@@ -31,7 +31,7 @@ type value = {
 }
 ```
 
-The value corresponding to the key can be seen as graph node structure that refers to the previous receipt hash and the next receipt hashes that use the key. Note that `next_receipt_hash` is a list because transactions can fork from other transactions. The node also holds the transaction that corresponds to the receipt hash. We can use the next receipt hashes to get the next graph nodes to iteratively create a Merkle list of transactions. Note that this graph structure is always acyclic since a hashing function should be collision-free.
+The value corresponding to the key can be seen as tree node structure that refers to the previous receipt hash and the next receipt hashes that use the key. Note that `next_receipt_hash` is a list because transactions can fork from other transactions. The node also holds the transaction that was last hashed to produce the key value. We can use the next receipt hashes to get the next tree nodes and iteratively create a Merkle list of transactions. Note that these nodes form an acyclic struct since a hashing function should be collision-free.
 
 The signature for this structure can look like the following:
 
