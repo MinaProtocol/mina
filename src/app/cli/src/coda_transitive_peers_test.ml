@@ -7,8 +7,7 @@ module Make
     (Ledger_proof : Ledger_proof_intf)
     (Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof.t)
     (Coda : Coda_intf.S with type ledger_proof = Ledger_proof.t) :
-  Integration_test_intf.S =
-struct
+  Integration_test_intf.S = struct
   let name = "coda-transitive-peers-test"
 
   module Coda_processes = Coda_processes.Make (Ledger_proof) (Kernel) (Coda)

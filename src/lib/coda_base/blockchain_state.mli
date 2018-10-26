@@ -31,13 +31,14 @@ end
 
 type value = t [@@deriving bin_io, sexp, eq, compare, hash]
 
-include Snarkable.S
-        with type var =
-                    ( Ledger_builder_hash.var
-                    , Frozen_ledger_hash.var
-                    , Block_time.Unpacked.var )
-                    t_
-         and type value := value
+include
+  Snarkable.S
+  with type var =
+              ( Ledger_builder_hash.var
+              , Frozen_ledger_hash.var
+              , Block_time.Unpacked.var )
+              t_
+   and type value := value
 
 module Hash = State_hash
 

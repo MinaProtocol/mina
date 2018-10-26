@@ -29,9 +29,8 @@ module type S = sig
     , Currency.Amount.var )
     t
 
-  include Snark_params.Tick.Snarkable.S
-          with type value := value
-           and type var := var
+  include
+    Snark_params.Tick.Snarkable.S with type value := value and type var := var
 
   val create_value :
        ?sok_digest:Sok_message.Digest.t
@@ -56,8 +55,7 @@ module type S = sig
 end
 
 module Make (Consensus_data : Consensus_data_intf) :
-  S with module Consensus_data = Consensus_data =
-struct
+  S with module Consensus_data = Consensus_data = struct
   module Consensus_data = Consensus_data
 
   type ('blockchain_state, 'consensus_data, 'sok_digest, 'supply_increase) t =
@@ -83,7 +81,7 @@ struct
     , Currency.Amount.var )
     t
 
-  let create_value ?(sok_digest= Sok_message.Digest.default) ?ledger_proof
+  let create_value ?(sok_digest = Sok_message.Digest.default) ?ledger_proof
       ~supply_increase ~blockchain_state ~consensus_data () =
     { blockchain_state
     ; consensus_data

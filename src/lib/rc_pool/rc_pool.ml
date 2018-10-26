@@ -29,8 +29,7 @@ end
 exception Free_unsaved_value
 
 module Make (Key : Hashable.S) (Data : Data_intf with type key := Key.t) :
-  S with type key := Key.t and type data := Data.t =
-struct
+  S with type key := Key.t and type data := Data.t = struct
   type t = (Data.t * int) Key.Table.t
 
   let create = Key.Table.create

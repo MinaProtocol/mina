@@ -12,10 +12,11 @@ end)
 (Kvdb : Intf.Key_value_database)
 (Sdb : Intf.Stack_database)
 (Storage_locations : Intf.Storage_locations) : sig
-  include Database_intf.S
-          with type account := Account.t
-           and type hash := Hash.t
-           and type key := Key.t
+  include
+    Database_intf.S
+    with type account := Account.t
+     and type hash := Hash.t
+     and type key := Key.t
 end = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   include Depth
@@ -52,10 +53,10 @@ end = struct
     end
 
     type t =
-      | Generic of Bigstring.t [@printer
-                                 fun fmt bstr ->
-                                   Format.pp_print_string fmt
-                                     (Bigstring.to_string bstr)]
+      | Generic of Bigstring.t
+          [@printer
+            fun fmt bstr ->
+              Format.pp_print_string fmt (Bigstring.to_string bstr)]
       | Account of Addr.t
       | Hash of Addr.t
     [@@deriving sexp]
@@ -82,9 +83,9 @@ end = struct
     let last_direction path =
       Direction.of_bool (Addr.get path (Addr.depth path - 1) <> 0)
 
-    let build_generic (data: Bigstring.t) : t = Generic data
+    let build_generic (data : Bigstring.t) : t = Generic data
 
-    let parse (str: Bigstring.t) : (t, unit) Result.t =
+    let parse (str : Bigstring.t) : (t, unit) Result.t =
       let prefix = Bigstring.get str 0 |> Char.to_int |> UInt8.of_int in
       let data = Bigstring.sub str ~pos:1 ~len:(Bigstring.length str - 1) in
       if prefix = Prefix.generic then Result.return (Generic data)
@@ -144,7 +145,7 @@ end = struct
       | Account path -> Account (Addr.sibling path)
       | Hash path -> Hash (Addr.sibling path)
 
-    let order_siblings (location: t) (base: 'a) (sibling: 'a) : 'a * 'a =
+    let order_siblings (location : t) (base : 'a) (sibling : 'a) : 'a * 'a =
       match last_direction (path location) with
       | Left -> (base, sibling)
       | Right -> (sibling, base)
@@ -255,7 +256,7 @@ end = struct
           in
           set_raw mdb location (Location.serialize first_location) ;
           Result.return first_location
-      | Some prev_location ->
+      | Some prev_location -> (
         match Location.parse prev_location with
         | Error () -> Error Malformed_database
         | Ok prev_account_location ->
@@ -264,7 +265,7 @@ end = struct
             |> Result.map ~f:(fun next_account_location ->
                    set_raw mdb location
                      (Location.serialize next_account_location) ;
-                   next_account_location )
+                   next_account_location ) )
 
     let allocate mdb key =
       let location_result =
@@ -295,7 +296,7 @@ end = struct
   module For_tests = struct
     let gen_account_location =
       let open Quickcheck.Let_syntax in
-      let build_account (path: Direction.t list) =
+      let build_account (path : Direction.t list) =
         assert (List.length path = Depth.depth) ;
         Location.Account (Addr.of_directions path)
       in
@@ -355,18 +356,17 @@ end = struct
     in
     List.rev_filter_map result ~f:Fn.id
 
-  let set_all_accounts_rooted_at_exn mdb address (accounts: Account.t list) =
+  let set_all_accounts_rooted_at_exn mdb address (accounts : Account.t list) =
     let first_node, last_node = Addr.Range.subtree_range address in
     Addr.Range.fold (first_node, last_node) ~init:accounts ~f:(fun bit_index ->
-        function
+      function
       | head :: tail ->
           set mdb (Location.Account bit_index) head ;
           tail
       | [] -> [] )
     |> ignore
 
-  module C :
-    Container.S0 with type t := t and type elt := Account.t =
+  module C : Container.S0 with type t := t and type elt := Account.t =
   Container.Make0 (struct
     module Elt = Account
 

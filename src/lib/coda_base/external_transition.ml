@@ -28,8 +28,7 @@ end)
 (Protocol_state : Protocol_state.S) :
   S
   with module Protocol_state = Protocol_state
-   and module Ledger_builder_diff = Ledger_builder_diff =
-struct
+   and module Ledger_builder_diff = Ledger_builder_diff = struct
   module Protocol_state = Protocol_state
   module Ledger_builder_diff = Ledger_builder_diff
 

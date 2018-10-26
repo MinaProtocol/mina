@@ -31,8 +31,7 @@ module Make (Inputs : Inputs_intf) :
    and type completed_work_statement := Inputs.Completed_work.Statement.t
    and type completed_work_checked := Inputs.Completed_work.Checked.t
    and type time_controller := Inputs.Time.Controller.t
-   and type keypair := Inputs.Keypair.t =
-struct
+   and type keypair := Inputs.Keypair.t = struct
   open Inputs
   open Consensus_mechanism
 
@@ -213,8 +212,8 @@ struct
             !"Signer got initial change with tip %{sexp: Tip.t}"
             initial_tip ;
           Linear_pipe.fold change_feeder
-            ~init:(schedule_transition initial_tip) ~f:
-            (fun scheduled_transition (Tip_change tip) ->
+            ~init:(schedule_transition initial_tip)
+            ~f:(fun scheduled_transition (Tip_change tip) ->
               ( match Time.Timeout.peek scheduled_transition with
               | None | Some None ->
                   Time.Timeout.cancel time_controller scheduled_transition None

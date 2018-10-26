@@ -18,10 +18,10 @@ module Account = struct
   [@@deriving bin_io, eq, show, fields]
 
   let sexp_of_t {public_key; balance} =
-    [%sexp_of : string * string] (public_key, Balance.to_string balance)
+    [%sexp_of: string * string] (public_key, Balance.to_string balance)
 
   let t_of_sexp sexp =
-    let public_key, string_balance = [%of_sexp : string * string] sexp in
+    let public_key, string_balance = [%of_sexp: string * string] sexp in
     let balance = Balance.of_string string_balance in
     {public_key; balance}
 

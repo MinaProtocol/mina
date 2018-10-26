@@ -83,16 +83,16 @@ end = struct
         ~var_of_hlist:(fun Snarky.H_list.([normal; fee_transfer; coinbase]) ->
           {normal; fee_transfer; coinbase} )
         ~value_to_hlist:(function
-            | Normal -> [true; false; false]
-            | Fee_transfer -> [false; true; false]
-            | Coinbase -> [false; false; true])
+          | Normal -> [true; false; false]
+          | Fee_transfer -> [false; true; false]
+          | Coinbase -> [false; false; true])
         ~value_of_hlist:
           Snarky.H_list.(
             function
-              | [true; false; false] -> Normal
-              | [false; true; false] -> Fee_transfer
-              | [false; false; true] -> Coinbase
-              | _ -> assert false)
+            | [true; false; false] -> Normal
+            | [false; true; false] -> Fee_transfer
+            | [false; false; true] -> Coinbase
+            | _ -> assert false)
     in
     let check ({normal; fee_transfer; coinbase} as t) =
       let open Let_syntax in
@@ -110,9 +110,9 @@ end = struct
         ; coinbase= Boolean.false_ }
       in
       function
-        | Normal -> {all_false with normal= Boolean.true_}
-        | Fee_transfer -> {all_false with fee_transfer= Boolean.true_}
-        | Coinbase -> {all_false with coinbase= Boolean.true_}
+      | Normal -> {all_false with normal= Boolean.true_}
+      | Fee_transfer -> {all_false with fee_transfer= Boolean.true_}
+      | Coinbase -> {all_false with coinbase= Boolean.true_}
 
     let normal = constant Normal
 
@@ -145,7 +145,7 @@ module Tagged_transaction = struct
 
   let typ : (var, t) Typ.t = Typ.(Tag.typ * Transaction.typ)
 
-  let excess ((tag, t): t) =
+  let excess ((tag, t) : t) =
     match tag with
     | Normal ->
         Amount.Signed.create ~sgn:Sgn.Pos
@@ -161,7 +161,7 @@ module Tagged_transaction = struct
         ) ;
         Currency.Amount.Signed.zero
 
-  let supply_increase ((tag, _t): t) =
+  let supply_increase ((tag, _t) : t) =
     match tag with
     | Normal | Fee_transfer -> Amount.zero
     | Coinbase -> Protocols.Coda_praos.coinbase_amount
@@ -173,7 +173,7 @@ module Tagged_transaction = struct
       ; supply_increase: Amount.var }
 
     (* Someday: Have a more structured "case" construct *)
-    let changes ((tag, t): var) =
+    let changes ((tag, t) : var) =
       with_label __LOC__
         (let open Let_syntax in
         let if_ cond ~then_:(t1, t2) ~else_:(e1, e2) =
@@ -452,8 +452,9 @@ module Base = struct
   *)
   (* Nonce should only be incremented if it is a "Normal" transaction. *)
   let apply_tagged_transaction (type shifted)
-      (shifted: (module Inner_curve.Checked.Shifted.S with type t = shifted))
-      root ((tag, {sender; signature; payload}) as txn: Tagged_transaction.var) =
+      (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
+      root
+      ((tag, {sender; signature; payload}) as txn : Tagged_transaction.var) =
     with_label __LOC__
       ( if not Insecure.transaction_replay then
           failwith "Insecure.transaction_replay false" ;
@@ -513,8 +514,8 @@ module Base = struct
         in
         (* we explicitly set the public_key because it could be zero if the account is new *)
         let%map root =
-          Frozen_ledger_hash.modify_account_recv root receiver ~f:
-            (fun account ->
+          Frozen_ledger_hash.modify_account_recv root receiver
+            ~f:(fun account ->
               let%map balance = Balance.Checked.(account.balance + amount) in
               {account with balance; public_key= receiver} )
         in
@@ -585,7 +586,7 @@ module Base = struct
   let create_keys () = generate_keypair main ~exposing:(tick_input ())
 
   let tagged_transaction_proof ~proving_key sok_digest state1 state2
-      (transaction: Tagged_transaction.t) handler =
+      (transaction : Tagged_transaction.t) handler =
     let prover_state : Prover_state.t =
       {state1; state2; transaction; sok_digest}
     in
@@ -688,7 +689,7 @@ module Merge = struct
     + Amount.length_in_triples + Amount.Signed.length_in_triples
 
   let construct_input_checked ~prefix
-      ~(sok_digest: Sok_message.Digest.Checked.t) ~state1 ~state2
+      ~(sok_digest : Sok_message.Digest.Checked.t) ~state1 ~state2
       ~supply_increase ~fee_excess ?tock_vk () =
     let prefix_section =
       Pedersen.Checked.Section.create ~acc:prefix
@@ -770,10 +771,10 @@ module Merge = struct
      verify_transition tock_vk _ s1 s2 is true
      verify_transition tock_vk _ s2 s3 is true
   *)
-  let main (top_hash: Pedersen.Checked.Digest.var) =
+  let main (top_hash : Pedersen.Checked.Digest.var) =
     let%bind tock_vk =
-      provide_witness' Verifier.Verification_key.typ ~f:
-        (fun {Prover_state.tock_vk; _} ->
+      provide_witness' Verifier.Verification_key.typ
+        ~f:(fun {Prover_state.tock_vk; _} ->
           Verifier.Verification_key.of_verification_key tock_vk )
     and s1 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash1
     and s2 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash2
@@ -993,11 +994,11 @@ module Verification = struct
         then digest
         else
           failwithf
-            !"%d = Hash_prefix.length_in_triples aka %d\n            \
-              + Sok_message.Digest.length_in_triples aka %d\n\
-              + (2 * Frozen_ledger_hash.length_in_triples) aka %d \n            \
-              + Amount.length aka %d + Amount.Signed.length aka %d + \
-              List.length wrap_vk_triples aka %d ) aka %d"
+            !"%d = Hash_prefix.length_in_triples aka %d\n\
+             \            + Sok_message.Digest.length_in_triples aka %d\n\
+              + (2 * Frozen_ledger_hash.length_in_triples) aka %d \n\
+             \            + Amount.length aka %d + Amount.Signed.length aka \
+              %d + List.length wrap_vk_triples aka %d ) aka %d"
             n Hash_prefix.length_in_triples
             Sok_message.Digest.length_in_triples
             (2 * Frozen_ledger_hash.length_in_triples)
@@ -1061,7 +1062,7 @@ struct
    constraints pass iff
    (b1, b2, .., bn) = unpack input,
    there is a proof making one of [ base_vk; merge_vk ] accept (b1, b2, .., bn) *)
-  let main (input: Wrap_input.var) =
+  let main (input : Wrap_input.var) =
     let open Let_syntax in
     with_label __LOC__
       (let%bind input = Wrap_input.Checked.to_scalar input in
@@ -1166,7 +1167,7 @@ let check_tagged_transaction sok_message source target transaction handler =
   in
   Or_error.ok_exn (run_and_check main prover_state) |> ignore
 
-let check_transition ~sok_message ~source ~target (t: Transition.t) handler =
+let check_transition ~sok_message ~source ~target (t : Transition.t) handler =
   check_tagged_transaction sok_message source target
     (Transition.to_tagged_transaction t)
     handler
@@ -1327,7 +1328,7 @@ module Keys = struct
     let checksum ~base ~merge ~wrap =
       checksum ~prefix:"verification" ~base ~merge ~wrap
 
-    let load ({merge; base; wrap}: Location.t) =
+    let load ({merge; base; wrap} : Location.t) =
       let open Storage in
       let parent_log = Logger.create () in
       let tick_controller =
@@ -1361,7 +1362,7 @@ module Keys = struct
     let checksum ~base ~merge ~wrap =
       checksum ~prefix:"proving" ~base ~merge ~wrap
 
-    let load ({merge; base; wrap}: Location.t) =
+    let load ({merge; base; wrap} : Location.t) =
       let open Storage in
       let parent_log = Logger.create () in
       let tick_controller =
@@ -1405,7 +1406,7 @@ module Keys = struct
     type t = {proving: Md5.t; verification: Md5.t}
   end
 
-  let load ({proving; verification}: Location.t) =
+  let load ({proving; verification} : Location.t) =
     let open Async in
     let%map proving, proving_checksum = Proving.load proving
     and verification, verification_checksum = Verification.load verification in
@@ -1605,7 +1606,7 @@ let%test_module "transaction_snark" =
               (t1 :> Transaction.t)
           in
           Ledger.apply_transaction ledger t1 |> Or_error.ok_exn |> ignore ;
-          [%test_eq : Frozen_ledger_hash.t]
+          [%test_eq: Frozen_ledger_hash.t]
             (Ledger.merkle_root ledger)
             (Sparse_ledger.merkle_root sparse_ledger) ;
           let proof23 =
@@ -1617,7 +1618,7 @@ let%test_module "transaction_snark" =
               (t2 :> Transaction.t)
           in
           Ledger.apply_transaction ledger t2 |> Or_error.ok_exn |> ignore ;
-          [%test_eq : Frozen_ledger_hash.t]
+          [%test_eq: Frozen_ledger_hash.t]
             (Ledger.merkle_root ledger)
             (Sparse_ledger.merkle_root sparse_ledger) ;
           let total_fees =

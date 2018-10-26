@@ -19,19 +19,19 @@ type t =
   | True
   | False
 
-let eval_sexp_expr e (m: Logger.Message.t) =
+let eval_sexp_expr e (m : Logger.Message.t) =
   match e with
   | Null -> None
   | Attribute s -> Map.find m.attributes s
-  | Int n -> Some ([%sexp_of : int] n)
-  | String s -> Some ([%sexp_of : string] s)
+  | Int n -> Some ([%sexp_of: int] n)
+  | String s -> Some ([%sexp_of: string] s)
   | Sexp s -> Some s
-  | Host -> Some ([%sexp_of : string] m.host)
-  | Pid -> Some ([%sexp_of : Pid.t] m.pid)
-  | Level -> Some ([%sexp_of : Logger.Level.t] m.level)
-  | Level_literal l -> Some ([%sexp_of : Logger.Level.t] l)
+  | Host -> Some ([%sexp_of: string] m.host)
+  | Pid -> Some ([%sexp_of: Pid.t] m.pid)
+  | Level -> Some ([%sexp_of: Logger.Level.t] m.level)
+  | Level_literal l -> Some ([%sexp_of: Logger.Level.t] l)
 
-let rec eval t (m: Logger.Message.t) =
+let rec eval t (m : Logger.Message.t) =
   match t with
   | True -> true
   | False -> false

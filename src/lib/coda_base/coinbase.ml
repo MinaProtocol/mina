@@ -16,7 +16,8 @@ let is_valid {proposer= _; amount; fee_transfer} =
   | None -> true
   | Some (_, fee) -> Currency.Amount.(of_fee fee <= amount)
 
-include Binable.Of_binable (T)
+include Binable.Of_binable
+          (T)
           (struct
             type nonrec t = t
 

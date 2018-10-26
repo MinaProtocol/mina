@@ -57,11 +57,11 @@ module Transaction = struct
       module type of Transaction
       with module With_valid_signature := Transaction.With_valid_signature )
 
-  let fee (t: t) = t.payload.Transaction.Payload.fee
+  let fee (t : t) = t.payload.Transaction.Payload.fee
 
-  let receiver (t: t) = t.payload.receiver
+  let receiver (t : t) = t.payload.receiver
 
-  let sender (t: t) = Public_key.compress t.sender
+  let sender (t : t) = Public_key.compress t.sender
 
   let seed = Secure_random.string ()
 
@@ -118,19 +118,17 @@ end
 
 module Make_kernel
     (Ledger_proof : Ledger_proof_intf)
-      (Make_consensus_mechanism : functor (Ledger_builder_diff :sig
-                                                                  
-                                                                  type t
-                                                                  [@@deriving
-                                                                    sexp
-                                                                    , bin_io]
-      end) -> Consensus.Mechanism.S
-              with type Internal_transition.Ledger_builder_diff.t =
-                          Ledger_builder_diff.t
-               and type External_transition.Ledger_builder_diff.t =
-                          Ledger_builder_diff.t) :
-  Kernel_intf with type Ledger_proof.t = Ledger_proof.t =
-struct
+      (Make_consensus_mechanism : functor
+        (Ledger_builder_diff :sig
+                              
+                              type t [@@deriving sexp, bin_io]
+                            end)
+        -> Consensus.Mechanism.S
+           with type Internal_transition.Ledger_builder_diff.t =
+                       Ledger_builder_diff.t
+            and type External_transition.Ledger_builder_diff.t =
+                       Ledger_builder_diff.t) :
+  Kernel_intf with type Ledger_proof.t = Ledger_proof.t = struct
   module Ledger_proof = Ledger_proof
   module Completed_work =
     Ledger_builder.Make_completed_work (Public_key.Compressed) (Ledger_proof)
@@ -230,7 +228,7 @@ let make_init ~should_propose (type ledger_proof) (module Config : Config_intf)
                         , Inputs.Sparse_ledger.t
                         , Inputs.Ledger_proof.t )
                         Snark_work_lib.Work.Single.Spec.t =
-          Work_selector.Sequence.Make (Inputs)
+            Work_selector.Sequence.Make (Inputs)
         end )
     | Random ->
         ( module struct
@@ -243,7 +241,7 @@ let make_init ~should_propose (type ledger_proof) (module Config : Config_intf)
                         , Inputs.Sparse_ledger.t
                         , Inputs.Ledger_proof.t )
                         Snark_work_lib.Work.Single.Spec.t =
-          Work_selector.Random.Make (Inputs)
+            Work_selector.Random.Make (Inputs)
         end )
   in
   let module Init = struct
@@ -263,9 +261,10 @@ module type State_proof_intf = sig
 
   type t [@@deriving bin_io, sexp]
 
-  include Protocols.Coda_pow.Proof_intf
-          with type input := Consensus_mechanism.Protocol_state.value
-           and type t := t
+  include
+    Protocols.Coda_pow.Proof_intf
+    with type input := Consensus_mechanism.Protocol_state.value
+     and type t := t
 end
 
 module Make_inputs0
@@ -581,7 +580,8 @@ struct
     open Snark_work_lib.Work
 
     let add_completed_work t
-        (res: (('a, 'b, 'c, 'd) Single.Spec.t Spec.t, Ledger_proof.t) Result.t) =
+        (res :
+          (('a, 'b, 'c, 'd) Single.Spec.t Spec.t, Ledger_proof.t) Result.t) =
       apply_and_broadcast t
         (Add_solved_work
            ( List.map res.spec.instances ~f:Single.Spec.statement
@@ -608,7 +608,7 @@ struct
       (struct
         include Ledger_hash
 
-        let to_hash (h: t) =
+        let to_hash (h : t) =
           Merkle_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
       end)
       (struct
@@ -697,7 +697,7 @@ struct
 
     module Prover = struct
       let prove ~prev_state ~prev_state_proof ~next_state
-          (transition: Init.Consensus_mechanism.Internal_transition.t) =
+          (transition : Init.Consensus_mechanism.Internal_transition.t) =
         match Init.proposer_prover with
         | `Non_proposer -> failwith "prove: Coda not run as proposer"
         | `Proposer prover ->
@@ -727,8 +727,8 @@ struct
   module Work_selector = Make_work_selector (Work_selector_inputs)
 
   let request_work ~best_ledger_builder
-      ~(seen_jobs: 'a -> Work_selector.State.t)
-      ~(set_seen_jobs: 'a -> Work_selector.State.t -> unit) (t: 'a) =
+      ~(seen_jobs : 'a -> Work_selector.State.t)
+      ~(set_seen_jobs : 'a -> Work_selector.State.t -> unit) (t : 'a) =
     let lb = best_ledger_builder t in
     let instances, seen_jobs = Work_selector.work lb (seen_jobs t) in
     set_seen_jobs t seen_jobs ;
@@ -1002,7 +1002,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let ledger_proof t = ledger_builder_ledger_proof t
   end
 
-  let get_balance t (addr: Public_key.Compressed.t) =
+  let get_balance t (addr : Public_key.Compressed.t) =
     let open Option.Let_syntax in
     let ledger = best_ledger t in
     let%bind location = Ledger.location_of_key ledger addr in
@@ -1024,7 +1024,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
            ( Account.balance account |> Currency.Balance.to_int
            , string_of_public_key account ) )
 
-  let is_valid_transaction t (txn: Transaction.t) =
+  let is_valid_transaction t (txn : Transaction.t) =
     let remainder =
       let open Option.Let_syntax in
       let%bind balance = get_balance t (Public_key.compress txn.sender)
@@ -1055,7 +1055,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let schedule_transactions log t txns =
     List.iter txns ~f:(schedule_transaction log t)
 
-  let get_nonce t (addr: Public_key.Compressed.t) =
+  let get_nonce t (addr : Public_key.Compressed.t) =
     let open Option.Let_syntax in
     let ledger = best_ledger t in
     let%bind location = Ledger.location_of_key ledger addr in
@@ -1067,13 +1067,13 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let get_status t =
     let ledger = best_ledger t in
     let ledger_merkle_root =
-      Ledger.merkle_root ledger |> [%sexp_of : Ledger_hash.t] |> Sexp.to_string
+      Ledger.merkle_root ledger |> [%sexp_of: Ledger_hash.t] |> Sexp.to_string
     in
     let num_accounts = Ledger.num_accounts ledger in
     let state = best_protocol_state t in
     let state_hash =
       Consensus_mechanism.Protocol_state.hash state
-      |> [%sexp_of : State_hash.t] |> Sexp.to_string
+      |> [%sexp_of: State_hash.t] |> Sexp.to_string
     in
     let block_count =
       state |> Consensus_mechanism.Protocol_state.consensus_state
@@ -1106,8 +1106,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   let get_lite_chain :
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =
-    Option.map Consensus_mechanism.Consensus_state.to_lite ~f:
-      (fun consensus_state_to_lite t pks ->
+    Option.map Consensus_mechanism.Consensus_state.to_lite
+      ~f:(fun consensus_state_to_lite t pks ->
         let ledger, state, proof = best_tip t in
         let ledger =
           List.fold pks
@@ -1141,7 +1141,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   let clear_hist_status t = Perf_histograms.wipe () ; get_status t
 
-  let setup_local_server ?(client_whitelist= []) ?rest_server_port ~coda ~log
+  let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda ~log
       ~client_port () =
     let client_whitelist =
       Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_whitelist)
@@ -1175,7 +1175,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             ) ;
             return r )
       ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc
-          (fun () (work: Snark_worker.Work.Result.t) ->
+          (fun () (work : Snark_worker.Work.Result.t) ->
             Logger.info log
               !"Submit_work: %{sexp:Snark_worker.Work.Spec.t}"
               work.spec ;
@@ -1239,7 +1239,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                      Logger.error log "%s" (Exn.to_string_mach exn) ;
                      Deferred.unit )) ))
 
-  let create_snark_worker ~log ~public_key ~client_port ~shutdown_on_disconnect =
+  let create_snark_worker ~log ~public_key ~client_port ~shutdown_on_disconnect
+      =
     let open Snark_worker_lib in
     let%map p =
       let our_binary = Sys.executable_name in

@@ -111,8 +111,8 @@ let%test_module "network pool test" =
       let command = Snark_pool_diff.Add_solved_work (work, priced_proof) in
       (fun () ->
         don't_wait_for
-        @@ Linear_pipe.iter (Mock_network_pool.broadcasts network_pool) ~f:
-             (fun _ ->
+        @@ Linear_pipe.iter (Mock_network_pool.broadcasts network_pool)
+             ~f:(fun _ ->
                let pool = Mock_network_pool.pool network_pool in
                ( match Mock_snark_pool.request_proof pool 1 with
                | Some {proof; fee= _} -> assert (proof = priced_proof.proof)
@@ -136,8 +136,8 @@ let%test_module "network pool test" =
             ~incoming_diffs:work_diffs
         in
         don't_wait_for
-        @@ Linear_pipe.iter (Mock_network_pool.broadcasts network_pool) ~f:
-             (fun work_command ->
+        @@ Linear_pipe.iter (Mock_network_pool.broadcasts network_pool)
+             ~f:(fun work_command ->
                let work =
                  match work_command
                  with Snark_pool_diff.Add_solved_work (work, _) -> work

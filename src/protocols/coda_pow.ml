@@ -928,7 +928,6 @@ Merge Snark:
       p23 verifies s2 -> s3 is a valid transition with fee_excess23
       fee_excess_total = fee_excess12 + fee_excess23
   *)
-
   module Time_close_validator :
     Time_close_validator_intf with type time := Time.t
 
@@ -1014,13 +1013,15 @@ module Make
     (Inputs : Inputs_intf)
     (Block_state_transition_proof : Block_state_transition_proof_intf
                                     with type protocol_state :=
-                                                Inputs.Consensus_mechanism.
-                                                Protocol_state.value
+                                                Inputs.Consensus_mechanism
+                                                .Protocol_state
+                                                .value
                                      and type protocol_state_proof :=
                                                 Inputs.Protocol_state_proof.t
                                      and type internal_transition :=
-                                                Inputs.Consensus_mechanism.
-                                                Internal_transition.t) =
+                                                Inputs.Consensus_mechanism
+                                                .Internal_transition
+                                                .t) =
 struct
   open Inputs
 

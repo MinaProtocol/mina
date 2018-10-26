@@ -29,9 +29,9 @@ end
 
 let default_external_port = 8302
 
-let daemon (type ledger_proof) (module Kernel
-    : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
-    : Coda_intf with type ledger_proof = ledger_proof) log =
+let daemon (type ledger_proof)
+    (module Kernel : Kernel_intf with type Ledger_proof.t = ledger_proof)
+    (module Coda : Coda_intf with type ledger_proof = ledger_proof) log =
   let open Command.Let_syntax in
   Command.async ~summary:"Coda daemon"
     (let%map_open conf_dir =
@@ -127,8 +127,8 @@ let daemon (type ledger_proof) (module Kernel
              Logger.warn log "failed to read daemon.json, not using it" ;
              None
        in
-       let maybe_from_config (type a) (f: YJ.json -> a option)
-           (keyname: string) (actual_value: a option) : a option =
+       let maybe_from_config (type a) (f : YJ.json -> a option)
+           (keyname : string) (actual_value : a option) : a option =
          let open Option.Let_syntax in
          let open YJ.Util in
          match actual_value with
@@ -191,19 +191,19 @@ let daemon (type ledger_proof) (module Kernel
        let%bind initial_peers_raw =
          match peers with
          | _ :: _ -> return peers
-         | [] ->
+         | [] -> (
              let peers_path = conf_dir ^/ "peers" in
              match%bind
-               Reader.load_sexp peers_path [%of_sexp : Host_and_port.t list]
+               Reader.load_sexp peers_path [%of_sexp: Host_and_port.t list]
              with
              | Ok ls -> return ls
              | Error e ->
                  let default_initial_peers = [] in
                  let%map () =
                    Writer.save_sexp peers_path
-                     ([%sexp_of : Host_and_port.t list] default_initial_peers)
+                     ([%sexp_of: Host_and_port.t list] default_initial_peers)
                  in
-                 []
+                 [] )
        in
        let%bind initial_peers =
          Deferred.List.filter_map ~how:(`Max_concurrent_jobs 8)
@@ -241,7 +241,7 @@ let daemon (type ledger_proof) (module Kernel
        let%bind client_whitelist =
          Reader.load_sexp
            (conf_dir ^/ "client_whitelist")
-           [%of_sexp : Unix.Inet_addr.Blocking_sexp.t list]
+           [%of_sexp: Unix.Inet_addr.Blocking_sexp.t list]
          >>| Or_error.ok
        in
        let keypair =
@@ -278,8 +278,8 @@ let daemon (type ledger_proof) (module Kernel
        let%bind () =
          let open M in
          let run_snark_worker_action =
-           Option.value_map run_snark_worker_flag ~default:`Don't_run ~f:
-             (fun k -> `With_public_key k )
+           Option.value_map run_snark_worker_flag ~default:`Don't_run
+             ~f:(fun k -> `With_public_key k )
          in
          let banlist_dir_name = conf_dir ^/ "banlist" in
          let%bind () = Async.Unix.mkdir ~p:() banlist_dir_name in
@@ -352,7 +352,7 @@ let () =
              minutes" ;
           try_later recheck_soon ;
           Deferred.unit
-      | Ok (resp, body) ->
+      | Ok (resp, body) -> (
           if resp.status <> `OK then (
             try_later recheck_soon ;
             Logger.error log
@@ -388,7 +388,7 @@ let () =
                   List.exists valid_ids ~f:(fun remote_id ->
                       Git_sha.equal sha remote_id )
                 then ( try_later recheck_later ; Deferred.unit )
-                else finish commit_id body_string
+                else finish commit_id body_string )
     else Deferred.unit
   in
   ensure_testnet_id_still_good () |> don't_wait_for ;
@@ -472,8 +472,8 @@ let () =
                     with _ -> None )
 
               let coinbase =
-                env "COINBASE" ~default:(Currency.Amount.of_int 20) ~f:
-                  (fun str ->
+                env "COINBASE" ~default:(Currency.Amount.of_int 20)
+                  ~f:(fun str ->
                     try Some (Currency.Amount.of_int @@ Int.of_string str)
                     with _ -> None )
 
@@ -489,8 +489,8 @@ let () =
                     try Some (Int.of_string str) with _ -> None )
 
               let probable_slots_per_transition_count =
-                env "PROBABLE_SLOTS_PER_TRANSITION_COUNT" ~default:8 ~f:
-                  (fun str -> try Some (Int.of_string str) with _ -> None )
+                env "PROBABLE_SLOTS_PER_TRANSITION_COUNT" ~default:8
+                  ~f:(fun str -> try Some (Int.of_string str) with _ -> None )
 
               (* Conservatively pick 1seconds *)
               let expected_network_delay =
@@ -508,7 +508,8 @@ let () =
     in
     if Insecure.with_snark then
       let module Kernel =
-        Make_kernel (Ledger_proof.Prod) (Consensus_mechanism.Make) in
+        Make_kernel (Ledger_proof.Prod) (Consensus_mechanism.Make)
+      in
       let module Coda = struct
         type ledger_proof = Transaction_snark.t
 
@@ -520,36 +521,42 @@ let () =
       ("daemon", daemon (module Kernel) (module Coda) log)
       ::
       ( if Insecure.integration_tests then
-          let module Coda_peers_test =
-            Coda_peers_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
-          let module Coda_block_production_test =
-            Coda_block_production_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
-          let module Coda_shared_prefix_test =
-            Coda_shared_prefix_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
-          let module Coda_restart_node_test =
-            Coda_restart_node_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
-          let module Coda_shared_state_test =
-            Coda_shared_state_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
-          let module Coda_transitive_peers_test =
-            Coda_transitive_peers_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
-          let group =
-            Command.group ~summary:"Integration tests"
-              [ (Coda_peers_test.name, Coda_peers_test.command)
-              ; ( Coda_block_production_test.name
-                , Coda_block_production_test.command )
-              ; (Coda_shared_state_test.name, Coda_shared_state_test.command)
-              ; ( Coda_transitive_peers_test.name
-                , Coda_transitive_peers_test.command )
-              ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
-              ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
-              ; ("full-test", Full_test.command (module Kernel) (module Coda))
-              ]
-          in
-          [("integration-tests", group)]
+        let module Coda_peers_test =
+          Coda_peers_test.Make (Ledger_proof.Prod) (Kernel) (Coda)
+        in
+        let module Coda_block_production_test =
+          Coda_block_production_test.Make (Ledger_proof.Prod) (Kernel) (Coda)
+        in
+        let module Coda_shared_prefix_test =
+          Coda_shared_prefix_test.Make (Ledger_proof.Prod) (Kernel) (Coda)
+        in
+        let module Coda_restart_node_test =
+          Coda_restart_node_test.Make (Ledger_proof.Prod) (Kernel) (Coda)
+        in
+        let module Coda_shared_state_test =
+          Coda_shared_state_test.Make (Ledger_proof.Prod) (Kernel) (Coda)
+        in
+        let module Coda_transitive_peers_test =
+          Coda_transitive_peers_test.Make (Ledger_proof.Prod) (Kernel) (Coda)
+        in
+        let group =
+          Command.group ~summary:"Integration tests"
+            [ (Coda_peers_test.name, Coda_peers_test.command)
+            ; ( Coda_block_production_test.name
+              , Coda_block_production_test.command )
+            ; (Coda_shared_state_test.name, Coda_shared_state_test.command)
+            ; ( Coda_transitive_peers_test.name
+              , Coda_transitive_peers_test.command )
+            ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
+            ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
+            ; ("full-test", Full_test.command (module Kernel) (module Coda)) ]
+        in
+        [("integration-tests", group)]
       else [] )
     else
       let module Kernel =
-        Make_kernel (Ledger_proof.Debug) (Consensus_mechanism.Make) in
+        Make_kernel (Ledger_proof.Debug) (Consensus_mechanism.Make)
+      in
       let module Coda = struct
         type ledger_proof = Ledger_proof.Debug.t
 
@@ -561,35 +568,39 @@ let () =
       ("daemon", daemon (module Kernel) (module Coda) log)
       ::
       ( if Insecure.integration_tests then
-          let module Coda_peers_test =
-            Coda_peers_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
-          let module Coda_block_production_test =
-            Coda_block_production_test.Make (Ledger_proof.Debug) (Kernel)
-              (Coda) in
-          let module Coda_shared_prefix_test =
-            Coda_shared_prefix_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
-          let module Coda_restart_node_test =
-            Coda_restart_node_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
-          let module Coda_shared_state_test =
-            Coda_shared_state_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
-          let module Coda_transitive_peers_test =
-            Coda_transitive_peers_test.Make (Ledger_proof.Debug) (Kernel)
-              (Coda) in
-          let group =
-            Command.group ~summary:"Integration tests"
-              [ (Coda_peers_test.name, Coda_peers_test.command)
-              ; ( Coda_block_production_test.name
-                , Coda_block_production_test.command )
-              ; (Coda_shared_state_test.name, Coda_shared_state_test.command)
-              ; ( Coda_transitive_peers_test.name
-                , Coda_transitive_peers_test.command )
-              ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
-              ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
-              ; ("full-test", Full_test.command (module Kernel) (module Coda))
-              ; ( "transaction-snark-profiler"
-                , Transaction_snark_profiler.command ) ]
-          in
-          [("integration-tests", group)]
+        let module Coda_peers_test =
+          Coda_peers_test.Make (Ledger_proof.Debug) (Kernel) (Coda)
+        in
+        let module Coda_block_production_test =
+          Coda_block_production_test.Make (Ledger_proof.Debug) (Kernel) (Coda)
+        in
+        let module Coda_shared_prefix_test =
+          Coda_shared_prefix_test.Make (Ledger_proof.Debug) (Kernel) (Coda)
+        in
+        let module Coda_restart_node_test =
+          Coda_restart_node_test.Make (Ledger_proof.Debug) (Kernel) (Coda)
+        in
+        let module Coda_shared_state_test =
+          Coda_shared_state_test.Make (Ledger_proof.Debug) (Kernel) (Coda)
+        in
+        let module Coda_transitive_peers_test =
+          Coda_transitive_peers_test.Make (Ledger_proof.Debug) (Kernel) (Coda)
+        in
+        let group =
+          Command.group ~summary:"Integration tests"
+            [ (Coda_peers_test.name, Coda_peers_test.command)
+            ; ( Coda_block_production_test.name
+              , Coda_block_production_test.command )
+            ; (Coda_shared_state_test.name, Coda_shared_state_test.command)
+            ; ( Coda_transitive_peers_test.name
+              , Coda_transitive_peers_test.command )
+            ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
+            ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
+            ; ("full-test", Full_test.command (module Kernel) (module Coda))
+            ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
+            ]
+        in
+        [("integration-tests", group)]
       else [] )
   in
   let internal_commands =

@@ -30,8 +30,7 @@ module Make (Inputs : Inputs_intf) :
   with type Internal_transition.Ledger_builder_diff.t =
               Inputs.Ledger_builder_diff.t
    and type External_transition.Ledger_builder_diff.t =
-              Inputs.Ledger_builder_diff.t =
-struct
+              Inputs.Ledger_builder_diff.t = struct
   open Inputs
   module Ledger_builder_diff = Ledger_builder_diff
 
@@ -155,7 +154,7 @@ struct
     in
     Some (protocol_state, consensus_transition_data)
 
-  let is_transition_valid_checked (transition: Snark_transition.var) =
+  let is_transition_valid_checked (transition : Snark_transition.var) =
     let Consensus_transition_data.({signature}) =
       Snark_transition.consensus_data transition
     in
@@ -169,7 +168,7 @@ struct
       (Public_key.var_of_t Global_public_key.t)
       (transition |> Snark_transition.blockchain_state)
 
-  let next_state_checked (state: Consensus_state.var) _state_hash _block =
+  let next_state_checked (state : Consensus_state.var) _state_hash _block =
     let open Consensus_state in
     let open Snark_params.Tick.Let_syntax in
     let%bind length = Length.increment_var state.length in

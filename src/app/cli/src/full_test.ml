@@ -6,9 +6,10 @@ open Signature_lib
 
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
-let run_test (type ledger_proof) (module Kernel
-    : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
-    : Coda_intf.S with type ledger_proof = ledger_proof) : unit Deferred.t =
+let run_test (type ledger_proof)
+    (module Kernel : Kernel_intf with type Ledger_proof.t = ledger_proof)
+    (module Coda : Coda_intf.S with type ledger_proof = ledger_proof) :
+    unit Deferred.t =
   Parallel.init_master () ;
   let log = Logger.create () in
   let%bind temp_conf_dir =
@@ -75,7 +76,7 @@ let run_test (type ledger_proof) (module Kernel
          ~keypair () ~banlist)
   in
   don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers coda)) ;
-  let wait_until_cond ~(f: t -> bool) ~(timeout: Float.t) =
+  let wait_until_cond ~(f : t -> bool) ~(timeout : Float.t) =
     let rec go () =
       if f coda then return ()
       else
@@ -232,9 +233,9 @@ let run_test (type ledger_proof) (module Kernel
     let%bind _ = test_multiple_txns rest_accounts rest_pks 3. in
     test_duplicate_txns new_sender_sk
 
-let command (type ledger_proof) (module Kernel
-    : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
-    : Coda_intf.S with type ledger_proof = ledger_proof) =
+let command (type ledger_proof)
+    (module Kernel : Kernel_intf with type Ledger_proof.t = ledger_proof)
+    (module Coda : Coda_intf.S with type ledger_proof = ledger_proof) =
   let open Core in
   let open Async in
   Command.async ~summary:"Full coda end-to-end test"

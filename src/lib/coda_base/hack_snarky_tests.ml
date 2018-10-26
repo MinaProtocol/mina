@@ -21,7 +21,9 @@ let%test_module "merkle_tree" =
     let%test "length" = List.length (to_list tree) = n
 
     let%test_unit "key_retrieval" =
-      for i = 0 to n - 1 do assert (get_exn tree i = i) done
+      for i = 0 to n - 1 do
+        assert (get_exn tree i = i)
+      done
 
     let%test "key_nonexist" = None = get tree n
 

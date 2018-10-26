@@ -37,8 +37,7 @@ module type Coda_intf = sig
 end
 
 module Chain (Program : Coda_intf) :
-  Web_client_pipe.Chain_intf with type data = Program.t =
-struct
+  Web_client_pipe.Chain_intf with type data = Program.t = struct
   open Program
 
   type data = t
@@ -66,7 +65,8 @@ module Make_broadcaster
     (Put_request : Web_client_pipe.Put_request_intf) =
 struct
   module Web_pipe =
-    Web_client_pipe.Make (Chain (Program)) (Config)
+    Web_client_pipe.Make
+      (Chain (Program)) (Config)
       (Storage (Lite_base.Lite_chain))
       (Put_request)
 
@@ -89,13 +89,13 @@ let verification_key_location () =
   let manual = Cache_dir.manual_install_path ^/ verification_key_basename in
   match%bind Sys.file_exists manual with
   | `Yes -> return (Ok manual)
-  | `No | `Unknown ->
+  | `No | `Unknown -> (
       match%map Sys.file_exists autogen with
       | `Yes -> Ok autogen
       | `No | `Unknown ->
           Or_error.errorf
-            !"IO ERROR: Verification key does not exist\n        \
-              You should probably turn off snarks"
+            !"IO ERROR: Verification key does not exist\n\
+             \        You should probably turn off snarks" )
 
 let store_verification_keys log store =
   let res =
@@ -141,7 +141,8 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
       end in
       let module Broadcaster =
         Make_broadcaster (Web_config) (Program)
-          (Web_client_pipe.S3_put_request) in
+          (Web_client_pipe.S3_put_request)
+      in
       Broadcaster.run coda |> don't_wait_for ;
       store_verification_keys log (fun vk_location ->
           let open Deferred.Or_error.Let_syntax in

@@ -64,7 +64,7 @@ module Proof_of_signature = Consensus.Proof_of_signature.Make (struct
   module Ledger_builder_diff = Unit
 end)
 
-let protocol_state (s: Proof_of_signature.Protocol_state.value) :
+let protocol_state (s : Proof_of_signature.Protocol_state.value) :
     Lite_base.Protocol_state.t =
   let open Proof_of_signature in
   let consensus_state =

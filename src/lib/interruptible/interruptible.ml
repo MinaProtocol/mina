@@ -29,8 +29,8 @@ module T = struct
             [ t.interruption_signal
             ; ( maybe_sig_d
               >>= function
-                | Ok (interruption_signal, _) -> interruption_signal
-                | Error e -> Deferred.return e ) ]
+              | Ok (interruption_signal, _) -> interruption_signal
+              | Error e -> Deferred.return e ) ]
         in
         let d' =
           Deferred.any

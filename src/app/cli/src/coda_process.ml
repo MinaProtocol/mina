@@ -12,7 +12,7 @@ struct
 
   type t = Coda_worker.Connection.t * Process.t * Coda_worker.Input.t
 
-  let spawn_exn (config: Coda_worker.Input.t) =
+  let spawn_exn (config : Coda_worker.Input.t) =
     let%bind conn, process =
       Coda_worker.spawn_in_foreground_exn ~env:config.env
         ~on_failure:Error.raise ~cd:config.program_dir ~shutdown_on:Disconnect
@@ -23,7 +23,7 @@ struct
     File_system.dup_stderr process ;
     return (conn, process, config)
 
-  let local_config ?(transition_interval= 1000.0) ?proposal_interval ~peers
+  let local_config ?(transition_interval = 1000.0) ?proposal_interval ~peers
       ~discovery_port ~external_port ~program_dir ~should_propose
       ~snark_worker_config ~work_selection () =
     let host = "127.0.0.1" in

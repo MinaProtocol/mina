@@ -60,7 +60,7 @@ struct
 
     let make_space_for = MT.make_space_for
 
-    let load_ledger num_accounts (balance: int) =
+    let load_ledger num_accounts (balance : int) =
       let ledger = MT.create () in
       let keys =
         List.init num_accounts ~f:(( + ) 1) |> List.map ~f:Int.to_string

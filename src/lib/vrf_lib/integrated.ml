@@ -84,8 +84,8 @@ end = struct
   module Checked = struct
     open Let_syntax
 
-    let eval (type shifted) ((module Shifted): shifted Group.Checked.Shifted.m)
-        ~private_key m =
+    let eval (type shifted)
+        ((module Shifted) : shifted Group.Checked.Shifted.m) ~private_key m =
       let%bind h = Message.Checked.hash_to_group m in
       let%bind u =
         (* This use of unshift_nonzero is acceptable since if h^private_key = 0 then
@@ -96,7 +96,7 @@ end = struct
       Output_hash.Checked.hash m u
 
     let eval_and_check_public_key (type shifted)
-        ((module Shifted): shifted Group.Checked.Shifted.m) ~private_key
+        ((module Shifted) : shifted Group.Checked.Shifted.m) ~private_key
         ~public_key message =
       let%bind () =
         let%bind public_key_shifted = Shifted.(add zero public_key) in

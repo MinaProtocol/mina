@@ -77,8 +77,7 @@ module type S = sig
 end
 
 module Make (Consensus_state : Consensus_state_intf) :
-  S with module Consensus_state = Consensus_state =
-struct
+  S with module Consensus_state = Consensus_state = struct
   module Consensus_state = Consensus_state
 
   type ('state_hash, 'blockchain_state, 'consensus_state) t =

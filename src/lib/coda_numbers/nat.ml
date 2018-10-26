@@ -33,27 +33,29 @@ module type S = sig
 
   module Bits : Bits_intf.S with type t := t
 
-  include Snark_params.Tick.Snarkable.Bits.Small
-          with type Unpacked.value = t
-           and type Packed.value = t
+  include
+    Snark_params.Tick.Snarkable.Bits.Small
+    with type Unpacked.value = t
+     and type Packed.value = t
 
   val fold : t -> bool Triple.t Fold.t
 end
 
-module type F = functor (N :sig
-                              
-                              type t [@@deriving bin_io, sexp, compare, hash]
+module type F = functor
+  (N :sig
+      
+      type t [@@deriving bin_io, sexp, compare, hash]
 
-                              include Unsigned_extended.S with type t := t
+      include Unsigned_extended.S with type t := t
 
-                              val random : unit -> t
-end) -> functor (Bits :
-  Bits_intf.S with type t := N.t) -> functor (Bits_snarkable :
-  Snark_params.Tick.Snarkable.Bits.Small
-  with type Packed.value = N.t
-   and type Unpacked.value = N.t) -> S
-                                     with type t := N.t
-                                      and module Bits := Bits
+      val random : unit -> t
+    end)
+  (Bits : Bits_intf.S with type t := N.t)
+  (Bits_snarkable :
+     Snark_params.Tick.Snarkable.Bits.Small
+     with type Packed.value = N.t
+      and type Unpacked.value = N.t)
+  -> S with type t := N.t and module Bits := Bits
 
 module Make (N : sig
   type t [@@deriving bin_io, sexp, compare, hash]

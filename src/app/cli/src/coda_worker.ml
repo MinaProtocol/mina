@@ -224,12 +224,12 @@ struct
           don't_wait_for
             (Linear_pipe.iter (Main.strongest_ledgers coda) ~f:(fun t ->
                  let p =
-                   Main.Inputs.Consensus_mechanism.External_transition.
-                   protocol_state t
+                   Main.Inputs.Consensus_mechanism.External_transition
+                   .protocol_state t
                  in
                  let prev_state_hash =
-                   Main.Inputs.Consensus_mechanism.Protocol_state.
-                   previous_state_hash p
+                   Main.Inputs.Consensus_mechanism.Protocol_state
+                   .previous_state_hash p
                  in
                  let state_hash =
                    Main.Inputs.Consensus_mechanism.Protocol_state.hash p
