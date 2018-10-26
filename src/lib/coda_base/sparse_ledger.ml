@@ -108,12 +108,15 @@ let apply_coinbase_exn t ({proposer; fee_transfer; amount}: Coinbase.t) =
       ; (* set as above *)
       balance= Option.value_exn (Balance.add_amount a.balance amount) }
   in
-  let t =
-    Option.value_map ~default:t fee_transfer ~f:(fun (receiver, fee) ->
+  let proposer_reward, t =
+    match fee_transfer with
+    | None -> (amount, t)
+    | Some (receiver, fee) ->
         let fee = Amount.of_fee fee in
-        add_to_balance t receiver fee )
+        let reward = Amount.sub amount fee |> Option.value_exn in
+        (reward, add_to_balance t receiver fee)
   in
-  add_to_balance t proposer amount
+  add_to_balance t proposer proposer_reward
 
 let apply_super_transaction_exn t transition =
   match transition with
