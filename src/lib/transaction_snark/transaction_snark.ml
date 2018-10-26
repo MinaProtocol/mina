@@ -256,7 +256,8 @@ module Fee_transfer = struct
           { receiver= pk1
           ; amount= Amount.of_fee fee1 (* What "receiver" receives *)
           ; fee= fee2 (* What "sender" receives *)
-          ; nonce= Account.Nonce.zero }
+          ; nonce= Account.Nonce.zero
+          ; memo= Sha256_lib.Sha256.digest "Fee transfer" }
       ; sender= Public_key.decompress_exn pk2
       ; signature= dummy_signature } )
 
@@ -280,7 +281,8 @@ module Transition = struct
               { receiver
               ; amount= Amount.of_fee amount
               ; fee= Fee.zero
-              ; nonce= Account.Nonce.zero }
+              ; nonce= Account.Nonce.zero
+              ; memo= Sha256_lib.Sha256.digest "Coinbase" }
           ; sender= Public_key.decompress_exn proposer
           ; signature= dummy_signature }
         in
@@ -457,7 +459,7 @@ module Base = struct
     with_label __LOC__
       ( if not Insecure.transaction_replay then
           failwith "Insecure.transaction_replay false" ;
-        let {Transaction.Payload.receiver; amount; fee= _; nonce} = payload in
+        let {Transaction.Payload.receiver; amount; fee= _; nonce; memo= _} = payload in
         let%bind payload_section = Schnorr.Message.var_of_payload payload in
         let%bind () =
           with_label __LOC__
@@ -1510,14 +1512,15 @@ let%test_module "transaction_snark" =
       let n = Int.pow 2 ledger_depth in
       Array.init n ~f:(fun _ -> random_wallet ())
 
-    let transaction wallets i j amt fee nonce =
+    let transaction wallets i j amt fee nonce memo =
       let sender = wallets.(i) in
       let receiver = wallets.(j) in
       let payload : Transaction.Payload.t =
         { receiver= receiver.account.public_key
         ; fee
         ; amount= Amount.of_int amt
-        ; nonce }
+        ; nonce
+        ; memo }
       in
       let signature = Schnorr.sign sender.private_key payload in
       Transaction.check
@@ -1551,7 +1554,7 @@ let%test_module "transaction_snark" =
           let t1 =
             transaction wallets 1 0 8
               (Fee.of_int (Random.int 20))
-              Account.Nonce.zero
+              Account.Nonce.zero (Sha256_lib.Sha256.digest "") (*TODO*)
           in
           let target = Ledger.merkle_root_after_transaction_exn ledger t1 in
           let mentioned_keys = Transaction.public_keys (t1 :> Transaction.t) in
@@ -1577,12 +1580,12 @@ let%test_module "transaction_snark" =
           let t1 =
             transaction wallets 0 1 8
               (Fee.of_int (Random.int 20))
-              Account.Nonce.zero
+              Account.Nonce.zero (Sha256_lib.Sha256.digest "") (*TODO*)
           in
           let t2 =
             transaction wallets 1 2 3
               (Fee.of_int (Random.int 20))
-              Account.Nonce.zero
+              Account.Nonce.zero (Sha256_lib.Sha256.digest "") (*TODO*)
           in
           let sok_digest =
             Sok_message.create ~fee:Fee.zero

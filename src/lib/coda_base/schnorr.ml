@@ -23,7 +23,7 @@ module Message = struct
         Fold.(
           Transaction_payload.fold t +> group3 ~default:false (of_list nonce))
     in
-    Scalar.of_bits (Sha256_lib.Sha256.digest (Field.unpack d))
+    Scalar.of_bits ((Sha256_lib.Sha256.digest ( Sha256_lib.Sha256.bits_to_string (Field.unpack d) )) |> Sha256.Digest.to_bits)
 
   let () = assert Insecure.signature_hash_function
 

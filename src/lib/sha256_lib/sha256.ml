@@ -42,9 +42,11 @@ let words_to_bits ws =
   in
   go (Array.length ws - 1) []
 
-let digest bits =
-  Digestif.SHA256.(feed_string (init ()) (bits_to_string (pad false bits))).h
-  |> words_to_bits
+let digest t =
+  (Digestif.SHA256.digest_string t :> string)
+
+  (*bits_to_string (Digestif.SHA256.(feed_string (init ()) (bits_to_string (pad false bits))).h
+  |> words_to_bits) *)
 
 module Digest = Gadget.Digest
 
@@ -61,9 +63,9 @@ module Checked = struct
 end
 
 let%test_unit "sha-checked-and-unchecked" =
-  let bitstring bs =
+  (*let bitstring bs =
     List.map bs ~f:(fun b -> if b then '1' else '0') |> String.of_char_list
-  in
+  in*)
   let gen =
     let open Quickcheck.Generator in
     let open Let_syntax in

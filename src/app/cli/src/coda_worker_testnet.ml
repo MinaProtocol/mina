@@ -185,7 +185,7 @@ struct
       (Linear_pipe.iter transactions ~f:(fun (i, sk, pk, amount, fee) ->
            let%bind () = add_to_active_accounts pk in
            Coda_process.send_transaction_exn (List.nth_exn workers i) sk pk
-             amount fee )) ;
+             amount fee "")) ;
     don't_wait_for
       (let rec go () =
          let%bind () = check_active_accounts () in

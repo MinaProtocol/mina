@@ -339,7 +339,7 @@ struct
             ( Message.fold msg
             +> Non_zero_curve_point.Compressed.fold compressed_g )
         in
-        Sha256.digest (Snark_params.Tick.Pedersen.Digest.Bits.to_bits digest)
+        Sha256.digest @@ Sha256_lib.Sha256.bits_to_string ((Snark_params.Tick.Pedersen.Digest.Bits.to_bits digest))
 
       module Checked = struct
         let hash msg g =
@@ -379,7 +379,7 @@ struct
                (Snark_params.Tick.Typ.list ~length:256
                   Snark_params.Tick.Boolean.typ)
                (fun (msg, g) -> Checked.hash msg g)
-               (fun (msg, g) -> hash msg g))
+               (fun (msg, g) -> Sha256_lib.Sha256.Digest.to_bits (hash msg g)))
     end
 
     module Threshold = struct
@@ -640,7 +640,7 @@ struct
     let genesis =
       { epoch= Epoch.zero
       ; slot= Epoch.Slot.zero
-      ; proposer_vrf_result= List.init 256 ~f:(fun _ -> false) }
+      ; proposer_vrf_result= Sha256_lib.Sha256.digest "" (*(String.init 256 ~f:(fun _ -> '\000'))*)(*Sha256_lib.Sha256.bits_to_string (List.init 256 ~f:(fun _ -> false))*) }
 
     let to_hlist {epoch; slot; proposer_vrf_result} =
       Coda_base.H_list.[epoch; slot; proposer_vrf_result]
@@ -918,7 +918,7 @@ struct
         Vrf.Threshold.satisfies
           (Vrf.Threshold.create ~my_stake:my_currency
              ~total_stake:total_currency)
-          proposer_vrf_result
+          (Sha256_lib.Sha256.Digest.to_bits proposer_vrf_result)
       then Some ()
       else None
     in

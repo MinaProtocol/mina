@@ -39,6 +39,7 @@ struct
       * Public_key.Compressed.t
       * Currency.Amount.t
       * Currency.Fee.t
+      * string
     [@@deriving bin_io]
   end
 
@@ -203,7 +204,7 @@ struct
         ) ;
         let coda_peers () = return (Main.peers coda) in
         let coda_get_balance pk = return (Run.get_balance coda pk) in
-        let coda_send_transaction (sk, pk, amount, fee) =
+        let coda_send_transaction (sk, pk, amount, fee, memo) =
           let pk_of_sk sk =
             Public_key.of_private_key_exn sk |> Public_key.compress
           in
@@ -212,7 +213,7 @@ struct
               Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn
             in
             let payload : Transaction.Payload.t =
-              {receiver= receiver_pk; amount; fee; nonce}
+              {receiver= receiver_pk; amount; fee; nonce; memo= (Sha256_lib.Sha256.digest memo)}
             in
             Transaction.sign (Keypair.of_private_key_exn sender_sk) payload
           in

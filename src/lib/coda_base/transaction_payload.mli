@@ -5,15 +5,16 @@ open Coda_numbers
 open Snark_params.Tick
 open Import
 
-type ('pk, 'amount, 'fee, 'nonce) t_ =
-  {receiver: 'pk; amount: 'amount; fee: 'fee; nonce: 'nonce}
+type ('pk, 'amount, 'fee, 'nonce, 'memo) t_ =
+  {receiver: 'pk; amount: 'amount; fee: 'fee; nonce: 'nonce; memo: 'memo}
 [@@deriving bin_io, eq, sexp, hash]
 
 type t =
   ( Public_key.Compressed.t
   , Currency.Amount.t
   , Currency.Fee.t
-  , Account_nonce.t )
+  , Account_nonce.t
+  , Sha256.Digest.t )
   t_
 [@@deriving bin_io, eq, sexp, hash]
 
@@ -23,20 +24,22 @@ val gen : t Quickcheck.Generator.t
 
 module Stable : sig
   module V1 : sig
-    type nonrec ('pk, 'amount, 'fee, 'nonce) t_ =
+    type nonrec ('pk, 'amount, 'fee, 'nonce, 'memo) t_ =
                                                  ( 'pk
                                                  , 'amount
                                                  , 'fee
-                                                 , 'nonce )
+                                                 , 'nonce
+                                                 , 'memo )
                                                  t_ =
-      {receiver: 'pk; amount: 'amount; fee: 'fee; nonce: 'nonce}
+      {receiver: 'pk; amount: 'amount; fee: 'fee; nonce: 'nonce; memo: 'memo}
     [@@deriving bin_io, eq, sexp, hash]
 
     type t =
       ( Public_key.Compressed.Stable.V1.t
       , Currency.Amount.Stable.V1.t
       , Currency.Fee.Stable.V1.t
-      , Account_nonce.t )
+      , Account_nonce.t
+      , Sha256.Digest.t )
       t_
     [@@deriving bin_io, eq, sexp, hash]
   end
@@ -46,7 +49,8 @@ type var =
   ( Public_key.Compressed.var
   , Currency.Amount.var
   , Currency.Fee.var
-  , Account_nonce.Unpacked.var )
+  , Account_nonce.Unpacked.var
+  , Sha256.Digest.var )
   t_
 
 val length_in_triples : int
