@@ -14,6 +14,7 @@ RUN sudo apt-get install --yes \
     librocksdb4.5 \
     libsodium-dev \
     libssl-dev \
+    lsb \
     m4 \
     pandoc \
     python \
