@@ -12,7 +12,6 @@ module Git_sha = Client_lib.Git_sha
 
 let commit_id = Option.map [%getenv "CODA_COMMIT_SHA1"] ~f:Git_sha.of_string
 
-let force_updates = false
 
 module type Coda_intf = sig
   type ledger_proof
@@ -333,6 +332,7 @@ let env name ~f ~default =
                     name x) )
   |> Option.value ~default
 
+[%%if force_updates]
 let rec ensure_testnet_id_still_good log =
   let open Cohttp_async in
   let recheck_soon = 0.1 in
@@ -391,6 +391,9 @@ let rec ensure_testnet_id_still_good log =
               then ( try_later recheck_later ; Deferred.unit )
               else finish commit_id body_string
   else Deferred.unit
+[%%else]
+let ensure_testnet_id_still_good _ = Deferred.unit
+[%%endif]
 
 let consensus_mechanism () : (module Consensus_mechanism_intf) =
   let mechanism =
