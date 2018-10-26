@@ -47,6 +47,7 @@
       yojson
       web_client_pipe
       work_selector ))
+   (preprocessor_deps ("../../../config.mlh"))
    (preprocess (pps (ppx_jane ppx_deriving.eq ppx_deriving.make ppx_inline_test ppx_coda)))
    (flags (-short-paths -w -40 -g -warn-error +3+4+6+8+9+10+11+12+14+16+20+21+23+24+26+27+29+32..39+56-58+59+60+61))
    (modes (native))

@@ -3,12 +3,8 @@ open Async
 open Coda_worker
 open Coda_main
 
-module Make
-    (Ledger_proof : Ledger_proof_intf)
-    (Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof.t)
-    (Coda : Coda_intf.S with type ledger_proof = Ledger_proof.t) =
-struct
-  module Coda_process = Coda_process.Make (Ledger_proof) (Kernel) (Coda)
+module Make (Kernel : Kernel_intf) = struct
+  module Coda_process = Coda_process.Make (Kernel)
 
   let init () = Parallel.init_master ()
 

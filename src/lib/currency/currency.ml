@@ -585,6 +585,8 @@ end
 module Balance = struct
   include (Amount : Basic with type t = Amount.t and type var = Amount.var)
 
+  let to_amount = Fn.id
+
   let add_amount = Amount.add
 
   let sub_amount = Amount.sub

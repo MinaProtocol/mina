@@ -2,6 +2,8 @@ open Core
 open Async
 open Signature_lib
 
+let command_name = "snark-worker"
+
 module type Inputs_intf = sig
   module Sparse_ledger : sig
     type t [@@deriving bin_io, sexp]
