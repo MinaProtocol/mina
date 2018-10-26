@@ -16,7 +16,7 @@ module type S = sig
   module Addr : Merkle_address.S
 
   module Location : sig
-    type t
+    type t [@@deriving sexp, compare, hash]
   end
 
   val create : unit -> t
