@@ -45,7 +45,5 @@ struct
   let set t location account =
     Base.set t location account ;
     List.iter !mask_children ~f:(fun child_mask ->
-        let merkle_path = Base.merkle_path t location in
-        Mask.Attached.parent_set_notify child_mask location account merkle_path
-    )
+        Mask.Attached.parent_set_notify child_mask location account )
 end

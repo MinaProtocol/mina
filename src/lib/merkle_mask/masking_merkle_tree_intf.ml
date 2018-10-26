@@ -40,7 +40,7 @@ module type S = sig
     val get_parent : t -> parent
     (** get mask parent *)
 
-    val parent_set_notify : t -> location -> account -> Path.t -> unit
+    val parent_set_notify : t -> location -> account -> unit
     (** called when parent sets an account; update local state *)
 
     (** already have module For_testing from include above *)

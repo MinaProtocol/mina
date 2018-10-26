@@ -173,6 +173,27 @@ let%test_module "Test mask connected to underlying Merkle tree" =
               in
               true
             with Failure _ -> false )
+
+      let%test "mask and parent agree on Merkle path" =
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            Mask.Attached.set attached_mask dummy_location dummy_account ;
+            (* set affects hashes along the path P from location to the root, while the Merkle path for the location 
+               contains the siblings of P elements; to observe a hash in the Merkle path changed by the set, choose an 
+               address that is a sibling of an element in P; the Merkle path for that address will include a P element
+             *)
+            let address =
+              dummy_address |> Maskable.Addr.parent_exn
+              |> Maskable.Addr.sibling
+            in
+            let mask_merkle_path =
+              Mask.Attached.merkle_path_at_addr_exn attached_mask address
+            in
+            Maskable.set maskable dummy_location dummy_account ;
+            let maskable_merkle_path =
+              Maskable.merkle_path_at_addr_exn maskable address
+            in
+            mask_merkle_path = maskable_merkle_path )
     end
 
     module type Depth_S = sig

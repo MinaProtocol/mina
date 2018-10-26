@@ -76,42 +76,70 @@ struct
       | Some account -> Some account
       | None -> Base.get (get_parent t) location
 
-    (* given a Merkle path given by the mask parent and an account address, calculate addresses and hash for each node affected 
-     by the account hash; that is, along the path from the account address to root
-       *)
-    let addresses_and_hashes_from_merkle_path_exn t merkle_path account_address
-        account_hash : (Addr.t * Hash.t) list =
+    (* fixup_merkle_path patches a Merkle path reported by the parent, overriding
+       with hashes which are stored in the mask
+     *)
+
+    let fixup_merkle_path t path address =
+      let rec build_fixed_path path address accum =
+        if List.is_empty path then List.rev accum
+        else
+          (* first element in the path contains hash at sibling of address *)
+          let curr_element = List.hd_exn path in
+          let merkle_node_address = Addr.sibling address in
+          let mask_hash = find_hash t merkle_node_address in
+          let parent_hash =
+            match curr_element with `Left h | `Right h -> h
+          in
+          let new_hash = Option.value mask_hash ~default:parent_hash in
+          let new_element =
+            match curr_element with
+            | `Left _ -> `Left new_hash
+            | `Right _ -> `Right new_hash
+          in
+          build_fixed_path (List.tl_exn path) (Addr.parent_exn address)
+            (new_element :: accum)
+      in
+      build_fixed_path path address []
+
+    (* the following merkle_path_* functions report the Merkle path for the mask *)
+
+    let merkle_path_at_addr_exn t address =
+      let parent_merkle_path =
+        Base.merkle_path_at_addr_exn (get_parent t) address
+      in
+      fixup_merkle_path t parent_merkle_path address
+
+    let merkle_path_at_index_exn t index =
+      let address = Addr.of_int_exn index in
+      let parent_merkle_path =
+        Base.merkle_path_at_addr_exn (get_parent t) address
+      in
+      fixup_merkle_path t parent_merkle_path address
+
+    let merkle_path t location =
+      let address = Location.to_path_exn location in
+      let parent_merkle_path = Base.merkle_path (get_parent t) location in
+      fixup_merkle_path t parent_merkle_path address
+
+    (* given a Merkle path corresponding to a starting address, calculate addresses and hash 
+       for each node affected by the starting hash; that is, along the path from the 
+       account address to root
+     *)
+    let addresses_and_hashes_from_merkle_path_exn merkle_path starting_address
+        starting_hash : (Addr.t * Hash.t) list =
       let get_addresses_hashes height accum node =
-        let last_address, last_hash =
-          match List.hd accum with
-          | Some elt -> elt
-          | None ->
-              failwith "addresses_and_hashes_from_merkle_path_exn: empty accum"
+        let last_address, last_hash = List.hd_exn accum in
+        let next_address = Addr.parent_exn last_address in
+        let next_hash =
+          match node with
+          | `Left sibling_hash -> Hash.merge ~height last_hash sibling_hash
+          | `Right sibling_hash -> Hash.merge ~height sibling_hash last_hash
         in
-        let next_address =
-          match Addr.parent last_address with
-          | Ok addr -> addr
-          | Error _s ->
-              failwith
-                "addresses_and_hashes_from_merkle_path_exn: could not get \
-                 next address"
-        in
-        (* the Merkle path is provided by the mask's parent; some hashes may be out-of-date after
-         the mask is updated. Check whether our hash mask has an entry for corresponding address 
-         in the path, and use it if present
-           *)
-        let merkle_node_address = Addr.sibling last_address in
-        let mask_hash = find_hash t merkle_node_address in
-        match node with
-        | `Left h ->
-            let sibling_hash = Option.value mask_hash ~default:h in
-            (next_address, Hash.merge ~height last_hash sibling_hash) :: accum
-        | `Right h ->
-            let sibling_hash = Option.value mask_hash ~default:h in
-            (next_address, Hash.merge ~height sibling_hash last_hash) :: accum
+        (next_address, next_hash) :: accum
       in
       List.foldi merkle_path
-        ~init:[(account_address, account_hash)]
+        ~init:[(starting_address, starting_hash)]
         ~f:get_addresses_hashes
 
     (* a write writes only to the mask, parent is not involved 
@@ -121,9 +149,9 @@ struct
       set_account t location account ;
       let account_address = Location.to_path_exn location in
       let account_hash = Hash.hash_account account in
-      let merkle_path = Base.merkle_path (get_parent t) location in
+      let merkle_path = merkle_path t location in
       let addresses_and_hashes =
-        addresses_and_hashes_from_merkle_path_exn t merkle_path account_address
+        addresses_and_hashes_from_merkle_path_exn merkle_path account_address
           account_hash
       in
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
@@ -132,7 +160,7 @@ struct
     (* if the mask's parent sets an account, we can prune an entry in the mask if the account in the parent
      is the same in the mask
        *)
-    let parent_set_notify t location account merkle_path =
+    let parent_set_notify t location account =
       match find_account t location with
       | Some existing_account ->
           if Account.equal account existing_account then (
@@ -141,8 +169,9 @@ struct
             (* update hashes *)
             let account_address = Location.to_path_exn location in
             let account_hash = Hash.empty_account in
+            let merkle_path = merkle_path t location in
             let addresses_and_hashes =
-              addresses_and_hashes_from_merkle_path_exn t merkle_path
+              addresses_and_hashes_from_merkle_path_exn merkle_path
                 account_address account_hash
             in
             List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
@@ -221,17 +250,9 @@ struct
     let get_inner_hash_at_addr_exn =
       delegate_to_parent Base.get_inner_hash_at_addr_exn
 
-    let merkle_path_at_addr_exn =
-      delegate_to_parent Base.merkle_path_at_addr_exn
-
     let num_accounts = delegate_to_parent Base.num_accounts
 
     let remove_accounts_exn = delegate_to_parent Base.remove_accounts_exn
-
-    let merkle_path_at_index_exn =
-      delegate_to_parent Base.merkle_path_at_index_exn
-
-    let merkle_path = delegate_to_parent Base.merkle_path
 
     let get_or_create_account_exn =
       delegate_to_parent Base.get_or_create_account_exn
