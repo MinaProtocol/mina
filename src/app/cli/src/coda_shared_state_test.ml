@@ -12,7 +12,7 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
 
   let name = "coda-shared-state-test"
 
-  let main () =
+  let main proposal_interval () =
     let open Keypair in
     let log = Logger.create () in
     let log = Logger.child log name in
@@ -36,7 +36,7 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
     let send_amount = Currency.Amount.of_int 10 in
     let fee = Currency.Fee.of_int 0 in
     let%bind testnet =
-      Coda_worker_testnet.test ~proposal_interval:4000 log n should_propose
+      Coda_worker_testnet.test ?proposal_interval log n should_propose
         snark_work_public_keys Protocols.Coda_pow.Work_selection.Seq
     in
     let rec go i =
@@ -50,7 +50,11 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
     go 40
 
   let command =
-    Command.async_spec ~summary:"Test that workers share states"
-      Command.Spec.(empty)
-      main
+    let open Command.Let_syntax in
+    Command.async ~summary:"Test that workers share states"
+      (let%map_open proposal_interval =
+         flag "proposal-interval"
+           ~doc:"MILLIS proposal interval in proof of sig" (optional int)
+       in
+       main proposal_interval)
 end

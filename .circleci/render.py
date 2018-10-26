@@ -7,10 +7,10 @@ base_actions = [
     'coda-peers-test',
     'coda-transitive-peers-test',
     'coda-block-production-test',
-    'coda-shared-prefix-test -who-proposes 0',
-    'coda-shared-prefix-test -who-proposes 1',
-    'coda-shared-state-test',
-    'coda-restart-node-test',
+    'coda-shared-prefix-test -who-proposes 0 -proposal-interval 8000',
+    'coda-shared-prefix-test -who-proposes 1 -proposal-interval 8000',
+    'coda-shared-state-test -proposal-interval 6000',
+    'coda-restart-node-test -proposal-interval 6000',
     'transaction-snark-profiler -check-only'
 ]
 
