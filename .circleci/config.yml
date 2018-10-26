@@ -111,9 +111,6 @@ jobs:
         resource_class: large
         docker:
         - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
         steps:
             - checkout
             - run:
