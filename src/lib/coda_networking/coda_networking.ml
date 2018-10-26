@@ -22,6 +22,8 @@ module Rpcs (Inputs : sig
     with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
      and type ledger_hash := Ledger_hash.t
 
+  module Blockchain_state : Blockchain_state.S
+
   module Protocol_state : sig
     type value [@@deriving bin_io]
 
@@ -181,6 +183,8 @@ module type Inputs_intf = sig
     Protocols.Coda_pow.Ledger_builder_hash_intf
     with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
      and type ledger_hash := Ledger_hash.t
+
+  module Blockchain_state : Coda_base.Blockchain_state.S
 
   module Protocol_state : sig
     type value [@@deriving bin_io]

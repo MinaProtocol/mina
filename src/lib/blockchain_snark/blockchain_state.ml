@@ -10,6 +10,7 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) :
   Blockchain_state_intf.S
   with module Consensus_mechanism := Consensus_mechanism =
 struct
+  module Blockchain_state = Consensus_mechanism.Blockchain_state
   module Protocol_state = Consensus_mechanism.Protocol_state
   module Snark_transition = Consensus_mechanism.Snark_transition
 
