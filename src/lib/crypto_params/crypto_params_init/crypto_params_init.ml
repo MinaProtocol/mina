@@ -70,7 +70,7 @@ module Wrap_input = struct
 
     let typ = Field.typ
 
-    let of_tick_field (x: Tick0.Field.t) : t =
+    let of_tick_field (x : Tick0.Field.t) : t =
       Tock0.Field.project (Tick0.Field.unpack x)
 
     module Checked = struct
@@ -104,16 +104,16 @@ module Wrap_input = struct
         | x' :: xs -> go (x :: acc) x' xs
       in
       function
-        | [] -> failwith "split_last: Empty list" | x :: xs -> go [] x xs
+      | [] -> failwith "split_last: Empty list" | x :: xs -> go [] x xs
 
-    let of_tick_field (x: Tick0.Field.t) : t = x
+    let of_tick_field (x : Tick0.Field.t) : t = x
 
     let typ : (var, t) Typ.t =
       Typ.of_hlistable spec
         ~var_to_hlist:(fun {low_bits; high_bit} -> [low_bits; high_bit])
         ~var_of_hlist:(fun Snarky.H_list.([low_bits; high_bit]) ->
           {low_bits; high_bit} )
-        ~value_to_hlist:(fun (x: Tick0.Field.t) ->
+        ~value_to_hlist:(fun (x : Tick0.Field.t) ->
           let low_bits, high_bit = split_last_exn (Tick0.Field.unpack x) in
           [Tock0.Field.project low_bits; high_bit] )
         ~value_of_hlist:(fun Snarky.H_list.([low_bits; high_bit]) ->
@@ -139,9 +139,9 @@ module Wrap_input = struct
   end
 
   let m =
-    if Bigint.(Tock0.Field.size < Tick0.Field.size) then ( module Tock_field_smaller
-      : S )
+    if Bigint.(Tock0.Field.size < Tick0.Field.size) then
+      (module Tock_field_smaller : S )
     else (module Tock_field_larger : S)
 
-  include ( val m )
+  include (val m)
 end

@@ -135,7 +135,7 @@ struct
     let provide_witness' typ ~f =
       provide_witness typ As_prover.(map get_state ~f)
 
-    let main (top_hash: Digest.Tick.Packed.var) =
+    let main (top_hash : Digest.Tick.Packed.var) =
       with_label __LOC__
         (let%bind prev_state =
            provide_witness' State.typ ~f:Prover_state.prev_state
@@ -146,8 +146,8 @@ struct
              (State.Checked.update (prev_state_hash, prev_state) update)
          in
          let%bind wrap_vk =
-           provide_witness' Verifier.Verification_key.typ ~f:
-             (fun {Prover_state.wrap_vk; _} ->
+           provide_witness' Verifier.Verification_key.typ
+             ~f:(fun {Prover_state.wrap_vk; _} ->
                Verifier.Verification_key.of_verification_key wrap_vk )
          in
          let wrap_vk_data =
@@ -201,7 +201,7 @@ struct
     let step_vk_bits = Verifier.Verification_key_data.to_bits step_vk_data
 
     (* TODO: Use an online verifier here *)
-    let main (input: Wrap_input.var) =
+    let main (input : Wrap_input.var) =
       let open Let_syntax in
       with_label __LOC__
         (let%bind vk_data, result =

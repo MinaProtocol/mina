@@ -49,8 +49,7 @@ module List
   S
   with type 'a t = 'a list
    and type ('a, 's) monad := ('a, 's) M.t
-   and type boolean := Bool.t =
-struct
+   and type boolean := Bool.t = struct
   type 'a t = 'a list
 
   open M.Let_syntax

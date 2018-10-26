@@ -2,8 +2,7 @@ open Core_kernel
 open Async_kernel
 
 module Make (M : Storage_intf.With_checksum_intf) :
-  Storage_intf.With_checksum_intf with type location = M.location list =
-struct
+  Storage_intf.With_checksum_intf with type location = M.location list = struct
   type 'a t = unit
 
   type location = M.location list [@@deriving sexp]
@@ -21,10 +20,10 @@ struct
     let open Deferred.Let_syntax in
     let rec go errs = function
       | [] -> return (Error (`IO_error (errors errs)))
-      | x :: xs ->
+      | x :: xs -> (
           match%bind f x with
           | Ok x -> return (Ok x)
-          | Error e -> go (e :: errs) xs
+          | Error e -> go (e :: errs) xs )
     in
     go []
 

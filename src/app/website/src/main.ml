@@ -22,7 +22,8 @@ module Example = struct
              [ div [class_ "flex justify-center mb4"] [image]
              ; div [class_ "w-100"] [important_text] ])
         ~not_small:
-          (div [class_ "flex items-center"]
+          (div
+             [class_ "flex items-center"]
              [ div [class_ "w-50 mr4-ns tr-ns"] [left]
              ; div [class_ "w-50 ml4-ns tl-ns"] [right] ])
     in
@@ -66,14 +67,15 @@ let marked_up_content content =
           else Html_concise.span [bold_style] [Html_concise.text str] ) )
 
 module Important_text = struct
-  let create ~title ~content ?(alt_content= None) () =
+  let create ~title ~content ?(alt_content = None) () =
     let open Html_concise in
     let content_style, title_html =
       Important_title.(content_style title, html title)
     in
     let make_content content =
       let content_length = List.length content in
-      div [Style.render content_style]
+      div
+        [Style.render content_style]
         (List.mapi content ~f:(fun i txt ->
              p
                (let open Style in

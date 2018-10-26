@@ -123,14 +123,16 @@ module type Fake_timer_transport_intf = sig
   val stop_listening : t -> me:peer -> unit
 end
 
-module type Fake_timer_transport_s = functor (Message :sig
-                                                         
-                                                         type t
-end) -> functor (Message_delay :
-  Message_delay_intf with type message := Message.t) -> functor (Peer :
-  Node.Peer_intf) -> Fake_timer_transport_intf
-                     with type message := Message.t
-                      and type peer := Peer.t
+module type Fake_timer_transport_s = functor
+  (Message :sig
+            
+            type t
+          end)
+  (Message_delay : Message_delay_intf with type message := Message.t)
+  (Peer : Node.Peer_intf)
+  -> Fake_timer_transport_intf
+     with type message := Message.t
+      and type peer := Peer.t
 
 module Fake_timer_transport (Message : sig
   type t
@@ -169,7 +171,7 @@ struct
       | Timeout ivar ->
           Ivar.fill_if_empty ivar `Finished ;
           Ivar.read ivar >>| Fn.const ()
-      | Msg (m, p) ->
+      | Msg (m, p) -> (
         match Peer.Table.find t.network p with
         | None ->
             failwithf "Unknown recipient %s"
@@ -177,7 +179,7 @@ struct
               ()
         | Some (r, w) ->
             Linear_pipe.write_or_exn ~capacity:1024 w r m ;
-            Linear_pipe.values_available r >>| Fn.const () )
+            Linear_pipe.values_available r >>| Fn.const () ) )
 
   let wait t ts =
     let tok = Ident.next () in
@@ -227,30 +229,35 @@ module Trivial_peer : Trivial_peer_intf = struct
   include T
 end
 
-module type S = functor (State :sig
-                                  
-                                  type t [@@deriving eq, sexp]
-end) -> functor (Message :sig
-                            
-                            type t
-end) -> functor (Message_delay :
-  Message_delay_intf with type message := Message.t) -> functor (Message_label :
-sig
-  
-  type label [@@deriving enum, sexp]
+module type S = functor
+  (State :sig
+          
+          type t [@@deriving eq, sexp]
+        end)
+  (Message :sig
+            
+            type t
+          end)
+  (Message_delay : Message_delay_intf with type message := Message.t)
+  (Message_label :sig
+                  
+                  type label [@@deriving enum, sexp]
 
-  include Hashable.S with type t = label
-end) -> functor (Timer_label :sig
-                                
-                                type label [@@deriving enum, sexp]
+                  include Hashable.S with type t = label
+                end)
+  (Timer_label :sig
+                
+                type label [@@deriving enum, sexp]
 
-                                include Hashable.S with type t = label
-end) -> functor (Condition_label :sig
-                                    
-                                    type label [@@deriving enum, sexp]
+                include Hashable.S with type t = label
+              end)
+  (Condition_label :sig
+                    
+                    type label [@@deriving enum, sexp]
 
-                                    include Hashable.S with type t = label
-end) -> sig
+                    include Hashable.S with type t = label
+                  end)
+  -> sig
   type t
 
   module Timer_transport :
@@ -335,7 +342,7 @@ struct
   let rec loop t ~stop ~max_iters =
     match max_iters with
     | Some iters when iters <= 0 -> return ()
-    | _ ->
+    | _ -> (
         let merge : 'a. 'a option -> 'a option -> 'a option =
          fun a b ->
           match (a, b) with
@@ -344,8 +351,8 @@ struct
           | Some a, None -> Some a
           | Some a, Some b -> Some a
         in
-        let choose3 (a: 'a Deferred.t) (a_imm: 'a option) (b: 'b Deferred.t)
-            (b_imm: 'b option) (c: 'c Deferred.t) (c_imm: 'c option) :
+        let choose3 (a : 'a Deferred.t) (a_imm : 'a option) (b : 'b Deferred.t)
+            (b_imm : 'b option) (c : 'c Deferred.t) (c_imm : 'c option) :
             ('a option * 'b option * 'c option) Deferred.t =
           Deferred.any
             [ ( a
@@ -373,8 +380,8 @@ struct
           any_ready
           >>| fun n ->
           let maybe_real =
-            List.fold (Identifier.Table.data t.nodes) ~init:None ~f:
-              (fun acc x ->
+            List.fold (Identifier.Table.data t.nodes) ~init:None
+              ~f:(fun acc x ->
                 match (acc, x) with
                 | Some _, _ -> acc
                 | None, x when MyNode.is_ready x -> Some x
@@ -402,7 +409,7 @@ struct
             (*printf "There's an event since no stuff for peers\n%!";*)
             let%bind () = Timer_transport.tick_forwards t.timer in
             loop t ~stop ~max_iters:(Option.map max_iters ~f:(fun i -> i - 1))
-        | None, None, None -> failwith "Something is ready"
+        | None, None, None -> failwith "Something is ready" )
 
   let create ~count ~initial_state cmds_per_node ~stop =
     let table = Identifier.Table.create () in
@@ -503,8 +510,8 @@ let%test_module "Distributed_dsl" =
               [ on Init
                   (function Start -> true | _ -> false)
                   ~f:(fun t state ->
-                    timeout' t Spawn_msg (Time.Span.of_sec 10.) ~f:
-                      (fun t state ->
+                    timeout' t Spawn_msg (Time.Span.of_sec 10.)
+                      ~f:(fun t state ->
                         let%map () =
                           send_multi_exn t
                             ~recipients:
@@ -526,15 +533,15 @@ let%test_module "Distributed_dsl" =
               ; on Wait_timeout
                   (function Wait_msg -> true | _ -> false)
                   ~f:(fun t state ->
-                    timeout' t Timeout_message (Time.Span.of_sec 20.) ~f:
-                      (fun t -> function
+                    timeout' t Timeout_message (Time.Span.of_sec 20.)
+                      ~f:(fun t -> function
                       | Got_msg _ as m -> return m | _ -> return Timeout ) ;
                     return state )
               ; on Failure_case
                   (function
-                      | Timeout -> true
-                      | Got_msg i when i <= 5 -> true
-                      | _ -> false)
+                    | Timeout -> true
+                    | Got_msg i when i <= 5 -> true
+                    | _ -> false)
                   ~f:(fun _ _ ->
                     failwith
                       "All nodes should have received a message containing a \

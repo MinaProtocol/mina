@@ -83,8 +83,7 @@ module Make
     (Consensus_state : Consensus_state_intf) :
   S
   with module Blockchain_state = Blockchain_state
-   and module Consensus_state = Consensus_state =
-struct
+   and module Consensus_state = Consensus_state = struct
   module Blockchain_state = Blockchain_state
   module Consensus_state = Consensus_state
 
