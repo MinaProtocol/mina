@@ -33,11 +33,11 @@ module type Inputs_intf = sig
     val add : t -> Span.t -> t
   end
 
+  module Genesis_ledger : sig
+    val t : Coda_base.Ledger.t
+  end
+
   val genesis_state_timestamp : Time.t
-
-  val genesis_ledger_total_currency : Amount.t
-
-  val genesis_ledger : Coda_base.Ledger.t
 
   val coinbase : Amount.t
 

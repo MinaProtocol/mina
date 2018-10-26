@@ -1,3 +1,6 @@
+[%%import
+"../../../config.mlh"]
+
 open Core
 open Async
 open Coda_base
@@ -125,6 +128,9 @@ struct
           let%map (module W) = Worker_state.get w in
           `Initialized )
 
+    [%%if
+    with_snark]
+
     let extend_blockchain =
       create
         [%bin_type_class
@@ -137,15 +143,34 @@ struct
         , transition )
         ->
           let%map (module W) = Worker_state.get w in
-          if Insecure.extend_blockchain then
-            let proof = Precomputed_values.base_proof in
-            {Blockchain.proof; state= next_state}
-          else W.extend_blockchain chain next_state transition )
+          W.extend_blockchain chain next_state transition )
 
     let verify_blockchain =
       create Blockchain.bin_t bin_bool (fun w {Blockchain.state; proof} ->
           let%map (module W) = Worker_state.get w in
-          if Insecure.verify_blockchain then true else W.verify state proof )
+          W.verify state proof )
+
+    [%%else]
+
+    let extend_blockchain =
+      create
+        [%bin_type_class
+          : Blockchain.t
+            * Consensus_mechanism.Protocol_state.value
+            * Consensus_mechanism.Snark_transition.value] Blockchain.bin_t
+        (fun w
+        ( {Blockchain.state= prev_state; proof= prev_proof}
+        , next_state
+        , transition )
+        ->
+          let proof = Precomputed_values.base_proof in
+          Deferred.return {Blockchain.proof; state= next_state} )
+
+    let verify_blockchain =
+      create Blockchain.bin_t bin_bool (fun w {Blockchain.state; proof} ->
+          Deferred.return true )
+
+    [%%endif]
   end
 
   module Worker = struct

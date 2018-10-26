@@ -18,7 +18,7 @@ jobs:
                 command: source ~/.profile && make kademlia
             - run:
                 name: Build OCaml
-                command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                command: eval `opam config env` && DUNE_PROFILE=dev make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                 name: rm snark_params
                 command: rm -rf src/_build/default/lib/snark_params
@@ -54,7 +54,7 @@ jobs:
                 command: make withkeys
             - run:
                 name: Build OCaml
-                command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                command: eval `opam config env` && DUNE_PROFILE=testnet make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                 name: Build deb Package with verification keys
                 command: make deb
@@ -90,7 +90,7 @@ jobs:
                 command: make withkeys
             - run:
                 name: Build OCaml
-                command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                command: eval `opam config env` && DUNE_PROFILE=testnet make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                 name: Build deb Package with verification keys
                 command: make deb
@@ -100,24 +100,24 @@ jobs:
             - store_artifacts:
                 path: /tmp/artifacts
 
-    test-runtest:
-        resource_class: large
-        docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a41ac5a782b453cc5163e75b7d4e29ebac708cc6
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
-        steps:
-            - checkout
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
-            - run:
-                name: Get stable SNARK keys - make withkeys
-                command: source ~/.profile && make withkeys
-            - run:
-                name: Test make test-runtest
-                command: source ~/.profile && make test-runtest
+    test-unit-test:
+       resource_class: large
+       docker:
+       - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
+         auth:
+           username: _json_key
+           password: $JSON_GCLOUD_CREDENTIALS
+       steps:
+           - checkout
+           - run:
+               name: Build Haskell
+               command: source ~/.profile && make kademlia
+           - run:
+               name: Get stable SNARK keys - make withkeys
+               command: source ~/.profile && make withkeys
+           - run:
+              name: Test make test-runtest
+              command: source ~/.profile && make test-runtest
 
     test-withsnark:
         resource_class: large
@@ -141,74 +141,101 @@ jobs:
                 name: Test make test-withsnark
                 command: source ~/.profile && make test-withsnark
 
-    test-stake:
-        resource_class: large
-        docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a41ac5a782b453cc5163e75b7d4e29ebac708cc6
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
-        steps:
-            - checkout
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
-            - run:
-                name: Get stable SNARK keys - make withkeys
-                command: source ~/.profile && make withkeys
-            - run:
-                name: Test make test-stakes
-                command: source ~/.profile && make test-stakes
-
-    test-sig:
-        resource_class: large
-        docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a41ac5a782b453cc5163e75b7d4e29ebac708cc6
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
-        steps:
-            - checkout
-            - run:
-                name: Check .circleci Render
-                command: make check-render-circleci
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
-            - run:
-                name: Get stable SNARK keys - make withkeys
-                command: source ~/.profile && make withkeys
-            - run:
-                name: Build OCaml
-                command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+    
+    test-all_sig_integration_tests:
+      resource_class: large
+      docker:
+      - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
+        auth:
+          username: _json_key
+          password: $JSON_GCLOUD_CREDENTIALS
+      steps:
+          - checkout
+          - run:
+              name: Check .circleci Render
+              command: make check-render-circleci
+          - run:
+              name: Build Haskell
+              command: source ~/.profile && make kademlia
+          - run:
+              name: Build OCaml
+              command: eval `opam config env` && DUNE_PROFILE=test make build 2>&1 | tee /tmp/buildocaml.log
             
-            - run:
-                name: Running test - full-test | proof_of_signature
-                command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'full-test'
-            - run:
-                name: Running test - coda-peers-test | proof_of_signature
-                command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-peers-test'
-            - run:
-                name: Running test - coda-transitive-peers-test | proof_of_signature
-                command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-transitive-peers-test'
-            - run:
-                name: Running test - coda-block-production-test | proof_of_signature
-                command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-block-production-test'
-            - run:
-                name: Running test - coda-shared-prefix-test -who-proposes 0 | proof_of_signature
-                command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-shared-prefix-test -who-proposes 0'
-            - run:
-                name: Running test - coda-shared-prefix-test -who-proposes 1 | proof_of_signature
-                command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-shared-prefix-test -who-proposes 1'
-            - run:
-                name: Running test - coda-shared-state-test | proof_of_signature
-                command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-shared-state-test'
-            - run:
-                name: Running test - coda-restart-node-test | proof_of_signature
-                command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-restart-node-test'
-            - run:
-                name: Running test - transaction-snark-profiler -check-only | proof_of_signature
-                command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'transaction-snark-profiler -check-only'
+          - run:
+              name: Running test - Sig Tests | full-test
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=1000 'run_integration_test' 'full-test' 
+          - run:
+              name: Running test - Sig Tests | coda-peers-test
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=1000 'run_integration_test' 'coda-peers-test' 
+          - run:
+              name: Running test - Sig Tests | coda-transitive-peers-test
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=1000 'run_integration_test' 'coda-transitive-peers-test' 
+          - run:
+              name: Running test - Sig Tests | coda-block-production-test
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=1000 'run_integration_test' 'coda-block-production-test' 
+          - run:
+              name: Running test - Sig Tests | coda-shared-prefix-test -who-proposes 0
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=1000 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0' 
+          - run:
+              name: Running test - Sig Tests | coda-shared-prefix-test -who-proposes 1
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=1000 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1' 
+          - run:
+              name: Running test - Sig Tests | coda-shared-state-test
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=1000 'run_integration_test' 'coda-shared-state-test' 
+          - run:
+              name: Running test - Sig Tests | coda-restart-node-test
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=1000 'run_integration_test' 'coda-restart-node-test' 
+          - run:
+              name: Running test - Sig Tests | transaction-snark-profiler -check-only
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=1000 'run_integration_test' 'transaction-snark-profiler -check-only' 
+      
+    test-all_stake_integration_tests:
+      resource_class: large
+      docker:
+      - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
+        auth:
+          username: _json_key
+          password: $JSON_GCLOUD_CREDENTIALS
+      steps:
+          - checkout
+          - run:
+              name: Check .circleci Render
+              command: make check-render-circleci
+          - run:
+              name: Build Haskell
+              command: source ~/.profile && make kademlia
+          - run:
+              name: Build OCaml
+              command: eval `opam config env` && DUNE_PROFILE=test make build 2>&1 | tee /tmp/buildocaml.log
+            
+          - run:
+              name: Running test - Stake Tests | full-test
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=1000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'full-test' 
+          - run:
+              name: Running test - Stake Tests | coda-peers-test
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=1000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-peers-test' 
+          - run:
+              name: Running test - Stake Tests | coda-transitive-peers-test
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=1000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-transitive-peers-test' 
+          - run:
+              name: Running test - Stake Tests | coda-block-production-test
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=1000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-block-production-test' 
+          - run:
+              name: Running test - Stake Tests | coda-shared-prefix-test -who-proposes 0
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=1000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0' 
+          - run:
+              name: Running test - Stake Tests | coda-shared-prefix-test -who-proposes 1
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=1000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1' 
+          - run:
+              name: Running test - Stake Tests | coda-shared-state-test
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=1000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-state-test' 
+          - run:
+              name: Running test - Stake Tests | coda-restart-node-test
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=1000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-restart-node-test' 
+          - run:
+              name: Running test - Stake Tests | transaction-snark-profiler -check-only
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=1000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'transaction-snark-profiler -check-only' 
+      
 
 workflows:
     version: 2
@@ -217,10 +244,13 @@ workflows:
             - build
             - build_withsnark
             - build_public
-            - test-runtest
-            - test-sig
+            
+            - test-all_sig_integration_tests
+            
+            - test-all_stake_integration_tests
+            
             - test-withsnark
-            #- test-stake
+            - test-unit-test
     # NOTES: Save this idea for later (nightly/scheduled workflows)
     # nightly:
     #     triggers:
@@ -231,4 +261,3 @@ workflows:
     #                     only: master
     #     jobs:
     #         - build_withsnark
-

@@ -8,6 +8,10 @@ GITLONGHASH = $(shell git rev-parse HEAD)
 MYUID = $(shell id -u)
 DOCKERNAME = nanotest-$(MYUID)
 
+ifeq ($(DUNE_PROFILE),)
+DUNE_PROFILE := dev
+endif
+
 ifeq ($(USEDOCKER),TRUE)
  $(info INFO Using Docker Named $(DOCKERNAME))
  WRAP = docker exec -it $(DOCKERNAME)
@@ -37,7 +41,7 @@ dht: kademlia
 build:
 	$(info Starting Build)
 	ulimit -s 65536
-	cd src ; $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build
+	cd src ; $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 withupdates:
@@ -67,11 +71,10 @@ withkeys:
 ## Lint
 
 reformat:
-	cd src; $(WRAPSRC) dune exec app/reformat/reformat.exe -- -path .
+	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
 
 check-format:
-	cd src; $(WRAPSRC) dune exec app/reformat/reformat.exe -- -path . -check
-
+	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
 
 ########################################
 ## Containers and container management
@@ -173,15 +176,15 @@ test-runtest:
 
 test-sigs: SHELL := /bin/bash
 test-sigs:
-	source scripts/test_all.sh ; cd src ; CODA_CONSENSUS_MECHANISM=proof_of_signature WITH_SNARKS=false run_integration_tests
+	source scripts/test_all.sh ; cd src ; run_all_sig_integration_tests
 
 test-stakes: SHELL := /bin/bash
 test-stakes:
-	source scripts/test_all.sh ; cd src ; CODA_CONSENSUS_MECHANISM=proof_of_stake WITH_SNARKS=false run_integration_tests
+	source scripts/test_all.sh ; cd src ; run_all_stake_integration_tests
 
 test-withsnark: SHELL := /bin/bash
 test-withsnark:
-	source scripts/test_all.sh ; cd src; CODA_CONSENSUS_MECHANISM=proof_of_signature WITH_SNARKS=true run_integration_tests
+	source scripts/test_all.sh ; cd src; CODA_CONSENSUS_MECHANISM=proof_of_signature WITH_SNARKS=true run_integration_test full-test
 
 web:
 	./scripts/web.sh

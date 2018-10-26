@@ -5,12 +5,8 @@ open Coda_main
 open Signature_lib
 open Coda_base
 
-module Make
-    (Ledger_proof : Ledger_proof_intf)
-    (Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof.t)
-    (Coda : Coda_intf.S with type ledger_proof = Ledger_proof.t) =
-struct
-  module Coda_processes = Coda_processes.Make (Ledger_proof) (Kernel) (Coda)
+module Make (Kernel : Kernel_intf) = struct
+  module Coda_processes = Coda_processes.Make (Kernel)
   open Coda_processes
 
   module Api = struct
