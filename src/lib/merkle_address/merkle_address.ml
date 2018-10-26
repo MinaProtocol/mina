@@ -42,6 +42,8 @@ module type S = sig
 
   val serialize : t -> Bigstring.t
 
+  val to_string : t -> string
+
   val pp : Format.formatter -> t -> unit
 
   module Range : sig

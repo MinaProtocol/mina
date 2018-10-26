@@ -3,6 +3,7 @@ FROM ocaml/opam2:debian-9-ocaml-4.07
 # OS package dependancies
 RUN sudo apt-get install --yes \
     cmake \
+    jq \
     libboost-dev \
     libboost-program-options-dev \
     libffi-dev \
@@ -13,6 +14,7 @@ RUN sudo apt-get install --yes \
     librocksdb4.5 \
     libsodium-dev \
     libssl-dev \
+    lsb \
     m4 \
     pandoc \
     python \
@@ -20,6 +22,13 @@ RUN sudo apt-get install --yes \
     pkg-config \
     python-jinja2 \
     zlib1g-dev
+
+# Google Cloud tools
+RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
+    echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
+    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - && \
+    sudo apt-get update -y && sudo apt-get install google-cloud-sdk -y
+    
 
 # Opam dependancies
 RUN opam update -y && opam upgrade -y

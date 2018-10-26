@@ -111,6 +111,7 @@ pull-ocaml407-googlecloud:
 
 update-deps: base-googlecloud
 	./scripts/rewrite-from-dockerfile.sh ocaml-base $(GITLONGHASH)
+	cd .circleci; python2 render.py > config.yml
 
 container:
 	@./scripts/container.sh restart

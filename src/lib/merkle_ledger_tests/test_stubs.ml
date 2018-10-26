@@ -71,6 +71,9 @@ module In_memory_kvdb : Intf.Key_value_database = struct
 
   let set tbl ~key ~data = Hashtbl.set tbl ~key:(Bigstring.to_string key) ~data
 
+  let set_batch tbl ~key_data_pairs =
+    List.iter key_data_pairs ~f:(fun (key, data) -> set tbl ~key ~data)
+
   let delete tbl ~key = Hashtbl.remove tbl (Bigstring.to_string key)
 
   let copy tbl = Hashtbl.copy tbl
@@ -107,8 +110,6 @@ end
 module Key = struct
   module T = struct
     type t = string [@@deriving sexp, compare, hash, bin_io]
-
-    type key = t [@@deriving sexp, bin_io]
   end
 
   let empty = ""
