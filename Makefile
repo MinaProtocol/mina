@@ -44,12 +44,6 @@ build:
 	cd src ; $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
-withupdates:
-	sed -i '/let force_updates = /c\let force_updates = true' src/app/cli/src/coda.ml
-
-withoutupdates:
-	sed -i '/let force_updates = /c\let force_updates = false' src/app/cli/src/coda.ml
-
 dev: docker container build
 
 # snark tunable

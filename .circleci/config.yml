@@ -83,9 +83,6 @@ jobs:
                 name: Enable snarks --  make withsnark
                 command: make withsnark
             - run:
-                name: Enable update checking
-                command: make withupdates
-            - run:
                 name: Get Proving Keys -- make withkeys
                 command: make withkeys
             - run:
