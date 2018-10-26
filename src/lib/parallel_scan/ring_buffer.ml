@@ -19,7 +19,7 @@ let direct_update t i ~f =
   let open Or_error.Let_syntax in
   let x : 'a = t.data.(i) in
   let%bind v = f x in
-  return @@ t.data.(i) <- v
+  return @@ (t.data.(i) <- v)
 
 let update t ~f = direct_update t t.position ~f:(fun x -> f t.position x)
 

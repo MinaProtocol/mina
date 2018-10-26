@@ -1,5 +1,6 @@
 open Core
 open Snarky
+
 (* Welcome!
 
    Snarky is a library for constructing R1CS SNARKs.
