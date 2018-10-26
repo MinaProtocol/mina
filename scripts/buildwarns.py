@@ -29,8 +29,11 @@ for line in fileinput.input():
         code=line.split()[1].replace(':','')
         percode[code] += 1
         percode['total'] += 1
-        
-        myfile = lastline.split('"')[1]
+        try:
+            myfile = lastline.split('"')[1]
+        except:
+            # Cannot parse line
+            continue
         perfile[myfile] += 1
         if myfile not in fulldata:  # init
             fulldata[myfile] = collections.Counter()
