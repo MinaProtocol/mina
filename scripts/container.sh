@@ -8,12 +8,12 @@ fi
 echo "Starting developer docker container"
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-IMG=nanotest:latest
+IMG=codabuilder:latest
 
 MYUID=$(id -u)
 MYGID=$(id -g)
 
-DOCKERNAME="nanotest-$MYUID"
+DOCKERNAME="codabuilder-$MYUID"
 
 if [[ $1 == "restart" ]]; then
   if $(docker ps | grep -q $IMG); then

@@ -10,7 +10,6 @@ fi
 
 filenames="
   $SCRIPTPATH/../dockerfiles/Dockerfile
-  $SCRIPTPATH/../dockerfiles/Dockerfile-build
   $SCRIPTPATH/../.circleci/config.yml.jinja
 "
 

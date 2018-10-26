@@ -6,7 +6,7 @@ GITHASH = $(shell git rev-parse --short=8 HEAD)
 GITLONGHASH = $(shell git rev-parse HEAD)
 
 MYUID = $(shell id -u)
-DOCKERNAME = nanotest-$(MYUID)
+DOCKERNAME = codabuilder-$(MYUID)
 
 ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
@@ -20,7 +20,6 @@ else
  $(info INFO Not using Docker)
  WRAP =
 endif
-
 
 ########################################
 ## Code
@@ -82,14 +81,18 @@ check-format:
 # customized local docker
 # fixme 'nanotest'
 docker:
-	docker build --file dockerfiles/Dockerfile --tag nanotest .
+	docker build --file dockerfiles/Dockerfile --tag codabuilder .
 
 # push steps require auth on docker hub
 docker-toolchain:
-	docker build --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/coda:toolchain-$(GITLONGHASH) .
-	docker tag codaprotocol/coda:toolchain-$(GITLONGHASH) codaprotocol/coda:toolchain-latest
-	docker push codaprotocol/coda:toolchain-$(GITLONGHASH)
-	docker push codaprotocol/coda:toolchain-latest
+	@if git diff-index --quiet HEAD ; then \
+		docker build --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/coda:toolchain-$(GITLONGHASH) . ;\
+		docker tag  codaprotocol/coda:toolchain-$(GITLONGHASH) codaprotocol/coda:toolchain-latest ;\
+		docker push codaprotocol/coda:toolchain-$(GITLONGHASH) ;\
+		docker push codaprotocol/coda:toolchain-latest ;\
+	else \
+		echo "Repo is dirty, commit first." ;\
+	fi
 
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)

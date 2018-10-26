@@ -4,7 +4,7 @@ jobs:
     build:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-7882157f7c6c7bd5def2b0b5a18541bc1b5e0f4f
+        - image: codaprotocol/coda:toolchain-57f14a512ef840447a38409c07649d84af79bf84
         steps:
             - checkout
             - run:
@@ -34,7 +34,7 @@ jobs:
     build_withsnark:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-7882157f7c6c7bd5def2b0b5a18541bc1b5e0f4f
+        - image: codaprotocol/coda:toolchain-57f14a512ef840447a38409c07649d84af79bf84
         steps:
             - checkout
             - run:
@@ -64,7 +64,7 @@ jobs:
     build_public:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-7882157f7c6c7bd5def2b0b5a18541bc1b5e0f4f
+        - image: codaprotocol/coda:toolchain-57f14a512ef840447a38409c07649d84af79bf84
         steps:
             - checkout
             - run:
@@ -94,7 +94,7 @@ jobs:
     test-unit-test:
        resource_class: large
        docker:
-       - image: codaprotocol/coda:toolchain-7882157f7c6c7bd5def2b0b5a18541bc1b5e0f4f
+       - image: codaprotocol/coda:toolchain-57f14a512ef840447a38409c07649d84af79bf84
        steps:
            - checkout
            - run:
@@ -110,7 +110,7 @@ jobs:
     test-withsnark:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-7882157f7c6c7bd5def2b0b5a18541bc1b5e0f4f
+        - image: codaprotocol/coda:toolchain-57f14a512ef840447a38409c07649d84af79bf84
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -133,7 +133,7 @@ jobs:
     test-{{test.name}}:
       resource_class: large
       docker:
-      - image: codaprotocol/coda:toolchain-7882157f7c6c7bd5def2b0b5a18541bc1b5e0f4f
+      - image: codaprotocol/coda:toolchain-57f14a512ef840447a38409c07649d84af79bf84
       steps:
           - checkout
           - run:
