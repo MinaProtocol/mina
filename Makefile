@@ -52,17 +52,6 @@ withoutupdates:
 
 dev: docker container build
 
-# snark tunable
-
-withsnark:
-	sed -i '/let with_snark =/c\let with_snark = true' src/lib/coda_base/insecure.ml
-
-withoutsnark:
-	sed -i '/let with_snark =/c\let with_snark = false' src/lib/coda_base/insecure.ml
-
-showsnark:
-	@grep 'let with_snark' src/lib/coda_base/insecure.ml
-
 # gets proiving keys -- only used in CI
 withkeys:
 	sudo -E scripts/get_keys.sh
