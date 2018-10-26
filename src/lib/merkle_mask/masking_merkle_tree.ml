@@ -159,7 +159,7 @@ struct
     (* if the mask's parent sets an account, we can prune an entry in the mask if the account in the parent
      is the same in the mask
        *)
-    let parent_set_notify t location account parent_merkle_path =
+    let parent_set_notify t location account =
       match find_account t location with
       | Some existing_account ->
           if Account.equal account existing_account then (
@@ -168,9 +168,7 @@ struct
             (* update hashes *)
             let account_address = Location.to_path_exn location in
             let account_hash = Hash.empty_account in
-            let merkle_path =
-              fixup_merkle_path t parent_merkle_path account_address
-            in
+            let merkle_path = merkle_path t location in
             let addresses_and_hashes =
               addresses_and_hashes_from_merkle_path_exn merkle_path
                 account_address account_hash
