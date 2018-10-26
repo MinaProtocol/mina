@@ -343,55 +343,52 @@ let rec ensure_testnet_id_still_good log =
       (fun () -> don't_wait_for @@ ensure_testnet_id_still_good log)
       ()
   in
-  if force_updates then
-    match%bind
-      Monitor.try_with_or_error (fun () ->
-          Client.get (Uri.of_string "http://updates.o1test.net/testnet_id") )
-    with
-    | Error e ->
-        Logger.error log
-          "exception while trying to fetch testnet_id, trying again in 6 \
-           minutes" ;
+  match%bind
+    Monitor.try_with_or_error (fun () ->
+        Client.get (Uri.of_string "http://updates.o1test.net/testnet_id") )
+  with
+  | Error e ->
+      Logger.error log
+        "exception while trying to fetch testnet_id, trying again in 6 minutes" ;
+      try_later recheck_soon ;
+      Deferred.unit
+  | Ok (resp, body) ->
+      if resp.status <> `OK then (
         try_later recheck_soon ;
-        Deferred.unit
-    | Ok (resp, body) ->
-        if resp.status <> `OK then (
-          try_later recheck_soon ;
-          Logger.error log
-            "HTTP response status %s while getting testnet id, checking again \
-             in 6 minutes."
-            (Cohttp.Code.string_of_status resp.status) ;
-          Deferred.unit )
-        else
-          let%bind body_string = Body.to_string body in
-          let valid_ids =
-            String.split ~on:'\n' body_string
-            |> List.map ~f:(Fn.compose Git_sha.of_string String.strip)
-          in
-          (* Maybe the Git_sha.of_string is a bit gratuitous *)
-          let finish local_id remote_ids =
-            let str x = Git_sha.sexp_of_t x |> Sexp.to_string in
-            exit1
-              ~msg:
-                (sprintf
-                   "The version for the testnet has changed, and this client \
-                    (version %s) is no longer compatible. Please download the \
-                    latest Coda software!\n\
-                    Valid versions:\n\
-                    %s"
-                   ( local_id |> Option.map ~f:str
-                   |> Option.value ~default:"[COMMIT_SHA1 not set]" )
-                   remote_ids)
-          in
-          match commit_id with
-          | None -> finish None body_string
-          | Some sha ->
-              if
-                List.exists valid_ids ~f:(fun remote_id ->
-                    Git_sha.equal sha remote_id )
-              then ( try_later recheck_later ; Deferred.unit )
-              else finish commit_id body_string
-  else Deferred.unit
+        Logger.error log
+          "HTTP response status %s while getting testnet id, checking again \
+           in 6 minutes."
+          (Cohttp.Code.string_of_status resp.status) ;
+        Deferred.unit )
+      else
+        let%bind body_string = Body.to_string body in
+        let valid_ids =
+          String.split ~on:'\n' body_string
+          |> List.map ~f:(Fn.compose Git_sha.of_string String.strip)
+        in
+        (* Maybe the Git_sha.of_string is a bit gratuitous *)
+        let finish local_id remote_ids =
+          let str x = Git_sha.sexp_of_t x |> Sexp.to_string in
+          exit1
+            ~msg:
+              (sprintf
+                 "The version for the testnet has changed, and this client \
+                  (version %s) is no longer compatible. Please download the \
+                  latest Coda software!\n\
+                  Valid versions:\n\
+                  %s"
+                 ( local_id |> Option.map ~f:str
+                 |> Option.value ~default:"[COMMIT_SHA1 not set]" )
+                 remote_ids)
+        in
+        match commit_id with
+        | None -> finish None body_string
+        | Some sha ->
+            if
+              List.exists valid_ids ~f:(fun remote_id ->
+                  Git_sha.equal sha remote_id )
+            then ( try_later recheck_later ; Deferred.unit )
+            else finish commit_id body_string
 
 [%%else]
 
