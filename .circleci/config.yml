@@ -130,7 +130,7 @@ jobs:
                 command: eval `opam config env` && DUNE_PROFILE=test_snark make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                 name: Test make test-withsnark
-                command: source ~/.profile && make test-withsnark
+                command: source ~/.profile && DUNE_PROFILE=test_snark make test-withsnark
 
     
     test-all_sig_integration_tests:
