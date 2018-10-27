@@ -290,10 +290,10 @@ let home () =
                (marked_up_content
                   [ "Coda uses recursive composition of zk-SNARKs to compress \
                      the whole\n\
-                    \                blockchain down to the size of a few \
+                     blockchain down to the size of a few \
                      tweets."
                   ; "No one needs to store\n\
-                    \                or download transaction history in order \
+                     or download transaction history in order \
                      to verify the blockchain." ])
              ())
     ; Example.create
@@ -317,10 +317,10 @@ let home () =
              ~content:
                (marked_up_content
                   [ "A cornerstone of our approach is a focus on building\n\
-                    \                reliable software through the use of \
+                     reliable software through the use of \
                      statically-typed functional programming languages."
                   ; "This is reflected in our OCaml codebase and style of\n\
-                    \                structuring code around DSLs, as well as \
+                     structuring code around DSLs, as well as \
                      in the design of languages we're developing for Coda." ])
              ())
     ; Example.create
@@ -342,10 +342,10 @@ let home () =
              ~content:
                (marked_up_content
                   [ "We implement state-of-the-art\n\
-                    \                consensus protocols and have developed\n\
-                    \                frameworks for describing distributed \
+                     consensus protocols and have developed\n\
+                     frameworks for describing distributed \
                      systems, enabling us to quickly\n\
-                    \                iterate." ])
+                     iterate." ])
              ()) ]
   in
   let protocol_design scheme =
