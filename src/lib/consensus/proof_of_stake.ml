@@ -643,7 +643,6 @@ struct
       ; slot= Epoch.Slot.zero
       ; proposer_vrf_result=
           String.init 256 ~f:(fun _ -> '\000')
-          (*Sha256_lib.Sha256.bits_to_string (List.init 256 ~f:(fun _ -> false))*)
       }
 
     let to_hlist {epoch; slot; proposer_vrf_result} =

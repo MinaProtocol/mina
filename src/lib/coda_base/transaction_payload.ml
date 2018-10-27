@@ -114,9 +114,8 @@ let%test_unit "to_bits" =
         ; fee= Fee.of_int (Random.int Int.max_value_30_bits)
         ; nonce= Account_nonce.random ()
         ; memo=
-            Sha256.digest_string
-              (String.init (Random.int Int.max_value) ~f:(fun _ ->
-                   Char.of_int_exn (Random.int_incl 0 255) )) }
+            Sha256.digest_string arbitrary_string
+              }
       in
       Test_util.test_to_triples typ fold var_to_triples input )
 

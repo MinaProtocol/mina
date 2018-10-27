@@ -43,6 +43,7 @@ let words_to_bits ws =
   go (Array.length ws - 1) []
 
 let digest_string t =
+  (*TODO large strings might throw out of memory*)
   let n = String.length t in
   let block_length = Gadget.Block.length_in_bits / 8 in
   let r = n mod block_length in

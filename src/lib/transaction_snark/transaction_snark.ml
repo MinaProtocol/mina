@@ -272,7 +272,7 @@ module Transition = struct
   let to_tagged_transaction = function
     | Fee_transfer t -> Fee_transfer.to_tagged_transaction t
     | Transaction t -> (Normal, (t :> Transaction.t))
-    | Coinbase {proposer; fee_transfer} ->
+    | Coinbase {proposer; fee_transfer;_} ->
         let receiver, amount =
           Option.value ~default:(proposer, Fee.zero) fee_transfer
         in
@@ -1557,8 +1557,7 @@ let%test_module "transaction_snark" =
             transaction wallets 1 0 8
               (Fee.of_int (Random.int 20))
               Account.Nonce.zero
-              (Sha256_lib.Sha256.digest_string "")
-            (*TODO*)
+              (Sha256_lib.Sha256.digest_string Test_util.arbitrary_string)
           in
           let target = Ledger.merkle_root_after_transaction_exn ledger t1 in
           let mentioned_keys = Transaction.public_keys (t1 :> Transaction.t) in
@@ -1585,14 +1584,14 @@ let%test_module "transaction_snark" =
             transaction wallets 0 1 8
               (Fee.of_int (Random.int 20))
               Account.Nonce.zero
-              (Sha256_lib.Sha256.digest_string "")
+              (Sha256_lib.Sha256.digest_string Test_util.arbitrary_string)
             (*TODO*)
           in
           let t2 =
             transaction wallets 1 2 3
               (Fee.of_int (Random.int 20))
               Account.Nonce.zero
-              (Sha256_lib.Sha256.digest_string "")
+              (Sha256_lib.Sha256.digest_string Test_util.arbitrary_string)
             (*TODO*)
           in
           let sok_digest =
