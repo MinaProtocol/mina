@@ -29,7 +29,7 @@ module Keys = struct
     let dummy =
       {step= Dummy_values.Tick.proving_key; wrap= Dummy_values.Tock.proving_key}
 
-    let load ({step; wrap}: Location.t) =
+    let load ({step; wrap} : Location.t) =
       let open Storage in
       let parent_log = Logger.create () in
       let tick_controller =
@@ -67,7 +67,7 @@ module Keys = struct
       { step= Dummy_values.Tick.verification_key
       ; wrap= Dummy_values.Tock.verification_key }
 
-    let load ({step; wrap}: Location.t) =
+    let load ({step; wrap} : Location.t) =
       let open Storage in
       let parent_log = Logger.create () in
       let tick_controller =
@@ -110,7 +110,7 @@ module Keys = struct
     include Sexpable.To_stringable (T)
   end
 
-  let load ({proving; verification}: Location.t) =
+  let load ({proving; verification} : Location.t) =
     let%map proving, proving_checksum = Proving.load proving
     and verification, verification_checksum = Verification.load verification in
     ( {proving; verification}
@@ -166,7 +166,7 @@ struct
                   let typ : (var, value) Tick.Typ.t =
                     Tick.Pedersen.Checked.Digest.Unpacked.typ
 
-                  let var_to_bits (x: var) = (x :> Tick.Boolean.var list)
+                  let var_to_bits (x : var) = (x :> Tick.Boolean.var list)
 
                   let var_to_triples xs =
                     let open Fold in

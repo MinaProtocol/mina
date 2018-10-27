@@ -8,12 +8,12 @@ fi
 echo "Starting developer docker container"
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-IMG=nanotest:latest
+IMG=codabuilder:latest
 
 MYUID=$(id -u)
 MYGID=$(id -g)
 
-DOCKERNAME="nanotest-$MYUID"
+DOCKERNAME="codabuilder-$MYUID"
 
 if [[ $1 == "restart" ]]; then
   if $(docker ps | grep -q $IMG); then
@@ -23,10 +23,8 @@ if [[ $1 == "restart" ]]; then
 
     # Delete prior image if it's been stopped, but not deleted
     docker rm -fv $DOCKERNAME > /dev/null
-    
     echo "Starting new dev container - $DOCKERNAME"
     NAME=$(docker run \
-      -p 127.0.0.1:8080:8080 \
       --volume $SCRIPTPATH/..:/home/opam/app \
       --user $MYUID:$MYGID \
       --name $DOCKERNAME \

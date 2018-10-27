@@ -51,17 +51,16 @@ end) :
   end
   with type work := Work.t
    and type proof := Proof.t
-   and type fee := Fee.t =
-struct
+   and type fee := Fee.t = struct
   module Priced_proof = struct
     type t = (Proof.t sexp_opaque, Fee.t) Priced_proof.t
     [@@deriving sexp, bin_io]
 
     let create proof fee : (Proof.t, Fee.t) Priced_proof.t = {proof; fee}
 
-    let proof (t: t) = t.proof
+    let proof (t : t) = t.proof
 
-    let fee (t: t) = t.fee
+    let fee (t : t) = t.fee
   end
 
   type t = Priced_proof.t Work.Table.t [@@deriving sexp, bin_io]
@@ -130,11 +129,11 @@ let%test_module "random set test" =
       in
       Quickcheck.test
         ~sexp_of:
-          [%sexp_of
-            : Mock_snark_pool.t
-              * Mock_work.t
-              * (Mock_proof.t * Mock_fee.t)
-              * (Mock_proof.t * Mock_fee.t)]
+          [%sexp_of:
+            Mock_snark_pool.t
+            * Mock_work.t
+            * (Mock_proof.t * Mock_fee.t)
+            * (Mock_proof.t * Mock_fee.t)]
         (Quickcheck.Generator.tuple4 gen Mock_work.gen (gen_entry ())
            (gen_entry ()))
         ~f:(fun (t, work, (proof_1, fee_1), (proof_2, fee_2)) ->
@@ -151,16 +150,16 @@ let%test_module "random set test" =
                    the existing priced proof" =
       Quickcheck.test
         ~sexp_of:
-          [%sexp_of
-            : Mock_snark_pool.t
-              * Mock_work.t
-              * Mock_fee.t
-              * Mock_fee.t
-              * Mock_proof.t
-              * Mock_proof.t]
+          [%sexp_of:
+            Mock_snark_pool.t
+            * Mock_work.t
+            * Mock_fee.t
+            * Mock_fee.t
+            * Mock_proof.t
+            * Mock_proof.t]
         (Quickcheck.Generator.tuple6 gen Mock_work.gen Mock_fee.gen
-           Mock_fee.gen Mock_proof.gen Mock_proof.gen) ~f:
-        (fun (t, work, fee_1, fee_2, cheap_proof, expensive_proof) ->
+           Mock_fee.gen Mock_proof.gen Mock_proof.gen)
+        ~f:(fun (t, work, fee_1, fee_2, cheap_proof, expensive_proof) ->
           Mock_snark_pool.remove_solved_work t work ;
           let expensive_fee = max fee_1 fee_2
           and cheap_fee = min fee_1 fee_2 in

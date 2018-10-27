@@ -69,7 +69,6 @@ end
 
 module Make_small (M : sig
   val length_in_bits : int
-end) :
-  Small
+end) : Small
 
 module Make_full_size () : Full_size

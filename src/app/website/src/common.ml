@@ -16,7 +16,7 @@ module Styles = struct
 end
 
 module Image = struct
-  let draw ?(style= Style.empty) src xy =
+  let draw ?(style = Style.empty) src xy =
     let inline_style =
       match xy with
       | `Fixed_width x ->
@@ -33,7 +33,7 @@ module Image = struct
       (String.concat ~sep:" " style)
       src
 
-  let placeholder ?(style= Style.empty) x y =
+  let placeholder ?(style = Style.empty) x y =
     let xStr = Int.to_string x in
     let yStr = Int.to_string y in
     draw ~style
@@ -176,14 +176,14 @@ module Input_button = struct
       @ if new_tab then [Attribute.create "target" "_blank"] else [] )
       [button_node]
 
-  let cta ?(extra_style= "") ?(new_tab= true) ~label ~button_hint ~url () =
+  let cta ?(extra_style = "") ?(new_tab = true) ~label ~button_hint ~url () =
     let open Html in
     let open Html_concise in
     create ~button_hint:(`Text button_hint) ~new_tab
       ~extra_style:(Style.of_class ("f3 ph4 pv3 " ^ extra_style))
       ~label ~url ()
 
-  let fixed ?(new_tab= true) ~button_hint () =
+  let fixed ?(new_tab = true) ~button_hint () =
     let open Html in
     let open Html_concise in
     create ~button_hint:(`Text button_hint)
@@ -217,7 +217,7 @@ module Navbar = struct
       if current_page = label then Style.empty
       else Style.of_class "no-underline"
     in
-    let a' ?(open_new_tab= false) ?(style= Style.empty) url children label =
+    let a' ?(open_new_tab = false) ?(style = Style.empty) url children label =
       a
         Style.(
           of_class "fw3 silver tracked ttu" + style + maybe_no_underline label)
@@ -261,7 +261,7 @@ module Footer = struct
 end
 
 module Compound_chunk = struct
-  let create ?(variant= `With_image) ~important_text ~image ~image_positioning
+  let create ?(variant = `With_image) ~important_text ~image ~image_positioning
       () =
     let open Html_concise in
     match image with
@@ -282,7 +282,8 @@ module Compound_chunk = struct
                [ div [class_ "flex w-50"] [div [class_ "mw6"] [left]]
                ; div [class_ "flex w-50"] [div [class_ "center"] [right]] ])
           ~small:
-            (div [class_ "w-100 center mb4"]
+            (div
+               [class_ "w-100 center mb4"]
                ( match variant with
                | `With_image ->
                    [ div [class_ "flex justify-center mb3"] [image]
@@ -291,7 +292,7 @@ module Compound_chunk = struct
 end
 
 module Section = struct
-  let section' ?(heading_size= `Normal) ?heading ?(footer= false) content
+  let section' ?(heading_size = `Normal) ?heading ?(footer = false) content
       scheme =
     let open Html_concise in
     let color, bg_color =
@@ -349,9 +350,9 @@ module Section = struct
               Mobile_switch.create
                 ~not_small:
                   ( if i = 4 then
-                      a
-                        [Style.(render (of_class "jump")); href "#item-0"]
-                        [text "start over"]
+                    a
+                      [Style.(render (of_class "jump")); href "#item-0"]
+                      [text "start over"]
                   else
                     a
                       [Style.(render (of_class "jump")); href "#item-4"]
@@ -481,7 +482,7 @@ module Section = struct
     in
     section' content scheme
 
-  let footer' ?(fixed= false) ~links ~newsletter ~scheme =
+  let footer' ?(fixed = false) ~links ~newsletter ~scheme =
     let content =
       let open Html_concise in
       let a style url children label =
@@ -503,8 +504,8 @@ module Section = struct
         [class_ "flex justify-center tc mb4"]
         [ ul
             [Style.(render (of_class "list ph0"))]
-            (List.map (List.zip_exn links cdots) ~f:
-               (fun ((name, link, label), cdot) ->
+            (List.map (List.zip_exn links cdots)
+               ~f:(fun ((name, link, label), cdot) ->
                  li [class_ "mb2 dib"]
                    [ a
                        Style.(of_class "no-underline fw3 f6 silver")
@@ -541,7 +542,7 @@ module Section = struct
     section' ?heading content scheme
 end
 
-let wrap ?(headers= []) ?(fixed_footer= false) ?title ~page_label sections =
+let wrap ?(headers = []) ?(fixed_footer = false) ?title ~page_label sections =
   let title =
     Option.value_map ~default:"Coda Cryptocurrency Protocol" title
       ~f:title_string

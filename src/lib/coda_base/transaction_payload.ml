@@ -97,7 +97,7 @@ let%test_unit "to_bits" =
       in
       Test_util.test_to_triples typ fold var_to_triples input )
 
-let var_of_t ({receiver; amount; fee; nonce}: t) : var =
+let var_of_t ({receiver; amount; fee; nonce} : t) : var =
   { receiver= Public_key.Compressed.var_of_t receiver
   ; amount= Amount.var_of_t amount
   ; fee= Fee.var_of_t fee

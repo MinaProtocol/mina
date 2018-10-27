@@ -15,7 +15,7 @@ module Chain_hash = struct
     |> of_hash
 
   module Checked = struct
-    let constant (t: t) =
+    let constant (t : t) =
       var_of_hash_packed (Field.Checked.constant (t :> Field.t))
 
     type t = var
@@ -46,8 +46,8 @@ module Chain_hash = struct
 
   let%test_unit "checked-unchecked equivalence" =
     let open Quickcheck in
-    test ~trials:20 (Generator.tuple2 gen Transaction_payload.gen) ~f:
-      (fun (base, payload) ->
+    test ~trials:20 (Generator.tuple2 gen Transaction_payload.gen)
+      ~f:(fun (base, payload) ->
         let unchecked = cons payload base in
         let checked =
           let comp =
