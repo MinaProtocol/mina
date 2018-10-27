@@ -25,8 +25,7 @@ module Message = struct
           Transaction_payload.fold t +> group3 ~default:false (of_list nonce))
     in
     Scalar.of_bits
-      ( Sha256_lib.Sha256.digest_bits (Field.unpack d)
-      |> Sha256.Digest.to_bits)
+      (Sha256_lib.Sha256.digest_bits (Field.unpack d) |> Sha256.Digest.to_bits)
 
   let () = assert Insecure.signature_hash_function
 

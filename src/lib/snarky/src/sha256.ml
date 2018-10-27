@@ -111,16 +111,14 @@ end = struct
       List.init length_in_bits ~f:(fun i ->
           (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1 )
 
-    let of_bits = 
+    let of_bits =
       let nearest_multiple ~of_:n k =
         let r = k mod n in
         if Int.equal r 0 then k else k - r + n
       in
       let pad zero bits =
         let n = List.length bits in
-        let padding_length =
-          nearest_multiple ~of_:length_in_bits n - n
-        in
+        let padding_length = nearest_multiple ~of_:length_in_bits n - n in
         bits @ List.init padding_length ~f:(fun _ -> zero)
       in
       Fn.compose bits_to_string (pad false)

@@ -71,9 +71,6 @@ module Checked = struct
 end
 
 let%test_unit "sha-checked-and-unchecked" =
-  (*let bitstring bs =
-    List.map bs ~f:(fun b -> if b then '1' else '0') |> String.of_char_list
-  in*)
   let gen =
     let open Quickcheck.Generator in
     let open Let_syntax in
