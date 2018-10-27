@@ -26,10 +26,11 @@ module Bits : Bits_intf.S with type t := t
 
 val fold : t -> bool Triple.t Fold.t
 
-include Tick.Snarkable.Bits.Faithful
-        with type Unpacked.value = t
-         and type Packed.value = t
-         and type Packed.var = private Tick.Field.Checked.t
+include
+  Tick.Snarkable.Bits.Faithful
+  with type Unpacked.value = t
+   and type Packed.value = t
+   and type Packed.var = private Tick.Field.Checked.t
 
 module Span : sig
   type t [@@deriving sexp]
@@ -42,9 +43,10 @@ module Span : sig
 
   val of_time_span : Time.Span.t -> t
 
-  include Tick.Snarkable.Bits.Faithful
-          with type Unpacked.value = t
-           and type Packed.value = t
+  include
+    Tick.Snarkable.Bits.Faithful
+    with type Unpacked.value = t
+     and type Packed.value = t
 
   val to_ms : t -> Int64.t
 

@@ -13,13 +13,14 @@ module type S = sig
 
   module Path : Merkle_path.S with type hash := hash
 
-  include Syncable_intf.S
-          with type root_hash := root_hash
-           and type hash := hash
-           and type account := account
-           and type addr := Addr.t
-           and type path = Path.t
-           and type t := t
+  include
+    Syncable_intf.S
+    with type root_hash := root_hash
+     and type hash := hash
+     and type account := account
+     and type addr := Addr.t
+     and type path = Path.t
+     and type t := t
 
   val to_list : t -> account list
 

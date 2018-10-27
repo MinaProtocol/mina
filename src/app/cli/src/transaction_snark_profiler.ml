@@ -24,7 +24,7 @@ let create_ledger_and_transactions num_transitions =
         ; balance= Currency.Balance.of_int 10_000
         ; receipt_chain_hash= Receipt.Chain_hash.empty
         ; nonce= Account.Nonce.zero } ) ;
-  let txn from_kp (to_kp: Signature_lib.Keypair.t) amount fee nonce =
+  let txn from_kp (to_kp : Signature_lib.Keypair.t) amount fee nonce =
     let payload : Transaction.Payload.t =
       {receiver= Public_key.compress to_kp.public_key; fee; amount; nonce}
     in
@@ -100,10 +100,10 @@ let rec pair_up = function
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
 let profile (module T : Transaction_snark.S) sparse_ledger0
-    (transitions: Transaction_snark.Transition.t list) =
+    (transitions : Transaction_snark.Transition.t list) =
   let (base_proof_time, _), base_proofs =
-    List.fold_map transitions ~init:(Time.Span.zero, sparse_ledger0) ~f:
-      (fun (max_span, sparse_ledger) t ->
+    List.fold_map transitions ~init:(Time.Span.zero, sparse_ledger0)
+      ~f:(fun (max_span, sparse_ledger) t ->
         let sparse_ledger' =
           Sparse_ledger.apply_super_transaction_exn sparse_ledger t
         in
@@ -122,8 +122,8 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
     | [x] -> serial_time
     | _ ->
         let layer_time, new_proofs =
-          List.fold_map (pair_up proofs) ~init:Time.Span.zero ~f:
-            (fun max_time (x, y) ->
+          List.fold_map (pair_up proofs) ~init:Time.Span.zero
+            ~f:(fun max_time (x, y) ->
               let pair_time, proof =
                 time (fun () ->
                     T.merge ~sok_digest:Sok_message.Digest.default x y
@@ -137,7 +137,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
   Printf.sprintf !"Total time was: %{Time.Span}" total_time
 
 let check_base_snarks sparse_ledger0
-    (transitions: Transaction_snark.Transition.t list) =
+    (transitions : Transaction_snark.Transition.t list) =
   let _ =
     let sok_message =
       Sok_message.create ~fee:Currency.Fee.zero

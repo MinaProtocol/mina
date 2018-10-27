@@ -25,7 +25,7 @@ module Agent : sig
 end = struct
   type 'a t = {signal: unit Ivar.t; mutable value: 'a option}
 
-  let create ~(f: 'a -> 'b) (reader: 'a Linear_pipe.Reader.t) : 'b t =
+  let create ~(f : 'a -> 'b) (reader : 'a Linear_pipe.Reader.t) : 'b t =
     let t = {signal= Ivar.create (); value= None} in
     don't_wait_for
       (Linear_pipe.iter reader ~f:(fun x ->
@@ -92,8 +92,7 @@ module Make (Inputs : Inputs_intf) :
    and type completed_work_statement := Inputs.Completed_work.Statement.t
    and type completed_work_checked := Inputs.Completed_work.Checked.t
    and type time_controller := Inputs.Time.Controller.t
-   and type keypair := Inputs.Keypair.t =
-struct
+   and type keypair := Inputs.Keypair.t = struct
   open Inputs
   open Consensus_mechanism
 
@@ -168,16 +167,16 @@ struct
           Consensus_mechanism.generate_transition ~previous_protocol_state
             ~blockchain_state ~local_state:consensus_local_state ~time ~keypair
             ~transactions:
-              ( Ledger_builder_diff.With_valid_signatures_and_proofs.
-                transactions diff
+              ( Ledger_builder_diff.With_valid_signatures_and_proofs
+                .transactions diff
                 :> Transaction.t list )
             ~ledger:(Ledger_builder.ledger ledger_builder)
             ~logger )
     in
     Option.value
       ~default:(Interruptible.return None)
-      (Option.map transition_opt ~f:
-         (fun (protocol_state, consensus_transition_data) ->
+      (Option.map transition_opt
+         ~f:(fun (protocol_state, consensus_transition_data) ->
            lift_sync (fun () ->
                let snark_transition =
                  Snark_transition.create_value
@@ -225,7 +224,7 @@ struct
       let open Interruptible.Let_syntax in
       match Agent.get tip_agent with
       | None -> Interruptible.return ()
-      | Some tip ->
+      | Some tip -> (
           Logger.info logger
             !"Begining to propose off of tip %{sexp: Tip.t}"
             tip ;
@@ -265,7 +264,7 @@ struct
                      in
                      Linear_pipe.write_or_exn ~capacity:transition_capacity
                        transition_writer transition_reader
-                       (external_transition, time)) )
+                       (external_transition, time)) ) )
     in
     let proposal_supervisor = Singleton_supervisor.create ~task:propose in
     let scheduler = Singleton_scheduler.create time_controller in
@@ -282,8 +281,8 @@ struct
               Singleton_scheduler.schedule scheduler (time_of_ms time)
                 ~f:check_for_proposal
           | `Propose time ->
-              Singleton_scheduler.schedule scheduler (time_of_ms time) ~f:
-                (fun () ->
+              Singleton_scheduler.schedule scheduler (time_of_ms time)
+                ~f:(fun () ->
                   ignore
                     (Interruptible.finally
                        (Singleton_supervisor.dispatch proposal_supervisor)
