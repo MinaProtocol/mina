@@ -121,7 +121,11 @@ let run_test (type ledger_proof) (module Kernel
   let build_txn amount sender_sk receiver_pk fee =
     let nonce = Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn in
     let payload : Transaction.Payload.t =
-      {receiver= receiver_pk; amount; fee; nonce}
+      { receiver= receiver_pk
+      ; amount
+      ; fee
+      ; nonce
+      ; memo= Sha256_lib.Sha256.digest_string "" }
     in
     Transaction.sign (Keypair.of_private_key_exn sender_sk) payload
   in

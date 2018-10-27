@@ -4,6 +4,7 @@ open Coda_numbers
 open Snark_params.Tick
 open Let_syntax
 open Import
+open Sha256_lib
 module Amount = Currency.Amount
 module Fee = Currency.Fee
 
@@ -27,12 +28,13 @@ end
 include Stable.V1
 
 let dummy =
-  let dummy_memo = String.init (Sha256.Digest.length_in_bits / 8) ~f:(fun _ -> '\000') in
   { receiver= Public_key.Compressed.empty
   ; amount= Amount.zero
   ; fee= Fee.zero
   ; nonce= Account_nonce.zero
-  ; memo= dummy_memo } (*TODO*)
+  ; memo= Sha256.digest_string "" }
+
+(*TODO*)
 
 type var =
   ( Public_key.Compressed.var
@@ -45,13 +47,18 @@ type var =
 let typ : (var, t) Typ.t =
   let spec =
     let open Data_spec in
-    [Public_key.Compressed.typ; Amount.typ; Fee.typ; Account_nonce.Unpacked.typ; Sha256.Digest.typ]
+    [ Public_key.Compressed.typ
+    ; Amount.typ
+    ; Fee.typ
+    ; Account_nonce.Unpacked.typ
+    ; Sha256.Digest.typ ]
   in
   let of_hlist
         : 'a 'b 'c 'd 'e.    (unit, 'a -> 'b -> 'c -> 'd -> 'e -> unit) H_list.t
           -> ('a, 'b, 'c, 'd, 'e) t_ =
     let open H_list in
-    fun [receiver; amount; fee; nonce; memo] -> {receiver; amount; fee; nonce; memo}
+    fun [receiver; amount; fee; nonce; memo] ->
+      {receiver; amount; fee; nonce; memo}
   in
   let to_hlist {receiver; amount; fee; nonce; memo} =
     H_list.[receiver; amount; fee; nonce; memo]
@@ -62,7 +69,8 @@ let typ : (var, t) Typ.t =
 let fold {receiver; amount; fee; nonce; memo} =
   let open Fold in
   Public_key.Compressed.fold receiver
-  +> Amount.fold amount +> Fee.fold fee +> Account_nonce.fold nonce +> Sha256.Digest.fold memo
+  +> Amount.fold amount +> Fee.fold fee +> Account_nonce.fold nonce
+  +> Sha256.Digest.fold memo
 
 (* TODO: This could be a bit more efficient by packing across triples,
    but I think the added confusion-possibility
@@ -73,12 +81,15 @@ let var_to_triples {receiver; amount; fee; nonce; memo} =
      let amount = Amount.var_to_triples amount in
      let fee = Fee.var_to_triples fee in
      let nonce = Account_nonce.Unpacked.var_to_triples nonce in
-     let memo = Fold.(to_list (group3 ~default:Boolean.false_ (of_list memo))) in
+     let memo =
+       Fold.(to_list (group3 ~default:Boolean.false_ (of_list memo)))
+     in
      receiver @ amount @ fee @ nonce @ memo)
 
 let length_in_triples =
   Public_key.Compressed.length_in_triples + Amount.length_in_triples
-  + Fee.length_in_triples + Account_nonce.length_in_triples + Sha256.Digest.length_in_triples
+  + Fee.length_in_triples + Account_nonce.length_in_triples
+  + Sha256.Digest.length_in_triples
 
 let to_triples t = Fold.to_list (fold t)
 
@@ -88,7 +99,9 @@ let gen =
   and amount = Amount.gen
   and fee = Fee.gen
   and nonce = Account_nonce.gen
-  and memo = String.gen_with_length (Sha256.Digest.length_in_bits / 8) Char.gen in
+  and memo =
+    String.gen_with_length (Sha256.Digest.length_in_bits / 8) Char.gen
+  in
   {receiver; amount; fee; nonce; memo}
 
 let%test_unit "to_bits" =

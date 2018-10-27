@@ -213,7 +213,11 @@ struct
               Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn
             in
             let payload : Transaction.Payload.t =
-              {receiver= receiver_pk; amount; fee; nonce; memo= (Sha256_lib.Sha256.digest memo)}
+              { receiver= receiver_pk
+              ; amount
+              ; fee
+              ; nonce
+              ; memo= Sha256_lib.Sha256.digest_string memo }
             in
             Transaction.sign (Keypair.of_private_key_exn sender_sk) payload
           in

@@ -18,11 +18,11 @@ module Gadget =
     (Tick)
     (Tick_backend)
 
-let nearest_multiple ~of_:n k =
-  let r = k mod n in
-  if Int.equal r 0 then k else k - r + n
-
 let pad zero bits =
+  let nearest_multiple ~of_:n k =
+    let r = k mod n in
+    if Int.equal r 0 then k else k - r + n
+  in
   let n = List.length bits in
   let padding_length =
     nearest_multiple ~of_:Gadget.Block.length_in_bits n - n
@@ -42,11 +42,19 @@ let words_to_bits ws =
   in
   go (Array.length ws - 1) []
 
-let digest t =
-  (Digestif.SHA256.digest_string t :> string)
+let digest_string t =
+  let n = String.length t in
+  let block_length = Gadget.Block.length_in_bits / 8 in
+  let r = n mod block_length in
+  let t =
+    if r = 0 then t else t ^ String.init ~f:(fun _ -> '\000') (block_length - r)
+  in
+  bits_to_string (Digestif.SHA256.(feed_string (init ()) t).h |> words_to_bits)
 
-  (*bits_to_string (Digestif.SHA256.(feed_string (init ()) (bits_to_string (pad false bits))).h
-  |> words_to_bits) *)
+let digest_bits (bits: bool list) =
+  bits_to_string
+    ( Digestif.SHA256.(feed_string (init ()) (bits_to_string (pad false bits)))
+        .h |> words_to_bits )
 
 module Digest = Gadget.Digest
 
@@ -81,7 +89,11 @@ let%test_unit "sha-checked-and-unchecked" =
         in
         snd (Or_error.ok_exn (Tick.run_and_check t ()))
       in
-      let native = digest bits in
-      if not ([%eq : bool list] from_gadget native) then
-        failwithf "%s <> %s (on input %s)" (bitstring from_gadget)
-          (bitstring native) (bitstring bits) () )
+      let native_string = digest_string (bits_to_string bits) in
+      let native_bits = digest_bits bits in
+      if not ([%eq : string] from_gadget native_string) then
+        failwithf "%s <> %s (on input %s)" from_gadget native_string
+          (bits_to_string bits) ()
+      else if not ([%eq : string] from_gadget native_bits) then
+        failwithf "%s <> %s (on input %s)" from_gadget native_bits
+          (bits_to_string bits) () )

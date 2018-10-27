@@ -3,6 +3,7 @@ open Fold_lib
 open Tuple_lib
 open Coda_numbers
 open Snark_params.Tick
+open Sha256_lib
 open Import
 
 type ('pk, 'amount, 'fee, 'nonce, 'memo) t_ =
@@ -25,12 +26,12 @@ val gen : t Quickcheck.Generator.t
 module Stable : sig
   module V1 : sig
     type nonrec ('pk, 'amount, 'fee, 'nonce, 'memo) t_ =
-                                                 ( 'pk
-                                                 , 'amount
-                                                 , 'fee
-                                                 , 'nonce
-                                                 , 'memo )
-                                                 t_ =
+                                                        ( 'pk
+                                                        , 'amount
+                                                        , 'fee
+                                                        , 'nonce
+                                                        , 'memo )
+                                                        t_ =
       {receiver: 'pk; amount: 'amount; fee: 'fee; nonce: 'nonce; memo: 'memo}
     [@@deriving bin_io, eq, sexp, hash]
 

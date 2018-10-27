@@ -339,7 +339,8 @@ struct
             ( Message.fold msg
             +> Non_zero_curve_point.Compressed.fold compressed_g )
         in
-        Sha256.digest @@ Sha256_lib.Sha256.bits_to_string ((Snark_params.Tick.Pedersen.Digest.Bits.to_bits digest))
+        Sha256.digest_bits
+             (Snark_params.Tick.Pedersen.Digest.Bits.to_bits digest)
 
       module Checked = struct
         let hash msg g =
@@ -640,7 +641,9 @@ struct
     let genesis =
       { epoch= Epoch.zero
       ; slot= Epoch.Slot.zero
-      ; proposer_vrf_result= Sha256_lib.Sha256.digest "" (*(String.init 256 ~f:(fun _ -> '\000'))*)(*Sha256_lib.Sha256.bits_to_string (List.init 256 ~f:(fun _ -> false))*) }
+      ; proposer_vrf_result= (String.init 256 ~f:(fun _ -> '\000'))
+          (*Sha256_lib.Sha256.bits_to_string (List.init 256 ~f:(fun _ -> false))*)
+      }
 
     let to_hlist {epoch; slot; proposer_vrf_result} =
       Coda_base.H_list.[epoch; slot; proposer_vrf_result]

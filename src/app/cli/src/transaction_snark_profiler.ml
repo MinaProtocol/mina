@@ -26,7 +26,11 @@ let create_ledger_and_transactions num_transitions =
         ; nonce= Account.Nonce.zero } ) ;
   let txn from_kp (to_kp: Signature_lib.Keypair.t) amount fee nonce =
     let payload : Transaction.Payload.t =
-      {receiver= Public_key.compress to_kp.public_key; fee; amount; nonce; memo=Sha256_lib.Sha256.digest ""}
+      { receiver= Public_key.compress to_kp.public_key
+      ; fee
+      ; amount
+      ; nonce
+      ; memo= Sha256_lib.Sha256.digest_string "" }
     in
     Transaction.sign from_kp payload
   in

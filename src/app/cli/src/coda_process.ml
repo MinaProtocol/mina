@@ -1,6 +1,7 @@
 open Core
 open Async
 open Coda_worker
+open Coda_base
 open Coda_main
 
 module Make
@@ -63,7 +64,8 @@ struct
 
   let send_transaction_exn (conn, proc, _) sk pk amount fee memo =
     Coda_worker.Connection.run_exn conn
-      ~f:Coda_worker.functions.send_transaction ~arg:(sk, pk, amount, fee, memo)
+      ~f:Coda_worker.functions.send_transaction
+      ~arg:(sk, pk, amount, fee, Sha256_lib.Sha256.digest_string memo)
 
   let strongest_ledgers_exn (conn, proc, _) =
     let%map r =

@@ -389,7 +389,7 @@ let batch_send_txns =
               ; amount
               ; fee
               ; nonce
-              ; memo= Sha256_lib.Sha256.digest "" } ) )
+              ; memo= Sha256_lib.Sha256.digest_string "" } ) )
     in
     dispatch_with_message Client_lib.Send_transactions.rpc
       (ts :> Transaction.t list)
@@ -429,7 +429,11 @@ let send_txn =
          let receiver_compressed = Public_key.compress address in
          let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
          let payload : Transaction.Payload.t =
-           {receiver= receiver_compressed; amount; fee; nonce; memo=Sha256_lib.Sha256.digest "" }
+           { receiver= receiver_compressed
+           ; amount
+           ; fee
+           ; nonce
+           ; memo= Sha256_lib.Sha256.digest_string "" }
          in
          let txn = Transaction.sign sender_kp payload in
          dispatch_with_message Client_lib.Send_transactions.rpc

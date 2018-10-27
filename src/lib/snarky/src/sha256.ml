@@ -103,13 +103,27 @@ end = struct
             if b then acc lor (1 lsl (7 - i)) else acc )
         |> Char.of_int_exn
       in
-      chunks_of 8 bs |> List.map ~f:bits_to_char_big_endian |> String.of_char_list    
+      chunks_of 8 bs
+      |> List.map ~f:bits_to_char_big_endian
+      |> String.of_char_list
 
     let to_bits s =
       List.init length_in_bits ~f:(fun i ->
           (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1 )
-    
-    let of_bits = bits_to_string
+
+    let of_bits = 
+      let nearest_multiple ~of_:n k =
+        let r = k mod n in
+        if Int.equal r 0 then k else k - r + n
+      in
+      let pad zero bits =
+        let n = List.length bits in
+        let padding_length =
+          nearest_multiple ~of_:length_in_bits n - n
+        in
+        bits @ List.init padding_length ~f:(fun _ -> zero)
+      in
+      Fn.compose bits_to_string (pad false)
 
     let typ =
       Typ.transport
@@ -174,23 +188,21 @@ end = struct
       assert (Int.equal (List.length bits) length_in_bits) ;
       of_bits bits
 
-    let default_init = 
-      let init = List.init length_in_bits ~f:(fun i ->
-        (init_words.(i / 32) lsr (31 - (i mod 32))) land 1 = 1 )
-      in bits_to_string init
-    (*String.init (length_in_bits / 2) ~f:(fun _ -> '\000')*)
-    (*let default_init =
-      List.init length_in_bits ~f:(fun i ->
-          (init_words.(i / 32) lsr (31 - (i mod 32))) land 1 = 1 )*)
+    let default_init =
+      let init =
+        List.init length_in_bits ~f:(fun i ->
+            (init_words.(i / 32) lsr (31 - (i mod 32))) land 1 = 1 )
+      in
+      bits_to_string init
 
     module Checked = struct
-      let var_of_t = var_of_t(*List.map ~f:Boolean.var_of_value*)
+      let var_of_t = var_of_t
 
       let digest (x: var) : Digest.var = x
 
       let default_init = var_of_t default_init
 
-      let of_bits_exn bits = 
+      let of_bits_exn bits =
         assert (Int.equal (List.length bits) length_in_bits) ;
         bits
 
