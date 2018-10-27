@@ -9,12 +9,11 @@ module Make (Inputs : Inputs.Inputs_intf) :
               , Inputs.Super_transaction.t
               , Inputs.Sparse_ledger.t
               , Inputs.Ledger_proof.t )
-              Snark_work_lib.Work.Single.Spec.t =
-struct
+              Snark_work_lib.Work.Single.Spec.t = struct
   module Helper = Work_lib.Make (Inputs)
   module State = Helper.State
 
-  let work (ledger_builder: Inputs.Ledger_builder.t) (state: State.t) =
+  let work (ledger_builder : Inputs.Ledger_builder.t) (state : State.t) =
     let unseen_jobs = Helper.all_works ledger_builder state in
     match unseen_jobs with
     | [] -> ([], state)
@@ -38,7 +37,7 @@ let%test_module "test" =
                * does not give repeats then our loop will not iterate more than
                * list-length times. *)
               let rec go i seen =
-                [%test_result : Bool.t]
+                [%test_result: Bool.t]
                   ~message:"Exceeded time expected to exhaust work in sequence"
                   ~expect:true (i <= p) ;
                 let stuff, seen = Selector.work lb seen in

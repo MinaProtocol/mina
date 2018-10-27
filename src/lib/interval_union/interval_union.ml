@@ -50,11 +50,11 @@ let rec canonicalize = function
 let rec disjoint_union_exn t1 t2 =
   match (t1, t2) with
   | t, [] | [], t -> t
-  | i1 :: t1', i2 :: t2' ->
+  | i1 :: t1', i2 :: t2' -> (
     match union_intervals_exn i1 i2 with
     | `Combine (a, b) -> (a, b) :: disjoint_union_exn t1' t2'
     | `Disjoint_ordered -> i1 :: disjoint_union_exn t1' t2
-    | `Disjoint_inverted -> i2 :: disjoint_union_exn t1 t2'
+    | `Disjoint_inverted -> i2 :: disjoint_union_exn t1 t2' )
 
 let disjoint_union_exn t1 t2 = canonicalize (disjoint_union_exn t1 t2)
 
@@ -94,7 +94,7 @@ let invariant t =
   in
   go t
 
-let gen_from ?(min_size= 0) start =
+let gen_from ?(min_size = 0) start =
   let open Quickcheck.Generator.Let_syntax in
   let rec go acc size start =
     if size = 0 then return (of_intervals_exn (List.rev acc))

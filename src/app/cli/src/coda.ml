@@ -125,8 +125,8 @@ let daemon (module Kernel : Kernel_intf) log =
              Logger.warn log "failed to read daemon.json, not using it" ;
              None
        in
-       let maybe_from_config (type a) (f: YJ.json -> a option)
-           (keyname: string) (actual_value: a option) : a option =
+       let maybe_from_config (type a) (f : YJ.json -> a option)
+           (keyname : string) (actual_value : a option) : a option =
          let open Option.Let_syntax in
          let open YJ.Util in
          match actual_value with
@@ -184,19 +184,19 @@ let daemon (module Kernel : Kernel_intf) log =
        let%bind initial_peers_raw =
          match peers with
          | _ :: _ -> return peers
-         | [] ->
+         | [] -> (
              let peers_path = conf_dir ^/ "peers" in
              match%bind
-               Reader.load_sexp peers_path [%of_sexp : Host_and_port.t list]
+               Reader.load_sexp peers_path [%of_sexp: Host_and_port.t list]
              with
              | Ok ls -> return ls
              | Error e ->
                  let default_initial_peers = [] in
                  let%map () =
                    Writer.save_sexp peers_path
-                     ([%sexp_of : Host_and_port.t list] default_initial_peers)
+                     ([%sexp_of: Host_and_port.t list] default_initial_peers)
                  in
-                 []
+                 [] )
        in
        let%bind initial_peers =
          Deferred.List.filter_map ~how:(`Max_concurrent_jobs 8)
@@ -234,7 +234,7 @@ let daemon (module Kernel : Kernel_intf) log =
        let%bind client_whitelist =
          Reader.load_sexp
            (conf_dir ^/ "client_whitelist")
-           [%of_sexp : Unix.Inet_addr.Blocking_sexp.t list]
+           [%of_sexp: Unix.Inet_addr.Blocking_sexp.t list]
          >>| Or_error.ok
        in
        let keypair = Genesis_ledger.largest_account_keypair_exn () in
@@ -266,8 +266,8 @@ let daemon (module Kernel : Kernel_intf) log =
        let%bind () =
          let open M in
          let run_snark_worker_action =
-           Option.value_map run_snark_worker_flag ~default:`Don't_run ~f:
-             (fun k -> `With_public_key k )
+           Option.value_map run_snark_worker_flag ~default:`Don't_run
+             ~f:(fun k -> `With_public_key k )
          in
          let banlist_dir_name = conf_dir ^/ "banlist" in
          let%bind () = Async.Unix.mkdir ~p:() banlist_dir_name in
@@ -352,7 +352,7 @@ let rec ensure_testnet_id_still_good log =
         "exception while trying to fetch testnet_id, trying again in 6 minutes" ;
       try_later recheck_soon ;
       Deferred.unit
-  | Ok (resp, body) ->
+  | Ok (resp, body) -> (
       if resp.status <> `OK then (
         try_later recheck_soon ;
         Logger.error log
@@ -388,7 +388,7 @@ let rec ensure_testnet_id_still_good log =
               List.exists valid_ids ~f:(fun remote_id ->
                   Git_sha.equal sha remote_id )
             then ( try_later recheck_later ; Deferred.unit )
-            else finish commit_id body_string
+            else finish commit_id body_string )
 
 [%%else]
 
@@ -513,11 +513,13 @@ integration_tests]
 let coda_commands (module Kernel : Kernel_intf) log =
   let group =
     let module Coda_peers_test = Coda_peers_test.Make (Kernel) in
-    let module Coda_block_production_test = Coda_block_production_test.Make (Kernel) in
+    let module Coda_block_production_test =
+      Coda_block_production_test.Make (Kernel) in
     let module Coda_shared_prefix_test = Coda_shared_prefix_test.Make (Kernel) in
     let module Coda_restart_node_test = Coda_restart_node_test.Make (Kernel) in
     let module Coda_shared_state_test = Coda_shared_state_test.Make (Kernel) in
-    let module Coda_transitive_peers_test = Coda_transitive_peers_test.Make (Kernel) in
+    let module Coda_transitive_peers_test =
+      Coda_transitive_peers_test.Make (Kernel) in
     [ (Coda_peers_test.name, Coda_peers_test.command)
     ; (Coda_block_production_test.name, Coda_block_production_test.command)
     ; (Coda_shared_state_test.name, Coda_shared_state_test.command)

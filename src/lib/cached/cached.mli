@@ -15,9 +15,7 @@ module Let_syntax : sig
 
     val both : ('a, 'e) t -> ('b, 'e) t -> ('a * 'b, 'e) t
 
-    module Open_on_rhs : sig
-      
-    end
+    module Open_on_rhs : sig end
   end
 end
 

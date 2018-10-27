@@ -69,7 +69,8 @@ module Make (Backend : Backend_intf) = struct
       in
       (List.rev xs, List.rev ys)
 
-    let fold_bits {h; g_alpha; h_beta; g_alpha_h_beta; g_gamma; h_gamma; query} =
+    let fold_bits {h; g_alpha; h_beta; g_alpha_h_beta; g_gamma; h_gamma; query}
+        =
       let g1s = Array.to_list query @ [g_alpha; g_gamma] in
       let g2s = [h; h_beta; h_gamma] in
       let gts = [Fq_target.unitary_inverse g_alpha_h_beta] in
@@ -117,7 +118,8 @@ module Make (Backend : Backend_intf) = struct
         ; query: G1.t array }
       [@@deriving bin_io, sexp]
 
-      let create {h; g_alpha; h_beta; g_alpha_h_beta; g_gamma; h_gamma; query} =
+      let create {h; g_alpha; h_beta; g_alpha_h_beta; g_gamma; h_gamma; query}
+          =
         { g_alpha
         ; h_beta
         ; g_alpha_h_beta
@@ -144,7 +146,7 @@ module Make (Backend : Backend_intf) = struct
       ()
   end
 
-  let verify (vk: Verification_key.Processed.t) input
+  let verify (vk : Verification_key.Processed.t) input
       ({Proof.a; b; c} as proof) =
     let open Or_error.Let_syntax in
     let%bind () =
@@ -154,8 +156,8 @@ module Make (Backend : Backend_intf) = struct
     in
     let%bind () = Proof.is_well_formed proof in
     let input_acc =
-      List.foldi input ~init:(vk.query).(0) ~f:(fun i acc x ->
-          let q = (vk.query).(1 + i) in
+      List.foldi input ~init:vk.query.(0) ~f:(fun i acc x ->
+          let q = vk.query.(1 + i) in
           G1.(acc + (x * q)) )
     in
     let test1 =

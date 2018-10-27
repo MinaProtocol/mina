@@ -49,9 +49,7 @@ module Make
     (Store : Storage_intf
              with type location := string
               and type data := Lite_base.Lite_chain.t)
-    (Request : Put_request_intf) :
-  S with type data = Chain.data =
-struct
+    (Request : Put_request_intf) : S with type data = Chain.data = struct
   open Lite_base
 
   type data = Chain.data

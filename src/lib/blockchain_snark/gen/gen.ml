@@ -13,7 +13,7 @@ let expr_of_t ~loc
      ; strength
      ; length
      ; timestamp
-     ; signer_public_key }:
+     ; signer_public_key } :
       t) =
   let open Coda_base in
   let ident str = Loc.make loc (Longident.parse str) in
@@ -22,7 +22,7 @@ let expr_of_t ~loc
   end) in
   let open E in
   let n s = "Coda_base." ^ s in
-  let e (type a) name (module M : Sexpable.S with type t = a) (x: a) =
+  let e (type a) name (module M : Sexpable.S with type t = a) (x : a) =
     [%expr
       [%e pexp_ident (ident (sprintf "%s.t_of_sexp" name))]
         [%e Ppx_util.expr_of_sexp ~loc (M.sexp_of_t x)]]

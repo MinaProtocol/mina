@@ -18,12 +18,12 @@ module Blockchain_snark_keys = struct
       [%expr
         let open Async.Deferred in
         Blockchain_snark.Blockchain_transition.Keys.Proving.load
-          (Blockchain_snark.Blockchain_transition.Keys.Proving.Location.
-           of_string
+          (Blockchain_snark.Blockchain_transition.Keys.Proving.Location
+           .of_string
              [%e
                estring
-                 (Blockchain_snark.Blockchain_transition.Keys.Proving.Location.
-                  to_string bc_location)])
+                 (Blockchain_snark.Blockchain_transition.Keys.Proving.Location
+                  .to_string bc_location)])
         >>| fun (keys, checksum) ->
         assert (
           String.equal (Md5_lib.to_hex checksum)
@@ -40,12 +40,13 @@ module Blockchain_snark_keys = struct
       [%expr
         let open Async.Deferred in
         Blockchain_snark.Blockchain_transition.Keys.Verification.load
-          (Blockchain_snark.Blockchain_transition.Keys.Verification.Location.
-           of_string
+          (Blockchain_snark.Blockchain_transition.Keys.Verification.Location
+           .of_string
              [%e
                estring
-                 (Blockchain_snark.Blockchain_transition.Keys.Verification.
-                  Location.to_string bc_location)])
+                 (Blockchain_snark.Blockchain_transition.Keys.Verification
+                  .Location
+                  .to_string bc_location)])
         >>| fun (keys, checksum) ->
         assert (
           String.equal (Md5_lib.to_hex checksum)
@@ -157,8 +158,8 @@ let gen_keys () =
         include (
           Transaction :
             module type of Transaction
-            with module With_valid_signature := Transaction.
-                                                With_valid_signature )
+            with module With_valid_signature := Transaction
+                                                .With_valid_signature )
 
         let receiver _ = failwith "stub"
 
@@ -178,7 +179,8 @@ let gen_keys () =
       module Ledger_proof = Transaction_snark
 
       module Completed_work = struct
-        include Ledger_builder.Make_completed_work (Compressed_public_key)
+        include Ledger_builder.Make_completed_work
+                  (Compressed_public_key)
                   (Ledger_proof)
                   (Transaction_snark.Statement)
 
@@ -206,10 +208,12 @@ let gen_keys () =
   end) in
   let module M =
     (* TODO make toplevel library to encapsulate consensus params *)
-      Blockchain_snark.Blockchain_transition.Make (Consensus_mechanism)
-      (Transaction_snark.Verification.Make (struct
-        let keys = tx_keys.verification
-      end)) in
+      Blockchain_snark.Blockchain_transition.Make
+        (Consensus_mechanism)
+        (Transaction_snark.Verification.Make (struct
+          let keys = tx_keys.verification
+        end))
+  in
   let%map bc_keys_location, _bc_keys, bc_keys_checksum = M.Keys.cached () in
   ( Blockchain_snark_keys.Proving.load_expr ~loc bc_keys_location.proving
       bc_keys_checksum.proving

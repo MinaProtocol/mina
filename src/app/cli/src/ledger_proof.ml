@@ -8,8 +8,7 @@ module Prod :
    and type statement = Transaction_snark.Statement.t
    and type sok_digest := Sok_message.Digest.t
    and type ledger_hash := Frozen_ledger_hash.t
-   and type proof := Proof.t =
-struct
+   and type proof := Proof.t = struct
   type t = Transaction_snark.t [@@deriving bin_io, sexp]
 
   type statement = Transaction_snark.Statement.t
@@ -18,7 +17,7 @@ struct
 
   let statement = Transaction_snark.statement
 
-  let statement_target (t: Transaction_snark.Statement.t) = t.target
+  let statement_target (t : Transaction_snark.Statement.t) = t.target
 
   let underlying_proof = Transaction_snark.proof
 end
@@ -29,18 +28,17 @@ module Debug :
    and type statement = Transaction_snark.Statement.t
    and type sok_digest := Sok_message.Digest.t
    and type ledger_hash := Frozen_ledger_hash.t
-   and type proof := Proof.t =
-struct
+   and type proof := Proof.t = struct
   type t = Transaction_snark.Statement.t * Sok_message.Digest.Stable.V1.t
   [@@deriving sexp, bin_io]
 
   type statement = Transaction_snark.Statement.t
 
-  let underlying_proof (_: t) = Proof.dummy
+  let underlying_proof (_ : t) = Proof.dummy
 
-  let statement ((t, _): t) : Transaction_snark.Statement.t = t
+  let statement ((t, _) : t) : Transaction_snark.Statement.t = t
 
-  let statement_target (t: Transaction_snark.Statement.t) = t.target
+  let statement_target (t : Transaction_snark.Statement.t) = t.target
 
   let sok_digest (_, d) = d
 end
