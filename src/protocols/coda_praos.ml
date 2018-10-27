@@ -310,14 +310,15 @@ module type Inputs_intf = sig
   module State_hash : State_hash_intf
 
   module State : sig
-    include State_intf
-            with type state_hash := State_hash.t
-             and type ledger_hash := Ledger_hash.t
-             and type seed := Epoch_seed.t
-             and type length := Length.t
-             and type time := Time.t
-             and type slot := Slot.t
-             and type epoch := Epoch.t
+    include
+      State_intf
+      with type state_hash := State_hash.t
+       and type ledger_hash := Ledger_hash.t
+       and type seed := Epoch_seed.t
+       and type length := Length.t
+       and type time := Time.t
+       and type slot := Slot.t
+       and type epoch := Epoch.t
 
     module Proof : Proof_intf with type input = t
   end
@@ -366,7 +367,7 @@ struct
 
   type t = {state: Proof_carrying_state.t} [@@deriving fields]
 
-  let step' t (transition: Transition.t) : t Deferred.t =
+  let step' t (transition : Transition.t) : t Deferred.t =
     assert (
       Ledger_hash.equal
         (Ledger.merkle_root transition.ledger)
@@ -450,8 +451,8 @@ struct
 
   let create ~initial : t = {state= initial}
 
-  let select (current: Proof_carrying_state.t)
-      (candidate: Proof_carrying_state.t) =
+  let select (current : Proof_carrying_state.t)
+      (candidate : Proof_carrying_state.t) =
     let%bind validated = Validator.validate candidate.data candidate.proof in
     if not validated then return current
     else
@@ -464,7 +465,7 @@ struct
         candidate
       else current
 
-  let step (t: t) = function
+  let step (t : t) = function
     | Event.Found transition -> step' t transition
     | Event.Candidate_state pcd ->
         let%map state = select t.state pcd in

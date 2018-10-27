@@ -5,6 +5,7 @@ open Coda_numbers
 open Currency
 open Sha256_lib
 open Fold_lib
+open Signature_lib
 
 module type Inputs_intf = sig
   module Ledger_builder_diff : sig
@@ -39,11 +40,11 @@ module type Inputs_intf = sig
     val add : t -> Span.t -> t
   end
 
+  module Genesis_ledger : sig
+    val t : Coda_base.Ledger.t
+  end
+
   val genesis_state_timestamp : Time.t
-
-  val genesis_ledger_total_currency : Amount.t
-
-  val genesis_ledger : Coda_base.Ledger.t
 
   val coinbase : Amount.t
 
@@ -74,7 +75,7 @@ module Epoch_seed = struct
       (Pedersen.digest_fold Coda_base.Hash_prefix.epoch_seed
          (fold_vrf_result seed vrf_result))
 
-  let update_var (seed: var) (vrf_result: Sha256.Digest.var) :
+  let update_var (seed : var) (vrf_result : Sha256.Digest.var) :
       (var, _) Snark_params.Tick.Checked.t =
     let open Snark_params.Tick in
     let open Snark_params.Tick.Let_syntax in
@@ -92,19 +93,30 @@ let uint32_of_int64 x = x |> Int64.to_int64 |> UInt32.of_int64
 
 let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64
 
+let iter_none ~f opt = match opt with None -> f () ; None | Some x -> Some x
+
 module Make (Inputs : Inputs_intf) :
   Mechanism.S
   with type Internal_transition.Ledger_builder_diff.t =
               Inputs.Ledger_builder_diff.t
    and type External_transition.Ledger_builder_diff.t =
-              Inputs.Ledger_builder_diff.t =
-struct
+              Inputs.Ledger_builder_diff.t = struct
   module Ledger_builder_diff = Inputs.Ledger_builder_diff
   module Time = Inputs.Time
 
+  let genesis_ledger_total_currency =
+    Coda_base.Ledger.to_list Inputs.Genesis_ledger.t
+    |> List.fold_left ~init:Balance.zero ~f:(fun sum account ->
+           Balance.add_amount sum
+             (Balance.to_amount @@ Coda_base.Account.balance account)
+           |> Option.value_exn
+                ~message:"failed to calculate total currency in genesis ledger"
+       )
+    |> Balance.to_amount
+
   let genesis_ledger_hash =
-    Coda_base.Frozen_ledger_hash.of_ledger_hash
-    @@ Coda_base.Ledger.merkle_root Inputs.genesis_ledger
+    Coda_base.Ledger.merkle_root Inputs.Genesis_ledger.t
+    |> Coda_base.Frozen_ledger_hash.of_ledger_hash
 
   module Local_state = struct
     type t =
@@ -138,7 +150,7 @@ struct
         Int64.Infix.(
           Time.Span.to_ms time_since_genesis / Time.Span.to_ms interval)
 
-    let start_time (epoch: t) =
+    let start_time (epoch : t) =
       let ms =
         let open Int64.Infix in
         Time.Span.to_ms
@@ -147,7 +159,7 @@ struct
       in
       Time.of_span_since_epoch (Time.Span.of_ms ms)
 
-    let end_time (epoch: t) = Time.add (start_time epoch) interval
+    let end_time (epoch : t) = Time.add (start_time epoch) interval
 
     module Slot = struct
       include Segment_id
@@ -159,14 +171,14 @@ struct
           ( Inputs.probable_slots_per_transition_count
           * Inputs.unforkable_transition_count )
 
-      let in_seed_update_range (slot: t) =
+      let in_seed_update_range (slot : t) =
         let open UInt32 in
         let open UInt32.Infix in
         let ( <= ) x y = compare x y <= 0 in
         let ( < ) x y = compare x y < 0 in
         unforkable_count <= slot && slot < unforkable_count * of_int 2
 
-      let in_seed_update_range_var (slot: Unpacked.var) =
+      let in_seed_update_range_var (slot : Unpacked.var) =
         let open Snark_params.Tick in
         let open Snark_params.Tick.Let_syntax in
         let open Field.Checked in
@@ -194,12 +206,12 @@ struct
               in_seed_update_range_var in_seed_update_range slot )
     end
 
-    let slot_start_time (epoch: t) (slot: Slot.t) =
+    let slot_start_time (epoch : t) (slot : Slot.t) =
       Time.add (start_time epoch)
         (Time.Span.of_ms
            Int64.Infix.(int64_of_uint32 slot * Time.Span.to_ms Slot.interval))
 
-    let slot_end_time (epoch: t) (slot: Slot.t) =
+    let slot_end_time (epoch : t) (slot : Slot.t) =
       Time.add (slot_start_time epoch slot) Slot.interval
 
     let epoch_and_slot_of_time_exn t : t * Slot.t =
@@ -207,9 +219,8 @@ struct
       let time_since_epoch = Time.diff t (start_time epoch) in
       let slot =
         uint32_of_int64
-        @@
-        Int64.Infix.(
-          Time.Span.to_ms time_since_epoch / Time.Span.to_ms Slot.interval)
+        @@ Int64.Infix.(
+             Time.Span.to_ms time_since_epoch / Time.Span.to_ms Slot.interval)
       in
       (epoch, slot)
   end
@@ -322,7 +333,7 @@ struct
     end
 
     module Output = struct
-      type value = Sha256.Digest.t [@@deriving eq]
+      type value = Sha256.Digest.t [@@deriving eq, sexp]
 
       type var = Sha256.Digest.var
 
@@ -387,10 +398,10 @@ struct
 
       let of_uint64_exn = Fn.compose of_int64_exn UInt64.to_int64
 
-      let create ~my_stake ~total_stake =
-        let my_stake = Balance.to_uint64 my_stake in
+      let create ~owned_stake ~total_stake =
+        let owned_stake = Balance.to_uint64 owned_stake in
         let total_stake = Amount.to_uint64 total_stake in
-        let stake_ratio = of_uint64_exn (UInt64.div my_stake total_stake) in
+        let stake_ratio = of_uint64_exn (UInt64.div owned_stake total_stake) in
         stake_ratio * pow (of_int 2) (of_int 256)
 
       let satisfies threshold output = of_bits_lsb output <= threshold
@@ -399,6 +410,20 @@ struct
     include Vrf_lib.Integrated.Make (Snark_params.Tick) (Scalar) (Group)
               (Message)
               (Output)
+
+    let check ~epoch ~slot ~seed ~lock_checkpoint ~private_key ~owned_stake
+        ~total_stake ~logger =
+      let open Message in
+      let result = eval ~private_key {epoch; slot; seed; lock_checkpoint} in
+      let threshold = Threshold.create ~owned_stake ~total_stake in
+      Logger.info logger
+        !"Checking vrf at %d:%d - owned_stake: %d, total_stake: %d, \
+          evaluation: %{sexp: Output.value}, threshold: %{sexp: Threshold.t}"
+        (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
+        (Balance.to_int owned_stake)
+        (Amount.to_int total_stake)
+        result threshold ;
+      Option.some_if (Threshold.satisfies threshold result) result
   end
 
   module Epoch_ledger = struct
@@ -420,7 +445,8 @@ struct
      fun Coda_base.H_list.([hash; total_currency]) -> {hash; total_currency}
 
     let data_spec =
-      Snark_params.Tick.Data_spec.[Coda_base.Frozen_ledger_hash.typ; Amount.typ]
+      Snark_params.Tick.Data_spec.
+        [Coda_base.Frozen_ledger_hash.typ; Amount.typ]
 
     let typ =
       Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
@@ -453,8 +479,36 @@ struct
       {hash; total_currency}
 
     let genesis =
-      { hash= genesis_ledger_hash
-      ; total_currency= Inputs.genesis_ledger_total_currency }
+      {hash= genesis_ledger_hash; total_currency= genesis_ledger_total_currency}
+
+    let get_stake ~logger ~public_key ~local_state {hash; total_currency} =
+      let open Local_state in
+      let open Option.Let_syntax in
+      let%bind ledger =
+        if Coda_base.Frozen_ledger_hash.equal hash genesis_ledger_hash then
+          Some Genesis_ledger.t
+        else
+          let%bind last_epoch_ledger = local_state.last_epoch_ledger in
+          let last_epoch_ledger_hash =
+            Coda_base.Frozen_ledger_hash.of_ledger_hash
+              (Coda_base.Ledger.merkle_root last_epoch_ledger)
+          in
+          if Coda_base.Frozen_ledger_hash.equal hash last_epoch_ledger_hash
+          then Some last_epoch_ledger
+          else None
+      in
+      let%map account_location =
+        Coda_base.Ledger.location_of_key ledger
+          (Public_key.compress public_key)
+        |> iter_none ~f:(fun () ->
+               Logger.warn logger "no account associated with public key" )
+      in
+      let balance =
+        Coda_base.Ledger.get ledger account_location
+        |> Option.map ~f:Coda_base.Account.balance
+        |> Option.value ~default:Balance.zero
+      in
+      (balance, total_currency)
   end
 
   module Epoch_data = struct
@@ -478,7 +532,8 @@ struct
       t
 
     let to_hlist {ledger; seed; start_checkpoint; lock_checkpoint; length} =
-      Coda_base.H_list.[ledger; seed; start_checkpoint; lock_checkpoint; length]
+      Coda_base.H_list.
+        [ledger; seed; start_checkpoint; lock_checkpoint; length]
 
     let of_hlist :
            ( unit
@@ -510,8 +565,8 @@ struct
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
-    let var_to_triples
-        {ledger; seed; start_checkpoint; lock_checkpoint; length} =
+    let var_to_triples {ledger; seed; start_checkpoint; lock_checkpoint; length}
+        =
       let open Snark_params.Tick.Let_syntax in
       let%map ledger_triples = Epoch_ledger.var_to_triples ledger
       and seed_triples = Epoch_seed.var_to_triples seed
@@ -559,19 +614,20 @@ struct
       ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
       ; length= Length.zero }
 
-    let update_pair (last_data, curr_data) ~prev_epoch ~next_epoch ~next_slot
-        ~prev_protocol_state_hash ~proposer_vrf_result ~ledger_hash
+    let update_pair (last_data, curr_data) epoch_length ~prev_epoch ~next_epoch
+        ~next_slot ~prev_protocol_state_hash ~proposer_vrf_result ~ledger_hash
         ~total_currency =
       let open Epoch_ledger in
-      let last_data, curr_data =
+      let last_data, curr_data, epoch_length =
         if next_epoch > prev_epoch then
           ( curr_data
           , { seed= Epoch_seed.(of_hash zero)
             ; ledger= {hash= ledger_hash; total_currency}
             ; start_checkpoint= prev_protocol_state_hash
             ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
-            ; length= Length.zero } )
-        else (last_data, curr_data)
+            ; length= Length.zero }
+          , Length.succ epoch_length )
+        else (last_data, curr_data, epoch_length)
       in
       let curr_seed, curr_lock_checkpoint =
         if Epoch.Slot.in_seed_update_range next_slot then
@@ -582,13 +638,13 @@ struct
       let curr_data =
         {curr_data with seed= curr_seed; lock_checkpoint= curr_lock_checkpoint}
       in
-      (last_data, curr_data)
+      (last_data, curr_data, epoch_length)
 
-    let update_pair_checked (last_data, curr_data) ~prev_epoch ~next_epoch
-        ~next_slot ~prev_protocol_state_hash ~proposer_vrf_result ~ledger_hash
-        ~total_currency =
+    let update_pair_checked (last_data, curr_data) epoch_length ~prev_epoch
+        ~next_epoch ~next_slot ~prev_protocol_state_hash ~proposer_vrf_result
+        ~ledger_hash ~total_currency =
       let open Snark_params.Tick.Let_syntax in
-      let%bind last_data, curr_data =
+      let%bind last_data, curr_data, epoch_length =
         let%bind epoch_changed =
           Epoch.compare_var prev_epoch next_epoch >>| fun c -> c.less
         in
@@ -602,8 +658,10 @@ struct
               ; lock_checkpoint= Coda_base.State_hash.(var_of_t (of_hash zero))
               ; length= Length.Unpacked.var_of_value Length.zero }
             ~else_:curr_data
+        and epoch_length =
+          Length.increment_if_var epoch_length epoch_changed
         in
-        (last_data, curr_data)
+        (last_data, curr_data, epoch_length)
       in
       let%map curr_seed, curr_lock_checkpoint =
         let%bind updated_curr_seed =
@@ -623,7 +681,7 @@ struct
       let curr_data =
         {curr_data with seed= curr_seed; lock_checkpoint= curr_lock_checkpoint}
       in
-      (last_data, curr_data)
+      (last_data, curr_data, epoch_length)
   end
 
   module Consensus_transition_data = struct
@@ -678,6 +736,7 @@ struct
   module Consensus_state = struct
     type ('length, 'amount, 'epoch, 'slot, 'epoch_data) t =
       { length: 'length
+      ; epoch_length: 'length
       ; total_currency: 'amount
       ; curr_epoch: 'epoch
       ; curr_slot: 'slot
@@ -699,6 +758,7 @@ struct
 
     let to_hlist
         { length
+        ; epoch_length
         ; total_currency
         ; curr_epoch
         ; curr_slot
@@ -706,6 +766,7 @@ struct
         ; curr_epoch_data } =
       let open Coda_base.H_list in
       [ length
+      ; epoch_length
       ; total_currency
       ; curr_epoch
       ; curr_slot
@@ -715,6 +776,7 @@ struct
     let of_hlist :
            ( unit
            ,    'length
+             -> 'length
              -> 'amount
              -> 'epoch
              -> 'slot
@@ -724,12 +786,14 @@ struct
            Coda_base.H_list.t
         -> ('length, 'amount, 'epoch, 'slot, 'epoch_data) t =
      fun Coda_base.H_list.([ length
+                           ; epoch_length
                            ; total_currency
                            ; curr_epoch
                            ; curr_slot
                            ; last_epoch_data
                            ; curr_epoch_data ]) ->
       { length
+      ; epoch_length
       ; total_currency
       ; curr_epoch
       ; curr_slot
@@ -739,6 +803,7 @@ struct
     let data_spec =
       let open Snark_params.Tick.Data_spec in
       [ Length.Unpacked.typ
+      ; Length.Unpacked.typ
       ; Amount.typ
       ; Epoch.Unpacked.typ
       ; Epoch.Slot.Unpacked.typ
@@ -752,6 +817,7 @@ struct
 
     let var_to_triples
         { length
+        ; epoch_length
         ; total_currency
         ; curr_epoch
         ; curr_slot
@@ -764,6 +830,7 @@ struct
         Epoch_data.var_to_triples curr_epoch_data
       in
       Length.Unpacked.var_to_triples length
+      @ Length.Unpacked.var_to_triples epoch_length
       @ Epoch.Unpacked.var_to_triples curr_epoch
       @ Epoch.Slot.Unpacked.var_to_triples curr_slot
       @ Amount.var_to_triples total_currency
@@ -771,25 +838,28 @@ struct
 
     let fold
         { length
+        ; epoch_length
         ; curr_epoch
         ; curr_slot
         ; total_currency
         ; last_epoch_data
         ; curr_epoch_data } =
       let open Fold in
-      Length.fold length +> Epoch.fold curr_epoch +> Epoch.Slot.fold curr_slot
-      +> Amount.fold total_currency
+      Length.fold length +> Length.fold epoch_length +> Epoch.fold curr_epoch
+      +> Epoch.Slot.fold curr_slot +> Amount.fold total_currency
       +> Epoch_data.fold last_epoch_data
       +> Epoch_data.fold curr_epoch_data
 
     let length_in_triples =
-      Length.length_in_triples + Epoch.length_in_triples
-      + Epoch.Slot.length_in_triples + Amount.length_in_triples
-      + Epoch_data.length_in_triples + Epoch_data.length_in_triples
+      Length.length_in_triples + Length.length_in_triples
+      + Epoch.length_in_triples + Epoch.Slot.length_in_triples
+      + Amount.length_in_triples + Epoch_data.length_in_triples
+      + Epoch_data.length_in_triples
 
     let genesis : value =
       { length= Length.zero
-      ; total_currency= Inputs.genesis_ledger_total_currency
+      ; epoch_length= Length.zero
+      ; total_currency= genesis_ledger_total_currency
       ; curr_epoch= Epoch.zero
       ; curr_slot= Epoch.Slot.zero
       ; curr_epoch_data= Epoch_data.genesis
@@ -800,10 +870,10 @@ struct
       Epoch.slot_start_time curr_epoch curr_slot < time
       && Epoch.slot_end_time curr_epoch curr_slot >= time
 
-    let update ~(previous_consensus_state: value)
-        ~(consensus_transition_data: Consensus_transition_data.value)
-        ~(previous_protocol_state_hash: Coda_base.State_hash.t)
-        ~(ledger_hash: Coda_base.Frozen_ledger_hash.t) : value Or_error.t =
+    let update ~(previous_consensus_state : value)
+        ~(consensus_transition_data : Consensus_transition_data.value)
+        ~(previous_protocol_state_hash : Coda_base.State_hash.t)
+        ~(ledger_hash : Coda_base.Frozen_ledger_hash.t) : value Or_error.t =
       let open Or_error.Let_syntax in
       let open Consensus_transition_data in
       let%map total_currency =
@@ -812,10 +882,11 @@ struct
         |> Option.value
              ~default:(Or_error.error_string "failed to add total_currency")
       in
-      let last_epoch_data, curr_epoch_data =
+      let last_epoch_data, curr_epoch_data, epoch_length =
         Epoch_data.update_pair
           ( previous_consensus_state.last_epoch_data
           , previous_consensus_state.curr_epoch_data )
+          previous_consensus_state.epoch_length
           ~prev_epoch:previous_consensus_state.curr_epoch
           ~next_epoch:consensus_transition_data.epoch
           ~next_slot:consensus_transition_data.slot
@@ -824,16 +895,17 @@ struct
           ~ledger_hash ~total_currency
       in
       { length= Length.succ previous_consensus_state.length
+      ; epoch_length
       ; total_currency
       ; curr_epoch= consensus_transition_data.epoch
       ; curr_slot= consensus_transition_data.slot
       ; last_epoch_data
       ; curr_epoch_data }
 
-    let update_var (previous_state: var)
-        (transition_data: Consensus_transition_data.var)
-        (previous_protocol_state_hash: Coda_base.State_hash.var)
-        (ledger_hash: Coda_base.Frozen_ledger_hash.var) :
+    let update_var (previous_state : var)
+        (transition_data : Consensus_transition_data.var)
+        (previous_protocol_state_hash : Coda_base.State_hash.var)
+        (ledger_hash : Coda_base.Frozen_ledger_hash.var) :
         (var, _) Snark_params.Tick.Checked.t =
       let open Snark_params.Tick.Let_syntax in
       let%bind length = Length.increment_var previous_state.length
@@ -845,82 +917,68 @@ struct
           (Amount.var_of_t Inputs.coinbase)
       in
       (* TODO: check vrf result from transition data *)
-      let%map last_epoch_data, curr_epoch_data =
+      let%map last_epoch_data, curr_epoch_data, epoch_length =
         Epoch_data.update_pair_checked
           (previous_state.last_epoch_data, previous_state.curr_epoch_data)
-          ~prev_epoch:previous_state.curr_epoch
+          previous_state.epoch_length ~prev_epoch:previous_state.curr_epoch
           ~next_epoch:transition_data.epoch ~next_slot:transition_data.slot
           ~prev_protocol_state_hash:previous_protocol_state_hash
           ~proposer_vrf_result:transition_data.proposer_vrf_result ~ledger_hash
           ~total_currency
       in
       { length
+      ; epoch_length
       ; curr_epoch= transition_data.epoch
       ; curr_slot= transition_data.slot
       ; total_currency
       ; last_epoch_data
       ; curr_epoch_data }
 
-    let length (t: value) = t.length
+    let length (t : value) = t.length
 
     let to_lite = None
   end
 
-  module Protocol_state = Coda_base.Protocol_state.Make (Consensus_state)
-  module Snark_transition = Coda_base.Snark_transition.Make (Consensus_transition_data)
+  module Blockchain_state =
+    Coda_base.Blockchain_state.Make (Inputs.Genesis_ledger)
+  module Protocol_state =
+    Coda_base.Protocol_state.Make (Blockchain_state) (Consensus_state)
+
+  module Snark_transition = Coda_base.Snark_transition.Make (struct
+    module Genesis_ledger = Inputs.Genesis_ledger
+    module Blockchain_state = Blockchain_state
+    module Consensus_data = Consensus_transition_data
+  end)
+
   module Internal_transition =
     Coda_base.Internal_transition.Make (Ledger_builder_diff) (Snark_transition)
   module External_transition =
     Coda_base.External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
   (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
-  let generate_transition ~(previous_protocol_state: Protocol_state.value)
-      ~blockchain_state ~local_state ~time ~keypair ~transactions:_ =
-    let open Local_state in
+  let generate_transition ~(previous_protocol_state : Protocol_state.value)
+      ~blockchain_state ~local_state ~time ~keypair ~transactions:_ ~ledger
+      ~logger =
     let open Consensus_state in
     let open Epoch_data in
-    let open Signature_lib.Keypair in
+    let open Keypair in
     let open Option.Let_syntax in
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
     in
     let time = Time.of_span_since_epoch (Time.Span.of_ms time) in
     let epoch, slot = Epoch.epoch_and_slot_of_time_exn time in
-    let ledger =
-      match local_state.last_epoch_ledger with
-      | Some ledger -> ledger
-      | None -> Inputs.genesis_ledger
+    let%bind proposer_stake, total_stake =
+      Epoch_ledger.get_stake previous_consensus_state.last_epoch_data.ledger
+        ~logger ~public_key:keypair.public_key ~local_state
     in
-    let%bind my_account_location =
-      Coda_base.Ledger.location_of_key ledger
-        (Signature_lib.Public_key.compress keypair.public_key)
-    in
-    let my_currency =
-      Coda_base.Ledger.get ledger my_account_location
-      |> Option.map ~f:Coda_base.Account.balance
-      |> Option.value ~default:Balance.zero
-    in
-    let total_currency =
-      previous_consensus_state.last_epoch_data.ledger.total_currency
-    in
-    let vrf_message =
-      { Vrf.Message.epoch
-      ; slot
-      ; seed= previous_consensus_state.last_epoch_data.seed
-      ; lock_checkpoint=
-          previous_consensus_state.last_epoch_data.lock_checkpoint }
-    in
-    let proposer_vrf_result =
-      Vrf.eval ~private_key:keypair.private_key vrf_message
-    in
-    let%map () =
-      if
-        Vrf.Threshold.satisfies
-          (Vrf.Threshold.create ~my_stake:my_currency
-             ~total_stake:total_currency)
-          proposer_vrf_result
-      then Some ()
-      else None
+    let%map proposer_vrf_result =
+      Vrf.check ~epoch ~slot
+        ~seed:previous_consensus_state.last_epoch_data.seed
+        ~lock_checkpoint:
+          previous_consensus_state.last_epoch_data.lock_checkpoint
+        ~private_key:keypair.private_key ~owned_stake:proposer_stake
+        ~total_stake ~logger
     in
     let consensus_transition_data =
       Consensus_transition_data.{epoch; slot; proposer_vrf_result}
@@ -950,7 +1008,7 @@ struct
       (Snark_transition.consensus_data transition)
       previous_state_hash
       ( transition |> Snark_transition.blockchain_state
-      |> Coda_base.Blockchain_state.ledger_hash )
+      |> Blockchain_state.ledger_hash )
 
   let select this that ~logger ~time_received =
     let open Consensus_state in
@@ -982,6 +1040,83 @@ struct
       else `Keep
     else `Keep
 
+  let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
+      ~logger =
+    let open Consensus_state in
+    let open Epoch_data in
+    let open Keypair in
+    let logger = Logger.child logger "proof_of_stake" in
+    Logger.info logger "Checking for next proposal..." ;
+    let epoch, slot =
+      Epoch.epoch_and_slot_of_time_exn
+        (Time.of_span_since_epoch (Time.Span.of_ms now))
+    in
+    let next_slot =
+      let open Option.Let_syntax in
+      (* When we first enter an epoch, the protocol state may still be a previous
+       * epoch. If that is the case, we need to select the staged vrf inputs
+       * instead of the last vrf inputs, since if the protocol state were actually
+       * up to date with the epoch, those would be the last vrf inputs.
+       *)
+      let epoch_data =
+        Logger.info logger
+          !"Selecting correct epoch data from state -- epoch by time: %d, \
+            state epoch: %d, state epoch length: %d"
+          (Epoch.to_int epoch)
+          (Epoch.to_int state.curr_epoch)
+          (Length.to_int state.epoch_length) ;
+        (* If we are in the current epoch or we are in the first epoch (before any
+         * transitions), use the last epoch data.
+         *)
+        if
+          Epoch.equal epoch state.curr_epoch
+          || Length.equal state.epoch_length Length.zero
+        then state.last_epoch_data
+          (* If we are in the next epoch, use the current epoch data. *)
+        else if Epoch.equal epoch (Epoch.succ state.curr_epoch) then
+          state.curr_epoch_data
+          (* If the epoch we are in is none of the above, something is wrong. *)
+        else (
+          Logger.error logger
+            "system time is out of sync with protocol state time" ;
+          failwith
+            "System time is out of sync. (hint: setup NTP if you haven't)" )
+      in
+      let%bind proposer_stake, total_stake =
+        Epoch_ledger.get_stake epoch_data.ledger ~logger
+          ~public_key:keypair.public_key ~local_state
+      in
+      Logger.info logger "Theoretical chance of winning a slot: %f"
+        ( (float_of_int @@ Balance.to_int proposer_stake)
+        /. (float_of_int @@ Amount.to_int total_stake) ) ;
+      let is_winning_slot slot =
+        Option.is_some
+          (Vrf.check ~epoch ~slot ~seed:epoch_data.seed
+             ~lock_checkpoint:epoch_data.lock_checkpoint
+             ~private_key:keypair.private_key ~owned_stake:proposer_stake
+             ~total_stake ~logger)
+      in
+      let rec find_winning_slot slot =
+        if UInt32.of_int (Epoch.Slot.to_int slot) >= Epoch.size then None
+        else if is_winning_slot slot then Some slot
+        else find_winning_slot (Epoch.Slot.succ slot)
+      in
+      find_winning_slot (Epoch.Slot.succ slot)
+    in
+    match next_slot with
+    | Some next_slot ->
+        Logger.info logger "Proposing in %d slots"
+          (Epoch.Slot.to_int next_slot - Epoch.Slot.to_int slot) ;
+        `Propose
+          ( Epoch.slot_start_time epoch next_slot
+          |> Time.to_span_since_epoch |> Time.Span.to_ms )
+    | None ->
+        Logger.info logger
+          "No slots won in this epoch... waiting for next epoch" ;
+        `Check_again
+          (Epoch.end_time epoch |> Time.to_span_since_epoch |> Time.Span.to_ms)
+
+  (* TODO *)
   let lock_transition prev next ~snarked_ledger ~local_state =
     let open Local_state in
     let open Consensus_state in
@@ -1017,12 +1152,9 @@ let%test_module "Proof_of_stake tests" =
       end
 
       module Time = Coda_base.Block_time
+      module Genesis_ledger = Genesis_ledger
 
       let genesis_state_timestamp = Coda_base.Block_time.now ()
-
-      let genesis_ledger_total_currency = Amount.zero
-
-      let genesis_ledger = Coda_base.Ledger.create ()
 
       let coinbase = Amount.of_int 20
 

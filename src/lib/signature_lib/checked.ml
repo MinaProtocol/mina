@@ -175,8 +175,7 @@ module Schnorr
    and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
    and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
    and module Shifted := Curve.Checked.Shifted
-   and module Message := Message =
-struct
+   and module Message := Message = struct
   open Impl
 
   module Signature = struct
@@ -195,7 +194,7 @@ struct
     type t = Curve.Scalar.t
   end
 
-  let compress (t: Curve.t) =
+  let compress (t : Curve.t) =
     let x, _ = Curve.to_coords t in
     Field.unpack x
 
@@ -203,9 +202,10 @@ struct
     type t = Curve.t
 
     type var = Curve.var
-  end = Curve
+  end =
+    Curve
 
-  let sign (k: Private_key.t) m =
+  let sign (k : Private_key.t) m =
     let e_r = Curve.Scalar.random () in
     let r = compress (Curve.scale Curve.one e_r) in
     let h = Message.hash ~nonce:r m in
@@ -213,8 +213,8 @@ struct
     (s, h)
 
   (* TODO: Have expect test for this *)
-  let shamir_sum ((sp, p): Curve.Scalar.t * Curve.t)
-      ((sq, q): Curve.Scalar.t * Curve.t) =
+  let shamir_sum ((sp, p) : Curve.Scalar.t * Curve.t)
+      ((sq, q) : Curve.Scalar.t * Curve.t) =
     let pq = Curve.add p q in
     let rec go i acc =
       if i < 0 then acc
@@ -231,7 +231,7 @@ struct
     in
     go (Curve.Scalar.length_in_bits - 1) Curve.zero
 
-  let verify ((s, h): Signature.t) (pk: Public_key.t) (m: Message.t) =
+  let verify ((s, h) : Signature.t) (pk : Public_key.t) (m : Message.t) =
     let pre_r = shamir_sum (s, Curve.one) (h, pk) in
     if Curve.equal Curve.zero pre_r then false
     else
@@ -240,7 +240,7 @@ struct
       Curve.Scalar.equal h' h
 
   [%%if
-  log_calls]
+  call_logger]
 
   let verify s pk m =
     Coda_debug.Call_logger.record_call "Signature_lib.Schnorr.verify" ;
@@ -252,15 +252,16 @@ struct
   [%%endif]
 
   module Checked = struct
-    let compress ((x, _): Curve.var) =
+    let compress ((x, _) : Curve.var) =
       Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
 
     open Impl.Let_syntax
 
     let verification_hash (type s)
-        ((module Shifted) as shifted:
+        ((module Shifted) as shifted :
           (module Curve.Checked.Shifted.S with type t = s))
-        ((s, h): Signature.var) (public_key: Public_key.var) (m: Message.var) =
+        ((s, h) : Signature.var) (public_key : Public_key.var)
+        (m : Message.var) =
       with_label __LOC__
         (let%bind pre_r =
            (* s * g + h * public_key *)

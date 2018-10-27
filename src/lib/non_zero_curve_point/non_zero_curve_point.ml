@@ -79,10 +79,10 @@ module Compressed = struct
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
-  let var_of_t ({x; is_odd}: t) : var =
+  let var_of_t ({x; is_odd} : t) : var =
     {x= Field.Checked.constant x; is_odd= Boolean.var_of_value is_odd}
 
-  let assert_equal (t1: var) (t2: var) =
+  let assert_equal (t1 : var) (t2 : var) =
     let open Let_syntax in
     let%map () = Field.Checked.Assert.equal t1.x t2.x
     and () = Boolean.Assert.(t1.is_odd = t2.is_odd) in
@@ -95,7 +95,7 @@ module Compressed = struct
 
   (* TODO: Right now everyone could switch to using the other unpacking...
    Either decide this is ok or assert bitstring lt field size *)
-  let var_to_triples ({x; is_odd}: var) =
+  let var_to_triples ({x; is_odd} : var) =
     let open Let_syntax in
     let%map x_bits =
       Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
@@ -124,7 +124,7 @@ end
 open Tick
 open Let_syntax
 
-let decompress ({x; is_odd}: Compressed.t) =
+let decompress ({x; is_odd} : Compressed.t) =
   Option.map (Tick.Inner_curve.find_y x) ~f:(fun y ->
       let y_parity = parity y in
       let y = if Bool.(is_odd = y_parity) then y else Field.negate y in
@@ -136,7 +136,7 @@ let parity_var y =
   let%map bs = Field.Checked.unpack_full y in
   List.hd_exn (Bitstring_lib.Bitstring.Lsb_first.to_list bs)
 
-let decompress_var ({x; is_odd} as c: Compressed.var) =
+let decompress_var ({x; is_odd} as c : Compressed.var) =
   let%bind y =
     provide_witness Typ.field
       As_prover.(
@@ -148,7 +148,7 @@ let decompress_var ({x; is_odd} as c: Compressed.var) =
 
 let compress : t -> Compressed.t = Compressed.compress
 
-let compress_var ((x, y): var) : (Compressed.var, _) Checked.t =
+let compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
   with_label __LOC__
     (let%map is_odd = parity_var y in
      {Compressed.x; is_odd})

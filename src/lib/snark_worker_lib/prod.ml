@@ -15,7 +15,7 @@ module Cache = struct
     T.push_exn t ~key:statement ~data:(Time.now (), proof) ;
     if Int.( > ) (T.length t) max_size then ignore (T.pop_exn t)
 
-  let find (t: t) statement = Option.map ~f:snd (T.find t statement)
+  let find (t : t) statement = Option.map ~f:snd (T.find t statement)
 end
 
 module Inputs = struct
@@ -50,14 +50,14 @@ module Inputs = struct
   module Sparse_ledger = Coda_base.Sparse_ledger
 
   (* TODO: Use public_key once SoK is implemented *)
-  let perform_single ({m= (module M); cache}: Worker_state.t) ~message =
+  let perform_single ({m= (module M); cache} : Worker_state.t) ~message =
     let open Snark_work_lib in
     let sok_digest = Coda_base.Sok_message.digest message in
     fun single ->
       let statement = Work.Single.Spec.statement single in
       match Cache.find cache statement with
       | Some proof -> Or_error.return (proof, Time.Span.zero)
-      | None ->
+      | None -> (
         match single with
         | Work.Single.Spec.Transition (input, t, l) ->
             let start = Time.now () in
@@ -75,9 +75,7 @@ module Inputs = struct
             let%map res = M.merge ~sok_digest proof1 proof2 in
             Cache.add cache ~statement ~proof:res ;
             let total = Time.abs_diff (Time.now ()) start in
-            (res, total)
+            (res, total) )
 end
 
 module Worker = Worker.Make (Inputs)
-
-let command_name = "snark-worker-prod"

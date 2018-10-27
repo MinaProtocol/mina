@@ -22,7 +22,8 @@ module Example = struct
              [ div [class_ "flex justify-center mb4"] [image]
              ; div [class_ "w-100"] [important_text] ])
         ~not_small:
-          (div [class_ "flex items-center"]
+          (div
+             [class_ "flex items-center"]
              [ div [class_ "w-50 mr4-ns tr-ns"] [left]
              ; div [class_ "w-50 ml4-ns tl-ns"] [right] ])
     in
@@ -66,14 +67,15 @@ let marked_up_content content =
           else Html_concise.span [bold_style] [Html_concise.text str] ) )
 
 module Important_text = struct
-  let create ~title ~content ?(alt_content= None) () =
+  let create ~title ~content ?(alt_content = None) () =
     let open Html_concise in
     let content_style, title_html =
       Important_title.(content_style title, html title)
     in
     let make_content content =
       let content_length = List.length content in
-      div [Style.render content_style]
+      div
+        [Style.render content_style]
         (List.mapi content ~f:(fun i txt ->
              p
                (let open Style in
@@ -287,9 +289,9 @@ let home () =
              ~content:
                (marked_up_content
                   [ "Coda uses recursive composition of zk-SNARKs to compress \
-                     the whole\n                \
+                     the whole\n\
                      blockchain down to the size of a few tweets."
-                  ; "No one needs to store\n                \
+                  ; "No one needs to store\n\
                      or download transaction history in order to verify the \
                      blockchain." ])
              ())
@@ -313,10 +315,10 @@ let home () =
           (Important_text.create ~title:(`Left "Functional programming")
              ~content:
                (marked_up_content
-                  [ "A cornerstone of our approach is a focus on building\n                \
+                  [ "A cornerstone of our approach is a focus on building\n\
                      reliable software through the use of statically-typed \
                      functional programming languages."
-                  ; "This is reflected in our OCaml codebase and style of\n                \
+                  ; "This is reflected in our OCaml codebase and style of\n\
                      structuring code around DSLs, as well as in the design \
                      of languages we're developing for Coda." ])
              ())
@@ -338,10 +340,10 @@ let home () =
           (Important_text.create ~title:(`Left "Distributed systems")
              ~content:
                (marked_up_content
-                  [ "We implement state-of-the-art\n                \
-                     consensus protocols and have developed\n                \
+                  [ "We implement state-of-the-art\n\
+                     consensus protocols and have developed\n\
                      frameworks for describing distributed systems, enabling \
-                     us to quickly\n                \
+                     us to quickly\n\
                      iterate." ])
              ()) ]
   in

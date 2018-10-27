@@ -22,6 +22,10 @@ module type Inputs_intf = sig
     type t [@@deriving bin_io, sexp]
   end
 
+  module Genesis_ledger : sig
+    val t : Coda_base.Ledger.t
+  end
+
   val proposal_interval : Time.Span.t
 end
 
@@ -30,8 +34,7 @@ module Make (Inputs : Inputs_intf) :
   with type Internal_transition.Ledger_builder_diff.t =
               Inputs.Ledger_builder_diff.t
    and type External_transition.Ledger_builder_diff.t =
-              Inputs.Ledger_builder_diff.t =
-struct
+              Inputs.Ledger_builder_diff.t = struct
   open Inputs
   module Ledger_builder_diff = Ledger_builder_diff
 
@@ -40,6 +43,10 @@ struct
 
     let create () = ()
   end
+
+  module Blockchain_state =
+    Coda_base.Blockchain_state.Make (Inputs.Genesis_ledger)
+  module Lite_compat = Lite_compat.Make (Blockchain_state)
 
   module Consensus_transition_data = struct
     type 'signature t_ = {signature: 'signature} [@@deriving bin_io, sexp]
@@ -127,15 +134,22 @@ struct
           ; signer_public_key= Lite_compat.public_key signer_public_key } )
   end
 
-  module Protocol_state = Protocol_state.Make (Consensus_state)
-  module Snark_transition = Snark_transition.Make (Consensus_transition_data)
+  module Protocol_state =
+    Protocol_state.Make (Blockchain_state) (Consensus_state)
+
+  module Snark_transition = Coda_base.Snark_transition.Make (struct
+    module Genesis_ledger = Inputs.Genesis_ledger
+    module Blockchain_state = Blockchain_state
+    module Consensus_data = Consensus_transition_data
+  end)
+
   module Internal_transition =
     Internal_transition.Make (Ledger_builder_diff) (Snark_transition)
   module External_transition =
     External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
   let generate_transition ~previous_protocol_state ~blockchain_state
-      ~local_state:_ ~time:_ ~keypair:_ ~transactions:_ =
+      ~local_state:_ ~time:_ ~keypair:_ ~transactions:_ ~ledger:_ ~logger:_ =
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
     in
@@ -155,7 +169,7 @@ struct
     in
     Some (protocol_state, consensus_transition_data)
 
-  let is_transition_valid_checked (transition: Snark_transition.var) =
+  let is_transition_valid_checked (transition : Snark_transition.var) =
     let Consensus_transition_data.({signature}) =
       Snark_transition.consensus_data transition
     in
@@ -169,7 +183,7 @@ struct
       (Public_key.var_of_t Global_public_key.t)
       (transition |> Snark_transition.blockchain_state)
 
-  let next_state_checked (state: Consensus_state.var) _state_hash _block =
+  let next_state_checked (state : Consensus_state.var) _state_hash _block =
     let open Consensus_state in
     let open Snark_params.Tick.Let_syntax in
     let%bind length = Length.increment_var state.length in
@@ -189,6 +203,16 @@ struct
   let select Consensus_state.({length= l1; _})
       Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
     if l1 >= l2 then `Keep else `Take
+
+  let next_proposal now _state ~local_state:_ ~keypair:_ ~logger:_ =
+    let open Unix_timestamp in
+    let time_since_last_interval =
+      rem now (Time.Span.to_ms Inputs.proposal_interval)
+    in
+    let proposal_time =
+      now - time_since_last_interval + Time.Span.to_ms Inputs.proposal_interval
+    in
+    `Propose proposal_time
 
   let lock_transition _ _ ~snarked_ledger:_ ~local_state:_ = ()
 

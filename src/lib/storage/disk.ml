@@ -13,7 +13,7 @@ module Controller = struct
     {log= Logger.child parent_log "storage.with_checksum.memory"; tc}
 end
 
-let load_with_checksum (c: 'a Controller.t) location =
+let load_with_checksum (c : 'a Controller.t) location =
   match%bind Sys.file_exists location with
   | `Yes -> (
       match%map
@@ -28,7 +28,7 @@ let load_with_checksum (c: 'a Controller.t) location =
 let load c location =
   Deferred.Result.map (load_with_checksum c location) ~f:(fun t -> t.data)
 
-let atomic_write (c: 'a Controller.t) location data =
+let atomic_write (c : 'a Controller.t) location data =
   let temp_location = location ^ ".temp" in
   let t = wrap c.tc data in
   let%bind () =
@@ -37,7 +37,7 @@ let atomic_write (c: 'a Controller.t) location data =
   let%map () = Sys.rename temp_location location in
   t
 
-let store_with_checksum (c: 'a Controller.t) location data =
+let store_with_checksum (c : 'a Controller.t) location data =
   atomic_write c location data >>| fun t -> t.checksum
 
 let store c location data = atomic_write c location data |> Deferred.ignore

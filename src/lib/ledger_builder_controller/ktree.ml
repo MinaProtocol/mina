@@ -57,7 +57,7 @@ struct
     in
     go tree [] |> Option.map ~f:List.rev
 
-  let singleton (e: Elem.t) : t =
+  let singleton (e : Elem.t) : t =
     {tree= Rose.singleton e; elems= Elem_set.singleton e}
 
   let gen elem_gen =
@@ -147,14 +147,15 @@ let%test_module "K-tree" =
       val max_depth : int
     end) =
     struct
-      include Make (Elem)
+      include Make
+                (Elem)
                 (struct
                   let max_depth = `Finite Security.max_depth
                 end)
 
       let%test_unit "Adding an element either changes the tree or it was \
                      already in the set" =
-        Quickcheck.test ~sexp_of:[%sexp_of : t * Elem.t * Elem.t]
+        Quickcheck.test ~sexp_of:[%sexp_of: t * Elem.t * Elem.t]
           (let open Quickcheck.Generator.Let_syntax in
           let%bind r = gen Elem.gen and e = Elem.gen in
           let candidates = Rose.to_array r.tree in
@@ -169,7 +170,7 @@ let%test_module "K-tree" =
 
       let%test_unit "Adding to the end of the longest_path extends the path \
                      (modulo the last thing / first-thing)" =
-        Quickcheck.test ~sexp_of:[%sexp_of : t * Elem.t]
+        Quickcheck.test ~sexp_of:[%sexp_of: t * Elem.t]
           ( Quickcheck.Generator.tuple2 (gen Elem.gen) Elem.gen
           |> Quickcheck.Generator.filter ~f:(fun (r, e) ->
                  not (Rose.mem r.tree e ~equal:Elem.equal) ) )
@@ -192,7 +193,7 @@ let%test_module "K-tree" =
                        path' ) )
 
       let%test_unit "There exists a path between the root and any node" =
-        Quickcheck.test ~sexp_of:[%sexp_of : t * Elem.t]
+        Quickcheck.test ~sexp_of:[%sexp_of: t * Elem.t]
           (let open Quickcheck.Generator.Let_syntax in
           let%bind r = gen Elem.gen in
           let%map e =
@@ -201,7 +202,8 @@ let%test_module "K-tree" =
           (r, e))
           ~f:(fun (r, e) -> assert (Option.is_some (path r ~f:(Elem.equal e))))
 
-      let%test_unit "Extending a tree with depth-k, extends full-tree properly" =
+      let%test_unit "Extending a tree with depth-k, extends full-tree properly"
+          =
         let elem_pairs =
           Quickcheck.random_value ~seed:(`Deterministic "seed")
             (Quickcheck.Generator.list_with_length Security.max_depth
@@ -235,13 +237,15 @@ let%test_module "K-tree" =
     end
 
     module Tree =
-      Make_quickchecks (Int)
+      Make_quickchecks
+        (Int)
         (struct
           let max_depth = 10
         end)
 
     module Big_tree =
-      Make_quickchecks (Int)
+      Make_quickchecks
+        (Int)
         (struct
           let max_depth = 50
         end)

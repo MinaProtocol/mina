@@ -1,3 +1,6 @@
+[%%import
+"../../../config.mlh"]
+
 open Core
 open Async
 open Coda_base
@@ -5,6 +8,20 @@ open Signature_lib
 open Blockchain_snark
 open Coda_numbers
 module Fee = Protocols.Coda_pow.Fee
+
+[%%if
+with_snark]
+
+module Ledger_proof = Ledger_proof.Prod
+
+[%%else]
+
+module Ledger_proof = struct
+  module Statement = Transaction_snark.Statement
+  include Ledger_proof.Debug
+end
+
+[%%endif]
 
 module Ledger_builder_aux_hash = struct
   include Ledger_builder_hash.Aux_hash.Stable.V1
@@ -34,18 +51,9 @@ module Frozen_ledger_hash = struct
   let of_ledger_hash = Frozen_ledger_hash.of_ledger_hash
 end
 
-module type Ledger_proof_intf =
-  Protocols.Coda_pow.Ledger_proof_intf
-  with type sok_digest := Sok_message.Digest.t
-   and type ledger_hash := Frozen_ledger_hash.t
-   and type proof := Proof.t
-   and type statement = Transaction_snark.Statement.t
-
 module type Ledger_proof_verifier_intf = sig
-  type ledger_proof
-
   val verify :
-       ledger_proof
+       Ledger_proof.t
     -> Transaction_snark.Statement.t
     -> message:Sok_message.t
     -> bool Deferred.t
@@ -57,11 +65,11 @@ module Transaction = struct
       module type of Transaction
       with module With_valid_signature := Transaction.With_valid_signature )
 
-  let fee (t: t) = t.payload.Transaction.Payload.fee
+  let fee (t : t) = t.payload.Transaction.Payload.fee
 
-  let receiver (t: t) = t.payload.receiver
+  let receiver (t : t) = t.payload.receiver
 
-  let sender (t: t) = Public_key.compress t.sender
+  let sender (t : t) = Public_key.compress t.sender
 
   let seed = Secure_random.string ()
 
@@ -82,8 +90,6 @@ end
 module Ledger_proof_statement = Transaction_snark.Statement
 
 module type Kernel_intf = sig
-  module Ledger_proof : Ledger_proof_intf
-
   module Completed_work :
     Protocols.Coda_pow.Completed_work_intf
     with type public_key := Public_key.Compressed.t
@@ -117,21 +123,16 @@ module type Kernel_intf = sig
 end
 
 module Make_kernel
-    (Ledger_proof : Ledger_proof_intf)
-      (Make_consensus_mechanism : functor (Ledger_builder_diff :sig
-                                                                  
-                                                                  type t
-                                                                  [@@deriving
-                                                                    sexp
-                                                                    , bin_io]
-      end) -> Consensus.Mechanism.S
-              with type Internal_transition.Ledger_builder_diff.t =
-                          Ledger_builder_diff.t
-               and type External_transition.Ledger_builder_diff.t =
-                          Ledger_builder_diff.t) :
-  Kernel_intf with type Ledger_proof.t = Ledger_proof.t =
-struct
-  module Ledger_proof = Ledger_proof
+    (Make_consensus_mechanism : functor
+      (Ledger_builder_diff :sig
+                            
+                            type t [@@deriving sexp, bin_io]
+                          end)
+      -> Consensus.Mechanism.S
+         with type Internal_transition.Ledger_builder_diff.t =
+                     Ledger_builder_diff.t
+          and type External_transition.Ledger_builder_diff.t =
+                     Ledger_builder_diff.t) : Kernel_intf = struct
   module Completed_work =
     Ledger_builder.Make_completed_work (Public_key.Compressed) (Ledger_proof)
       (Ledger_proof_statement)
@@ -158,8 +159,6 @@ module type Config_intf = sig
   val conf_dir : string
 
   val lbc_tree_max_depth : [`Infinity | `Finite of int]
-
-  val transition_interval : Time.Span.t
 
   val keypair : Keypair.t
 
@@ -207,9 +206,8 @@ module type Init_intf = sig
   val genesis_proof : Proof.t
 end
 
-let make_init ~should_propose (type ledger_proof) (module Config : Config_intf)
-    (module Kernel : Kernel_intf with type Ledger_proof.t = ledger_proof) :
-    (module Init_intf with type Ledger_proof.t = ledger_proof) Deferred.t =
+let make_init ~should_propose (module Config : Config_intf)
+    (module Kernel : Kernel_intf) : (module Init_intf) Deferred.t =
   let open Config in
   let open Kernel in
   let%bind proposer_prover =
@@ -230,7 +228,7 @@ let make_init ~should_propose (type ledger_proof) (module Config : Config_intf)
                         , Inputs.Sparse_ledger.t
                         , Inputs.Ledger_proof.t )
                         Snark_work_lib.Work.Single.Spec.t =
-          Work_selector.Sequence.Make (Inputs)
+            Work_selector.Sequence.Make (Inputs)
         end )
     | Random ->
         ( module struct
@@ -243,7 +241,7 @@ let make_init ~should_propose (type ledger_proof) (module Config : Config_intf)
                         , Inputs.Sparse_ledger.t
                         , Inputs.Ledger_proof.t )
                         Snark_work_lib.Work.Single.Spec.t =
-          Work_selector.Random.Make (Inputs)
+            Work_selector.Random.Make (Inputs)
         end )
   in
   let module Init = struct
@@ -256,22 +254,22 @@ let make_init ~should_propose (type ledger_proof) (module Config : Config_intf)
 
     module Make_work_selector = Selector.Make
   end in
-  (module Init : Init_intf with type Ledger_proof.t = ledger_proof)
+  (module Init : Init_intf)
 
 module type State_proof_intf = sig
   module Consensus_mechanism : Consensus.Mechanism.S
 
   type t [@@deriving bin_io, sexp]
 
-  include Protocols.Coda_pow.Proof_intf
-          with type input := Consensus_mechanism.Protocol_state.value
-           and type t := t
+  include
+    Protocols.Coda_pow.Proof_intf
+    with type input := Consensus_mechanism.Protocol_state.value
+     and type t := t
 end
 
 module Make_inputs0
     (Init : Init_intf)
-    (Ledger_proof_verifier : Ledger_proof_verifier_intf
-                             with type ledger_proof := Init.Ledger_proof.t) =
+    (Ledger_proof_verifier : Ledger_proof_verifier_intf) =
 struct
   open Protocols.Coda_pow
   open Init
@@ -348,7 +346,6 @@ struct
   module Ledger = Ledger
 
   module Transaction_snark = struct
-    module Statement = Transaction_snark.Statement
     include Ledger_proof
     include Ledger_proof_verifier
   end
@@ -461,10 +458,8 @@ end
 
 module Make_inputs
     (Init : Init_intf)
-    (Ledger_proof_verifier : Ledger_proof_verifier_intf
-                             with type ledger_proof := Init.Ledger_proof.t)
-    (Store : Storage.With_checksum_intf with type location = string)
-    () =
+    (Ledger_proof_verifier : Ledger_proof_verifier_intf)
+    (Store : Storage.With_checksum_intf with type location = string) =
 struct
   open Init
   module Inputs0 = Make_inputs0 (Init) (Ledger_proof_verifier)
@@ -521,7 +516,7 @@ struct
   module Genesis = struct
     let state = Consensus_mechanism.genesis_protocol_state
 
-    let ledger = Genesis_ledger.ledger
+    let ledger = Genesis_ledger.t
 
     let proof = Init.genesis_proof
   end
@@ -581,7 +576,8 @@ struct
     open Snark_work_lib.Work
 
     let add_completed_work t
-        (res: (('a, 'b, 'c, 'd) Single.Spec.t Spec.t, Ledger_proof.t) Result.t) =
+        (res :
+          (('a, 'b, 'c, 'd) Single.Spec.t Spec.t, Ledger_proof.t) Result.t) =
       apply_and_broadcast t
         (Add_solved_work
            ( List.map res.spec.instances ~f:Single.Spec.statement
@@ -608,7 +604,7 @@ struct
       (struct
         include Ledger_hash
 
-        let to_hash (h: t) =
+        let to_hash (h : t) =
           Merkle_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
       end)
       (struct
@@ -628,6 +624,7 @@ struct
     module Ledger_builder_hash = Ledger_builder_hash
     module Ledger_hash = Ledger_hash
     module Ledger_builder_aux_hash = Ledger_builder_aux_hash
+    module Blockchain_state = Consensus_mechanism.Blockchain_state
   end)
 
   module Ledger_builder_controller = struct
@@ -657,6 +654,7 @@ struct
       module Ledger_builder = Ledger_builder
       module Blockchain_state = Blockchain_state
       module Consensus_mechanism = Consensus_mechanism
+      module Protocol_state = Protocol_state
       module Protocol_state_proof = Protocol_state_proof
       module State_hash = State_hash
       module Valid_transaction = Transaction.With_valid_signature
@@ -692,12 +690,11 @@ struct
     module Public_key = Public_key
     module Private_key = Private_key
     module Keypair = Keypair
-    module Blockchain_state = Coda_base.Blockchain_state
     module Compressed_public_key = Public_key.Compressed
 
     module Prover = struct
       let prove ~prev_state ~prev_state_proof ~next_state
-          (transition: Init.Consensus_mechanism.Internal_transition.t) =
+          (transition : Init.Consensus_mechanism.Internal_transition.t) =
         match Init.proposer_prover with
         | `Non_proposer -> failwith "prove: Coda not run as proposer"
         | `Proposer prover ->
@@ -708,10 +705,6 @@ struct
               (Init.Consensus_mechanism.Internal_transition.snark_transition
                  transition)
             >>| fun {Init.Blockchain.proof; _} -> proof
-    end
-
-    module Proposal_interval = struct
-      let t = Time.Span.of_time_span Init.transition_interval
     end
   end)
 
@@ -727,8 +720,8 @@ struct
   module Work_selector = Make_work_selector (Work_selector_inputs)
 
   let request_work ~best_ledger_builder
-      ~(seen_jobs: 'a -> Work_selector.State.t)
-      ~(set_seen_jobs: 'a -> Work_selector.State.t -> unit) (t: 'a) =
+      ~(seen_jobs : 'a -> Work_selector.State.t)
+      ~(set_seen_jobs : 'a -> Work_selector.State.t -> unit) (t : 'a) =
     let lb = best_ledger_builder t in
     let instances, seen_jobs = Work_selector.work lb (seen_jobs t) in
     set_seen_jobs t seen_jobs ;
@@ -736,18 +729,16 @@ struct
     else Some {Snark_work_lib.Work.Spec.instances; fee= Fee.Unsigned.zero}
 end
 
-module Coda_with_snark
-    (Store : Storage.With_checksum_intf with type location = string)
-    (Init : Init_intf with type Ledger_proof.t = Transaction_snark.t)
-    () =
-struct
+[%%if
+with_snark]
+
+module Make_coda (Init : Init_intf) = struct
   module Ledger_proof_verifier = struct
     let verify t stmt ~message =
       if
         not
           (Int.( = )
-             (Transaction_snark.Statement.compare
-                (Init.Ledger_proof.statement t)
+             (Transaction_snark.Statement.compare (Ledger_proof.statement t)
                 stmt)
              0)
       then Deferred.return false
@@ -764,8 +755,7 @@ struct
   end
 
   module Inputs = struct
-    include Make_inputs (Init) (Ledger_proof_verifier) (Store) ()
-
+    include Make_inputs (Init) (Ledger_proof_verifier) (Storage.Disk)
     module Ledger_proof_statement = Ledger_proof_statement
     module Snark_worker = Snark_worker_lib.Prod.Worker
   end
@@ -775,25 +765,19 @@ struct
   module Prover = Init.Prover
   include Coda_lib.Make (Inputs)
 
-  let snark_worker_command_name = Snark_worker_lib.Prod.command_name
-
   let request_work =
     Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
 end
 
-module Coda_without_snark
-    (Init : Init_intf with module Ledger_proof = Ledger_proof.Debug)
-    () =
-struct
-  module Store = Storage.Disk
+[%%else]
 
+module Make_coda (Init : Init_intf) = struct
   module Ledger_proof_verifier = struct
     let verify _ _ ~message:_ = return true
   end
 
   module Inputs = struct
-    include Make_inputs (Init) (Ledger_proof_verifier) (Store) ()
-
+    include Make_inputs (Init) (Ledger_proof_verifier) (Storage.Disk)
     module Ledger_proof_statement = Ledger_proof_statement
     module Snark_worker = Snark_worker_lib.Debug.Worker
   end
@@ -805,9 +789,9 @@ struct
 
   let request_work =
     Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
-
-  let snark_worker_command_name = Snark_worker_lib.Debug.command_name
 end
+
+[%%endif]
 
 module type Main_intf = sig
   module Inputs : sig
@@ -987,8 +971,6 @@ module type Main_intf = sig
 
   val create : Config.t -> t Deferred.t
 
-  val snark_worker_command_name : string
-
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
 
   val get_ledger : t -> Ledger_builder_hash.t -> Ledger.t Deferred.Or_error.t
@@ -1002,7 +984,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let ledger_proof t = ledger_builder_ledger_proof t
   end
 
-  let get_balance t (addr: Public_key.Compressed.t) =
+  module Lite_compat = Lite_compat.Make (Consensus_mechanism.Blockchain_state)
+
+  let get_balance t (addr : Public_key.Compressed.t) =
     let open Option.Let_syntax in
     let ledger = best_ledger t in
     let%bind location = Ledger.location_of_key ledger addr in
@@ -1024,7 +1008,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
            ( Account.balance account |> Currency.Balance.to_int
            , string_of_public_key account ) )
 
-  let is_valid_transaction t (txn: Transaction.t) =
+  let is_valid_transaction t (txn : Transaction.t) =
     let remainder =
       let open Option.Let_syntax in
       let%bind balance = get_balance t (Public_key.compress txn.sender)
@@ -1055,7 +1039,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let schedule_transactions log t txns =
     List.iter txns ~f:(schedule_transaction log t)
 
-  let get_nonce t (addr: Public_key.Compressed.t) =
+  let get_nonce t (addr : Public_key.Compressed.t) =
     let open Option.Let_syntax in
     let ledger = best_ledger t in
     let%bind location = Ledger.location_of_key ledger addr in
@@ -1067,13 +1051,13 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let get_status t =
     let ledger = best_ledger t in
     let ledger_merkle_root =
-      Ledger.merkle_root ledger |> [%sexp_of : Ledger_hash.t] |> Sexp.to_string
+      Ledger.merkle_root ledger |> [%sexp_of: Ledger_hash.t] |> Sexp.to_string
     in
     let num_accounts = Ledger.num_accounts ledger in
     let state = best_protocol_state t in
     let state_hash =
       Consensus_mechanism.Protocol_state.hash state
-      |> [%sexp_of : State_hash.t] |> Sexp.to_string
+      |> [%sexp_of: State_hash.t] |> Sexp.to_string
     in
     let block_count =
       state |> Consensus_mechanism.Protocol_state.consensus_state
@@ -1106,8 +1090,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   let get_lite_chain :
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =
-    Option.map Consensus_mechanism.Consensus_state.to_lite ~f:
-      (fun consensus_state_to_lite t pks ->
+    Option.map Consensus_mechanism.Consensus_state.to_lite
+      ~f:(fun consensus_state_to_lite t pks ->
         let ledger, state, proof = best_tip t in
         let ledger =
           List.fold pks
@@ -1141,7 +1125,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   let clear_hist_status t = Perf_histograms.wipe () ; get_status t
 
-  let setup_local_server ?(client_whitelist= []) ?rest_server_port ~coda ~log
+  let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda ~log
       ~client_port () =
     let client_whitelist =
       Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_whitelist)
@@ -1175,7 +1159,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             ) ;
             return r )
       ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc
-          (fun () (work: Snark_worker.Work.Result.t) ->
+          (fun () (work : Snark_worker.Work.Result.t) ->
             Logger.info log
               !"Submit_work: %{sexp:Snark_worker.Work.Spec.t}"
               work.spec ;
@@ -1239,13 +1223,14 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                      Logger.error log "%s" (Exn.to_string_mach exn) ;
                      Deferred.unit )) ))
 
-  let create_snark_worker ~log ~public_key ~client_port ~shutdown_on_disconnect =
+  let create_snark_worker ~log ~public_key ~client_port ~shutdown_on_disconnect
+      =
     let open Snark_worker_lib in
     let%map p =
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary
         ~args:
-          ( "internal" :: Program.snark_worker_command_name
+          ( "internal" :: Snark_worker_lib.Intf.command_name
           :: Snark_worker.arguments ~public_key
                ~daemon_address:
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
