@@ -187,14 +187,14 @@ module Synchronizing = struct
     end
 
     module Net : sig
-      include Coda_lib.Ledger_builder_io_intf
-              with type sync_ledger_query := Sync_ledger.query
-               and type sync_ledger_answer := Sync_ledger.answer
-               and type ledger_builder_hash := Ledger_builder_hash.t
-               and type ledger_builder_aux := Ledger_builder.Aux.t
-               and type ledger_hash := Ledger_hash.t
-               and type protocol_state :=
-                          Consensus_mechanism.Protocol_state.value
+      include
+        Coda_lib.Ledger_builder_io_intf
+        with type sync_ledger_query := Sync_ledger.query
+         and type sync_ledger_answer := Sync_ledger.answer
+         and type ledger_builder_hash := Ledger_builder_hash.t
+         and type ledger_builder_aux := Ledger_builder.Aux.t
+         and type ledger_hash := Ledger_hash.t
+         and type protocol_state := Consensus_mechanism.Protocol_state.value
     end
   end
 end

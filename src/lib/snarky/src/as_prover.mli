@@ -20,5 +20,4 @@ end
 
 module Make (Env : sig
   type t
-end) :
-  S with type env := Env.t
+end) : S with type env := Env.t

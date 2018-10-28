@@ -32,16 +32,16 @@ let main dry_run check path =
       ~process_path:(fun kind path ->
         match kind with
         | `Dir ->
-            not (String.is_suffix ~suffix:".git" path)
-            && not (String.is_suffix ~suffix:"_build" path)
-            && not (String.is_suffix ~suffix:"stationary" path)
-            && not (String.is_suffix ~suffix:".un~" path)
-            && not (String.is_suffix ~suffix:"external" path)
+            (not (String.is_suffix ~suffix:".git" path))
+            && (not (String.is_suffix ~suffix:"_build" path))
+            && (not (String.is_suffix ~suffix:"stationary" path))
+            && (not (String.is_suffix ~suffix:".un~" path))
+            && (not (String.is_suffix ~suffix:"external" path))
             && not (String.is_suffix ~suffix:"ocamlformat" path)
         | `File ->
-            not
-              (List.exists whitelist ~f:(fun s ->
-                   String.is_suffix ~suffix:s path ))
+            (not
+               (List.exists whitelist ~f:(fun s ->
+                    String.is_suffix ~suffix:s path )))
             && ( String.is_suffix ~suffix:".ml" path
                || String.is_suffix ~suffix:".mli" path ) )
       ~f:(fun () file ->

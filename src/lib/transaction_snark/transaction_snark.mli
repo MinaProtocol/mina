@@ -114,8 +114,7 @@ module Verification : sig
 
   module Make (K : sig
     val keys : Keys.Verification.t
-  end) :
-    S
+  end) : S
 end
 
 val check_transition :
@@ -166,5 +165,4 @@ end
 
 module Make (K : sig
   val keys : Keys.t
-end) :
-  S
+end) : S

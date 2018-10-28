@@ -479,7 +479,7 @@ module Make (Inputs : Inputs_intf) = struct
     [@@deriving make]
   end
 
-  let create (config: Config.t) =
+  let create (config : Config.t) =
     let external_transitions_reader, external_transitions_writer =
       Linear_pipe.create ()
     in
@@ -521,8 +521,8 @@ module Make (Inputs : Inputs_intf) = struct
         ~incoming_diffs:(Net.transaction_pool_diffs net)
     in
     don't_wait_for
-      (Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool) ~f:
-         (fun x ->
+      (Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
+         ~f:(fun x ->
            Net.broadcast_transaction_pool_diff net x ;
            Deferred.unit )) ;
     Ivar.fill net_ivar net ;
@@ -555,8 +555,8 @@ module Make (Inputs : Inputs_intf) = struct
             { protocol_state= (tip.protocol_state, tip.proof)
             ; transactions= Transaction_pool.transactions transaction_pool
             ; ledger_builder= tip.ledger_builder })) ;
-      Linear_pipe.transfer strongest_ledgers_for_miner tips_w ~f:
-        (fun (ledger_builder, transition) ->
+      Linear_pipe.transfer strongest_ledgers_for_miner tips_w
+        ~f:(fun (ledger_builder, transition) ->
           let protocol_state =
             Consensus_mechanism.External_transition.protocol_state transition
           in
@@ -573,12 +573,12 @@ module Make (Inputs : Inputs_intf) = struct
                     Consensus_mechanism.Protocol_state.blockchain_state
                       protocol_state
                   in
-                  [%test_eq : Currency.Fee.Signed.t] Currency.Fee.Signed.zero
+                  [%test_eq: Currency.Fee.Signed.t] Currency.Fee.Signed.zero
                     fee_excess ;
-                  [%test_eq : Frozen_ledger_hash.t]
+                  [%test_eq: Frozen_ledger_hash.t]
                     (Consensus_mechanism.Blockchain_state.ledger_hash bc_state)
                     source ;
-                  [%test_eq : Frozen_ledger_hash.t]
+                  [%test_eq: Frozen_ledger_hash.t]
                     ( Ledger_builder.ledger ledger_builder
                     |> Ledger.merkle_root |> Frozen_ledger_hash.of_ledger_hash
                     )

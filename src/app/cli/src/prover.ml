@@ -72,8 +72,8 @@ struct
           open Keys
           module Consensus_mechanism = Keys.Consensus_mechanism
           module Transaction_snark = Transaction_snark
-          module Blockchain_state = Blockchain_state.Make (Keys.
-                                                           Consensus_mechanism)
+          module Blockchain_state =
+            Blockchain_state.Make (Keys.Consensus_mechanism)
           module State = Blockchain_state.Make_update (Transaction_snark)
 
           let wrap hash proof =
@@ -83,9 +83,9 @@ struct
               Wrap.input {Wrap.Prover_state.proof} Wrap.main
               (Wrap_input.of_tick_field hash)
 
-          let extend_blockchain (chain: Blockchain.t)
-              (next_state: Keys.Consensus_mechanism.Protocol_state.value)
-              (block: Keys.Consensus_mechanism.Snark_transition.value) =
+          let extend_blockchain (chain : Blockchain.t)
+              (next_state : Keys.Consensus_mechanism.Protocol_state.value)
+              (block : Keys.Consensus_mechanism.Snark_transition.value) =
             let next_state_top_hash = Keys.Step.instance_hash next_state in
             let prover_state =
               { Keys.Step.Prover_state.prev_proof= chain.proof
@@ -124,7 +124,7 @@ struct
     let create input output f : ('i, 'o) t = (input, output, f)
 
     let initialized =
-      create bin_unit [%bin_type_class : [`Initialized]] (fun w () ->
+      create bin_unit [%bin_type_class: [`Initialized]] (fun w () ->
           let%map (module W) = Worker_state.get w in
           `Initialized )
 
@@ -133,10 +133,10 @@ struct
 
     let extend_blockchain =
       create
-        [%bin_type_class
-          : Blockchain.t
-            * Consensus_mechanism.Protocol_state.value
-            * Consensus_mechanism.Snark_transition.value] Blockchain.bin_t
+        [%bin_type_class:
+          Blockchain.t
+          * Consensus_mechanism.Protocol_state.value
+          * Consensus_mechanism.Snark_transition.value] Blockchain.bin_t
         (fun w
         ( ({Blockchain.state= prev_state; proof= prev_proof} as chain)
         , next_state
@@ -154,10 +154,10 @@ struct
 
     let extend_blockchain =
       create
-        [%bin_type_class
-          : Blockchain.t
-            * Consensus_mechanism.Protocol_state.value
-            * Consensus_mechanism.Snark_transition.value] Blockchain.bin_t
+        [%bin_type_class:
+          Blockchain.t
+          * Consensus_mechanism.Protocol_state.value
+          * Consensus_mechanism.Snark_transition.value] Blockchain.bin_t
         (fun w
         ( {Blockchain.state= prev_state; proof= prev_proof}
         , next_state

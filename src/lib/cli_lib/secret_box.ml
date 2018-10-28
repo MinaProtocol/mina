@@ -45,8 +45,8 @@ end = struct
       =
     {box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
 
-  let to_stable
-      {box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext} =
+  let to_stable {box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
+      =
     {Stable.V1.box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
 end
 
@@ -54,11 +54,11 @@ include Stable.V1
 
 let to_yojson t : Yojson.Safe.json = Json.to_yojson (Json.of_stable t)
 
-let of_yojson (t: Yojson.Safe.json) =
+let of_yojson (t : Yojson.Safe.json) =
   Result.map ~f:Json.to_stable (Json.of_yojson t)
 
 (** warning: this will zero [password] *)
-let encrypt ~(password: Bytes.t) ~(plaintext: Bytes.t) =
+let encrypt ~(password : Bytes.t) ~(plaintext : Bytes.t) =
   let nonce = Secret_box.random_nonce () in
   let salt = Password_hash.random_salt () in
   let ({Password_hash.mem_limit; ops_limit} as diff) =
@@ -75,7 +75,7 @@ let encrypt ~(password: Bytes.t) ~(plaintext: Bytes.t) =
   ; ciphertext }
 
 (** warning: this will zero [password] *)
-let decrypt ~(password: Bytes.t)
+let decrypt ~(password : Bytes.t)
     { box_primitive
     ; pw_primitive
     ; nonce

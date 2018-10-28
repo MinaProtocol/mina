@@ -27,7 +27,8 @@ module Member = struct
               [Style.(render (Styles.heading_style + ["silver f5"]))]
               [text affiliation]
       in
-      div [class_ "flex items-center"]
+      div
+        [class_ "flex items-center"]
         [ div [class_ "w-25"] [icon]
         ; div [class_ "ph4 w-100"] [name; affiliation] ]
     in

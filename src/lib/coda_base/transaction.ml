@@ -18,7 +18,7 @@ module Stable = struct
 
     type with_seed = string * t [@@deriving hash]
 
-    let compare ~seed (t: t) (t': t) =
+    let compare ~seed (t : t) (t' : t) =
       let same_sender = Public_key.equal t.sender t'.sender in
       let fee_compare = -Fee.compare t.payload.fee t'.payload.fee in
       if same_sender then
@@ -39,10 +39,10 @@ type value = t
 
 type var = (Payload.var, Public_key.var, Signature.var) t_
 
-let public_keys ({payload= {Payload.receiver; _}; sender; _}: value) =
+let public_keys ({payload= {Payload.receiver; _}; sender; _} : value) =
   [receiver; Public_key.compress sender]
 
-let sign (kp: Signature_keypair.t) (payload: Payload.t) : t =
+let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
   { payload
   ; sender= kp.public_key
   ; signature= Schnorr.sign kp.private_key payload }
@@ -50,7 +50,8 @@ let sign (kp: Signature_keypair.t) (payload: Payload.t) : t =
 let typ : (var, t) Tick.Typ.t =
   let spec = Data_spec.[Payload.typ; Public_key.typ; Schnorr.Signature.typ] in
   let of_hlist
-        : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) t_ =
+        : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) t_
+      =
     H_list.(fun [payload; sender; signature] -> {payload; sender; signature})
   in
   let to_hlist {payload; sender; signature} =
@@ -83,12 +84,12 @@ module With_valid_signature = struct
   let gen = gen
 end
 
-let check_signature ({payload; sender; signature}: t) =
+let check_signature ({payload; sender; signature} : t) =
   Schnorr.verify signature (Inner_curve.of_coords sender) payload
 
 let%test_unit "completeness" =
   let keys = Array.init 2 ~f:(fun _ -> Signature_keypair.create ()) in
-  Quickcheck.test ~trials:20 (gen ~keys ~max_amount:10000 ~max_fee:1000) ~f:
-    (fun t -> assert (check_signature t) )
+  Quickcheck.test ~trials:20 (gen ~keys ~max_amount:10000 ~max_fee:1000)
+    ~f:(fun t -> assert (check_signature t) )
 
 let check t = Option.some_if (check_signature t) t

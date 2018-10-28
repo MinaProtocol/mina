@@ -17,27 +17,29 @@ let copy {data; position} = {data= Array.copy data; position}
 
 let direct_update t i ~f =
   let open Or_error.Let_syntax in
-  let x : 'a = (t.data).(i) in
+  let x : 'a = t.data.(i) in
   let%bind v = f x in
-  return @@ (t.data).(i) <- v
+  return @@ (t.data.(i) <- v)
 
 let update t ~f = direct_update t t.position ~f:(fun x -> f t.position x)
 
 (*Read element from the ith positon*)
-let read_i t i = (t.data).(i)
+let read_i t i = t.data.(i)
 
 let next_i t i = mod_ (i + 1) (Array.length t.data)
 
 let swap t i j =
   let temp = read_i t i in
-  (t.data).(i) <- (t.data).(j) ;
-  (t.data).(j) <- temp
+  t.data.(i) <- t.data.(j) ;
+  t.data.(j) <- temp
 
 let iter t ~f =
   let n = Array.length t.data in
-  for i = 0 to n - 1 do f (t.data).((t.position + i) mod n) done
+  for i = 0 to n - 1 do
+    f t.data.((t.position + i) mod n)
+  done
 
-let read t = (t.data).(t.position)
+let read t = t.data.(t.position)
 
 let filter t ~f =
   let curr_position_neg_one = mod_ (t.position - 1) (Array.length t.data) in
@@ -47,13 +49,13 @@ let filter t ~f =
       | `More pos ->
           if pos = curr_position_neg_one then
             if not (f pos) then Some (None, `Stop)
-            else Some (Some (t.data).(pos), `Stop)
+            else Some (Some t.data.(pos), `Stop)
           else if not (f pos) then
             Some (None, `More (mod_ (pos + 1) (Array.length t.data)))
           else
             Some
-              ( Some (t.data).(pos)
-              , `More (mod_ (pos + 1) (Array.length t.data)) ) )
+              (Some t.data.(pos), `More (mod_ (pos + 1) (Array.length t.data)))
+  )
   |> Sequence.to_list |> List.filter_map ~f:ident
 
 let read_all t =
@@ -62,9 +64,8 @@ let read_all t =
       match pos with
       | `Stop -> None
       | `More pos ->
-          if pos = curr_position_neg_one then Some ((t.data).(pos), `Stop)
-          else
-            Some ((t.data).(pos), `More (mod_ (pos + 1) (Array.length t.data)))
+          if pos = curr_position_neg_one then Some (t.data.(pos), `Stop)
+          else Some (t.data.(pos), `More (mod_ (pos + 1) (Array.length t.data)))
   )
   |> Sequence.to_list
 
@@ -81,7 +82,7 @@ let back ~n t = t.position <- mod_ (t.position - n) (Array.length t.data)
 
 let add t a =
   t.position <- mod_ (t.position + 1) (Array.length t.data) ;
-  (t.data).(t.position) <- a
+  t.data.(t.position) <- a
 
 let add_many t xs = List.fold xs ~init:() ~f:(fun () x -> add t x)
 
@@ -103,7 +104,7 @@ let%test_unit "buffer wraps around" =
   assert (b.data = [|4; 2; 3|])
 
 let%test_unit "b = let s = read_all b; back1;add_many s;forwards1" =
-  Quickcheck.test ~sexp_of:[%sexp_of : int t] (gen Int.gen) ~f:(fun b ->
+  Quickcheck.test ~sexp_of:[%sexp_of: int t] (gen Int.gen) ~f:(fun b ->
       let old = copy b in
       let stuff = read_all b in
       back ~n:1 b ;
