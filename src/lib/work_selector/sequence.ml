@@ -14,7 +14,7 @@ struct
   module State = Helper.State
 
   module For_tests = struct
-    let check_competable_offer = Helper.For_tests.check_competable_offer
+    let does_not_have_better_fee = Helper.For_tests.does_not_have_better_fee
   end
 
   let work ~snark_pool ~fee (ledger_builder: Inputs.Ledger_builder.t)

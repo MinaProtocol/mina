@@ -9,7 +9,7 @@ module type For_tests = sig
   type fee
 
   module For_tests : sig
-    val check_competable_offer :
+    val does_not_have_better_fee :
       snark_pool:snark_pool -> fee:fee -> work list -> bool
   end
 end
@@ -120,7 +120,7 @@ module Make_test (Make_selector : Work_selector_F) = struct
               | job ->
                   [%test_result : Bool.t]
                     ~message:"Should not get any cheap jobs" ~expect:true
-                    (Selector.For_tests.check_competable_offer ~snark_pool
+                    (Selector.For_tests.does_not_have_better_fee ~snark_pool
                        ~fee:my_fee job) ;
                   go (i + 1) seen
             in
