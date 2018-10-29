@@ -199,9 +199,6 @@ There are two primary operations in ledger builder.
 
 2. Applying a diff: Diffs from the node itself (Internal transitions) or form the network (External transitions) are then used to update the ledger builder by applying the transactions to the ledger and updating the parallel scan state with the proofs. Applying a diff may produce a proof for a sequence of transactions that were included in the previous blocks.
 
-
-TODO
-
 ## Ledger
 
 TODO
