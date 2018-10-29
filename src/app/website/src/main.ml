@@ -287,9 +287,9 @@ let home () =
              ~content:
                (marked_up_content
                   [ "Coda uses recursive composition of zk-SNARKs to compress \
-                     the whole\n                \
+                     the whole\n\
                      blockchain down to the size of a few tweets."
-                  ; "No one needs to store\n                \
+                  ; "No one needs to store\n\
                      or download transaction history in order to verify the \
                      blockchain." ])
              ())
@@ -313,10 +313,10 @@ let home () =
           (Important_text.create ~title:(`Left "Functional programming")
              ~content:
                (marked_up_content
-                  [ "A cornerstone of our approach is a focus on building\n                \
+                  [ "A cornerstone of our approach is a focus on building\n\
                      reliable software through the use of statically-typed \
                      functional programming languages."
-                  ; "This is reflected in our OCaml codebase and style of\n                \
+                  ; "This is reflected in our OCaml codebase and style of\n\
                      structuring code around DSLs, as well as in the design \
                      of languages we're developing for Coda." ])
              ())
@@ -338,10 +338,10 @@ let home () =
           (Important_text.create ~title:(`Left "Distributed systems")
              ~content:
                (marked_up_content
-                  [ "We implement state-of-the-art\n                \
-                     consensus protocols and have developed\n                \
+                  [ "We implement state-of-the-art\n\
+                     consensus protocols and have developed\n\
                      frameworks for describing distributed systems, enabling \
-                     us to quickly\n                \
+                     us to quickly\n\
                      iterate." ])
              ()) ]
   in
@@ -523,6 +523,8 @@ let testnet () =
   in
   let sections = [top; app] in
   wrap
+    ~extra_body:
+      [Html.literal {html|<script defer src="static/main.bc.js"></script>|html}]
     ~headers:[Html.link ~href:"https://csshake.surge.sh/csshake.min.css"]
     ~fixed_footer:false
     ~page_label:Links.(label testnet)
@@ -556,6 +558,7 @@ let site () : Site.t Deferred.t =
     ( List.map position_files ~f:file
     @ [ file (File.of_html ~name:"index.html" home)
       ; file (File.of_html ~name:"jobs.html" (jobs ()))
+      ; file (File.of_html ~name:"open.html" Open_source.content)
       ; file (File.of_html ~name:"testnet.html" (testnet ()))
       ; file (File.of_html ~name:"privacy.html" Privacy_policy.content)
       ; file (File.of_html ~name:"tos.html" Tos.content)

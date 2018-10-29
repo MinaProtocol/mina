@@ -61,10 +61,6 @@ struct
   let get_bin mdb location bin_read =
     get_raw mdb location |> Option.map ~f:(fun v -> bin_read v ~pos_ref:(ref 0))
 
-  let get_generic mdb location =
-    assert (Location.is_generic location) ;
-    get_raw mdb location
-
   let get mdb location =
     assert (Location.is_account location) ;
     get_bin mdb location Account.bin_read_t
@@ -123,6 +119,10 @@ struct
   let make_space_for _t _tot = ()
 
   module Account_location = struct
+    let get_generic mdb location =
+      assert (Location.is_generic location) ;
+      get_raw mdb location
+
     let build_location key =
       Location.build_generic (Bigstring.of_string ("$" ^ Key.to_string key))
 

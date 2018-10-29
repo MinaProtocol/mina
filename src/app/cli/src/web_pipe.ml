@@ -97,8 +97,8 @@ let verification_key_location () =
       | `Yes -> Ok autogen
       | `No | `Unknown ->
           Or_error.errorf
-            !"IO ERROR: Verification key does not exist\n        \
-              You should probably turn off snarks"
+            !"IO ERROR: Verification key does not exist\n\
+              \        You should probably turn off snarks"
 
 let store_verification_keys log store =
   let res =

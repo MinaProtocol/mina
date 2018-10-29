@@ -62,6 +62,14 @@ let%test_module "Test mask connected to underlying Merkle tree" =
 
       let dummy_account = Account.create "not_really_a_public_key" 1000
 
+      let create_new_account_exn mdb ({Account.public_key; _} as account) =
+        let action, location =
+          Mask.Attached.get_or_create_account_exn mdb public_key account
+        in
+        match action with
+        | `Existed -> failwith "Expected to allocate a new account"
+        | `Added -> location
+
       let%test "parent, mask agree on set" =
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
@@ -217,6 +225,27 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             Mask.Attached.For_testing.address_in_mask attached_mask
               (Mask.Addr.root ())
             && Hash.equal mask_merkle_root maskable_merkle_root )
+
+      let%test_unit "add and retrieve a block of accounts" =
+        if Test.depth <= 8 then
+          Test.with_instances (fun maskable mask ->
+              let attached_mask = Maskable.register_mask maskable mask in
+              let gen_balance = Int.gen_incl 1 Int.max_value in
+              let accounts =
+                List.init (1 lsl Test.depth) ~f:(fun public_key ->
+                    Account.create (Int.to_string public_key)
+                      (Quickcheck.random_value gen_balance) )
+              in
+              List.iter accounts ~f:(fun account ->
+                  ignore @@ create_new_account_exn attached_mask account ) ;
+              let retrieved_accounts =
+                Mask.Attached.get_all_accounts_rooted_at_exn attached_mask
+                  (Mask.Addr.root ())
+              in
+              assert (List.length accounts = List.length retrieved_accounts) ;
+              assert (
+                List.equal ~equal:Account.equal accounts retrieved_accounts )
+          )
     end
 
     module type Depth_S = sig
