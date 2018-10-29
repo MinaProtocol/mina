@@ -103,8 +103,8 @@ let main () =
             include (
               Transaction :
                 module type of Transaction
-                with module With_valid_signature := Transaction.
-                                                    With_valid_signature )
+                with module With_valid_signature := Transaction
+                                                    .With_valid_signature )
 
             let receiver _ = failwith "stub"
 
@@ -124,7 +124,8 @@ let main () =
           module Ledger_proof = Transaction_snark
 
           module Completed_work = struct
-            include Ledger_builder.Make_completed_work (Compressed_public_key)
+            include Ledger_builder.Make_completed_work
+                      (Compressed_public_key)
                       (Ledger_proof)
                       (Transaction_snark.Statement)
 

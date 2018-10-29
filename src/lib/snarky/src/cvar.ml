@@ -53,7 +53,7 @@ struct
 
   let sub t1 t2 = add t1 (scale t2 neg_one)
 
-  let linear_combination (terms: (Field.t * t) list) : t =
+  let linear_combination (terms : (Field.t * t) list) : t =
     List.fold terms ~init:(constant Field.zero) ~f:(fun acc (c, t) ->
         add acc (scale t c) )
 

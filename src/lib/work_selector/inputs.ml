@@ -63,6 +63,6 @@ module Test_input = struct
           | [j1; j2] -> (work j1, Some (work j2))
           | _ -> failwith "error pairing jobs" )
 
-    let all_work_pairs (t: t) = paired t
+    let all_work_pairs (t : t) = paired t
   end
 end

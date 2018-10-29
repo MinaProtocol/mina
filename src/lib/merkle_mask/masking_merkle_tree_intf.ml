@@ -21,11 +21,12 @@ module type S = sig
   (** create a mask with no parent *)
 
   module Attached : sig
-    include Base_merkle_tree_intf.S
-            with type account := account
-             and type location := location
-             and type hash := hash
-             and type key := key
+    include
+      Base_merkle_tree_intf.S
+      with type account := account
+       and type location := location
+       and type hash := hash
+       and type key := key
 
     val get_hash : t -> Addr.t -> hash option
     (** get hash from mask, if present, else from its parent *)

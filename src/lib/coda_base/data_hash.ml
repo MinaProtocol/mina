@@ -157,7 +157,7 @@ struct
   let equal_var x y = Field.Checked.equal x.digest y.digest
 
   let typ : (var, t) Typ.t =
-    let store (t: t) =
+    let store (t : t) =
       let open Typ.Store.Let_syntax in
       let n = Bigint.of_field t in
       let rec go i acc =
@@ -170,7 +170,7 @@ struct
       { bits= Some bits
       ; digest= Field.Checked.project (bits :> Boolean.var list) }
     in
-    let read (t: var) = Field.typ.read t.digest in
+    let read (t : var) = Field.typ.read t.digest in
     let alloc =
       let open Typ.Alloc.Let_syntax in
       let rec go i acc =

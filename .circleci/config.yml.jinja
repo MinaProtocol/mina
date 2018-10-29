@@ -4,10 +4,7 @@ jobs:
     build:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a41ac5a782b453cc5163e75b7d4e29ebac708cc6
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
+        - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
         steps:
             - checkout
             - run:
@@ -37,10 +34,7 @@ jobs:
     build_withsnark:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a41ac5a782b453cc5163e75b7d4e29ebac708cc6
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
+        - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
         steps:
             - checkout
             - run:
@@ -70,10 +64,7 @@ jobs:
     build_public:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a41ac5a782b453cc5163e75b7d4e29ebac708cc6
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
+        - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
         steps:
             - checkout
             - run:
@@ -83,14 +74,11 @@ jobs:
                 name: Enable snarks --  make withsnark
                 command: make withsnark
             - run:
-                name: Enable update checking
-                command: make withupdates
-            - run:
                 name: Get Proving Keys -- make withkeys
                 command: make withkeys
             - run:
                 name: Build OCaml
-                command: eval `opam config env` && DUNE_PROFILE=testnet make build 2>&1 | tee /tmp/buildocaml.log
+                command: eval `opam config env` && DUNE_PROFILE=testnet_public make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                 name: Build deb Package with verification keys
                 command: make deb
@@ -103,10 +91,7 @@ jobs:
     test-unit-test:
        resource_class: large
        docker:
-       - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
-         auth:
-           username: _json_key
-           password: $JSON_GCLOUD_CREDENTIALS
+       - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
        steps:
            - checkout
            - run:
@@ -122,10 +107,7 @@ jobs:
     test-withsnark:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
+        - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
         steps:
             - checkout
             - run:
@@ -145,10 +127,7 @@ jobs:
     test-{{test.name}}:
       resource_class: large
       docker:
-      - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
-        auth:
-          username: _json_key
-          password: $JSON_GCLOUD_CREDENTIALS
+      - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
       steps:
           - checkout
           - run:
