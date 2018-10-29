@@ -424,7 +424,10 @@ module Make (Inputs : Inputs_intf) :
         (Balance.to_int owned_stake)
         (Amount.to_int total_stake)
         result threshold ;
-      Option.some_if (Threshold.satisfies threshold result) result
+      Option.some_if
+        (Threshold.satisfies threshold
+           (Sha256_lib.Sha256.Digest.to_bits result))
+        result
   end
 
   module Epoch_ledger = struct

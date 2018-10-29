@@ -52,7 +52,7 @@ let digest_string t =
   in
   bits_to_string (Digestif.SHA256.(feed_string (init ()) t).h |> words_to_bits)
 
-let digest_bits (bits: bool list) =
+let digest_bits (bits : bool list) =
   bits_to_string
     ( Digestif.SHA256.(feed_string (init ()) (bits_to_string (pad false bits)))
         .h |> words_to_bits )
@@ -89,9 +89,9 @@ let%test_unit "sha-checked-and-unchecked" =
       in
       let native_string = digest_string (bits_to_string bits) in
       let native_bits = digest_bits bits in
-      if not ([%eq : string] from_gadget native_string) then
+      if not ([%eq: string] from_gadget native_string) then
         failwithf "%s <> %s (on input %s)" from_gadget native_string
           (bits_to_string bits) ()
-      else if not ([%eq : string] from_gadget native_bits) then
+      else if not ([%eq: string] from_gadget native_bits) then
         failwithf "%s <> %s (on input %s)" from_gadget native_bits
           (bits_to_string bits) () )
