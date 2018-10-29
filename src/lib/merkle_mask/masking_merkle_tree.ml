@@ -142,6 +142,12 @@ struct
         ~init:[(starting_address, starting_hash)]
         ~f:get_addresses_hashes
 
+    (* use mask Merkle root, if it exists, else get from parent *)
+    let merkle_root t =
+      match find_hash t (Addr.root ()) with
+      | Some hash -> hash
+      | None -> Base.merkle_root (get_parent t)
+
     (* a write writes only to the mask, parent is not involved 
      need to update both account and hash pieces of the mask
        *)
@@ -235,8 +241,6 @@ struct
     let delegate_to_parent f t = get_parent t |> f
 
     let make_space_for = delegate_to_parent Base.make_space_for
-
-    let merkle_root = delegate_to_parent Base.merkle_root
 
     let get_all_accounts_rooted_at_exn =
       delegate_to_parent Base.get_all_accounts_rooted_at_exn
