@@ -236,8 +236,8 @@ struct
       (* basically, the same code used for the database implementation *)
       let mask_maybe_accounts =
         let first_node, last_node = Addr.Range.subtree_range address in
-        Addr.Range.fold (first_node, last_node) ~init:[] ~f:
-          (fun bit_index acc ->
+        Addr.Range.fold (first_node, last_node) ~init:[]
+          ~f:(fun bit_index acc ->
             let account = find_account t (Location.Account bit_index) in
             account :: acc )
       in
@@ -245,11 +245,11 @@ struct
       mask_accounts @ parent_accounts
 
     (* set accounts in mask *)
-    let set_all_accounts_rooted_at_exn t address (accounts: Account.t list) =
+    let set_all_accounts_rooted_at_exn t address (accounts : Account.t list) =
       (* basically, the same code used for the database implementation *)
       let first_node, last_node = Addr.Range.subtree_range address in
-      Addr.Range.fold (first_node, last_node) ~init:accounts ~f:
-        (fun bit_index -> function
+      Addr.Range.fold (first_node, last_node) ~init:accounts
+        ~f:(fun bit_index -> function
         | head :: tail ->
             set t (Location.Account bit_index) head ;
             tail
