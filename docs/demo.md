@@ -8,7 +8,7 @@ Specifically, you'll download a docker image, run it, then play around with the 
 
 ## Helpful links
 
-- [Docs](https://github.com/CodaProtocol/coda/tree/master/docs)
+- [Docs](https://codaprotocol.com/docs.html)
 - [Support Channel](https://discord.gg/Ur3tEAu)
 
 ## Prerequisites
@@ -33,7 +33,9 @@ We'll walk through them one by one.
 
 ### Download the docker image
 
-First, you'll need to install docker on your machine. You can do so by following the instructions here: [Mac](https://docs.docker.com/docker-for-mac/install/), [Ubuntu](https://docs.docker.com/install/linux/docker-ce/ubuntu/), [Windows](https://docs.docker.com/docker-for-windows/install/).
+First, you'll need to install Docker 18.06 on your machine. You can do so by following the instructions here: [Mac](https://docs.docker.com/docker-for-mac/install/), [Ubuntu](https://docs.docker.com/install/linux/docker-ce/ubuntu/), [Windows](https://docs.docker.com/docker-for-windows/install/).
+
+**WARNING**: Most of these commands won't work as shown unless you [manage Docker as a non-root user](https://docs.docker.com/install/linux/linux-postinstall/). You can either follow the linked instructions OR run the following commands as root.
 
 Now, create a directory where you can work, and run the docker image:
 
