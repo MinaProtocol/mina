@@ -63,8 +63,8 @@ module Get_started = struct
   module Item = struct
     let chevron =
       div
-        [Style.just "ocean o-40 mr2 ml4-ns"]
-        [node "i" [Style.just "f1 fas fa-chevron-down"] []]
+        [Style.just "ocean o-40 mr3 ml4-ns"]
+        [node "i" [Style.just "f1 fas fa-chevron-right"] []]
 
     let title s =
       h2 [Style.just "w310px ibmplex f2 fw5 ocean mt0 mb4 mb0-ns"] [text s]
@@ -132,9 +132,9 @@ let content =
                         "https://github.com/CodaProtocol/coda/blob/master/CONTRIBUTING.md"
                       ~name:"Contribute"
                       ~description:
-                        "Join our free, open source community, work on \
+                        "Join our open-source community, work on \
                          issues, and learn how we use novel cryptography to \
-                         create a cryptocurrency network."
+                         create a scalable cryptocurrency network."
                   ; Item.create
                       ~url:
                         "https://github.com/CodaProtocol/coda/blob/master/docs/lifecycle-of-a-transaction-lite.md"
