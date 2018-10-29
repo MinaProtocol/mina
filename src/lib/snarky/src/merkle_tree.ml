@@ -391,12 +391,12 @@ struct
     go 0 entry_hash addr0 path0
 
   type _ Request.t +=
-    | Get_element: Address.value -> (Elt.value * Path.value) Request.t
-    | Get_path: Address.value -> Path.value Request.t
-    | Set: Address.value * Elt.value -> unit Request.t
+    | Get_element : Address.value -> (Elt.value * Path.value) Request.t
+    | Get_path : Address.value -> Path.value Request.t
+    | Set : Address.value * Elt.value -> unit Request.t
 
   (* addr0 should have least significant bit first *)
-  let modify_req ~(depth: int) root addr0 ~f : (Hash.var, 's) Checked.t =
+  let modify_req ~(depth : int) root addr0 ~f : (Hash.var, 's) Checked.t =
     let open Let_syntax in
     with_label "Merkle_tree.Checked.update_req"
       (let%bind prev, prev_path =
@@ -423,7 +423,7 @@ struct
        implied_root next_entry_hash addr0 prev_path)
 
   (* addr0 should have least significant bit first *)
-  let update_req ~(depth: int) ~root ~prev ~next addr0 :
+  let update_req ~(depth : int) ~root ~prev ~next addr0 :
       (Hash.var, _) Checked.t =
     let open Let_syntax in
     with_label "Merkle_tree.Checked.update_req"
@@ -449,7 +449,7 @@ struct
        implied_root next_entry_hash addr0 prev_path)
 
   (* addr0 should have least significant bit first *)
-  let update ~(depth: int) ~root ~prev ~next addr0 :
+  let update ~(depth : int) ~root ~prev ~next addr0 :
       (Hash.var, (Hash.value, Elt.value) merkle_tree) Checked.t =
     let open Let_syntax in
     with_label "Merkle_tree.Checked.update"

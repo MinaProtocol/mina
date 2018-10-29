@@ -607,48 +607,28 @@ module type Tip_intf = sig
   val copy : t -> t
 end
 
-module type Blockchain_state_intf = sig
+module type Consensus_mechanism_intf = sig
+  type proof
+
+  type ledger
+
+  type frozen_ledger_hash
+
   type ledger_builder_hash
 
-  type ledger_hash
+  type ledger_builder_diff
 
-  type time
-
-  type value [@@deriving sexp, bin_io]
-
-  type var
-
-  val create_value :
-       ledger_builder_hash:ledger_builder_hash
-    -> ledger_hash:ledger_hash
-    -> timestamp:time
-    -> value
-
-  val ledger_builder_hash : value -> ledger_builder_hash
-
-  val ledger_hash : value -> ledger_hash
-
-  val timestamp : value -> time
-end
-
-module type Consensus_mechanism_intf = sig
   type protocol_state_proof
 
   type protocol_state_hash
-
-  type blockchain_state
-
-  type proof
-
-  type ledger_builder_diff
 
   type transaction
 
   type sok_digest
 
-  type ledger
-
   type keypair
+
+  type time
 
   module Local_state : sig
     type t [@@deriving sexp]
@@ -668,6 +648,24 @@ module type Consensus_mechanism_intf = sig
     type var
   end
 
+  module Blockchain_state : sig
+    type value [@@deriving sexp, bin_io]
+
+    type var
+
+    val create_value :
+         ledger_builder_hash:ledger_builder_hash
+      -> ledger_hash:frozen_ledger_hash
+      -> timestamp:time
+      -> value
+
+    val ledger_builder_hash : value -> ledger_builder_hash
+
+    val ledger_hash : value -> frozen_ledger_hash
+
+    val timestamp : value -> time
+  end
+
   module Protocol_state : sig
     type value [@@deriving sexp, bin_io, eq, compare]
 
@@ -675,13 +673,13 @@ module type Consensus_mechanism_intf = sig
 
     val create_value :
          previous_state_hash:protocol_state_hash
-      -> blockchain_state:blockchain_state
+      -> blockchain_state:Blockchain_state.value
       -> consensus_state:Consensus_state.value
       -> value
 
     val previous_state_hash : value -> protocol_state_hash
 
-    val blockchain_state : value -> blockchain_state
+    val blockchain_state : value -> Blockchain_state.value
 
     val consensus_state : value -> Consensus_state.value
 
@@ -697,12 +695,12 @@ module type Consensus_mechanism_intf = sig
          ?sok_digest:sok_digest
       -> ?ledger_proof:proof
       -> supply_increase:Currency.Amount.t
-      -> blockchain_state:blockchain_state
+      -> blockchain_state:Blockchain_state.value
       -> consensus_data:Consensus_transition_data.value
       -> unit
       -> value
 
-    val blockchain_state : value -> blockchain_state
+    val blockchain_state : value -> Blockchain_state.value
 
     val consensus_data : value -> Consensus_transition_data.value
   end
@@ -736,12 +734,22 @@ module type Consensus_mechanism_intf = sig
 
   val generate_transition :
        previous_protocol_state:Protocol_state.value
-    -> blockchain_state:blockchain_state
+    -> blockchain_state:Blockchain_state.value
     -> local_state:Local_state.t
     -> time:Int64.t
     -> keypair:keypair
     -> transactions:transaction list
+    -> ledger:ledger
+    -> logger:Logger.t
     -> (Protocol_state.value * Consensus_transition_data.value) option
+
+  val next_proposal :
+       Int64.t
+    -> Consensus_state.value
+    -> local_state:Local_state.t
+    -> keypair:keypair
+    -> logger:Logger.t
+    -> [`Check_again of Int64.t | `Propose of Int64.t]
 end
 
 module type Time_close_validator_intf = sig
@@ -928,7 +936,6 @@ Merge Snark:
       p23 verifies s2 -> s3 is a valid transition with fee_excess23
       fee_excess_total = fee_excess12 + fee_excess23
   *)
-
   module Time_close_validator :
     Time_close_validator_intf with type time := Time.t
 
@@ -980,27 +987,23 @@ Merge Snark:
      and type diff_with_valid_signatures_and_proofs :=
                 Ledger_builder_diff.With_valid_signatures_and_proofs.t
 
-  module Blockchain_state :
-    Blockchain_state_intf
-    with type ledger_builder_hash := Ledger_builder_hash.t
-     and type ledger_hash := Frozen_ledger_hash.t
-     and type time := Time.t
-
   module Protocol_state_hash : Protocol_state_hash_intf
 
   module Protocol_state_proof : Protocol_state_proof_intf
 
   module Consensus_mechanism :
     Consensus_mechanism_intf
-    with type protocol_state_hash := Protocol_state_hash.t
+    with type proof := Proof.t
+     and type protocol_state_hash := Protocol_state_hash.t
      and type protocol_state_proof := Protocol_state_proof.t
-     and type blockchain_state := Blockchain_state.value
-     and type proof := Proof.t
+     and type frozen_ledger_hash := Frozen_ledger_hash.t
+     and type ledger_builder_hash := Ledger_builder_hash.t
      and type ledger_builder_diff := Ledger_builder_diff.t
      and type transaction := Transaction.t
      and type sok_digest := Sok_message.Digest.t
      and type ledger := Ledger.t
      and type keypair := Keypair.t
+     and type time := Time.t
 
   module Tip :
     Tip_intf
@@ -1014,13 +1017,15 @@ module Make
     (Inputs : Inputs_intf)
     (Block_state_transition_proof : Block_state_transition_proof_intf
                                     with type protocol_state :=
-                                                Inputs.Consensus_mechanism.
-                                                Protocol_state.value
+                                                Inputs.Consensus_mechanism
+                                                .Protocol_state
+                                                .value
                                      and type protocol_state_proof :=
                                                 Inputs.Protocol_state_proof.t
                                      and type internal_transition :=
-                                                Inputs.Consensus_mechanism.
-                                                Internal_transition.t) =
+                                                Inputs.Consensus_mechanism
+                                                .Internal_transition
+                                                .t) =
 struct
   open Inputs
 

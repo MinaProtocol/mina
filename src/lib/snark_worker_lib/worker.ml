@@ -6,8 +6,7 @@ module Make (Inputs : Intf.Inputs_intf) :
   with type transition := Inputs.Super_transaction.t
    and type sparse_ledger := Inputs.Sparse_ledger.t
    and type statement := Inputs.Statement.t
-   and type proof := Inputs.Proof.t =
-struct
+   and type proof := Inputs.Proof.t = struct
   open Inputs
 
   module Work = struct
@@ -36,8 +35,8 @@ struct
 
   module Rpcs = Rpcs.Make (Inputs)
 
-  let perform (s: Worker_state.t) public_key
-      ({instances; fee} as spec: Work.Spec.t) =
+  let perform (s : Worker_state.t) public_key
+      ({instances; fee} as spec : Work.Spec.t) =
     List.fold_until instances ~init:([], [])
       ~f:(fun (acc1, acc2) w ->
         match
@@ -76,7 +75,7 @@ struct
   let main daemon_address public_key shutdown_on_disconnect =
     let log = Logger.create () in
     let%bind state = Worker_state.create () in
-    let wait ?(sec= 0.5) () = after (Time.Span.of_sec sec) in
+    let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
     let rec go () =
       let log_and_retry label error =
         Logger.error log !"Error %s:\n%{sexp:Error.t}" label error ;
@@ -92,17 +91,17 @@ struct
           Logger.info log "No work; waiting a few seconds before retrying" ;
           let%bind () = wait ~sec:Worker_state.worker_wait_time () in
           go ()
-      | Ok (Some work) ->
+      | Ok (Some work) -> (
           Logger.info log "Got some work\n" ;
           match perform state public_key work with
           | Error e -> log_and_retry "performing work" e
-          | Ok result ->
+          | Ok result -> (
               match%bind
                 dispatch Rpcs.Submit_work.rpc shutdown_on_disconnect result
                   daemon_address
               with
               | Error e -> log_and_retry "submitting work" e
-              | Ok () -> go ()
+              | Ok () -> go () ) )
     in
     go ()
 
