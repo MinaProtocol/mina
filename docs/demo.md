@@ -1,5 +1,3 @@
-<img src="coda.png" width="400">
-
 # Tutorial: Coda Quickstart
 
 ## Introduction
@@ -10,10 +8,8 @@ Specifically, you'll download a docker image, run it, then play around with the 
 
 ## Helpful links
 
-- [Docs](TODO)
+- [Docs](https://github.com/CodaProtocol/coda/tree/master/docs)
 - [Support Channel](https://discord.gg/Ur3tEAu)
-
-[TODO: Talk to Joel about the specific sequencing]
 
 ## Prerequisites
 
@@ -33,30 +29,21 @@ We'll walk through them one by one.
 
 **Software**: You need to be running **a Debian 9 or Ubuntu 18 distribution**, either natively or in a VM. These are the only operating systems we have tested against. If you don't have this running locally, there are instructions in the [appendix](#appendix) to set up a Google Compute instance.
 
-**Hardware**: We'll be running three nodes on your machine, including a node that is performing intensive zk-SNARK proving work. Therefore, we recommend the following system requirements: 12GB ram [TODO: Check with iz/joel], 4 cores. 
+**Hardware**: We'll be running three nodes on your machine, including a node that is performing intensive zk-SNARK proving work. Therefore, we recommend the following system requirements: 12GB ram (you may be able to get away with less), 4 cores. 
 
 ### Download the docker image
 
-First, you'll need to install docker on your machine. You can do so by following the instructions [here](TODO).
+First, you'll need to install docker on your machine. You can do so by following the instructions here: [Mac](https://docs.docker.com/docker-for-mac/install/), [Ubuntu](https://docs.docker.com/install/linux/docker-ce/ubuntu/), [Windows](https://docs.docker.com/docker-for-windows/install/).
 
-Now, create a directory where you can work, and download the docker image:
-
-```
-TODO
-```
-
-Then, build and run the docker with the following commands.
-
-*Build*
+Now, create a directory where you can work, and run the docker image:
 
 ```
-TODO
+$ docker run -d --name coda codaprotocol/coda:demo
 ```
 
-*Run*
-
+Now, connect to the docker process with the following command:
 ```
-TODO
+$ docker exec -it coda /bin/bash
 ```
 
 ### Interact with the network
@@ -70,7 +57,7 @@ There are a few ways you can interact with this network right away:
 - [Check account balances](#check-account-balances)
 - [Add additional nodes to the network](#add-additional-nodes-to-the-network)
 
-We'll show some code snippets for each of these actions below. If you want a general reference, you can head over to the [docs](TODO).
+We'll show some code snippets for each of these actions below.
 
 #### Check the network status
 
@@ -83,22 +70,22 @@ $ coda client status
 **Since you're running three nodes, the command above will fail.** You have to specify the port that your nodes are running on. The following commands should work -- *and* give a consistent view of the network:
 
 ```
-$ coda client status -daemon-port TODO
-$ coda client status -daemon-port TODO
-$ coda client status -daemon-port TODO
+$ coda client status -daemon-port 8301
+$ coda client status -daemon-port 8401
+$ coda client status -daemon-port 8501
 
 ```
 
 If you just want to have a running status page of the entire network, try running this:
 
 ```
-$ coda client status -daemon-port TODO
+$ watch coda client status -daemon-port 8301
 
 ```
 
 #### Create a wallet
 
-A wallet in Coda is just a [public/private key pair](TODO). The public key corresponds to your publicly available address, and the private key is like a password, required to authorize sending funds from that address. 
+A wallet in Coda is just a [public/private key pair](https://en.wikipedia.org/wiki/Public-key_cryptography). The public key corresponds to your publicly available address, and the private key is like a password, required to authorize sending funds from that address. 
 
 First, create a directory for your wallet:
 
@@ -144,24 +131,18 @@ $ coda client get-public-keys -with-balances
 
 #### Add additional nodes to the network
 
-To spin up additional nodes, you'll need to point them to existing, running nodes. You can see how we spin up the nodes used in your network by reading through `./scripts/start.sh` (TODO), and if you want to spin up new nodes, you can just run the following command.
-
-```
-$ coda daemon -external-port [TODO] -ip 127.0.1.1 -txn-capacity 8 -rest-port [TODO] -client-port [TODO] -config-directory /home/brad/[TODO] > [TODO].txt &
-```
+To spin up additional nodes, you'll need to point them to existing, running nodes. You can see how we spin up the nodes used in your network by reading through `./scripts/cluster.sh`, and if you want to spin up new nodes, you can follow the patterns there.
 
 Then, you can check whether this node is up and running with the following status command:
 
 ```
-$ coda client status -daemon-port [TODO]
+$ coda client status -daemon-port <PORT>
 ```
 
 
 ## Appendix
 
 This will show you how to get up and running with an appropriate Linux distribution on Google Cloud. We'll cover a few steps: 1) getting the instance set up, 2) interacting with the machine on the command line.
-
-[TODO: go over these particulars with Joel, see if we can set up a GCE, in particular see how challenging it is to install docker]
 
 #### Setting up the instance
 
@@ -170,15 +151,11 @@ To get the instance set up, follow [these instructions](https://cloud.google.com
 - **Choose `Ubuntu 18.04 LTS` as the OS.**
 - **Instead of 1 vCPU, choose to have 4 vCPUs**
 - **If you're on the west coast, instead of choosing us-east1 choose a west coast region**
-
-<div class="pb">
+- **Change the amount of ram to 12GB**
 
 #### Interacting with the CLI
 
 To interact with the CLI, go to the compute engine -> VM instances page.
 
-<img src="vm.png" width="600" align="middle">
-
 Then, select the VM, start the VM, and click the SSH button to open up a terminal window.
 
-<img src="ssh.png" width="600" align="middle">
