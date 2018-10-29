@@ -9,8 +9,9 @@ let%test_module "Database integration test" =
       let depth = 4
     end
 
+    module Location = Merkle_ledger.Location.Make (Depth)
     module DB =
-      Database.Make (Key) (Account) (Hash) (Depth) (In_memory_kvdb)
+      Database.Make (Key) (Account) (Hash) (Depth) (Location) (In_memory_kvdb)
         (In_memory_sdb)
         (Storage_locations)
     module Ledger = Ledger.Make (Key) (Account) (Hash) (Depth)
@@ -47,14 +48,14 @@ let%test_module "Database integration test" =
       type hash = Hash.t [@@deriving sexp, eq]
     end)
 
-    let check_hash (type t1 t2) (module L1
-        : Visualizable_ledger.S with type t = t1 and type hash = Hash.t)
-        (module L2
-        : Visualizable_ledger.S with type t = t2 and type hash = Hash.t)
-        (l1, h1) (l2, h2) =
+    let check_hash (type t1 t2)
+        (module L1 : Visualizable_ledger.S
+          with type t = t1 and type hash = Hash.t)
+        (module L2 : Visualizable_ledger.S
+          with type t = t2 and type hash = Hash.t) (l1, h1) (l2, h2) =
       if not (Hash.equal h1 h2) then
         failwithf
-          !"\n\ Expected:\n%{sexp:L1.tree}\n\n\n\ Actual:\n%{sexp:L2.tree}"
+          !"\n Expected:\n%{sexp:L1.tree}\n\n\n Actual:\n%{sexp:L2.tree}"
           (L1.to_tree l1) (L2.to_tree l2) ()
 
     let%test_unit "databases have equivalent hash values" =
@@ -63,8 +64,8 @@ let%test_module "Database integration test" =
         let open Quickcheck.Generator in
         list_with_length num_accounts (Int.gen_incl 1 Int.max_value)
       in
-      Quickcheck.test ~sexp_of:[%sexp_of : int list] gen_non_zero_balances ~f:
-        (fun balances ->
+      Quickcheck.test ~sexp_of:[%sexp_of: int list] gen_non_zero_balances
+        ~f:(fun balances ->
           let accounts =
             List.mapi balances ~f:(fun account_id balance ->
                 Account.create (Int.to_string account_id) balance )

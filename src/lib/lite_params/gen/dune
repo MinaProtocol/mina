@@ -2,16 +2,15 @@
   (name gen)
   (libraries
      async
-      core
-      crypto_params
-      snarky
-      snarkette
-      ppxlib
-      snark_keys
-      coda_base
-      lite_compat
-      precomputed_values
-    )
+     core
+     crypto_params
+     snarky
+     snarkette
+     ppxlib
+     snark_keys
+     coda_base
+     lite_compat
+     precomputed_values)
+   (preprocessor_deps "../../../config.mlh")
    (preprocess (pps ppx_jane ppxlib.metaquot ppxlib.runner))
-   (modes native)
-  )
+   (modes native))
