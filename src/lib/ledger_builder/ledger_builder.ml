@@ -96,8 +96,8 @@ module Make_diff (Inputs : sig
      and type proof := Ledger_proof.t
 end) :
   Coda_pow.Ledger_builder_diff_intf
-  with type transaction := Inputs.Payment.t
-   and type transaction_with_valid_signature :=
+  with type payment := Inputs.Payment.t
+   and type payment_with_valid_signature :=
               Inputs.Payment.With_valid_signature.t
    and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
    and type public_key := Inputs.Compressed_public_key.t
@@ -130,7 +130,7 @@ end) :
   end
 
   type diff =
-    {completed_works: Completed_work.t list; transactions: Payment.t list}
+    {completed_works: Completed_work.t list; payments: Payment.t list}
   [@@deriving sexp, bin_io]
 
   type diff_with_at_most_two_coinbase =
@@ -156,7 +156,7 @@ end) :
   module With_valid_signatures_and_proofs = struct
     type diff =
       { completed_works: Completed_work.Checked.t list
-      ; transactions: Payment.With_valid_signature.t list }
+      ; payments: Payment.With_valid_signature.t list }
     [@@deriving sexp]
 
     type diff_with_at_most_two_coinbase =
@@ -181,16 +181,16 @@ end) :
       ; creator: Compressed_public_key.t }
     [@@deriving sexp]
 
-    let transactions t =
+    let payments t =
       Either.value_map t.pre_diffs
-        ~first:(fun d -> d.diff.transactions)
-        ~second:(fun d -> (fst d).diff.transactions @ (snd d).diff.transactions)
+        ~first:(fun d -> d.diff.payments)
+        ~second:(fun d -> (fst d).diff.payments @ (snd d).diff.payments)
   end
 
   let forget_diff
-      {With_valid_signatures_and_proofs.completed_works; transactions} =
+      {With_valid_signatures_and_proofs.completed_works; payments} =
     { completed_works= List.map ~f:Completed_work.forget completed_works
-    ; transactions= (transactions :> Payment.t list) }
+    ; payments= (payments :> Payment.t list) }
 
   let forget_work_opt = Option.map ~f:Completed_work.forget
 
@@ -225,10 +225,10 @@ end) :
     ; prev_hash= t.prev_hash
     ; creator= t.creator }
 
-  let transactions (t : t) =
+  let payments (t : t) =
     Either.value_map t.pre_diffs
-      ~first:(fun d -> d.diff.transactions)
-      ~second:(fun d -> (fst d).diff.transactions @ (snd d).diff.transactions)
+      ~first:(fun d -> d.diff.payments)
+      ~second:(fun d -> (fst d).diff.payments @ (snd d).diff.payments)
 end
 
 module Make (Inputs : Inputs.S) : sig
@@ -242,7 +242,7 @@ module Make (Inputs : Inputs.S) : sig
      and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
      and type public_key := Inputs.Compressed_public_key.t
      and type ledger := Inputs.Ledger.t
-     and type transaction_with_valid_signature :=
+     and type payment_with_valid_signature :=
                 Inputs.Payment.With_valid_signature.t
      and type statement := Inputs.Completed_work.Statement.t
      and type completed_work := Inputs.Completed_work.Checked.t
@@ -838,7 +838,7 @@ end = struct
     let open Result_with_rollback.Let_syntax in
     let%bind payments =
       let%map payments' =
-        List.fold_until diff.transactions ~init:[]
+        List.fold_until diff.payments ~init:[]
           ~f:(fun acc t ->
             match Payment.check t with
             | Some t -> Continue (t :: acc)
@@ -962,7 +962,7 @@ end = struct
 
   let apply_pre_diff_unchecked t coinbase_parts
       (diff : Ledger_builder_diff.With_valid_signatures_and_proofs.diff) =
-    let payments = diff.transactions in
+    let payments = diff.payments in
     let txn_works = List.map ~f:Completed_work.forget diff.completed_works in
     let coinbase_work =
       match coinbase_parts with
@@ -1475,7 +1475,7 @@ end = struct
     let diff (res : Resources.t) :
         Ledger_builder_diff.With_valid_signatures_and_proofs.diff =
       (* We have to reverse here because we only know they work in THIS order *)
-      { transactions= List.rev_map res.transactions ~f:fst
+      { payments= List.rev_map res.transactions ~f:fst
       ; completed_works= List.rev res.completed_works }
     in
     let make_diff_with_one (res : Resources.t) :
@@ -1910,9 +1910,9 @@ let%test_module "test" =
         type completed_work_checked = Completed_work.Checked.t
         [@@deriving sexp, bin_io, compare]
 
-        type transaction = Payment.t [@@deriving sexp, bin_io, compare]
+        type payment = Payment.t [@@deriving sexp, bin_io, compare]
 
-        type transaction_with_valid_signature = Payment.With_valid_signature.t
+        type payment_with_valid_signature = Payment.With_valid_signature.t
         [@@deriving sexp, bin_io, compare]
 
         type public_key = Compressed_public_key.t
@@ -1949,7 +1949,7 @@ let%test_module "test" =
         end
 
         type diff =
-          {completed_works: completed_work list; transactions: transaction list}
+          {completed_works: completed_work list; payments: payment list}
         [@@deriving sexp, bin_io]
 
         type diff_with_at_most_two_coinbase =
@@ -1975,7 +1975,7 @@ let%test_module "test" =
         module With_valid_signatures_and_proofs = struct
           type diff =
             { completed_works: completed_work_checked list
-            ; transactions: transaction_with_valid_signature list }
+            ; payments: payment_with_valid_signature list }
           [@@deriving sexp]
 
           type diff_with_at_most_two_coinbase =
@@ -1999,17 +1999,17 @@ let%test_module "test" =
             ; creator: public_key }
           [@@deriving sexp]
 
-          let transactions t =
+          let payments t =
             Either.value_map t.pre_diffs
-              ~first:(fun d -> d.diff.transactions)
+              ~first:(fun d -> d.diff.payments)
               ~second:(fun d ->
-                (fst d).diff.transactions @ (snd d).diff.transactions )
+                (fst d).diff.payments @ (snd d).diff.payments )
         end
 
         let forget_diff
-            {With_valid_signatures_and_proofs.completed_works; transactions} =
+            {With_valid_signatures_and_proofs.completed_works; payments} =
           { completed_works= List.map ~f:Completed_work.forget completed_works
-          ; transactions= (transactions :> Payment.t list) }
+          ; payments= (payments :> Payment.t list) }
 
         let forget_work_opt = Option.map ~f:Completed_work.forget
 
@@ -2044,11 +2044,11 @@ let%test_module "test" =
           ; prev_hash= t.prev_hash
           ; creator= t.creator }
 
-        let transactions (t : t) =
+        let payments (t : t) =
           Either.value_map t.pre_diffs
-            ~first:(fun d -> d.diff.transactions)
+            ~first:(fun d -> d.diff.payments)
             ~second:(fun d ->
-              (fst d).diff.transactions @ (snd d).diff.transactions )
+              (fst d).diff.payments @ (snd d).diff.payments )
       end
 
       module Config = struct
@@ -2149,7 +2149,7 @@ let%test_module "test" =
               (*At worst case number of provers coinbase should not be split more than two times*)
               assert (cb > 0 && cb < 3) ;
               let x =
-                List.length (Test_input1.Ledger_builder_diff.transactions diff)
+                List.length (Test_input1.Ledger_builder_diff.payments diff)
               in
               assert_at_least_coinbase_added x cb ;
               let expected_value = expected_ledger x all_ts old_ledger in
@@ -2186,7 +2186,7 @@ let%test_module "test" =
               (*At worst case number of provers coinbase should not be split more than two times*)
               assert (cb > 0 && cb < 3) ;
               let x =
-                List.length (Test_input1.Ledger_builder_diff.transactions diff)
+                List.length (Test_input1.Ledger_builder_diff.payments diff)
               in
               assert_at_least_coinbase_added x cb ;
               let expected_value = expected_ledger x all_ts old_ledger in
@@ -2230,7 +2230,7 @@ let%test_module "test" =
               (*With just one prover, coinbase should never be split*)
               assert (cb = 1) ;
               let x =
-                List.length (Test_input1.Ledger_builder_diff.transactions diff)
+                List.length (Test_input1.Ledger_builder_diff.payments diff)
               in
               assert_at_least_coinbase_added x cb ;
               let expected_value = expected_ledger x all_ts old_ledger in

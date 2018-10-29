@@ -140,7 +140,7 @@ module type Ledger_intf = sig
     val super_transaction : t -> super_transaction Or_error.t
   end
 
-  type valid_transaction
+  type valid_payment
 
   type ledger_hash
 
@@ -266,14 +266,14 @@ module type Coinbase_intf = sig
 end
 
 module type Super_transaction_intf = sig
-  type valid_transaction
+  type valid_payment
 
   type fee_transfer
 
   type coinbase
 
   type t =
-    | Payment of valid_transaction
+    | Payment of valid_payment
     | Fee_transfer of fee_transfer
     | Coinbase of coinbase
   [@@deriving sexp, compare, eq, bin_io]
@@ -375,9 +375,9 @@ module type Completed_work_intf = sig
 end
 
 module type Ledger_builder_diff_intf = sig
-  type transaction
+  type payment
 
-  type transaction_with_valid_signature
+  type payment_with_valid_signature
 
   type ledger_builder_hash
 
@@ -401,7 +401,7 @@ module type Ledger_builder_diff_intf = sig
   end
 
   type diff =
-    {completed_works: completed_work list; transactions: transaction list}
+    {completed_works: completed_work list; payments: payment list}
   [@@deriving sexp, bin_io]
 
   type diff_with_at_most_two_coinbase =
@@ -425,7 +425,7 @@ module type Ledger_builder_diff_intf = sig
   module With_valid_signatures_and_proofs : sig
     type diff =
       { completed_works: completed_work_checked list
-      ; transactions: transaction_with_valid_signature list }
+      ; payments: payment_with_valid_signature list }
     [@@deriving sexp]
 
     type diff_with_at_most_two_coinbase =
@@ -448,12 +448,12 @@ module type Ledger_builder_diff_intf = sig
       ; creator: public_key }
     [@@deriving sexp]
 
-    val transactions : t -> transaction_with_valid_signature list
+    val payments : t -> payment_with_valid_signature list
   end
 
   val forget : With_valid_signatures_and_proofs.t -> t
 
-  val transactions : t -> transaction list
+  val payments : t -> payment list
 end
 
 module type Ledger_builder_transition_intf = sig
@@ -528,7 +528,7 @@ module type Ledger_builder_intf = sig
 
   type super_transaction
 
-  type transaction_with_valid_signature
+  type payment_with_valid_signature
 
   type statement
 
@@ -549,7 +549,7 @@ module type Ledger_builder_intf = sig
   val create_diff :
        t
     -> logger:Logger.t
-    -> transactions_by_fee:transaction_with_valid_signature Sequence.t
+    -> transactions_by_fee:payment_with_valid_signature Sequence.t
     -> get_completed_work:(statement -> completed_work option)
     -> valid_diff
        * [`Hash_after_applying of ledger_builder_hash]
@@ -622,7 +622,7 @@ module type Consensus_mechanism_intf = sig
 
   type protocol_state_hash
 
-  type transaction
+  type payment
 
   type sok_digest
 
@@ -738,7 +738,7 @@ module type Consensus_mechanism_intf = sig
     -> local_state:Local_state.t
     -> time:Int64.t
     -> keypair:keypair
-    -> transactions:transaction list
+    -> transactions:payment list
     -> ledger:ledger
     -> logger:Logger.t
     -> (Protocol_state.value * Consensus_transition_data.value) option
@@ -860,7 +860,7 @@ module type Inputs_intf = sig
 
   module Super_transaction :
     Super_transaction_intf
-    with type valid_transaction := Payment.With_valid_signature.t
+    with type valid_payment := Payment.With_valid_signature.t
      and type fee_transfer := Fee_transfer.t
      and type coinbase := Coinbase.t
 
@@ -897,7 +897,7 @@ module type Inputs_intf = sig
 
   module Ledger :
     Ledger_intf
-    with type valid_transaction := Payment.With_valid_signature.t
+    with type valid_payment := Payment.With_valid_signature.t
      and type super_transaction := Super_transaction.t
      and type ledger_hash := Ledger_hash.t
 
@@ -946,8 +946,8 @@ Merge Snark:
 
   module Ledger_builder_diff :
     Ledger_builder_diff_intf
-    with type transaction := Payment.t
-     and type transaction_with_valid_signature :=
+    with type payment := Payment.t
+     and type payment_with_valid_signature :=
                 Payment.With_valid_signature.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type public_key := Public_key.Compressed.t
@@ -970,7 +970,7 @@ Merge Snark:
      and type public_key := Public_key.Compressed.t
      and type ledger := Ledger.t
      and type ledger_proof := Ledger_proof.t
-     and type transaction_with_valid_signature :=
+     and type payment_with_valid_signature :=
                 Payment.With_valid_signature.t
      and type statement := Completed_work.Statement.t
      and type completed_work := Completed_work.Checked.t
@@ -998,7 +998,7 @@ Merge Snark:
      and type frozen_ledger_hash := Frozen_ledger_hash.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type ledger_builder_diff := Ledger_builder_diff.t
-     and type transaction := Payment.t
+     and type payment := Payment.t
      and type sok_digest := Sok_message.Digest.t
      and type ledger := Ledger.t
      and type keypair := Keypair.t

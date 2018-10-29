@@ -19,7 +19,7 @@ module type S = sig
 
   module Super_transaction :
     Coda_pow.Super_transaction_intf
-    with type valid_transaction := Payment.With_valid_signature.t
+    with type valid_payment := Payment.With_valid_signature.t
      and type fee_transfer := Fee_transfer.t
      and type coinbase := Coinbase.t
 
@@ -65,7 +65,7 @@ module type S = sig
     Coda_pow.Ledger_intf
     with type ledger_hash := Ledger_hash.t
      and type super_transaction := Super_transaction.t
-     and type valid_transaction := Payment.With_valid_signature.t
+     and type valid_payment := Payment.With_valid_signature.t
 
   module Sparse_ledger : sig
     type t [@@deriving sexp, bin_io]
@@ -94,8 +94,8 @@ module type S = sig
     Coda_pow.Ledger_builder_diff_intf
     with type completed_work := Completed_work.t
      and type completed_work_checked := Completed_work.Checked.t
-     and type transaction := Payment.t
-     and type transaction_with_valid_signature :=
+     and type payment := Payment.t
+     and type payment_with_valid_signature :=
                 Payment.With_valid_signature.t
      and type public_key := Compressed_public_key.t
      and type ledger_builder_hash := Ledger_builder_hash.t

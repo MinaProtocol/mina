@@ -102,8 +102,8 @@ module type Kernel_intf = sig
      and type completed_work := Completed_work.t
      and type public_key := Public_key.Compressed.t
      and type ledger_builder_hash := Ledger_builder_hash.t
-     and type transaction := Payment.t
-     and type transaction_with_valid_signature :=
+     and type payment := Payment.t
+     and type payment_with_valid_signature :=
                 Payment.With_valid_signature.t
 
   module Consensus_mechanism :
