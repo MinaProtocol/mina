@@ -103,10 +103,10 @@ let content =
       [Style.just "mw7 pv3 center ph3 blacklike"]
       [ Code_snippet.create
           ~lines:
-            [ "coda client generate-keypair -privkey-path ./wallet/mykey"
-            ; "coda client send-txn -amount 100 -privkey-path ./wallet/mykey \
-               -receiver \
-               KNQxdQ2zGPN+xbEinl9//vVvVxIvI/I6UCXiYCj3Bu66afuhDHkBAAAA" ]
+            [ "docker run -d --name coda codaprotocol/coda:demo"
+            ; "docker exec -it coda /bin/bash"
+            ; "watch coda client status"
+            ]
       ; div [Style.just "ph2"]
           [ Cta_description.create ~button_text:"View on GitHub"
               ~copy:
