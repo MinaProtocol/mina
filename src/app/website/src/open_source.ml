@@ -3,9 +3,7 @@ open Async
 open Stationary
 open Common
 
-let heading =
-  let open Html_concise in
-  h1 [] [text "CODA"]
+let heading = Html_concise.(h1 [] [text "CODA"])
 
 module Code_snippet = struct
   open Html_concise

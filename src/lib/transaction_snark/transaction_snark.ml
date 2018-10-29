@@ -162,7 +162,7 @@ module Tagged_transaction = struct
             Protocols.Coda_praos.coinbase_amount ) ;
         Currency.Amount.Signed.zero
 
-  let supply_increase ((tag, t): t) =
+  let supply_increase ((tag, t) : t) =
     match tag with
     | Normal | Fee_transfer -> Amount.zero
     | Coinbase -> t.payload.amount
@@ -268,8 +268,7 @@ module Transition = struct
         let t : Transaction.t =
           { payload=
               { receiver= proposer
-              ; amount
-              (*reward*)
+              ; amount (*reward*)
               ; fee
               ; nonce= Account.Nonce.zero }
           ; sender= Public_key.decompress_exn sender

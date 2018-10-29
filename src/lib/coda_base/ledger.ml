@@ -189,7 +189,7 @@ struct
     remove_accounts_exn t previous_empty_accounts
 
   (* TODO: Better system needed for making atomic changes. Could use a monad. *)
-  let apply_coinbase t ({proposer; fee_transfer; amount} as cb: Coinbase.t) =
+  let apply_coinbase t ({proposer; fee_transfer; amount} as cb : Coinbase.t) =
     let get_or_initialize pk =
       let initial_account = Account.initialize pk in
       match get_or_create_account_exn t pk (Account.initialize pk) with
