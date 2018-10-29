@@ -53,6 +53,8 @@ module type Key_value_database = sig
 
   val set : t -> key:Bigstring.t -> data:Bigstring.t -> unit
 
+  val set_batch : t -> key_data_pairs:(Bigstring.t * Bigstring.t) list -> unit
+
   val delete : t -> key:Bigstring.t -> unit
 end
 

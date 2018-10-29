@@ -27,22 +27,25 @@ module type S = sig
   val ( >= ) : t -> t -> bool
 end
 
-module type F = functor (Unsigned :
-  Unsigned.S) -> functor (Signed :sig
-                                    
-                                    type t [@@deriving bin_io]
-end) -> functor (M :sig
-                      
-                      val to_signed : Unsigned.t -> Signed.t
+module type F = functor
+  (Unsigned : Unsigned.S)
+  (Signed :sig
+           
+           type t [@@deriving bin_io]
+         end)
+  (M :sig
+      
+      val to_signed : Unsigned.t -> Signed.t
 
-                      val of_signed : Signed.t -> Unsigned.t
+      val of_signed : Signed.t -> Unsigned.t
 
-                      val to_uint64 : Unsigned.t -> uint64
+      val to_uint64 : Unsigned.t -> uint64
 
-                      val of_uint64 : uint64 -> Unsigned.t
+      val of_uint64 : uint64 -> Unsigned.t
 
-                      val length : int
-end) -> S with type t = Unsigned.t
+      val length : int
+    end)
+  -> S with type t = Unsigned.t
 
 module Make_bin_io (M : sig
   type v
@@ -82,10 +85,9 @@ module Extend
       val of_uint64 : uint64 -> Unsigned.t
 
       val length : int
-    end) :
-  S with type t = Unsigned.t =
-struct
-  ;; assert (M.length < Tick.Field.size_in_bits - 3)
+    end) : S with type t = Unsigned.t = struct
+  ;;
+  assert (M.length < Tick.Field.size_in_bits - 3)
 
   let length_in_bits = M.length
 

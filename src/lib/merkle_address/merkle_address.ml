@@ -42,6 +42,8 @@ module type S = sig
 
   val serialize : t -> Bigstring.t
 
+  val to_string : t -> string
+
   val pp : Format.formatter -> t -> unit
 
   module Range : sig
@@ -68,9 +70,7 @@ end
 
 module Make (Input : sig
   val depth : int
-end) :
-  S =
-struct
+end) : S = struct
   let byte_count_of_bits n = (n / 8) + min 1 (n % 8)
 
   let path_byte_count = byte_count_of_bits Input.depth
@@ -130,10 +130,10 @@ struct
           in
           Fn.compose of_string string_of_sexp
 
-        let hash = Fn.compose [%hash : int * string] to_tuple
+        let hash = Fn.compose [%hash: int * string] to_tuple
 
         let hash_fold_t hash_state t =
-          [%hash_fold : int * string] hash_state (to_tuple t)
+          [%hash_fold: int * string] hash_state (to_tuple t)
 
         let compare = compare
 
@@ -160,23 +160,23 @@ struct
 
   let of_byte_string = bitstring_of_string
 
-  let pp (fmt: Format.formatter) : t -> unit =
+  let pp (fmt : Format.formatter) : t -> unit =
     Fn.compose (Format.pp_print_string fmt) to_string
 
-  let copy (path: t) : t =
+  let copy (path : t) : t =
     let%bitstring path = {| path: -1: bitstring |} in
     path
 
   (* returns a slice of the original path, so the returned key needs to be
        copied before mutating the path *)
-  let parent (path: t) =
+  let parent (path : t) =
     if bitstring_length path = 0 then
       Or_error.error_string "Address length should be nonzero"
     else Or_error.return (slice path 0 (bitstring_length path - 1))
 
   let parent_exn = Fn.compose Or_error.ok_exn parent
 
-  let child (path: t) dir : t Or_error.t =
+  let child (path : t) dir : t Or_error.t =
     if bitstring_length path >= Input.depth then
       Or_error.error_string "The address length cannot be greater than depth"
     else
@@ -184,9 +184,9 @@ struct
       let%bitstring path = {| path: -1: bitstring; dir_bit: 1|} in
       Or_error.return path
 
-  let child_exn (path: t) dir : t = child path dir |> Or_error.ok_exn
+  let child_exn (path : t) dir : t = child path dir |> Or_error.ok_exn
 
-  let to_int (path: t) : int =
+  let to_int (path : t) : int =
     Sequence.range 0 (depth path)
     |> Sequence.fold ~init:0 ~f:(fun acc i ->
            let index = depth path - 1 - i in
@@ -209,14 +209,14 @@ struct
 
   let root () = create_bitstring 0
 
-  let sibling (path: t) : t =
+  let sibling (path : t) : t =
     let path = copy path in
     let last_bit_index = depth path - 1 in
     let last_bit = if get path last_bit_index = 0 then 1 else 0 in
     put path last_bit_index last_bit ;
     path
 
-  let next (path: t) : t Option.t =
+  let next (path : t) : t Option.t =
     let open Option.Let_syntax in
     let path = copy path in
     let len = depth path in
@@ -265,7 +265,7 @@ struct
     let fold_incl (first, last) ~init ~f =
       f last @@ fold_exl (first, last) ~init ~f
 
-    let fold ?(stop= `Inclusive) (first, last) ~init ~f =
+    let fold ?(stop = `Inclusive) (first, last) ~init ~f =
       assert (depth first = depth last) ;
       match stop with
       | `Inclusive -> fold_incl (first, last) ~init ~f
@@ -281,32 +281,32 @@ struct
     dirs_from_root (root ()) = []
 
   let%test_unit "parent_exn(child_exn(node)) = node" =
-    Quickcheck.test ~sexp_of:[%sexp_of : Direction.t List.t * Direction.t]
+    Quickcheck.test ~sexp_of:[%sexp_of: Direction.t List.t * Direction.t]
       (Quickcheck.Generator.tuple2
          (Direction.gen_var_length_list Input.depth)
          Direction.gen)
       ~f:(fun (path, direction) ->
         let address = of_directions path in
-        [%test_eq : t] (parent_exn (child_exn address direction)) address )
+        [%test_eq: t] (parent_exn (child_exn address direction)) address )
 
   let%test_unit "to_index(of_index_exn(i)) = i" =
-    Quickcheck.test ~sexp_of:[%sexp_of : int]
+    Quickcheck.test ~sexp_of:[%sexp_of: int]
       (Int.gen_incl 0 ((1 lsl Input.depth) - 1))
       ~f:(fun index ->
-        [%test_result : int] ~expect:index (to_int @@ of_int_exn index) )
+        [%test_result: int] ~expect:index (to_int @@ of_int_exn index) )
 
   let%test_unit "of_index_exn(to_index(addr)) = addr" =
-    Quickcheck.test ~sexp_of:[%sexp_of : Direction.t list]
+    Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
       (Direction.gen_list Input.depth) ~f:(fun directions ->
         let address = of_directions directions in
-        [%test_result : t] ~expect:address (of_int_exn @@ to_int address) )
+        [%test_result: t] ~expect:address (of_int_exn @@ to_int address) )
 
   let%test_unit "nonempty(addr): sibling(sibling(addr)) = addr" =
-    Quickcheck.test ~sexp_of:[%sexp_of : Direction.t list]
-      (Direction.gen_var_length_list ~start:1 Input.depth) ~f:
-      (fun directions ->
+    Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
+      (Direction.gen_var_length_list ~start:1 Input.depth)
+      ~f:(fun directions ->
         let address = of_directions directions in
-        [%test_result : t] ~expect:address (sibling @@ sibling address) )
+        [%test_result: t] ~expect:address (sibling @@ sibling address) )
 end
 
 let%test_module "Address" =

@@ -5,12 +5,8 @@ open Coda_main
 open Signature_lib
 open Coda_base
 
-module Make
-    (Ledger_proof : Ledger_proof_intf)
-    (Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof.t)
-    (Coda : Coda_intf.S with type ledger_proof = Ledger_proof.t) =
-struct
-  module Coda_processes = Coda_processes.Make (Ledger_proof) (Kernel) (Coda)
+module Make (Kernel : Kernel_intf) = struct
+  module Coda_processes = Coda_processes.Make (Kernel)
   open Coda_processes
 
   module Api = struct
@@ -33,7 +29,7 @@ struct
       let online = Array.init (List.length workers) ~f:(fun _ -> true) in
       {workers; configs; start_writer; online; transaction_writer}
 
-    let online t i = (t.online).(i)
+    let online t i = t.online.(i)
 
     let get_balance t i pk =
       let worker = List.nth_exn t.workers i in
@@ -44,10 +40,10 @@ struct
 
     let start t i =
       Linear_pipe.write t.start_writer
-        (i, List.nth_exn t.configs i, fun () -> (t.online).(i) <- true)
+        (i, List.nth_exn t.configs i, fun () -> t.online.(i) <- true)
 
     let stop t i =
-      (t.online).(i) <- false ;
+      t.online.(i) <- false ;
       Coda_process.disconnect (List.nth_exn t.workers i)
 
     let send_transaction t i sk pk amount fee =
@@ -104,8 +100,8 @@ struct
        go ()) ;
     don't_wait_for
       (Deferred.ignore
-         (Linear_pipe.fold ~init:chains all_transitions_r ~f:
-            (fun chains (prev, curr, i) ->
+         (Linear_pipe.fold ~init:chains all_transitions_r
+            ~f:(fun chains (prev, curr, i) ->
               let bits_to_str b =
                 let str =
                   String.concat
@@ -145,8 +141,8 @@ struct
     in
     let check_active_accounts () =
       let%map new_aa =
-        Deferred.List.filter !active_accounts ~f:
-          (fun (pk, send_block_counts, send_balances) ->
+        Deferred.List.filter !active_accounts
+          ~f:(fun (pk, send_block_counts, send_balances) ->
             let%bind balances = get_balances pk in
             let current_block_counts = Array.to_list block_counts in
             let%map dones =
@@ -229,7 +225,7 @@ struct
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-  let test ?(proposal_interval= 1000) log n should_propose
+  let test ?(proposal_interval = 1000) log n should_propose
       snark_work_public_keys work_selection =
     let log = Logger.child log "worker_testnet" in
     let%bind program_dir = Unix.getcwd () in

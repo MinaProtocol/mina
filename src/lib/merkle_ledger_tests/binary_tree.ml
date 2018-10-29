@@ -14,8 +14,8 @@ struct
 
   let get_hash = function Leaf hash -> hash | Node {hash; _} -> hash
 
-  let set_accounts (list: Account.t list) =
-    let rec go (list: Hash.t list) num_nodes =
+  let set_accounts (list : Account.t list) =
+    let rec go (list : Hash.t list) num_nodes =
       if num_nodes = 1 then
         match list with
         | head :: next_nodes -> (Leaf head, next_nodes, 0)
@@ -48,11 +48,10 @@ struct
   let rec get_inner_hash_at_addr_exn = function
     | Leaf hash -> (
         function
-          | [] -> hash | _ :: _ -> failwith "Could not traverse beyond a leaf"
-        )
-    | Node {hash; left; right} ->
+        | [] -> hash | _ :: _ -> failwith "Could not traverse beyond a leaf" )
+    | Node {hash; left; right} -> (
         function
-          | [] -> hash
-          | Direction.Left :: xs -> get_inner_hash_at_addr_exn left xs
-          | Direction.Right :: xs -> get_inner_hash_at_addr_exn right xs
+        | [] -> hash
+        | Direction.Left :: xs -> get_inner_hash_at_addr_exn left xs
+        | Direction.Right :: xs -> get_inner_hash_at_addr_exn right xs )
 end

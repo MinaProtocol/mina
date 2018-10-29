@@ -1,0 +1,29 @@
+#!/bin/sh
+
+output='dependencies.dot'
+
+cat /dev/null > "${output}"
+echo "digraph dependencies {" >> "${output}"
+
+source_files="$(find _build/default/app _build/default/lib -name '*.ml' -or -name '*.mli' -or -name '*.ml-gen')"
+dep_stmts="$(echo "${source_files}" | xargs ocamldep -modules -ml-synonym .ml-gen)"
+echo "${dep_stmts}"
+for stmt in ${dep_stmts}; do
+  target="$(\
+    echo "${stmt}" |
+    cut -d: -f1 |
+    sed -e 's:\(_build/default/lib|_build/default/app\)/\(.\)\(.\+\)/.\+:\U\2\E\3:' \
+  )"
+  deps="$(\
+    echo "${stmt}" |
+    cut -d: -f2 |
+    sed -e 's/^[[:space:]]*//' |
+    sed -e 's/ /, /g' \
+  )"
+  echo "  ${target} -> {${deps}};" >> "${output}"
+done
+
+echo "}" >> "${output}"
+
+dot -Tpng "${output}" > dependencies.png
+display dependencies.png

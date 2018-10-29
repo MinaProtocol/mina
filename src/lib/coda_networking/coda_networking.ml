@@ -22,6 +22,8 @@ module Rpcs (Inputs : sig
     with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
      and type ledger_hash := Ledger_hash.t
 
+  module Blockchain_state : Blockchain_state.S
+
   module Protocol_state : sig
     type value [@@deriving bin_io]
 
@@ -182,6 +184,8 @@ module type Inputs_intf = sig
     with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
      and type ledger_hash := Ledger_hash.t
 
+  module Blockchain_state : Coda_base.Blockchain_state.S
+
   module Protocol_state : sig
     type value [@@deriving bin_io]
 
@@ -221,8 +225,7 @@ module Make (Inputs : Inputs_intf) = struct
   module Gossip_net = Gossip_net.Make (Message)
   module Peer = Peer
 
-  module Config :
-    Config_intf with type gossip_config := Gossip_net.Config.t =
+  module Config : Config_intf with type gossip_config := Gossip_net.Config.t =
   struct
     type t = {parent_log: Logger.t; gossip_net_params: Gossip_net.Config.t}
   end
@@ -238,11 +241,11 @@ module Make (Inputs : Inputs_intf) = struct
     ; snark_pool_diffs: Snark_pool_diff.t Linear_pipe.Reader.t }
   [@@deriving fields]
 
-  let create (config: Config.t)
-      ~(get_ledger_builder_aux_at_hash:
+  let create (config : Config.t)
+      ~(get_ledger_builder_aux_at_hash :
             Ledger_builder_hash.t
          -> (Ledger_builder_aux.t * Ledger_hash.t) option Deferred.t)
-      ~(answer_sync_ledger_query:
+      ~(answer_sync_ledger_query :
             Ledger_hash.t * Sync_ledger.query
          -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t) =
     let log = Logger.child config.parent_log "coda networking" in
@@ -347,7 +350,8 @@ module Make (Inputs : Inputs_intf) = struct
               Rpcs.Get_ledger_builder_aux_at_hash.dispatch_multi
               ledger_builder_hash
           with
-          | Ok (Some (ledger_builder_aux, ledger_builder_aux_merkle_sibling)) ->
+          | Ok (Some (ledger_builder_aux, ledger_builder_aux_merkle_sibling))
+            ->
               let implied_ledger_builder_hash =
                 Ledger_builder_hash.of_aux_and_ledger_hash
                   (Ledger_builder_aux.hash ledger_builder_aux)

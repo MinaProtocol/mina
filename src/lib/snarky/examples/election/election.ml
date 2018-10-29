@@ -49,18 +49,18 @@ end
 
 (* Here we have a checked computation for "closing" an opened ballot. In other words,
    turning the ballot into a commitment. *)
-let close_ballot_var (ballot: Ballot.Opened.var) =
+let close_ballot_var (ballot : Ballot.Opened.var) =
   let%bind bs = Ballot.Opened.var_to_bits ballot in
   Hash.hash_var bs
 
-let close_ballot (ballot: Ballot.Opened.t) =
+let close_ballot (ballot : Ballot.Opened.t) =
   Hash.hash (Ballot.Opened.to_bits ballot)
 
 (* Checked computations in Snarky are allowed to ask for help.
    This adds a new kind of "help request" a checked computation can make:
    [Open_ballot i] is a request for the opened ballot corresponding to voter [i].
 *)
-type _ Request.t += Open_ballot: int -> Ballot.Opened.t Request.t
+type _ Request.t += Open_ballot : int -> Ballot.Opened.t Request.t
 
 (* Here we write a checked function [open_ballot], which given a voter index [i]
    and a closed ballot (i.e., a commitment) [closed], produces the corresponding
@@ -72,7 +72,7 @@ type _ Request.t += Open_ballot: int -> Ballot.Opened.t Request.t
    and then verify that the help was useful. In this case, we [request] for someone out there
    to provide us with an opening to our commitment, and then check that it is indeed a
    correct opening of our closed ballot, before returning it as the result of the function. *)
-let open_ballot i (commitment: Ballot.Closed.var) =
+let open_ballot i (commitment : Ballot.Closed.var) =
   let%map _, vote =
     request Ballot.Opened.typ (Open_ballot i) ~such_that:(fun opened ->
         let%bind implied = close_ballot_var opened in
@@ -119,7 +119,7 @@ let exposed () =
 
 let keypair = generate_keypair check_winner ~exposing:(exposed ())
 
-let winner (ballots: Ballot.Opened.t array) =
+let winner (ballots : Ballot.Opened.t array) =
   let pepperoni_votes =
     Array.count ballots ~f:(function
       | _, Pepperoni -> true
@@ -128,7 +128,7 @@ let winner (ballots: Ballot.Opened.t array) =
   if pepperoni_votes > Array.length ballots / 2 then Vote.Pepperoni
   else Mushroom
 
-let tally_and_prove (ballots: Ballot.Opened.t array) =
+let tally_and_prove (ballots : Ballot.Opened.t array) =
   let commitments =
     List.init number_of_voters ~f:(fun i ->
         Hash.hash (Ballot.Opened.to_bits ballots.(i)) )

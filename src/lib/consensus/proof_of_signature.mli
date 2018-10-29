@@ -5,6 +5,10 @@ module type Inputs_intf = sig
     type t [@@deriving bin_io, sexp]
   end
 
+  module Genesis_ledger : sig
+    val t : Coda_base.Ledger.t
+  end
+
   val proposal_interval : Time.Span.t
 end
 

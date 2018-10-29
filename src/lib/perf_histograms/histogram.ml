@@ -118,8 +118,8 @@ module Exp_time_spans = Make (struct
       in
       (a, b)
 
-    let create ?(min= Time.Span.of_sec 1.) ?(max= Time.Span.of_min 5.)
-        ?(buckets= 50) () =
+    let create ?(min = Time.Span.of_sec 1.) ?(max = Time.Span.of_min 5.)
+        ?(buckets = 50) () =
       let a, b = fit min max buckets in
       {a; b; buckets}
   end

@@ -12,7 +12,7 @@ include Sparse_ledger_lib.Sparse_ledger.Make (struct
             let hash = Fn.compose Merkle_hash.of_digest Account.digest
           end)
 
-let of_ledger_subset_exn (ledger: Ledger.t) keys =
+let of_ledger_subset_exn (ledger : Ledger.t) keys =
   let new_keys, sparse =
     List.fold keys
       ~f:(fun (new_keys, sl) key ->
@@ -34,7 +34,7 @@ let of_ledger_subset_exn (ledger: Ledger.t) keys =
   in
   Ledger.remove_accounts_exn ledger new_keys ;
   Debug_assert.debug_assert (fun () ->
-      [%test_eq : Ledger_hash.t]
+      [%test_eq: Ledger_hash.t]
         (Ledger.merkle_root ledger)
         ((merkle_root sparse :> Pedersen.Digest.t) |> Ledger_hash.of_hash) ) ;
   sparse
@@ -48,11 +48,11 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
   let _, pub1 = keygen () in
   let _, pub2 = keygen () in
   let sl = of_ledger_subset_exn ledger [pub1; pub2] in
-  [%test_eq : Ledger_hash.t]
+  [%test_eq: Ledger_hash.t]
     (Ledger.merkle_root ledger)
     ((merkle_root sl :> Pedersen.Digest.t) |> Ledger_hash.of_hash)
 
-let apply_transaction_exn t ({sender; payload; signature= _}: Transaction.t) =
+let apply_transaction_exn t ({sender; payload; signature= _} : Transaction.t) =
   let {Transaction_payload.amount; fee; receiver; nonce} = payload in
   let sender_idx = find_index_exn t (Public_key.compress sender) in
   let receiver_idx = find_index_exn t receiver in
@@ -83,7 +83,7 @@ let apply_transaction_exn t ({sender; payload; signature= _}: Transaction.t) =
     }
 
 let apply_fee_transfer_exn =
-  let apply_single t ((pk, fee): Fee_transfer.single) =
+  let apply_single t ((pk, fee) : Fee_transfer.single) =
     let index = find_index_exn t pk in
     let account = get_exn t index in
     let open Currency in
@@ -97,7 +97,7 @@ let apply_fee_transfer_exn =
   fun t transfer ->
     List.fold (Fee_transfer.to_list transfer) ~f:apply_single ~init:t
 
-let apply_coinbase_exn t ({proposer; fee_transfer}: Coinbase.t) =
+let apply_coinbase_exn t ({proposer; fee_transfer} : Coinbase.t) =
   let open Currency in
   let add_to_balance t pk amount =
     let idx = find_index_exn t pk in
@@ -106,7 +106,7 @@ let apply_coinbase_exn t ({proposer; fee_transfer}: Coinbase.t) =
       { a with
         public_key= pk
       ; (* set as above *)
-      balance= Option.value_exn (Balance.add_amount a.balance amount) }
+        balance= Option.value_exn (Balance.add_amount a.balance amount) }
   in
   let proposer_reward, t =
     match fee_transfer with

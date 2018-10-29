@@ -1,18 +1,19 @@
+open Core
+
 module type S = sig
   type account
 
   type hash
 
-  type location [@@deriving sexp]
+  type location
 
   type key
 
   type t
 
-  type error =
-    | Account_location_not_found
-    | Out_of_leaves
-    | Malformed_database
+  module Db_error : sig
+    type t = Account_location_not_found | Out_of_leaves | Malformed_database
+  end
 
   module Addr : Merkle_address.S
 
@@ -30,6 +31,8 @@ module type S = sig
 
   val set : t -> location -> account -> unit
 
+  val set_batch : t -> (location * account) list -> unit
+
   val get_at_index_exn : t -> int -> account
 
   val set_at_index_exn : t -> int -> account -> unit
@@ -37,7 +40,7 @@ module type S = sig
   val index_of_key_exn : t -> key -> int
 
   val get_or_create_account :
-    t -> key -> account -> ([`Added | `Existed] * location, error) result
+    t -> key -> account -> ([`Added | `Existed] * location, Db_error.t) result
 
   val get_or_create_account_exn :
     t -> key -> account -> [`Added | `Existed] * location
@@ -50,13 +53,14 @@ module type S = sig
 
   val copy : t -> t
 
-  include Syncable_intf.S
-          with type root_hash := hash
-           and type hash := hash
-           and type account := account
-           and type addr := Addr.t
-           and type t := t
-           and type path := Path.t
+  include
+    Syncable_intf.S
+    with type root_hash := hash
+     and type hash := hash
+     and type account := account
+     and type addr := Addr.t
+     and type t := t
+     and type path := Path.t
 
   module For_tests : sig
     val gen_account_location : location Core.Quickcheck.Generator.t

@@ -140,16 +140,16 @@ module State = struct
 
   let dir c = if c mod 2 = 1 then `Left else `Right
 
-  let rec parent_empty (t: ('a, 'b) Job.t Ring_buffer.t) pos =
+  let rec parent_empty (t : ('a, 'b) Job.t Ring_buffer.t) pos =
     match pos with
     | 0 -> true
-    | pos ->
+    | pos -> (
       match (dir pos, Ring_buffer.read_i t ((pos - 1) / 2)) with
       | `Left, Merge (None, _) -> true
       | `Right, Merge (_, None) -> true
       | _, Merge (Some _, Some _) -> parent_empty t ((pos - 1) / 2)
       | _, Base _ -> failwith "This shouldn't have occured"
-      | _ -> false
+      | _ -> false )
 
   (*Level_pointer stores a start index for each level. These are, at first, 
   the indices of the first node on each level and get incremented when a job is 
@@ -186,12 +186,12 @@ module State = struct
   index is set back to first node*)
   let incr_level_pointer t cur_pos =
     let cur_level = Int.floor_log2 (cur_pos + 1) in
-    if (t.level_pointer).(cur_level) = cur_pos then
+    if t.level_pointer.(cur_level) = cur_pos then
       let last_node = Int.pow 2 (cur_level + 1) - 2 in
       let first_node = Int.pow 2 cur_level - 1 in
-      if cur_pos + 1 <= last_node then (t.level_pointer).(cur_level)
-        <- cur_pos + 1
-      else (t.level_pointer).(cur_level) <- first_node
+      if cur_pos + 1 <= last_node then
+        t.level_pointer.(cur_level) <- cur_pos + 1
+      else t.level_pointer.(cur_level) <- first_node
     else ()
 
   let fold_chronological t ~init ~f =
@@ -199,7 +199,7 @@ module State = struct
     let rec go acc i pos =
       if Int.equal i n then acc
       else
-        let x = (t.jobs.data).(pos) in
+        let x = t.jobs.data.(pos) in
         go (f acc x) (i + 1)
           (next_position (parallelism t) t.level_pointer pos)
     in
@@ -252,7 +252,7 @@ module State = struct
         job_ready job )
 
   let update_new_job t z dir pos =
-    let new_job (cur_job: ('a, 'd) Job.t) : ('a, 'd) Job.t Or_error.t =
+    let new_job (cur_job : ('a, 'd) Job.t) : ('a, 'd) Job.t Or_error.t =
       match (dir, cur_job) with
       | `Left, Merge (None, r) -> Ok (Merge (Some z, r))
       | `Right, Merge (l, None) -> Ok (Merge (l, Some z))
@@ -319,7 +319,7 @@ module State = struct
 
   let include_one_datum state value base_pos : unit Or_error.t =
     let open Or_error.Let_syntax in
-    let f (job: ('a, 'd) State.Job.t) : ('a, 'd) State.Job.t Or_error.t =
+    let f (job : ('a, 'd) State.Job.t) : ('a, 'd) State.Job.t Or_error.t =
       match job with
       | Base None -> Ok (Base (Some value))
       | _ ->
@@ -333,7 +333,7 @@ module State = struct
       state.recent_tree_data <- [] )
     else state.recent_tree_data <- value :: state.recent_tree_data
 
-  let include_many_data (state: ('a, 'd) State.t) data : unit Or_error.t =
+  let include_many_data (state : ('a, 'd) State.t) data : unit Or_error.t =
     List.fold ~init:(Ok ()) data ~f:(fun acc a ->
         let open Or_error.Let_syntax in
         let%bind () = acc in
@@ -354,7 +354,8 @@ let next_jobs_sequence :
  fun ~state -> State.jobs_ready_sequence state
 
 let next_k_jobs :
-    state:('a, 'd) State.t -> k:int -> ('a, 'd) Available_job.t list Or_error.t =
+    state:('a, 'd) State.t -> k:int -> ('a, 'd) Available_job.t list Or_error.t
+    =
  fun ~state ~k ->
   if k > State.parallelism state then
     Or_error.errorf "You asked for %d jobs, but it's only safe to ask for %d" k
@@ -484,9 +485,9 @@ let fill_in_completed_jobs :
   (state.jobs).position <- 0 ;
   if not (fst last_acc = fst state.acc) then snd state.acc else None
 
-let last_emitted_value (state: ('a, 'd) State.t) = snd state.acc
+let last_emitted_value (state : ('a, 'd) State.t) = snd state.acc
 
-let current_data (state: ('a, 'd) State.t) =
+let current_data (state : ('a, 'd) State.t) =
   state.recent_tree_data @ List.concat state.other_trees_data
 
 let parallelism : state:('a, 'd) State.t -> int =
@@ -610,12 +611,12 @@ let%test_module "scans" =
 
     let%test_module "scan (+) over ints" =
       ( module struct
-        let f_merge_up (state: int * int64 option) x =
+        let f_merge_up (state : int * int64 option) x =
           let open Option.Let_syntax in
           let%map acc = snd state in
           Int64.( + ) acc x
 
-        let job_done (job: (Int64.t, Int64.t) Available_job.t) :
+        let job_done (job : (Int64.t, Int64.t) Available_job.t) :
             Int64.t State.Completed_job.t =
           match job with
           | Base x -> Lifted x
@@ -708,7 +709,7 @@ let%test_module "scans" =
                 Quickcheck.Generator.Let_syntax.(Int.gen >>| Int64.of_int)
               ~f_job_done:job_done ~f_acc:f_merge_up
           in
-          Quickcheck.test g ~sexp_of:[%sexp_of : (int64, int64) State.t]
+          Quickcheck.test g ~sexp_of:[%sexp_of: (int64, int64) State.t]
             ~trials:10 ~f:(fun s ->
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let do_one_next = ref false in
@@ -758,12 +759,12 @@ let%test_module "scans" =
 
     let%test_module "scan (+) over ints, map from string" =
       ( module struct
-        let f_merge_up (tuple: int * int64 option) x =
+        let f_merge_up (tuple : int * int64 option) x =
           let open Option.Let_syntax in
           let%map acc = snd tuple in
           Int64.( + ) acc x
 
-        let job_done (job: (Int64.t, string) Available_job.t) :
+        let job_done (job : (Int64.t, string) Available_job.t) :
             Int64.t State.Completed_job.t =
           match job with
           | Base x -> Lifted (Int64.of_string x)
@@ -805,12 +806,12 @@ let%test_module "scans" =
 
     let%test_module "scan (concat) over strings" =
       ( module struct
-        let f_merge_up (tuple: int * string option) x =
+        let f_merge_up (tuple : int * string option) x =
           let open Option.Let_syntax in
           let%map acc = snd tuple in
           String.( ^ ) acc x
 
-        let job_done (job: (string, string) Available_job.t) :
+        let job_done (job : (string, string) Available_job.t) :
             string State.Completed_job.t =
           match job with
           | Base x -> Lifted x
@@ -856,7 +857,7 @@ let%test_module "scans" =
       let exp = 3 in
       let not_valid = Fn.compose not is_valid in
       let ok = Or_error.ok_exn in
-      let create_job (s: ('a, 'd) State.t) pos job =
+      let create_job (s : ('a, 'd) State.t) pos job =
         Ring_buffer.direct_update s.jobs pos ~f:(fun _ -> Ok job) |> ok
       in
       let empty_tree = State.create ~parallelism_log_2:exp in
