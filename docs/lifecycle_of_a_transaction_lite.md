@@ -1,6 +1,6 @@
 # The Lifecycle of a Transaction (overview)
 
-In Coda, transactions pass through several steps before they are considered verified and complete. This document is meant to walk through what happens to a single transaction in a simplified overview to help users understand a little about how Coda transactions work. It it not a comprehensive technical overview, but instead a simplified walkthrough for users. For a more detailed technical overview aimed at developers wishing to understand the codebase check out the [technical lifecycle of a transaction](lifecycle-of-a-transaction-technical.md).
+In Coda, transactions pass through several steps before they are considered verified and complete. This document is meant to walk through what happens to a single transaction in a simplified overview to help users understand a little about how Coda transactions work. It it not a comprehensive technical overview, but instead a simplified walkthrough for users. For a more detailed technical overview aimed at developers wishing to understand the codebase check out the [technical lifecycle of a transaction](lifecycle_of_a_transaction_technical.md).
 
 ### Assumption About Communications
 Coda uses a Gossip protocol to ensure that messages can be reliably transmitted to all other members of the network in a timely manner.
