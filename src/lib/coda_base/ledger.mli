@@ -26,7 +26,7 @@ module Undo : sig
   [@@deriving sexp, bin_io]
 
   type varying =
-    | Transaction of transaction
+    | Payment of transaction
     | Fee_transfer of fee_transfer
     | Coinbase of coinbase
   [@@deriving sexp, bin_io]

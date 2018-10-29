@@ -124,7 +124,7 @@ let apply_coinbase_exn t ({proposer; fee_transfer} : Coinbase.t) =
 let apply_super_transaction_exn t transition =
   match transition with
   | Super_transaction.Fee_transfer tr -> apply_fee_transfer_exn t tr
-  | Transaction tr -> apply_transaction_exn t (tr :> Payment.t)
+  | Payment tr -> apply_transaction_exn t (tr :> Payment.t)
   | Coinbase c -> apply_coinbase_exn t c
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Pedersen.Digest.t)

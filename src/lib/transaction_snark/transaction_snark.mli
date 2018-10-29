@@ -8,7 +8,7 @@ end
 
 module Transition : sig
   type t = Super_transaction.t =
-    | Transaction of Payment.With_valid_signature.t
+    | Payment of Payment.With_valid_signature.t
     | Fee_transfer of Fee_transfer.t
     | Coinbase of Coinbase.t
   [@@deriving bin_io, sexp]

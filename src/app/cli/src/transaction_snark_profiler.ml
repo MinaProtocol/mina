@@ -68,7 +68,7 @@ let create_ledger_and_transactions num_transitions =
       in
       let transitions =
         List.map transactions ~f:(fun t ->
-            Transaction_snark.Transition.Transaction t )
+            Transaction_snark.Transition.Payment t )
         @ [Coinbase coinbase; Fee_transfer fee_transfer]
       in
       (ledger, transitions)
@@ -84,7 +84,7 @@ let create_ledger_and_transactions num_transitions =
           Currency.Fee.zero
           (Account.Nonce.succ Account.Nonce.zero)
       in
-      (ledger, [Transaction a; Transaction b])
+      (ledger, [Payment a; Payment b])
 
 let time thunk =
   let start = Time.now () in
@@ -167,7 +167,7 @@ let run profiler num_transactions =
            match t with
            | Fee_transfer t ->
                List.map (Fee_transfer.to_list t) ~f:(fun (pk, _) -> pk)
-           | Transaction t ->
+           | Payment t ->
                let t = (t :> Payment.t) in
                [t.payload.receiver; Public_key.compress t.sender]
            | Coinbase {proposer; fee_transfer} ->

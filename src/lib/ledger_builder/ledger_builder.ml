@@ -674,7 +674,7 @@ end = struct
   let apply_super_transaction_and_get_witness ledger s =
     let public_keys = function
       | Super_transaction.Fee_transfer t -> Fee_transfer.receivers t
-      | Transaction t ->
+      | Payment t ->
           let t = (t :> Payment.t) in
           [Payment.sender t; Payment.receiver t]
       | Coinbase c ->
@@ -870,7 +870,7 @@ end = struct
       |> Result_with_rollback.of_or_error
     in
     let super_transactions =
-      List.map payments ~f:(fun t -> Super_transaction.Transaction t)
+      List.map payments ~f:(fun t -> Super_transaction.Payment t)
       @ List.map coinbase ~f:(fun t -> Super_transaction.Coinbase t)
       @ List.map fee_transfers ~f:(fun t -> Super_transaction.Fee_transfer t)
     in
@@ -979,7 +979,7 @@ end = struct
       Or_error.ok_exn (create_fee_transfers txn_works delta t.public_key)
     in
     let super_transactions =
-      List.map payments ~f:(fun t -> Super_transaction.Transaction t)
+      List.map payments ~f:(fun t -> Super_transaction.Payment t)
       @ List.map coinbase_parts ~f:(fun t -> Super_transaction.Coinbase t)
       @ List.map fee_transfers ~f:(fun t -> Super_transaction.Fee_transfer t)
     in
@@ -1245,7 +1245,7 @@ end = struct
     | None -> Error (Error.of_string "Work not found")
 
   let add_transaction ledger txn resources =
-    match Ledger.apply_super_transaction ledger (Transaction txn) with
+    match Ledger.apply_super_transaction ledger (Payment txn) with
     | Error _ -> Ok resources
     | Ok undo -> (
       match Resources.add_transaction resources (txn, undo) with
@@ -1668,7 +1668,7 @@ let%test_module "test" =
         type unsigned_fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
 
         type t =
-          | Transaction of valid_transaction
+          | Payment of valid_transaction
           | Fee_transfer of fee_transfer
           | Coinbase of coinbase
         [@@deriving sexp, bin_io, compare, eq]
@@ -1677,15 +1677,14 @@ let%test_module "test" =
          fun t ->
           let open Or_error.Let_syntax in
           match t with
-          | Transaction t' ->
-              Ok (Currency.Fee.Signed.of_unsigned (Payment.fee t'))
+          | Payment t' -> Ok (Currency.Fee.Signed.of_unsigned (Payment.fee t'))
           | Fee_transfer f ->
               let%map fee = Fee_transfer.fee_excess f in
               Currency.Fee.Signed.negate (Currency.Fee.Signed.of_unsigned fee)
           | Coinbase t -> Coinbase.fee_excess t
 
         let supply_increase = function
-          | Transaction _ | Fee_transfer _ -> Ok Currency.Amount.zero
+          | Payment _ | Fee_transfer _ -> Ok Currency.Amount.zero
           | Coinbase t -> Coinbase.supply_increase t
       end
 
@@ -1799,9 +1798,9 @@ let%test_module "test" =
         let apply_super_transaction : t -> Undo.t -> Undo.t Or_error.t =
          fun t s ->
           match s with
-          | Transaction t' ->
+          | Payment t' ->
               t := !t + fst t' ;
-              Or_error.return (Super_transaction.Transaction t')
+              Or_error.return (Super_transaction.Payment t')
           | Fee_transfer f ->
               let t' = Fee_transfer.fee_excess_int f in
               t := !t + t' ;
@@ -1815,7 +1814,7 @@ let%test_module "test" =
          fun t s ->
           let v =
             match s with
-            | Transaction t' -> fst t'
+            | Payment t' -> fst t'
             | Fee_transfer f -> Fee_transfer.fee_excess_int f
             | Coinbase c -> Currency.Amount.to_int c.amount
           in

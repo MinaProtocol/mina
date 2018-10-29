@@ -273,7 +273,7 @@ module type Super_transaction_intf = sig
   type coinbase
 
   type t =
-    | Transaction of valid_transaction
+    | Payment of valid_transaction
     | Fee_transfer of fee_transfer
     | Coinbase of coinbase
   [@@deriving sexp, compare, eq, bin_io]

@@ -326,7 +326,7 @@ struct
   module Super_transaction = struct
     module T = struct
       type t = Transaction_snark.Transition.t =
-        | Transaction of Payment.With_valid_signature.t
+        | Payment of Payment.With_valid_signature.t
         | Fee_transfer of Fee_transfer.t
         | Coinbase of Coinbase.t
       [@@deriving compare, eq]

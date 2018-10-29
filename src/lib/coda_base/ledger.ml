@@ -83,7 +83,7 @@ struct
     [@@deriving sexp, bin_io]
 
     type varying =
-      | Transaction of transaction
+      | Payment of transaction
       | Fee_transfer of fee_transfer
       | Coinbase of coinbase
     [@@deriving sexp, bin_io]
@@ -95,10 +95,10 @@ struct
      fun {varying; _} ->
       let open Or_error.Let_syntax in
       match varying with
-      | Transaction tr ->
+      | Payment tr ->
           Option.value_map ~default:(Or_error.error_string "Bad signature")
             (Payment.check tr.transaction) ~f:(fun x ->
-              Ok (Super_transaction.Transaction x) )
+              Ok (Super_transaction.Payment x) )
       | Fee_transfer f -> Ok (Fee_transfer f.fee_transfer)
       | Coinbase c -> Ok (Coinbase c.coinbase)
   end
@@ -300,7 +300,7 @@ struct
     let%map res =
       match undo.varying with
       | Fee_transfer u -> undo_fee_transfer ledger u
-      | Transaction u -> undo_transaction ledger u
+      | Payment u -> undo_transaction ledger u
       | Coinbase c -> undo_coinbase ledger c ; Ok ()
     in
     Debug_assert.debug_assert (fun () ->
@@ -311,9 +311,9 @@ struct
     let previous_hash = merkle_root ledger in
     Or_error.map
       ( match t with
-      | Transaction txn ->
+      | Payment txn ->
           Or_error.map (apply_transaction ledger txn) ~f:(fun u ->
-              Undo.Transaction u )
+              Undo.Payment u )
       | Fee_transfer t ->
           Or_error.map (apply_fee_transfer ledger t) ~f:(fun u ->
               Undo.Fee_transfer u )

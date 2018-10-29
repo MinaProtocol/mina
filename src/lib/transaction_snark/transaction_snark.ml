@@ -270,7 +270,7 @@ module Transition = struct
 
   let to_tagged_transaction = function
     | Fee_transfer t -> Fee_transfer.to_tagged_transaction t
-    | Transaction t -> (Normal, (t :> Payment.t))
+    | Payment t -> (Normal, (t :> Payment.t))
     | Coinbase {proposer; fee_transfer} ->
         let receiver, amount =
           Option.value ~default:(proposer, Fee.zero) fee_transfer
@@ -1173,7 +1173,7 @@ let check_transition ~sok_message ~source ~target (t : Transition.t) handler =
     handler
 
 let check_transaction ~sok_message ~source ~target t handler =
-  check_transition ~sok_message ~source ~target (Transaction t) handler
+  check_transition ~sok_message ~source ~target (Payment t) handler
 
 let check_fee_transfer ~sok_message ~source ~target t handler =
   check_transition ~sok_message ~source ~target (Fee_transfer t) handler
@@ -1249,7 +1249,7 @@ struct
       handler
 
   let of_transaction ~sok_digest ~source ~target transaction handler =
-    of_transition ~sok_digest ~source ~target (Transaction transaction) handler
+    of_transition ~sok_digest ~source ~target (Payment transaction) handler
 
   let of_fee_transfer ~sok_digest ~source ~target transfer handler =
     of_transition ~sok_digest ~source ~target (Fee_transfer transfer) handler
