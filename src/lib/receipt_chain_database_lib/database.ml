@@ -5,13 +5,14 @@ type ('key, 'value) tree_node =
   | Child of {parent: 'key; children: 'key list; value: 'value}
 [@@deriving sexp]
 
-module Make (Transaction : Intf.Transaction)
-(Receipt_chain_hash : Intf.Receipt_chain_hash
-                      with type transaction_payload := Transaction.payload)
-(Key_value_db : Key_value_database.S
-                with type key := Receipt_chain_hash.t
-                 and type value :=
-                            (Receipt_chain_hash.t, Transaction.t) tree_node) :
+module Make
+    (Transaction : Intf.Transaction)
+    (Receipt_chain_hash : Intf.Receipt_chain_hash
+                          with type transaction_payload := Transaction.payload)
+    (Key_value_db : Key_value_database.S
+                    with type key := Receipt_chain_hash.t
+                     and type value :=
+                                (Receipt_chain_hash.t, Transaction.t) tree_node) :
   Intf.Test.S
   with type receipt_chain_hash := Receipt_chain_hash.t
    and type transaction := Transaction.t
@@ -126,7 +127,6 @@ let%test_module "receipt_database" =
         end)
 
     module Receipt_db = Make (Transaction) (Receipt_chain_hash) (Key_value_db)
-
     module Verifier = Verifier.Make (Transaction) (Receipt_chain_hash)
 
     let populate_random_path ~db transactions initial_receipt_hash =
@@ -213,9 +213,9 @@ let%test_module "receipt_database" =
               ~resulting_receipt:random_receipt_chain
             |> Or_error.ok_exn
           in
-          assert (Verifier.verify merkle_list ~resulting_receipt:random_receipt_chain
-          |> Result.is_ok)
-           )
+          assert (
+            Verifier.verify merkle_list ~resulting_receipt:random_receipt_chain
+            |> Result.is_ok ) )
 
     let%test_unit "A merkle list should not exist if a proving receipt does \
                    not exist in the database" =
