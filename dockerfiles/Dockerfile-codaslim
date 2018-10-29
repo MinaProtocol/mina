@@ -8,12 +8,15 @@ RUN apt-get -y update && \
     libssl1.1 \
     libprocps6 \
     libgmp10 \
+    libgomp1 \
     libffi6 && \
-  rm -rf /var/lib/apt/lists/* 
+  rm -rf /var/lib/apt/lists/*
 
 # coda package
 # FIXME: The copy creates a layer, wasting space.
 COPY codaclient.deb /tmp/
 RUN dpkg -i /tmp/codaclient.deb
+
+# FIXME: unpack verification keys
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/usr/local/bin/coda"]

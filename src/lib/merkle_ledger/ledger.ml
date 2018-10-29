@@ -15,10 +15,11 @@ module Make
             with type account := Account.t) (Depth : sig
         val depth : int
     end) : sig
-  include Ledger_intf.S
-          with type hash := Hash.t
-           and type account := Account.t
-           and type key := Key.t
+  include
+    Ledger_intf.S
+    with type hash := Hash.t
+     and type account := Account.t
+     and type key := Key.t
 
   module For_tests : sig
     val get_leaf_hash_at_addr : t -> Addr.t -> Hash.t
@@ -27,7 +28,7 @@ end = struct
   include Depth
   module Addr = Merkle_address.Make (Depth)
 
-  type index = int
+  type index = int [@@deriving sexp, compare, hash]
 
   type leafs = int Key.Table.t [@@deriving sexp, bin_io]
 
@@ -47,8 +48,7 @@ end = struct
 
   type t = {accounts: accounts; tree: tree} [@@deriving sexp, bin_io]
 
-  module C :
-    Container.S0 with type t := t and type elt := Account.t =
+  module C : Container.S0 with type t := t and type elt := Account.t =
   Container.Make0 (struct
     module Elt = Account
 
@@ -64,7 +64,7 @@ end = struct
   let fold_until = C.fold_until
 
   module Location = struct
-    type t = index
+    type t = index [@@deriving sexp, compare, hash]
   end
 
   let copy t =
@@ -354,7 +354,7 @@ end = struct
       (t.tree).unset_slots
       <- Int.Set.union t.tree.unset_slots
            (Int.Set.of_list
-              (List.init (total - len) (fun i ->
+              (List.init (total - len) ~f:(fun i ->
                    Dyn_array.add t.accounts Account.empty ;
                    len + i )))
 

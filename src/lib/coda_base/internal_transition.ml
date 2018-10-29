@@ -25,8 +25,7 @@ end)
 (Snark_transition : Snark_transition.S) :
   S
   with module Ledger_builder_diff = Ledger_builder_diff
-   and module Snark_transition = Snark_transition =
-struct
+   and module Snark_transition = Snark_transition = struct
   module Ledger_builder_diff = Ledger_builder_diff
   module Snark_transition = Snark_transition
 

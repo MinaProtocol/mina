@@ -1,0 +1,6 @@
+[%%define genesis_ledger "testnet"]
+[%%define with_snark true]
+[%%define integration_tests false]
+[%%define debug_logs true]
+[%%define call_logger false]
+[%%define force_updates false]

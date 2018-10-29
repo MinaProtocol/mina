@@ -1,0 +1,4 @@
+(rule
+  (targets config.mlh)
+  (deps config/%{profile}.mlh)
+  (action (copy "%{deps}" config.mlh)))

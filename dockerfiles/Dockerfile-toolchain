@@ -1,0 +1,56 @@
+FROM ocaml/opam2:debian-9-ocaml-4.07
+
+# OS package dependancies
+RUN sudo apt-get install --yes \
+    cmake \
+    jq \
+    libboost-dev \
+    libboost-program-options-dev \
+    libffi-dev \
+    libgmp-dev \
+    libgmp3-dev \
+    libprocps-dev \
+    librocksdb-dev \
+    librocksdb4.5 \
+    libsodium-dev \
+    libssl-dev \
+    lsb \
+    m4 \
+    pandoc \
+    python \
+    perl \
+    pkg-config \
+    python-jinja2 \
+    zlib1g-dev
+
+# Google Cloud tools
+RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
+    echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
+    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - && \
+    sudo apt-get update -y && sudo apt-get install google-cloud-sdk -y
+
+# Opam dependancies
+# Pull freshest repository
+RUN git -C /home/opam/opam-repository pull
+RUN opam update -y && opam upgrade -y
+RUN opam depext -i dune
+ADD /src/opam.export .
+RUN opam switch import opam.export ; rm opam.export
+
+# Source copy of ocaml-sodium (modified for static linking)
+ADD /src/external/ocaml-sodium /ocaml-sodium
+RUN cd /ocaml-sodium && yes | opam pin add .
+
+
+# nix for haskell for kademlia
+# fixme: break in to it's own container
+RUN sudo mkdir -p /nix
+RUN sudo chown opam /nix
+RUN sudo mkdir -p /etc/nix
+RUN sudo bash  -c 'echo "build-users-group =" > /etc/nix/nix.conf'
+ENV USER opam
+RUN cd /home/opam && curl https://nixos.org/nix/install | sh
+
+ADD /src/app/kademlia-haskell/prefetch /prefetch
+RUN sudo chown -R opam /prefetch
+RUN cd /prefetch && . /home/opam/.nix-profile/etc/profile.d/nix.sh && nix-build prefetch.nix

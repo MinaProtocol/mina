@@ -17,7 +17,8 @@ let dispatch rpc query port =
       | Ok conn -> Rpc.Rpc.dispatch rpc conn query )
 
 let json_flag =
-  Command.Param.(flag "json" no_arg ~doc:"Use json output (default: plaintext)")
+  Command.Param.(
+    flag "json" no_arg ~doc:"Use json output (default: plaintext)")
 
 module Daemon_cli = struct
   module Flag = struct
@@ -170,7 +171,7 @@ let status_clear_hist =
          dispatch Clear_hist_status.rpc () port >>| print (module Status) json
      ))
 
-let handle_open ~mkdir ~(f: string -> 'a Deferred.t) path : 'a Deferred.t =
+let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path : 'a Deferred.t =
   let open Unix.Error in
   let dn = Filename.dirname path in
   let%bind parent_exists =
@@ -195,7 +196,7 @@ let handle_open ~mkdir ~(f: string -> 'a Deferred.t) path : 'a Deferred.t =
   let%bind () =
     match%bind
       Monitor.try_with ~extract_exn:true (fun () ->
-          if not parent_exists && mkdir then
+          if (not parent_exists) && mkdir then
             let%bind () = Unix.mkdir ~p:() dn in
             Unix.chmod dn 0o700
           else if not parent_exists then (
@@ -219,7 +220,7 @@ let handle_open ~mkdir ~(f: string -> 'a Deferred.t) path : 'a Deferred.t =
   | Error e -> raise e
 
 let write_keypair {Keypair.private_key; public_key; _} privkey_path
-    ~(password: unit -> Bytes.t Deferred.t) =
+    ~(password : unit -> Bytes.t Deferred.t) =
   let%bind privkey_f =
     handle_open ~mkdir:true ~f:Writer.open_file privkey_path
   in
@@ -246,7 +247,7 @@ let write_keypair {Keypair.private_key; public_key; _} privkey_path
   let%bind () = Writer.close pubkey_f in
   Deferred.unit
 
-let read_keypair_exn privkey_path ~(password: unit -> Bytes.t Deferred.t) =
+let read_keypair_exn privkey_path ~(password : unit -> Bytes.t Deferred.t) =
   let open Deferred.Let_syntax in
   let read_all r =
     Pipe.to_list (Reader.lines r) >>| fun ss -> String.concat ~sep:"\n" ss
@@ -355,7 +356,7 @@ let batch_send_txns =
   in
   let get_infos transactions_path =
     match%bind
-      Reader.load_sexp transactions_path [%of_sexp : Transaction_info.t list]
+      Reader.load_sexp transactions_path [%of_sexp: Transaction_info.t list]
     with
     | Ok x -> return x
     | Error e ->
@@ -372,7 +373,7 @@ let batch_send_txns =
            file:\n\
            %s\n"
           (Sexp.to_string_hum
-             ([%sexp_of : Transaction_info.t list]
+             ([%sexp_of: Transaction_info.t list]
                 (List.init 3 ~f:(fun _ -> sample_info ())))) ;
         exit 1
   in
@@ -497,9 +498,9 @@ let dump_ledger =
     (Daemon_cli.init lb_hash ~f:(fun port lb_hash ->
          dispatch Client_lib.Get_ledger.rpc lb_hash port
          >>| function
-           | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e
-           | Ok (Error e) -> printf !"Ledger not found: %{sexp:Error.t}\n" e
-           | Ok (Ok ledger) -> printf !"%{sexp:Ledger.t}\n" ledger ))
+         | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e
+         | Ok (Error e) -> printf !"Ledger not found: %{sexp:Error.t}\n" e
+         | Ok (Ok ledger) -> printf !"%{sexp:Ledger.t}\n" ledger ))
 
 let command =
   Command.group ~summary:"Lightweight client process"

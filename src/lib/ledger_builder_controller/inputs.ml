@@ -39,10 +39,6 @@ module Base = struct
       type t [@@deriving sexp, bin_io]
     end
 
-    module Internal_transition : sig
-      type t [@@deriving sexp]
-    end
-
     module Ledger : sig
       type t
 
@@ -59,14 +55,6 @@ module Base = struct
       type t
     end
 
-    module Blockchain_state : sig
-      type value [@@deriving eq]
-
-      val ledger_hash : value -> Frozen_ledger_hash.t
-
-      val ledger_builder_hash : value -> Ledger_builder_hash.t
-    end
-
     module Consensus_mechanism : sig
       module Local_state : sig
         type t
@@ -74,6 +62,14 @@ module Base = struct
 
       module Consensus_state : sig
         type value
+      end
+
+      module Blockchain_state : sig
+        type value [@@deriving eq]
+
+        val ledger_hash : value -> Frozen_ledger_hash.t
+
+        val ledger_builder_hash : value -> Ledger_builder_hash.t
       end
 
       module Protocol_state : sig
@@ -191,14 +187,14 @@ module Synchronizing = struct
     end
 
     module Net : sig
-      include Coda_lib.Ledger_builder_io_intf
-              with type sync_ledger_query := Sync_ledger.query
-               and type sync_ledger_answer := Sync_ledger.answer
-               and type ledger_builder_hash := Ledger_builder_hash.t
-               and type ledger_builder_aux := Ledger_builder.Aux.t
-               and type ledger_hash := Ledger_hash.t
-               and type protocol_state :=
-                          Consensus_mechanism.Protocol_state.value
+      include
+        Coda_lib.Ledger_builder_io_intf
+        with type sync_ledger_query := Sync_ledger.query
+         and type sync_ledger_answer := Sync_ledger.answer
+         and type ledger_builder_hash := Ledger_builder_hash.t
+         and type ledger_builder_aux := Ledger_builder.Aux.t
+         and type ledger_hash := Ledger_hash.t
+         and type protocol_state := Consensus_mechanism.Protocol_state.value
     end
   end
 end

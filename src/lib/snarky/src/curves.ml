@@ -146,8 +146,7 @@ module Edwards = struct
     module Make
         (Field : Field_intf.Extended)
         (Params : Params_intf with type field := Field.t) :
-      S with type field := Field.t and module Params = Params =
-    struct
+      S with type field := Field.t and module Params = Params = struct
       open Field
       module Params = Params
 
@@ -264,8 +263,7 @@ module Edwards = struct
      and type field := Impl.Field.t
      and type var = Impl.Field.Checked.t * Impl.Field.Checked.t
      and type value = Impl.Field.t * Impl.Field.t
-     and module Scalar = Scalar =
-  struct
+     and module Scalar = Scalar = struct
     open Impl
     include Basic
     module Scalar = Scalar
@@ -364,7 +362,7 @@ module Edwards = struct
            in
            (a, b))
 
-      let if_value (b: Boolean.var) ~then_:(x1, y1) ~else_:(x2, y2) =
+      let if_value (b : Boolean.var) ~then_:(x1, y1) ~else_:(x2, y2) =
         let not_b = (Boolean.not b :> Field.Checked.t) in
         let b = (b :> Field.Checked.t) in
         let choose_field t e =
@@ -397,8 +395,8 @@ module Edwards = struct
              in
              (*     r - e = b (t - e) *)
              let%map () =
-               rev_map3i_exn (to_list r) (to_list then_) (to_list else_) ~f:
-                 (fun i r t e ->
+               rev_map3i_exn (to_list r) (to_list then_) (to_list else_)
+                 ~f:(fun i r t e ->
                    let open Field.Checked.Infix in
                    Constraint.r1cs ~label:(sprintf "main_%d" i)
                      (b :> Field.Checked.t)
@@ -407,7 +405,7 @@ module Edwards = struct
              in
              r)
 
-      let scale t (c: Scalar.var) =
+      let scale t (c : Scalar.var) =
         with_label __LOC__
           (let rec go i acc pt = function
              | [] -> return acc
@@ -428,8 +426,8 @@ module Edwards = struct
                go 1 acc pt bs)
 
       (* TODO: Unit test *)
-      let cond_add ((x2, y2): value) ~to_:((x1, y1): var) ~if_:(b: Boolean.var)
-          : (var, _) Checked.t =
+      let cond_add ((x2, y2) : value) ~to_:((x1, y1) : var)
+          ~if_:(b : Boolean.var) : (var, _) Checked.t =
         with_label __LOC__
           (let one = Field.Checked.constant Field.one in
            let b = (b :> Field.Checked.t) in
@@ -456,7 +454,7 @@ module Edwards = struct
            let%map x_res = res x1 x3 and y_res = res y1 y3 in
            (x_res, y_res))
 
-      let scale_known (t: value) (c: Scalar.var) =
+      let scale_known (t : value) (c : Scalar.var) =
         with_label __LOC__
           (let rec go i acc pt = function
              | b :: bs ->
@@ -587,8 +585,7 @@ module Make_weierstrass_checked
   Weierstrass_checked_intf
   with module Impl := Impl
    and type t := Curve.t
-   and type var := Impl.Field.var * Impl.Field.var =
-struct
+   and type var := Impl.Field.var * Impl.Field.var = struct
   open Impl
 
   type var = Field.Checked.t * Field.Checked.t
@@ -611,9 +608,10 @@ struct
     in
     {unchecked with check= assert_on_curve}
 
-  let negate ((x, y): var) : var = (x, Field.Checked.scale y Field.(negate one))
+  let negate ((x, y) : var) : var =
+    (x, Field.Checked.scale y Field.(negate one))
 
-  let constant (t: t) : var =
+  let constant (t : t) : var =
     let x, y = Curve.to_coords t in
     Field.Checked.(constant x, constant y)
 
@@ -658,7 +656,8 @@ struct
           Field.(sub (mul lambda (sub ax cx)) ay))
       in
       let%map () =
-        Field.Checked.Infix.(assert_r1cs ~label:"c2" lambda (ax - cx) (cy + ay))
+        Field.Checked.Infix.(
+          assert_r1cs ~label:"c2" lambda (ax - cx) (cy + ay))
       in
       (cx, cy))
 
@@ -685,8 +684,8 @@ struct
       in
       (*     r - e = b (t - e) *)
       let%map () =
-        rev_map3i_exn (to_list r) (to_list then_) (to_list else_) ~f:
-          (fun i r t e ->
+        rev_map3i_exn (to_list r) (to_list then_) (to_list else_)
+          ~f:(fun i r t e ->
             let open Field.Checked.Infix in
             Constraint.r1cs ~label:(sprintf "main_%d" i)
               (b :> Field.Checked.t)
@@ -706,9 +705,7 @@ struct
 
     module Make (M : sig
       val shift : var
-    end) :
-      S =
-    struct
+    end) : S = struct
       open M
 
       type t = var
@@ -775,7 +772,7 @@ struct
       and () = assert_r1cs lambda (ax - bx) (by + ay) in
       (bx, by))
 
-  let if_value (cond: Boolean.var) ~then_ ~else_ =
+  let if_value (cond : Boolean.var) ~then_ ~else_ =
     let x1, y1 = Curve.to_coords then_ in
     let x2, y2 = Curve.to_coords else_ in
     let cond = (cond :> Field.Checked.t) in
@@ -786,7 +783,7 @@ struct
     (choose x1 x2, choose y1 y2)
 
   let scale (type shifted) (module Shifted : Shifted.S with type t = shifted) t
-      (c: Boolean.var Bitstring_lib.Bitstring.Lsb_first.t) ~(init: shifted) :
+      (c : Boolean.var Bitstring_lib.Bitstring.Lsb_first.t) ~(init : shifted) :
       (shifted, _) Checked.t =
     let c = Bitstring_lib.Bitstring.Lsb_first.to_list c in
     with_label __LOC__
@@ -828,7 +825,7 @@ struct
     (lookup_one (x1, x2, x3, x4), lookup_one (y1, y2, y3, y4))
 
   (* Similar to the above, but doing lookup in a size 1 table *)
-  let lookup_single_bit (b: Boolean.var) (t1, t2) =
+  let lookup_single_bit (b : Boolean.var) (t1, t2) =
     let lookup_one (a1, a2) =
       let open Field.Checked.Infix in
       Field.Checked.constant a1 + (Field.sub a2 a1 * (b :> Field.Checked.t))
@@ -836,9 +833,9 @@ struct
     let x1, y1 = Curve.to_coords t1 and x2, y2 = Curve.to_coords t2 in
     (lookup_one (x1, x2), lookup_one (y1, y2))
 
-  let scale_known (type shifted) (module Shifted
-      : Shifted.S with type t = shifted) (t: Curve.t)
-      (b: Boolean.var Bitstring_lib.Bitstring.Lsb_first.t) ~init =
+  let scale_known (type shifted)
+      (module Shifted : Shifted.S with type t = shifted) (t : Curve.t)
+      (b : Boolean.var Bitstring_lib.Bitstring.Lsb_first.t) ~init =
     let b = Bitstring_lib.Bitstring.Lsb_first.to_list b in
     let sigma = t in
     let n = List.length b in

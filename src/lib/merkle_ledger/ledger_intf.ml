@@ -16,7 +16,7 @@ module type S = sig
   module Addr : Merkle_address.S
 
   module Location : sig
-    type t
+    type t [@@deriving sexp, compare, hash]
   end
 
   val create : unit -> t
@@ -64,13 +64,14 @@ module type S = sig
 
   val remove_accounts_exn : t -> key list -> unit
 
-  include Syncable_intf.S
-          with type root_hash := hash
-           and type hash := hash
-           and type account := account
-           and type addr := Addr.t
-           and type t := t
-           and type path := Path.t
+  include
+    Syncable_intf.S
+    with type root_hash := hash
+     and type hash := hash
+     and type account := account
+     and type addr := Addr.t
+     and type t := t
+     and type path := Path.t
 
   val recompute_tree : t -> unit
 end

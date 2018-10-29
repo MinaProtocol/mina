@@ -6,7 +6,11 @@ GITHASH = $(shell git rev-parse --short=8 HEAD)
 GITLONGHASH = $(shell git rev-parse HEAD)
 
 MYUID = $(shell id -u)
-DOCKERNAME = nanotest-$(MYUID)
+DOCKERNAME = codabuilder-$(MYUID)
+
+ifeq ($(DUNE_PROFILE),)
+DUNE_PROFILE := dev
+endif
 
 ifeq ($(USEDOCKER),TRUE)
  $(info INFO Using Docker Named $(DOCKERNAME))
@@ -16,7 +20,6 @@ else
  $(info INFO Not using Docker)
  WRAP =
 endif
-
 
 ########################################
 ## Code
@@ -37,14 +40,8 @@ dht: kademlia
 build:
 	$(info Starting Build)
 	ulimit -s 65536
-	cd src ; $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build
+	cd src ; $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
 	$(info Build complete)
-
-withupdates:
-	sed -i '/let force_updates = /c\let force_updates = true' src/app/cli/src/coda.ml
-
-withoutupdates:
-	sed -i '/let force_updates = /c\let force_updates = false' src/app/cli/src/coda.ml
 
 dev: docker container build
 
@@ -67,53 +64,38 @@ withkeys:
 ## Lint
 
 reformat:
-	cd src; $(WRAPSRC) dune exec app/reformat/reformat.exe -- -path .
+	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
 
 check-format:
-	cd src; $(WRAPSRC) dune exec app/reformat/reformat.exe -- -path . -check
-
+	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
 
 ########################################
 ## Containers and container management
 
+# customized local docker
 docker:
-	./scripts/rebuild-docker.sh nanotest dockerfiles/Dockerfile
+	docker build --file dockerfiles/Dockerfile --tag codabuilder .
 
-ci-base-docker:
-	./scripts/rebuild-docker.sh o1labs/ci-base dockerfiles/Dockerfile-ci-base
+# push steps require auth on docker hub
+docker-toolchain:
+	@if git diff-index --quiet HEAD ; then \
+		docker build --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/coda:toolchain-$(GITLONGHASH) . ;\
+		docker tag  codaprotocol/coda:toolchain-$(GITLONGHASH) codaprotocol/coda:toolchain-latest ;\
+		docker push codaprotocol/coda:toolchain-$(GITLONGHASH) ;\
+		docker push codaprotocol/coda:toolchain-latest ;\
+	else \
+		echo "Repo is dirty, commit first." ;\
+	fi
 
-coda-docker:
-	./scripts/rebuild-docker.sh coda dockerfiles/Dockerfile-coda
-
-base-docker:
-	./scripts/rebuild-docker.sh ocaml-base dockerfiles/Dockerfile-base
-
-base-minikube:
-	./scripts/rebuild-minikube.sh ocaml-base dockerfiles/Dockerfile-base
-
-coda-minikube:
-	./scripts/rebuild-minikube.sh coda dockerfiles/Dockerfile-coda
-
-base-googlecloud:
-	./scripts/rebuild-googlecloud.sh ocaml-base dockerfiles/Dockerfile-base $(GITLONGHASH)
-
-coda-googlecloud:
-	./scripts/rebuild-googlecloud.sh coda dockerfiles/Dockerfile-coda
-
-ocaml407-googlecloud:
-	./scripts/rebuild-googlecloud.sh ocaml407 dockerfiles/Dockerfile-ocaml407
-
-pull-ocaml407-googlecloud:
-	gcloud docker -- pull gcr.io/o1labs-192920/ocaml407:latest
-
-update-deps: base-googlecloud
-	./scripts/rewrite-from-dockerfile.sh ocaml-base $(GITLONGHASH)
+update-deps:
+	./scripts/update-toolchain-references.sh $(GITLONGHASH)
+	cd .circleci; python2 render.py > config.yml
 
 container:
 	@./scripts/container.sh restart
 
 ########################################
-## Artifacts 
+## Artifacts
 
 deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
@@ -172,15 +154,15 @@ test-runtest:
 
 test-sigs: SHELL := /bin/bash
 test-sigs:
-	source scripts/test_all.sh ; cd src ; CODA_CONSENSUS_MECHANISM=proof_of_signature WITH_SNARKS=false run_integration_tests
+	source scripts/test_all.sh ; cd src ; run_all_sig_integration_tests
 
 test-stakes: SHELL := /bin/bash
 test-stakes:
-	source scripts/test_all.sh ; cd src ; CODA_CONSENSUS_MECHANISM=proof_of_stake WITH_SNARKS=false run_integration_tests
+	source scripts/test_all.sh ; cd src ; run_all_stake_integration_tests
 
 test-withsnark: SHELL := /bin/bash
 test-withsnark:
-	source scripts/test_all.sh ; cd src; CODA_CONSENSUS_MECHANISM=proof_of_signature WITH_SNARKS=true run_integration_tests
+	source scripts/test_all.sh ; cd src; CODA_CONSENSUS_MECHANISM=proof_of_signature WITH_SNARKS=true run_integration_test full-test
 
 web:
 	./scripts/web.sh
