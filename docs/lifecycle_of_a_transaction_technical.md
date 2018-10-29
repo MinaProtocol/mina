@@ -1,6 +1,6 @@
 # The Lifecycle of a Transaction (technical)
 
-In Coda, transactions pass through several steps before they are considered verified and complete. This document is meant to walk through what happens to a single transaction as it works it's way through our codebase. For a more high-level simple overview aimed at users who want to understand a little bit about how transactions work check out the [lite lifecycle of a transaction](lifecycle-of-a-transaction-technical-lite.md).
+In Coda, transactions pass through several steps before they are considered verified and complete. This document is meant to walk through what happens to a single transaction as it works it's way through our codebase. For a more high-level simple overview aimed at users who want to understand a little bit about how transactions work check out the [lite lifecycle of a transaction](lifecycle_of_a_transaction_technical_lite.md).
 
 Let's say you want to send a transaction in Coda, assuming you've already made you're account and you have funds.
 Your friend gives you her public key -- it's `KEFLx5TOqJNzd6buc+dW3HCjkL57NjnZIaplYJ50DO1uTfogKfwAAAAA`.
@@ -29,12 +29,12 @@ In the body of `send_txn` we build a transaction and send it over to the [daemon
 In [transaction.mli](../src/lib/coda_base/transaction.mli), you'll see a couple important things. (1) we break down transactions into a [transaction payload](#transaction-payload) (the part that needs to be [signed](#signature)) and the rest. and (2) you see the type defined in what will seem to be a strange manner, but is a common pattern in our codebase.
 
 For more see:
-* [Parameterized records](code-idiosyncrasies.md#parameterized-records)
-* [Ppx deriving](code-idiosyncrasies.md#ppx_deriving)
-* [Stable.V1](code-idiosyncrasies.md#stable-v1)
-* [Property based tests](code-idiosyncrasies.md#quickcheck-gen)
-* [Typesafe Invariants](code-idiosyncrasies.md#typesafe-invariants)
-* [Unit Tests](code-idiosyncrasies.md#unit-tests)
+* [Parameterized records](style_guide.md#parameterized-records)
+* [Ppx deriving](style_guide.md#ppx_deriving)
+* [Stable.V1](style_guide.md#stable-v1)
+* [Property based tests](style_guide.md#quickcheck-gen)
+* [Typesafe Invariants](style_guide.md#typesafe-invariants)
+* [Unit Tests](style_guide.md#unit-tests)
 
 Let's dig into the Transaction payload:
 
@@ -50,7 +50,7 @@ Check out [transaction_payload.mli](../src/lib/coda_base/transaction_payload.mli
 
 We use [Schnorr signatures](https://en.wikipedia.org/wiki/Schnorr_signature). A [Schnorr signature](https://en.wikipedia.org/wiki/Schnorr_signature) is an element in a [group](https://en.wikipedia.org/wiki/Group_(mathematics). Our group is a point on an [eliptic curve](https://en.wikipedia.org/wiki/Elliptic_curve). So what is a signature? Open up [signature lib's checked.ml](../src/lib/signature_lib/checked.ml) and scroll to `module Signature` within `module type S`. It's a non-zeor point on a curve, aka a pair of two `curve_scalar` values. To sign we give a [private key](#private-key) and a message, we can verify a signature on a message with a [public key](#public-key).
 
-This is the first time we see heavily functored code, so see [functors](code-idiosyncrasies.md#functors) if you're confused. This is also the first time we see custom SNARK circuit logic, see [custom SNARK circuit logic](code-idiosyncrasies.md#snark-checked) for more.
+This is the first time we see heavily functored code, so see [functors](style_guide.md#functors) if you're confused. This is also the first time we see custom SNARK circuit logic, see [custom SNARK circuit logic](style_guide.md#snark-checked) for more.
 
 <a name="private-key"></a>
 ## Private key
