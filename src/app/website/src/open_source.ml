@@ -131,7 +131,7 @@ let content =
                         "https://github.com/CodaProtocol/coda/blob/master/CONTRIBUTING.md"
                       ~name:"Contribute"
                       ~description:
-                        "Join our open-source community, work on issues, and \
+                        "Join our open source community, work on issues, and \
                          learn how we use novel cryptography to create a \
                          scalable cryptocurrency network."
                   ; Item.create
