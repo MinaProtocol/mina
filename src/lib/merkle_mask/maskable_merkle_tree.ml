@@ -7,7 +7,8 @@ module Make
     (Account : Merkle_ledger.Intf.Account with type key := Key.t)
     (Hash : Merkle_ledger.Intf.Hash with type account := Account.t)
     (Location : Merkle_ledger.Location_intf.S)
-    (Base : Base_merkle_tree_intf.S with module Addr = Location.Addr
+    (Base : Base_merkle_tree_intf.S
+            with module Addr = Location.Addr
             with type account := Account.t
              and type hash := Hash.t
              and type location := Location.t
@@ -22,7 +23,7 @@ struct
   include Base
 
   (* registered masks *)
-  let (mask_children: Mask.Attached.t list ref) = ref []
+  let (mask_children : Mask.Attached.t list ref) = ref []
 
   let register_mask t mask =
     let attached_mask = Mask.set_parent mask t in

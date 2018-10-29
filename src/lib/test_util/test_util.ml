@@ -42,7 +42,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
         (triple_string checked) (List.length checked) (triple_string unchecked)
         (List.length unchecked) ()
 
-  let test_equal ?(equal= ( = )) typ1 typ2 checked unchecked input =
+  let test_equal ?(equal = ( = )) typ1 typ2 checked unchecked input =
     let checked_result = checked_to_unchecked typ1 typ2 checked input in
     assert (equal checked_result (unchecked input))
 

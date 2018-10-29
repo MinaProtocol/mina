@@ -94,7 +94,7 @@ let typ : (var, value) Typ.t =
   Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let var_of_t ({public_key; balance; nonce; receipt_chain_hash}: value) =
+let var_of_t ({public_key; balance; nonce; receipt_chain_hash} : value) =
   { public_key= Public_key.Compressed.var_of_t public_key
   ; balance= Balance.var_of_t balance
   ; nonce= Nonce.Unpacked.var_of_value nonce
@@ -109,7 +109,7 @@ let var_to_triples {public_key; balance; nonce; receipt_chain_hash} =
   let nonce = Nonce.Unpacked.var_to_triples nonce in
   public_key @ balance @ nonce @ receipt_chain_hash
 
-let fold_bits ({public_key; balance; nonce; receipt_chain_hash}: t) =
+let fold_bits ({public_key; balance; nonce; receipt_chain_hash} : t) =
   let open Fold in
   Public_key.Compressed.fold public_key
   +> Balance.fold balance +> Nonce.fold nonce

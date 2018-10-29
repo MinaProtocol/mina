@@ -85,7 +85,7 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
          ~keypair () ~banlist)
   in
   don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers coda)) ;
-  let wait_until_cond ~(f: t -> bool) ~(timeout: Float.t) =
+  let wait_until_cond ~(f : t -> bool) ~(timeout : Float.t) =
     let rec go () =
       if f coda then return ()
       else
@@ -189,8 +189,8 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
     new_balance_sheet'
   in
   let send_txns accounts pks balance_sheet f_amount =
-    Deferred.List.foldi accounts ~init:balance_sheet ~f:
-      (fun i acc ((keypair: Signature_lib.Keypair.t), _) ->
+    Deferred.List.foldi accounts ~init:balance_sheet
+      ~f:(fun i acc ((keypair : Signature_lib.Keypair.t), _) ->
         let sender_pk = Public_key.compress keypair.public_key in
         let receiver =
           List.random_element_exn
@@ -211,8 +211,8 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
   let test_multiple_txns accounts pks timeout =
     let balance_sheet =
       Public_key.Compressed.Map.of_alist_exn
-        (List.map accounts ~f:
-           (fun ((keypair: Signature_lib.Keypair.t), account) ->
+        (List.map accounts
+           ~f:(fun ((keypair : Signature_lib.Keypair.t), account) ->
              (Public_key.compress keypair.public_key, Account.balance account)
          ))
     in
@@ -227,8 +227,8 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
         assert_balance key data ) ;
     block_count coda
   in
-  let test_duplicate_txns (sender_keypair: Signature_lib.Keypair.t)
-      (receiver_keypair: Signature_lib.Keypair.t) =
+  let test_duplicate_txns (sender_keypair : Signature_lib.Keypair.t)
+      (receiver_keypair : Signature_lib.Keypair.t) =
     let%bind () =
       test_sending_transaction sender_keypair.private_key
         (Public_key.compress receiver_keypair.public_key)
@@ -237,7 +237,7 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
       (Public_key.compress receiver_keypair.public_key)
   in
   let pks accounts =
-    List.map accounts ~f:(fun ((keypair: Signature_lib.Keypair.t), _) ->
+    List.map accounts ~f:(fun ((keypair : Signature_lib.Keypair.t), _) ->
         Public_key.compress keypair.public_key )
   in
   (*Need some accounts from the genesis ledger to test transaction replays and 

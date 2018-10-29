@@ -62,7 +62,7 @@ struct
     | `Existed, _ -> failwith "create_empty for a key already present"
     | `Added, new_loc ->
         Debug_assert.debug_assert (fun () ->
-            [%test_eq : Ledger_hash.t] start_hash (merkle_root ledger) ) ;
+            [%test_eq: Ledger_hash.t] start_hash (merkle_root ledger) ) ;
         (merkle_path ledger new_loc, Account.empty)
 
   module Undo = struct
@@ -107,7 +107,7 @@ struct
    in the case that the sender is equal to the receiver, but it complicates the SNARK, so
    we don't for now. *)
   let apply_transaction_unchecked ledger
-      ({payload; sender; signature= _} as transaction: Transaction.t) =
+      ({payload; sender; signature= _} as transaction : Transaction.t) =
     let sender = Public_key.compress sender in
     let {Transaction.Payload.fee; amount; receiver; nonce} = payload in
     let open Or_error.Let_syntax in
@@ -145,10 +145,10 @@ struct
       {undo with previous_empty_accounts}
 
   let apply_transaction ledger
-      (transaction: Transaction.With_valid_signature.t) =
+      (transaction : Transaction.With_valid_signature.t) =
     apply_transaction_unchecked ledger (transaction :> Transaction.t)
 
-  let process_fee_transfer t (transfer: Fee_transfer.t) ~modify_balance =
+  let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =
     let open Or_error.Let_syntax in
     match transfer with
     | One (pk, fee) ->
@@ -180,7 +180,7 @@ struct
     {Undo.fee_transfer= transfer; previous_empty_accounts}
 
   let undo_fee_transfer t
-      ({previous_empty_accounts; fee_transfer}: Undo.fee_transfer) =
+      ({previous_empty_accounts; fee_transfer} : Undo.fee_transfer) =
     let open Or_error.Let_syntax in
     let%map _ =
       process_fee_transfer t fee_transfer ~modify_balance:(fun b f ->
@@ -304,10 +304,10 @@ struct
       | Coinbase c -> undo_coinbase ledger c ; Ok ()
     in
     Debug_assert.debug_assert (fun () ->
-        [%test_eq : Ledger_hash.t] undo.previous_hash (merkle_root ledger) ) ;
+        [%test_eq: Ledger_hash.t] undo.previous_hash (merkle_root ledger) ) ;
     res
 
-  let apply_super_transaction ledger (t: Super_transaction.t) =
+  let apply_super_transaction ledger (t : Super_transaction.t) =
     let previous_hash = merkle_root ledger in
     Or_error.map
       ( match t with

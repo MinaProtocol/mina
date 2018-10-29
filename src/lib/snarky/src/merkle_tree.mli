@@ -103,9 +103,9 @@ module Checked
   end
 
   type _ Request.t +=
-    | Get_element: Address.value -> (Elt.value * Path.value) Request.t
-    | Get_path: Address.value -> Path.value Request.t
-    | Set: Address.value * Elt.value -> unit Request.t
+    | Get_element : Address.value -> (Elt.value * Path.value) Request.t
+    | Get_path : Address.value -> Path.value Request.t
+    | Set : Address.value * Elt.value -> unit Request.t
 
   val implied_root :
     Hash.var -> Address.var -> Path.var -> (Hash.var, _) Checked.t

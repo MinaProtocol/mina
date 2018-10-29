@@ -52,8 +52,8 @@ struct
     let seen_queries = ref [] in
     let sr = SR.create l2 (fun q -> seen_queries := q :: !seen_queries) in
     don't_wait_for
-      (Linear_pipe.iter_unordered ~max_concurrency:3 qr ~f:
-         (fun (_hash, query) ->
+      (Linear_pipe.iter_unordered ~max_concurrency:3 qr
+         ~f:(fun (_hash, query) ->
            let answ = SR.answer_query sr query in
            let%bind () =
              if match query with What_contents _ -> true | _ -> false then
@@ -107,15 +107,15 @@ struct
           SL.fetch lsync !desired_root )
     with
     | `Ok _ -> failwith "shouldn't happen"
-    | `Target_changed _ ->
+    | `Target_changed _ -> (
       match
         Async.Thread_safe.block_on_async_exn (fun () ->
             SL.wait_until_valid lsync !desired_root )
       with
       | `Ok mt ->
-          [%test_result : Root_hash.t] ~expect:(L.merkle_root l3)
+          [%test_result: Root_hash.t] ~expect:(L.merkle_root l3)
             (L.merkle_root mt)
-      | `Target_changed _ -> failwith "the target changed again"
+      | `Target_changed _ -> failwith "the target changed again" )
 end
 
 module L3 = Test_ledger.Make (struct
@@ -133,57 +133,67 @@ end)
 let%test_unit "exhaustive depth=10 testing" =
   for i = 3 to 1 lsl 10 do
     let module M =
-      Make (L10)
+      Make
+        (L10)
         (struct
           let num_accts = i
-        end) in
+        end)
+    in
     ()
   done
 
 module TestL3_3 =
-  Make (L3)
+  Make
+    (L3)
     (struct
       let num_accts = 3
     end)
 
 module TestL3_8 =
-  Make (L3)
+  Make
+    (L3)
     (struct
       let num_accts = 8
     end)
 
 module TestL16_2 =
-  Make (L16)
+  Make
+    (L16)
     (struct
       let num_accts = 2
     end)
 
 module TestL16_3 =
-  Make (L16)
+  Make
+    (L16)
     (struct
       let num_accts = 3
     end)
 
 module TestL16_20 =
-  Make (L16)
+  Make
+    (L16)
     (struct
       let num_accts = 20
     end)
 
 module TestL16_1024 =
-  Make (L16)
+  Make
+    (L16)
     (struct
       let num_accts = 1024
     end)
 
 module TestL16_1025 =
-  Make (L16)
+  Make
+    (L16)
     (struct
       let num_accts = 80
     end)
 
 module TestL16_65536 =
-  Make (L16)
+  Make
+    (L16)
     (struct
       let num_accts = 65536
     end)
@@ -197,31 +207,36 @@ module DB16 = Test_db.Make (struct
 end)
 
 module TestDB3_3 =
-  Make (DB3)
+  Make
+    (DB3)
     (struct
       let num_accts = 3
     end)
 
 module TestDB3_8 =
-  Make (DB3)
+  Make
+    (DB3)
     (struct
       let num_accts = 8
     end)
 
 module TestDB16_20 =
-  Make (DB16)
+  Make
+    (DB16)
     (struct
       let num_accts = 20
     end)
 
 module TestDB16_1024 =
-  Make (DB16)
+  Make
+    (DB16)
     (struct
       let num_accts = 1024
     end)
 
 module TestDB16_1026 =
-  Make (DB16)
+  Make
+    (DB16)
     (struct
       let num_accts = 1026
     end)

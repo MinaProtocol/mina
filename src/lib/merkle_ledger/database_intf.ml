@@ -53,13 +53,14 @@ module type S = sig
 
   val copy : t -> t
 
-  include Syncable_intf.S
-          with type root_hash := hash
-           and type hash := hash
-           and type account := account
-           and type addr := Addr.t
-           and type t := t
-           and type path := Path.t
+  include
+    Syncable_intf.S
+    with type root_hash := hash
+     and type hash := hash
+     and type account := account
+     and type addr := Addr.t
+     and type t := t
+     and type path := Path.t
 
   module For_tests : sig
     val gen_account_location : location Core.Quickcheck.Generator.t

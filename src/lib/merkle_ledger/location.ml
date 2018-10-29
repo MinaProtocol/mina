@@ -40,10 +40,10 @@ module Make (Depth : Intf.Depth) = struct
 
   module T = struct
     type t =
-      | Generic of Bigstring.t [@printer
-                                 fun fmt bstr ->
-                                   Format.pp_print_string fmt
-                                     (Bigstring.to_string bstr)]
+      | Generic of Bigstring.t
+          [@printer
+            fun fmt bstr ->
+              Format.pp_print_string fmt (Bigstring.to_string bstr)]
       | Account of Addr.t
       | Hash of Addr.t
     [@@deriving hash, sexp, compare]
@@ -69,9 +69,9 @@ module Make (Depth : Intf.Depth) = struct
   let last_direction path =
     Direction.of_bool (Addr.get path (Addr.depth path - 1) <> 0)
 
-  let build_generic (data: Bigstring.t) : t = Generic data
+  let build_generic (data : Bigstring.t) : t = Generic data
 
-  let parse (str: Bigstring.t) : (t, unit) Result.t =
+  let parse (str : Bigstring.t) : (t, unit) Result.t =
     let prefix = Bigstring.get str 0 |> Char.to_int |> UInt8.of_int in
     let data = Bigstring.sub str ~pos:1 ~len:(Bigstring.length str - 1) in
     if prefix = Prefix.generic then Result.return (Generic data)
@@ -127,7 +127,7 @@ module Make (Depth : Intf.Depth) = struct
     | Account path -> Account (Addr.sibling path)
     | Hash path -> Hash (Addr.sibling path)
 
-  let order_siblings (location: t) (base: 'a) (sibling: 'a) : 'a * 'a =
+  let order_siblings (location : t) (base : 'a) (sibling : 'a) : 'a * 'a =
     match last_direction (to_path_exn location) with
     | Left -> (base, sibling)
     | Right -> (sibling, base)

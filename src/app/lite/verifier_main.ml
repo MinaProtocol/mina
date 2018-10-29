@@ -3,7 +3,7 @@ open Core_kernel
 open Lite_base
 
 let state_and_instance_hash ~wrap_vk =
-  let salt (s: Hash_prefixes.t) =
+  let salt (s : Hash_prefixes.t) =
     Pedersen.State.salt Lite_params.pedersen_params (s :> string)
   in
   let acc =
@@ -28,7 +28,7 @@ let to_wrap_input instance_hash =
   Lite_base.Crypto_params.Tock.fq_to_scalars instance_hash
 
 let verify_chain pvk state_and_instance_hash
-    ({protocol_state; ledger; proof}: Lite_chain.t) =
+    ({protocol_state; ledger; proof} : Lite_chain.t) =
   let check b lab = if b then Ok () else Or_error.error_string lab in
   let open Or_error.Let_syntax in
   let lb_ledger_hash =
@@ -55,7 +55,7 @@ let get_verification_key on_sucess on_error =
     on_error
 
 let () =
-  Js_of_ocaml.Worker.set_onmessage (fun (message: Js.js_string Js.t) ->
+  Js_of_ocaml.Worker.set_onmessage (fun (message : Js.js_string Js.t) ->
       get_verification_key
         (fun vk ->
           let pvk = Proof_system.Verification_key.Processed.create vk in

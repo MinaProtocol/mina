@@ -1,5 +1,6 @@
 open Core
 open Snarky
+
 (* Welcome!
 
    Snarky is a library for constructing R1CS SNARKs.
@@ -53,7 +54,7 @@ let () =
 
    Here we assert that [x] is a square root of 9.
 *)
-let assert_is_square_root_of_9 (x: Field.var) : (unit, _) Checked.t =
+let assert_is_square_root_of_9 (x : Field.var) : (unit, _) Checked.t =
   let%bind x_squared = Field.Checked.mul x x in
   Field.Checked.Assert.equal x_squared
     (Field.Checked.constant (Field.of_int 9))
@@ -81,7 +82,7 @@ let assert_is_square_root_of_9 (x: Field.var) : (unit, _) Checked.t =
 (* In this field, it happens to be the case that -3 is a square. *)
 let () = assert (Field.is_square (Field.of_int (-3)))
 
-let assert_is_cube_root_of_1 (x: Field.var) = failwith "Exercise 1"
+let assert_is_cube_root_of_1 (x : Field.var) = failwith "Exercise 1"
 
 let cube_root_of_1 =
   let open Field in
@@ -185,8 +186,8 @@ module Exercise3 = struct
       assert (cols a = rows b) ;
       Array.init (rows a) ~f:(fun i ->
           Array.init (cols b) ~f:(fun j ->
-              Array.fold2_exn (row a i) (col b j) ~init:R.zero ~f:
-                (fun acc aik bkj -> R.add acc (R.mul aik bkj) ) ) )
+              Array.fold2_exn (row a i) (col b j) ~init:R.zero
+                ~f:(fun acc aik bkj -> R.add acc (R.mul aik bkj) ) ) )
   end
 
   (* A Field is a ring *)
@@ -194,7 +195,8 @@ module Exercise3 = struct
 
   (* We can multiply *)
   let a =
-    Field.[|[|of_int 1; of_int 2; of_int 3|]; [|of_int 4; of_int 5; of_int 6|]|]
+    Field.
+      [|[|of_int 1; of_int 2; of_int 3|]; [|of_int 4; of_int 5; of_int 6|]|]
 
   let b =
     let open Field in
