@@ -848,8 +848,7 @@ module type Inputs_intf = sig
     with type private_key := Private_key.t
      and type public_key := Public_key.t
 
-  module Payment :
-    Payment_intf with type public_key := Public_key.Compressed.t
+  module Payment : Payment_intf with type public_key := Public_key.Compressed.t
 
   module Fee_transfer :
     Fee_transfer_intf with type public_key := Public_key.Compressed.t

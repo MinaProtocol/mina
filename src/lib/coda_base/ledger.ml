@@ -144,8 +144,7 @@ struct
         {receiver_account with balance= receiver_balance'} ;
       {undo with previous_empty_accounts}
 
-  let apply_transaction ledger
-      (transaction : Payment.With_valid_signature.t) =
+  let apply_transaction ledger (transaction : Payment.With_valid_signature.t) =
     apply_transaction_unchecked ledger (transaction :> Payment.t)
 
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =

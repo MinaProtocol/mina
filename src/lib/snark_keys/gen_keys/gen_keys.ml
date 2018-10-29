@@ -158,8 +158,7 @@ let gen_keys () =
         include (
           Payment :
             module type of Payment
-            with module With_valid_signature := Payment
-                                                .With_valid_signature )
+            with module With_valid_signature := Payment.With_valid_signature )
 
         let receiver _ = failwith "stub"
 

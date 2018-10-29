@@ -1602,8 +1602,7 @@ let%test_module "transaction_snark" =
               (unstage @@ Sparse_ledger.handler sparse_ledger)
           in
           let sparse_ledger =
-            Sparse_ledger.apply_transaction_exn sparse_ledger
-              (t1 :> Payment.t)
+            Sparse_ledger.apply_transaction_exn sparse_ledger (t1 :> Payment.t)
           in
           Ledger.apply_transaction ledger t1 |> Or_error.ok_exn |> ignore ;
           [%test_eq: Frozen_ledger_hash.t]
@@ -1614,8 +1613,7 @@ let%test_module "transaction_snark" =
               (unstage @@ Sparse_ledger.handler sparse_ledger)
           in
           let sparse_ledger =
-            Sparse_ledger.apply_transaction_exn sparse_ledger
-              (t2 :> Payment.t)
+            Sparse_ledger.apply_transaction_exn sparse_ledger (t2 :> Payment.t)
           in
           Ledger.apply_transaction ledger t2 |> Or_error.ok_exn |> ignore ;
           [%test_eq: Frozen_ledger_hash.t]

@@ -66,15 +66,14 @@ struct
             | Some txn ->
                 if Set.mem pool.set txn then (
                   Logger.debug t.log
-                    !"Skipping txn %{sexp: \
-                    Payment.With_valid_signature.t} because I've \
-                      already seen it"
+                    !"Skipping txn %{sexp: Payment.With_valid_signature.t} \
+                      because I've already seen it"
                     txn ;
                   (pool, acc) )
                 else (
                   Logger.debug t.log
-                    !"Adding %{sexp: Payment.With_valid_signature.t} to \
-                      my pool locally, and scheduling for rebroadcast"
+                    !"Adding %{sexp: Payment.With_valid_signature.t} to my \
+                      pool locally, and scheduling for rebroadcast"
                     txn ;
                   (add' pool txn, (txn :> Payment.t) :: acc) ) )
       in

@@ -87,8 +87,7 @@ module Make_diff (Inputs : sig
 
   module Compressed_public_key : Compressed_public_key_intf
 
-  module Payment :
-    Payment_intf with type public_key := Compressed_public_key.t
+  module Payment : Payment_intf with type public_key := Compressed_public_key.t
 
   module Completed_work :
     Completed_work_intf
@@ -1108,8 +1107,7 @@ end = struct
       let open Or_error.Let_syntax in
       let%bind budget =
         option "overflow"
-          (Fee.Signed.add t.budget
-             (Fee.Signed.of_unsigned @@ Payment.fee tx))
+          (Fee.Signed.add t.budget (Fee.Signed.of_unsigned @@ Payment.fee tx))
       in
       let q =
         if Currency.Fee.equal (Payment.fee tx) Currency.Fee.zero then
@@ -1915,8 +1913,7 @@ let%test_module "test" =
 
         type transaction = Payment.t [@@deriving sexp, bin_io, compare]
 
-        type transaction_with_valid_signature =
-          Payment.With_valid_signature.t
+        type transaction_with_valid_signature = Payment.With_valid_signature.t
         [@@deriving sexp, bin_io, compare]
 
         type public_key = Compressed_public_key.t

@@ -34,8 +34,7 @@ module Chain_hash = struct
         let%bind bs = var_to_triples t in
         Pedersen.Checked.Section.extend init bs
           ~start:
-            ( Hash_prefix.length_in_triples
-            + Payment.Payload.length_in_triples )
+            (Hash_prefix.length_in_triples + Payment.Payload.length_in_triples)
       in
       let%map s = Pedersen.Checked.Section.disjoint_union_exn payload with_t in
       let digest, _ =
