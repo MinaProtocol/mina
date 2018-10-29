@@ -194,6 +194,29 @@ let%test_module "Test mask connected to underlying Merkle tree" =
               Maskable.merkle_path_at_addr_exn maskable address
             in
             mask_merkle_path = maskable_merkle_path )
+
+      let%test "mask and parent agree on Merkle root before set" =
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            let mask_merkle_root = Mask.Attached.merkle_root attached_mask in
+            let maskable_merkle_root = Maskable.merkle_root maskable in
+            Hash.equal mask_merkle_root maskable_merkle_root )
+
+      let%test "mask and parent agree on Merkle root after set" =
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            (* the order of sets matters here; if we set in the mask first,
+               the set in the maskable notifies the mask, which then removes
+               the account, changing the Merkle root to what it was before the set
+             *)
+            Maskable.set maskable dummy_location dummy_account ;
+            Mask.Attached.set attached_mask dummy_location dummy_account ;
+            let mask_merkle_root = Mask.Attached.merkle_root attached_mask in
+            let maskable_merkle_root = Maskable.merkle_root maskable in
+            (* verify root address in mask *)
+            Mask.Attached.For_testing.address_in_mask attached_mask
+              (Mask.Addr.root ())
+            && Hash.equal mask_merkle_root maskable_merkle_root )
     end
 
     module type Depth_S = sig
