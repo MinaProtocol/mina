@@ -18,63 +18,41 @@ Currently, Coda only builds/runs on Linux. Building on macOS [is tracked in this
 
 The short version:
 
+1. Start with Ubuntu 18 or run it in a [virtual machine](https://www.osboxes.org/ubuntu/)
 1. Install Docker, GNU make, and bash
 2. `make USEDOCKER=TRUE dev`
 3. `make USEDOCKER=TRUE deb`
 
-Now you'll have a `_build/codaclient.deb` ready to install on Ubuntu or Debian!
+Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debian!
 
 ## Developer Setup
 
-### Setup Docker CE on Linux
-[Ubuntu Setup Instructions](https://docs.docker.com/install/linux/docker-ce/ubuntu/)
+### Install or have Ubuntu 18 ready.
+* [VM Images](https://www.osboxes.org/ubuntu/)
 
-### Setup Google Cloud gcloud
-We use gcloud to store developer container images
+### Setup Docker CE on Ubuntu
+* [Ubuntu Setup Instructions](https://docs.docker.com/install/linux/docker-ce/ubuntu/)
 
-[Instructions to install gcloud sdk](https://cloud.google.com/sdk/install)
+### Toolchain docker image
+* Pull down developer container image  (~2GB download, go stretch your legs)\
+`docker pull codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c`
 
-### Take a Snapshot
-If developing on a VM, now is a good time to take a snapshot and save your state.
-
-### Login and test gcloud access
-
-* Authorize gcloud with your o1 account\
-`gcloud auth login`
-
-* Setup docker to use google cloud registry\
-`gcloud auth configure-docker`
-
-* Setup project id (o1 internal id)\
-`gcloud config set project o1labs-192920`
-
-* Test gcloud/docker access\
-`docker run -it gcr.io/o1labs-192920/hellocoda`
-
-### Build a dev docker image
-* clone this repository
-* Pull down dev container  (~7GB download, go stretch your legs)\
+* Apply local customizatins\
 `make docker`
 
-### First code build
-
-* Change your shell path to include our scripts directory.\
-(REMEMBER to change the HOME and SOURCE directory to match yours)
-
-```bash
-export PATH=path/to/coda/scripts:$PATH
-```
+* Start developer container\
+`make container`
 
 * Start a build (go stretch your arms)\
-`make dev`
+`make USEDOCKER=TRUE build`
+
 
 ### Customizing your dev environment for autocomplete/merlin
-
 * If you use vim, add this snippet in your vimrc to use merlin.\
 (REMEMBER to change the HOME directory to match yours)
 
 ```bash
-let s:ocamlmerlin="/Users/bkase/.opam/4.06.0/share/merlin"
+let s:ocamlmerlin="/Users/USERNAME/.opam/4.07/share/merlin"
 execute "set rtp+=".s:ocamlmerlin."/vim"
 execute "set rtp+=".s:ocamlmerlin."/vimbufsync"
 let g:syntastic_ocaml_checkers=['merlin']
@@ -143,13 +121,12 @@ Error: Files external/digestif/src-c/.digestif_c.objs/digestif.cmx
        make inconsistent assumptions over implementation Rakia
 ```
 
-You can work around it with `rm -r _build/default/src/$OFFENDING_PATH` and a rebuild.
+You can work around it with `rm -r src/_build/default/src/$OFFENDING_PATH` and a rebuild.
 Here, the offending path is `external/digestif/src-c/.diestif_c.objs`.
 
 ## Docker Image Family Tree
 
 Container Stages:
-* [ocaml/ocaml:debian-stable](https://hub.docker.com/r/ocaml/ocaml/) (community image, ~856MB) 
-* ocaml407 (built by us, stored in gcr, ~1.7GB)
-* ocaml-base (built by us, stored in gcr, ~7.1GB -- external dependencies and haskell)
-* nanotest (built with `make docker`, used with `make dev`, ~7.8GB)
+* Stage 0: Initial Image [ocaml/opam2:debian-9-ocaml-4.07](https://hub.docker.com/r/ocaml/opam2/) (opam community image, ~880MB) 
+* Stage 1: [coda toolchain](https://github.com/CodaProtocol/coda/blob/master/dockerfiles/Dockerfile-toolchain) (built by us, stored on docker hub, ~2GB compressed)
+* Stage 2: [codabuilder](https://github.com/CodaProtocol/coda/blob/master/dockerfiles/Dockerfile) (built with `make docker`, used with `make build`, ~2GB compressed)
