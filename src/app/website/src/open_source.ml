@@ -105,8 +105,7 @@ let content =
           ~lines:
             [ "docker run -d --name coda codaprotocol/coda:demo"
             ; "docker exec -it coda /bin/bash"
-            ; "watch coda client status"
-            ]
+            ; "watch coda client status" ]
       ; div [Style.just "ph2"]
           [ Cta_description.create ~button_text:"View on GitHub"
               ~copy:
@@ -132,9 +131,9 @@ let content =
                         "https://github.com/CodaProtocol/coda/blob/master/CONTRIBUTING.md"
                       ~name:"Contribute"
                       ~description:
-                        "Join our open-source community, work on \
-                         issues, and learn how we use novel cryptography to \
-                         create a scalable cryptocurrency network."
+                        "Join our open-source community, work on issues, and \
+                         learn how we use novel cryptography to create a \
+                         scalable cryptocurrency network."
                   ; Item.create
                       ~url:
                         "https://github.com/CodaProtocol/coda/blob/master/docs/lifecycle-of-a-transaction-lite.md"
