@@ -8,7 +8,8 @@ module Make
     (Account : Merkle_ledger.Intf.Account with type key := Key.t)
     (Hash : Merkle_ledger.Intf.Hash with type account := Account.t)
     (Location : Merkle_ledger.Location_intf.S)
-    (Base : Base_merkle_tree_intf.S with module Addr = Location.Addr
+    (Base : Base_merkle_tree_intf.S
+            with module Addr = Location.Addr
             with type key := Key.t
              and type hash := Hash.t
              and type location := Location.t
@@ -187,11 +188,11 @@ struct
     let get_hash t addr =
       match find_hash t addr with
       | Some hash -> Some hash
-      | None ->
+      | None -> (
         try
           let hash = Base.get_inner_hash_at_addr_exn (get_parent t) addr in
           Some hash
-        with _ -> None
+        with _ -> None )
 
     (* batch operations
      TODO: rely on availability of batch operations in Base for speed
@@ -210,9 +211,9 @@ struct
       List.map addrs ~f:(fun addr ->
           match find_hash t addr with
           | Some account -> Some account
-          | None ->
+          | None -> (
             try Some (Base.get_inner_hash_at_addr_exn (get_parent t) addr)
-            with _ -> None )
+            with _ -> None ) )
 
     (* transfer state from mask to parent; flush local state *)
     let commit t =

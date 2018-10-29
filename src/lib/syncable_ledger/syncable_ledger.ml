@@ -147,9 +147,8 @@ module Make
     end) (Hash : sig
       type t [@@deriving bin_io, sexp, eq]
 
-      include Merkle_ledger.Intf.Hash
-              with type account := Account.t
-               and type t := t
+      include
+        Merkle_ledger.Intf.Hash with type account := Account.t and type t := t
     end) (Root_hash : sig
       type t [@@deriving eq, sexp]
 
@@ -168,16 +167,14 @@ module Make
    and type root_hash := Root_hash.t
    and type addr := Addr.t
    and type merkle_path := MT.path
-   and type account := Account.t =
-struct
+   and type account := Account.t = struct
   type diff = unit
 
   type index = int
 
   (* TODO #434: This is a waste of memory. *)
   module Valid :
-    Validity_intf with type hash := Hash.t and type addr := Addr.t =
-  struct
+    Validity_intf with type hash := Hash.t and type addr := Addr.t = struct
     type hash_status = Fresh | Stale [@@deriving sexp, eq]
 
     type hash' = hash_status * Hash.t [@@deriving sexp, eq]
@@ -209,7 +206,7 @@ struct
                 assert (ds = []) ;
                 node := Node ((Stale, l), ref (Leaf None), ref (Leaf None)) ;
                 go node dirs depth
-            | Node (_, l, r) ->
+            | Node (_, l, r) -> (
                 let res = go (accessor (l, r)) ds (depth + 1) in
                 match !node with
                 | Node
@@ -225,7 +222,7 @@ struct
                       node := Leaf (Some (Fresh, h)) ;
                       res )
                     else res
-                | _ -> res )
+                | _ -> res ) )
         | [] ->
             let changed =
               match !node with
@@ -248,7 +245,7 @@ struct
             match !node with
             | Leaf _ -> None
             | Node (_, l, r) -> go (accessor (l, r)) ds )
-        | [] -> match !node with Leaf c -> c | Node (c, _, _) -> Some c
+        | [] -> ( match !node with Leaf c -> c | Node (c, _, _) -> Some c )
       in
       go t (Addr.dirs_from_root a)
 
@@ -354,7 +351,8 @@ struct
          t
       -> Addr.t
       -> Hash.t
-      -> [`Good of (Addr.t * Hash.t) list | `More | `Hash_mismatch] Or_error.t =
+      -> [`Good of (Addr.t * Hash.t) list | `More | `Hash_mismatch] Or_error.t
+      =
    fun t child_addr h ->
     (* lots of _exn called on attacker data. it's not clear how to handle these regardless *)
     let open Or_error.Let_syntax in

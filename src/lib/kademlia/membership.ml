@@ -55,10 +55,10 @@ let keep_trying :
   let rec go e xs : 'b Deferred.Or_error.t =
     match xs with
     | [] -> return e
-    | x :: xs ->
+    | x :: xs -> (
         match%bind f x with
         | Ok r -> return (Ok r)
-        | Error e -> go (Error e) xs
+        | Error e -> go (Error e) xs )
   in
   go (Or_error.error_string "empty input") xs
 
@@ -344,7 +344,7 @@ let%test_module "Tests" =
 
       type punishment = unit
 
-      let lookup (_: t) (_: Host_and_port.t) = `Normal
+      let lookup (_ : t) (_ : Host_and_port.t) = `Normal
     end
 
     module type S_test = sig
@@ -500,8 +500,8 @@ let%test_module "Tests" =
       retry 3 (fun () ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               File_system.with_temp_dir (conf_dir ^ "1") ~f:(fun conf_dir_1 ->
-                  File_system.with_temp_dir (conf_dir ^ "2") ~f:
-                    (fun conf_dir_2 -> f conf_dir_1 conf_dir_2 ) ) ) )
+                  File_system.with_temp_dir (conf_dir ^ "2")
+                    ~f:(fun conf_dir_2 -> f conf_dir_1 conf_dir_2 ) ) ) )
 
     let create_banlist () =
       Haskell.Banlist.create ~suspicious_dir:"" ~punished_dir:""
@@ -554,7 +554,8 @@ let%test_module "Tests" =
 
         module Punished_db =
           Banlist.Punished_db.Make (Host_and_port) (Time) (Punishment_record)
-            (Banlist.Key_value_database.Make_mock (Host_and_port)
+            (Banlist.Key_value_database.Make_mock
+               (Host_and_port)
                (Punishment_record))
 
         let ban_threshold = 100

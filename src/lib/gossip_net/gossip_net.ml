@@ -9,9 +9,10 @@ type ('q, 'r) dispatch =
 module type Message_intf = sig
   type msg
 
-  include Versioned_rpc.Both_convert.One_way.S
-          with type callee_msg := msg
-           and type caller_msg := msg
+  include
+    Versioned_rpc.Both_convert.One_way.S
+    with type callee_msg := msg
+     and type caller_msg := msg
 end
 
 module type Config_intf = sig
@@ -91,9 +92,9 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             create_connection_with_menu r w
             >>=? fun conn -> dispatch conn query ) )
     >>| function
-      | Ok (Ok result) -> Ok result
-      | Ok (Error exn) -> Error exn
-      | Error exn -> Or_error.of_exn exn
+    | Ok (Ok result) -> Ok result
+    | Ok (Error exn) -> Error exn
+    | Error exn -> Or_error.of_exn exn
 
   let broadcast_selected t peers msg =
     let peers = List.map peers ~f:(fun peer -> Peer.external_rpc peer) in
@@ -111,7 +112,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     let selected_peers = random_sublist (Hash_set.to_list t.peers) n in
     broadcast_selected t selected_peers msg
 
-  let create (config: Config.t) implementations =
+  let create (config : Config.t) implementations =
     let log = Logger.child config.parent_log __MODULE__ in
     let%map membership =
       match%map
@@ -136,8 +137,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       ; peers= Peer.Hash_set.create () }
     in
     don't_wait_for
-      (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader ~f:
-         (fun m ->
+      (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
+         ~f:(fun m ->
            Logger.trace log "broadcasting message" ;
            broadcast_random t t.target_peer_count m )) ;
     let broadcast_received_capacity = 64 in
@@ -197,11 +198,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
 
   let random_peers t n = random_sublist (Hash_set.to_list t.peers) n
 
-  let random_peers_except t n ~(except: Peer.Hash_set.t) =
+  let random_peers_except t n ~(except : Peer.Hash_set.t) =
     let new_peers = Hash_set.(diff t.peers except |> to_list) in
     random_sublist new_peers n
 
-  let query_peer t (peer: Peer.t) rpc query =
+  let query_peer t (peer : Peer.t) rpc query =
     Logger.trace t.log !"Querying peer %{sexp: Peer.t}" peer ;
     let peer = Peer.external_rpc peer in
     try_call_rpc peer t.timeout rpc query

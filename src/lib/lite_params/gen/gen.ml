@@ -81,7 +81,7 @@ let wrap_vk ~loc =
       (module Lite_base.Crypto_params.Tock.Groth_maller.Verification_key)
       (B64.decode [%e estring vk_base64])]
 
-let protocol_state (s: Proof_of_signature.Protocol_state.value) :
+let protocol_state (s : Proof_of_signature.Protocol_state.value) :
     Lite_base.Protocol_state.t =
   let open Proof_of_signature in
   let consensus_state =

@@ -36,8 +36,8 @@ struct
 
   (* Perform the `Sync interruptible work *)
   let do_sync {net; log; sl_ref; public_key}
-      ~(old_state: Transition_logic_state.t)
-      ~(state_mutator:
+      ~(old_state : Transition_logic_state.t)
+      ~(state_mutator :
             Transition_logic_state.t
          -> Transition_logic_state.Change.t list
          -> External_transition.t
@@ -124,8 +124,7 @@ struct
                 Logger.faulty_peer log
                   "Malicious aux data received from net %s"
                   (Error.to_string_hum e) ;
-                return ()
-                (* TODO: Retry? see #361 *) )
+                return () (* TODO: Retry? see #361 *) )
           | Error e ->
               Logger.faulty_peer log "Network failed to send aux %s"
                 (Error.to_string_hum e) ;
@@ -139,7 +138,7 @@ struct
     in
     (work, ivar)
 
-  let sync (t: t) ~(old_state: Transition_logic_state.t) ~state_mutator
+  let sync (t : t) ~(old_state : Transition_logic_state.t) ~state_mutator
       transition_with_hash =
     Job.create transition_with_hash ~f:(do_sync ~old_state ~state_mutator t)
 end
