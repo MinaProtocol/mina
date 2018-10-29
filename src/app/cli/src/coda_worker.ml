@@ -204,13 +204,13 @@ module Make (Kernel : Kernel_intf) = struct
             let nonce =
               Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn
             in
-            let payload : Transaction.Payload.t =
+            let payload : Payment.Payload.t =
               {receiver= receiver_pk; amount; fee; nonce}
             in
-            Transaction.sign (Keypair.of_private_key_exn sender_sk) payload
+            Payment.sign (Keypair.of_private_key_exn sender_sk) payload
           in
           let transaction = build_txn amount sk pk fee in
-          Run.send_txn log coda (transaction :> Transaction.t)
+          Run.send_txn log coda (transaction :> Payment.t)
         in
         let coda_strongest_ledgers () =
           let r, w = Linear_pipe.create () in

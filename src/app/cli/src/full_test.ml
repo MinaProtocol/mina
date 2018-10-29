@@ -136,10 +136,10 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
   (* Send money to someone *)
   let build_txn amount sender_sk receiver_pk fee =
     let nonce = Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn in
-    let payload : Transaction.Payload.t =
+    let payload : Payment.Payload.t =
       {receiver= receiver_pk; amount; fee; nonce}
     in
-    Transaction.sign (Keypair.of_private_key_exn sender_sk) payload
+    Payment.sign (Keypair.of_private_key_exn sender_sk) payload
   in
   let test_sending_transaction sender_sk receiver_pk =
     let transaction =
@@ -152,13 +152,13 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
       Run.get_balance coda receiver_pk
       |> Option.value ~default:Currency.Balance.zero
     in
-    let%bind () = Run.send_txn log coda (transaction :> Transaction.t) in
+    let%bind () = Run.send_txn log coda (transaction :> Payment.t) in
     (* Send a similar the transaction twice on purpose; this second one
     * will be rejected because the nonce is wrong *)
     let transaction' =
       build_txn send_amount sender_sk receiver_pk (Currency.Fee.of_int 0)
     in
-    let%bind () = Run.send_txn log coda (transaction' :> Transaction.t) in
+    let%bind () = Run.send_txn log coda (transaction' :> Payment.t) in
     (* Let the system settle, mine some blocks *)
     let%map () =
       balance_change_or_timeout ~initial_receiver_balance:prev_receiver_balance
@@ -185,7 +185,7 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
           Option.value_exn
             (Currency.Balance.add_amount (Option.value_exn v) amount) )
     in
-    let%map () = Run.send_txn log coda (transaction :> Transaction.t) in
+    let%map () = Run.send_txn log coda (transaction :> Payment.t) in
     new_balance_sheet'
   in
   let send_txns accounts pks balance_sheet f_amount =

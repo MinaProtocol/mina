@@ -67,7 +67,7 @@ struct
 
   module Undo = struct
     type transaction =
-      { transaction: Transaction.t
+      { transaction: Payment.t
       ; previous_empty_accounts: Public_key.Compressed.t list
       ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
     [@@deriving sexp, bin_io]
@@ -97,7 +97,7 @@ struct
       match varying with
       | Transaction tr ->
           Option.value_map ~default:(Or_error.error_string "Bad signature")
-            (Transaction.check tr.transaction) ~f:(fun x ->
+            (Payment.check tr.transaction) ~f:(fun x ->
               Ok (Super_transaction.Transaction x) )
       | Fee_transfer f -> Ok (Fee_transfer f.fee_transfer)
       | Coinbase c -> Ok (Coinbase c.coinbase)
@@ -107,9 +107,9 @@ struct
    in the case that the sender is equal to the receiver, but it complicates the SNARK, so
    we don't for now. *)
   let apply_transaction_unchecked ledger
-      ({payload; sender; signature= _} as transaction : Transaction.t) =
+      ({payload; sender; signature= _} as transaction : Payment.t) =
     let sender = Public_key.compress sender in
-    let {Transaction.Payload.fee; amount; receiver; nonce} = payload in
+    let {Payment.Payload.fee; amount; receiver; nonce} = payload in
     let open Or_error.Let_syntax in
     let%bind sender_location = location_of_key' ledger "" sender in
     let%bind sender_account = get' ledger "sender" sender_location in
@@ -145,8 +145,8 @@ struct
       {undo with previous_empty_accounts}
 
   let apply_transaction ledger
-      (transaction : Transaction.With_valid_signature.t) =
-    apply_transaction_unchecked ledger (transaction :> Transaction.t)
+      (transaction : Payment.With_valid_signature.t) =
+    apply_transaction_unchecked ledger (transaction :> Payment.t)
 
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =
     let open Or_error.Let_syntax in
@@ -265,7 +265,7 @@ struct
       ; previous_empty_accounts
       ; previous_receipt_chain_hash } =
     let sender = Public_key.compress sender in
-    let {Transaction.Payload.fee; amount; receiver; nonce} = payload in
+    let {Payment.Payload.fee; amount; receiver; nonce} = payload in
     let open Or_error.Let_syntax in
     let%bind sender_location = location_of_key' ledger "sender" sender in
     let%bind sender_account = get' ledger "sender" sender_location in

@@ -154,11 +154,11 @@ let gen_keys () =
       open Coda_base
       module Compressed_public_key = Public_key.Compressed
 
-      module Transaction = struct
+      module Payment = struct
         include (
-          Transaction :
-            module type of Transaction
-            with module With_valid_signature := Transaction
+          Payment :
+            module type of Payment
+            with module With_valid_signature := Payment
                                                 .With_valid_signature )
 
         let receiver _ = failwith "stub"
@@ -170,7 +170,7 @@ let gen_keys () =
         let compare _ _ = failwith "stub"
 
         module With_valid_signature = struct
-          include Transaction.With_valid_signature
+          include Payment.With_valid_signature
 
           let compare _ _ = failwith "stub"
         end

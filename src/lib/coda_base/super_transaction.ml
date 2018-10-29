@@ -1,6 +1,6 @@
 open Core
 
-type transaction = Transaction.With_valid_signature.t [@@deriving bin_io, sexp]
+type transaction = Payment.With_valid_signature.t [@@deriving bin_io, sexp]
 
 type fee_transfer = Fee_transfer.t [@@deriving bin_io, sexp]
 
@@ -12,7 +12,7 @@ type t =
 
 let fee_excess = function
   | Transaction t ->
-      Ok (Currency.Fee.Signed.of_unsigned (t :> Transaction.t).payload.fee)
+      Ok (Currency.Fee.Signed.of_unsigned (t :> Payment.t).payload.fee)
   | Fee_transfer t -> Fee_transfer.fee_excess t
   | Coinbase t -> Coinbase.fee_excess t
 

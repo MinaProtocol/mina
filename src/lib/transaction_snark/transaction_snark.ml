@@ -139,11 +139,11 @@ end
 module Tagged_transaction = struct
   open Tick
 
-  type t = Tag.t * Transaction.t [@@deriving sexp]
+  type t = Tag.t * Payment.t [@@deriving sexp]
 
-  type var = Tag.var * Transaction.var
+  type var = Tag.var * Payment.var
 
-  let typ : (var, t) Typ.t = Typ.(Tag.typ * Transaction.typ)
+  let typ : (var, t) Typ.t = Typ.(Tag.typ * Payment.typ)
 
   let excess ((tag, t) : t) =
     match tag with
@@ -270,12 +270,12 @@ module Transition = struct
 
   let to_tagged_transaction = function
     | Fee_transfer t -> Fee_transfer.to_tagged_transaction t
-    | Transaction t -> (Normal, (t :> Transaction.t))
+    | Transaction t -> (Normal, (t :> Payment.t))
     | Coinbase {proposer; fee_transfer} ->
         let receiver, amount =
           Option.value ~default:(proposer, Fee.zero) fee_transfer
         in
-        let t : Transaction.t =
+        let t : Payment.t =
           { payload=
               { receiver
               ; amount= Amount.of_fee amount
@@ -458,7 +458,7 @@ module Base = struct
     with_label __LOC__
       ( if not Insecure.transaction_replay then
           failwith "Insecure.transaction_replay false" ;
-        let {Transaction.Payload.receiver; amount; fee= _; nonce} = payload in
+        let {Payment.Payload.receiver; amount; fee= _; nonce} = payload in
         let%bind payload_section = Schnorr.Message.var_of_payload payload in
         let%bind () =
           with_label __LOC__
@@ -1132,7 +1132,7 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> Transaction.With_valid_signature.t
+    -> Payment.With_valid_signature.t
     -> Tick.Handler.t
     -> t
 
@@ -1514,15 +1514,15 @@ let%test_module "transaction_snark" =
     let transaction wallets i j amt fee nonce =
       let sender = wallets.(i) in
       let receiver = wallets.(j) in
-      let payload : Transaction.Payload.t =
+      let payload : Payment.Payload.t =
         { receiver= receiver.account.public_key
         ; fee
         ; amount= Amount.of_int amt
         ; nonce }
       in
       let signature = Schnorr.sign sender.private_key payload in
-      Transaction.check
-        { Transaction.payload
+      Payment.check
+        { Payment.payload
         ; sender= Public_key.of_private_key_exn sender.private_key
         ; signature }
       |> Option.value_exn
@@ -1555,7 +1555,7 @@ let%test_module "transaction_snark" =
               Account.Nonce.zero
           in
           let target = Ledger.merkle_root_after_transaction_exn ledger t1 in
-          let mentioned_keys = Transaction.public_keys (t1 :> Transaction.t) in
+          let mentioned_keys = Payment.public_keys (t1 :> Payment.t) in
           let sparse_ledger =
             Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
           in
@@ -1594,7 +1594,7 @@ let%test_module "transaction_snark" =
           let sparse_ledger =
             Sparse_ledger.of_ledger_subset_exn ledger
               (List.concat_map
-                 ~f:(fun t -> Transaction.public_keys (t :> Transaction.t))
+                 ~f:(fun t -> Payment.public_keys (t :> Payment.t))
                  [t1; t2])
           in
           let proof12 =
@@ -1603,7 +1603,7 @@ let%test_module "transaction_snark" =
           in
           let sparse_ledger =
             Sparse_ledger.apply_transaction_exn sparse_ledger
-              (t1 :> Transaction.t)
+              (t1 :> Payment.t)
           in
           Ledger.apply_transaction ledger t1 |> Or_error.ok_exn |> ignore ;
           [%test_eq: Frozen_ledger_hash.t]
@@ -1615,7 +1615,7 @@ let%test_module "transaction_snark" =
           in
           let sparse_ledger =
             Sparse_ledger.apply_transaction_exn sparse_ledger
-              (t2 :> Transaction.t)
+              (t2 :> Payment.t)
           in
           Ledger.apply_transaction ledger t2 |> Or_error.ok_exn |> ignore ;
           [%test_eq: Frozen_ledger_hash.t]
@@ -1624,8 +1624,8 @@ let%test_module "transaction_snark" =
           let total_fees =
             let open Amount in
             let magnitude =
-              of_fee (t1 :> Transaction.t).payload.fee
-              + of_fee (t2 :> Transaction.t).payload.fee
+              of_fee (t1 :> Payment.t).payload.fee
+              + of_fee (t2 :> Payment.t).payload.fee
               |> Option.value_exn
             in
             Signed.create ~magnitude ~sgn:Sgn.Pos

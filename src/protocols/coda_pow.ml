@@ -185,7 +185,7 @@ module type Snark_pool_proof_intf = sig
   type t [@@deriving sexp, bin_io]
 end
 
-module type Transaction_intf = sig
+module type Payment_intf = sig
   type t [@@deriving sexp, compare, eq, bin_io]
 
   type public_key
@@ -848,8 +848,8 @@ module type Inputs_intf = sig
     with type private_key := Private_key.t
      and type public_key := Public_key.t
 
-  module Transaction :
-    Transaction_intf with type public_key := Public_key.Compressed.t
+  module Payment :
+    Payment_intf with type public_key := Public_key.Compressed.t
 
   module Fee_transfer :
     Fee_transfer_intf with type public_key := Public_key.Compressed.t
@@ -861,7 +861,7 @@ module type Inputs_intf = sig
 
   module Super_transaction :
     Super_transaction_intf
-    with type valid_transaction := Transaction.With_valid_signature.t
+    with type valid_transaction := Payment.With_valid_signature.t
      and type fee_transfer := Fee_transfer.t
      and type coinbase := Coinbase.t
 
@@ -898,7 +898,7 @@ module type Inputs_intf = sig
 
   module Ledger :
     Ledger_intf
-    with type valid_transaction := Transaction.With_valid_signature.t
+    with type valid_transaction := Payment.With_valid_signature.t
      and type super_transaction := Super_transaction.t
      and type ledger_hash := Ledger_hash.t
 
@@ -947,9 +947,9 @@ Merge Snark:
 
   module Ledger_builder_diff :
     Ledger_builder_diff_intf
-    with type transaction := Transaction.t
+    with type transaction := Payment.t
      and type transaction_with_valid_signature :=
-                Transaction.With_valid_signature.t
+                Payment.With_valid_signature.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type public_key := Public_key.Compressed.t
      and type completed_work := Completed_work.t
@@ -972,7 +972,7 @@ Merge Snark:
      and type ledger := Ledger.t
      and type ledger_proof := Ledger_proof.t
      and type transaction_with_valid_signature :=
-                Transaction.With_valid_signature.t
+                Payment.With_valid_signature.t
      and type statement := Completed_work.Statement.t
      and type completed_work := Completed_work.Checked.t
      and type sparse_ledger := Sparse_ledger.t
@@ -999,7 +999,7 @@ Merge Snark:
      and type frozen_ledger_hash := Frozen_ledger_hash.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type ledger_builder_diff := Ledger_builder_diff.t
-     and type transaction := Transaction.t
+     and type transaction := Payment.t
      and type sok_digest := Sok_message.Digest.t
      and type ledger := Ledger.t
      and type keypair := Keypair.t

@@ -10,7 +10,7 @@ include
 
 module Undo : sig
   type transaction =
-    { transaction: Transaction.t
+    { transaction: Payment.t
     ; previous_empty_accounts: Public_key.Compressed.t list
     ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
   [@@deriving sexp, bin_io]

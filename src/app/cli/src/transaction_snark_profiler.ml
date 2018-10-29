@@ -25,17 +25,17 @@ let create_ledger_and_transactions num_transitions =
         ; receipt_chain_hash= Receipt.Chain_hash.empty
         ; nonce= Account.Nonce.zero } ) ;
   let txn from_kp (to_kp : Signature_lib.Keypair.t) amount fee nonce =
-    let payload : Transaction.Payload.t =
+    let payload : Payment.Payload.t =
       {receiver= Public_key.compress to_kp.public_key; fee; amount; nonce}
     in
-    Transaction.sign from_kp payload
+    Payment.sign from_kp payload
   in
   let nonces =
     Public_key.Compressed.Table.of_alist_exn
       (List.map (Array.to_list keys) ~f:(fun k ->
            (Public_key.compress k.public_key, Account.Nonce.zero) ))
   in
-  let random_transaction () : Transaction.With_valid_signature.t =
+  let random_transaction () : Payment.With_valid_signature.t =
     let sender_idx = Random.int num_accounts in
     let sender = keys.(sender_idx) in
     let receiver = keys.(Random.int num_accounts) in
@@ -56,7 +56,7 @@ let create_ledger_and_transactions num_transitions =
         let open Currency.Fee in
         let total_fee =
           List.fold transactions ~init:zero ~f:(fun acc t ->
-              Option.value_exn (add acc (t :> Transaction.t).payload.fee) )
+              Option.value_exn (add acc (t :> Payment.t).payload.fee) )
         in
         Fee_transfer.One (Public_key.compress keys.(0).public_key, total_fee)
       in
@@ -168,7 +168,7 @@ let run profiler num_transactions =
            | Fee_transfer t ->
                List.map (Fee_transfer.to_list t) ~f:(fun (pk, _) -> pk)
            | Transaction t ->
-               let t = (t :> Transaction.t) in
+               let t = (t :> Payment.t) in
                [t.payload.receiver; Public_key.compress t.sender]
            | Coinbase {proposer; fee_transfer} ->
                proposer :: Option.to_list (Option.map fee_transfer ~f:fst) ))

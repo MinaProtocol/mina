@@ -59,13 +59,13 @@ module type Ledger_proof_verifier_intf = sig
     -> bool Deferred.t
 end
 
-module Transaction = struct
+module Payment = struct
   include (
-    Transaction :
-      module type of Transaction
-      with module With_valid_signature := Transaction.With_valid_signature )
+    Payment :
+      module type of Payment
+      with module With_valid_signature := Payment.With_valid_signature )
 
-  let fee (t : t) = t.payload.Transaction.Payload.fee
+  let fee (t : t) = t.payload.Payment.Payload.fee
 
   let receiver (t : t) = t.payload.receiver
 
@@ -73,13 +73,13 @@ module Transaction = struct
 
   let seed = Secure_random.string ()
 
-  let compare t1 t2 = Transaction.Stable.V1.compare ~seed t1 t2
+  let compare t1 t2 = Payment.Stable.V1.compare ~seed t1 t2
 
   module With_valid_signature = struct
     module T = struct
-      include Transaction.With_valid_signature
+      include Payment.With_valid_signature
 
-      let compare t1 t2 = Transaction.With_valid_signature.compare ~seed t1 t2
+      let compare t1 t2 = Payment.With_valid_signature.compare ~seed t1 t2
     end
 
     include T
@@ -102,9 +102,9 @@ module type Kernel_intf = sig
      and type completed_work := Completed_work.t
      and type public_key := Public_key.Compressed.t
      and type ledger_builder_hash := Ledger_builder_hash.t
-     and type transaction := Transaction.t
+     and type transaction := Payment.t
      and type transaction_with_valid_signature :=
-                Transaction.With_valid_signature.t
+                Payment.With_valid_signature.t
 
   module Consensus_mechanism :
     Consensus.Mechanism.S
@@ -143,7 +143,7 @@ module Make_kernel
     module Ledger_builder_hash = Ledger_builder_hash
     module Ledger_builder_aux_hash = Ledger_builder_aux_hash
     module Compressed_public_key = Public_key.Compressed
-    module Transaction = Transaction
+    module Payment = Payment
     module Completed_work = Completed_work
   end)
 
@@ -326,7 +326,7 @@ struct
   module Super_transaction = struct
     module T = struct
       type t = Transaction_snark.Transition.t =
-        | Transaction of Transaction.With_valid_signature.t
+        | Transaction of Payment.With_valid_signature.t
         | Fee_transfer of Fee_transfer.t
         | Coinbase of Coinbase.t
       [@@deriving compare, eq]
@@ -366,7 +366,7 @@ struct
       module Amount = Amount
       module Completed_work = Completed_work
       module Compressed_public_key = Public_key.Compressed
-      module Transaction = Transaction
+      module Payment = Payment
       module Fee_transfer = Fee_transfer
       module Coinbase = Coinbase
       module Super_transaction = Super_transaction
@@ -417,7 +417,7 @@ struct
   module Internal_transition = Consensus_mechanism.Internal_transition
 
   module Transaction_pool = struct
-    module Pool = Transaction_pool.Make (Transaction)
+    module Pool = Transaction_pool.Make (Payment)
     include Network_pool.Make (Pool) (Pool.Diff)
 
     type pool_diff = Pool.Diff.t [@@deriving bin_io]
@@ -472,7 +472,7 @@ struct
   module Ledger_proof_verifier = Ledger_proof_verifier
   module Ledger_hash = Ledger_hash
   module Frozen_ledger_hash = Frozen_ledger_hash
-  module Transaction = Transaction
+  module Payment = Payment
   module Public_key = Public_key
   module Compressed_public_key = Public_key.Compressed
   module Private_key = Private_key
@@ -657,7 +657,7 @@ struct
       module Protocol_state = Protocol_state
       module Protocol_state_proof = Protocol_state_proof
       module State_hash = State_hash
-      module Valid_transaction = Transaction.With_valid_signature
+      module Valid_payment = Payment.With_valid_signature
       module Internal_transition = Internal_transition
 
       module Net = struct
@@ -686,7 +686,7 @@ struct
     module Ledger_proof_statement = Ledger_proof_statement
     module Ledger_hash = Ledger_hash
     module Frozen_ledger_hash = Frozen_ledger_hash
-    module Transaction = Transaction
+    module Payment = Payment
     module Public_key = Public_key
     module Private_key = Private_key
     module Keypair = Keypair
@@ -889,7 +889,7 @@ module type Main_intf = sig
     module Transaction_pool : sig
       type t
 
-      val add : t -> Transaction.t -> unit Deferred.t
+      val add : t -> Payment.t -> unit Deferred.t
     end
 
     module Protocol_state_proof : sig
@@ -1008,7 +1008,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
            ( Account.balance account |> Currency.Balance.to_int
            , string_of_public_key account ) )
 
-  let is_valid_transaction t (txn : Transaction.t) =
+  let is_valid_transaction t (txn : Payment.t) =
     let remainder =
       let open Option.Let_syntax in
       let%bind balance = get_balance t (Public_key.compress txn.sender)
@@ -1028,7 +1028,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let txn_pool = transaction_pool t in
     don't_wait_for (Transaction_pool.add txn_pool txn) ;
     Logger.info log
-      !"Added transaction %{sexp: Transaction.t} to pool successfully"
+      !"Added transaction %{sexp: Payment.t} to pool successfully"
       txn ;
     txn_count := !txn_count + 1
 

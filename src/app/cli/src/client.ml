@@ -385,14 +385,14 @@ let batch_send_txns =
     let _, ts =
       List.fold_map ~init:nonce0 infos ~f:(fun nonce {receiver; amount; fee} ->
           ( Account.Nonce.succ nonce
-          , Transaction.sign keypair
+          , Payment.sign keypair
               { receiver= Public_key.Compressed.of_base64_exn receiver
               ; amount
               ; fee
               ; nonce } ) )
     in
     dispatch_with_message Client_lib.Send_transactions.rpc
-      (ts :> Transaction.t list)
+      (ts :> Payment.t list)
       port
       ~success:(fun () -> "Successfully enqueued transactions in pool")
       ~error:(fun e ->
@@ -428,12 +428,12 @@ let send_txn =
          let%bind nonce = get_nonce_exn sender_kp.public_key port in
          let receiver_compressed = Public_key.compress address in
          let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
-         let payload : Transaction.Payload.t =
+         let payload : Payment.Payload.t =
            {receiver= receiver_compressed; amount; fee; nonce}
          in
-         let txn = Transaction.sign sender_kp payload in
+         let txn = Payment.sign sender_kp payload in
          dispatch_with_message Client_lib.Send_transactions.rpc
-           [(txn :> Transaction.t)]
+           [(txn :> Payment.t)]
            port
            ~success:(fun () -> "Successfully enqueued transaction in pool")
            ~error:(fun e ->

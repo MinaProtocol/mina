@@ -8,7 +8,7 @@ end
 
 module Transition : sig
   type t = Super_transaction.t =
-    | Transaction of Transaction.With_valid_signature.t
+    | Transaction of Payment.With_valid_signature.t
     | Fee_transfer of Fee_transfer.t
     | Coinbase of Coinbase.t
   [@@deriving bin_io, sexp]
@@ -129,7 +129,7 @@ val check_transaction :
      sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
-  -> Transaction.With_valid_signature.t
+  -> Payment.With_valid_signature.t
   -> Tick.Handler.t
   -> unit
 
@@ -148,7 +148,7 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> Transaction.With_valid_signature.t
+    -> Payment.With_valid_signature.t
     -> Tick.Handler.t
     -> t
 
