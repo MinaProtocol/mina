@@ -47,7 +47,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     assert (equal checked_result (unchecked input))
 
   let arbitrary_string =
-    String.init (Random.int 1000000000) ~f:(fun _ ->
+    String.init (Random.int 10000000) ~f:(fun _ ->
         Char.of_int_exn (Random.int_incl 0 255) )
 
   let with_randomness r f =
