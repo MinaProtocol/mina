@@ -10,7 +10,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
 
     type response =
       ( Statement.t
-      , Super_transaction.t
+      , Transaction.t
       , Sparse_ledger.t
       , Proof.t )
       Work.Single.Spec.t
@@ -25,7 +25,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   module Submit_work = struct
     type query =
       ( ( Statement.t
-        , Super_transaction.t
+        , Transaction.t
         , Sparse_ledger.t
         , Proof.t )
         Work.Single.Spec.t

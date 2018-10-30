@@ -1,11 +1,11 @@
 open Core
 
-type transaction = Payment.With_valid_signature.t [@@deriving bin_io, sexp]
+type payment = Payment.With_valid_signature.t [@@deriving bin_io, sexp]
 
 type fee_transfer = Fee_transfer.t [@@deriving bin_io, sexp]
 
 type t =
-  | Payment of transaction
+  | Payment of payment
   | Fee_transfer of Fee_transfer.t
   | Coinbase of Coinbase.t
 [@@deriving bin_io, sexp]

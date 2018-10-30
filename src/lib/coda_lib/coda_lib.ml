@@ -313,7 +313,7 @@ module type Inputs_intf = sig
     with type ledger_builder := Ledger_builder.t
      and type work :=
                 ( Ledger_proof_statement.t
-                , Super_transaction.t
+                , Transaction.t
                 , Sparse_ledger.t
                 , Ledger_proof.t )
                 Snark_work_lib.Work.Single.Spec.t

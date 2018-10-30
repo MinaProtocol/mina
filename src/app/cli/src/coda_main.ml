@@ -178,7 +178,7 @@ module type Make_work_selector_intf = sig
     with type ledger_builder := Inputs.Ledger_builder.t
      and type work :=
                 ( Inputs.Ledger_proof_statement.t
-                , Inputs.Super_transaction.t
+                , Inputs.Transaction.t
                 , Inputs.Sparse_ledger.t
                 , Inputs.Ledger_proof.t )
                 Snark_work_lib.Work.Single.Spec.t
@@ -194,7 +194,7 @@ module type Init_intf = sig
     with type ledger_builder := Inputs.Ledger_builder.t
      and type work :=
                 ( Inputs.Ledger_proof_statement.t
-                , Inputs.Super_transaction.t
+                , Inputs.Transaction.t
                 , Inputs.Sparse_ledger.t
                 , Inputs.Ledger_proof.t )
                 Snark_work_lib.Work.Single.Spec.t
@@ -224,7 +224,7 @@ let make_init ~should_propose (module Config : Config_intf)
             with type ledger_builder := Inputs.Ledger_builder.t
              and type work :=
                         ( Inputs.Ledger_proof_statement.t
-                        , Inputs.Super_transaction.t
+                        , Inputs.Transaction.t
                         , Inputs.Sparse_ledger.t
                         , Inputs.Ledger_proof.t )
                         Snark_work_lib.Work.Single.Spec.t =
@@ -237,7 +237,7 @@ let make_init ~should_propose (module Config : Config_intf)
             with type ledger_builder := Inputs.Ledger_builder.t
              and type work :=
                         ( Inputs.Ledger_proof_statement.t
-                        , Inputs.Super_transaction.t
+                        , Inputs.Transaction.t
                         , Inputs.Sparse_ledger.t
                         , Inputs.Ledger_proof.t )
                         Snark_work_lib.Work.Single.Spec.t =
@@ -323,7 +323,7 @@ struct
   module Fee_transfer = Coda_base.Fee_transfer
   module Coinbase = Coda_base.Coinbase
 
-  module Super_transaction = struct
+  module Transaction = struct
     module T = struct
       type t = Transaction_snark.Transition.t =
         | Payment of Payment.With_valid_signature.t
@@ -332,9 +332,9 @@ struct
       [@@deriving compare, eq]
     end
 
-    let fee_excess = Super_transaction.fee_excess
+    let fee_excess = Transaction.fee_excess
 
-    let supply_increase = Super_transaction.supply_increase
+    let supply_increase = Transaction.supply_increase
 
     include T
 
@@ -369,7 +369,7 @@ struct
       module Payment = Payment
       module Fee_transfer = Fee_transfer
       module Coinbase = Coinbase
-      module Super_transaction = Super_transaction
+      module Transaction = Transaction
       module Ledger = Ledger
       module Ledger_proof = Ledger_proof
       module Ledger_proof_verifier = Ledger_proof_verifier
@@ -711,7 +711,7 @@ struct
   module Work_selector_inputs = struct
     module Ledger_proof_statement = Ledger_proof_statement
     module Sparse_ledger = Sparse_ledger
-    module Super_transaction = Super_transaction
+    module Transaction = Transaction
     module Ledger_hash = Ledger_hash
     module Ledger_proof = Ledger_proof
     module Ledger_builder = Ledger_builder
@@ -868,7 +868,7 @@ module type Main_intf = sig
       type statement
     end
 
-    module Super_transaction : sig
+    module Transaction : sig
       type t
     end
 
@@ -876,7 +876,7 @@ module type Main_intf = sig
       Snark_worker_lib.Intf.S
       with type proof := Ledger_proof.t
        and type statement := Ledger_proof.statement
-       and type transition := Super_transaction.t
+       and type transition := Transaction.t
        and type sparse_ledger := Sparse_ledger.t
 
     module Snark_pool : sig

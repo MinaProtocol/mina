@@ -17,8 +17,8 @@ module type S = sig
     with type public_key := Compressed_public_key.t
      and type fee_transfer := Fee_transfer.single
 
-  module Super_transaction :
-    Coda_pow.Super_transaction_intf
+  module Transaction :
+    Coda_pow.Transaction_intf
     with type valid_payment := Payment.With_valid_signature.t
      and type fee_transfer := Fee_transfer.t
      and type coinbase := Coinbase.t
@@ -64,7 +64,7 @@ module type S = sig
   module Ledger :
     Coda_pow.Ledger_intf
     with type ledger_hash := Ledger_hash.t
-     and type super_transaction := Super_transaction.t
+     and type transaction := Transaction.t
      and type valid_payment := Payment.With_valid_signature.t
 
   module Sparse_ledger : sig
@@ -74,7 +74,7 @@ module type S = sig
 
     val merkle_root : t -> Ledger_hash.t
 
-    val apply_super_transaction_exn : t -> Super_transaction.t -> t
+    val apply_transaction_exn : t -> Transaction.t -> t
   end
 
   module Ledger_builder_aux_hash : Coda_pow.Ledger_builder_aux_hash_intf
