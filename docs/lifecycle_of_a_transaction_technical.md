@@ -1,6 +1,6 @@
 # The Lifecycle of a Transaction (technical)
 
-In Coda, transactions pass through several steps before they are considered verified and complete. This document is meant to walk through what happens to a single transaction as it works it's way through our codebase. For a more high-level simple overview aimed at users who want to understand a little bit about how transactions work check out the [lite lifecycle of a transaction](lifecycle-of-a-transaction-technical-lite.md).
+In Coda, transactions pass through several steps before they are considered verified and complete. This document is meant to walk through what happens to a single transaction as it works it's way through our codebase. For a more high-level simple overview aimed at users who want to understand a little bit about how transactions work check out the [lite lifecycle of a transaction](lifecycle_of_a_transaction_lite.md).
 
 Let's say you want to send a transaction in Coda, assuming you've already made you're account and you have funds.
 Your friend gives you her public key -- it's `KEFLx5TOqJNzd6buc+dW3HCjkL57NjnZIaplYJ50DO1uTfogKfwAAAAA`.
@@ -29,12 +29,12 @@ In the body of `send_txn` we build a transaction and send it over to the [daemon
 In [transaction.mli](../src/lib/coda_base/transaction.mli), you'll see a couple important things. (1) we break down transactions into a [transaction payload](#transaction-payload) (the part that needs to be [signed](#signature)) and the rest. and (2) you see the type defined in what will seem to be a strange manner, but is a common pattern in our codebase.
 
 For more see:
-* [Parameterized records](code-idiosyncrasies.md#parameterized-records)
-* [Ppx deriving](code-idiosyncrasies.md#ppx_deriving)
-* [Stable.V1](code-idiosyncrasies.md#stable-v1)
-* [Property based tests](code-idiosyncrasies.md#quickcheck-gen)
-* [Typesafe Invariants](code-idiosyncrasies.md#typesafe-invariants)
-* [Unit Tests](code-idiosyncrasies.md#unit-tests)
+* [Parameterized records](style_guide.md#parameterized-records)
+* [Ppx deriving](style_guide.md#ppx_deriving)
+* [Stable.V1](style_guide.md#stable-v1)
+* [Property based tests](style_guide.md#quickcheck-gen)
+* [Typesafe Invariants](style_guide.md#typesafe-invariants)
+* [Unit Tests](style_guide.md#unit-tests)
 
 Let's dig into the Transaction payload:
 
@@ -48,9 +48,9 @@ Check out [transaction_payload.mli](../src/lib/coda_base/transaction_payload.mli
 
 (TODO: @ihm can you correct any details I mess up here)
 
-We use [Schnorr signatures](https://en.wikipedia.org/wiki/Schnorr_signature). A [Schnorr signature](https://en.wikipedia.org/wiki/Schnorr_signature) is an element in a [group](https://en.wikipedia.org/wiki/Group_(mathematics). Our group is a point on an [eliptic curve](https://en.wikipedia.org/wiki/Elliptic_curve). So what is a signature? Open up [signature lib's checked.ml](../src/lib/signature_lib/checked.ml) and scroll to `module Signature` within `module type S`. It's a non-zeor point on a curve, aka a pair of two `curve_scalar` values. To sign we give a [private key](#private-key) and a message, we can verify a signature on a message with a [public key](#public-key).
+We use [Schnorr signatures](https://en.wikipedia.org/wiki/Schnorr_signature). A [Schnorr signature](https://en.wikipedia.org/wiki/Schnorr_signature) is an element in a [group](https://en.wikipedia.org/wiki/Group_(mathematics). Our group is a point on an [eliptic curve](https://en.wikipedia.org/wiki/Elliptic_curve). So what is a signature? Open up [signature lib's checked.ml](../src/lib/signature_lib/checked.ml) and scroll to `module Signature` within `module type S`. It's a non-zero point on a curve, aka a pair of two `curve_scalar` values. To sign we give a [private key](#private-key) and a message, we can verify a signature on a message with a [public key](#public-key).
 
-This is the first time we see heavily functored code, so see [functors](code-idiosyncrasies.md#functors) if you're confused. This is also the first time we see custom SNARK circuit logic, see [custom SNARK circuit logic](code-idiosyncrasies.md#snark-checked) for more.
+This is the first time we see heavily functored code, so see [functors](style_guide.md#functors) if you're confused. This is also the first time we see custom SNARK circuit logic, see [custom SNARK circuit logic](style_guide.md#snark-checked) for more.
 
 <a name="private-key"></a>
 ## Private key
@@ -72,7 +72,7 @@ In [currency.mli](../src/lib/currency/currency.mli), we define [nominal types](h
 <a name="account"></a>
 ## Account
 
-Transactions are can be applied successfully only if certain properties hold of the account of the sender (and the receiver's balance doesn't overflow).
+Transactions are applied successfully only if certain properties hold of the account of the sender (and the receiver's balance doesn't overflow).
 
 Checkout [account.ml](../src/lib/coda_base/account.ml), an account is a record with a [public key](#public-key) (the owner of the account), a [balance](#currency), a [nonce](#account-nonce), and a [receipt chain hash](#receipt-chain-hash).
 
@@ -182,8 +182,22 @@ TODO
 
 <a name="ledger-builder"></a>
 ## Ledger-builder
+A ledger builder can be regarded as a "Pending accounts database" that has transactions applied for which there are no snark available yet.
+A ledger builder consists of the accounts state (what we currently call ledger) and a data structure called [parallel_scan.ml](../src/lib/parallel_scan/parallel_scan.ml). It keeps track of all the transactions that need to be snarked (grep for `Available_job.t`) to produce a single transaction snark that certifies a set of transactions. This is exposed as Aux in the ledger builder.
+Parallel scan is a tree like structure that stores statements needed to be proved. A statement can apply a single transaction `Base` or compose other statements `Merge`. Snarking of these statements is delegated to snark-workers. Then, the snark workers submit snarks for the corresponding statements. Then, the proofs are used by the proposer to update the parallel scan state.
 
-TODO
+When the propser wins a block, the transactions read from the transaction pool are sent to the ledger builder to create a diff `Ledger_builder_diff`. 
+A diff consists of 
+1. Transactions included in the block
+2. A list of proofs that prove some of the transactions from previous blocks
+3. Coinbase 
+
+There are two primary operations in ledger builder.
+1. Creating a diff :
+    To include a transaction from the transaction pool, the proposer needs to include snarks generated by its own snark-workers (or buy it from someone) which certifies some of the transactions added in previous blocks. The number of snarks needs to be twice the number of transaction being included in th block (an invariant of the aux data structure). These proofs are included in the diff along with the transactions and coinbase.
+    The diff is then included in the external transition and  broadcasted to the network.
+
+2. Applying a diff: Diffs from the node itself (Internal transitions) or form the network (External transitions) are then used to update the ledger builder by applying the transactions to the ledger and updating the parallel scan state with the proofs. Applying a diff may produce a proof for a sequence of transactions that were included in the previous blocks.
 
 ## Ledger
 

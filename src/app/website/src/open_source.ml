@@ -63,8 +63,8 @@ module Get_started = struct
   module Item = struct
     let chevron =
       div
-        [Style.just "ocean o-40 mr2 ml4-ns"]
-        [node "i" [Style.just "f1 fas fa-chevron-down"] []]
+        [Style.just "ocean o-40 mr3 ml4-ns"]
+        [node "i" [Style.just "f1 fas fa-chevron-right"] []]
 
     let title s =
       h2 [Style.just "w310px ibmplex f2 fw5 ocean mt0 mb4 mb0-ns"] [text s]
@@ -103,10 +103,9 @@ let content =
       [Style.just "mw7 pv3 center ph3 blacklike"]
       [ Code_snippet.create
           ~lines:
-            [ "coda client generate-keypair -privkey-path ./wallet/mykey"
-            ; "coda client send-txn -amount 100 -privkey-path ./wallet/mykey \
-               -receiver \
-               KNQxdQ2zGPN+xbEinl9//vVvVxIvI/I6UCXiYCj3Bu66afuhDHkBAAAA" ]
+            [ "docker run -d --name coda codaprotocol/coda:demo"
+            ; "docker exec -it coda /bin/bash"
+            ; "watch coda client status" ]
       ; div [Style.just "ph2"]
           [ Cta_description.create ~button_text:"View on GitHub"
               ~copy:
@@ -132,12 +131,12 @@ let content =
                         "https://github.com/CodaProtocol/coda/blob/master/CONTRIBUTING.md"
                       ~name:"Contribute"
                       ~description:
-                        "Join our free, open source community, work on \
-                         issues, and learn how we use novel cryptography to \
-                         create a cryptocurrency network."
+                        "Join our open source community, work on issues, and \
+                         learn how we use novel cryptography to create a \
+                         scalable cryptocurrency network."
                   ; Item.create
                       ~url:
-                        "https://github.com/CodaProtocol/coda/blob/master/docs/lifecycle-of-a-transaction-lite.md"
+                        "https://github.com/CodaProtocol/coda/blob/master/docs/lifecycle_of_a_transaction_lite.md"
                       ~name:"Learn More"
                       ~description:
                         "Dive into the cutting-edge research and engineering \

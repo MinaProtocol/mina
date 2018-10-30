@@ -69,6 +69,7 @@ module type S = sig
     -> keypair:Signature_lib.Keypair.t
     -> transactions:Coda_base.Payment.t list
     -> ledger:Coda_base.Ledger.t
+    -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
     -> (Protocol_state.value * Consensus_transition_data.value) option
   (**
