@@ -560,7 +560,7 @@ let site () : Site.t Deferred.t =
     ( List.map position_files ~f:file
     @ [ file (File.of_html ~name:"index.html" home)
       ; file (File.of_html ~name:"jobs.html" (jobs ()))
-      ; file (File.of_html ~name:"open.html" Open_source.content)
+      ; file (File.of_html ~name:"code.html" Open_source.content)
       ; file (File.of_html ~name:"testnet.html" (testnet ()))
       ; file (File.of_html ~name:"privacy.html" Privacy_policy.content)
       ; file (File.of_html ~name:"tos.html" Tos.content)

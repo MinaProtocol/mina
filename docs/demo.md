@@ -8,7 +8,7 @@ Specifically, you'll download a docker image, run it, then play around with the 
 
 ## Helpful links
 
-- [Docs](https://codaprotocol.com/open.html)
+- [Docs](https://codaprotocol.com/code.html)
 - [Support Channel](https://discord.gg/Ur3tEAu)
 
 ## Prerequisites
