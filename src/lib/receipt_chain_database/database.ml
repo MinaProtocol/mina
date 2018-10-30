@@ -1,10 +1,5 @@
 open Core_kernel
 
-type ('key, 'value) tree_node =
-  | Root of {children: 'key list}
-  | Child of {parent: 'key; children: 'key list; value: 'value}
-[@@deriving sexp]
-
 module Make
     (Transaction : Intf.Transaction)
     (Receipt_chain_hash : Intf.Receipt_chain_hash
@@ -12,7 +7,9 @@ module Make
     (Key_value_db : Key_value_database.S
                     with type key := Receipt_chain_hash.t
                      and type value :=
-                                (Receipt_chain_hash.t, Transaction.t) tree_node) :
+                                ( Receipt_chain_hash.t
+                                , Transaction.t )
+                                Tree_node.t) :
   Intf.Test.S
   with type receipt_chain_hash := Receipt_chain_hash.t
    and type transaction := Transaction.t
@@ -22,81 +19,60 @@ struct
 
   let create ~directory = Key_value_db.create ~directory
 
-  (* Prove will provide  a merkle list of a proving receipt h_1 
-  and it's corresponding transaction t_1 to  a resulting_receipt h_k 
-  and it's corresponding transaction t_k, inclusively *)
   let prove t ~proving_receipt ~resulting_receipt =
-    let rec dfs acc start_receipt expected_receipt =
-      Key_value_db.get t ~key:start_receipt
-      |> Result.of_option
-           ~error:
-             (Error.createf
-                !"Cannot retrieve proving receipt: %{sexp: \
-                  Receipt_chain_hash.t}"
-                start_receipt)
-      |> Or_error.bind ~f:(function
-           | Root _ ->
-               Or_error.errorf
-                 !"The transaction of root hash %{sexp: Receipt_chain_hash.t} \
-                   is not recorded"
-                 start_receipt
-           | Child {value; children; _} ->
-               if Receipt_chain_hash.equal start_receipt expected_receipt then
-                 Or_error.return [(start_receipt, value)]
-               else
-                 Sequence.of_list children
-                 |> Sequence.find_map ~f:(fun child ->
-                        match dfs acc child resulting_receipt with
-                        | Ok result -> Some ((start_receipt, value) :: result)
-                        | Error _ -> None )
-                 |> Result.of_option
-                      ~error:
-                        (Error.createf
-                           !"Could not find resulting receipt: %{sexp: \
-                             Receipt_chain_hash.t}"
-                           resulting_receipt) )
+    let open Or_error.Let_syntax in
+    let rec parent_traversal start_receipt last_receipt :
+        (Receipt_chain_hash.t * Transaction.t) list Or_error.t =
+      match%bind
+        Key_value_db.get t ~key:last_receipt
+        |> Result.of_option
+             ~error:
+               (Error.createf
+                  !"Cannot retrieve receipt: %{sexp: Receipt_chain_hash.t}"
+                  last_receipt)
+      with
+      | Root ->
+          Or_error.errorf
+            !"The transaction of root hash %{sexp: Receipt_chain_hash.t} is \
+              not recorded"
+            last_receipt
+      | Child {value; parent; _} ->
+          if Receipt_chain_hash.equal start_receipt last_receipt then
+            Or_error.return [(start_receipt, value)]
+          else
+            let%map subresult = parent_traversal start_receipt parent in
+            (last_receipt, value) :: subresult
     in
-    dfs [] proving_receipt resulting_receipt
+    let%map result = parent_traversal proving_receipt resulting_receipt in
+    List.rev result
 
   let get_transaction t ~receipt =
     Key_value_db.get t ~key:receipt
-    |> Option.bind ~f:(function
-         | Root _ -> None
-         | Child {value; _} -> Some value )
+    |> Option.bind ~f:(function Root -> None | Child {value; _} -> Some value)
 
   let add t ~previous (transaction: Transaction.t) =
     let payload = Transaction.payload transaction in
     let receipt_chain_hash = Receipt_chain_hash.cons payload previous in
-    let open Result.Let_syntax in
-    let result =
-      let%map children =
-        Option.value_map (Key_value_db.get t ~key:receipt_chain_hash)
-          ~default:(Ok []) ~f:(function
-          | Root {children} -> Ok children
-          | Child {parent= retrieved_parent; children; _} ->
-              if not (Receipt_chain_hash.equal previous retrieved_parent) then
-                Error (`Error_multiple_previous_receipts retrieved_parent)
-              else Ok children )
-      in
-      let node = Child {parent= previous; children; value= transaction} in
-      Key_value_db.set t ~key:receipt_chain_hash ~data:node ;
-      let updated_previous_node, status =
-        match Key_value_db.get t ~key:previous with
-        | None ->
-            (Root {children= [receipt_chain_hash]}, `Ok receipt_chain_hash)
-        | Some (Child previous_node) ->
-            ( Child
-                { previous_node with
-                  children= receipt_chain_hash :: previous_node.children }
-            , `Ok receipt_chain_hash )
-        | Some (Root previous_node) ->
-            ( Root {children= receipt_chain_hash :: previous_node.children}
-            , `Duplicate receipt_chain_hash )
-      in
-      Key_value_db.set t ~key:previous ~data:updated_previous_node ;
-      status
+    let node, status =
+      Option.value_map
+        (Key_value_db.get t ~key:receipt_chain_hash)
+        ~default:
+          ( Some (Tree_node.Child {parent= previous; value= transaction})
+          , `Ok receipt_chain_hash )
+        ~f:(function
+            | Root ->
+                ( Some (Child {parent= previous; value= transaction})
+                , `Duplicate receipt_chain_hash )
+            | Child {parent= retrieved_parent; _} ->
+                if not (Receipt_chain_hash.equal previous retrieved_parent)
+                then (None, `Error_multiple_previous_receipts retrieved_parent)
+                else
+                  ( Some (Child {parent= previous; value= transaction})
+                  , `Duplicate receipt_chain_hash ))
     in
-    match result with Ok value -> value | Error e -> e
+    Option.iter node ~f:(function node ->
+        Key_value_db.set t ~key:receipt_chain_hash ~data:node ) ;
+    status
 
   let database t = t
 end
@@ -122,7 +98,7 @@ let%test_module "receipt_database" =
     module Key_value_db =
       Key_value_database.Make_mock (Receipt_chain_hash)
         (struct
-          type t = (Receipt_chain_hash.t, Transaction.t) tree_node
+          type t = (Receipt_chain_hash.t, Transaction.t) Tree_node.t
           [@@deriving sexp]
         end)
 

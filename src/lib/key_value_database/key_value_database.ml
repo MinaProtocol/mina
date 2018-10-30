@@ -30,13 +30,11 @@ end
 module Make_mock
     (Key : Hashable.S) (Value : sig
         type t
-    end) : sig
-  (* HACK: This exposes useful functions for debugging *)
-
-  include Mock_intf with type t = Value.t Key.Table.t
-          with type key := Key.t
-           and type value := Value.t
-end = struct
+    end) :
+  Mock_intf with type t = Value.t Key.Table.t
+  with type key := Key.t
+   and type value := Value.t =
+struct
   type t = Value.t Key.Table.t
 
   let to_sexp t ~key_sexp ~value_sexp =

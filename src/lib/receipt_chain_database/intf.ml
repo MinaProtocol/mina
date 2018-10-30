@@ -9,6 +9,13 @@ module type S = sig
 
   val create : directory:string -> t
 
+  (* Prove will provide  a merkle list of a proving receipt h_1 
+  and it's corresponding transaction t_1 to  a resulting_receipt r_k 
+  and it's corresponding transaction r_k, inclusively.
+  Therefore, the output will be in the form of [(t_1, r_1, ... t_k, r_k)],
+  where r_i = h(r_{i-1}, i_k) for i = 2...k
+   *)
+
   val prove :
        t
     -> proving_receipt:receipt_chain_hash

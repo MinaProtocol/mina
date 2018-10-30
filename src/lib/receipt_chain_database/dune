@@ -1,6 +1,6 @@
 (library
- (name receipt_chain_database_lib)
-  (public_name receipt_chain_database_lib)
+ (name receipt_chain_database)
+  (public_name receipt_chain_database)
   (library_flags (-linkall))
   (libraries core key_value_database)
   (inline_tests)
