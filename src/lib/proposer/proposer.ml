@@ -155,6 +155,11 @@ module Make (Inputs : Inputs_intf) :
                 ( previous_protocol_state |> Protocol_state.blockchain_state
                 |> Blockchain_state.ledger_hash )
           in
+          let supply_increase =
+            Option.value_map ledger_proof_opt
+              ~f:(fun (_, stmt) -> stmt.supply_increase)
+              ~default:Currency.Amount.zero
+          in
           let blockchain_state =
             Blockchain_state.create_value ~timestamp:(Time.now time_controller)
               ~ledger_hash:next_ledger_hash
@@ -171,7 +176,7 @@ module Make (Inputs : Inputs_intf) :
                 .transactions diff
                 :> Transaction.t list )
             ~ledger:(Ledger_builder.ledger ledger_builder)
-            ~logger )
+            ~supply_increase ~logger )
     in
     Option.value
       ~default:(Interruptible.return None)

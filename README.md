@@ -17,8 +17,8 @@ Discord](https://discordapp.com/invite/cCYQbqN), for general OCaml help.
 * [Compiling from source and and running a node](docs/demo.md)
 
 # Learn more
-*  [directory structure](DIRECTORY_STRUCTURE.md)
-*  [lifecycle of a transaction](docs/lifecycle_of_a_transaction_lite.md)
+*  [Directory structure](DIRECTORY_STRUCTURE.md)
+*  [Lifecycle of a transaction](docs/lifecycle_of_a_transaction_lite.md)
 
 # License
 
