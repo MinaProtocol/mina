@@ -740,6 +740,7 @@ module type Consensus_mechanism_intf = sig
     -> keypair:keypair
     -> transactions:transaction list
     -> ledger:ledger
+    -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
     -> (Protocol_state.value * Consensus_transition_data.value) option
 
