@@ -1,6 +1,6 @@
 # The Lifecycle of a Transaction (technical)
 
-In Coda, transactions pass through several steps before they are considered verified and complete. This document is meant to walk through what happens to a single transaction as it works it's way through our codebase. For a more high-level simple overview aimed at users who want to understand a little bit about how transactions work check out the [lite lifecycle of a transaction](lifecycle_of_a_transaction_technical_lite.md).
+In Coda, transactions pass through several steps before they are considered verified and complete. This document is meant to walk through what happens to a single transaction as it works it's way through our codebase. For a more high-level simple overview aimed at users who want to understand a little bit about how transactions work check out the [lite lifecycle of a transaction](lifecycle_of_a_transaction_lite.md).
 
 Let's say you want to send a transaction in Coda, assuming you've already made you're account and you have funds.
 Your friend gives you her public key -- it's `KEFLx5TOqJNzd6buc+dW3HCjkL57NjnZIaplYJ50DO1uTfogKfwAAAAA`.
