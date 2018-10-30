@@ -35,9 +35,9 @@ let daemon (module Kernel : Kernel_intf) log =
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
          (optional file)
-     and should_propose_flag =
-       flag "propose" ~doc:"true|false Run the proposer (default:false)"
-         (optional bool)
+     and propose_key =
+       flag "propose-key" ~doc:"FILE Private key file for the proposing transitions (default:don't propose)"
+         (optional file)
      and peers =
        flag "peer"
          ~doc:
@@ -152,10 +152,6 @@ let daemon (module Kernel : Kernel_intf) log =
          or_from_config YJ.Util.to_int_option "client-port"
            ~default:default_client_port client_port
        in
-       let should_propose_flag =
-         or_from_config YJ.Util.to_bool_option "propose" ~default:false
-           should_propose_flag
-       in
        let transaction_capacity_log_2 =
          or_from_config YJ.Util.to_int_option "txn-capacity" ~default:8
            transaction_capacity_log_2
@@ -231,21 +227,22 @@ let daemon (module Kernel : Kernel_intf) log =
        let me =
          (Host_and_port.create ~host:ip ~port:discovery_port, external_port)
        in
+       let keypair_of_file : string -> Signature_lib.Keypair.t = failwith "TODO" in
+       let propose_keypair =
+         Option.map ~f:keypair_of_file propose_key
+       in
        let%bind client_whitelist =
          Reader.load_sexp
            (conf_dir ^/ "client_whitelist")
            [%of_sexp: Unix.Inet_addr.Blocking_sexp.t list]
          >>| Or_error.ok
        in
-       let keypair = Genesis_ledger.largest_account_keypair_exn () in
        let module Config = struct
          let logger = log
 
          let conf_dir = conf_dir
 
          let lbc_tree_max_depth = `Finite 50
-
-         let keypair = keypair
 
          let genesis_proof = Precomputed_values.base_proof
 
@@ -256,7 +253,7 @@ let daemon (module Kernel : Kernel_intf) log =
          let work_selection = work_selection
        end in
        let%bind (module Init) =
-         make_init ~should_propose:should_propose_flag
+         make_init ~should_propose:(Option.is_some propose_keypair)
            (module Config)
            (module Kernel)
        in
@@ -292,14 +289,13 @@ let daemon (module Kernel : Kernel_intf) log =
          let%map coda =
            Run.create
              (Run.Config.make ~log ~net_config
-                ~should_propose:should_propose_flag
                 ~run_snark_worker:(Option.is_some run_snark_worker_flag)
                 ~ledger_builder_persistant_location:
                   (conf_dir ^/ "ledger_builder")
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~time_controller:(Inputs.Time.Controller.create ())
-                ~keypair () ~banlist)
+                ~propose_keypair () ~banlist)
          in
          let web_service = Web_pipe.get_service () in
          Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;

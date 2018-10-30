@@ -10,11 +10,6 @@ module Base = struct
     module Public_key :
       Protocols.Coda_pow.Public_key_intf with module Private_key = Private_key
 
-    module Keypair :
-      Protocols.Coda_pow.Keypair_intf
-      with type public_key := Public_key.t
-       and type private_key := Private_key.t
-
     module State_hash : sig
       type t [@@deriving eq, sexp, compare, bin_io]
 

@@ -29,13 +29,13 @@ struct
     { net: Net.t
     ; log: Logger.t
     ; sl_ref: Sync_ledger.t option ref
-    ; public_key: Public_key.Compressed.t }
+    }
 
-  let create ~net ~parent_log ~public_key =
-    {net; log= Logger.child parent_log __MODULE__; sl_ref= ref None; public_key}
+  let create ~net ~parent_log =
+    {net; log= Logger.child parent_log __MODULE__; sl_ref= ref None}
 
   (* Perform the `Sync interruptible work *)
-  let do_sync {net; log; sl_ref; public_key}
+  let do_sync {net; log; sl_ref}
       ~(old_state : Transition_logic_state.t)
       ~(state_mutator :
             Transition_logic_state.t
@@ -92,7 +92,7 @@ struct
           with
           | Ok aux -> (
             match
-              Ledger_builder.of_aux_and_ledger ~public_key ~snarked_ledger_hash
+              Ledger_builder.of_aux_and_ledger ~public_key:(failwith "TODO deapthi") ~snarked_ledger_hash
                 ~ledger ~aux
             with
             (* TODO: We'll need the full history in order to trust that

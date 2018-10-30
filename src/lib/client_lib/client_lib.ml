@@ -79,8 +79,8 @@ module Status = struct
     ; external_transition_latency: Perf_histograms.Report.t option
     ; snark_worker_transition_time: Perf_histograms.Report.t option
     ; snark_worker_merge_time: Perf_histograms.Report.t option
-    ; propose: bool }
-  [@@deriving yojson, bin_io, fields]
+    ; propose_pubkey: Public_key.t option }
+  [@@deriving to_yojson, bin_io, fields]
 
   (* Text response *)
   let to_text s =
@@ -148,8 +148,13 @@ module Status = struct
           | None -> acc
           | Some report ->
               ("Snark Worker Merge (hist.)", summarize_report report) :: acc )
-        ~propose:(fun acc x ->
-          ("Proposer Running", Bool.to_string (f x)) :: acc )
+        ~propose_pubkey:(fun acc x ->
+          match f x with
+          | None ->
+              ("Proposer Running", "false" :: acc)
+          | Some pubkey ->
+              ("Proposer Running", Printf.sprintf !"%{sexp: Public_key.t}" pubkey :: acc)
+        )
       |> List.rev
     in
     let max_key_length =

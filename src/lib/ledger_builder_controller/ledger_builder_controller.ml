@@ -18,7 +18,6 @@ module Make (Inputs : Inputs.S) : sig
      and type external_transition := Consensus_mechanism.External_transition.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type tip := Tip.t
-     and type keypair := Keypair.t
 
   val ledger_builder_io : t -> Net.t
 end = struct
@@ -34,7 +33,7 @@ end = struct
       ; genesis_tip: Tip.t
       ; consensus_local_state: Consensus_mechanism.Local_state.t
       ; longest_tip_location: string
-      ; keypair: Keypair.t }
+      }
     [@@deriving make]
   end
 
@@ -177,7 +176,6 @@ end = struct
     let net = Net.create net in
     let catchup =
       Catchup.create ~net ~parent_log:log
-        ~public_key:(Public_key.compress config.keypair.public_key)
     in
     (* Here we effectfully listen to transitions and emit what we belive are
        the strongest ledger_builders *)
@@ -385,10 +383,6 @@ let%test_module "test" =
           let compress t = t
 
           let of_private_key_exn t = t
-        end
-
-        module Keypair = struct
-          type t = {public_key: Public_key.t; private_key: Private_key.t}
         end
 
         module Ledger_builder_hash = struct
@@ -629,7 +623,6 @@ let%test_module "test" =
             ; proof= ()
             ; ledger_builder= Ledger_builder.create ~ledger:0 ~self:() }
           ~longest_tip_location ~consensus_local_state:()
-          ~keypair:{Keypair.public_key= (); private_key= ()}
 
       let create_transition x parent strength =
         { Inputs.Consensus_mechanism.Protocol_state.previous_state_hash= parent
