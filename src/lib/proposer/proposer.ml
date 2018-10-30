@@ -176,8 +176,7 @@ module Make (Inputs : Inputs_intf) :
                 .transactions diff
                 :> Transaction.t list )
             ~ledger:(Ledger_builder.ledger ledger_builder)
-            ~supply_increase
-            ~logger )
+            ~supply_increase ~logger )
     in
     Option.value
       ~default:(Interruptible.return None)
