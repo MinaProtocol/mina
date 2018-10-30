@@ -2,44 +2,23 @@
 
 Coda is a new cryptocurrency protocol with a lightweight, constant sized blockchain.
 
-* [Coda Protocol Website](https://codaprotocol.com/)
-* [Coda Protocol Roadmap](https://github.com/orgs/CodaProtocol/projects/1)
-
 Please see our [developer README](README-dev.md) if you are interested in building coda from source code.
 
 We have a [Discord server]( https://discord.gg/ShKhA7J)! Please come by if you
 need help or have questions. You might also be interested in the [OCaml
 Discord](https://discordapp.com/invite/cCYQbqN), for general OCaml help.
 
-FIXME: Add some user documentation here.
+# Table of Contents
 
-# Getting started
+* [Coda homepage](https://codaprotocol.com/)
+* [Roadmap](https://github.com/orgs/CodaProtocol/projects/1)
+* [Developer homepage](docs/demo.md)
+* [Developer readme](README-dev.md)
+* [Compiling from source and and running a node](docs/demo.md)
 
-# Downloading coda packages
-
-```
-curl
-dpkg -i
-coda daemon ...
-coda client ...
-```
-
-# Running coda container
-
-```
-docker run ...
-```
-
-# Network considerations
-
-Coda needs open communication for our Gossip protcol and DHT neighbor discovery to communicate.
-
-Be sure to open the necessary ports on iptables, security groups, or NAT forwarding rules to permit this traffic.
-
-Default ports are: TCP 8302 for Gossip and UDP 8303 for DHT peer exchange.
-
-The [miniupnp project](http://miniupnp.free.fr/) has some simple utilities to make this easier to setup.
-
+# Learn more
+*  [directory structure](DIRECTORY_STRUCTURE.md)
+*  [lifecycle of a transaction](docs/lifecycle_of_a_transaction_lite.md)
 
 # License
 
