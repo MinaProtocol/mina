@@ -12,7 +12,7 @@ Discord](https://discordapp.com/invite/cCYQbqN), for general OCaml help.
 
 * [Coda homepage](https://codaprotocol.com/)
 * [Roadmap](https://github.com/orgs/CodaProtocol/projects/1)
-* [Developer homepage](docs/demo.md)
+* [Developer homepage](https://codaprotocol.com/code.html)
 * [Developer readme](README-dev.md)
 * [Compiling from source and and running a node](docs/demo.md)
 
