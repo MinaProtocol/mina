@@ -2,7 +2,7 @@
 
 Coda is a new cryptocurrency protocol with a lightweight, constant sized blockchain.
 
-* [Developer homepage](docs/demo.md)
+* [Developer homepage](https://codaprotocol.com/code.html)
 * [Roadmap](https://github.com/orgs/CodaProtocol/projects/1)
 * [Repository Readme](README.md)
 
