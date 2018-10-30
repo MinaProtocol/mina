@@ -167,8 +167,8 @@ module Make (Inputs : Inputs_intf) :
           Consensus_mechanism.generate_transition ~previous_protocol_state
             ~blockchain_state ~local_state:consensus_local_state ~time ~keypair
             ~transactions:
-              ( Ledger_builder_diff.With_valid_signatures_and_proofs
-                .payments diff
+              ( Ledger_builder_diff.With_valid_signatures_and_proofs.payments
+                  diff
                 :> Payment.t list )
             ~ledger:(Ledger_builder.ledger ledger_builder)
             ~logger )
@@ -205,8 +205,7 @@ module Make (Inputs : Inputs_intf) :
       { protocol_state:
           Protocol_state.value * Protocol_state_proof.t sexp_opaque
       ; ledger_builder: Ledger_builder.t sexp_opaque
-      ; transactions: Payment.With_valid_signature.t Sequence.t sexp_opaque
-      }
+      ; transactions: Payment.With_valid_signature.t Sequence.t sexp_opaque }
     [@@deriving sexp_of]
   end
 

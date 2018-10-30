@@ -95,8 +95,7 @@ module type S = sig
     with type completed_work := Completed_work.t
      and type completed_work_checked := Completed_work.Checked.t
      and type payment := Payment.t
-     and type payment_with_valid_signature :=
-                Payment.With_valid_signature.t
+     and type payment_with_valid_signature := Payment.With_valid_signature.t
      and type public_key := Compressed_public_key.t
      and type ledger_builder_hash := Ledger_builder_hash.t
 

@@ -1535,9 +1535,7 @@ let%test_module "transaction_snark" =
 
     let of_payment' sok_digest ledger payment handler =
       let source = Ledger.merkle_root ledger in
-      let target =
-        Ledger.merkle_root_after_payment_exn ledger payment
-      in
+      let target = Ledger.merkle_root_after_payment_exn ledger payment in
       of_payment ~sok_digest ~source ~target payment handler
 
     let%test_unit "new_account" =

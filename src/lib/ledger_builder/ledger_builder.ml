@@ -129,8 +129,7 @@ end) :
       | _ -> Or_error.error_string "Error incrementing coinbase parts"
   end
 
-  type diff =
-    {completed_works: Completed_work.t list; payments: Payment.t list}
+  type diff = {completed_works: Completed_work.t list; payments: Payment.t list}
   [@@deriving sexp, bin_io]
 
   type diff_with_at_most_two_coinbase =
@@ -187,8 +186,8 @@ end) :
         ~second:(fun d -> (fst d).diff.payments @ (snd d).diff.payments)
   end
 
-  let forget_diff
-      {With_valid_signatures_and_proofs.completed_works; payments} =
+  let forget_diff {With_valid_signatures_and_proofs.completed_works; payments}
+      =
     { completed_works= List.map ~f:Completed_work.forget completed_works
     ; payments= (payments :> Payment.t list) }
 
@@ -353,8 +352,7 @@ end = struct
                       { Ledger_proof_statement.source
                       ; target
                       ; fee_excess=
-                          ok_or_return
-                            (Transaction.fee_excess transaction)
+                          ok_or_return (Transaction.fee_excess transaction)
                       ; supply_increase=
                           ok_or_return
                             (Transaction.supply_increase transaction)
@@ -424,8 +422,7 @@ end = struct
       match job with
       | A.Base d ->
           let transaction =
-            Or_error.ok_exn
-            @@ Ledger.Undo.transaction d.transaction_with_info
+            Or_error.ok_exn @@ Ledger.Undo.transaction d.transaction_with_info
           in
           Snark_work_lib.Work.Single.Spec.Transition
             (d.statement, transaction, d.witness)
@@ -686,13 +683,10 @@ end = struct
     in
     let open Or_error.Let_syntax in
     let witness = Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) in
-    let%map undo, statement =
-      apply_transaction_and_get_statement ledger s
-    in
+    let%map undo, statement = apply_transaction_and_get_statement ledger s in
     ( undo
-    , { Transaction_with_witness.transaction_with_info= undo
-      ; witness
-      ; statement } )
+    , {Transaction_with_witness.transaction_with_info= undo; witness; statement}
+    )
 
   let update_ledger_and_get_statements ledger ts =
     let undo_transactions undos =
@@ -986,8 +980,7 @@ end = struct
     let new_data =
       List.map transactions ~f:(fun s ->
           let _undo, t =
-            Or_error.ok_exn
-              (apply_transaction_and_get_witness t.ledger s)
+            Or_error.ok_exn (apply_transaction_and_get_witness t.ledger s)
           in
           t )
     in
@@ -1054,17 +1047,16 @@ end = struct
     module Queue_consumption = struct
       type t =
         { fee_transfers: Compressed_public_key.Set.t
-        ; transactions: int
+        ; payments: int
         ; coinbase_part_count: int }
       [@@deriving sexp]
 
-      let count {fee_transfers; transactions; coinbase_part_count} =
+      let count {fee_transfers; payments; coinbase_part_count} =
         (* This is number of coinbase_parts + number of transactions + ceil
         (Set.length fee_transfers / 2) *)
-        coinbase_part_count + transactions
-        + ((Set.length fee_transfers + 1) / 2)
+        coinbase_part_count + payments + ((Set.length fee_transfers + 1) / 2)
 
-      let add_transaction t = {t with transactions= t.transactions + 1}
+      let add_payment t = {t with payments= t.payments + 1}
 
       let add_fee_transfer t public_key =
         {t with fee_transfers= Set.add t.fee_transfers public_key}
@@ -1073,7 +1065,7 @@ end = struct
         {t with coinbase_part_count= t.coinbase_part_count + 1}
 
       let init =
-        { transactions= 0
+        { payments= 0
         ; fee_transfers= Compressed_public_key.Set.empty
         ; coinbase_part_count= 0 }
     end
@@ -1083,7 +1075,7 @@ end = struct
       ; queue_consumption: Queue_consumption.t
       ; available_queue_space: int
       ; work_done: int
-      ; transactions: (Payment.With_valid_signature.t * Ledger.Undo.t) list
+      ; payments: (Payment.With_valid_signature.t * Ledger.Undo.t) list
       ; completed_works: Completed_work.Checked.t list
       ; coinbase_parts:
           ( Completed_work.Checked.t Ledger_builder_diff.At_most_two.t
@@ -1102,7 +1094,7 @@ end = struct
 
     let coinbase_added t = t.queue_consumption.coinbase_part_count > 0
 
-    let add_transaction t ((txv : Payment.With_valid_signature.t), undo) =
+    let add_payment t ((txv : Payment.With_valid_signature.t), undo) =
       let tx = (txv :> Payment.t) in
       let open Or_error.Let_syntax in
       let%bind budget =
@@ -1114,15 +1106,13 @@ end = struct
           t.queue_consumption
         else Queue_consumption.add_fee_transfer t.queue_consumption t.self_pk
       in
-      let queue_consumption = Queue_consumption.add_transaction q in
+      let queue_consumption = Queue_consumption.add_payment q in
       if not (is_space_available {t with queue_consumption= q}) then
         Or_error.error_string "Error adding a transaction: Insufficient space"
       else
         Ok
           { t with
-            budget
-          ; queue_consumption
-          ; transactions= (txv, undo) :: t.transactions }
+            budget; queue_consumption; payments= (txv, undo) :: t.payments }
 
     let add_coinbase t =
       let open Or_error.Let_syntax in
@@ -1149,14 +1139,14 @@ end = struct
         in
         {t with queue_consumption; coinbase_parts}
 
-    let enough_work_for_txn t (txv : Payment.With_valid_signature.t) =
+    let enough_work_for_payment t (txv : Payment.With_valid_signature.t) =
       let tx = (txv :> Payment.t) in
       let q =
         if Currency.Fee.equal (Payment.fee tx) Currency.Fee.zero then
           t.queue_consumption
         else Queue_consumption.add_fee_transfer t.queue_consumption t.self_pk
       in
-      let queue_consumption = Queue_consumption.add_transaction q in
+      let queue_consumption = Queue_consumption.add_payment q in
       t.work_done = Queue_consumption.count queue_consumption * 2
 
     let enough_work_for_coinbase t =
@@ -1212,7 +1202,7 @@ end = struct
       ; work_done= 0
       ; queue_consumption= Queue_consumption.init
       ; budget= Fee.Signed.zero
-      ; transactions= []
+      ; payments= []
       ; completed_works= []
       ; coinbase_parts= prediff
       ; completed_works_for_coinbase= []
@@ -1223,7 +1213,7 @@ end = struct
     type t =
       { resources: Resources.t
       ; work_to_do: Completed_work.Statement.t Sequence.t
-      ; txns_to_include: Payment.With_valid_signature.t Sequence.t }
+      ; payments_to_include: Payment.With_valid_signature.t Sequence.t }
   end
 
   let add_work work resources get_completed_work =
@@ -1244,21 +1234,19 @@ end = struct
         Resources.add_work_for_coinbase resources w
     | None -> Error (Error.of_string "Work not found")
 
-  let add_transaction ledger txn resources =
+  let add_payment ledger txn resources =
     match Ledger.apply_transaction ledger (Payment txn) with
     | Error _ -> Ok resources
     | Ok undo -> (
-      match Resources.add_transaction resources (txn, undo) with
+      match Resources.add_payment resources (txn, undo) with
       | Ok resources -> Ok resources
       | Error e ->
           Or_error.ok_exn (Ledger.undo ledger undo) ;
           Error e )
 
   let txns_not_included (valid : Resources.t) (invalid : Resources.t) =
-    let diff =
-      List.length invalid.transactions - List.length valid.transactions
-    in
-    if diff > 0 then List.take invalid.transactions diff else []
+    let diff = List.length invalid.payments - List.length valid.payments in
+    if diff > 0 then List.take invalid.payments diff else []
 
   let log_error_and_return_value logger err_val def_val =
     match err_val with
@@ -1269,18 +1257,18 @@ end = struct
 
   let rec check_resources_add_txns logger get_completed_work ledger
       (valid : Resource_util.t) (current : Resource_util.t) =
-    let add_transaction t ts ws =
-      let r_transaction =
+    let add_payment t ts ws =
+      let r_payment =
         log_error_and_return_value logger
-          (add_transaction ledger t current.resources)
+          (add_payment ledger t current.resources)
           current.resources
       in
       let new_res_util =
-        { Resource_util.resources= r_transaction
+        { Resource_util.resources= r_payment
         ; work_to_do= ws
-        ; txns_to_include= ts }
+        ; payments_to_include= ts }
       in
-      if Resources.budget_non_neg r_transaction then
+      if Resources.budget_non_neg r_payment then
         check_resources_add_txns logger get_completed_work ledger new_res_util
           new_res_util
       else
@@ -1289,25 +1277,26 @@ end = struct
     in
     match
       ( Sequence.next current.work_to_do
-      , Sequence.next current.txns_to_include
+      , Sequence.next current.payments_to_include
       , Resources.is_space_available current.resources )
     with
     | None, None, _ ->
         (valid, txns_not_included valid.resources current.resources)
-    | None, Some (t, ts), true -> add_transaction t ts Sequence.empty
+    | None, Some (t, ts), true -> add_payment t ts Sequence.empty
     | Some (w, ws), Some (t, ts), true -> (
         let enough_work_added_to_include_one_more =
-          Resources.enough_work_for_txn current.resources t
+          Resources.enough_work_for_payment current.resources t
         in
         if enough_work_added_to_include_one_more then
-          add_transaction t ts (Sequence.append (Sequence.singleton w) ws)
+          add_payment t ts (Sequence.append (Sequence.singleton w) ws)
         else
           match add_work w current.resources get_completed_work with
           | Ok r_work ->
               check_resources_add_txns logger get_completed_work ledger valid
                 { resources= r_work
                 ; work_to_do= ws
-                ; txns_to_include= Sequence.append (Sequence.singleton t) ts }
+                ; payments_to_include=
+                    Sequence.append (Sequence.singleton t) ts }
           | Error e ->
               Logger.error logger "%s" (Error.to_string_hum e) ;
               (valid, txns_not_included valid.resources current.resources) )
@@ -1387,7 +1376,7 @@ end = struct
     let init_res_util =
       { Resource_util.resources= init_resources
       ; work_to_do= ws_seq
-      ; txns_to_include= ts_seq }
+      ; payments_to_include= ts_seq }
     in
     let res_util_with_coinbase =
       if add_coinbase then
@@ -1411,13 +1400,14 @@ end = struct
     let init_res_util =
       { Resource_util.resources= init_resources
       ; work_to_do= ws_seq
-      ; txns_to_include= ts_seq }
+      ; payments_to_include= ts_seq }
     in
     (*splitting coinbase into n parts*)
     let remaining_slots (res_util : Resource_util.t) =
       let n' = Resources.available_space res_util.resources in
       (*if there are no more transactions to be included in the second prediff then don't bother splitting up the coinbase*)
-      if n' > 1 && Sequence.length res_util.txns_to_include = 0 then 1 else n'
+      if n' > 1 && Sequence.length res_util.payments_to_include = 0 then 1
+      else n'
     in
     let res_util_coinbase =
       coinbase_after_txns remaining_slots logger get_completed_work ledger
@@ -1430,7 +1420,7 @@ end = struct
     if unable_to_add_coinbase then
       (*Not enough work to add coinbase and therefore recompute the diff again
       by adding coinbase first, resulting in a single pre_diff*)
-      let _ = undo_txns ledger res_util_coinbase.resources.transactions in
+      let _ = undo_txns ledger res_util_coinbase.resources.payments in
       let res =
         one_prediff logger ws_seq ts_seq get_completed_work ledger self
           (fst partitions) ~add_coinbase:true
@@ -1439,7 +1429,7 @@ end = struct
     else
       let res_coinbase2 =
         one_prediff logger res_util_coinbase.work_to_do
-          res_util_coinbase.txns_to_include get_completed_work ledger self
+          res_util_coinbase.payments_to_include get_completed_work ledger self
           (snd partitions)
           ~add_coinbase:
             (not (Resources.coinbase_added res_util_coinbase.resources))
@@ -1454,15 +1444,14 @@ end = struct
           Resources.Queue_consumption.count
             res_util_coinbase.resources.queue_consumption
           = fst partitions
-          || List.length res_coinbase2.transactions = 0 ) ;
+          || List.length res_coinbase2.payments = 0 ) ;
         Second (res_util_coinbase.resources, res_coinbase2) )
       else
         (*Not enough work to add coinbase and therefore recompute the diff
         again by adding coinbase first, resulting in a single pre_diff*)
         let _ =
           undo_txns ledger
-            ( res_coinbase2.transactions
-            @ res_util_coinbase.resources.transactions )
+            (res_coinbase2.payments @ res_util_coinbase.resources.payments)
         in
         let res =
           one_prediff logger ws_seq ts_seq get_completed_work ledger self
@@ -1475,7 +1464,7 @@ end = struct
     let diff (res : Resources.t) :
         Ledger_builder_diff.With_valid_signatures_and_proofs.diff =
       (* We have to reverse here because we only know they work in THIS order *)
-      { payments= List.rev_map res.transactions ~f:fst
+      { payments= List.rev_map res.payments ~f:fst
       ; completed_works= List.rev res.completed_works }
     in
     let make_diff_with_one (res : Resources.t) :
@@ -1504,17 +1493,17 @@ end = struct
           one_prediff logger ws_seq ts_seq get_completed_work ledger self x
             ~add_coinbase:true
         in
-        let _ = undo_txns ledger res.transactions in
+        let _ = undo_txns ledger res.payments in
         First (make_diff_with_one res)
     | `Two (x, y) -> (
       match
         two_prediffs logger ws_seq ts_seq get_completed_work ledger self (x, y)
       with
       | First res ->
-          let _ = undo_txns ledger res.transactions in
+          let _ = undo_txns ledger res.payments in
           First (make_diff_with_one res)
       | Second (res1, res2) ->
-          let _ = undo_txns ledger (res2.transactions @ res1.transactions) in
+          let _ = undo_txns ledger (res2.payments @ res1.payments) in
           Second (make_diff_with_two res1, make_diff_with_one res2) )
 
   let create_diff t ~logger
@@ -1657,7 +1646,7 @@ let%test_module "test" =
       end
 
       module Transaction = struct
-        type valid_transaction = Payment.With_valid_signature.t
+        type valid_payment = Payment.With_valid_signature.t
         [@@deriving sexp, bin_io, compare, eq]
 
         type fee_transfer = Fee_transfer.t
@@ -1668,7 +1657,7 @@ let%test_module "test" =
         type unsigned_fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
 
         type t =
-          | Payment of valid_transaction
+          | Payment of valid_payment
           | Fee_transfer of fee_transfer
           | Coinbase of coinbase
         [@@deriving sexp, bin_io, compare, eq]
@@ -1809,8 +1798,7 @@ let%test_module "test" =
               t := !t + Currency.Amount.to_int c.amount ;
               Or_error.return (Transaction.Coinbase c)
 
-        let undo_transaction : t -> transaction -> unit Or_error.t
-            =
+        let undo_transaction : t -> transaction -> unit Or_error.t =
          fun t s ->
           let v =
             match s with
@@ -2002,8 +1990,7 @@ let%test_module "test" =
           let payments t =
             Either.value_map t.pre_diffs
               ~first:(fun d -> d.diff.payments)
-              ~second:(fun d ->
-                (fst d).diff.payments @ (snd d).diff.payments )
+              ~second:(fun d -> (fst d).diff.payments @ (snd d).diff.payments)
         end
 
         let forget_diff
@@ -2047,8 +2034,7 @@ let%test_module "test" =
         let payments (t : t) =
           Either.value_map t.pre_diffs
             ~first:(fun d -> d.diff.payments)
-            ~second:(fun d ->
-              (fst d).diff.payments @ (snd d).diff.payments )
+            ~second:(fun d -> (fst d).diff.payments @ (snd d).diff.payments)
       end
 
       module Config = struct
@@ -2155,7 +2141,7 @@ let%test_module "test" =
               let expected_value = expected_ledger x all_ts old_ledger in
               assert (!(Lb.ledger lb) = expected_value) ) )
 
-    let%test_unit "Be able to include random number of transactions" =
+    let%test_unit "Be able to include random number of payments" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
       let logger = Logger.create () in
@@ -2192,8 +2178,7 @@ let%test_module "test" =
               let expected_value = expected_ledger x all_ts old_ledger in
               assert (!(Lb.ledger lb) = expected_value) ) )
 
-    let%test_unit "Be able to include random number of transactions (One \
-                   prover)" =
+    let%test_unit "Be able to include random number of payments (One prover)" =
       let get_work (stmts : Test_input1.Completed_work.Statement.t) :
           Test_input1.Completed_work.Checked.t option =
         Some

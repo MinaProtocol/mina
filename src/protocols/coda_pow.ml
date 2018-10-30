@@ -400,8 +400,7 @@ module type Ledger_builder_diff_intf = sig
     val increase : 'a t -> 'a list -> 'a t Or_error.t
   end
 
-  type diff =
-    {completed_works: completed_work list; payments: payment list}
+  type diff = {completed_works: completed_work list; payments: payment list}
   [@@deriving sexp, bin_io]
 
   type diff_with_at_most_two_coinbase =
@@ -947,8 +946,7 @@ Merge Snark:
   module Ledger_builder_diff :
     Ledger_builder_diff_intf
     with type payment := Payment.t
-     and type payment_with_valid_signature :=
-                Payment.With_valid_signature.t
+     and type payment_with_valid_signature := Payment.With_valid_signature.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type public_key := Public_key.Compressed.t
      and type completed_work := Completed_work.t
@@ -970,8 +968,7 @@ Merge Snark:
      and type public_key := Public_key.Compressed.t
      and type ledger := Ledger.t
      and type ledger_proof := Ledger_proof.t
-     and type payment_with_valid_signature :=
-                Payment.With_valid_signature.t
+     and type payment_with_valid_signature := Payment.With_valid_signature.t
      and type statement := Completed_work.Statement.t
      and type completed_work := Completed_work.Checked.t
      and type sparse_ledger := Sparse_ledger.t

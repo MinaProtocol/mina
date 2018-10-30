@@ -97,8 +97,8 @@ struct
       match varying with
       | Payment tr ->
           Option.value_map ~default:(Or_error.error_string "Bad signature")
-            (Payment.check tr.payment) ~f:(fun x ->
-              Ok (Transaction.Payment x) )
+            (Payment.check tr.payment) ~f:(fun x -> Ok (Transaction.Payment x)
+          )
       | Fee_transfer f -> Ok (Fee_transfer f.fee_transfer)
       | Coinbase c -> Ok (Coinbase c.coinbase)
   end
@@ -312,8 +312,7 @@ struct
     Or_error.map
       ( match t with
       | Payment txn ->
-          Or_error.map (apply_payment ledger txn) ~f:(fun u ->
-              Undo.Payment u )
+          Or_error.map (apply_payment ledger txn) ~f:(fun u -> Undo.Payment u)
       | Fee_transfer t ->
           Or_error.map (apply_fee_transfer ledger t) ~f:(fun u ->
               Undo.Fee_transfer u )

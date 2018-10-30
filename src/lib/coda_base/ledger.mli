@@ -39,14 +39,12 @@ end
 
 val create_new_account_exn : t -> Public_key.Compressed.t -> Account.t -> unit
 
-val apply_payment :
-  t -> Transaction.payment -> Undo.payment Or_error.t
+val apply_payment : t -> Transaction.payment -> Undo.payment Or_error.t
 
 val apply_transaction : t -> Transaction.t -> Undo.t Or_error.t
 
 val undo : t -> Undo.t -> unit Or_error.t
 
-val merkle_root_after_payment_exn :
-  t -> Transaction.payment -> Ledger_hash.t
+val merkle_root_after_payment_exn : t -> Transaction.payment -> Ledger_hash.t
 
 val create_empty : t -> Public_key.Compressed.t -> Path.t * Account.t
