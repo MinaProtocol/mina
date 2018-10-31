@@ -227,10 +227,12 @@ let daemon (module Kernel : Kernel_intf) log =
        let me =
          (Host_and_port.create ~host:ip ~port:discovery_port, external_port)
        in
-       let keypair_of_file : string -> Signature_lib.Keypair.t = failwith "TODO" in
-       let propose_keypair : Signature_lib.Keypair.t option =
-         Option.map ~f:keypair_of_file propose_key
+       let sequence maybe_def =
+         match maybe_def with
+         | Some def -> Deferred.map def ~f:Option.return
+         | None -> Deferred.return None
        in
+       let%bind propose_keypair = Option.map ~f:Cli_lib.read_keypair_exn' propose_key |> sequence in
        let%bind client_whitelist =
          Reader.load_sexp
            (conf_dir ^/ "client_whitelist")

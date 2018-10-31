@@ -206,10 +206,6 @@ let dispatch_with_message rpc arg port ~success ~error =
       eprintf "%s\n" (error e) ;
       exit 1
 
-let read_keypair path =
-  read_keypair_exn ~privkey_path:path
-    ~password:(lazy (read_password_exn "Secret key password: "))
-
 let batch_send_txns =
   let module Transaction_info = struct
     type t = {receiver: string; amount: Currency.Amount.t; fee: Currency.Fee.t}
@@ -246,7 +242,7 @@ let batch_send_txns =
   in
   let main port (privkey_path, transactions_path) =
     let open Deferred.Let_syntax in
-    let%bind keypair = read_keypair privkey_path
+    let%bind keypair = read_keypair_exn' privkey_path
     and infos = get_infos transactions_path in
     let%bind nonce0 = get_nonce_exn keypair.public_key port in
     let _, ts =
@@ -291,7 +287,7 @@ let send_txn =
   Command.async ~summary:"Send transaction to an address"
     (Daemon_cli.init flag ~f:(fun port (address, from_account, fee, amount) ->
          let open Deferred.Let_syntax in
-         let%bind sender_kp = read_keypair from_account in
+         let%bind sender_kp = read_keypair_exn' from_account in
          let%bind nonce = get_nonce_exn sender_kp.public_key port in
          let receiver_compressed = Public_key.compress address in
          let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
