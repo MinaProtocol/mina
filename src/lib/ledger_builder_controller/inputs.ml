@@ -139,7 +139,6 @@ module Base = struct
        and type ledger_proof := Ledger_proof.t
        and type ledger := Ledger.t
        and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
-       and type public_key := Public_key.Compressed.t
 
     module Tip :
       Protocols.Coda_pow.Tip_intf
