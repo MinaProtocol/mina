@@ -87,6 +87,14 @@ docker-toolchain:
 		echo "Repo is dirty, commit first." ;\
 	fi
 
+# All in one step to build toolchain and binary for kademlia
+docker-toolchain-haskell:
+	@echo "Building toolchain/build" ;\
+    docker build --file dockerfiles/Dockerfile-toolchain-haskell --tag codaprotocol/coda:toolchain-haskell-$(GITLONGHASH) . ;\
+    echo  'Extracting binary' ;\
+    docker run --rm --entrypoint cat codaprotocol/coda:toolchain-haskell-$(GITLONGHASH)  /src/result/bin/kademlia > src/_build/coda-kademlia ;\
+    chmod +x src/_build/coda-kademlia
+
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
 	cd .circleci; python2 render.py > config.yml

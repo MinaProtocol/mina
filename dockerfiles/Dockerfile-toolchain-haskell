@@ -1,0 +1,22 @@
+FROM nixos/nix:latest
+
+#
+# Simple toolchain & build container that compiles and patches a kademlia binary for coda use
+#
+
+# Add patchelf tool
+RUN apk add patchelf
+
+# Nix for haskell for kademlia
+ADD /src/app/kademlia-haskell /src
+
+# Fetch nix dependancies
+RUN cd /src/prefetch ; nix-build prefetch.nix
+
+# Compile kademlia
+RUN cd /src ; nix-build release2.nix
+
+# Adjust elf headers (de-nix)
+RUN patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 /src/result/bin/kademlia
+
+# FIXME: Get a recursive sha1 of src/app/kademlia-haskell to determine when/if we need to rebuild this....
