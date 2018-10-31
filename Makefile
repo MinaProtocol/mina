@@ -105,8 +105,8 @@ deb:
 provingkeys:
 	@if [ ! -f src/_build/coda_cache_dir_$(GITHASH).tar.bz2 ] ; then \
 		$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH).tar.bz2  /var/lib/coda ; \
-		@mkdir -p /tmp/artifacts ; \
-		@cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
+		mkdir -p /tmp/artifacts ; \
+		cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
 	else \
 		echo "Skipping because not on master" ; \
 	fi
