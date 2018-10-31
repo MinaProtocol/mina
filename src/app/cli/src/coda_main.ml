@@ -1007,7 +1007,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
            ( Account.balance account |> Currency.Balance.to_int
            , string_of_public_key account ) )
 
-  let is_valid_transaction t (txn : Payment.t) =
+  let is_valid_payment t (txn : Payment.t) =
     let remainder =
       let open Option.Let_syntax in
       let%bind balance = get_balance t (Public_key.compress txn.sender)
@@ -1019,24 +1019,21 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   (** For status *)
   let txn_count = ref 0
 
-  let schedule_transaction log t txn =
+  let schedule_payment log t txn =
     let open Deferred.Let_syntax in
-    if not (is_valid_transaction t txn) then (
-      Core.Printf.eprintf "Invalid transaction: account balance is too low" ;
+    if not (is_valid_payment t txn) then (
+      Core.Printf.eprintf "Invalid payment: account balance is too low" ;
       Core.exit 1 ) ;
     let txn_pool = transaction_pool t in
     don't_wait_for (Transaction_pool.add txn_pool txn) ;
     Logger.info log
-      !"Added transaction %{sexp: Payment.t} to pool successfully"
+      !"Added payment %{sexp: Payment.t} to pool successfully"
       txn ;
     txn_count := !txn_count + 1
 
-  let send_txn log t txn =
-    schedule_transaction log t txn ;
-    Deferred.unit
+  let send_payment log t txn = schedule_payment log t txn ; Deferred.unit
 
-  let schedule_transactions log t txns =
-    List.iter txns ~f:(schedule_transaction log t)
+  let schedule_payments log t txns = List.iter txns ~f:(schedule_payment log t)
 
   let get_nonce t (addr : Public_key.Compressed.t) =
     let open Option.Let_syntax in
@@ -1083,7 +1080,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
     ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
-    ; transactions_sent= !txn_count
+    ; payments_sent= !txn_count
     ; run_snark_worker= run_snark_worker t
     ; propose= should_propose t }
 
@@ -1132,8 +1129,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
     let client_impls =
-      [ Rpc.Rpc.implement Client_lib.Send_transactions.rpc (fun () ts ->
-            schedule_transactions log coda ts ;
+      [ Rpc.Rpc.implement Client_lib.Send_payments.rpc (fun () ts ->
+            schedule_payments log coda ts ;
             Deferred.unit )
       ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
             return (get_balance coda pk) )

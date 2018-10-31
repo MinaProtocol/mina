@@ -45,15 +45,14 @@ module Chain_hash = struct
 
   let%test_unit "checked-unchecked equivalence" =
     let open Quickcheck in
-    test ~trials:20 (Generator.tuple2 gen Transaction_payload.gen)
+    test ~trials:20 (Generator.tuple2 gen Payment_payload.gen)
       ~f:(fun (base, payload) ->
         let unchecked = cons payload base in
         let checked =
           let comp =
             let open Snark_params.Tick.Let_syntax in
             let%bind payload =
-              Schnorr.Message.var_of_payload
-                (Transaction_payload.var_of_t payload)
+              Schnorr.Message.var_of_payload (Payment_payload.var_of_t payload)
             in
             let%map res = Checked.cons ~payload (var_of_t base) in
             As_prover.read typ res

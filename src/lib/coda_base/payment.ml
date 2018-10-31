@@ -4,7 +4,7 @@ open Snark_params
 open Coda_numbers
 open Tick
 module Fee = Currency.Fee
-module Payload = Transaction_payload
+module Payload = Payment_payload
 
 module Stable = struct
   module V1 = struct

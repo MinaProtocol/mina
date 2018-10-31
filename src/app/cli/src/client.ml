@@ -343,44 +343,43 @@ let dispatch_with_message rpc arg port ~success ~error =
       eprintf "%s\n" (error e) ;
       exit 1
 
-let batch_send_txns =
-  let module Transaction_info = struct
+let batch_send_payments =
+  let module Payment_info = struct
     type t = {receiver: string; amount: Currency.Amount.t; fee: Currency.Fee.t}
     [@@deriving sexp]
   end in
   let arg =
     let open Command.Let_syntax in
     let%map_open privkey_path = privkey_read_path_flag
-    and transactions_path = anon ("transactions-file" %: string) in
-    (privkey_path, transactions_path)
+    and payments_path = anon ("payments-file" %: string) in
+    (privkey_path, payments_path)
   in
-  let get_infos transactions_path =
+  let get_infos payments_path =
     match%bind
-      Reader.load_sexp transactions_path [%of_sexp: Transaction_info.t list]
+      Reader.load_sexp payments_path [%of_sexp: Payment_info.t list]
     with
     | Ok x -> return x
     | Error e ->
-        let sample_info () : Transaction_info.t =
+        let sample_info () : Payment_info.t =
           let keypair = Keypair.create () in
-          { Transaction_info.receiver=
+          { Payment_info.receiver=
               Public_key.(Compressed.to_base64 (compress keypair.public_key))
           ; amount= Currency.Amount.of_int (Random.int 100)
           ; fee= Currency.Fee.of_int (Random.int 100) }
         in
-        eprintf "Could not read transactions from %s.\n" transactions_path ;
+        eprintf "Could not read payments from %s.\n" payments_path ;
         eprintf
-          "The file should be a sexp list of transactions. Here is an example \
-           file:\n\
+          "The file should be a sexp list of payments. Here is an example file:\n\
            %s\n"
           (Sexp.to_string_hum
-             ([%sexp_of: Transaction_info.t list]
+             ([%sexp_of: Payment_info.t list]
                 (List.init 3 ~f:(fun _ -> sample_info ())))) ;
         exit 1
   in
-  let main port (privkey_path, transactions_path) =
+  let main port (privkey_path, payments_path) =
     let open Deferred.Let_syntax in
     let%bind keypair = read_keypair privkey_path
-    and infos = get_infos transactions_path in
+    and infos = get_infos payments_path in
     let%bind nonce0 = get_nonce_exn keypair.public_key port in
     let _, ts =
       List.fold_map ~init:nonce0 infos ~f:(fun nonce {receiver; amount; fee} ->
@@ -391,17 +390,17 @@ let batch_send_txns =
               ; fee
               ; nonce } ) )
     in
-    dispatch_with_message Client_lib.Send_transactions.rpc
+    dispatch_with_message Client_lib.Send_payments.rpc
       (ts :> Payment.t list)
       port
-      ~success:(fun () -> "Successfully enqueued transactions in pool")
+      ~success:(fun () -> "Successfully enqueued payments in pool")
       ~error:(fun e ->
-        sprintf "Failed to send transactions %s" (Error.to_string_hum e) )
+        sprintf "Failed to send payments %s" (Error.to_string_hum e) )
   in
-  Command.async ~summary:"send multiple transactions from a file"
+  Command.async ~summary:"send multiple payments from a file"
     (Daemon_cli.init arg ~f:main)
 
-let send_txn =
+let send_payment =
   let open Command.Param in
   let address_flag =
     flag "receiver"
@@ -409,11 +408,11 @@ let send_txn =
       (required public_key)
   in
   let fee_flag =
-    flag "fee" ~doc:"VALUE  Transaction fee you're willing to pay (default: 1)"
+    flag "fee" ~doc:"VALUE  Payment fee you're willing to pay (default: 1)"
       (optional txn_fee)
   in
   let amount_flag =
-    flag "amount" ~doc:"VALUE Transaction amount you want to send"
+    flag "amount" ~doc:"VALUE Payment amount you want to send"
       (required txn_amount)
   in
   let flag =
@@ -421,7 +420,7 @@ let send_txn =
     return (fun a b c d -> (a, b, c, d))
     <*> address_flag <*> privkey_read_path_flag <*> fee_flag <*> amount_flag
   in
-  Command.async ~summary:"Send transaction to an address"
+  Command.async ~summary:"Send payment to an address"
     (Daemon_cli.init flag ~f:(fun port (address, from_account, fee, amount) ->
          let open Deferred.Let_syntax in
          let%bind sender_kp = read_keypair from_account in
@@ -432,13 +431,12 @@ let send_txn =
            {receiver= receiver_compressed; amount; fee; nonce}
          in
          let txn = Payment.sign sender_kp payload in
-         dispatch_with_message Client_lib.Send_transactions.rpc
+         dispatch_with_message Client_lib.Send_payments.rpc
            [(txn :> Payment.t)]
            port
-           ~success:(fun () -> "Successfully enqueued transaction in pool")
+           ~success:(fun () -> "Successfully enqueued payment in pool")
            ~error:(fun e ->
-             sprintf "Failed to send transaction %s" (Error.to_string_hum e) )
-     ))
+             sprintf "Failed to send payment %s" (Error.to_string_hum e) ) ))
 
 let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
@@ -507,8 +505,8 @@ let command =
     [ ("get-balance", get_balance)
     ; ("get-public-keys", get_public_keys)
     ; ("get-nonce", get_nonce_cmd)
-    ; ("send-txn", send_txn)
-    ; ("batch-send-txns", batch_send_txns)
+    ; ("send-payment", send_payment)
+    ; ("batch-send-payments", batch_send_payments)
     ; ("status", status)
     ; ("status-clear-hist", status_clear_hist)
     ; ("wrap-key", wrap_key)

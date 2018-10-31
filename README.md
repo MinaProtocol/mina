@@ -18,7 +18,7 @@ Discord](https://discordapp.com/invite/cCYQbqN), for general OCaml help.
 
 # Learn more
 *  [Directory structure](DIRECTORY_STRUCTURE.md)
-*  [Lifecycle of a transaction](docs/lifecycle_of_a_transaction_lite.md)
+*  [Lifecycle of a payment](docs/lifecycle_of_a_payment_lite.md)
 
 # License
 

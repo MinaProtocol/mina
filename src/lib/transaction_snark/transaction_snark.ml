@@ -245,7 +245,7 @@ module Tagged_transaction = struct
 end
 
 let dummy_signature =
-  Schnorr.sign (Private_key.create ()) Transaction_payload.dummy
+  Schnorr.sign (Private_key.create ()) Payment_payload.dummy
 
 module Fee_transfer = struct
   include Fee_transfer

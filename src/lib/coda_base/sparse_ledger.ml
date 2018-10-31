@@ -53,7 +53,7 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
     ((merkle_root sl :> Pedersen.Digest.t) |> Ledger_hash.of_hash)
 
 let apply_payment_exn t ({sender; payload; signature= _} : Payment.t) =
-  let {Transaction_payload.amount; fee; receiver; nonce} = payload in
+  let {Payment_payload.amount; fee; receiver; nonce} = payload in
   let sender_idx = find_index_exn t (Public_key.compress sender) in
   let receiver_idx = find_index_exn t receiver in
   let sender_account = get_exn t sender_idx in

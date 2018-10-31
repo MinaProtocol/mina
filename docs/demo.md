@@ -4,7 +4,7 @@
 
 Hello! We'll walk you through a short demo to get a local testnet running using Coda. 
 
-Specifically, you'll download a docker image, run it, then play around with the command line interface to create a wallet and send/receive transactions.
+Specifically, you'll download a docker image, run it, then play around with the command line interface to create a wallet and send/receive payments.
 
 ## Helpful links
 
@@ -55,7 +55,7 @@ At a high level, here's what just happened: you started three Coda nodes, all of
 There are a few ways you can interact with this network right away:
 - [Check the network status](#check-the-network-status)
 - [Create a wallet](#create-a-wallet)
-- [Send transactions](#send-transactions)
+- [Send payments](#send-payments)
 - [Check account balances](#check-account-balances)
 - [Add additional nodes to the network](#add-additional-nodes-to-the-network)
 
@@ -107,9 +107,9 @@ That creates an encrypted private key file at `./wallet/key` and a corresponding
 $ cat ./wallet/key.pub
 ```
 
-#### Send transactions
+#### Send payments
 
-For ease of setup and experimentation, we've already given you a well-funded account, which you can use to send transactions to new accounts. Here's how you can send a transaction from this account:
+For ease of setup and experimentation, we've already given you a well-funded account, which you can use to send payments to new accounts. Here's how you can send a payment from this account:
 
 ```
 $ coda client send-txn -amount <AMOUNT> -privkey-path ./funded-wallet/key -receiver <RECEIVER_ADDRESS>
@@ -119,7 +119,7 @@ Replacing the `<AMOUNT>` argument with an integer value and the `<RECEIVER_ADDRE
 
 #### Check account balances
 
-Naturally, you might be interested in seeing how and when the network processes your transactions. You can do that by either inquiring for a specific address or all account balances. Here are the commands to do so:
+Naturally, you might be interested in seeing how and when the network processes your payments. You can do that by either inquiring for a specific address or all account balances. Here are the commands to do so:
 
 **Checking account balance**
 ```
