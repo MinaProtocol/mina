@@ -206,7 +206,9 @@ let dispatch_with_message rpc arg port ~success ~error =
       eprintf "%s\n" (error e) ;
       exit 1
 
-let read_keypair path = read_keypair_exn ~privkey_path:path ~password:(lazy (read_password_exn "Secret key password: "))
+let read_keypair path =
+  read_keypair_exn ~privkey_path:path
+    ~password:(lazy (read_password_exn "Secret key password: "))
 
 let batch_send_txns =
   let module Transaction_info = struct
@@ -314,10 +316,13 @@ let wrap_key =
       let%bind privkey =
         hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
       in
-      let pk = Private_key.of_base64_exn (privkey |> Or_error.ok_exn |> Bytes.to_string) in
+      let pk =
+        Private_key.of_base64_exn
+          (privkey |> Or_error.ok_exn |> Bytes.to_string)
+      in
       let kp = Keypair.of_private_key_exn pk in
-      write_keypair_exn kp ~privkey_path ~password:(lazy
-          (prompt_password "Password for new private key file: " )))
+      write_keypair_exn kp ~privkey_path
+        ~password:(lazy (prompt_password "Password for new private key file: ")))
 
 let dump_keypair =
   Command.async ~summary:"Print out a keypair from a private key file"
@@ -326,8 +331,8 @@ let dump_keypair =
     fun () ->
       let open Deferred.Let_syntax in
       let%map kp =
-        read_keypair_exn ~privkey_path ~password:(lazy (
-            read_password_exn "Password for private key file: " ))
+        read_keypair_exn ~privkey_path
+          ~password:(lazy (read_password_exn "Password for private key file: "))
       in
       printf "Public key: %s\nPrivate key: %s\n"
         ( kp.public_key |> Public_key.compress
@@ -342,8 +347,9 @@ let generate_keypair =
       let open Deferred.Let_syntax in
       let kp = Keypair.create () in
       let%bind () =
-        write_keypair_exn kp ~privkey_path ~password:(lazy (
-            prompt_password "Password for new private key file: " ))
+        write_keypair_exn kp ~privkey_path
+          ~password:
+            (lazy (prompt_password "Password for new private key file: "))
       in
       printf "Public key: %s\n"
         ( kp.public_key |> Public_key.compress

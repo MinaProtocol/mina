@@ -55,6 +55,7 @@ let handle_open ~mkdir ~(f : string -> 'a Deferred.Or_error.t) path :
     | e -> Deferred.Or_error.of_exn e )
 
 let lift (t : 'a Deferred.t) : 'a Deferred.Or_error.t = t >>| fun x -> Ok x
+
 let lift1 f x = lift (f x)
 
 let write ~path ~mkdir ~(password : Bytes.t Deferred.Or_error.t Lazy.t)
@@ -82,22 +83,31 @@ let read ~path ~(password : Bytes.t Deferred.Or_error.t Lazy.t) =
     handle_open ~mkdir:false ~f:(lift1 Reader.open_file) path
   in
   let%bind st = handle_open ~mkdir:false ~f:(lift1 Unix.stat) path in
-  let file_error = if st.perm land 0o077 <> 0 then (
-    Some (sprintf
-      "insecure permissions on `%s`. They should be 0600, they are %o\n\
-       Hint: chmod 600 %s\n"
-      path (st.perm land 0o777) path)) else None in
+  let file_error =
+    if st.perm land 0o077 <> 0 then
+      Some
+        (sprintf
+           "insecure permissions on `%s`. They should be 0600, they are %o\n\
+            Hint: chmod 600 %s\n"
+           path (st.perm land 0o777) path)
+    else None
+  in
   let dn = Filename.dirname path in
   let%bind st = handle_open ~mkdir:false ~f:(lift1 Unix.stat) dn in
-  let dir_error = if st.perm land 0o777 <> 0o700 then (
-    Some (sprintf
-      "insecure permissions on `%s`. They should be 0700, they are %o\n\
-       Hint: chmod 700 %s\n"
-      dn (st.perm land 0o777) dn)) else None in
-  let%bind () = match (file_error, dir_error) with
-  | Some e1, Some e2 -> Deferred.Or_error.error_string (e1 ^ e2)
-  | Some e1, None | None, Some e1 -> Deferred.Or_error.error_string (e1)
-  | None, None -> Deferred.Or_error.ok_unit
+  let dir_error =
+    if st.perm land 0o777 <> 0o700 then
+      Some
+        (sprintf
+           "insecure permissions on `%s`. They should be 0700, they are %o\n\
+            Hint: chmod 700 %s\n"
+           dn (st.perm land 0o777) dn)
+    else None
+  in
+  let%bind () =
+    match (file_error, dir_error) with
+    | Some e1, Some e2 -> Deferred.Or_error.error_string (e1 ^ e2)
+    | Some e1, None | None, Some e1 -> Deferred.Or_error.error_string e1
+    | None, None -> Deferred.Or_error.ok_unit
   in
   let%bind file_contents = read_all privkey_file in
   let%bind sb =
