@@ -103,9 +103,13 @@ deb:
 	@cp src/_build/codaclient.deb /tmp/artifacts/.
 
 provingkeys:
-	$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH).tar.bz2  /var/lib/coda
-	@mkdir -p /tmp/artifacts
-	@cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/.
+	@if [ ! -f src/_build/coda_cache_dir_$(GITHASH).tar.bz2 ] ; then \
+		$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH).tar.bz2  /var/lib/coda ; \
+		mkdir -p /tmp/artifacts ; \
+		cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
+	else \
+		echo "Skipping because not on master" ; \
+	fi
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts

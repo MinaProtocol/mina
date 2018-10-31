@@ -842,7 +842,7 @@ module Make_weierstrass_checked
     let sigma_count = (n + 1) / 2 in
     (* = ceil (n / 2.0) *)
     (* We implement a complicated optimzation so that in total
-       this costs roughly (1 + 3) * (n / 2) constaints, rather than
+       this costs roughly (1 + 3) * (n / 2) constraints, rather than
        the naive 4*n + 3*n. If scalars were represented with some
        kind of signed digit representation we could probably get it
        down to 2 * (n / 3) + 3 * (n / 3).

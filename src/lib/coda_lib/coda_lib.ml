@@ -486,9 +486,7 @@ module Make (Inputs : Inputs_intf) = struct
         (Ledger_builder_controller.Config.make ~parent_log:config.log
            ~net_deferred:(Ivar.read net_ivar)
            ~genesis_tip:
-             { ledger_builder=
-                 Ledger_builder.create ~ledger:Genesis.ledger
-                   ~self:(failwith "TODO deepthi")
+             { ledger_builder= Ledger_builder.create ~ledger:Genesis.ledger
              ; protocol_state= Genesis.state
              ; proof= Genesis.proof }
            ~consensus_local_state
