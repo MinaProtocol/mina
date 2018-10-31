@@ -23,22 +23,19 @@ percode = collections.Counter()
 fulldata = {}
 
 # parse the log
-lastline = ''  # init
+lastline = False  # init
 for line in fileinput.input():
     if 'Warning' in line:
         code=line.split()[1].replace(':','')
         percode[code] += 1
         percode['total'] += 1
-        try:
+        if lastline and '"' in lastline:
             myfile = lastline.split('"')[1]
-        except:
-            # Cannot parse line
-            continue
-        perfile[myfile] += 1
-        if myfile not in fulldata:  # init
-            fulldata[myfile] = collections.Counter()
-        fulldata[myfile][code] += 1
-        fulldata[myfile]['total'] += 1
+            perfile[myfile] += 1
+            if myfile not in fulldata:  # init
+                fulldata[myfile] = collections.Counter()
+            fulldata[myfile][code] += 1
+            fulldata[myfile]['total'] += 1
     lastline=line
 
 print '=' * 80

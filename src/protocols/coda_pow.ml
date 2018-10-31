@@ -484,8 +484,6 @@ module type Ledger_builder_base_intf = sig
 
   type ledger_proof
 
-  type public_key
-
   type ledger
 
   module Aux : sig
@@ -496,11 +494,10 @@ module type Ledger_builder_base_intf = sig
 
   val ledger : t -> ledger
 
-  val create : ledger:ledger -> self:public_key -> t
+  val create : ledger:ledger -> t
 
   val of_aux_and_ledger :
        snarked_ledger_hash:frozen_ledger_hash
-    -> public_key:public_key
     -> ledger:ledger
     -> aux:Aux.t
     -> t Or_error.t
@@ -539,6 +536,8 @@ module type Ledger_builder_intf = sig
 
   type completed_work
 
+  type public_key
+
   val ledger : t -> ledger
 
   val current_ledger_proof : t -> ledger_proof option
@@ -547,6 +546,7 @@ module type Ledger_builder_intf = sig
 
   val create_diff :
        t
+    -> self:public_key
     -> logger:Logger.t
     -> transactions_by_fee:payment_with_valid_signature Sequence.t
     -> get_completed_work:(statement -> completed_work option)
