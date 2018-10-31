@@ -9,7 +9,7 @@ MYUID = $(shell id -u)
 DOCKERNAME = codabuilder-$(MYUID)
 
 # Unique signature of kademlia coda tree
-KADEMLIA_SIG = $(shell find src/app/kademlia-haskell/ -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
+KADEMLIA_SIG = $(shell cd src/app/kademlia-haskell ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
 
 ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
@@ -92,9 +92,9 @@ docker-toolchain:
 
 # All in one step to build toolchain and binary for kademlia
 docker-toolchain-haskell:
-	@echo "Building toolchain/build" ;\
+	@echo "Building codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG)" ;\
     docker build --file dockerfiles/Dockerfile-toolchain-haskell --tag codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) . ;\
-    echo  'Extracting binary' ;\
+    echo  'Extracting deb package' ;\
     mkdir -p src/_build ;\
     docker run --rm --entrypoint cat codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) /src/coda-kademlia.deb > src/_build/coda-kademlia.deb
 

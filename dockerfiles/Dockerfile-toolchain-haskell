@@ -5,11 +5,11 @@ FROM nixos/nix:latest
 # Add OS tools
 RUN apk add patchelf dpkg tar
 
-# Nix for haskell for kademlia
+# Source tree nix-built haskell kademlia
 ADD /src/app/kademlia-haskell /src
 
-# Generate a unique signature for the code path
-RUN find /src/ -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ' > /tmp/sha1sig
+# Generate a unique signature for the source tree path
+RUN cd /src ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ' > /tmp/sha1sig ; cat /tmp/sha1sig
 
 # Build dependancies
 RUN cd /src/prefetch ; nix-build prefetch.nix
@@ -20,11 +20,9 @@ RUN cd /src ; nix-build release2.nix
 # Adjust elf headers (de-nix)
 RUN patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 /src/result/bin/kademlia
 
-# Deb creation
+# Deb staging
 RUN mkdir -p /src/build/usr/local/bin
 RUN cp /src/result/bin/kademlia /src/build//usr/local/bin/coda-kademlia
-
-# Replace control file HASH with signature
 RUN SIG=$(cat /tmp/sha1sig) ; sed -i "s/HASH/${SIG}/" /src/build/DEBIAN/control
 
 # Build and copy deb
