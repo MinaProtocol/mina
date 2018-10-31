@@ -228,7 +228,7 @@ let daemon (module Kernel : Kernel_intf) log =
          (Host_and_port.create ~host:ip ~port:discovery_port, external_port)
        in
        let keypair_of_file : string -> Signature_lib.Keypair.t = failwith "TODO" in
-       let propose_keypair =
+       let propose_keypair : Signature_lib.Keypair.t option =
          Option.map ~f:keypair_of_file propose_key
        in
        let%bind client_whitelist =
@@ -237,12 +237,14 @@ let daemon (module Kernel : Kernel_intf) log =
            [%of_sexp: Unix.Inet_addr.Blocking_sexp.t list]
          >>| Or_error.ok
        in
-       let module Config = struct
+       let module Config0 = struct
          let logger = log
 
          let conf_dir = conf_dir
 
          let lbc_tree_max_depth = `Finite 50
+
+         let propose_keypair = propose_keypair
 
          let genesis_proof = Precomputed_values.base_proof
 
@@ -254,11 +256,11 @@ let daemon (module Kernel : Kernel_intf) log =
        end in
        let%bind (module Init) =
          make_init ~should_propose:(Option.is_some propose_keypair)
-           (module Config)
+           (module Config0)
            (module Kernel)
        in
        let module M = Coda_main.Make_coda (Init) in
-       let module Run = Run (Config) (M) in
+       let module Run = Run (Config0) (M) in
        Async.Scheduler.report_long_cycle_times ~cutoff:(sec 0.5) () ;
        let%bind () =
          let open M in
@@ -295,7 +297,9 @@ let daemon (module Kernel : Kernel_intf) log =
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~time_controller:(Inputs.Time.Controller.create ())
-                ~propose_keypair () ~banlist)
+                ?propose_keypair:Config0.propose_keypair
+                ()
+                ~banlist)
          in
          let web_service = Web_pipe.get_service () in
          Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;

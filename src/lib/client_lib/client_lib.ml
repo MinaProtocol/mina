@@ -49,7 +49,7 @@ module Get_nonce = struct
 end
 
 module type Printable_intf = sig
-  type t [@@deriving yojson]
+  type t [@@deriving to_yojson]
 
   val to_text : t -> string
 end
@@ -151,9 +151,9 @@ module Status = struct
         ~propose_pubkey:(fun acc x ->
           match f x with
           | None ->
-              ("Proposer Running", "false" :: acc)
+              ("Proposer Running", "false") :: acc
           | Some pubkey ->
-              ("Proposer Running", Printf.sprintf !"%{sexp: Public_key.t}" pubkey :: acc)
+              ("Proposer Running", Printf.sprintf !"%{sexp: Public_key.t}" pubkey) :: acc
         )
       |> List.rev
     in

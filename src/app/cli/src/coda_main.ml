@@ -918,7 +918,7 @@ module type Main_intf = sig
   module Config : sig
     type t =
       { log: Logger.t
-      ; should_propose: bool
+      ; propose_keypair: Keypair.t option
       ; run_snark_worker: bool
       ; net_config: Inputs.Net.Config.t
       ; ledger_builder_persistant_location: string
@@ -926,7 +926,6 @@ module type Main_intf = sig
       ; snark_pool_disk_location: string
       ; ledger_builder_transition_backup_capacity: int [@default 10]
       ; time_controller: Inputs.Time.Controller.t
-      ; propose_keypair: Keypair.t option
       ; banlist: Banlist.t }
     [@@deriving make]
   end

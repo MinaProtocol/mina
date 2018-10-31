@@ -179,7 +179,7 @@ module Make (Kernel : Kernel_intf) = struct
         in
         let%bind coda =
           Main.create
-            (Main.Config.make ~log ~net_config ~should_propose
+            (Main.Config.make ~log ~net_config
                ~run_snark_worker:(Option.is_some snark_worker_config)
                ~ledger_builder_persistant_location:
                  (conf_temp_dir ^/ "ledger_builder")
