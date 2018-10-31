@@ -1,22 +1,31 @@
 FROM nixos/nix:latest
 
-#
 # Simple toolchain & build container that compiles and patches a kademlia binary for coda use
-#
 
-# Add patchelf tool
-RUN apk add patchelf
+# Add OS tools
+RUN apk add patchelf dpkg tar
 
 # Nix for haskell for kademlia
 ADD /src/app/kademlia-haskell /src
 
-# Fetch nix dependancies
+# Generate a unique signature for the code path
+RUN find /src/ -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ' > /tmp/sha1sig
+
+# Build dependancies
 RUN cd /src/prefetch ; nix-build prefetch.nix
 
-# Compile kademlia
+# Build kademlia
 RUN cd /src ; nix-build release2.nix
 
 # Adjust elf headers (de-nix)
 RUN patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 /src/result/bin/kademlia
 
-# FIXME: Get a recursive sha1 of src/app/kademlia-haskell to determine when/if we need to rebuild this....
+# Deb creation
+RUN mkdir -p /src/build/usr/local/bin
+RUN cp /src/result/bin/kademlia /src/build//usr/local/bin/coda-kademlia
+
+# Replace control file HASH with signature
+RUN SIG=$(cat /tmp/sha1sig) ; sed -i "s/HASH/${SIG}/" /src/build/DEBIAN/control
+
+# Build and copy deb
+RUN cd /src ; dpkg-deb --build /src/build ; cp /src/build.deb /src/coda-kademlia.deb

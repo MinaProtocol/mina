@@ -8,6 +8,9 @@ GITLONGHASH = $(shell git rev-parse HEAD)
 MYUID = $(shell id -u)
 DOCKERNAME = codabuilder-$(MYUID)
 
+# Unique signature of kademlia coda tree
+KADEMLIA_SIG = $(shell find src/app/kademlia-haskell/ -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
+
 ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
 endif
@@ -90,10 +93,10 @@ docker-toolchain:
 # All in one step to build toolchain and binary for kademlia
 docker-toolchain-haskell:
 	@echo "Building toolchain/build" ;\
-    docker build --file dockerfiles/Dockerfile-toolchain-haskell --tag codaprotocol/coda:toolchain-haskell-$(GITLONGHASH) . ;\
+    docker build --file dockerfiles/Dockerfile-toolchain-haskell --tag codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) . ;\
     echo  'Extracting binary' ;\
-    docker run --rm --entrypoint cat codaprotocol/coda:toolchain-haskell-$(GITLONGHASH)  /src/result/bin/kademlia > src/_build/coda-kademlia ;\
-    chmod +x src/_build/coda-kademlia
+    mkdir -p src/_build ;\
+    docker run --rm --entrypoint cat codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) /src/coda-kademlia.deb > src/_build/coda-kademlia.deb
 
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
