@@ -31,17 +31,17 @@ module Make_mock
     (Key : Hashable.S) (Value : sig
         type t
     end) :
-  Mock_intf with type t = Value.t Key.Table.t
+  Mock_intf
+  with type t = Value.t Key.Table.t
   with type key := Key.t
-   and type value := Value.t =
-struct
+   and type value := Value.t = struct
   type t = Value.t Key.Table.t
 
   let to_sexp t ~key_sexp ~value_sexp =
     Key.Table.to_alist t
     |> List.map ~f:(fun (key, value) ->
-           [%sexp_of : Sexp.t * Sexp.t] (key_sexp key, value_sexp value) )
-    |> [%sexp_of : Sexp.t list]
+           [%sexp_of: Sexp.t * Sexp.t] (key_sexp key, value_sexp value) )
+    |> [%sexp_of: Sexp.t list]
 
   let create ~directory:_ = Key.Table.create ()
 

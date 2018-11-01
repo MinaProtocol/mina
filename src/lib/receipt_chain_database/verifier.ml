@@ -9,8 +9,8 @@ struct
     | (proving_receipt, _) :: merkle_list ->
         let open Result.Let_syntax in
         let%bind derived_receipt_chain =
-          List.fold_result merkle_list ~init:proving_receipt ~f:
-            (fun prev_receipt (expected_receipt, transaction) ->
+          List.fold_result merkle_list ~init:proving_receipt
+            ~f:(fun prev_receipt (expected_receipt, transaction) ->
               let computed_receipt =
                 Receipt_chain_hash.cons transaction prev_receipt
               in

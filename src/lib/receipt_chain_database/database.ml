@@ -13,8 +13,7 @@ module Make
   Intf.Test.S
   with type receipt_chain_hash := Receipt_chain_hash.t
    and type transaction := Transaction.t
-   and type database := Key_value_db.t =
-struct
+   and type database := Key_value_db.t = struct
   type t = Key_value_db.t
 
   let create ~directory = Key_value_db.create ~directory
@@ -50,7 +49,7 @@ struct
     Key_value_db.get t ~key:receipt
     |> Option.bind ~f:(function Root -> None | Child {value; _} -> Some value)
 
-  let add t ~previous (transaction: Transaction.t) =
+  let add t ~previous (transaction : Transaction.t) =
     let payload = Transaction.payload transaction in
     let receipt_chain_hash = Receipt_chain_hash.cons payload previous in
     let node, status =
@@ -60,15 +59,15 @@ struct
           ( Some (Tree_node.Child {parent= previous; value= transaction})
           , `Ok receipt_chain_hash )
         ~f:(function
-            | Root ->
+          | Root ->
+              ( Some (Child {parent= previous; value= transaction})
+              , `Duplicate receipt_chain_hash )
+          | Child {parent= retrieved_parent; _} ->
+              if not (Receipt_chain_hash.equal previous retrieved_parent) then
+                (None, `Error_multiple_previous_receipts retrieved_parent)
+              else
                 ( Some (Child {parent= previous; value= transaction})
-                , `Duplicate receipt_chain_hash )
-            | Child {parent= retrieved_parent; _} ->
-                if not (Receipt_chain_hash.equal previous retrieved_parent)
-                then (None, `Error_multiple_previous_receipts retrieved_parent)
-                else
-                  ( Some (Child {parent= previous; value= transaction})
-                  , `Duplicate receipt_chain_hash ))
+                , `Duplicate receipt_chain_hash ))
     in
     Option.iter node ~f:(function node ->
         Key_value_db.set t ~key:receipt_chain_hash ~data:node ) ;
@@ -92,11 +91,12 @@ let%test_module "receipt_database" =
 
       let empty = ""
 
-      let cons (payload: Transaction.t) t = String.of_char payload ^ t
+      let cons (payload : Transaction.t) t = String.of_char payload ^ t
     end
 
     module Key_value_db =
-      Key_value_database.Make_mock (Receipt_chain_hash)
+      Key_value_database.Make_mock
+        (Receipt_chain_hash)
         (struct
           type t = (Receipt_chain_hash.t, Transaction.t) Tree_node.t
           [@@deriving sexp]
@@ -106,8 +106,8 @@ let%test_module "receipt_database" =
     module Verifier = Verifier.Make (Transaction) (Receipt_chain_hash)
 
     let populate_random_path ~db transactions initial_receipt_hash =
-      List.fold transactions ~init:[initial_receipt_hash] ~f:
-        (fun current_leaves transaction ->
+      List.fold transactions ~init:[initial_receipt_hash]
+        ~f:(fun current_leaves transaction ->
           let selected_forked_node = List.random_element_exn current_leaves in
           match
             Receipt_db.add db ~previous:selected_forked_node transaction
@@ -122,14 +122,14 @@ let%test_module "receipt_database" =
                    merkle list from the first transaction to the last \
                    transaction" =
       Quickcheck.test
-        ~sexp_of:[%sexp_of : Receipt_chain_hash.t * Transaction.t list]
+        ~sexp_of:[%sexp_of: Receipt_chain_hash.t * Transaction.t list]
         Quickcheck.Generator.(
           tuple2 Receipt_chain_hash.gen (list_non_empty Transaction.gen))
         ~f:(fun (initial_receipt_chain, transactions) ->
           let db = Receipt_db.create ~directory:"" in
           let _, expected_merkle_path =
-            List.fold_map transactions ~init:initial_receipt_chain ~f:
-              (fun prev_receipt_chain transaction ->
+            List.fold_map transactions ~init:initial_receipt_chain
+              ~f:(fun prev_receipt_chain transaction ->
                 match
                   Receipt_db.add db ~previous:prev_receipt_chain transaction
                 with
@@ -145,7 +145,7 @@ let%test_module "receipt_database" =
             ( List.hd_exn expected_merkle_path
             , List.last_exn expected_merkle_path )
           in
-          [%test_result : (Receipt_chain_hash.t * Transaction.t) List.t]
+          [%test_result: (Receipt_chain_hash.t * Transaction.t) List.t]
             ~message:"Merkle paths should be equal"
             ~expect:expected_merkle_path
             ( Receipt_db.prove db ~proving_receipt ~resulting_receipt
@@ -155,8 +155,7 @@ let%test_module "receipt_database" =
                    tree of transactions" =
       Quickcheck.test
         ~sexp_of:
-          [%sexp_of
-            : Receipt_chain_hash.t * Transaction.t * Transaction.t list]
+          [%sexp_of: Receipt_chain_hash.t * Transaction.t * Transaction.t list]
         Quickcheck.Generator.(
           tuple3 Receipt_chain_hash.gen Transaction.gen
             (list_non_empty Transaction.gen))
@@ -197,8 +196,7 @@ let%test_module "receipt_database" =
                    not exist in the database" =
       Quickcheck.test
         ~sexp_of:
-          [%sexp_of
-            : Receipt_chain_hash.t * Transaction.t * Transaction.t list]
+          [%sexp_of: Receipt_chain_hash.t * Transaction.t * Transaction.t list]
         Quickcheck.Generator.(
           tuple3 Receipt_chain_hash.gen Transaction.gen
             (list_non_empty Transaction.gen))
