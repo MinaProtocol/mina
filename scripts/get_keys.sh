@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euxo pipefail
 
+if [[ $CIRCLE_BRANCH == 'master' ]]; then
+
 # script to use in ci to pull down current proving and verificaiton keys
 # uses exising circleci GC creds
 # run as sudo
@@ -30,3 +32,5 @@ PINNED_KEY_COMMIT=c92e84c97abc239feb54b758de6cde98b9a6ef58
 mkdir -p /var/lib/coda
 cd /var/lib/coda
 tar --strip-components=2 -xvf /tmp/keys-$PINNED_KEY_COMMIT.tar.bz2
+
+fi

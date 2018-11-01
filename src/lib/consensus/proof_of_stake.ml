@@ -873,11 +873,12 @@ module Make (Inputs : Inputs_intf) :
     let update ~(previous_consensus_state : value)
         ~(consensus_transition_data : Consensus_transition_data.value)
         ~(previous_protocol_state_hash : Coda_base.State_hash.t)
+        ~(supply_increase : Currency.Amount.t)
         ~(ledger_hash : Coda_base.Frozen_ledger_hash.t) : value Or_error.t =
       let open Or_error.Let_syntax in
       let open Consensus_transition_data in
       let%map total_currency =
-        Amount.add previous_consensus_state.total_currency Inputs.coinbase
+        Amount.add previous_consensus_state.total_currency supply_increase
         |> Option.map ~f:Or_error.return
         |> Option.value
              ~default:(Or_error.error_string "failed to add total_currency")
@@ -958,7 +959,7 @@ module Make (Inputs : Inputs_intf) :
   (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
   let generate_transition ~(previous_protocol_state : Protocol_state.value)
       ~blockchain_state ~local_state ~time ~keypair ~transactions:_ ~ledger
-      ~logger =
+      ~supply_increase ~logger =
     let open Consensus_state in
     let open Epoch_data in
     let open Keypair in
@@ -989,6 +990,7 @@ module Make (Inputs : Inputs_intf) :
            ~consensus_transition_data
            ~previous_protocol_state_hash:
              (Protocol_state.hash previous_protocol_state)
+           ~supply_increase
            ~ledger_hash:
              ( Coda_base.Ledger.merkle_root ledger
              |> Coda_base.Frozen_ledger_hash.of_ledger_hash ))
@@ -1136,6 +1138,7 @@ module Make (Inputs : Inputs_intf) :
              Protocol_state.(consensus_state negative_one)
            ~previous_protocol_state_hash:Protocol_state.(hash negative_one)
            ~consensus_transition_data:Snark_transition.(consensus_data genesis)
+           ~supply_increase:Currency.Amount.zero
            ~ledger_hash:genesis_ledger_hash)
     in
     Protocol_state.create_value

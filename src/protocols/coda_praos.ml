@@ -75,7 +75,7 @@ module type Ledger_intf = sig
   val lookup : t -> key -> amount
 end
 
-module type Transaction_intf = sig
+module type Payment_intf = sig
   type t [@@deriving sexp, compare, eq]
 
   module With_valid_signature : sig
@@ -260,7 +260,7 @@ end
 module type Inputs_intf = sig
   module Time : Time_intf
 
-  module Transaction : Transaction_intf
+  module Payment : Payment_intf
 
   module Ledger_hash : Ledger_hash_intf
 
