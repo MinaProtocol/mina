@@ -746,8 +746,6 @@ module Make_coda (Init : Init_intf) = struct
   module Prover = Init.Prover
   include Coda_lib.Make (Inputs)
 
-  let snark_worker_command_name = Snark_worker_lib.Prod.command_name
-
   let request_work t =
     Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
       ~snark_pool t (snark_work_fee t)
