@@ -171,123 +171,8 @@ let status_clear_hist =
          dispatch Clear_hist_status.rpc () port >>| print (module Status) json
      ))
 
-let handle_open ~mkdir ~(f : string -> 'a Deferred.t) path : 'a Deferred.t =
-  let open Unix.Error in
-  let dn = Filename.dirname path in
-  let%bind parent_exists =
-    match%bind
-      Monitor.try_with ~extract_exn:true (fun () ->
-          let%bind stat = Unix.stat dn in
-          if stat.kind <> `Directory then (
-            eprintf
-              "Error: %s exists and is not a directory, can't store keys there\n"
-              dn ;
-            exit 1 )
-          else return true )
-    with
-    | Ok x -> return x
-    | Error (Unix.Unix_error (ENOENT, _, _)) -> return false
-    | Error (Unix.Unix_error (e, _, _)) ->
-        eprintf "Error: could not stat %s: %s, not making keys\n" dn
-          (message e) ;
-        exit 1
-    | Error e -> raise e
-  in
-  let%bind () =
-    match%bind
-      Monitor.try_with ~extract_exn:true (fun () ->
-          if (not parent_exists) && mkdir then
-            let%bind () = Unix.mkdir ~p:() dn in
-            Unix.chmod dn 0o700
-          else if not parent_exists then (
-            eprintf
-              "Error: %s does not exist\nHint: mkdir -p %s; chmod 700 %s\n" dn
-              dn dn ;
-            exit 1 )
-          else Deferred.unit )
-    with
-    | Ok x -> return x
-    | Error (Unix.Unix_error ((EACCES as e), _, _)) ->
-        eprintf "Error: could not mkdir -p %s: %s\n" dn (message e) ;
-        exit 1
-    | Error e -> raise e
-  in
-  match%bind Monitor.try_with ~extract_exn:true (fun () -> f path) with
-  | Ok x -> return x
-  | Error (Unix.Unix_error (e, _, _)) ->
-      eprintf "Error: could not open %s: %s\n" path (message e) ;
-      exit 1
-  | Error e -> raise e
-
-let write_keypair {Keypair.private_key; public_key; _} privkey_path
-    ~(password : unit -> Bytes.t Deferred.t) =
-  let%bind privkey_f =
-    handle_open ~mkdir:true ~f:Writer.open_file privkey_path
-  in
-  let%bind pubkey_f =
-    handle_open ~mkdir:false ~f:Writer.open_file (privkey_path ^ ".pub")
-  in
-  let%bind password = password () in
-  let sb =
-    Secret_box.encrypt
-      ~plaintext:(Private_key.to_bigstring private_key |> Bigstring.to_bytes)
-      ~password
-  in
-  let sb =
-    Secret_box.to_yojson sb |> Yojson.Safe.to_string |> Bytes.of_string
-  in
-  Writer.write_bytes privkey_f sb ;
-  let%bind () = Writer.close privkey_f in
-  let%bind () = Unix.chmod privkey_path ~perm:0o600 in
-  let pubkey_bytes =
-    Public_key.Compressed.to_base64 (Public_key.compress public_key)
-    |> Bytes.of_string
-  in
-  Writer.write_bytes pubkey_f pubkey_bytes ;
-  let%bind () = Writer.close pubkey_f in
-  Deferred.unit
-
-let read_keypair_exn privkey_path ~(password : unit -> Bytes.t Deferred.t) =
-  let open Deferred.Let_syntax in
-  let read_all r =
-    Pipe.to_list (Reader.lines r) >>| fun ss -> String.concat ~sep:"\n" ss
-  in
-  let%bind privkey_file =
-    handle_open ~mkdir:false ~f:Reader.open_file privkey_path
-  in
-  let%bind file_contents = read_all privkey_file in
-  let%bind sb =
-    match Secret_box.of_yojson (Yojson.Safe.from_string file_contents) with
-    | Ok sb -> return sb
-    | Error e ->
-        eprintf "Error parsing %s, is your keyfile corrupt?: %s\n" privkey_path
-          e ;
-        exit 1
-  in
-  let%bind password = password () in
-  let%bind pk =
-    match Secret_box.decrypt ~password sb with
-    | Ok pk_bytes -> (
-      try
-        pk_bytes |> Bigstring.of_bytes |> Private_key.of_bigstring_exn
-        |> return
-      with exn ->
-        eprintf
-          "Error parsing decrypted private key, is your keyfile corrupt?: %s\n"
-          (Exn.to_string exn) ;
-        exit 1 )
-    | Error e ->
-        eprintf "Error decrypting %s: %s\n" privkey_path
-          (Error.to_string_hum e) ;
-        exit 1
-  in
-  try return @@ Keypair.of_private_key_exn pk with exn ->
-    eprintf
-      "Error computing public key from private, is your keyfile corrupt?: %s\n"
-      (Exn.to_string exn) ;
-    exit 1
-
 let rec prompt_password prompt =
+  let open Deferred.Or_error.Let_syntax in
   let%bind pw1 = read_password_exn prompt in
   let%bind pw2 = read_password_exn "Again to confirm: " in
   if not (Bytes.equal pw1 pw2) then (
@@ -305,28 +190,6 @@ let privkey_read_path_flag =
   let open Command.Param in
   flag "privkey-path" ~doc:"FILE File to read private key from" (required file)
 
-let read_keypair from_account =
-  let open Deferred.Let_syntax in
-  let perm_error = ref false in
-  let%bind st = handle_open ~mkdir:false ~f:Unix.stat from_account in
-  if st.perm land 0o077 <> 0 then (
-    eprintf
-      "Error: insecure permissions on `%s`. They should be 0600, they are %o\n\
-       Hint: chmod 600 %s\n"
-      from_account (st.perm land 0o777) from_account ;
-    perm_error := true ) ;
-  let dn = Filename.dirname from_account in
-  let%bind st = handle_open ~mkdir:false ~f:Unix.stat dn in
-  if st.perm land 0o777 <> 0o700 then (
-    eprintf
-      "Error: insecure permissions on `%s`. They should be 0700, they are %o\n\
-       Hint: chmod 700 %s\n"
-      dn (st.perm land 0o777) dn ;
-    perm_error := true ) ;
-  let%bind () = if !perm_error then exit 1 else Deferred.unit in
-  read_keypair_exn from_account ~password:(fun () ->
-      read_password_exn "Private key password: " )
-
 let get_nonce_exn public_key port =
   match%bind get_nonce public_key port with
   | Error e ->
@@ -342,6 +205,10 @@ let dispatch_with_message rpc arg port ~success ~error =
   | Error e ->
       eprintf "%s\n" (error e) ;
       exit 1
+
+let read_keypair path =
+  read_keypair_exn ~privkey_path:path
+    ~password:(lazy (read_password_exn "Secret key password: "))
 
 let batch_send_payments =
   let module Payment_info = struct
@@ -447,10 +314,13 @@ let wrap_key =
       let%bind privkey =
         hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
       in
-      let pk = Private_key.of_base64_exn (Bytes.to_string privkey) in
+      let pk =
+        Private_key.of_base64_exn
+          (privkey |> Or_error.ok_exn |> Bytes.to_string)
+      in
       let kp = Keypair.of_private_key_exn pk in
-      write_keypair kp privkey_path ~password:(fun () ->
-          prompt_password "Password for new private key file: " ))
+      write_keypair_exn kp ~privkey_path
+        ~password:(lazy (prompt_password "Password for new private key file: ")))
 
 let dump_keypair =
   Command.async ~summary:"Print out a keypair from a private key file"
@@ -459,8 +329,8 @@ let dump_keypair =
     fun () ->
       let open Deferred.Let_syntax in
       let%map kp =
-        read_keypair_exn privkey_path ~password:(fun () ->
-            read_password_exn "Password for private key file: " )
+        read_keypair_exn ~privkey_path
+          ~password:(lazy (read_password_exn "Password for private key file: "))
       in
       printf "Public key: %s\nPrivate key: %s\n"
         ( kp.public_key |> Public_key.compress
@@ -475,8 +345,9 @@ let generate_keypair =
       let open Deferred.Let_syntax in
       let kp = Keypair.create () in
       let%bind () =
-        write_keypair kp privkey_path ~password:(fun () ->
-            prompt_password "Password for new private key file: " )
+        write_keypair_exn kp ~privkey_path
+          ~password:
+            (lazy (prompt_password "Password for new private key file: "))
       in
       printf "Public key: %s\n"
         ( kp.public_key |> Public_key.compress
