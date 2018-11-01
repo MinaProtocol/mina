@@ -14,7 +14,7 @@ end)
   open Impl
 
   module Digest : sig
-    type t = string [@@deriving sexp, bin_io, eq, compare, hash]
+    type t [@@deriving sexp, bin_io, eq, compare, hash]
 
     type var = Boolean.var list
 
@@ -29,6 +29,12 @@ end)
     val var_of_t : t -> var
 
     val to_bits : t -> bool list
+
+    val to_string : t -> string
+
+    val of_string : string -> t
+
+    val of_bits : bool list -> t
   end
 
   module Block : sig
@@ -110,6 +116,10 @@ end = struct
     let to_bits s =
       List.init length_in_bits ~f:(fun i ->
           (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1 )
+
+    let to_string = Fn.id
+
+    let of_string = Fn.id
 
     let of_bits =
       let nearest_multiple ~of_:n k =

@@ -61,7 +61,7 @@ module Make (Kernel : Kernel_intf) = struct
   let send_transaction_exn (conn, proc, _) sk pk amount fee memo =
     Coda_worker.Connection.run_exn conn
       ~f:Coda_worker.functions.send_transaction
-      ~arg:(sk, pk, amount, fee, Sha256_lib.Sha256.digest_string memo)
+      ~arg:(sk, pk, amount, fee, memo)
 
   let strongest_ledgers_exn (conn, proc, _) =
     let%map r =

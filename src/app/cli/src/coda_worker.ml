@@ -35,7 +35,7 @@ module Make (Kernel : Kernel_intf) = struct
       * Public_key.Compressed.t
       * Currency.Amount.t
       * Currency.Fee.t
-      * string
+      * Sha256_lib.Sha256.Digest.t
     [@@deriving bin_io]
   end
 
@@ -206,11 +206,7 @@ module Make (Kernel : Kernel_intf) = struct
               Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn
             in
             let payload : Transaction.Payload.t =
-              { receiver= receiver_pk
-              ; amount
-              ; fee
-              ; nonce
-              ; memo= Sha256_lib.Sha256.digest_string memo }
+              {receiver= receiver_pk; amount; fee; nonce; memo}
             in
             Transaction.sign (Keypair.of_private_key_exn sender_sk) payload
           in

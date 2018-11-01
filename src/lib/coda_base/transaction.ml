@@ -75,7 +75,6 @@ let gen ~keys ~max_amount ~max_fee =
     ; amount
     ; nonce= Account_nonce.zero
     ; memo= Sha256_lib.Sha256.digest_string memo }
-    (*TODO*)
   in
   sign sender payload
 

@@ -390,7 +390,7 @@ let batch_send_txns =
               ; amount
               ; fee
               ; nonce
-              ; memo= Sha256_lib.Sha256.digest_string "" } ) )
+              ; memo= Sha256_lib.Sha256.dummy } ) )
     in
     dispatch_with_message Client_lib.Send_transactions.rpc
       (ts :> Transaction.t list)
@@ -434,7 +434,7 @@ let send_txn =
            ; amount
            ; fee
            ; nonce
-           ; memo= Sha256_lib.Sha256.digest_string "" }
+           ; memo= Sha256_lib.Sha256.dummy }
          in
          let txn = Transaction.sign sender_kp payload in
          dispatch_with_message Client_lib.Send_transactions.rpc

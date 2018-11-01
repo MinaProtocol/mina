@@ -30,7 +30,7 @@ let create_ledger_and_transactions num_transitions =
       ; fee
       ; amount
       ; nonce
-      ; memo= Sha256_lib.Sha256.digest_string "" }
+      ; memo= Sha256_lib.Sha256.dummy }
     in
     Transaction.sign from_kp payload
   in

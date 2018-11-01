@@ -18,6 +18,8 @@ module Gadget =
     (Tick)
     (Tick_backend)
 
+module Digest = Gadget.Digest
+
 let pad zero bits =
   let nearest_multiple ~of_:n k =
     let r = k mod n in
@@ -42,22 +44,24 @@ let words_to_bits ws =
   in
   go (Array.length ws - 1) []
 
-let digest_string t =
+let dummy = Digest.of_string @@ String.init 256 ~f:(fun _ -> '\000')
+
+let digest_string (s : string) : Digest.t =
   (*TODO large strings might throw out of memory*)
-  let n = String.length t in
+  let n = String.length s in
   let block_length = Gadget.Block.length_in_bits / 8 in
   let r = n mod block_length in
   let t =
-    if r = 0 then t else t ^ String.init ~f:(fun _ -> '\000') (block_length - r)
+    if r = 0 then s else s ^ String.init ~f:(fun _ -> '\000') (block_length - r)
   in
-  bits_to_string (Digestif.SHA256.(feed_string (init ()) t).h |> words_to_bits)
+  Digest.of_string
+  @@ bits_to_string
+       (Digestif.SHA256.(feed_string (init ()) t).h |> words_to_bits)
 
-let digest_bits (bits : bool list) =
-  bits_to_string
-    ( Digestif.SHA256.(feed_string (init ()) (bits_to_string (pad false bits)))
-        .h |> words_to_bits )
-
-module Digest = Gadget.Digest
+let digest_bits (bits : bool list) : Digest.t =
+  Digest.of_bits
+  @@ ( Digestif.SHA256.(feed_string (init ()) (bits_to_string (pad false bits)))
+         .h |> words_to_bits )
 
 module Checked = struct
   open Tick
@@ -89,9 +93,11 @@ let%test_unit "sha-checked-and-unchecked" =
       in
       let native_string = digest_string (bits_to_string bits) in
       let native_bits = digest_bits bits in
-      if not ([%eq: string] from_gadget native_string) then
-        failwithf "%s <> %s (on input %s)" from_gadget native_string
-          (bits_to_string bits) ()
-      else if not ([%eq: string] from_gadget native_bits) then
-        failwithf "%s <> %s (on input %s)" from_gadget native_bits
-          (bits_to_string bits) () )
+      if not ([%eq: Digest.t] from_gadget native_string) then
+        failwithf
+          !"%{sexp: Digest.t} <> %{sexp: Digest.t} (on input %s)"
+          from_gadget native_string (bits_to_string bits) ()
+      else if not ([%eq: Digest.t] from_gadget native_bits) then
+        failwithf
+          !"%{sexp: Digest.t} <> %{sexp: Digest.t} (on input %s)"
+          from_gadget native_bits (bits_to_string bits) () )

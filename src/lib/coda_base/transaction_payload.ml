@@ -32,9 +32,7 @@ let dummy =
   ; amount= Amount.zero
   ; fee= Fee.zero
   ; nonce= Account_nonce.zero
-  ; memo= Sha256.digest_string "" }
-
-(*TODO*)
+  ; memo= Sha256.dummy }
 
 type var =
   ( Public_key.Compressed.var
@@ -99,10 +97,8 @@ let gen =
   and amount = Amount.gen
   and fee = Fee.gen
   and nonce = Account_nonce.gen
-  and memo =
-    String.gen_with_length (Sha256.Digest.length_in_bits / 8) Char.gen
-  in
-  {receiver; amount; fee; nonce; memo}
+  and memo = String.gen in
+  {receiver; amount; fee; nonce; memo= Sha256_lib.Sha256.digest_string memo}
 
 let%test_unit "to_bits" =
   let open Test_util in

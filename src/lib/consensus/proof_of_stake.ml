@@ -702,7 +702,8 @@ module Make (Inputs : Inputs_intf) :
     let genesis =
       { epoch= Epoch.zero
       ; slot= Epoch.Slot.zero
-      ; proposer_vrf_result= String.init 256 ~f:(fun _ -> '\000') }
+      ; proposer_vrf_result=
+          Sha256.Digest.of_string @@ String.init 256 ~f:(fun _ -> '\000') }
 
     let to_hlist {epoch; slot; proposer_vrf_result} =
       Coda_base.H_list.[epoch; slot; proposer_vrf_result]

@@ -1523,7 +1523,7 @@ let%test_module "transaction_snark" =
         ; fee
         ; amount= Amount.of_int amt
         ; nonce
-        ; memo= Sha256_lib.Sha256.digest_string memo }
+        ; memo }
       in
       let signature = Schnorr.sign sender.private_key payload in
       Transaction.check
