@@ -151,10 +151,10 @@ Whenever a type is serializable, it's important for us to maintain backwards com
 <a name="quickcheck-gen"></a>
 ### Property based tests
 
-[Core](https://opensource.janestreet.com/core/) has an implementation of [QuickCheck](https://blog.janestreet.com/quickcheck-for-core/) that we use whenever we can in unit tests. Here is an example signature for a `Quickcheck.Generator.t` of transactions.
+[Core](https://opensource.janestreet.com/core/) has an implementation of [QuickCheck](https://blog.janestreet.com/quickcheck-for-core/) that we use whenever we can in unit tests. Here is an example signature for a `Quickcheck.Generator.t` of payments.
 
 ```ocaml
-(* Generate a single transaction between
+(* Generate a single payment between
  * $a, b \in keys$
  * for fee $\in [0,max_fee]$
  * and an amount $\in [1,max_amount]$
@@ -171,11 +171,11 @@ val gen :
 ### Typesafe invariants (help with naming this section)
 
 Often times in Coda, we need to perform very important checks on certain pieces of data.
-For example, we need to confirm that the signature is valid on a transaction we recieve over the network.
+For example, we need to confirm that the signature is valid on a payment we recieve over the network.
 Such checks can be expensive, so we only want to do them once, but we want to remember that we've done them.
 
 ```ocaml
-(* inside transaction.mli *)
+(* inside payment.mli *)
 
 module With_valid_signature : sig
   type nonrec t = private t [@@deriving sexp, eq]
@@ -186,7 +186,7 @@ end
 val check : t -> With_valid_signature.t option
 ```
 
-Here we define `With_valid_signature` (usage will be `Transaction.With_valid_signature.t`) using `type nonrec t = private t` to allow upcasting to a `Transaction.t`, but prevent downcasting. The _only_ way to turn a `Transaction.t` into a `Transaction.With_valid_signature.t` is to `check` it. Now the compiler will catch our mistakes.
+Here we define `With_valid_signature` (usage will be `Payment.With_valid_signature.t`) using `type nonrec t = private t` to allow upcasting to a `Payment.t`, but prevent downcasting. The _only_ way to turn a `Payment.t` into a `Payment.With_valid_signature.t` is to `check` it. Now the compiler will catch our mistakes.
 
 <a name="unit-tests"></a>
 ### Unit Tests

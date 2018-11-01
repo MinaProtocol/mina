@@ -42,8 +42,8 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
     let rec go i =
       let%bind () = after (Time.Span.of_sec 1.) in
       let%bind () =
-        Coda_worker_testnet.Api.send_transaction testnet 0 sender_sk
-          receiver_pk send_amount fee
+        Coda_worker_testnet.Api.send_payment testnet 0 sender_sk receiver_pk
+          send_amount fee
       in
       if i > 0 then go (i - 1) else return ()
     in
