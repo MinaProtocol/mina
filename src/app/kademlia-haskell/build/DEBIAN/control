@@ -3,6 +3,8 @@ Version: 0.1.HASH
 Section: base
 Priority: optional
 Architecture: amd64
-Maintainer: O1Labs <build@o1labs.org>
+License: BSD 3-Clause
+Homepage: https://codaprotocol.com/
+Maintainer: o(1)Labs <build@o1labs.org>
 Description: Coda Protocol Kadelima Tool
- Coda Protocol Kademlia Tool
+ Coda Protocol Kademlia Utility
