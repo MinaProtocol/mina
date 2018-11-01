@@ -206,9 +206,20 @@ let dispatch_with_message rpc arg port ~success ~error =
       eprintf "%s\n" (error e) ;
       exit 1
 
+let handle_exception_nicely (type a) (f : unit -> a Deferred.t) () :
+    a Deferred.t =
+  match%bind Deferred.Or_error.try_with ~extract_exn:true f with
+  | Ok e -> return e
+  | Error e ->
+      eprintf "Error: %s" (Error.to_string_hum e) ;
+      exit 1
+
 let read_keypair path =
-  read_keypair_exn ~privkey_path:path
-    ~password:(lazy (read_password_exn "Secret key password: "))
+  handle_exception_nicely
+    (fun () ->
+      read_keypair_exn ~privkey_path:path
+        ~password:(lazy (read_password_exn "Secret key password: ")) )
+    ()
 
 let batch_send_txns =
   let module Transaction_info = struct
@@ -311,50 +322,49 @@ let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
     (let open Command.Let_syntax in
     let%map_open privkey_path = privkey_path_flag in
-    fun () ->
-      let open Deferred.Let_syntax in
-      let%bind privkey =
-        hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
-      in
-      let pk =
-        Private_key.of_base64_exn
-          (privkey |> Or_error.ok_exn |> Bytes.to_string)
-      in
-      let kp = Keypair.of_private_key_exn pk in
-      write_keypair_exn kp ~privkey_path
-        ~password:(lazy (prompt_password "Password for new private key file: ")))
+    handle_exception_nicely
+    @@ fun () ->
+    let open Deferred.Let_syntax in
+    let%bind privkey =
+      hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
+    in
+    let pk =
+      Private_key.of_base64_exn (privkey |> Or_error.ok_exn |> Bytes.to_string)
+    in
+    let kp = Keypair.of_private_key_exn pk in
+    write_keypair_exn kp ~privkey_path
+      ~password:(lazy (prompt_password "Password for new private key file: ")))
 
 let dump_keypair =
   Command.async ~summary:"Print out a keypair from a private key file"
     (let open Command.Let_syntax in
     let%map_open privkey_path = privkey_read_path_flag in
-    fun () ->
-      let open Deferred.Let_syntax in
-      let%map kp =
-        read_keypair_exn ~privkey_path
-          ~password:(lazy (read_password_exn "Password for private key file: "))
-      in
-      printf "Public key: %s\nPrivate key: %s\n"
-        ( kp.public_key |> Public_key.compress
-        |> Public_key.Compressed.to_base64 )
-        (kp.private_key |> Private_key.to_base64))
+    handle_exception_nicely
+    @@ fun () ->
+    let open Deferred.Let_syntax in
+    let%map kp =
+      read_keypair_exn ~privkey_path
+        ~password:(lazy (read_password_exn "Password for private key file: "))
+    in
+    printf "Public key: %s\nPrivate key: %s\n"
+      (kp.public_key |> Public_key.compress |> Public_key.Compressed.to_base64)
+      (kp.private_key |> Private_key.to_base64))
 
 let generate_keypair =
   Command.async ~summary:"Generate a new public-key/private-key pair"
     (let open Command.Let_syntax in
     let%map_open privkey_path = privkey_path_flag in
-    fun () ->
-      let open Deferred.Let_syntax in
-      let kp = Keypair.create () in
-      let%bind () =
-        write_keypair_exn kp ~privkey_path
-          ~password:
-            (lazy (prompt_password "Password for new private key file: "))
-      in
-      printf "Public key: %s\n"
-        ( kp.public_key |> Public_key.compress
-        |> Public_key.Compressed.to_base64 ) ;
-      exit 0)
+    handle_exception_nicely
+    @@ fun () ->
+    let open Deferred.Let_syntax in
+    let kp = Keypair.create () in
+    let%bind () =
+      write_keypair_exn kp ~privkey_path
+        ~password:(lazy (prompt_password "Password for new private key file: "))
+    in
+    printf "Public key: %s\n"
+      (kp.public_key |> Public_key.compress |> Public_key.Compressed.to_base64) ;
+    exit 0)
 
 let dump_ledger =
   let lb_hash =
