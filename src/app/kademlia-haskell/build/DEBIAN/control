@@ -1,5 +1,5 @@
 Package: coda-kademlia
-Version: 0.1.HASH
+Version: 0.1.DATE-HASH
 Section: base
 Priority: optional
 Architecture: amd64
