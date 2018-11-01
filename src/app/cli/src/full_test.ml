@@ -74,7 +74,6 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
         ; me= (Host_and_port.of_string "127.0.0.1:8001", 8000)
         ; banlist } }
   in
-  let snarking_fee = Currency.Fee.of_int 0 in
   let%bind coda =
     Main.create
       (Main.Config.make ~log ~net_config ~should_propose:should_propose_bool
@@ -83,7 +82,7 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
          ~transaction_pool_disk_location:(temp_conf_dir ^/ "transaction_pool")
          ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
          ~time_controller:(Inputs.Time.Controller.create ())
-         ~keypair () ~banlist ~snarking_fee)
+         ~keypair () ~banlist ~snark_work_fee:(Currency.Fee.of_int 0))
   in
   don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers coda)) ;
   let wait_until_cond ~(f : t -> bool) ~(timeout : Float.t) =

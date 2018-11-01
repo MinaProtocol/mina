@@ -1,7 +1,7 @@
 open Core_kernel
 open Async
 
-module type For_tests = sig
+module type For_tests_intf = sig
   type work
 
   type snark_pool
@@ -17,7 +17,7 @@ end
 module type Work_selector_with_tests_intf = sig
   include Protocols.Coda_pow.Work_selector_intf
 
-  include For_tests
+  include For_tests_intf
           with type work := work
            and type snark_pool := snark_pool
            and type fee := fee

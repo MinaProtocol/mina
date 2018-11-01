@@ -680,7 +680,6 @@ struct
     end
   end)
 
-  (* let remove_cheap_jobs = Work_selector.Work_lib. *)
   module Work_selector_inputs = struct
     module Ledger_proof_statement = Ledger_proof_statement
     module Sparse_ledger = Sparse_ledger
@@ -755,7 +754,7 @@ module Make_coda (Init : Init_intf) = struct
 
   let request_work t =
     Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
-      ~snark_pool t (snarking_fee t)
+      ~snark_pool t (snark_work_fee t)
 end
 
 [%%else]
@@ -778,7 +777,7 @@ module Make_coda (Init : Init_intf) = struct
 
   let request_work t =
     Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
-      ~snark_pool t t.snarking_fee
+      ~snark_pool t t.snark_work_fee
 end
 
 [%%endif]
@@ -920,7 +919,7 @@ module type Main_intf = sig
       ; time_controller: Inputs.Time.Controller.t
       ; keypair: Keypair.t
       ; banlist: Banlist.t
-      ; snarking_fee: Currency.Fee.t }
+      ; snark_work_fee: Currency.Fee.t }
     [@@deriving make]
   end
 
