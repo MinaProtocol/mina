@@ -172,21 +172,18 @@ module type Config_intf = sig
   val work_selection : Protocols.Coda_pow.Work_selection.t
 end
 
-module type Work_selector_F = functor (Inputs :
-  Work_selector.Inputs.Inputs_intf) -> Protocols.Coda_pow.Work_selector_intf
-                                       with type ledger_builder :=
-                                                   Inputs.Ledger_builder.t
-                                        and type work :=
-                                                   ( Inputs.
-                                                     Ledger_proof_statement.t
-                                                   , Inputs.Super_transaction.t
-                                                   , Inputs.Sparse_ledger.t
-                                                   , Inputs.Ledger_proof.t )
-                                                   Snark_work_lib.Work.Single.
-                                                   Spec.t
-                                        and type snark_pool :=
-                                                   Inputs.Snark_pool.t
-                                        and type fee := Inputs.Fee.t
+module type Work_selector_F = functor
+  (Inputs : Work_selector.Inputs.Inputs_intf)
+  -> Protocols.Coda_pow.Work_selector_intf
+     with type ledger_builder := Inputs.Ledger_builder.t
+      and type work :=
+                 ( Inputs.Ledger_proof_statement.t
+                 , Inputs.Super_transaction.t
+                 , Inputs.Sparse_ledger.t
+                 , Inputs.Ledger_proof.t )
+                 Snark_work_lib.Work.Single.Spec.t
+      and type snark_pool := Inputs.Snark_pool.t
+      and type fee := Inputs.Fee.t
 
 module type Init_intf = sig
   include Config_intf
@@ -702,9 +699,9 @@ struct
   module Work_selector = Make_work_selector (Work_selector_inputs)
 
   let request_work ~best_ledger_builder
-      ~(seen_jobs: 'a -> Work_selector.State.t)
-      ~(set_seen_jobs: 'a -> Work_selector.State.t -> unit)
-      ~(snark_pool: 'a -> Snark_pool.t) (t: 'a) (fee: Fee.Unsigned.t) =
+      ~(seen_jobs : 'a -> Work_selector.State.t)
+      ~(set_seen_jobs : 'a -> Work_selector.State.t -> unit)
+      ~(snark_pool : 'a -> Snark_pool.t) (t : 'a) (fee : Fee.Unsigned.t) =
     let lb = best_ledger_builder t in
     let instances, seen_jobs =
       Work_selector.work ~fee ~snark_pool:(snark_pool t) lb (seen_jobs t)

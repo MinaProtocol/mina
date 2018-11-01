@@ -81,7 +81,7 @@ module Test_input = struct
 
     type t = Completed_work.t Work.Table.t
 
-    let get_completed_work (t: t) = Work.Table.find t
+    let get_completed_work (t : t) = Work.Table.find t
 
     let create () = Work.Table.create ()
 

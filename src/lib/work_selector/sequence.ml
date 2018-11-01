@@ -8,8 +8,7 @@ module Make (Inputs : Inputs.Inputs_intf) :
               , Inputs.Ledger_proof.t )
               Snark_work_lib.Work.Single.Spec.t
    and type snark_pool := Inputs.Snark_pool.t
-   and type fee := Inputs.Fee.t =
-struct
+   and type fee := Inputs.Fee.t = struct
   module Helper = Work_lib.Make (Inputs)
   module State = Helper.State
 
@@ -17,8 +16,8 @@ struct
     let does_not_have_better_fee = Helper.For_tests.does_not_have_better_fee
   end
 
-  let work ~snark_pool ~fee (ledger_builder: Inputs.Ledger_builder.t)
-      (state: State.t) =
+  let work ~snark_pool ~fee (ledger_builder : Inputs.Ledger_builder.t)
+      (state : State.t) =
     let unseen_jobs = Helper.all_works ledger_builder state in
     match Helper.get_expensive_work ~snark_pool ~fee unseen_jobs with
     | [] -> ([], state)

@@ -167,7 +167,9 @@ let daemon (module Kernel : Kernel_intf) log =
            transaction_capacity_log_2
        in
        let snark_work_fee_flag =
-         Currency.Fee.of_int (or_from_config YJ.Util.to_int_option "snark-worker-fee" ~default:0 snark_work_fee)
+         Currency.Fee.of_int
+           (or_from_config YJ.Util.to_int_option "snark-worker-fee" ~default:0
+              snark_work_fee)
        in
        let rest_server_port =
          maybe_from_config YJ.Util.to_int_option "rest-port" rest_server_port
@@ -309,9 +311,7 @@ let daemon (module Kernel : Kernel_intf) log =
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~snark_work_fee:snark_work_fee_flag
                 ~time_controller:(Inputs.Time.Controller.create ())
-                ~keypair 
-                ~banlist                 
-                ())
+                ~keypair ~banlist ())
          in
          let web_service = Web_pipe.get_service () in
          Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;

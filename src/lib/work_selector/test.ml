@@ -17,46 +17,49 @@ end
 module type Work_selector_with_tests_intf = sig
   include Protocols.Coda_pow.Work_selector_intf
 
-  include For_tests_intf
-          with type work := work
-           and type snark_pool := snark_pool
-           and type fee := fee
+  include
+    For_tests_intf
+    with type work := work
+     and type snark_pool := snark_pool
+     and type fee := fee
 end
 
 module type Work_selector_F = functor (Inputs : Inputs.Inputs_intf) -> Work_selector_with_tests_intf
                                                                        with type 
                                                                        ledger_builder :=
-                                                                         Inputs.
-                                                                         Ledger_builder.
-                                                                         t
+                                                                         Inputs
+                                                                         .Ledger_builder
+                                                                         .t
                                                                         and type 
                                                                        work :=
-                                                                         ( Inputs.
-                                                                           Ledger_proof_statement.
-                                                                           t
-                                                                         , Inputs.
-                                                                           Super_transaction.
-                                                                           t
-                                                                         , Inputs.
-                                                                           Sparse_ledger.
-                                                                           t
-                                                                         , Inputs.
-                                                                           Ledger_proof.
-                                                                           t
+                                                                         ( Inputs
+                                                                           .Ledger_proof_statement
+                                                                           .t
+                                                                         , Inputs
+                                                                           .Super_transaction
+                                                                           .t
+                                                                         , Inputs
+                                                                           .Sparse_ledger
+                                                                           .t
+                                                                         , Inputs
+                                                                           .Ledger_proof
+                                                                           .t
                                                                          )
-                                                                         Snark_work_lib.
-                                                                         Work.
-                                                                         Single.
-                                                                         Spec.t
+                                                                         Snark_work_lib
+                                                                         .Work
+                                                                         .Single
+                                                                         .Spec
+                                                                         .t
                                                                         and type 
                                                                        snark_pool :=
-                                                                         Inputs.
-                                                                         Snark_pool.
-                                                                         t
+                                                                         Inputs
+                                                                         .Snark_pool
+                                                                         .t
                                                                         and type 
                                                                        fee :=
-                                                                         Inputs.
-                                                                         Fee.t
+                                                                         Inputs
+                                                                         .Fee
+                                                                         .t
 
 module Make_test (Make_selector : Work_selector_F) = struct
   module T = Inputs.Test_input
@@ -73,7 +76,7 @@ module Make_test (Make_selector : Work_selector_F) = struct
             let open Deferred.Let_syntax in
             let lb : T.Ledger_builder.t = List.init i ~f:Fn.id in
             let rec go i seen =
-              [%test_result : Bool.t]
+              [%test_result: Bool.t]
                 ~message:"Exceeded time expected to exhaust work" ~expect:true
                 (i <= p) ;
               let stuff, seen = Selector.work ~snark_pool ~fee lb seen in
@@ -111,14 +114,14 @@ module Make_test (Make_selector : Work_selector_F) = struct
             let my_fee = 2 in
             let snark_pool = gen_snark_pool works my_fee in
             let rec go i seen =
-              [%test_result : Bool.t]
+              [%test_result: Bool.t]
                 ~message:"Exceeded time expected to exhaust work" ~expect:true
                 (i <= p) ;
               let work, seen = Selector.work ~snark_pool ~fee:my_fee lb seen in
               match work with
               | [] -> return ()
               | job ->
-                  [%test_result : Bool.t]
+                  [%test_result: Bool.t]
                     ~message:"Should not get any cheap jobs" ~expect:true
                     (Selector.For_tests.does_not_have_better_fee ~snark_pool
                        ~fee:my_fee job) ;
