@@ -6,7 +6,10 @@ GITHASH = $(shell git rev-parse --short=8 HEAD)
 GITLONGHASH = $(shell git rev-parse HEAD)
 
 MYUID = $(shell id -u)
-DOCKERNAME = nanotest-$(MYUID)
+DOCKERNAME = codabuilder-$(MYUID)
+
+# Unique signature of kademlia coda tree
+KADEMLIA_SIG = $(shell cd src/app/kademlia-haskell ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
 
 ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
@@ -20,7 +23,6 @@ else
  $(info INFO Not using Docker)
  WRAP =
 endif
-
 
 ########################################
 ## Code
@@ -43,12 +45,6 @@ build:
 	ulimit -s 65536
 	cd src ; $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
 	$(info Build complete)
-
-withupdates:
-	sed -i '/let force_updates = /c\let force_updates = true' src/app/cli/src/coda.ml
-
-withoutupdates:
-	sed -i '/let force_updates = /c\let force_updates = false' src/app/cli/src/coda.ml
 
 dev: docker container build
 
@@ -79,45 +75,38 @@ check-format:
 ########################################
 ## Containers and container management
 
+# customized local docker
 docker:
-	./scripts/rebuild-docker.sh nanotest dockerfiles/Dockerfile
+	docker build --file dockerfiles/Dockerfile --tag codabuilder .
 
-ci-base-docker:
-	./scripts/rebuild-docker.sh o1labs/ci-base dockerfiles/Dockerfile-ci-base
+# push steps require auth on docker hub
+docker-toolchain:
+	@if git diff-index --quiet HEAD ; then \
+		docker build --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/coda:toolchain-$(GITLONGHASH) . ;\
+		docker tag  codaprotocol/coda:toolchain-$(GITLONGHASH) codaprotocol/coda:toolchain-latest ;\
+		docker push codaprotocol/coda:toolchain-$(GITLONGHASH) ;\
+		docker push codaprotocol/coda:toolchain-latest ;\
+	else \
+		echo "Repo is dirty, commit first." ;\
+	fi
 
-coda-docker:
-	./scripts/rebuild-docker.sh coda dockerfiles/Dockerfile-coda
+# All in one step to build toolchain and binary for kademlia
+docker-toolchain-haskell:
+	@echo "Building codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG)" ;\
+    docker build --file dockerfiles/Dockerfile-toolchain-haskell --tag codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) . ;\
+    echo  'Extracting deb package' ;\
+    mkdir -p src/_build ;\
+    docker run --rm --entrypoint cat codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) /src/coda-kademlia.deb > src/_build/coda-kademlia.deb
 
-base-docker:
-	./scripts/rebuild-docker.sh ocaml-base dockerfiles/Dockerfile-base
-
-base-minikube:
-	./scripts/rebuild-minikube.sh ocaml-base dockerfiles/Dockerfile-base
-
-coda-minikube:
-	./scripts/rebuild-minikube.sh coda dockerfiles/Dockerfile-coda
-
-base-googlecloud:
-	./scripts/rebuild-googlecloud.sh ocaml-base dockerfiles/Dockerfile-base $(GITLONGHASH)
-
-coda-googlecloud:
-	./scripts/rebuild-googlecloud.sh coda dockerfiles/Dockerfile-coda
-
-ocaml407-googlecloud:
-	./scripts/rebuild-googlecloud.sh ocaml407 dockerfiles/Dockerfile-ocaml407
-
-pull-ocaml407-googlecloud:
-	gcloud docker -- pull gcr.io/o1labs-192920/ocaml407:latest
-
-update-deps: base-googlecloud
-	./scripts/rewrite-from-dockerfile.sh ocaml-base $(GITLONGHASH)
+update-deps:
+	./scripts/update-toolchain-references.sh $(GITLONGHASH)
 	cd .circleci; python2 render.py > config.yml
 
 container:
 	@./scripts/container.sh restart
 
 ########################################
-## Artifacts 
+## Artifacts
 
 deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
@@ -125,9 +114,13 @@ deb:
 	@cp src/_build/codaclient.deb /tmp/artifacts/.
 
 provingkeys:
-	$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH).tar.bz2  /var/lib/coda
-	@mkdir -p /tmp/artifacts
-	@cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/.
+	@if [ ! -f src/_build/coda_cache_dir_$(GITHASH).tar.bz2 ] ; then \
+		$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH).tar.bz2  /var/lib/coda ; \
+		mkdir -p /tmp/artifacts ; \
+		cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
+	else \
+		echo "Skipping because not on master" ; \
+	fi
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts

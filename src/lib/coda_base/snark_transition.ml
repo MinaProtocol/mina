@@ -41,9 +41,8 @@ module type S = sig
     , Currency.Amount.var )
     t
 
-  include Snark_params.Tick.Snarkable.S
-          with type value := value
-           and type var := var
+  include
+    Snark_params.Tick.Snarkable.S with type value := value and type var := var
 
   val create_value :
        ?sok_digest:Sok_message.Digest.t
@@ -70,8 +69,7 @@ end
 module Make (Inputs : Inputs_intf) :
   S
   with module Blockchain_state = Inputs.Blockchain_state
-   and module Consensus_data = Inputs.Consensus_data =
-struct
+   and module Consensus_data = Inputs.Consensus_data = struct
   include Inputs
 
   type ('blockchain_state, 'consensus_data, 'sok_digest, 'supply_increase) t =
@@ -97,7 +95,7 @@ struct
     , Currency.Amount.var )
     t
 
-  let create_value ?(sok_digest= Sok_message.Digest.default) ?ledger_proof
+  let create_value ?(sok_digest = Sok_message.Digest.default) ?ledger_proof
       ~supply_increase ~blockchain_state ~consensus_data () =
     { blockchain_state
     ; consensus_data

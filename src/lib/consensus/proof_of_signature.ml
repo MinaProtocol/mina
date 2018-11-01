@@ -34,8 +34,7 @@ module Make (Inputs : Inputs_intf) :
   with type Internal_transition.Ledger_builder_diff.t =
               Inputs.Ledger_builder_diff.t
    and type External_transition.Ledger_builder_diff.t =
-              Inputs.Ledger_builder_diff.t =
-struct
+              Inputs.Ledger_builder_diff.t = struct
   open Inputs
   module Ledger_builder_diff = Ledger_builder_diff
 
@@ -45,8 +44,8 @@ struct
     let create () = ()
   end
 
-  module Blockchain_state = Coda_base.Blockchain_state.Make (Inputs.
-                                                             Genesis_ledger)
+  module Blockchain_state =
+    Coda_base.Blockchain_state.Make (Inputs.Genesis_ledger)
   module Lite_compat = Lite_compat.Make (Blockchain_state)
 
   module Consensus_transition_data = struct
@@ -150,7 +149,8 @@ struct
     External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
   let generate_transition ~previous_protocol_state ~blockchain_state
-      ~local_state:_ ~time:_ ~keypair:_ ~transactions:_ ~ledger:_ ~logger:_ =
+      ~local_state:_ ~time:_ ~keypair:_ ~transactions:_ ~ledger:_
+      ~supply_increase:_ ~logger:_ =
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
     in
@@ -170,7 +170,7 @@ struct
     in
     Some (protocol_state, consensus_transition_data)
 
-  let is_transition_valid_checked (transition: Snark_transition.var) =
+  let is_transition_valid_checked (transition : Snark_transition.var) =
     let Consensus_transition_data.({signature}) =
       Snark_transition.consensus_data transition
     in
@@ -184,7 +184,7 @@ struct
       (Public_key.var_of_t Global_public_key.t)
       (transition |> Snark_transition.blockchain_state)
 
-  let next_state_checked (state: Consensus_state.var) _state_hash _block =
+  let next_state_checked (state : Consensus_state.var) _state_hash _block =
     let open Consensus_state in
     let open Snark_params.Tick.Let_syntax in
     let%bind length = Length.increment_var state.length in

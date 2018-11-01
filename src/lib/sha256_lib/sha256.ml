@@ -80,6 +80,6 @@ let%test_unit "sha-checked-and-unchecked" =
         snd (Or_error.ok_exn (Tick.run_and_check t ()))
       in
       let native = digest bits in
-      if not ([%eq : bool list] from_gadget native) then
+      if not ([%eq: bool list] from_gadget native) then
         failwithf "%s <> %s (on input %s)" (bitstring from_gadget)
           (bitstring native) (bitstring bits) () )

@@ -111,7 +111,8 @@ struct
 
   let find_y x =
     let y2 =
-      Field.Infix.((x * Field.square x) + (Coefficients.a * x) + Coefficients.b)
+      Field.Infix.(
+        (x * Field.square x) + (Coefficients.a * x) + Coefficients.b)
     in
     if Field.is_square y2 then Some (Field.sqrt y2) else None
 end
@@ -236,7 +237,7 @@ module Tick = struct
       include Snarky.Pedersen.Make (Tick0) (Inner_curve)
                 (Crypto_params.Pedersen_params)
 
-      let hash_triples ts ~(init: State.t) =
+      let hash_triples ts ~(init : State.t) =
         hash ts ~init:(init.triples_consumed, `Value init.acc)
 
       let digest_triples ts ~init =
@@ -257,7 +258,7 @@ module Tick = struct
       (Inner_curve)
 end
 
-let embed (x: Tick.Field.t) : Tock.Field.t =
+let embed (x : Tick.Field.t) : Tock.Field.t =
   let n = Tick.Bigint.of_field x in
   let rec go pt acc i =
     if i = Tick.Field.size_in_bits then acc

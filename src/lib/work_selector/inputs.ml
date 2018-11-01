@@ -13,7 +13,7 @@ module type Inputs_intf = sig
     type t
   end
 
-  module Super_transaction : sig
+  module Transaction : sig
     type t
   end
 
@@ -27,12 +27,12 @@ module type Inputs_intf = sig
     val all_work_pairs :
          t
       -> ( ( Ledger_proof_statement.t
-           , Super_transaction.t
+           , Transaction.t
            , Sparse_ledger.t
            , Ledger_proof.t )
            Snark_work_lib.Work.Single.Spec.t
          * ( Ledger_proof_statement.t
-           , Super_transaction.t
+           , Transaction.t
            , Sparse_ledger.t
            , Ledger_proof.t )
            Snark_work_lib.Work.Single.Spec.t
@@ -45,7 +45,7 @@ module Test_input = struct
   module Ledger_hash = Int
   module Ledger_proof_statement = Int
   module Sparse_ledger = Int
-  module Super_transaction = Int
+  module Transaction = Int
   module Ledger_proof = Int
 
   module Ledger_builder = struct
@@ -63,6 +63,6 @@ module Test_input = struct
           | [j1; j2] -> (work j1, Some (work j2))
           | _ -> failwith "error pairing jobs" )
 
-    let all_work_pairs (t: t) = paired t
+    let all_work_pairs (t : t) = paired t
   end
 end

@@ -29,8 +29,8 @@ let%test_module "test functor on in memory databases" =
 
       let%test_unit "getting a non existing account returns None" =
         Test.with_instance (fun mdb ->
-            Quickcheck.test MT.For_tests.gen_account_location ~f:
-              (fun location -> assert (MT.get mdb location = None) ) )
+            Quickcheck.test MT.For_tests.gen_account_location
+              ~f:(fun location -> assert (MT.get mdb location = None) ) )
 
       let create_new_account_exn mdb ({Account.public_key; _} as account) =
         let action, location =
@@ -84,7 +84,7 @@ let%test_module "test functor on in memory databases" =
             List.iter accounts ~f:(fun account ->
                 ignore @@ create_new_account_exn mdb account ) ;
             let result = MT.num_accounts mdb in
-            [%test_eq : int] result num_initial_accounts )
+            [%test_eq: int] result num_initial_accounts )
 
       let%test "get_or_create_acount does not update an account if key \
                 already exists" =
@@ -130,7 +130,7 @@ let%test_module "test functor on in memory databases" =
         in
         Test.with_instance (fun mdb ->
             Quickcheck.test (Direction.gen_var_length_list ~start:1 MT.depth)
-              ~sexp_of:[%sexp_of : Direction.t List.t] ~f:(fun direction ->
+              ~sexp_of:[%sexp_of: Direction.t List.t] ~f:(fun direction ->
                 let address = MT.Addr.of_directions direction in
                 MT.set_inner_hash_at_addr_exn mdb address random_hash ;
                 let result = MT.get_inner_hash_at_addr_exn mdb address in
@@ -160,7 +160,7 @@ let%test_module "test functor on in memory databases" =
             let max_height = Int.min MT.depth 5 in
             populate_db mdb max_height ;
             Quickcheck.test (Direction.gen_var_length_list max_height)
-              ~sexp_of:[%sexp_of : Direction.t List.t] ~f:(fun directions ->
+              ~sexp_of:[%sexp_of: Direction.t List.t] ~f:(fun directions ->
                 let address =
                   let offset = MT.depth - max_height in
                   let padding =
@@ -231,7 +231,7 @@ let%test_module "test functor on in memory databases" =
             let max_height = Int.min MT.depth 5 in
             populate_db mdb max_height ;
             Quickcheck.test (Direction.gen_list max_height)
-              ~sexp_of:[%sexp_of : Direction.t List.t] ~f:(fun directions ->
+              ~sexp_of:[%sexp_of: Direction.t List.t] ~f:(fun directions ->
                 let offset =
                   List.init (MT.depth - max_height) ~f:(fun _ -> Direction.Left)
                 in
@@ -297,7 +297,7 @@ let%test_module "test functor on in memory databases" =
           (Storage_locations)
 
       (* TODO: maybe this function should work with dynamic modules *)
-      let with_instance (type a) (f: MT.t -> a) =
+      let with_instance (type a) (f : MT.t -> a) =
         let mdb = MT.create () in
         f mdb
     end)

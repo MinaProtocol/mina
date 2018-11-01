@@ -63,9 +63,7 @@ end
 module Make_fp
     (N : Nat_intf.S) (Info : sig
         val order : N.t
-    end) :
-  Fp_intf with type nat := N.t =
-struct
+    end) : Fp_intf with type nat := N.t = struct
   include Info
 
   type t = N.t [@@deriving eq, bin_io, sexp]
@@ -359,7 +357,7 @@ end = struct
 
   let scale (x1, x2) s = Fp3.(s * x1, s * x2)
 
-  let mul_by_non_residue ((c0, c1, c2): Fp3.t) =
+  let mul_by_non_residue ((c0, c1, c2) : Fp3.t) =
     Fp.(Info.non_residue * c2, c0, c1)
 
   let mul_by_2345 (a1, b1) (a2, b2) =

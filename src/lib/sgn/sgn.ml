@@ -34,21 +34,21 @@ module Checked = struct
 
   let neg_one_half = Field.negate one_half
 
-  let is_pos (v: var) =
+  let is_pos (v : var) =
     Boolean.Unsafe.of_cvar
       (let open Field.Checked in
       Infix.(one_half * (v + constant Field.one)))
 
-  let is_neg (v: var) =
+  let is_neg (v : var) =
     Boolean.Unsafe.of_cvar
       (let open Field.Checked in
       Infix.(neg_one_half * (v - constant Field.one)))
 
-  let pos_if_true (b: Boolean.var) =
+  let pos_if_true (b : Boolean.var) =
     let open Field.Checked in
     Infix.((two * (b :> Field.Checked.t)) - constant Field.one)
 
-  let neg_if_true (b: Boolean.var) =
+  let neg_if_true (b : Boolean.var) =
     let open Field.Checked in
     Infix.((neg_two * (b :> Field.Checked.t)) + constant Field.one)
 
