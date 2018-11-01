@@ -1,3 +1,6 @@
+[%%import
+"../../config.mlh"]
+
 open Core_kernel
 open Coda_numbers
 open Coda_base
@@ -5,12 +8,14 @@ open Fold_lib
 open Signature_lib
 
 module Global_public_key = struct
-  let compressed =
-    match Signer_private_key.mode with
-    | `Dev -> fst Sample_keypairs.keypairs.(0)
-    | `Prod ->
-        Public_key.Compressed.of_base64_exn
-          "KBWuaAm5Sl5jH/dlpiTKQeUUsty/4Rq6Xz2Py2Y2i/VweJmDHwUAAAAB"
+  [%%if global_signer_real]
+    let compressed =
+      Public_key.Compressed.of_base64_exn
+        "KBWuaAm5Sl5jH/dlpiTKQeUUsty/4Rq6Xz2Py2Y2i/VweJmDHwUAAAAB"
+  [%%else]
+    let compressed =
+      fst Sample_keypairs.keypairs.(0)
+  [%%endif]
 
   let t = Public_key.decompress_exn compressed
 end
@@ -51,7 +56,12 @@ module Make (Inputs : Inputs_intf) :
   module Consensus_transition_data = struct
     type 'signature t_ = {signature: 'signature} [@@deriving bin_io, sexp]
 
-    type value = Signature.Stable.V1.t t_ [@@deriving bin_io, sexp]
+    module Elem = struct
+      type t = [`Signed of Signature.Stable.V1.t | `Genesis]
+      [@@deriving bin_io, sexp]
+    end
+
+    type value = Elem.t t_ [@@deriving bin_io, sexp]
 
     type var = Signature.var t_
 
@@ -61,19 +71,33 @@ module Make (Inputs : Inputs_intf) :
      fun H_list.([signature]) -> {signature}
 
     let data_spec =
-      Snark_params.Tick.Data_spec.[Blockchain_state.Signature.Signature.typ]
+      let open Snark_params.Tock in
+      let inner_typ : (Signature.var, Elem.t) Snark_params.Tick.Typ.t =
+        Snark_params.Tick.Typ.transport
+          Blockchain_state.Signature.Signature.typ
+          ~there:(function
+            | `Genesis -> (Field.zero, Field.zero)
+            | `Signed signature -> signature)
+          ~back:(fun (x,y) ->
+            if Field.equal x Field.zero && Field.equal y Field.zero then
+              `Genesis
+            else
+              `Signed (x,y)
+          )
+      in
+      Snark_params.Tick.Data_spec.[inner_typ]
 
     let typ =
       Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
-    let create_value blockchain_state =
+    let create_value ~private_key blockchain_state =
       { signature=
-          Blockchain_state.Signature.sign Signer_private_key.signer_private_key
-            blockchain_state }
+          `Signed (Blockchain_state.Signature.sign private_key
+            blockchain_state) }
 
-    let genesis = create_value Blockchain_state.genesis
+    let genesis = {signature = `Genesis}
   end
 
   module Consensus_state = struct
@@ -149,14 +173,14 @@ module Make (Inputs : Inputs_intf) :
     External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
   let generate_transition ~previous_protocol_state ~blockchain_state
-      ~local_state:_ ~time:_ ~keypair:_ ~transactions:_ ~ledger:_
+      ~local_state:_ ~time:_ ~keypair ~transactions:_ ~ledger:_
       ~supply_increase:_ ~logger:_ =
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
     in
     (* TODO: sign protocol_state instead of blockchain_state *)
     let consensus_transition_data =
-      Consensus_transition_data.create_value blockchain_state
+      Consensus_transition_data.create_value ~private_key:(keypair.Signature_lib.Keypair.private_key) blockchain_state
     in
     let consensus_state =
       let open Consensus_state in
@@ -170,7 +194,7 @@ module Make (Inputs : Inputs_intf) :
     in
     Some (protocol_state, consensus_transition_data)
 
-  let is_transition_valid_checked (transition : Snark_transition.var) =
+  let is_transition_valid_checked (transition : Snark_transition.var) (previous_state_hash : State_hash.var) =
     let Consensus_transition_data.({signature}) =
       Snark_transition.consensus_data transition
     in
@@ -178,11 +202,16 @@ module Make (Inputs : Inputs_intf) :
     let%bind (module Shifted) =
       Snark_params.Tick.Inner_curve.Checked.Shifted.create ()
     in
-    Blockchain_state.Signature.Checked.verifies
-      (module Shifted)
-      signature
-      (Public_key.var_of_t Global_public_key.t)
-      (transition |> Snark_transition.blockchain_state)
+    let%bind signature_verifies =
+      Blockchain_state.Signature.Checked.verifies
+        (module Shifted)
+        signature
+        (Public_key.var_of_t Global_public_key.t)
+        (transition |> Snark_transition.blockchain_state)
+    and previous_state_was_neg_one =
+      State_hash.equal_var previous_state_hash (State_hash.var_of_t (Protocol_state.hash Protocol_state.negative_one))
+    in
+    Snark_params.Tick.Boolean.(signature_verifies || previous_state_was_neg_one)
 
   let next_state_checked (state : Consensus_state.var) _state_hash _block =
     let open Consensus_state in
