@@ -113,6 +113,10 @@ deb:
 	@mkdir -p /tmp/artifacts
 	@cp src/_build/codaclient.deb /tmp/artifacts/.
 
+# deb-s3 https://github.com/krobertson/deb-s3
+publish_deb:
+	deb-s3 upload --bucket repo.o1test.net  --codename coda --s3-region=us-west-2 src/_build/coda-kademlia.deb
+
 provingkeys:
 	@if [ ! -f src/_build/coda_cache_dir_$(GITHASH).tar.bz2 ] ; then \
 		$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH).tar.bz2  /var/lib/coda ; \
