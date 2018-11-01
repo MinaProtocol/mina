@@ -80,6 +80,8 @@ module Snarkable = struct
 
     val increment_var : Unpacked.var -> (Unpacked.var, _) checked
 
+    val decrement_var : Unpacked.var -> (Unpacked.var, _) checked
+
     val increment_if_var :
       Unpacked.var -> boolean_var -> (Unpacked.var, _) checked
 

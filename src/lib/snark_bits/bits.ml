@@ -257,6 +257,13 @@ module Snarkable = struct
          let v' = Field.Checked.add v (Field.Checked.constant Field.one) in
          Field.Checked.unpack v' ~length:V.length)
 
+    let decrement_var bs =
+      let open Impl in
+      with_label __LOC__
+        (let v = Field.Checked.pack bs in
+         let v' = Field.Checked.sub v (Field.Checked.constant Field.one) in
+         Field.Checked.unpack v' ~length:V.length)
+
     let equal_var (n : Unpacked.var) (n' : Unpacked.var) =
       with_label __LOC__ (Field.Checked.equal (pack_var n) (pack_var n'))
 

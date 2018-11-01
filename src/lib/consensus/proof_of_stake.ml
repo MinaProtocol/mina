@@ -630,7 +630,7 @@ module Make (Inputs : Inputs_intf) :
         else (last_data, curr_data, epoch_length)
       in
       let curr_seed, curr_lock_checkpoint =
-        if Epoch.Slot.in_seed_update_range next_slot then
+        if Epoch.Slot.in_seed_update_range UInt32.(pred next_slot) then
           ( Epoch_seed.update curr_data.seed proposer_vrf_result
           , prev_protocol_state_hash )
         else (curr_data.seed, curr_data.lock_checkpoint)
@@ -662,12 +662,12 @@ module Make (Inputs : Inputs_intf) :
           Length.increment_if_var epoch_length epoch_changed
         in
         (last_data, curr_data, epoch_length)
-      in
+      and cur_slot = Segment_id.decrement_var next_slot in
       let%map curr_seed, curr_lock_checkpoint =
         let%bind updated_curr_seed =
           Epoch_seed.update_var curr_data.seed proposer_vrf_result
         and in_seed_update_range =
-          Epoch.Slot.in_seed_update_range_var next_slot
+          Epoch.Slot.in_seed_update_range_var cur_slot
         in
         let%map curr_seed =
           Epoch_seed.if_ in_seed_update_range ~then_:updated_curr_seed
