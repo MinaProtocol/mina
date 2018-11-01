@@ -139,11 +139,11 @@ end
 module Tagged_transaction = struct
   open Tick
 
-  type t = Tag.t * Transaction.t [@@deriving sexp]
+  type t = Tag.t * Payment.t [@@deriving sexp]
 
-  type var = Tag.var * Transaction.var
+  type var = Tag.var * Payment.var
 
-  let typ : (var, t) Typ.t = Typ.(Tag.typ * Transaction.typ)
+  let typ : (var, t) Typ.t = Typ.(Tag.typ * Payment.typ)
 
   let excess ((tag, t) : t) =
     match tag with
@@ -245,7 +245,7 @@ module Tagged_transaction = struct
 end
 
 let dummy_signature =
-  Schnorr.sign (Private_key.create ()) Transaction_payload.dummy
+  Schnorr.sign (Private_key.create ()) Payment_payload.dummy
 
 module Fee_transfer = struct
   include Fee_transfer
@@ -266,16 +266,16 @@ module Fee_transfer = struct
 end
 
 module Transition = struct
-  include Super_transaction
+  include Transaction
 
   let to_tagged_transaction = function
     | Fee_transfer t -> Fee_transfer.to_tagged_transaction t
-    | Transaction t -> (Normal, (t :> Transaction.t))
+    | Payment t -> (Normal, (t :> Payment.t))
     | Coinbase {proposer; fee_transfer} ->
         let receiver, amount =
           Option.value ~default:(proposer, Fee.zero) fee_transfer
         in
-        let t : Transaction.t =
+        let t : Payment.t =
           { payload=
               { receiver
               ; amount= Amount.of_fee amount
@@ -458,7 +458,7 @@ module Base = struct
     with_label __LOC__
       ( if not Insecure.transaction_replay then
           failwith "Insecure.transaction_replay false" ;
-        let {Transaction.Payload.receiver; amount; fee= _; nonce} = payload in
+        let {Payment.Payload.receiver; amount; fee= _; nonce} = payload in
         let%bind payload_section = Schnorr.Message.var_of_payload payload in
         let%bind () =
           with_label __LOC__
@@ -1128,11 +1128,11 @@ module type S = sig
     -> Tick.Handler.t
     -> t
 
-  val of_transaction :
+  val of_payment :
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> Transaction.With_valid_signature.t
+    -> Payment.With_valid_signature.t
     -> Tick.Handler.t
     -> t
 
@@ -1172,8 +1172,8 @@ let check_transition ~sok_message ~source ~target (t : Transition.t) handler =
     (Transition.to_tagged_transaction t)
     handler
 
-let check_transaction ~sok_message ~source ~target t handler =
-  check_transition ~sok_message ~source ~target (Transaction t) handler
+let check_payment ~sok_message ~source ~target t handler =
+  check_transition ~sok_message ~source ~target (Payment t) handler
 
 let check_fee_transfer ~sok_message ~source ~target t handler =
   check_transition ~sok_message ~source ~target (Fee_transfer t) handler
@@ -1248,8 +1248,8 @@ struct
       (Transition.to_tagged_transaction transition)
       handler
 
-  let of_transaction ~sok_digest ~source ~target transaction handler =
-    of_transition ~sok_digest ~source ~target (Transaction transaction) handler
+  let of_payment ~sok_digest ~source ~target payment handler =
+    of_transition ~sok_digest ~source ~target (Payment payment) handler
 
   let of_fee_transfer ~sok_digest ~source ~target transfer handler =
     of_transition ~sok_digest ~source ~target (Fee_transfer transfer) handler
@@ -1484,9 +1484,9 @@ let%test_module "transaction_snark" =
 
       let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
 
-      let merkle_root_after_transaction_exn t txn =
+      let merkle_root_after_payment_exn t txn =
         Frozen_ledger_hash.of_ledger_hash
-        @@ merkle_root_after_transaction_exn t txn
+        @@ merkle_root_after_payment_exn t txn
     end
 
     module Sparse_ledger = struct
@@ -1511,18 +1511,18 @@ let%test_module "transaction_snark" =
       let n = Int.pow 2 ledger_depth in
       Array.init n ~f:(fun _ -> random_wallet ())
 
-    let transaction wallets i j amt fee nonce =
+    let payment wallets i j amt fee nonce =
       let sender = wallets.(i) in
       let receiver = wallets.(j) in
-      let payload : Transaction.Payload.t =
+      let payload : Payment.Payload.t =
         { receiver= receiver.account.public_key
         ; fee
         ; amount= Amount.of_int amt
         ; nonce }
       in
       let signature = Schnorr.sign sender.private_key payload in
-      Transaction.check
-        { Transaction.payload
+      Payment.check
+        { Payment.payload
         ; sender= Public_key.of_private_key_exn sender.private_key
         ; signature }
       |> Option.value_exn
@@ -1533,12 +1533,10 @@ let%test_module "transaction_snark" =
       let keys = keys
     end)
 
-    let of_transaction' sok_digest ledger transaction handler =
+    let of_payment' sok_digest ledger payment handler =
       let source = Ledger.merkle_root ledger in
-      let target =
-        Ledger.merkle_root_after_transaction_exn ledger transaction
-      in
-      of_transaction ~sok_digest ~source ~target transaction handler
+      let target = Ledger.merkle_root_after_payment_exn ledger payment in
+      of_payment ~sok_digest ~source ~target payment handler
 
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -1550,12 +1548,12 @@ let%test_module "transaction_snark" =
               Ledger.create_new_account_exn ledger account.public_key account
               ) ;
           let t1 =
-            transaction wallets 1 0 8
+            payment wallets 1 0 8
               (Fee.of_int (Random.int 20))
               Account.Nonce.zero
           in
-          let target = Ledger.merkle_root_after_transaction_exn ledger t1 in
-          let mentioned_keys = Transaction.public_keys (t1 :> Transaction.t) in
+          let target = Ledger.merkle_root_after_payment_exn ledger t1 in
+          let mentioned_keys = Payment.public_keys (t1 :> Payment.t) in
           let sparse_ledger =
             Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
           in
@@ -1563,7 +1561,7 @@ let%test_module "transaction_snark" =
             Sok_message.create ~fee:Fee.zero
               ~prover:wallets.(1).account.public_key
           in
-          check_transaction ~sok_message
+          check_payment ~sok_message
             ~source:(Ledger.merkle_root ledger)
             ~target t1
             (unstage @@ Sparse_ledger.handler sparse_ledger) )
@@ -1576,12 +1574,12 @@ let%test_module "transaction_snark" =
               Ledger.create_new_account_exn ledger account.public_key account
           ) ;
           let t1 =
-            transaction wallets 0 1 8
+            payment wallets 0 1 8
               (Fee.of_int (Random.int 20))
               Account.Nonce.zero
           in
           let t2 =
-            transaction wallets 1 2 3
+            payment wallets 1 2 3
               (Fee.of_int (Random.int 20))
               Account.Nonce.zero
           in
@@ -1594,38 +1592,36 @@ let%test_module "transaction_snark" =
           let sparse_ledger =
             Sparse_ledger.of_ledger_subset_exn ledger
               (List.concat_map
-                 ~f:(fun t -> Transaction.public_keys (t :> Transaction.t))
+                 ~f:(fun t -> Payment.public_keys (t :> Payment.t))
                  [t1; t2])
           in
           let proof12 =
-            of_transaction' sok_digest ledger t1
+            of_payment' sok_digest ledger t1
               (unstage @@ Sparse_ledger.handler sparse_ledger)
           in
           let sparse_ledger =
-            Sparse_ledger.apply_transaction_exn sparse_ledger
-              (t1 :> Transaction.t)
+            Sparse_ledger.apply_payment_exn sparse_ledger (t1 :> Payment.t)
           in
-          Ledger.apply_transaction ledger t1 |> Or_error.ok_exn |> ignore ;
+          Ledger.apply_payment ledger t1 |> Or_error.ok_exn |> ignore ;
           [%test_eq: Frozen_ledger_hash.t]
             (Ledger.merkle_root ledger)
             (Sparse_ledger.merkle_root sparse_ledger) ;
           let proof23 =
-            of_transaction' sok_digest ledger t2
+            of_payment' sok_digest ledger t2
               (unstage @@ Sparse_ledger.handler sparse_ledger)
           in
           let sparse_ledger =
-            Sparse_ledger.apply_transaction_exn sparse_ledger
-              (t2 :> Transaction.t)
+            Sparse_ledger.apply_payment_exn sparse_ledger (t2 :> Payment.t)
           in
-          Ledger.apply_transaction ledger t2 |> Or_error.ok_exn |> ignore ;
+          Ledger.apply_payment ledger t2 |> Or_error.ok_exn |> ignore ;
           [%test_eq: Frozen_ledger_hash.t]
             (Ledger.merkle_root ledger)
             (Sparse_ledger.merkle_root sparse_ledger) ;
           let total_fees =
             let open Amount in
             let magnitude =
-              of_fee (t1 :> Transaction.t).payload.fee
-              + of_fee (t2 :> Transaction.t).payload.fee
+              of_fee (t1 :> Payment.t).payload.fee
+              + of_fee (t2 :> Payment.t).payload.fee
               |> Option.value_exn
             in
             Signed.create ~magnitude ~sgn:Sgn.Pos
