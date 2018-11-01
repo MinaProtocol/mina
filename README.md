@@ -16,10 +16,9 @@ Discord](https://discordapp.com/invite/cCYQbqN), for general OCaml help.
 * [Developer readme](README-dev.md)
 * [Compiling from source and and running a node](docs/demo.md)
 
-## Learn more
-
-* [Directory structure](DIRECTORY_STRUCTURE.md)
-* [Lifecycle of a transaction](docs/lifecycle_of_a_transaction_lite.md)
+# Learn more
+*  [Directory structure](DIRECTORY_STRUCTURE.md)
+*  [Lifecycle of a payment](docs/lifecycle_of_a_payment_lite.md)
 
 ## License
 

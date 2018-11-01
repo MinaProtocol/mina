@@ -67,7 +67,7 @@ module type S = sig
     -> local_state:Local_state.t
     -> time:Unix_timestamp.t
     -> keypair:Signature_lib.Keypair.t
-    -> transactions:Coda_base.Transaction.t list
+    -> transactions:Coda_base.Payment.t list
     -> ledger:Coda_base.Ledger.t
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
