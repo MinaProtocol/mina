@@ -50,7 +50,7 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
     Logger.info log "Stopping %d" 1 ;
     let%bind () = Coda_worker_testnet.Api.stop testnet 1 in
     let%bind () =
-      Coda_worker_testnet.Api.send_transaction testnet 0 sender_sk receiver_pk
+      Coda_worker_testnet.Api.send_payment testnet 0 sender_sk receiver_pk
         send_amount fee
     in
     let%bind () = after (Time.Span.of_sec 5.) in

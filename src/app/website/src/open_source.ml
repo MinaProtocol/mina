@@ -124,8 +124,8 @@ let content =
                         "https://github.com/CodaProtocol/coda/blob/master/docs/demo.md"
                       ~name:"Get Started"
                       ~description:
-                        "Spin up a local testnet, send transactions, and \
-                         learn how to interact with the Coda client"
+                        "Spin up a local testnet, send payments, and learn \
+                         how to interact with the Coda client"
                   ; Item.create
                       ~url:
                         "https://github.com/CodaProtocol/coda/blob/master/CONTRIBUTING.md"

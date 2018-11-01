@@ -175,10 +175,7 @@ end = struct
     in
     let%map net = config.net_deferred in
     let net = Net.create net in
-    let catchup =
-      Catchup.create ~net ~parent_log:log
-        ~public_key:(Public_key.compress config.keypair.public_key)
-    in
+    let catchup = Catchup.create ~net ~parent_log:log in
     (* Here we effectfully listen to transitions and emit what we belive are
        the strongest ledger_builders *)
     let strongest_ledgers_reader, strongest_ledgers_writer =
@@ -421,19 +418,16 @@ let%test_module "test" =
             let hash t = t
           end
 
-          type proof = ()
-
           let ledger t = !t
 
-          let create ~ledger ~self:_ = ref ledger
+          let create ~ledger = ref ledger
 
           let copy t = ref !t
 
           let hash t = !t
 
-          let of_aux_and_ledger ~snarked_ledger_hash:_ ~public_key:_ ~ledger
-              ~aux:_ =
-            Ok (create ~ledger ~self:())
+          let of_aux_and_ledger ~snarked_ledger_hash:_ ~ledger ~aux:_ =
+            Ok (create ~ledger)
 
           let aux t = !t
 
@@ -627,7 +621,7 @@ let%test_module "test" =
           ~genesis_tip:
             { protocol_state= Inputs.Consensus_mechanism.Protocol_state.genesis
             ; proof= ()
-            ; ledger_builder= Ledger_builder.create ~ledger:0 ~self:() }
+            ; ledger_builder= Ledger_builder.create ~ledger:0 }
           ~longest_tip_location ~consensus_local_state:()
           ~keypair:{Keypair.public_key= (); private_key= ()}
 
