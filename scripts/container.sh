@@ -35,4 +35,5 @@ if [[ $1 == "restart" ]]; then
       sleep infinity)
 else
   NAME=$(docker ps -q --filter "name=$DOCKERNAME")
+  echo "Container ${NAME} already running."
 fi

@@ -29,7 +29,7 @@ module Make (Kernel : Kernel_intf) = struct
 
   open Input
 
-  module Send_transaction_input = struct
+  module Send_payment_input = struct
     type t =
       Private_key.t
       * Public_key.Compressed.t
@@ -58,8 +58,8 @@ module Make (Kernel : Kernel_intf) = struct
           , Public_key.Compressed.t
           , Currency.Balance.t option )
           Rpc_parallel.Function.t
-      ; send_transaction:
-          ('worker, Send_transaction_input.t, unit) Rpc_parallel.Function.t
+      ; send_payment:
+          ('worker, Send_payment_input.t, unit) Rpc_parallel.Function.t
       ; strongest_ledgers:
           ('worker, unit, State_hashes.t Pipe.Reader.t) Rpc_parallel.Function.t
       }
@@ -68,7 +68,7 @@ module Make (Kernel : Kernel_intf) = struct
       { coda_peers: unit -> Peers.t Deferred.t
       ; coda_get_balance:
           Public_key.Compressed.t -> Maybe_currency.t Deferred.t
-      ; coda_send_transaction: Send_transaction_input.t -> unit Deferred.t
+      ; coda_send_payment: Send_payment_input.t -> unit Deferred.t
       ; coda_strongest_ledgers: unit -> State_hashes.t Pipe.Reader.t Deferred.t
       }
 
@@ -98,8 +98,8 @@ module Make (Kernel : Kernel_intf) = struct
       let get_balance_impl ~worker_state ~conn_state:() pk =
         worker_state.coda_get_balance pk
 
-      let send_transaction_impl ~worker_state ~conn_state:() input =
-        worker_state.coda_send_transaction input
+      let send_payment_impl ~worker_state ~conn_state:() input =
+        worker_state.coda_send_payment input
 
       let peers =
         C.create_rpc ~f:peers_impl ~bin_input:Unit.bin_t
@@ -109,15 +109,15 @@ module Make (Kernel : Kernel_intf) = struct
         C.create_rpc ~f:get_balance_impl ~bin_input:Public_key.Compressed.bin_t
           ~bin_output:Maybe_currency.bin_t ()
 
-      let send_transaction =
-        C.create_rpc ~f:send_transaction_impl
-          ~bin_input:Send_transaction_input.bin_t ~bin_output:Unit.bin_t ()
+      let send_payment =
+        C.create_rpc ~f:send_payment_impl ~bin_input:Send_payment_input.bin_t
+          ~bin_output:Unit.bin_t ()
 
       let strongest_ledgers =
         C.create_pipe ~f:strongest_ledgers_impl ~bin_input:Unit.bin_t
           ~bin_output:State_hashes.bin_t ()
 
-      let functions = {peers; strongest_ledgers; get_balance; send_transaction}
+      let functions = {peers; strongest_ledgers; get_balance; send_payment}
 
       let init_worker_state
           { host
@@ -197,7 +197,7 @@ module Make (Kernel : Kernel_intf) = struct
         ) ;
         let coda_peers () = return (Main.peers coda) in
         let coda_get_balance pk = return (Run.get_balance coda pk) in
-        let coda_send_transaction (sk, pk, amount, fee) =
+        let coda_send_payment (sk, pk, amount, fee) =
           let pk_of_sk sk =
             Public_key.of_private_key_exn sk |> Public_key.compress
           in
@@ -205,13 +205,13 @@ module Make (Kernel : Kernel_intf) = struct
             let nonce =
               Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn
             in
-            let payload : Transaction.Payload.t =
+            let payload : Payment.Payload.t =
               {receiver= receiver_pk; amount; fee; nonce}
             in
-            Transaction.sign (Keypair.of_private_key_exn sender_sk) payload
+            Payment.sign (Keypair.of_private_key_exn sender_sk) payload
           in
-          let transaction = build_txn amount sk pk fee in
-          Run.send_txn log coda (transaction :> Transaction.t)
+          let payment = build_txn amount sk pk fee in
+          Run.send_payment log coda (payment :> Payment.t)
         in
         let coda_strongest_ledgers () =
           let r, w = Linear_pipe.create () in
@@ -237,7 +237,7 @@ module Make (Kernel : Kernel_intf) = struct
           { coda_peers
           ; coda_strongest_ledgers
           ; coda_get_balance
-          ; coda_send_transaction }
+          ; coda_send_payment }
 
       let init_connection_state ~connection:_ ~worker_state:_ = return
     end

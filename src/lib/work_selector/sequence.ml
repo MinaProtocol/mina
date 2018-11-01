@@ -3,7 +3,7 @@ module Make (Inputs : Inputs.Inputs_intf) :
   with type ledger_builder := Inputs.Ledger_builder.t
    and type work :=
               ( Inputs.Ledger_proof_statement.t
-              , Inputs.Super_transaction.t
+              , Inputs.Transaction.t
               , Inputs.Sparse_ledger.t
               , Inputs.Ledger_proof.t )
               Snark_work_lib.Work.Single.Spec.t

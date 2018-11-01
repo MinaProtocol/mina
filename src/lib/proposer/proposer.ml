@@ -85,7 +85,7 @@ module Make (Inputs : Inputs_intf) :
               Inputs.Consensus_mechanism.External_transition.t
    and type ledger_hash := Inputs.Ledger_hash.t
    and type ledger_builder := Inputs.Ledger_builder.t
-   and type transaction := Inputs.Transaction.With_valid_signature.t
+   and type transaction := Inputs.Payment.With_valid_signature.t
    and type protocol_state := Inputs.Consensus_mechanism.Protocol_state.value
    and type protocol_state_proof := Inputs.Protocol_state_proof.t
    and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
@@ -137,14 +137,15 @@ module Make (Inputs : Inputs_intf) :
 
   let generate_next_state ~previous_protocol_state ~consensus_local_state
       ~time_controller ~ledger_builder ~transactions ~get_completed_work
-      ~logger ~keypair =
+      ~logger ~(keypair : Keypair.t) =
     let open Interruptible.Let_syntax in
     let%bind ( diff
              , `Hash_after_applying next_ledger_builder_hash
              , `Ledger_proof ledger_proof_opt ) =
       lift_sync (fun () ->
-          Ledger_builder.create_diff ledger_builder ~logger
-            ~transactions_by_fee:transactions ~get_completed_work )
+          Ledger_builder.create_diff ledger_builder
+            ~self:(Public_key.compress keypair.public_key)
+            ~logger ~transactions_by_fee:transactions ~get_completed_work )
     in
     let%bind transition_opt =
       lift_sync (fun () ->
@@ -154,6 +155,11 @@ module Make (Inputs : Inputs_intf) :
               ~default:
                 ( previous_protocol_state |> Protocol_state.blockchain_state
                 |> Blockchain_state.ledger_hash )
+          in
+          let supply_increase =
+            Option.value_map ledger_proof_opt
+              ~f:(fun (_, stmt) -> stmt.supply_increase)
+              ~default:Currency.Amount.zero
           in
           let blockchain_state =
             Blockchain_state.create_value ~timestamp:(Time.now time_controller)
@@ -167,11 +173,11 @@ module Make (Inputs : Inputs_intf) :
           Consensus_mechanism.generate_transition ~previous_protocol_state
             ~blockchain_state ~local_state:consensus_local_state ~time ~keypair
             ~transactions:
-              ( Ledger_builder_diff.With_valid_signatures_and_proofs
-                .transactions diff
-                :> Transaction.t list )
+              ( Ledger_builder_diff.With_valid_signatures_and_proofs.payments
+                  diff
+                :> Payment.t list )
             ~ledger:(Ledger_builder.ledger ledger_builder)
-            ~logger )
+            ~supply_increase ~logger )
     in
     Option.value
       ~default:(Interruptible.return None)
@@ -205,8 +211,7 @@ module Make (Inputs : Inputs_intf) :
       { protocol_state:
           Protocol_state.value * Protocol_state_proof.t sexp_opaque
       ; ledger_builder: Ledger_builder.t sexp_opaque
-      ; transactions: Transaction.With_valid_signature.t Sequence.t sexp_opaque
-      }
+      ; transactions: Payment.With_valid_signature.t Sequence.t sexp_opaque }
     [@@deriving sexp_of]
   end
 
