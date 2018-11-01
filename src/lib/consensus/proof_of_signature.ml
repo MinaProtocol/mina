@@ -80,11 +80,10 @@ module Make (Inputs : Inputs_intf) :
         Snark_params.Tick.Typ.transport
           Blockchain_state.Signature.Signature.typ
           ~there:(function
-            | `Genesis -> (Field.zero, Field.zero)
+            | `Genesis -> (Field.one, Field.one)
             | `Signed signature -> signature)
           ~back:(fun (x, y) ->
-            if Field.equal x Field.zero && Field.equal y Field.zero then
-              `Genesis
+            if Field.equal x Field.one && Field.equal y Field.one then `Genesis
             else `Signed (x, y) )
       in
       Snark_params.Tick.Data_spec.[inner_typ]
