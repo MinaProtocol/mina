@@ -3,7 +3,7 @@ open Async
 
 module Make (Inputs : Intf.Inputs_intf) :
   Intf.S
-  with type transition := Inputs.Super_transaction.t
+  with type transition := Inputs.Transaction.t
    and type sparse_ledger := Inputs.Sparse_ledger.t
    and type statement := Inputs.Statement.t
    and type proof := Inputs.Proof.t = struct
@@ -16,7 +16,7 @@ module Make (Inputs : Intf.Inputs_intf) :
       module Spec = struct
         type t =
           ( Statement.t
-          , Super_transaction.t
+          , Transaction.t
           , Sparse_ledger.t
           , Proof.t )
           Work.Single.Spec.t

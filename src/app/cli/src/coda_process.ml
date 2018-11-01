@@ -57,9 +57,9 @@ module Make (Kernel : Kernel_intf) = struct
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_balance
       ~arg:pk
 
-  let send_transaction_exn (conn, proc, _) sk pk amount fee =
-    Coda_worker.Connection.run_exn conn
-      ~f:Coda_worker.functions.send_transaction ~arg:(sk, pk, amount, fee)
+  let send_payment_exn (conn, proc, _) sk pk amount fee =
+    Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.send_payment
+      ~arg:(sk, pk, amount, fee)
 
   let strongest_ledgers_exn (conn, proc, _) =
     let%map r =
