@@ -150,11 +150,11 @@ module Status = struct
               ("Snark Worker Merge (hist.)", summarize_report report) :: acc )
         ~propose_pubkey:(fun acc x ->
           match f x with
-          | None ->
-              ("Proposer Running", "false") :: acc
+          | None -> ("Proposer Running", "false") :: acc
           | Some pubkey ->
-              ("Proposer Running", Printf.sprintf !"%{sexp: Public_key.t}" pubkey) :: acc
-        )
+              ( "Proposer Running"
+              , Printf.sprintf !"%{sexp: Public_key.t}" pubkey )
+              :: acc )
       |> List.rev
     in
     let max_key_length =

@@ -8,13 +8,17 @@ open Fold_lib
 open Signature_lib
 
 module Global_public_key = struct
-  [%%if global_signer_real]
-    let compressed =
-      Public_key.Compressed.of_base64_exn
-        "KBWuaAm5Sl5jH/dlpiTKQeUUsty/4Rq6Xz2Py2Y2i/VweJmDHwUAAAAB"
+  [%%if
+  global_signer_real]
+
+  let compressed =
+    Public_key.Compressed.of_base64_exn
+      "KBWuaAm5Sl5jH/dlpiTKQeUUsty/4Rq6Xz2Py2Y2i/VweJmDHwUAAAAB"
+
   [%%else]
-    let compressed =
-      fst Sample_keypairs.keypairs.(0)
+
+  let compressed = fst Sample_keypairs.keypairs.(0)
+
   [%%endif]
 
   let t = Public_key.decompress_exn compressed
@@ -78,12 +82,10 @@ module Make (Inputs : Inputs_intf) :
           ~there:(function
             | `Genesis -> (Field.zero, Field.zero)
             | `Signed signature -> signature)
-          ~back:(fun (x,y) ->
+          ~back:(fun (x, y) ->
             if Field.equal x Field.zero && Field.equal y Field.zero then
               `Genesis
-            else
-              `Signed (x,y)
-          )
+            else `Signed (x, y) )
       in
       Snark_params.Tick.Data_spec.[inner_typ]
 
@@ -94,10 +96,10 @@ module Make (Inputs : Inputs_intf) :
 
     let create_value ~private_key blockchain_state =
       { signature=
-          `Signed (Blockchain_state.Signature.sign private_key
-            blockchain_state) }
+          `Signed
+            (Blockchain_state.Signature.sign private_key blockchain_state) }
 
-    let genesis = {signature = `Genesis}
+    let genesis = {signature= `Genesis}
   end
 
   module Consensus_state = struct
@@ -180,7 +182,8 @@ module Make (Inputs : Inputs_intf) :
     in
     (* TODO: sign protocol_state instead of blockchain_state *)
     let consensus_transition_data =
-      Consensus_transition_data.create_value ~private_key:(keypair.Signature_lib.Keypair.private_key) blockchain_state
+      Consensus_transition_data.create_value
+        ~private_key:keypair.Signature_lib.Keypair.private_key blockchain_state
     in
     let consensus_state =
       let open Consensus_state in
@@ -194,7 +197,8 @@ module Make (Inputs : Inputs_intf) :
     in
     Some (protocol_state, consensus_transition_data)
 
-  let is_transition_valid_checked (transition : Snark_transition.var) (previous_state_hash : State_hash.var) =
+  let is_transition_valid_checked (transition : Snark_transition.var)
+      (previous_state_hash : State_hash.var) =
     let Consensus_transition_data.({signature}) =
       Snark_transition.consensus_data transition
     in
@@ -209,9 +213,11 @@ module Make (Inputs : Inputs_intf) :
         (Public_key.var_of_t Global_public_key.t)
         (transition |> Snark_transition.blockchain_state)
     and previous_state_was_neg_one =
-      State_hash.equal_var previous_state_hash (State_hash.var_of_t (Protocol_state.hash Protocol_state.negative_one))
+      State_hash.equal_var previous_state_hash
+        (State_hash.var_of_t (Protocol_state.hash Protocol_state.negative_one))
     in
-    Snark_params.Tick.Boolean.(signature_verifies || previous_state_was_neg_one)
+    Snark_params.Tick.Boolean.(
+      signature_verifies || previous_state_was_neg_one)
 
   let next_state_checked (state : Consensus_state.var) _state_hash _block =
     let open Consensus_state in

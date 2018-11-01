@@ -1083,7 +1083,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
     ; transactions_sent= !txn_count
     ; run_snark_worker= run_snark_worker t
-    ; propose_pubkey= Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t) }
+    ; propose_pubkey=
+        Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t) }
 
   let get_lite_chain :
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =

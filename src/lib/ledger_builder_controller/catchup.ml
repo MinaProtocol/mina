@@ -25,11 +25,8 @@ struct
     External_transition.protocol_state t
     |> Protocol_state.blockchain_state |> Blockchain_state.ledger_builder_hash
 
-  type t =
-    { net: Net.t
-    ; log: Logger.t
-    ; sl_ref: Sync_ledger.t option ref
-    }
+  type t = {net: Net.t; log: Logger.t; sl_ref: Sync_ledger.t option ref}
+
   let create ~net ~parent_log =
     {net; log= Logger.child parent_log __MODULE__; sl_ref= ref None}
 

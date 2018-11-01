@@ -160,4 +160,3 @@ let read_keypair_exn ~(privkey_path : string)
 let read_keypair_exn' path =
   read_keypair_exn ~privkey_path:path
     ~password:(lazy (read_password_exn "Secret key password: "))
-

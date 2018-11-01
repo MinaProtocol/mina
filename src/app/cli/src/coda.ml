@@ -36,7 +36,10 @@ let daemon (module Kernel : Kernel_intf) log =
        flag "config-directory" ~doc:"DIR Configuration directory"
          (optional file)
      and propose_key =
-       flag "propose-key" ~doc:"FILE Private key file for the proposing transitions (default:don't propose)"
+       flag "propose-key"
+         ~doc:
+           "FILE Private key file for the proposing transitions \
+            (default:don't propose)"
          (optional file)
      and peers =
        flag "peer"
@@ -232,7 +235,9 @@ let daemon (module Kernel : Kernel_intf) log =
          | Some def -> Deferred.map def ~f:Option.return
          | None -> Deferred.return None
        in
-       let%bind propose_keypair = Option.map ~f:Cli_lib.read_keypair_exn' propose_key |> sequence in
+       let%bind propose_keypair =
+         Option.map ~f:Cli_lib.read_keypair_exn' propose_key |> sequence
+       in
        let%bind client_whitelist =
          Reader.load_sexp
            (conf_dir ^/ "client_whitelist")
@@ -257,7 +262,8 @@ let daemon (module Kernel : Kernel_intf) log =
          let work_selection = work_selection
        end in
        let%bind (module Init) =
-         make_init ~should_propose:(Option.is_some propose_keypair)
+         make_init
+           ~should_propose:(Option.is_some propose_keypair)
            (module Config0)
            (module Kernel)
        in
@@ -299,9 +305,7 @@ let daemon (module Kernel : Kernel_intf) log =
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~time_controller:(Inputs.Time.Controller.create ())
-                ?propose_keypair:Config0.propose_keypair
-                ()
-                ~banlist)
+                ?propose_keypair:Config0.propose_keypair () ~banlist)
          in
          let web_service = Web_pipe.get_service () in
          Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;

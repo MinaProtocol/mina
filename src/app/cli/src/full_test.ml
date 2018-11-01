@@ -48,9 +48,7 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
     let work_selection = Protocols.Coda_pow.Work_selection.Seq
   end in
   let%bind (module Init) =
-    make_init ~should_propose:true
-      (module Config)
-      (module Kernel)
+    make_init ~should_propose:true (module Config) (module Kernel)
   in
   let module Main = Coda_main.Make_coda (Init) in
   let module Run = Run (Config) (Main) in

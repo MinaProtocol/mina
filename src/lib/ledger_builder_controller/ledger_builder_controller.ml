@@ -32,8 +32,7 @@ end = struct
           (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: Tip.t
       ; consensus_local_state: Consensus_mechanism.Local_state.t
-      ; longest_tip_location: string
-      }
+      ; longest_tip_location: string }
     [@@deriving make]
   end
 
@@ -174,9 +173,7 @@ end = struct
     in
     let%map net = config.net_deferred in
     let net = Net.create net in
-    let catchup =
-      Catchup.create ~net ~parent_log:log
-    in
+    let catchup = Catchup.create ~net ~parent_log:log in
     (* Here we effectfully listen to transitions and emit what we belive are
        the strongest ledger_builders *)
     let strongest_ledgers_reader, strongest_ledgers_writer =

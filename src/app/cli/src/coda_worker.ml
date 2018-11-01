@@ -142,7 +142,10 @@ module Make (Kernel : Kernel_intf) = struct
 
           let lbc_tree_max_depth = `Finite 50
 
-          let propose_keypair = if should_propose then Some (Genesis_ledger.largest_account_keypair_exn ()) else None
+          let propose_keypair =
+            if should_propose then
+              Some (Genesis_ledger.largest_account_keypair_exn ())
+            else None
 
           let genesis_proof = Precomputed_values.base_proof
 
