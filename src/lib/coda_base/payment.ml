@@ -65,14 +65,16 @@ let gen ~keys ~max_amount ~max_fee =
   let%map sender_idx = Int.gen_incl 0 (Array.length keys - 1)
   and receiver_idx = Int.gen_incl 0 (Array.length keys - 1)
   and fee = Int.gen_incl 0 max_fee >>| Currency.Fee.of_int
-  and amount = Int.gen_incl 1 max_amount >>| Currency.Amount.of_int in
+  and amount = Int.gen_incl 1 max_amount >>| Currency.Amount.of_int
+  and memo = String.gen in
   let sender = keys.(sender_idx) in
   let receiver = keys.(receiver_idx) in
   let payload : Payload.t =
     { receiver= Public_key.compress receiver.Signature_keypair.public_key
     ; fee
     ; amount
-    ; nonce= Account_nonce.zero }
+    ; nonce= Account_nonce.zero
+    ; memo= Sha256_lib.Sha256.digest_string memo }
   in
   sign sender payload
 
