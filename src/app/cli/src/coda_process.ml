@@ -31,7 +31,8 @@ module Make (Kernel : Kernel_intf) = struct
       ; env=
           (* TODO: what about all the PoS env vars? Shouldn't we just inherit? *)
           Option.map proposal_interval ~f:(fun interval ->
-              [("CODA_PROPOSAL_INTERVAL", Int.to_string interval)] )
+              [ ("CODA_PROPOSAL_INTERVAL", Int.to_string interval)
+              ; ("CODA_SLOT_INTERVAL", Int.to_string interval) ] )
           |> Option.value ~default:[]
       ; should_propose
       ; external_port
