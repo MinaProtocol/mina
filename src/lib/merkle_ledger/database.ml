@@ -26,6 +26,8 @@ end)
   module Db_error = struct
     type t = Account_location_not_found | Out_of_leaves | Malformed_database
     [@@deriving sexp]
+
+    exception Db_exception of t
   end
 
   module Path = Merkle_path.Make (Hash)
@@ -238,11 +240,9 @@ end)
     | Error err -> Error err
     | Ok location -> Ok (`Existed, location)
 
-  exception Error_exception of Db_error.t
-
   let get_or_create_account_exn mdb key account =
     get_or_create_account mdb key account
-    |> Result.map_error ~f:(fun err -> Error_exception err)
+    |> Result.map_error ~f:(fun err -> Db_error.Db_exception err)
     |> Result.ok_exn
 
   let num_accounts t =

@@ -1,44 +1,6 @@
 open Core
-open Unsigned
-
-module Balance = struct
-  include UInt64
-  include Binable.Of_stringable (UInt64)
-
-  let equal x y = UInt64.compare x y = 0
-end
-
-module Account = struct
-  type t =
-    { public_key: string
-    ; balance: Balance.t
-           [@printer
-             fun fmt balance ->
-               Format.pp_print_string fmt (Balance.to_string balance)] }
-  [@@deriving bin_io, eq, show, fields]
-
-  let sexp_of_t {public_key; balance} =
-    [%sexp_of: string * string] (public_key, Balance.to_string balance)
-
-  let t_of_sexp sexp =
-    let public_key, string_balance = [%of_sexp: string * string] sexp in
-    let balance = Balance.of_string string_balance in
-    {public_key; balance}
-
-  let set_balance {public_key; _} balance = {public_key; balance}
-
-  let create public_key balance = {public_key; balance= UInt64.of_int balance}
-
-  let empty = {public_key= ""; balance= Balance.zero}
-
-  let gen =
-    let open Quickcheck.Let_syntax in
-    let%bind public_key = String.gen in
-    let%map int_balance = Int.gen in
-    let nat_balance = abs int_balance in
-    let balance = Balance.of_int nat_balance in
-    {public_key; balance}
-end
+module Account = Coda_base.Account
+module Receipt = Coda_base.Receipt
 
 module Hash = struct
   type t = Md5.t [@@deriving sexp, hash, compare, bin_io, eq]
@@ -46,7 +8,8 @@ module Hash = struct
   (* to prevent pre-image attack,
    * important impossible to create an account such that (merge a b = hash_account account) *)
 
-  let hash_account account = Md5.digest_string ("0" ^ Account.show account)
+  let hash_account account =
+    Md5.digest_string ("0" ^ Format.sprintf !"%{sexp: Account.t}" account)
 
   let merge ~height a b =
     let res =
@@ -109,12 +72,29 @@ end
 
 module Key = struct
   module T = struct
-    type t = string [@@deriving sexp, compare, hash, bin_io]
+    type t = Account.key [@@deriving sexp, bin_io, eq, compare, hash]
   end
 
-  let empty = ""
+  let empty = Account.empty.public_key
 
-  let to_string = Fn.id
+  let to_string = Format.sprintf !"%{sexp: T.t}"
+
+  let gen_keys num_keys =
+    (* TODO : the Quickcheck generator for public keys produces duplicates
+       as a workaround, we generate extra keys, remove duplicates, and take as many as needed
+       Issue #1078 notes the problem with the generators
+     *)
+    let num_to_gen = num_keys + (num_keys / 5) in
+    let more_than_enough_keys =
+      Quickcheck.random_value
+        (Quickcheck.Generator.list_with_length num_to_gen
+           Signature_lib.Public_key.Compressed.gen)
+    in
+    let unique_keys =
+      List.dedup_and_sort ~compare:T.compare more_than_enough_keys
+    in
+    assert (List.length unique_keys >= num_keys) ;
+    List.take unique_keys num_keys
 
   include T
   include Hashable.Make_binable (T)

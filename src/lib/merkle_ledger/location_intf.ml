@@ -21,6 +21,8 @@ module type S = sig
 
   val sexp_of_t : t -> Ppx_sexp_conv_lib.Sexp.t
 
+  val equal : t -> t -> bool
+
   val is_generic : t -> bool
 
   val is_account : t -> bool

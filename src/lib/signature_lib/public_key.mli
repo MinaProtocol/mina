@@ -68,6 +68,8 @@ module Compressed : sig
   end
 end
 
+val gen : t Quickcheck.Generator.t
+
 val of_bigstring : Bigstring.t -> t Or_error.t
 
 val to_bigstring : t -> Bigstring.t

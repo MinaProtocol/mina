@@ -62,13 +62,13 @@ let%test_module "Database integration test" =
       let num_accounts = (1 lsl Depth.depth) - 1 in
       let gen_non_zero_balances =
         let open Quickcheck.Generator in
-        list_with_length num_accounts (Int.gen_incl 1 Int.max_value)
+        list_with_length num_accounts Currency.Balance.gen
       in
-      Quickcheck.test ~sexp_of:[%sexp_of: int list] gen_non_zero_balances
-        ~f:(fun balances ->
+      Quickcheck.test ~trials:5 ~sexp_of:[%sexp_of: Currency.Balance.t list]
+        gen_non_zero_balances ~f:(fun balances ->
+          let public_keys = Key.gen_keys num_accounts in
           let accounts =
-            List.mapi balances ~f:(fun account_id balance ->
-                Account.create (Int.to_string account_id) balance )
+            List.map2_exn public_keys balances ~f:Account.create
           in
           let db = DB.create () in
           let ledger = Ledger.create () in
@@ -79,7 +79,7 @@ let%test_module "Database integration test" =
                    @ List.map acc ~f:(List.cons Direction.Left)
                    @ List.map acc ~f:(List.cons Direction.Right) )
           in
-          List.iter accounts ~f:(fun ({public_key; _} as account) ->
+          List.iter accounts ~f:(fun ({Account.public_key; _} as account) ->
               ignore @@ DB.get_or_create_account_exn db public_key account ;
               ignore
               @@ Ledger.get_or_create_account_exn ledger public_key account ) ;

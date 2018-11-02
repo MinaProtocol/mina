@@ -52,6 +52,13 @@ module Make (Depth : Intf.Depth) = struct
   include T
   include Hashable.Make (T)
 
+  let equal loc1 loc2 =
+    match (loc1, loc2) with
+    | Generic bs1, Generic bs2 -> Bigstring.equal bs1 bs2
+    | Account addr1, Account addr2 | Hash addr1, Hash addr2 ->
+        Addr.equal addr1 addr2
+    | _, _ -> false
+
   let is_generic = function Generic _ -> true | _ -> false
 
   let is_account = function Account _ -> true | _ -> false

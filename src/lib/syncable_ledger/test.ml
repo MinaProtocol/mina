@@ -4,7 +4,9 @@ open Async_kernel
 module type Ledger_intf = sig
   include Merkle_ledger.Syncable_intf.S
 
-  val load_ledger : int -> int -> t * string list
+  type key
+
+  val load_ledger : int -> int -> t * key list
 end
 
 module type Input_intf = sig
@@ -14,7 +16,10 @@ module type Input_intf = sig
     val equal : t -> t -> bool
   end
 
-  module L : Ledger_intf with type root_hash := Root_hash.t
+  module L :
+    Ledger_intf
+    with type root_hash := Root_hash.t
+     and type key := Merkle_ledger_tests.Test_stubs.Key.t
 
   module SL :
     Syncable_ledger.S
@@ -130,7 +135,10 @@ module L10 = Test_ledger.Make (struct
   let depth = 10
 end)
 
-let%test_unit "exhaustive depth=10 testing" =
+(* 
+  TODO : put this test along with other lengthy tests
+
+  let%test_unit "exhaustive depth=10 testing" =
   for i = 3 to 1 lsl 10 do
     let module M =
       Make
@@ -141,6 +149,7 @@ let%test_unit "exhaustive depth=10 testing" =
     in
     ()
   done
+ *)
 
 module TestL3_3 =
   Make
@@ -191,12 +200,15 @@ module TestL16_1025 =
       let num_accts = 80
     end)
 
-module TestL16_65536 =
+(*
+  TODO : put this test along with other lengthy tests
+  module TestL16_65536 =
   Make
     (L16)
     (struct
       let num_accts = 65536
     end)
+ *)
 
 module DB3 = Test_db.Make (struct
   let depth = 3
