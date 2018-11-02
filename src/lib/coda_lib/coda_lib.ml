@@ -186,8 +186,6 @@ module type Ledger_builder_controller_intf = sig
 
   type ledger_hash
 
-  type keypair
-
   module Config : sig
     type t =
       { parent_log: Logger.t
@@ -196,8 +194,7 @@ module type Ledger_builder_controller_intf = sig
           (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: tip
       ; consensus_local_state: consensus_local_state
-      ; longest_tip_location: string
-      ; keypair: keypair }
+      ; longest_tip_location: string }
     [@@deriving make]
   end
 
@@ -380,7 +377,6 @@ module type Inputs_intf = sig
      and type ledger_hash := Ledger_hash.t
      and type ledger_proof := Ledger_proof.t
      and type tip := Tip.t
-     and type keypair := Keypair.t
 
   module Proposer :
     Proposer_intf
@@ -409,7 +405,7 @@ module Make (Inputs : Inputs_intf) = struct
   open Inputs
 
   type t =
-    { should_propose: bool
+    { propose_keypair: Keypair.t option
     ; run_snark_worker: bool
     ; net: Net.t
     ; external_transitions:
@@ -429,7 +425,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let run_snark_worker t = t.run_snark_worker
 
-  let should_propose t = t.should_propose
+  let propose_keypair t = t.propose_keypair
 
   let best_ledger_builder t =
     (Ledger_builder_controller.strongest_tip t.ledger_builder).ledger_builder
@@ -469,7 +465,7 @@ module Make (Inputs : Inputs_intf) = struct
   module Config = struct
     type t =
       { log: Logger.t
-      ; should_propose: bool
+      ; propose_keypair: Keypair.t option
       ; run_snark_worker: bool
       ; net_config: Net.Config.t
       ; ledger_builder_persistant_location: string
@@ -477,7 +473,6 @@ module Make (Inputs : Inputs_intf) = struct
       ; snark_pool_disk_location: string
       ; ledger_builder_transition_backup_capacity: int [@default 10]
       ; time_controller: Time.Controller.t
-      ; keypair: Keypair.t
       ; banlist: Coda_base.Banlist.t
       ; snark_work_fee: Currency.Fee.t
       (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
@@ -501,8 +496,7 @@ module Make (Inputs : Inputs_intf) = struct
              ; proof= Genesis.proof }
            ~consensus_local_state
            ~longest_tip_location:config.ledger_builder_persistant_location
-           ~external_transitions:external_transitions_reader
-           ~keypair:config.keypair)
+           ~external_transitions:external_transitions_reader)
     in
     let%bind net =
       Net.create config.net_config
@@ -551,61 +545,64 @@ module Make (Inputs : Inputs_intf) = struct
     Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (_, t) ->
         Net.broadcast_state net t ; Deferred.unit )
     |> don't_wait_for ;
-    if config.should_propose then (
-      let tips_r, tips_w = Linear_pipe.create () in
-      (let tip = Ledger_builder_controller.strongest_tip ledger_builder in
-       Linear_pipe.write_without_pushback tips_w
-         (Proposer.Tip_change
-            { protocol_state= (tip.protocol_state, tip.proof)
-            ; transactions= Transaction_pool.transactions transaction_pool
-            ; ledger_builder= tip.ledger_builder })) ;
-      Linear_pipe.transfer strongest_ledgers_for_miner tips_w
-        ~f:(fun (ledger_builder, transition) ->
-          let protocol_state =
-            Consensus_mechanism.External_transition.protocol_state transition
-          in
-          Debug_assert.debug_assert (fun () ->
-              match Ledger_builder.statement_exn ledger_builder with
-              | `Empty -> ()
-              | `Non_empty
-                  { source
-                  ; target
-                  ; fee_excess
-                  ; proof_type= _
-                  ; supply_increase= _ } ->
-                  let bc_state =
-                    Consensus_mechanism.Protocol_state.blockchain_state
-                      protocol_state
-                  in
-                  [%test_eq: Currency.Fee.Signed.t] Currency.Fee.Signed.zero
-                    fee_excess ;
-                  [%test_eq: Frozen_ledger_hash.t]
-                    (Consensus_mechanism.Blockchain_state.ledger_hash bc_state)
-                    source ;
-                  [%test_eq: Frozen_ledger_hash.t]
-                    ( Ledger_builder.ledger ledger_builder
-                    |> Ledger.merkle_root |> Frozen_ledger_hash.of_ledger_hash
-                    )
-                    target ) ;
-          Proposer.Tip_change
-            { protocol_state=
-                ( protocol_state
-                , Consensus_mechanism.External_transition.protocol_state_proof
-                    transition )
-            ; ledger_builder
-            ; transactions= Transaction_pool.transactions transaction_pool } )
-      |> don't_wait_for ;
-      let transitions =
-        Proposer.create ~parent_log:config.log ~change_feeder:tips_r
-          ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
-          ~time_controller:config.time_controller ~keypair:config.keypair
-          ~consensus_local_state
-      in
-      don't_wait_for
-        (Linear_pipe.transfer_id transitions external_transitions_writer) )
-    else don't_wait_for (Linear_pipe.drain strongest_ledgers_for_miner) ;
+    ( match config.propose_keypair with
+    | Some keypair ->
+        let tips_r, tips_w = Linear_pipe.create () in
+        (let tip = Ledger_builder_controller.strongest_tip ledger_builder in
+         Linear_pipe.write_without_pushback tips_w
+           (Proposer.Tip_change
+              { protocol_state= (tip.protocol_state, tip.proof)
+              ; transactions= Transaction_pool.transactions transaction_pool
+              ; ledger_builder= tip.ledger_builder })) ;
+        Linear_pipe.transfer strongest_ledgers_for_miner tips_w
+          ~f:(fun (ledger_builder, transition) ->
+            let protocol_state =
+              Consensus_mechanism.External_transition.protocol_state transition
+            in
+            Debug_assert.debug_assert (fun () ->
+                match Ledger_builder.statement_exn ledger_builder with
+                | `Empty -> ()
+                | `Non_empty
+                    { source
+                    ; target
+                    ; fee_excess
+                    ; proof_type= _
+                    ; supply_increase= _ } ->
+                    let bc_state =
+                      Consensus_mechanism.Protocol_state.blockchain_state
+                        protocol_state
+                    in
+                    [%test_eq: Currency.Fee.Signed.t] Currency.Fee.Signed.zero
+                      fee_excess ;
+                    [%test_eq: Frozen_ledger_hash.t]
+                      (Consensus_mechanism.Blockchain_state.ledger_hash
+                         bc_state)
+                      source ;
+                    [%test_eq: Frozen_ledger_hash.t]
+                      ( Ledger_builder.ledger ledger_builder
+                      |> Ledger.merkle_root
+                      |> Frozen_ledger_hash.of_ledger_hash )
+                      target ) ;
+            Proposer.Tip_change
+              { protocol_state=
+                  ( protocol_state
+                  , Consensus_mechanism.External_transition
+                    .protocol_state_proof transition )
+              ; ledger_builder
+              ; transactions= Transaction_pool.transactions transaction_pool }
+        )
+        |> don't_wait_for ;
+        let transitions =
+          Proposer.create ~parent_log:config.log ~change_feeder:tips_r
+            ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
+            ~time_controller:config.time_controller ~keypair
+            ~consensus_local_state
+        in
+        don't_wait_for
+          (Linear_pipe.transfer_id transitions external_transitions_writer)
+    | None -> don't_wait_for (Linear_pipe.drain strongest_ledgers_for_miner) ) ;
     return
-      { should_propose= config.should_propose
+      { propose_keypair= config.propose_keypair
       ; run_snark_worker= config.run_snark_worker
       ; net
       ; external_transitions= external_transitions_writer

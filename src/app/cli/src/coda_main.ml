@@ -159,7 +159,7 @@ module type Config_intf = sig
 
   val lbc_tree_max_depth : [`Infinity | `Finite of int]
 
-  val keypair : Keypair.t
+  val propose_keypair : Keypair.t option
 
   val genesis_proof : Snark_params.Tock.Proof.t
 
@@ -420,8 +420,6 @@ struct
 
     let copy t = {t with ledger_builder= Ledger_builder.copy t.ledger_builder}
   end
-
-  let keypair = Init.keypair
 end
 
 module Make_inputs
@@ -903,7 +901,7 @@ module type Main_intf = sig
   module Config : sig
     type t =
       { log: Logger.t
-      ; should_propose: bool
+      ; propose_keypair: Keypair.t option
       ; run_snark_worker: bool
       ; net_config: Inputs.Net.Config.t
       ; ledger_builder_persistant_location: string
@@ -911,7 +909,6 @@ module type Main_intf = sig
       ; snark_pool_disk_location: string
       ; ledger_builder_transition_backup_capacity: int [@default 10]
       ; time_controller: Inputs.Time.Controller.t
-      ; keypair: Keypair.t
       ; banlist: Banlist.t
       ; snark_work_fee: Currency.Fee.t }
     [@@deriving make]
@@ -919,7 +916,7 @@ module type Main_intf = sig
 
   type t
 
-  val should_propose : t -> bool
+  val propose_keypair : t -> Keypair.t option
 
   val run_snark_worker : t -> bool
 
@@ -1067,7 +1064,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
     ; payments_sent= !txn_count
     ; run_snark_worker= run_snark_worker t
-    ; propose= should_propose t }
+    ; propose_pubkey=
+        Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t) }
 
   let get_lite_chain :
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =

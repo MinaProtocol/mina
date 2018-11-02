@@ -3,3 +3,4 @@
 [%%define integration_tests true]
 [%%define debug_logs true]
 [%%define call_logger false]
+[%%define global_signer_real false]

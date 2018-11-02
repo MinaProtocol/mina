@@ -20,9 +20,8 @@ module Make (Kernel : Kernel_intf) = struct
     in
     (discovery_ports, external_ports, peers)
 
-  let local_configs ?(transition_interval = 1000.0) ?proposal_interval
-      ?(should_propose = Fn.const true) n ~program_dir
-      ~snark_worker_public_keys ~work_selection =
+  let local_configs ?proposal_interval ?(should_propose = Fn.const true) n
+      ~program_dir ~snark_worker_public_keys ~work_selection =
     let discovery_ports, external_ports, peers = net_configs n in
     let peers = [] :: List.drop peers 1 in
     let args =
