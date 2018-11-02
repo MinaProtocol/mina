@@ -104,6 +104,8 @@ module Make (Inputs : Inputs_intf) :
   module Ledger_builder_diff = Inputs.Ledger_builder_diff
   module Time = Inputs.Time
 
+  let block_interval_ms = Time.Span.to_ms Inputs.slot_interval
+
   let genesis_ledger_total_currency =
     Coda_base.Ledger.to_list Inputs.Genesis_ledger.t
     |> List.fold_left ~init:Balance.zero ~f:(fun sum account ->
@@ -1002,7 +1004,7 @@ module Make (Inputs : Inputs_intf) :
     in
     (protocol_state, consensus_transition_data)
 
-  let is_transition_valid_checked _transition =
+  let is_transition_valid_checked _transition _ =
     Snark_params.Tick.(Let_syntax.return Boolean.true_)
 
   let next_state_checked previous_state previous_state_hash transition =

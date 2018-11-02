@@ -138,6 +138,7 @@ let write_keypair_exn {Keypair.private_key; public_key; _}
       Writer.close pubkey_f
   | Error e -> raise (Error.to_exn e)
 
+(** Reads a private key from [privkey_path] using [Secret_file] *)
 let read_keypair_exn ~(privkey_path : string)
     ~(password : Secret_file.password) : Keypair.t Deferred.t =
   match%bind Secret_file.read ~path:privkey_path ~password with
@@ -156,4 +157,6 @@ let read_keypair_exn ~(privkey_path : string)
           (Exn.to_string exn) () )
   | Error e -> raise (Error.to_exn e)
 
-(** Reads a private key from [privkey_path] using [Secret_file] *)
+let read_keypair_exn' path =
+  read_keypair_exn ~privkey_path:path
+    ~password:(lazy (read_password_exn "Secret key password: "))
