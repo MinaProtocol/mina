@@ -48,8 +48,7 @@ struct
       let open Interruptible.Let_syntax in
       match%bind
         Interruptible.uninterruptible
-          (Ledger_builder.of_aux_and_ledger ~snarked_ledger_hash
-             ~ledger ~aux)
+          (Ledger_builder.of_aux_and_ledger ~snarked_ledger_hash ~ledger ~aux)
       with
       (* TODO: We'll need the full history in order to trust that
                the ledger builder we get is actually valid. See #285 *)

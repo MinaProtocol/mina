@@ -315,9 +315,7 @@ end = struct
       let source =
         Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root witness
       in
-      let%bind transaction =
-        Ledger.Undo.transaction transaction_with_info
-      in
+      let%bind transaction = Ledger.Undo.transaction transaction_with_info in
       let%bind after =
         Or_error.try_with (fun () ->
             Sparse_ledger.apply_transaction_exn witness transaction )
@@ -326,9 +324,7 @@ end = struct
         Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
       in
       let%bind fee_excess = Transaction.fee_excess transaction in
-      let%map supply_increase =
-        Transaction.supply_increase transaction
-      in
+      let%map supply_increase = Transaction.supply_increase transaction in
       { Ledger_proof_statement.source
       ; target
       ; fee_excess
@@ -394,9 +390,7 @@ end = struct
                      (Ledger_proof.statement proof_1)
                      (Ledger_proof.statement proof_2)
               in
-              (merge_acc
-                acc_statement merged_statement
-                ~verify_proof:(fun () ->
+              merge_acc acc_statement merged_statement ~verify_proof:(fun () ->
                   let open M.Let_syntax in
                   let%map verified_list =
                     M.all
@@ -406,7 +400,6 @@ end = struct
                              (Ledger_proof.statement proof) ))
                   in
                   List.for_all verified_list ~f:Fn.id )
-                )
           | Base None -> M.Or_error.return acc_statement
           | Base (Some transaction) ->
               with_error "Bad base statement" ~f:(fun () ->
@@ -438,50 +431,57 @@ end = struct
         | Ok None -> Error `Empty
         | Ok (Some res) -> Ok res
         | Error e -> Error (`Error e)
-    
-    let check_invariants t error_prefix ledger snarked_ledger_hash =
-      let clarify_error cond err =
-        if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
-      in
-      let open M.Let_syntax in
-      match%map scan_statement t with
-      | Error (`Error e) -> Error e
-      | Error `Empty -> Ok ()
-      | Ok {fee_excess; source; target; supply_increase= _; proof_type= _} ->
-          let open Or_error.Let_syntax in
-          let%map () =
-            Option.value_map ~default:(Ok ()) snarked_ledger_hash
-              ~f:(fun hash ->
-                clarify_error
-                  (Frozen_ledger_hash.equal hash source)
-                  "did not connect with snarked ledger hash" )
-          and () =
-            clarify_error
-              (Frozen_ledger_hash.equal
-                 ( Ledger.merkle_root ledger
-                 |> Frozen_ledger_hash.of_ledger_hash )
-                 target)
-              "incorrect statement target hash"
-          and () =
-            clarify_error
-              (Fee.Signed.equal Fee.Signed.zero fee_excess)
-              "nonzero fee excess"
-          in
-          ()
+
+      let check_invariants t error_prefix ledger snarked_ledger_hash =
+        let clarify_error cond err =
+          if not cond then Or_error.errorf "%s : %s" error_prefix err
+          else Ok ()
+        in
+        let open M.Let_syntax in
+        match%map scan_statement t with
+        | Error (`Error e) -> Error e
+        | Error `Empty -> Ok ()
+        | Ok {fee_excess; source; target; supply_increase= _; proof_type= _} ->
+            let open Or_error.Let_syntax in
+            let%map () =
+              Option.value_map ~default:(Ok ()) snarked_ledger_hash
+                ~f:(fun hash ->
+                  clarify_error
+                    (Frozen_ledger_hash.equal hash source)
+                    "did not connect with snarked ledger hash" )
+            and () =
+              clarify_error
+                (Frozen_ledger_hash.equal
+                   ( Ledger.merkle_root ledger
+                   |> Frozen_ledger_hash.of_ledger_hash )
+                   target)
+                "incorrect statement target hash"
+            and () =
+              clarify_error
+                (Fee.Signed.equal Fee.Signed.zero fee_excess)
+                "nonzero fee excess"
+            in
+            ()
     end
 
-    module Statement_scanner = struct 
+    module Statement_scanner = struct
       module T = struct
         include Monad.Ident
         module Or_error = Or_error
       end
 
-      include Make_statement_scanner(T) (struct 
-        let verify (_: Ledger_proof.t) (_:Ledger_proof_statement.t) ~message:(_: Sok_message.t) = true
-      end)
+      include Make_statement_scanner
+                (T)
+                (struct
+                  let verify (_ : Ledger_proof.t)
+                      (_ : Ledger_proof_statement.t)
+                      ~message:(_ : Sok_message.t) =
+                    true
+                end)
     end
 
-    module Statement_scaner_with_proofs = Make_statement_scanner(Deferred) (Inputs.Ledger_proof_verifier)
+    module Statement_scaner_with_proofs =
+      Make_statement_scanner (Deferred) (Inputs.Ledger_proof_verifier)
 
     let is_valid t =
       Parallel_scan.parallelism ~state:t
@@ -538,8 +538,12 @@ end = struct
           Snark_work_lib.Work.Single.Spec.Transition
             (d.statement, transaction, d.witness)
       | A.Merge ((p1, _), (p2, _)) ->
-          let merged = Ledger_proof_statement.merge (Ledger_proof.statement p1) 
-          (Ledger_proof.statement p2) |> Or_error.ok_exn in
+          let merged =
+            Ledger_proof_statement.merge
+              (Ledger_proof.statement p1)
+              (Ledger_proof.statement p2)
+            |> Or_error.ok_exn
+          in
           Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
     in
     let all_jobs_paired =
@@ -567,10 +571,11 @@ end = struct
       "Error verifying the parallel scan state after applying the diff."
     in
     match Parallel_scan.last_emitted_value aux with
-    | None -> Aux.Statement_scanner.check_invariants
-     aux error_prefix ledger None
+    | None ->
+        Aux.Statement_scanner.check_invariants aux error_prefix ledger None
     | Some proof ->
-        Aux.Statement_scanner.check_invariants aux error_prefix ledger (Some (get_target proof))
+        Aux.Statement_scanner.check_invariants aux error_prefix ledger
+          (Some (get_target proof))
 
   let snarked_ledger :
       t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t =
@@ -631,8 +636,8 @@ end = struct
     in
     let t = {ledger; scan_state= aux} in
     let%bind () =
-      Aux.Statement_scaner_with_proofs.check_invariants aux "Ledger_hash.of_aux_and_ledger" ledger
-        (Some snarked_ledger_hash)
+      Aux.Statement_scaner_with_proofs.check_invariants aux
+        "Ledger_hash.of_aux_and_ledger" ledger (Some snarked_ledger_hash)
     in
     let%map () =
       Deferred.return @@ verify_snarked_ledger t snarked_ledger_hash
