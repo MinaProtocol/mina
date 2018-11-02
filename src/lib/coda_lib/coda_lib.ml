@@ -560,9 +560,9 @@ module Make (Inputs : Inputs_intf) = struct
             let protocol_state =
               Consensus_mechanism.External_transition.protocol_state transition
             in
-            let%bind () =
-              Debug_assert.debug_assert_deferred (fun () ->
-                  match%map Ledger_builder.statement_exn ledger_builder with
+            
+              Debug_assert.debug_assert (fun () ->
+                  match Ledger_builder.statement_exn ledger_builder with
                   | `Empty -> ()
                   | `Non_empty
                       { source
@@ -583,8 +583,8 @@ module Make (Inputs : Inputs_intf) = struct
                         ( Ledger_builder.ledger ledger_builder
                         |> Ledger.merkle_root
                         |> Frozen_ledger_hash.of_ledger_hash )
-                        target )
-            in
+                        target );
+            
             Linear_pipe.write tips_w
               (Proposer.Tip_change
                  { protocol_state=

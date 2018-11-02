@@ -49,6 +49,17 @@ module State : sig
       -> finish:('acc -> 'stop Deferred.t)
       -> 'stop Deferred.t
   end
+
+  module Make_foldable (M : Monad.S) : sig
+    val fold_chronological_until :
+         ('a, 'd) t
+      -> init:'acc
+      -> f:(   'acc
+            -> ('a, 'd) Job.t
+            -> ('acc, 'stop) Container.Continue_or_stop.t M.t)
+      -> finish:('acc -> 'stop M.t)
+      -> 'stop M.t
+  end
 end
 
 module type Spec_intf = sig

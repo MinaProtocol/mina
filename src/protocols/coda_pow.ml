@@ -575,7 +575,7 @@ module type Ledger_builder_intf = sig
   end
 
   val statement_exn :
-    t -> [`Non_empty of ledger_proof_statement | `Empty] Deferred.t
+    t -> [`Non_empty of ledger_proof_statement | `Empty]
 end
 
 module type Tip_intf = sig
