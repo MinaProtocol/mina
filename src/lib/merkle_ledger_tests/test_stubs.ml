@@ -18,10 +18,10 @@ module Account = struct
   [@@deriving bin_io, eq, show, fields]
 
   let sexp_of_t {public_key; balance} =
-    [%sexp_of : string * string] (public_key, Balance.to_string balance)
+    [%sexp_of: string * string] (public_key, Balance.to_string balance)
 
   let t_of_sexp sexp =
-    let public_key, string_balance = [%of_sexp : string * string] sexp in
+    let public_key, string_balance = [%of_sexp: string * string] sexp in
     let balance = Balance.of_string string_balance in
     {public_key; balance}
 
@@ -71,6 +71,9 @@ module In_memory_kvdb : Intf.Key_value_database = struct
 
   let set tbl ~key ~data = Hashtbl.set tbl ~key:(Bigstring.to_string key) ~data
 
+  let set_batch tbl ~key_data_pairs =
+    List.iter key_data_pairs ~f:(fun (key, data) -> set tbl ~key ~data)
+
   let delete tbl ~key = Hashtbl.remove tbl (Bigstring.to_string key)
 
   let copy tbl = Hashtbl.copy tbl
@@ -107,8 +110,6 @@ end
 module Key = struct
   module T = struct
     type t = string [@@deriving sexp, compare, hash, bin_io]
-
-    type key = t [@@deriving sexp, bin_io]
   end
 
   let empty = ""

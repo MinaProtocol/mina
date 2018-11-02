@@ -1,7 +1,32 @@
+[%%import
+"../../../config.mlh"]
+
 open Ppxlib
 open Asttypes
 open Parsetree
 open Core
+
+[%%if
+with_snark]
+
+let key_generation = true
+
+[%%else]
+
+let key_generation = false
+
+[%%endif]
+
+module Proof_of_signature = Consensus.Proof_of_signature.Make (struct
+  module Time = Coda_base.Block_time
+
+  let proposal_interval = Time.Span.of_ms Int64.zero
+
+  module Ledger_builder_diff = Unit
+  module Genesis_ledger = Genesis_ledger
+end)
+
+module Lite_compat = Lite_compat.Make (Proof_of_signature.Blockchain_state)
 
 let pedersen_params ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
@@ -40,7 +65,7 @@ let wrap_vk ~loc =
          vk)
   in
   let%map () =
-    if Coda_base.Insecure.key_generation then Deferred.unit
+    if not key_generation then Deferred.unit
     else
       let%bind () = Unix.mkdir ~p:() Cache_dir.autogen_path in
       Writer.save
@@ -56,15 +81,7 @@ let wrap_vk ~loc =
       (module Lite_base.Crypto_params.Tock.Groth_maller.Verification_key)
       (B64.decode [%e estring vk_base64])]
 
-module Proof_of_signature = Consensus.Proof_of_signature.Make (struct
-  module Time = Coda_base.Block_time
-
-  let proposal_interval = Time.Span.of_ms Int64.zero
-
-  module Ledger_builder_diff = Unit
-end)
-
-let protocol_state (s: Proof_of_signature.Protocol_state.value) :
+let protocol_state (s : Proof_of_signature.Protocol_state.value) :
     Lite_base.Protocol_state.t =
   let open Proof_of_signature in
   let consensus_state =
@@ -76,7 +93,8 @@ let protocol_state (s: Proof_of_signature.Protocol_state.value) :
         ( Protocol_state.previous_state_hash s
           :> Snark_params.Tick.Pedersen.Digest.t )
   ; blockchain_state=
-      Lite_compat.blockchain_state (Protocol_state.blockchain_state s)
+      Lite_compat.blockchain_state
+        (Proof_of_signature.Protocol_state.blockchain_state s)
   ; consensus_state }
 
 let genesis ~loc =

@@ -232,7 +232,8 @@ end = struct
     let get t i = Infix.((t lsr i) land one = one)
 
     let set v i b =
-      if b then Infix.(v lor (one lsl i)) else Infix.(v land lognot (one lsl i))
+      if b then Infix.(v lor (one lsl i))
+      else Infix.(v land lognot (one lsl i))
   end
 
   include (Bits.Vector.Make (Vector) : Bits_intf.S with type t := t)
@@ -243,7 +244,7 @@ end = struct
   let var_to_triples t =
     Bitstring.pad_to_triple_list ~default:Boolean.false_ (var_to_bits t)
 
-  let var_of_bits (bits: Boolean.var Bitstring.Lsb_first.t) : var =
+  let var_of_bits (bits : Boolean.var Bitstring.Lsb_first.t) : var =
     let bits = (bits :> Boolean.var list) in
     let n = List.length bits in
     assert (Int.( <= ) n M.length) ;
@@ -315,7 +316,7 @@ end = struct
 
     let sgn_to_bool = function Sgn.Pos -> true | Neg -> false
 
-    let fold_bits ({sgn; magnitude}: t) =
+    let fold_bits ({sgn; magnitude} : t) =
       { Fold.fold=
           (fun ~init ~f ->
             let init = (fold_bits magnitude).fold ~init ~f in
@@ -326,7 +327,7 @@ end = struct
     let to_triples t =
       List.rev ((fold t).fold ~init:[] ~f:(fun acc x -> x :: acc))
 
-    let add (x: t) (y: t) : t option =
+    let add (x : t) (y : t) : t option =
       match (x.sgn, y.sgn) with
       | Neg, (Neg as sgn) | Pos, (Pos as sgn) ->
           let open Option.Let_syntax in
@@ -336,8 +337,8 @@ end = struct
           let c = compare_magnitude x.magnitude y.magnitude in
           Some
             ( if Int.( < ) c 0 then
-                { sgn= y.sgn
-                ; magnitude= Unsigned.Infix.(y.magnitude - x.magnitude) }
+              { sgn= y.sgn
+              ; magnitude= Unsigned.Infix.(y.magnitude - x.magnitude) }
             else if Int.( > ) c 0 then
               { sgn= x.sgn
               ; magnitude= Unsigned.Infix.(x.magnitude - y.magnitude) }
@@ -368,10 +369,10 @@ end = struct
       let to_triples t =
         Bitstring.pad_to_triple_list ~default:Boolean.false_ (to_bits t)
 
-      let to_field_var ({magnitude; sgn}: var) =
+      let to_field_var ({magnitude; sgn} : var) =
         Tick.Field.Checked.mul (pack_var magnitude) (sgn :> Field.Checked.t)
 
-      let add (x: var) (y: var) =
+      let add (x : var) (y : var) =
         let%bind xv = to_field_var x and yv = to_field_var y in
         let%bind sgn =
           provide_witness Sgn.typ
@@ -390,7 +391,7 @@ end = struct
 
       let ( + ) = add
 
-      let cswap_field (b: Boolean.var) (x, y) =
+      let cswap_field (b : Boolean.var) (x, y) =
         (* (x + b(y - x), y + b(x - y)) *)
         let open Field.Checked.Infix in
         let%map b_y_minus_x =
@@ -429,7 +430,7 @@ end = struct
           | false, true -> Boolean.not cond )
 
     (* Unpacking protects against underflow *)
-    let sub (x: Unpacked.var) (y: Unpacked.var) =
+    let sub (x : Unpacked.var) (y : Unpacked.var) =
       unpack_var (Field.Checked.sub (pack_var x) (pack_var y))
 
     let sub_flagged x y =
@@ -451,22 +452,22 @@ end = struct
           (Typ.tuple2 typ Boolean.typ)
           f
       in
-      Quickcheck.test ~trials:100 (Quickcheck.Generator.tuple2 gen gen) ~f:
-        (fun p ->
+      Quickcheck.test ~trials:100 (Quickcheck.Generator.tuple2 gen gen)
+        ~f:(fun p ->
           let m, u = sub_flagged_unchecked p in
           let m_checked, u_checked = sub_flagged_checked p in
           assert (Bool.equal u u_checked) ;
-          if not u then [%test_eq : magnitude] m m_checked )
+          if not u then [%test_eq: magnitude] m m_checked )
 
     (* Unpacking protects against overflow *)
-    let add (x: Unpacked.var) (y: Unpacked.var) =
+    let add (x : Unpacked.var) (y : Unpacked.var) =
       unpack_var (Field.Checked.add (pack_var x) (pack_var y))
 
     let ( - ) = sub
 
     let ( + ) = add
 
-    let add_signed (t: var) (d: Signed.var) =
+    let add_signed (t : var) (d : Signed.var) =
       let%bind d = Signed.Checked.to_field_var d in
       Field.Checked.add (pack_var t) d |> unpack_var
 
@@ -543,14 +544,16 @@ end
 let currency_length = 64
 
 module Fee =
-  Make (Unsigned_extended.UInt64)
+  Make
+    (Unsigned_extended.UInt64)
     (struct
       let length = currency_length
     end)
 
 module Amount = struct
   module T =
-    Make (Unsigned_extended.UInt64)
+    Make
+      (Unsigned_extended.UInt64)
       (struct
         let length = currency_length
       end)
@@ -564,26 +567,28 @@ module Amount = struct
        and module Signed = T.Signed
        and module Checked := T.Checked )
 
-  let of_fee (fee: Fee.t) : t = fee
+  let of_fee (fee : Fee.t) : t = fee
 
-  let to_fee (fee: t) : Fee.t = fee
+  let to_fee (fee : t) : Fee.t = fee
 
-  let add_fee (t: t) (fee: Fee.t) = add t (of_fee fee)
+  let add_fee (t : t) (fee : Fee.t) = add t (of_fee fee)
 
   module Checked = struct
     include T.Checked
 
-    let of_fee (fee: Fee.var) : var = fee
+    let of_fee (fee : Fee.var) : var = fee
 
-    let to_fee (t: var) : Fee.var = t
+    let to_fee (t : var) : Fee.var = t
 
-    let add_fee (t: var) (fee: Fee.var) =
+    let add_fee (t : var) (fee : Fee.var) =
       Field.Checked.add (pack_var t) (Fee.pack_var fee) |> unpack_var
   end
 end
 
 module Balance = struct
   include (Amount : Basic with type t = Amount.t and type var = Amount.var)
+
+  let to_amount = Fn.id
 
   let add_amount = Amount.add
 

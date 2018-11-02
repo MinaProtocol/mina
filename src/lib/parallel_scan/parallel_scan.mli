@@ -1,5 +1,4 @@
 open Core_kernel
-open Async_kernel
 
 module Ring_buffer : sig
   type 'a t [@@deriving sexp, bin_io]
@@ -31,24 +30,6 @@ module State : sig
   end
 
   val hash : ('a, 'd) t -> ('a -> string) -> ('d -> string) -> Hash.t
-
-  val fold_chronological_until :
-       ('a, 'd) t
-    -> init:'acc
-    -> f:('acc -> ('a, 'd) Job.t -> ('acc, 'stop) Container.Continue_or_stop.t)
-    -> finish:('acc -> 'stop)
-    -> 'stop
-
-  module Deferred : sig
-    val fold_chronological_until :
-         ('a, 'd) t
-      -> init:'acc
-      -> f:(   'acc
-            -> ('a, 'd) Job.t
-            -> ('acc, 'stop) Container.Continue_or_stop.t Deferred.t)
-      -> finish:('acc -> 'stop Deferred.t)
-      -> 'stop Deferred.t
-  end
 
   module Make_foldable (M : Monad.S) : sig
     val fold_chronological_until :

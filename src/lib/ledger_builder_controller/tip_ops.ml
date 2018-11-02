@@ -7,11 +7,11 @@ module Make (Inputs : Inputs.Base.S) = struct
 
   let assert_materialization_of {With_hash.data= t; hash= tip_state_hash}
       {With_hash.data= transition; hash= transition_state_hash} =
-    [%test_result : State_hash.t]
+    [%test_result: State_hash.t]
       ~message:
         "Protocol state in tip should be the target state of the transition"
       ~expect:transition_state_hash tip_state_hash ;
-    [%test_result : Ledger_builder_hash.t]
+    [%test_result: Ledger_builder_hash.t]
       ~message:
         (Printf.sprintf
            !"Ledger_builder_hash inside protocol state inconsistent with \
@@ -26,12 +26,13 @@ module Make (Inputs : Inputs.Base.S) = struct
 
   let transition_unchecked t
       ( {With_hash.data= transition; hash= transition_state_hash} as
-      transition_with_hash ) =
+      transition_with_hash ) logger =
     let%map () =
       let open Deferred.Let_syntax in
       match%map
         Ledger_builder.apply t.Tip.ledger_builder
           (External_transition.ledger_builder_diff transition)
+          ~logger
       with
       | Ok None -> ()
       | Ok (Some _) -> ()

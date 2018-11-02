@@ -2,7 +2,7 @@ module type S = sig
   module Protocol_state : Protocol_state.S
 
   module Ledger_builder_diff : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving bin_io, sexp]
   end
 
   type t [@@deriving sexp, bin_io, compare, eq]
@@ -23,15 +23,15 @@ module type S = sig
 end
 
 module Make (Ledger_builder_diff : sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving bin_io, sexp]
 end)
 (Protocol_state : Protocol_state.S) :
   S
-  with module Protocol_state = Protocol_state
-   and module Ledger_builder_diff = Ledger_builder_diff =
-struct
-  module Protocol_state = Protocol_state
+  with module Ledger_builder_diff = Ledger_builder_diff
+   and module Protocol_state = Protocol_state = struct
   module Ledger_builder_diff = Ledger_builder_diff
+  module Protocol_state = Protocol_state
+  module Blockchain_state = Protocol_state.Blockchain_state
 
   type t =
     { protocol_state: Protocol_state.value

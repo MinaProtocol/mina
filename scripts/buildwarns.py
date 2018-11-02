@@ -11,7 +11,7 @@ errorcodes = {
     '32':    'unused value',
     '33':    'unused open',
     '34':    'unused type',
-    '35':    'unused for-loop index',  
+    '35':    'unused for-loop index',
     '37':    'unused constructor',
     '39':    'unused rec flag.',
     '58':    'no cmx file was found in path for module',
@@ -23,31 +23,33 @@ percode = collections.Counter()
 fulldata = {}
 
 # parse the log
-lastline = ''  # init
+lastline = False  # init
 for line in fileinput.input():
     if 'Warning' in line:
         code=line.split()[1].replace(':','')
         percode[code] += 1
         percode['total'] += 1
-        
-        myfile = lastline.split('"')[1]
-        perfile[myfile] += 1
-        if myfile not in fulldata:  # init
-            fulldata[myfile] = collections.Counter()
-        fulldata[myfile][code] += 1 
-        fulldata[myfile]['total'] += 1
+        if lastline and '"' in lastline:
+            myfile = lastline.split('"')[1]
+            perfile[myfile] += 1
+            if myfile not in fulldata:  # init
+                fulldata[myfile] = collections.Counter()
+            fulldata[myfile][code] += 1
+            fulldata[myfile]['total'] += 1
     lastline=line
 
 print '=' * 80
 print 'Warnings by type/code'
 for key, value in sorted(percode.iteritems(), reverse=True, key=lambda (k,v): (v,k)):
-    print percode[key] , errorcodes[key]
-
+    try:
+        print percode[key] , errorcodes[key]
+    except KeyError:
+        continue
 print '=' * 80
 print 'Warnings by file'
 for key, value in sorted(perfile.iteritems(), reverse=True, key=lambda (k,v): (v,k)):
     print value, key
-    
+
 print '=' * 80
 print 'Warnings detail per file'
 # Walk per file again, but read from full data
@@ -57,4 +59,4 @@ for key, value in sorted(perfile.iteritems(), reverse=True, key=lambda (k,v): (v
     for k in fulldata[key]:
         if k is not 'total':
             print "\t", fulldata[key][k], errorcodes[k]
-    print "\t", fulldata[key]['total'], 'total' 
+    print "\t", fulldata[key]['total'], 'total'

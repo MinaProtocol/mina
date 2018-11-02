@@ -354,18 +354,10 @@ module State = struct
 
   module Foldable_ident = Make_foldable (Monad.Ident)
 
-  let fold_chronological_until = Foldable_ident.fold_chronological_until
-
   let fold_chronological t ~init ~f =
-    fold_chronological_until t ~init
+    Foldable_ident.fold_chronological_until t ~init
       ~f:(fun acc job -> Container.Continue_or_stop.Continue (f acc job))
       ~finish:Fn.id
-
-  module Deferred = struct
-    module Foldable = Make_foldable (Deferred)
-
-    let fold_chronological_until = Foldable.fold_chronological_until
-  end
 end
 
 let start : type a d. parallelism_log_2:int -> (a, d) State.t = State.create

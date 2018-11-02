@@ -13,4 +13,4 @@ pkill -9 kademlia
 pkill -9 coda
 sleep 1
 set -e
-dune exec coda -- integration-tests ${TEST}
+dune exec --profile=test coda -- integration-tests ${TEST}

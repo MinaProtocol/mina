@@ -48,9 +48,10 @@ let%test_module "test functor on in memory databases" =
       let ledger, _ = L16.load_ledger n b in
       L16.num_accounts ledger = n
 
-    let get (type t key account) (module L
-        : Merkle_ledger.Ledger_intf.S with type t = t and type key = key and type account = 
-          account) ledger public_key =
+    let get (type t key account)
+        (module L : Merkle_ledger.Ledger_intf.S
+          with type t = t and type key = key and type account = account) ledger
+        public_key =
       let open Option.Let_syntax in
       let%bind location = L.location_of_key ledger public_key in
       L.get ledger location
@@ -143,12 +144,13 @@ let%test_module "test functor on in memory databases" =
 
     module Path = Merkle_ledger.Merkle_path.Make (Hash)
 
-    let check_path account (path: Path.t) root =
+    let check_path account (path : Path.t) root =
       Path.check_path path (Hash.hash_account account) root
 
-    let merkle_path (type t key hash) (module L
-        : Merkle_ledger.Ledger_intf.S with type t = t and type key = key and type hash = 
-          hash) ledger public_key =
+    let merkle_path (type t key hash)
+        (module L : Merkle_ledger.Ledger_intf.S
+          with type t = t and type key = key and type hash = hash) ledger
+        public_key =
       L.location_of_key ledger public_key
       |> Option.value_exn |> L.merkle_path ledger
 
@@ -245,7 +247,7 @@ let%test_module "test functor on in memory databases" =
           let old_hash = L16.get_inner_hash_at_addr_exn ledger a in
           L16.set_inner_hash_at_addr_exn ledger a hash_to_set ;
           let res =
-            [%test_result : Hash.t] ~equal:Hash.equal
+            [%test_result: Hash.t] ~equal:Hash.equal
               (L16.get_inner_hash_at_addr_exn ledger a)
               ~expect:hash_to_set
           in
@@ -271,7 +273,7 @@ let%test_module "test functor on in memory databases" =
       let og_hash = L16.merkle_root (L16.create ()) in
       let l1, keys = L16.load_ledger 10 1 in
       L16.remove_accounts_exn l1 keys ;
-      [%test_eq : Hash.t] (L16.merkle_root l1) og_hash
+      [%test_eq: Hash.t] (L16.merkle_root l1) og_hash
 
     let%test_unit "set_all_accounts_rooted_at can grow the ledger" =
       let l1, _ = L16.load_ledger 1026 1 in
@@ -292,7 +294,7 @@ let%test_module "test functor on in memory databases" =
       L16.set_all_accounts_rooted_at_exn l1
         (L16.Addr.of_directions Direction.[Left; Left; Left; Left; Left; Right])
         right_subtree ;
-      [%test_eq : Hash.t] (L16.merkle_root l1) (L16.merkle_root l2)
+      [%test_eq: Hash.t] (L16.merkle_root l1) (L16.merkle_root l2)
 
     let%test_unit "set_all_accounts_rooted_at . get_all_accounts_rooted_at \
                    works for any root" =
@@ -311,8 +313,8 @@ let%test_module "test functor on in memory databases" =
             let%bind allocated_length = Int.gen_incl 0 (1 lsl depth) in
             return (allocated_length, path, subtree_accounts)
           in
-          Quickcheck.test gen ~trials:500 ~f:
-            (fun (allocated_length, path, subtree_accounts) ->
+          Quickcheck.test gen ~trials:500
+            ~f:(fun (allocated_length, path, subtree_accounts) ->
               let l, _ = L.load_ledger allocated_length 10 in
               L.set_all_accounts_rooted_at_exn l
                 (L.Addr.of_directions path)
@@ -343,7 +345,7 @@ let%test_module "test functor on in memory databases" =
     let%test_unit "set_all_accounts_rooted_at_exn can work out of order" =
       let l1, _ = L16.load_ledger 8 1 in
       let l2, _ = L16.load_ledger 2 1 in
-      let pr = Direction.(List.init 13 (fun _ -> Left)) in
+      let pr = Direction.(List.init 13 ~f:(fun _ -> Left)) in
       let rr = L16.Addr.of_directions Direction.(pr @ [Right; Right]) in
       let rl = L16.Addr.of_directions Direction.(pr @ [Right; Left]) in
       let lr = L16.Addr.of_directions Direction.(pr @ [Left; Right]) in

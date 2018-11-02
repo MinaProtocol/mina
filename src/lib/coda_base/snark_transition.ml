@@ -8,7 +8,19 @@ module type Consensus_data_intf = sig
   val genesis : value
 end
 
+module type Inputs_intf = sig
+  module Genesis_ledger : sig
+    val t : Ledger.t
+  end
+
+  module Blockchain_state : Blockchain_state.S
+
+  module Consensus_data : Consensus_data_intf
+end
+
 module type S = sig
+  module Blockchain_state : Blockchain_state.S
+
   module Consensus_data : Consensus_data_intf
 
   type ('blockchain_state, 'consensus_data, 'sok_digest, 'supply_increase) t
@@ -29,9 +41,8 @@ module type S = sig
     , Currency.Amount.var )
     t
 
-  include Snark_params.Tick.Snarkable.S
-          with type value := value
-           and type var := var
+  include
+    Snark_params.Tick.Snarkable.S with type value := value and type var := var
 
   val create_value :
        ?sok_digest:Sok_message.Digest.t
@@ -55,10 +66,11 @@ module type S = sig
   val genesis : value
 end
 
-module Make (Consensus_data : Consensus_data_intf) :
-  S with module Consensus_data = Consensus_data =
-struct
-  module Consensus_data = Consensus_data
+module Make (Inputs : Inputs_intf) :
+  S
+  with module Blockchain_state = Inputs.Blockchain_state
+   and module Consensus_data = Inputs.Consensus_data = struct
+  include Inputs
 
   type ('blockchain_state, 'consensus_data, 'sok_digest, 'supply_increase) t =
     { blockchain_state: 'blockchain_state
@@ -83,7 +95,7 @@ struct
     , Currency.Amount.var )
     t
 
-  let create_value ?(sok_digest= Sok_message.Digest.default) ?ledger_proof
+  let create_value ?(sok_digest = Sok_message.Digest.default) ?ledger_proof
       ~supply_increase ~blockchain_state ~consensus_data () =
     { blockchain_state
     ; consensus_data
@@ -160,6 +172,9 @@ struct
     ; supply_increase= Currency.Amount.zero
     ; sok_digest=
         Sok_message.digest
-          {fee= Currency.Fee.zero; prover= Genesis_ledger.high_balance_pk}
+          { fee= Currency.Fee.zero
+          ; prover=
+              Account.public_key
+                (List.hd_exn (Ledger.to_list Genesis_ledger.t)) }
     ; ledger_proof= None }
 end

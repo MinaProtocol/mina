@@ -11,17 +11,17 @@ let try_load bin_t path =
       Logger.info logger "Loaded value successfully from %s" path ;
       Ok {path; value= data; checksum}
   | Error `Checksum_no_match -> Or_error.error_string "Checksum failure"
-  | Error ((`IO_error _ | `No_exist) as err) ->
+  | Error ((`IO_error _ | `No_exist) as err) -> (
     match err with
     | `IO_error e ->
         Or_error.errorf "Could not load value. The error was: %s"
           (Error.to_string_hum e)
     | `No_exist ->
-        Or_error.error_string "Cached value not found in default location"
+        Or_error.error_string "Cached value not found in default location" )
 
 module Component = struct
   type (_, 'env) t =
-    | Load:
+    | Load :
         { label: string
         ; f: 'env -> 'a
         ; bin_t: 'a Bin_prot.Type_class.t }
@@ -45,8 +45,8 @@ end
 module With_components = struct
   module T = struct
     type ('a, 'env) t =
-      | Pure: 'a -> ('a, 'env) t
-      | Ap: ('a, 'env) Component.t * ('a -> 'b, 'env) t -> ('b, 'env) t
+      | Pure : 'a -> ('a, 'env) t
+      | Ap : ('a, 'env) Component.t * ('a -> 'b, 'env) t -> ('b, 'env) t
 
     let return x = Pure x
 
@@ -99,9 +99,7 @@ module With_components = struct
 
       let both t1 t2 = apply (map t1 ~f:(fun x y -> (x, y))) t2
 
-      module Open_on_rhs = struct
-        
-      end
+      module Open_on_rhs = struct end
     end
   end
 end
@@ -115,7 +113,7 @@ let component ~label ~f bin_t =
 
 module Spec = struct
   type 'a t =
-    | T:
+    | T :
         { load: ('a, 'env) With_components.t
         ; name: string
         ; autogen_path: string
@@ -156,7 +154,7 @@ let run
       Core.printf "Loaded %s from manual installation path %s\n" name
         manual_install_path ;
       return x
-  | Error _e ->
+  | Error _e -> (
       Core.printf
         "Could not load %s from manual installation path %s. Trying the \
          autogen path %s...\n"
@@ -171,4 +169,4 @@ let run
             "Could not load %s from autogen path %s. Autogenerating...\n" name
             autogen_path ;
           let%bind () = Unix.mkdir ~p:() autogen_path in
-          With_components.store load ~base_path ~env:(create_env input)
+          With_components.store load ~base_path ~env:(create_env input) )

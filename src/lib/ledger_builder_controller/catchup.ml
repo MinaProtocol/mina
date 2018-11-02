@@ -25,19 +25,14 @@ struct
     External_transition.protocol_state t
     |> Protocol_state.blockchain_state |> Blockchain_state.ledger_builder_hash
 
-  type t =
-    { net: Net.t
-    ; log: Logger.t
-    ; sl_ref: Sync_ledger.t option ref
-    ; public_key: Public_key.Compressed.t }
+  type t = {net: Net.t; log: Logger.t; sl_ref: Sync_ledger.t option ref}
 
-  let create ~net ~parent_log ~public_key =
-    {net; log= Logger.child parent_log __MODULE__; sl_ref= ref None; public_key}
+  let create ~net ~parent_log =
+    {net; log= Logger.child parent_log __MODULE__; sl_ref= ref None}
 
   (* Perform the `Sync interruptible work *)
-  let do_sync {net; log; sl_ref; public_key}
-      ~(old_state: Transition_logic_state.t)
-      ~(state_mutator:
+  let do_sync {net; log; sl_ref} ~(old_state : Transition_logic_state.t)
+      ~(state_mutator :
             Transition_logic_state.t
          -> Transition_logic_state.Change.t list
          -> External_transition.t
@@ -53,7 +48,7 @@ struct
       let open Interruptible.Let_syntax in
       match%bind
         Interruptible.uninterruptible
-          (Ledger_builder.of_aux_and_ledger ~public_key ~snarked_ledger_hash
+          (Ledger_builder.of_aux_and_ledger ~snarked_ledger_hash
              ~ledger ~aux)
       with
       (* TODO: We'll need the full history in order to trust that
@@ -139,7 +134,7 @@ struct
     in
     (work, ivar)
 
-  let sync (t: t) ~(old_state: Transition_logic_state.t) ~state_mutator
+  let sync (t : t) ~(old_state : Transition_logic_state.t) ~state_mutator
       transition_with_hash =
     Job.create transition_with_hash ~f:(do_sync ~old_state ~state_mutator t)
 end

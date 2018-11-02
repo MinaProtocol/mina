@@ -132,15 +132,15 @@ end
 module type Ledger_intf = sig
   type t [@@deriving sexp, bin_io]
 
-  type super_transaction
+  type transaction
 
   module Undo : sig
     type t [@@deriving sexp, bin_io]
 
-    val super_transaction : t -> super_transaction Or_error.t
+    val transaction : t -> transaction Or_error.t
   end
 
-  type valid_transaction
+  type valid_payment
 
   type ledger_hash
 
@@ -152,7 +152,7 @@ module type Ledger_intf = sig
 
   val merkle_root : t -> ledger_hash
 
-  val apply_super_transaction : t -> super_transaction -> Undo.t Or_error.t
+  val apply_transaction : t -> transaction -> Undo.t Or_error.t
 
   val undo : t -> Undo.t -> unit Or_error.t
 end
@@ -185,7 +185,7 @@ module type Snark_pool_proof_intf = sig
   type t [@@deriving sexp, bin_io]
 end
 
-module type Transaction_intf = sig
+module type Payment_intf = sig
   type t [@@deriving sexp, compare, eq, bin_io]
 
   type public_key
@@ -265,15 +265,15 @@ module type Coinbase_intf = sig
     -> t Or_error.t
 end
 
-module type Super_transaction_intf = sig
-  type valid_transaction
+module type Transaction_intf = sig
+  type valid_payment
 
   type fee_transfer
 
   type coinbase
 
   type t =
-    | Transaction of valid_transaction
+    | Payment of valid_payment
     | Fee_transfer of fee_transfer
     | Coinbase of coinbase
   [@@deriving sexp, compare, eq, bin_io]
@@ -331,6 +331,10 @@ module type Ledger_proof_verifier_intf = sig
   val verify : ledger_proof -> statement -> message:message -> bool Deferred.t
 end
 
+module Work_selection = struct
+  type t = Seq | Random [@@deriving bin_io]
+end
+
 module type Completed_work_intf = sig
   type proof
 
@@ -373,9 +377,9 @@ module type Completed_work_intf = sig
 end
 
 module type Ledger_builder_diff_intf = sig
-  type transaction
+  type payment
 
-  type transaction_with_valid_signature
+  type payment_with_valid_signature
 
   type ledger_builder_hash
 
@@ -398,8 +402,7 @@ module type Ledger_builder_diff_intf = sig
     val increase : 'a t -> 'a list -> 'a t Or_error.t
   end
 
-  type diff =
-    {completed_works: completed_work list; transactions: transaction list}
+  type diff = {completed_works: completed_work list; payments: payment list}
   [@@deriving sexp, bin_io]
 
   type diff_with_at_most_two_coinbase =
@@ -423,7 +426,7 @@ module type Ledger_builder_diff_intf = sig
   module With_valid_signatures_and_proofs : sig
     type diff =
       { completed_works: completed_work_checked list
-      ; transactions: transaction_with_valid_signature list }
+      ; payments: payment_with_valid_signature list }
     [@@deriving sexp]
 
     type diff_with_at_most_two_coinbase =
@@ -446,12 +449,12 @@ module type Ledger_builder_diff_intf = sig
       ; creator: public_key }
     [@@deriving sexp]
 
-    val transactions : t -> transaction_with_valid_signature list
+    val payments : t -> payment_with_valid_signature list
   end
 
   val forget : With_valid_signatures_and_proofs.t -> t
 
-  val transactions : t -> transaction list
+  val payments : t -> payment list
 end
 
 module type Ledger_builder_transition_intf = sig
@@ -483,8 +486,6 @@ module type Ledger_builder_base_intf = sig
 
   type ledger_proof
 
-  type public_key
-
   type ledger
 
   module Aux : sig
@@ -497,11 +498,10 @@ module type Ledger_builder_base_intf = sig
 
   val ledger : t -> ledger
 
-  val create : ledger:ledger -> self:public_key -> t
+  val create : ledger:ledger -> t
 
   val of_aux_and_ledger :
        snarked_ledger_hash:frozen_ledger_hash
-    -> public_key:public_key
     -> ledger:ledger
     -> aux:Aux.t
     -> t Or_error.t Deferred.t
@@ -512,7 +512,8 @@ module type Ledger_builder_base_intf = sig
 
   val aux : t -> Aux.t
 
-  val apply : t -> diff -> ledger_proof option Deferred.Or_error.t
+  val apply :
+    t -> diff -> logger:Logger.t -> ledger_proof option Deferred.Or_error.t
 
   val snarked_ledger :
     t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t
@@ -525,9 +526,9 @@ module type Ledger_builder_intf = sig
 
   type ledger_hash
 
-  type super_transaction
+  type transaction
 
-  type transaction_with_valid_signature
+  type payment_with_valid_signature
 
   type statement
 
@@ -539,6 +540,8 @@ module type Ledger_builder_intf = sig
 
   type completed_work
 
+  type public_key
+
   val ledger : t -> ledger
 
   val current_ledger_proof : t -> ledger_proof option
@@ -547,35 +550,54 @@ module type Ledger_builder_intf = sig
 
   val create_diff :
        t
+    -> self:public_key
     -> logger:Logger.t
-    -> transactions_by_fee:transaction_with_valid_signature Sequence.t
+    -> transactions_by_fee:payment_with_valid_signature Sequence.t
     -> get_completed_work:(statement -> completed_work option)
     -> valid_diff
        * [`Hash_after_applying of ledger_builder_hash]
        * [`Ledger_proof of ledger_proof option]
 
-  module Coordinator : sig
-    module State : sig
-      type t
-
-      val init : t
-    end
-
-    val random_work_spec_chunk :
-         t
-      -> State.t
-      -> ( ledger_proof_statement
-         , super_transaction
+  val all_work_pairs :
+       t
+    -> ( ( ledger_proof_statement
+         , transaction
          , sparse_ledger
          , ledger_proof )
          Snark_work_lib.Work.Single.Spec.t
-         list
-         option
-         * State.t
-  end
+       * ( ledger_proof_statement
+         , transaction
+         , sparse_ledger
+         , ledger_proof )
+         Snark_work_lib.Work.Single.Spec.t
+         option )
+       list
 
   val statement_exn :
     t -> [`Non_empty of ledger_proof_statement | `Empty]
+end
+
+module type Work_selector_intf = sig
+  type ledger_builder
+
+  type work
+
+  type snark_pool
+
+  type fee
+
+  module State : sig
+    type t
+
+    val init : t
+  end
+
+  val work :
+       snark_pool:snark_pool
+    -> fee:fee
+    -> ledger_builder
+    -> State.t
+    -> work list * State.t
 end
 
 module type Tip_intf = sig
@@ -598,48 +620,28 @@ module type Tip_intf = sig
   val copy : t -> t
 end
 
-module type Blockchain_state_intf = sig
+module type Consensus_mechanism_intf = sig
+  type proof
+
+  type ledger
+
+  type frozen_ledger_hash
+
   type ledger_builder_hash
 
-  type ledger_hash
+  type ledger_builder_diff
 
-  type time
-
-  type value [@@deriving sexp, bin_io]
-
-  type var
-
-  val create_value :
-       ledger_builder_hash:ledger_builder_hash
-    -> ledger_hash:ledger_hash
-    -> timestamp:time
-    -> value
-
-  val ledger_builder_hash : value -> ledger_builder_hash
-
-  val ledger_hash : value -> ledger_hash
-
-  val timestamp : value -> time
-end
-
-module type Consensus_mechanism_intf = sig
   type protocol_state_proof
 
   type protocol_state_hash
 
-  type blockchain_state
-
-  type proof
-
-  type ledger_builder_diff
-
-  type transaction
+  type payment
 
   type sok_digest
 
-  type ledger
-
   type keypair
+
+  type time
 
   module Local_state : sig
     type t [@@deriving sexp]
@@ -659,6 +661,24 @@ module type Consensus_mechanism_intf = sig
     type var
   end
 
+  module Blockchain_state : sig
+    type value [@@deriving sexp, bin_io]
+
+    type var
+
+    val create_value :
+         ledger_builder_hash:ledger_builder_hash
+      -> ledger_hash:frozen_ledger_hash
+      -> timestamp:time
+      -> value
+
+    val ledger_builder_hash : value -> ledger_builder_hash
+
+    val ledger_hash : value -> frozen_ledger_hash
+
+    val timestamp : value -> time
+  end
+
   module Protocol_state : sig
     type value [@@deriving sexp, bin_io, eq, compare]
 
@@ -666,13 +686,13 @@ module type Consensus_mechanism_intf = sig
 
     val create_value :
          previous_state_hash:protocol_state_hash
-      -> blockchain_state:blockchain_state
+      -> blockchain_state:Blockchain_state.value
       -> consensus_state:Consensus_state.value
       -> value
 
     val previous_state_hash : value -> protocol_state_hash
 
-    val blockchain_state : value -> blockchain_state
+    val blockchain_state : value -> Blockchain_state.value
 
     val consensus_state : value -> Consensus_state.value
 
@@ -688,12 +708,12 @@ module type Consensus_mechanism_intf = sig
          ?sok_digest:sok_digest
       -> ?ledger_proof:proof
       -> supply_increase:Currency.Amount.t
-      -> blockchain_state:blockchain_state
+      -> blockchain_state:Blockchain_state.value
       -> consensus_data:Consensus_transition_data.value
       -> unit
       -> value
 
-    val blockchain_state : value -> blockchain_state
+    val blockchain_state : value -> Blockchain_state.value
 
     val consensus_data : value -> Consensus_transition_data.value
   end
@@ -727,12 +747,23 @@ module type Consensus_mechanism_intf = sig
 
   val generate_transition :
        previous_protocol_state:Protocol_state.value
-    -> blockchain_state:blockchain_state
+    -> blockchain_state:Blockchain_state.value
     -> local_state:Local_state.t
     -> time:Int64.t
     -> keypair:keypair
-    -> transactions:transaction list
+    -> transactions:payment list
+    -> ledger:ledger
+    -> supply_increase:Currency.Amount.t
+    -> logger:Logger.t
     -> (Protocol_state.value * Consensus_transition_data.value) option
+
+  val next_proposal :
+       Int64.t
+    -> Consensus_state.value
+    -> local_state:Local_state.t
+    -> keypair:keypair
+    -> logger:Logger.t
+    -> [`Check_again of Int64.t | `Propose of Int64.t]
 end
 
 module type Time_close_validator_intf = sig
@@ -831,8 +862,7 @@ module type Inputs_intf = sig
     with type private_key := Private_key.t
      and type public_key := Public_key.t
 
-  module Transaction :
-    Transaction_intf with type public_key := Public_key.Compressed.t
+  module Payment : Payment_intf with type public_key := Public_key.Compressed.t
 
   module Fee_transfer :
     Fee_transfer_intf with type public_key := Public_key.Compressed.t
@@ -842,9 +872,9 @@ module type Inputs_intf = sig
     with type public_key := Public_key.Compressed.t
      and type fee_transfer := Fee_transfer.single
 
-  module Super_transaction :
-    Super_transaction_intf
-    with type valid_transaction := Transaction.With_valid_signature.t
+  module Transaction :
+    Transaction_intf
+    with type valid_payment := Payment.With_valid_signature.t
      and type fee_transfer := Fee_transfer.t
      and type coinbase := Coinbase.t
 
@@ -881,8 +911,8 @@ module type Inputs_intf = sig
 
   module Ledger :
     Ledger_intf
-    with type valid_transaction := Transaction.With_valid_signature.t
-     and type super_transaction := Super_transaction.t
+    with type valid_payment := Payment.With_valid_signature.t
+     and type transaction := Transaction.t
      and type ledger_hash := Ledger_hash.t
 
   module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
@@ -919,7 +949,6 @@ Merge Snark:
       p23 verifies s2 -> s3 is a valid transition with fee_excess23
       fee_excess_total = fee_excess12 + fee_excess23
   *)
-
   module Time_close_validator :
     Time_close_validator_intf with type time := Time.t
 
@@ -931,9 +960,8 @@ Merge Snark:
 
   module Ledger_builder_diff :
     Ledger_builder_diff_intf
-    with type transaction := Transaction.t
-     and type transaction_with_valid_signature :=
-                Transaction.With_valid_signature.t
+    with type payment := Payment.t
+     and type payment_with_valid_signature := Payment.With_valid_signature.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type public_key := Public_key.Compressed.t
      and type completed_work := Completed_work.t
@@ -955,14 +983,13 @@ Merge Snark:
      and type public_key := Public_key.Compressed.t
      and type ledger := Ledger.t
      and type ledger_proof := Ledger_proof.t
-     and type transaction_with_valid_signature :=
-                Transaction.With_valid_signature.t
+     and type payment_with_valid_signature := Payment.With_valid_signature.t
      and type statement := Completed_work.Statement.t
      and type completed_work := Completed_work.Checked.t
      and type sparse_ledger := Sparse_ledger.t
      and type ledger_proof_statement := Ledger_proof_statement.t
      and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
-     and type super_transaction := Super_transaction.t
+     and type transaction := Transaction.t
 
   module Ledger_builder_transition :
     Ledger_builder_transition_intf
@@ -971,27 +998,23 @@ Merge Snark:
      and type diff_with_valid_signatures_and_proofs :=
                 Ledger_builder_diff.With_valid_signatures_and_proofs.t
 
-  module Blockchain_state :
-    Blockchain_state_intf
-    with type ledger_builder_hash := Ledger_builder_hash.t
-     and type ledger_hash := Frozen_ledger_hash.t
-     and type time := Time.t
-
   module Protocol_state_hash : Protocol_state_hash_intf
 
   module Protocol_state_proof : Protocol_state_proof_intf
 
   module Consensus_mechanism :
     Consensus_mechanism_intf
-    with type protocol_state_hash := Protocol_state_hash.t
+    with type proof := Proof.t
+     and type protocol_state_hash := Protocol_state_hash.t
      and type protocol_state_proof := Protocol_state_proof.t
-     and type blockchain_state := Blockchain_state.value
-     and type proof := Proof.t
+     and type frozen_ledger_hash := Frozen_ledger_hash.t
+     and type ledger_builder_hash := Ledger_builder_hash.t
      and type ledger_builder_diff := Ledger_builder_diff.t
-     and type transaction := Transaction.t
+     and type payment := Payment.t
      and type sok_digest := Sok_message.Digest.t
      and type ledger := Ledger.t
      and type keypair := Keypair.t
+     and type time := Time.t
 
   module Tip :
     Tip_intf
@@ -1005,13 +1028,15 @@ module Make
     (Inputs : Inputs_intf)
     (Block_state_transition_proof : Block_state_transition_proof_intf
                                     with type protocol_state :=
-                                                Inputs.Consensus_mechanism.
-                                                Protocol_state.value
+                                                Inputs.Consensus_mechanism
+                                                .Protocol_state
+                                                .value
                                      and type protocol_state_proof :=
                                                 Inputs.Protocol_state_proof.t
                                      and type internal_transition :=
-                                                Inputs.Consensus_mechanism.
-                                                Internal_transition.t) =
+                                                Inputs.Consensus_mechanism
+                                                .Internal_transition
+                                                .t) =
 struct
   open Inputs
 

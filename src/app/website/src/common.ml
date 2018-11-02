@@ -13,10 +13,12 @@ module Styles = struct
   let copytext = Style.of_class "lh-copy f4 fw3 silver"
 
   let heading_style = ["ttu"; "tracked"; "fw4"]
+
+  let clean_hr = Style.of_class "ml0 mr0 mt0 mb0 b0 h2px bg-extradarksnow"
 end
 
 module Image = struct
-  let draw ?(style= Style.empty) src xy =
+  let draw ?(style = Style.empty) src xy =
     let inline_style =
       match xy with
       | `Fixed_width x ->
@@ -33,7 +35,7 @@ module Image = struct
       (String.concat ~sep:" " style)
       src
 
-  let placeholder ?(style= Style.empty) x y =
+  let placeholder ?(style = Style.empty) x y =
     let xStr = Int.to_string x in
     let yStr = Int.to_string y in
     draw ~style
@@ -133,6 +135,8 @@ module Links = struct
   let jobs = ("Jobs", "jobs.html", "jobs")
 
   let testnet = ("Testnet", "testnet.html", "testnet")
+
+  let code = ("Code", "code.html", "code")
 end
 
 module Input_button = struct
@@ -176,14 +180,14 @@ module Input_button = struct
       @ if new_tab then [Attribute.create "target" "_blank"] else [] )
       [button_node]
 
-  let cta ?(extra_style= "") ?(new_tab= true) ~label ~button_hint ~url () =
+  let cta ?(extra_style = "") ?(new_tab = true) ~label ~button_hint ~url () =
     let open Html in
     let open Html_concise in
     create ~button_hint:(`Text button_hint) ~new_tab
       ~extra_style:(Style.of_class ("f3 ph4 pv3 " ^ extra_style))
       ~label ~url ()
 
-  let fixed ?(new_tab= true) ~button_hint () =
+  let fixed ?(new_tab = true) ~button_hint () =
     let open Html in
     let open Html_concise in
     create ~button_hint:(`Text button_hint)
@@ -192,33 +196,61 @@ module Input_button = struct
 end
 
 module Navbar = struct
+  let coda style =
+    let open Html_concise in
+    Mobile_switch.create
+      ~not_small:
+        (div []
+           [ node "img"
+               [ Attribute.create "width" "220px"
+               ; Attribute.src "/static/img/logo.svg"
+               ; Style.render style ]
+               [] ])
+      ~small:
+        (div
+           [Style.just "flex justify-center"]
+           [ node "img"
+               [ Attribute.create "width" "220px"
+               ; Attribute.src "/static/img/logo.svg"
+               ; Style.render style ]
+               [] ])
+
+  let anchor style url children label open_new_tab =
+    let open Html_concise in
+    let extra_attrrs =
+      if open_new_tab then [Attribute.create "target" "_blank"] else []
+    in
+    node "a"
+      ( [ href url
+        ; analytics_handler (sprintf "navbar-%s" label)
+        ; Style.(render (style + of_class "hover-link")) ]
+      @ extra_attrrs )
+      children
+
+  let top_margins = Style.of_class "mt3 mt4-m mt5-l center"
+
+  let simple_nav =
+    let open Html in
+    let open Html_concise in
+    div
+      [Style.(render (top_margins + of_class "mw7 ph3 mb4"))]
+      [ div [Style.just "ph2"]
+          [ div [Style.just "mb3"]
+              [ anchor [] "./"
+                  [coda (Style.of_class "ml-15px-ns ml-20px")]
+                  "coda-home" false ]
+          ; hr [Style.(render (of_class "w-50-ns w-100" + Styles.clean_hr))] ]
+      ]
+
   let navbar current_page =
     let open Html in
     let open Html_concise in
-    let a style url children label open_new_tab =
-      let extra_attrrs =
-        if open_new_tab then [Attribute.create "target" "_blank"] else []
-      in
-      node "a"
-        ( [ href url
-          ; analytics_handler (sprintf "navbar-%s" label)
-          ; Style.(render (style + of_class "hover-link")) ]
-        @ extra_attrrs )
-        children
-    in
-    let coda style =
-      div [Style.render style]
-        [ node "img"
-            [ Attribute.create "width" "170px"
-            ; Attribute.src "/static/img/logo.svg" ]
-            [] ]
-    in
     let maybe_no_underline label =
       if current_page = label then Style.empty
       else Style.of_class "no-underline"
     in
-    let a' ?(open_new_tab= false) ?(style= Style.empty) url children label =
-      a
+    let a' ?(open_new_tab = false) ?(style = Style.empty) url children label =
+      anchor
         Style.(
           of_class "fw3 silver tracked ttu" + style + maybe_no_underline label)
         url children label open_new_tab
@@ -226,9 +258,10 @@ module Navbar = struct
     div
       [ Style.(
           render
-            ( of_class "flex items-center mw9 center mt3 mt4-m mt5-l mb4 mb5-m"
-            + Spacing.side_padding )) ]
-      [ div [class_ "w-50"] [a [] "./" [coda Style.empty] "coda-home" false]
+            ( of_class "flex items-center mw9 mb4 mb5-m"
+            + Spacing.side_padding + top_margins )) ]
+      [ div [class_ "w-50"]
+          [anchor [] "./" [coda Style.empty] "coda-home" false]
       ; div
           [class_ "flex justify-around w-75"]
           [ (let name, url, label = Links.blog in
@@ -236,8 +269,8 @@ module Navbar = struct
                label)
           ; (let name, url, label = Links.testnet in
              a' url [text name] label)
-          ; a' ~style:Visibility.only_large "index.html#community"
-              [text "Community"] "community"
+          ; (let name, url, label = Links.code in
+             a' url [text name] label)
           ; (let name, url, label = Links.jobs in
              a' url [text name] label)
           ; a' ~style:Visibility.only_large ~open_new_tab:true
@@ -261,7 +294,7 @@ module Footer = struct
 end
 
 module Compound_chunk = struct
-  let create ?(variant= `With_image) ~important_text ~image ~image_positioning
+  let create ?(variant = `With_image) ~important_text ~image ~image_positioning
       () =
     let open Html_concise in
     match image with
@@ -282,7 +315,8 @@ module Compound_chunk = struct
                [ div [class_ "flex w-50"] [div [class_ "mw6"] [left]]
                ; div [class_ "flex w-50"] [div [class_ "center"] [right]] ])
           ~small:
-            (div [class_ "w-100 center mb4"]
+            (div
+               [class_ "w-100 center mb4"]
                ( match variant with
                | `With_image ->
                    [ div [class_ "flex justify-center mb3"] [image]
@@ -291,13 +325,14 @@ module Compound_chunk = struct
 end
 
 module Section = struct
-  let section' ?(heading_size= `Normal) ?heading ?(footer= false) content
+  let section' ?(heading_size = `Normal) ?heading ?(footer = false) content
       scheme =
     let open Html_concise in
     let color, bg_color =
       match scheme with
       | `Light -> ("black", "bg-white")
       | `Dark -> ("silver", "bg-snow")
+      | `None -> ("black", "")
     in
     let heading_font =
       match heading_size with `Normal -> "f5" | `Large -> "f3"
@@ -349,9 +384,9 @@ module Section = struct
               Mobile_switch.create
                 ~not_small:
                   ( if i = 4 then
-                      a
-                        [Style.(render (of_class "jump")); href "#item-0"]
-                        [text "start over"]
+                    a
+                      [Style.(render (of_class "jump")); href "#item-0"]
+                      [text "start over"]
                   else
                     a
                       [Style.(render (of_class "jump")); href "#item-4"]
@@ -481,7 +516,7 @@ module Section = struct
     in
     section' content scheme
 
-  let footer' ?(fixed= false) ~links ~newsletter ~scheme =
+  let footer' ?(fixed = false) ~links ~newsletter ~scheme =
     let content =
       let open Html_concise in
       let a style url children label =
@@ -501,16 +536,16 @@ module Section = struct
       in
       div
         [class_ "flex justify-center tc mb4"]
-        [ ul
-            [Style.(render (of_class "list ph0"))]
-            (List.map (List.zip_exn links cdots) ~f:
-               (fun ((name, link, label), cdot) ->
-                 li [class_ "mb2 dib"]
-                   [ a
-                       Style.(of_class "no-underline fw3 f6 silver")
-                       link [text name] label
-                   ; cdot ] ))
-        ; newsletter ]
+        ( [ ul
+              [Style.(render (of_class "list ph0"))]
+              (List.map (List.zip_exn links cdots)
+                 ~f:(fun ((name, link, label), cdot) ->
+                   li [class_ "mb2 dib"]
+                     [ a
+                         Style.(of_class "no-underline fw3 f6 silver")
+                         link [text name] label
+                     ; cdot ] )) ]
+        @ Option.value (Option.map newsletter ~f:(fun n -> [n])) ~default:[] )
     in
     section' ~footer:fixed content scheme
 
@@ -541,7 +576,23 @@ module Section = struct
     section' ?heading content scheme
 end
 
-let wrap ?(headers= []) ?(fixed_footer= false) ?title ~page_label sections =
+let footer ~fixed ~show_newsletter scheme =
+  let open Footer in
+  Section.footer' ~fixed
+    ~links:
+      Links.
+        [mail; o1www; twitter; github; reddit; telegram; tos; privacy; hiring]
+    ~newsletter:
+      ( if show_newsletter then
+        Some
+          (Newsletter.create ~copy:"We won’t spam you, ever."
+             ~button_hint:"Join mailing list")
+      else None )
+    ~scheme
+
+let wrap_simple ~navbar ~body_style ?(extra_body = []) ?(headers = [])
+    ?(fixed_footer = false) ?title ~page_label ~append_footer ~show_newsletter
+    content =
   let title =
     Option.value_map ~default:"Coda Cryptocurrency Protocol" title
       ~f:title_string
@@ -592,28 +643,28 @@ let wrap ?(headers= []) ?(fixed_footer= false) ?title ~page_label sections =
       <link rel="icon" type="image/png" href="/static/favicon-16x16.png" sizes="16x16" />|html}
         ] )
   in
-  let footer scheme =
-    let open Footer in
-    Section.footer' ~fixed:fixed_footer
-      ~links:
-        Links.
-          [mail; o1www; twitter; github; reddit; telegram; tos; privacy; hiring]
-      ~newsletter:
-        (Newsletter.create ~copy:"We won’t spam you, ever."
-           ~button_hint:"Join mailing list")
-      ~scheme
+  let content' =
+    if append_footer then
+      node "div" [] [content; footer ~fixed:fixed_footer ~show_newsletter `None]
+    else content
   in
   let body =
-    let navbar = Navbar.navbar page_label in
-    let reified_sections =
-      List.mapi
-        (sections @ [footer])
-        ~f:(fun i s -> s (if i % 2 = 0 then `Light else `Dark))
-    in
     node "body"
-      [class_ "metropolis bg-white black"]
-      [ navbar
-      ; node "div" [class_ "wrapper"] reified_sections
-      ; literal {html|<script defer src="static/main.bc.js"></script>|html} ]
+      [Style.(render (of_class "metropolis black" + body_style))]
+      ([navbar; node "div" [class_ "wrapper"] [content']] @ extra_body)
   in
   node "html" [] [head; body]
+
+let wrap ?(extra_body = []) ?(headers = []) ?(fixed_footer = false) ?title
+    ~page_label sections =
+  let reified_sections =
+    List.mapi
+      (sections @ [footer ~fixed:fixed_footer ~show_newsletter:true])
+      ~f:(fun i s -> s (if i % 2 = 0 then `Light else `Dark))
+  in
+  let open Html_concise in
+  wrap_simple
+    ~body_style:(Style.of_class "bg-white")
+    ~navbar:(Navbar.navbar page_label) ~extra_body ~headers ~fixed_footer
+    ?title ~page_label ~append_footer:false ~show_newsletter:true
+    (div [] reified_sections)
