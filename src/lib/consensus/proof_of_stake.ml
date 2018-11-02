@@ -617,14 +617,19 @@ module Make (Inputs : Inputs_intf) :
       ; length= Length.zero }
 
     let update_pair (last_data, curr_data) epoch_length ~prev_epoch ~next_epoch
-        ~next_slot ~prev_protocol_state_hash ~proposer_vrf_result ~ledger_hash
-        ~total_currency =
+        ~next_slot ~prev_protocol_state_hash ~proposer_vrf_result
+        ~snarked_ledger_hash ~total_currency =
       let open Epoch_ledger in
       let last_data, curr_data, epoch_length =
         if next_epoch > prev_epoch then
+          let hash =
+            match snarked_ledger_hash () with
+            | Ok l -> l
+            | Error e -> Error.raise e
+          in
           ( curr_data
           , { seed= Epoch_seed.(of_hash zero)
-            ; ledger= {hash= ledger_hash; total_currency}
+            ; ledger= {hash; total_currency}
             ; start_checkpoint= prev_protocol_state_hash
             ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
             ; length= Length.zero }
@@ -876,7 +881,9 @@ module Make (Inputs : Inputs_intf) :
         ~(consensus_transition_data : Consensus_transition_data.value)
         ~(previous_protocol_state_hash : Coda_base.State_hash.t)
         ~(supply_increase : Currency.Amount.t)
-        ~(ledger_hash : Coda_base.Frozen_ledger_hash.t) : value Or_error.t =
+        ~(snarked_ledger_hash :
+           unit -> Coda_base.Frozen_ledger_hash.t Or_error.t) :
+        value Or_error.t =
       let open Or_error.Let_syntax in
       let open Consensus_transition_data in
       let%map total_currency =
@@ -895,7 +902,7 @@ module Make (Inputs : Inputs_intf) :
           ~next_slot:consensus_transition_data.slot
           ~prev_protocol_state_hash:previous_protocol_state_hash
           ~proposer_vrf_result:consensus_transition_data.proposer_vrf_result
-          ~ledger_hash ~total_currency
+          ~snarked_ledger_hash ~total_currency
       in
       { length= Length.succ previous_consensus_state.length
       ; epoch_length
@@ -960,8 +967,8 @@ module Make (Inputs : Inputs_intf) :
 
   (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
   let generate_transition ~(previous_protocol_state : Protocol_state.value)
-      ~blockchain_state ~local_state ~time ~keypair ~transactions:_ ~ledger
-      ~supply_increase ~logger =
+      ~blockchain_state ~local_state ~time ~keypair ~transactions:_
+      ~snarked_ledger_hash ~supply_increase ~logger =
     let open Consensus_state in
     let open Epoch_data in
     let open Keypair in
@@ -992,10 +999,7 @@ module Make (Inputs : Inputs_intf) :
            ~consensus_transition_data
            ~previous_protocol_state_hash:
              (Protocol_state.hash previous_protocol_state)
-           ~supply_increase
-           ~ledger_hash:
-             ( Coda_base.Ledger.merkle_root ledger
-             |> Coda_base.Frozen_ledger_hash.of_ledger_hash ))
+           ~supply_increase ~snarked_ledger_hash)
     in
     let protocol_state =
       Protocol_state.create_value
@@ -1141,7 +1145,7 @@ module Make (Inputs : Inputs_intf) :
            ~previous_protocol_state_hash:Protocol_state.(hash negative_one)
            ~consensus_transition_data:Snark_transition.(consensus_data genesis)
            ~supply_increase:Currency.Amount.zero
-           ~ledger_hash:genesis_ledger_hash)
+           ~snarked_ledger_hash:(fun () -> Ok genesis_ledger_hash))
     in
     Protocol_state.create_value
       ~previous_state_hash:Protocol_state.(hash negative_one)

@@ -70,7 +70,7 @@ module type S = sig
     -> time:Unix_timestamp.t
     -> keypair:Signature_lib.Keypair.t
     -> transactions:Coda_base.Payment.t list
-    -> ledger:Coda_base.Ledger.t
+    -> snarked_ledger_hash:(unit -> Coda_base.Frozen_ledger_hash.t Or_error.t)
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
     -> (Protocol_state.value * Consensus_transition_data.value) option
