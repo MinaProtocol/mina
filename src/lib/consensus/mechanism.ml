@@ -59,6 +59,8 @@ module type S = sig
   module External_transition :
     Coda_base.External_transition.S with module Protocol_state = Protocol_state
 
+  val block_interval_ms : int64
+
   val genesis_protocol_state : Protocol_state.value
 
   val generate_transition :
@@ -81,6 +83,7 @@ module type S = sig
 
   val is_transition_valid_checked :
        Snark_transition.var
+    -> Coda_base.State_hash.var
     -> (Snark_params.Tick.Boolean.var, _) Snark_params.Tick.Checked.t
   (**
    * Create a checked boolean constraint for the validity of a transition.

@@ -14,10 +14,13 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
     let n = 3 in
     let log = Logger.create () in
     let log = Logger.child log name in
+    let proposal_interval =
+      Int64.to_int_exn Kernel.Consensus_mechanism.block_interval_ms
+    in
     let work_selection = Protocols.Coda_pow.Work_selection.Seq in
     Coda_processes.init () ;
     let configs =
-      Coda_processes.local_configs n ~program_dir
+      Coda_processes.local_configs n ~program_dir ~proposal_interval
         ~snark_worker_public_keys:None ~should_propose:(Fn.const false)
         ~work_selection
     in
@@ -49,7 +52,7 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
     )
 
   let command =
-    Command.async_spec ~summary:"Simple use of Async Rpc_parallel V2"
-      Command.Spec.(empty)
-      main
+    Command.async
+      ~summary:"test that second-degree peers show up in the peer list"
+      (Command.Param.return main)
 end

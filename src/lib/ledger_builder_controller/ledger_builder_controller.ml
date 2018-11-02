@@ -18,7 +18,6 @@ module Make (Inputs : Inputs.S) : sig
      and type external_transition := Consensus_mechanism.External_transition.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type tip := Tip.t
-     and type keypair := Keypair.t
 
   val ledger_builder_io : t -> Net.t
 end = struct
@@ -33,8 +32,7 @@ end = struct
           (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: Tip.t
       ; consensus_local_state: Consensus_mechanism.Local_state.t
-      ; longest_tip_location: string
-      ; keypair: Keypair.t }
+      ; longest_tip_location: string }
     [@@deriving make]
   end
 
@@ -384,10 +382,6 @@ let%test_module "test" =
           let of_private_key_exn t = t
         end
 
-        module Keypair = struct
-          type t = {public_key: Public_key.t; private_key: Private_key.t}
-        end
-
         module Ledger_builder_hash = struct
           include Int
 
@@ -623,7 +617,6 @@ let%test_module "test" =
             ; proof= ()
             ; ledger_builder= Ledger_builder.create ~ledger:0 }
           ~longest_tip_location ~consensus_local_state:()
-          ~keypair:{Keypair.public_key= (); private_key= ()}
 
       let create_transition x parent strength =
         { Inputs.Consensus_mechanism.Protocol_state.previous_state_hash= parent
