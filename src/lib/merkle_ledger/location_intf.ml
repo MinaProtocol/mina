@@ -14,14 +14,9 @@ module type S = sig
   end
 
   type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
+  [@@deriving eq, sexp]
 
   include Hashable.S with type t := t
-
-  val t_of_sexp : Ppx_sexp_conv_lib.Sexp.t -> t
-
-  val sexp_of_t : t -> Ppx_sexp_conv_lib.Sexp.t
-
-  val equal : t -> t -> bool
 
   val is_generic : t -> bool
 
