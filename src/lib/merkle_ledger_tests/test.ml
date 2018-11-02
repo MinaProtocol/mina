@@ -62,9 +62,9 @@ let%test_module "Database integration test" =
       let num_accounts = (1 lsl Depth.depth) - 1 in
       let gen_non_zero_balances =
         let open Quickcheck.Generator in
-        list_with_length num_accounts Currency.Balance.gen
+        list_with_length num_accounts Balance.gen
       in
-      Quickcheck.test ~trials:5 ~sexp_of:[%sexp_of: Currency.Balance.t list]
+      Quickcheck.test ~trials:5 ~sexp_of:[%sexp_of: Balance.t list]
         gen_non_zero_balances ~f:(fun balances ->
           let public_keys = Key.gen_keys num_accounts in
           let accounts =

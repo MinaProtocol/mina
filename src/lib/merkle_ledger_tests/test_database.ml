@@ -63,7 +63,7 @@ let%test_module "test functor on in memory databases" =
 
       let dedup_accounts accounts =
         List.dedup_and_sort accounts ~compare:(fun account1 account2 ->
-            Signature_lib.Public_key.Compressed.compare
+            Key.compare
               (Account.public_key account1)
               (Account.public_key account2) )
 
@@ -92,15 +92,10 @@ let%test_module "test functor on in memory databases" =
       let%test "get_or_create_acount does not update an account if key \
                 already exists" =
         Test.with_instance (fun mdb ->
-            let public_key =
-              Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
-            in
-            let balance = Quickcheck.random_value Currency.Balance.gen in
+            let public_key = Quickcheck.random_value Key.gen in
+            let balance = Quickcheck.random_value Balance.gen in
             let account = Account.create public_key balance in
-            let balance' =
-              Option.value_exn
-                (Currency.Balance.add_amount balance (Currency.Amount.of_int 1))
-            in
+            let balance' = Balance.add balance (Balance.of_int 1) in
             let account' = Account.create public_key balance' in
             let location = create_new_account_exn mdb account in
             let action, location' =
@@ -191,19 +186,16 @@ let%test_module "test functor on in memory databases" =
             let gift = 1 in
             let balance_gen = Int.gen_incl gift (Int.max_value - gift) in
             let public_key =
-              Quickcheck.random_value ~seed:(`Deterministic "pk")
-                Signature_lib.Public_key.Compressed.gen
+              Quickcheck.random_value ~seed:(`Deterministic "pk") Key.gen
             in
             let balance =
-              Currency.Balance.of_int @@ Quickcheck.random_value balance_gen
+              Balance.of_int @@ Quickcheck.random_value balance_gen
             in
             let account = Account.create public_key balance in
             let account_location = create_new_account_exn mdb account in
             let mdb_copy = MT.copy mdb in
             let balance_with_gift =
-              Option.value_exn
-                (Currency.Balance.add_amount balance
-                   (Currency.Amount.of_int gift))
+              Balance.add balance (Balance.of_int gift)
             in
             let updated_account =
               {account with Account.balance= balance_with_gift}
@@ -287,7 +279,7 @@ let%test_module "test functor on in memory databases" =
               let balances =
                 Quickcheck.random_value
                   (Quickcheck.Generator.list_with_length num_accounts
-                     Currency.Balance.gen)
+                     Balance.gen)
               in
               let accounts = List.map2_exn keys balances ~f:Account.create in
               List.iter accounts ~f:(fun account ->

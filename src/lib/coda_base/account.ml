@@ -65,6 +65,8 @@ type value =
   (Public_key.Compressed.t, Balance.t, Nonce.t, Receipt.Chain_hash.t) t_
 [@@deriving sexp]
 
+let key_gen = Public_key.Compressed.gen
+
 let initialize public_key : t =
   { public_key
   ; balance= Balance.zero

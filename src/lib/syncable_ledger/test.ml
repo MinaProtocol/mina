@@ -138,6 +138,8 @@ end)
 (* 
   TODO : put this test along with other lengthy tests
 
+  See issue #1088 in Github.
+
   let%test_unit "exhaustive depth=10 testing" =
   for i = 3 to 1 lsl 10 do
     let module M =

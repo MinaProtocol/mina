@@ -60,12 +60,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
 
       let dummy_location = Test.Location.Account dummy_address
 
-      let dummy_account =
-        let public_key =
-          Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
-        in
-        let balance = Quickcheck.random_value Currency.Balance.gen in
-        Account.create public_key balance
+      let dummy_account = Quickcheck.random_value Account.gen
 
       let create_new_account_exn mdb ({Account.public_key; _} as account) =
         let action, location =
@@ -241,10 +236,8 @@ let%test_module "Test mask connected to underlying Merkle tree" =
                 Quickcheck.random_value
                   (Quickcheck.Generator.list_with_length num_accounts gen)
               in
-              let public_keys =
-                gen_values Signature_lib.Public_key.Compressed.gen
-              in
-              let balances = gen_values Currency.Balance.gen in
+              let public_keys = Key.gen_keys num_accounts in
+              let balances = gen_values Balance.gen in
               let accounts =
                 List.map2_exn public_keys balances
                   ~f:(fun public_key balance ->

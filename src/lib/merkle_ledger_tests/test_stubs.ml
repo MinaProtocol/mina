@@ -1,5 +1,82 @@
 open Core
+open Unsigned
 module Account = Coda_base.Account
+
+module Balance = struct
+  include Currency.Balance
+
+  (* add missing operations for tests *)
+  let one = Currency.Balance.of_int 1
+
+  let add b1 b2 =
+    Option.value_exn
+      (Currency.Balance.add_amount b1 (Currency.Balance.to_amount b2))
+end
+
+(* below are alternative modules that use strings as public keys and UInt64 as balances for
+   in accounts
+
+   using these modules instead of Account and Balance above speeds up the 
+   ledger tests
+
+   we don't use the alternatives for testing currently, because Account
+   and Balance above are the modules used for actual ledgers
+ *)
+
+module Balance_not_used = struct
+  include UInt64
+  include Binable.Of_stringable (UInt64)
+
+  let sexp_of_t t = [%sexp_of: string] (to_string t)
+
+  let t_of_sexp sexp =
+    let string_balance = [%of_sexp: string] sexp in
+    of_string string_balance
+
+  let equal x y = UInt64.compare x y = 0
+
+  let gen = Quickcheck.Generator.map ~f:UInt64.of_int64 Int64.gen
+end
+
+module Account_not_used = struct
+  type key = string [@@deriving sexp, show, bin_io, eq, compare, hash]
+
+  module Balance = Balance_not_used
+
+  type t =
+    { public_key: key
+    ; balance: Balance.t
+           [@printer
+             fun fmt balance ->
+               Format.pp_print_string fmt (Balance.to_string balance)] }
+  [@@deriving bin_io, eq, show, fields]
+
+  let sexp_of_t {public_key; balance} =
+    [%sexp_of: string * string] (public_key, Balance.to_string balance)
+
+  let t_of_sexp sexp =
+    let public_key, string_balance = [%of_sexp: string * string] sexp in
+    let balance = Balance.of_string string_balance in
+    {public_key; balance}
+
+  (* vanilla String.gen yields the empty string about half the time *)
+  let key_gen = String.gen_with_length 10 Char.gen
+
+  let set_balance {public_key; _} balance = {public_key; balance}
+
+  let create public_key balance = {public_key; balance}
+
+  let empty = {public_key= ""; balance= Balance.zero}
+
+  let gen =
+    let open Quickcheck.Let_syntax in
+    let%bind public_key = String.gen in
+    let%map int_balance = Int.gen in
+    let nat_balance = abs int_balance in
+    let balance = Balance.of_int nat_balance in
+    {public_key; balance}
+end
+
 module Receipt = Coda_base.Receipt
 
 module Hash = struct
@@ -73,6 +150,8 @@ end
 module Key = struct
   module T = struct
     type t = Account.key [@@deriving sexp, bin_io, eq, compare, hash]
+
+    let gen = Account.key_gen
   end
 
   let empty = Account.empty.public_key
@@ -80,15 +159,14 @@ module Key = struct
   let to_string = Format.sprintf !"%{sexp: T.t}"
 
   let gen_keys num_keys =
-    (* TODO : the Quickcheck generator for public keys produces duplicates
+    (* TODO : the Quickcheck generator for Public_key.Compressed produces duplicates
        as a workaround, we generate extra keys, remove duplicates, and take as many as needed
        Issue #1078 notes the problem with the generators
      *)
     let num_to_gen = num_keys + (num_keys / 5) in
     let more_than_enough_keys =
       Quickcheck.random_value
-        (Quickcheck.Generator.list_with_length num_to_gen
-           Signature_lib.Public_key.Compressed.gen)
+        (Quickcheck.Generator.list_with_length num_to_gen T.gen)
     in
     let unique_keys =
       List.dedup_and_sort ~compare:T.compare more_than_enough_keys
