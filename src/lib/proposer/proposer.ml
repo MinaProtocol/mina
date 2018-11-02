@@ -180,8 +180,8 @@ module Make (Inputs : Inputs_intf) :
                 :> Payment.t list )
             ~snarked_ledger_hash:(fun () ->
               let open Or_error.Let_syntax in
-              Option.value_map ledger_proof_opt
-                ~f:(fun (_, stmt) ->
+              match ledger_proof_opt with
+              | Some (_, stmt) ->
                   let snarked_ledger_hash =
                     Ledger_proof.(statement_target stmt)
                   in
@@ -190,8 +190,8 @@ module Make (Inputs : Inputs_intf) :
                       ~snarked_ledger_hash
                   in
                   Frozen_ledger_hash.of_ledger_hash
-                    (Ledger.merkle_root snarked_ledger) )
-                ~default:(Ok previous_ledger_hash) )
+                    (Ledger.merkle_root snarked_ledger)
+              | None -> Ok previous_ledger_hash )
             ~supply_increase ~logger )
     in
     Option.value
