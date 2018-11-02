@@ -16,5 +16,6 @@
       vrf_lib
       unix_timestamp
       non_zero_curve_point ))
+  (preprocessor_deps ("../../config.mlh"))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "Consensus mechanisms")))

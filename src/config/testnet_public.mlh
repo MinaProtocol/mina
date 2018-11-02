@@ -4,3 +4,4 @@
 [%%define debug_logs true]
 [%%define call_logger false]
 [%%define force_updates true]
+[%%define global_signer_real true]

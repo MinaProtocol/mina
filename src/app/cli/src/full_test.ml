@@ -34,7 +34,7 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
 
     let lbc_tree_max_depth = `Finite 50
 
-    let keypair = keypair
+    let propose_keypair = Some keypair
 
     let genesis_proof = Precomputed_values.base_proof
 
@@ -47,11 +47,8 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
 
     let work_selection = Protocols.Coda_pow.Work_selection.Seq
   end in
-  let should_propose_bool = true in
   let%bind (module Init) =
-    make_init ~should_propose:should_propose_bool
-      (module Config)
-      (module Kernel)
+    make_init ~should_propose:true (module Config) (module Kernel)
   in
   let module Main = Coda_main.Make_coda (Init) in
   let module Run = Run (Config) (Main) in
@@ -76,13 +73,13 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
   in
   let%bind coda =
     Main.create
-      (Main.Config.make ~log ~net_config ~should_propose:should_propose_bool
+      (Main.Config.make ~log ~net_config ~propose_keypair:keypair
          ~run_snark_worker:true
          ~ledger_builder_persistant_location:(temp_conf_dir ^/ "ledger_builder")
          ~transaction_pool_disk_location:(temp_conf_dir ^/ "transaction_pool")
          ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
          ~time_controller:(Inputs.Time.Controller.create ())
-         ~keypair () ~banlist)
+         () ~banlist)
   in
   don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers coda)) ;
   let wait_until_cond ~(f : t -> bool) ~(timeout : Float.t) =
