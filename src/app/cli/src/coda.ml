@@ -35,9 +35,12 @@ let daemon (module Kernel : Kernel_intf) log =
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
          (optional file)
-     and should_propose_flag =
-       flag "propose" ~doc:"true|false Run the proposer (default:false)"
-         (optional bool)
+     and propose_key =
+       flag "propose-key"
+         ~doc:
+           "FILE Private key file for the proposing transitions \
+            (default:don't propose)"
+         (optional file)
      and peers =
        flag "peer"
          ~doc:
@@ -81,12 +84,6 @@ let daemon (module Kernel : Kernel_intf) log =
          ~doc:
            "CAPACITY_LOG_2 Log of capacity of transactions per transition \
             (default: 4)"
-         (optional int)
-     and proposal_interval =
-       flag "proposal-interval"
-         ~doc:
-           "MILLIS Time between the proposer proposing and waiting (default: \
-            5000)"
          (optional int)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
@@ -151,10 +148,6 @@ let daemon (module Kernel : Kernel_intf) log =
        let client_port =
          or_from_config YJ.Util.to_int_option "client-port"
            ~default:default_client_port client_port
-       in
-       let should_propose_flag =
-         or_from_config YJ.Util.to_bool_option "propose" ~default:false
-           should_propose_flag
        in
        let transaction_capacity_log_2 =
          or_from_config YJ.Util.to_int_option "txn-capacity" ~default:8
@@ -231,21 +224,28 @@ let daemon (module Kernel : Kernel_intf) log =
        let me =
          (Host_and_port.create ~host:ip ~port:discovery_port, external_port)
        in
+       let sequence maybe_def =
+         match maybe_def with
+         | Some def -> Deferred.map def ~f:Option.return
+         | None -> Deferred.return None
+       in
+       let%bind propose_keypair =
+         Option.map ~f:Cli_lib.read_keypair_exn' propose_key |> sequence
+       in
        let%bind client_whitelist =
          Reader.load_sexp
            (conf_dir ^/ "client_whitelist")
            [%of_sexp: Unix.Inet_addr.Blocking_sexp.t list]
          >>| Or_error.ok
        in
-       let keypair = Genesis_ledger.largest_account_keypair_exn () in
-       let module Config = struct
+       let module Config0 = struct
          let logger = log
 
          let conf_dir = conf_dir
 
          let lbc_tree_max_depth = `Finite 50
 
-         let keypair = keypair
+         let propose_keypair = propose_keypair
 
          let genesis_proof = Precomputed_values.base_proof
 
@@ -256,12 +256,13 @@ let daemon (module Kernel : Kernel_intf) log =
          let work_selection = work_selection
        end in
        let%bind (module Init) =
-         make_init ~should_propose:should_propose_flag
-           (module Config)
+         make_init
+           ~should_propose:(Option.is_some propose_keypair)
+           (module Config0)
            (module Kernel)
        in
        let module M = Coda_main.Make_coda (Init) in
-       let module Run = Run (Config) (M) in
+       let module Run = Run (Config0) (M) in
        Async.Scheduler.report_long_cycle_times ~cutoff:(sec 0.5) () ;
        let%bind () =
          let open M in
@@ -292,14 +293,13 @@ let daemon (module Kernel : Kernel_intf) log =
          let%map coda =
            Run.create
              (Run.Config.make ~log ~net_config
-                ~should_propose:should_propose_flag
                 ~run_snark_worker:(Option.is_some run_snark_worker_flag)
                 ~ledger_builder_persistant_location:
                   (conf_dir ^/ "ledger_builder")
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~time_controller:(Inputs.Time.Controller.create ())
-                ~keypair () ~banlist)
+                ?propose_keypair:Config0.propose_keypair () ~banlist)
          in
          let web_service = Web_pipe.get_service () in
          Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;
@@ -419,8 +419,6 @@ let consensus_mechanism () : (module Consensus_mechanism_intf) =
           module Proof = Coda_base.Proof
           module Ledger_builder_diff = Ledger_builder_diff
           module Time = Coda_base.Block_time
-
-          let private_key = Consensus.Signer_private_key.signer_private_key
 
           let proposal_interval =
             env "PROPOSAL_INTERVAL"
