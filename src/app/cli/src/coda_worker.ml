@@ -142,7 +142,10 @@ module Make (Kernel : Kernel_intf) = struct
 
           let lbc_tree_max_depth = `Finite 50
 
-          let keypair = Genesis_ledger.largest_account_keypair_exn ()
+          let propose_keypair =
+            if should_propose then
+              Some (Genesis_ledger.largest_account_keypair_exn ())
+            else None
 
           let genesis_proof = Precomputed_values.base_proof
 
@@ -179,7 +182,7 @@ module Make (Kernel : Kernel_intf) = struct
         in
         let%bind coda =
           Main.create
-            (Main.Config.make ~log ~net_config ~should_propose
+            (Main.Config.make ~log ~net_config
                ~run_snark_worker:(Option.is_some snark_worker_config)
                ~ledger_builder_persistant_location:
                  (conf_temp_dir ^/ "ledger_builder")
@@ -187,7 +190,7 @@ module Make (Kernel : Kernel_intf) = struct
                  (conf_temp_dir ^/ "transaction_pool")
                ~snark_pool_disk_location:(conf_temp_dir ^/ "snark_pool")
                ~time_controller:(Main.Inputs.Time.Controller.create ())
-               ~keypair:Config.keypair () ~banlist)
+               ?propose_keypair:Config.propose_keypair () ~banlist)
         in
         Option.iter snark_worker_config ~f:(fun config ->
             let run_snark_worker = `With_public_key config.public_key in
