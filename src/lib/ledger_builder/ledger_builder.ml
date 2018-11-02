@@ -480,7 +480,7 @@ end = struct
                 end)
     end
 
-    module Statement_scaner_with_proofs =
+    module Statement_scanner_with_proofs =
       Make_statement_scanner (Deferred) (Inputs.Ledger_proof_verifier)
 
     let is_valid t =
@@ -636,7 +636,7 @@ end = struct
     in
     let t = {ledger; scan_state= aux} in
     let%bind () =
-      Aux.Statement_scaner_with_proofs.check_invariants aux
+      Aux.Statement_scanner_with_proofs.check_invariants aux
         "Ledger_hash.of_aux_and_ledger" ledger (Some snarked_ledger_hash)
     in
     let%map () =
