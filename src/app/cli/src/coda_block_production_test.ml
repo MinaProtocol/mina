@@ -23,6 +23,6 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
     after (Time.Span.of_sec 30.)
 
   let command =
-    Command.async_spec ~summary:"Test that blocks get produced"
-      Command.Spec.empty main
+    Command.async ~summary:"Test that blocks get produced"
+      (Command.Param.return main)
 end
