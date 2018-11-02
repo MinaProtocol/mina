@@ -173,6 +173,8 @@ module Make (Inputs : Inputs_intf) :
   module External_transition =
     External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
+  let block_interval_ms = Time.Span.to_ms proposal_interval
+
   let generate_transition ~previous_protocol_state ~blockchain_state
       ~local_state:_ ~time:_ ~keypair ~transactions:_ ~ledger:_
       ~supply_increase:_ ~logger:_ =

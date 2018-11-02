@@ -1508,7 +1508,7 @@ let%test_module "transaction_snark" =
             ; receipt_chain_hash= Receipt.Chain_hash.empty
             ; nonce= Account.Nonce.zero } }
       in
-      let n = Int.pow 2 ledger_depth in
+      let n = min (Int.pow 2 ledger_depth) (1 lsl 10) in
       Array.init n ~f:(fun _ -> random_wallet ())
 
     let payment wallets i j amt fee nonce =

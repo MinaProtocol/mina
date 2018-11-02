@@ -85,12 +85,6 @@ let daemon (module Kernel : Kernel_intf) log =
            "CAPACITY_LOG_2 Log of capacity of transactions per transition \
             (default: 4)"
          (optional int)
-     and proposal_interval =
-       flag "proposal-interval"
-         ~doc:
-           "MILLIS Time between the proposer proposing and waiting (default: \
-            5000)"
-         (optional int)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
      in

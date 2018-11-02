@@ -15,7 +15,6 @@ module Make (Kernel : Kernel_intf) = struct
     type t =
       { host: string
       ; env: (string * string) list
-      ; transition_interval: float
       ; should_propose: bool
       ; snark_worker_config: Snark_worker_config.t option
       ; work_selection: Protocols.Coda_pow.Work_selection.t
@@ -122,7 +121,6 @@ module Make (Kernel : Kernel_intf) = struct
       let init_worker_state
           { host
           ; should_propose
-          ; transition_interval
           ; snark_worker_config
           ; work_selection
           ; conf_dir
