@@ -12,7 +12,7 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
 
   let name = "coda-restart-node-test"
 
-  let main proposal_interval () =
+  let main () =
     let open Keypair in
     let log = Logger.create () in
     let log = Logger.child log name in
@@ -43,7 +43,7 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
     let send_amount = Currency.Amount.of_int 10 in
     let fee = Currency.Fee.of_int 0 in
     let%bind testnet =
-      Coda_worker_testnet.test ?proposal_interval log n should_propose
+      Coda_worker_testnet.test log n should_propose
         snark_work_public_keys Protocols.Coda_pow.Work_selection.Seq
     in
     let%bind () = after (Time.Span.of_sec 5.) in
@@ -61,9 +61,5 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
   let command =
     let open Command.Let_syntax in
     Command.async ~summary:"Test of stopping, waiting, then starting a node"
-      (let%map_open proposal_interval =
-         flag "proposal-interval"
-           ~doc:"MILLIS proposal interval in proof of sig" (optional int)
-       in
-       main proposal_interval)
+    (Command.Param.return main)
 end

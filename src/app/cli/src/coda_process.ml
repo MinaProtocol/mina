@@ -19,7 +19,7 @@ module Make (Kernel : Kernel_intf) = struct
     File_system.dup_stderr process ;
     return (conn, process, config)
 
-  let local_config ?(transition_interval = 1000.0) ?proposal_interval ~peers
+  let local_config ?proposal_interval ~peers
       ~discovery_port ~external_port ~program_dir ~should_propose
       ~snark_worker_config ~work_selection () =
     let host = "127.0.0.1" in
@@ -30,11 +30,11 @@ module Make (Kernel : Kernel_intf) = struct
     let config =
       { Coda_worker.Input.host
       ; env=
+          (* TODO: what about all the PoS env vars? Shouldn't we just inherit? *)
           Option.map proposal_interval ~f:(fun interval ->
               [("CODA_PROPOSAL_INTERVAL", Int.to_string interval)] )
           |> Option.value ~default:[]
       ; should_propose
-      ; transition_interval
       ; external_port
       ; snark_worker_config
       ; work_selection

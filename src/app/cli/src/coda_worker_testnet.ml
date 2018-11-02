@@ -225,15 +225,14 @@ module Make (Kernel : Kernel_intf) = struct
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-  let test ?(proposal_interval = 1000) log n should_propose
+  let test log n should_propose
       snark_work_public_keys work_selection =
     let log = Logger.child log "worker_testnet" in
     let%bind program_dir = Unix.getcwd () in
     Coda_processes.init () ;
     let configs =
-      Coda_processes.local_configs n ~proposal_interval ~program_dir
+      Coda_processes.local_configs n ~program_dir
         ~should_propose
-        ~transition_interval:(Float.of_int proposal_interval)
         ~snark_worker_public_keys:(Some (List.init n snark_work_public_keys))
         ~work_selection
     in
@@ -241,7 +240,7 @@ module Make (Kernel : Kernel_intf) = struct
     let payment_reader, payment_writer = Linear_pipe.create () in
     let start_reader, start_writer = Linear_pipe.create () in
     let testnet = Api.create configs workers payment_writer start_writer in
-    start_checks log workers proposal_interval payment_reader start_reader
+    start_checks log workers (Int64.to_int_exn Kernel.Consensus_mechanism.block_interval_ms) payment_reader start_reader
       testnet ;
     testnet
 end
