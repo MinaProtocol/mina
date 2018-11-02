@@ -104,7 +104,7 @@ publish_deb:
 	deb-s3 upload --bucket repo.o1test.net --codename coda --s3-region=us-west-2 src/_build/coda.deb
 
 provingkeys:
-	@if [ ! -f src/_build/coda_cache_dir_$(GITHASH).tar.bz2 ] ; then \
+	@if [ $(CIRCLE_BRANCH) == "master" && ! -f src/_build/coda_cache_dir_$(GITHASH).tar.bz2 ] ; then \
 		$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH).tar.bz2  /tmp/coda_cache_dir ; \
 		mkdir -p /tmp/artifacts ; \
 		cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
