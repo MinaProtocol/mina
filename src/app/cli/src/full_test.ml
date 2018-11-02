@@ -137,7 +137,11 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
   let build_payment amount sender_sk receiver_pk fee =
     let nonce = Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn in
     let payload : Payment.Payload.t =
-      {receiver= receiver_pk; amount; fee; nonce; memo= Sha256_lib.Sha256.dummy}
+      { receiver= receiver_pk
+      ; amount
+      ; fee
+      ; nonce
+      ; memo= Payment.Payload.create_memo "" }
     in
     Payment.sign (Keypair.of_private_key_exn sender_sk) payload
   in

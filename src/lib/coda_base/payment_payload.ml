@@ -8,6 +8,14 @@ open Sha256_lib
 module Amount = Currency.Amount
 module Fee = Currency.Fee
 
+module Memo : Payment_memo.S = struct
+  include Sha256.Digest
+
+  let create = Sha256.digest_string
+
+  let dummy = Sha256.dummy
+end
+
 module Stable = struct
   module V1 = struct
     type ('pk, 'amount, 'fee, 'nonce, 'memo) t_ =
@@ -19,7 +27,7 @@ module Stable = struct
       , Amount.Stable.V1.t
       , Fee.Stable.V1.t
       , Account_nonce.Stable.V1.t
-      , Sha256.Digest.t )
+      , Memo.t )
       t_
     [@@deriving bin_io, eq, sexp, hash]
   end
@@ -32,14 +40,16 @@ let dummy =
   ; amount= Amount.zero
   ; fee= Fee.zero
   ; nonce= Account_nonce.zero
-  ; memo= Sha256.dummy }
+  ; memo= Memo.dummy }
+
+let create_memo = Memo.create
 
 type var =
   ( Public_key.Compressed.var
   , Amount.var
   , Fee.var
   , Account_nonce.Unpacked.var
-  , Sha256.Digest.var )
+  , Memo.var )
   t_
 
 let typ : (var, t) Typ.t =
@@ -49,7 +59,7 @@ let typ : (var, t) Typ.t =
     ; Amount.typ
     ; Fee.typ
     ; Account_nonce.Unpacked.typ
-    ; Sha256.Digest.typ ]
+    ; Memo.typ ]
   in
   let of_hlist
         : 'a 'b 'c 'd 'e.    (unit, 'a -> 'b -> 'c -> 'd -> 'e -> unit) H_list.t
@@ -68,7 +78,7 @@ let fold {receiver; amount; fee; nonce; memo} =
   let open Fold in
   Public_key.Compressed.fold receiver
   +> Amount.fold amount +> Fee.fold fee +> Account_nonce.fold nonce
-  +> Sha256.Digest.fold memo
+  +> Memo.fold memo
 
 (* TODO: This could be a bit more efficient by packing across triples,
    but I think the added confusion-possibility
@@ -87,7 +97,7 @@ let var_to_triples {receiver; amount; fee; nonce; memo} =
 let length_in_triples =
   Public_key.Compressed.length_in_triples + Amount.length_in_triples
   + Fee.length_in_triples + Account_nonce.length_in_triples
-  + Sha256.Digest.length_in_triples
+  + Memo.length_in_triples
 
 let to_triples t = Fold.to_list (fold t)
 
@@ -98,7 +108,7 @@ let gen =
   and fee = Fee.gen
   and nonce = Account_nonce.gen
   and memo = String.gen in
-  {receiver; amount; fee; nonce; memo= Sha256_lib.Sha256.digest_string memo}
+  {receiver; amount; fee; nonce; memo= create_memo memo}
 
 let%test_unit "to_bits" =
   let open Test_util in
@@ -109,7 +119,7 @@ let%test_unit "to_bits" =
         ; amount= Amount.of_int (Random.int Int.max_value)
         ; fee= Fee.of_int (Random.int Int.max_value_30_bits)
         ; nonce= Account_nonce.random ()
-        ; memo= Sha256.digest_string arbitrary_string }
+        ; memo= create_memo arbitrary_string }
       in
       Test_util.test_to_triples typ fold var_to_triples input )
 
@@ -118,4 +128,4 @@ let var_of_t ({receiver; amount; fee; nonce; memo} : t) : var =
   ; amount= Amount.var_of_t amount
   ; fee= Fee.var_of_t fee
   ; nonce= Account_nonce.Unpacked.var_of_value nonce
-  ; memo= Sha256_lib.Sha256.Digest.var_of_t memo }
+  ; memo= Memo.var_of_t memo }

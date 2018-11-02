@@ -267,7 +267,7 @@ let batch_send_payments =
               ; amount
               ; fee
               ; nonce
-              ; memo= Sha256_lib.Sha256.dummy } ) )
+              ; memo= Payment.Payload.create_memo "" } ) )
     in
     dispatch_with_message Client_lib.Send_payments.rpc
       (ts :> Payment.t list)
@@ -311,7 +311,7 @@ let send_payment =
            ; amount
            ; fee
            ; nonce
-           ; memo= Sha256_lib.Sha256.dummy }
+           ; memo= Payment.Payload.create_memo "" }
          in
          let txn = Payment.sign sender_kp payload in
          dispatch_with_message Client_lib.Send_payments.rpc

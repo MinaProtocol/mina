@@ -257,7 +257,7 @@ module Fee_transfer = struct
           ; amount= Amount.of_fee fee1 (* What "receiver" receives *)
           ; fee= fee2 (* What "sender" receives *)
           ; nonce= Account.Nonce.zero
-          ; memo= Sha256_lib.Sha256.digest_string "Fee transfer" }
+          ; memo= Payment.Payload.create_memo "Fee transfer" }
       ; sender= Public_key.decompress_exn pk2
       ; signature= dummy_signature } )
 
@@ -282,7 +282,7 @@ module Transition = struct
               ; amount= Amount.of_fee amount
               ; fee= Fee.zero
               ; nonce= Account.Nonce.zero
-              ; memo= Sha256_lib.Sha256.digest_string "Coinbase" }
+              ; memo= Payment_payload.create_memo "Coinbase" }
           ; sender= Public_key.decompress_exn proposer
           ; signature= dummy_signature }
         in
@@ -1556,7 +1556,7 @@ let%test_module "transaction_snark" =
             payment wallets 1 0 8
               (Fee.of_int (Random.int 20))
               Account.Nonce.zero
-              (Sha256_lib.Sha256.digest_string Test_util.arbitrary_string)
+              (Payment_payload.create_memo Test_util.arbitrary_string)
           in
           let target = Ledger.merkle_root_after_payment_exn ledger t1 in
           let mentioned_keys = Payment.public_keys (t1 :> Payment.t) in
@@ -1583,14 +1583,14 @@ let%test_module "transaction_snark" =
             payment wallets 0 1 8
               (Fee.of_int (Random.int 20))
               Account.Nonce.zero
-              (Sha256_lib.Sha256.digest_string Test_util.arbitrary_string)
+              (Payment_payload.create_memo Test_util.arbitrary_string)
             (*TODO*)
           in
           let t2 =
             payment wallets 1 2 3
               (Fee.of_int (Random.int 20))
               Account.Nonce.zero
-              (Sha256_lib.Sha256.digest_string Test_util.arbitrary_string)
+              (Payment_payload.create_memo Test_util.arbitrary_string)
             (*TODO*)
           in
           let sok_digest =

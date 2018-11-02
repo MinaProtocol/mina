@@ -74,7 +74,7 @@ let gen ~keys ~max_amount ~max_fee =
     ; fee
     ; amount
     ; nonce= Account_nonce.zero
-    ; memo= Sha256_lib.Sha256.digest_string memo }
+    ; memo= Payload.create_memo memo }
   in
   sign sender payload
 
