@@ -52,6 +52,7 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
     )
 
   let command =
-    Command.async ~summary:"Simple use of Async Rpc_parallel V2"
+    Command.async
+      ~summary:"test that second-degree peers show up in the peer list"
       (Command.Param.return main)
 end

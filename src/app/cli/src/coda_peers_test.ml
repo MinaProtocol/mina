@@ -41,6 +41,7 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
                (S.of_list expected_peers) ) ))
 
   let command =
-    Command.async ~summary:"Simple use of Async Rpc_parallel V2"
+    Command.async
+      ~summary:"integration test with two peers spawned alongside a seed"
       (Command.Param.return main)
 end
