@@ -20,7 +20,7 @@ module type Sok_message_intf = sig
     type t
   end
 
-  type t
+  type t [@@deriving bin_io, sexp]
 
   val create : fee:Currency.Fee.t -> prover:public_key_compressed -> t
 end
@@ -310,6 +310,8 @@ module type Ledger_proof_intf = sig
 
   type t [@@deriving sexp, bin_io]
 
+  val create : statement:statement -> sok_digest:sok_digest -> proof:proof -> t
+
   val statement_target : statement -> ledger_hash
 
   val statement : t -> statement
@@ -490,6 +492,8 @@ module type Ledger_builder_base_intf = sig
     type t [@@deriving bin_io]
 
     val hash : t -> ledger_builder_aux_hash
+
+    val is_valid : t -> bool
   end
 
   val ledger : t -> ledger
@@ -500,7 +504,7 @@ module type Ledger_builder_base_intf = sig
        snarked_ledger_hash:frozen_ledger_hash
     -> ledger:ledger
     -> aux:Aux.t
-    -> t Or_error.t
+    -> t Or_error.t Deferred.t
 
   val copy : t -> t
 
@@ -552,7 +556,7 @@ module type Ledger_builder_intf = sig
     -> get_completed_work:(statement -> completed_work option)
     -> valid_diff
        * [`Hash_after_applying of ledger_builder_hash]
-       * [`Ledger_proof of (ledger_proof * ledger_proof_statement) option]
+       * [`Ledger_proof of ledger_proof option]
 
   val all_work_pairs :
        t
