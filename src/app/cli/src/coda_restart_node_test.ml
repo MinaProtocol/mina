@@ -59,8 +59,7 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
     ()
 
   let command =
-    Command.async_spec
-      ~summary:"Test of stopping, waiting, then starting a node"
-      Command.Spec.(empty)
-      main
+    let open Command.Let_syntax in
+    Command.async ~summary:"Test of stopping, waiting, then starting a node"
+      (Command.Param.return main)
 end

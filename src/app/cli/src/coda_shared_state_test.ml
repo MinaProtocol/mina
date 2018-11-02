@@ -50,7 +50,7 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
     go 40
 
   let command =
-    Command.async_spec ~summary:"Test that workers share states"
-      Command.Spec.(empty)
-      main
+    let open Command.Let_syntax in
+    Command.async ~summary:"Test that workers share states"
+      (Command.Param.return main)
 end

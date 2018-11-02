@@ -59,6 +59,8 @@ module type S = sig
   module External_transition :
     Coda_base.External_transition.S with module Protocol_state = Protocol_state
 
+  val block_interval_ms : int64
+
   val genesis_protocol_state : Protocol_state.value
 
   val generate_transition :

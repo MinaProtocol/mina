@@ -23,7 +23,8 @@ RUN patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 /src/result/bin/kadem
 # Deb staging
 RUN mkdir -p /src/build/usr/local/bin
 RUN cp /src/result/bin/kademlia /src/build//usr/local/bin/coda-kademlia
-RUN SIG=$(cat /tmp/sha1sig) ; sed -i "s/HASH/${SIG}/" /src/build/DEBIAN/control
+RUN DATE=$(date +%Y-%m-%d)   ; sed -i "s/DATE/${DATE}/" /src/build/DEBIAN/control
+RUN HASH=$(cat /tmp/sha1sig) ; sed -i "s/HASH/${HASH}/" /src/build/DEBIAN/control
 
 # Build and copy deb
 RUN cd /src ; dpkg-deb --build /src/build ; cp /src/build.deb /src/coda-kademlia.deb

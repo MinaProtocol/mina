@@ -85,14 +85,14 @@ let daemon (module Kernel : Kernel_intf) log =
            "CAPACITY_LOG_2 Log of capacity of transactions per transition \
             (default: 4)"
          (optional int)
-     and proposal_interval =
-       flag "proposal-interval"
-         ~doc:
-           "MILLIS Time between the proposer proposing and waiting (default: \
-            5000)"
-         (optional int)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
+     and snark_work_fee =
+       flag "snark-worker-fee"
+         ~doc:
+           "FEE Amount a worker wants to get compensated for generating a \
+            snark proof"
+         (optional int)
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -158,6 +158,11 @@ let daemon (module Kernel : Kernel_intf) log =
        let transaction_capacity_log_2 =
          or_from_config YJ.Util.to_int_option "txn-capacity" ~default:8
            transaction_capacity_log_2
+       in
+       let snark_work_fee_flag =
+         Currency.Fee.of_int
+           (or_from_config YJ.Util.to_int_option "snark-worker-fee" ~default:0
+              snark_work_fee)
        in
        let rest_server_port =
          maybe_from_config YJ.Util.to_int_option "rest-port" rest_server_port
@@ -304,6 +309,7 @@ let daemon (module Kernel : Kernel_intf) log =
                   (conf_dir ^/ "ledger_builder")
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+                ~snark_work_fee:snark_work_fee_flag
                 ~time_controller:(Inputs.Time.Controller.create ())
                 ?propose_keypair:Config0.propose_keypair () ~banlist)
          in

@@ -577,13 +577,22 @@ module type Work_selector_intf = sig
 
   type work
 
+  type snark_pool
+
+  type fee
+
   module State : sig
     type t
 
     val init : t
   end
 
-  val work : ledger_builder -> State.t -> work list * State.t
+  val work :
+       snark_pool:snark_pool
+    -> fee:fee
+    -> ledger_builder
+    -> State.t
+    -> work list * State.t
 end
 
 module type Tip_intf = sig

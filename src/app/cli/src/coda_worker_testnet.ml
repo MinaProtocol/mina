@@ -225,9 +225,11 @@ module Make (Kernel : Kernel_intf) = struct
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-  let test ?(proposal_interval = 1000) log n should_propose
-      snark_work_public_keys work_selection =
+  let test log n should_propose snark_work_public_keys work_selection =
     let log = Logger.child log "worker_testnet" in
+    let proposal_interval =
+      Int64.to_int_exn Kernel.Consensus_mechanism.block_interval_ms
+    in
     let%bind program_dir = Unix.getcwd () in
     Coda_processes.init () ;
     let configs =
