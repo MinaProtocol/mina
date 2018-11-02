@@ -188,6 +188,7 @@ module Make (Kernel : Kernel_intf) = struct
                  (conf_temp_dir ^/ "transaction_pool")
                ~snark_pool_disk_location:(conf_temp_dir ^/ "snark_pool")
                ~time_controller:(Main.Inputs.Time.Controller.create ())
+               ~snark_work_fee:(Currency.Fee.of_int 0)
                ?propose_keypair:Config.propose_keypair () ~banlist)
         in
         Option.iter snark_worker_config ~f:(fun config ->

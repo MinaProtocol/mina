@@ -305,16 +305,6 @@ end
 module type Inputs_intf = sig
   include Coda_pow.Inputs_intf
 
-  module Work_selector :
-    Coda_pow.Work_selector_intf
-    with type ledger_builder := Ledger_builder.t
-     and type work :=
-                ( Ledger_proof_statement.t
-                , Transaction.t
-                , Sparse_ledger.t
-                , Ledger_proof.t )
-                Snark_work_lib.Work.Single.Spec.t
-
   module Proof_carrying_state : sig
     type t =
       ( Consensus_mechanism.Protocol_state.value
@@ -335,6 +325,18 @@ module type Inputs_intf = sig
     Snark_pool_intf
     with type completed_work_statement := Completed_work.Statement.t
      and type completed_work_checked := Completed_work.Checked.t
+
+  module Work_selector :
+    Coda_pow.Work_selector_intf
+    with type ledger_builder := Ledger_builder.t
+     and type work :=
+                ( Ledger_proof_statement.t
+                , Transaction.t
+                , Sparse_ledger.t
+                , Ledger_proof.t )
+                Snark_work_lib.Work.Single.Spec.t
+     and type snark_pool := Snark_pool.t
+     and type fee := Currency.Fee.t
 
   module Transaction_pool :
     Transaction_pool_intf
@@ -418,7 +420,8 @@ module Make (Inputs : Inputs_intf) = struct
         Linear_pipe.Reader.t
     ; log: Logger.t
     ; mutable seen_jobs: Work_selector.State.t
-    ; ledger_builder_transition_backup_capacity: int }
+    ; ledger_builder_transition_backup_capacity: int
+    ; snark_work_fee: Currency.Fee.t }
 
   let run_snark_worker t = t.run_snark_worker
 
@@ -450,6 +453,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let peers t = Net.peers t.net
 
+  let snark_work_fee t = t.snark_work_fee
+
   let ledger_builder_ledger_proof t =
     let lb = best_ledger_builder t in
     Ledger_builder.current_ledger_proof lb
@@ -469,6 +474,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; ledger_builder_transition_backup_capacity: int [@default 10]
       ; time_controller: Time.Controller.t
       ; banlist: Coda_base.Banlist.t
+      ; snark_work_fee: Currency.Fee.t
       (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
       }
     [@@deriving make]
@@ -607,5 +613,6 @@ module Make (Inputs : Inputs_intf) = struct
       ; log= config.log
       ; seen_jobs= Work_selector.State.init
       ; ledger_builder_transition_backup_capacity=
-          config.ledger_builder_transition_backup_capacity }
+          config.ledger_builder_transition_backup_capacity
+      ; snark_work_fee= config.snark_work_fee }
 end

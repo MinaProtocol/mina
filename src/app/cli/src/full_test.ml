@@ -79,7 +79,7 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
          ~transaction_pool_disk_location:(temp_conf_dir ^/ "transaction_pool")
          ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
          ~time_controller:(Inputs.Time.Controller.create ())
-         () ~banlist)
+         () ~banlist ~snark_work_fee:(Currency.Fee.of_int 0))
   in
   don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers coda)) ;
   let wait_until_cond ~(f : t -> bool) ~(timeout : Float.t) =

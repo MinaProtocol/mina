@@ -171,32 +171,25 @@ module type Config_intf = sig
   val work_selection : Protocols.Coda_pow.Work_selection.t
 end
 
-module type Make_work_selector_intf = sig
-  module Make (Inputs : Work_selector.Inputs.Inputs_intf) :
-    Protocols.Coda_pow.Work_selector_intf
-    with type ledger_builder := Inputs.Ledger_builder.t
-     and type work :=
-                ( Inputs.Ledger_proof_statement.t
-                , Inputs.Transaction.t
-                , Inputs.Sparse_ledger.t
-                , Inputs.Ledger_proof.t )
-                Snark_work_lib.Work.Single.Spec.t
-end
+module type Work_selector_F = functor
+  (Inputs : Work_selector.Inputs.Inputs_intf)
+  -> Protocols.Coda_pow.Work_selector_intf
+     with type ledger_builder := Inputs.Ledger_builder.t
+      and type work :=
+                 ( Inputs.Ledger_proof_statement.t
+                 , Inputs.Transaction.t
+                 , Inputs.Sparse_ledger.t
+                 , Inputs.Ledger_proof.t )
+                 Snark_work_lib.Work.Single.Spec.t
+      and type snark_pool := Inputs.Snark_pool.t
+      and type fee := Inputs.Fee.t
 
 module type Init_intf = sig
   include Config_intf
 
   include Kernel_intf
 
-  module Make_work_selector (Inputs : Work_selector.Inputs.Inputs_intf) :
-    Protocols.Coda_pow.Work_selector_intf
-    with type ledger_builder := Inputs.Ledger_builder.t
-     and type work :=
-                ( Inputs.Ledger_proof_statement.t
-                , Inputs.Transaction.t
-                , Inputs.Sparse_ledger.t
-                , Inputs.Ledger_proof.t )
-                Snark_work_lib.Work.Single.Spec.t
+  module Make_work_selector : Work_selector_F
 
   val proposer_prover : [`Proposer of Prover.t | `Non_proposer]
 
@@ -214,34 +207,10 @@ let make_init ~should_propose (module Config : Config_intf)
     else return `Non_proposer
   in
   let%map verifier = Verifier.create ~conf_dir in
-  let (module Selector : Make_work_selector_intf) =
+  let (module Make_work_selector : Work_selector_F) =
     match work_selection with
-    | Seq ->
-        ( module struct
-          module Make (Inputs : Work_selector.Inputs.Inputs_intf) :
-            Protocols.Coda_pow.Work_selector_intf
-            with type ledger_builder := Inputs.Ledger_builder.t
-             and type work :=
-                        ( Inputs.Ledger_proof_statement.t
-                        , Inputs.Transaction.t
-                        , Inputs.Sparse_ledger.t
-                        , Inputs.Ledger_proof.t )
-                        Snark_work_lib.Work.Single.Spec.t =
-            Work_selector.Sequence.Make (Inputs)
-        end )
-    | Random ->
-        ( module struct
-          module Make (Inputs : Work_selector.Inputs.Inputs_intf) :
-            Protocols.Coda_pow.Work_selector_intf
-            with type ledger_builder := Inputs.Ledger_builder.t
-             and type work :=
-                        ( Inputs.Ledger_proof_statement.t
-                        , Inputs.Transaction.t
-                        , Inputs.Sparse_ledger.t
-                        , Inputs.Ledger_proof.t )
-                        Snark_work_lib.Work.Single.Spec.t =
-            Work_selector.Random.Make (Inputs)
-        end )
+    | Seq -> (module Work_selector.Sequence.Make : Work_selector_F)
+    | Random -> (module Work_selector.Random.Make : Work_selector_F)
   in
   let module Init = struct
     include Kernel
@@ -251,7 +220,7 @@ let make_init ~should_propose (module Config : Config_intf)
 
     let verifier = verifier
 
-    module Make_work_selector = Selector.Make
+    module Make_work_selector = Make_work_selector
   end in
   (module Init : Init_intf)
 
@@ -712,18 +681,31 @@ struct
     module Ledger_hash = Ledger_hash
     module Ledger_proof = Ledger_proof
     module Ledger_builder = Ledger_builder
+    module Fee = Fee.Unsigned
+    module Snark_pool = Snark_pool
+
+    module Completed_work = struct
+      type t = Completed_work.Checked.t
+
+      let fee t =
+        let {Completed_work.fee; _} = Completed_work.forget t in
+        fee
+    end
   end
 
   module Work_selector = Make_work_selector (Work_selector_inputs)
 
   let request_work ~best_ledger_builder
       ~(seen_jobs : 'a -> Work_selector.State.t)
-      ~(set_seen_jobs : 'a -> Work_selector.State.t -> unit) (t : 'a) =
+      ~(set_seen_jobs : 'a -> Work_selector.State.t -> unit)
+      ~(snark_pool : 'a -> Snark_pool.t) (t : 'a) (fee : Fee.Unsigned.t) =
     let lb = best_ledger_builder t in
-    let instances, seen_jobs = Work_selector.work lb (seen_jobs t) in
+    let instances, seen_jobs =
+      Work_selector.work ~fee ~snark_pool:(snark_pool t) lb (seen_jobs t)
+    in
     set_seen_jobs t seen_jobs ;
     if List.is_empty instances then None
-    else Some {Snark_work_lib.Work.Spec.instances; fee= Fee.Unsigned.zero}
+    else Some {Snark_work_lib.Work.Spec.instances; fee}
 end
 
 [%%if
@@ -762,8 +744,9 @@ module Make_coda (Init : Init_intf) = struct
   module Prover = Init.Prover
   include Coda_lib.Make (Inputs)
 
-  let request_work =
+  let request_work t =
     Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
+      ~snark_pool t (snark_work_fee t)
 end
 
 [%%else]
@@ -784,8 +767,9 @@ module Make_coda (Init : Init_intf) = struct
   module Prover = Init.Prover
   include Coda_lib.Make (Inputs)
 
-  let request_work =
+  let request_work t =
     Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
+      ~snark_pool t t.snark_work_fee
 end
 
 [%%endif]
@@ -925,7 +909,8 @@ module type Main_intf = sig
       ; snark_pool_disk_location: string
       ; ledger_builder_transition_backup_capacity: int [@default 10]
       ; time_controller: Inputs.Time.Controller.t
-      ; banlist: Banlist.t }
+      ; banlist: Banlist.t
+      ; snark_work_fee: Currency.Fee.t }
     [@@deriving make]
   end
 
