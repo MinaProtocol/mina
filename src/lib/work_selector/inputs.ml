@@ -21,6 +21,23 @@ module type Inputs_intf = sig
     type t
   end
 
+  module Fee : sig
+    type t [@@deriving compare]
+  end
+
+  module Completed_work : sig
+    type t
+
+    val fee : t -> Fee.t
+  end
+
+  module Snark_pool : sig
+    type t
+
+    val get_completed_work :
+      t -> Ledger_proof_statement.t list -> Completed_work.t option
+  end
+
   module Ledger_builder : sig
     type t
 
@@ -47,6 +64,29 @@ module Test_input = struct
   module Sparse_ledger = Int
   module Transaction = Int
   module Ledger_proof = Int
+  module Fee = Int
+
+  module Completed_work = struct
+    type t = Int.t
+
+    let fee = Fn.id
+  end
+
+  module Snark_pool = struct
+    module T = struct
+      type t = Ledger_proof.t list [@@deriving bin_io, hash, compare, sexp]
+    end
+
+    module Work = Hashable.Make_binable (T)
+
+    type t = Completed_work.t Work.Table.t
+
+    let get_completed_work (t : t) = Work.Table.find t
+
+    let create () = Work.Table.create ()
+
+    let add_snark t ~work ~fee = Work.Table.add_exn t ~key:work ~data:fee
+  end
 
   module Ledger_builder = struct
     type t = int List.t
