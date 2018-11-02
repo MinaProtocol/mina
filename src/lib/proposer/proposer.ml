@@ -149,14 +149,14 @@ module Make (Inputs : Inputs_intf) :
     in
     let%bind transition_opt =
       lift_sync (fun () ->
-          let previous_blockchain_hash =
+          let previous_ledger_hash =
             previous_protocol_state |> Protocol_state.blockchain_state
             |> Blockchain_state.ledger_hash
           in
           let next_ledger_hash =
             Option.value_map ledger_proof_opt
               ~f:(fun (_, stmt) -> Ledger_proof.(statement_target stmt))
-              ~default:previous_blockchain_hash
+              ~default:previous_ledger_hash
           in
           let supply_increase =
             Option.value_map ledger_proof_opt
@@ -191,7 +191,7 @@ module Make (Inputs : Inputs_intf) :
                   in
                   Frozen_ledger_hash.of_ledger_hash
                     (Ledger.merkle_root snarked_ledger) )
-                ~default:(Ok previous_blockchain_hash) )
+                ~default:(Ok previous_ledger_hash) )
             ~supply_increase ~logger )
     in
     Option.value
