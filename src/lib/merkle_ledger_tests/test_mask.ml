@@ -60,7 +60,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
 
       let dummy_location = Test.Location.Account dummy_address
 
-      let dummy_account = Account.create "not_really_a_public_key" 1000
+      let dummy_account = Quickcheck.random_value Account.gen
 
       let create_new_account_exn mdb ({Account.public_key; _} as account) =
         let action, location =
@@ -227,14 +227,21 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             && Hash.equal mask_merkle_root maskable_merkle_root )
 
       let%test_unit "add and retrieve a block of accounts" =
+        (* see similar test in test_database *)
         if Test.depth <= 8 then
           Test.with_instances (fun maskable mask ->
               let attached_mask = Maskable.register_mask maskable mask in
-              let gen_balance = Int.gen_incl 1 Int.max_value in
+              let num_accounts = 1 lsl Test.depth in
+              let gen_values gen =
+                Quickcheck.random_value
+                  (Quickcheck.Generator.list_with_length num_accounts gen)
+              in
+              let public_keys = Key.gen_keys num_accounts in
+              let balances = gen_values Balance.gen in
               let accounts =
-                List.init (1 lsl Test.depth) ~f:(fun public_key ->
-                    Account.create (Int.to_string public_key)
-                      (Quickcheck.random_value gen_balance) )
+                List.map2_exn public_keys balances
+                  ~f:(fun public_key balance ->
+                    Account.create public_key balance )
               in
               List.iter accounts ~f:(fun account ->
                   ignore @@ create_new_account_exn attached_mask account ) ;
