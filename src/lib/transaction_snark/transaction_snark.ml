@@ -1588,7 +1588,6 @@ let%test_module "transaction_snark" =
               (Payment_memo.create_exn
                  (Test_util.arbitrary_string
                     ~len:Payment_memo.max_size_in_bytes))
-            (*TODO*)
           in
           let t2 =
             payment wallets 1 2 3
@@ -1597,7 +1596,6 @@ let%test_module "transaction_snark" =
               (Payment_memo.create_exn
                  (Test_util.arbitrary_string
                     ~len:Payment_memo.max_size_in_bytes))
-            (*TODO*)
           in
           let sok_digest =
             Sok_message.create ~fee:Fee.zero
