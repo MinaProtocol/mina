@@ -30,7 +30,7 @@ let create_ledger_and_transactions num_transitions =
       ; fee
       ; amount
       ; nonce
-      ; memo= Payment.Payload.create_memo "" }
+      ; memo= Payment_memo.dummy }
     in
     Payment.sign from_kp payload
   in

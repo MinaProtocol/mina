@@ -74,7 +74,7 @@ let gen ~keys ~max_amount ~max_fee =
     ; fee
     ; amount
     ; nonce= Account_nonce.zero
-    ; memo= Payload.create_memo memo }
+    ; memo= Payment_memo.create_exn memo }
   in
   sign sender payload
 

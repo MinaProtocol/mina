@@ -7,14 +7,7 @@ open Import
 open Sha256_lib
 module Amount = Currency.Amount
 module Fee = Currency.Fee
-
-module Memo : Payment_memo.S = struct
-  include Sha256.Digest
-
-  let create = Sha256.digest_string
-
-  let dummy = Sha256.dummy
-end
+module Memo = Payment_memo
 
 module Stable = struct
   module V1 = struct
@@ -41,8 +34,6 @@ let dummy =
   ; fee= Fee.zero
   ; nonce= Account_nonce.zero
   ; memo= Memo.dummy }
-
-let create_memo = Memo.create
 
 type var =
   ( Public_key.Compressed.var
@@ -89,9 +80,7 @@ let var_to_triples {receiver; amount; fee; nonce; memo} =
      let amount = Amount.var_to_triples amount in
      let fee = Fee.var_to_triples fee in
      let nonce = Account_nonce.Unpacked.var_to_triples nonce in
-     let memo =
-       Fold.(to_list (group3 ~default:Boolean.false_ (of_list memo)))
-     in
+     let memo = Memo.var_to_triples memo in
      receiver @ amount @ fee @ nonce @ memo)
 
 let length_in_triples =
@@ -107,8 +96,8 @@ let gen =
   and amount = Amount.gen
   and fee = Fee.gen
   and nonce = Account_nonce.gen
-  and memo = String.gen in
-  {receiver; amount; fee; nonce; memo= create_memo memo}
+  and memo = String.gen_with_length Payment_memo.max_size_in_bytes Char.gen in
+  {receiver; amount; fee; nonce; memo= Memo.create_exn memo}
 
 let%test_unit "to_bits" =
   let open Test_util in
@@ -119,7 +108,9 @@ let%test_unit "to_bits" =
         ; amount= Amount.of_int (Random.int Int.max_value)
         ; fee= Fee.of_int (Random.int Int.max_value_30_bits)
         ; nonce= Account_nonce.random ()
-        ; memo= create_memo arbitrary_string }
+        ; memo=
+            Memo.create_exn
+              (arbitrary_string ~len:Payment_memo.max_size_in_bytes) }
       in
       Test_util.test_to_triples typ fold var_to_triples input )
 

@@ -35,7 +35,7 @@ module Make (Kernel : Kernel_intf) = struct
       * Public_key.Compressed.t
       * Currency.Amount.t
       * Currency.Fee.t
-      * Payment.Payload.Memo.t
+      * Payment_memo.t
     [@@deriving bin_io]
   end
 

@@ -6,14 +6,6 @@ open Snark_params.Tick
 open Sha256_lib
 open Import
 
-module Memo : sig
-  type t [@@deriving bin_io, eq, sexp, hash]
-
-  type var
-
-  val create : string -> t
-end
-
 type ('pk, 'amount, 'fee, 'nonce, 'memo) t_ =
   {receiver: 'pk; amount: 'amount; fee: 'fee; nonce: 'nonce; memo: 'memo}
 [@@deriving bin_io, eq, sexp, hash]
@@ -23,13 +15,11 @@ type t =
   , Currency.Amount.t
   , Currency.Fee.t
   , Account_nonce.t
-  , Memo.t )
+  , Payment_memo.t )
   t_
 [@@deriving bin_io, eq, sexp, hash]
 
 val dummy : t
-
-val create_memo : string -> Memo.t
 
 val gen : t Quickcheck.Generator.t
 
@@ -50,7 +40,7 @@ module Stable : sig
       , Currency.Amount.Stable.V1.t
       , Currency.Fee.Stable.V1.t
       , Account_nonce.t
-      , Memo.t )
+      , Payment_memo.t )
       t_
     [@@deriving bin_io, eq, sexp, hash]
   end
@@ -61,7 +51,7 @@ type var =
   , Currency.Amount.var
   , Currency.Fee.var
   , Account_nonce.Unpacked.var
-  , Memo.var )
+  , Payment_memo.var )
   t_
 
 val length_in_triples : int

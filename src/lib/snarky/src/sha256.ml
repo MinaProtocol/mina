@@ -35,6 +35,8 @@ end)
     val of_string : string -> t
 
     val of_bits : bool list -> t
+
+    val var_to_triples : var -> Boolean.var Triple.t list
   end
 
   module Block : sig
@@ -87,19 +89,24 @@ end = struct
 
     type var = Boolean.var list
 
-    let fold s =
+    let bit_at s i = (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1
+
+    let var_to_triples t =
+      Fold.(to_list (group3 ~default:Boolean.false_ (of_list t)))
+
+    let fold' s =
       { Fold.fold=
           (fun ~init ~f ->
             let n = 8 * String.length s in
             let rec go acc i =
               if i = n then acc
               else
-                let b = (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1 in
+                let b = bit_at s i in
                 go (f acc b) (i + 1)
             in
             go init 0 ) }
 
-    let fold t = Fold.group3 ~default:false (fold t)
+    let fold t = Fold.group3 ~default:false (fold' t)
 
     let chunks_of n xs = List.groupi ~break:(fun i _ _ -> i mod n = 0) xs
 
@@ -113,9 +120,7 @@ end = struct
       |> List.map ~f:bits_to_char_big_endian
       |> String.of_char_list
 
-    let to_bits s =
-      List.init length_in_bits ~f:(fun i ->
-          (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1 )
+    let to_bits s = List.init length_in_bits ~f:(fun i -> bit_at s i)
 
     let to_string = Fn.id
 
@@ -141,6 +146,19 @@ end = struct
     let length_in_triples = (M.length_in_bits + 2) / 3
 
     let var_of_t t = List.map (to_bits t) ~f:Boolean.var_of_value
+
+    let gen = String.gen_with_length (length_in_bits / 8) Char.gen
+
+    let%test_unit "to_bits compatible with fold" =
+      Quickcheck.test gen ~f:(fun t ->
+          assert (Fold.to_list (fold' t) = to_bits t) )
+
+    let%test_unit "of_bits . to_bits = id" =
+      Quickcheck.test gen ~f:(fun t -> assert (equal (of_bits (to_bits t)) t))
+
+    let%test_unit "to_bits . of_bits = id" =
+      Quickcheck.test (List.gen_with_length length_in_bits Bool.gen)
+        ~f:(fun t -> assert (to_bits (of_bits t) = t) )
   end
 
   module Digest = Bits (struct

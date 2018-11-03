@@ -47,16 +47,13 @@ let words_to_bits ws =
 let dummy = Digest.of_string @@ String.init 256 ~f:(fun _ -> '\000')
 
 let digest_string (s : string) : Digest.t =
-  (*TODO large strings might throw out of memory*)
   let n = String.length s in
   let block_length = Gadget.Block.length_in_bits / 8 in
   let r = n mod block_length in
   let t =
     if r = 0 then s else s ^ String.init ~f:(fun _ -> '\000') (block_length - r)
   in
-  Digest.of_string
-  @@ bits_to_string
-       (Digestif.SHA256.(feed_string (init ()) t).h |> words_to_bits)
+  Digest.of_bits (Digestif.SHA256.(feed_string (init ()) t).h |> words_to_bits)
 
 let digest_bits (bits : bool list) : Digest.t =
   Digest.of_bits
