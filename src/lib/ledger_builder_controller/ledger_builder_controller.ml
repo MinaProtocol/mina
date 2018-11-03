@@ -410,6 +410,8 @@ let%test_module "test" =
             type t = int [@@deriving bin_io]
 
             let hash t = t
+
+            let is_valid _ = true
           end
 
           let ledger t = !t
@@ -421,7 +423,7 @@ let%test_module "test" =
           let hash t = !t
 
           let of_aux_and_ledger ~snarked_ledger_hash:_ ~ledger ~aux:_ =
-            Ok (create ~ledger)
+            Deferred.return (Ok (create ~ledger))
 
           let aux t = !t
 

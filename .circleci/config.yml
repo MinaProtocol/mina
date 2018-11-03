@@ -41,9 +41,6 @@ jobs:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
             - run:
-                name: Get Proving Keys -- make withkeys
-                command: make withkeys
-            - run:
                 name: Build OCaml
                 command: eval `opam config env` && DUNE_PROFILE=testnet make build 2>&1 | tee /tmp/buildocaml.log
             - run:
@@ -68,9 +65,6 @@ jobs:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
             - run:
-                name: Get Proving Keys -- make withkeys
-                command: make withkeys
-            - run:
                 name: Build OCaml
                 command: eval `opam config env` && DUNE_PROFILE=testnet_public make build 2>&1 | tee /tmp/buildocaml.log
             - run:
@@ -91,9 +85,6 @@ jobs:
            - run:
                name: Build Haskell
                command: source ~/.profile && make kademlia
-           - run:
-               name: Get stable SNARK keys - make withkeys
-               command: source ~/.profile && make withkeys
            - run:
               name: Test make test-runtest
               command: source ~/.profile && make test-runtest
