@@ -26,12 +26,18 @@ struct
   module Addr = Location.Addr
 
   type t =
-    {account_tbl: Account.t Location.Table.t; hash_tbl: Hash.t Addr.Table.t}
+    { account_tbl: Account.t Location.Table.t
+    ; hash_tbl: Hash.t Addr.Table.t
+    ; location_tbl: Location.t Key.Table.t
+    ; mutable current_location: Location.t option }
 
   type unattached = t
 
   let create () =
-    {account_tbl= Location.Table.create (); hash_tbl= Addr.Table.create ()}
+    { account_tbl= Location.Table.create ()
+    ; hash_tbl= Addr.Table.create ()
+    ; location_tbl= Key.Table.create ()
+    ; current_location= None }
 
   module Attached = struct
     type parent = Base.t
@@ -39,7 +45,9 @@ struct
     type t =
       { parent: parent
       ; account_tbl: Account.t Location.Table.t
-      ; hash_tbl: Hash.t Addr.Table.t }
+      ; hash_tbl: Hash.t Addr.Table.t
+      ; location_tbl: Location.t Key.Table.t
+      ; mutable current_location: Location.t option }
 
     module Path = Base.Path
     module Db_error = Base.Db_error
@@ -51,24 +59,40 @@ struct
         "Mask.Attached.create: cannot create an attached mask; use \
          Mask.create and Mask.set_parent"
 
-    let unset_parent t = {account_tbl= t.account_tbl; hash_tbl= t.hash_tbl}
+    let unset_parent t =
+      { account_tbl= t.account_tbl
+      ; hash_tbl= t.hash_tbl
+      ; location_tbl= t.location_tbl
+      ; current_location= t.current_location }
 
     let get_parent t = t.parent
-
-    (* getter, setter, so we don't rely on a particular implementation *)
-    let find_account t location = Location.Table.find t.account_tbl location
-
-    let set_account t location account =
-      Location.Table.set t.account_tbl ~key:location ~data:account
-
-    let remove_account t location =
-      Location.Table.remove t.account_tbl location
 
     (* don't rely on a particular implementation *)
     let find_hash t address = Addr.Table.find t.hash_tbl address
 
     let set_hash t address hash =
       Addr.Table.set t.hash_tbl ~key:address ~data:hash
+
+    (* don't rely on a particular implementation *)
+    let find_location t public_key = Key.Table.find t.location_tbl public_key
+
+    let set_location t public_key location =
+      Key.Table.set t.location_tbl ~key:public_key ~data:location
+
+    (* don't rely on a particular implementation *)
+    let find_account t location = Location.Table.find t.account_tbl location
+
+    let set_account t location account =
+      Location.Table.set t.account_tbl ~key:location ~data:account ;
+      set_location t (Account.public_key account) location
+
+    let remove_account t location =
+      let account = Option.value_exn (find_account t location) in
+      Location.Table.remove t.account_tbl location ;
+      (* TODO : use stack database to save unused location, which can be 
+        used when allocating a location
+      *)
+      Key.Table.remove t.location_tbl (Account.public_key account)
 
     (* a read does a lookup in the account_tbl; if that fails, delegate to parent *)
     let get t location =
@@ -258,8 +282,7 @@ struct
 
     let num_accounts t = Location.Table.length t.account_tbl
 
-    (* TODO : database maintains persistent map of keys to locations; do the same for mask? *)
-    let location_of_key _t _key = failwith "location_of_key: not implemented"
+    let location_of_key t key = find_location t key
 
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
     let make_space_for _t _tot = failwith "make_space_for: not implemented"
@@ -309,16 +332,34 @@ struct
       let address_in_mask t addr = Option.is_some (find_hash t addr)
     end
 
-    (* types/modules/operations/values we delegate to parent *)
+    (* leftmost location *)
+    let first_location =
+      Location.Account
+        ( Addr.of_directions
+        @@ List.init Base.depth ~f:(fun _ -> Direction.Left) )
 
-    let delegate_to_parent f t = get_parent t |> f
+    (* NB: updates the mutable current_location field in t *)
+    let get_or_create_account t key account =
+      match find_location t key with
+      | None ->
+          let maybe_location =
+            match t.current_location with
+            | None -> Some first_location
+            | Some loc -> Location.next loc
+          in
+          if not (Option.is_some maybe_location) then
+            Error Db_error.Out_of_leaves
+          else
+            let location = Option.value_exn maybe_location in
+            set t location account ;
+            t.current_location <- Some location ;
+            Ok (`Added, location)
+      | Some location -> Ok (`Existed, location)
 
-    (* TODO : should allocate account location in mask *)
-    let get_or_create_account = delegate_to_parent Base.get_or_create_account
-
-    (* TODO : should allocate account location in mask *)
-    let get_or_create_account_exn =
-      delegate_to_parent Base.get_or_create_account_exn
+    let get_or_create_account_exn t key account =
+      get_or_create_account t key account
+      |> Result.map_error ~f:(fun err -> Db_error.Db_exception err)
+      |> Result.ok_exn
 
     let sexp_of_location = Location.sexp_of_t
 
@@ -328,5 +369,9 @@ struct
   end
 
   let set_parent t parent =
-    {Attached.parent; account_tbl= t.account_tbl; hash_tbl= t.hash_tbl}
+    { Attached.parent
+    ; account_tbl= t.account_tbl
+    ; hash_tbl= t.hash_tbl
+    ; location_tbl= t.location_tbl
+    ; current_location= t.current_location }
 end
