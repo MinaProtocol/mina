@@ -151,14 +151,16 @@ module Make (Inputs : Inputs_intf) :
       lift_sync (fun () ->
           let next_ledger_hash =
             Option.value_map ledger_proof_opt
-              ~f:(fun (_, stmt) -> Ledger_proof.(statement_target stmt))
+              ~f:(fun proof ->
+                Ledger_proof.statement proof |> Ledger_proof.statement_target
+                )
               ~default:
                 ( previous_protocol_state |> Protocol_state.blockchain_state
                 |> Blockchain_state.ledger_hash )
           in
           let supply_increase =
             Option.value_map ledger_proof_opt
-              ~f:(fun (_, stmt) -> stmt.supply_increase)
+              ~f:(fun proof -> (Ledger_proof.statement proof).supply_increase)
               ~default:Currency.Amount.zero
           in
           let blockchain_state =
@@ -187,14 +189,15 @@ module Make (Inputs : Inputs_intf) :
                let snark_transition =
                  Snark_transition.create_value
                    ?sok_digest:
-                     (Option.map ledger_proof_opt ~f:(fun (p, _) ->
-                          Ledger_proof.sok_digest p ))
+                     (Option.map ledger_proof_opt ~f:(fun proof ->
+                          Ledger_proof.sok_digest proof ))
                    ?ledger_proof:
                      (Option.map ledger_proof_opt
-                        ~f:(Fn.compose Ledger_proof.underlying_proof fst))
+                        ~f:Ledger_proof.underlying_proof)
                    ~supply_increase:
                      (Option.value_map ~default:Currency.Amount.zero
-                        ~f:(fun (_p, statement) -> statement.supply_increase)
+                        ~f:(fun proof ->
+                          (Ledger_proof.statement proof).supply_increase )
                         ledger_proof_opt)
                    ~blockchain_state:
                      (Protocol_state.blockchain_state protocol_state)

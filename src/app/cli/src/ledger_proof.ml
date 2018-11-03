@@ -2,6 +2,12 @@ open Core_kernel
 open Async_kernel
 open Coda_base
 
+let to_signed_amount signed_fee =
+  let magnitude =
+    Currency.Fee.Signed.magnitude signed_fee |> Currency.Amount.of_fee
+  and sgn = Currency.Fee.Signed.sgn signed_fee in
+  Currency.Amount.Signed.create ~magnitude ~sgn
+
 module Prod :
   Protocols.Coda_pow.Ledger_proof_intf
   with type t = Transaction_snark.t
@@ -20,6 +26,16 @@ module Prod :
   let statement_target (t : Transaction_snark.Statement.t) = t.target
 
   let underlying_proof = Transaction_snark.proof
+
+  let create
+      ~statement:{ Transaction_snark.Statement.source
+                 ; target
+                 ; supply_increase
+                 ; fee_excess
+                 ; proof_type } ~sok_digest ~proof =
+    Transaction_snark.create ~source ~target ~supply_increase
+      ~fee_excess:(to_signed_amount fee_excess)
+      ~sok_digest ~proof ~proof_type
 end
 
 module Debug :
@@ -41,4 +57,6 @@ module Debug :
   let statement_target (t : Transaction_snark.Statement.t) = t.target
 
   let sok_digest (_, d) = d
+
+  let create ~statement ~sok_digest ~proof = (statement, sok_digest)
 end

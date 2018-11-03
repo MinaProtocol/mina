@@ -104,6 +104,8 @@ module Make (Inputs : Inputs_intf) :
   module Ledger_builder_diff = Inputs.Ledger_builder_diff
   module Time = Inputs.Time
 
+  let block_interval_ms = Time.Span.to_ms Inputs.slot_interval
+
   let genesis_ledger_total_currency =
     Coda_base.Ledger.to_list Inputs.Genesis_ledger.t
     |> List.fold_left ~init:Balance.zero ~f:(fun sum account ->
@@ -619,7 +621,7 @@ module Make (Inputs : Inputs_intf) :
       ; length= Length.zero }
 
     let update_pair (last_data, curr_data) epoch_length ~prev_epoch ~next_epoch
-        ~next_slot ~prev_protocol_state_hash ~proposer_vrf_result ~ledger_hash
+        ~curr_slot ~prev_protocol_state_hash ~proposer_vrf_result ~ledger_hash
         ~total_currency =
       let open Epoch_ledger in
       let last_data, curr_data, epoch_length =
@@ -634,7 +636,7 @@ module Make (Inputs : Inputs_intf) :
         else (last_data, curr_data, epoch_length)
       in
       let curr_seed, curr_lock_checkpoint =
-        if Epoch.Slot.in_seed_update_range next_slot then
+        if Epoch.Slot.in_seed_update_range curr_slot then
           ( Epoch_seed.update curr_data.seed proposer_vrf_result
           , prev_protocol_state_hash )
         else (curr_data.seed, curr_data.lock_checkpoint)
@@ -645,7 +647,7 @@ module Make (Inputs : Inputs_intf) :
       (last_data, curr_data, epoch_length)
 
     let update_pair_checked (last_data, curr_data) epoch_length ~prev_epoch
-        ~next_epoch ~next_slot ~prev_protocol_state_hash ~proposer_vrf_result
+        ~next_epoch ~curr_slot ~prev_protocol_state_hash ~proposer_vrf_result
         ~ledger_hash ~total_currency =
       let open Snark_params.Tick.Let_syntax in
       let%bind last_data, curr_data, epoch_length =
@@ -671,7 +673,7 @@ module Make (Inputs : Inputs_intf) :
         let%bind updated_curr_seed =
           Epoch_seed.update_var curr_data.seed proposer_vrf_result
         and in_seed_update_range =
-          Epoch.Slot.in_seed_update_range_var next_slot
+          Epoch.Slot.in_seed_update_range_var curr_slot
         in
         let%map curr_seed =
           Epoch_seed.if_ in_seed_update_range ~then_:updated_curr_seed
@@ -895,7 +897,7 @@ module Make (Inputs : Inputs_intf) :
           previous_consensus_state.epoch_length
           ~prev_epoch:previous_consensus_state.curr_epoch
           ~next_epoch:consensus_transition_data.epoch
-          ~next_slot:consensus_transition_data.slot
+          ~curr_slot:previous_consensus_state.curr_slot
           ~prev_protocol_state_hash:previous_protocol_state_hash
           ~proposer_vrf_result:consensus_transition_data.proposer_vrf_result
           ~ledger_hash ~total_currency
@@ -927,7 +929,7 @@ module Make (Inputs : Inputs_intf) :
         Epoch_data.update_pair_checked
           (previous_state.last_epoch_data, previous_state.curr_epoch_data)
           previous_state.epoch_length ~prev_epoch:previous_state.curr_epoch
-          ~next_epoch:transition_data.epoch ~next_slot:transition_data.slot
+          ~next_epoch:transition_data.epoch ~curr_slot:previous_state.curr_slot
           ~prev_protocol_state_hash:previous_protocol_state_hash
           ~proposer_vrf_result:transition_data.proposer_vrf_result ~ledger_hash
           ~total_currency
@@ -1007,7 +1009,7 @@ module Make (Inputs : Inputs_intf) :
     in
     (protocol_state, consensus_transition_data)
 
-  let is_transition_valid_checked _transition =
+  let is_transition_valid_checked _transition _ =
     Snark_params.Tick.(Let_syntax.return Boolean.true_)
 
   let next_state_checked previous_state previous_state_hash transition =
