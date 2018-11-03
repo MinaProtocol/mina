@@ -6,6 +6,6 @@
   (flags (:standard -short-paths -warn-error -6-33-27-9-58))
   (library_flags (-linkall))
   (inline_tests)
-  (libraries (core merkle_ledger merkle_mask extlib))
+  (libraries (core merkle_ledger merkle_mask signature_lib extlib))
   (preprocess (pps (ppx_jane ppx_deriving.eq ppx_deriving.show)))
   (synopsis "Testing account databases")))
