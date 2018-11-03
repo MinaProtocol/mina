@@ -93,9 +93,15 @@ let%test_module "test functor on in memory databases" =
                 already exists" =
         Test.with_instance (fun mdb ->
             let public_key = Quickcheck.random_value Key.gen in
-            let balance = Quickcheck.random_value Balance.gen in
+            let balance =
+              Quickcheck.random_value ~seed:(`Deterministic "balance 1")
+                Balance.gen
+            in
             let account = Account.create public_key balance in
-            let balance' = Balance.add balance (Balance.of_int 1) in
+            let balance' =
+              Quickcheck.random_value ~seed:(`Deterministic "balance 2")
+                Balance.gen
+            in
             let account' = Account.create public_key balance' in
             let location = create_new_account_exn mdb account in
             let action, location' =
@@ -188,14 +194,14 @@ let%test_module "test functor on in memory databases" =
             let public_key =
               Quickcheck.random_value ~seed:(`Deterministic "pk") Key.gen
             in
-            let balance =
-              Balance.of_int @@ Quickcheck.random_value balance_gen
-            in
+            let balance_int = Quickcheck.random_value balance_gen in
+            let balance = Balance.of_int balance_int in
             let account = Account.create public_key balance in
             let account_location = create_new_account_exn mdb account in
             let mdb_copy = MT.copy mdb in
+            (* because of bounds on balance_int, sum won't overflow *)
             let balance_with_gift =
-              Balance.add balance (Balance.of_int gift)
+              Balance.of_int (Int.( + ) balance_int gift)
             in
             let updated_account =
               {account with Account.balance= balance_with_gift}

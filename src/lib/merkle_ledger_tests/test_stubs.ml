@@ -1,17 +1,7 @@
 open Core
 open Unsigned
 module Account = Coda_base.Account
-
-module Balance = struct
-  include Currency.Balance
-
-  (* add missing operations for tests *)
-  let one = Currency.Balance.of_int 1
-
-  let add b1 b2 =
-    Option.value_exn
-      (Currency.Balance.add_amount b1 (Currency.Balance.to_amount b2))
-end
+module Balance = Currency.Balance
 
 (* below are alternative modules that use strings as public keys and UInt64 as balances for
    in accounts
@@ -40,8 +30,6 @@ end
 
 module Account_not_used = struct
   type key = string [@@deriving sexp, show, bin_io, eq, compare, hash]
-
-  module Balance = Balance_not_used
 
   type t =
     { public_key: key
