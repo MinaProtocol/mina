@@ -118,7 +118,19 @@ module Haskell_process = struct
           ~f:(fun prog -> Process.create ~prog ~args ())
         |> Deferred.Or_error.map ~f:(fun process -> {process; lock_path})
       with
-      | Ok p -> Ok p
+      | Ok p ->
+          (* If the Kademlia process dies, kill the parent daemon process.   Fix
+           * for #550 *)
+          Deferred.upon (Process.wait p.process) (fun code ->
+              match code with
+              | Ok () -> ()
+              | Error e ->
+                  Logger.fatal log
+                    !"Kademlia process died: %{sexp: \
+                      Unix.Exit_or_signal.error}%!"
+                    e ;
+                  don't_wait_for @@ exit 1 ) ;
+          Ok p
       | Error e ->
           Or_error.error_string
             ( "If you are a dev, did you forget to `make kademlia` and set \
