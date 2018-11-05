@@ -13,6 +13,8 @@ module type S = sig
 
   module Db_error : sig
     type t = Account_location_not_found | Out_of_leaves | Malformed_database
+
+    exception Db_exception of t
   end
 
   module Addr : Merkle_address.S
