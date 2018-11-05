@@ -65,9 +65,13 @@ let keep_trying :
 module Haskell_process = struct
   open Async
 
-  type t = {process: Process.t; lock_path: string}
+  type t =
+    { failure_response: [`Die | `Ignore] ref
+    ; process: Process.t
+    ; lock_path: string }
 
-  let kill {process; lock_path} =
+  let kill {failure_response; process; lock_path} =
+    failure_response := `Ignore ;
     let%bind _ =
       Process.run_exn ~prog:"kill"
         ~args:[Pid.to_string (Process.pid process)]
@@ -116,9 +120,22 @@ module Haskell_process = struct
           ; kademlia_binary
           ; test_prefix ^ kademlia_binary ]
           ~f:(fun prog -> Process.create ~prog ~args ())
-        |> Deferred.Or_error.map ~f:(fun process -> {process; lock_path})
+        |> Deferred.Or_error.map ~f:(fun process ->
+               {failure_response= ref `Die; process; lock_path} )
       with
-      | Ok p -> Ok p
+      | Ok p ->
+          (* If the Kademlia process dies, kill the parent daemon process. Fix
+           * for #550 *)
+          Deferred.upon (Process.wait p.process) (fun code ->
+              match (!(p.failure_response), code) with
+              | `Ignore, _ | _, Ok () -> ()
+              | `Die, Error e ->
+                  Logger.fatal log
+                    !"Kademlia process died: %{sexp: \
+                      Unix.Exit_or_signal.error}%!"
+                    e ;
+                  don't_wait_for @@ exit 1 ) ;
+          Ok p
       | Error e ->
           Or_error.error_string
             ( "If you are a dev, did you forget to `make kademlia` and set \
@@ -154,7 +171,7 @@ module Haskell_process = struct
     with
     | `Yes ->
         let%bind t = run_kademlia () in
-        let {process; lock_path} = t in
+        let {failure_response= _; process; lock_path} = t in
         let%map () =
           write_lock_file lock_path (Process.pid process)
           |> Deferred.map ~f:Or_error.return
