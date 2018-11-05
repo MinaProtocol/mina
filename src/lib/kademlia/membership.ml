@@ -124,7 +124,7 @@ module Haskell_process = struct
                {failure_response= ref `Die; process; lock_path} )
       with
       | Ok p ->
-          (* If the Kademlia process dies, kill the parent daemon process.   Fix
+          (* If the Kademlia process dies, kill the parent daemon process. Fix
            * for #550 *)
           Deferred.upon (Process.wait p.process) (fun code ->
               match (!(p.failure_response), code) with
