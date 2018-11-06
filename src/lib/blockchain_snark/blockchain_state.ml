@@ -13,10 +13,6 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) :
   module Protocol_state = Consensus_mechanism.Protocol_state
   module Snark_transition = Consensus_mechanism.Snark_transition
 
-  let check cond msg =
-    if not cond then Or_error.errorf "Blockchain_state.update: %s" msg
-    else Ok ()
-
   module type Update_intf = sig
     module Checked : sig
       val update :
@@ -58,7 +54,8 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) :
           , _ )
           Tick.Checked.t =
         with_label __LOC__
-          (let%bind good_body =
+          (let supply_increase = Snark_transition.supply_increase transition in
+           let%bind good_body =
              let%bind correct_transaction_snark =
                T.verify_complete_merge
                  (Snark_transition.sok_digest transition)
@@ -66,7 +63,7 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) :
                  |> Blockchain_state.ledger_hash )
                  ( transition |> Snark_transition.blockchain_state
                  |> Blockchain_state.ledger_hash )
-                 (Snark_transition.supply_increase transition)
+                 supply_increase
                  (As_prover.return
                     (Option.value ~default:Tock.Proof.dummy
                        (Snark_transition.ledger_proof transition)))
@@ -88,7 +85,7 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) :
            let%bind consensus_state =
              Consensus_mechanism.next_state_checked
                (Protocol_state.consensus_state previous_state)
-               previous_state_hash transition
+               previous_state_hash transition supply_increase
            in
            let new_state =
              Protocol_state.create_var ~previous_state_hash
