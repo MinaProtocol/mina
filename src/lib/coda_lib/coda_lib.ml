@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Protocols
+open O1trace
 
 module type Ledger_builder_io_intf = sig
   type t
@@ -481,6 +482,7 @@ module Make (Inputs : Inputs_intf) = struct
   end
 
   let create (config : Config.t) =
+    trace_task "coda" (fun () ->
     let external_transitions_reader, external_transitions_writer =
       Linear_pipe.create ()
     in
@@ -615,4 +617,5 @@ module Make (Inputs : Inputs_intf) = struct
       ; ledger_builder_transition_backup_capacity=
           config.ledger_builder_transition_backup_capacity
       ; snark_work_fee= config.snark_work_fee }
+    )
 end

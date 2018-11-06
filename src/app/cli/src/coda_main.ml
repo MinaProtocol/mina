@@ -7,6 +7,8 @@ open Coda_base
 open Signature_lib
 open Blockchain_snark
 open Coda_numbers
+open O1trace
+
 module Fee = Protocols.Coda_pow.Fee
 
 [%%if
@@ -1152,7 +1154,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             Snark_pool.add_completed_work (snark_pool coda) work ) ]
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
-        ignore
+        trace_task "REST server" (fun () ->
           Cohttp_async.(
             Server.create
               ~on_handler_error:
@@ -1170,11 +1172,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                     Server.respond_string
                       ( get_status coda |> Client_lib.Status.to_yojson
                       |> Yojson.Safe.pretty_to_string )
-                | _ -> route_not_found () )) ) ;
+                | _ -> route_not_found () )) ) |> ignore) ;
     let where_to_listen =
       Tcp.Where_to_listen.bind_to All_addresses (On_port client_port)
     in
-    ignore
+    trace_task "client RPC handling" (fun () ->
       (Tcp.Server.create
          ~on_handler_error:
            (`Call
@@ -1199,7 +1201,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                  (`Call
                    (fun exn ->
                      Logger.error log "%s" (Exn.to_string_mach exn) ;
-                     Deferred.unit )) ))
+                     Deferred.unit )) ))) |> ignore
 
   let create_snark_worker ~log ~public_key ~client_port ~shutdown_on_disconnect
       =

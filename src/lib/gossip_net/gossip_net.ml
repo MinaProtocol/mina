@@ -1,6 +1,8 @@
 open Core
 open Async
 open Kademlia
+open O1trace
+
 module Membership = Membership.Haskell
 
 type ('q, 'r) dispatch =
@@ -114,10 +116,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
 
   let create (config : Config.t) implementations =
     let log = Logger.child config.parent_log __MODULE__ in
+    trace_task "gossip net" (fun () ->
     let%map membership =
       match%map
-        Membership.connect ~initial_peers:config.initial_peers ~me:config.me
-          ~conf_dir:config.conf_dir ~parent_log:log ~banlist:config.banlist
+        (trace_task "membership" (fun () -> Membership.connect ~initial_peers:config.initial_peers ~me:config.me
+          ~conf_dir:config.conf_dir ~parent_log:log ~banlist:config.banlist))
       with
       | Ok membership -> membership
       | Error e ->
@@ -136,11 +139,12 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       ; received_reader
       ; peers= Peer.Hash_set.create () }
     in
+    (trace_task "rebroadcasting messages" (fun () ->
     don't_wait_for
       (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
          ~f:(fun m ->
            Logger.trace log "broadcasting message" ;
-           broadcast_random t t.target_peer_count m )) ;
+           broadcast_random t t.target_peer_count m )) ) ) ;
     let broadcast_received_capacity = 64 in
     let implementations =
       let implementations =
@@ -181,6 +185,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                    Logger.error log "%s" (Exn.to_string_mach exn) ;
                    Deferred.unit )) )) ;
     t
+    )
 
   let received t = t.received_reader
 

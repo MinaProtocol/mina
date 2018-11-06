@@ -121,7 +121,7 @@ let copy ~src ~dst =
 let project_directory = "CODA_PROJECT_DIR"
 
 let run_service (type t) (module Program : Coda_intf with type t = t) coda
-    ~conf_dir ~log = function
+    ~conf_dir ~log = O1trace.trace_task "web pipe" (fun () -> function
   | `None ->
       Logger.info log "Not running a web client pipe" ;
       don't_wait_for (Linear_pipe.drain (Program.strongest_ledgers coda))

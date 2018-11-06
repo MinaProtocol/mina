@@ -1,5 +1,6 @@
 open Core
 open Async
+open O1trace
 
 module type Inputs_intf = sig
   include Protocols.Coda_pow.Inputs_intf
@@ -230,6 +231,7 @@ module Make (Inputs : Inputs_intf) :
 
   let create ~parent_log ~get_completed_work ~change_feeder:tip_reader
       ~time_controller ~keypair ~consensus_local_state =
+    trace_task "proposer" (fun () ->
     let logger = Logger.child parent_log "proposer" in
     let transition_reader, transition_writer = Linear_pipe.create () in
     let tip_agent = Agent.create tip_reader ~f:(fun (Tip_change tip) -> tip) in
@@ -254,6 +256,7 @@ module Make (Inputs : Inputs_intf) :
               ~transactions:tip.transactions ~get_completed_work ~logger
               ~keypair
           in
+          trace_event "next state generated" ;
           match next_state_opt with
           | None -> Interruptible.return ()
           | Some (protocol_state, internal_transition) ->
@@ -265,6 +268,7 @@ module Make (Inputs : Inputs_intf) :
                          ~prev_state_proof:previous_protocol_state_proof
                          ~next_state:protocol_state internal_transition
                      in
+                     trace_event "prover done" ;
                      let external_transition =
                        External_transition.create ~protocol_state
                          ~protocol_state_proof
@@ -302,5 +306,5 @@ module Make (Inputs : Inputs_intf) :
                        (Singleton_supervisor.dispatch proposal_supervisor)
                        ~f:check_for_proposal) ) )
     in
-    check_for_proposal () ; transition_reader
+    check_for_proposal () ; transition_reader)
 end

@@ -10,8 +10,8 @@ end
 
 let accumulate ~init ~parent_log ~prover ~updates ~strongest_chain =
   let log = Logger.child parent_log "blockchain_accumulator" in
-  don't_wait_for
-    (let%map _last_block =
+  O1trace.trace_task "blockchain_accumulator"
+    (fun () -> let%map _last_block =
        Linear_pipe.fold updates ~init
          ~f:(fun (chain : Blockchain.t) (Update.New_chain new_chain) ->
            match%bind Prover.verify_blockchain prover new_chain with

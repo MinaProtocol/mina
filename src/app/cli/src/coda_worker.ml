@@ -179,6 +179,7 @@ module Make (Kernel : Kernel_intf) = struct
               ; parent_log= log
               ; banlist } }
         in
+        let%bind () = ((Writer.open_file (sprintf "/tmp/coda-profile-%d" (Unix.getpid () |> Pid.to_int))) >>| O1trace.start_tracing) in
         let%bind coda =
           Main.create
             (Main.Config.make ~log ~net_config

@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open O1trace
 
 module type Inputs_intf = sig
   include Inputs.Base.S
@@ -229,6 +230,7 @@ module Make (Inputs : Inputs_intf) :
 
     let run old_state ~on_success new_tree old_tree new_best_path logger
         _transition =
+      trace_task "path traversal" (fun () ->
       let locked_tip = Transition_logic_state.locked_tip old_state
       and longest_branch_tip =
         Transition_logic_state.longest_branch_tip old_state
@@ -252,6 +254,7 @@ module Make (Inputs : Inputs_intf) :
             transition_unchecked locked_tip.data new_head logger
           else return locked_tip
         in
+        trace_event "done transition check" ;
         (* Now adjust the longest_branch_tip *)
         let tip, path =
           match
@@ -263,6 +266,7 @@ module Make (Inputs : Inputs_intf) :
               ( With_hash.map longest_branch_tip ~f:Tip.copy
               , Path.drop new_best_path (i + 1) )
         in
+        trace_event "step over path start" ;
         let last_transition = List.last_exn path.Path.path in
         (* Now step over the path *)
         assert (is_materialization_of tip path.Path.source) ;
@@ -280,6 +284,7 @@ module Make (Inputs : Inputs_intf) :
                         (Error.to_string_hum e) ;
                       return None ) )
         in
+        trace_event "step over path end" ;
         match result with
         | Some tip ->
             assert_materialization_of tip last_transition ;
@@ -291,7 +296,7 @@ module Make (Inputs : Inputs_intf) :
             Some result
         | None -> Interruptible.return None
       in
-      (work, ivar)
+      (work, ivar) )
 
     let create ~on_success old_state new_tree old_tree new_best_path
         (logger : Logger.t)

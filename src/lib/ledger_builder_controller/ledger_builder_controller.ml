@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open O1trace
 
 module Make (Inputs : Inputs.S) : sig
   open Inputs
@@ -187,8 +188,8 @@ end = struct
       ; strongest_ledgers_reader
       ; handler= Transition_logic.create state log }
     in
-    don't_wait_for
-      (Linear_pipe.iter (Transition_logic.strongest_tip t.handler)
+    trace_task "strongest_tip"
+      (fun () -> Linear_pipe.iter (Transition_logic.strongest_tip t.handler)
          ~f:(fun (tip, transition) ->
            Linear_pipe.force_write_maybe_drop_head ~capacity:1 store_tip_writer
              store_tip_reader tip ;
@@ -196,8 +197,8 @@ end = struct
            @@ Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
                 t.strongest_ledgers_reader
                 (tip.ledger_builder, transition) )) ;
-    don't_wait_for
-      (Linear_pipe.iter store_tip_reader ~f:(fun tip ->
+    trace_task "store_tip"
+      (fun () -> Linear_pipe.iter store_tip_reader ~f:(fun tip ->
            let open With_hash in
            let tip_with_genesis_hash =
              {data= tip; hash= genesis_tip_state_hash}
@@ -206,7 +207,8 @@ end = struct
              tip_with_genesis_hash )) ;
     (* Handle new transitions *)
     let possibly_jobs =
-      Linear_pipe.filter_map_unordered ~max_concurrency:1
+      trace_task "external transitions"
+      (fun () -> Linear_pipe.filter_map_unordered ~max_concurrency:1
         config.external_transitions ~f:(fun (transition, time_received) ->
           let transition_with_hash =
             With_hash.of_data transition ~hash_data:(fun t ->
@@ -217,7 +219,7 @@ end = struct
             Transition_logic.on_new_transition catchup t.handler
               transition_with_hash ~time_received
           in
-          Option.map job ~f:(fun job -> (job, time_received)) )
+          Option.map job ~f:(fun job -> (job, time_received)) ))
     in
     let replace last
         ( {Job.input= {With_hash.data= current_transition; hash= _}; _}
@@ -237,8 +239,8 @@ end = struct
           | `Keep -> `Skip
           | `Take -> `Cancel_and_do_next )
     in
-    don't_wait_for
-      ( Linear_pipe.fold possibly_jobs ~init:None
+    trace_task "possible jobs"
+      (fun () -> Linear_pipe.fold possibly_jobs ~init:None
           ~f:(fun last
              ( (({Job.input= current_transition_with_hash; _} as job), _) as
              job_with_time )
@@ -249,7 +251,7 @@ end = struct
               | `Cancel_and_do_next ->
                   Option.iter last ~f:(fun (input, ivar) ->
                       Ivar.fill_if_empty ivar input ) ;
-                  let w, this_ivar = Job.run job in
+                  let w, this_ivar = trace_task "running job" (fun () -> Job.run job) in
                   let () =
                     Deferred.upon w.Interruptible.d (function
                       | Ok () -> Logger.trace log "Job is completed"
@@ -609,7 +611,7 @@ let%test_module "test" =
         let r, w = Linear_pipe.create () in
         don't_wait_for
           (Deferred.List.iter xs ~f:(fun x ->
-               (* Without the wait here, we get interrupted before doing anything interesting *)
+               (* SUSP WAIT: Without the wait here, we get interrupted before doing anything interesting *)
                let%bind () = after (Time.Span.of_ms 100.) in
                let time =
                  Time.now () |> Time.to_span_since_epoch |> Time.Span.to_ms
