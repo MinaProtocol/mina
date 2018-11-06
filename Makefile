@@ -6,7 +6,10 @@ GITHASH = $(shell git rev-parse --short=8 HEAD)
 GITLONGHASH = $(shell git rev-parse HEAD)
 
 MYUID = $(shell id -u)
-DOCKERNAME = codabuilder-$(MYUID)
+DOCKERNAME = codabuilder-$(MYUID) 
+
+# Unique signature of kademlia coda tree
+KADEMLIA_SIG = $(shell cd src/app/kademlia-haskell ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
 
 ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
@@ -45,21 +48,6 @@ build:
 
 dev: docker container build
 
-# snark tunable
-
-withsnark:
-	sed -i '/let with_snark =/c\let with_snark = true' src/lib/coda_base/insecure.ml
-
-withoutsnark:
-	sed -i '/let with_snark =/c\let with_snark = false' src/lib/coda_base/insecure.ml
-
-showsnark:
-	@grep 'let with_snark' src/lib/coda_base/insecure.ml
-
-# gets proiving keys -- only used in CI
-withkeys:
-	sudo -E scripts/get_keys.sh
-
 ########################################
 ## Lint
 
@@ -87,6 +75,14 @@ docker-toolchain:
 		echo "Repo is dirty, commit first." ;\
 	fi
 
+# All in one step to build toolchain and binary for kademlia
+docker-toolchain-haskell:
+	@echo "Building codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG)" ;\
+    docker build --file dockerfiles/Dockerfile-toolchain-haskell --tag codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) . ;\
+    echo  'Extracting deb package' ;\
+    mkdir -p src/_build ;\
+    docker run --rm --entrypoint cat codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) /src/coda-kademlia.deb > src/_build/coda-kademlia.deb
+
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
 	cd .circleci; python2 render.py > config.yml
@@ -100,12 +96,21 @@ container:
 deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
 	@mkdir -p /tmp/artifacts
-	@cp src/_build/codaclient.deb /tmp/artifacts/.
+	@cp src/_build/coda.deb /tmp/artifacts/.
+
+# deb-s3 https://github.com/krobertson/deb-s3
+publish_deb:
+	deb-s3 upload --bucket repo.o1test.net --codename coda --s3-region=us-west-2 src/_build/coda-kademlia.deb
+	deb-s3 upload --bucket repo.o1test.net --codename coda --s3-region=us-west-2 src/_build/coda.deb
 
 provingkeys:
-	$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH).tar.bz2  /var/lib/coda
-	@mkdir -p /tmp/artifacts
-	@cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/.
+	@if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
+		$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH).tar.bz2  /tmp/coda_cache_dir ; \
+		mkdir -p /tmp/artifacts ; \
+		cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
+	else \
+		echo "Skipping because not on master" ; \
+	fi
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts
@@ -116,21 +121,6 @@ codaslim:
 	@cp src/_build/codaclient.deb .
 	@./scripts/rebuild-docker.sh codaslim dockerfiles/Dockerfile-codaslim
 	@rm codaclient.deb
-
-src/_build/keys-$(GITLONGHASH).tar.bz2: withsnark build
-ifneq (,$(wildcard /var/lib/coda))
-	$(error "Trying to bundle keys but /var/lib/coda exists so they won't be built")
-endif
-	$(WRAP) tar -cvjf src/_build/keys-$(GITLONGHASH).tar.bz2  /tmp/coda_cache_dir
-
-bundle-keys: withsnark build src/_build/keys-$(GITLONGHASH).tar.bz2
-	gsutil cp -n src/_build/keys-$(GITLONGHASH).tar.bz2 gs://proving-keys-stable/keys-$(GITLONGHASH).tar.bz2
-
-update-keys:
-ifeq (,$(wildcard src/_build/keys-$(GITLONGHASH).tar.bz2))
-	$(error "Trying to update keys, but I'm not sure we've bundled them yet")
-endif
-	perl -i -p -e "s,PINNED_KEY_COMMIT=.*,PINNED_KEY_COMMIT=$(GITLONGHASH)," scripts/get_keys.sh
 
 ########################################
 ## Tests
@@ -173,4 +163,4 @@ web:
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim container deb dev docker kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps bundle-keys update-keys render-circleci check-render-circleci
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim container deb dev docker kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci

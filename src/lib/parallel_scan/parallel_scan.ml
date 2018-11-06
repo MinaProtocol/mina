@@ -194,17 +194,6 @@ module State = struct
       else t.level_pointer.(cur_level) <- first_node
     else ()
 
-  let fold_chronological t ~init ~f =
-    let n = Array.length t.jobs.data in
-    let rec go acc i pos =
-      if Int.equal i n then acc
-      else
-        let x = t.jobs.data.(pos) in
-        go (f acc x) (i + 1)
-          (next_position (parallelism t) t.level_pointer pos)
-    in
-    go init 0 0
-
   let make_jobs_ordered f empty t =
     let rec go count t =
       if count = (parallelism t * 2) - 1 then empty
@@ -342,6 +331,33 @@ module State = struct
         | Some pos ->
             let%map () = include_one_datum state a pos in
             state.base_none_pos <- next_base_pos state pos )
+
+  module Make_foldable (M : Monad.S) = struct
+    let fold_chronological_until t ~init ~f ~finish =
+      let n = Array.length t.jobs.data in
+      let open M.Let_syntax in
+      let rec go acc i pos =
+        let open Container.Continue_or_stop in
+        if Int.equal i n then M.return (Continue acc)
+        else
+          let x = t.jobs.data.(pos) in
+          match%bind f acc x with
+          | Continue subresult ->
+              go subresult (i + 1)
+                (next_position (parallelism t) t.level_pointer pos)
+          | Stop aborted_value -> M.return (Stop aborted_value)
+      in
+      match%bind go init 0 0 with
+      | Continue result -> finish result
+      | Stop e -> return e
+  end
+
+  module Foldable_ident = Make_foldable (Monad.Ident)
+
+  let fold_chronological t ~init ~f =
+    Foldable_ident.fold_chronological_until t ~init
+      ~f:(fun acc job -> Container.Continue_or_stop.Continue (f acc job))
+      ~finish:Fn.id
 end
 
 let start : type a d. parallelism_log_2:int -> (a, d) State.t = State.create

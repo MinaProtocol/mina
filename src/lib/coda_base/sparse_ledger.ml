@@ -52,8 +52,8 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
     (Ledger.merkle_root ledger)
     ((merkle_root sl :> Pedersen.Digest.t) |> Ledger_hash.of_hash)
 
-let apply_transaction_exn t ({sender; payload; signature= _} : Transaction.t) =
-  let {Transaction_payload.amount; fee; receiver; nonce} = payload in
+let apply_payment_exn t ({sender; payload; signature= _} : Payment.t) =
+  let {Payment_payload.amount; fee; receiver; nonce} = payload in
   let sender_idx = find_index_exn t (Public_key.compress sender) in
   let receiver_idx = find_index_exn t receiver in
   let sender_account = get_exn t sender_idx in
@@ -118,10 +118,10 @@ let apply_coinbase_exn t ({proposer; fee_transfer; amount} : Coinbase.t) =
   in
   add_to_balance t proposer proposer_reward
 
-let apply_super_transaction_exn t transition =
+let apply_transaction_exn t transition =
   match transition with
-  | Super_transaction.Fee_transfer tr -> apply_fee_transfer_exn t tr
-  | Transaction tr -> apply_transaction_exn t (tr :> Transaction.t)
+  | Transaction.Fee_transfer tr -> apply_fee_transfer_exn t tr
+  | Payment tr -> apply_payment_exn t (tr :> Payment.t)
   | Coinbase c -> apply_coinbase_exn t c
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Pedersen.Digest.t)

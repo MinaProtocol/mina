@@ -66,8 +66,8 @@ struct
         (merkle_path ledger new_loc, Account.empty)
 
   module Undo = struct
-    type transaction =
-      { transaction: Transaction.t
+    type payment =
+      { payment: Payment.t
       ; previous_empty_accounts: Public_key.Compressed.t list
       ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
     [@@deriving sexp, bin_io]
@@ -83,7 +83,7 @@ struct
     [@@deriving sexp, bin_io]
 
     type varying =
-      | Transaction of transaction
+      | Payment of payment
       | Fee_transfer of fee_transfer
       | Coinbase of coinbase
     [@@deriving sexp, bin_io]
@@ -91,14 +91,14 @@ struct
     type t = {previous_hash: Ledger_hash.t; varying: varying}
     [@@deriving sexp, bin_io]
 
-    let super_transaction : t -> Super_transaction.t Or_error.t =
+    let transaction : t -> Transaction.t Or_error.t =
      fun {varying; _} ->
       let open Or_error.Let_syntax in
       match varying with
-      | Transaction tr ->
+      | Payment tr ->
           Option.value_map ~default:(Or_error.error_string "Bad signature")
-            (Transaction.check tr.transaction) ~f:(fun x ->
-              Ok (Super_transaction.Transaction x) )
+            (Payment.check tr.payment) ~f:(fun x -> Ok (Transaction.Payment x)
+          )
       | Fee_transfer f -> Ok (Fee_transfer f.fee_transfer)
       | Coinbase c -> Ok (Coinbase c.coinbase)
   end
@@ -106,10 +106,10 @@ struct
   (* someday: It would probably be better if we didn't modify the receipt chain hash
    in the case that the sender is equal to the receiver, but it complicates the SNARK, so
    we don't for now. *)
-  let apply_transaction_unchecked ledger
-      ({payload; sender; signature= _} as transaction : Transaction.t) =
+  let apply_payment_unchecked ledger
+      ({payload; sender; signature= _} as payment : Payment.t) =
     let sender = Public_key.compress sender in
-    let {Transaction.Payload.fee; amount; receiver; nonce} = payload in
+    let {Payment.Payload.fee; amount; receiver; nonce} = payload in
     let open Or_error.Let_syntax in
     let%bind sender_location = location_of_key' ledger "" sender in
     let%bind sender_account = get' ledger "sender" sender_location in
@@ -125,7 +125,7 @@ struct
           Receipt.Chain_hash.cons payload sender_account.receipt_chain_hash }
     in
     let undo =
-      { Undo.transaction
+      { Undo.payment
       ; previous_empty_accounts= []
       ; previous_receipt_chain_hash= sender_account.receipt_chain_hash }
     in
@@ -144,9 +144,8 @@ struct
         {receiver_account with balance= receiver_balance'} ;
       {undo with previous_empty_accounts}
 
-  let apply_transaction ledger
-      (transaction : Transaction.With_valid_signature.t) =
-    apply_transaction_unchecked ledger (transaction :> Transaction.t)
+  let apply_payment ledger (payment : Payment.With_valid_signature.t) =
+    apply_payment_unchecked ledger (payment :> Payment.t)
 
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =
     let open Or_error.Let_syntax in
@@ -201,7 +200,7 @@ struct
       match fee_transfer with
       | None -> return (amount, [], None)
       | Some (receiver, fee) ->
-          (* This assertion will pass because of how coinbase super transactions are produced by Ledger_builder.apply_diff *)
+          (* This assertion will pass because of how coinbase is produced by Ledger_builder.apply_diff *)
           assert (not @@ Public_key.Compressed.equal receiver proposer) ;
           let fee = Amount.of_fee fee in
           let%bind proposer_reward =
@@ -259,12 +258,12 @@ struct
             (Balance.sub_amount proposer_account.balance proposer_reward) } ;
     remove_accounts_exn t previous_empty_accounts
 
-  let undo_transaction ledger
-      { Undo.transaction= {payload; sender; signature= _}
+  let undo_payment ledger
+      { Undo.payment= {payload; sender; signature= _}
       ; previous_empty_accounts
       ; previous_receipt_chain_hash } =
     let sender = Public_key.compress sender in
-    let {Transaction.Payload.fee; amount; receiver; nonce} = payload in
+    let {Payment.Payload.fee; amount; receiver; nonce} = payload in
     let open Or_error.Let_syntax in
     let%bind sender_location = location_of_key' ledger "sender" sender in
     let%bind sender_account = get' ledger "sender" sender_location in
@@ -300,20 +299,19 @@ struct
     let%map res =
       match undo.varying with
       | Fee_transfer u -> undo_fee_transfer ledger u
-      | Transaction u -> undo_transaction ledger u
+      | Payment u -> undo_payment ledger u
       | Coinbase c -> undo_coinbase ledger c ; Ok ()
     in
     Debug_assert.debug_assert (fun () ->
         [%test_eq: Ledger_hash.t] undo.previous_hash (merkle_root ledger) ) ;
     res
 
-  let apply_super_transaction ledger (t : Super_transaction.t) =
+  let apply_transaction ledger (t : Transaction.t) =
     let previous_hash = merkle_root ledger in
     Or_error.map
       ( match t with
-      | Transaction txn ->
-          Or_error.map (apply_transaction ledger txn) ~f:(fun u ->
-              Undo.Transaction u )
+      | Payment txn ->
+          Or_error.map (apply_payment ledger txn) ~f:(fun u -> Undo.Payment u)
       | Fee_transfer t ->
           Or_error.map (apply_fee_transfer ledger t) ~f:(fun u ->
               Undo.Fee_transfer u )
@@ -322,10 +320,10 @@ struct
       )
       ~f:(fun varying -> {Undo.previous_hash; varying})
 
-  let merkle_root_after_transaction_exn ledger transaction =
-    let undo = Or_error.ok_exn (apply_transaction ledger transaction) in
+  let merkle_root_after_payment_exn ledger payment =
+    let undo = Or_error.ok_exn (apply_payment ledger payment) in
     let root = merkle_root ledger in
-    Or_error.ok_exn (undo_transaction ledger undo) ;
+    Or_error.ok_exn (undo_payment ledger undo) ;
     root
 
   let%test "apply fee transfer to the same account" =

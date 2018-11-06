@@ -135,6 +135,8 @@ module Links = struct
   let jobs = ("Jobs", "jobs.html", "jobs")
 
   let testnet = ("Testnet", "testnet.html", "testnet")
+
+  let code = ("Code", "code.html", "code")
 end
 
 module Input_button = struct
@@ -267,8 +269,8 @@ module Navbar = struct
                label)
           ; (let name, url, label = Links.testnet in
              a' url [text name] label)
-          ; a' ~style:Visibility.only_large "index.html#community"
-              [text "Community"] "community"
+          ; (let name, url, label = Links.code in
+             a' url [text name] label)
           ; (let name, url, label = Links.jobs in
              a' url [text name] label)
           ; a' ~style:Visibility.only_large ~open_new_tab:true

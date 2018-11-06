@@ -30,6 +30,8 @@ module type Basic = sig
 
   val zero : t
 
+  val one : t
+
   val of_string : string -> t
 
   val to_string : t -> string
@@ -252,6 +254,8 @@ end = struct
     bits @ List.init padding ~f:(fun _ -> Boolean.false_)
 
   let zero = Unsigned.zero
+
+  let one = Unsigned.one
 
   let sub x y = if x < y then None else Some (Unsigned.sub x y)
 

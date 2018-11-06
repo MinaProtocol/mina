@@ -85,7 +85,7 @@ module Make (Inputs : Inputs_intf) :
               Inputs.Consensus_mechanism.External_transition.t
    and type ledger_hash := Inputs.Ledger_hash.t
    and type ledger_builder := Inputs.Ledger_builder.t
-   and type transaction := Inputs.Transaction.With_valid_signature.t
+   and type transaction := Inputs.Payment.With_valid_signature.t
    and type protocol_state := Inputs.Consensus_mechanism.Protocol_state.value
    and type protocol_state_proof := Inputs.Protocol_state_proof.t
    and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
@@ -151,14 +151,16 @@ module Make (Inputs : Inputs_intf) :
       lift_sync (fun () ->
           let next_ledger_hash =
             Option.value_map ledger_proof_opt
-              ~f:(fun (_, stmt) -> Ledger_proof.(statement_target stmt))
+              ~f:(fun proof ->
+                Ledger_proof.statement proof |> Ledger_proof.statement_target
+                )
               ~default:
                 ( previous_protocol_state |> Protocol_state.blockchain_state
                 |> Blockchain_state.ledger_hash )
           in
           let supply_increase =
             Option.value_map ledger_proof_opt
-              ~f:(fun (_, stmt) -> stmt.supply_increase)
+              ~f:(fun proof -> (Ledger_proof.statement proof).supply_increase)
               ~default:Currency.Amount.zero
           in
           let blockchain_state =
@@ -173,9 +175,9 @@ module Make (Inputs : Inputs_intf) :
           Consensus_mechanism.generate_transition ~previous_protocol_state
             ~blockchain_state ~local_state:consensus_local_state ~time ~keypair
             ~transactions:
-              ( Ledger_builder_diff.With_valid_signatures_and_proofs
-                .transactions diff
-                :> Transaction.t list )
+              ( Ledger_builder_diff.With_valid_signatures_and_proofs.payments
+                  diff
+                :> Payment.t list )
             ~ledger:(Ledger_builder.ledger ledger_builder)
             ~supply_increase ~logger )
     in
@@ -187,14 +189,15 @@ module Make (Inputs : Inputs_intf) :
                let snark_transition =
                  Snark_transition.create_value
                    ?sok_digest:
-                     (Option.map ledger_proof_opt ~f:(fun (p, _) ->
-                          Ledger_proof.sok_digest p ))
+                     (Option.map ledger_proof_opt ~f:(fun proof ->
+                          Ledger_proof.sok_digest proof ))
                    ?ledger_proof:
                      (Option.map ledger_proof_opt
-                        ~f:(Fn.compose Ledger_proof.underlying_proof fst))
+                        ~f:Ledger_proof.underlying_proof)
                    ~supply_increase:
                      (Option.value_map ~default:Currency.Amount.zero
-                        ~f:(fun (_p, statement) -> statement.supply_increase)
+                        ~f:(fun proof ->
+                          (Ledger_proof.statement proof).supply_increase )
                         ledger_proof_opt)
                    ~blockchain_state:
                      (Protocol_state.blockchain_state protocol_state)
@@ -211,8 +214,7 @@ module Make (Inputs : Inputs_intf) :
       { protocol_state:
           Protocol_state.value * Protocol_state_proof.t sexp_opaque
       ; ledger_builder: Ledger_builder.t sexp_opaque
-      ; transactions: Transaction.With_valid_signature.t Sequence.t sexp_opaque
-      }
+      ; transactions: Payment.With_valid_signature.t Sequence.t sexp_opaque }
     [@@deriving sexp_of]
   end
 

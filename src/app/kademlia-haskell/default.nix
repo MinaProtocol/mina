@@ -14,5 +14,5 @@ mkDerivation {
     extra hashable kademlia MonadRandom mtl network random
     random-shuffle transformers transformers-compat unix
   ];
-  license = stdenv.lib.licenses.mit;
+  license = stdenv.lib.licenses.asl20;
 }

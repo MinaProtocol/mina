@@ -44,6 +44,40 @@ struct
       transition_with_hash
     in
     let snarked_ledger_hash = ledger_hash_of_transition transition in
+    let build_lb ~aux ~ledger =
+      let open Interruptible.Let_syntax in
+      match%bind
+        Interruptible.uninterruptible
+          (Ledger_builder.of_aux_and_ledger ~snarked_ledger_hash ~ledger ~aux)
+      with
+      (* TODO: We'll need the full history in order to trust that
+               the ledger builder we get is actually valid. See #285 *)
+      | Ok lb ->
+          Sync_ledger.destroy (!sl_ref |> Option.value_exn) ;
+          sl_ref := None ;
+          let new_tree =
+            Transition_logic_state.Transition_tree.singleton
+              transition_with_hash
+          in
+          let new_tip =
+            { With_hash.data= Tip.of_transition_and_lb transition lb
+            ; hash= transition_state_hash }
+          in
+          assert_materialization_of new_tip transition_with_hash ;
+          Logger.debug log
+            !"Successfully caught up to full ledger-builder %{sexp: \
+              Ledger_builder_hash.t}"
+            (Ledger_builder.hash lb) ;
+          let open Transition_logic_state.Change in
+          Interruptible.uninterruptible
+            (state_mutator old_state
+               [Ktree new_tree; Locked_tip new_tip; Longest_branch_tip new_tip]
+               (With_hash.data transition_with_hash))
+      | Error e ->
+          Logger.faulty_peer log "Malicious aux data received from net %s"
+            (Error.to_string_hum e) ;
+          Interruptible.return ()
+    in
     let h =
       Ledger_builder_hash.ledger_hash
         (ledger_builder_hash_of_transition transition)
@@ -63,7 +97,6 @@ struct
           sl
       | Some sl -> sl
     in
-    let open Interruptible.Let_syntax in
     let ivar : (External_transition.t, State_hash.t) With_hash.t Ivar.t =
       Ivar.create ()
     in
@@ -71,6 +104,7 @@ struct
       !"Attempting to catchup to ledger-hash %{sexp: Ledger_hash.t}"
       h ;
     let work =
+      let open Interruptible.Let_syntax in
       match%bind
         Interruptible.lift (Sync_ledger.fetch sl h)
           (Deferred.map (Ivar.read ivar) ~f:ignore)
@@ -85,41 +119,7 @@ struct
               (Net.get_ledger_builder_aux_at_hash net
                  (ledger_builder_hash_of_transition transition))
           with
-          | Ok aux -> (
-            match
-              Ledger_builder.of_aux_and_ledger ~snarked_ledger_hash ~ledger
-                ~aux
-            with
-            (* TODO: We'll need the full history in order to trust that
-               the ledger builder we get is actually valid. See #285 *)
-            | Ok lb ->
-                Sync_ledger.destroy (!sl_ref |> Option.value_exn) ;
-                sl_ref := None ;
-                let new_tree =
-                  Transition_logic_state.Transition_tree.singleton
-                    transition_with_hash
-                in
-                let new_tip =
-                  { With_hash.data= Tip.of_transition_and_lb transition lb
-                  ; hash= transition_state_hash }
-                in
-                assert_materialization_of new_tip transition_with_hash ;
-                Logger.debug log
-                  !"Successfully caught up to full ledger-builder %{sexp: \
-                    Ledger_builder_hash.t}"
-                  (Ledger_builder.hash lb) ;
-                let open Transition_logic_state.Change in
-                Interruptible.uninterruptible
-                  (state_mutator old_state
-                     [ Ktree new_tree
-                     ; Locked_tip new_tip
-                     ; Longest_branch_tip new_tip ]
-                     (With_hash.data transition_with_hash))
-            | Error e ->
-                Logger.faulty_peer log
-                  "Malicious aux data received from net %s"
-                  (Error.to_string_hum e) ;
-                return () (* TODO: Retry? see #361 *) )
+          | Ok aux -> build_lb ~aux ~ledger
           | Error e ->
               Logger.faulty_peer log "Network failed to send aux %s"
                 (Error.to_string_hum e) ;

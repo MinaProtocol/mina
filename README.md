@@ -8,7 +8,7 @@ We have a [Discord server]( https://discord.gg/ShKhA7J)! Please come by if you
 need help or have questions. You might also be interested in the [OCaml
 Discord](https://discordapp.com/invite/cCYQbqN), for general OCaml help.
 
-# Table of Contents
+## Table of Contents
 
 * [Coda homepage](https://codaprotocol.com/)
 * [Roadmap](https://github.com/orgs/CodaProtocol/projects/1)
@@ -18,9 +18,9 @@ Discord](https://discordapp.com/invite/cCYQbqN), for general OCaml help.
 
 # Learn more
 *  [Directory structure](DIRECTORY_STRUCTURE.md)
-*  [Lifecycle of a transaction](docs/lifecycle_of_a_transaction_lite.md)
+*  [Lifecycle of a payment](docs/lifecycle_of_a_payment_lite.md)
 
-# License
+## License
 
 This repository is distributed under the terms of the Apache 2.0 license,
 available in the LICENSE fail and online at

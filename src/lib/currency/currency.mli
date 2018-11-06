@@ -27,6 +27,8 @@ module type Basic = sig
 
   val zero : t
 
+  val one : t
+
   val of_string : string -> t
 
   val to_string : t -> string

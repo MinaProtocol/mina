@@ -41,12 +41,6 @@ jobs:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
             - run:
-                name: Enable snarks --  make withsnark
-                command: make withsnark
-            - run:
-                name: Get Proving Keys -- make withkeys
-                command: make withkeys
-            - run:
                 name: Build OCaml
                 command: eval `opam config env` && DUNE_PROFILE=testnet make build 2>&1 | tee /tmp/buildocaml.log
             - run:
@@ -71,12 +65,6 @@ jobs:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
             - run:
-                name: Enable snarks --  make withsnark
-                command: make withsnark
-            - run:
-                name: Get Proving Keys -- make withkeys
-                command: make withkeys
-            - run:
                 name: Build OCaml
                 command: eval `opam config env` && DUNE_PROFILE=testnet_public make build 2>&1 | tee /tmp/buildocaml.log
             - run:
@@ -98,9 +86,6 @@ jobs:
                name: Build Haskell
                command: source ~/.profile && make kademlia
            - run:
-               name: Get stable SNARK keys - make withkeys
-               command: source ~/.profile && make withkeys
-           - run:
               name: Test make test-runtest
               command: source ~/.profile && make test-runtest
 
@@ -114,14 +99,11 @@ jobs:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
             - run:
-                name: Enable snarks --  make withsnark
-                command: make withsnark
-            - run:
                 name: Build OCaml
-                command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                command: eval `opam config env` && DUNE_PROFILE=test_snark make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                 name: Test make test-withsnark
-                command: source ~/.profile && make test-withsnark
+                command: source ~/.profile && DUNE_PROFILE=test_snark make test-withsnark
 
     {%for test in tests%}
     test-{{test.name}}:
