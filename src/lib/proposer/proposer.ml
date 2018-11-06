@@ -149,14 +149,16 @@ module Make (Inputs : Inputs_intf) :
     in
     let%bind transition_opt =
       lift_sync (fun () ->
+          let previous_ledger_hash =
+            previous_protocol_state |> Protocol_state.blockchain_state
+            |> Blockchain_state.ledger_hash
+          in
           let next_ledger_hash =
             Option.value_map ledger_proof_opt
               ~f:(fun proof ->
                 Ledger_proof.statement proof |> Ledger_proof.statement_target
                 )
-              ~default:
-                ( previous_protocol_state |> Protocol_state.blockchain_state
-                |> Blockchain_state.ledger_hash )
+              ~default:previous_ledger_hash
           in
           let supply_increase =
             Option.value_map ledger_proof_opt
@@ -178,7 +180,10 @@ module Make (Inputs : Inputs_intf) :
               ( Ledger_builder_diff.With_valid_signatures_and_proofs.payments
                   diff
                 :> Payment.t list )
-            ~ledger:(Ledger_builder.ledger ledger_builder)
+            ~snarked_ledger_hash:
+              (Option.value_map ledger_proof_opt ~default:previous_ledger_hash
+                 ~f:(fun proof ->
+                   Ledger_proof.(statement proof |> statement_target) ))
             ~supply_increase ~logger )
     in
     Option.value
