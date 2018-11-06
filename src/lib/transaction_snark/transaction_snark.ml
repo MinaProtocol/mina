@@ -272,7 +272,7 @@ module Transition = struct
   let to_tagged_transaction = function
     | Fee_transfer t -> Fee_transfer.to_tagged_transaction t
     | Payment t -> (Normal, (t :> Payment.t))
-    | Coinbase {proposer; fee_transfer; _} ->
+    | Coinbase {proposer; fee_transfer; amount= _} ->
         let receiver, amount =
           Option.value ~default:(proposer, Fee.zero) fee_transfer
         in
