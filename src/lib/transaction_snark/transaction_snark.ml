@@ -214,7 +214,7 @@ module Tagged_transaction = struct
             with_label __LOC__
               (* If tag = Coinbase:
 
-                "receiver" gets the coinbase amount and sender the fee transfer
+                "receiver" gets the coinbase amount and sender the fee transfer.
                 excess is zero *)
               (let excess =
                  Amount.Signed.Checked.constant Amount.Signed.zero
@@ -265,10 +265,19 @@ module Transition = struct
         let sender, fee =
           Option.value ~default:(proposer, Fee.zero) fee_transfer
         in
+        let reward =
+          let reward = Amount.sub amount (Amount.of_fee fee) in
+          Option.value reward
+            ~default:
+              (failwithf
+                 !"Error creating tagged transaction: Coinbase amount \
+                   (%{sexp:Amount.t}) < fee (%{sexp:Fee.t}) \n"
+                 amount fee ())
+        in
         let t : Payment.t =
           { payload=
               { receiver= proposer
-              ; amount (*reward*)
+              ; amount= reward
               ; fee
               ; nonce= Account.Nonce.zero }
           ; sender= Public_key.decompress_exn sender
