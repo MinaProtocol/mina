@@ -44,8 +44,6 @@ let words_to_bits ws =
   in
   go (Array.length ws - 1) []
 
-let dummy = Digest.of_string @@ String.init 256 ~f:(fun _ -> '\000')
-
 let digest_string (s : string) : Digest.t =
   let n = String.length s in
   let block_length = Gadget.Block.length_in_bits / 8 in

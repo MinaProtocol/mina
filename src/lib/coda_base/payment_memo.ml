@@ -11,4 +11,4 @@ let create_exn s =
     failwithf !"Memo data too long. Max size = %d" max_size ()
   else Sha256.digest_string s
 
-let dummy = Sha256.dummy
+let dummy = create_exn ""
