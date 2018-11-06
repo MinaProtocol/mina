@@ -220,7 +220,8 @@ module Make (Inputs : Inputs_intf) :
     Snark_params.Tick.Boolean.(
       signature_verifies || previous_state_was_neg_one)
 
-  let next_state_checked (state : Consensus_state.var) _state_hash _block =
+  let next_state_checked (state : Consensus_state.var) _state_hash _block
+      _supply_increase =
     let open Consensus_state in
     let open Snark_params.Tick.Let_syntax in
     let%bind length = Length.increment_var state.length in
