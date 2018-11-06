@@ -157,7 +157,7 @@ module Make (Inputs : Inputs_intf) :
             Option.value_map ledger_proof_opt
               ~f:(fun proof ->
                 Ledger_proof.statement proof |> Ledger_proof.statement_target
-              )
+                )
               ~default:previous_ledger_hash
           in
           let supply_increase =
@@ -180,20 +180,10 @@ module Make (Inputs : Inputs_intf) :
               ( Ledger_builder_diff.With_valid_signatures_and_proofs.payments
                   diff
                 :> Payment.t list )
-            ~snarked_ledger_hash:(fun () ->
-              let open Or_error.Let_syntax in
-              match ledger_proof_opt with
-              | Some proof ->
-                  let snarked_ledger_hash =
-                    Ledger_proof.(statement proof |> statement_target) 
-                  in
-                  let%map snarked_ledger =
-                    Ledger_builder.snarked_ledger ledger_builder
-                      ~snarked_ledger_hash
-                  in
-                  Frozen_ledger_hash.of_ledger_hash
-                    (Ledger.merkle_root snarked_ledger)
-              | None -> Ok previous_ledger_hash )
+            ~snarked_ledger_hash:
+              (Option.value_map ledger_proof_opt ~default:previous_ledger_hash
+                 ~f:(fun proof ->
+                   Ledger_proof.(statement proof |> statement_target) ))
             ~supply_increase ~logger )
     in
     Option.value

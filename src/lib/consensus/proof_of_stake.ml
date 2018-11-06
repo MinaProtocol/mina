@@ -622,14 +622,9 @@ module Make (Inputs : Inputs_intf) :
       let open Epoch_ledger in
       let last_data, curr_data, epoch_length =
         if next_epoch > prev_epoch then
-          let hash =
-            match snarked_ledger_hash () with
-            | Ok l -> l
-            | Error e -> Error.raise e
-          in
           ( curr_data
           , { seed= Epoch_seed.(of_hash zero)
-            ; ledger= {hash; total_currency}
+            ; ledger= {hash= snarked_ledger_hash; total_currency}
             ; start_checkpoint= prev_protocol_state_hash
             ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
             ; length= Length.zero }
@@ -881,8 +876,7 @@ module Make (Inputs : Inputs_intf) :
         ~(consensus_transition_data : Consensus_transition_data.value)
         ~(previous_protocol_state_hash : Coda_base.State_hash.t)
         ~(supply_increase : Currency.Amount.t)
-        ~(snarked_ledger_hash :
-           unit -> Coda_base.Frozen_ledger_hash.t Or_error.t) :
+        ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t) :
         value Or_error.t =
       let open Or_error.Let_syntax in
       let open Consensus_transition_data in
@@ -1150,7 +1144,7 @@ module Make (Inputs : Inputs_intf) :
            ~previous_protocol_state_hash:Protocol_state.(hash negative_one)
            ~consensus_transition_data:Snark_transition.(consensus_data genesis)
            ~supply_increase:Currency.Amount.zero
-           ~snarked_ledger_hash:(fun () -> Ok genesis_ledger_hash))
+           ~snarked_ledger_hash:genesis_ledger_hash)
     in
     Protocol_state.create_value
       ~previous_state_hash:Protocol_state.(hash negative_one)
