@@ -112,6 +112,11 @@ module Compressed = struct
       let%bind odd_eq = Boolean.equal t1.is_odd t2.is_odd in
       Boolean.(x_eq && odd_eq)
 
+    let if_ cond ~then_ ~else_ =
+      let%map x = Field.Checked.if_ cond ~then_:then_.x ~else_:else_.x
+      and is_odd = Boolean.if_ cond ~then_:then_.is_odd ~else_:else_.is_odd in
+      {x; is_odd}
+
     module Assert = struct
       let equal t1 t2 =
         let%map () = Field.Checked.Assert.equal t1.x t2.x
