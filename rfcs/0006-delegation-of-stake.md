@@ -6,12 +6,11 @@ that the delegate's probability of winning increases (with the intention, whethe
 enforced on chain or not, that they would receive some of the block reward as in a mining
 pool).
 
-First it must be enforced that the function `delegate`
-
-There are a few ways one could imagine 
-
-Currently, our issue labels are ad-hoc and somewhat confusing. This defines
-several categories of label, and how to use them.
+Some goals for such a design are the following:
+- We want as much stake used directly or delegated to active stakers as possible. This is
+  how the security of the network is ensured.
+- It should not be too expensive inside the SNARK.
+- It should not be too expensive outside the SNARK.
 
 # Detailed design
 [detailed-design]: #detailed-design
@@ -32,7 +31,8 @@ delegation.
 `2` seems *very* difficult to implement and it's dubious to me whether it would be
 much better than `1`, at least for now.
 
-As such, here are three non-transitive designs. I think Design 3 is probably best.
+As such, here are three non-transitive designs. Discussion on this has converged
+on going with design 1 for now.
 
 ## Design 1: Better in the SNARK, but worse everywhere else
 - Add to `Account.t` a field `delegate : Public_key.Compressed.t`
@@ -56,7 +56,8 @@ which have delegated to you. You also need to maintain a large amount of additio
 state (the set of people delegating to you).
 
 The main thing this design has going for it is that it would barely increase the
-size of the circuit.
+size of the circuit. It's also nice that it makes it very easy to delegate your
+stake. Just set it and forget it.
 
 ## Design 2: Worse in the SNARK, but better everywhere else.
 - Add to `Account.t` two fields
