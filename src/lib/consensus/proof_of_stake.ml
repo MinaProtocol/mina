@@ -913,6 +913,7 @@ module Make (Inputs : Inputs_intf) :
     let update_var (previous_state : var)
         (transition_data : Consensus_transition_data.var)
         (previous_protocol_state_hash : Coda_base.State_hash.var)
+        (supply_increase : Currency.Amount.var)
         (ledger_hash : Coda_base.Frozen_ledger_hash.var) :
         (var, _) Snark_params.Tick.Checked.t =
       let open Snark_params.Tick.Let_syntax in
@@ -923,6 +924,9 @@ module Make (Inputs : Inputs_intf) :
       and total_currency =
         Amount.Checked.add previous_state.total_currency
           (Amount.var_of_t Inputs.coinbase)
+      in
+      let%bind total_currency =
+        Amount.Checked.add total_currency supply_increase
       in
       (* TODO: check vrf result from transition data *)
       let%map last_epoch_data, curr_epoch_data, epoch_length =
@@ -1012,10 +1016,11 @@ module Make (Inputs : Inputs_intf) :
   let is_transition_valid_checked _transition _ =
     Snark_params.Tick.(Let_syntax.return Boolean.true_)
 
-  let next_state_checked previous_state previous_state_hash transition =
+  let next_state_checked previous_state previous_state_hash transition
+      supply_increase =
     Consensus_state.update_var previous_state
       (Snark_transition.consensus_data transition)
-      previous_state_hash
+      previous_state_hash supply_increase
       ( transition |> Snark_transition.blockchain_state
       |> Blockchain_state.ledger_hash )
 

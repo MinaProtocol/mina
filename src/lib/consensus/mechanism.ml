@@ -93,6 +93,7 @@ module type S = sig
        Consensus_state.var
     -> Coda_base.State_hash.var
     -> Snark_transition.var
+    -> Currency.Amount.var
     -> (Consensus_state.var, _) Snark_params.Tick.Checked.t
   (**
    * Create a constrained, checked var for the next consensus state of
