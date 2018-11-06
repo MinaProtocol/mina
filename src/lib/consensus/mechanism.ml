@@ -70,7 +70,7 @@ module type S = sig
     -> time:Unix_timestamp.t
     -> keypair:Signature_lib.Keypair.t
     -> transactions:Coda_base.Payment.t list
-    -> ledger:Coda_base.Ledger.t
+    -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
     -> (Protocol_state.value * Consensus_transition_data.value) option
@@ -93,6 +93,7 @@ module type S = sig
        Consensus_state.var
     -> Coda_base.State_hash.var
     -> Snark_transition.var
+    -> Currency.Amount.var
     -> (Consensus_state.var, _) Snark_params.Tick.Checked.t
   (**
    * Create a constrained, checked var for the next consensus state of
