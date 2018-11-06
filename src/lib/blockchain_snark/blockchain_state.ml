@@ -8,8 +8,7 @@ open Let_syntax
 
 module Make (Consensus_mechanism : Consensus.Mechanism.S) :
   Blockchain_state_intf.S
-  with module Consensus_mechanism := Consensus_mechanism =
-struct
+  with module Consensus_mechanism := Consensus_mechanism = struct
   module Blockchain_state = Consensus_mechanism.Blockchain_state
   module Protocol_state = Consensus_mechanism.Protocol_state
   module Snark_transition = Consensus_mechanism.Snark_transition
@@ -52,9 +51,9 @@ struct
               new consensus state is a function of the old consensus state
       *)
       let update
-          ((previous_state_hash, previous_state):
+          ((previous_state_hash, previous_state) :
             State_hash.var * Protocol_state.var)
-          (transition: Snark_transition.var) :
+          (transition : Snark_transition.var) :
           ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]
           , _ )
           Tick.Checked.t =
@@ -79,6 +78,7 @@ struct
                  |> Blockchain_state.ledger_hash )
              and consensus_data_is_valid =
                Consensus_mechanism.is_transition_valid_checked transition
+                 (previous_state |> Protocol_state.previous_state_hash)
              in
              let%bind correct_snark =
                Boolean.(correct_transaction_snark || ledger_hash_didn't_change)
@@ -123,7 +123,7 @@ struct
                 :> Field.t ))
            (State_hash.var_to_hash_packed h))
 
-    let hash (t: Protocol_state.var) =
+    let hash (t : Protocol_state.var) =
       with_label __LOC__
         ( Protocol_state.var_to_triples t
         >>= Pedersen.Checked.digest_triples ~init:Hash_prefix.protocol_state

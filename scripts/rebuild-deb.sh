@@ -6,13 +6,12 @@ SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 
 cd $SCRIPTPATH/../src/_build
 
-PROJECT='codaclient'
+PROJECT='coda'
 
-MAJORVERSION=0
-DATE=`date +%m-%d`
+DATE=`date +%Y-%m-%d`
 GITHASH=`git rev-parse --short=8 HEAD`
 
-VERSION="${MAJORVERSION}.${DATE}.${GITHASH}"
+VERSION="0.1.${DATE}-${GITHASH}"
 BUILDDIR="${PROJECT}_${VERSION}"
 
 mkdir -p ${BUILDDIR}/DEBIAN
@@ -22,16 +21,17 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libssl1.1, libprocps6, libgmp10, libffi6, libgomp1
-Maintainer: O1Labs <build@o1labs.org>
-Description: Coda Client
- Coda Protocol Client
+Depends: libssl1.1, libprocps6, libgmp10, libffi6, libgomp1, coda-kademlia
+License: Apache-2.0
+Homepage: https://codaprotocol.com/
+Maintainer: o(1)Labs <build@o1labs.org>
+Description: Coda Client and Daemon
+ Coda Protocol Client and Daemon
 EOF
 
 mkdir -p ${BUILDDIR}/usr/local/bin
 cp ./default/app/cli/src/coda.exe ${BUILDDIR}/usr/local/bin/coda
 cp ./default/app/logproc/src/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
-cp ../app/kademlia-haskell/result/bin/kademlia ${BUILDDIR}/usr/local/bin/coda-kademlia
 
 # verification keys
 if [ -d "/var/lib/coda" ]; then
@@ -44,12 +44,6 @@ else
     fi
 fi
 
-# Ugly hack #1 to patch elf interpreter to get past nix-build
-if [ ! -f /usr/bin/patchelf ]; then
-    sudo apt install patchelf
-fi
-sudo patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2  ${BUILDDIR}/usr/local/bin/coda-kademlia
-
 # Bash autocompletion for coda
 # NOTE: We do not list bash-completion as a required package, 
 #       but it needs to be present for this to be effective
@@ -61,4 +55,4 @@ env COMMAND_OUTPUT_INSTALLATION_BASH=1 coda  > ${BUILDDIR}/etc/bash_completion.d
 # Build the package
 dpkg-deb --build ${BUILDDIR}
 
-ln -s -f ${BUILDDIR}.deb codaclient.deb
+ln -s -f ${BUILDDIR}.deb coda.deb

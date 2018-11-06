@@ -35,8 +35,8 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
     let receiver_pk =
       Public_key.compress
         ( if send_new then
-            let keypair = Keypair.create () in
-            keypair.public_key
+          let keypair = Keypair.create () in
+          keypair.public_key
         else another_account_keypair.public_key )
     in
     let sender_sk = largest_account_keypair.private_key in
@@ -50,7 +50,7 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
     Logger.info log "Stopping %d" 1 ;
     let%bind () = Coda_worker_testnet.Api.stop testnet 1 in
     let%bind () =
-      Coda_worker_testnet.Api.send_transaction testnet 0 sender_sk receiver_pk
+      Coda_worker_testnet.Api.send_payment testnet 0 sender_sk receiver_pk
         send_amount fee
     in
     let%bind () = after (Time.Span.of_sec 5.) in
@@ -59,8 +59,7 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
     ()
 
   let command =
-    Command.async_spec
-      ~summary:"Test of stopping, waiting, then starting a node"
-      Command.Spec.(empty)
-      main
+    let open Command.Let_syntax in
+    Command.async ~summary:"Test of stopping, waiting, then starting a node"
+      (Command.Param.return main)
 end

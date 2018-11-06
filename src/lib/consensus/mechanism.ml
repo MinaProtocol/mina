@@ -59,6 +59,8 @@ module type S = sig
   module External_transition :
     Coda_base.External_transition.S with module Protocol_state = Protocol_state
 
+  val block_interval_ms : int64
+
   val genesis_protocol_state : Protocol_state.value
 
   val generate_transition :
@@ -67,8 +69,9 @@ module type S = sig
     -> local_state:Local_state.t
     -> time:Unix_timestamp.t
     -> keypair:Signature_lib.Keypair.t
-    -> transactions:Coda_base.Transaction.t list
+    -> transactions:Coda_base.Payment.t list
     -> ledger:Coda_base.Ledger.t
+    -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
     -> (Protocol_state.value * Consensus_transition_data.value) option
   (**
@@ -80,6 +83,7 @@ module type S = sig
 
   val is_transition_valid_checked :
        Snark_transition.var
+    -> Coda_base.State_hash.var
     -> (Snark_params.Tick.Boolean.var, _) Snark_params.Tick.Checked.t
   (**
    * Create a checked boolean constraint for the validity of a transition.

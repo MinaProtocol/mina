@@ -25,7 +25,7 @@ module Agent : sig
 end = struct
   type 'a t = {signal: unit Ivar.t; mutable value: 'a option}
 
-  let create ~(f: 'a -> 'b) (reader: 'a Linear_pipe.Reader.t) : 'b t =
+  let create ~(f : 'a -> 'b) (reader : 'a Linear_pipe.Reader.t) : 'b t =
     let t = {signal= Ivar.create (); value= None} in
     don't_wait_for
       (Linear_pipe.iter reader ~f:(fun x ->
@@ -85,15 +85,14 @@ module Make (Inputs : Inputs_intf) :
               Inputs.Consensus_mechanism.External_transition.t
    and type ledger_hash := Inputs.Ledger_hash.t
    and type ledger_builder := Inputs.Ledger_builder.t
-   and type transaction := Inputs.Transaction.With_valid_signature.t
+   and type transaction := Inputs.Payment.With_valid_signature.t
    and type protocol_state := Inputs.Consensus_mechanism.Protocol_state.value
    and type protocol_state_proof := Inputs.Protocol_state_proof.t
    and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
    and type completed_work_statement := Inputs.Completed_work.Statement.t
    and type completed_work_checked := Inputs.Completed_work.Checked.t
    and type time_controller := Inputs.Time.Controller.t
-   and type keypair := Inputs.Keypair.t =
-struct
+   and type keypair := Inputs.Keypair.t = struct
   open Inputs
   open Consensus_mechanism
 
@@ -138,23 +137,31 @@ struct
 
   let generate_next_state ~previous_protocol_state ~consensus_local_state
       ~time_controller ~ledger_builder ~transactions ~get_completed_work
-      ~logger ~keypair =
+      ~logger ~(keypair : Keypair.t) =
     let open Interruptible.Let_syntax in
     let%bind ( diff
              , `Hash_after_applying next_ledger_builder_hash
              , `Ledger_proof ledger_proof_opt ) =
       lift_sync (fun () ->
-          Ledger_builder.create_diff ledger_builder ~logger
-            ~transactions_by_fee:transactions ~get_completed_work )
+          Ledger_builder.create_diff ledger_builder
+            ~self:(Public_key.compress keypair.public_key)
+            ~logger ~transactions_by_fee:transactions ~get_completed_work )
     in
     let%bind transition_opt =
       lift_sync (fun () ->
           let next_ledger_hash =
             Option.value_map ledger_proof_opt
-              ~f:(fun (_, stmt) -> Ledger_proof.(statement_target stmt))
+              ~f:(fun proof ->
+                Ledger_proof.statement proof |> Ledger_proof.statement_target
+                )
               ~default:
                 ( previous_protocol_state |> Protocol_state.blockchain_state
                 |> Blockchain_state.ledger_hash )
+          in
+          let supply_increase =
+            Option.value_map ledger_proof_opt
+              ~f:(fun proof -> (Ledger_proof.statement proof).supply_increase)
+              ~default:Currency.Amount.zero
           in
           let blockchain_state =
             Blockchain_state.create_value ~timestamp:(Time.now time_controller)
@@ -168,28 +175,29 @@ struct
           Consensus_mechanism.generate_transition ~previous_protocol_state
             ~blockchain_state ~local_state:consensus_local_state ~time ~keypair
             ~transactions:
-              ( Ledger_builder_diff.With_valid_signatures_and_proofs.
-                transactions diff
-                :> Transaction.t list )
+              ( Ledger_builder_diff.With_valid_signatures_and_proofs.payments
+                  diff
+                :> Payment.t list )
             ~ledger:(Ledger_builder.ledger ledger_builder)
-            ~logger )
+            ~supply_increase ~logger )
     in
     Option.value
       ~default:(Interruptible.return None)
-      (Option.map transition_opt ~f:
-         (fun (protocol_state, consensus_transition_data) ->
+      (Option.map transition_opt
+         ~f:(fun (protocol_state, consensus_transition_data) ->
            lift_sync (fun () ->
                let snark_transition =
                  Snark_transition.create_value
                    ?sok_digest:
-                     (Option.map ledger_proof_opt ~f:(fun (p, _) ->
-                          Ledger_proof.sok_digest p ))
+                     (Option.map ledger_proof_opt ~f:(fun proof ->
+                          Ledger_proof.sok_digest proof ))
                    ?ledger_proof:
                      (Option.map ledger_proof_opt
-                        ~f:(Fn.compose Ledger_proof.underlying_proof fst))
+                        ~f:Ledger_proof.underlying_proof)
                    ~supply_increase:
                      (Option.value_map ~default:Currency.Amount.zero
-                        ~f:(fun (_p, statement) -> statement.supply_increase)
+                        ~f:(fun proof ->
+                          (Ledger_proof.statement proof).supply_increase )
                         ledger_proof_opt)
                    ~blockchain_state:
                      (Protocol_state.blockchain_state protocol_state)
@@ -206,8 +214,7 @@ struct
       { protocol_state:
           Protocol_state.value * Protocol_state_proof.t sexp_opaque
       ; ledger_builder: Ledger_builder.t sexp_opaque
-      ; transactions: Transaction.With_valid_signature.t Sequence.t sexp_opaque
-      }
+      ; transactions: Payment.With_valid_signature.t Sequence.t sexp_opaque }
     [@@deriving sexp_of]
   end
 
@@ -225,7 +232,7 @@ struct
       let open Interruptible.Let_syntax in
       match Agent.get tip_agent with
       | None -> Interruptible.return ()
-      | Some tip ->
+      | Some tip -> (
           Logger.info logger
             !"Begining to propose off of tip %{sexp: Tip.t}"
             tip ;
@@ -265,7 +272,7 @@ struct
                      in
                      Linear_pipe.write_or_exn ~capacity:transition_capacity
                        transition_writer transition_reader
-                       (external_transition, time)) )
+                       (external_transition, time)) ) )
     in
     let proposal_supervisor = Singleton_supervisor.create ~task:propose in
     let scheduler = Singleton_scheduler.create time_controller in
@@ -282,8 +289,8 @@ struct
               Singleton_scheduler.schedule scheduler (time_of_ms time)
                 ~f:check_for_proposal
           | `Propose time ->
-              Singleton_scheduler.schedule scheduler (time_of_ms time) ~f:
-                (fun () ->
+              Singleton_scheduler.schedule scheduler (time_of_ms time)
+                ~f:(fun () ->
                   ignore
                     (Interruptible.finally
                        (Singleton_supervisor.dispatch proposal_supervisor)

@@ -10,11 +10,6 @@ module Base = struct
     module Public_key :
       Protocols.Coda_pow.Public_key_intf with module Private_key = Private_key
 
-    module Keypair :
-      Protocols.Coda_pow.Keypair_intf
-      with type public_key := Public_key.t
-       and type private_key := Private_key.t
-
     module State_hash : sig
       type t [@@deriving eq, sexp, compare, bin_io]
 
@@ -139,7 +134,6 @@ module Base = struct
        and type ledger_proof := Ledger_proof.t
        and type ledger := Ledger.t
        and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
-       and type public_key := Public_key.Compressed.t
 
     module Tip :
       Protocols.Coda_pow.Tip_intf
@@ -187,14 +181,14 @@ module Synchronizing = struct
     end
 
     module Net : sig
-      include Coda_lib.Ledger_builder_io_intf
-              with type sync_ledger_query := Sync_ledger.query
-               and type sync_ledger_answer := Sync_ledger.answer
-               and type ledger_builder_hash := Ledger_builder_hash.t
-               and type ledger_builder_aux := Ledger_builder.Aux.t
-               and type ledger_hash := Ledger_hash.t
-               and type protocol_state :=
-                          Consensus_mechanism.Protocol_state.value
+      include
+        Coda_lib.Ledger_builder_io_intf
+        with type sync_ledger_query := Sync_ledger.query
+         and type sync_ledger_answer := Sync_ledger.answer
+         and type ledger_builder_hash := Ledger_builder_hash.t
+         and type ledger_builder_aux := Ledger_builder.Aux.t
+         and type ledger_hash := Ledger_hash.t
+         and type protocol_state := Consensus_mechanism.Protocol_state.value
     end
   end
 end

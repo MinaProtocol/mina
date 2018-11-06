@@ -12,12 +12,12 @@ end)
 (Kvdb : Intf.Key_value_database)
 (Sdb : Intf.Stack_database)
 (Storage_locations : Intf.Storage_locations) :
-  Database_intf.S with module Addr = Location.Addr
+  Database_intf.S
+  with module Addr = Location.Addr
   with type account := Account.t
    and type hash := Hash.t
    and type key := Key.t
-   and type location := Location.t =
-struct
+   and type location := Location.t = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   include Depth
 
@@ -26,6 +26,8 @@ struct
   module Db_error = struct
     type t = Account_location_not_found | Out_of_leaves | Malformed_database
     [@@deriving sexp]
+
+    exception Db_exception of t
   end
 
   module Path = Merkle_path.Make (Hash)
@@ -60,10 +62,6 @@ struct
 
   let get_bin mdb location bin_read =
     get_raw mdb location |> Option.map ~f:(fun v -> bin_read v ~pos_ref:(ref 0))
-
-  let get_generic mdb location =
-    assert (Location.is_generic location) ;
-    get_raw mdb location
 
   let get mdb location =
     assert (Location.is_account location) ;
@@ -123,6 +121,10 @@ struct
   let make_space_for _t _tot = ()
 
   module Account_location = struct
+    let get_generic mdb location =
+      assert (Location.is_generic location) ;
+      get_raw mdb location
+
     let build_location key =
       Location.build_generic (Bigstring.of_string ("$" ^ Key.to_string key))
 
@@ -149,7 +151,7 @@ struct
           in
           set_raw mdb location (Location.serialize first_location) ;
           Result.return first_location
-      | Some prev_location ->
+      | Some prev_location -> (
         match Location.parse prev_location with
         | Error () -> Error Db_error.Malformed_database
         | Ok prev_account_location ->
@@ -158,7 +160,7 @@ struct
             |> Result.map ~f:(fun next_account_location ->
                    set_raw mdb location
                      (Location.serialize next_account_location) ;
-                   next_account_location )
+                   next_account_location ) )
 
     let allocate mdb key =
       let location_result =
@@ -189,7 +191,7 @@ struct
   module For_tests = struct
     let gen_account_location =
       let open Quickcheck.Let_syntax in
-      let build_account (path: Direction.t list) =
+      let build_account (path : Direction.t list) =
         assert (List.length path = Depth.depth) ;
         Location.Account (Addr.of_directions path)
       in
@@ -238,11 +240,9 @@ struct
     | Error err -> Error err
     | Ok location -> Ok (`Existed, location)
 
-  exception Error_exception of Db_error.t
-
   let get_or_create_account_exn mdb key account =
     get_or_create_account mdb key account
-    |> Result.map_error ~f:(fun err -> Error_exception err)
+    |> Result.map_error ~f:(fun err -> Db_error.Db_exception err)
     |> Result.ok_exn
 
   let num_accounts t =
@@ -259,18 +259,17 @@ struct
     in
     List.rev_filter_map result ~f:Fn.id
 
-  let set_all_accounts_rooted_at_exn mdb address (accounts: Account.t list) =
+  let set_all_accounts_rooted_at_exn mdb address (accounts : Account.t list) =
     let first_node, last_node = Addr.Range.subtree_range address in
     Addr.Range.fold (first_node, last_node) ~init:accounts ~f:(fun bit_index ->
-        function
+      function
       | head :: tail ->
           set mdb (Location.Account bit_index) head ;
           tail
       | [] -> [] )
     |> ignore
 
-  module C :
-    Container.S0 with type t := t and type elt := Account.t =
+  module C : Container.S0 with type t := t and type elt := Account.t =
   Container.Make0 (struct
     module Elt = Account
 

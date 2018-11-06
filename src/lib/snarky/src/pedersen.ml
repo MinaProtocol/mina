@@ -101,8 +101,8 @@ end = struct
     and x4, y4 = Weierstrass_curve.to_coords t4 in
     ((x1, x2, x3, x4), (y1, y2, y3, y4))
 
-  let lookup ((s0, s1, s2): Boolean.var Triple.t)
-      (q: Weierstrass_curve.t Quadruple.t) =
+  let lookup ((s0, s1, s2) : Boolean.var Triple.t)
+      (q : Weierstrass_curve.t Quadruple.t) =
     let open Let_syntax in
     let%bind s_and = Boolean.(s0 && s1) in
     let open Field.Checked.Infix in
@@ -160,7 +160,7 @@ end = struct
     module Acc = struct
       type t = [`Var of Weierstrass_curve.var | `Value of Weierstrass_curve.t]
 
-      let add (t1: t) (t2: t) =
+      let add (t1 : t) (t2 : t) =
         let open Let_syntax in
         match (t1, t2) with
         | `Var v1, `Var v2 ->

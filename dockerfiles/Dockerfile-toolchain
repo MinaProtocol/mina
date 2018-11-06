@@ -17,6 +17,7 @@ RUN sudo apt-get install --yes \
     lsb \
     m4 \
     pandoc \
+    patchelf \
     python \
     perl \
     pkg-config \
@@ -28,37 +29,14 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
     echo "deb http://packages.cloud.google.com/apt $CLOUD_SDK_REPO main" | sudo tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - && \
     sudo apt-get update -y && sudo apt-get install google-cloud-sdk -y
-    
 
 # Opam dependancies
+# Pull freshest repository
+RUN git -C /home/opam/opam-repository pull
 RUN opam update -y && opam upgrade -y
 RUN opam depext -i dune
-RUN opam install \
-    async \
-    async_ssl \
-    bignum \
-    bitstring \
-    camlp4 \
-    cohttp \
-    cohttp-async \
-    core \
-    ctypes \
-    ctypes-foreign \
-    extlib \
-    js_of_ocaml \
-    js_of_ocaml-ppx \
-    menhir \
-    merlin \
-    num \
-    ocamlformat \
-    ocp-indent \
-    orocksdb \
-    ppx_deriving \
-    ppx_deriving_yojson \
-    rpc_parallel \
-    utop \
-    virtual_dom \
-    yojson
+ADD /src/opam.export .
+RUN opam switch import opam.export ; rm opam.export
 
 # Source copy of ocaml-sodium (modified for static linking)
 ADD /src/external/ocaml-sodium /ocaml-sodium

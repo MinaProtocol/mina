@@ -29,8 +29,7 @@ module Make
     (Consensus_mechanism : Consensus.Mechanism.S)
     (Blockchain : Blockchain.S
                   with module Consensus_mechanism = Consensus_mechanism) :
-  S with type blockchain := Blockchain.t =
-struct
+  S with type blockchain := Blockchain.t = struct
   module Worker_state = struct
     module type S = sig
       val verify_wrap :
@@ -53,14 +52,16 @@ struct
          end) in
          let module B = Blockchain_transition.Make (Consensus_mechanism) (T) in
          let module U =
-           Blockchain_snark_utils.Verification (Consensus_mechanism)
+           Blockchain_snark_utils.Verification
+             (Consensus_mechanism)
              (struct
                let key = bc_vk.wrap
 
                let key_to_bool_list =
                  let open B.Step_base.Verifier.Verification_key_data in
                  Fn.compose to_bits full_data_of_verification_key
-             end) in
+             end)
+         in
          let module M = struct
            let verify_wrap = U.verify_wrap
 
@@ -96,18 +97,18 @@ struct
         [%%if
         with_snark]
 
-        let verify_blockchain (w: Worker_state.t) (chain: Blockchain.t) =
+        let verify_blockchain (w : Worker_state.t) (chain : Blockchain.t) =
           let%map (module M) = Worker_state.get w in
           M.verify_wrap chain.state chain.proof
 
         [%%else]
 
-        let verify_blockchain (w: Worker_state.t) (chain: Blockchain.t) =
+        let verify_blockchain (w : Worker_state.t) (chain : Blockchain.t) =
           Deferred.return true
 
         [%%endif]
 
-        let verify_transaction_snark (w: Worker_state.t) (p, message) =
+        let verify_transaction_snark (w : Worker_state.t) (p, message) =
           let%map (module M) = Worker_state.get w in
           M.verify_transaction_snark p ~message
 
@@ -121,7 +122,7 @@ struct
               f (Blockchain.bin_t, Bool.bin_t, verify_blockchain)
           ; verify_transaction_snark=
               f
-                ( [%bin_type_class : Transaction_snark.t * Sok_message.t]
+                ( [%bin_type_class: Transaction_snark.t * Sok_message.t]
                 , Bool.bin_t
                 , verify_transaction_snark ) }
 

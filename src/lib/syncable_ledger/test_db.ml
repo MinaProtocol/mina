@@ -61,13 +61,12 @@ struct
 
     let make_space_for = MT.make_space_for
 
-    let load_ledger num_accounts (balance: int) =
+    let load_ledger num_accounts (balance : int) =
       let ledger = MT.create () in
-      let keys =
-        List.init num_accounts ~f:(( + ) 1) |> List.map ~f:Int.to_string
-      in
+      let keys = Key.gen_keys num_accounts in
+      let currency_balance = Currency.Balance.of_int balance in
       List.iter keys ~f:(fun key ->
-          let account = Account.create key balance in
+          let account = Account.create key currency_balance in
           MT.get_or_create_account_exn ledger key account |> ignore ) ;
       (ledger, keys)
   end

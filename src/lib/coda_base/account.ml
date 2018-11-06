@@ -37,15 +37,18 @@ module Stable = struct
       ; balance: 'amount
       ; nonce: 'nonce
       ; receipt_chain_hash: 'receipt_chain_hash }
-    [@@deriving fields, sexp, bin_io, eq]
+    [@@deriving fields, sexp, bin_io, eq, compare, hash]
+
+    type key = Public_key.Compressed.Stable.V1.t
+    [@@deriving sexp, bin_io, eq, hash, compare]
 
     type t =
-      ( Public_key.Compressed.Stable.V1.t
+      ( key
       , Balance.Stable.V1.t
       , Nonce.Stable.V1.t
       , Receipt.Chain_hash.Stable.V1.t )
       t_
-    [@@deriving sexp, bin_io, eq]
+    [@@deriving sexp, bin_io, eq, hash, compare]
   end
 end
 
@@ -61,6 +64,8 @@ type var =
 type value =
   (Public_key.Compressed.t, Balance.t, Nonce.t, Receipt.Chain_hash.t) t_
 [@@deriving sexp]
+
+let key_gen = Public_key.Compressed.gen
 
 let initialize public_key : t =
   { public_key
@@ -94,7 +99,7 @@ let typ : (var, value) Typ.t =
   Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let var_of_t ({public_key; balance; nonce; receipt_chain_hash}: value) =
+let var_of_t ({public_key; balance; nonce; receipt_chain_hash} : value) =
   { public_key= Public_key.Compressed.var_of_t public_key
   ; balance= Balance.var_of_t balance
   ; nonce= Nonce.Unpacked.var_of_value nonce
@@ -109,7 +114,7 @@ let var_to_triples {public_key; balance; nonce; receipt_chain_hash} =
   let nonce = Nonce.Unpacked.var_to_triples nonce in
   public_key @ balance @ nonce @ receipt_chain_hash
 
-let fold_bits ({public_key; balance; nonce; receipt_chain_hash}: t) =
+let fold_bits ({public_key; balance; nonce; receipt_chain_hash} : t) =
   let open Fold in
   Public_key.Compressed.fold public_key
   +> Balance.fold balance +> Nonce.fold nonce
@@ -130,6 +135,18 @@ let digest t = Pedersen.State.digest (hash t)
 let empty_hash = digest empty
 
 let pubkey t = t.public_key
+
+let create public_key balance =
+  { public_key
+  ; balance
+  ; nonce= Nonce.zero
+  ; receipt_chain_hash= Receipt.Chain_hash.empty }
+
+let gen =
+  let open Quickcheck.Let_syntax in
+  let%bind public_key = Public_key.Compressed.gen in
+  let%bind balance = Currency.Balance.gen in
+  return (create public_key balance)
 
 module Checked = struct
   let hash t =

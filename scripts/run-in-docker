@@ -18,7 +18,7 @@ ARGS=${@}
 ARGS=$(echo ${ARGS} | fix_dir_stdin)
 
 MYUID=$(id -u)
-DOCKERNAME="nanotest-$MYUID"
+DOCKERNAME="codabuilder-$MYUID"
 
 NAME=$(docker ps -q --filter "name=$DOCKERNAME")
 
