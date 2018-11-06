@@ -267,12 +267,13 @@ module Transition = struct
         in
         let reward =
           let reward = Amount.sub amount (Amount.of_fee fee) in
-          Option.value reward
-            ~default:
-              (failwithf
-                 !"Error creating tagged transaction: Coinbase amount \
-                   (%{sexp:Amount.t}) < fee (%{sexp:Fee.t}) \n"
-                 amount fee ())
+          match reward with
+          | Some x -> x
+          | None ->
+              failwithf
+                !"Error creating tagged transaction: Coinbase amount \
+                  (%{sexp:Amount.t}) < fee (%{sexp:Fee.t}) \n"
+                amount fee ()
         in
         let t : Payment.t =
           { payload=
