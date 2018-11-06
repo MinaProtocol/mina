@@ -99,12 +99,12 @@ let main () =
           open Coda_base
           module Compressed_public_key = Public_key.Compressed
 
-          module Transaction = struct
+          module Payment = struct
             include (
-              Transaction :
-                module type of Transaction
-                with module With_valid_signature := Transaction.
-                                                    With_valid_signature )
+              Payment :
+                module type of Payment
+                with module With_valid_signature := Payment
+                                                    .With_valid_signature )
 
             let receiver _ = failwith "stub"
 
@@ -115,7 +115,7 @@ let main () =
             let compare _ _ = failwith "stub"
 
             module With_valid_signature = struct
-              include Transaction.With_valid_signature
+              include Payment.With_valid_signature
 
               let compare _ _ = failwith "stub"
             end
@@ -124,7 +124,8 @@ let main () =
           module Ledger_proof = Transaction_snark
 
           module Completed_work = struct
-            include Ledger_builder.Make_completed_work (Compressed_public_key)
+            include Ledger_builder.Make_completed_work
+                      (Compressed_public_key)
                       (Ledger_proof)
                       (Transaction_snark.Statement)
 

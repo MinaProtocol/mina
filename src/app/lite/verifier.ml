@@ -27,9 +27,9 @@ module Response = struct
   include T
   include Make_stringable_of_base64_binable (T)
 
-  let id (((_, id), _): t) = id
+  let id (((_, id), _) : t) = id
 
-  let result ((_, r): t) = r
+  let result ((_, r) : t) = r
 end
 
 type t = (Js.js_string Js.t, Js.js_string Js.t) Worker.worker Js.t
@@ -38,11 +38,11 @@ let verifier_main = "/static/verifier_main.bc.js"
 
 let create () = Worker.create verifier_main
 
-let send_verify_message (t: t) q =
-  t ## postMessage (Js.string (Query.to_string q))
+let send_verify_message (t : t) q =
+  t##postMessage (Js.string (Query.to_string q))
 
-let set_on_message (t: t) ~f =
-  t ##. onmessage :=
+let set_on_message (t : t) ~f =
+  t##.onmessage :=
     Dom.handler (fun q ->
-        f (Response.of_string (Js.to_string q ##. data)) ;
+        f (Response.of_string (Js.to_string q##.data)) ;
         Js._false )

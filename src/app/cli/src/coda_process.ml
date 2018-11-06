@@ -8,7 +8,7 @@ module Make (Kernel : Kernel_intf) = struct
 
   type t = Coda_worker.Connection.t * Process.t * Coda_worker.Input.t
 
-  let spawn_exn (config: Coda_worker.Input.t) =
+  let spawn_exn (config : Coda_worker.Input.t) =
     let%bind conn, process =
       Coda_worker.spawn_in_foreground_exn ~env:config.env
         ~on_failure:Error.raise ~cd:config.program_dir ~shutdown_on:Disconnect
@@ -19,9 +19,8 @@ module Make (Kernel : Kernel_intf) = struct
     File_system.dup_stderr process ;
     return (conn, process, config)
 
-  let local_config ?(transition_interval= 1000.0) ?proposal_interval ~peers
-      ~discovery_port ~external_port ~program_dir ~should_propose
-      ~snark_worker_config ~work_selection () =
+  let local_config ?proposal_interval ~peers ~discovery_port ~external_port
+      ~program_dir ~should_propose ~snark_worker_config ~work_selection () =
     let host = "127.0.0.1" in
     let conf_dir =
       Filename.temp_dir_name
@@ -30,11 +29,12 @@ module Make (Kernel : Kernel_intf) = struct
     let config =
       { Coda_worker.Input.host
       ; env=
+          (* FIXME #1089: what about all the PoS env vars? Shouldn't we just inherit? *)
           Option.map proposal_interval ~f:(fun interval ->
-              [("CODA_PROPOSAL_INTERVAL", Int.to_string interval)] )
+              [ ("CODA_PROPOSAL_INTERVAL", Int.to_string interval)
+              ; ("CODA_SLOT_INTERVAL", Int.to_string interval) ] )
           |> Option.value ~default:[]
       ; should_propose
-      ; transition_interval
       ; external_port
       ; snark_worker_config
       ; work_selection
@@ -57,9 +57,9 @@ module Make (Kernel : Kernel_intf) = struct
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_balance
       ~arg:pk
 
-  let send_transaction_exn (conn, proc, _) sk pk amount fee =
-    Coda_worker.Connection.run_exn conn
-      ~f:Coda_worker.functions.send_transaction ~arg:(sk, pk, amount, fee)
+  let send_payment_exn (conn, proc, _) sk pk amount fee =
+    Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.send_payment
+      ~arg:(sk, pk, amount, fee)
 
   let strongest_ledgers_exn (conn, proc, _) =
     let%map r =

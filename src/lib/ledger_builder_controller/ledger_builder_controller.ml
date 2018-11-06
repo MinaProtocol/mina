@@ -4,21 +4,20 @@ open Async_kernel
 module Make (Inputs : Inputs.S) : sig
   open Inputs
 
-  include Coda_lib.Ledger_builder_controller_intf
-          with type ledger_builder := Ledger_builder.t
-           and type ledger_builder_hash := Ledger_builder_hash.t
-           and type ledger := Ledger.t
-           and type ledger_proof := Ledger_proof.t
-           and type net := Net.net
-           and type protocol_state := Consensus_mechanism.Protocol_state.value
-           and type ledger_hash := Ledger_hash.t
-           and type sync_query := Sync_ledger.query
-           and type sync_answer := Sync_ledger.answer
-           and type external_transition :=
-                      Consensus_mechanism.External_transition.t
-           and type consensus_local_state := Consensus_mechanism.Local_state.t
-           and type tip := Tip.t
-           and type keypair := Keypair.t
+  include
+    Coda_lib.Ledger_builder_controller_intf
+    with type ledger_builder := Ledger_builder.t
+     and type ledger_builder_hash := Ledger_builder_hash.t
+     and type ledger := Ledger.t
+     and type ledger_proof := Ledger_proof.t
+     and type net := Net.net
+     and type protocol_state := Consensus_mechanism.Protocol_state.value
+     and type ledger_hash := Ledger_hash.t
+     and type sync_query := Sync_ledger.query
+     and type sync_answer := Sync_ledger.answer
+     and type external_transition := Consensus_mechanism.External_transition.t
+     and type consensus_local_state := Consensus_mechanism.Local_state.t
+     and type tip := Tip.t
 
   val ledger_builder_io : t -> Net.t
 end = struct
@@ -33,8 +32,7 @@ end = struct
           (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: Tip.t
       ; consensus_local_state: Consensus_mechanism.Local_state.t
-      ; longest_tip_location: string
-      ; keypair: Keypair.t }
+      ; longest_tip_location: string }
     [@@deriving make]
   end
 
@@ -123,7 +121,7 @@ end = struct
   let ledger_builder_io {ledger_builder_io; _} = ledger_builder_io
 
   let load_tip_and_genesis_hash
-      (controller: (Tip.t, State_hash.t) With_hash.t Store.Controller.t)
+      (controller : (Tip.t, State_hash.t) With_hash.t Store.Controller.t)
       {Config.longest_tip_location; genesis_tip; _} log =
     let genesis_state_hash =
       Protocol_state.hash genesis_tip.Tip.protocol_state
@@ -147,7 +145,7 @@ end = struct
           longest_tip_location ;
         {data= genesis_tip; hash= genesis_state_hash}
 
-  let create (config: Config.t) =
+  let create (config : Config.t) =
     let log = Logger.child config.parent_log "ledger_builder_controller" in
     let store_controller =
       Store.Controller.create
@@ -175,10 +173,7 @@ end = struct
     in
     let%map net = config.net_deferred in
     let net = Net.create net in
-    let catchup =
-      Catchup.create ~net ~parent_log:log
-        ~public_key:(Public_key.compress config.keypair.public_key)
-    in
+    let catchup = Catchup.create ~net ~parent_log:log in
     (* Here we effectfully listen to transitions and emit what we belive are
        the strongest ledger_builders *)
     let strongest_ledgers_reader, strongest_ledgers_writer =
@@ -193,8 +188,8 @@ end = struct
       ; handler= Transition_logic.create state log }
     in
     don't_wait_for
-      (Linear_pipe.iter (Transition_logic.strongest_tip t.handler) ~f:
-         (fun (tip, transition) ->
+      (Linear_pipe.iter (Transition_logic.strongest_tip t.handler)
+         ~f:(fun (tip, transition) ->
            Linear_pipe.force_write_maybe_drop_head ~capacity:1 store_tip_writer
              store_tip_reader tip ;
            Deferred.return
@@ -229,7 +224,7 @@ end = struct
         , time_received ) =
       match last with
       | None -> `Cancel_and_do_next
-      | Some last ->
+      | Some last -> (
           let {With_hash.data= last_transition; _}, _ = last in
           match
             Consensus_mechanism.select
@@ -240,14 +235,14 @@ end = struct
               ~logger:log ~time_received
           with
           | `Keep -> `Skip
-          | `Take -> `Cancel_and_do_next
+          | `Take -> `Cancel_and_do_next )
     in
     don't_wait_for
-      ( Linear_pipe.fold possibly_jobs ~init:None ~f:
-          (fun last
-          ( (({Job.input= current_transition_with_hash; _} as job), _) as
-          job_with_time )
-          ->
+      ( Linear_pipe.fold possibly_jobs ~init:None
+          ~f:(fun last
+             ( (({Job.input= current_transition_with_hash; _} as job), _) as
+             job_with_time )
+             ->
             Deferred.return
               ( match replace last job_with_time with
               | `Skip -> last
@@ -387,10 +382,6 @@ let%test_module "test" =
           let of_private_key_exn t = t
         end
 
-        module Keypair = struct
-          type t = {public_key: Public_key.t; private_key: Private_key.t}
-        end
-
         module Ledger_builder_hash = struct
           include Int
 
@@ -419,25 +410,24 @@ let%test_module "test" =
             type t = int [@@deriving bin_io]
 
             let hash t = t
-          end
 
-          type proof = ()
+            let is_valid _ = true
+          end
 
           let ledger t = !t
 
-          let create ~ledger ~self:_ = ref ledger
+          let create ~ledger = ref ledger
 
           let copy t = ref !t
 
           let hash t = !t
 
-          let of_aux_and_ledger ~snarked_ledger_hash:_ ~public_key:_ ~ledger
-              ~aux:_ =
-            Ok (create ~ledger ~self:())
+          let of_aux_and_ledger ~snarked_ledger_hash:_ ~ledger ~aux:_ =
+            Deferred.return (Ok (create ~ledger))
 
           let aux t = !t
 
-          let apply (t: t) (x: Ledger_builder_diff.t) ~logger:_ =
+          let apply (t : t) (x : Ledger_builder_diff.t) ~logger:_ =
             t := x ;
             return (Ok (Some x))
 
@@ -627,9 +617,8 @@ let%test_module "test" =
           ~genesis_tip:
             { protocol_state= Inputs.Consensus_mechanism.Protocol_state.genesis
             ; proof= ()
-            ; ledger_builder= Ledger_builder.create ~ledger:0 ~self:() }
+            ; ledger_builder= Ledger_builder.create ~ledger:0 }
           ~longest_tip_location ~consensus_local_state:()
-          ~keypair:{Keypair.public_key= (); private_key= ()}
 
       let create_transition x parent strength =
         { Inputs.Consensus_mechanism.Protocol_state.previous_state_hash= parent
@@ -660,8 +649,8 @@ let%test_module "test" =
         Async.Thread_safe.block_on_async_exn (fun () ->
             let%bind lbc = lbc_deferred in
             let%map results =
-              take_map (strongest_ledgers lbc) (List.length expected) ~f:
-                (fun (lb, _) -> !lb )
+              take_map (strongest_ledgers lbc) (List.length expected)
+                ~f:(fun (lb, _) -> !lb )
             in
             assert (List.equal results expected ~equal:Int.equal) )
     end

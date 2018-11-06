@@ -9,8 +9,9 @@ let%test_module "Database integration test" =
       let depth = 4
     end
 
+    module Location = Merkle_ledger.Location.Make (Depth)
     module DB =
-      Database.Make (Key) (Account) (Hash) (Depth) (In_memory_kvdb)
+      Database.Make (Key) (Account) (Hash) (Depth) (Location) (In_memory_kvdb)
         (In_memory_sdb)
         (Storage_locations)
     module Ledger = Ledger.Make (Key) (Account) (Hash) (Depth)
@@ -47,27 +48,27 @@ let%test_module "Database integration test" =
       type hash = Hash.t [@@deriving sexp, eq]
     end)
 
-    let check_hash (type t1 t2) (module L1
-        : Visualizable_ledger.S with type t = t1 and type hash = Hash.t)
-        (module L2
-        : Visualizable_ledger.S with type t = t2 and type hash = Hash.t)
-        (l1, h1) (l2, h2) =
+    let check_hash (type t1 t2)
+        (module L1 : Visualizable_ledger.S
+          with type t = t1 and type hash = Hash.t)
+        (module L2 : Visualizable_ledger.S
+          with type t = t2 and type hash = Hash.t) (l1, h1) (l2, h2) =
       if not (Hash.equal h1 h2) then
         failwithf
-          !"\n\ Expected:\n%{sexp:L1.tree}\n\n\n\ Actual:\n%{sexp:L2.tree}"
+          !"\n Expected:\n%{sexp:L1.tree}\n\n\n Actual:\n%{sexp:L2.tree}"
           (L1.to_tree l1) (L2.to_tree l2) ()
 
     let%test_unit "databases have equivalent hash values" =
       let num_accounts = (1 lsl Depth.depth) - 1 in
       let gen_non_zero_balances =
         let open Quickcheck.Generator in
-        list_with_length num_accounts (Int.gen_incl 1 Int.max_value)
+        list_with_length num_accounts Balance.gen
       in
-      Quickcheck.test ~sexp_of:[%sexp_of : int list] gen_non_zero_balances ~f:
-        (fun balances ->
+      Quickcheck.test ~trials:5 ~sexp_of:[%sexp_of: Balance.t list]
+        gen_non_zero_balances ~f:(fun balances ->
+          let public_keys = Key.gen_keys num_accounts in
           let accounts =
-            List.mapi balances ~f:(fun account_id balance ->
-                Account.create (Int.to_string account_id) balance )
+            List.map2_exn public_keys balances ~f:Account.create
           in
           let db = DB.create () in
           let ledger = Ledger.create () in
@@ -78,7 +79,7 @@ let%test_module "Database integration test" =
                    @ List.map acc ~f:(List.cons Direction.Left)
                    @ List.map acc ~f:(List.cons Direction.Right) )
           in
-          List.iter accounts ~f:(fun ({public_key; _} as account) ->
+          List.iter accounts ~f:(fun ({Account.public_key; _} as account) ->
               ignore @@ DB.get_or_create_account_exn db public_key account ;
               ignore
               @@ Ledger.get_or_create_account_exn ledger public_key account ) ;

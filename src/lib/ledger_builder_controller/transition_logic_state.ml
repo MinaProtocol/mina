@@ -6,8 +6,7 @@ module Make (Inputs : Inputs.Base.S) :
    and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
    and type external_transition :=
               Inputs.Consensus_mechanism.External_transition.t
-   and type state_hash := Inputs.State_hash.t =
-struct
+   and type state_hash := Inputs.State_hash.t = struct
   open Inputs
   open Consensus_mechanism
   module Ops = Tip_ops.Make (Inputs)
@@ -82,7 +81,7 @@ struct
     Debug_assert.debug_assert (fun () ->
         match t.ktree with
         | None -> ()
-        | Some ktree ->
+        | Some ktree -> (
           match Transition_tree.longest_path ktree with
           | [] -> failwith "Impossible, paths are non-empty"
           | [x] ->
@@ -91,7 +90,7 @@ struct
           | x :: y :: rest ->
               let last = List.last_exn (y :: rest) in
               assert_materialization_of t.locked_tip x ;
-              assert_materialization_of t.longest_branch_tip last )
+              assert_materialization_of t.longest_branch_tip last ) )
 
   let apply_all t changes =
     assert_state_valid t ;

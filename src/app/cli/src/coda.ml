@@ -12,8 +12,6 @@ module Git_sha = Client_lib.Git_sha
 
 let commit_id = Option.map [%getenv "CODA_COMMIT_SHA1"] ~f:Git_sha.of_string
 
-let force_updates = false
-
 module type Coda_intf = sig
   type ledger_proof
 
@@ -37,9 +35,12 @@ let daemon (module Kernel : Kernel_intf) log =
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
          (optional file)
-     and should_propose_flag =
-       flag "propose" ~doc:"true|false Run the proposer (default:false)"
-         (optional bool)
+     and propose_key =
+       flag "propose-key"
+         ~doc:
+           "FILE Private key file for the proposing transitions \
+            (default:don't propose)"
+         (optional file)
      and peers =
        flag "peer"
          ~doc:
@@ -84,14 +85,14 @@ let daemon (module Kernel : Kernel_intf) log =
            "CAPACITY_LOG_2 Log of capacity of transactions per transition \
             (default: 4)"
          (optional int)
-     and proposal_interval =
-       flag "proposal-interval"
-         ~doc:
-           "MILLIS Time between the proposer proposing and waiting (default: \
-            5000)"
-         (optional int)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
+     and snark_work_fee =
+       flag "snark-worker-fee"
+         ~doc:
+           "FEE Amount a worker wants to get compensated for generating a \
+            snark proof"
+         (optional int)
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -127,8 +128,8 @@ let daemon (module Kernel : Kernel_intf) log =
              Logger.warn log "failed to read daemon.json, not using it" ;
              None
        in
-       let maybe_from_config (type a) (f: YJ.json -> a option)
-           (keyname: string) (actual_value: a option) : a option =
+       let maybe_from_config (type a) (f : YJ.json -> a option)
+           (keyname : string) (actual_value : a option) : a option =
          let open Option.Let_syntax in
          let open YJ.Util in
          match actual_value with
@@ -154,13 +155,14 @@ let daemon (module Kernel : Kernel_intf) log =
          or_from_config YJ.Util.to_int_option "client-port"
            ~default:default_client_port client_port
        in
-       let should_propose_flag =
-         or_from_config YJ.Util.to_bool_option "propose" ~default:false
-           should_propose_flag
-       in
        let transaction_capacity_log_2 =
          or_from_config YJ.Util.to_int_option "txn-capacity" ~default:8
            transaction_capacity_log_2
+       in
+       let snark_work_fee_flag =
+         Currency.Fee.of_int
+           (or_from_config YJ.Util.to_int_option "snark-worker-fee" ~default:0
+              snark_work_fee)
        in
        let rest_server_port =
          maybe_from_config YJ.Util.to_int_option "rest-port" rest_server_port
@@ -186,19 +188,19 @@ let daemon (module Kernel : Kernel_intf) log =
        let%bind initial_peers_raw =
          match peers with
          | _ :: _ -> return peers
-         | [] ->
+         | [] -> (
              let peers_path = conf_dir ^/ "peers" in
              match%bind
-               Reader.load_sexp peers_path [%of_sexp : Host_and_port.t list]
+               Reader.load_sexp peers_path [%of_sexp: Host_and_port.t list]
              with
              | Ok ls -> return ls
              | Error e ->
                  let default_initial_peers = [] in
                  let%map () =
                    Writer.save_sexp peers_path
-                     ([%sexp_of : Host_and_port.t list] default_initial_peers)
+                     ([%sexp_of: Host_and_port.t list] default_initial_peers)
                  in
-                 []
+                 [] )
        in
        let%bind initial_peers =
          Deferred.List.filter_map ~how:(`Max_concurrent_jobs 8)
@@ -233,21 +235,28 @@ let daemon (module Kernel : Kernel_intf) log =
        let me =
          (Host_and_port.create ~host:ip ~port:discovery_port, external_port)
        in
+       let sequence maybe_def =
+         match maybe_def with
+         | Some def -> Deferred.map def ~f:Option.return
+         | None -> Deferred.return None
+       in
+       let%bind propose_keypair =
+         Option.map ~f:Cli_lib.read_keypair_exn' propose_key |> sequence
+       in
        let%bind client_whitelist =
          Reader.load_sexp
            (conf_dir ^/ "client_whitelist")
-           [%of_sexp : Unix.Inet_addr.Blocking_sexp.t list]
+           [%of_sexp: Unix.Inet_addr.Blocking_sexp.t list]
          >>| Or_error.ok
        in
-       let keypair = Genesis_ledger.largest_account_keypair_exn () in
-       let module Config = struct
+       let module Config0 = struct
          let logger = log
 
          let conf_dir = conf_dir
 
          let lbc_tree_max_depth = `Finite 50
 
-         let keypair = keypair
+         let propose_keypair = propose_keypair
 
          let genesis_proof = Precomputed_values.base_proof
 
@@ -258,18 +267,19 @@ let daemon (module Kernel : Kernel_intf) log =
          let work_selection = work_selection
        end in
        let%bind (module Init) =
-         make_init ~should_propose:should_propose_flag
-           (module Config)
+         make_init
+           ~should_propose:(Option.is_some propose_keypair)
+           (module Config0)
            (module Kernel)
        in
        let module M = Coda_main.Make_coda (Init) in
-       let module Run = Run (Config) (M) in
+       let module Run = Run (Config0) (M) in
        Async.Scheduler.report_long_cycle_times ~cutoff:(sec 0.5) () ;
        let%bind () =
          let open M in
          let run_snark_worker_action =
-           Option.value_map run_snark_worker_flag ~default:`Don't_run ~f:
-             (fun k -> `With_public_key k )
+           Option.value_map run_snark_worker_flag ~default:`Don't_run
+             ~f:(fun k -> `With_public_key k )
          in
          let banlist_dir_name = conf_dir ^/ "banlist" in
          let%bind () = Async.Unix.mkdir ~p:() banlist_dir_name in
@@ -294,14 +304,14 @@ let daemon (module Kernel : Kernel_intf) log =
          let%map coda =
            Run.create
              (Run.Config.make ~log ~net_config
-                ~should_propose:should_propose_flag
                 ~run_snark_worker:(Option.is_some run_snark_worker_flag)
                 ~ledger_builder_persistant_location:
                   (conf_dir ^/ "ledger_builder")
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+                ~snark_work_fee:snark_work_fee_flag
                 ~time_controller:(Inputs.Time.Controller.create ())
-                ~keypair () ~banlist)
+                ?propose_keypair:Config0.propose_keypair () ~banlist)
          in
          let web_service = Web_pipe.get_service () in
          Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;
@@ -333,6 +343,9 @@ let env name ~f ~default =
                     name x) )
   |> Option.value ~default
 
+[%%if
+force_updates]
+
 let rec ensure_testnet_id_still_good log =
   let open Cohttp_async in
   let recheck_soon = 0.1 in
@@ -342,55 +355,58 @@ let rec ensure_testnet_id_still_good log =
       (fun () -> don't_wait_for @@ ensure_testnet_id_still_good log)
       ()
   in
-  if force_updates then
-    match%bind
-      Monitor.try_with_or_error (fun () ->
-          Client.get (Uri.of_string "http://updates.o1test.net/testnet_id") )
-    with
-    | Error e ->
-        Logger.error log
-          "exception while trying to fetch testnet_id, trying again in 6 \
-           minutes" ;
+  match%bind
+    Monitor.try_with_or_error (fun () ->
+        Client.get (Uri.of_string "http://updates.o1test.net/testnet_id") )
+  with
+  | Error e ->
+      Logger.error log
+        "exception while trying to fetch testnet_id, trying again in 6 minutes" ;
+      try_later recheck_soon ;
+      Deferred.unit
+  | Ok (resp, body) -> (
+      if resp.status <> `OK then (
         try_later recheck_soon ;
-        Deferred.unit
-    | Ok (resp, body) ->
-        if resp.status <> `OK then (
-          try_later recheck_soon ;
-          Logger.error log
-            "HTTP response status %s while getting testnet id, checking again \
-             in 6 minutes."
-            (Cohttp.Code.string_of_status resp.status) ;
-          Deferred.unit )
-        else
-          let%bind body_string = Body.to_string body in
-          let valid_ids =
-            String.split ~on:'\n' body_string
-            |> List.map ~f:(Fn.compose Git_sha.of_string String.strip)
-          in
-          (* Maybe the Git_sha.of_string is a bit gratuitous *)
-          let finish local_id remote_ids =
-            let str x = Git_sha.sexp_of_t x |> Sexp.to_string in
-            exit1
-              ~msg:
-                (sprintf
-                   "The version for the testnet has changed, and this client \
-                    (version %s) is no longer compatible. Please download the \
-                    latest Coda software!\n\
-                    Valid versions:\n\
-                    %s"
-                   ( local_id |> Option.map ~f:str
-                   |> Option.value ~default:"[COMMIT_SHA1 not set]" )
-                   remote_ids)
-          in
-          match commit_id with
-          | None -> finish None body_string
-          | Some sha ->
-              if
-                List.exists valid_ids ~f:(fun remote_id ->
-                    Git_sha.equal sha remote_id )
-              then ( try_later recheck_later ; Deferred.unit )
-              else finish commit_id body_string
-  else Deferred.unit
+        Logger.error log
+          "HTTP response status %s while getting testnet id, checking again \
+           in 6 minutes."
+          (Cohttp.Code.string_of_status resp.status) ;
+        Deferred.unit )
+      else
+        let%bind body_string = Body.to_string body in
+        let valid_ids =
+          String.split ~on:'\n' body_string
+          |> List.map ~f:(Fn.compose Git_sha.of_string String.strip)
+        in
+        (* Maybe the Git_sha.of_string is a bit gratuitous *)
+        let finish local_id remote_ids =
+          let str x = Git_sha.sexp_of_t x |> Sexp.to_string in
+          exit1
+            ~msg:
+              (sprintf
+                 "The version for the testnet has changed, and this client \
+                  (version %s) is no longer compatible. Please download the \
+                  latest Coda software!\n\
+                  Valid versions:\n\
+                  %s"
+                 ( local_id |> Option.map ~f:str
+                 |> Option.value ~default:"[COMMIT_SHA1 not set]" )
+                 remote_ids)
+        in
+        match commit_id with
+        | None -> finish None body_string
+        | Some sha ->
+            if
+              List.exists valid_ids ~f:(fun remote_id ->
+                  Git_sha.equal sha remote_id )
+            then ( try_later recheck_later ; Deferred.unit )
+            else finish commit_id body_string )
+
+[%%else]
+
+let ensure_testnet_id_still_good _ = Deferred.unit
+
+[%%endif]
 
 let consensus_mechanism () : (module Consensus_mechanism_intf) =
   let mechanism =
@@ -399,11 +415,6 @@ let consensus_mechanism () : (module Consensus_mechanism_intf) =
       | "PROOF_OF_STAKE" -> Some `Proof_of_stake
       | _ -> None )
   in
-  Core.Printf.printf
-    !"consensus mechanism = %s\n%!"
-    ( match mechanism with
-    | `Proof_of_signature -> "PROOF_OF_SIGNATURE"
-    | `Proof_of_stake -> "PROOF_OF_STAKE" ) ;
   match mechanism with
   | `Proof_of_signature ->
       ( module struct
@@ -415,8 +426,6 @@ let consensus_mechanism () : (module Consensus_mechanism_intf) =
           module Proof = Coda_base.Proof
           module Ledger_builder_diff = Ledger_builder_diff
           module Time = Coda_base.Block_time
-
-          let private_key = Consensus.Signer_private_key.signer_private_key
 
           let proposal_interval =
             env "PROPOSAL_INTERVAL"
@@ -509,11 +518,13 @@ integration_tests]
 let coda_commands (module Kernel : Kernel_intf) log =
   let group =
     let module Coda_peers_test = Coda_peers_test.Make (Kernel) in
-    let module Coda_block_production_test = Coda_block_production_test.Make (Kernel) in
+    let module Coda_block_production_test =
+      Coda_block_production_test.Make (Kernel) in
     let module Coda_shared_prefix_test = Coda_shared_prefix_test.Make (Kernel) in
     let module Coda_restart_node_test = Coda_restart_node_test.Make (Kernel) in
     let module Coda_shared_state_test = Coda_shared_state_test.Make (Kernel) in
-    let module Coda_transitive_peers_test = Coda_transitive_peers_test.Make (Kernel) in
+    let module Coda_transitive_peers_test =
+      Coda_transitive_peers_test.Make (Kernel) in
     [ (Coda_peers_test.name, Coda_peers_test.command)
     ; (Coda_block_production_test.name, Coda_block_production_test.command)
     ; (Coda_shared_state_test.name, Coda_shared_state_test.command)

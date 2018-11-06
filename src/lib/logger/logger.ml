@@ -44,7 +44,7 @@ let null () =
   let l = create () in
   {l with null= true}
 
-let log ~level ?loc ?(attrs= []) t fmt =
+let log ~level ?loc ?(attrs = []) t fmt =
   ksprintf
     (fun message ->
       let m : Message.t =
@@ -74,8 +74,8 @@ let child t s =
     path= s :: t.path
   ; attributes=
       t.attributes
-      |> Map.set ~key:"module" ~data:([%sexp_of : string] s)
-      |> Map.set ~key:(sprintf "module-%s" s) ~data:([%sexp_of : bool] true) }
+      |> Map.set ~key:"module" ~data:([%sexp_of: string] s)
+      |> Map.set ~key:(sprintf "module-%s" s) ~data:([%sexp_of: bool] true) }
 
 type 'a logger =
      ?loc:string
