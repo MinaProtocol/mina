@@ -22,7 +22,7 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     perl \
     pkg-config \
     python-jinja2 \
-    rubygems-integration \
+    rubygems \
     zlib1g-dev
 
 RUN gem install deb-s3
