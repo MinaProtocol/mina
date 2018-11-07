@@ -751,7 +751,7 @@ module type Consensus_mechanism_intf = sig
     -> time:Int64.t
     -> keypair:keypair
     -> transactions:payment list
-    -> ledger:ledger
+    -> snarked_ledger_hash:frozen_ledger_hash
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
     -> (Protocol_state.value * Consensus_transition_data.value) option

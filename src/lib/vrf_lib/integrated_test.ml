@@ -87,7 +87,7 @@ module Output_hash = struct
       Snark_params.Tick.Pedersen.digest_fold Coda_base.Hash_prefix.vrf_output
         (Message.fold msg +> Non_zero_curve_point.Compressed.fold compressed_g)
     in
-    Sha256.digest (Snark_params.Tick.Pedersen.Digest.Bits.to_bits digest)
+    Sha256.digest_bits (Snark_params.Tick.Pedersen.Digest.Bits.to_bits digest)
 
   module Checked = struct
     let hash msg g =
