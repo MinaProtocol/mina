@@ -281,8 +281,8 @@ module Transition = struct
               { receiver= proposer
               ; amount= reward (* What "receiver" receives *)
               ; fee (* What "sender" receives *)
-              ; nonce= Account.Nonce.zero 
-              ; memo= Payment_memo.dummy}
+              ; nonce= Account.Nonce.zero
+              ; memo= Payment_memo.dummy }
           ; sender= Public_key.decompress_exn sender
           ; signature= dummy_signature }
         in
