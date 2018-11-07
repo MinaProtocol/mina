@@ -34,6 +34,7 @@ module Make (Kernel : Kernel_intf) = struct
       * Public_key.Compressed.t
       * Currency.Amount.t
       * Currency.Fee.t
+      * Payment_memo.t
     [@@deriving bin_io]
   end
 
@@ -198,7 +199,7 @@ module Make (Kernel : Kernel_intf) = struct
         ) ;
         let coda_peers () = return (Main.peers coda) in
         let coda_get_balance pk = return (Run.get_balance coda pk) in
-        let coda_send_payment (sk, pk, amount, fee) =
+        let coda_send_payment (sk, pk, amount, fee, memo) =
           let pk_of_sk sk =
             Public_key.of_private_key_exn sk |> Public_key.compress
           in
@@ -207,7 +208,7 @@ module Make (Kernel : Kernel_intf) = struct
               Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn
             in
             let payload : Payment.Payload.t =
-              {receiver= receiver_pk; amount; fee; nonce}
+              {receiver= receiver_pk; amount; fee; nonce; memo}
             in
             Payment.sign (Keypair.of_private_key_exn sender_sk) payload
           in
