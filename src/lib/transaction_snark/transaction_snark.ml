@@ -278,8 +278,8 @@ module Transition = struct
         let t : Payment.t =
           { payload=
               { receiver= proposer
-              ; amount= reward
-              ; fee
+              ; amount= reward (* What "receiver" receives *)
+              ; fee (* What "sender" receives *)
               ; nonce= Account.Nonce.zero }
           ; sender= Public_key.decompress_exn sender
           ; signature= dummy_signature }
@@ -443,12 +443,21 @@ module Base = struct
           - merkle tree [root'] where the sender balance is decremented by
             [payload.amount] and the receiver balance is incremented by [payload.amount].
           - fee excess = +fee.
+          - supply_increase = 0
 
      - if tag = Fee_transfer
         - return:
           - merkle tree [root'] where the sender balance is incremented by
             fee and the receiver balance is incremented by amount
           - fee excess = -(amount + fee)
+          - supply_increase = 0
+
+    - if tag = Coinbase
+      - return:
+        - merkle tree [root'] where the sender balance is incremented by
+            fee and the receiver balance is incremented by amount
+        - fee excess = 0
+        - supply_increase = +amount
   *)
   (* Nonce should only be incremented if it is a "Normal" transaction. *)
   let apply_tagged_transaction (type shifted)
