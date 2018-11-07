@@ -352,7 +352,8 @@ module Make (Inputs : Inputs_intf) :
             ( Message.fold msg
             +> Non_zero_curve_point.Compressed.fold compressed_g )
         in
-        Sha256.digest (Snark_params.Tick.Pedersen.Digest.Bits.to_bits digest)
+        Sha256.digest_bits
+          (Snark_params.Tick.Pedersen.Digest.Bits.to_bits digest)
 
       module Checked = struct
         let hash msg g =
@@ -392,7 +393,7 @@ module Make (Inputs : Inputs_intf) :
                (Snark_params.Tick.Typ.list ~length:256
                   Snark_params.Tick.Boolean.typ)
                (fun (msg, g) -> Checked.hash msg g)
-               (fun (msg, g) -> hash msg g))
+               (fun (msg, g) -> Sha256_lib.Sha256.Digest.to_bits (hash msg g)))
     end
 
     module Threshold = struct
@@ -425,7 +426,10 @@ module Make (Inputs : Inputs_intf) :
         (Balance.to_int owned_stake)
         (Amount.to_int total_stake)
         result threshold ;
-      Option.some_if (Threshold.satisfies threshold result) result
+      Option.some_if
+        (Threshold.satisfies threshold
+           (Sha256_lib.Sha256.Digest.to_bits result))
+        result
   end
 
   module Epoch_ledger = struct
@@ -700,7 +704,8 @@ module Make (Inputs : Inputs_intf) :
     let genesis =
       { epoch= Epoch.zero
       ; slot= Epoch.Slot.zero
-      ; proposer_vrf_result= List.init 256 ~f:(fun _ -> false) }
+      ; proposer_vrf_result=
+          Sha256.Digest.of_string @@ String.init 256 ~f:(fun _ -> '\000') }
 
     let to_hlist {epoch; slot; proposer_vrf_result} =
       Coda_base.H_list.[epoch; slot; proposer_vrf_result]

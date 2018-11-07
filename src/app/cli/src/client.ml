@@ -266,7 +266,8 @@ let batch_send_payments =
               { receiver= Public_key.Compressed.of_base64_exn receiver
               ; amount
               ; fee
-              ; nonce } ) )
+              ; nonce
+              ; memo= Payment_memo.dummy } ) )
     in
     dispatch_with_message Client_lib.Send_payments.rpc
       (ts :> Payment.t list)
@@ -306,7 +307,11 @@ let send_payment =
          let receiver_compressed = Public_key.compress address in
          let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
          let payload : Payment.Payload.t =
-           {receiver= receiver_compressed; amount; fee; nonce}
+           { receiver= receiver_compressed
+           ; amount
+           ; fee
+           ; nonce
+           ; memo= Payment_memo.dummy }
          in
          let txn = Payment.sign sender_kp payload in
          dispatch_with_message Client_lib.Send_payments.rpc

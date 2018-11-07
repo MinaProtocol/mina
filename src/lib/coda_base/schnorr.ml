@@ -2,6 +2,7 @@ open Core_kernel
 open Snark_params
 open Fold_lib
 open Bitstring_lib
+open Sha256_lib
 
 module Message = struct
   module Scalar = Tick.Inner_curve.Scalar
@@ -22,7 +23,8 @@ module Message = struct
       Pedersen.digest_fold Hash_prefix.signature
         Fold.(Payment_payload.fold t +> group3 ~default:false (of_list nonce))
     in
-    Scalar.of_bits (Sha256_lib.Sha256.digest (Field.unpack d))
+    Scalar.of_bits
+      (Sha256_lib.Sha256.digest_bits (Field.unpack d) |> Sha256.Digest.to_bits)
 
   let () = assert Insecure.signature_hash_function
 
