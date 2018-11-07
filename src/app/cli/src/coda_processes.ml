@@ -3,12 +3,8 @@ open Async
 open Coda_worker
 open Coda_main
 
-module Make
-    (Ledger_proof : Ledger_proof_intf)
-    (Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof.t)
-    (Coda : Coda_intf.S with type ledger_proof = Ledger_proof.t) =
-struct
-  module Coda_process = Coda_process.Make (Ledger_proof) (Kernel) (Coda)
+module Make (Kernel : Kernel_intf) = struct
+  module Coda_process = Coda_process.Make (Kernel)
 
   let init () = Parallel.init_master ()
 
@@ -24,9 +20,8 @@ struct
     in
     (discovery_ports, external_ports, peers)
 
-  let local_configs ?(transition_interval= 1000.0) ?proposal_interval
-      ?(should_propose= Fn.const true) n ~program_dir ~snark_worker_public_keys
-      ~work_selection =
+  let local_configs ?proposal_interval ?(should_propose = Fn.const true) n
+      ~program_dir ~snark_worker_public_keys ~work_selection =
     let discovery_ports, external_ports, peers = net_configs n in
     let peers = [] :: List.drop peers 1 in
     let args =
@@ -52,7 +47,7 @@ struct
     in
     configs
 
-  let spawn_local_processes_exn ?(first_delay= 3.0) configs =
+  let spawn_local_processes_exn ?(first_delay = 3.0) configs =
     let first = List.hd_exn configs in
     let rest = List.drop configs 1 in
     let%bind first = Coda_process.spawn_exn first in

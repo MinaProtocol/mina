@@ -1,32 +1,14 @@
-open Core
-open Async
-
-module Config = struct
-  type t = {conf_dir: string; log: Logger.t}
-end
+open Core_kernel
+open Async_kernel
 
 module type S = sig
   type t
 
   type data
 
-  val create : unit -> t Deferred.t
+  val create : filename:string -> log:Logger.t -> t Deferred.t
 
   val store : t -> data -> unit Deferred.t
-end
-
-module type Put_request_intf = sig
-  type t
-
-  val create : unit -> t Deferred.Or_error.t
-
-  val put : t -> string -> unit Deferred.Or_error.t
-end
-
-module type Config_intf = sig
-  val conf_dir : string
-
-  val log : Logger.t
 end
 
 module type Storage_intf = sig
@@ -37,63 +19,42 @@ module type Storage_intf = sig
   val store : location -> data -> unit Deferred.t
 end
 
-module type Chain_intf = sig
-  type data
-
-  val create : data -> Lite_base.Lite_chain.t
-end
-
-module Make
-    (Chain : Chain_intf)
-    (Config : Config_intf)
-    (Store : Storage_intf
-             with type location := string
-              and type data := Lite_base.Lite_chain.t)
-    (Request : Put_request_intf) :
-  S with type data = Chain.data =
-struct
-  open Lite_base
-
-  type data = Chain.data
-
+module Make (Data : sig
+  type t
+end)
+(Store : Storage_intf with type location := string and type data := Data.t)
+(Request : Web_request.Intf.S) : S with type data := Data.t = struct
   type t =
-    { location: string
-    ; reader: Lite_base.Lite_chain.t Linear_pipe.Reader.t
-    ; writer: Lite_base.Lite_chain.t Linear_pipe.Writer.t }
+    { filename: string
+    ; reader: Data.t Linear_pipe.Reader.t
+    ; writer: Data.t Linear_pipe.Writer.t }
 
-  let write_to_storage {location; _} request chain =
-    let chain_file = location ^/ "chain" in
-    let%bind () = Store.store chain_file chain in
-    Request.put request chain_file
+  let write_to_storage {filename; _} request data =
+    let%bind () = Store.store filename data in
+    Request.put request filename
 
-  let create () =
-    let location = Config.conf_dir ^/ "snarkette-data" in
-    let%bind () = Unix.mkdir location ~p:() in
+  let create ~filename ~log =
     let reader, writer = Linear_pipe.create () in
-    let t = {location; reader; writer} in
+    let t = {filename; reader; writer} in
     let%map () =
       match%map Request.create () with
       | Ok request ->
           don't_wait_for
-            (Linear_pipe.iter reader ~f:(fun chain ->
-                 match%map write_to_storage t request chain with
+            (Linear_pipe.iter reader ~f:(fun data ->
+                 match%map write_to_storage t request data with
                  | Ok () -> ()
                  | Error e ->
-                     Logger.error Config.log
+                     Logger.error log
                        !"Writing data IO_error: %s"
                        (Error.to_string_hum e) ))
       | Error e ->
-          Logger.error Config.log
+          Logger.error log
             !"Unable to create request: %s"
             (Error.to_string_hum e)
     in
     t
 
   let store {reader; writer; _} data =
-    let lite_chain = Chain.create data in
-    Linear_pipe.force_write_maybe_drop_head ~capacity:1 writer reader
-      lite_chain ;
+    Linear_pipe.force_write_maybe_drop_head ~capacity:1 writer reader data ;
     Deferred.unit
 end
-
-module S3_put_request = S3_put_request

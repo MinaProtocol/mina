@@ -24,7 +24,7 @@ module Inputs = struct
     let arg_type = Cli_lib.public_key_compressed
   end
 
-  module Super_transaction = Coda_base.Super_transaction
+  module Transaction = Coda_base.Transaction
   module Sparse_ledger = Coda_base.Sparse_ledger
 
   let perform_single () ~message s =
@@ -35,5 +35,3 @@ module Inputs = struct
 end
 
 module Worker = Worker.Make (Inputs)
-
-let command_name = "snark-worker-debug"

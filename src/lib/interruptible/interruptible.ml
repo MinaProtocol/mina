@@ -29,8 +29,8 @@ module T = struct
             [ t.interruption_signal
             ; ( maybe_sig_d
               >>= function
-                | Ok (interruption_signal, _) -> interruption_signal
-                | Error e -> Deferred.return e ) ]
+              | Ok (interruption_signal, _) -> interruption_signal
+              | Error e -> Deferred.return e ) ]
         in
         let d' =
           Deferred.any
@@ -51,6 +51,9 @@ module T = struct
 
   let return a =
     {interruption_signal= Deferred.never (); d= Deferred.Result.return a}
+
+  let don't_wait_for {d; _} =
+    don't_wait_for @@ Deferred.map d ~f:(function Ok () -> () | Error _ -> ())
 
   let finally t ~f = {t with d= Deferred.map t.d ~f:(fun r -> f () ; r)}
 
