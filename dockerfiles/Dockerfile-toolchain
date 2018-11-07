@@ -22,7 +22,10 @@ RUN sudo apt-get install --yes \
     perl \
     pkg-config \
     python-jinja2 \
+    rubygems-integration \
     zlib1g-dev
+
+RUN gem install deb-s3
 
 # Google Cloud tools
 RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
