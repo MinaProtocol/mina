@@ -60,16 +60,18 @@ let fold {receiver; amount; fee; nonce} =
   Public_key.Compressed.fold receiver
   +> Amount.fold amount +> Fee.fold fee +> Account_nonce.fold nonce
 
-(* TODO: This could be a bit more efficient by packing across triples,
-   but I think the added confusion-possibility
-   is not worth it. *)
-let var_to_triples {receiver; amount; fee; nonce} =
-  with_label __LOC__
-    (let%map receiver = Public_key.Compressed.var_to_triples receiver in
-     let amount = Amount.var_to_triples amount in
-     let fee = Fee.var_to_triples fee in
-     let nonce = Account_nonce.Unpacked.var_to_triples nonce in
-     receiver @ amount @ fee @ nonce)
+module Checked = struct
+  (* TODO: This could be a bit more efficient by packing across triples,
+    but I think the added confusion-possibility
+    is not worth it. *)
+  let to_triples {receiver; amount; fee; nonce} =
+    with_label __LOC__
+      (let%map receiver = Public_key.Compressed.var_to_triples receiver in
+       let amount = Amount.var_to_triples amount in
+       let fee = Fee.var_to_triples fee in
+       let nonce = Account_nonce.Unpacked.var_to_triples nonce in
+       receiver @ amount @ fee @ nonce)
+end
 
 let length_in_triples =
   Public_key.Compressed.length_in_triples + Amount.length_in_triples
@@ -95,7 +97,7 @@ let%test_unit "to_bits" =
         ; fee= Fee.of_int (Random.int Int.max_value_30_bits)
         ; nonce= Account_nonce.random () }
       in
-      Test_util.test_to_triples typ fold var_to_triples input )
+      Test_util.test_to_triples typ fold Checked.to_triples input )
 
 let var_of_t ({receiver; amount; fee; nonce} : t) : var =
   { receiver= Public_key.Compressed.var_of_t receiver

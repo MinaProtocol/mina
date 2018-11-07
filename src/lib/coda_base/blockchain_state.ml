@@ -165,7 +165,7 @@ module Make (Genesis_ledger : sig val t : Ledger.t end) : S = struct
 
     let hash t ~nonce =
       let d =
-        Pedersen.digest_fold Hash_prefix.signature
+        Pedersen.digest_fold Hash_prefix.blockchain_signature
           Fold.(fold t +> Fold.(group3 ~default:false (of_list nonce)))
       in
       List.take (Field.unpack d) Inner_curve.Scalar.length_in_bits
@@ -178,7 +178,7 @@ module Make (Genesis_ledger : sig val t : Ledger.t end) : S = struct
       with_label __LOC__
         (let%bind trips = var_to_triples t in
          let%bind hash =
-           Pedersen.Checked.digest_triples ~init:Hash_prefix.signature
+           Pedersen.Checked.digest_triples ~init:Hash_prefix.blockchain_signature
              (trips @ Fold.(to_list (group3 ~default:Boolean.false_ (of_list nonce))))
          in
          let%map bs =

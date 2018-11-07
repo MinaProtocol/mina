@@ -57,6 +57,8 @@ val to_triples : t -> bool Triple.t list
 
 val fold : t -> bool Triple.t Fold.t
 
-val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
-
 val var_of_t : t -> var
+
+module Checked : sig
+  val to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+end

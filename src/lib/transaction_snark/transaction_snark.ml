@@ -244,8 +244,7 @@ module Tagged_transaction = struct
   end
 end
 
-let dummy_signature =
-  Schnorr.sign (Private_key.create ()) Payment_payload.dummy
+let dummy_signature : Signature.t = Tick.Inner_curve.Scalar.(zero, zero)
 
 module Fee_transfer = struct
   include Fee_transfer
@@ -459,11 +458,11 @@ module Base = struct
       ( if not Insecure.transaction_replay then
           failwith "Insecure.transaction_replay false" ;
         let {Payment.Payload.receiver; amount; fee= _; nonce} = payload in
-        let%bind payload_section = Schnorr.Message.var_of_payload payload in
+        let%bind payload_section = Payment.Section.create payload in
         let%bind () =
           with_label __LOC__
             (let%bind verifies =
-               Schnorr.Checked.verifies shifted signature sender
+               Payment.Checked.verifies shifted signature sender
                  payload_section
              in
              (* Should only assert_verifies if the tag is Normal *)
@@ -1527,12 +1526,7 @@ let%test_module "transaction_snark" =
         ; amount= Amount.of_int amt
         ; nonce }
       in
-      let signature = Schnorr.sign sender.private_key payload in
-      Payment.check
-        { Payment.payload
-        ; sender= Public_key.of_private_key_exn sender.private_key
-        ; signature }
-      |> Option.value_exn
+      Payment.sign (Keypair.of_private_key_exn sender.private_key) payload
 
     let keys = Keys.create ()
 

@@ -3,43 +3,7 @@ open Import
 open Snark_params.Tick
 module Payload = Payment_payload
 
-type ('payload, 'pk, 'signature) t_ =
-  {payload: 'payload; sender: 'pk; signature: 'signature}
-[@@deriving bin_io, eq, sexp, hash]
-
-type t = (Payload.t, Public_key.t, Signature.t) t_
-[@@deriving bin_io, eq, sexp, hash]
-
-module Stable : sig
-  module V1 : sig
-    type nonrec ('payload, 'pk, 'signature) t_ =
-                                                ('payload, 'pk, 'signature) t_ =
-      {payload: 'payload; sender: 'pk; signature: 'signature}
-    [@@deriving bin_io, eq, sexp, hash]
-
-    type t =
-      (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_
-    [@@deriving bin_io, eq, sexp, hash]
-
-    val compare : seed:string -> t -> t -> int
-  end
-end
-
-type var = (Payload.var, Public_key.var, Signature.var) t_
-
-val typ : (var, t) Typ.t
-
-(* Generate a single transaction between
- * $a, b \in keys$
- * for fee $\in [0,max_fee]$
- * and an amount $\in [1,max_amount]$
- *)
-
-val gen :
-     keys:Signature_keypair.t array
-  -> max_amount:int
-  -> max_fee:int
-  -> t Quickcheck.Generator.t
+type t = Payload.t Signed_payload.t
 
 module With_valid_signature : sig
   type nonrec t = private t [@@deriving sexp, eq, bin_io]
@@ -53,8 +17,31 @@ module With_valid_signature : sig
     -> t Quickcheck.Generator.t
 end
 
-val sign : Signature_keypair.t -> Payload.t -> With_valid_signature.t
+include
+  Signed_payload.S
+  with module Payload := Payload
+   and type t := t
+   and module With_valid_signature := With_valid_signature
 
-val check : t -> With_valid_signature.t option
+module Stable : sig
+  module V1 : sig
+    type t = Payload.Stable.V1.t Signed_payload.Stable.V1.t
+    [@@deriving bin_io, eq, sexp, hash]
+
+    val compare : seed:string -> t -> t -> int
+  end
+end
+
+(* Generate a single transaction between
+ * $a, b \in keys$
+ * for fee $\in [0,max_fee]$
+ * and an amount $\in [1,max_amount]$
+ *)
+
+val gen :
+     keys:Signature_keypair.t array
+  -> max_amount:int
+  -> max_fee:int
+  -> t Quickcheck.Generator.t
 
 val public_keys : t -> Public_key.Compressed.t list

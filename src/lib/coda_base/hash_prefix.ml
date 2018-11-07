@@ -20,7 +20,7 @@ let base_snark = salt base_snark
 
 let transition_system_snark = salt transition_system_snark
 
-let signature = salt signature
+let payment_payload = salt payment_payload
 
 let receipt_chain = salt receipt_chain
 
@@ -29,3 +29,7 @@ let epoch_seed = salt epoch_seed
 let vrf_message = salt vrf_message
 
 let vrf_output = salt vrf_output
+
+let blockchain_signature = salt blockchain_signature
+
+let set_delegate = salt set_delegate

@@ -36,7 +36,7 @@ let base_snark = create "CodaBaseSnark"
 
 let transition_system_snark = create "CodaTransitionSnark"
 
-let signature = create "CodaSignature"
+let payment_payload = create "CodaPaymentPayload"
 
 let receipt_chain = create "CodaReceiptChain"
 
@@ -45,3 +45,7 @@ let epoch_seed = create "CodaEpochSeed"
 let vrf_message = create "CodaVrfMessage"
 
 let vrf_output = create "CodaVrfOutput"
+
+let blockchain_signature = create "CodaProofOfSignature"
+
+let set_delegate = create "CodaSetDelegate"

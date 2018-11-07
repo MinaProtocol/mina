@@ -47,12 +47,11 @@ module type S = sig
        and type ('a, 'b) checked := ('a, 'b) checked
   end
 
-  module Message :
-    Message_intf
-    with type boolean_var := boolean_var
-     and type curve_scalar := curve_scalar
-     and type curve_scalar_var := curve_scalar_var
-     and type ('a, 'b) checked := ('a, 'b) checked
+  module Message : sig
+    type t
+
+    type var
+  end
 
   module Signature : sig
     type t = curve_scalar * curve_scalar [@@deriving sexp]

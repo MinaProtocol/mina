@@ -22,7 +22,7 @@ module Chain_hash = struct
 
     let if_ = if_
 
-    let cons ~payload t =
+    let cons ~(payload : Payment.Section.t) t =
       let open Let_syntax in
       let init =
         Pedersen.Checked.Section.create
@@ -36,7 +36,11 @@ module Chain_hash = struct
           ~start:
             (Hash_prefix.length_in_triples + Payment.Payload.length_in_triples)
       in
-      let%map s = Pedersen.Checked.Section.disjoint_union_exn payload with_t in
+      let%map s =
+        Pedersen.Checked.Section.disjoint_union_exn
+          (payload :> Pedersen.Checked.Section.t)
+          with_t
+      in
       let digest, _ =
         Pedersen.Checked.Section.to_initial_segment_digest s |> Or_error.ok_exn
       in
@@ -52,7 +56,7 @@ module Chain_hash = struct
           let comp =
             let open Snark_params.Tick.Let_syntax in
             let%bind payload =
-              Schnorr.Message.var_of_payload (Payment_payload.var_of_t payload)
+              Payment.Section.create (Payment_payload.var_of_t payload)
             in
             let%map res = Checked.cons ~payload (var_of_t base) in
             As_prover.read typ res

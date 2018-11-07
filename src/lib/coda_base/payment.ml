@@ -6,14 +6,15 @@ open Tick
 module Fee = Currency.Fee
 module Payload = Payment_payload
 
+module T =
+  Signed_payload.Make (struct
+      let t = Hash_prefix.payment_payload
+    end)
+    (Payload)
+
 module Stable = struct
   module V1 = struct
-    type ('payload, 'pk, 'signature) t_ =
-      {payload: 'payload; sender: 'pk; signature: 'signature}
-    [@@deriving bin_io, eq, sexp, hash]
-
-    type t =
-      (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_
+    type t = Payload.Stable.V1.t Signed_payload.Stable.V1.t
     [@@deriving bin_io, eq, sexp, hash]
 
     type with_seed = string * t [@@deriving hash]
@@ -37,30 +38,16 @@ include Stable.V1
 
 type value = t
 
-type var = (Payload.var, Public_key.var, Signature.var) t_
+type var = T.var
 
 let public_keys ({payload= {Payload.receiver; _}; sender; _} : value) =
   [receiver; Public_key.compress sender]
 
-let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
-  { payload
-  ; sender= kp.public_key
-  ; signature= Schnorr.sign kp.private_key payload }
+let sign = T.sign
 
-let typ : (var, t) Tick.Typ.t =
-  let spec = Data_spec.[Payload.typ; Public_key.typ; Schnorr.Signature.typ] in
-  let of_hlist
-        : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) t_
-      =
-    H_list.(fun [payload; sender; signature] -> {payload; sender; signature})
-  in
-  let to_hlist {payload; sender; signature} =
-    H_list.[payload; sender; signature]
-  in
-  Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-    ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+let typ = T.typ
 
-let gen ~keys ~max_amount ~max_fee =
+let gen_valid ~keys ~max_amount ~max_fee =
   let open Quickcheck.Generator.Let_syntax in
   let%map sender_idx = Int.gen_incl 0 (Array.length keys - 1)
   and receiver_idx = Int.gen_incl 0 (Array.length keys - 1)
@@ -76,20 +63,25 @@ let gen ~keys ~max_amount ~max_fee =
   in
   sign sender payload
 
+let gen ~keys ~max_amount ~max_fee =
+  Quickcheck.Generator.map (gen_valid ~keys ~max_amount ~max_fee) ~f:(fun t ->
+      (t :> T.t) )
+
 module With_valid_signature = struct
-  type t = Stable.V1.t [@@deriving sexp, eq, bin_io]
+  type t = T.With_valid_signature.t [@@deriving sexp, eq, bin_io]
 
-  let compare = Stable.V1.compare
+  let compare ~seed (t1 : t) (t2 : t) =
+    Stable.V1.compare ~seed (t1 :> T.t) (t2 :> T.t)
 
-  let gen = gen
+  let gen = gen_valid
 end
 
-let check_signature ({payload; sender; signature} : t) =
-  Schnorr.verify signature (Inner_curve.of_coords sender) payload
+module Checked = T.Checked
+module Section = T.Section
+
+let check = T.check
 
 let%test_unit "completeness" =
   let keys = Array.init 2 ~f:(fun _ -> Signature_keypair.create ()) in
   Quickcheck.test ~trials:20 (gen ~keys ~max_amount:10000 ~max_fee:1000)
-    ~f:(fun t -> assert (check_signature t) )
-
-let check t = Option.some_if (check_signature t) t
+    ~f:(fun t -> assert (Option.is_some (check t)) )

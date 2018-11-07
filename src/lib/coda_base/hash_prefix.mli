@@ -4,7 +4,7 @@ val length_in_triples : int
 
 val protocol_state : Tick.Pedersen.State.t
 
-val signature : Tick.Pedersen.State.t
+val payment_payload : Tick.Pedersen.State.t
 
 val account : Tick.Pedersen.State.t
 
@@ -25,3 +25,7 @@ val epoch_seed : Tick.Pedersen.State.t
 val vrf_message : Tick.Pedersen.State.t
 
 val vrf_output : Tick.Pedersen.State.t
+
+val blockchain_signature : Tick.Pedersen.State.t
+
+val set_delegate : Tick.Pedersen.State.t
