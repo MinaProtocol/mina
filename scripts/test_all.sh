@@ -5,7 +5,10 @@ set -eo pipefail
 eval `opam config env`
 
 run_dune() {
-  dune $1 --profile=DUNE_PROFILE ${@:2}
+  if [ "${DUNE_PROFILE}" = "" ]; then
+    DUNE_PROFILE=test
+  fi
+  dune $1 --profile="${DUNE_PROFILE}" ${@:2}
 }
 
 run_unit_tests() {
@@ -61,7 +64,6 @@ run_all_integration_tests() {
 run_all_sig_integration_tests() {
   CODA_CONSENSUS_MECHANISM=proof_of_signature \
     CODA_PROPOSAL_INTERVAL=1000 \
-    DUNE_PROFILE=test \
     run_all_integration_tests
 }
 
@@ -70,7 +72,6 @@ run_all_stake_integration_tests() {
     CODA_SLOT_INTERVAL=1000 \
     CODA_UNFORKABLE_TRANSITION_COUNT=24 \
     CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 \
-    DUNE_PROFILE=test \
     run_all_integration_tests
 }
 
@@ -79,7 +80,6 @@ run_epoch_stake_integration_test() {
     CODA_SLOT_INTERVAL=1000 \
     CODA_UNFORKABLE_TRANSITION_COUNT=2 \
     CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=2 \
-    DUNE_PROFILE=test \
     run_integration_test full-test
 }
 
