@@ -1,0 +1,5 @@
+(library
+ (name web_request)
+  (public_name web_request)
+  (libraries core async)
+  (synopsis "Web tools that are used to send put requests"))
