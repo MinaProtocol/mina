@@ -25,7 +25,7 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     rubygems \
     zlib1g-dev
 
-RUN gem install deb-s3
+RUN sudo gem install deb-s3
 
 # Google Cloud tools
 RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
