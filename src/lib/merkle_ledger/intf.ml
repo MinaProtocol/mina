@@ -1,7 +1,7 @@
 open Core
 
 module type Key = sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp, bin_io, eq]
 
   val empty : t
 

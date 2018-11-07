@@ -193,8 +193,12 @@ struct
     let parent_set_notify t location account =
       match find_account t location with
       | Some existing_account ->
-          if Account.equal account existing_account then (
-            (* optimization: remove from account table *)
+          if
+            Key.equal
+              (Account.public_key account)
+              (Account.public_key existing_account)
+          then (
+            (* remove from account table *)
             remove_account t location ;
             (* update hashes *)
             let account_address = Location.to_path_exn location in
@@ -205,7 +209,10 @@ struct
                 account_address account_hash
             in
             List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
-                set_hash t addr hash ) )
+                set_hash t addr hash )
+            (* TODO : for the "else", move account to new location in mask, because there's a conflict
+            with parent; see issue #1048
+          *) )
       | None -> ()
 
     (* as for accounts, we see if we have it in the mask, else delegate to parent *)
