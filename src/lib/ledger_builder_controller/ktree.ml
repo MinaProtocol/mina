@@ -120,7 +120,7 @@ struct
         ; elems= Elem_set.add t.elems e }
       in
       match tree_and_depths with
-      | [] | [_] -> `Added default
+      | [] -> `Added default
       | _ ->
           let longest_subtree, longest_depth =
             List.max_elt tree_and_depths ~compare:(fun (_, d) (_, d') ->
@@ -201,6 +201,38 @@ let%test_module "K-tree" =
           in
           (r, e))
           ~f:(fun (r, e) -> assert (Option.is_some (path r ~f:(Elem.equal e))))
+
+      let%test_unit "The tree size never exceeds depth-k" =
+        let elems =
+          Quickcheck.random_value ~seed:(`Deterministic "seed")
+            (Quickcheck.Generator.list_with_length
+               (Security.max_depth + 60_000)
+               Elem.gen)
+        in
+        match elems with
+        | [] -> failwith "Generated bad list"
+        | e0 :: es ->
+            let t =
+              let rec go i t parent es =
+                match es with
+                | [] -> ()
+                | e1 :: es -> (
+                    let next_expected_size =
+                      Int.min (i + 1) Security.max_depth
+                    in
+                    match add t e1 ~parent:(Elem.equal parent) with
+                    | `No_parent -> failwith "There should always be a parent"
+                    | `Repeat -> go i t parent es
+                    | `Added t' ->
+                        [%test_result: Int.t]
+                          ~message:"Expected size was not count increase"
+                          ~expect:next_expected_size
+                          (List.length (longest_path t')) ;
+                        go next_expected_size t' e1 es )
+              in
+              go 1 (singleton e0) e0 es
+            in
+            ignore t
 
       let%test_unit "Extending a tree with depth-k, extends full-tree properly"
           =
