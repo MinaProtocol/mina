@@ -10,36 +10,36 @@ module Stable = struct
       {payload: 'payload; sender: 'pk; signature: 'signature}
     [@@deriving bin_io, eq, sexp, hash]
 
-    type 'payload t = ('payload, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_
+    type 'payload t =
+      ('payload, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_
     [@@deriving bin_io, eq, sexp, hash]
   end
 end
 
 include Stable.V1
-
 module With_valid_signature = Stable.V1
 
 type 'payload var = ('payload, Public_key.var, Signature.var) t_
 
-type 'a signed_payload = 'a t
-[@@deriving bin_io, eq, sexp, hash]
+type 'a signed_payload = 'a t [@@deriving bin_io, eq, sexp, hash]
 
 module type S = sig
   open Snark_params.Tick
 
   module Payload : sig
-    type t type var end
+    type t
 
-  type nonrec t = Payload.t t
-  [@@deriving bin_io, eq, sexp, hash]
+    type var
+  end
+
+  type nonrec t = Payload.t t [@@deriving bin_io, eq, sexp, hash]
 
   type nonrec var = Payload.var var
 
   val typ : (var, t) Typ.t
 
   module With_valid_signature : sig
-    type nonrec t = private t
-    [@@deriving sexp, eq, bin_io]
+    type nonrec t = private t [@@deriving sexp, eq, bin_io]
   end
 
   val sign : Signature_keypair.t -> Payload.t -> With_valid_signature.t
@@ -69,38 +69,41 @@ module type S = sig
   end
 end
 
-module Make
-    (Prefix : sig
-       val t : Snark_params.Tick.Pedersen.State.t
-     end)
-    (Payload : sig
-       type t [@@deriving sexp, bin_io, eq, hash]
-       type var
-       val typ : (var, t) Snark_params.Tick.Typ.t
+module Make (Prefix : sig
+  val t : Snark_params.Tick.Pedersen.State.t
+end) (Payload : sig
+  type t [@@deriving sexp, bin_io, eq, hash]
 
-       val fold : t -> bool Triple.t Fold.t
+  type var
 
-       val length_in_triples : int
+  val typ : (var, t) Snark_params.Tick.Typ.t
 
-       module Checked : sig
-         val to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
-       end
-     end)
-= struct
-  module T = struct
-    type t = Payload.t signed_payload
-    [@@deriving bin_io, eq, sexp, hash]
+  val fold : t -> bool Triple.t Fold.t
+
+  val length_in_triples : int
+
+  module Checked : sig
+    val to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
   end
+end) =
+struct
+  module T = struct
+    type t = Payload.t signed_payload [@@deriving bin_io, eq, sexp, hash]
+  end
+
   include T
 
   type nonrec var = Payload.var var
 
-  module Schnorr = Schnorr.Make(Prefix)(Payload)
+  module Schnorr = Schnorr.Make (Prefix) (Payload)
 
   let typ : (var, t) Typ.t =
-    let spec = Data_spec.[Payload.typ; Public_key.typ; Schnorr.Signature.typ] in
+    let spec =
+      Data_spec.[Payload.typ; Public_key.typ; Schnorr.Signature.typ]
+    in
     let of_hlist
-          : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) t_ =
+          : 'a 'b 'c.    (unit, 'a -> 'b -> 'c -> unit) H_list.t
+            -> ('a, 'b, 'c) t_ =
       H_list.(fun [payload; sender; signature] -> {payload; sender; signature})
     in
     let to_hlist {payload; sender; signature} =
@@ -116,13 +119,14 @@ module Make
     ; sender= kp.public_key
     ; signature= Schnorr.sign kp.private_key payload }
 
-  let check_signature ({payload; sender; signature}: t) =
+  let check_signature ({payload; sender; signature} : t) =
     Schnorr.verify signature (Inner_curve.of_coords sender) payload
 
   let check t = Option.some_if (check_signature t) t
 
   module Section = struct
     type t = Pedersen.Checked.Section.t
+
     let create payload =
       let open Let_syntax in
       let%bind triples = Payload.Checked.to_triples payload in
@@ -132,4 +136,3 @@ module Make
 
   module Checked = Schnorr.Checked
 end
-
