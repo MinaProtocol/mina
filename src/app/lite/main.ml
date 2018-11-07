@@ -910,7 +910,7 @@ let main ~render ~get_data =
         5_000.
       |> ignore )
     (fun e ->
-      printf "Coudl not retrieve verifier code: %s" (Error.to_string_hum e) )
+      printf "Could not retrieve verifier code: %s" (Error.to_string_hum e) )
 
 let _ =
   main
