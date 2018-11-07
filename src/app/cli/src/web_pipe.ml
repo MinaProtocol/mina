@@ -146,7 +146,13 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
   | `S3 ->
       Logger.info log "Running S3 web client pipe" ;
       let module Broadcaster =
-        Make_broadcaster (Program) (Web_request.S3_put_request)
+        Make_broadcaster
+          (Program)
+          (struct
+            include Web_request.S3_put_request
+
+            let put = put ~options:["--cache-control"; "max-age=0,no-store"]
+          end)
       in
       don't_wait_for
         (let location = conf_dir ^/ "snarkette-data" in
