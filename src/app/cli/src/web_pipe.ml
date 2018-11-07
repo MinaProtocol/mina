@@ -174,4 +174,4 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
           [ store_verification_keys ~send:send_file_to_s3 ~log
           ; js_file_storage_work ]
       in
-      upon work Fn.id
+      don't_wait_for work
