@@ -308,7 +308,7 @@ end = struct
       -> Ledger_hash.t * Sync_ledger.query
       -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t =
    fun t (hash, query) ->
-    (* TODO: We should cache, but in the future it will be free *)
+    (* TODO: this caching shouldn't be necessary *)
     let open Deferred.Or_error.Let_syntax in
     Logger.trace t.log
       !"Attempting to handle a sync-ledger query for %{sexp: Ledger_hash.t}"
