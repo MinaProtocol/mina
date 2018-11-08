@@ -372,6 +372,22 @@ module Make (Inputs : Inputs_intf) :
               return
                 (Or_error.error_string "Not found locally within our ktree") )
 
+  let verify_blockchain ~log ~on_success transition_with_hash =
+    let transition = With_hash.data transition_with_hash in
+    let proof = External_transition.protocol_state_proof transition in
+    let protocol_state = External_transition.protocol_state transition in
+    match%bind verify_blockchain proof protocol_state with
+    | Error e ->
+        Logger.error log !"Could not connect to verifier: %{sexp:Error.t}" e ;
+        Deferred.return None
+    | Ok false ->
+        Logger.faulty_peer log
+          !"Recieved malicious transition. Will not add external transition \
+            %{sexp:External_transition.t}"
+          transition ;
+        Deferred.return None
+    | Ok true -> on_success ()
+
   let unguarded_on_new_transition catchup t transition_with_hash ~time_received
       :
       ((External_transition.t, State_hash.t) With_hash.t, unit) Job.t option
@@ -440,59 +456,64 @@ module Make (Inputs : Inputs_intf) :
         Transition_tree.add old_tree transition_with_hash ~parent:(fun x ->
             transition_is_parent_of ~child:transition_with_hash ~parent:x )
       with
-      | `No_parent -> (
-          let best_tip = locked_and_best old_tree |> snd in
-          match
-            Consensus_mechanism.select
-              ( transition_with_hash |> With_hash.data
-              |> External_transition.protocol_state
-              |> Protocol_state.consensus_state )
-              ( best_tip |> With_hash.data |> External_transition.protocol_state
-              |> Protocol_state.consensus_state )
-              ~logger:t.log ~time_received
-          with
-          | `Keep ->
-              Logger.debug t.log "Branch noparent" ;
-              return
-                (Some
-                   (Catchup.sync ~state_mutator:(mutate_state t) catchup
-                      ~old_state transition_with_hash))
-          | `Take -> return None )
+      | `No_parent ->
+          verify_blockchain ~log:t.log transition_with_hash
+            ~on_success:(fun () ->
+              let best_tip = locked_and_best old_tree |> snd in
+              match
+                Consensus_mechanism.select
+                  ( transition_with_hash |> With_hash.data
+                  |> External_transition.protocol_state
+                  |> Protocol_state.consensus_state )
+                  ( best_tip |> With_hash.data
+                  |> External_transition.protocol_state
+                  |> Protocol_state.consensus_state )
+                  ~logger:t.log ~time_received
+              with
+              | `Keep ->
+                  Logger.debug t.log "Branch noparent" ;
+                  return
+                    (Some
+                       (Catchup.sync ~state_mutator:(mutate_state t) catchup
+                          ~old_state transition_with_hash))
+              | `Take -> return None )
       | `Repeat -> return None
       | `Added new_tree ->
-          let old_locked_head, old_best_tip = locked_and_best old_tree in
-          let new_head, new_tip = locked_and_best new_tree in
-          if
-            With_hash.compare External_transition.compare State_hash.compare
-              old_locked_head new_head
-            = 0
-            && With_hash.compare External_transition.compare State_hash.compare
-                 old_best_tip new_tip
-               = 0
-          then
-            let%map () =
-              mutate_state t old_state
-                [Transition_logic_state.Change.Ktree new_tree]
-                (With_hash.data new_tip)
-            in
-            None
-          else
-            let new_best_path =
-              Transition_tree.longest_path new_tree |> Path.of_tree_path
-            in
-            return
-              (Some
-                 ( Path_traversal.create old_state new_tree old_tree
-                     new_best_path t.log transition_with_hash
-                     ~on_success:(fun ~longest_branch ~ktree ~transition ->
-                       let changes =
-                         [ Transition_logic_state.Change.Longest_branch_tip
-                             longest_branch
-                         ; Transition_logic_state.Change.Ktree ktree ]
-                       in
-                       mutate_state t old_state changes
-                         (With_hash.data transition) )
-                 |> Job.map ~f:ignore )) )
+          verify_blockchain ~log:t.log transition_with_hash
+            ~on_success:(fun () ->
+              let old_locked_head, old_best_tip = locked_and_best old_tree in
+              let new_head, new_tip = locked_and_best new_tree in
+              if
+                With_hash.compare External_transition.compare
+                  State_hash.compare old_locked_head new_head
+                = 0
+                && With_hash.compare External_transition.compare
+                     State_hash.compare old_best_tip new_tip
+                   = 0
+              then
+                let%map () =
+                  mutate_state t old_state
+                    [Transition_logic_state.Change.Ktree new_tree]
+                    (With_hash.data new_tip)
+                in
+                None
+              else
+                let new_best_path =
+                  Transition_tree.longest_path new_tree |> Path.of_tree_path
+                in
+                return
+                  (Some
+                     ( Path_traversal.create old_state new_tree old_tree
+                         new_best_path t.log transition_with_hash
+                         ~on_success:(fun ~longest_branch ~ktree ~transition ->
+                           let changes =
+                             [ Transition_logic_state.Change.Longest_branch_tip
+                                 longest_branch
+                             ; Transition_logic_state.Change.Ktree ktree ]
+                           in
+                           mutate_state t old_state changes
+                             (With_hash.data transition) )
+                     |> Job.map ~f:ignore )) ) )
 
   let on_new_transition catchup ({pending_target; _} as t) transition_with_hash
       ~(time_received : Unix_timestamp.t) :

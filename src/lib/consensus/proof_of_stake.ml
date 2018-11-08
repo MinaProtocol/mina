@@ -356,7 +356,8 @@ module Make (Inputs : Inputs_intf) :
             ( Message.fold msg
             +> Non_zero_curve_point.Compressed.fold compressed_g )
         in
-        Sha256.digest (Snark_params.Tick.Pedersen.Digest.Bits.to_bits digest)
+        Sha256.digest_bits
+          (Snark_params.Tick.Pedersen.Digest.Bits.to_bits digest)
 
       module Checked = struct
         let hash msg g =
@@ -396,21 +397,27 @@ module Make (Inputs : Inputs_intf) :
                (Snark_params.Tick.Typ.list ~length:256
                   Snark_params.Tick.Boolean.typ)
                (fun (msg, g) -> Checked.hash msg g)
-               (fun (msg, g) -> hash msg g))
+               (fun (msg, g) -> Sha256_lib.Sha256.Digest.to_bits (hash msg g)))
     end
 
     module Threshold = struct
-      include Bignum_bigint
+      open Bignum_bigint
 
       let of_uint64_exn = Fn.compose of_int64_exn UInt64.to_int64
 
-      let create ~owned_stake ~total_stake =
-        let owned_stake = Balance.to_uint64 owned_stake in
-        let total_stake = Amount.to_uint64 total_stake in
-        let stake_ratio = of_uint64_exn (UInt64.div owned_stake total_stake) in
-        stake_ratio * pow (of_int 2) (of_int 256)
+      let c = of_int 1
 
-      let satisfies threshold output = of_bits_lsb output <= threshold
+      (*  Check if
+          vrf_output / 2^256 <= c * my_stake / total_currency
+
+          So that we don't have to do division we check
+
+          vrf_output * total_currency <= c * my_stake * 2^256
+      *)
+      let is_satisfied ~my_stake ~total_stake vrf_output =
+        of_bit_fold_lsb (Sha256.Digest.fold_bits vrf_output)
+        * of_uint64_exn (Amount.to_uint64 total_stake)
+        <= shift_left (c * of_uint64_exn (Balance.to_uint64 my_stake)) 256
     end
 
     include Vrf_lib.Integrated.Make (Snark_params.Tick) (Scalar) (Group)
@@ -421,14 +428,18 @@ module Make (Inputs : Inputs_intf) :
         ~total_stake ~logger =
       let open Message in
       let result = eval ~private_key {epoch; slot; seed; lock_checkpoint} in
-      let threshold = Threshold.create ~owned_stake ~total_stake in
       Logger.info logger
-        !"Checking vrf at %d:%d - owned_stake: %d, total_stake: %d, threshold: %{sexp: Threshold.t}"
+        (*
+        !"Checking vrf at %d:%d - owned_stake: %d, total_stake: %d, \
+          evaluation: %{sexp: Output.value}"
+         *)
+        !"Checking vrf at %d:%d - owned_stake: %d, total_stake: %d"
         (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
         (Balance.to_int owned_stake)
-        (Amount.to_int total_stake)
-        threshold ;
-      Option.some_if (Threshold.satisfies threshold result) result
+        (Amount.to_int total_stake) ;
+      Option.some_if
+        (Threshold.is_satisfied ~my_stake:owned_stake ~total_stake result)
+        result
   end
 
   module Epoch_ledger = struct
@@ -703,7 +714,8 @@ module Make (Inputs : Inputs_intf) :
     let genesis =
       { epoch= Epoch.zero
       ; slot= Epoch.Slot.zero
-      ; proposer_vrf_result= List.init 256 ~f:(fun _ -> false) }
+      ; proposer_vrf_result=
+          Sha256.Digest.of_string @@ String.init 256 ~f:(fun _ -> '\000') }
 
     let to_hlist {epoch; slot; proposer_vrf_result} =
       Coda_base.H_list.[epoch; slot; proposer_vrf_result]
