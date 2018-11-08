@@ -142,6 +142,11 @@ module Base = struct
        and type protocol_state_proof := Protocol_state_proof.t
        and type external_transition :=
                   Consensus_mechanism.External_transition.t
+
+    val verify_blockchain :
+         Protocol_state_proof.t
+      -> Consensus_mechanism.Protocol_state.value
+      -> bool Deferred.Or_error.t
   end
 end
 
@@ -197,9 +202,4 @@ module type S = sig
   include Synchronizing.S
 
   module Store : Storage.With_checksum_intf with type location = string
-
-  val verify_blockchain :
-       Protocol_state_proof.t
-    -> Consensus_mechanism.Protocol_state.value
-    -> bool Deferred.Or_error.t
 end
