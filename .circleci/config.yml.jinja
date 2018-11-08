@@ -52,6 +52,9 @@ jobs:
             - run:
                 name: Store Genesis keys
                 command: make genesiskeys
+            - run:
+                name: Upload deb to repo
+                command: make publish_deb
             - store_artifacts:
                 path: /tmp/artifacts
 
