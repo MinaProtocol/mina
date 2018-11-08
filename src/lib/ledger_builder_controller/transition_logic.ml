@@ -463,16 +463,18 @@ module Make (Inputs : Inputs_intf) :
           let transition = With_hash.data transition_with_hash in
           let proof = External_transition.protocol_state_proof transition in
           let protocol_state = External_transition.protocol_state transition in
-          let log_misbehavior message =
-            Logger.faulty_peer t.log
-              !"Recieved malicious transition. Will not add external \
-                transition %{sexp:External_transition.t}: %s"
-              transition message ;
-            Deferred.return None
-          in
           match%bind verify_blockchain proof protocol_state with
-          | Error e -> log_misbehavior (Error.to_string_hum e)
-          | Ok false -> log_misbehavior ""
+          | Error e ->
+              Logger.error t.log
+                !"Could not connect to verifier: %{sexp:Error.t}"
+                e ;
+              Deferred.return None
+          | Ok false ->
+              Logger.faulty_peer t.log
+                !"Recieved malicious transition. Will not add external \
+                  transition %{sexp:External_transition.t}"
+                transition ;
+              Deferred.return None
           | Ok true ->
               let old_locked_head, old_best_tip = locked_and_best old_tree in
               let new_head, new_tip = locked_and_best new_tree in
