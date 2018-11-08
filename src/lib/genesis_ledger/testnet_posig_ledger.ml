@@ -3,7 +3,7 @@ open Functor.Without_private
 (* TODO: generate new keypairs before public testnet *)
 include Make (struct
   let accounts =
-    [ { pk= "KE63vdBqwbQ+p2XQ5QOrrPUkCfKtvPRg5jX2AfeC8C7cCNCJSmQBAAAB"
+    [ { pk= "KAG4EV1+uap/MrNhO087NXVC52IgeezeHa9h4vOFrBgVHPXgrlwCAAAB"
       ; balance= 10_000_000 }
     ; { pk= "KNQxdQ2zGPN+xbEinl9//vVvVxIvI/I6UCXiYCj3Bu66afuhDHkBAAAA"
       ; balance= 1_000 }
