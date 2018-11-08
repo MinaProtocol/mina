@@ -34,9 +34,7 @@ end
 
 type t = (Js.js_string Js.t, Js.js_string Js.t) Worker.worker Js.t
 
-let verifier_main = "/static/verifier_main.bc.js"
-
-let create () = Worker.create verifier_main
+let create url = Worker.create url
 
 let send_verify_message (t : t) q =
   t##postMessage (Js.string (Query.to_string q))
