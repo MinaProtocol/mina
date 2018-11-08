@@ -4,7 +4,7 @@ jobs:
     build:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
+        - image: codaprotocol/coda:toolchain-90509bec114a4bbe4e676765c21118f403e86452
         steps:
             - checkout
             - run:
@@ -34,7 +34,7 @@ jobs:
     build_withsnark:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
+        - image: codaprotocol/coda:toolchain-90509bec114a4bbe4e676765c21118f403e86452
         steps:
             - checkout
             - run:
@@ -58,7 +58,7 @@ jobs:
     build_public:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
+        - image: codaprotocol/coda:toolchain-90509bec114a4bbe4e676765c21118f403e86452
         steps:
             - checkout
             - run:
@@ -79,7 +79,7 @@ jobs:
     test-unit-test:
        resource_class: large
        docker:
-       - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
+       - image: codaprotocol/coda:toolchain-90509bec114a4bbe4e676765c21118f403e86452
        steps:
            - checkout
            - run:
@@ -92,7 +92,7 @@ jobs:
     test-withsnark:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
+        - image: codaprotocol/coda:toolchain-90509bec114a4bbe4e676765c21118f403e86452
         steps:
             - checkout
             - run:
@@ -109,7 +109,7 @@ jobs:
     test-{{test.name}}:
       resource_class: large
       docker:
-      - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
+      - image: codaprotocol/coda:toolchain-90509bec114a4bbe4e676765c21118f403e86452
       steps:
           - checkout
           - run:
