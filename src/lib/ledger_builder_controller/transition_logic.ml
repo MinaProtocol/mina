@@ -372,6 +372,22 @@ module Make (Inputs : Inputs_intf) :
               return
                 (Or_error.error_string "Not found locally within our ktree") )
 
+  let verify_blockchain ~log ~on_success transition_with_hash =
+    let transition = With_hash.data transition_with_hash in
+    let proof = External_transition.protocol_state_proof transition in
+    let protocol_state = External_transition.protocol_state transition in
+    match%bind verify_blockchain proof protocol_state with
+    | Error e ->
+        Logger.error log !"Could not connect to verifier: %{sexp:Error.t}" e ;
+        Deferred.return None
+    | Ok false ->
+        Logger.faulty_peer log
+          !"Recieved malicious transition. Will not add external transition \
+            %{sexp:External_transition.t}"
+          transition ;
+        Deferred.return None
+    | Ok true -> on_success ()
+
   let unguarded_on_new_transition catchup t transition_with_hash ~time_received
       :
       ((External_transition.t, State_hash.t) With_hash.t, unit) Job.t option
@@ -440,42 +456,31 @@ module Make (Inputs : Inputs_intf) :
         Transition_tree.add old_tree transition_with_hash ~parent:(fun x ->
             transition_is_parent_of ~child:transition_with_hash ~parent:x )
       with
-      | `No_parent -> (
-          let best_tip = locked_and_best old_tree |> snd in
-          match
-            Consensus_mechanism.select
-              ( transition_with_hash |> With_hash.data
-              |> External_transition.protocol_state
-              |> Protocol_state.consensus_state )
-              ( best_tip |> With_hash.data |> External_transition.protocol_state
-              |> Protocol_state.consensus_state )
-              ~logger:t.log ~time_received
-          with
-          | `Keep ->
-              Logger.debug t.log "Branch noparent" ;
-              return
-                (Some
-                   (Catchup.sync ~state_mutator:(mutate_state t) catchup
-                      ~old_state transition_with_hash))
-          | `Take -> return None )
+      | `No_parent ->
+          verify_blockchain ~log:t.log transition_with_hash
+            ~on_success:(fun () ->
+              let best_tip = locked_and_best old_tree |> snd in
+              match
+                Consensus_mechanism.select
+                  ( transition_with_hash |> With_hash.data
+                  |> External_transition.protocol_state
+                  |> Protocol_state.consensus_state )
+                  ( best_tip |> With_hash.data
+                  |> External_transition.protocol_state
+                  |> Protocol_state.consensus_state )
+                  ~logger:t.log ~time_received
+              with
+              | `Keep ->
+                  Logger.debug t.log "Branch noparent" ;
+                  return
+                    (Some
+                       (Catchup.sync ~state_mutator:(mutate_state t) catchup
+                          ~old_state transition_with_hash))
+              | `Take -> return None )
       | `Repeat -> return None
-      | `Added new_tree -> (
-          let transition = With_hash.data transition_with_hash in
-          let proof = External_transition.protocol_state_proof transition in
-          let protocol_state = External_transition.protocol_state transition in
-          match%bind verify_blockchain proof protocol_state with
-          | Error e ->
-              Logger.error t.log
-                !"Could not connect to verifier: %{sexp:Error.t}"
-                e ;
-              Deferred.return None
-          | Ok false ->
-              Logger.faulty_peer t.log
-                !"Recieved malicious transition. Will not add external \
-                  transition %{sexp:External_transition.t}"
-                transition ;
-              Deferred.return None
-          | Ok true ->
+      | `Added new_tree ->
+          verify_blockchain ~log:t.log transition_with_hash
+            ~on_success:(fun () ->
               let old_locked_head, old_best_tip = locked_and_best old_tree in
               let new_head, new_tip = locked_and_best new_tree in
               if
