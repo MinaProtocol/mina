@@ -397,17 +397,23 @@ module Make (Inputs : Inputs_intf) :
     end
 
     module Threshold = struct
-      include Bignum_bigint
+      open Bignum_bigint
 
       let of_uint64_exn = Fn.compose of_int64_exn UInt64.to_int64
 
-      let create ~owned_stake ~total_stake =
-        let owned_stake = Balance.to_uint64 owned_stake in
-        let total_stake = Amount.to_uint64 total_stake in
-        let stake_ratio = of_uint64_exn (UInt64.div owned_stake total_stake) in
-        stake_ratio * pow (of_int 2) (of_int 256)
+      let c = of_int 1
 
-      let satisfies threshold output = of_bits_lsb output <= threshold
+      (*  Check if
+          vrf_output / 2^256 <= c * my_stake / total_currency
+
+          So that we don't have to do division we check
+
+          vrf_output * total_currency <= c * my_stake * 2^256
+      *)
+      let is_satisfied ~my_stake ~total_stake vrf_output =
+        of_bit_fold_lsb (Sha256.Digest.fold_bits vrf_output)
+        * of_uint64_exn (Amount.to_uint64 total_stake)
+        <= shift_left (c * of_uint64_exn (Balance.to_uint64 my_stake)) 256
     end
 
     include Vrf_lib.Integrated.Make (Snark_params.Tick) (Scalar) (Group)
@@ -418,17 +424,15 @@ module Make (Inputs : Inputs_intf) :
         ~total_stake ~logger =
       let open Message in
       let result = eval ~private_key {epoch; slot; seed; lock_checkpoint} in
-      let threshold = Threshold.create ~owned_stake ~total_stake in
       Logger.info logger
         !"Checking vrf at %d:%d - owned_stake: %d, total_stake: %d, \
-          evaluation: %{sexp: Output.value}, threshold: %{sexp: Threshold.t}"
+          evaluation: %{sexp: Output.value}"
         (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
         (Balance.to_int owned_stake)
         (Amount.to_int total_stake)
-        result threshold ;
+        result ;
       Option.some_if
-        (Threshold.satisfies threshold
-           (Sha256_lib.Sha256.Digest.to_bits result))
+        (Threshold.is_satisfied ~my_stake:owned_stake ~total_stake result)
         result
   end
 
