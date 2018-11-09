@@ -10,7 +10,7 @@ DATE=$(date +%Y-%m-%d)
 GITHASH=$(git rev-parse --short=8 HEAD)
 
 # Identify CI builds by build number
-if [ -n "$CIRCLE_BUILD_NUM" ]; then
+if [[ -v CIRCLE_BUILD_NUM ]]; then
     VERSION="0.1.${DATE}-${GITHASH}"
 else
     VERSION="0.1.CI${CIRCLE_BUILD_NUM}"
@@ -31,6 +31,8 @@ Maintainer: o(1)Labs <build@o1labs.org>
 Description: Coda Client and Daemon
  Coda Protocol Client and Daemon
 EOF
+
+cat ${BUILDDIR}/DEBIAN/control
 
 mkdir -p ${BUILDDIR}/usr/local/bin
 cp ./default/app/cli/src/coda.exe ${BUILDDIR}/usr/local/bin/coda
