@@ -100,10 +100,10 @@ deb:
 
 # deb-s3 https://github.com/krobertson/deb-s3
 publish_kademlia_deb:
-	deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --codename unstable --component main src/_build/coda-kademlia.deb
+	deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --codename unstable --component main src/_build/coda-kademlia.deb
 
 publish_deb:
-	deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --codename unstable --component main src/_build/coda.deb
+	deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --codename unstable --component main src/_build/coda.deb
 
 publish_debs: publish_deb publish_kademlia_deb
 

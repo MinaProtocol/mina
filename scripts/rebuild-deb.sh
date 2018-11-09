@@ -11,9 +11,9 @@ GITHASH=$(git rev-parse --short=8 HEAD)
 
 # Identify CI builds by build number
 if [[ -v CIRCLE_BUILD_NUM ]]; then
-    VERSION="0.1.${DATE}-${GITHASH}"
+    VERSION="0.1.${CIRCLE_BUILD_NUM}-CI"
 else
-    VERSION="0.1.CI${CIRCLE_BUILD_NUM}"
+    VERSION="0.1.${DATE}-${GITHASH}"
 fi
 BUILDDIR="${PROJECT}_${VERSION}"
 
@@ -30,6 +30,7 @@ Homepage: https://codaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
 Description: Coda Client and Daemon
  Coda Protocol Client and Daemon
+ Built from ${GITHASH}
 EOF
 
 cat ${BUILDDIR}/DEBIAN/control
