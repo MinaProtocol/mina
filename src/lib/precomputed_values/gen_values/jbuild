@@ -14,6 +14,7 @@
       ppxlib
       ppx_util
       ledger_builder
+      global_signer_private_key
     ))
    (preprocessor_deps ("../../../config.mlh"))
    (preprocess (pps (ppx_jane ppxlib.metaquot ppxlib.runner)))

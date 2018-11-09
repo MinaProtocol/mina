@@ -5,7 +5,10 @@ set -eo pipefail
 eval `opam config env`
 
 run_dune() {
-  dune $1 --profile=test ${@:2}
+  if [ "${DUNE_PROFILE}" = "" ]; then
+    DUNE_PROFILE=test
+  fi
+  dune $1 --profile="${DUNE_PROFILE}" ${@:2}
 }
 
 run_unit_tests() {
