@@ -22,6 +22,8 @@ end)
 
     val typ : (var, t) Typ.t
 
+    val fold_bits : t -> bool Fold.t
+
     val fold : t -> bool Triple.t Fold.t
 
     val length_in_triples : int
@@ -94,7 +96,7 @@ end = struct
     let var_to_triples t =
       Fold.(to_list (group3 ~default:Boolean.false_ (of_list t)))
 
-    let fold' s =
+    let fold_bits s =
       { Fold.fold=
           (fun ~init ~f ->
             let n = 8 * String.length s in
@@ -106,7 +108,7 @@ end = struct
             in
             go init 0 ) }
 
-    let fold t = Fold.group3 ~default:false (fold' t)
+    let fold t = Fold.group3 ~default:false (fold_bits t)
 
     let chunks_of n xs = List.groupi ~break:(fun i _ _ -> i mod n = 0) xs
 
@@ -151,7 +153,7 @@ end = struct
 
     let%test_unit "to_bits compatible with fold" =
       Quickcheck.test gen ~f:(fun t ->
-          assert (Fold.to_list (fold' t) = to_bits t) )
+          assert (Fold.to_list (fold_bits t) = to_bits t) )
 
     let%test_unit "of_bits . to_bits = id" =
       Quickcheck.test gen ~f:(fun t -> assert (equal (of_bits (to_bits t)) t))
