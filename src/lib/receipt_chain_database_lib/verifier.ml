@@ -1,18 +1,18 @@
 open Core_kernel
 
 module Make
-    (Transaction : Intf.Transaction)
+    (Transaction : Intf.Payment)
     (Receipt_chain_hash : Intf.Receipt_chain_hash
-                          with type transaction_payload := Transaction.payload) =
+                          with type payment_payload := Transaction.payload) =
 struct
   let verify ~resulting_receipt = function
     | (proving_receipt, _) :: merkle_list ->
         let open Result.Let_syntax in
         let%bind derived_receipt_chain =
           List.fold_result merkle_list ~init:proving_receipt
-            ~f:(fun prev_receipt (expected_receipt, transaction) ->
+            ~f:(fun prev_receipt (expected_receipt, payment) ->
               let computed_receipt =
-                Receipt_chain_hash.cons transaction prev_receipt
+                Receipt_chain_hash.cons payment prev_receipt
               in
               if Receipt_chain_hash.equal expected_receipt computed_receipt
               then Ok expected_receipt
@@ -29,5 +29,5 @@ struct
                !"Unable to derivie resulting receipt %{sexp: \
                  Receipt_chain_hash.t}"
                resulting_receipt)
-    | [] -> Or_error.error_string "A merkle list should not be non-empty"
+    | [] -> Or_error.error_string "A merkle list should be non-empty"
 end

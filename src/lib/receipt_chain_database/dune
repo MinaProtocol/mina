@@ -1,9 +1,0 @@
-(library
- (name receipt_chain_database)
-  (public_name receipt_chain_database)
-  (library_flags (-linkall))
-  (libraries core key_value_database)
-  (inline_tests)
-  (preprocess (pps ppx_jane ppx_deriving.eq))
-  (synopsis "A library that contains a database that records sent transactions for an individual account and generates a merkle list of a transaction. 
-  Also, the library contains a verifier that proves the correctness of a merkle list of transactions"))
