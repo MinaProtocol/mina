@@ -73,11 +73,6 @@ let initialize public_key : t =
   ; nonce= Nonce.zero
   ; receipt_chain_hash= Receipt.Chain_hash.empty }
 
-let empty_hash =
-  Pedersen.digest_fold
-    (Pedersen.State.create Pedersen.params)
-    (Fold_lib.Fold.string_triples "nothing up my sleeve")
-
 let typ : (var, value) Typ.t =
   let spec =
     let open Data_spec in
