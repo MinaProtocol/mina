@@ -89,7 +89,7 @@ module State = struct
           | [] -> failwith "impossible"
           | hd :: rest ->
               if List.length hd >= len then [job] :: layers
-              else (job :: hd) :: layers )
+              else (job :: hd) :: rest )
     in
     let to_draw_rev =
       List.mapi layers_rev ~f:(fun i layer ->
