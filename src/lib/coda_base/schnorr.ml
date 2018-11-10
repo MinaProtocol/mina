@@ -46,7 +46,7 @@ module Message = struct
                 ~default:Boolean.false_ nonce)
              ~start:
                ( Hash_prefix.length_in_triples
-               + Payment_payload.length_in_triples )
+               + User_command_payload.length_in_triples )
          in
          let d, _ =
            Pedersen.Checked.Section.to_initial_segment_digest final
