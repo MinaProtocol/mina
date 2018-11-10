@@ -523,7 +523,8 @@ module Base = struct
                  { Account.balance
                  ; public_key= sender_compressed
                  ; nonce= next_nonce
-                 ; receipt_chain_hash }) )
+                 ; receipt_chain_hash
+                 ; delegate= account.delegate }) )
         in
         (* we explicitly set the public_key because it could be zero if the account is new *)
         let%map root =
@@ -1516,11 +1517,9 @@ let%test_module "transaction_snark" =
         let private_key = Private_key.create () in
         { private_key
         ; account=
-            { public_key=
-                Public_key.compress (Public_key.of_private_key_exn private_key)
-            ; balance= Balance.of_int (50 + Random.int 100)
-            ; receipt_chain_hash= Receipt.Chain_hash.empty
-            ; nonce= Account.Nonce.zero } }
+            Account.create
+              (Public_key.compress (Public_key.of_private_key_exn private_key))
+              (Balance.of_int (50 + Random.int 100)) }
       in
       let n = min (Int.pow 2 ledger_depth) (1 lsl 10) in
       Array.init n ~f:(fun _ -> random_wallet ())
