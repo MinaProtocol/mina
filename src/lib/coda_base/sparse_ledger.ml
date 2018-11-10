@@ -74,8 +74,7 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
       ; receipt_chain_hash=
           Receipt.Chain_hash.cons payload sender_account.receipt_chain_hash }
   in
-  match User_command.Payload.body payload
-  with Payment {amount; receiver; memo= _} ->
+  match User_command.Payload.body payload with Payment {amount; receiver} ->
     let receiver_idx = find_index_exn t receiver in
     let receiver_account = get_exn t receiver_idx in
     set_exn t receiver_idx

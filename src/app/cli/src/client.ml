@@ -264,11 +264,11 @@ let batch_send_payments =
           ( Account.Nonce.succ nonce
           , User_command.sign keypair
               (User_command_payload.create ~fee ~nonce
+                 ~memo:User_command_memo.dummy
                  ~body:
                    (Payment
                       { receiver= Public_key.Compressed.of_base64_exn receiver
-                      ; amount
-                      ; memo= Payment_memo.dummy })) ) )
+                      ; amount })) ) )
     in
     dispatch_with_message Client_lib.Send_user_commands.rpc
       (ts :> User_command.t list)
@@ -309,11 +309,8 @@ let send_payment =
          let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
          let payload : User_command.Payload.t =
            User_command.Payload.create ~fee ~nonce
-             ~body:
-               (Payment
-                  { receiver= receiver_compressed
-                  ; amount
-                  ; memo= Payment_memo.dummy })
+             ~memo:User_command_memo.dummy
+             ~body:(Payment {receiver= receiver_compressed; amount})
          in
          let txn = User_command.sign sender_kp payload in
          dispatch_with_message Client_lib.Send_user_commands.rpc

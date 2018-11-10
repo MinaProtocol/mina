@@ -130,7 +130,7 @@ struct
       ; previous_receipt_chain_hash= sender_account.receipt_chain_hash }
     in
     match User_command.Payload.body payload
-    with Payment {Payment_payload.amount; receiver; memo= _} ->
+    with Payment {Payment_payload.amount; receiver} ->
       if Public_key.Compressed.equal sender receiver then (
         ignore
         @@ set ledger sender_location sender_account_without_balance_modified ;
@@ -286,7 +286,7 @@ struct
         nonce; receipt_chain_hash= previous_receipt_chain_hash }
     in
     match User_command.Payload.body payload
-    with Payment {amount; receiver; memo= _} ->
+    with Payment {amount; receiver} ->
       if Public_key.Compressed.equal sender receiver then (
         set ledger sender_location sender_account_without_balance_modified ;
         return () )

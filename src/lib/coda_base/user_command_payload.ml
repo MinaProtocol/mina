@@ -2,53 +2,62 @@ open Core_kernel
 open Snark_params.Tick
 open Fold_lib
 module Account_nonce = Coda_numbers.Account_nonce
+module Memo = User_command_memo
 
 module Common = struct
   module Stable = struct
     module V1 = struct
-      type ('fee, 'nonce) t_ = {fee: 'fee; nonce: 'nonce}
+      type ('fee, 'nonce, 'memo) t_ = {fee: 'fee; nonce: 'nonce; memo: 'memo}
       [@@deriving bin_io, eq, sexp, hash]
 
-      type t = (Currency.Fee.Stable.V1.t, Account_nonce.Stable.V1.t) t_
+      type t = (Currency.Fee.Stable.V1.t, Account_nonce.Stable.V1.t, Memo.t) t_
       [@@deriving bin_io, eq, sexp, hash]
     end
   end
 
   include Stable.V1
 
-  let fold ({fee; nonce} : t) =
-    Fold.(Currency.Fee.fold fee +> Account_nonce.fold nonce)
+  let fold ({fee; nonce; memo} : t) =
+    Fold.(Currency.Fee.fold fee +> Account_nonce.fold nonce +> Memo.fold memo)
 
   let length_in_triples =
     Currency.Fee.length_in_triples + Account_nonce.length_in_triples
+    + Memo.length_in_triples
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
-    let%map fee = Currency.Fee.gen and nonce = Account_nonce.gen in
-    {fee; nonce}
+    let%map fee = Currency.Fee.gen
+    and nonce = Account_nonce.gen
+    and memo =
+      String.gen_with_length Memo.max_size_in_bytes Char.gen
+      >>| Memo.create_exn
+    in
+    {fee; nonce; memo}
 
-  type var = (Currency.Fee.var, Account_nonce.Unpacked.var) t_
+  type var = (Currency.Fee.var, Account_nonce.Unpacked.var, Memo.var) t_
 
-  let to_hlist {fee; nonce} = H_list.[fee; nonce]
+  let to_hlist {fee; nonce; memo} = H_list.[fee; nonce; memo]
 
-  let of_hlist : type fee nonce.
-      (unit, fee -> nonce -> unit) H_list.t -> (fee, nonce) t_ =
-   fun H_list.([fee; nonce]) -> {fee; nonce}
+  let of_hlist : type fee nonce memo.
+      (unit, fee -> nonce -> memo -> unit) H_list.t -> (fee, nonce, memo) t_ =
+   fun H_list.([fee; nonce; memo]) -> {fee; nonce; memo}
 
   let typ =
     Typ.of_hlistable
-      [Currency.Fee.typ; Account_nonce.Unpacked.typ]
+      [Currency.Fee.typ; Account_nonce.Unpacked.typ; Memo.typ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
   module Checked = struct
-    let constant ({fee; nonce} : t) : var =
+    let constant ({fee; nonce; memo} : t) : var =
       { fee= Currency.Fee.var_of_t fee
-      ; nonce= Account_nonce.Unpacked.var_of_value nonce }
+      ; nonce= Account_nonce.Unpacked.var_of_value nonce
+      ; memo= Memo.var_of_t memo }
 
-    let to_triples ({fee; nonce} : var) =
+    let to_triples ({fee; nonce; memo} : var) =
       Currency.Fee.var_to_triples fee
       @ Account_nonce.Unpacked.var_to_triples nonce
+      @ Memo.var_to_triples memo
   end
 end
 
@@ -97,7 +106,7 @@ end
 
 include Stable.V1
 
-let create ~fee ~nonce ~body : t = {common= {fee; nonce}; body}
+let create ~fee ~nonce ~memo ~body : t = {common= {fee; nonce; memo}; body}
 
 let fold ({common; body} : t) = Fold.(Common.fold common +> Body.fold body)
 
@@ -117,6 +126,8 @@ let typ : (var, t) Typ.t =
 let fee (t : t) = t.common.fee
 
 let nonce (t : t) = t.common.nonce
+
+let memo (t : t) = t.common.memo
 
 let body (t : t) = t.body
 
@@ -145,7 +156,8 @@ module Checked = struct
 end
 
 let dummy : t =
-  { common= {fee= Currency.Fee.zero; nonce= Account_nonce.zero}
+  { common=
+      {fee= Currency.Fee.zero; nonce= Account_nonce.zero; memo= Memo.dummy}
   ; body= Payment Payment_payload.dummy }
 
 let gen =

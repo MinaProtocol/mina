@@ -23,12 +23,9 @@ let create_ledger_and_transactions num_transitions =
         (Account.create public_key (Currency.Balance.of_int 10_000)) ) ;
   let txn from_kp (to_kp : Signature_lib.Keypair.t) amount fee nonce =
     let payload : User_command.Payload.t =
-      User_command.Payload.create ~fee ~nonce
+      User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
         ~body:
-          (Payment
-             { receiver= Public_key.compress to_kp.public_key
-             ; amount
-             ; memo= Payment_memo.dummy })
+          (Payment {receiver= Public_key.compress to_kp.public_key; amount})
     in
     User_command.sign from_kp payload
   in

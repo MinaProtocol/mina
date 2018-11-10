@@ -34,7 +34,7 @@ module Make (Kernel : Kernel_intf) = struct
       * Public_key.Compressed.t
       * Currency.Amount.t
       * Currency.Fee.t
-      * Payment_memo.t
+      * User_command_memo.t
     [@@deriving bin_io]
   end
 
@@ -208,8 +208,8 @@ module Make (Kernel : Kernel_intf) = struct
               Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn
             in
             let payload : User_command.Payload.t =
-              User_command.Payload.create ~fee ~nonce
-                ~body:(Payment {receiver= receiver_pk; amount; memo})
+              User_command.Payload.create ~fee ~nonce ~memo
+                ~body:(Payment {receiver= receiver_pk; amount})
             in
             User_command.sign (Keypair.of_private_key_exn sender_sk) payload
           in
