@@ -276,7 +276,7 @@ let daemon (module Kernel : Kernel_intf) log =
        let module Run = Run (Config0) (M) in
        Async.Scheduler.report_long_cycle_times ~cutoff:(sec 0.5) () ;
        let%bind () =
-        (let open M in
+         let open M in
          let run_snark_worker_action =
            Option.value_map run_snark_worker_flag ~default:`Don't_run
              ~f:(fun k -> `With_public_key k )
@@ -317,7 +317,7 @@ let daemon (module Kernel : Kernel_intf) log =
          Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;
          Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
            ~client_port ~log () ;
-         Run.run_snark_worker ~log ~client_port run_snark_worker_action)
+         Run.run_snark_worker ~log ~client_port run_snark_worker_action
        in
        Async.never ())
 

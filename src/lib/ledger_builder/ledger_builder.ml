@@ -1087,7 +1087,8 @@ end = struct
       | _ -> []
     in
     let coinbase_parts =
-      measure "create_coinbase" (fun () -> Or_error.ok_exn (create_coinbase coinbase_parts proposer))
+      measure "create_coinbase" (fun () ->
+          Or_error.ok_exn (create_coinbase coinbase_parts proposer) )
     in
     let delta = Or_error.ok_exn (fee_remainder user_commands txn_works) in
     let fee_transfers =

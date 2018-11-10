@@ -32,7 +32,8 @@ let of_ledger_subset_exn (ledger : Ledger.t) keys =
             (Merkle_hash.of_digest
                (Ledger.merkle_root ledger :> Pedersen.Digest.t)) )
   in
-  O1trace.measure "remove accounts exn" (fun () -> Ledger.remove_accounts_exn ledger new_keys) ;
+  O1trace.measure "remove accounts exn" (fun () ->
+      Ledger.remove_accounts_exn ledger new_keys ) ;
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
         (Ledger.merkle_root ledger)

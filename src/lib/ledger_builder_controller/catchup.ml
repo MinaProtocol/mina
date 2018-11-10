@@ -88,15 +88,15 @@ struct
       match !sl_ref with
       | None ->
           trace_task "sync ledger" (fun () ->
-          let ledger =
-            Ledger_builder.ledger locked_tip.ledger_builder |> Ledger.copy
-          in
-          let sl = Sync_ledger.create ledger ~parent_log:log in
-          Net.glue_sync_ledger net
-            (Sync_ledger.query_reader sl)
-            (Sync_ledger.answer_writer sl) ;
-          sl_ref := Some sl ;
-          sl)
+              let ledger =
+                Ledger_builder.ledger locked_tip.ledger_builder |> Ledger.copy
+              in
+              let sl = Sync_ledger.create ledger ~parent_log:log in
+              Net.glue_sync_ledger net
+                (Sync_ledger.query_reader sl)
+                (Sync_ledger.answer_writer sl) ;
+              sl_ref := Some sl ;
+              sl )
       | Some sl -> sl
     in
     let ivar : (External_transition.t, State_hash.t) With_hash.t Ivar.t =
@@ -111,22 +111,22 @@ struct
         Interruptible.lift (Sync_ledger.fetch sl h)
           (Deferred.map (Ivar.read ivar) ~f:ignore)
       with
-      | `Ok ledger -> (
+      | `Ok ledger ->
           Logger.debug log
             !"Successfully caught up to ledger %{sexp: Ledger_hash.t}"
             h ;
           (* TODO: This should be parallelized with the syncing *)
           trace_task "net aux" (fun () ->
-          match%bind
-            Interruptible.uninterruptible
-              (Net.get_ledger_builder_aux_at_hash net
-                 (ledger_builder_hash_of_transition transition))
-          with
-          | Ok aux -> build_lb ~aux ~ledger
-          | Error e ->
-              Logger.faulty_peer log "Network failed to send aux %s"
-                (Error.to_string_hum e) ;
-              return () ) )
+              match%bind
+                Interruptible.uninterruptible
+                  (Net.get_ledger_builder_aux_at_hash net
+                     (ledger_builder_hash_of_transition transition))
+              with
+              | Ok aux -> build_lb ~aux ~ledger
+              | Error e ->
+                  Logger.faulty_peer log "Network failed to send aux %s"
+                    (Error.to_string_hum e) ;
+                  return () )
       | `Target_changed (old_target, new_target) ->
           Logger.debug log
             !"Existing sync-ledger target_changed from %{sexp: Ledger_hash.t \
