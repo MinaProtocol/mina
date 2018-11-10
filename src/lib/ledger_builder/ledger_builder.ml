@@ -1139,9 +1139,10 @@ end = struct
           let%map data, works, cb_works = apply_pre_diff_with_at_most_one d in
           (data, cb_works @ works) )
         ~second:(fun d ->
-          let%map data1, works1, cb_works1 =
+          let%bind data1, works1, cb_works1 =
             apply_pre_diff_with_at_most_two (fst d)
-          and data2, works2, cb_works2 =
+          in
+          let%map data2, works2, cb_works2 =
             apply_pre_diff_with_at_most_one (snd d)
           in
           (data1 @ data2, works1 @ cb_works1 @ cb_works2 @ works2) )
