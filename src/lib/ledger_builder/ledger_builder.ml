@@ -794,10 +794,14 @@ end = struct
     in
     let open Or_error.Let_syntax in
     let witness = Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) in
-    let%map undo, statement = apply_transaction_and_get_statement ledger s in
-    ( undo
-    , {Transaction_with_witness.transaction_with_info= undo; witness; statement}
-    )
+    Deferred.bind (Async.Scheduler.yield ()) ~f:(fun () ->
+        let r = apply_transaction_and_get_statement ledger s in
+        Deferred.map (Async.Scheduler.yield ()) ~f:(fun () ->
+            let%map undo, statement = r in
+            ( undo
+            , { Transaction_with_witness.transaction_with_info= undo
+              ; witness
+              ; statement } ) ) )
 
   let update_ledger_and_get_statements ledger ts =
     let undo_transactions undos =
@@ -809,11 +813,11 @@ end = struct
             { Result_with_rollback.result= Ok (List.rev acc)
             ; rollback= Call (fun () -> undo_transactions processed) }
       | t :: ts -> (
-        match apply_transaction_and_get_witness ledger t with
-        | Error e ->
-            undo_transactions processed ;
-            Result_with_rollback.error e
-        | Ok (undo, res) -> go (undo :: processed) (res :: acc) ts )
+          match%bind apply_transaction_and_get_witness ledger t with
+          | Error e ->
+              undo_transactions processed ;
+              Result_with_rollback.error e
+          | Ok (undo, res) -> go (undo :: processed) (res :: acc) ts )
     in
     go [] [] ts
 
@@ -852,22 +856,22 @@ end = struct
         |> Fee_transfer.of_single_list )
 
   (*A Coinbase is a single transaction that accommodates the coinbase amount
-  and a fee transfer for the work required to add the coinbase. Unlike a 
-  transaction, a coinbase (including the fee transfer) just requires one slot 
-  in the jobs queue. 
-  
-  The minimum number of slots required to add a single transaction is three (at 
-  worst case number of provers: when each pair of proofs is from a different 
+  and a fee transfer for the work required to add the coinbase. Unlike a
+  transaction, a coinbase (including the fee transfer) just requires one slot
+  in the jobs queue.
+
+  The minimum number of slots required to add a single transaction is three (at
+  worst case number of provers: when each pair of proofs is from a different
   prover). One slot for the transaction and two slots for fee transfers.
 
-  When the diff is split into two prediffs (why? refer to #687) and if after 
-  adding transactions, the first prediff has two slots remaining which cannot 
-  not accommodate transactions, then those slots are filled by splitting the 
-  coinbase into two parts. 
-  If it has one slot, then we simply add one coinbase. It is also possible that 
-  the first prediff may have no slots left after adding transactions (For 
-  example, when there are three slots and 
-  maximum number of provers), in which case, we simply add one coinbase as part 
+  When the diff is split into two prediffs (why? refer to #687) and if after
+  adding transactions, the first prediff has two slots remaining which cannot
+  not accommodate transactions, then those slots are filled by splitting the
+  coinbase into two parts.
+  If it has one slot, then we simply add one coinbase. It is also possible that
+  the first prediff may have no slots left after adding transactions (For
+  example, when there are three slots and
+  maximum number of provers), in which case, we simply add one coinbase as part
   of the second prediff.
   *)
   let create_coinbase coinbase_parts proposer =
@@ -1093,11 +1097,10 @@ end = struct
       @ List.map coinbase_parts ~f:(fun t -> Transaction.Coinbase t)
       @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
     in
-    let new_data =
-      List.map transactions ~f:(fun s ->
-          let _undo, t =
-            Or_error.ok_exn (apply_transaction_and_get_witness t.ledger s)
-          in
+    let%map new_data =
+      Deferred.List.mapi transactions ~f:(fun _ s ->
+          let%map r = apply_transaction_and_get_witness t.ledger s in
+          let _undo, t = Or_error.ok_exn r in
           t )
     in
     (new_data, txn_works, coinbase_work)
@@ -1130,16 +1133,15 @@ end = struct
       in
       apply_pre_diff_unchecked t coinbase_added diff.creator pre_diff2.diff
     in
-    let data, works =
+    let%map data, works =
       Either.value_map diff.pre_diffs
         ~first:(fun d ->
-          let data, works, cb_works = apply_pre_diff_with_at_most_one d in
+          let%map data, works, cb_works = apply_pre_diff_with_at_most_one d in
           (data, cb_works @ works) )
         ~second:(fun d ->
-          let data1, works1, cb_works1 =
+          let%map data1, works1, cb_works1 =
             apply_pre_diff_with_at_most_two (fst d)
-          in
-          let data2, works2, cb_works2 =
+          and data2, works2, cb_works2 =
             apply_pre_diff_with_at_most_one (snd d)
           in
           (data1 @ data2, works1 @ cb_works1 @ cb_works2 @ works2) )
@@ -1655,7 +1657,7 @@ end = struct
       ; creator= self
       ; prev_hash= curr_hash }
     in
-    let ledger_proof = apply_diff_unchecked t' diff in
+    let%map ledger_proof = apply_diff_unchecked t' diff in
     (diff, `Hash_after_applying (hash t'), `Ledger_proof ledger_proof)
 end
 
@@ -2199,7 +2201,7 @@ let%test_module "test" =
         ; prover }
 
     let create_and_apply lb logger txns stmt_to_work =
-      let diff, _, _ =
+      let%bind diff, _, _ =
         Lb.create_diff lb ~self:self_pk ~logger ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work
       in
