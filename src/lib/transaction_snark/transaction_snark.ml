@@ -259,11 +259,11 @@ module Fee_transfer = struct
     , { payload=
           User_command_payload.create ~nonce:Account.Nonce.zero
             ~fee:fee2 (* What "sender" receives *)
+            ~memo:User_command_memo.dummy
             ~body:
               (Payment
                  { receiver= pk1
-                 ; amount= Amount.of_fee fee1 (* What "receiver" receives *)
-                 ; memo= Payment_memo.dummy })
+                 ; amount= Amount.of_fee fee1 (* What "receiver" receives *) })
       ; sender= Public_key.decompress_exn pk2
       ; signature= dummy_signature } )
 
@@ -285,12 +285,8 @@ module Transition = struct
         let t : User_command.t =
           { payload=
               User_command_payload.create ~fee:Fee.zero
-                ~nonce:Account.Nonce.zero
-                ~body:
-                  (Payment
-                     { receiver
-                     ; amount= Amount.of_fee amount
-                     ; memo= Payment_memo.dummy })
+                ~nonce:Account.Nonce.zero ~memo:User_command_memo.dummy
+                ~body:(Payment {receiver; amount= Amount.of_fee amount})
           ; sender= Public_key.decompress_exn proposer
           ; signature= dummy_signature }
         in
@@ -469,7 +465,7 @@ module Base = struct
       ( if not Insecure.transaction_replay then
           failwith "Insecure.transaction_replay false" ;
         let nonce = User_command_payload.Checked.nonce payload in
-        let {Payment_payload.receiver; amount; memo= _} =
+        let {Payment_payload.receiver; amount} =
           User_command_payload.Checked.payment_payload payload
         in
         let%bind payload_section = Schnorr.Message.var_of_payload payload in
@@ -1529,12 +1525,11 @@ let%test_module "transaction_snark" =
       let sender = wallets.(i) in
       let receiver = wallets.(j) in
       let payload : User_command.Payload.t =
-        User_command.Payload.create ~fee ~nonce
+        User_command.Payload.create ~fee ~nonce ~memo
           ~body:
             (Payment
                { receiver= receiver.account.public_key
-               ; amount= Amount.of_int amt
-               ; memo })
+               ; amount= Amount.of_int amt })
       in
       let signature = Schnorr.sign sender.private_key payload in
       User_command.check
@@ -1569,9 +1564,9 @@ let%test_module "transaction_snark" =
             user_command wallets 1 0 8
               (Fee.of_int (Random.int 20))
               Account.Nonce.zero
-              (Payment_memo.create_exn
+              (User_command_memo.create_exn
                  (Test_util.arbitrary_string
-                    ~len:Payment_memo.max_size_in_bytes))
+                    ~len:User_command_memo.max_size_in_bytes))
           in
           let target = Ledger.merkle_root_after_user_command_exn ledger t1 in
           let mentioned_keys =
@@ -1600,17 +1595,17 @@ let%test_module "transaction_snark" =
             user_command wallets 0 1 8
               (Fee.of_int (Random.int 20))
               Account.Nonce.zero
-              (Payment_memo.create_exn
+              (User_command_memo.create_exn
                  (Test_util.arbitrary_string
-                    ~len:Payment_memo.max_size_in_bytes))
+                    ~len:User_command_memo.max_size_in_bytes))
           in
           let t2 =
             user_command wallets 1 2 3
               (Fee.of_int (Random.int 20))
               Account.Nonce.zero
-              (Payment_memo.create_exn
+              (User_command_memo.create_exn
                  (Test_util.arbitrary_string
-                    ~len:Payment_memo.max_size_in_bytes))
+                    ~len:User_command_memo.max_size_in_bytes))
           in
           let sok_digest =
             Sok_message.create ~fee:Fee.zero

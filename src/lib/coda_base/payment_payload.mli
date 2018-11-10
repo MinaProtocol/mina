@@ -6,10 +6,10 @@ open Snark_params.Tick
 open Sha256_lib
 open Import
 
-type ('pk, 'amount, 'memo) t_ = {receiver: 'pk; amount: 'amount; memo: 'memo}
+type ('pk, 'amount) t_ = {receiver: 'pk; amount: 'amount}
 [@@deriving bin_io, eq, sexp, hash]
 
-type t = (Public_key.Compressed.t, Currency.Amount.t, Payment_memo.t) t_
+type t = (Public_key.Compressed.t, Currency.Amount.t) t_
 [@@deriving bin_io, eq, sexp, hash]
 
 val dummy : t
@@ -18,21 +18,17 @@ val gen : t Quickcheck.Generator.t
 
 module Stable : sig
   module V1 : sig
-    type nonrec ('pk, 'amount, 'memo) t_ = ('pk, 'amount, 'memo) t_ =
-      {receiver: 'pk; amount: 'amount; memo: 'memo}
+    type nonrec ('pk, 'amount) t_ = ('pk, 'amount) t_ =
+      {receiver: 'pk; amount: 'amount}
     [@@deriving bin_io, eq, sexp, hash]
 
     type t =
-      ( Public_key.Compressed.Stable.V1.t
-      , Currency.Amount.Stable.V1.t
-      , Payment_memo.t )
-      t_
+      (Public_key.Compressed.Stable.V1.t, Currency.Amount.Stable.V1.t) t_
     [@@deriving bin_io, eq, sexp, hash]
   end
 end
 
-type var =
-  (Public_key.Compressed.var, Currency.Amount.var, Payment_memo.var) t_
+type var = (Public_key.Compressed.var, Currency.Amount.var) t_
 
 val length_in_triples : int
 

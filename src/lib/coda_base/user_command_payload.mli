@@ -18,7 +18,11 @@ end
 type t [@@deriving bin_io, eq, sexp, hash]
 
 val create :
-  fee:Currency.Fee.t -> nonce:Coda_numbers.Account_nonce.t -> body:Body.t -> t
+     fee:Currency.Fee.t
+  -> nonce:Coda_numbers.Account_nonce.t
+  -> memo:User_command_memo.t
+  -> body:Body.t
+  -> t
 
 type var
 
@@ -39,6 +43,8 @@ val fold : t -> bool Triple.t Fold.t
 val fee : t -> Currency.Fee.t
 
 val nonce : t -> Coda_numbers.Account_nonce.t
+
+val memo : t -> User_command_memo.t
 
 val sender_cost : t -> Currency.Amount.t Or_error.t
 

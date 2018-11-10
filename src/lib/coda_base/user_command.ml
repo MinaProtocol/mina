@@ -74,11 +74,11 @@ let gen ~keys ~max_amount ~max_fee =
   let receiver = keys.(receiver_idx) in
   let payload : Payload.t =
     Payload.create ~fee ~nonce:Account_nonce.zero
+      ~memo:(User_command_memo.create_exn memo)
       ~body:
         (Payment
            { receiver= Public_key.compress receiver.Signature_keypair.public_key
-           ; amount
-           ; memo= Payment_memo.create_exn memo })
+           ; amount })
   in
   sign sender payload
 
