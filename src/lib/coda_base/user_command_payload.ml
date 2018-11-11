@@ -93,7 +93,7 @@ module Body = struct
     | Payment {amount; _} -> amount
     | Stake_delegation _ -> Currency.Amount.zero
 
-  let length_in_triples = Payment_payload.length_in_triples
+  let length_in_triples = Tag.length_in_triples + max_variant_size
 
   let gen =
     let open Quickcheck.Generator in
