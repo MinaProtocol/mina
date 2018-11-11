@@ -57,32 +57,39 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
   let sender_idx = find_index_exn t (Public_key.compress sender) in
   let sender_account = get_exn t sender_idx in
   let nonce = User_command.Payload.nonce payload in
+  let fee = User_command.Payload.fee payload in
   assert (Account.Nonce.equal sender_account.nonce nonce) ;
   if not Insecure.fee_collection then
     failwith "Bundle.Sparse_ledger: Insecure.fee_collection" ;
   let open Currency in
-  let t =
-    set_exn t sender_idx
-      { sender_account with
-        nonce= Account.Nonce.succ sender_account.nonce
-      ; balance=
-          (let sender_cost =
-             User_command.Payload.sender_cost payload |> Or_error.ok_exn
-           in
-           Balance.sub_amount sender_account.balance sender_cost
-           |> Option.value_exn)
-      ; receipt_chain_hash=
-          Receipt.Chain_hash.cons payload sender_account.receipt_chain_hash }
+  let sender_account =
+    { sender_account with
+      nonce= Account.Nonce.succ sender_account.nonce
+    ; receipt_chain_hash=
+        Receipt.Chain_hash.cons payload sender_account.receipt_chain_hash
+    ; balance=
+        Balance.sub_amount sender_account.balance (Amount.of_fee fee)
+        |> Option.value_exn }
   in
-  match User_command.Payload.body payload with Payment {amount; receiver} ->
-    let receiver_idx = find_index_exn t receiver in
-    let receiver_account = get_exn t receiver_idx in
-    set_exn t receiver_idx
-      { receiver_account with
-        public_key= receiver
-      ; balance=
-          Option.value_exn (Balance.add_amount receiver_account.balance amount)
-      }
+  match User_command.Payload.body payload with
+  | Stake_delegation (Set_delegate {new_delegate}) ->
+      set_exn t sender_idx {sender_account with delegate= new_delegate}
+  | Payment {amount; receiver} ->
+      let t =
+        set_exn t sender_idx
+          { sender_account with
+            balance=
+              Balance.sub_amount sender_account.balance amount
+              |> Option.value_exn }
+      in
+      let receiver_idx = find_index_exn t receiver in
+      let receiver_account = get_exn t receiver_idx in
+      set_exn t receiver_idx
+        { receiver_account with
+          public_key= receiver
+        ; balance=
+            Option.value_exn
+              (Balance.add_amount receiver_account.balance amount) }
 
 let apply_fee_transfer_exn =
   let apply_single t ((pk, fee) : Fee_transfer.single) =
