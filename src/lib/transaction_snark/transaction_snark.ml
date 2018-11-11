@@ -24,275 +24,6 @@ module Input = struct
   [@@deriving bin_io]
 end
 
-module Tag : sig
-  open Tick
-
-  type t = Normal | Fee_transfer | Coinbase [@@deriving sexp]
-
-  type var
-
-  val typ : (var, t) Typ.t
-
-  module Checked : sig
-    val normal : var
-
-    val fee_transfer : var
-
-    val coinbase : var
-
-    val is_normal : var -> Boolean.var
-
-    val is_fee_transfer : var -> Boolean.var
-
-    val is_coinbase : var -> Boolean.var
-
-    val should_check_signature : var -> Boolean.var
-
-    val should_check_if_nonce_matches : var -> Boolean.var
-
-    val should_increment_nonce : var -> Boolean.var
-
-    val should_cons_to_receipt_chain : var -> Boolean.var
-  end
-end = struct
-  open Tick
-
-  (* This could definitely be more efficient, but I decided to do
-   it in a relatively straightforward way I could think of since the
-   constraints saved were not significant. *)
-
-  type t = Normal | Fee_transfer | Coinbase [@@deriving sexp]
-
-  let gen =
-    let open Quickcheck.Generator in
-    map (variant3 Unit.gen Unit.gen Unit.gen) ~f:(function
-      | `A () -> Normal
-      | `B () -> Fee_transfer
-      | `C () -> Coinbase )
-
-  (* We encode this as a one-hot vector essentially *)
-  type var =
-    {normal: Boolean.var; fee_transfer: Boolean.var; coinbase: Boolean.var}
-
-  let typ : (var, t) Typ.t =
-    let typ =
-      Typ.of_hlistable
-        Data_spec.[Boolean.typ; Boolean.typ; Boolean.typ]
-        ~var_to_hlist:(fun {normal; fee_transfer; coinbase} ->
-          [normal; fee_transfer; coinbase] )
-        ~var_of_hlist:(fun Snarky.H_list.([normal; fee_transfer; coinbase]) ->
-          {normal; fee_transfer; coinbase} )
-        ~value_to_hlist:(function
-          | Normal -> [true; false; false]
-          | Fee_transfer -> [false; true; false]
-          | Coinbase -> [false; false; true])
-        ~value_of_hlist:
-          Snarky.H_list.(
-            function
-            | [true; false; false] -> Normal
-            | [false; true; false] -> Fee_transfer
-            | [false; false; true] -> Coinbase
-            | _ -> assert false)
-    in
-    let check ({normal; fee_transfer; coinbase} as t) =
-      let open Let_syntax in
-      let%map () = typ.check t
-      and () = Boolean.Assert.exactly_one [normal; fee_transfer; coinbase] in
-      ()
-    in
-    {typ with check}
-
-  module Checked = struct
-    let constant : t -> var =
-      let all_false =
-        { normal= Boolean.false_
-        ; fee_transfer= Boolean.false_
-        ; coinbase= Boolean.false_ }
-      in
-      function
-      | Normal -> {all_false with normal= Boolean.true_}
-      | Fee_transfer -> {all_false with fee_transfer= Boolean.true_}
-      | Coinbase -> {all_false with coinbase= Boolean.true_}
-
-    let normal = constant Normal
-
-    let fee_transfer = constant Fee_transfer
-
-    let coinbase = constant Coinbase
-
-    let is_normal {normal; _} = normal
-
-    let is_fee_transfer {fee_transfer; _} = fee_transfer
-
-    let is_coinbase {coinbase; _} = coinbase
-
-    let should_check_signature = is_normal
-
-    let should_check_if_nonce_matches = is_normal
-
-    let should_increment_nonce = is_normal
-
-    let should_cons_to_receipt_chain = is_normal
-  end
-end
-
-module Tagged_transaction = struct
-  open Tick
-
-  type t = Tag.t * User_command.t [@@deriving sexp]
-
-  type var = Tag.var * User_command.var
-
-  let typ : (var, t) Typ.t = Typ.(Tag.typ * User_command.typ)
-
-  let excess ((tag, t) : t) =
-    match tag with
-    | Normal ->
-        Amount.Signed.create ~sgn:Sgn.Pos
-          ~magnitude:(Amount.of_fee (User_command_payload.fee t.payload))
-    | Fee_transfer -> (
-      match User_command_payload.body t.payload with Payment {amount; _} ->
-        let magnitude =
-          Amount.add_fee amount (User_command.Payload.fee t.payload)
-          |> Option.value_exn
-        in
-        Amount.Signed.create ~sgn:Sgn.Neg ~magnitude )
-    | Coinbase -> (
-      match User_command_payload.body t.payload with Payment {amount; _} ->
-        assert (Amount.( <= ) amount Protocols.Coda_praos.coinbase_amount) ;
-        Currency.Amount.Signed.zero )
-
-  let supply_increase ((tag, _t) : t) =
-    match tag with
-    | Normal | Fee_transfer -> Amount.zero
-    | Coinbase -> Protocols.Coda_praos.coinbase_amount
-
-  module Checked = struct
-    type changes =
-      { sender_delta: Amount.Signed.var
-      ; excess: Amount.Signed.var
-      ; supply_increase: Amount.var }
-
-    (* Someday: Have a more structured "case" construct *)
-    let changes ((tag, t) : var) =
-      with_label __LOC__
-        (let open Let_syntax in
-        let if_ cond ~then_:(t1, t2) ~else_:(e1, e2) =
-          with_label __LOC__
-            (let%map x1 = Amount.Signed.Checked.if_ cond ~then_:t1 ~else_:e1
-             and x2 = Amount.Signed.Checked.if_ cond ~then_:t2 ~else_:e2 in
-             (x1, x2))
-        in
-        let is_coinbase = Tag.Checked.is_coinbase tag in
-        let cmd_fee = User_command_payload.Checked.fee t.payload in
-        let cmd_amount =
-          (User_command_payload.Checked.payment_payload t.payload).amount
-        in
-        let%map excess, sender_delta =
-          let%bind non_coinbase_case =
-            with_label __LOC__
-              (let%bind amount_plus_fee =
-                 Amount.Checked.add_fee cmd_amount cmd_fee
-               in
-               let open Amount.Signed in
-               let neg_amount_plus_fee =
-                 create ~sgn:Sgn.Neg ~magnitude:amount_plus_fee
-               in
-               let pos_fee =
-                 create ~sgn:Sgn.Pos ~magnitude:(Amount.Checked.of_fee cmd_fee)
-               in
-               (* If tag = Normal:
-              sender gets -(amount + fee)
-              excess is +fee
-
-              If tag = Fee_transfer:
-              "sender" gets +fee
-              excess is -(amount + fee) (since "receiver" gets amount)
-              *)
-               Checked.cswap
-                 (Tag.Checked.is_fee_transfer tag)
-                 (pos_fee, neg_amount_plus_fee))
-          in
-          let%bind coinbase_case =
-            with_label __LOC__
-              (* If tag = Coinbase:
-
-                "sender" gets (coinbase_amount - amount)
-                excess is zero *)
-              (let%map proposer_reward =
-                 let%bind res, `Underflow underflow =
-                   Amount.Checked.sub_flagged
-                     (Amount.var_of_t Protocols.Coda_praos.coinbase_amount)
-                     cmd_amount
-                 in
-                 let%map () =
-                   (* Only need to check that the subtraction actually succeeded in
-                     the coinbase case. *)
-                   Boolean.Assert.any
-                     [Boolean.not underflow; Boolean.not is_coinbase]
-                 in
-                 res
-               in
-               let excess =
-                 Amount.Signed.Checked.constant Amount.Signed.zero
-               in
-               (excess, Amount.Signed.Checked.of_unsigned proposer_reward))
-          in
-          if_ is_coinbase ~then_:coinbase_case ~else_:non_coinbase_case
-        in
-        let supply_increase =
-          Amount.Checked.if_value is_coinbase
-            ~then_:Protocols.Coda_praos.coinbase_amount ~else_:Amount.zero
-        in
-        {excess; sender_delta; supply_increase})
-  end
-end
-
-let dummy_signature =
-  Schnorr.sign (Private_key.create ()) User_command_payload.dummy
-
-module Fee_transfer = struct
-  include Fee_transfer
-
-  let two (pk1, fee1) (pk2, fee2) : Tagged_transaction.t =
-    ( Fee_transfer
-    , { payload=
-          User_command_payload.create ~nonce:Account.Nonce.zero
-            ~fee:fee2 (* What "sender" receives *)
-            ~memo:User_command_memo.dummy
-            ~body:
-              (Payment
-                 { receiver= pk1
-                 ; amount= Amount.of_fee fee1 (* What "receiver" receives *) })
-      ; sender= Public_key.decompress_exn pk2
-      ; signature= dummy_signature } )
-
-  let to_tagged_transaction = function
-    | One (pk1, fee1) -> two (pk1, fee1) (pk1, Fee.zero)
-    | Two (t1, t2) -> two t1 t2
-end
-
-module Transition = struct
-  include Transaction
-
-  let to_tagged_transaction = function
-    | Fee_transfer t -> Fee_transfer.to_tagged_transaction t
-    | User_command t -> (Normal, (t :> User_command.t))
-    | Coinbase {proposer; fee_transfer; amount= _} ->
-        let receiver, amount =
-          Option.value ~default:(proposer, Fee.zero) fee_transfer
-        in
-        let t : User_command.t =
-          { payload=
-              User_command_payload.create ~fee:Fee.zero
-                ~nonce:Account.Nonce.zero ~memo:User_command_memo.dummy
-                ~body:(Payment {receiver; amount= Amount.of_fee amount})
-          ; sender= Public_key.decompress_exn proposer
-          ; signature= dummy_signature }
-        in
-        (Coinbase, t)
-end
-
 module Proof_type = struct
   type t = [`Merge | `Base] [@@deriving bin_io, sexp, hash, compare, eq]
 
@@ -441,6 +172,14 @@ module Base = struct
   open Tick
   open Let_syntax
 
+  let check_signature shifted ~payload_section ~is_user_command ~sender
+      ~signature =
+    with_label __LOC__
+      (let%bind verifies =
+         Schnorr.Checked.verifies shifted signature sender payload_section
+       in
+       Boolean.Assert.any [Boolean.not is_user_command; verifies])
+
   (* spec for
      [apply_tagged_transaction root (tag, { sender; signature; payload }]):
      - if tag = Normal:
@@ -459,77 +198,70 @@ module Base = struct
   (* Nonce should only be incremented if it is a "Normal" transaction. *)
   let apply_tagged_transaction (type shifted)
       (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
-      root
-      ((tag, {sender; signature; payload}) as txn : Tagged_transaction.var) =
+      root ({sender; signature; payload} : Transaction_union.var) =
     with_label __LOC__
-      ( if not Insecure.transaction_replay then
-          failwith "Insecure.transaction_replay false" ;
-        let nonce = User_command_payload.Checked.nonce payload in
-        let {Payment_payload.receiver; amount} =
-          User_command_payload.Checked.payment_payload payload
-        in
-        let%bind payload_section = Schnorr.Message.var_of_payload payload in
-        let%bind () =
-          with_label __LOC__
-            (let%bind verifies =
-               Schnorr.Checked.verifies shifted signature sender
-                 payload_section
+      (let nonce = payload.common.nonce in
+       let receiver = payload.body.public_key in
+       let tag = payload.body.tag in
+       let%bind payload_section = Schnorr.Message.var_of_payload payload in
+       let%bind is_user_command =
+         Transaction_union.Tag.Checked.is_user_command tag
+       in
+       let%bind () =
+         check_signature shifted ~payload_section ~is_user_command ~sender
+           ~signature
+       in
+       let%bind {excess; sender_delta; supply_increase; receiver_increase} =
+         Transaction_union_payload.Changes.Checked.of_payload payload
+       in
+       let%bind root =
+         let%bind sender_compressed = Public_key.compress_var sender in
+         let%bind is_fee_transfer =
+           Transaction_union.Tag.Checked.is_fee_transfer tag
+         in
+         Frozen_ledger_hash.modify_account_send root ~is_fee_transfer
+           sender_compressed ~f:(fun account ->
+             with_label __LOC__
+               (let%bind next_nonce =
+                  Account.Nonce.increment_if_var account.nonce is_user_command
+                in
+                let%bind () =
+                  with_label __LOC__
+                    (let%bind nonce_matches =
+                       Account.Nonce.equal_var nonce account.nonce
+                     in
+                     Boolean.Assert.any
+                       [Boolean.not is_user_command; nonce_matches])
+                in
+                let%bind receipt_chain_hash =
+                  let current = account.receipt_chain_hash in
+                  let%bind r =
+                    Receipt.Chain_hash.Checked.cons ~payload:payload_section
+                      current
+                  in
+                  Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
+                    ~else_:current
+                in
+                let%map balance =
+                  Balance.Checked.add_signed_amount account.balance
+                    sender_delta
+                in
+                { Account.balance
+                ; public_key= sender_compressed
+                ; nonce= next_nonce
+                ; receipt_chain_hash
+                ; delegate= account.delegate }) )
+       in
+       (* we explicitly set the public_key because it could be zero if the account is new *)
+       let%map root =
+         Frozen_ledger_hash.modify_account_recv root receiver
+           ~f:(fun account ->
+             let%map balance =
+               Balance.Checked.(account.balance + receiver_increase)
              in
-             (* Should only assert_verifies if the tag is Normal *)
-             Boolean.Assert.any
-               [Boolean.not (Tag.Checked.should_check_signature tag); verifies])
-        in
-        let%bind {excess; sender_delta; supply_increase} =
-          Tagged_transaction.Checked.changes txn
-        in
-        let%bind root =
-          let%bind sender_compressed = Public_key.compress_var sender in
-          Frozen_ledger_hash.modify_account_send root
-            ~is_fee_transfer:(Tag.Checked.is_fee_transfer tag)
-            sender_compressed ~f:(fun account ->
-              with_label __LOC__
-                (let%bind next_nonce =
-                   Account.Nonce.increment_if_var account.nonce
-                     (Tag.Checked.should_increment_nonce tag)
-                 in
-                 let%bind () =
-                   with_label __LOC__
-                     (let%bind nonce_matches =
-                        Account.Nonce.equal_var nonce account.nonce
-                      in
-                      Boolean.Assert.any
-                        [ Boolean.not
-                            (Tag.Checked.should_check_if_nonce_matches tag)
-                        ; nonce_matches ])
-                 in
-                 let%bind receipt_chain_hash =
-                   let current = account.receipt_chain_hash in
-                   let%bind r =
-                     Receipt.Chain_hash.Checked.cons ~payload:payload_section
-                       current
-                   in
-                   Receipt.Chain_hash.Checked.if_
-                     (Tag.Checked.should_cons_to_receipt_chain tag)
-                     ~then_:r ~else_:current
-                 in
-                 let%map balance =
-                   Balance.Checked.add_signed_amount account.balance
-                     sender_delta
-                 in
-                 { Account.balance
-                 ; public_key= sender_compressed
-                 ; nonce= next_nonce
-                 ; receipt_chain_hash
-                 ; delegate= account.delegate }) )
-        in
-        (* we explicitly set the public_key because it could be zero if the account is new *)
-        let%map root =
-          Frozen_ledger_hash.modify_account_recv root receiver
-            ~f:(fun account ->
-              let%map balance = Balance.Checked.(account.balance + amount) in
-              {account with balance; public_key= receiver} )
-        in
-        (root, excess, supply_increase) )
+             {account with balance; public_key= receiver} )
+       in
+       (root, excess, supply_increase))
 
   (* Someday:
    write the following soundness tests:
@@ -540,7 +272,7 @@ module Base = struct
 
   module Prover_state = struct
     type t =
-      { transaction: Tagged_transaction.t
+      { transaction: Transaction_union.t
       ; state1: Frozen_ledger_hash.t
       ; state2: Frozen_ledger_hash.t
       ; sok_digest: Sok_message.Digest.t }
@@ -568,7 +300,7 @@ module Base = struct
        in
        let%bind t =
          with_label __LOC__
-           (provide_witness' Tagged_transaction.typ ~f:Prover_state.transaction)
+           (provide_witness' Transaction_union.typ ~f:Prover_state.transaction)
        in
        let%bind root_after, fee_excess, supply_increase =
          apply_tagged_transaction (module Shifted) root_before t
@@ -595,29 +327,29 @@ module Base = struct
 
   let create_keys () = generate_keypair main ~exposing:(tick_input ())
 
-  let tagged_transaction_proof ~proving_key sok_digest state1 state2
-      (transaction : Tagged_transaction.t) handler =
+  let transaction_union_proof ~proving_key sok_digest state1 state2
+      (transaction : Transaction_union.t) handler =
     let prover_state : Prover_state.t =
       {state1; state2; transaction; sok_digest}
     in
     let main top_hash = handle (main top_hash) handler in
     let top_hash =
       base_top_hash ~sok_digest ~state1 ~state2
-        ~fee_excess:(Tagged_transaction.excess transaction)
-        ~supply_increase:(Tagged_transaction.supply_increase transaction)
+        ~fee_excess:(Transaction_union.excess transaction)
+        ~supply_increase:(Transaction_union.supply_increase transaction)
     in
     (top_hash, prove proving_key (tick_input ()) prover_state main top_hash)
 
-  let fee_transfer_proof ~proving_key sok_message state1 state2 transfer
-      handler =
-    tagged_transaction_proof ~proving_key sok_message state1 state2
-      (Fee_transfer.to_tagged_transaction transfer)
-      handler
-
   let transaction_proof ~proving_key sok_message state1 state2 transaction
       handler =
-    tagged_transaction_proof ~proving_key sok_message state1 state2
-      (Normal, transaction) handler
+    transaction_union_proof ~proving_key sok_message state1 state2
+      (Transaction_union.of_transaction transaction)
+      handler
+
+  let fee_transfer_proof ~proving_key sok_message state1 state2 transfer
+      handler =
+    transaction_proof ~proving_key sok_message state1 state2
+      (Fee_transfer transfer) handler
 
   let cached =
     let load =
@@ -1130,11 +862,11 @@ end
 module type S = sig
   include Verification.S
 
-  val of_transition :
+  val of_transaction :
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> Transition.t
+    -> Transaction.t
     -> Tick.Handler.t
     -> t
 
@@ -1157,15 +889,15 @@ module type S = sig
   val merge : t -> t -> sok_digest:Sok_message.Digest.t -> t Or_error.t
 end
 
-let check_tagged_transaction sok_message source target transaction handler =
+let check_transaction_union sok_message source target transaction handler =
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
     {state1= source; state2= target; transaction; sok_digest}
   in
   let top_hash =
     base_top_hash ~sok_digest ~state1:source ~state2:target
-      ~fee_excess:(Tagged_transaction.excess transaction)
-      ~supply_increase:(Tagged_transaction.supply_increase transaction)
+      ~fee_excess:(Transaction_union.excess transaction)
+      ~supply_increase:(Transaction_union.supply_increase transaction)
   in
   let open Tick in
   let main =
@@ -1177,16 +909,17 @@ let check_tagged_transaction sok_message source target transaction handler =
   in
   Or_error.ok_exn (run_and_check main prover_state) |> ignore
 
-let check_transition ~sok_message ~source ~target (t : Transition.t) handler =
-  check_tagged_transaction sok_message source target
-    (Transition.to_tagged_transaction t)
+let check_transaction ~sok_message ~source ~target (t : Transaction.t) handler
+    =
+  check_transaction_union sok_message source target
+    (Transaction_union.of_transaction t)
     handler
 
 let check_user_command ~sok_message ~source ~target t handler =
-  check_transition ~sok_message ~source ~target (User_command t) handler
+  check_transaction ~sok_message ~source ~target (User_command t) handler
 
 let check_fee_transfer ~sok_message ~source ~target t handler =
-  check_transition ~sok_message ~source ~target (Fee_transfer t) handler
+  check_transaction ~sok_message ~source ~target (Fee_transfer t) handler
 
 let verification_keys_of_keys {Keys0.verification; _} = verification
 
@@ -1240,30 +973,30 @@ struct
     , Tick.prove keys.proving.merge (tick_input ()) prover_state Merge.main
         top_hash )
 
-  let of_tagged_transaction sok_digest source target transaction handler =
+  let of_transaction_union sok_digest source target transaction handler =
     let top_hash, proof =
-      Base.tagged_transaction_proof sok_digest ~proving_key:keys.proving.base
+      Base.transaction_union_proof sok_digest ~proving_key:keys.proving.base
         source target transaction handler
     in
     { source
     ; sok_digest
     ; target
     ; proof_type= `Base
-    ; fee_excess= Tagged_transaction.excess transaction
-    ; supply_increase= Tagged_transaction.supply_increase transaction
+    ; fee_excess= Transaction_union.excess transaction
+    ; supply_increase= Transaction_union.supply_increase transaction
     ; proof= wrap `Base proof top_hash }
 
-  let of_transition ~sok_digest ~source ~target transition handler =
-    of_tagged_transaction sok_digest source target
-      (Transition.to_tagged_transaction transition)
+  let of_transaction ~sok_digest ~source ~target transition handler =
+    of_transaction_union sok_digest source target
+      (Transaction_union.of_transaction transition)
       handler
 
   let of_user_command ~sok_digest ~source ~target user_command handler =
-    of_transition ~sok_digest ~source ~target (User_command user_command)
+    of_transaction ~sok_digest ~source ~target (User_command user_command)
       handler
 
   let of_fee_transfer ~sok_digest ~source ~target transfer handler =
-    of_transition ~sok_digest ~source ~target (Fee_transfer transfer) handler
+    of_transaction ~sok_digest ~source ~target (Fee_transfer transfer) handler
 
   let merge t1 t2 ~sok_digest =
     if not (Frozen_ledger_hash.( = ) t1.target t2.source) then
