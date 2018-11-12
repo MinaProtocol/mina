@@ -8,10 +8,12 @@ module Tag = Transaction_union_tag
 
 module Body = struct
   type ('tag, 'pk, 'amount) t_ = {tag: 'tag; public_key: 'pk; amount: 'amount}
+  [@@deriving sexp]
 
   type var = (Tag.var, Public_key.Compressed.var, Currency.Amount.var) t_
 
   type t = (Tag.t, Public_key.Compressed.t, Currency.Amount.t) t_
+  [@@deriving sexp]
 
   let fold ({tag; public_key; amount} : t) =
     Fold.(
@@ -19,11 +21,26 @@ module Body = struct
       +> Public_key.Compressed.fold public_key
       +> Currency.Amount.fold amount)
 
-  let gen =
+  let gen ~fee =
     let open Quickcheck.Generator.Let_syntax in
-    let%map tag = Tag.gen
-    and public_key = Public_key.Compressed.gen
-    and amount = Amount.gen in
+    let%bind tag = Tag.gen in
+    let%map amount =
+      let min, max =
+        let max_amount_without_overflow =
+          Amount.(sub max_int (of_fee fee)) |> Option.value_exn
+        in
+        match tag with
+        | Payment -> (Amount.zero, max_amount_without_overflow)
+        | Stake_delegation -> (Amount.zero, max_amount_without_overflow)
+        | Fee_transfer -> (Amount.zero, max_amount_without_overflow)
+        | Coinbase ->
+            (* In this case, 
+             fee - amount should be defined. In other words,
+             fee >= amount. *)
+            (Amount.zero, Amount.of_fee fee)
+      in
+      Amount.gen_incl min max
+    and public_key = Public_key.Compressed.gen in
     {tag; public_key; amount}
 
   let length_in_triples =
@@ -65,8 +82,9 @@ module Body = struct
 end
 
 type t = (User_command_payload.Common.t, Body.t) User_command_payload.t_
+[@@deriving sexp]
 
-type payload = t
+type payload = t [@@deriving sexp]
 
 type var = (User_command_payload.Common.var, Body.var) User_command_payload.t_
 
@@ -74,7 +92,8 @@ type payload_var = var
 
 let gen =
   let open Quickcheck.Generator.Let_syntax in
-  let%map common = User_command_payload.Common.gen and body = Body.gen in
+  let%bind common = User_command_payload.Common.gen in
+  let%map body = Body.gen ~fee:common.fee in
   {User_command_payload.common; body}
 
 let to_hlist ({common; body} : (_, _) User_command_payload.t_) =
@@ -118,13 +137,11 @@ module Changes = struct
     let open Amount.Signed in
     let ( + ) x y = Option.value_exn (x + y) in
     let ( - ) x y = x + negate y in
-    assert (
-      equal
-        ( sender_delta
-        + of_unsigned receiver_increase
-        + excess
-        - of_unsigned supply_increase )
-        zero )
+    [%test_eq: Amount.Signed.t] zero
+      ( sender_delta
+      + of_unsigned receiver_increase
+      + excess
+      - of_unsigned supply_increase )
 
   let typ =
     Typ.of_hlistable
@@ -150,7 +167,9 @@ module Changes = struct
         ; excess= Amount.Signed.of_unsigned (Amount.of_fee fee)
         ; supply_increase= Amount.zero }
     | Stake_delegation ->
-        { sender_delta= Amount.Signed.zero
+        { sender_delta=
+            Amount.of_fee fee |> Amount.Signed.of_unsigned
+            |> Amount.Signed.negate
         ; receiver_increase= Amount.zero
         ; excess= Amount.Signed.of_unsigned (Amount.of_fee fee)
         ; supply_increase= Amount.zero }
@@ -186,6 +205,7 @@ module Changes = struct
       let amount = payload.body.amount in
       let%bind is_coinbase = Tag.Checked.is_coinbase tag in
       let%bind is_stake_delegation = Tag.Checked.is_stake_delegation tag in
+      let%bind is_payment = Tag.Checked.is_payment tag in
       let%bind is_fee_transfer = Tag.Checked.is_fee_transfer tag in
       let%bind is_user_command = Tag.Checked.is_user_command tag in
       let coinbase_amount = Amount.Checked.of_fee fee in
@@ -199,11 +219,25 @@ module Changes = struct
           ~else_:amount
       in
       let%bind neg_amount_plus_fee =
-        Amount.Checked.add_fee amount fee
-        >>| fun m -> Amount.Signed.create ~magnitude:m ~sgn:Sgn.Checked.neg
+        let%bind res, `Overflow overflowed =
+          Amount.Checked.add_flagged amount (Amount.Checked.of_fee fee)
+        in
+        let%bind is_fee_transfer_or_payment =
+          Boolean.(is_payment || is_fee_transfer)
+        in
+        let%map () =
+          Boolean.Assert.any
+            [Boolean.not overflowed; Boolean.not is_fee_transfer_or_payment]
+        in
+        Amount.Signed.create ~magnitude:res ~sgn:Sgn.Checked.neg
       in
       let pos_fee =
         Amount.Signed.Checked.of_unsigned (Amount.Checked.of_fee fee)
+      in
+      let neg_fee =
+        Amount.Signed.create
+          ~magnitude:(Amount.Checked.of_fee fee)
+          ~sgn:Sgn.Checked.neg
       in
       let%bind excess =
         let user_command_excess = pos_fee in
@@ -216,17 +250,17 @@ module Changes = struct
       in
       let%bind sender_delta =
         let%bind coinbase_sender_delta =
-          let%bind proposer_reward, `Underflow underflowed =
-            Amount.Checked.sub_flagged coinbase_amount amount
-          in
-          let%map () =
-            Boolean.Assert.any
-              [Boolean.not underflowed; Boolean.not is_coinbase]
-          in
-          Amount.Signed.Checked.of_unsigned proposer_reward
+          with_label __LOC__
+            (let%bind proposer_reward, `Underflow underflowed =
+               Amount.Checked.sub_flagged coinbase_amount amount
+             in
+             let%map () =
+               Boolean.Assert.any
+                 [Boolean.not underflowed; Boolean.not is_coinbase]
+             in
+             Amount.Signed.Checked.of_unsigned proposer_reward)
         in
-        if_' is_stake_delegation
-          ~then_:Amount.Signed.(Checked.constant zero)
+        if_' is_stake_delegation ~then_:neg_fee
           ~else_:
             (if_' is_coinbase ~then_:coinbase_sender_delta
                ~else_:
@@ -237,7 +271,7 @@ module Changes = struct
   end
 
   let%test_unit "checked-unchecked changes" =
-    Quickcheck.test gen ~f:(fun t ->
+    Quickcheck.test gen ~f:(fun (t : payload) ->
         Test_util.test_equal ~equal payload_typ typ Checked.of_payload
           of_payload t )
 end
