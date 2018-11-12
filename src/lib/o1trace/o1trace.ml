@@ -1,12 +1,11 @@
-open Core
-open Async
-
 [%%import
 "../../config.mlh"]
 
 [%%if
 tracing]
 
+open Core
+open Async
 module Scheduler = Async_kernel_scheduler
 
 type event_kind =

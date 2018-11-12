@@ -188,23 +188,25 @@ end = struct
       ; strongest_ledgers_reader
       ; handler= Transition_logic.create state log }
     in
-    trace_task "strongest_tip" (fun () ->
-        Linear_pipe.iter (Transition_logic.strongest_tip t.handler)
-          ~f:(fun (tip, transition) ->
-            Linear_pipe.force_write_maybe_drop_head ~capacity:1
-              store_tip_writer store_tip_reader tip ;
-            Deferred.return
-            @@ Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
-                 t.strongest_ledgers_reader
-                 (tip.ledger_builder, transition) ) ) ;
-    trace_task "store_tip" (fun () ->
-        Linear_pipe.iter store_tip_reader ~f:(fun tip ->
-            let open With_hash in
-            let tip_with_genesis_hash =
-              {data= tip; hash= genesis_tip_state_hash}
-            in
-            Store.store store_controller config.longest_tip_location
-              tip_with_genesis_hash ) ) ;
+    don't_wait_for
+    @@ trace_task "strongest_tip" (fun () ->
+           Linear_pipe.iter (Transition_logic.strongest_tip t.handler)
+             ~f:(fun (tip, transition) ->
+               Linear_pipe.force_write_maybe_drop_head ~capacity:1
+                 store_tip_writer store_tip_reader tip ;
+               Deferred.return
+               @@ Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
+                    t.strongest_ledgers_reader
+                    (tip.ledger_builder, transition) ) ) ;
+    don't_wait_for
+    @@ trace_task "store_tip" (fun () ->
+           Linear_pipe.iter store_tip_reader ~f:(fun tip ->
+               let open With_hash in
+               let tip_with_genesis_hash =
+                 {data= tip; hash= genesis_tip_state_hash}
+               in
+               Store.store store_controller config.longest_tip_location
+                 tip_with_genesis_hash ) ) ;
     (* Handle new transitions *)
     let possibly_jobs =
       trace_task "external transitions" (fun () ->
@@ -239,28 +241,29 @@ end = struct
           | `Keep -> `Skip
           | `Take -> `Cancel_and_do_next )
     in
-    trace_task "possible jobs" (fun () ->
-        Linear_pipe.fold possibly_jobs ~init:None
-          ~f:(fun last
-             ( (({Job.input= current_transition_with_hash; _} as job), _) as
-             job_with_time )
-             ->
-            Deferred.return
-              ( match replace last job_with_time with
-              | `Skip -> last
-              | `Cancel_and_do_next ->
-                  Option.iter last ~f:(fun (input, ivar) ->
-                      Ivar.fill_if_empty ivar input ) ;
-                  let w, this_ivar =
-                    trace_task "running job" (fun () -> Job.run job)
-                  in
-                  let () =
-                    Deferred.upon w.Interruptible.d (function
-                      | Ok () -> Logger.trace log "Job is completed"
-                      | Error () -> Logger.trace log "Job is destroyed" )
-                  in
-                  Some (current_transition_with_hash, this_ivar) ) )
-        >>| ignore ) ;
+    don't_wait_for
+    @@ trace_task "possible jobs" (fun () ->
+           Linear_pipe.fold possibly_jobs ~init:None
+             ~f:(fun last
+                ( (({Job.input= current_transition_with_hash; _} as job), _) as
+                job_with_time )
+                ->
+               Deferred.return
+                 ( match replace last job_with_time with
+                 | `Skip -> last
+                 | `Cancel_and_do_next ->
+                     Option.iter last ~f:(fun (input, ivar) ->
+                         Ivar.fill_if_empty ivar input ) ;
+                     let w, this_ivar =
+                       trace_task "running job" (fun () -> Job.run job)
+                     in
+                     let () =
+                       Deferred.upon w.Interruptible.d (function
+                         | Ok () -> Logger.trace log "Job is completed"
+                         | Error () -> Logger.trace log "Job is destroyed" )
+                     in
+                     Some (current_transition_with_hash, this_ivar) ) )
+           >>| ignore ) ;
     t
 
   module For_tests = struct
