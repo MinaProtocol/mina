@@ -220,7 +220,7 @@ module Base = struct
            Transaction_union.Tag.Checked.is_fee_transfer tag
          in
          Frozen_ledger_hash.modify_account_send root ~is_fee_transfer
-           sender_compressed ~f:(fun account ->
+           sender_compressed ~f:(fun ~is_empty_and_writeable account ->
              with_label __LOC__
                (let%bind next_nonce =
                   Account.Nonce.increment_if_var account.nonce is_user_command
@@ -242,6 +242,10 @@ module Base = struct
                   Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
                     ~else_:current
                 in
+                let%bind delegate =
+                  Public_key.Compressed.Checked.if_ is_empty_and_writeable
+                    ~then_:sender_compressed ~else_:account.delegate
+                in
                 let%map balance =
                   Balance.Checked.add_signed_amount account.balance
                     sender_delta
@@ -255,11 +259,14 @@ module Base = struct
        (* we explicitly set the public_key because it could be zero if the account is new *)
        let%map root =
          Frozen_ledger_hash.modify_account_recv root receiver
-           ~f:(fun account ->
+           ~f:(fun ~is_empty_and_writeable account ->
              let%map balance =
                Balance.Checked.(account.balance + receiver_increase)
+             and delegate =
+               Public_key.Compressed.Checked.if_ is_empty_and_writeable
+                 ~then_:receiver ~else_:account.delegate
              in
-             {account with balance; public_key= receiver} )
+             {account with balance; delegate; public_key= receiver} )
        in
        (root, excess, supply_increase))
 

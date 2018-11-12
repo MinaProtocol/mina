@@ -66,7 +66,7 @@ let reraise_merkle_requests (With { request; respond }) =
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the account [f account] at path [addr].
 *)
-let modify_account t pk ~(filter:Account.var -> (unit, _) Checked.t) ~f =
+let modify_account t pk ~(filter:Account.var -> ('a, _) Checked.t) ~f =
   with_label __LOC__ begin
     let%bind addr =
       request_witness Account.Index.Unpacked.typ
@@ -76,8 +76,8 @@ let modify_account t pk ~(filter:Account.var -> (unit, _) Checked.t) ~f =
     in
     handle
       (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr ~f:(fun account ->
-        let%bind () = filter account in
-        f account))
+        let%bind x = filter account in
+        f x account))
       reraise_merkle_requests
     >>| var_of_hash_packed
   end
@@ -93,8 +93,9 @@ let modify_account_send t pk ~is_fee_transfer ~f = modify_account t pk ~filter:(
         let%bind account_already_there = Public_key.Compressed.Checked.equal account.public_key pk in
         let%bind account_not_there = Public_key.Compressed.Checked.equal account.public_key Public_key.Compressed.(var_of_t empty) in
         let%bind fee_transfer = Boolean.(account_not_there && is_fee_transfer) in
-        Boolean.Assert.any [account_already_there; fee_transfer]
-) ~f
+        let%bind () = Boolean.Assert.any [account_already_there; fee_transfer] in
+        return fee_transfer
+) ~f:(fun is_empty_and_writeable x -> f ~is_empty_and_writeable x)
 
 (*
    [modify_account_recv t ~pk ~f] implements the following spec:
@@ -106,5 +107,6 @@ let modify_account_send t pk ~is_fee_transfer ~f = modify_account t pk ~filter:(
 let modify_account_recv t pk ~f = modify_account t pk ~filter:(fun account ->
         let%bind account_already_there = Public_key.Compressed.Checked.equal account.public_key pk in
         let%bind account_not_there = Public_key.Compressed.Checked.equal account.public_key Public_key.Compressed.(var_of_t empty) in
-        Boolean.Assert.any [account_already_there; account_not_there]
-) ~f
+        let%bind () = Boolean.Assert.any [account_already_there; account_not_there] in
+        return account_not_there
+) ~f:(fun is_empty_and_writeable x -> f ~is_empty_and_writeable x)
