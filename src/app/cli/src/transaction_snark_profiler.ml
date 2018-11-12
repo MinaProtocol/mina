@@ -20,7 +20,10 @@ let create_ledger_and_transactions num_transitions =
   Array.iter keys ~f:(fun k ->
       let public_key = Public_key.compress k.public_key in
       Ledger.create_new_account_exn ledger public_key
-        (Account.create public_key (Currency.Balance.of_int 10_000)) ) ;
+        { public_key
+        ; balance= Currency.Balance.of_int 10_000
+        ; receipt_chain_hash= Receipt.Chain_hash.empty
+        ; nonce= Account.Nonce.zero } ) ;
   let txn from_kp (to_kp : Signature_lib.Keypair.t) amount fee nonce =
     let payload : User_command.Payload.t =
       User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy

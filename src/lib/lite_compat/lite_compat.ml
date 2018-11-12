@@ -76,7 +76,6 @@ module Make (Blockchain_state : Coda_base.Blockchain_state.S) = struct
     { public_key= public_key account.public_key
     ; nonce= account_nonce account.nonce
     ; balance= balance account.balance
-    ; delegate= public_key account.delegate
     ; receipt_chain_hash=
         digest (account.receipt_chain_hash :> Tick.Pedersen.Digest.t) }
 

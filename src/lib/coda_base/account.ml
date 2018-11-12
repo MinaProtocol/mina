@@ -36,8 +36,7 @@ module Stable = struct
       { public_key: 'pk
       ; balance: 'amount
       ; nonce: 'nonce
-      ; receipt_chain_hash: 'receipt_chain_hash
-      ; delegate: 'pk }
+      ; receipt_chain_hash: 'receipt_chain_hash }
     [@@deriving fields, sexp, bin_io, eq, compare, hash]
 
     type key = Public_key.Compressed.Stable.V1.t
@@ -72,10 +71,7 @@ let initialize public_key : t =
   { public_key
   ; balance= Balance.zero
   ; nonce= Nonce.zero
-  ; receipt_chain_hash=
-      Receipt.Chain_hash.empty
-      (* TODO: In the next PR this should be replaced by [public_key] *)
-  ; delegate= Public_key.Compressed.empty }
+  ; receipt_chain_hash= Receipt.Chain_hash.empty }
 
 let typ : (var, value) Typ.t =
   let spec =
@@ -83,45 +79,41 @@ let typ : (var, value) Typ.t =
     [ Public_key.Compressed.typ
     ; Balance.typ
     ; Nonce.Unpacked.typ
-    ; Receipt.Chain_hash.typ
-    ; Public_key.Compressed.typ ]
+    ; Receipt.Chain_hash.typ ]
   in
   let of_hlist
-        : 'a 'b 'c 'd.    (unit, 'a -> 'b -> 'c -> 'd -> 'a -> unit) H_list.t
+        : 'a 'b 'c 'd.    (unit, 'a -> 'b -> 'c -> 'd -> unit) H_list.t
           -> ('a, 'b, 'c, 'd) t_ =
     let open H_list in
-    fun [public_key; balance; nonce; receipt_chain_hash; delegate] ->
-      {public_key; balance; nonce; receipt_chain_hash; delegate}
+    fun [public_key; balance; nonce; receipt_chain_hash] ->
+      {public_key; balance; nonce; receipt_chain_hash}
   in
-  let to_hlist {public_key; balance; nonce; receipt_chain_hash; delegate} =
-    H_list.[public_key; balance; nonce; receipt_chain_hash; delegate]
+  let to_hlist {public_key; balance; nonce; receipt_chain_hash} =
+    H_list.[public_key; balance; nonce; receipt_chain_hash]
   in
   Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let var_of_t
-    ({public_key; balance; nonce; receipt_chain_hash; delegate} : value) =
+let var_of_t ({public_key; balance; nonce; receipt_chain_hash} : value) =
   { public_key= Public_key.Compressed.var_of_t public_key
   ; balance= Balance.var_of_t balance
   ; nonce= Nonce.Unpacked.var_of_value nonce
-  ; receipt_chain_hash= Receipt.Chain_hash.var_of_t receipt_chain_hash
-  ; delegate= Public_key.Compressed.var_of_t delegate }
+  ; receipt_chain_hash= Receipt.Chain_hash.var_of_t receipt_chain_hash }
 
-let var_to_triples {public_key; balance; nonce; receipt_chain_hash; delegate} =
+let var_to_triples {public_key; balance; nonce; receipt_chain_hash} =
   let%map public_key = Public_key.Compressed.var_to_triples public_key
-  and receipt_chain_hash = Receipt.Chain_hash.var_to_triples receipt_chain_hash
-  and delegate = Public_key.Compressed.var_to_triples delegate in
+  and receipt_chain_hash =
+    Receipt.Chain_hash.var_to_triples receipt_chain_hash
+  in
   let balance = Balance.var_to_triples balance in
   let nonce = Nonce.Unpacked.var_to_triples nonce in
-  public_key @ balance @ nonce @ receipt_chain_hash @ delegate
+  public_key @ balance @ nonce @ receipt_chain_hash
 
-let fold_bits ({public_key; balance; nonce; receipt_chain_hash; delegate} : t)
-    =
+let fold_bits ({public_key; balance; nonce; receipt_chain_hash} : t) =
   let open Fold in
   Public_key.Compressed.fold public_key
   +> Balance.fold balance +> Nonce.fold nonce
   +> Receipt.Chain_hash.fold receipt_chain_hash
-  +> Public_key.Compressed.fold delegate
 
 let hash_prefix = Hash_prefix.account
 
@@ -131,8 +123,7 @@ let empty =
   { public_key= Public_key.Compressed.empty
   ; balance= Balance.zero
   ; nonce= Nonce.zero
-  ; receipt_chain_hash= Receipt.Chain_hash.empty
-  ; delegate= Public_key.Compressed.empty }
+  ; receipt_chain_hash= Receipt.Chain_hash.empty }
 
 let digest t = Pedersen.State.digest (hash t)
 
@@ -144,10 +135,7 @@ let create public_key balance =
   { public_key
   ; balance
   ; nonce= Nonce.zero
-  ; receipt_chain_hash=
-      Receipt.Chain_hash.empty
-      (* TODO: In the next PR this should be replaced by [public_key] *)
-  ; delegate= Public_key.Compressed.empty }
+  ; receipt_chain_hash= Receipt.Chain_hash.empty }
 
 let gen =
   let open Quickcheck.Let_syntax in
