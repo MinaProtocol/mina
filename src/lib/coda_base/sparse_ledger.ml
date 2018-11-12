@@ -52,6 +52,12 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
     (Ledger.merkle_root ledger)
     ((merkle_root sl :> Pedersen.Digest.t) |> Ledger_hash.of_hash)
 
+let get_or_initialize_exn public_key t idx =
+  let account = get_exn t idx in
+  if Public_key.Compressed.(equal empty account.public_key) then
+    {account with delegate= public_key; public_key}
+  else account
+
 let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
     =
   let sender_idx = find_index_exn t (Public_key.compress sender) in
@@ -83,23 +89,21 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
               |> Option.value_exn }
       in
       let receiver_idx = find_index_exn t receiver in
-      let receiver_account = get_exn t receiver_idx in
+      let receiver_account = get_or_initialize_exn receiver t receiver_idx in
       set_exn t receiver_idx
         { receiver_account with
-          public_key= receiver
-        ; balance=
+          balance=
             Option.value_exn
               (Balance.add_amount receiver_account.balance amount) }
 
 let apply_fee_transfer_exn =
   let apply_single t ((pk, fee) : Fee_transfer.single) =
     let index = find_index_exn t pk in
-    let account = get_exn t index in
+    let account = get_or_initialize_exn pk t index in
     let open Currency in
     set_exn t index
       { account with
-        public_key= pk (* explicitly set because receipient could be new *)
-      ; balance=
+        balance=
           Option.value_exn
             (Balance.add_amount account.balance (Amount.of_fee fee)) }
   in
@@ -110,12 +114,9 @@ let apply_coinbase_exn t ({proposer; fee_transfer} : Coinbase.t) =
   let open Currency in
   let add_to_balance t pk amount =
     let idx = find_index_exn t pk in
-    let a = get_exn t idx in
+    let a = get_or_initialize_exn pk t idx in
     set_exn t idx
-      { a with
-        public_key= pk
-      ; (* set as above *)
-        balance= Option.value_exn (Balance.add_amount a.balance amount) }
+      {a with balance= Option.value_exn (Balance.add_amount a.balance amount)}
   in
   let proposer_reward, t =
     match fee_transfer with
