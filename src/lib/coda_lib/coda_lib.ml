@@ -341,8 +341,8 @@ module type Inputs_intf = sig
   module Transaction_pool :
     Transaction_pool_intf
     with type transaction_with_valid_signature :=
-                Payment.With_valid_signature.t
-     and type transaction := Payment.t
+                User_command.With_valid_signature.t
+     and type transaction := User_command.t
 
   module Sync_ledger : sig
     type query [@@deriving bin_io]
@@ -382,7 +382,7 @@ module type Inputs_intf = sig
     Proposer_intf
     with type ledger_hash := Ledger_hash.t
      and type ledger_builder := Ledger_builder.t
-     and type transaction := Payment.With_valid_signature.t
+     and type transaction := User_command.With_valid_signature.t
      and type protocol_state := Consensus_mechanism.Protocol_state.value
      and type protocol_state_proof := Protocol_state_proof.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t

@@ -34,7 +34,7 @@ module Make (Kernel : Kernel_intf) = struct
       * Public_key.Compressed.t
       * Currency.Amount.t
       * Currency.Fee.t
-      * Payment_memo.t
+      * User_command_memo.t
     [@@deriving bin_io]
   end
 
@@ -207,13 +207,14 @@ module Make (Kernel : Kernel_intf) = struct
             let nonce =
               Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn
             in
-            let payload : Payment.Payload.t =
-              {receiver= receiver_pk; amount; fee; nonce; memo}
+            let payload : User_command.Payload.t =
+              User_command.Payload.create ~fee ~nonce ~memo
+                ~body:(Payment {receiver= receiver_pk; amount})
             in
-            Payment.sign (Keypair.of_private_key_exn sender_sk) payload
+            User_command.sign (Keypair.of_private_key_exn sender_sk) payload
           in
           let payment = build_txn amount sk pk fee in
-          Run.send_payment log coda (payment :> Payment.t)
+          Run.send_payment log coda (payment :> User_command.t)
         in
         let coda_strongest_ledgers () =
           let r, w = Linear_pipe.create () in

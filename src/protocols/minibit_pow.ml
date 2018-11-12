@@ -83,7 +83,7 @@ module type Public_key_intf = sig
   type t [@@deriving sexp, eq]
 end
 
-module type Payment_intf = sig
+module type User_command_intf = sig
   type t [@@deriving sexp, eq]
 
   module With_valid_signature : sig
@@ -228,7 +228,7 @@ module type Inputs_intf = sig
 
   module Public_key : Public_key_intf
 
-  module Payment : Payment_intf
+  module User_command : User_command_intf
 
   module Block_nonce : Nonce_intf
 
@@ -238,7 +238,7 @@ module type Inputs_intf = sig
 
   module Ledger :
     Ledger_intf
-    with type valid_transaction := Payment.With_valid_signature.t
+    with type valid_transaction := User_command.With_valid_signature.t
      and type ledger_hash := Ledger_hash.t
 
   module Transition :

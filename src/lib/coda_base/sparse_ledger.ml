@@ -52,11 +52,11 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
     (Ledger.merkle_root ledger)
     ((merkle_root sl :> Pedersen.Digest.t) |> Ledger_hash.of_hash)
 
-let apply_payment_exn t ({sender; payload; signature= _} : Payment.t) =
-  let {Payment_payload.amount; fee; receiver; nonce} = payload in
+let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
+    =
   let sender_idx = find_index_exn t (Public_key.compress sender) in
-  let receiver_idx = find_index_exn t receiver in
   let sender_account = get_exn t sender_idx in
+  let nonce = User_command.Payload.nonce payload in
   assert (Account.Nonce.equal sender_account.nonce nonce) ;
   if not Insecure.fee_collection then
     failwith "Bundle.Sparse_ledger: Insecure.fee_collection" ;
@@ -66,21 +66,23 @@ let apply_payment_exn t ({sender; payload; signature= _} : Payment.t) =
       { sender_account with
         nonce= Account.Nonce.succ sender_account.nonce
       ; balance=
-          (let open Option in
-          value_exn
-            (let open Let_syntax in
-            let%bind total = Amount.add_fee amount fee in
-            Balance.sub_amount sender_account.balance total))
+          (let sender_cost =
+             User_command.Payload.sender_cost payload |> Or_error.ok_exn
+           in
+           Balance.sub_amount sender_account.balance sender_cost
+           |> Option.value_exn)
       ; receipt_chain_hash=
           Receipt.Chain_hash.cons payload sender_account.receipt_chain_hash }
   in
-  let receiver_account = get_exn t receiver_idx in
-  set_exn t receiver_idx
-    { receiver_account with
-      public_key= receiver
-    ; balance=
-        Option.value_exn (Balance.add_amount receiver_account.balance amount)
-    }
+  match User_command.Payload.body payload with Payment {amount; receiver} ->
+    let receiver_idx = find_index_exn t receiver in
+    let receiver_account = get_exn t receiver_idx in
+    set_exn t receiver_idx
+      { receiver_account with
+        public_key= receiver
+      ; balance=
+          Option.value_exn (Balance.add_amount receiver_account.balance amount)
+      }
 
 let apply_fee_transfer_exn =
   let apply_single t ((pk, fee) : Fee_transfer.single) =
@@ -124,7 +126,7 @@ let apply_coinbase_exn t ({proposer; fee_transfer} : Coinbase.t) =
 let apply_transaction_exn t transition =
   match transition with
   | Transaction.Fee_transfer tr -> apply_fee_transfer_exn t tr
-  | Payment tr -> apply_payment_exn t (tr :> Payment.t)
+  | User_command cmd -> apply_user_command_exn t (cmd :> User_command.t)
   | Coinbase c -> apply_coinbase_exn t c
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Pedersen.Digest.t)
