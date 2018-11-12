@@ -301,6 +301,12 @@ let daemon (module Kernel : Kernel_intf) log =
                ; me
                ; banlist } }
          in
+         let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
+         let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
+         let receipt_chain_database =
+           Coda_base.Receipt_chain_database.create
+             ~directory:receipt_chain_dir_name
+         in
          let%map coda =
            Run.create
              (Run.Config.make ~log ~net_config
@@ -309,7 +315,8 @@ let daemon (module Kernel : Kernel_intf) log =
                   (conf_dir ^/ "ledger_builder")
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
-                ~snark_work_fee:snark_work_fee_flag
+                ~snark_work_fee:snark_work_fee_flag 
+                ~receipt_chain_database
                 ~time_controller:(Inputs.Time.Controller.create ())
                 ?propose_keypair:Config0.propose_keypair () ~banlist)
          in

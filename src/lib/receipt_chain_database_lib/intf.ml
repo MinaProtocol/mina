@@ -77,9 +77,9 @@ module type Receipt_chain_hash = sig
 end
 
 module type Payment = sig
-  type t [@@deriving bin_io]
+  type t
 
-  type payload [@@deriving bin_io]
+  type payload
 
   val payload : t -> payload
 end

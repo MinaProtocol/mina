@@ -910,6 +910,7 @@ module type Main_intf = sig
       ; ledger_builder_transition_backup_capacity: int [@default 10]
       ; time_controller: Inputs.Time.Controller.t
       ; banlist: Banlist.t
+      ; receipt_chain_database: Receipt_chain_database.t
       ; snark_work_fee: Currency.Fee.t }
     [@@deriving make]
   end
@@ -955,6 +956,8 @@ module type Main_intf = sig
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
 
   val get_ledger : t -> Ledger_builder_hash.t -> Ledger.t Deferred.Or_error.t
+
+  val receipt_chain_database : t -> Receipt_chain_database.t
 end
 
 module Run (Config_in : Config_intf) (Program : Main_intf) = struct
@@ -967,11 +970,15 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   module Lite_compat = Lite_compat.Make (Consensus_mechanism.Blockchain_state)
 
-  let get_balance t (addr : Public_key.Compressed.t) =
+  let get_account t (addr : Public_key.Compressed.t) =
     let open Option.Let_syntax in
     let ledger = best_ledger t in
     let%bind location = Ledger.location_of_key ledger addr in
-    let%map account = Ledger.get ledger location in
+    Ledger.get ledger location
+
+  let get_balance t (addr : Public_key.Compressed.t) =
+    let open Option.Let_syntax in
+    let%map account = get_account t addr in
     account.Account.balance
 
   let get_accounts t =
@@ -989,23 +996,46 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
            ( Account.balance account |> Currency.Balance.to_int
            , string_of_public_key account ) )
 
-  let is_valid_payment t (txn : Payment.t) =
+  let is_valid_payment t (txn : Payment.t) account_opt =
     let remainder =
       let open Option.Let_syntax in
-      let%bind balance = get_balance t (Public_key.compress txn.sender)
+      let%bind account = account_opt
       and cost = Currency.Amount.add_fee txn.payload.amount txn.payload.fee in
-      Currency.Balance.sub_amount balance cost
+      Currency.Balance.sub_amount account.Account.balance cost
     in
     Option.is_some remainder
 
   (** For status *)
   let txn_count = ref 0
 
-  let schedule_payment log t txn =
-    let open Deferred.Let_syntax in
-    if not (is_valid_payment t txn) then (
+  let record_payment ~log t (txn : Payment.t) account =
+    let previous = Account.receipt_chain_hash account in
+    let receipt_chain_database = receipt_chain_database t in
+    match Receipt_chain_database.add receipt_chain_database ~previous txn with
+    | `Ok hash ->
+        Logger.debug log
+          !"Added  payment %{sexp:Payment.t} into receipt_chain database. You \
+            should wait for a bit to see your account's receipt chain hash \
+            update as %{sexp:Receipt.Chain_hash.t}"
+          txn hash
+    | `Duplicate _ ->
+        Logger.warn log !"Already sent transaction %{sexp:Payment.t}" txn
+    | `Error_multiple_previous_receipts parent_hash ->
+        Logger.error log
+          !"A payment is derived from two different blockchain states \
+            (%{sexp:Receipt.Chain_hash.t}, %{sexp:Receipt.Chain_hash.t}). \
+            Receipt.Chain_hash is not collision resistant. This \
+            should not happen."
+          parent_hash previous ;
+        Core.exit 1
+
+  let schedule_payment log t (txn : Payment.t) =
+    let public_key = Public_key.compress txn.sender in
+    let account_opt = get_account t public_key in
+    if not (is_valid_payment t txn account_opt) then (
       Core.Printf.eprintf "Invalid payment: account balance is too low" ;
       Core.exit 1 ) ;
+    Option.iter account_opt ~f:(record_payment ~log t txn) ;
     let txn_pool = transaction_pool t in
     don't_wait_for (Transaction_pool.add txn_pool txn) ;
     Logger.info log
@@ -1013,7 +1043,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       txn ;
     txn_count := !txn_count + 1
 
-  let send_payment log t txn = schedule_payment log t txn ; Deferred.unit
+  let send_payment log t (txn : Payment.t) =
+    schedule_payment log t txn ; Deferred.unit
 
   let schedule_payments log t txns = List.iter txns ~f:(schedule_payment log t)
 

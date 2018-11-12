@@ -165,6 +165,13 @@ module Make (Kernel : Kernel_intf) = struct
           Unix.mkdtemp (banlist_dir_name ^/ "suspicious")
         in
         let%bind punished_dir = Unix.mkdtemp (banlist_dir_name ^/ "banned") in
+        let%bind receipt_chain_dir_name =
+          Unix.mkdtemp (conf_dir ^/ "receipt_chain")
+        in
+        let receipt_chain_database =
+          Coda_base.Receipt_chain_database.create
+            ~directory:receipt_chain_dir_name
+        in
         let banlist = Coda_base.Banlist.create ~suspicious_dir ~punished_dir in
         let net_config =
           { Main.Inputs.Net.Config.parent_log= log
@@ -189,7 +196,7 @@ module Make (Kernel : Kernel_intf) = struct
                  (conf_temp_dir ^/ "transaction_pool")
                ~snark_pool_disk_location:(conf_temp_dir ^/ "snark_pool")
                ~time_controller:(Main.Inputs.Time.Controller.create ())
-               ~snark_work_fee:(Currency.Fee.of_int 0)
+               ~receipt_chain_database ~snark_work_fee:(Currency.Fee.of_int 0)
                ?propose_keypair:Config.propose_keypair () ~banlist)
         in
         Option.iter snark_worker_config ~f:(fun config ->
