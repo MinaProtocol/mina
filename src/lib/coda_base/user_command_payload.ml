@@ -95,11 +95,11 @@ module Body = struct
 
   let length_in_triples = Tag.length_in_triples + max_variant_size
 
-  let gen =
+  let gen ~max_amount =
     let open Quickcheck.Generator in
-    map (variant2 Payment_payload.gen Stake_delegation.gen) ~f:(function
-      | `A p -> Payment p
-      | `B d -> Stake_delegation d )
+    map
+      (variant2 (Payment_payload.gen ~max_amount) Stake_delegation.gen)
+      ~f:(function `A p -> Payment p | `B d -> Stake_delegation d)
 end
 
 module Stable = struct
@@ -140,5 +140,9 @@ let dummy : t =
 
 let gen =
   let open Quickcheck.Generator.Let_syntax in
-  let%map common = Common.gen and body = Body.gen in
+  let%bind common = Common.gen in
+  let max_amount =
+    Currency.Amount.(sub max_int (of_fee common.fee)) |> Option.value_exn
+  in
+  let%map body = Body.gen ~max_amount in
   {common; body}
