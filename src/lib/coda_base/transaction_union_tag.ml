@@ -5,7 +5,7 @@ open Signature_lib
 open Snark_params.Tick
 
 type t = Payment | Stake_delegation | Fee_transfer | Coinbase
-[@@deriving enum, eq]
+[@@deriving enum, eq, sexp]
 
 let gen =
   Quickcheck.Generator.map (Int.gen_incl min max) ~f:(fun i ->
