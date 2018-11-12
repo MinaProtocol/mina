@@ -166,7 +166,7 @@ module Make (Kernel : Kernel_intf) = struct
         in
         let%bind punished_dir = Unix.mkdtemp (banlist_dir_name ^/ "banned") in
         let%bind receipt_chain_dir_name =
-          Unix.mkdtemp (conf_dir ^/ "receipt_chain")
+          Unix.mkdtemp (conf_temp_dir ^/ "receipt_chain")
         in
         let receipt_chain_database =
           Coda_base.Receipt_chain_database.create
