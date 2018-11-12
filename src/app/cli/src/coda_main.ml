@@ -1024,8 +1024,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         Logger.error log
           !"A payment is derived from two different blockchain states \
             (%{sexp:Receipt.Chain_hash.t}, %{sexp:Receipt.Chain_hash.t}). \
-            Receipt.Chain_hash is not collision resistant. This \
-            should not happen."
+            Receipt.Chain_hash is not collision resistant. This should not \
+            happen."
           parent_hash previous ;
         Core.exit 1
 

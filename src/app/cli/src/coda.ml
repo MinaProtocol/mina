@@ -315,8 +315,7 @@ let daemon (module Kernel : Kernel_intf) log =
                   (conf_dir ^/ "ledger_builder")
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
-                ~snark_work_fee:snark_work_fee_flag 
-                ~receipt_chain_database
+                ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
                 ~time_controller:(Inputs.Time.Controller.create ())
                 ?propose_keypair:Config0.propose_keypair () ~banlist)
          in
