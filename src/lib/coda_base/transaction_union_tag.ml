@@ -50,6 +50,8 @@ module Checked = struct
 
   let to_triples ((x, y) : var) = [(x, y, Boolean.false_)]
 
+  (* someday: Make these all cached *)
+
   let is_payment (b0, b1) = Boolean.((not b0) && not b1)
 
   let is_fee_transfer (b0, b1) = Boolean.((not b0) && b1)
