@@ -512,7 +512,7 @@ module Base = struct
                      (Tag.Checked.should_cons_to_receipt_chain tag)
                      ~then_:r ~else_:current
                  in
-                 let%bind delegate =
+                 let%bind _delegate =
                    Public_key.Compressed.Checked.if_ is_empty_and_writeable
                      ~then_:sender_compressed ~else_:account.delegate
                  in
@@ -523,19 +523,20 @@ module Base = struct
                  { Account.balance
                  ; public_key= sender_compressed
                  ; nonce= next_nonce
-                 ; receipt_chain_hash
-                 ; delegate }) )
+                 ; receipt_chain_hash (* TODO: Change in the next PR *)
+                 ; delegate= account.delegate }) )
         in
         (* we explicitly set the public_key because it could be zero if the account is new *)
         let%map root =
           Frozen_ledger_hash.modify_account_recv root receiver
             ~f:(fun ~is_empty_and_writeable account ->
               let%map balance = Balance.Checked.(account.balance + amount)
-              and delegate =
+              and _delegate =
                 Public_key.Compressed.Checked.if_ is_empty_and_writeable
                   ~then_:receiver ~else_:account.delegate
               in
-              {account with balance; delegate; public_key= receiver} )
+              (* TODO: Change in the next PR *)
+              {account with balance; public_key= receiver} )
         in
         (root, excess, supply_increase) )
 
