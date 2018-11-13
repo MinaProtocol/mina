@@ -792,16 +792,16 @@ end = struct
           in
           c.proposer :: ft_receivers
     in
-    let open Or_error.Let_syntax in
+    let open Deferred.Let_syntax in
     let witness = Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) in
-    Deferred.bind (Async.Scheduler.yield ()) ~f:(fun () ->
-        let r = apply_transaction_and_get_statement ledger s in
-        Deferred.map (Async.Scheduler.yield ()) ~f:(fun () ->
-            let%map undo, statement = r in
-            ( undo
-            , { Transaction_with_witness.transaction_with_info= undo
-              ; witness
-              ; statement } ) ) )
+    let%bind () = Async.Scheduler.yield () in
+    let r = apply_transaction_and_get_statement ledger s in
+    let%map () = Async.Scheduler.yield () in
+    let open Or_error.Let_syntax in
+    let%map undo, statement = r in
+    ( undo
+    , {Transaction_with_witness.transaction_with_info= undo; witness; statement}
+    )
 
   let update_ledger_and_get_statements ledger ts =
     let undo_transactions undos =
