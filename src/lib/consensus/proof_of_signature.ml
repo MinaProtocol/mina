@@ -252,7 +252,9 @@ module Make (Inputs : Inputs_intf) :
     in
     `Propose proposal_time
 
-  let lock_transition _ _ ~snarked_ledger:_ ~local_state:_ = ()
+  let lock_transition _ _ ~proposer_public_key:_ ~snarked_ledger:_
+      ~local_state:_ =
+    ()
 
   let genesis_protocol_state =
     Protocol_state.create_value
