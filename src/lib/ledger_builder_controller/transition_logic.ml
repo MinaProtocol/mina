@@ -10,6 +10,7 @@ module type Inputs_intf = sig
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type external_transition := Consensus_mechanism.External_transition.t
      and type state_hash := State_hash.t
+     and type public_key_compressed := Public_key.Compressed.t
 
   module Step : sig
     (* This checks the SNARKs in State/LB and does the transition *)

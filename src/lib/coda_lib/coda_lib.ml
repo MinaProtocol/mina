@@ -160,6 +160,8 @@ module type Ktree_intf = sig
 end
 
 module type Ledger_builder_controller_intf = sig
+  type public_key_compressed
+
   type ledger_builder
 
   type ledger_builder_hash
@@ -194,6 +196,7 @@ module type Ledger_builder_controller_intf = sig
           (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: tip
       ; consensus_local_state: consensus_local_state
+      ; proposer_public_key: public_key_compressed option
       ; longest_tip_location: string }
     [@@deriving make]
   end
@@ -377,6 +380,7 @@ module type Inputs_intf = sig
      and type ledger_hash := Ledger_hash.t
      and type ledger_proof := Ledger_proof.t
      and type tip := Tip.t
+     and type public_key_compressed := Public_key.Compressed.t
 
   module Proposer :
     Proposer_intf
@@ -489,6 +493,9 @@ module Make (Inputs : Inputs_intf) = struct
     let lbc_deferred =
       Ledger_builder_controller.create
         (Ledger_builder_controller.Config.make ~parent_log:config.log
+           ?proposer_public_key:
+             (Option.map config.propose_keypair ~f:(fun k ->
+                  k.public_key |> Public_key.compress ))
            ~net_deferred:(Ivar.read net_ivar)
            ~genesis_tip:
              { ledger_builder= Ledger_builder.create ~ledger:Genesis.ledger
@@ -496,7 +503,7 @@ module Make (Inputs : Inputs_intf) = struct
              ; proof= Genesis.proof }
            ~consensus_local_state
            ~longest_tip_location:config.ledger_builder_persistant_location
-           ~external_transitions:external_transitions_reader)
+           ~external_transitions:external_transitions_reader ())
     in
     let%bind net =
       Net.create config.net_config
