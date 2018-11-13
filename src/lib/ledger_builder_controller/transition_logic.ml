@@ -230,7 +230,7 @@ module Make (Inputs : Inputs_intf) :
 
     let run old_state ~on_success new_tree old_tree new_best_path logger
         _transition =
-      trace_task "path traversal" (fun () ->
+      trace_recurring_task "path traversal" (fun () ->
           let locked_tip = Transition_logic_state.locked_tip old_state
           and longest_branch_tip =
             Transition_logic_state.longest_branch_tip old_state

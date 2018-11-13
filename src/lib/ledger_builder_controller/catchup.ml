@@ -38,6 +38,7 @@ struct
          -> Transition_logic_state.Change.t list
          -> External_transition.t
          -> unit Deferred.t) transition_with_hash =
+      trace_recurring_task "catchup" (fun () ->
     let {With_hash.data= locked_tip; hash= _} =
       Transition_logic_state.locked_tip old_state
     in
@@ -87,7 +88,7 @@ struct
     let sl : Sync_ledger.t =
       match !sl_ref with
       | None ->
-          trace_task "sync ledger" (fun () ->
+          trace_recurring_task "sync ledger" (fun () ->
               let ledger =
                 Ledger_builder.ledger locked_tip.ledger_builder |> Ledger.copy
               in
@@ -134,7 +135,7 @@ struct
             old_target new_target ;
           return ()
     in
-    (work, ivar)
+    (work, ivar))
 
   let sync (t : t) ~(old_state : Transition_logic_state.t) ~state_mutator
       transition_with_hash =

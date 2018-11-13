@@ -254,9 +254,8 @@ end = struct
                  | `Cancel_and_do_next ->
                      Option.iter last ~f:(fun (input, ivar) ->
                          Ivar.fill_if_empty ivar input ) ;
-                     let w, this_ivar =
-                       trace_task "running job" (fun () -> Job.run job)
-                     in
+                     trace_event "running a job" ;
+                     let w, this_ivar = Job.run job in
                      let () =
                        Deferred.upon w.Interruptible.d (function
                          | Ok () -> Logger.trace log "Job is completed"
@@ -316,6 +315,7 @@ end = struct
       -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t =
    fun t (hash, query) ->
     (* TODO: this caching shouldn't be necessary *)
+    trace_recurring_task "answer sync query" (fun () ->
     let open Deferred.Or_error.Let_syntax in
     Logger.trace t.log
       !"Attempting to handle a sync-ledger query for %{sexp: Ledger_hash.t}"
@@ -346,8 +346,9 @@ end = struct
         prev_ledger := Some ll ;
         ll
     in
+    trace_event "local ledger get"
     let responder = Sync_ledger.Responder.create ledger ignore in
-    (hash, Sync_ledger.Responder.answer_query responder query)
+    (hash, Sync_ledger.Responder.answer_query responder query))
 end
 
 let%test_module "test" =

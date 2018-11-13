@@ -104,6 +104,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         (fun conn m -> return (Message.dispatch_multi conn m))
         msg
     in
+    trace_event "broadcasting message" ;
     Deferred.List.iter ~how:`Parallel peers ~f:(fun p ->
         match%map send p with
         | Ok () -> ()
@@ -159,7 +160,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
           Rpc.Implementations.create_exn ~implementations
             ~on_unknown_rpc:`Close_connection
         in
-        don't_wait_for
+        trace_task "peer events" (fun () ->
           (Linear_pipe.iter_unordered ~max_concurrency:64 peer_events
              ~f:(function
             | Connect peers ->
@@ -171,7 +172,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                 Logger.info log "Some peers disconnected %s"
                   (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
                 List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer) ;
-                Deferred.unit )) ;
+                Deferred.unit )) |> ignore);
         ignore
           (Tcp.Server.create
              ~on_handler_error:
