@@ -41,6 +41,7 @@
       rpc_parallel
       async_ssl
       cohttp
+      o1trace
       cohttp-async
       parallel
       file_system
