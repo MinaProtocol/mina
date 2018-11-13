@@ -245,10 +245,12 @@ module Make (Inputs : Inputs_intf) :
           (Deferred.map (Ivar.read ivar) ~f:ignore)
       in
       let work =
+        let locked_tip = With_hash.map locked_tip ~f:Tip.copy in
+        let longest_branch_tip = With_hash.map longest_branch_tip ~f:Tip.copy in
+
         (* Adjust the locked_ledger if necessary *)
         let%bind locked_tip =
           if transition_is_parent_of ~child:new_head ~parent:old_head then
-            let locked_tip = With_hash.map locked_tip ~f:Tip.copy in
             transition_unchecked locked_tip.data new_head logger
           else return locked_tip
         in
@@ -258,9 +260,9 @@ module Make (Inputs : Inputs_intf) :
             Path.findi new_best_path ~f:(fun _ x ->
                 is_materialization_of longest_branch_tip x )
           with
-          | None -> (With_hash.map locked_tip ~f:Tip.copy, new_best_path)
+          | None -> (locked_tip, new_best_path)
           | Some (i, _) ->
-              ( With_hash.map longest_branch_tip ~f:Tip.copy
+              ( longest_branch_tip
               , Path.drop new_best_path (i + 1) )
         in
         let last_transition = List.last_exn path.Path.path in
