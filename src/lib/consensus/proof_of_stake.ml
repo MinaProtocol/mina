@@ -123,10 +123,14 @@ module Make (Inputs : Inputs_intf) :
   module Local_state = struct
     type t =
       { mutable last_epoch_ledger: Coda_base.Ledger.t option
-      ; mutable curr_epoch_ledger: Coda_base.Ledger.t option }
+      ; mutable curr_epoch_ledger: Coda_base.Ledger.t option
+      ; mutable delegators: Currency.Balance.t Public_key.Compressed.Table.t }
     [@@deriving sexp]
 
-    let create () = {last_epoch_ledger= None; curr_epoch_ledger= None}
+    let create () =
+      { last_epoch_ledger= None
+      ; curr_epoch_ledger= None
+      ; delegators= Public_key.Compressed.Table.create () }
   end
 
   module Epoch = struct
@@ -1132,8 +1136,18 @@ module Make (Inputs : Inputs_intf) :
         `Check_again
           (Epoch.end_time epoch |> Time.to_span_since_epoch |> Time.Span.to_ms)
 
+  let compute_delegators self_pk ledger =
+    let t = Public_key.Compressed.Table.create () in
+    Coda_base.Ledger.fold_until ledger ~init:() ~finish:Fn.id
+      ~f:(fun () acct ->
+        if Public_key.Compressed.equal self_pk acct.delegate then
+          Hashtbl.add t ~key:acct.public_key ~data:acct.balance |> ignore ;
+        Continue () ) ;
+    t
+
   (* TODO *)
-  let lock_transition prev next ~snarked_ledger ~local_state =
+  let lock_transition prev next ~proposer_public_key ~snarked_ledger
+      ~local_state =
     let open Local_state in
     let open Consensus_state in
     if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
@@ -1141,6 +1155,8 @@ module Make (Inputs : Inputs_intf) :
         match snarked_ledger () with Ok l -> l | Error e -> Error.raise e
       in
       local_state.last_epoch_ledger <- local_state.curr_epoch_ledger ;
+      Option.iter local_state.last_epoch_ledger ~f:(fun l ->
+          local_state.delegators <- compute_delegators proposer_public_key l ) ;
       local_state.curr_epoch_ledger <- Some ledger )
 
   (* TODO: determine correct definition of genesis state *)
