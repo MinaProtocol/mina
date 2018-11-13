@@ -11,9 +11,6 @@ jobs:
                 name: Lint
                 command: eval `opam config env` && make check-format
             - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
-            - run:
                 name: Build OCaml
                 command: eval `opam config env` && DUNE_PROFILE=dev make build 2>&1 | tee /tmp/buildocaml.log
             - run:
@@ -37,9 +34,6 @@ jobs:
         - image: codaprotocol/coda:toolchain-90509bec114a4bbe4e676765c21118f403e86452
         steps:
             - checkout
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
             - run:
                 name: Build OCaml
                 command: eval `opam config env` && DUNE_PROFILE=testnet make build 2>&1 | tee /tmp/buildocaml.log
@@ -65,9 +59,6 @@ jobs:
         steps:
             - checkout
             - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
-            - run:
                 name: Build OCaml
                 command: eval `opam config env` && DUNE_PROFILE=testnet_public make build 2>&1 | tee /tmp/buildocaml.log
             - run:
@@ -86,9 +77,6 @@ jobs:
        steps:
            - checkout
            - run:
-               name: Build Haskell
-               command: source ~/.profile && make kademlia
-           - run:
               name: Test make test-runtest
               command: source ~/.profile && make test-runtest
 
@@ -98,9 +86,6 @@ jobs:
         - image: codaprotocol/coda:toolchain-90509bec114a4bbe4e676765c21118f403e86452
         steps:
             - checkout
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
             - run:
                 name: Build OCaml
                 command: eval `opam config env` && DUNE_PROFILE=test_snark make build 2>&1 | tee /tmp/buildocaml.log
@@ -118,9 +103,6 @@ jobs:
           - run:
               name: Check .circleci Render
               command: make check-render-circleci
-          - run:
-              name: Build Haskell
-              command: source ~/.profile && make kademlia
           - run:
               name: Build OCaml
               command: eval `opam config env` && DUNE_PROFILE=test make build 2>&1 | tee /tmp/buildocaml.log
@@ -142,7 +124,8 @@ workflows:
             {%endfor%}
             - test-withsnark
             - test-unit-test
-    # NOTES: Save this idea for later (nightly/scheduled workflows)
+
+# NOTES: Save this idea for later (nightly/scheduled workflows)
     # nightly:
     #     triggers:
     #         - schedule:
