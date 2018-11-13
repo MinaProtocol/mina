@@ -1,6 +1,15 @@
 # WARNING: config.yml file is generated from config.yml.jinja
 version: 2
 jobs:
+    tracetool:
+        docker:
+            - image: rust
+        steps:
+            - checkout
+            - run:
+                name: Build trace-tool
+                command: cd src/app/trace-tool && cargo build
+
     build:
         resource_class: large
         docker:
@@ -142,6 +151,7 @@ workflows:
             {%endfor%}
             - test-withsnark
             - test-unit-test
+            - tracetool
     # NOTES: Save this idea for later (nightly/scheduled workflows)
     # nightly:
     #     triggers:
