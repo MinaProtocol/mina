@@ -1,16 +1,25 @@
 open Core
+open Async
 open Receipt_chain_database_lib
+open Storage.Disk
 
 module Payment = struct
-  include Payment
+  module T = struct
+    include Payment
 
-  type payload = Payload.Stable.V1.t
+    type payload = Payload.Stable.V1.t
 
-  let payload {payload; _} = payload
+    let payload {payload; _} = payload
+
+    let compare this that = compare this.payload that.payload
+  end
+
+  include T
+  include Hashable.Make_binable (T)
 end
 
 module Tree_node = struct
-  type t = (Receipt.Chain_hash.t, Payment.t) Tree_node.t
+  type t = (Receipt.Chain_hash.t, Payment.t) Tree_node.t [@@deriving bin_io]
 end
 
 module Key_value_store =

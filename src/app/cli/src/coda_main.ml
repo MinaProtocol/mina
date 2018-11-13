@@ -1017,9 +1017,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
           !"Added  payment %{sexp:Payment.t} into receipt_chain database. You \
             should wait for a bit to see your account's receipt chain hash \
             update as %{sexp:Receipt.Chain_hash.t}"
-          txn hash
-    | `Duplicate _ ->
-        Logger.warn log !"Already sent transaction %{sexp:Payment.t}" txn
+          txn hash ;
+        hash
+    | `Duplicate hash ->
+        Logger.warn log !"Already sent transaction %{sexp:Payment.t}" txn ;
+        hash
     | `Error_multiple_previous_receipts parent_hash ->
         Logger.error log
           !"A payment is derived from two different blockchain states \
@@ -1035,18 +1037,32 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     if not (is_valid_payment t txn account_opt) then (
       Core.Printf.eprintf "Invalid payment: account balance is too low" ;
       Core.exit 1 ) ;
-    Option.iter account_opt ~f:(record_payment ~log t txn) ;
+    let receipt = record_payment ~log t txn (Option.value_exn account_opt) in
     let txn_pool = transaction_pool t in
     don't_wait_for (Transaction_pool.add txn_pool txn) ;
     Logger.info log
       !"Added payment %{sexp: Payment.t} to pool successfully"
       txn ;
-    txn_count := !txn_count + 1
+    txn_count := !txn_count + 1 ;
+    receipt
 
   let send_payment log t (txn : Payment.t) =
-    schedule_payment log t txn ; Deferred.unit
+    return @@ schedule_payment log t txn
 
-  let schedule_payments log t txns = List.iter txns ~f:(schedule_payment log t)
+  let schedule_payments log t txns =
+    List.iter txns ~f:(fun txn ->
+        let _ : Receipt.Chain_hash.t = schedule_payment log t txn in
+        () )
+
+  let prove_receipt t ~proving_receipt ~resulting_receipt :
+      (Receipt.Chain_hash.t * Payment.t) list Deferred.t =
+    let receipt_chain_database = receipt_chain_database t in
+    let result =
+      Receipt_chain_database.prove receipt_chain_database ~proving_receipt
+        ~resulting_receipt
+      |> Or_error.ok_exn
+    in
+    result |> Deferred.return
 
   let get_nonce t (addr : Public_key.Compressed.t) =
     let open Option.Let_syntax in

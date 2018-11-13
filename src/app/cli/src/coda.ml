@@ -529,6 +529,7 @@ let coda_commands (module Kernel : Kernel_intf) log =
     let module Coda_shared_prefix_test = Coda_shared_prefix_test.Make (Kernel) in
     let module Coda_restart_node_test = Coda_restart_node_test.Make (Kernel) in
     let module Coda_shared_state_test = Coda_shared_state_test.Make (Kernel) in
+    let module Coda_receipt_chain_test = Coda_receipt_chain_test.Make (Kernel) in
     let module Coda_transitive_peers_test =
       Coda_transitive_peers_test.Make (Kernel) in
     [ (Coda_peers_test.name, Coda_peers_test.command)
@@ -537,6 +538,7 @@ let coda_commands (module Kernel : Kernel_intf) log =
     ; (Coda_transitive_peers_test.name, Coda_transitive_peers_test.command)
     ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
     ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
+    ; (Coda_receipt_chain_test.name, Coda_receipt_chain_test.command)
     ; ("full-test", Full_test.command (module Kernel))
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
   in

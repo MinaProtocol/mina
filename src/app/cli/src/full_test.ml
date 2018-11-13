@@ -156,13 +156,17 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
       Run.get_balance coda receiver_pk
       |> Option.value ~default:Currency.Balance.zero
     in
-    let%bind () = Run.send_payment log coda (payment :> Payment.t) in
+    let%bind _ : Receipt.Chain_hash.t =
+      Run.send_payment log coda (payment :> Payment.t)
+    in
     (* Send a similar the payment twice on purpose; this second one
     * will be rejected because the nonce is wrong *)
     let payment' =
       build_payment send_amount sender_sk receiver_pk (Currency.Fee.of_int 0)
     in
-    let%bind () = Run.send_payment log coda (payment' :> Payment.t) in
+    let%bind _ : Receipt.Chain_hash.t =
+      Run.send_payment log coda (payment' :> Payment.t)
+    in
     (* Let the system settle, mine some blocks *)
     let%map () =
       balance_change_or_timeout ~initial_receiver_balance:prev_receiver_balance
@@ -189,7 +193,9 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
           Option.value_exn
             (Currency.Balance.add_amount (Option.value_exn v) amount) )
     in
-    let%map () = Run.send_payment log coda (payment :> Payment.t) in
+    let%map _ : Receipt.Chain_hash.t =
+      Run.send_payment log coda (payment :> Payment.t)
+    in
     new_balance_sheet'
   in
   let send_payments accounts pks balance_sheet f_amount =

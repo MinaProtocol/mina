@@ -31,12 +31,15 @@ module Make (Kernel : Kernel_intf) = struct
 
     let online t i = t.online.(i)
 
-    let get_balance t i pk =
+    let run_online_worker ~f ~arg t i =
       let worker = List.nth_exn t.workers i in
-      if online t i then
-        Deferred.map (Coda_process.get_balance_exn worker pk) ~f:(fun x ->
-            Some x )
+      if online t i then Deferred.map (f ~worker arg) ~f:(fun x -> Some x)
       else return None
+
+    let get_balance t i pk =
+      run_online_worker ~arg:pk
+        ~f:(fun ~worker pk -> Coda_process.get_balance_exn worker pk)
+        t i
 
     let start t i =
       Linear_pipe.write t.start_writer
@@ -48,6 +51,25 @@ module Make (Kernel : Kernel_intf) = struct
 
     let send_payment t i sk pk amount fee =
       Linear_pipe.write t.payment_writer (i, sk, pk, amount, fee)
+
+    let send_payment_with_receipt t i sk pk amount fee =
+      run_online_worker ~arg:(sk, pk, amount, fee)
+        ~f:(fun ~worker (sk, pk, amount, fee) ->
+          Coda_process.send_payment_exn worker sk pk amount fee
+            Payment_memo.dummy )
+        t i
+    
+    (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the 
+      merkle_list of receipts up to the current state of a sender's receipt_chain hash for some blockchain. 
+      However, whenever we get a new transition, the blockchain does not update and `prove_receipt` would not query 
+      the merkle list that we are looking for *)
+    let prove_receipt t i proving_receipt resulting_receipt =
+      run_online_worker
+        ~arg:(proving_receipt, resulting_receipt)
+        ~f:(fun ~worker (proving_receipt, resulting_receipt) ->
+          Coda_process.prove_receipt_exn worker proving_receipt
+            resulting_receipt )
+        t i
   end
 
   let start_prefix_check log workers events proposal_interval testnet =
@@ -180,8 +202,11 @@ module Make (Kernel : Kernel_intf) = struct
     don't_wait_for
       (Linear_pipe.iter payments ~f:(fun (i, sk, pk, amount, fee) ->
            let%bind () = add_to_active_accounts pk in
-           Coda_process.send_payment_exn (List.nth_exn workers i) sk pk amount
-             fee Payment_memo.dummy )) ;
+           let%map _ : Receipt.Chain_hash.t =
+             Coda_process.send_payment_exn (List.nth_exn workers i) sk pk
+               amount fee Payment_memo.dummy
+           in
+           () )) ;
     don't_wait_for
       (let rec go () =
          let%bind () = check_active_accounts () in

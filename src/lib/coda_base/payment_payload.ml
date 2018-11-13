@@ -13,7 +13,7 @@ module Stable = struct
   module V1 = struct
     type ('pk, 'amount, 'fee, 'nonce, 'memo) t_ =
       {receiver: 'pk; amount: 'amount; fee: 'fee; nonce: 'nonce; memo: 'memo}
-    [@@deriving bin_io, eq, sexp, hash]
+    [@@deriving bin_io, eq, sexp, hash, compare]
 
     type t =
       ( Public_key.Compressed.Stable.V1.t
@@ -22,7 +22,7 @@ module Stable = struct
       , Account_nonce.Stable.V1.t
       , Memo.t )
       t_
-    [@@deriving bin_io, eq, sexp, hash]
+    [@@deriving bin_io, eq, sexp, hash, compare]
   end
 end
 

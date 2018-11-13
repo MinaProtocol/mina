@@ -51,6 +51,17 @@ module Make (Kernel : Kernel_intf) = struct
       type t = Currency.Balance.t option [@@deriving bin_io]
     end
 
+    module Prove_receipt = struct
+      module Input = struct
+        type t = Receipt.Chain_hash.t * Receipt.Chain_hash.t
+        [@@deriving bin_io]
+      end
+
+      module Output = struct
+        type t = (Receipt.Chain_hash.t * Payment.t) list [@@deriving bin_io]
+      end
+    end
+
     type 'worker functions =
       { peers: ('worker, unit, Peers.t) Rpc_parallel.Function.t
       ; get_balance:
@@ -59,18 +70,27 @@ module Make (Kernel : Kernel_intf) = struct
           , Currency.Balance.t option )
           Rpc_parallel.Function.t
       ; send_payment:
-          ('worker, Send_payment_input.t, unit) Rpc_parallel.Function.t
+          ( 'worker
+          , Send_payment_input.t
+          , Receipt.Chain_hash.t )
+          Rpc_parallel.Function.t
       ; strongest_ledgers:
           ('worker, unit, State_hashes.t Pipe.Reader.t) Rpc_parallel.Function.t
-      }
+      ; prove_receipt:
+          ( 'worker
+          , Prove_receipt.Input.t
+          , Prove_receipt.Output.t )
+          Rpc_parallel.Function.t }
 
     type coda_functions =
       { coda_peers: unit -> Peers.t Deferred.t
       ; coda_get_balance:
           Public_key.Compressed.t -> Maybe_currency.t Deferred.t
-      ; coda_send_payment: Send_payment_input.t -> unit Deferred.t
+      ; coda_send_payment:
+          Send_payment_input.t -> Receipt.Chain_hash.t Deferred.t
       ; coda_strongest_ledgers: unit -> State_hashes.t Pipe.Reader.t Deferred.t
-      }
+      ; coda_prove_receipt:
+          Prove_receipt.Input.t -> Prove_receipt.Output.t Deferred.t }
 
     module Worker_state = struct
       type init_arg = Input.t [@@deriving bin_io]
@@ -101,6 +121,9 @@ module Make (Kernel : Kernel_intf) = struct
       let send_payment_impl ~worker_state ~conn_state:() input =
         worker_state.coda_send_payment input
 
+      let prove_receipt_impl ~worker_state ~conn_state:() input =
+        worker_state.coda_prove_receipt input
+
       let peers =
         C.create_rpc ~f:peers_impl ~bin_input:Unit.bin_t
           ~bin_output:Peers.bin_t ()
@@ -109,15 +132,20 @@ module Make (Kernel : Kernel_intf) = struct
         C.create_rpc ~f:get_balance_impl ~bin_input:Public_key.Compressed.bin_t
           ~bin_output:Maybe_currency.bin_t ()
 
+      let prove_receipt =
+        C.create_rpc ~f:prove_receipt_impl ~bin_input:Prove_receipt.Input.bin_t
+          ~bin_output:Prove_receipt.Output.bin_t ()
+
       let send_payment =
         C.create_rpc ~f:send_payment_impl ~bin_input:Send_payment_input.bin_t
-          ~bin_output:Unit.bin_t ()
+          ~bin_output:Receipt.Chain_hash.bin_t ()
 
       let strongest_ledgers =
         C.create_pipe ~f:strongest_ledgers_impl ~bin_input:Unit.bin_t
           ~bin_output:State_hashes.bin_t ()
 
-      let functions = {peers; strongest_ledgers; get_balance; send_payment}
+      let functions =
+        {peers; strongest_ledgers; get_balance; send_payment; prove_receipt}
 
       let init_worker_state
           { host
@@ -222,6 +250,9 @@ module Make (Kernel : Kernel_intf) = struct
           let payment = build_txn amount sk pk fee in
           Run.send_payment log coda (payment :> Payment.t)
         in
+        let coda_prove_receipt (proving_receipt, resulting_receipt) =
+          Run.prove_receipt coda ~proving_receipt ~resulting_receipt
+        in
         let coda_strongest_ledgers () =
           let r, w = Linear_pipe.create () in
           don't_wait_for
@@ -246,7 +277,8 @@ module Make (Kernel : Kernel_intf) = struct
           { coda_peers
           ; coda_strongest_ledgers
           ; coda_get_balance
-          ; coda_send_payment }
+          ; coda_send_payment
+          ; coda_prove_receipt }
 
       let init_connection_state ~connection:_ ~worker_state:_ = return
     end
