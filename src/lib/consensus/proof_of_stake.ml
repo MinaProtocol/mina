@@ -401,7 +401,9 @@ module Make (Inputs : Inputs_intf) :
 
       let of_uint64_exn = Fn.compose of_int64_exn UInt64.to_int64
 
-      let c = of_int 1
+      let c_int = 1
+
+      let c = of_int c_int
 
       (*  Check if
           vrf_output / 2^256 <= c * my_stake / total_currency
@@ -413,12 +415,73 @@ module Make (Inputs : Inputs_intf) :
       let is_satisfied ~my_stake ~total_stake vrf_output =
         of_bit_fold_lsb (Sha256.Digest.fold_bits vrf_output)
         * of_uint64_exn (Amount.to_uint64 total_stake)
-        <= shift_left (c * of_uint64_exn (Balance.to_uint64 my_stake)) 256
+        <= shift_left
+             (c * of_uint64_exn (Balance.to_uint64 my_stake))
+             Sha256.Digest.length_in_bits
+
+      module Checked = struct
+        (* This version can't be used right now because the field is too small. *)
+        let _is_satisfied ~my_stake ~total_stake vrf_output =
+          let open Snark_params.Tick in
+          let open Let_syntax in
+          let open Number in
+          let%bind lhs =
+            of_bits vrf_output * Amount.var_to_number total_stake
+          in
+          let%bind rhs =
+            let%bind x =
+              (* someday: This should really just be a scalar multiply... *)
+              constant (Field.of_int c_int) * Amount.var_to_number my_stake
+            in
+            mul_pow_2 x (`Two_to_the Sha256.Digest.length_in_bits)
+          in
+          lhs <= rhs
+
+        (* It was somewhat involved to implement that check with the small field, so
+          we've stubbed it out for now. *)
+        let is_satisfied ~my_stake:_ ~total_stake:_ _vrf_output =
+          let () = assert Coda_base.Insecure.vrf_threshold_check in
+          Snark_params.Tick.(Checked.return Boolean.true_)
+      end
     end
 
-    include Vrf_lib.Integrated.Make (Snark_params.Tick) (Scalar) (Group)
-              (Message)
-              (Output)
+    module T =
+      Vrf_lib.Integrated.Make (Snark_params.Tick) (Scalar) (Group) (Message)
+        (Output)
+    include T
+
+    type _ Snarky.Request.t +=
+      | Winner_address : Coda_base.Account.Index.t Snarky.Request.t
+      | Private_key : Scalar.value Snarky.Request.t
+
+    let get_vrf_evaluation shifted ~ledger ~message =
+      let open Coda_base in
+      let open Snark_params.Tick in
+      let open Let_syntax in
+      let%bind winner_addr =
+        request_witness Account.Index.Unpacked.typ
+          (As_prover.return Winner_address)
+      in
+      let%bind private_key =
+        request_witness Scalar.typ (As_prover.return Private_key)
+      in
+      let%bind account = Coda_base.Frozen_ledger_hash.get ledger winner_addr in
+      let%bind delegate = Public_key.decompress_var account.delegate in
+      let%map evaluation =
+        T.Checked.eval_and_check_public_key shifted ~private_key
+          ~public_key:delegate message
+      in
+      (evaluation, account.balance)
+
+    let check_in_snark shifted ~ledger ~epoch ~slot ~seed ~lock_checkpoint
+        ~total_stake =
+      let open Snark_params.Tick in
+      let open Let_syntax in
+      let%bind result, my_stake =
+        get_vrf_evaluation shifted ~ledger
+          ~message:{Message.epoch; slot; seed; lock_checkpoint}
+      in
+      Threshold.Checked.is_satisfied ~my_stake ~total_stake result
 
     let check ~epoch ~slot ~seed ~lock_checkpoint ~private_key ~owned_stake
         ~total_stake ~logger =
