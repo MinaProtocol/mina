@@ -121,6 +121,8 @@ fn main() {
             .read_to_end(&mut contents)
             .unwrap();
         let mut seen_tids = HashMap::<Tid, String>::new();
+        let mut recurring_map = HashMap::<String, Tid>::new();
+        let mut tidmap = HashMap::<Tid, Tid>::new();
         let mut cur_pid = 0;
         match parse_trace_events(contents.as_ref()) {
             Ok((_, events)) => {
@@ -135,15 +137,23 @@ fn main() {
                         let cur_ts = event.ns_since_epoch;
                         match event.data {
                             New(t, s) => {
+                                if s.starts_with("R&") {
+                                    let real = recurring_map.entry(s.clone()).or_insert(t);
+                                    tidmap.insert(t, *real);
+                                }
                                 println!(r#"{{"name":"thread_name","ph":"M","pid":{},"tid":{},"args":{{"name":"{}"}}}},"#, cur_pid, t.0, s);
                                 seen_tids.insert(t, s);
                                 (prev_ts, prev_task)
                             }
                             Switch(t) => {
+                                let prev_task = prev_task.and_then(|t| tidmap.get(&t).map(|x| *x));
                                 complete_event(&seen_tids, cur_pid, cur_ts, prev_ts, prev_task);
-                                (cur_ts, Some(t))
-                            },
-                            CycleStart => { cycle_start_ts = cur_ts; (cur_ts, prev_task)},
+                                (cur_ts, tidmap.get(&t).map(|x| *x).or(Some(t)))
+                            }
+                            CycleStart => {
+                                cycle_start_ts = cur_ts;
+                                (cur_ts, prev_task)
+                            }
                             CycleEnd => {
                                 // if the cycle is reported as ending, then whatever thread was running just finished.
                                 complete_event(&seen_tids, cur_pid, cur_ts, prev_ts, prev_task);

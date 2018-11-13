@@ -77,6 +77,9 @@ let trace_task (name : string) (f : unit -> 'a) =
       failwith "traced task failed, exception reported to parent monitor"
   | Ok x -> x
 
+let trace_recurring_task (name : string) (f : unit -> 'a) =
+  trace_task ("R&" ^ name) (fun () -> trace_event "started another" ; f ())
+
 let measure' wr (name : string) (f : unit -> 'a) : 'a =
   emitk Start 0 |> emitt |> emits name |> finish wr ;
   let res = f () in
@@ -108,6 +111,8 @@ let start_tracing wr =
 let[@inline] measure _ f = f ()
 
 let[@inline] trace_event _ = ()
+
+let[@inline] trace_recurring_task _ f = f ()
 
 let[@inline] trace_task _ f = f ()
 
