@@ -794,9 +794,15 @@ end = struct
           c.proposer :: ft_receivers
     in
     let open Deferred.Let_syntax in
-    let witness = measure "sparse ledger" (fun () -> Sparse_ledger.of_ledger_subset_exn ledger (public_keys s)) in
+    let witness =
+      measure "sparse ledger" (fun () ->
+          Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) )
+    in
     let%bind () = Async.Scheduler.yield () in
-    let r = measure "apply+stmt" (fun () -> apply_transaction_and_get_statement ledger s) in
+    let r =
+      measure "apply+stmt" (fun () ->
+          apply_transaction_and_get_statement ledger s )
+    in
     let%map () = Async.Scheduler.yield () in
     let open Or_error.Let_syntax in
     let%map undo, statement = r in
