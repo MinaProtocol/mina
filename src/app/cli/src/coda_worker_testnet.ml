@@ -58,7 +58,7 @@ module Make (Kernel : Kernel_intf) = struct
           Coda_process.send_payment_exn worker sk pk amount fee
             Payment_memo.dummy )
         t i
-    
+
     (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the 
       merkle_list of receipts up to the current state of a sender's receipt_chain hash for some blockchain. 
       However, whenever we get a new transition, the blockchain does not update and `prove_receipt` would not query 

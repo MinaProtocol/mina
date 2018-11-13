@@ -40,6 +40,7 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
     in
     let%map result =
       let open Deferred.Option.Let_syntax in
+      (* TODO: we should test sending multiple payments simultaneously *)
       let%bind receipt_chain_hash =
         Coda_worker_testnet.Api.send_payment_with_receipt testnet 0 sender_sk
           receiver_pk send_amount fee

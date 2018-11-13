@@ -1023,40 +1023,43 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         Logger.warn log !"Already sent transaction %{sexp:Payment.t}" txn ;
         hash
     | `Error_multiple_previous_receipts parent_hash ->
-        Logger.error log
+        Logger.fatal log
           !"A payment is derived from two different blockchain states \
             (%{sexp:Receipt.Chain_hash.t}, %{sexp:Receipt.Chain_hash.t}). \
-            Receipt.Chain_hash is not collision resistant. This should not \
-            happen."
+            Receipt.Chain_hash is supposed to be collision resistant. This \
+            collision should not happen."
           parent_hash previous ;
         Core.exit 1
 
-  let schedule_payment log t (txn : Payment.t) =
-    let public_key = Public_key.compress txn.sender in
-    let account_opt = get_account t public_key in
+  let schedule_payment log t (txn : Payment.t) account_opt =
     if not (is_valid_payment t txn account_opt) then (
       Core.Printf.eprintf "Invalid payment: account balance is too low" ;
       Core.exit 1 ) ;
-    let receipt = record_payment ~log t txn (Option.value_exn account_opt) in
     let txn_pool = transaction_pool t in
     don't_wait_for (Transaction_pool.add txn_pool txn) ;
     Logger.info log
       !"Added payment %{sexp: Payment.t} to pool successfully"
       txn ;
-    txn_count := !txn_count + 1 ;
-    receipt
+    txn_count := !txn_count + 1
 
   let send_payment log t (txn : Payment.t) =
-    return @@ schedule_payment log t txn
+    let public_key = Public_key.compress txn.sender in
+    let account_opt = get_account t public_key in
+    schedule_payment log t txn account_opt ;
+    Deferred.return @@ record_payment ~log t txn (Option.value_exn account_opt)
 
+  (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
   let schedule_payments log t txns =
-    List.iter txns ~f:(fun txn ->
-        let _ : Receipt.Chain_hash.t = schedule_payment log t txn in
-        () )
+    List.iter txns ~f:(fun (txn : Payment.t) ->
+        let public_key = Public_key.compress txn.sender in
+        let account_opt = get_account t public_key in
+        schedule_payment log t txn account_opt )
 
   let prove_receipt t ~proving_receipt ~resulting_receipt :
       (Receipt.Chain_hash.t * Payment.t) list Deferred.t =
     let receipt_chain_database = receipt_chain_database t in
+    (* TODO: since we are making so many reads to `receipt_chain_database`, 
+    reads should be async to not get IO-blocked. See #1125 *)
     let result =
       Receipt_chain_database.prove receipt_chain_database ~proving_receipt
         ~resulting_receipt
