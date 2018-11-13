@@ -252,7 +252,7 @@ module Make (Inputs : Inputs_intf) :
     in
     `Propose proposal_time
 
-  let lock_transition _ _ ~proposer_public_key:_ ~snarked_ledger:_
+  let lock_transition ?proposer_public_key:_ _ _ ~snarked_ledger:_
       ~local_state:_ =
     ()
 
