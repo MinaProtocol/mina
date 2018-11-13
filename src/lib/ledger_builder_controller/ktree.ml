@@ -23,6 +23,11 @@ module Rose = struct
     let iter = `Define_using_fold
   end)
 
+  let rec fold_edges ~init ~f (Rose (base, successors)) =
+    List.fold successors
+      ~init:(List.fold successors ~init ~f:(fun init (Rose (child, _)) -> f init base child))
+      ~f:(fun init succ -> fold_edges succ ~init ~f)
+
   let to_list = C.to_list
 
   let to_array = C.to_array

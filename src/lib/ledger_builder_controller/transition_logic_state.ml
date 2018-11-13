@@ -95,7 +95,13 @@ module Make (Inputs : Inputs.Base.S) :
   let apply_all t changes =
     assert_state_valid t ;
     let t' = List.fold changes ~init:t ~f:apply in
-    assert_state_valid t' ; t'
+    try assert_state_valid t' ; t' with exn ->
+      Printf.printf !"*** GOT FATAL EXCEPTION WHILE APPLYING CHANGES TO TRANSITION LOGIC STATE IN LEDGER BUILDER CONTROLLER\n";
+      Option.iter t'.ktree ~f:(fun ktree ->
+        Transition_tree.Graph.output_graph Out_channel.stdout
+          (Transition_tree.to_graph ktree));
+      Printf.printf !"\n%!";
+      raise exn
 
   let create ~consensus_local_state genesis_heavy =
     { locked_tip= genesis_heavy
