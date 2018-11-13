@@ -11,7 +11,6 @@ module Scheduler = Async_kernel_scheduler
 type event_kind =
   | New_thread
   | Thread_switch
-  | Cycle_start
   | Cycle_end
   | Pid_is
   | Event
@@ -25,7 +24,6 @@ let emitk (k : event_kind) pos =
     match k with
     | New_thread -> 0
     | Thread_switch -> 1
-    | Cycle_start -> 2
     | Cycle_end -> 3
     | Pid_is -> 4
     | Event -> 5
@@ -99,8 +97,11 @@ let start_tracing wr =
     ; trace_new_thread= trace_new_thread' wr } ;
   trace_event_impl := trace_event' wr ;
   measure_impl := measure' wr ;
-  Scheduler.set_on_end_of_cycle (Scheduler.t ()) (fun () ->
-      emitk Cycle_end 0 |> emitt |> finish wr )
+  let sch = Scheduler.t () in
+  Scheduler.set_on_end_of_cycle sch (fun () ->
+      sch.cycle_started <- true ;
+      if sch.current_execution_context.tid <> 0 then
+        emitk Cycle_end 0 |> emitt |> finish wr )
 
 [%%else]
 
