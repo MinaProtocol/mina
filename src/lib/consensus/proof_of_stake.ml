@@ -433,10 +433,11 @@ module Make (Inputs : Inputs_intf) :
         !"Checking vrf at %d:%d - owned_stake: %d, total_stake: %d, \
           evaluation: %{sexp: Output.value}"
          *)
-        !"Checking vrf at %d:%d - owned_stake: %d, total_stake: %d"
+        !"Checking vrf at %d:%d - owned_stake: %d, total_stake: %d, evaluation: %{sexp: Bignum_bigint.t}"
         (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
         (Balance.to_int owned_stake)
-        (Amount.to_int total_stake) ;
+        (Amount.to_int total_stake)
+        (Bignum_bigint.of_bit_fold_lsb (Sha256.Digest.fold_bits result));
       Option.some_if
         (Threshold.is_satisfied ~my_stake:owned_stake ~total_stake result)
         result
@@ -1032,65 +1033,85 @@ module Make (Inputs : Inputs_intf) :
       ( transition |> Snark_transition.blockchain_state
       |> Blockchain_state.ledger_hash )
 
-  let select this that ~logger ~time_received =
+  let select old_state new_state ~logger ~time_received =
     let open Consensus_state in
     let open Epoch_data in
-    let lock_checkpoint state =
-      if Epoch.Slot.after_lock_checkpoint state.curr_slot then
-        state.curr_epoch_data.lock_checkpoint
-      else
-        state.last_epoch_data.lock_checkpoint
-    in
     let logger = Logger.child logger "proof_of_stake" in
+    let string_of_option = function
+    | `Take -> "Take"
+    | `Keep -> "Keep"
+    in
+    let log_result option msg = Logger.debug logger "RESULT: %s -- %s" (string_of_option option) msg in
+    let log_choice ~precondition_msg ~choice_msg option =
+      let choice_msg = match option with
+      | `Take -> choice_msg
+      | `Keep -> Printf.sprintf "not (%s)" choice_msg
+      in
+      let msg = Printf.sprintf "(%s) && (%s)" precondition_msg choice_msg in
+      log_result option msg
+    in
+
     Logger.info logger "SELECTING BEST CONSENSUS STATE";
-    Logger.info logger !"old consensus state: %{sexp:Consensus_state.value}" this;
-    Logger.info logger !"new consensus state: %{sexp:Consensus_state.value}" that;
+    Logger.info logger !"old consensus state: %{sexp:Consensus_state.value}" old_state;
+    Logger.info logger !"new consensus state: %{sexp:Consensus_state.value}" new_state;
+
     (* TODO: update time_received check and `Keep when it is not met *)
     if
       not
-        (time_in_epoch_slot that
+        (time_in_epoch_slot new_state
            Time.(of_span_since_epoch (Span.of_ms time_received)))
     then Logger.error logger "received a transition outside of it's slot time" ;
+
     (* TODO: add fork_before_checkpoint check *)
-    (* not (List.exists this.checkpoints ~f:(fun c ->
-     *   List.exists that.checkpoints ~f:(
-     *     Coda_base.State_hash.equal c)))
-     *)
-    if Coda_base.State_hash.equal (lock_checkpoint this) (lock_checkpoint that)
-    then
-      if Length.compare this.length that.length < 0 then (
-        Logger.info logger "RESULT: Take -- lock checkpoints equal and new length is greater than old length";
-        `Take)
-      else (
-        Logger.info logger "RESULT: Keep -- lock checkpoints equal and new length is not greater than old length";
-        `Keep)
-    else if
-      Coda_base.State_hash.equal
-        this.last_epoch_data.start_checkpoint
-        that.last_epoch_data.start_checkpoint
-    then
-      if Length.compare this.last_epoch_data.length that.last_epoch_data.length < 0
-      then (
-        Logger.info logger "RESULT: Take -- lock checkpoints not equal but start checkpoints equal and new last epoch length is greater than old last epoch length";
-        `Take)
-      else (
-        Logger.info logger "RESULT: Take -- lock checkpoints not equal but start checkpoints equal and new last epoch length is not greater than old last epoch length";
-        `Keep)
-    (*
-    else
-    if
-      (* NOTE: this makes an important assumption that `that.curr_epoch` has been received
-       * within the acceptable receival range; currently, this is not true *)
-      Epoch_data.equal_value that.last_epoch_data this.curr_epoch_data
-      && Epoch.equal that.curr_epoch (Epoch.succ this.curr_epoch)
-      (* && new epoch length = 1 *)
-    then (
-      Logger.info logger "RESULT: Take -- new state in next epoch";
-      `Take)
-     *)
-    else (
-      Logger.info logger "RESULT: Keep -- no checkpoints were equal";
-      `Keep)
+    (* Each branch contains a precondition predicate and a choice predicate,
+     * which takes the new state when true. Each predicate is also decorated
+     * with a string description, used for debugging messages *)
+    let (=) = Coda_base.State_hash.equal in
+    let (<) a b = Length.compare a b < 0 in
+    let branches =
+      [ ( ( lazy (old_state.last_epoch_data.lock_checkpoint = new_state.last_epoch_data.lock_checkpoint)
+          , "last epoch lock checkpoints are equal" )
+        , ( lazy (old_state.length < new_state.length)
+          , "new state is longer than old state" ) )
+
+      ; ( ( lazy (old_state.last_epoch_data.start_checkpoint = new_state.last_epoch_data.start_checkpoint)
+          , "last epoch start checkpoints are equal" )
+        , ( lazy (old_state.last_epoch_data.length < new_state.last_epoch_data.length)
+          , "new state last epoch is longer than old state last epoch" ) )
+
+      (* these two could be condensed into one entry *)
+      ; ( ( lazy (old_state.curr_epoch_data.lock_checkpoint = new_state.last_epoch_data.lock_checkpoint)
+          , "new state last epoch lock checkpoint is equal to old state current epoch lock checkpoint" )
+        , ( lazy (old_state.length < new_state.length)
+          , "new state is longer than old state" ) )
+      ; ( ( lazy (old_state.last_epoch_data.lock_checkpoint = new_state.curr_epoch_data.lock_checkpoint)
+          , "new state current epoch lock checkpoint is equal to old state last epoch lock checkpoint" )
+        , ( lazy (old_state.length < new_state.length)
+          , "new state is longer than old state" ) )
+
+      ; ( ( lazy (old_state.curr_epoch_data.start_checkpoint = new_state.last_epoch_data.start_checkpoint)
+          , "new state last epoch start checkpoint is equal to old state current epoch start checkpoint" )
+        , ( lazy (old_state.curr_epoch_data.length < new_state.last_epoch_data.length)
+          , "new state last epoch is longer than old state current epoch" ) )
+      ; ( ( lazy (old_state.last_epoch_data.start_checkpoint = new_state.curr_epoch_data.start_checkpoint)
+          , "new state current epoch start checkpoint is equal to old state last epoch start checkpoint" )
+        , ( lazy (old_state.last_epoch_data.length < new_state.curr_epoch_data.length)
+          , "new state current epoch is longer than old state last epoch" ) ) ]
+    in
+
+    match
+      List.find_map branches ~f:(fun ((precondition, precondition_msg), (choice, choice_msg)) ->
+        if Lazy.force precondition then
+          let option = if Lazy.force choice then `Take else `Keep in
+          log_choice ~precondition_msg ~choice_msg option;
+          Some option
+        else
+          None)
+    with
+    | Some option -> option
+    | None ->
+        log_result `Keep "no predicates were matched";
+        `Keep
 
   let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
       ~logger =
