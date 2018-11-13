@@ -142,10 +142,10 @@ module Make (Inputs : Inputs_intf) :
     let%bind ( diff
              , `Hash_after_applying next_ledger_builder_hash
              , `Ledger_proof ledger_proof_opt ) =
-      lift_sync (fun () ->
-          Ledger_builder.create_diff ledger_builder
-            ~self:(Public_key.compress keypair.public_key)
-            ~logger ~transactions_by_fee:transactions ~get_completed_work )
+      Interruptible.uninterruptible
+        (Ledger_builder.create_diff ledger_builder
+           ~self:(Public_key.compress keypair.public_key)
+           ~logger ~transactions_by_fee:transactions ~get_completed_work)
     in
     let%bind transition_opt =
       lift_sync (fun () ->
