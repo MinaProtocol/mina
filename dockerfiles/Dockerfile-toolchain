@@ -46,6 +46,7 @@ ADD /src/external/ocaml-sodium /ocaml-sodium
 RUN cd /ocaml-sodium && yes | opam pin add .
 
 # Get coda-kademlia from packages repo
-RUN echo "deb [trusted=yes] https://packages.o1test.net unstable main" | sudo tee -a /etc/apt/sources.list.d/coda.list && \
+RUN sudo apt-get install --yes apt-transport-https ca-certificates && \
+      echo "deb [trusted=yes] https://packages.o1test.net unstable main" | sudo tee -a /etc/apt/sources.list.d/coda.list && \
       sudo apt-get update && \
       sudo apt-get install --yes coda-kademlia
