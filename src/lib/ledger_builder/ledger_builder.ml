@@ -1098,7 +1098,7 @@ end = struct
       @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
     in
     let%map new_data =
-      Deferred.List.mapi transactions ~f:(fun _ s ->
+      Deferred.List.map transactions ~f:(fun s ->
           let%map r = apply_transaction_and_get_witness t.ledger s in
           let _undo, t = Or_error.ok_exn r in
           t )
