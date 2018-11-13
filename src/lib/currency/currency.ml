@@ -50,6 +50,8 @@ module type Basic = sig
 
   val var_of_t : t -> var
 
+  val var_to_number : var -> Number.t
+
   val var_to_triples : var -> Boolean.var Triple.t list
 end
 
@@ -242,6 +244,8 @@ end = struct
 
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
   include Unpacked
+
+  let var_to_number t = Number.of_bits (var_to_bits t)
 
   let var_to_triples t =
     Bitstring.pad_to_triple_list ~default:Boolean.false_ (var_to_bits t)
