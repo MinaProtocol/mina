@@ -5,7 +5,7 @@ include Make (struct
   let accounts =
     [ { pk= "KAG4EV1+uap/MrNhO087NXVC52IgeezeHa9h4vOFrBgVHPXgrlwCAAAB"
       ; balance= 5_000_000 }
-    ; { pk= "KE63vdBqwbQ+p2XQ5QOrrPUkCfKtvPRg5jX2AfeC8C7cCNCJSmQBAAAB"
+    ; { pk= "KBWuaAm5Sl5jH/dlpiTKQeUUsty/4Rq6Xz2Py2Y2i/VweJmDHwUAAAAB"
       ; balance= 5_000_000 }
     ; { pk= "KA4EVFZFimYTnjvb5+o7Pfh8qe7+/vf7oZC5S1kk3xXdXRZ+xBoBAAAA"
       ; balance= 1_000 }
