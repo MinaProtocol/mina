@@ -1146,7 +1146,7 @@ module Make (Inputs : Inputs_intf) :
     t
 
   (* TODO *)
-  let lock_transition prev next ~proposer_public_key ~snarked_ledger
+  let lock_transition ?proposer_public_key prev next ~snarked_ledger
       ~local_state =
     let open Local_state in
     let open Consensus_state in
@@ -1155,8 +1155,11 @@ module Make (Inputs : Inputs_intf) :
         match snarked_ledger () with Ok l -> l | Error e -> Error.raise e
       in
       local_state.last_epoch_ledger <- local_state.curr_epoch_ledger ;
-      Option.iter local_state.last_epoch_ledger ~f:(fun l ->
-          local_state.delegators <- compute_delegators proposer_public_key l ) ;
+      ( match proposer_public_key with
+      | None -> local_state.delegators <- Public_key.Compressed.Table.create ()
+      | Some pk ->
+          Option.iter local_state.last_epoch_ledger ~f:(fun l ->
+              local_state.delegators <- compute_delegators pk l ) ) ;
       local_state.curr_epoch_ledger <- Some ledger )
 
   (* TODO: determine correct definition of genesis state *)
