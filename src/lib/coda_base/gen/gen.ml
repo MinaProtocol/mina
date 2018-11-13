@@ -20,8 +20,7 @@ let bigint_of_bits bits =
 let rec random_scalar () =
   let n =
     bigint_of_bits
-      (List.init Tock0.Field.size_in_bits
-         ~f:(fun _ -> random_bool ()))
+      (List.init Tock0.Field.size_in_bits ~f:(fun _ -> random_bool ()))
   in
   if Bigint.(n < Tock0.Field.size) then
     Tock0.Bigint.(to_field (of_bignum_bigint n))
@@ -30,8 +29,8 @@ let rec random_scalar () =
 let keypairs =
   let n = 40 in
   List.init n ~f:(fun _ ->
-    let pk = random_scalar () in
-    Keypair.of_private_key_exn pk)
+      let pk = random_scalar () in
+      Keypair.of_private_key_exn pk )
 
 let expr ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
@@ -40,32 +39,29 @@ let expr ~loc =
   let open E in
   let earray =
     E.pexp_array
-      (List.map keypairs ~f:(fun { public_key; private_key } ->
-         E.pexp_tuple
-           [ estring (Public_key.Compressed.to_base64 (Public_key.compress public_key))
-           ; estring (Private_key.to_base64 private_key)
-           ]))
+      (List.map keypairs ~f:(fun {public_key; private_key} ->
+           E.pexp_tuple
+             [ estring
+                 (Public_key.Compressed.to_base64
+                    (Public_key.compress public_key))
+             ; estring (Private_key.to_base64 private_key) ] ))
   in
   let%expr conv (pk, sk) =
     ( Signature_lib.Public_key.Compressed.of_base64_exn pk
-    , Signature_lib.Private_key.of_base64_exn sk
-    )
+    , Signature_lib.Private_key.of_base64_exn sk )
   in
-  Array.map conv
-    [%e earray]
+  Array.map conv [%e earray]
 
 let structure ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
   end) in
   let open E in
-  [%str 
-    let keypairs = [%e expr ~loc]]
+  [%str let keypairs = [%e expr ~loc]]
 
 let main () =
   let fmt =
-    Format.formatter_of_out_channel
-      (Out_channel.create "sample_keypairs.ml")
+    Format.formatter_of_out_channel (Out_channel.create "sample_keypairs.ml")
   in
   Pprintast.top_phrase fmt (Ptop_def (structure ~loc:Ppxlib.Location.none)) ;
   exit 0
