@@ -13,7 +13,7 @@ module type S = sig
   module Local_state : sig
     type t [@@deriving sexp]
 
-    val create : unit -> t
+    val create : Signature_lib.Keypair.t option -> t
   end
 
   module Consensus_transition_data : sig

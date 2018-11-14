@@ -647,7 +647,7 @@ module type Consensus_mechanism_intf = sig
   module Local_state : sig
     type t [@@deriving sexp]
 
-    val create : unit -> t
+    val create : keypair option -> t
   end
 
   module Consensus_transition_data : sig

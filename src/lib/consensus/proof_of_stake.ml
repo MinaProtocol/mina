@@ -127,6 +127,21 @@ module Make (Inputs : Inputs_intf) :
     Coda_base.Ledger.merkle_root Inputs.Genesis_ledger.t
     |> Coda_base.Frozen_ledger_hash.of_ledger_hash
 
+  let compute_delegators self_pk ledger =
+    let open Coda_base in
+    let t = Account.Index.Table.create () in
+    Ledger.foldi ledger ~init:() ~f:(fun i () acct ->
+        (* TODO: The second disjunct is a hack and should be removed once the delegation
+         command PR lands. *)
+        if
+          Public_key.Compressed.equal self_pk acct.delegate
+          || Public_key.Compressed.equal self_pk acct.public_key
+        then
+          Hashtbl.add t ~key:(Ledger.Addr.to_int i) ~data:acct.balance
+          |> ignore
+        else () ) ;
+    t
+
   module Local_state = struct
     type t =
       { mutable last_epoch_ledger: Coda_base.Ledger.t option
@@ -135,10 +150,16 @@ module Make (Inputs : Inputs_intf) :
       }
     [@@deriving sexp]
 
-    let create () =
-      { last_epoch_ledger= None
-      ; curr_epoch_ledger= None
-      ; delegators= Coda_base.Account.Index.Table.create () }
+    let create keypair =
+      let delegators =
+        match keypair with
+        | None -> Coda_base.Account.Index.Table.create ()
+        | Some k ->
+            compute_delegators
+              (Public_key.compress k.Keypair.public_key)
+              Genesis_ledger.t
+      in
+      {last_epoch_ledger= None; curr_epoch_ledger= None; delegators}
   end
 
   module Epoch = struct
@@ -445,8 +466,10 @@ module Make (Inputs : Inputs_intf) :
     let check ~local_state ~epoch ~slot ~seed ~lock_checkpoint ~private_key
         ~total_stake =
       let open Message in
+      let open Option.Let_syntax in
+      let%bind ledger = local_state.Local_state.last_epoch_ledger in
       with_return (fun {return} ->
-          Hashtbl.iteri local_state.Local_state.delegators
+          Hashtbl.iteri local_state.delegators
             ~f:(fun ~key:delegator ~data:balance ->
               let vrf_result =
                 eval ~private_key
@@ -463,8 +486,7 @@ module Make (Inputs : Inputs_intf) :
                          ; delegator
                          ; ledger=
                              Coda_base.Sparse_ledger.of_ledger_index_subset_exn
-                               (Option.value_exn local_state.last_epoch_ledger)
-                               [delegator] }
+                               ledger [delegator] }
                      ; vrf_result }) ) ;
           None )
   end
@@ -1126,17 +1148,6 @@ module Make (Inputs : Inputs_intf) :
           "No slots won in this epoch... waiting for next epoch" ;
         `Check_again
           (Epoch.end_time epoch |> Time.to_span_since_epoch |> Time.Span.to_ms)
-
-  let compute_delegators self_pk ledger =
-    let t = Coda_base.Account.Index.Table.create () in
-    Coda_base.Ledger.foldi ledger ~init:() ~f:(fun i () acct ->
-        if Public_key.Compressed.equal self_pk acct.delegate then
-          Hashtbl.add t
-            ~key:(Coda_base.Ledger.Addr.to_int i)
-            ~data:acct.balance
-          |> ignore
-        else () ) ;
-    t
 
   (* TODO *)
   let lock_transition ?proposer_public_key prev next ~snarked_ledger

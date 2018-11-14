@@ -50,7 +50,7 @@ module Make (Inputs : Inputs_intf) :
   module Local_state = struct
     type t = unit [@@deriving sexp]
 
-    let create () = ()
+    let create _ = ()
   end
 
   module Prover_state = struct
