@@ -5,6 +5,7 @@ open Core_kernel
 open Async_kernel
 open Protocols
 open Coda_pow
+open O1trace
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -793,9 +794,15 @@ end = struct
           c.proposer :: ft_receivers
     in
     let open Deferred.Let_syntax in
-    let witness = Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) in
+    let witness =
+      measure "sparse ledger" (fun () ->
+          Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) )
+    in
     let%bind () = Async.Scheduler.yield () in
-    let r = apply_transaction_and_get_statement ledger s in
+    let r =
+      measure "apply+stmt" (fun () ->
+          apply_transaction_and_get_statement ledger s )
+    in
     let%map () = Async.Scheduler.yield () in
     let open Or_error.Let_syntax in
     let%map undo, statement = r in
@@ -1086,7 +1093,8 @@ end = struct
       | _ -> []
     in
     let coinbase_parts =
-      Or_error.ok_exn (create_coinbase coinbase_parts proposer)
+      measure "create_coinbase" (fun () ->
+          Or_error.ok_exn (create_coinbase coinbase_parts proposer) )
     in
     let delta = Or_error.ok_exn (fee_remainder user_commands txn_works) in
     let fee_transfers =
@@ -1653,12 +1661,14 @@ end = struct
       generate_prediff logger (work_to_do t'.scan_state) transactions_by_fee
         get_completed_work ledger self partitions
     in
+    trace_event "prediffs done" ;
     let diff =
       { Ledger_builder_diff.With_valid_signatures_and_proofs.pre_diffs
       ; creator= self
       ; prev_hash= curr_hash }
     in
     let%map ledger_proof = apply_diff_unchecked t' diff in
+    trace_event "applied diff" ;
     (diff, `Hash_after_applying (hash t'), `Ledger_proof ledger_proof)
 end
 

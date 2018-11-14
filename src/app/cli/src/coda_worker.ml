@@ -1,9 +1,26 @@
+[%%import
+"../../../config.mlh"]
+
 open Core
 open Async
 open Coda_base
 open Signature_lib
 open Coda_main
 open Signature_lib
+
+[%%if
+tracing]
+
+let start_tracing () =
+  Writer.open_file
+    (sprintf "/tmp/coda-profile-%d" (Unix.getpid () |> Pid.to_int))
+  >>| O1trace.start_tracing
+
+[%%else]
+
+let start_tracing () = Deferred.unit
+
+[%%endif]
 
 module Make (Kernel : Kernel_intf) = struct
   module Snark_worker_config = struct
@@ -179,6 +196,7 @@ module Make (Kernel : Kernel_intf) = struct
               ; parent_log= log
               ; banlist } }
         in
+        let%bind () = start_tracing () in
         let%bind coda =
           Main.create
             (Main.Config.make ~log ~net_config

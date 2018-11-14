@@ -45,16 +45,8 @@ RUN opam switch import opam.export ; rm opam.export
 ADD /src/external/ocaml-sodium /ocaml-sodium
 RUN cd /ocaml-sodium && yes | opam pin add .
 
-
-# nix for haskell for kademlia
-# fixme: break in to it's own container
-RUN sudo mkdir -p /nix
-RUN sudo chown opam /nix
-RUN sudo mkdir -p /etc/nix
-RUN sudo bash  -c 'echo "build-users-group =" > /etc/nix/nix.conf'
-ENV USER opam
-RUN cd /home/opam && curl https://nixos.org/nix/install | sh
-
-ADD /src/app/kademlia-haskell/prefetch /prefetch
-RUN sudo chown -R opam /prefetch
-RUN cd /prefetch && . /home/opam/.nix-profile/etc/profile.d/nix.sh && nix-build prefetch.nix
+# Get coda-kademlia from packages repo
+RUN sudo apt-get install --yes apt-transport-https ca-certificates && \
+      echo "deb [trusted=yes] https://packages.o1test.net unstable main" | sudo tee -a /etc/apt/sources.list.d/coda.list && \
+      sudo apt-get update && \
+      sudo apt-get install --yes coda-kademlia
