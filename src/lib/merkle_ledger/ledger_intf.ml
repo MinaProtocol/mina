@@ -30,6 +30,9 @@ module type S = sig
     -> finish:('accum -> 'stop)
     -> 'stop
 
+  val foldi :
+    t -> init:'accum -> f:(Addr.t -> 'accum -> account -> 'accum) -> 'accum
+
   val location_of_key : t -> key -> Location.t option
 
   val get : t -> Location.t -> account option
