@@ -523,35 +523,6 @@ module Make (Inputs : Inputs_intf) :
 
     let genesis =
       {hash= genesis_ledger_hash; total_currency= genesis_ledger_total_currency}
-
-    let get_stake ~logger ~public_key ~local_state {hash; total_currency} =
-      let open Local_state in
-      let open Option.Let_syntax in
-      let%bind ledger =
-        if Coda_base.Frozen_ledger_hash.equal hash genesis_ledger_hash then
-          Some Genesis_ledger.t
-        else
-          let%bind last_epoch_ledger = local_state.last_epoch_ledger in
-          let last_epoch_ledger_hash =
-            Coda_base.Frozen_ledger_hash.of_ledger_hash
-              (Coda_base.Ledger.merkle_root last_epoch_ledger)
-          in
-          if Coda_base.Frozen_ledger_hash.equal hash last_epoch_ledger_hash
-          then Some last_epoch_ledger
-          else None
-      in
-      let%map account_location =
-        Coda_base.Ledger.location_of_key ledger
-          (Public_key.compress public_key)
-        |> iter_none ~f:(fun () ->
-               Logger.warn logger "no account associated with public key" )
-      in
-      let balance =
-        Coda_base.Ledger.get ledger account_location
-        |> Option.map ~f:Coda_base.Account.balance
-        |> Option.value ~default:Balance.zero
-      in
-      (balance, total_currency)
   end
 
   module Epoch_data = struct
@@ -1128,10 +1099,7 @@ module Make (Inputs : Inputs_intf) :
           failwith
             "System time is out of sync. (hint: setup NTP if you haven't)" )
       in
-      let%bind _proposer_stake, total_stake =
-        Epoch_ledger.get_stake epoch_data.ledger ~logger
-          ~public_key:keypair.public_key ~local_state
-      in
+      let total_stake = epoch_data.ledger.total_currency in
       let proposal_data slot =
         Vrf.check ~epoch ~slot ~seed:epoch_data.seed ~local_state
           ~lock_checkpoint:epoch_data.lock_checkpoint
