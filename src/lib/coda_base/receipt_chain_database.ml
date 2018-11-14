@@ -5,7 +5,7 @@ open Storage.Disk
 
 module Payment = struct
   module T = struct
-    include Payment
+    include User_command
 
     type payload = Payload.Stable.V1.t
 

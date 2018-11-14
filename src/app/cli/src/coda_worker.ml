@@ -1,9 +1,26 @@
+[%%import
+"../../../config.mlh"]
+
 open Core
 open Async
 open Coda_base
 open Signature_lib
 open Coda_main
 open Signature_lib
+
+[%%if
+tracing]
+
+let start_tracing () =
+  Writer.open_file
+    (sprintf "/tmp/coda-profile-%d" (Unix.getpid () |> Pid.to_int))
+  >>| O1trace.start_tracing
+
+[%%else]
+
+let start_tracing () = Deferred.unit
+
+[%%endif]
 
 module Make (Kernel : Kernel_intf) = struct
   module Snark_worker_config = struct
@@ -34,7 +51,7 @@ module Make (Kernel : Kernel_intf) = struct
       * Public_key.Compressed.t
       * Currency.Amount.t
       * Currency.Fee.t
-      * Payment_memo.t
+      * User_command_memo.t
     [@@deriving bin_io]
   end
 
@@ -58,7 +75,7 @@ module Make (Kernel : Kernel_intf) = struct
       end
 
       module Output = struct
-        type t = (Receipt.Chain_hash.t * Payment.t) list [@@deriving bin_io]
+        type t = (Receipt.Chain_hash.t * User_command.t) list [@@deriving bin_io]
       end
     end
 
@@ -214,6 +231,7 @@ module Make (Kernel : Kernel_intf) = struct
               ; parent_log= log
               ; banlist } }
         in
+        let%bind () = start_tracing () in
         let%bind coda =
           Main.create
             (Main.Config.make ~log ~net_config
@@ -242,13 +260,14 @@ module Make (Kernel : Kernel_intf) = struct
             let nonce =
               Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn
             in
-            let payload : Payment.Payload.t =
-              {receiver= receiver_pk; amount; fee; nonce; memo}
+            let payload : User_command.Payload.t =
+              User_command.Payload.create ~fee ~nonce ~memo
+                ~body:(Payment {receiver= receiver_pk; amount})
             in
-            Payment.sign (Keypair.of_private_key_exn sender_sk) payload
+            User_command.sign (Keypair.of_private_key_exn sender_sk) payload
           in
           let payment = build_txn amount sk pk fee in
-          Run.send_payment log coda (payment :> Payment.t)
+          Run.send_payment log coda (payment :> User_command.t)
         in
         let coda_prove_receipt (proving_receipt, resulting_receipt) =
           Run.prove_receipt coda ~proving_receipt ~resulting_receipt

@@ -7,6 +7,7 @@ open Coda_base
 open Signature_lib
 open Blockchain_snark
 open Coda_numbers
+open O1trace
 module Fee = Protocols.Coda_pow.Fee
 
 [%%if
@@ -59,27 +60,25 @@ module type Ledger_proof_verifier_intf = sig
     -> bool Deferred.t
 end
 
-module Payment = struct
+module User_command = struct
   include (
-    Payment :
-      module type of Payment
-      with module With_valid_signature := Payment.With_valid_signature )
+    User_command :
+      module type of User_command
+      with module With_valid_signature := User_command.With_valid_signature )
 
-  let fee (t : t) = t.payload.Payment.Payload.fee
-
-  let receiver (t : t) = t.payload.receiver
+  let fee (t : t) = Payload.fee t.payload
 
   let sender (t : t) = Public_key.compress t.sender
 
   let seed = Secure_random.string ()
 
-  let compare t1 t2 = Payment.Stable.V1.compare ~seed t1 t2
+  let compare t1 t2 = User_command.Stable.V1.compare ~seed t1 t2
 
   module With_valid_signature = struct
     module T = struct
-      include Payment.With_valid_signature
+      include User_command.With_valid_signature
 
-      let compare t1 t2 = Payment.With_valid_signature.compare ~seed t1 t2
+      let compare t1 t2 = User_command.With_valid_signature.compare ~seed t1 t2
     end
 
     include T
@@ -102,8 +101,9 @@ module type Kernel_intf = sig
      and type completed_work := Completed_work.t
      and type public_key := Public_key.Compressed.t
      and type ledger_builder_hash := Ledger_builder_hash.t
-     and type payment := Payment.t
-     and type payment_with_valid_signature := Payment.With_valid_signature.t
+     and type user_command := User_command.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
 
   module Consensus_mechanism :
     Consensus.Mechanism.S
@@ -142,7 +142,7 @@ module Make_kernel
     module Ledger_builder_hash = Ledger_builder_hash
     module Ledger_builder_aux_hash = Ledger_builder_aux_hash
     module Compressed_public_key = Public_key.Compressed
-    module Payment = Payment
+    module User_command = User_command
     module Completed_work = Completed_work
   end)
 
@@ -294,7 +294,7 @@ struct
   module Transaction = struct
     module T = struct
       type t = Transaction_snark.Transition.t =
-        | Payment of Payment.With_valid_signature.t
+        | User_command of User_command.With_valid_signature.t
         | Fee_transfer of Fee_transfer.t
         | Coinbase of Coinbase.t
       [@@deriving compare, eq]
@@ -334,7 +334,7 @@ struct
       module Amount = Amount
       module Completed_work = Completed_work
       module Compressed_public_key = Public_key.Compressed
-      module Payment = Payment
+      module User_command = User_command
       module Fee_transfer = Fee_transfer
       module Coinbase = Coinbase
       module Transaction = Transaction
@@ -385,7 +385,7 @@ struct
   module Internal_transition = Consensus_mechanism.Internal_transition
 
   module Transaction_pool = struct
-    module Pool = Transaction_pool.Make (Payment)
+    module Pool = Transaction_pool.Make (User_command)
     include Network_pool.Make (Pool) (Pool.Diff)
 
     type pool_diff = Pool.Diff.t [@@deriving bin_io]
@@ -438,7 +438,7 @@ struct
   module Ledger_proof_verifier = Ledger_proof_verifier
   module Ledger_hash = Ledger_hash
   module Frozen_ledger_hash = Frozen_ledger_hash
-  module Payment = Payment
+  module User_command = User_command
   module Public_key = Public_key
   module Compressed_public_key = Public_key.Compressed
   module Private_key = Private_key
@@ -623,7 +623,7 @@ struct
       module Protocol_state = Protocol_state
       module Protocol_state_proof = Protocol_state_proof
       module State_hash = State_hash
-      module Valid_payment = Payment.With_valid_signature
+      module Valid_user_command = User_command.With_valid_signature
       module Internal_transition = Internal_transition
 
       module Net = struct
@@ -652,7 +652,7 @@ struct
     module Ledger_proof_statement = Ledger_proof_statement
     module Ledger_hash = Ledger_hash
     module Frozen_ledger_hash = Frozen_ledger_hash
-    module Payment = Payment
+    module User_command = User_command
     module Public_key = Public_key
     module Private_key = Private_key
     module Keypair = Keypair
@@ -870,7 +870,7 @@ module type Main_intf = sig
     module Transaction_pool : sig
       type t
 
-      val add : t -> Payment.t -> unit Deferred.t
+      val add : t -> User_command.t -> unit Deferred.t
     end
 
     module Protocol_state_proof : sig
@@ -996,11 +996,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
            ( Account.balance account |> Currency.Balance.to_int
            , string_of_public_key account ) )
 
-  let is_valid_payment t (txn : Payment.t) account_opt =
+  let is_valid_payment t (txn : User_command.t) account_opt =
     let remainder =
       let open Option.Let_syntax in
       let%bind account = account_opt
-      and cost = Currency.Amount.add_fee txn.payload.amount txn.payload.fee in
+      and cost = User_command.Payload.sender_cost txn.payload |> Or_error.ok in
       Currency.Balance.sub_amount account.Account.balance cost
     in
     Option.is_some remainder
@@ -1008,19 +1008,19 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   (** For status *)
   let txn_count = ref 0
 
-  let record_payment ~log t (txn : Payment.t) account =
+  let record_payment ~log t (txn : User_command.t) account =
     let previous = Account.receipt_chain_hash account in
     let receipt_chain_database = receipt_chain_database t in
     match Receipt_chain_database.add receipt_chain_database ~previous txn with
     | `Ok hash ->
         Logger.debug log
-          !"Added  payment %{sexp:Payment.t} into receipt_chain database. You \
+          !"Added  payment %{sexp:User_command.t} into receipt_chain database. You \
             should wait for a bit to see your account's receipt chain hash \
             update as %{sexp:Receipt.Chain_hash.t}"
           txn hash ;
         hash
     | `Duplicate hash ->
-        Logger.warn log !"Already sent transaction %{sexp:Payment.t}" txn ;
+        Logger.warn log !"Already sent transaction %{sexp:User_command.t}" txn ;
         hash
     | `Error_multiple_previous_receipts parent_hash ->
         Logger.fatal log
@@ -1031,18 +1031,18 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
           parent_hash previous ;
         Core.exit 1
 
-  let schedule_payment log t (txn : Payment.t) account_opt =
+  let schedule_payment log t (txn : User_command.t) account_opt =
     if not (is_valid_payment t txn account_opt) then (
       Core.Printf.eprintf "Invalid payment: account balance is too low" ;
       Core.exit 1 ) ;
     let txn_pool = transaction_pool t in
     don't_wait_for (Transaction_pool.add txn_pool txn) ;
     Logger.info log
-      !"Added payment %{sexp: Payment.t} to pool successfully"
+      !"Added payment %{sexp: User_command.t} to pool successfully"
       txn ;
     txn_count := !txn_count + 1
 
-  let send_payment log t (txn : Payment.t) =
+  let send_payment log t (txn : User_command.t) =
     let public_key = Public_key.compress txn.sender in
     let account_opt = get_account t public_key in
     schedule_payment log t txn account_opt ;
@@ -1050,13 +1050,13 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
   let schedule_payments log t txns =
-    List.iter txns ~f:(fun (txn : Payment.t) ->
+    List.iter txns ~f:(fun (txn : User_command.t) ->
         let public_key = Public_key.compress txn.sender in
         let account_opt = get_account t public_key in
         schedule_payment log t txn account_opt )
 
   let prove_receipt t ~proving_receipt ~resulting_receipt :
-      (Receipt.Chain_hash.t * Payment.t) list Deferred.t =
+      (Receipt.Chain_hash.t * User_command.t) list Deferred.t =
     let receipt_chain_database = receipt_chain_database t in
     (* TODO: since we are making so many reads to `receipt_chain_database`, 
     reads should be async to not get IO-blocked. See #1125 *)
@@ -1112,7 +1112,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
     ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
-    ; payments_sent= !txn_count
+    ; user_commands_sent= !txn_count
     ; run_snark_worker= run_snark_worker t
     ; propose_pubkey=
         Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t) }
@@ -1162,7 +1162,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
     let client_impls =
-      [ Rpc.Rpc.implement Client_lib.Send_payments.rpc (fun () ts ->
+      [ Rpc.Rpc.implement Client_lib.Send_user_commands.rpc (fun () ts ->
             schedule_payments log coda ts ;
             Deferred.unit )
       ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
@@ -1203,54 +1203,57 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             Snark_pool.add_completed_work (snark_pool coda) work ) ]
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
-        ignore
-          Cohttp_async.(
-            Server.create
-              ~on_handler_error:
-                (`Call
-                  (fun net exn ->
-                    Logger.error log "%s" (Exn.to_string_mach exn) ))
-              (Tcp.Where_to_listen.bind_to Localhost (On_port rest_server_port))
-              (fun ~body _sock req ->
-                let uri = Cohttp.Request.uri req in
-                let route_not_found () =
-                  Server.respond_string ~status:`Not_found "Route not found"
-                in
-                match Uri.path uri with
-                | "/status" ->
-                    Server.respond_string
-                      ( get_status coda |> Client_lib.Status.to_yojson
-                      |> Yojson.Safe.pretty_to_string )
-                | _ -> route_not_found () )) ) ;
+        trace_task "REST server" (fun () ->
+            Cohttp_async.(
+              Server.create
+                ~on_handler_error:
+                  (`Call
+                    (fun net exn ->
+                      Logger.error log "%s" (Exn.to_string_mach exn) ))
+                (Tcp.Where_to_listen.bind_to Localhost
+                   (On_port rest_server_port))
+                (fun ~body _sock req ->
+                  let uri = Cohttp.Request.uri req in
+                  let route_not_found () =
+                    Server.respond_string ~status:`Not_found "Route not found"
+                  in
+                  match Uri.path uri with
+                  | "/status" ->
+                      Server.respond_string
+                        ( get_status coda |> Client_lib.Status.to_yojson
+                        |> Yojson.Safe.pretty_to_string )
+                  | _ -> route_not_found () )) )
+        |> ignore ) ;
     let where_to_listen =
       Tcp.Where_to_listen.bind_to All_addresses (On_port client_port)
     in
-    ignore
-      (Tcp.Server.create
-         ~on_handler_error:
-           (`Call
-             (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
-         where_to_listen
-         (fun address reader writer ->
-           let address = Socket.Address.Inet.addr address in
-           if not (Set.mem client_whitelist address) then (
-             Logger.error log
-               !"Rejecting client connection from \
-                 %{sexp:Unix.Inet_addr.Blocking_sexp.t}"
-               address ;
-             Deferred.unit )
-           else
-             Rpc.Connection.server_with_close reader writer
-               ~implementations:
-                 (Rpc.Implementations.create_exn
-                    ~implementations:(client_impls @ snark_worker_impls)
-                    ~on_unknown_rpc:`Raise)
-               ~connection_state:(fun _ -> ())
-               ~on_handshake_error:
-                 (`Call
-                   (fun exn ->
-                     Logger.error log "%s" (Exn.to_string_mach exn) ;
-                     Deferred.unit )) ))
+    trace_task "client RPC handling" (fun () ->
+        Tcp.Server.create
+          ~on_handler_error:
+            (`Call
+              (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
+          where_to_listen
+          (fun address reader writer ->
+            let address = Socket.Address.Inet.addr address in
+            if not (Set.mem client_whitelist address) then (
+              Logger.error log
+                !"Rejecting client connection from \
+                  %{sexp:Unix.Inet_addr.Blocking_sexp.t}"
+                address ;
+              Deferred.unit )
+            else
+              Rpc.Connection.server_with_close reader writer
+                ~implementations:
+                  (Rpc.Implementations.create_exn
+                     ~implementations:(client_impls @ snark_worker_impls)
+                     ~on_unknown_rpc:`Raise)
+                ~connection_state:(fun _ -> ())
+                ~on_handshake_error:
+                  (`Call
+                    (fun exn ->
+                      Logger.error log "%s" (Exn.to_string_mach exn) ;
+                      Deferred.unit )) ) )
+    |> ignore
 
   let create_snark_worker ~log ~public_key ~client_port ~shutdown_on_disconnect
       =

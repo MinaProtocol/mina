@@ -56,7 +56,7 @@ module Make (Kernel : Kernel_intf) = struct
       run_online_worker ~arg:(sk, pk, amount, fee)
         ~f:(fun ~worker (sk, pk, amount, fee) ->
           Coda_process.send_payment_exn worker sk pk amount fee
-            Payment_memo.dummy )
+            User_command_memo.dummy )
         t i
 
     (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the 
@@ -204,7 +204,7 @@ module Make (Kernel : Kernel_intf) = struct
            let%bind () = add_to_active_accounts pk in
            let%map _ : Receipt.Chain_hash.t =
              Coda_process.send_payment_exn (List.nth_exn workers i) sk pk
-               amount fee Payment_memo.dummy
+               amount fee User_command_memo.dummy
            in
            () )) ;
     don't_wait_for
