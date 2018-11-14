@@ -1,5 +1,6 @@
 open Unsigned
 open Core_kernel
+
 (* Added binable to Score and serialization methods to make it easy for Score to be serialized into Rocksdb *)
 include UInt32
 include Binable.Of_stringable (UInt32)

@@ -39,7 +39,7 @@ let pretty_print_message
   if not (Map.is_empty attributes) then
     printf "    %s\n"
       (Sexp.to_string_hum ~indent:4
-         ([%sexp_of : Sexp.t String.Map.t] attributes))
+         ([%sexp_of: Sexp.t String.Map.t] attributes))
 
 let pos_string lexbuf =
   let open Lexing in

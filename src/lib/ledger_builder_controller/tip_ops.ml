@@ -7,11 +7,11 @@ module Make (Inputs : Inputs.Base.S) = struct
 
   let assert_materialization_of {With_hash.data= t; hash= tip_state_hash}
       {With_hash.data= transition; hash= transition_state_hash} =
-    [%test_result : State_hash.t]
+    [%test_result: State_hash.t]
       ~message:
         "Protocol state in tip should be the target state of the transition"
       ~expect:transition_state_hash tip_state_hash ;
-    [%test_result : Ledger_builder_hash.t]
+    [%test_result: Ledger_builder_hash.t]
       ~message:
         (Printf.sprintf
            !"Ledger_builder_hash inside protocol state inconsistent with \

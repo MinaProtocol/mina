@@ -201,7 +201,7 @@ struct
           List.init (V.length elts) ~f:(fun i -> V.get elts i)
       ; sign= List.init (V.length signs) ~f:(fun i -> V.get signs i) }
 
-    let to_bits ({characterizing_up_to_sign; sign}: t) =
+    let to_bits ({characterizing_up_to_sign; sign} : t) =
       let bs1 =
         (* It's ok to use choose_preimage here *)
         List.concat_map characterizing_up_to_sign ~f:(fun x -> Field.unpack x)
@@ -214,12 +214,12 @@ struct
       bs1 @ bs2
 
     module Checked = struct
-      let constant ({sign; characterizing_up_to_sign}: t) : var =
+      let constant ({sign; characterizing_up_to_sign} : t) : var =
         { sign= List.map sign ~f:Field.Checked.constant
         ; characterizing_up_to_sign=
             List.map characterizing_up_to_sign ~f:Field.Checked.constant }
 
-      let if_value (choice: Boolean.var) ~then_:t1 ~else_:t2 =
+      let if_value (choice : Boolean.var) ~then_:t1 ~else_:t2 =
         let if_value x y =
           let choice = (choice :> Field.Checked.t) in
           let open Field.Checked in
@@ -252,7 +252,7 @@ struct
           ()
       end
 
-      let to_bits ({characterizing_up_to_sign; sign}: var) =
+      let to_bits ({characterizing_up_to_sign; sign} : var) =
         let open Checked.Let_syntax in
         let%map bs1 =
           (* It's ok to use choose_preimage here *)
@@ -282,7 +282,7 @@ struct
     type var = (Inner_curve.var, Field.var) t_
 
     let of_hlist
-        (H_list.([query_base; query; other_data]):
+        (H_list.([query_base; query; other_data]) :
           (unit, 'a1 -> 'a2 -> 'a3 -> unit) H_list.t) =
       {query_base; query; other_data}
 
@@ -339,12 +339,12 @@ struct
       ; sign= List.map g1s ~f:get_y @ other_data.sign }
 
     module Checked = struct
-      let to_full_data (t: var) = to_full_data ~get_x:fst ~get_y:snd t
+      let to_full_data (t : var) = to_full_data ~get_x:fst ~get_y:snd t
 
       let accumulate_input (type s)
-          ((module Shifted): s Inner_curve.Checked.Shifted.m)
+          ((module Shifted) : s Inner_curve.Checked.Shifted.m)
           {query_base; query; other_data= _}
-          (inputs: Boolean.var Bitstring_lib.Bitstring.Lsb_first.t list) =
+          (inputs : Boolean.var Bitstring_lib.Bitstring.Lsb_first.t list) =
         let open Let_syntax in
         let%bind init = Shifted.(add zero query_base) in
         Checked.List.fold
@@ -354,7 +354,7 @@ struct
           ~init
         >>= Shifted.unshift_nonzero
 
-      let constant ({query_base; query; other_data}: t) =
+      let constant ({query_base; query; other_data} : t) =
         { query_base= Inner_curve.Checked.constant query_base
         ; query= List.map ~f:Inner_curve.Checked.constant query
         ; other_data= Verification_key_data.Checked.constant other_data }
@@ -465,8 +465,8 @@ struct
         @-> Pb.Variable.typ @-> Proof.typ @-> Pb.Variable.typ
         @-> returning gadget_typ )
 
-    let create pb (conv: Field.Checked.t -> Pb.Variable.t)
-        (conv_back: Pb.Variable.t -> Field.Checked.t)
+    let create pb (conv : Field.Checked.t -> Pb.Variable.t)
+        (conv_back : Pb.Variable.t -> Field.Checked.t)
         {pvk; accumulated_input= acc_x, acc_y; proof} =
       let acc_x = conv acc_x and acc_y = conv acc_y in
       let result_pb = Pb.allocate_variable pb in
@@ -568,7 +568,7 @@ struct
         let module V = Libsnark.Linear_combination.Vector in
         List.init (V.length lcs) ~f:(fun i -> conv_lc conv_back (V.get lcs i))
 
-      let create pb conv conv_back ((acc_x, acc_y): input) =
+      let create pb conv conv_back ((acc_x, acc_y) : input) =
         let acc_x = conv acc_x and acc_y = conv acc_y in
         let vk = Verification_key_var.create pb in
         let proof = Proof.create pb in
@@ -593,7 +593,7 @@ struct
         Proof.generate_constraints proof ;
         gadget_generate_constraints gadget
 
-      let generate_witness {gadget; proof; vk; _} _input (w: witness) =
+      let generate_witness {gadget; proof; vk; _} _input (w : witness) =
         suspend (fun () ->
             Verification_key_var.generate_witness vk w.verification_key ;
             Proof.generate_witness proof w.proof ;
@@ -642,7 +642,8 @@ module Mnt4
                         Libsnark.Mnt4.R1CS_constraint_system.t) (Info : sig
         val input_size : int
     end) =
-  Make (Impl)
+  Make
+    (Impl)
     (struct
       let prefix = "camlsnark_mnt4"
     end)
@@ -663,7 +664,8 @@ module Mnt6
                         Libsnark.Mnt6.R1CS_constraint_system.t) (Info : sig
         val input_size : int
     end) =
-  Make (Impl)
+  Make
+    (Impl)
     (struct
       let prefix = "camlsnark_mnt6"
     end)

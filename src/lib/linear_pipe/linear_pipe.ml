@@ -33,18 +33,18 @@ let write_or_exn ~capacity writer reader x =
   if Pipe.length reader.Reader.pipe > capacity then raise Overflow
   else Pipe.write_without_pushback writer x
 
-let close_read (reader: 'a Reader.t) = Pipe.close_read reader.pipe
+let close_read (reader : 'a Reader.t) = Pipe.close_read reader.pipe
 
 let close = Pipe.close
 
-let closed (reader: 'a Reader.t) = Pipe.closed reader.pipe
+let closed (reader : 'a Reader.t) = Pipe.closed reader.pipe
 
 let multiple_reads_error () =
   failwith
     "Linear_pipe.bracket: the same reader has been used multiple times. If \
      you want to rebroadcast the reader, use fork"
 
-let bracket (reader: 'a Reader.t) dx =
+let bracket (reader : 'a Reader.t) dx =
   if reader.has_reader then multiple_reads_error ()
   else (
     reader.has_reader <- true ;
@@ -52,7 +52,7 @@ let bracket (reader: 'a Reader.t) dx =
     reader.has_reader <- false ;
     x )
 
-let set_has_reader (reader: 'a Reader.t) =
+let set_has_reader (reader : 'a Reader.t) =
   if reader.has_reader then multiple_reads_error ()
   else reader.has_reader <- true
 
@@ -104,11 +104,11 @@ let scan reader ~init ~f =
     >>= fun () -> loop init ) ;
   wrap_reader r
 
-let map (reader: 'a Reader.t) ~f =
+let map (reader : 'a Reader.t) ~f =
   set_has_reader reader ;
   wrap_reader (Pipe.map reader.Reader.pipe ~f)
 
-let filter_map (reader: 'a Reader.t) ~f =
+let filter_map (reader : 'a Reader.t) ~f =
   set_has_reader reader ;
   wrap_reader (Pipe.filter_map reader.Reader.pipe ~f)
 
@@ -209,11 +209,11 @@ let latest_ref t ~initial =
   don't_wait_for (iter t ~f:(fun a -> return (cell := a))) ;
   cell
 
-let values_available ({pipe}: 'a Reader.t) = Pipe.values_available pipe
+let values_available ({pipe} : 'a Reader.t) = Pipe.values_available pipe
 
-let peek ({pipe}: 'a Reader.t) = Pipe.peek pipe
+let peek ({pipe} : 'a Reader.t) = Pipe.peek pipe
 
-let release_has_reader (reader: 'a Reader.t) =
+let release_has_reader (reader : 'a Reader.t) =
   if not reader.has_reader then
     failwith "Linear_pipe.bracket: did not have reader"
   else reader.has_reader <- false
@@ -223,10 +223,10 @@ let read_now reader =
   let res = Pipe.read_now reader.pipe in
   release_has_reader reader ; res
 
-let read' ?max_queue_length ({pipe}: 'a Reader.t) =
+let read' ?max_queue_length ({pipe} : 'a Reader.t) =
   Pipe.read' ?max_queue_length pipe
 
-let read ({pipe}: 'a Reader.t) = Pipe.read pipe
+let read ({pipe} : 'a Reader.t) = Pipe.read pipe
 
 let read_exn reader =
   match%map read reader with

@@ -19,10 +19,11 @@ val of_field : Field.t -> t
 
 module Bits : Bits_intf.S with type t := t
 
-include Snarkable.Bits.Faithful
-        with type Unpacked.value = t
-         and type Packed.value = t
-         and type Packed.var = private Field.Checked.t
+include
+  Snarkable.Bits.Faithful
+  with type Unpacked.value = t
+   and type Packed.value = t
+   and type Packed.var = private Field.Checked.t
 
 val var_to_unpacked : Field.Checked.t -> (Unpacked.var, _) Tick.Checked.t
 

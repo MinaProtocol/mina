@@ -6,7 +6,7 @@
   (flags (:standard -short-paths -warn-error -58))
   (library_flags (-linkall))
   (libraries
-    ( snarky base64 snark_params core non_zero_curve_point ))
+    ( snarky base64 snark_params core non_zero_curve_point yojson ))
   (preprocessor_deps ("../../config.mlh"))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "Schnorr signatures using the tick and tock curves")))

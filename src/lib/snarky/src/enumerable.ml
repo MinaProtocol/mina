@@ -46,7 +46,7 @@ struct
 
   let to_bits t = int_to_bits ~length:bit_length (to_enum t)
 
-  let if_ b ~(then_: var) ~(else_: var) = Field.Checked.if_ b ~then_ ~else_
+  let if_ b ~(then_ : var) ~(else_ : var) = Field.Checked.if_ b ~then_ ~else_
 
   let var t : var = Field.Checked.constant (to_field t)
 

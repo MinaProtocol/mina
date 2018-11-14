@@ -109,51 +109,45 @@ module type S = sig
   val send_multi_exn : t -> recipients:peer list -> message -> unit Deferred.t
 end
 
-module type F = functor (State :sig
-                                  
-                                  type t [@@deriving eq, sexp]
-end) -> functor (Message :sig
-                            
-                            type t
-end) -> functor (Peer :
-  Peer_intf) -> functor (Timer :
-  Timer_intf) -> functor (Message_label :sig
-                                           
-                                           type label [@@deriving enum, sexp]
+module type F = functor
+  (State :sig
+          
+          type t [@@deriving eq, sexp]
+        end)
+  (Message :sig
+            
+            type t
+          end)
+  (Peer : Peer_intf)
+  (Timer : Timer_intf)
+  (Message_label :sig
+                  
+                  type label [@@deriving enum, sexp]
 
-                                           include Hashable.S
-                                                   with type t = label
-end) -> functor (Timer_label :sig
-                                
-                                type label [@@deriving enum, sexp]
+                  include Hashable.S with type t = label
+                end)
+  (Timer_label :sig
+                
+                type label [@@deriving enum, sexp]
 
-                                include Hashable.S with type t = label
-end) -> functor (Condition_label :sig
-                                    
-                                    type label [@@deriving enum, sexp]
+                include Hashable.S with type t = label
+              end)
+  (Condition_label :sig
+                    
+                    type label [@@deriving enum, sexp]
 
-                                    include Hashable.S with type t = label
-end) -> functor (Transport :
-  Transport_intf with type message := Message.t and type peer := Peer.t) -> S
-                                                                            with type 
-                                                                            message :=
-                                                                              Message.
-                                                                              t
-                                                                             and type 
-                                                                            state :=
-                                                                              State.
-                                                                              t
-                                                                             and type 
-                                                                            transport :=
-                                                                              Transport.
-                                                                              t
-                                                                             and type 
-                                                                            peer :=
-                                                                              Peer.
-                                                                              t
-                                                                             and module Message_label := Message_label
-                                                                             and module Timer_label := Timer_label
-                                                                             and module Condition_label := Condition_label
-                                                                             and module Timer := Timer
+                    include Hashable.S with type t = label
+                  end)
+  (Transport :
+     Transport_intf with type message := Message.t and type peer := Peer.t)
+  -> S
+     with type message := Message.t
+      and type state := State.t
+      and type transport := Transport.t
+      and type peer := Peer.t
+      and module Message_label := Message_label
+      and module Timer_label := Timer_label
+      and module Condition_label := Condition_label
+      and module Timer := Timer
 
 module Make : F

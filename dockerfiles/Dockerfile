@@ -1,15 +1,11 @@
-FROM gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
+FROM codaprotocol/coda:toolchain-6c30528b108af08d559d08edec04d6db4f654f50
 
-ENV PATH "/home/opam/.opam/4.07.0/bin:$PATH"
-ENV CAML_LD_LIBRARY_PATH "/home/opam/.opam/4.07.0/lib/stublibs"
-ENV MANPATH "/home/opam/.opam/4.07.0/man:"
-ENV PERL5LIB "/home/opam/.opam/4.07.0/lib/perl5"
-ENV OCAML_TOPLEVEL_PATH "/home/opam/.opam/4.07.0/lib/toplevel"
-
-RUN sudo apt-get install --yes python
-RUN CLOUDSDK_CORE_DISABLE_PROMPTS=1 curl https://sdk.cloud.google.com | bash
-RUN ~/google-cloud-sdk/bin/gcloud --quiet components update
-RUN ~/google-cloud-sdk/bin/gcloud components install kubectl
+ENV OPAM_DIR             "/home/opam/.opam/4.07"
+ENV PATH                 "${OPAM_DIR}/bin:$PATH"
+ENV CAML_LD_LIBRARY_PATH "${OPAM_DIR}/lib/stublibs"
+ENV MANPATH              "${OPAM_DIR}/man:"
+ENV PERL5LIB             "${OPAM_DIR}/lib/perl5"
+ENV OCAML_TOPLEVEL_PATH  "${OPAM_DIR}/lib/toplevel"
 
 WORKDIR /home/opam/app
 

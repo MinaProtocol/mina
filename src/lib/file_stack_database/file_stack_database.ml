@@ -25,7 +25,7 @@ struct
     let {fd; _} = t in
     Unix.close fd
 
-  let push t (message: Bigstring.t) =
+  let push t (message : Bigstring.t) =
     t.num_elem <- Unsigned.UInt.succ t.num_elem ;
     assert (Element.size = Unix.write t.fd ~buf:(Bigstring.to_bytes message))
 
@@ -58,8 +58,8 @@ let%test_module "file stack database" =
     let with_test f =
       (fun () ->
         File_system.with_temp_dir
-          (Filename.temp_dir_name ^/ "merkle_database_test") ~f:
-          (fun dir_name ->
+          (Filename.temp_dir_name ^/ "merkle_database_test")
+          ~f:(fun dir_name ->
             let stack_db_file = Filename.concat dir_name "sdb" in
             let t = Test.create ~filename:stack_db_file in
             File_system.try_finally
@@ -84,7 +84,7 @@ let%test_module "file stack database" =
       in
       let test_command t stack = function
         | Push message -> Test.push t message ; message :: stack
-        | Pop ->
+        | Pop -> (
             let elem = Test.pop t in
             match stack with
             | head :: tail ->
@@ -92,10 +92,10 @@ let%test_module "file stack database" =
                 tail
             | [] ->
                 assert (None = elem) ;
-                []
+                [] )
       in
       with_test (fun t ->
-          Quickcheck.test ~sexp_of:[%sexp_of : command List.t]
+          Quickcheck.test ~sexp_of:[%sexp_of: command List.t]
             (Quickcheck.Generator.list command_gen) ~f:(fun commands ->
               let expected_stack =
                 List.fold ~init:[] commands ~f:(test_command t)
@@ -104,7 +104,7 @@ let%test_module "file stack database" =
 
     let%test_unit "continue from previous state" =
       with_test (fun t ->
-          Quickcheck.test ~sexp_of:[%sexp_of : Bigstring.t List.t]
+          Quickcheck.test ~sexp_of:[%sexp_of: Bigstring.t List.t]
             (Quickcheck.Generator.list string_gen) ~f:(fun strings ->
               let killed_t = t in
               List.iter strings ~f:(Test.push killed_t) ;

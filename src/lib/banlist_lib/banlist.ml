@@ -46,8 +46,7 @@ end) :
   S
   with type peer := Peer.t
    and type offense := Offense.t
-   and type record := Punishment_record.t =
-struct
+   and type record := Punishment_record.t = struct
   type t =
     { suspicious: Suspicious_db.t
     ; punished: Punished_db.t

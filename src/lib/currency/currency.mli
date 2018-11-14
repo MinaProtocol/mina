@@ -27,6 +27,8 @@ module type Basic = sig
 
   val zero : t
 
+  val one : t
+
   val of_string : string -> t
 
   val to_string : t -> string
@@ -158,15 +160,15 @@ module Fee : sig
   include Arithmetic_intf with type t := t
 
   (* TODO: Get rid of signed fee, use signed amount *)
-
   module Signed :
     Signed_intf with type magnitude := t and type magnitude_var := var
 
   module Checked : sig
-    include Checked_arithmetic_intf
-            with type var := var
-             and type signed_var := Signed.var
-             and type t := t
+    include
+      Checked_arithmetic_intf
+      with type var := var
+       and type signed_var := Signed.var
+       and type t := t
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
   end
@@ -189,10 +191,11 @@ module Amount : sig
   val add_fee : t -> Fee.t -> t option
 
   module Checked : sig
-    include Checked_arithmetic_intf
-            with type var := var
-             and type signed_var := Signed.var
-             and type t := t
+    include
+      Checked_arithmetic_intf
+      with type var := var
+       and type signed_var := Signed.var
+       and type t := t
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
 
@@ -206,6 +209,8 @@ end
 
 module Balance : sig
   include Basic
+
+  val to_amount : t -> Amount.t
 
   val add_amount : t -> Amount.t -> t option
 

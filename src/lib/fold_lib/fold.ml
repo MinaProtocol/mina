@@ -4,17 +4,17 @@ type ('a, 's) fold = init:'s -> f:('s -> 'a -> 's) -> 's
 
 type 'a t = {fold: 's. ('a, 's) fold}
 
-let map (t: 'a t) ~(f: 'a -> 'b) : 'b t =
+let map (t : 'a t) ~(f : 'a -> 'b) : 'b t =
   { fold=
       (fun ~init ~f:update -> t.fold ~init ~f:(fun acc x -> update acc (f x)))
   }
 
-let concat (t: 'a t t) : 'a t =
+let concat (t : 'a t t) : 'a t =
   { fold=
       (fun ~init ~f ->
         t.fold ~init ~f:(fun acc inner -> inner.fold ~init:acc ~f) ) }
 
-let concat_map (t: 'a t) ~(f: 'a -> 'b t) : 'b t =
+let concat_map (t : 'a t) ~(f : 'a -> 'b t) : 'b t =
   { fold=
       (fun ~init ~f:update ->
         t.fold ~init ~f:(fun acc x -> (f x).fold ~init:acc ~f:update) ) }
@@ -29,10 +29,10 @@ include Monad.Make (struct
   let bind = concat_map
 end)
 
-let to_list (t: 'a t) : 'a list =
+let to_list (t : 'a t) : 'a list =
   List.rev (t.fold ~init:[] ~f:(Fn.flip List.cons))
 
-let of_list (xs: 'a list) : 'a t =
+let of_list (xs : 'a list) : 'a t =
   {fold= (fun ~init ~f -> List.fold xs ~init ~f)}
 
 let%test_unit "fold-to-list" =
@@ -41,12 +41,12 @@ let%test_unit "fold-to-list" =
 
 let sexp_of_t f t = List.sexp_of_t f (to_list t)
 
-let compose (t1: 'a t) (t2: 'a t) : 'a t =
+let compose (t1 : 'a t) (t2 : 'a t) : 'a t =
   {fold= (fun ~init ~f -> t2.fold ~init:(t1.fold ~init ~f) ~f)}
 
 let ( +> ) = compose
 
-let group3 ~default (t: 'a t) : ('a * 'a * 'a) t =
+let group3 ~default (t : 'a t) : ('a * 'a * 'a) t =
   { fold=
       (fun ~init ~f ->
         let pt, bs =
@@ -77,7 +77,7 @@ let%test_unit "group3" =
        let concated =
          List.concat_map ~f:(fun (b1, b2, b3) -> [b1; b2; b3]) tuples
        in
-       [%test_eq : int list] padded concated) ;
+       [%test_eq: int list] padded concated) ;
       assert ((n + 2) / 3 = k) )
 
 let string_bits s =

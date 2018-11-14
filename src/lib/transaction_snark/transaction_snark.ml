@@ -83,16 +83,16 @@ end = struct
         ~var_of_hlist:(fun Snarky.H_list.([normal; fee_transfer; coinbase]) ->
           {normal; fee_transfer; coinbase} )
         ~value_to_hlist:(function
-            | Normal -> [true; false; false]
-            | Fee_transfer -> [false; true; false]
-            | Coinbase -> [false; false; true])
+          | Normal -> [true; false; false]
+          | Fee_transfer -> [false; true; false]
+          | Coinbase -> [false; false; true])
         ~value_of_hlist:
           Snarky.H_list.(
             function
-              | [true; false; false] -> Normal
-              | [false; true; false] -> Fee_transfer
-              | [false; false; true] -> Coinbase
-              | _ -> assert false)
+            | [true; false; false] -> Normal
+            | [false; true; false] -> Fee_transfer
+            | [false; false; true] -> Coinbase
+            | _ -> assert false)
     in
     let check ({normal; fee_transfer; coinbase} as t) =
       let open Let_syntax in
@@ -110,9 +110,9 @@ end = struct
         ; coinbase= Boolean.false_ }
       in
       function
-        | Normal -> {all_false with normal= Boolean.true_}
-        | Fee_transfer -> {all_false with fee_transfer= Boolean.true_}
-        | Coinbase -> {all_false with coinbase= Boolean.true_}
+      | Normal -> {all_false with normal= Boolean.true_}
+      | Fee_transfer -> {all_false with fee_transfer= Boolean.true_}
+      | Coinbase -> {all_false with coinbase= Boolean.true_}
 
     let normal = constant Normal
 
@@ -139,29 +139,30 @@ end
 module Tagged_transaction = struct
   open Tick
 
-  type t = Tag.t * Transaction.t [@@deriving sexp]
+  type t = Tag.t * User_command.t [@@deriving sexp]
 
-  type var = Tag.var * Transaction.var
+  type var = Tag.var * User_command.var
 
-  let typ : (var, t) Typ.t = Typ.(Tag.typ * Transaction.typ)
+  let typ : (var, t) Typ.t = Typ.(Tag.typ * User_command.typ)
 
-  let excess ((tag, t): t) =
+  let excess ((tag, t) : t) =
     match tag with
     | Normal ->
         Amount.Signed.create ~sgn:Sgn.Pos
-          ~magnitude:(Amount.of_fee t.payload.fee)
-    | Fee_transfer ->
+          ~magnitude:(Amount.of_fee (User_command_payload.fee t.payload))
+    | Fee_transfer -> (
+      match User_command_payload.body t.payload with Payment {amount; _} ->
         let magnitude =
-          Amount.add_fee t.payload.amount t.payload.fee |> Option.value_exn
+          Amount.add_fee amount (User_command.Payload.fee t.payload)
+          |> Option.value_exn
         in
-        Amount.Signed.create ~sgn:Sgn.Neg ~magnitude
-    | Coinbase ->
-        assert (
-          Amount.( <= ) t.payload.amount Protocols.Coda_praos.coinbase_amount
-        ) ;
-        Currency.Amount.Signed.zero
+        Amount.Signed.create ~sgn:Sgn.Neg ~magnitude )
+    | Coinbase -> (
+      match User_command_payload.body t.payload with Payment {amount; _} ->
+        assert (Amount.( <= ) amount Protocols.Coda_praos.coinbase_amount) ;
+        Currency.Amount.Signed.zero )
 
-  let supply_increase ((tag, _t): t) =
+  let supply_increase ((tag, _t) : t) =
     match tag with
     | Normal | Fee_transfer -> Amount.zero
     | Coinbase -> Protocols.Coda_praos.coinbase_amount
@@ -173,7 +174,7 @@ module Tagged_transaction = struct
       ; supply_increase: Amount.var }
 
     (* Someday: Have a more structured "case" construct *)
-    let changes ((tag, t): var) =
+    let changes ((tag, t) : var) =
       with_label __LOC__
         (let open Let_syntax in
         let if_ cond ~then_:(t1, t2) ~else_:(e1, e2) =
@@ -183,19 +184,22 @@ module Tagged_transaction = struct
              (x1, x2))
         in
         let is_coinbase = Tag.Checked.is_coinbase tag in
+        let cmd_fee = User_command_payload.Checked.fee t.payload in
+        let cmd_amount =
+          (User_command_payload.Checked.payment_payload t.payload).amount
+        in
         let%map excess, sender_delta =
           let%bind non_coinbase_case =
             with_label __LOC__
               (let%bind amount_plus_fee =
-                 Amount.Checked.add_fee t.payload.amount t.payload.fee
+                 Amount.Checked.add_fee cmd_amount cmd_fee
                in
                let open Amount.Signed in
                let neg_amount_plus_fee =
                  create ~sgn:Sgn.Neg ~magnitude:amount_plus_fee
                in
                let pos_fee =
-                 create ~sgn:Sgn.Pos
-                   ~magnitude:(Amount.Checked.of_fee t.payload.fee)
+                 create ~sgn:Sgn.Pos ~magnitude:(Amount.Checked.of_fee cmd_fee)
                in
                (* If tag = Normal:
               sender gets -(amount + fee)
@@ -219,7 +223,7 @@ module Tagged_transaction = struct
                  let%bind res, `Underflow underflow =
                    Amount.Checked.sub_flagged
                      (Amount.var_of_t Protocols.Coda_praos.coinbase_amount)
-                     t.payload.amount
+                     cmd_amount
                  in
                  let%map () =
                    (* Only need to check that the subtraction actually succeeded in
@@ -245,7 +249,7 @@ module Tagged_transaction = struct
 end
 
 let dummy_signature =
-  Schnorr.sign (Private_key.create ()) Transaction_payload.dummy
+  Schnorr.sign (Private_key.create ()) User_command_payload.dummy
 
 module Fee_transfer = struct
   include Fee_transfer
@@ -253,10 +257,13 @@ module Fee_transfer = struct
   let two (pk1, fee1) (pk2, fee2) : Tagged_transaction.t =
     ( Fee_transfer
     , { payload=
-          { receiver= pk1
-          ; amount= Amount.of_fee fee1 (* What "receiver" receives *)
-          ; fee= fee2 (* What "sender" receives *)
-          ; nonce= Account.Nonce.zero }
+          User_command_payload.create ~nonce:Account.Nonce.zero
+            ~fee:fee2 (* What "sender" receives *)
+            ~memo:User_command_memo.dummy
+            ~body:
+              (Payment
+                 { receiver= pk1
+                 ; amount= Amount.of_fee fee1 (* What "receiver" receives *) })
       ; sender= Public_key.decompress_exn pk2
       ; signature= dummy_signature } )
 
@@ -266,21 +273,20 @@ module Fee_transfer = struct
 end
 
 module Transition = struct
-  include Super_transaction
+  include Transaction
 
   let to_tagged_transaction = function
     | Fee_transfer t -> Fee_transfer.to_tagged_transaction t
-    | Transaction t -> (Normal, (t :> Transaction.t))
-    | Coinbase {proposer; fee_transfer} ->
+    | User_command t -> (Normal, (t :> User_command.t))
+    | Coinbase {proposer; fee_transfer; amount= _} ->
         let receiver, amount =
           Option.value ~default:(proposer, Fee.zero) fee_transfer
         in
-        let t : Transaction.t =
+        let t : User_command.t =
           { payload=
-              { receiver
-              ; amount= Amount.of_fee amount
-              ; fee= Fee.zero
-              ; nonce= Account.Nonce.zero }
+              User_command_payload.create ~fee:Fee.zero
+                ~nonce:Account.Nonce.zero ~memo:User_command_memo.dummy
+                ~body:(Payment {receiver; amount= Amount.of_fee amount})
           ; sender= Public_key.decompress_exn proposer
           ; signature= dummy_signature }
         in
@@ -452,12 +458,16 @@ module Base = struct
   *)
   (* Nonce should only be incremented if it is a "Normal" transaction. *)
   let apply_tagged_transaction (type shifted)
-      (shifted: (module Inner_curve.Checked.Shifted.S with type t = shifted))
-      root ((tag, {sender; signature; payload}) as txn: Tagged_transaction.var) =
+      (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
+      root
+      ((tag, {sender; signature; payload}) as txn : Tagged_transaction.var) =
     with_label __LOC__
       ( if not Insecure.transaction_replay then
           failwith "Insecure.transaction_replay false" ;
-        let {Transaction.Payload.receiver; amount; fee= _; nonce} = payload in
+        let nonce = User_command_payload.Checked.nonce payload in
+        let {Payment_payload.receiver; amount} =
+          User_command_payload.Checked.payment_payload payload
+        in
         let%bind payload_section = Schnorr.Message.var_of_payload payload in
         let%bind () =
           with_label __LOC__
@@ -476,7 +486,7 @@ module Base = struct
           let%bind sender_compressed = Public_key.compress_var sender in
           Frozen_ledger_hash.modify_account_send root
             ~is_fee_transfer:(Tag.Checked.is_fee_transfer tag)
-            sender_compressed ~f:(fun account ->
+            sender_compressed ~f:(fun ~is_empty_and_writeable account ->
               with_label __LOC__
                 (let%bind next_nonce =
                    Account.Nonce.increment_if_var account.nonce
@@ -502,6 +512,10 @@ module Base = struct
                      (Tag.Checked.should_cons_to_receipt_chain tag)
                      ~then_:r ~else_:current
                  in
+                 let%bind _delegate =
+                   Public_key.Compressed.Checked.if_ is_empty_and_writeable
+                     ~then_:sender_compressed ~else_:account.delegate
+                 in
                  let%map balance =
                    Balance.Checked.add_signed_amount account.balance
                      sender_delta
@@ -509,13 +523,19 @@ module Base = struct
                  { Account.balance
                  ; public_key= sender_compressed
                  ; nonce= next_nonce
-                 ; receipt_chain_hash }) )
+                 ; receipt_chain_hash (* TODO: Change in the next PR *)
+                 ; delegate= account.delegate }) )
         in
         (* we explicitly set the public_key because it could be zero if the account is new *)
         let%map root =
-          Frozen_ledger_hash.modify_account_recv root receiver ~f:
-            (fun account ->
-              let%map balance = Balance.Checked.(account.balance + amount) in
+          Frozen_ledger_hash.modify_account_recv root receiver
+            ~f:(fun ~is_empty_and_writeable account ->
+              let%map balance = Balance.Checked.(account.balance + amount)
+              and _delegate =
+                Public_key.Compressed.Checked.if_ is_empty_and_writeable
+                  ~then_:receiver ~else_:account.delegate
+              in
+              (* TODO: Change in the next PR *)
               {account with balance; public_key= receiver} )
         in
         (root, excess, supply_increase) )
@@ -585,7 +605,7 @@ module Base = struct
   let create_keys () = generate_keypair main ~exposing:(tick_input ())
 
   let tagged_transaction_proof ~proving_key sok_digest state1 state2
-      (transaction: Tagged_transaction.t) handler =
+      (transaction : Tagged_transaction.t) handler =
     let prover_state : Prover_state.t =
       {state1; state2; transaction; sok_digest}
     in
@@ -688,7 +708,7 @@ module Merge = struct
     + Amount.length_in_triples + Amount.Signed.length_in_triples
 
   let construct_input_checked ~prefix
-      ~(sok_digest: Sok_message.Digest.Checked.t) ~state1 ~state2
+      ~(sok_digest : Sok_message.Digest.Checked.t) ~state1 ~state2
       ~supply_increase ~fee_excess ?tock_vk () =
     let prefix_section =
       Pedersen.Checked.Section.create ~acc:prefix
@@ -770,10 +790,10 @@ module Merge = struct
      verify_transition tock_vk _ s1 s2 is true
      verify_transition tock_vk _ s2 s3 is true
   *)
-  let main (top_hash: Pedersen.Checked.Digest.var) =
+  let main (top_hash : Pedersen.Checked.Digest.var) =
     let%bind tock_vk =
-      provide_witness' Verifier.Verification_key.typ ~f:
-        (fun {Prover_state.tock_vk; _} ->
+      provide_witness' Verifier.Verification_key.typ
+        ~f:(fun {Prover_state.tock_vk; _} ->
           Verifier.Verification_key.of_verification_key tock_vk )
     and s1 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash1
     and s2 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash2
@@ -993,11 +1013,11 @@ module Verification = struct
         then digest
         else
           failwithf
-            !"%d = Hash_prefix.length_in_triples aka %d\n            \
-              + Sok_message.Digest.length_in_triples aka %d\n\
-              + (2 * Frozen_ledger_hash.length_in_triples) aka %d \n            \
-              + Amount.length aka %d + Amount.Signed.length aka %d + \
-              List.length wrap_vk_triples aka %d ) aka %d"
+            !"%d = Hash_prefix.length_in_triples aka %d\n\
+             \            + Sok_message.Digest.length_in_triples aka %d\n\
+              + (2 * Frozen_ledger_hash.length_in_triples) aka %d \n\
+             \            + Amount.length aka %d + Amount.Signed.length aka \
+              %d + List.length wrap_vk_triples aka %d ) aka %d"
             n Hash_prefix.length_in_triples
             Sok_message.Digest.length_in_triples
             (2 * Frozen_ledger_hash.length_in_triples)
@@ -1061,7 +1081,7 @@ struct
    constraints pass iff
    (b1, b2, .., bn) = unpack input,
    there is a proof making one of [ base_vk; merge_vk ] accept (b1, b2, .., bn) *)
-  let main (input: Wrap_input.var) =
+  let main (input : Wrap_input.var) =
     let open Let_syntax in
     with_label __LOC__
       (let%bind input = Wrap_input.Checked.to_scalar input in
@@ -1127,11 +1147,11 @@ module type S = sig
     -> Tick.Handler.t
     -> t
 
-  val of_transaction :
+  val of_user_command :
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> Transaction.With_valid_signature.t
+    -> User_command.With_valid_signature.t
     -> Tick.Handler.t
     -> t
 
@@ -1166,13 +1186,13 @@ let check_tagged_transaction sok_message source target transaction handler =
   in
   Or_error.ok_exn (run_and_check main prover_state) |> ignore
 
-let check_transition ~sok_message ~source ~target (t: Transition.t) handler =
+let check_transition ~sok_message ~source ~target (t : Transition.t) handler =
   check_tagged_transaction sok_message source target
     (Transition.to_tagged_transaction t)
     handler
 
-let check_transaction ~sok_message ~source ~target t handler =
-  check_transition ~sok_message ~source ~target (Transaction t) handler
+let check_user_command ~sok_message ~source ~target t handler =
+  check_transition ~sok_message ~source ~target (User_command t) handler
 
 let check_fee_transfer ~sok_message ~source ~target t handler =
   check_transition ~sok_message ~source ~target (Fee_transfer t) handler
@@ -1247,8 +1267,9 @@ struct
       (Transition.to_tagged_transaction transition)
       handler
 
-  let of_transaction ~sok_digest ~source ~target transaction handler =
-    of_transition ~sok_digest ~source ~target (Transaction transaction) handler
+  let of_user_command ~sok_digest ~source ~target user_command handler =
+    of_transition ~sok_digest ~source ~target (User_command user_command)
+      handler
 
   let of_fee_transfer ~sok_digest ~source ~target transfer handler =
     of_transition ~sok_digest ~source ~target (Fee_transfer transfer) handler
@@ -1327,7 +1348,7 @@ module Keys = struct
     let checksum ~base ~merge ~wrap =
       checksum ~prefix:"verification" ~base ~merge ~wrap
 
-    let load ({merge; base; wrap}: Location.t) =
+    let load ({merge; base; wrap} : Location.t) =
       let open Storage in
       let parent_log = Logger.create () in
       let tick_controller =
@@ -1361,7 +1382,7 @@ module Keys = struct
     let checksum ~base ~merge ~wrap =
       checksum ~prefix:"proving" ~base ~merge ~wrap
 
-    let load ({merge; base; wrap}: Location.t) =
+    let load ({merge; base; wrap} : Location.t) =
       let open Storage in
       let parent_log = Logger.create () in
       let tick_controller =
@@ -1405,7 +1426,7 @@ module Keys = struct
     type t = {proving: Md5.t; verification: Md5.t}
   end
 
-  let load ({proving; verification}: Location.t) =
+  let load ({proving; verification} : Location.t) =
     let open Async in
     let%map proving, proving_checksum = Proving.load proving
     and verification, verification_checksum = Verification.load verification in
@@ -1483,9 +1504,9 @@ let%test_module "transaction_snark" =
 
       let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
 
-      let merkle_root_after_transaction_exn t txn =
+      let merkle_root_after_user_command_exn t txn =
         Frozen_ledger_hash.of_ledger_hash
-        @@ merkle_root_after_transaction_exn t txn
+        @@ merkle_root_after_user_command_exn t txn
     end
 
     module Sparse_ledger = struct
@@ -1501,27 +1522,26 @@ let%test_module "transaction_snark" =
         let private_key = Private_key.create () in
         { private_key
         ; account=
-            { public_key=
-                Public_key.compress (Public_key.of_private_key_exn private_key)
-            ; balance= Balance.of_int (50 + Random.int 100)
-            ; receipt_chain_hash= Receipt.Chain_hash.empty
-            ; nonce= Account.Nonce.zero } }
+            Account.create
+              (Public_key.compress (Public_key.of_private_key_exn private_key))
+              (Balance.of_int (50 + Random.int 100)) }
       in
-      let n = Int.pow 2 ledger_depth in
+      let n = min (Int.pow 2 ledger_depth) (1 lsl 10) in
       Array.init n ~f:(fun _ -> random_wallet ())
 
-    let transaction wallets i j amt fee nonce =
+    let user_command wallets i j amt fee nonce memo =
       let sender = wallets.(i) in
       let receiver = wallets.(j) in
-      let payload : Transaction.Payload.t =
-        { receiver= receiver.account.public_key
-        ; fee
-        ; amount= Amount.of_int amt
-        ; nonce }
+      let payload : User_command.Payload.t =
+        User_command.Payload.create ~fee ~nonce ~memo
+          ~body:
+            (Payment
+               { receiver= receiver.account.public_key
+               ; amount= Amount.of_int amt })
       in
       let signature = Schnorr.sign sender.private_key payload in
-      Transaction.check
-        { Transaction.payload
+      User_command.check
+        { User_command.payload
         ; sender= Public_key.of_private_key_exn sender.private_key
         ; signature }
       |> Option.value_exn
@@ -1532,12 +1552,12 @@ let%test_module "transaction_snark" =
       let keys = keys
     end)
 
-    let of_transaction' sok_digest ledger transaction handler =
+    let of_user_command' sok_digest ledger user_command handler =
       let source = Ledger.merkle_root ledger in
       let target =
-        Ledger.merkle_root_after_transaction_exn ledger transaction
+        Ledger.merkle_root_after_user_command_exn ledger user_command
       in
-      of_transaction ~sok_digest ~source ~target transaction handler
+      of_user_command ~sok_digest ~source ~target user_command handler
 
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -1549,12 +1569,17 @@ let%test_module "transaction_snark" =
               Ledger.create_new_account_exn ledger account.public_key account
               ) ;
           let t1 =
-            transaction wallets 1 0 8
+            user_command wallets 1 0 8
               (Fee.of_int (Random.int 20))
               Account.Nonce.zero
+              (User_command_memo.create_exn
+                 (Test_util.arbitrary_string
+                    ~len:User_command_memo.max_size_in_bytes))
           in
-          let target = Ledger.merkle_root_after_transaction_exn ledger t1 in
-          let mentioned_keys = Transaction.public_keys (t1 :> Transaction.t) in
+          let target = Ledger.merkle_root_after_user_command_exn ledger t1 in
+          let mentioned_keys =
+            User_command.accounts_accessed (t1 :> User_command.t)
+          in
           let sparse_ledger =
             Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
           in
@@ -1562,7 +1587,7 @@ let%test_module "transaction_snark" =
             Sok_message.create ~fee:Fee.zero
               ~prover:wallets.(1).account.public_key
           in
-          check_transaction ~sok_message
+          check_user_command ~sok_message
             ~source:(Ledger.merkle_root ledger)
             ~target t1
             (unstage @@ Sparse_ledger.handler sparse_ledger) )
@@ -1575,14 +1600,20 @@ let%test_module "transaction_snark" =
               Ledger.create_new_account_exn ledger account.public_key account
           ) ;
           let t1 =
-            transaction wallets 0 1 8
+            user_command wallets 0 1 8
               (Fee.of_int (Random.int 20))
               Account.Nonce.zero
+              (User_command_memo.create_exn
+                 (Test_util.arbitrary_string
+                    ~len:User_command_memo.max_size_in_bytes))
           in
           let t2 =
-            transaction wallets 1 2 3
+            user_command wallets 1 2 3
               (Fee.of_int (Random.int 20))
               Account.Nonce.zero
+              (User_command_memo.create_exn
+                 (Test_util.arbitrary_string
+                    ~len:User_command_memo.max_size_in_bytes))
           in
           let sok_digest =
             Sok_message.create ~fee:Fee.zero
@@ -1593,38 +1624,40 @@ let%test_module "transaction_snark" =
           let sparse_ledger =
             Sparse_ledger.of_ledger_subset_exn ledger
               (List.concat_map
-                 ~f:(fun t -> Transaction.public_keys (t :> Transaction.t))
+                 ~f:(fun t ->
+                   User_command.accounts_accessed (t :> User_command.t) )
                  [t1; t2])
           in
           let proof12 =
-            of_transaction' sok_digest ledger t1
+            of_user_command' sok_digest ledger t1
               (unstage @@ Sparse_ledger.handler sparse_ledger)
           in
           let sparse_ledger =
-            Sparse_ledger.apply_transaction_exn sparse_ledger
-              (t1 :> Transaction.t)
+            Sparse_ledger.apply_user_command_exn sparse_ledger
+              (t1 :> User_command.t)
           in
-          Ledger.apply_transaction ledger t1 |> Or_error.ok_exn |> ignore ;
-          [%test_eq : Frozen_ledger_hash.t]
+          Ledger.apply_user_command ledger t1 |> Or_error.ok_exn |> ignore ;
+          [%test_eq: Frozen_ledger_hash.t]
             (Ledger.merkle_root ledger)
             (Sparse_ledger.merkle_root sparse_ledger) ;
           let proof23 =
-            of_transaction' sok_digest ledger t2
+            of_user_command' sok_digest ledger t2
               (unstage @@ Sparse_ledger.handler sparse_ledger)
           in
           let sparse_ledger =
-            Sparse_ledger.apply_transaction_exn sparse_ledger
-              (t2 :> Transaction.t)
+            Sparse_ledger.apply_user_command_exn sparse_ledger
+              (t2 :> User_command.t)
           in
-          Ledger.apply_transaction ledger t2 |> Or_error.ok_exn |> ignore ;
-          [%test_eq : Frozen_ledger_hash.t]
+          Ledger.apply_user_command ledger t2 |> Or_error.ok_exn |> ignore ;
+          [%test_eq: Frozen_ledger_hash.t]
             (Ledger.merkle_root ledger)
             (Sparse_ledger.merkle_root sparse_ledger) ;
           let total_fees =
             let open Amount in
             let magnitude =
-              of_fee (t1 :> Transaction.t).payload.fee
-              + of_fee (t2 :> Transaction.t).payload.fee
+              of_fee (User_command_payload.fee (t1 :> User_command.t).payload)
+              + of_fee
+                  (User_command_payload.fee (t2 :> User_command.t).payload)
               |> Option.value_exn
             in
             Signed.create ~magnitude ~sgn:Sgn.Pos

@@ -16,8 +16,7 @@ module type S = sig
 end
 
 module Make (Consensus_mechanism : Consensus.Mechanism.S) :
-  S with module Consensus_mechanism = Consensus_mechanism =
-struct
+  S with module Consensus_mechanism = Consensus_mechanism = struct
   module Consensus_mechanism = Consensus_mechanism
   module Protocol_state = Consensus_mechanism.Protocol_state
 

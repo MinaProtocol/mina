@@ -18,16 +18,14 @@ module Make (Hash : sig
   type t [@@deriving sexp]
 
   val merge : height:int -> t -> t -> t
-end) :
-  S with type hash := Hash.t =
-struct
+end) : S with type hash := Hash.t = struct
   type elem = [`Left of Hash.t | `Right of Hash.t] [@@deriving sexp]
 
   let elem_hash = function `Left h | `Right h -> h
 
   type t = elem list [@@deriving sexp]
 
-  let implied_root (t: t) leaf_hash =
+  let implied_root (t : t) leaf_hash =
     List.fold t ~init:(leaf_hash, 0) ~f:(fun (acc, height) elem ->
         let acc =
           match elem with

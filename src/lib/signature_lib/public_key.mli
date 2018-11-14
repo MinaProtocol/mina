@@ -6,6 +6,8 @@ open Fold_lib
 
 type t = Field.t * Field.t [@@deriving bin_io, sexp, hash]
 
+val to_yojson : t -> Yojson.Safe.json
+
 module Stable : sig
   module V1 : sig
     type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
@@ -60,11 +62,15 @@ module Compressed : sig
   module Checked : sig
     val equal : var -> var -> (Boolean.var, _) Checked.t
 
+    val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+
     module Assert : sig
       val equal : var -> var -> (unit, _) Checked.t
     end
   end
 end
+
+val gen : t Quickcheck.Generator.t
 
 val of_bigstring : Bigstring.t -> t Or_error.t
 

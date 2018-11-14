@@ -6,7 +6,7 @@ open Ctypes
 open Foreign
 
 [%%if
-log_calls]
+call_logger]
 
 let foreign name t =
   let f = foreign name t in
@@ -975,7 +975,8 @@ struct
           let t = stub ptr in
           Caml.Gc.finalise delete t ; t
 
-      include Binable.Of_binable (Bigstring)
+      include Binable.Of_binable
+                (Bigstring)
                 (struct
                   type nonrec t = t
 
@@ -1826,7 +1827,8 @@ module Curves = struct
       let generator = mk_generator Mnt6.Field.typ Mnt6.Field.delete "mnt4_G1"
 
       module Coefficients =
-        Make_coefficients (Mnt6.Field)
+        Make_coefficients
+          (Mnt6.Field)
           (struct
             let curve_name = "mnt4_G1"
           end)
@@ -1839,20 +1841,19 @@ module Curves = struct
         mk_generator Mnt4_0.Field.typ Mnt4_0.Field.delete "mnt6_G1"
 
       module Coefficients =
-        Make_coefficients (Mnt4_0.Field)
+        Make_coefficients
+          (Mnt4_0.Field)
           (struct
             let curve_name = "mnt6_G1"
           end)
     end
 
     let final_exponent_last_chunk_abs_of_w0 =
-      !@
-        (foreign_value "camlsnark_mnt6_final_exponent_last_chunk_abs_of_w0"
+      !@(foreign_value "camlsnark_mnt6_final_exponent_last_chunk_abs_of_w0"
            Mnt6.Bigint.Q.typ)
 
     let final_exponent_last_chunk_w1 =
-      !@
-        (foreign_value "camlsnark_mnt6_final_exponent_last_chunk_w1"
+      !@(foreign_value "camlsnark_mnt6_final_exponent_last_chunk_w1"
            Mnt6.Bigint.Q.typ)
   end
 end

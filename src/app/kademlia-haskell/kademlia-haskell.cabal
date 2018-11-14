@@ -11,7 +11,7 @@ bug-reports:    https://github.com/o1labs/kademlia-haskell/issues
 author:         Brandon Kase
 maintainer:     bkase@o1labs.org
 copyright:      2018 O(1) Labs
-license:        MIT
+license:        Apache
 license-file:   LICENSE
 build-type:     Simple
 cabal-version:  >= 1.10

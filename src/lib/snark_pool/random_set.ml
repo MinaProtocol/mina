@@ -26,9 +26,7 @@ module Make (Key : sig
   val gen : t Quickcheck.Generator.t
 
   include Hashable.S_binable with type t := t
-end) :
-  S with type key := Key.t =
-struct
+end) : S with type key := Key.t = struct
   type t = {keys: Key.t Dyn_array.t; key_to_loc: Int.t Key.Table.t}
   [@@deriving sexp, bin_io]
 
@@ -49,8 +47,8 @@ struct
       Some (Dyn_array.get t.keys random_index)
 
   let remove t key =
-    Option.iter (Key.Table.find_and_remove t.key_to_loc key) ~f:
-      (fun delete_index ->
+    Option.iter (Key.Table.find_and_remove t.key_to_loc key)
+      ~f:(fun delete_index ->
         let last_elem = Dyn_array.last t.keys in
         Dyn_array.set t.keys delete_index last_elem ;
         Dyn_array.delete_last t.keys )
@@ -65,13 +63,13 @@ struct
     t
 
   let%test_unit "for all s, x : add s x -> mem s x" =
-    Quickcheck.test ~sexp_of:[%sexp_of : t * Key.t]
+    Quickcheck.test ~sexp_of:[%sexp_of: t * Key.t]
       (Quickcheck.Generator.tuple2 gen Key.gen) ~f:(fun (s, x) ->
         add s x ;
         assert (mem s x) )
 
   let%test_unit "for all s, x: add s x & remove s x -> !mem s x" =
-    Quickcheck.test ~sexp_of:[%sexp_of : t * Key.t]
+    Quickcheck.test ~sexp_of:[%sexp_of: t * Key.t]
       (Quickcheck.Generator.tuple2 gen Key.gen) ~f:(fun (s, x) ->
         add s x ;
         remove s x ;

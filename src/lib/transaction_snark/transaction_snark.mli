@@ -7,8 +7,8 @@ module Proof_type : sig
 end
 
 module Transition : sig
-  type t = Super_transaction.t =
-    | Transaction of Transaction.With_valid_signature.t
+  type t = Transaction.t =
+    | User_command of User_command.With_valid_signature.t
     | Fee_transfer of Fee_transfer.t
     | Coinbase of Coinbase.t
   [@@deriving bin_io, sexp]
@@ -114,8 +114,7 @@ module Verification : sig
 
   module Make (K : sig
     val keys : Keys.Verification.t
-  end) :
-    S
+  end) : S
 end
 
 val check_transition :
@@ -126,11 +125,11 @@ val check_transition :
   -> Tick.Handler.t
   -> unit
 
-val check_transaction :
+val check_user_command :
      sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
-  -> Transaction.With_valid_signature.t
+  -> User_command.With_valid_signature.t
   -> Tick.Handler.t
   -> unit
 
@@ -145,11 +144,11 @@ module type S = sig
     -> Tick.Handler.t
     -> t
 
-  val of_transaction :
+  val of_user_command :
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> Transaction.With_valid_signature.t
+    -> User_command.With_valid_signature.t
     -> Tick.Handler.t
     -> t
 
@@ -166,5 +165,4 @@ end
 
 module Make (K : sig
   val keys : Keys.t
-end) :
-  S
+end) : S

@@ -30,9 +30,7 @@ module Make (M : sig
   val schedule_delete : elt -> unit
 
   val prefix : string
-end) :
-  S with type elt = M.elt =
-struct
+end) : S with type elt = M.elt = struct
   type elt = M.elt
 
   type t = unit ptr

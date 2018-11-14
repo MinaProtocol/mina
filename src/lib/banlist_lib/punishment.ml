@@ -29,8 +29,7 @@ module Record = struct
       include Binable.S with type t := t
     end
     with type time := Time.t
-     and type score := Score.t =
-  struct
+     and type score := Score.t = struct
     type t = {score: Score.t; punishment: T.t} [@@deriving bin_io]
 
     let eviction_time {punishment; _} =

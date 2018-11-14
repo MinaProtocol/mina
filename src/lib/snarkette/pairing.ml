@@ -81,7 +81,7 @@ struct
     type t = {px: Fq.t; py: Fq.t; px_twist: Fq_twist.t; py_twist: Fq_twist.t}
     [@@deriving bin_io, sexp]
 
-    let create (p: G1.t) =
+    let create (p : G1.t) =
       let px, py = G1.to_affine_coordinates p in
       { px
       ; py
@@ -162,7 +162,7 @@ struct
       in
       (next, {Add_coeffs.c_L1= l1; c_RZ= next.z})
 
-    let create (q: G2.t) =
+    let create (q : G2.t) =
       let qx, qy = G2.to_affine_coordinates q in
       let qy2 = Fq_twist.square qy in
       let qx_over_twist = Fq_twist.(qx * twist_inv) in
@@ -215,7 +215,7 @@ struct
       ; add_coeffs= Array.of_list (List.rev add_coeffs) }
   end
 
-  let miller_loop (p: G1_precomputation.t) (q: G2_precomputation.t) =
+  let miller_loop (p : G1_precomputation.t) (q : G2_precomputation.t) =
     let l1_coeff = Fq_twist.(of_base p.px - q.qx_over_twist) in
     let f = ref Fq_target.one in
     let found_one = ref false in
@@ -227,7 +227,7 @@ struct
       else
         let dbl_idx = !dbl_idx_r in
         incr dbl_idx_r ;
-        let dc = (q.dbl_coeffs).(dbl_idx) in
+        let dc = q.dbl_coeffs.(dbl_idx) in
         let g_RR_at_P : Fq_target.t =
           let open Fq_twist in
           (negate dc.c_4C - (dc.c_J * p.px_twist) + dc.c_L, dc.c_H * p.py_twist)
@@ -236,7 +236,7 @@ struct
         if bit then (
           let add_idx = !add_idx_r in
           incr add_idx_r ;
-          let ac = (q.add_coeffs).(add_idx) in
+          let ac = q.add_coeffs.(add_idx) in
           let g_RQ_at_P =
             let open Fq_twist in
             ( ac.c_RZ * p.py_twist
@@ -247,7 +247,7 @@ struct
     if Info.is_loop_count_neg then (
       let add_idx = !add_idx_r in
       incr add_idx_r ;
-      let ac = (q.add_coeffs).(add_idx) in
+      let ac = q.add_coeffs.(add_idx) in
       let g_RnegR_at_P =
         let open Fq_twist in
         ( ac.c_RZ * p.py_twist

@@ -11,11 +11,13 @@ include T
 
 let arg_type = Command.Arg_type.create of_string
 
-let obtain_keys (type vk pk kp) (module Impl
-    : Snark_intf with type Verification_key.t = vk and type Proving_key.t = pk and type 
-      Keypair.t = kp) t f =
+let obtain_keys (type vk pk kp)
+    (module Impl : Snark_intf
+      with type Verification_key.t = vk
+       and type Proving_key.t = pk
+       and type Keypair.t = kp) t f =
   let keypair_of_sexp s =
-    let x, y = [%of_sexp : string * string] s in
+    let x, y = [%of_sexp: string * string] s in
     (Impl.Verification_key.of_string x, Impl.Proving_key.of_string y)
   in
   lazy

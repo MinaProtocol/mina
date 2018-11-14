@@ -1,20 +1,8 @@
 open Core
 open Async
 
-(* Ocamlformat breaks on the following files, so we ignore those for now *)
-let whitelist =
-  [ "lib/snark_params/snark_util.ml"
-  ; "lib/dummy_values/gen_values/gen_values.ml"
-  ; "lib/coda_base/blockchain_state.ml"
-  ; "lib/coda_base/ledger_hash.ml"
-  ; "lib/coda_base/public_key.ml"
-  ; "lib/coda_base/gen/gen.ml"
-  ; "lib/snarky/src/request.ml"
-  ; "lib/snarky/src/request.mli"
-  ; "lib/spirv/generator.ml"
-  ; "lib/spirv/spirv.ml"
-  ; "lib/spirv/spirv.mli"
-  ; "lib/spirv/spirv_test.ml" ]
+(* If OCamlformat ever breaks on any files add their paths here *)
+let whitelist = []
 
 let rec fold_over_files ~path ~process_path ~init ~f =
   let%bind all = Sys.ls_dir path in
@@ -32,16 +20,16 @@ let main dry_run check path =
       ~process_path:(fun kind path ->
         match kind with
         | `Dir ->
-            not (String.is_suffix ~suffix:".git" path)
-            && not (String.is_suffix ~suffix:"_build" path)
-            && not (String.is_suffix ~suffix:"stationary" path)
-            && not (String.is_suffix ~suffix:".un~" path)
-            && not (String.is_suffix ~suffix:"external" path)
+            (not (String.is_suffix ~suffix:".git" path))
+            && (not (String.is_suffix ~suffix:"_build" path))
+            && (not (String.is_suffix ~suffix:"stationary" path))
+            && (not (String.is_suffix ~suffix:".un~" path))
+            && (not (String.is_suffix ~suffix:"external" path))
             && not (String.is_suffix ~suffix:"ocamlformat" path)
         | `File ->
-            not
-              (List.exists whitelist ~f:(fun s ->
-                   String.is_suffix ~suffix:s path ))
+            (not
+               (List.exists whitelist ~f:(fun s ->
+                    String.is_suffix ~suffix:s path )))
             && ( String.is_suffix ~suffix:".ml" path
                || String.is_suffix ~suffix:".mli" path ) )
       ~f:(fun () file ->

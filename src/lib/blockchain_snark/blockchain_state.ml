@@ -8,14 +8,10 @@ open Let_syntax
 
 module Make (Consensus_mechanism : Consensus.Mechanism.S) :
   Blockchain_state_intf.S
-  with module Consensus_mechanism := Consensus_mechanism =
-struct
+  with module Consensus_mechanism := Consensus_mechanism = struct
+  module Blockchain_state = Consensus_mechanism.Blockchain_state
   module Protocol_state = Consensus_mechanism.Protocol_state
   module Snark_transition = Consensus_mechanism.Snark_transition
-
-  let check cond msg =
-    if not cond then Or_error.errorf "Blockchain_state.update: %s" msg
-    else Ok ()
 
   module type Update_intf = sig
     module Checked : sig
@@ -51,14 +47,15 @@ struct
               new consensus state is a function of the old consensus state
       *)
       let update
-          ((previous_state_hash, previous_state):
+          ((previous_state_hash, previous_state) :
             State_hash.var * Protocol_state.var)
-          (transition: Snark_transition.var) :
+          (transition : Snark_transition.var) :
           ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]
           , _ )
           Tick.Checked.t =
         with_label __LOC__
-          (let%bind good_body =
+          (let supply_increase = Snark_transition.supply_increase transition in
+           let%bind good_body =
              let%bind correct_transaction_snark =
                T.verify_complete_merge
                  (Snark_transition.sok_digest transition)
@@ -66,7 +63,7 @@ struct
                  |> Blockchain_state.ledger_hash )
                  ( transition |> Snark_transition.blockchain_state
                  |> Blockchain_state.ledger_hash )
-                 (Snark_transition.supply_increase transition)
+                 supply_increase
                  (As_prover.return
                     (Option.value ~default:Tock.Proof.dummy
                        (Snark_transition.ledger_proof transition)))
@@ -78,6 +75,7 @@ struct
                  |> Blockchain_state.ledger_hash )
              and consensus_data_is_valid =
                Consensus_mechanism.is_transition_valid_checked transition
+                 (previous_state |> Protocol_state.previous_state_hash)
              in
              let%bind correct_snark =
                Boolean.(correct_transaction_snark || ledger_hash_didn't_change)
@@ -87,7 +85,7 @@ struct
            let%bind consensus_state =
              Consensus_mechanism.next_state_checked
                (Protocol_state.consensus_state previous_state)
-               previous_state_hash transition
+               previous_state_hash transition supply_increase
            in
            let new_state =
              Protocol_state.create_var ~previous_state_hash
@@ -122,7 +120,7 @@ struct
                 :> Field.t ))
            (State_hash.var_to_hash_packed h))
 
-    let hash (t: Protocol_state.var) =
+    let hash (t : Protocol_state.var) =
       with_label __LOC__
         ( Protocol_state.var_to_triples t
         >>= Pedersen.Checked.digest_triples ~init:Hash_prefix.protocol_state

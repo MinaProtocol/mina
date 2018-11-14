@@ -16,7 +16,7 @@ let merge ~height h1 h2 =
 
 open Base
 
-let implied_root (t: t) leaf_hash =
+let implied_root (t : t) leaf_hash =
   List.fold t ~init:(leaf_hash, 0) ~f:(fun (acc, height) elem ->
       let acc =
         match elem with

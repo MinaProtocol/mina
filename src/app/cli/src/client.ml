@@ -17,7 +17,8 @@ let dispatch rpc query port =
       | Ok conn -> Rpc.Rpc.dispatch rpc conn query )
 
 let json_flag =
-  Command.Param.(flag "json" no_arg ~doc:"Use json output (default: plaintext)")
+  Command.Param.(
+    flag "json" no_arg ~doc:"Use json output (default: plaintext)")
 
 module Daemon_cli = struct
   module Flag = struct
@@ -170,123 +171,8 @@ let status_clear_hist =
          dispatch Clear_hist_status.rpc () port >>| print (module Status) json
      ))
 
-let handle_open ~mkdir ~(f: string -> 'a Deferred.t) path : 'a Deferred.t =
-  let open Unix.Error in
-  let dn = Filename.dirname path in
-  let%bind parent_exists =
-    match%bind
-      Monitor.try_with ~extract_exn:true (fun () ->
-          let%bind stat = Unix.stat dn in
-          if stat.kind <> `Directory then (
-            eprintf
-              "Error: %s exists and is not a directory, can't store keys there\n"
-              dn ;
-            exit 1 )
-          else return true )
-    with
-    | Ok x -> return x
-    | Error (Unix.Unix_error (ENOENT, _, _)) -> return false
-    | Error (Unix.Unix_error (e, _, _)) ->
-        eprintf "Error: could not stat %s: %s, not making keys\n" dn
-          (message e) ;
-        exit 1
-    | Error e -> raise e
-  in
-  let%bind () =
-    match%bind
-      Monitor.try_with ~extract_exn:true (fun () ->
-          if not parent_exists && mkdir then
-            let%bind () = Unix.mkdir ~p:() dn in
-            Unix.chmod dn 0o700
-          else if not parent_exists then (
-            eprintf
-              "Error: %s does not exist\nHint: mkdir -p %s; chmod 700 %s\n" dn
-              dn dn ;
-            exit 1 )
-          else Deferred.unit )
-    with
-    | Ok x -> return x
-    | Error (Unix.Unix_error ((EACCES as e), _, _)) ->
-        eprintf "Error: could not mkdir -p %s: %s\n" dn (message e) ;
-        exit 1
-    | Error e -> raise e
-  in
-  match%bind Monitor.try_with ~extract_exn:true (fun () -> f path) with
-  | Ok x -> return x
-  | Error (Unix.Unix_error (e, _, _)) ->
-      eprintf "Error: could not open %s: %s\n" path (message e) ;
-      exit 1
-  | Error e -> raise e
-
-let write_keypair {Keypair.private_key; public_key; _} privkey_path
-    ~(password: unit -> Bytes.t Deferred.t) =
-  let%bind privkey_f =
-    handle_open ~mkdir:true ~f:Writer.open_file privkey_path
-  in
-  let%bind pubkey_f =
-    handle_open ~mkdir:false ~f:Writer.open_file (privkey_path ^ ".pub")
-  in
-  let%bind password = password () in
-  let sb =
-    Secret_box.encrypt
-      ~plaintext:(Private_key.to_bigstring private_key |> Bigstring.to_bytes)
-      ~password
-  in
-  let sb =
-    Secret_box.to_yojson sb |> Yojson.Safe.to_string |> Bytes.of_string
-  in
-  Writer.write_bytes privkey_f sb ;
-  let%bind () = Writer.close privkey_f in
-  let%bind () = Unix.chmod privkey_path ~perm:0o600 in
-  let pubkey_bytes =
-    Public_key.Compressed.to_base64 (Public_key.compress public_key)
-    |> Bytes.of_string
-  in
-  Writer.write_bytes pubkey_f pubkey_bytes ;
-  let%bind () = Writer.close pubkey_f in
-  Deferred.unit
-
-let read_keypair_exn privkey_path ~(password: unit -> Bytes.t Deferred.t) =
-  let open Deferred.Let_syntax in
-  let read_all r =
-    Pipe.to_list (Reader.lines r) >>| fun ss -> String.concat ~sep:"\n" ss
-  in
-  let%bind privkey_file =
-    handle_open ~mkdir:false ~f:Reader.open_file privkey_path
-  in
-  let%bind file_contents = read_all privkey_file in
-  let%bind sb =
-    match Secret_box.of_yojson (Yojson.Safe.from_string file_contents) with
-    | Ok sb -> return sb
-    | Error e ->
-        eprintf "Error parsing %s, is your keyfile corrupt?: %s\n" privkey_path
-          e ;
-        exit 1
-  in
-  let%bind password = password () in
-  let%bind pk =
-    match Secret_box.decrypt ~password sb with
-    | Ok pk_bytes -> (
-      try
-        pk_bytes |> Bigstring.of_bytes |> Private_key.of_bigstring_exn
-        |> return
-      with exn ->
-        eprintf
-          "Error parsing decrypted private key, is your keyfile corrupt?: %s\n"
-          (Exn.to_string exn) ;
-        exit 1 )
-    | Error e ->
-        eprintf "Error decrypting %s: %s\n" privkey_path
-          (Error.to_string_hum e) ;
-        exit 1
-  in
-  try return @@ Keypair.of_private_key_exn pk with exn ->
-    eprintf
-      "Error computing public key from private, is your keyfile corrupt?: %s\n"
-      (Exn.to_string exn) ;
-    exit 1
-
 let rec prompt_password prompt =
+  let open Deferred.Or_error.Let_syntax in
   let%bind pw1 = read_password_exn prompt in
   let%bind pw2 = read_password_exn "Again to confirm: " in
   if not (Bytes.equal pw1 pw2) then (
@@ -304,28 +190,6 @@ let privkey_read_path_flag =
   let open Command.Param in
   flag "privkey-path" ~doc:"FILE File to read private key from" (required file)
 
-let read_keypair from_account =
-  let open Deferred.Let_syntax in
-  let perm_error = ref false in
-  let%bind st = handle_open ~mkdir:false ~f:Unix.stat from_account in
-  if st.perm land 0o077 <> 0 then (
-    eprintf
-      "Error: insecure permissions on `%s`. They should be 0600, they are %o\n\
-       Hint: chmod 600 %s\n"
-      from_account (st.perm land 0o777) from_account ;
-    perm_error := true ) ;
-  let dn = Filename.dirname from_account in
-  let%bind st = handle_open ~mkdir:false ~f:Unix.stat dn in
-  if st.perm land 0o777 <> 0o700 then (
-    eprintf
-      "Error: insecure permissions on `%s`. They should be 0700, they are %o\n\
-       Hint: chmod 700 %s\n"
-      dn (st.perm land 0o777) dn ;
-    perm_error := true ) ;
-  let%bind () = if !perm_error then exit 1 else Deferred.unit in
-  read_keypair_exn from_account ~password:(fun () ->
-      read_password_exn "Private key password: " )
-
 let get_nonce_exn public_key port =
   match%bind get_nonce public_key port with
   | Error e ->
@@ -342,65 +206,81 @@ let dispatch_with_message rpc arg port ~success ~error =
       eprintf "%s\n" (error e) ;
       exit 1
 
-let batch_send_txns =
-  let module Transaction_info = struct
+let handle_exception_nicely (type a) (f : unit -> a Deferred.t) () :
+    a Deferred.t =
+  match%bind Deferred.Or_error.try_with ~extract_exn:true f with
+  | Ok e -> return e
+  | Error e ->
+      eprintf "Error: %s" (Error.to_string_hum e) ;
+      exit 1
+
+let read_keypair path =
+  handle_exception_nicely
+    (fun () ->
+      read_keypair_exn ~privkey_path:path
+        ~password:(lazy (read_password_exn "Secret key password: ")) )
+    ()
+
+let batch_send_payments =
+  let module Payment_info = struct
     type t = {receiver: string; amount: Currency.Amount.t; fee: Currency.Fee.t}
     [@@deriving sexp]
   end in
   let arg =
     let open Command.Let_syntax in
     let%map_open privkey_path = privkey_read_path_flag
-    and transactions_path = anon ("transactions-file" %: string) in
-    (privkey_path, transactions_path)
+    and payments_path = anon ("payments-file" %: string) in
+    (privkey_path, payments_path)
   in
-  let get_infos transactions_path =
+  let get_infos payments_path =
     match%bind
-      Reader.load_sexp transactions_path [%of_sexp : Transaction_info.t list]
+      Reader.load_sexp payments_path [%of_sexp: Payment_info.t list]
     with
     | Ok x -> return x
     | Error e ->
-        let sample_info () : Transaction_info.t =
+        let sample_info () : Payment_info.t =
           let keypair = Keypair.create () in
-          { Transaction_info.receiver=
+          { Payment_info.receiver=
               Public_key.(Compressed.to_base64 (compress keypair.public_key))
           ; amount= Currency.Amount.of_int (Random.int 100)
           ; fee= Currency.Fee.of_int (Random.int 100) }
         in
-        eprintf "Could not read transactions from %s.\n" transactions_path ;
+        eprintf "Could not read payments from %s.\n" payments_path ;
         eprintf
-          "The file should be a sexp list of transactions. Here is an example \
-           file:\n\
+          "The file should be a sexp list of payments. Here is an example file:\n\
            %s\n"
           (Sexp.to_string_hum
-             ([%sexp_of : Transaction_info.t list]
+             ([%sexp_of: Payment_info.t list]
                 (List.init 3 ~f:(fun _ -> sample_info ())))) ;
         exit 1
   in
-  let main port (privkey_path, transactions_path) =
+  let main port (privkey_path, payments_path) =
     let open Deferred.Let_syntax in
-    let%bind keypair = read_keypair privkey_path
-    and infos = get_infos transactions_path in
+    let%bind keypair = read_keypair_exn' privkey_path
+    and infos = get_infos payments_path in
     let%bind nonce0 = get_nonce_exn keypair.public_key port in
     let _, ts =
       List.fold_map ~init:nonce0 infos ~f:(fun nonce {receiver; amount; fee} ->
           ( Account.Nonce.succ nonce
-          , Transaction.sign keypair
-              { receiver= Public_key.Compressed.of_base64_exn receiver
-              ; amount
-              ; fee
-              ; nonce } ) )
+          , User_command.sign keypair
+              (User_command_payload.create ~fee ~nonce
+                 ~memo:User_command_memo.dummy
+                 ~body:
+                   (Payment
+                      { receiver= Public_key.Compressed.of_base64_exn receiver
+                      ; amount })) ) )
     in
-    dispatch_with_message Client_lib.Send_transactions.rpc
-      (ts :> Transaction.t list)
+    dispatch_with_message Client_lib.Send_user_commands.rpc
+      (ts :> User_command.t list)
       port
-      ~success:(fun () -> "Successfully enqueued transactions in pool")
+      ~success:(fun () -> "Successfully enqueued payments in pool")
       ~error:(fun e ->
-        sprintf "Failed to send transactions %s" (Error.to_string_hum e) )
+        sprintf "Failed to send payments %s" (Error.to_string_hum e) )
   in
-  Command.async ~summary:"send multiple transactions from a file"
+  Command.async ~summary:"send multiple payments from a file"
     (Daemon_cli.init arg ~f:main)
 
-let send_txn =
+let send_payment =
   let open Command.Param in
   let address_flag =
     flag "receiver"
@@ -408,11 +288,11 @@ let send_txn =
       (required public_key)
   in
   let fee_flag =
-    flag "fee" ~doc:"VALUE  Transaction fee you're willing to pay (default: 1)"
+    flag "fee" ~doc:"VALUE  Payment fee you're willing to pay (default: 1)"
       (optional txn_fee)
   in
   let amount_flag =
-    flag "amount" ~doc:"VALUE Transaction amount you want to send"
+    flag "amount" ~doc:"VALUE Payment amount you want to send"
       (required txn_amount)
   in
   let flag =
@@ -420,69 +300,73 @@ let send_txn =
     return (fun a b c d -> (a, b, c, d))
     <*> address_flag <*> privkey_read_path_flag <*> fee_flag <*> amount_flag
   in
-  Command.async ~summary:"Send transaction to an address"
+  Command.async ~summary:"Send payment to an address"
     (Daemon_cli.init flag ~f:(fun port (address, from_account, fee, amount) ->
          let open Deferred.Let_syntax in
-         let%bind sender_kp = read_keypair from_account in
+         let%bind sender_kp = read_keypair_exn' from_account in
          let%bind nonce = get_nonce_exn sender_kp.public_key port in
          let receiver_compressed = Public_key.compress address in
          let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
-         let payload : Transaction.Payload.t =
-           {receiver= receiver_compressed; amount; fee; nonce}
+         let payload : User_command.Payload.t =
+           User_command.Payload.create ~fee ~nonce
+             ~memo:User_command_memo.dummy
+             ~body:(Payment {receiver= receiver_compressed; amount})
          in
-         let txn = Transaction.sign sender_kp payload in
-         dispatch_with_message Client_lib.Send_transactions.rpc
-           [(txn :> Transaction.t)]
+         let txn = User_command.sign sender_kp payload in
+         dispatch_with_message Client_lib.Send_user_commands.rpc
+           [(txn :> User_command.t)]
            port
-           ~success:(fun () -> "Successfully enqueued transaction in pool")
+           ~success:(fun () -> "Successfully enqueued payment in pool")
            ~error:(fun e ->
-             sprintf "Failed to send transaction %s" (Error.to_string_hum e) )
-     ))
+             sprintf "Failed to send payment %s" (Error.to_string_hum e) ) ))
 
 let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
     (let open Command.Let_syntax in
     let%map_open privkey_path = privkey_path_flag in
-    fun () ->
-      let open Deferred.Let_syntax in
-      let%bind privkey =
-        hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
-      in
-      let pk = Private_key.of_base64_exn (Bytes.to_string privkey) in
-      let kp = Keypair.of_private_key_exn pk in
-      write_keypair kp privkey_path ~password:(fun () ->
-          prompt_password "Password for new private key file: " ))
+    handle_exception_nicely
+    @@ fun () ->
+    let open Deferred.Let_syntax in
+    let%bind privkey =
+      hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
+    in
+    let pk =
+      Private_key.of_base64_exn (privkey |> Or_error.ok_exn |> Bytes.to_string)
+    in
+    let kp = Keypair.of_private_key_exn pk in
+    write_keypair_exn kp ~privkey_path
+      ~password:(lazy (prompt_password "Password for new private key file: ")))
 
 let dump_keypair =
   Command.async ~summary:"Print out a keypair from a private key file"
     (let open Command.Let_syntax in
     let%map_open privkey_path = privkey_read_path_flag in
-    fun () ->
-      let open Deferred.Let_syntax in
-      let%map kp =
-        read_keypair_exn privkey_path ~password:(fun () ->
-            read_password_exn "Password for private key file: " )
-      in
-      printf "Public key: %s\nPrivate key: %s\n"
-        ( kp.public_key |> Public_key.compress
-        |> Public_key.Compressed.to_base64 )
-        (kp.private_key |> Private_key.to_base64))
+    handle_exception_nicely
+    @@ fun () ->
+    let open Deferred.Let_syntax in
+    let%map kp =
+      read_keypair_exn ~privkey_path
+        ~password:(lazy (read_password_exn "Password for private key file: "))
+    in
+    printf "Public key: %s\nPrivate key: %s\n"
+      (kp.public_key |> Public_key.compress |> Public_key.Compressed.to_base64)
+      (kp.private_key |> Private_key.to_base64))
 
 let generate_keypair =
   Command.async ~summary:"Generate a new public-key/private-key pair"
     (let open Command.Let_syntax in
     let%map_open privkey_path = privkey_path_flag in
-    fun () ->
-      let open Deferred.Let_syntax in
-      let kp = Keypair.create () in
-      let%bind () =
-        write_keypair kp privkey_path ~password:(fun () ->
-            prompt_password "Password for new private key file: " )
-      in
-      printf "Public key: %s\n"
-        ( kp.public_key |> Public_key.compress
-        |> Public_key.Compressed.to_base64 ) ;
-      exit 0)
+    handle_exception_nicely
+    @@ fun () ->
+    let open Deferred.Let_syntax in
+    let kp = Keypair.create () in
+    let%bind () =
+      write_keypair_exn kp ~privkey_path
+        ~password:(lazy (prompt_password "Password for new private key file: "))
+    in
+    printf "Public key: %s\n"
+      (kp.public_key |> Public_key.compress |> Public_key.Compressed.to_base64) ;
+    exit 0)
 
 let dump_ledger =
   let lb_hash =
@@ -497,17 +381,17 @@ let dump_ledger =
     (Daemon_cli.init lb_hash ~f:(fun port lb_hash ->
          dispatch Client_lib.Get_ledger.rpc lb_hash port
          >>| function
-           | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e
-           | Ok (Error e) -> printf !"Ledger not found: %{sexp:Error.t}\n" e
-           | Ok (Ok ledger) -> printf !"%{sexp:Ledger.t}\n" ledger ))
+         | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e
+         | Ok (Error e) -> printf !"Ledger not found: %{sexp:Error.t}\n" e
+         | Ok (Ok ledger) -> printf !"%{sexp:Ledger.t}\n" ledger ))
 
 let command =
   Command.group ~summary:"Lightweight client process"
     [ ("get-balance", get_balance)
     ; ("get-public-keys", get_public_keys)
     ; ("get-nonce", get_nonce_cmd)
-    ; ("send-txn", send_txn)
-    ; ("batch-send-txns", batch_send_txns)
+    ; ("send-payment", send_payment)
+    ; ("batch-send-payments", batch_send_payments)
     ; ("status", status)
     ; ("status-clear-hist", status_clear_hist)
     ; ("wrap-key", wrap_key)
