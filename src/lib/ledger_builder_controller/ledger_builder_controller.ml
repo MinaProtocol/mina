@@ -316,39 +316,39 @@ end = struct
    fun t (hash, query) ->
     (* TODO: this caching shouldn't be necessary *)
     trace_recurring_task "answer sync query" (fun () ->
-    let open Deferred.Or_error.Let_syntax in
-    Logger.trace t.log
-      !"Attempting to handle a sync-ledger query for %{sexp: Ledger_hash.t}"
-      hash ;
-    let%map ledger =
-      if Option.equal Ledger_hash.equal (Some hash) !prev_hash then
-        return (Option.value_exn !prev_ledger)
-      else
-        let%map ll =
-          local_get_ledger' t hash
-            ~p_tip:(fun hash {With_hash.data= tip; hash= _} ->
-              Ledger_hash.equal
-                ( tip.Tip.ledger_builder |> Ledger_builder.ledger
-                |> Ledger.merkle_root )
-                hash )
-            ~p_trans:(fun hash {With_hash.data= trans; hash= _} ->
-              Ledger_hash.equal
-                ( trans |> External_transition.protocol_state
-                |> Protocol_state.blockchain_state
-                |> Blockchain_state.ledger_builder_hash
-                |> Ledger_builder_hash.ledger_hash )
-                hash )
-            ~f_result:(fun {With_hash.data= tip; hash= _} ->
-              tip.Tip.ledger_builder |> Ledger_builder.ledger )
-          >>| fst
+        let open Deferred.Or_error.Let_syntax in
+        Logger.trace t.log
+          !"Attempting to handle a sync-ledger query for %{sexp: Ledger_hash.t}"
+          hash ;
+        let%map ledger =
+          if Option.equal Ledger_hash.equal (Some hash) !prev_hash then
+            return (Option.value_exn !prev_ledger)
+          else
+            let%map ll =
+              local_get_ledger' t hash
+                ~p_tip:(fun hash {With_hash.data= tip; hash= _} ->
+                  Ledger_hash.equal
+                    ( tip.Tip.ledger_builder |> Ledger_builder.ledger
+                    |> Ledger.merkle_root )
+                    hash )
+                ~p_trans:(fun hash {With_hash.data= trans; hash= _} ->
+                  Ledger_hash.equal
+                    ( trans |> External_transition.protocol_state
+                    |> Protocol_state.blockchain_state
+                    |> Blockchain_state.ledger_builder_hash
+                    |> Ledger_builder_hash.ledger_hash )
+                    hash )
+                ~f_result:(fun {With_hash.data= tip; hash= _} ->
+                  tip.Tip.ledger_builder |> Ledger_builder.ledger )
+              >>| fst
+            in
+            prev_hash := Some hash ;
+            prev_ledger := Some ll ;
+            ll
         in
-        prev_hash := Some hash ;
-        prev_ledger := Some ll ;
-        ll
-    in
-    trace_event "local ledger get" ;
-    let responder = Sync_ledger.Responder.create ledger ignore in
-    (hash, Sync_ledger.Responder.answer_query responder query))
+        trace_event "local ledger get" ;
+        let responder = Sync_ledger.Responder.create ledger ignore in
+        (hash, Sync_ledger.Responder.answer_query responder query) )
 end
 
 let%test_module "test" =

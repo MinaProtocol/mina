@@ -78,7 +78,9 @@ let trace_task (name : string) (f : unit -> 'a) =
   | Ok x -> x
 
 let trace_recurring_task (name : string) (f : unit -> 'a) =
-  trace_task ("R&" ^ name) (fun () -> trace_event "started another" ; f ())
+  trace_task ("R&" ^ name) (fun () ->
+      trace_event "started another" ;
+      f () )
 
 let measure' wr (name : string) (f : unit -> 'a) : 'a =
   emitk Start 0 |> emitt |> emits name |> finish wr ;

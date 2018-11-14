@@ -161,18 +161,19 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             ~on_unknown_rpc:`Close_connection
         in
         trace_task "peer events" (fun () ->
-          (Linear_pipe.iter_unordered ~max_concurrency:64 peer_events
-             ~f:(function
-            | Connect peers ->
-                Logger.info log "Some peers connected %s"
-                  (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
-                List.iter peers ~f:(fun peer -> Hash_set.add t.peers peer) ;
-                Deferred.unit
-            | Disconnect peers ->
-                Logger.info log "Some peers disconnected %s"
-                  (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
-                List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer) ;
-                Deferred.unit )) |> ignore);
+            Linear_pipe.iter_unordered ~max_concurrency:64 peer_events
+              ~f:(function
+              | Connect peers ->
+                  Logger.info log "Some peers connected %s"
+                    (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
+                  List.iter peers ~f:(fun peer -> Hash_set.add t.peers peer) ;
+                  Deferred.unit
+              | Disconnect peers ->
+                  Logger.info log "Some peers disconnected %s"
+                    (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
+                  List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer) ;
+                  Deferred.unit )
+            |> ignore ) ;
         ignore
           (Tcp.Server.create
              ~on_handler_error:
