@@ -165,10 +165,7 @@ module Make (Inputs : Inputs_intf) :
 
     module Slot = struct
       include Segment_id
-
-      let ( <= ) x y = UInt32.compare x y <= 0
-
-      let ( < ) x y = UInt32.compare x y < 0
+      include Comparable.Make (Segment_id)
 
       let interval = Inputs.slot_interval
 
@@ -1048,18 +1045,18 @@ module Make (Inputs : Inputs_intf) :
     let open Consensus_state in
     let open Epoch_data in
     let logger = Logger.child logger "proof_of_stake" in
-    let string_of_option = function `Take -> "Take" | `Keep -> "Keep" in
-    let log_result option msg =
-      Logger.debug logger "RESULT: %s -- %s" (string_of_option option) msg
+    let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
+    let log_result choice msg =
+      Logger.debug logger "RESULT: %s -- %s" (string_of_choice choice) msg
     in
-    let log_choice ~precondition_msg ~choice_msg option =
+    let log_choice ~precondition_msg ~choice_msg choice =
       let choice_msg =
-        match option with
+        match choice with
         | `Take -> choice_msg
         | `Keep -> Printf.sprintf "not (%s)" choice_msg
       in
       let msg = Printf.sprintf "(%s) && (%s)" precondition_msg choice_msg in
-      log_result option msg
+      log_result choice msg
     in
     Logger.info logger "SELECTING BEST CONSENSUS STATE" ;
     Logger.info logger
@@ -1134,12 +1131,12 @@ module Make (Inputs : Inputs_intf) :
       List.find_map branches
         ~f:(fun ((precondition, precondition_msg), (choice, choice_msg)) ->
           if Lazy.force precondition then (
-            let option = if Lazy.force choice then `Take else `Keep in
-            log_choice ~precondition_msg ~choice_msg option ;
-            Some option )
+            let choice = if Lazy.force choice then `Take else `Keep in
+            log_choice ~precondition_msg ~choice_msg choice ;
+            Some choice )
           else None )
     with
-    | Some option -> option
+    | Some choice -> choice
     | None ->
         log_result `Keep "no predicates were matched" ;
         `Keep
