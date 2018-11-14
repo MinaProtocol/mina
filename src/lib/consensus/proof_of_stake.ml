@@ -255,49 +255,45 @@ module Make (Inputs : Inputs_intf) :
     end
 
     module Message = struct
-      type ('epoch, 'slot, 'epoch_seed, 'state_hash) t =
+      type ('epoch, 'slot, 'epoch_seed) t =
         { epoch: 'epoch
         ; slot: 'slot
-        ; seed: 'epoch_seed
-        ; lock_checkpoint: 'state_hash }
+        ; seed: 'epoch_seed }
 
       type value =
-        (Epoch.t, Epoch.Slot.t, Epoch_seed.t, Coda_base.State_hash.t) t
+        (Epoch.t, Epoch.Slot.t, Epoch_seed.t) t
 
       type var =
         ( Epoch.Unpacked.var
         , Epoch.Slot.Unpacked.var
-        , Epoch_seed.var
-        , Coda_base.State_hash.var )
+        , Epoch_seed.var )
         t
 
-      let to_hlist {epoch; slot; seed; lock_checkpoint} =
-        Coda_base.H_list.[epoch; slot; seed; lock_checkpoint]
+      let to_hlist {epoch; slot; seed} =
+        Coda_base.H_list.[epoch; slot; seed]
 
       let of_hlist :
              ( unit
-             , 'epoch -> 'slot -> 'epoch_seed -> 'state_hash -> unit )
+             , 'epoch -> 'slot -> 'epoch_seed -> unit )
              Coda_base.H_list.t
-          -> ('epoch, 'slot, 'epoch_seed, 'state_hash) t =
-       fun Coda_base.H_list.([epoch; slot; seed; lock_checkpoint]) ->
-        {epoch; slot; seed; lock_checkpoint}
+          -> ('epoch, 'slot, 'epoch_seed) t =
+       fun Coda_base.H_list.([epoch; slot; seed]) ->
+        {epoch; slot; seed}
 
       let data_spec =
         let open Snark_params.Tick.Data_spec in
         [ Epoch.Unpacked.typ
         ; Epoch.Slot.Unpacked.typ
-        ; Epoch_seed.typ
-        ; Coda_base.State_hash.typ ]
+        ; Epoch_seed.typ ]
 
       let typ =
         Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
           ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
 
-      let fold {epoch; slot; seed; lock_checkpoint} =
+      let fold {epoch; slot; seed} =
         let open Fold in
         Epoch.fold epoch +> Epoch.Slot.fold slot +> Epoch_seed.fold seed
-        +> Coda_base.State_hash.fold lock_checkpoint
 
       let hash_to_group msg =
         let msg_hash_state =
@@ -307,15 +303,13 @@ module Make (Inputs : Inputs_intf) :
         msg_hash_state.acc
 
       module Checked = struct
-        let var_to_triples {epoch; slot; seed; lock_checkpoint} =
+        let var_to_triples {epoch; slot; seed} =
           let open Snark_params.Tick.Let_syntax in
           let%map seed_triples = Epoch_seed.var_to_triples seed
-          and lock_checkpoint_triples =
-            Coda_base.State_hash.var_to_triples lock_checkpoint
           in
           Epoch.Unpacked.var_to_triples epoch
           @ Epoch.Slot.Unpacked.var_to_triples slot
-          @ seed_triples @ lock_checkpoint_triples
+          @ seed_triples
 
         let hash_to_group msg =
           let open Snark_params.Tick in
@@ -330,8 +324,8 @@ module Make (Inputs : Inputs_intf) :
         let%map epoch = Epoch.gen
         and slot = Epoch.Slot.gen
         and seed = Epoch_seed.gen
-        and lock_checkpoint = Coda_base.State_hash.gen in
-        {epoch; slot; seed; lock_checkpoint}
+        in
+        {epoch; slot; seed}
     end
 
     module Output = struct
@@ -420,10 +414,10 @@ module Make (Inputs : Inputs_intf) :
               (Message)
               (Output)
 
-    let check ~epoch ~slot ~seed ~lock_checkpoint ~private_key ~owned_stake
+    let check ~epoch ~slot ~seed ~private_key ~owned_stake
         ~total_stake ~logger =
       let open Message in
-      let result = eval ~private_key {epoch; slot; seed; lock_checkpoint} in
+      let result = eval ~private_key {epoch; slot; seed} in
       Logger.info logger
         !"Checking vrf at %d:%d - owned_stake: %d, total_stake: %d, \
           evaluation: %{sexp: Output.value}"
@@ -992,8 +986,6 @@ module Make (Inputs : Inputs_intf) :
     let%map proposer_vrf_result =
       Vrf.check ~epoch ~slot
         ~seed:previous_consensus_state.last_epoch_data.seed
-        ~lock_checkpoint:
-          previous_consensus_state.last_epoch_data.lock_checkpoint
         ~private_key:keypair.private_key ~owned_stake:proposer_stake
         ~total_stake ~logger
     in
@@ -1108,7 +1100,6 @@ module Make (Inputs : Inputs_intf) :
       let is_winning_slot slot =
         Option.is_some
           (Vrf.check ~epoch ~slot ~seed:epoch_data.seed
-             ~lock_checkpoint:epoch_data.lock_checkpoint
              ~private_key:keypair.private_key ~owned_stake:proposer_stake
              ~total_stake ~logger)
       in
