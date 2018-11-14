@@ -25,6 +25,21 @@ module State : sig
 
   val copy : ('a, 'd) t -> ('a, 'd) t
 
+  val visualize :
+    ('a, 'd) t -> draw_a:('a -> string) -> draw_d:('d -> string) -> string
+  (** Visualize produces a tree in a way that's a bit buggy, but still was
+   * helpful for debugging. [visualize state ~draw_a:(Fn.const "A") ~draw_d:(Fn.const "D")]
+   * creates a tree that looks like this:
+   *
+                                                            (_,_)                                                             
+                            (A,A)                                                           (_,_)                             
+            (_,_)                           (A,A)                           (_,_)              
+      _             (_,_)           (A,A)           (_,_)      
+   _       _     (_,_)   (A,A)   (_,_)  
+ D   _   _  (_,_(A,A(_,_
+D D _ _ (_(A(_
+   *)
+
   module Hash : sig
     type t = Digestif.SHA256.t
   end
