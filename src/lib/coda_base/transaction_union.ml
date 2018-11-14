@@ -26,6 +26,15 @@ let typ : (var, t) Typ.t =
   Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
+(** For SNARK purposes, we inject [Transaction.t]s into a single-variant 'tagged-union' record capable of
+    representing all the variants. We interpret the fields of this union in different ways depending on
+    the value of the [payload.body.tag] field, which represents which variant of [Transaction.t] the value
+    corresponds to.
+
+    Sometimes we interpret fields in surprising ways in different cases to save as much space in the SNARK as possible (e.g.,
+    [payload.body.public_key] is interpreted as the recipient of a payment, the new delegate of a stake
+    delegation command, and a fee transfer recipient for both coinbases and fee-transfers.
+*)
 let of_transaction : Transaction.t -> t = function
   | User_command cmd ->
       let {User_command.sender; payload; signature} =
