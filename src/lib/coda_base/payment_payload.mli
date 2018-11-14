@@ -6,17 +6,10 @@ open Snark_params.Tick
 open Sha256_lib
 open Import
 
-type ('pk, 'amount, 'fee, 'nonce, 'memo) t_ =
-  {receiver: 'pk; amount: 'amount; fee: 'fee; nonce: 'nonce; memo: 'memo}
+type ('pk, 'amount) t_ = {receiver: 'pk; amount: 'amount}
 [@@deriving bin_io, eq, sexp, hash]
 
-type t =
-  ( Public_key.Compressed.t
-  , Currency.Amount.t
-  , Currency.Fee.t
-  , Account_nonce.t
-  , Payment_memo.t )
-  t_
+type t = (Public_key.Compressed.t, Currency.Amount.t) t_
 [@@deriving bin_io, eq, sexp, hash]
 
 val dummy : t
@@ -25,34 +18,17 @@ val gen : t Quickcheck.Generator.t
 
 module Stable : sig
   module V1 : sig
-    type nonrec ('pk, 'amount, 'fee, 'nonce, 'memo) t_ =
-                                                        ( 'pk
-                                                        , 'amount
-                                                        , 'fee
-                                                        , 'nonce
-                                                        , 'memo )
-                                                        t_ =
-      {receiver: 'pk; amount: 'amount; fee: 'fee; nonce: 'nonce; memo: 'memo}
+    type nonrec ('pk, 'amount) t_ = ('pk, 'amount) t_ =
+      {receiver: 'pk; amount: 'amount}
     [@@deriving bin_io, eq, sexp, hash]
 
     type t =
-      ( Public_key.Compressed.Stable.V1.t
-      , Currency.Amount.Stable.V1.t
-      , Currency.Fee.Stable.V1.t
-      , Account_nonce.t
-      , Payment_memo.t )
-      t_
+      (Public_key.Compressed.Stable.V1.t, Currency.Amount.Stable.V1.t) t_
     [@@deriving bin_io, eq, sexp, hash]
   end
 end
 
-type var =
-  ( Public_key.Compressed.var
-  , Currency.Amount.var
-  , Currency.Fee.var
-  , Account_nonce.Unpacked.var
-  , Payment_memo.var )
-  t_
+type var = (Public_key.Compressed.var, Currency.Amount.var) t_
 
 val length_in_triples : int
 

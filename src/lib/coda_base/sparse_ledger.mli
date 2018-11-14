@@ -9,7 +9,7 @@ val merkle_root : t -> Ledger_hash.t
 val path_exn :
   t -> int -> [`Left of Merkle_hash.t | `Right of Merkle_hash.t] list
 
-val apply_payment_exn : t -> Payment.t -> t
+val apply_user_command_exn : t -> User_command.t -> t
 
 val apply_transaction_exn : t -> Transaction.t -> t
 

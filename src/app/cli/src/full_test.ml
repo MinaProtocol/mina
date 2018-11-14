@@ -133,10 +133,11 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
   (* Send money to someone *)
   let build_payment amount sender_sk receiver_pk fee =
     let nonce = Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn in
-    let payload : Payment.Payload.t =
-      {receiver= receiver_pk; amount; fee; nonce; memo= Payment_memo.dummy}
+    let payload : User_command.Payload.t =
+      User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
+        ~body:(Payment {receiver= receiver_pk; amount})
     in
-    Payment.sign (Keypair.of_private_key_exn sender_sk) payload
+    User_command.sign (Keypair.of_private_key_exn sender_sk) payload
   in
   let test_sending_payment sender_sk receiver_pk =
     let payment =
@@ -149,13 +150,13 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
       Run.get_balance coda receiver_pk
       |> Option.value ~default:Currency.Balance.zero
     in
-    let%bind () = Run.send_payment log coda (payment :> Payment.t) in
+    let%bind () = Run.send_payment log coda (payment :> User_command.t) in
     (* Send a similar the payment twice on purpose; this second one
     * will be rejected because the nonce is wrong *)
     let payment' =
       build_payment send_amount sender_sk receiver_pk (Currency.Fee.of_int 0)
     in
-    let%bind () = Run.send_payment log coda (payment' :> Payment.t) in
+    let%bind () = Run.send_payment log coda (payment' :> User_command.t) in
     (* Let the system settle, mine some blocks *)
     let%map () =
       balance_change_or_timeout ~initial_receiver_balance:prev_receiver_balance
@@ -182,7 +183,7 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
           Option.value_exn
             (Currency.Balance.add_amount (Option.value_exn v) amount) )
     in
-    let%map () = Run.send_payment log coda (payment :> Payment.t) in
+    let%map () = Run.send_payment log coda (payment :> User_command.t) in
     new_balance_sheet'
   in
   let send_payments accounts pks balance_sheet f_amount =

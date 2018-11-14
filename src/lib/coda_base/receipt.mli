@@ -5,7 +5,7 @@ module Chain_hash : sig
 
   val empty : t
 
-  val cons : Payment.Payload.t -> t -> t
+  val cons : User_command.Payload.t -> t -> t
 
   module Checked : sig
     val constant : t -> var

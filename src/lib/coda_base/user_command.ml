@@ -4,7 +4,7 @@ open Snark_params
 open Coda_numbers
 open Tick
 module Fee = Currency.Fee
-module Payload = Payment_payload
+module Payload = User_command_payload
 
 module Stable = struct
   module V1 = struct
@@ -20,11 +20,14 @@ module Stable = struct
 
     let compare ~seed (t : t) (t' : t) =
       let same_sender = Public_key.equal t.sender t'.sender in
-      let fee_compare = -Fee.compare t.payload.fee t'.payload.fee in
+      let fee_compare =
+        -Fee.compare (Payload.fee t.payload) (Payload.fee t'.payload)
+      in
       if same_sender then
         (* We pick the one with a smaller nonce to go first *)
         let nonce_compare =
-          Account_nonce.compare t.payload.nonce t'.payload.nonce
+          Account_nonce.compare (Payload.nonce t.payload)
+            (Payload.nonce t'.payload)
         in
         if nonce_compare <> 0 then nonce_compare else fee_compare
       else
@@ -39,8 +42,8 @@ type value = t
 
 type var = (Payload.var, Public_key.var, Signature.var) t_
 
-let public_keys ({payload= {Payload.receiver; _}; sender; _} : value) =
-  [receiver; Public_key.compress sender]
+let accounts_accessed ({payload; sender; _} : value) =
+  Public_key.compress sender :: Payload.accounts_accessed payload
 
 let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
   { payload
@@ -70,11 +73,12 @@ let gen ~keys ~max_amount ~max_fee =
   let sender = keys.(sender_idx) in
   let receiver = keys.(receiver_idx) in
   let payload : Payload.t =
-    { receiver= Public_key.compress receiver.Signature_keypair.public_key
-    ; fee
-    ; amount
-    ; nonce= Account_nonce.zero
-    ; memo= Payment_memo.create_exn memo }
+    Payload.create ~fee ~nonce:Account_nonce.zero
+      ~memo:(User_command_memo.create_exn memo)
+      ~body:
+        (Payment
+           { receiver= Public_key.compress receiver.Signature_keypair.public_key
+           ; amount })
   in
   sign sender payload
 

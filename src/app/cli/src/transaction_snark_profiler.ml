@@ -20,26 +20,21 @@ let create_ledger_and_transactions num_transitions =
   Array.iter keys ~f:(fun k ->
       let public_key = Public_key.compress k.public_key in
       Ledger.create_new_account_exn ledger public_key
-        { public_key
-        ; balance= Currency.Balance.of_int 10_000
-        ; receipt_chain_hash= Receipt.Chain_hash.empty
-        ; nonce= Account.Nonce.zero } ) ;
+        (Account.create public_key (Currency.Balance.of_int 10_000)) ) ;
   let txn from_kp (to_kp : Signature_lib.Keypair.t) amount fee nonce =
-    let payload : Payment.Payload.t =
-      { receiver= Public_key.compress to_kp.public_key
-      ; fee
-      ; amount
-      ; nonce
-      ; memo= Payment_memo.dummy }
+    let payload : User_command.Payload.t =
+      User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
+        ~body:
+          (Payment {receiver= Public_key.compress to_kp.public_key; amount})
     in
-    Payment.sign from_kp payload
+    User_command.sign from_kp payload
   in
   let nonces =
     Public_key.Compressed.Table.of_alist_exn
       (List.map (Array.to_list keys) ~f:(fun k ->
            (Public_key.compress k.public_key, Account.Nonce.zero) ))
   in
-  let random_transaction () : Payment.With_valid_signature.t =
+  let random_transaction () : User_command.With_valid_signature.t =
     let sender_idx = Random.int num_accounts in
     let sender = keys.(sender_idx) in
     let receiver = keys.(Random.int num_accounts) in
@@ -60,7 +55,9 @@ let create_ledger_and_transactions num_transitions =
         let open Currency.Fee in
         let total_fee =
           List.fold transactions ~init:zero ~f:(fun acc t ->
-              Option.value_exn (add acc (t :> Payment.t).payload.fee) )
+              Option.value_exn
+                (add acc
+                   (User_command.Payload.fee (t :> User_command.t).payload)) )
         in
         Fee_transfer.One (Public_key.compress keys.(0).public_key, total_fee)
       in
@@ -72,7 +69,7 @@ let create_ledger_and_transactions num_transitions =
       in
       let transitions =
         List.map transactions ~f:(fun t ->
-            Transaction_snark.Transition.Payment t )
+            Transaction_snark.Transition.User_command t )
         @ [Coinbase coinbase; Fee_transfer fee_transfer]
       in
       (ledger, transitions)
@@ -88,7 +85,7 @@ let create_ledger_and_transactions num_transitions =
           Currency.Fee.zero
           (Account.Nonce.succ Account.Nonce.zero)
       in
-      (ledger, [Payment a; Payment b])
+      (ledger, [User_command a; User_command b])
 
 let time thunk =
   let start = Time.now () in
@@ -171,9 +168,9 @@ let run profiler num_transactions =
            match t with
            | Fee_transfer t ->
                List.map (Fee_transfer.to_list t) ~f:(fun (pk, _) -> pk)
-           | Payment t ->
-               let t = (t :> Payment.t) in
-               [t.payload.receiver; Public_key.compress t.sender]
+           | User_command t ->
+               let t = (t :> User_command.t) in
+               User_command.accounts_accessed t
            | Coinbase {proposer; fee_transfer} ->
                proposer :: Option.to_list (Option.map fee_transfer ~f:fst) ))
   in
