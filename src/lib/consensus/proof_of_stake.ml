@@ -1034,7 +1034,7 @@ module Make (Inputs : Inputs_intf) :
     in
     (protocol_state, consensus_transition_data)
 
-  let is_transition_valid_checked _transition _ =
+  let is_transition_valid_checked _transition =
     Snark_params.Tick.(Let_syntax.return Boolean.true_)
 
   let next_state_checked previous_state previous_state_hash transition
