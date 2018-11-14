@@ -7,6 +7,7 @@ open Coda_base
 open Signature_lib
 open Blockchain_snark
 open Coda_numbers
+open O1trace
 module Fee = Protocols.Coda_pow.Fee
 
 [%%if
@@ -1158,54 +1159,57 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             Snark_pool.add_completed_work (snark_pool coda) work ) ]
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
-        ignore
-          Cohttp_async.(
-            Server.create
-              ~on_handler_error:
-                (`Call
-                  (fun net exn ->
-                    Logger.error log "%s" (Exn.to_string_mach exn) ))
-              (Tcp.Where_to_listen.bind_to Localhost (On_port rest_server_port))
-              (fun ~body _sock req ->
-                let uri = Cohttp.Request.uri req in
-                let route_not_found () =
-                  Server.respond_string ~status:`Not_found "Route not found"
-                in
-                match Uri.path uri with
-                | "/status" ->
-                    Server.respond_string
-                      ( get_status coda |> Client_lib.Status.to_yojson
-                      |> Yojson.Safe.pretty_to_string )
-                | _ -> route_not_found () )) ) ;
+        trace_task "REST server" (fun () ->
+            Cohttp_async.(
+              Server.create
+                ~on_handler_error:
+                  (`Call
+                    (fun net exn ->
+                      Logger.error log "%s" (Exn.to_string_mach exn) ))
+                (Tcp.Where_to_listen.bind_to Localhost
+                   (On_port rest_server_port))
+                (fun ~body _sock req ->
+                  let uri = Cohttp.Request.uri req in
+                  let route_not_found () =
+                    Server.respond_string ~status:`Not_found "Route not found"
+                  in
+                  match Uri.path uri with
+                  | "/status" ->
+                      Server.respond_string
+                        ( get_status coda |> Client_lib.Status.to_yojson
+                        |> Yojson.Safe.pretty_to_string )
+                  | _ -> route_not_found () )) )
+        |> ignore ) ;
     let where_to_listen =
       Tcp.Where_to_listen.bind_to All_addresses (On_port client_port)
     in
-    ignore
-      (Tcp.Server.create
-         ~on_handler_error:
-           (`Call
-             (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
-         where_to_listen
-         (fun address reader writer ->
-           let address = Socket.Address.Inet.addr address in
-           if not (Set.mem client_whitelist address) then (
-             Logger.error log
-               !"Rejecting client connection from \
-                 %{sexp:Unix.Inet_addr.Blocking_sexp.t}"
-               address ;
-             Deferred.unit )
-           else
-             Rpc.Connection.server_with_close reader writer
-               ~implementations:
-                 (Rpc.Implementations.create_exn
-                    ~implementations:(client_impls @ snark_worker_impls)
-                    ~on_unknown_rpc:`Raise)
-               ~connection_state:(fun _ -> ())
-               ~on_handshake_error:
-                 (`Call
-                   (fun exn ->
-                     Logger.error log "%s" (Exn.to_string_mach exn) ;
-                     Deferred.unit )) ))
+    trace_task "client RPC handling" (fun () ->
+        Tcp.Server.create
+          ~on_handler_error:
+            (`Call
+              (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
+          where_to_listen
+          (fun address reader writer ->
+            let address = Socket.Address.Inet.addr address in
+            if not (Set.mem client_whitelist address) then (
+              Logger.error log
+                !"Rejecting client connection from \
+                  %{sexp:Unix.Inet_addr.Blocking_sexp.t}"
+                address ;
+              Deferred.unit )
+            else
+              Rpc.Connection.server_with_close reader writer
+                ~implementations:
+                  (Rpc.Implementations.create_exn
+                     ~implementations:(client_impls @ snark_worker_impls)
+                     ~on_unknown_rpc:`Raise)
+                ~connection_state:(fun _ -> ())
+                ~on_handshake_error:
+                  (`Call
+                    (fun exn ->
+                      Logger.error log "%s" (Exn.to_string_mach exn) ;
+                      Deferred.unit )) ) )
+    |> ignore
 
   let create_snark_worker ~log ~public_key ~client_port ~shutdown_on_disconnect
       =

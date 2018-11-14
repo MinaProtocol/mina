@@ -6,6 +6,7 @@ module Make (Inputs : Inputs.Base.S) :
    and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
    and type external_transition :=
               Inputs.Consensus_mechanism.External_transition.t
+   and type public_key_compressed := Inputs.Public_key.Compressed.t
    and type state_hash := Inputs.State_hash.t = struct
   open Inputs
   open Consensus_mechanism
@@ -46,6 +47,7 @@ module Make (Inputs : Inputs.Base.S) :
     ; longest_branch_tip: (Tip.t, State_hash.t) With_hash.t
     ; ktree: Transition_tree.t option
     ; consensus_local_state: Local_state.t
+    ; proposer_public_key: Public_key.Compressed.t option
     (* TODO: This impl assumes we have the original Ouroboros assumption. In
        order to work with the Praos assumption we'll need to keep a linked
        list as well at the prefix of size (#blocks possible out of order)
@@ -64,7 +66,7 @@ module Make (Inputs : Inputs.Base.S) :
           Tip.protocol_state old_tip |> Protocol_state.blockchain_state
           |> Blockchain_state.ledger_hash
         in
-        lock_transition
+        lock_transition ?proposer_public_key:t.proposer_public_key
           (consensus_state_of_tip old_tip)
           (consensus_state_of_tip new_tip)
           ~snarked_ledger:(fun () ->
@@ -97,9 +99,10 @@ module Make (Inputs : Inputs.Base.S) :
     let t' = List.fold changes ~init:t ~f:apply in
     assert_state_valid t' ; t'
 
-  let create ~consensus_local_state genesis_heavy =
+  let create ?proposer_public_key ~consensus_local_state genesis_heavy =
     { locked_tip= genesis_heavy
     ; longest_branch_tip= genesis_heavy
     ; ktree= None
+    ; proposer_public_key
     ; consensus_local_state }
 end

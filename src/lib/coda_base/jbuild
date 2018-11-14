@@ -22,6 +22,7 @@
       protocols
       core
       dummy_values
+      o1trace
       merkle_ledger
       snarky
       crypto_params

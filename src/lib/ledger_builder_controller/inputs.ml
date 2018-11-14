@@ -107,7 +107,8 @@ module Base = struct
         -> [`Keep | `Take]
 
       val lock_transition :
-           Consensus_state.value
+           ?proposer_public_key:Public_key.Compressed.t
+        -> Consensus_state.value
         -> Consensus_state.value
         -> snarked_ledger:(unit -> Ledger.t Or_error.t)
         -> local_state:Local_state.t

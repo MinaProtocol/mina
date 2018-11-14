@@ -86,14 +86,6 @@ struct
       Location.Table.set t.account_tbl ~key:location ~data:account ;
       set_location t (Account.public_key account) location
 
-    let remove_account t location =
-      let account = Option.value_exn (find_account t location) in
-      Location.Table.remove t.account_tbl location ;
-      (* TODO : use stack database to save unused location, which can be 
-        used when allocating a location
-      *)
-      Key.Table.remove t.location_tbl (Account.public_key account)
-
     (* a read does a lookup in the account_tbl; if that fails, delegate to parent *)
     let get t location =
       match find_account t location with
@@ -172,6 +164,25 @@ struct
       | Some hash -> hash
       | None -> Base.merkle_root (get_parent t)
 
+    let remove_account_and_update_hashes t location =
+      (* remove account and key from tables *)
+      let account = Option.value_exn (find_account t location) in
+      Location.Table.remove t.account_tbl location ;
+      (* TODO : use stack database to save unused location, which can be
+        used when allocating a location
+      *)
+      Key.Table.remove t.location_tbl (Account.public_key account) ;
+      (* update hashes *)
+      let account_address = Location.to_path_exn location in
+      let account_hash = Hash.empty_account in
+      let merkle_path = merkle_path t location in
+      let addresses_and_hashes =
+        addresses_and_hashes_from_merkle_path_exn merkle_path account_address
+          account_hash
+      in
+      List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
+          set_hash t addr hash )
+
     (* a write writes only to the mask, parent is not involved 
      need to update both account and hash pieces of the mask
        *)
@@ -193,19 +204,9 @@ struct
     let parent_set_notify t location account =
       match find_account t location with
       | Some existing_account ->
-          if Account.equal account existing_account then (
+          if Account.equal account existing_account then
             (* optimization: remove from account table *)
-            remove_account t location ;
-            (* update hashes *)
-            let account_address = Location.to_path_exn location in
-            let account_hash = Hash.empty_account in
-            let merkle_path = merkle_path t location in
-            let addresses_and_hashes =
-              addresses_and_hashes_from_merkle_path_exn merkle_path
-                account_address account_hash
-            in
-            List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
-                set_hash t addr hash ) )
+            remove_account_and_update_hashes t location
       | None -> ()
 
     (* as for accounts, we see if we have it in the mask, else delegate to parent *)
@@ -295,9 +296,25 @@ struct
       assert (Addr.depth address <= Base.depth) ;
       get_hash t address |> Option.value_exn
 
-    (* database also does not implement remove_accounts_exn *)
-    let remove_accounts_exn _t _accounts =
-      failwith "remove_accounts_exn: not implemented"
+    let remove_accounts_exn t keys =
+      let rec loop keys parent_keys mask_locations =
+        match keys with
+        | [] -> (parent_keys, mask_locations)
+        | key :: rest -> (
+          match find_location t key with
+          | None -> loop rest (key :: parent_keys) mask_locations
+          | Some loc -> loop rest parent_keys (loc :: mask_locations) )
+      in
+      (* parent_keys not in mask, may be in parent
+         mask_locations definitely in mask
+       *)
+      let parent_keys, mask_locations = loop keys [] [] in
+      (* allow call to parent to raise an exception
+         if raised, the parent hasn't removed any accounts,
+          and we don't try to remove any accounts from mask *)
+      Base.remove_accounts_exn t.parent parent_keys ;
+      (* removing accounts in parent succeeded, so proceed with removing accounts from mask *)
+      List.iter mask_locations ~f:(remove_account_and_update_hashes t)
 
     let destroy t =
       Location.Table.iteri t.account_tbl ~f:(fun ~key ~data:_ ->
