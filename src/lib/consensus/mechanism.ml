@@ -128,7 +128,8 @@ module type S = sig
    *)
 
   val lock_transition :
-       Consensus_state.value
+       ?proposer_public_key:Signature_lib.Public_key.Compressed.t
+    -> Consensus_state.value
     -> Consensus_state.value
     -> snarked_ledger:(unit -> Coda_base.Ledger.t Or_error.t)
     -> local_state:Local_state.t
