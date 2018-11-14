@@ -35,13 +35,14 @@ module type S = sig
 
   type value = t [@@deriving bin_io, sexp, eq, compare, hash]
 
-  include Snarkable.S
-          with type var =
-                      ( Ledger_builder_hash.var
-                      , Frozen_ledger_hash.var
-                      , Block_time.Unpacked.var )
-                      t_
-           and type value := value
+  include
+    Snarkable.S
+    with type var =
+                ( Ledger_builder_hash.var
+                , Frozen_ledger_hash.var
+                , Block_time.Unpacked.var )
+                t_
+     and type value := value
 
   val create_value :
        ledger_builder_hash:Ledger_builder_hash.Stable.V1.t
@@ -81,7 +82,9 @@ module type S = sig
      and module Shifted := Snark_params.Tick.Inner_curve.Checked.Shifted
 end
 
-module Make (Genesis_ledger : sig val t : Ledger.t end) : S = struct
+module Make (Genesis_ledger : sig
+  val t : Ledger.t
+end) : S = struct
   module Stable = struct
     module V1 = struct
       type ('ledger_builder_hash, 'ledger_hash, 'time) t_ =
@@ -90,7 +93,11 @@ module Make (Genesis_ledger : sig val t : Ledger.t end) : S = struct
         ; timestamp: 'time }
       [@@deriving bin_io, sexp, fields, eq, compare, hash]
 
-      type t = (Ledger_builder_hash.Stable.V1.t, Frozen_ledger_hash.Stable.V1.t, Block_time.Stable.V1.t) t_
+      type t =
+        ( Ledger_builder_hash.Stable.V1.t
+        , Frozen_ledger_hash.Stable.V1.t
+        , Block_time.Stable.V1.t )
+        t_
       [@@deriving bin_io, sexp, eq, compare, hash]
     end
   end
@@ -100,50 +107,50 @@ module Make (Genesis_ledger : sig val t : Ledger.t end) : S = struct
   type var =
     ( Ledger_builder_hash.var
     , Frozen_ledger_hash.var
-    , Block_time.Unpacked.var 
-    ) t_
+    , Block_time.Unpacked.var )
+    t_
 
   type value = t [@@deriving bin_io, sexp, eq, compare, hash]
 
   let create_value ~ledger_builder_hash ~ledger_hash ~timestamp =
-    { ledger_builder_hash; ledger_hash; timestamp }
+    {ledger_builder_hash; ledger_hash; timestamp}
 
-  let to_hlist { ledger_builder_hash; ledger_hash; timestamp } =
-    H_list.([ ledger_builder_hash; ledger_hash; timestamp ])
-  let of_hlist : (unit, 'lbh -> 'lh -> 'ti -> unit) H_list.t -> ('lbh, 'lh, 'ti) t_ =
-    H_list.(fun [ ledger_builder_hash; ledger_hash; timestamp ] -> { ledger_builder_hash; ledger_hash; timestamp })
+  let to_hlist {ledger_builder_hash; ledger_hash; timestamp} =
+    H_list.[ledger_builder_hash; ledger_hash; timestamp]
+
+  let of_hlist :
+      (unit, 'lbh -> 'lh -> 'ti -> unit) H_list.t -> ('lbh, 'lh, 'ti) t_ =
+    H_list.(
+      fun [ledger_builder_hash; ledger_hash; timestamp] ->
+        {ledger_builder_hash; ledger_hash; timestamp})
 
   let data_spec =
     let open Data_spec in
-    [ Ledger_builder_hash.typ
-    ; Frozen_ledger_hash.typ
-    ; Block_time.Unpacked.typ
-    ]
+    [Ledger_builder_hash.typ; Frozen_ledger_hash.typ; Block_time.Unpacked.typ]
 
   let typ : (var, value) Typ.t =
-    Typ.of_hlistable data_spec
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+    Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let var_to_triples ({ ledger_builder_hash; ledger_hash; timestamp } : var) =
+  let var_to_triples ({ledger_builder_hash; ledger_hash; timestamp} : var) =
     let%map ledger_hash_triples = Frozen_ledger_hash.var_to_triples ledger_hash
-    and ledger_builder_hash_triples = Ledger_builder_hash.var_to_triples ledger_builder_hash
+    and ledger_builder_hash_triples =
+      Ledger_builder_hash.var_to_triples ledger_builder_hash
     in
-    ledger_builder_hash_triples
-    @ ledger_hash_triples
+    ledger_builder_hash_triples @ ledger_hash_triples
     @ Block_time.Unpacked.var_to_triples timestamp
 
-  let fold ({ ledger_builder_hash; ledger_hash; timestamp } : value) =
-    Fold.(Ledger_builder_hash.fold ledger_builder_hash
-    +> Frozen_ledger_hash.fold ledger_hash
-    +> Block_time.fold timestamp)
+  let fold ({ledger_builder_hash; ledger_hash; timestamp} : value) =
+    Fold.(
+      Ledger_builder_hash.fold ledger_builder_hash
+      +> Frozen_ledger_hash.fold ledger_hash
+      +> Block_time.fold timestamp)
 
   let length_in_triples =
     Ledger_builder_hash.length_in_triples
-    + Frozen_ledger_hash.length_in_triples
-    + Block_time.length_in_triples
+    + Frozen_ledger_hash.length_in_triples + Block_time.length_in_triples
 
-  let set_timestamp t timestamp = { t with timestamp }
+  let set_timestamp t timestamp = {t with timestamp}
 
   let genesis_time =
     Time.of_date_ofday ~zone:Time.Zone.utc
@@ -153,7 +160,9 @@ module Make (Genesis_ledger : sig val t : Ledger.t end) : S = struct
 
   let genesis =
     { ledger_builder_hash= Ledger_builder_hash.dummy
-    ; ledger_hash= Frozen_ledger_hash.of_ledger_hash @@ Ledger.merkle_root Genesis_ledger.t
+    ; ledger_hash=
+        Frozen_ledger_hash.of_ledger_hash
+        @@ Ledger.merkle_root Genesis_ledger.t
     ; timestamp= genesis_time }
 
   module Message = struct
@@ -179,13 +188,18 @@ module Make (Genesis_ledger : sig val t : Ledger.t end) : S = struct
         (let%bind trips = var_to_triples t in
          let%bind hash =
            Pedersen.Checked.digest_triples ~init:Hash_prefix.signature
-             (trips @ Fold.(to_list (group3 ~default:Boolean.false_ (of_list nonce))))
+             ( trips
+             @ Fold.(to_list (group3 ~default:Boolean.false_ (of_list nonce)))
+             )
          in
-         let%map bs =
-           Pedersen.Checked.Digest.choose_preimage hash
-         in
-         Bitstring.Lsb_first.of_list (List.take (bs :> Boolean.var list) Inner_curve.Scalar.length_in_bits))
+         let%map bs = Pedersen.Checked.Digest.choose_preimage hash in
+         Bitstring.Lsb_first.of_list
+           (List.take
+              (bs :> Boolean.var list)
+              Inner_curve.Scalar.length_in_bits))
   end
 
-  module Signature = Signature_lib.Checked.Schnorr (Tick) (Snark_params.Tick.Inner_curve) (Message)
+  module Signature =
+    Signature_lib.Checked.Schnorr (Tick) (Snark_params.Tick.Inner_curve)
+      (Message)
 end

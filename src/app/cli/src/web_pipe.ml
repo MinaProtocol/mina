@@ -121,63 +121,64 @@ let copy ~src ~dst =
 let project_directory = "CODA_PROJECT_DIR"
 
 let run_service (type t) (module Program : Coda_intf with type t = t) coda
-    ~conf_dir ~log = function
-  | `None ->
-      Logger.info log "Not running a web client pipe" ;
-      don't_wait_for (Linear_pipe.drain (Program.strongest_ledgers coda))
-  | `Local path ->
-      let open Keypair in
-      Logger.trace log "Saving chain locally at path %s" path ;
-      store_verification_keys ~log ~send:(fun _log vk_location ->
-          copy ~src:vk_location ~dst:(path ^/ verification_key_basename)
-          >>| Or_error.return )
-      |> don't_wait_for ;
-      let get_lite_chain = Option.value_exn Program.get_lite_chain in
-      let keypair = Genesis_ledger.largest_account_keypair_exn () in
-      Linear_pipe.iter (Program.strongest_ledgers coda) ~f:(fun _ ->
-          Writer.save (path ^/ "chain")
-            ~contents:
-              (B64.encode
-                 (Binable.to_string
-                    (module Lite_base.Lite_chain)
-                    (get_lite_chain coda
-                       [Public_key.compress keypair.public_key]))) )
-      |> don't_wait_for
-  | `S3 ->
-      Logger.info log "Running S3 web client pipe" ;
-      let module Broadcaster =
-        Make_broadcaster
-          (Program)
-          (struct
-            include Web_request.S3_put_request
+    ~conf_dir ~log =
+  O1trace.trace_task "web pipe" (fun () -> function
+    | `None ->
+        Logger.info log "Not running a web client pipe" ;
+        don't_wait_for (Linear_pipe.drain (Program.strongest_ledgers coda))
+    | `Local path ->
+        let open Keypair in
+        Logger.trace log "Saving chain locally at path %s" path ;
+        store_verification_keys ~log ~send:(fun _log vk_location ->
+            copy ~src:vk_location ~dst:(path ^/ verification_key_basename)
+            >>| Or_error.return )
+        |> don't_wait_for ;
+        let get_lite_chain = Option.value_exn Program.get_lite_chain in
+        let keypair = Genesis_ledger.largest_account_keypair_exn () in
+        Linear_pipe.iter (Program.strongest_ledgers coda) ~f:(fun _ ->
+            Writer.save (path ^/ "chain")
+              ~contents:
+                (B64.encode
+                   (Binable.to_string
+                      (module Lite_base.Lite_chain)
+                      (get_lite_chain coda
+                         [Public_key.compress keypair.public_key]))) )
+        |> don't_wait_for
+    | `S3 ->
+        Logger.info log "Running S3 web client pipe" ;
+        let module Broadcaster =
+          Make_broadcaster
+            (Program)
+            (struct
+              include Web_request.S3_put_request
 
-            let put = put ~options:["--cache-control"; "max-age=0,no-store"]
-          end)
-      in
-      don't_wait_for
-        (let location = conf_dir ^/ "snarkette-data" in
-         let%bind () = Unix.mkdir location ~p:() in
-         Broadcaster.run ~log ~filename:(location ^/ "chain") coda) ;
-      let js_file_storage_work =
-        Unix.getenv project_directory
-        |> Option.value_map ~default:Deferred.unit ~f:(fun file_dir ->
-               match%bind Sys.is_directory file_dir with
-               | `Yes ->
-                   Deferred.all_unit
-                     [ store_file
-                         (file_dir ^/ "verifier_main.bc.js")
-                         "Verifier Main" ~log ~send:send_file_to_s3
-                     ; store_file (file_dir ^/ "main.bc.js") "Main" ~log
-                         ~send:send_file_to_s3 ]
-               | `No | `Unknown ->
-                   Logger.error log
-                     !"Js file directory %s does not exists"
-                     file_dir ;
-                   Deferred.unit )
-      in
-      let work =
-        Deferred.all_unit
-          [ store_verification_keys ~send:send_file_to_s3 ~log
-          ; js_file_storage_work ]
-      in
-      don't_wait_for work
+              let put = put ~options:["--cache-control"; "max-age=0,no-store"]
+            end)
+        in
+        don't_wait_for
+          (let location = conf_dir ^/ "snarkette-data" in
+           let%bind () = Unix.mkdir location ~p:() in
+           Broadcaster.run ~log ~filename:(location ^/ "chain") coda) ;
+        let js_file_storage_work =
+          Unix.getenv project_directory
+          |> Option.value_map ~default:Deferred.unit ~f:(fun file_dir ->
+                 match%bind Sys.is_directory file_dir with
+                 | `Yes ->
+                     Deferred.all_unit
+                       [ store_file
+                           (file_dir ^/ "verifier_main.bc.js")
+                           "Verifier Main" ~log ~send:send_file_to_s3
+                       ; store_file (file_dir ^/ "main.bc.js") "Main" ~log
+                           ~send:send_file_to_s3 ]
+                 | `No | `Unknown ->
+                     Logger.error log
+                       !"Js file directory %s does not exists"
+                       file_dir ;
+                     Deferred.unit )
+        in
+        let work =
+          Deferred.all_unit
+            [ store_verification_keys ~send:send_file_to_s3 ~log
+            ; js_file_storage_work ]
+        in
+        don't_wait_for work )

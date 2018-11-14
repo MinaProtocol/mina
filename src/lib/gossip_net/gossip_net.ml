@@ -1,6 +1,7 @@
 open Core
 open Async
 open Kademlia
+open O1trace
 module Membership = Membership.Haskell
 
 type ('q, 'r) dispatch =
@@ -114,73 +115,78 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
 
   let create (config : Config.t) implementations =
     let log = Logger.child config.parent_log __MODULE__ in
-    let%map membership =
-      match%map
-        Membership.connect ~initial_peers:config.initial_peers ~me:config.me
-          ~conf_dir:config.conf_dir ~parent_log:log ~banlist:config.banlist
-      with
-      | Ok membership -> membership
-      | Error e ->
-          failwith
-            (Printf.sprintf "Failed to connect to kademlia process: %s\n"
-               (Error.to_string_hum e))
-    in
-    let peer_events = Membership.changes membership in
-    let broadcast_reader, broadcast_writer = Linear_pipe.create () in
-    let received_reader, received_writer = Linear_pipe.create () in
-    let t =
-      { timeout= config.timeout
-      ; log
-      ; target_peer_count= config.target_peer_count
-      ; broadcast_writer
-      ; received_reader
-      ; peers= Peer.Hash_set.create () }
-    in
-    don't_wait_for
-      (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
-         ~f:(fun m ->
-           Logger.trace log "broadcasting message" ;
-           broadcast_random t t.target_peer_count m )) ;
-    let broadcast_received_capacity = 64 in
-    let implementations =
-      let implementations =
-        Versioned_rpc.Menu.add
-          ( Message.implement_multi (fun () ~version:_ msg ->
-                Linear_pipe.force_write_maybe_drop_head
-                  ~capacity:broadcast_received_capacity received_writer
-                  received_reader msg )
-          @ implementations )
-      in
-      Rpc.Implementations.create_exn ~implementations
-        ~on_unknown_rpc:`Close_connection
-    in
-    don't_wait_for
-      (Linear_pipe.iter_unordered ~max_concurrency:64 peer_events ~f:(function
-        | Connect peers ->
-            Logger.info log "Some peers connected %s"
-              (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
-            List.iter peers ~f:(fun peer -> Hash_set.add t.peers peer) ;
-            Deferred.unit
-        | Disconnect peers ->
-            Logger.info log "Some peers disconnected %s"
-              (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
-            List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer) ;
-            Deferred.unit )) ;
-    ignore
-      (Tcp.Server.create
-         ~on_handler_error:
-           (`Call
-             (fun _ exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
-         (Tcp.Where_to_listen.of_port (snd config.me))
-         (fun _ reader writer ->
-           Rpc.Connection.server_with_close reader writer ~implementations
-             ~connection_state:(fun _ -> ())
-             ~on_handshake_error:
+    trace_task "gossip net" (fun () ->
+        let%map membership =
+          match%map
+            trace_task "membership" (fun () ->
+                Membership.connect ~initial_peers:config.initial_peers
+                  ~me:config.me ~conf_dir:config.conf_dir ~parent_log:log
+                  ~banlist:config.banlist )
+          with
+          | Ok membership -> membership
+          | Error e ->
+              failwith
+                (Printf.sprintf "Failed to connect to kademlia process: %s\n"
+                   (Error.to_string_hum e))
+        in
+        let peer_events = Membership.changes membership in
+        let broadcast_reader, broadcast_writer = Linear_pipe.create () in
+        let received_reader, received_writer = Linear_pipe.create () in
+        let t =
+          { timeout= config.timeout
+          ; log
+          ; target_peer_count= config.target_peer_count
+          ; broadcast_writer
+          ; received_reader
+          ; peers= Peer.Hash_set.create () }
+        in
+        trace_task "rebroadcasting messages" (fun () ->
+            don't_wait_for
+              (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
+                 ~f:(fun m ->
+                   Logger.trace log "broadcasting message" ;
+                   broadcast_random t t.target_peer_count m )) ) ;
+        let broadcast_received_capacity = 64 in
+        let implementations =
+          let implementations =
+            Versioned_rpc.Menu.add
+              ( Message.implement_multi (fun () ~version:_ msg ->
+                    Linear_pipe.force_write_maybe_drop_head
+                      ~capacity:broadcast_received_capacity received_writer
+                      received_reader msg )
+              @ implementations )
+          in
+          Rpc.Implementations.create_exn ~implementations
+            ~on_unknown_rpc:`Close_connection
+        in
+        don't_wait_for
+          (Linear_pipe.iter_unordered ~max_concurrency:64 peer_events
+             ~f:(function
+            | Connect peers ->
+                Logger.info log "Some peers connected %s"
+                  (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
+                List.iter peers ~f:(fun peer -> Hash_set.add t.peers peer) ;
+                Deferred.unit
+            | Disconnect peers ->
+                Logger.info log "Some peers disconnected %s"
+                  (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
+                List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer) ;
+                Deferred.unit )) ;
+        ignore
+          (Tcp.Server.create
+             ~on_handler_error:
                (`Call
-                 (fun exn ->
-                   Logger.error log "%s" (Exn.to_string_mach exn) ;
-                   Deferred.unit )) )) ;
-    t
+                 (fun _ exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
+             (Tcp.Where_to_listen.of_port (snd config.me))
+             (fun _ reader writer ->
+               Rpc.Connection.server_with_close reader writer ~implementations
+                 ~connection_state:(fun _ -> ())
+                 ~on_handshake_error:
+                   (`Call
+                     (fun exn ->
+                       Logger.error log "%s" (Exn.to_string_mach exn) ;
+                       Deferred.unit )) )) ;
+        t )
 
   let received t = t.received_reader
 

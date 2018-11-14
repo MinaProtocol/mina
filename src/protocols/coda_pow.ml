@@ -555,9 +555,10 @@ module type Ledger_builder_intf = sig
     -> logger:Logger.t
     -> transactions_by_fee:user_command_with_valid_signature Sequence.t
     -> get_completed_work:(statement -> completed_work option)
-    -> valid_diff
+    -> ( valid_diff
        * [`Hash_after_applying of ledger_builder_hash]
-       * [`Ledger_proof of ledger_proof option]
+       * [`Ledger_proof of ledger_proof option] )
+       Deferred.t
 
   val all_work_pairs :
        t

@@ -63,6 +63,9 @@ end)
   let get_bin mdb location bin_read =
     get_raw mdb location |> Option.map ~f:(fun v -> bin_read v ~pos_ref:(ref 0))
 
+  let delete_raw {kvdb; _} location =
+    Kvdb.delete kvdb ~key:(Location.serialize location)
+
   let get mdb location =
     assert (Location.is_account location) ;
     get_bin mdb location Account.bin_read_t
@@ -134,6 +137,8 @@ end)
       | Some location_bin ->
           Location.parse location_bin
           |> Result.map_error ~f:(fun () -> Db_error.Malformed_database)
+
+    let delete mdb key = delete_raw mdb (build_location key)
 
     let set mdb key location = set_raw mdb (build_location key) location
 
@@ -294,7 +299,26 @@ end)
 
   let copy {kvdb; sdb} = {kvdb= Kvdb.copy kvdb; sdb= Sdb.copy sdb}
 
-  let remove_accounts_exn _ _ = failwith "TODO: Implement"
+  let remove_accounts_exn t keys =
+    let locations =
+      (* if we don't have a location for all keys, raise an exception *)
+      let rec loop keys accum =
+        match keys with
+        | [] -> accum (* no need to reverse *)
+        | key :: rest -> (
+          match Account_location.get t key with
+          | Ok loc -> loop rest (loc :: accum)
+          | Error err -> raise (Db_error.Db_exception err) )
+      in
+      loop keys []
+    in
+    (* N.B.: we're not using stack database here to make available newly-freed locations *)
+    List.iter keys ~f:(Account_location.delete t) ;
+    List.iter locations ~f:(fun loc -> delete_raw t loc) ;
+    (* recalculate hashes for each removed account *)
+    List.iter locations ~f:(fun loc ->
+        let hash_loc = Location.Hash (Location.to_path_exn loc) in
+        set_hash t hash_loc Hash.empty_account )
 
   let merkle_path mdb location =
     let location =
