@@ -92,8 +92,6 @@ let main () =
 
         let proposal_interval = Time.Span.of_ms @@ Int64.of_int 5000
 
-        let private_key = None
-
         module Ledger_builder_diff = Ledger_builder.Make_diff (struct
           open Signature_lib
           open Coda_base

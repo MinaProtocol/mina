@@ -97,7 +97,6 @@ module type S = sig
 
   val is_transition_valid_checked :
        Snark_transition.var
-    -> Coda_base.State_hash.var
     -> (Snark_params.Tick.Boolean.var, _) Snark_params.Tick.Checked.t
   (**
    * Create a checked boolean constraint for the validity of a transition.

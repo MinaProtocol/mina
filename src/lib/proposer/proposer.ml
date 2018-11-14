@@ -261,12 +261,18 @@ module Make (Inputs : Inputs_intf) :
                   lift_sync (fun () ->
                       let open Deferred.Or_error.Let_syntax in
                       ignore
-                        (let%map protocol_state_proof =
+                        (let t0 = Time.now time_controller in
+                         let%map protocol_state_proof =
                            Prover.prove ~prev_state:previous_protocol_state
                              ~prev_state_proof:previous_protocol_state_proof
                              ~next_state:protocol_state internal_transition
                          in
-                         trace_event "prover done" ;
+                         let span = Time.diff (Time.now time_controller) t0 in
+                         Logger.info logger
+                           !"Protocol_state_proof proving time took: %{sexp: \
+                             int64}ms\n\
+                             %!"
+                           (Time.Span.to_ms span) ;
                          let external_transition =
                            External_transition.create ~protocol_state
                              ~protocol_state_proof
