@@ -208,6 +208,7 @@ end = struct
     let possibly_jobs =
       Linear_pipe.filter_map_unordered ~max_concurrency:1
         config.external_transitions ~f:(fun (transition, time_received) ->
+          Metrics.(Counter.inc Ledger_builder_controller.transitions_read 1.0);
           let transition_with_hash =
             With_hash.of_data transition ~hash_data:(fun t ->
                 t |> External_transition.protocol_state |> Protocol_state.hash

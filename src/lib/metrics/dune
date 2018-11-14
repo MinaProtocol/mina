@@ -1,0 +1,4 @@
+(library
+  (name metrics)
+  (public_name metrics)
+  (libraries core_kernel prometheus))

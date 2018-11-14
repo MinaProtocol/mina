@@ -1171,6 +1171,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                     Server.respond_string
                       ( get_status coda |> Client_lib.Status.to_yojson
                       |> Yojson.Safe.pretty_to_string )
+                | "/metrics" ->
+                    let data = Prometheus.CollectorRegistry.(collect default) in
+                    let body = Fmt.to_to_string Prometheus_app.TextFormat_0_0_4.output data in
+                    let headers = Cohttp.Header.init_with "Content-Type" "text/plain; version=0.0.4" in
+                    Server.respond_string ~status:`OK ~headers body
                 | _ -> route_not_found () )) ) ;
     let where_to_listen =
       Tcp.Where_to_listen.bind_to All_addresses (On_port client_port)
