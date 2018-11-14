@@ -5,3 +5,4 @@
 [%%define call_logger false]
 [%%define force_updates false]
 [%%define global_signer_real true]
+[%%define tracing false]

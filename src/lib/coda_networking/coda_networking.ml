@@ -393,6 +393,7 @@ module Make (Inputs : Inputs_intf) = struct
       let retry_max = 6 in
       let retry_interval = Time.Span.of_ms 200. in
       let rec answer_query ctr peers_tried query =
+        O1trace.trace_event "ask sync ledger query" ;
         let peers =
           Gossip_net.random_peers_except t.gossip_net 3 ~except:peers_tried
         in
