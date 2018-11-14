@@ -42,6 +42,8 @@ module type S = sig
 
   module Blockchain_state : Coda_base.Blockchain_state.S
 
+  module Prover_state : Coda_base.Snark_transition.Prover_state_intf
+
   module Protocol_state :
     Coda_base.Protocol_state.S
     with module Blockchain_state = Blockchain_state
@@ -51,6 +53,7 @@ module type S = sig
     Coda_base.Snark_transition.S
     with module Blockchain_state = Blockchain_state
      and module Consensus_data = Consensus_transition_data
+     and module Prover_state = Prover_state
 
   module Internal_transition :
     Coda_base.Internal_transition.S
@@ -59,6 +62,12 @@ module type S = sig
   module External_transition :
     Coda_base.External_transition.S with module Protocol_state = Protocol_state
 
+  module Proposal_data : sig
+    type t
+
+    val prover_state : t -> Prover_state.t
+  end
+
   val block_interval_ms : int64
 
   val genesis_protocol_state : Protocol_state.value
@@ -66,14 +75,13 @@ module type S = sig
   val generate_transition :
        previous_protocol_state:Protocol_state.value
     -> blockchain_state:Blockchain_state.value
-    -> local_state:Local_state.t
     -> time:Unix_timestamp.t
-    -> keypair:Signature_lib.Keypair.t
+    -> proposal_data:Proposal_data.t
     -> transactions:Coda_base.User_command.t list
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
-    -> (Protocol_state.value * Consensus_transition_data.value) option
+    -> Protocol_state.value * Consensus_transition_data.value
   (**
    * Generate a new protocol state and consensus specific transition data
    * for a new transition. Called from the proposer in order to generate
@@ -118,7 +126,8 @@ module type S = sig
     -> local_state:Local_state.t
     -> keypair:Signature_lib.Keypair.t
     -> logger:Logger.t
-    -> [`Check_again of Unix_timestamp.t | `Propose of Unix_timestamp.t]
+    -> [ `Check_again of Unix_timestamp.t
+       | `Propose of Unix_timestamp.t * Proposal_data.t ]
   (**
    * Determine if and when to perform the next transition proposal. Either
    * informs the callee to check again at some time in the future, or to
