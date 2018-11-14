@@ -256,35 +256,23 @@ module Make (Inputs : Inputs_intf) :
 
     module Message = struct
       type ('epoch, 'slot, 'epoch_seed) t =
-        { epoch: 'epoch
-        ; slot: 'slot
-        ; seed: 'epoch_seed }
+        {epoch: 'epoch; slot: 'slot; seed: 'epoch_seed}
 
-      type value =
-        (Epoch.t, Epoch.Slot.t, Epoch_seed.t) t
+      type value = (Epoch.t, Epoch.Slot.t, Epoch_seed.t) t
 
       type var =
-        ( Epoch.Unpacked.var
-        , Epoch.Slot.Unpacked.var
-        , Epoch_seed.var )
-        t
+        (Epoch.Unpacked.var, Epoch.Slot.Unpacked.var, Epoch_seed.var) t
 
-      let to_hlist {epoch; slot; seed} =
-        Coda_base.H_list.[epoch; slot; seed]
+      let to_hlist {epoch; slot; seed} = Coda_base.H_list.[epoch; slot; seed]
 
       let of_hlist :
-             ( unit
-             , 'epoch -> 'slot -> 'epoch_seed -> unit )
-             Coda_base.H_list.t
+             (unit, 'epoch -> 'slot -> 'epoch_seed -> unit) Coda_base.H_list.t
           -> ('epoch, 'slot, 'epoch_seed) t =
-       fun Coda_base.H_list.([epoch; slot; seed]) ->
-        {epoch; slot; seed}
+       fun Coda_base.H_list.([epoch; slot; seed]) -> {epoch; slot; seed}
 
       let data_spec =
         let open Snark_params.Tick.Data_spec in
-        [ Epoch.Unpacked.typ
-        ; Epoch.Slot.Unpacked.typ
-        ; Epoch_seed.typ ]
+        [Epoch.Unpacked.typ; Epoch.Slot.Unpacked.typ; Epoch_seed.typ]
 
       let typ =
         Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
@@ -305,8 +293,7 @@ module Make (Inputs : Inputs_intf) :
       module Checked = struct
         let var_to_triples {epoch; slot; seed} =
           let open Snark_params.Tick.Let_syntax in
-          let%map seed_triples = Epoch_seed.var_to_triples seed
-          in
+          let%map seed_triples = Epoch_seed.var_to_triples seed in
           Epoch.Unpacked.var_to_triples epoch
           @ Epoch.Slot.Unpacked.var_to_triples slot
           @ seed_triples
@@ -323,8 +310,7 @@ module Make (Inputs : Inputs_intf) :
         let open Quickcheck.Let_syntax in
         let%map epoch = Epoch.gen
         and slot = Epoch.Slot.gen
-        and seed = Epoch_seed.gen
-        in
+        and seed = Epoch_seed.gen in
         {epoch; slot; seed}
     end
 
@@ -414,8 +400,8 @@ module Make (Inputs : Inputs_intf) :
               (Message)
               (Output)
 
-    let check ~epoch ~slot ~seed ~private_key ~owned_stake
-        ~total_stake ~logger =
+    let check ~epoch ~slot ~seed ~private_key ~owned_stake ~total_stake ~logger
+        =
       let open Message in
       let result = eval ~private_key {epoch; slot; seed} in
       Logger.info logger
