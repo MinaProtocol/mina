@@ -104,6 +104,13 @@ module Make (Inputs : Inputs_intf) :
   module Ledger_builder_diff = Inputs.Ledger_builder_diff
   module Time = Inputs.Time
 
+  module Proposal_data = struct
+    type t = {stake_proof: Coda_base.Stake_proof.t; vrf_result: Sha256.Digest.t}
+    [@@deriving bin_io]
+
+    let prover_state {stake_proof; _} = stake_proof
+  end
+
   let block_interval_ms = Time.Span.to_ms Inputs.slot_interval
 
   let genesis_ledger_total_currency =
@@ -124,13 +131,14 @@ module Make (Inputs : Inputs_intf) :
     type t =
       { mutable last_epoch_ledger: Coda_base.Ledger.t option
       ; mutable curr_epoch_ledger: Coda_base.Ledger.t option
-      ; mutable delegators: Currency.Balance.t Public_key.Compressed.Table.t }
+      ; mutable delegators: Currency.Balance.t Coda_base.Account.Index.Table.t
+      }
     [@@deriving sexp]
 
     let create () =
       { last_epoch_ledger= None
       ; curr_epoch_ledger= None
-      ; delegators= Public_key.Compressed.Table.create () }
+      ; delegators= Coda_base.Account.Index.Table.create () }
   end
 
   module Epoch = struct
@@ -237,8 +245,6 @@ module Make (Inputs : Inputs_intf) :
 
       type var =
         Snark_params.Tick.Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
-
-      let typ = Snark_params.Tick.Inner_curve.Scalar.typ
     end
 
     module Group = struct
@@ -259,49 +265,59 @@ module Make (Inputs : Inputs_intf) :
     end
 
     module Message = struct
-      type ('epoch, 'slot, 'epoch_seed, 'state_hash) t =
+      type ('epoch, 'slot, 'epoch_seed, 'state_hash, 'delegator) t =
         { epoch: 'epoch
         ; slot: 'slot
         ; seed: 'epoch_seed
-        ; lock_checkpoint: 'state_hash }
+        ; lock_checkpoint: 'state_hash
+        ; delegator: 'delegator }
 
       type value =
-        (Epoch.t, Epoch.Slot.t, Epoch_seed.t, Coda_base.State_hash.t) t
+        ( Epoch.t
+        , Epoch.Slot.t
+        , Epoch_seed.t
+        , Coda_base.State_hash.t
+        , Coda_base.Account.Index.t )
+        t
 
       type var =
         ( Epoch.Unpacked.var
         , Epoch.Slot.Unpacked.var
         , Epoch_seed.var
-        , Coda_base.State_hash.var )
+        , Coda_base.State_hash.var
+        , Coda_base.Account.Index.Unpacked.var )
         t
 
-      let to_hlist {epoch; slot; seed; lock_checkpoint} =
-        Coda_base.H_list.[epoch; slot; seed; lock_checkpoint]
+      let to_hlist {epoch; slot; seed; lock_checkpoint; delegator} =
+        Coda_base.H_list.[epoch; slot; seed; lock_checkpoint; delegator]
 
       let of_hlist :
              ( unit
-             , 'epoch -> 'slot -> 'epoch_seed -> 'state_hash -> unit )
+             , 'epoch -> 'slot -> 'epoch_seed -> 'state_hash -> 'del -> unit
+             )
              Coda_base.H_list.t
-          -> ('epoch, 'slot, 'epoch_seed, 'state_hash) t =
-       fun Coda_base.H_list.([epoch; slot; seed; lock_checkpoint]) ->
-        {epoch; slot; seed; lock_checkpoint}
+          -> ('epoch, 'slot, 'epoch_seed, 'state_hash, 'del) t =
+       fun Coda_base.H_list.([epoch; slot; seed; lock_checkpoint; delegator]) ->
+        {epoch; slot; seed; lock_checkpoint; delegator}
 
       let data_spec =
         let open Snark_params.Tick.Data_spec in
         [ Epoch.Unpacked.typ
         ; Epoch.Slot.Unpacked.typ
         ; Epoch_seed.typ
-        ; Coda_base.State_hash.typ ]
+        ; Coda_base.State_hash.typ
+        ; Coda_base.Account.Index.Unpacked.typ ]
 
       let typ =
         Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
           ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
 
-      let fold {epoch; slot; seed; lock_checkpoint} =
+      let fold {epoch; slot; seed; lock_checkpoint; delegator} =
         let open Fold in
         Epoch.fold epoch +> Epoch.Slot.fold slot +> Epoch_seed.fold seed
         +> Coda_base.State_hash.fold lock_checkpoint
+        +> Coda_base.Account.Index.fold delegator
 
       let hash_to_group msg =
         let msg_hash_state =
@@ -311,7 +327,7 @@ module Make (Inputs : Inputs_intf) :
         msg_hash_state.acc
 
       module Checked = struct
-        let var_to_triples {epoch; slot; seed; lock_checkpoint} =
+        let var_to_triples {epoch; slot; seed; lock_checkpoint; delegator} =
           let open Snark_params.Tick.Let_syntax in
           let%map seed_triples = Epoch_seed.var_to_triples seed
           and lock_checkpoint_triples =
@@ -320,6 +336,7 @@ module Make (Inputs : Inputs_intf) :
           Epoch.Unpacked.var_to_triples epoch
           @ Epoch.Slot.Unpacked.var_to_triples slot
           @ seed_triples @ lock_checkpoint_triples
+          @ Coda_base.Account.Index.Unpacked.var_to_triples delegator
 
         let hash_to_group msg =
           let open Snark_params.Tick in
@@ -334,8 +351,9 @@ module Make (Inputs : Inputs_intf) :
         let%map epoch = Epoch.gen
         and slot = Epoch.Slot.gen
         and seed = Epoch_seed.gen
-        and lock_checkpoint = Coda_base.State_hash.gen in
-        {epoch; slot; seed; lock_checkpoint}
+        and lock_checkpoint = Coda_base.State_hash.gen
+        and delegator = Coda_base.Account.Index.gen in
+        {epoch; slot; seed; lock_checkpoint; delegator}
     end
 
     module Output = struct
@@ -424,20 +442,31 @@ module Make (Inputs : Inputs_intf) :
               (Message)
               (Output)
 
-    let check ~epoch ~slot ~seed ~lock_checkpoint ~private_key ~owned_stake
-        ~total_stake ~logger =
+    let check ~local_state ~epoch ~slot ~seed ~lock_checkpoint ~private_key
+        ~total_stake =
       let open Message in
-      let result = eval ~private_key {epoch; slot; seed; lock_checkpoint} in
-      Logger.info logger
-        !"Checking vrf at %d:%d - owned_stake: %d, total_stake: %d, \
-          evaluation: %{sexp: Output.value}"
-        (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
-        (Balance.to_int owned_stake)
-        (Amount.to_int total_stake)
-        result ;
-      Option.some_if
-        (Threshold.is_satisfied ~my_stake:owned_stake ~total_stake result)
-        result
+      with_return (fun {return} ->
+          Hashtbl.iteri local_state.Local_state.delegators
+            ~f:(fun ~key:delegator ~data:balance ->
+              let vrf_result =
+                eval ~private_key
+                  {epoch; slot; seed; lock_checkpoint; delegator}
+              in
+              if
+                Threshold.is_satisfied ~my_stake:balance ~total_stake
+                  vrf_result
+              then
+                return
+                  (Some
+                     { Proposal_data.stake_proof=
+                         { private_key
+                         ; delegator
+                         ; ledger=
+                             Coda_base.Sparse_ledger.of_ledger_index_subset_exn
+                               (Option.value_exn local_state.last_epoch_ledger)
+                               [delegator] }
+                     ; vrf_result }) ) ;
+          None )
   end
 
   module Epoch_ledger = struct
@@ -964,11 +993,13 @@ module Make (Inputs : Inputs_intf) :
     Coda_base.Blockchain_state.Make (Inputs.Genesis_ledger)
   module Protocol_state =
     Coda_base.Protocol_state.Make (Blockchain_state) (Consensus_state)
+  module Prover_state = Coda_base.Stake_proof
 
   module Snark_transition = Coda_base.Snark_transition.Make (struct
     module Genesis_ledger = Inputs.Genesis_ledger
     module Blockchain_state = Blockchain_state
     module Consensus_data = Consensus_transition_data
+    module Prover_state = Prover_state
   end)
 
   module Internal_transition =
@@ -978,31 +1009,20 @@ module Make (Inputs : Inputs_intf) :
 
   (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
   let generate_transition ~(previous_protocol_state : Protocol_state.value)
-      ~blockchain_state ~local_state ~time ~keypair ~transactions:_
-      ~snarked_ledger_hash ~supply_increase ~logger =
-    let open Consensus_state in
-    let open Epoch_data in
-    let open Keypair in
-    let open Option.Let_syntax in
+      ~blockchain_state ~time ~proposal_data ~transactions:_
+      ~snarked_ledger_hash ~supply_increase ~logger:_ =
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
     in
-    let time = Time.of_span_since_epoch (Time.Span.of_ms time) in
-    let epoch, slot = Epoch.epoch_and_slot_of_time_exn time in
-    let%bind proposer_stake, total_stake =
-      Epoch_ledger.get_stake previous_consensus_state.last_epoch_data.ledger
-        ~logger ~public_key:keypair.public_key ~local_state
-    in
-    let%map proposer_vrf_result =
-      Vrf.check ~epoch ~slot
-        ~seed:previous_consensus_state.last_epoch_data.seed
-        ~lock_checkpoint:
-          previous_consensus_state.last_epoch_data.lock_checkpoint
-        ~private_key:keypair.private_key ~owned_stake:proposer_stake
-        ~total_stake ~logger
+    let epoch, slot =
+      let time = Time.of_span_since_epoch (Time.Span.of_ms time) in
+      Epoch.epoch_and_slot_of_time_exn time
     in
     let consensus_transition_data =
-      Consensus_transition_data.{epoch; slot; proposer_vrf_result}
+      Consensus_transition_data.
+        { epoch
+        ; slot
+        ; proposer_vrf_result= proposal_data.Proposal_data.vrf_result }
     in
     let consensus_state =
       Or_error.ok_exn
@@ -1102,34 +1122,32 @@ module Make (Inputs : Inputs_intf) :
           failwith
             "System time is out of sync. (hint: setup NTP if you haven't)" )
       in
-      let%bind proposer_stake, total_stake =
+      let%bind _proposer_stake, total_stake =
         Epoch_ledger.get_stake epoch_data.ledger ~logger
           ~public_key:keypair.public_key ~local_state
       in
-      Logger.info logger "Theoretical chance of winning a slot: %f"
-        ( (float_of_int @@ Balance.to_int proposer_stake)
-        /. (float_of_int @@ Amount.to_int total_stake) ) ;
-      let is_winning_slot slot =
-        Option.is_some
-          (Vrf.check ~epoch ~slot ~seed:epoch_data.seed
-             ~lock_checkpoint:epoch_data.lock_checkpoint
-             ~private_key:keypair.private_key ~owned_stake:proposer_stake
-             ~total_stake ~logger)
+      let proposal_data slot =
+        Vrf.check ~epoch ~slot ~seed:epoch_data.seed ~local_state
+          ~lock_checkpoint:epoch_data.lock_checkpoint
+          ~private_key:keypair.private_key ~total_stake
       in
       let rec find_winning_slot slot =
         if UInt32.of_int (Epoch.Slot.to_int slot) >= Epoch.size then None
-        else if is_winning_slot slot then Some slot
-        else find_winning_slot (Epoch.Slot.succ slot)
+        else
+          match proposal_data slot with
+          | None -> find_winning_slot (Epoch.Slot.succ slot)
+          | Some data -> Some (slot, data)
       in
       find_winning_slot (Epoch.Slot.succ slot)
     in
     match next_slot with
-    | Some next_slot ->
+    | Some (next_slot, data) ->
         Logger.info logger "Proposing in %d slots"
           (Epoch.Slot.to_int next_slot - Epoch.Slot.to_int slot) ;
         `Propose
           ( Epoch.slot_start_time epoch next_slot
-          |> Time.to_span_since_epoch |> Time.Span.to_ms )
+            |> Time.to_span_since_epoch |> Time.Span.to_ms
+          , data )
     | None ->
         Logger.info logger
           "No slots won in this epoch... waiting for next epoch" ;
@@ -1137,12 +1155,14 @@ module Make (Inputs : Inputs_intf) :
           (Epoch.end_time epoch |> Time.to_span_since_epoch |> Time.Span.to_ms)
 
   let compute_delegators self_pk ledger =
-    let t = Public_key.Compressed.Table.create () in
-    Coda_base.Ledger.fold_until ledger ~init:() ~finish:Fn.id
-      ~f:(fun () acct ->
+    let t = Coda_base.Account.Index.Table.create () in
+    Coda_base.Ledger.foldi ledger ~init:() ~f:(fun i () acct ->
         if Public_key.Compressed.equal self_pk acct.delegate then
-          Hashtbl.add t ~key:acct.public_key ~data:acct.balance |> ignore ;
-        Continue () ) ;
+          Hashtbl.add t
+            ~key:(Coda_base.Ledger.Addr.to_int i)
+            ~data:acct.balance
+          |> ignore
+        else () ) ;
     t
 
   (* TODO *)
@@ -1156,7 +1176,8 @@ module Make (Inputs : Inputs_intf) :
       in
       local_state.last_epoch_ledger <- local_state.curr_epoch_ledger ;
       ( match proposer_public_key with
-      | None -> local_state.delegators <- Public_key.Compressed.Table.create ()
+      | None ->
+          local_state.delegators <- Coda_base.Account.Index.Table.create ()
       | Some pk ->
           Option.iter local_state.last_epoch_ledger ~f:(fun l ->
               local_state.delegators <- compute_delegators pk l ) ) ;
