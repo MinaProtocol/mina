@@ -464,10 +464,14 @@ module Make (Inputs : Inputs_intf) :
               (Output)
 
     let check ~local_state ~epoch ~slot ~seed ~lock_checkpoint ~private_key
-        ~total_stake =
+        ~total_stake ~ledger_hash =
       let open Message in
       let open Option.Let_syntax in
-      let%bind ledger = local_state.Local_state.last_epoch_ledger in
+      let%bind ledger =
+        if Coda_base.Frozen_ledger_hash.equal ledger_hash genesis_ledger_hash
+        then Some Genesis_ledger.t
+        else local_state.Local_state.last_epoch_ledger
+      in
       with_return (fun {return} ->
           Hashtbl.iteri local_state.delegators
             ~f:(fun ~key:delegator ~data:balance ->
@@ -1125,6 +1129,7 @@ module Make (Inputs : Inputs_intf) :
         Vrf.check ~epoch ~slot ~seed:epoch_data.seed ~local_state
           ~lock_checkpoint:epoch_data.lock_checkpoint
           ~private_key:keypair.private_key ~total_stake
+          ~ledger_hash:epoch_data.ledger.hash
       in
       let rec find_winning_slot slot =
         if UInt32.of_int (Epoch.Slot.to_int slot) >= Epoch.size then None
