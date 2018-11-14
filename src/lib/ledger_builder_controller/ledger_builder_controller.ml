@@ -346,7 +346,7 @@ end = struct
         prev_ledger := Some ll ;
         ll
     in
-    trace_event "local ledger get"
+    trace_event "local ledger get" ;
     let responder = Sync_ledger.Responder.create ledger ignore in
     (hash, Sync_ledger.Responder.answer_query responder query))
 end

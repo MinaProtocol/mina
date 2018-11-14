@@ -150,7 +150,7 @@ fn main() {
                                 (prev_ts, prev_task)
                             }
                             Switch(t) => {
-                                let prev_task = prev_task.and_then(|t| tidmap.get(&t).map(|x| *x));
+                                let prev_task = prev_task.and_then(|t| tidmap.get(&t).map(|x| *x)).or(prev_task);
                                 complete_event(&seen_tids, cur_pid, cur_ts, prev_ts, prev_task);
                                 (cur_ts, tidmap.get(&t).map(|x| *x).or(Some(t)))
                             }
