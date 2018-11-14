@@ -196,7 +196,6 @@ module Make (Inputs : Inputs_intf) :
                    Ledger_proof.sok_digest proof ))
             ?ledger_proof:
               (Option.map ledger_proof_opt ~f:Ledger_proof.underlying_proof)
-            ~prover_state:(Proposal_data.prover_state proposal_data)
             ~supply_increase:
               (Option.value_map ~default:Currency.Amount.zero
                  ~f:(fun proof ->
@@ -207,6 +206,7 @@ module Make (Inputs : Inputs_intf) :
         in
         let internal_transition =
           Internal_transition.create ~snark_transition
+            ~prover_state:(Proposal_data.prover_state proposal_data)
             ~ledger_builder_diff:(Ledger_builder_diff.forget diff)
         in
         Some (protocol_state, internal_transition) )

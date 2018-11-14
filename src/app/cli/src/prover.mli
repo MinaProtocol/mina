@@ -26,6 +26,7 @@ module type S = sig
     -> Blockchain.t
     -> Consensus_mechanism.Protocol_state.value
     -> Consensus_mechanism.Snark_transition.value
+    -> Consensus_mechanism.Prover_state.t
     -> Blockchain.t Deferred.Or_error.t
 end
 

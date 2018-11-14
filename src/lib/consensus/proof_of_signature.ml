@@ -56,7 +56,7 @@ module Make (Inputs : Inputs_intf) :
   module Prover_state = struct
     include Unit
 
-    let dummy = ()
+    let handler _ _ = Snarky.Request.unhandled
   end
 
   module Proposal_data = struct
@@ -183,6 +183,7 @@ module Make (Inputs : Inputs_intf) :
 
   module Internal_transition =
     Internal_transition.Make (Ledger_builder_diff) (Snark_transition)
+      (Prover_state)
   module External_transition =
     External_transition.Make (Ledger_builder_diff) (Protocol_state)
 

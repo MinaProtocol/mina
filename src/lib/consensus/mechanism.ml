@@ -3,6 +3,12 @@ open Tuple_lib
 open Fold_lib
 open Coda_numbers
 
+module type Prover_state_intf = sig
+  type t [@@deriving bin_io, sexp]
+
+  val handler : t -> Snark_params.Tick.Handler.t
+end
+
 module type S = sig
   module Local_state : sig
     type t [@@deriving sexp]
@@ -42,7 +48,7 @@ module type S = sig
 
   module Blockchain_state : Coda_base.Blockchain_state.S
 
-  module Prover_state : Coda_base.Snark_transition.Prover_state_intf
+  module Prover_state : Prover_state_intf
 
   module Protocol_state :
     Coda_base.Protocol_state.S
@@ -53,11 +59,11 @@ module type S = sig
     Coda_base.Snark_transition.S
     with module Blockchain_state = Blockchain_state
      and module Consensus_data = Consensus_transition_data
-     and module Prover_state = Prover_state
 
   module Internal_transition :
     Coda_base.Internal_transition.S
     with module Snark_transition = Snark_transition
+     and module Prover_state := Prover_state
 
   module External_transition :
     Coda_base.External_transition.S with module Protocol_state = Protocol_state

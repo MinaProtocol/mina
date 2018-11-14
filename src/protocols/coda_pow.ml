@@ -718,7 +718,6 @@ module type Consensus_mechanism_intf = sig
     val create_value :
          ?sok_digest:sok_digest
       -> ?ledger_proof:proof
-      -> prover_state:Prover_state.t
       -> supply_increase:Currency.Amount.t
       -> blockchain_state:Blockchain_state.value
       -> consensus_data:Consensus_transition_data.value
@@ -735,10 +734,13 @@ module type Consensus_mechanism_intf = sig
 
     val create :
          snark_transition:Snark_transition.value
+      -> prover_state:Prover_state.t
       -> ledger_builder_diff:ledger_builder_diff
       -> t
 
     val snark_transition : t -> Snark_transition.value
+
+    val prover_state : t -> Prover_state.t
 
     val ledger_builder_diff : t -> ledger_builder_diff
   end

@@ -993,17 +993,23 @@ module Make (Inputs : Inputs_intf) :
     Coda_base.Blockchain_state.Make (Inputs.Genesis_ledger)
   module Protocol_state =
     Coda_base.Protocol_state.Make (Blockchain_state) (Consensus_state)
-  module Prover_state = Coda_base.Stake_proof
+
+  module Prover_state = struct
+    include Coda_base.Stake_proof
+
+    let handler _ : Snark_params.Tick.Handler.t =
+     fun _ -> Snarky.Request.unhandled
+  end
 
   module Snark_transition = Coda_base.Snark_transition.Make (struct
     module Genesis_ledger = Inputs.Genesis_ledger
     module Blockchain_state = Blockchain_state
     module Consensus_data = Consensus_transition_data
-    module Prover_state = Prover_state
   end)
 
   module Internal_transition =
     Coda_base.Internal_transition.Make (Ledger_builder_diff) (Snark_transition)
+      (Prover_state)
   module External_transition =
     Coda_base.External_transition.Make (Ledger_builder_diff) (Protocol_state)
 

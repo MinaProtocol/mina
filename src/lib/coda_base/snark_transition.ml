@@ -8,12 +8,6 @@ module type Consensus_data_intf = sig
   val genesis : value
 end
 
-module type Prover_state_intf = sig
-  type t [@@deriving bin_io, sexp]
-
-  val dummy : t
-end
-
 module type Inputs_intf = sig
   module Genesis_ledger : sig
     val t : Ledger.t
@@ -22,16 +16,12 @@ module type Inputs_intf = sig
   module Blockchain_state : Blockchain_state.S
 
   module Consensus_data : Consensus_data_intf
-
-  module Prover_state : Prover_state_intf
 end
 
 module type S = sig
   module Blockchain_state : Blockchain_state.S
 
   module Consensus_data : Consensus_data_intf
-
-  module Prover_state : Prover_state_intf
 
   type ('blockchain_state, 'consensus_data, 'sok_digest, 'supply_increase) t
   [@@deriving sexp]
@@ -57,7 +47,6 @@ module type S = sig
   val create_value :
        ?sok_digest:Sok_message.Digest.t
     -> ?ledger_proof:Proof.t
-    -> prover_state:Prover_state.t
     -> supply_increase:Currency.Amount.t
     -> blockchain_state:Blockchain_state.value
     -> consensus_data:Consensus_data.value
@@ -74,16 +63,13 @@ module type S = sig
 
   val ledger_proof : _ t -> Proof.t option
 
-  val prover_state : _ t -> Prover_state.t
-
   val genesis : value
 end
 
 module Make (Inputs : Inputs_intf) :
   S
   with module Blockchain_state = Inputs.Blockchain_state
-   and module Consensus_data = Inputs.Consensus_data
-   and module Prover_state = Inputs.Prover_state = struct
+   and module Consensus_data = Inputs.Consensus_data = struct
   include Inputs
 
   type ('blockchain_state, 'consensus_data, 'sok_digest, 'supply_increase) t =
@@ -91,7 +77,6 @@ module Make (Inputs : Inputs_intf) :
     ; consensus_data: 'consensus_data
     ; sok_digest: 'sok_digest
     ; supply_increase: 'supply_increase
-    ; prover_state: Prover_state.t
     ; ledger_proof: Proof.t option }
   [@@deriving bin_io, sexp, fields]
 
@@ -111,12 +96,11 @@ module Make (Inputs : Inputs_intf) :
     t
 
   let create_value ?(sok_digest = Sok_message.Digest.default) ?ledger_proof
-      ~prover_state ~supply_increase ~blockchain_state ~consensus_data () =
+      ~supply_increase ~blockchain_state ~consensus_data () =
     { blockchain_state
     ; consensus_data
     ; ledger_proof
     ; sok_digest
-    ; prover_state
     ; supply_increase }
 
   let typ =
@@ -126,7 +110,6 @@ module Make (Inputs : Inputs_intf) :
         ; consensus_data
         ; sok_digest
         ; supply_increase
-        ; prover_state
         ; ledger_proof } =
       let open Store.Let_syntax in
       let%map blockchain_state = Blockchain_state.typ.store blockchain_state
@@ -137,7 +120,6 @@ module Make (Inputs : Inputs_intf) :
       ; consensus_data
       ; sok_digest
       ; supply_increase
-      ; prover_state
       ; ledger_proof }
     in
     let read
@@ -145,7 +127,6 @@ module Make (Inputs : Inputs_intf) :
         ; consensus_data
         ; sok_digest
         ; supply_increase
-        ; prover_state
         ; ledger_proof } =
       let open Read.Let_syntax in
       let%map blockchain_state = Blockchain_state.typ.read blockchain_state
@@ -156,7 +137,6 @@ module Make (Inputs : Inputs_intf) :
       ; consensus_data
       ; sok_digest
       ; supply_increase
-      ; prover_state
       ; ledger_proof }
     in
     let check
@@ -164,7 +144,6 @@ module Make (Inputs : Inputs_intf) :
         ; consensus_data
         ; sok_digest
         ; supply_increase
-        ; prover_state= _
         ; ledger_proof= _ } =
       let open Snark_params.Tick.Let_syntax in
       let%map () = Blockchain_state.typ.check blockchain_state
@@ -183,7 +162,6 @@ module Make (Inputs : Inputs_intf) :
       ; consensus_data
       ; sok_digest
       ; supply_increase
-      ; prover_state= Prover_state.dummy
       ; ledger_proof= None }
     in
     {store; read; check; alloc}
@@ -198,6 +176,5 @@ module Make (Inputs : Inputs_intf) :
           ; prover=
               Account.public_key
                 (List.hd_exn (Ledger.to_list Genesis_ledger.t)) }
-    ; prover_state= Prover_state.dummy
     ; ledger_proof= None }
 end
