@@ -75,7 +75,8 @@ module Make (Kernel : Kernel_intf) = struct
       end
 
       module Output = struct
-        type t = (Receipt.Chain_hash.t * User_command.t) list [@@deriving bin_io]
+        type t = (Receipt.Chain_hash.t * User_command.t) list
+        [@@deriving bin_io]
       end
     end
 

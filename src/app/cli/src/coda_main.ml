@@ -1014,9 +1014,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     match Receipt_chain_database.add receipt_chain_database ~previous txn with
     | `Ok hash ->
         Logger.debug log
-          !"Added  payment %{sexp:User_command.t} into receipt_chain database. You \
-            should wait for a bit to see your account's receipt chain hash \
-            update as %{sexp:Receipt.Chain_hash.t}"
+          !"Added  payment %{sexp:User_command.t} into receipt_chain \
+            database. You should wait for a bit to see your account's receipt \
+            chain hash update as %{sexp:Receipt.Chain_hash.t}"
           txn hash ;
         hash
     | `Duplicate hash ->
