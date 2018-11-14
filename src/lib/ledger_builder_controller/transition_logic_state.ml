@@ -117,7 +117,9 @@ module Make (Inputs : Inputs.Base.S) :
       Printf.printf
         !"*** GOT FATAL EXCEPTION WHILE APPLYING CHANGES TO TRANSITION LOGIC \
           STATE IN LEDGER BUILDER CONTROLLER\n" ;
-      Printf.printf !"locked tip state hash: %s\n%!" (Base64.encode_string (State_hash.to_bytes t'.locked_tip.hash));
+      Printf.printf
+        !"locked tip state hash: %s\n%!"
+        (Base64.encode_string (State_hash.to_bytes t'.locked_tip.hash)) ;
       Option.iter t'.ktree ~f:(fun ktree ->
           Transition_tree.Graph.output_graph Out_channel.stdout
             (Transition_tree.to_graph ktree) ) ;
