@@ -259,6 +259,7 @@ module Make (Inputs : Inputs_intf) :
                   ~transactions:tip.transactions ~get_completed_work ~logger
                   ~keypair
               in
+              trace_event "next state generated" ;
               match next_state_opt with
               | None -> Interruptible.return ()
               | Some (protocol_state, internal_transition) ->
@@ -296,25 +297,23 @@ module Make (Inputs : Inputs_intf) :
         let scheduler = Singleton_scheduler.create time_controller in
         let rec check_for_proposal () =
           Agent.with_value tip_agent ~f:(fun tip ->
-              Agent.with_value tip_agent ~f:(fun tip ->
-                  let open Tip in
-                  match
-                    Consensus_mechanism.next_proposal
-                      (time_to_ms (Time.now time_controller))
-                      (Protocol_state.consensus_state (fst tip.protocol_state))
-                      ~local_state:consensus_local_state ~keypair ~logger
-                  with
-                  | `Check_again time ->
-                      Singleton_scheduler.schedule scheduler (time_of_ms time)
-                        ~f:check_for_proposal
-                  | `Propose time ->
-                      Singleton_scheduler.schedule scheduler (time_of_ms time)
-                        ~f:(fun () ->
-                          ignore
-                            (Interruptible.finally
-                               (Singleton_supervisor.dispatch
-                                  proposal_supervisor)
-                               ~f:check_for_proposal) ) ) )
+              let open Tip in
+              match
+                Consensus_mechanism.next_proposal
+                  (time_to_ms (Time.now time_controller))
+                  (Protocol_state.consensus_state (fst tip.protocol_state))
+                  ~local_state:consensus_local_state ~keypair ~logger
+              with
+              | `Check_again time ->
+                  Singleton_scheduler.schedule scheduler (time_of_ms time)
+                    ~f:check_for_proposal
+              | `Propose time ->
+                  Singleton_scheduler.schedule scheduler (time_of_ms time)
+                    ~f:(fun () ->
+                      ignore
+                        (Interruptible.finally
+                           (Singleton_supervisor.dispatch proposal_supervisor)
+                           ~f:check_for_proposal) ) )
         in
         check_for_proposal () ; transition_reader )
 end
