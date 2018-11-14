@@ -496,12 +496,11 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let lbc_deferred =
           Ledger_builder_controller.create
-            (Ledger_builder_controller.Config.make 
-           ?proposer_public_key:
-             (Option.map config.propose_keypair ~f:(fun k ->
-                  k.public_key |> Public_key.compress ))
-               ~parent_log:config.log
-               ~net_deferred:(Ivar.read net_ivar)
+            (Ledger_builder_controller.Config.make
+               ?proposer_public_key:
+                 (Option.map config.propose_keypair ~f:(fun k ->
+                      k.public_key |> Public_key.compress ))
+               ~parent_log:config.log ~net_deferred:(Ivar.read net_ivar)
                ~genesis_tip:
                  { ledger_builder= Ledger_builder.create ~ledger:Genesis.ledger
                  ; protocol_state= Genesis.state
