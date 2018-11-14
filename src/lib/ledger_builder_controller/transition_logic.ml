@@ -252,10 +252,11 @@ module Make (Inputs : Inputs_intf) :
               With_hash.map longest_branch_tip ~f:Tip.copy
             in
             (* Adjust the locked_ledger if necessary *)
-            let%bind locked_tip =
+            let%bind (locked_tip_changed, locked_tip) =
               if transition_is_parent_of ~child:new_head ~parent:old_head then
-                transition_unchecked locked_tip.data new_head logger
-              else return locked_tip
+                let%map locked_tip = transition_unchecked locked_tip.data new_head logger in
+                (true, locked_tip)
+              else return (false, locked_tip)
             in
             trace_event "done transition check" ;
             (* Now adjust the longest_branch_tip *)
@@ -264,7 +265,7 @@ module Make (Inputs : Inputs_intf) :
                 Path.findi new_best_path ~f:(fun _ x ->
                     is_materialization_of longest_branch_tip x )
               with
-              | None -> (locked_tip, new_best_path)
+              | None -> (With_hash.map ~f:Tip.copy locked_tip, new_best_path)
               | Some (i, _) ->
                   (longest_branch_tip, Path.drop new_best_path (i + 1))
             in
@@ -290,9 +291,10 @@ module Make (Inputs : Inputs_intf) :
             match result with
             | Some tip ->
                 assert_materialization_of tip last_transition ;
+                let locked_tip = if locked_tip_changed then Some locked_tip else None in
                 let%map result =
                   Interruptible.uninterruptible
-                    (on_success ~longest_branch:tip ~ktree:new_tree
+                    (on_success ?locked_tip ~longest_branch:tip ~ktree:new_tree
                        ~transition:last_transition)
                 in
                 Some result
@@ -357,7 +359,7 @@ module Make (Inputs : Inputs_intf) :
               let job =
                 Path_traversal.create old_state ktree ktree path t.log
                   last_transition
-                  ~on_success:(fun ~longest_branch ~ktree:_ ~transition:_ ->
+                  ~on_success:(fun ?locked_tip:_ ~longest_branch ~ktree:_ ~transition:_ ->
                     Deferred.return longest_branch )
               in
               let w, _ = Job.run job in
@@ -512,11 +514,12 @@ module Make (Inputs : Inputs_intf) :
                   (Some
                      ( Path_traversal.create old_state new_tree old_tree
                          new_best_path t.log transition_with_hash
-                         ~on_success:(fun ~longest_branch ~ktree ~transition ->
+                         ~on_success:(fun ?locked_tip ~longest_branch ~ktree ~transition ->
                            let changes =
                              [ Transition_logic_state.Change.Longest_branch_tip
                                  longest_branch
                              ; Transition_logic_state.Change.Ktree ktree ]
+                             @ Option.value ~default:[] (Option.map ~f:(fun t -> [Transition_logic_state.Change.Locked_tip t]) locked_tip)
                            in
                            mutate_state t old_state changes
                              (With_hash.data transition) )
