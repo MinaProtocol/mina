@@ -442,6 +442,8 @@ let%test_module "test" =
           include Int
 
           let to_bits t = [t <> 0]
+
+          let to_bytes = string_of_int
         end
 
         module Protocol_state_proof = Unit
@@ -481,6 +483,8 @@ let%test_module "test" =
               { previous_state_hash= -1
               ; blockchain_state= {ledger_builder_hash= 0; ledger_hash= 0}
               ; consensus_state= {strength= 0} }
+
+            let to_string_record _ = "<opaque>"
           end
 
           module External_transition = struct

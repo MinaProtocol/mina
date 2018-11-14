@@ -38,6 +38,8 @@ module type S = sig
     val length : value -> Length.t
 
     val to_lite : (value -> Lite_base.Consensus_state.t) option
+
+    val to_string_record : value -> string
   end
 
   module Blockchain_state : Coda_base.Blockchain_state.S

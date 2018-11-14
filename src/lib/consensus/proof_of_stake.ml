@@ -961,6 +961,14 @@ module Make (Inputs : Inputs_intf) :
     let length (t : value) = t.length
 
     let to_lite = None
+
+    let to_string_record t =
+      Printf.sprintf "{length|%s}|{epoch_length|%s}|{curr_epoch|%s}|{curr_slot|%s}|{total_currency|%s}"
+        (Length.to_string t.length)
+        (Length.to_string t.epoch_length)
+        (Segment_id.to_string t.curr_epoch)
+        (Segment_id.to_string t.curr_slot)
+        (Amount.to_string t.total_currency)
   end
 
   module Blockchain_state =

@@ -12,12 +12,26 @@ module Make (Inputs : Inputs.Base.S) :
   module Ops = Tip_ops.Make (Inputs)
   include Ops
 
-  module Transition_tree =
-    Ktree.Make (struct
-        type t = (External_transition.t, State_hash.t) With_hash.t
-        [@@deriving compare, bin_io, sexp]
-      end)
-      (Security)
+  module Transition = struct
+    type t = (External_transition.t, State_hash.t) With_hash.t
+    [@@deriving compare, bin_io, sexp]
+
+    open With_hash
+
+    let equal {hash=a;_} {hash=b;_} = State_hash.equal a b
+
+    let hash {hash;_} = String.hash (State_hash.to_bytes hash)
+    let hash_fold_t state {hash;_} = String.hash_fold_t state (State_hash.to_bytes hash)
+
+    let id {hash; _} = "\"" ^ Base64.encode_string (State_hash.to_bytes hash) ^ "\""
+
+    let to_string_record t =
+      Printf.sprintf "{%s|%s}"
+        (Base64.encode_string (State_hash.to_bytes t.hash))
+        (Protocol_state.to_string_record (External_transition.protocol_state t.data))
+  end
+
+  module Transition_tree = Ktree.Make (Transition) (Security)
 
   module Change = struct
     type t =

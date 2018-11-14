@@ -157,6 +157,9 @@ module Make (Inputs : Inputs_intf) :
         (fun {length; signer_public_key} ->
           { Lite_base.Consensus_state.length= Lite_compat.length length
           ; signer_public_key= Lite_compat.public_key signer_public_key } )
+
+    let to_string_record t =
+      Printf.sprintf "{length|%s}" (Length.to_string t.length)
   end
 
   module Protocol_state =

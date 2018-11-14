@@ -39,7 +39,9 @@ end
 
 (** A Rose tree with max-depth k. Whenever we want to add a node that would increase the depth past k, we instead move the tree forward and root it at the node towards that path *)
 module Make (Elem : sig
-  type t [@@deriving compare, bin_io, sexp]
+  type t [@@deriving compare, bin_io, sexp, eq, hash]
+  val id : t -> string
+  val to_string_record : t -> string
 end)
 (Security : Protocols.Coda_pow.Security_intf) =
 struct
@@ -140,12 +142,35 @@ struct
               { tree= longest_subtree
               ; elems= Elem_set.of_list (Rose.to_list longest_subtree) }
           else `Added default
+
+  module Graph = struct
+    module G = Graph.Persistent.Digraph.ConcreteBidirectional (Elem)
+    include G
+    include Graph.Graphviz.Dot(struct
+      include G
+      let graph_attributes _ = []
+      let get_subgraph _ = None
+
+      let default_vertex_attributes _ = [`Shape `Record]
+      let vertex_name elem = Elem.id elem
+      let vertex_attributes elem = [`Label (Elem.to_string_record elem)]
+
+      let default_edge_attributes _ = []
+      let edge_attributes _ = []
+    end)
+  end
+
+  let to_graph t = Rose.fold_edges t.tree ~init:Graph.empty ~f:Graph.add_edge
 end
 
 let%test_module "K-tree" =
   ( module struct
     module Make_quickchecks (Elem : sig
-      type t [@@deriving eq, compare, bin_io, sexp]
+      type t [@@deriving eq, compare, bin_io, sexp, hash]
+
+      val id : t -> string
+
+      val to_string_record : t -> string
 
       val gen : t Quickcheck.Generator.t
     end) (Security : sig
@@ -273,16 +298,21 @@ let%test_module "K-tree" =
                 ~equal:Elem.equal )
     end
 
+    module Int_elem = struct
+      include Int
+      let id = string_of_int
+      let to_string_record = string_of_int
+    end
+
     module Tree =
-      Make_quickchecks
-        (Int)
+      Make_quickchecks (Int_elem)
         (struct
           let max_depth = 10
         end)
 
     module Big_tree =
       Make_quickchecks
-        (Int)
+        (Int_elem)
         (struct
           let max_depth = 50
         end)

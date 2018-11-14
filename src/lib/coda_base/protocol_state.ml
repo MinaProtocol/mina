@@ -28,6 +28,8 @@ module type Consensus_state_intf = sig
   (** For status *)
 
   val to_lite : (value -> Lite_base.Consensus_state.t) option
+
+  val to_string_record : value -> string
 end
 
 module type S = sig
@@ -76,6 +78,8 @@ module type S = sig
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
   val hash : value -> State_hash.Stable.V1.t
+
+  val to_string_record : value -> string
 end
 
 module Make
@@ -176,4 +180,9 @@ module Make
         State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
     ; blockchain_state= Blockchain_state.genesis
     ; consensus_state= Consensus_state.genesis }
+
+  let to_string_record t =
+    Printf.sprintf "{blockchain|%s}|{consensus|%s}"
+      (Blockchain_state.to_string_record t.blockchain_state)
+      (Consensus_state.to_string_record t.consensus_state)
 end
