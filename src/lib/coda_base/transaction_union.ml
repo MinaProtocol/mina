@@ -26,9 +26,6 @@ let typ : (var, t) Typ.t =
   Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let dummy_signature =
-  Schnorr.sign (Private_key.create ()) User_command_payload.dummy
-
 let of_transaction : Transaction.t -> t = function
   | User_command cmd ->
       let {User_command.sender; payload; signature} =
@@ -51,7 +48,7 @@ let of_transaction : Transaction.t -> t = function
               ; amount= Amount.of_fee other_amount
               ; tag= Tag.Coinbase } }
       ; sender= Public_key.decompress_exn proposer
-      ; signature= dummy_signature }
+      ; signature= Signature.dummy }
   | Fee_transfer tr -> (
       let two (pk1, fee1) (pk2, fee2) : t =
         { payload=
@@ -64,7 +61,7 @@ let of_transaction : Transaction.t -> t = function
                 ; amount= Amount.of_fee fee1
                 ; tag= Tag.Fee_transfer } }
         ; sender= Public_key.decompress_exn pk2
-        ; signature= dummy_signature }
+        ; signature= Signature.dummy }
       in
       match tr with
       | One (pk, fee) -> two (pk, fee) (pk, Fee.zero)

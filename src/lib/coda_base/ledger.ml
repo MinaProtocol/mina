@@ -127,43 +127,38 @@ struct
     let open Or_error.Let_syntax in
     let%bind sender_location = location_of_key' ledger "" sender in
     (* We unconditionally deduct the fee if this transaction succeeds *)
-    let%bind sender_account =
+    let%bind sender_account, common =
       let%bind account = get' ledger "sender" sender_location in
-      let%map balance =
+      let%bind balance =
         sub_amount account.balance
           (Amount.of_fee (User_command.Payload.fee payload))
       in
-      {account with balance}
-    in
-    let%bind () = validate_nonces nonce sender_account.nonce in
-    let sender_account_without_balance_modified =
-      { sender_account with
-        nonce= Account.Nonce.succ sender_account.nonce
-      ; receipt_chain_hash=
-          Receipt.Chain_hash.cons payload sender_account.receipt_chain_hash }
-    in
-    let common : Undo.User_command.Common.t =
-      { user_command
-      ; previous_receipt_chain_hash= sender_account.receipt_chain_hash }
+      let common : Undo.User_command.Common.t =
+        {user_command; previous_receipt_chain_hash= account.receipt_chain_hash}
+      in
+      let%bind () = validate_nonces nonce account.nonce in
+      let account =
+        { account with
+          nonce= Account.Nonce.succ account.nonce
+        ; receipt_chain_hash=
+            Receipt.Chain_hash.cons payload account.receipt_chain_hash }
+      in
+      return ({account with balance}, common)
     in
     match User_command.Payload.body payload with
     | Stake_delegation (Set_delegate {new_delegate}) ->
-        set ledger sender_location
-          {sender_account_without_balance_modified with delegate= new_delegate} ;
+        set ledger sender_location {sender_account with delegate= new_delegate} ;
         return
           { Undo.User_command.common
-          ; body=
-              Stake_delegation
-                { previous_delegate=
-                    sender_account_without_balance_modified.delegate } }
+          ; body= Stake_delegation {previous_delegate= sender_account.delegate}
+          }
     | Payment {Payment_payload.amount; receiver} ->
         let%bind sender_balance' = sub_amount sender_account.balance amount in
         let undo emptys : Undo.User_command.t =
           {common; body= Payment {previous_empty_accounts= emptys}}
         in
         if Public_key.Compressed.equal sender receiver then (
-          ignore
-          @@ set ledger sender_location sender_account_without_balance_modified ;
+          ignore @@ set ledger sender_location sender_account ;
           return (undo []) )
         else
           let previous_empty_accounts, receiver_account, receiver_location =
@@ -173,8 +168,7 @@ struct
             add_amount receiver_account.balance amount
           in
           set ledger sender_location
-            { sender_account_without_balance_modified with
-              balance= sender_balance' } ;
+            {sender_account with balance= sender_balance'} ;
           set ledger receiver_location
             {receiver_account with balance= receiver_balance'} ;
           undo previous_empty_accounts
@@ -307,30 +301,25 @@ struct
     let%bind sender_location = location_of_key' ledger "sender" sender in
     let%bind sender_account =
       let%bind account = get' ledger "sender" sender_location in
-      let%map balance =
+      let%bind balance =
         add_amount account.balance
           (Amount.of_fee (User_command.Payload.fee payload))
       in
-      {account with balance}
-    in
-    let%bind () =
-      validate_nonces (Account.Nonce.succ nonce) sender_account.nonce
-    in
-    let sender_account_without_balance_modified =
-      { sender_account with
-        nonce; receipt_chain_hash= previous_receipt_chain_hash }
+      let%bind () = validate_nonces (Account.Nonce.succ nonce) account.nonce in
+      return
+        { account with
+          balance; nonce; receipt_chain_hash= previous_receipt_chain_hash }
     in
     match (User_command.Payload.body payload, body) with
     | Stake_delegation (Set_delegate _), Stake_delegation {previous_delegate}
       ->
         set ledger sender_location
-          { sender_account_without_balance_modified with
-            delegate= previous_delegate } ;
+          {sender_account with delegate= previous_delegate} ;
         return ()
     | Payment {amount; receiver}, Payment {previous_empty_accounts} ->
         let%bind sender_balance' = add_amount sender_account.balance amount in
         if Public_key.Compressed.equal sender receiver then (
-          set ledger sender_location sender_account_without_balance_modified ;
+          set ledger sender_location sender_account ;
           return () )
         else
           let%bind receiver_location =
@@ -343,12 +332,11 @@ struct
             sub_amount receiver_account.balance amount
           in
           set ledger sender_location
-            { sender_account_without_balance_modified with
-              balance= sender_balance' } ;
+            {sender_account with balance= sender_balance'} ;
           set ledger receiver_location
             {receiver_account with balance= receiver_balance'} ;
           remove_accounts_exn ledger previous_empty_accounts
-    | _, _ -> assert false
+    | _, _ -> failwith "Undo/command mismatch"
 
   let undo : t -> Undo.t -> unit Or_error.t =
    fun ledger undo ->
