@@ -75,7 +75,6 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) :
                  |> Blockchain_state.ledger_hash )
              and consensus_data_is_valid =
                Consensus_mechanism.is_transition_valid_checked transition
-                 (previous_state |> Protocol_state.previous_state_hash)
              in
              let%bind correct_snark =
                Boolean.(correct_transaction_snark || ledger_hash_didn't_change)
