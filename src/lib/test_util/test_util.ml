@@ -46,6 +46,10 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     let checked_result = checked_to_unchecked typ1 typ2 checked input in
     assert (equal checked_result (unchecked input))
 
+  let arbitrary_string ~len =
+    String.init (Random.int len) ~f:(fun _ ->
+        Char.of_int_exn (Random.int_incl 0 255) )
+
   let with_randomness r f =
     let s = Caml.Random.get_state () in
     Random.init r ;

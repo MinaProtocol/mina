@@ -14,7 +14,7 @@ end)
   open Impl
 
   module Digest : sig
-    type t = bool list [@@deriving sexp, bin_io, eq, compare]
+    type t [@@deriving sexp, bin_io, eq, compare, hash]
 
     type var = Boolean.var list
 
@@ -22,21 +22,33 @@ end)
 
     val typ : (var, t) Typ.t
 
+    val fold_bits : t -> bool Fold.t
+
     val fold : t -> bool Triple.t Fold.t
 
     val length_in_triples : int
+
+    val var_of_t : t -> var
+
+    val to_bits : t -> bool list
+
+    val to_string : t -> string
+
+    val of_string : string -> t
+
+    val of_bits : bool list -> t
+
+    val var_to_triples : var -> Boolean.var Triple.t list
   end
 
   module Block : sig
-    type 'a t_ = private 'a list
+    type t
 
-    type t = bool t_
+    type var = Boolean.var list
 
-    type var = Boolean.var t_
+    val of_list_exn : 'a list -> 'a list
 
-    val of_list_exn : 'a list -> 'a t_
-
-    val list_to_padded_blocks : padding:'a -> 'a list -> 'a t_ list
+    val list_to_padded_blocks : padding:'a -> 'a list -> 'a list list
 
     val length_in_bits : int
 
@@ -75,15 +87,80 @@ end = struct
   struct
     include M
 
-    type t = bool list [@@deriving sexp, bin_io, eq, compare]
+    type t = string [@@deriving sexp, bin_io, eq, compare, hash]
 
     type var = Boolean.var list
 
-    let fold xs = Fold.(group3 ~default:false (of_list xs))
+    let bit_at s i = (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1
 
-    let typ = Typ.list ~length:length_in_bits Boolean.typ
+    let var_to_triples t =
+      Fold.(to_list (group3 ~default:Boolean.false_ (of_list t)))
+
+    let fold_bits s =
+      { Fold.fold=
+          (fun ~init ~f ->
+            let n = 8 * String.length s in
+            let rec go acc i =
+              if i = n then acc
+              else
+                let b = bit_at s i in
+                go (f acc b) (i + 1)
+            in
+            go init 0 ) }
+
+    let fold t = Fold.group3 ~default:false (fold_bits t)
+
+    let chunks_of n xs = List.groupi ~break:(fun i _ _ -> i mod n = 0) xs
+
+    let bits_to_string bs =
+      let bits_to_char_big_endian bs =
+        List.foldi bs ~init:0 ~f:(fun i acc b ->
+            if b then acc lor (1 lsl (7 - i)) else acc )
+        |> Char.of_int_exn
+      in
+      chunks_of 8 bs
+      |> List.map ~f:bits_to_char_big_endian
+      |> String.of_char_list
+
+    let to_bits s = List.init length_in_bits ~f:(fun i -> bit_at s i)
+
+    let to_string = Fn.id
+
+    let of_string = Fn.id
+
+    let of_bits =
+      let nearest_multiple ~of_:n k =
+        let r = k mod n in
+        if Int.equal r 0 then k else k - r + n
+      in
+      let pad zero bits =
+        let n = List.length bits in
+        let padding_length = nearest_multiple ~of_:length_in_bits n - n in
+        bits @ List.init padding_length ~f:(fun _ -> zero)
+      in
+      Fn.compose bits_to_string (pad false)
+
+    let typ =
+      Typ.transport
+        (Typ.list ~length:length_in_bits Boolean.typ)
+        ~there:to_bits ~back:of_bits
 
     let length_in_triples = (M.length_in_bits + 2) / 3
+
+    let var_of_t t = List.map (to_bits t) ~f:Boolean.var_of_value
+
+    let gen = String.gen_with_length (length_in_bits / 8) Char.gen
+
+    let%test_unit "to_bits compatible with fold" =
+      Quickcheck.test gen ~f:(fun t ->
+          assert (Fold.to_list (fold_bits t) = to_bits t) )
+
+    let%test_unit "of_bits . to_bits = id" =
+      Quickcheck.test gen ~f:(fun t -> assert (equal (of_bits (to_bits t)) t))
+
+    let%test_unit "to_bits . of_bits = id" =
+      Quickcheck.test (List.gen_with_length length_in_bits Bool.gen)
+        ~f:(fun t -> assert (to_bits (of_bits t) = t) )
   end
 
   module Digest = Bits (struct
@@ -137,20 +214,25 @@ end = struct
 
     let of_bits_exn bits =
       assert (Int.equal (List.length bits) length_in_bits) ;
-      bits
+      of_bits bits
 
     let default_init =
-      List.init length_in_bits ~f:(fun i ->
-          (init_words.(i / 32) lsr (31 - (i mod 32))) land 1 = 1 )
+      let init =
+        List.init length_in_bits ~f:(fun i ->
+            (init_words.(i / 32) lsr (31 - (i mod 32))) land 1 = 1 )
+      in
+      bits_to_string init
 
     module Checked = struct
-      let var_of_t = List.map ~f:Boolean.var_of_value
+      let var_of_t = var_of_t
 
       let digest (x : var) : Digest.var = x
 
       let default_init = var_of_t default_init
 
-      let of_bits_exn = of_bits_exn
+      let of_bits_exn bits =
+        assert (Int.equal (List.length bits) length_in_bits) ;
+        bits
 
       module Digest_variable = struct
         open Libsnark

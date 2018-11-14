@@ -3,15 +3,16 @@ open Async
 open Coda_base
 open Signature_lib
 
-module Send_payments = struct
-  type query = Payment.Stable.V1.t list [@@deriving bin_io]
+module Send_user_commands = struct
+  type query = User_command.Stable.V1.t list [@@deriving bin_io]
 
   type response = unit [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
   let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Send_payments" ~version:0 ~bin_query ~bin_response
+    Rpc.Rpc.create ~name:"Send_user_commands" ~version:0 ~bin_query
+      ~bin_response
 end
 
 module Get_ledger = struct
@@ -73,7 +74,7 @@ module Status = struct
     ; commit_id: Git_sha.t option
     ; conf_dir: string
     ; peers: string list
-    ; payments_sent: int
+    ; user_commands_sent: int
     ; run_snark_worker: bool
     ; external_transition_latency: Perf_histograms.Report.t option
     ; snark_worker_transition_time: Perf_histograms.Report.t option
@@ -128,8 +129,8 @@ module Status = struct
           , Printf.sprintf "Total: %d " (List.length peers)
             ^ List.to_string ~f:Fn.id peers )
           :: acc )
-        ~payments_sent:(fun acc x ->
-          ("Payments Sent", Int.to_string (f x)) :: acc )
+        ~user_commands_sent:(fun acc x ->
+          ("User_commands Sent", Int.to_string (f x)) :: acc )
         ~run_snark_worker:(fun acc x ->
           ("Snark Worker Running", Bool.to_string (f x)) :: acc )
         ~external_transition_latency:(fun acc x ->

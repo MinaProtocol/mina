@@ -262,14 +262,16 @@ let batch_send_payments =
     let _, ts =
       List.fold_map ~init:nonce0 infos ~f:(fun nonce {receiver; amount; fee} ->
           ( Account.Nonce.succ nonce
-          , Payment.sign keypair
-              { receiver= Public_key.Compressed.of_base64_exn receiver
-              ; amount
-              ; fee
-              ; nonce } ) )
+          , User_command.sign keypair
+              (User_command_payload.create ~fee ~nonce
+                 ~memo:User_command_memo.dummy
+                 ~body:
+                   (Payment
+                      { receiver= Public_key.Compressed.of_base64_exn receiver
+                      ; amount })) ) )
     in
-    dispatch_with_message Client_lib.Send_payments.rpc
-      (ts :> Payment.t list)
+    dispatch_with_message Client_lib.Send_user_commands.rpc
+      (ts :> User_command.t list)
       port
       ~success:(fun () -> "Successfully enqueued payments in pool")
       ~error:(fun e ->
@@ -305,12 +307,14 @@ let send_payment =
          let%bind nonce = get_nonce_exn sender_kp.public_key port in
          let receiver_compressed = Public_key.compress address in
          let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
-         let payload : Payment.Payload.t =
-           {receiver= receiver_compressed; amount; fee; nonce}
+         let payload : User_command.Payload.t =
+           User_command.Payload.create ~fee ~nonce
+             ~memo:User_command_memo.dummy
+             ~body:(Payment {receiver= receiver_compressed; amount})
          in
-         let txn = Payment.sign sender_kp payload in
-         dispatch_with_message Client_lib.Send_payments.rpc
-           [(txn :> Payment.t)]
+         let txn = User_command.sign sender_kp payload in
+         dispatch_with_message Client_lib.Send_user_commands.rpc
+           [(txn :> User_command.t)]
            port
            ~success:(fun () -> "Successfully enqueued payment in pool")
            ~error:(fun e ->

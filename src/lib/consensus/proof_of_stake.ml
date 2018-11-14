@@ -123,10 +123,14 @@ module Make (Inputs : Inputs_intf) :
   module Local_state = struct
     type t =
       { mutable last_epoch_ledger: Coda_base.Ledger.t option
-      ; mutable curr_epoch_ledger: Coda_base.Ledger.t option }
+      ; mutable curr_epoch_ledger: Coda_base.Ledger.t option
+      ; mutable delegators: Currency.Balance.t Public_key.Compressed.Table.t }
     [@@deriving sexp]
 
-    let create () = {last_epoch_ledger= None; curr_epoch_ledger= None}
+    let create () =
+      { last_epoch_ledger= None
+      ; curr_epoch_ledger= None
+      ; delegators= Public_key.Compressed.Table.create () }
   end
 
   module Epoch = struct
@@ -352,7 +356,8 @@ module Make (Inputs : Inputs_intf) :
             ( Message.fold msg
             +> Non_zero_curve_point.Compressed.fold compressed_g )
         in
-        Sha256.digest (Snark_params.Tick.Pedersen.Digest.Bits.to_bits digest)
+        Sha256.digest_bits
+          (Snark_params.Tick.Pedersen.Digest.Bits.to_bits digest)
 
       module Checked = struct
         let hash msg g =
@@ -392,21 +397,27 @@ module Make (Inputs : Inputs_intf) :
                (Snark_params.Tick.Typ.list ~length:256
                   Snark_params.Tick.Boolean.typ)
                (fun (msg, g) -> Checked.hash msg g)
-               (fun (msg, g) -> hash msg g))
+               (fun (msg, g) -> Sha256_lib.Sha256.Digest.to_bits (hash msg g)))
     end
 
     module Threshold = struct
-      include Bignum_bigint
+      open Bignum_bigint
 
       let of_uint64_exn = Fn.compose of_int64_exn UInt64.to_int64
 
-      let create ~owned_stake ~total_stake =
-        let owned_stake = Balance.to_uint64 owned_stake in
-        let total_stake = Amount.to_uint64 total_stake in
-        let stake_ratio = of_uint64_exn (UInt64.div owned_stake total_stake) in
-        stake_ratio * pow (of_int 2) (of_int 256)
+      let c = of_int 1
 
-      let satisfies threshold output = of_bits_lsb output <= threshold
+      (*  Check if
+          vrf_output / 2^256 <= c * my_stake / total_currency
+
+          So that we don't have to do division we check
+
+          vrf_output * total_currency <= c * my_stake * 2^256
+      *)
+      let is_satisfied ~my_stake ~total_stake vrf_output =
+        of_bit_fold_lsb (Sha256.Digest.fold_bits vrf_output)
+        * of_uint64_exn (Amount.to_uint64 total_stake)
+        <= shift_left (c * of_uint64_exn (Balance.to_uint64 my_stake)) 256
     end
 
     include Vrf_lib.Integrated.Make (Snark_params.Tick) (Scalar) (Group)
@@ -417,15 +428,16 @@ module Make (Inputs : Inputs_intf) :
         ~total_stake ~logger =
       let open Message in
       let result = eval ~private_key {epoch; slot; seed; lock_checkpoint} in
-      let threshold = Threshold.create ~owned_stake ~total_stake in
       Logger.info logger
         !"Checking vrf at %d:%d - owned_stake: %d, total_stake: %d, \
-          evaluation: %{sexp: Output.value}, threshold: %{sexp: Threshold.t}"
+          evaluation: %{sexp: Output.value}"
         (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
         (Balance.to_int owned_stake)
         (Amount.to_int total_stake)
-        result threshold ;
-      Option.some_if (Threshold.satisfies threshold result) result
+        result ;
+      Option.some_if
+        (Threshold.is_satisfied ~my_stake:owned_stake ~total_stake result)
+        result
   end
 
   module Epoch_ledger = struct
@@ -617,14 +629,14 @@ module Make (Inputs : Inputs_intf) :
       ; length= Length.zero }
 
     let update_pair (last_data, curr_data) epoch_length ~prev_epoch ~next_epoch
-        ~curr_slot ~prev_protocol_state_hash ~proposer_vrf_result ~ledger_hash
-        ~total_currency =
+        ~curr_slot ~prev_protocol_state_hash ~proposer_vrf_result
+        ~snarked_ledger_hash ~total_currency =
       let open Epoch_ledger in
       let last_data, curr_data, epoch_length =
         if next_epoch > prev_epoch then
           ( curr_data
           , { seed= Epoch_seed.(of_hash zero)
-            ; ledger= {hash= ledger_hash; total_currency}
+            ; ledger= {hash= snarked_ledger_hash; total_currency}
             ; start_checkpoint= prev_protocol_state_hash
             ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
             ; length= Length.zero }
@@ -700,7 +712,8 @@ module Make (Inputs : Inputs_intf) :
     let genesis =
       { epoch= Epoch.zero
       ; slot= Epoch.Slot.zero
-      ; proposer_vrf_result= List.init 256 ~f:(fun _ -> false) }
+      ; proposer_vrf_result=
+          Sha256.Digest.of_string @@ String.init 256 ~f:(fun _ -> '\000') }
 
     let to_hlist {epoch; slot; proposer_vrf_result} =
       Coda_base.H_list.[epoch; slot; proposer_vrf_result]
@@ -876,7 +889,8 @@ module Make (Inputs : Inputs_intf) :
         ~(consensus_transition_data : Consensus_transition_data.value)
         ~(previous_protocol_state_hash : Coda_base.State_hash.t)
         ~(supply_increase : Currency.Amount.t)
-        ~(ledger_hash : Coda_base.Frozen_ledger_hash.t) : value Or_error.t =
+        ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t) :
+        value Or_error.t =
       let open Or_error.Let_syntax in
       let open Consensus_transition_data in
       let%map total_currency =
@@ -895,7 +909,7 @@ module Make (Inputs : Inputs_intf) :
           ~curr_slot:previous_consensus_state.curr_slot
           ~prev_protocol_state_hash:previous_protocol_state_hash
           ~proposer_vrf_result:consensus_transition_data.proposer_vrf_result
-          ~ledger_hash ~total_currency
+          ~snarked_ledger_hash ~total_currency
       in
       { length= Length.succ previous_consensus_state.length
       ; epoch_length
@@ -964,8 +978,8 @@ module Make (Inputs : Inputs_intf) :
 
   (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
   let generate_transition ~(previous_protocol_state : Protocol_state.value)
-      ~blockchain_state ~local_state ~time ~keypair ~transactions:_ ~ledger
-      ~supply_increase ~logger =
+      ~blockchain_state ~local_state ~time ~keypair ~transactions:_
+      ~snarked_ledger_hash ~supply_increase ~logger =
     let open Consensus_state in
     let open Epoch_data in
     let open Keypair in
@@ -996,10 +1010,7 @@ module Make (Inputs : Inputs_intf) :
            ~consensus_transition_data
            ~previous_protocol_state_hash:
              (Protocol_state.hash previous_protocol_state)
-           ~supply_increase
-           ~ledger_hash:
-             ( Coda_base.Ledger.merkle_root ledger
-             |> Coda_base.Frozen_ledger_hash.of_ledger_hash ))
+           ~supply_increase ~snarked_ledger_hash)
     in
     let protocol_state =
       Protocol_state.create_value
@@ -1125,8 +1136,18 @@ module Make (Inputs : Inputs_intf) :
         `Check_again
           (Epoch.end_time epoch |> Time.to_span_since_epoch |> Time.Span.to_ms)
 
+  let compute_delegators self_pk ledger =
+    let t = Public_key.Compressed.Table.create () in
+    Coda_base.Ledger.fold_until ledger ~init:() ~finish:Fn.id
+      ~f:(fun () acct ->
+        if Public_key.Compressed.equal self_pk acct.delegate then
+          Hashtbl.add t ~key:acct.public_key ~data:acct.balance |> ignore ;
+        Continue () ) ;
+    t
+
   (* TODO *)
-  let lock_transition prev next ~snarked_ledger ~local_state =
+  let lock_transition ?proposer_public_key prev next ~snarked_ledger
+      ~local_state =
     let open Local_state in
     let open Consensus_state in
     if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
@@ -1134,6 +1155,11 @@ module Make (Inputs : Inputs_intf) :
         match snarked_ledger () with Ok l -> l | Error e -> Error.raise e
       in
       local_state.last_epoch_ledger <- local_state.curr_epoch_ledger ;
+      ( match proposer_public_key with
+      | None -> local_state.delegators <- Public_key.Compressed.Table.create ()
+      | Some pk ->
+          Option.iter local_state.last_epoch_ledger ~f:(fun l ->
+              local_state.delegators <- compute_delegators pk l ) ) ;
       local_state.curr_epoch_ledger <- Some ledger )
 
   (* TODO: determine correct definition of genesis state *)
@@ -1146,7 +1172,7 @@ module Make (Inputs : Inputs_intf) :
            ~previous_protocol_state_hash:Protocol_state.(hash negative_one)
            ~consensus_transition_data:Snark_transition.(consensus_data genesis)
            ~supply_increase:Currency.Amount.zero
-           ~ledger_hash:genesis_ledger_hash)
+           ~snarked_ledger_hash:genesis_ledger_hash)
     in
     Protocol_state.create_value
       ~previous_state_hash:Protocol_state.(hash negative_one)

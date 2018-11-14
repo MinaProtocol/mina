@@ -107,7 +107,8 @@ module Base = struct
         -> [`Keep | `Take]
 
       val lock_transition :
-           Consensus_state.value
+           ?proposer_public_key:Public_key.Compressed.t
+        -> Consensus_state.value
         -> Consensus_state.value
         -> snarked_ledger:(unit -> Ledger.t Or_error.t)
         -> local_state:Local_state.t
@@ -142,6 +143,11 @@ module Base = struct
        and type protocol_state_proof := Protocol_state_proof.t
        and type external_transition :=
                   Consensus_mechanism.External_transition.t
+
+    val verify_blockchain :
+         Protocol_state_proof.t
+      -> Consensus_mechanism.Protocol_state.value
+      -> bool Deferred.Or_error.t
   end
 end
 
@@ -197,9 +203,4 @@ module type S = sig
   include Synchronizing.S
 
   module Store : Storage.With_checksum_intf with type location = string
-
-  val verify_blockchain :
-       Protocol_state_proof.t
-    -> Consensus_mechanism.Protocol_state.value
-    -> bool Deferred.Or_error.t
 end

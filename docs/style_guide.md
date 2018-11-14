@@ -171,11 +171,11 @@ val gen :
 ### Typesafe invariants (help with naming this section)
 
 Often times in Coda, we need to perform very important checks on certain pieces of data.
-For example, we need to confirm that the signature is valid on a payment we recieve over the network.
+For example, we need to confirm that the signature is valid on a user-command we receive over the network.
 Such checks can be expensive, so we only want to do them once, but we want to remember that we've done them.
 
 ```ocaml
-(* inside payment.mli *)
+(* inside user_command.mli *)
 
 module With_valid_signature : sig
   type nonrec t = private t [@@deriving sexp, eq]
@@ -186,7 +186,7 @@ end
 val check : t -> With_valid_signature.t option
 ```
 
-Here we define `With_valid_signature` (usage will be `Payment.With_valid_signature.t`) using `type nonrec t = private t` to allow upcasting to a `Payment.t`, but prevent downcasting. The _only_ way to turn a `Payment.t` into a `Payment.With_valid_signature.t` is to `check` it. Now the compiler will catch our mistakes.
+Here we define `With_valid_signature` (usage will be `User_command.With_valid_signature.t`) using `type nonrec t = private t` to allow upcasting to a `User_command.t`, but prevent downcasting. The _only_ way to turn a `User_command.t` into a `User_command.With_valid_signature.t` is to `check` it. Now the compiler will catch our mistakes.
 
 <a name="unit-tests"></a>
 ### Unit Tests

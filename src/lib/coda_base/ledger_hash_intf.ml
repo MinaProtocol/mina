@@ -18,12 +18,16 @@ module type S = sig
        var
     -> Public_key.Compressed.var
     -> is_fee_transfer:Boolean.var
-    -> f:(Account.var -> (Account.var, 's) Checked.t)
+    -> f:(   is_empty_and_writeable:Boolean.var
+          -> Account.var
+          -> (Account.var, 's) Checked.t)
     -> (var, 's) Checked.t
 
   val modify_account_recv :
        var
     -> Public_key.Compressed.var
-    -> f:(Account.var -> (Account.var, 's) Checked.t)
+    -> f:(   is_empty_and_writeable:Boolean.var
+          -> Account.var
+          -> (Account.var, 's) Checked.t)
     -> (var, 's) Checked.t
 end

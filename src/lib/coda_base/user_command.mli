@@ -1,7 +1,7 @@
 open Core
 open Import
 open Snark_params.Tick
-module Payload = Payment_payload
+module Payload = User_command_payload
 
 type ('payload, 'pk, 'signature) t_ =
   {payload: 'payload; sender: 'pk; signature: 'signature}
@@ -57,4 +57,4 @@ val sign : Signature_keypair.t -> Payload.t -> With_valid_signature.t
 
 val check : t -> With_valid_signature.t option
 
-val public_keys : t -> Public_key.Compressed.t list
+val accounts_accessed : t -> Public_key.Compressed.t list

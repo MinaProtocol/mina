@@ -77,18 +77,8 @@ module Svg = struct
       []
 end
 
-let rest_server_port = 8080
-
-let url s = sprintf "http://localhost:%d/%s" rest_server_port s
-
 let get_account _pk on_sucess on_error =
   let url = sprintf !"%s/chain" Web_response.s3_link in
-  (* IF serialization does not work, please try the following code:
-  
-  let url = sprintf !"%s/sample_chain" s3_link in
-
-     Use "%s/chain" in production
-   *)
   Web_response.get url
     (fun s ->
       let chain = Binable.of_string (module Lite_chain) (B64.decode s) in
@@ -861,6 +851,17 @@ let state_html state =
   then div [Style.(render (of_class "animate-opacity o-0"))] contents
   else div [Style.(render (of_class "animate-opacity o-100"))] contents
 
+(* HACK: To get a web worker running for the verifier from s3 and avoid remote origin issues,
+  we have to download the code via a get request, encapsulate it in a Blob object to get 
+  an url link and then feed the url link into verifier*)
+let run_verifier ~f =
+  let verifier_url = sprintf !"%s/verifier_main.bc.js" Web_response.s3_link in
+  Web_response.get verifier_url (fun verifier_code ->
+      let blob = File.blob_from_string verifier_code in
+      let url = Dom_html.window##._URL##createObjectURL blob in
+      let verifier = Verifier.create @@ Js.to_string url in
+      f verifier )
+
 let main ~render ~get_data =
   let state = ref State.init in
   let vdom = ref (render !state) in
@@ -875,33 +876,41 @@ let main ~render ~get_data =
     vdom := new_vdom
   in
   g_update_state_and_vdom := update_state_and_vdom ;
-  let verifier = Verifier.create () in
-  Verifier.set_on_message verifier ~f:(fun resp ->
-      match !state.verification with
-      | `Pending id when id = Verifier.Response.id resp ->
-          update_state_and_vdom
-            { !state with
-              verification= `Complete (Verifier.Response.result resp) }
-      | _ -> () ) ;
-  let latest_completed = ref (-1) in
-  let count = ref 0 in
-  let loop () =
-    let id = !count in
-    incr count ;
-    get_data ~on_result:(fun chain ->
-        if id > !latest_completed then (
-          latest_completed := id ;
-          if State.should_update !state chain then (
-            let new_state = {!state with verification= `Pending id; chain} in
-            update_state_and_vdom new_state ;
-            Verifier.send_verify_message verifier (chain, id) ) ) )
-  in
-  loop () ;
-  ignore
-    (Dom_html.window##setInterval (Js.wrap_callback (fun _ -> loop ())) 5_000.) ;
-  Dom_html.window##setTimeout
-    (Js.wrap_callback (fun _ -> update_state_and_vdom !state))
-    5_000.
+  run_verifier
+    ~f:(fun verifier ->
+      Verifier.set_on_message verifier ~f:(fun resp ->
+          match !state.verification with
+          | `Pending id when id = Verifier.Response.id resp ->
+              update_state_and_vdom
+                { !state with
+                  verification= `Complete (Verifier.Response.result resp) }
+          | _ -> () ) ;
+      let latest_completed = ref (-1) in
+      let count = ref 0 in
+      let loop () =
+        let id = !count in
+        incr count ;
+        get_data ~on_result:(fun chain ->
+            if id > !latest_completed then (
+              latest_completed := id ;
+              if State.should_update !state chain then (
+                let new_state =
+                  {!state with verification= `Pending id; chain}
+                in
+                update_state_and_vdom new_state ;
+                Verifier.send_verify_message verifier (chain, id) ) ) )
+      in
+      loop () ;
+      ignore
+        (Dom_html.window##setInterval
+           (Js.wrap_callback (fun _ -> loop ()))
+           5_000.) ;
+      Dom_html.window##setTimeout
+        (Js.wrap_callback (fun _ -> update_state_and_vdom !state))
+        5_000.
+      |> ignore )
+    (fun e ->
+      printf "Could not retrieve verifier code: %s" (Error.to_string_hum e) )
 
 let _ =
   main

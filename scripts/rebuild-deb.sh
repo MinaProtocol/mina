@@ -3,15 +3,18 @@
 set -euo pipefail
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-
 cd $SCRIPTPATH/../src/_build
 
 PROJECT='coda'
+DATE=$(date +%Y-%m-%d)
+GITHASH=$(git rev-parse --short=8 HEAD)
 
-DATE=`date +%Y-%m-%d`
-GITHASH=`git rev-parse --short=8 HEAD`
-
-VERSION="0.1.${DATE}-${GITHASH}"
+# Identify CI builds by build number
+if [[ -v CIRCLE_BUILD_NUM ]]; then
+    VERSION="0.1.${CIRCLE_BUILD_NUM}-CI"
+else
+    VERSION="0.1.${DATE}-${GITHASH}"
+fi
 BUILDDIR="${PROJECT}_${VERSION}"
 
 mkdir -p ${BUILDDIR}/DEBIAN
@@ -27,13 +30,16 @@ Homepage: https://codaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
 Description: Coda Client and Daemon
  Coda Protocol Client and Daemon
+ Built from ${GITHASH}
 EOF
+
+cat ${BUILDDIR}/DEBIAN/control
 
 mkdir -p ${BUILDDIR}/usr/local/bin
 cp ./default/app/cli/src/coda.exe ${BUILDDIR}/usr/local/bin/coda
 cp ./default/app/logproc/src/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
 
-# verification keys
+# Verification keys
 if [ -d "/var/lib/coda" ]; then
     mkdir -p ${BUILDDIR}/var/lib/coda
     cp /var/lib/coda/*_verification ${BUILDDIR}/var/lib/coda
@@ -44,8 +50,8 @@ else
     fi
 fi
 
-# Bash autocompletion for coda
-# NOTE: We do not list bash-completion as a required package, 
+# Bash autocompletion
+# NOTE: We do not list bash-completion as a required package,
 #       but it needs to be present for this to be effective
 mkdir -p ${BUILDDIR}/etc/bash_completion.d
 cwd=$(pwd)
@@ -54,5 +60,4 @@ env COMMAND_OUTPUT_INSTALLATION_BASH=1 coda  > ${BUILDDIR}/etc/bash_completion.d
 
 # Build the package
 dpkg-deb --build ${BUILDDIR}
-
 ln -s -f ${BUILDDIR}.deb coda.deb

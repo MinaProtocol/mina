@@ -73,10 +73,9 @@ module With_private = struct
       let accounts =
         List.map Source.accounts ~f:(fun {pk; sk; balance} ->
             ( Some (Private_key.of_base64_exn sk)
-            , { Account.public_key= Public_key.Compressed.of_base64_exn pk
-              ; balance= Balance.of_int balance
-              ; receipt_chain_hash= Receipt.Chain_hash.empty
-              ; nonce= Account.Nonce.zero } ) )
+            , Account.create
+                (Public_key.Compressed.of_base64_exn pk)
+                (Balance.of_int balance) ) )
     end)
   end
 end
@@ -93,10 +92,9 @@ module Without_private = struct
       let accounts =
         List.map Source.accounts ~f:(fun {pk; balance} ->
             ( None
-            , { Account.public_key= Public_key.Compressed.of_base64_exn pk
-              ; balance= Balance.of_int balance
-              ; receipt_chain_hash= Receipt.Chain_hash.empty
-              ; nonce= Account.Nonce.zero } ) )
+            , Account.create
+                (Public_key.Compressed.of_base64_exn pk)
+                (Balance.of_int balance) ) )
     end)
   end
 end

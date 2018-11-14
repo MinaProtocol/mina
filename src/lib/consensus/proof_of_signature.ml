@@ -176,7 +176,7 @@ module Make (Inputs : Inputs_intf) :
   let block_interval_ms = Time.Span.to_ms proposal_interval
 
   let generate_transition ~previous_protocol_state ~blockchain_state
-      ~local_state:_ ~time:_ ~keypair ~transactions:_ ~ledger:_
+      ~local_state:_ ~time:_ ~keypair ~transactions:_ ~snarked_ledger_hash:_
       ~supply_increase:_ ~logger:_ =
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
@@ -252,7 +252,9 @@ module Make (Inputs : Inputs_intf) :
     in
     `Propose proposal_time
 
-  let lock_transition _ _ ~snarked_ledger:_ ~local_state:_ = ()
+  let lock_transition ?proposer_public_key:_ _ _ ~snarked_ledger:_
+      ~local_state:_ =
+    ()
 
   let genesis_protocol_state =
     Protocol_state.create_value

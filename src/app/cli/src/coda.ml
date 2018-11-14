@@ -415,11 +415,6 @@ let consensus_mechanism () : (module Consensus_mechanism_intf) =
       | "PROOF_OF_STAKE" -> Some `Proof_of_stake
       | _ -> None )
   in
-  Core.Printf.printf
-    !"consensus mechanism = %s\n%!"
-    ( match mechanism with
-    | `Proof_of_signature -> "PROOF_OF_SIGNATURE"
-    | `Proof_of_stake -> "PROOF_OF_STAKE" ) ;
   match mechanism with
   | `Proof_of_signature ->
       ( module struct

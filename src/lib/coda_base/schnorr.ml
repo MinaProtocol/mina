@@ -2,27 +2,30 @@ open Core_kernel
 open Snark_params
 open Fold_lib
 open Bitstring_lib
+open Sha256_lib
 
 module Message = struct
   module Scalar = Tick.Inner_curve.Scalar
   open Tick
 
-  type t = Payment_payload.t
+  type t = User_command_payload.t
 
   type var = Pedersen.Checked.Section.t
 
   let var_of_payload payload =
     let open Let_syntax in
-    let%bind bs = Payment_payload.var_to_triples payload in
+    let%bind bs = User_command_payload.Checked.to_triples payload in
     Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty bs
       ~start:Hash_prefix.length_in_triples
 
   let hash t ~nonce =
     let d =
       Pedersen.digest_fold Hash_prefix.signature
-        Fold.(Payment_payload.fold t +> group3 ~default:false (of_list nonce))
+        Fold.(
+          User_command_payload.fold t +> group3 ~default:false (of_list nonce))
     in
-    Scalar.of_bits (Sha256_lib.Sha256.digest (Field.unpack d))
+    Scalar.of_bits
+      (Sha256_lib.Sha256.digest_bits (Field.unpack d) |> Sha256.Digest.to_bits)
 
   let () = assert Insecure.signature_hash_function
 
@@ -43,7 +46,7 @@ module Message = struct
                 ~default:Boolean.false_ nonce)
              ~start:
                ( Hash_prefix.length_in_triples
-               + Payment_payload.length_in_triples )
+               + User_command_payload.length_in_triples )
          in
          let d, _ =
            Pedersen.Checked.Section.to_initial_segment_digest final
