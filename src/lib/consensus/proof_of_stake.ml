@@ -1069,7 +1069,6 @@ module Make (Inputs : Inputs_intf) :
         (Time.of_span_since_epoch (Time.Span.of_ms now))
     in
     let next_slot =
-      let open Option.Let_syntax in
       (* When we first enter an epoch, the protocol state may still be a previous
        * epoch. If that is the case, we need to select the staged vrf inputs
        * instead of the last vrf inputs, since if the protocol state were actually
