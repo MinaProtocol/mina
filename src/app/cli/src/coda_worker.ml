@@ -272,6 +272,7 @@ module Make (Kernel : Kernel_intf) = struct
         in
         let coda_prove_receipt (proving_receipt, resulting_receipt) =
           Run.prove_receipt coda ~proving_receipt ~resulting_receipt
+          |> Deferred.Or_error.ok_exn
         in
         let coda_strongest_ledgers () =
           let r, w = Linear_pipe.create () in

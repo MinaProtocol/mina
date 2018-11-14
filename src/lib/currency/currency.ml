@@ -547,12 +547,17 @@ end
 
 let currency_length = 64
 
-module Fee =
-  Make
-    (Unsigned_extended.UInt64)
-    (struct
-      let length = currency_length
-    end)
+module Fee = struct
+  module T =
+    Make
+      (Unsigned_extended.UInt64)
+      (struct
+        let length = currency_length
+      end)
+
+  include T
+  include Jsonable.Make_from_int (T)
+end
 
 module Amount = struct
   module T =
@@ -570,6 +575,8 @@ module Amount = struct
       with type var = T.var
        and module Signed = T.Signed
        and module Checked := T.Checked )
+
+  include Jsonable.Make_from_int (T)
 
   let of_fee (fee : Fee.t) : t = fee
 

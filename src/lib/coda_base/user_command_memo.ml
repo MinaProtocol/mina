@@ -12,3 +12,11 @@ let create_exn s =
   else Sha256.digest_string s
 
 let dummy = create_exn ""
+
+include Jsonable.Make_from_string (struct
+  type nonrec t = t
+
+  let to_string memo = to_string memo |> B64.encode
+
+  let of_string = Fn.compose of_string B64.decode
+end)

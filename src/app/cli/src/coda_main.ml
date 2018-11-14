@@ -1058,16 +1058,15 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         schedule_payment log t txn account_opt )
 
   let prove_receipt t ~proving_receipt ~resulting_receipt :
-      (Receipt.Chain_hash.t * User_command.t) list Deferred.t =
+      (Receipt.Chain_hash.t * User_command.t) list Deferred.Or_error.t =
     let receipt_chain_database = receipt_chain_database t in
     (* TODO: since we are making so many reads to `receipt_chain_database`, 
     reads should be async to not get IO-blocked. See #1125 *)
     let result =
       Receipt_chain_database.prove receipt_chain_database ~proving_receipt
         ~resulting_receipt
-      |> Or_error.ok_exn
     in
-    result |> Deferred.return
+    Deferred.return result
 
   let get_nonce t (addr : Public_key.Compressed.t) =
     let open Option.Let_syntax in
@@ -1164,11 +1163,29 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
     let client_impls =
-      [ Rpc.Rpc.implement Client_lib.Send_user_commands.rpc (fun () ts ->
+      [ Rpc.Rpc.implement Client_lib.Send_user_command.rpc (fun () tx ->
+            send_payment log coda tx )
+      ; Rpc.Rpc.implement Client_lib.Send_user_commands.rpc (fun () ts ->
             schedule_payments log coda ts ;
             Deferred.unit )
       ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
             return (get_balance coda pk) )
+      ; Rpc.Rpc.implement Client_lib.Prove_receipt.rpc
+          (fun () (proving_receipt, pk) ->
+            let open Deferred.Or_error.Let_syntax in
+            let%bind account =
+              get_account coda pk
+              |> Result.of_option
+                   ~error:
+                     (Error.of_string
+                        (sprintf
+                           !"Could not find account of public key %{sexp: \
+                             Public_key.Compressed.t}"
+                           pk))
+              |> Deferred.return
+            in
+            prove_receipt coda ~proving_receipt
+              ~resulting_receipt:(Account.receipt_chain_hash account) )
       ; Rpc.Rpc.implement Client_lib.Get_public_keys_with_balances.rpc
           (fun () () -> return (get_keys_with_balances coda) )
       ; Rpc.Rpc.implement Client_lib.Get_public_keys.rpc (fun () () ->

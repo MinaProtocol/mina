@@ -90,6 +90,17 @@ module Daemon_cli = struct
     <*> Flag.port <*> arg_flag
 end
 
+module Args = struct
+  open Command.Param
+
+  let t2 = map2 ~f:(fun arg1 arg2 -> (arg1, arg2))
+
+  let t3 = map3 ~f:(fun arg1 arg2 arg3 -> (arg1, arg2, arg3))
+
+  let t4 arg1 arg2 arg3 arg4 =
+    return (fun a b c d -> (a, b, c, d)) <*> arg1 <*> arg2 <*> arg3 <*> arg4
+end
+
 let get_balance =
   let open Command.Param in
   let open Deferred.Let_syntax in
@@ -130,6 +141,31 @@ let get_public_keys =
          else
            dispatch Get_public_keys.rpc () port
            >>| print (module String_list_formatter) json ))
+
+let prove_payment =
+  let open Deferred.Let_syntax in
+  let open Client_lib in
+  let open Command.Param in
+  let receipt_hash_flag =
+    flag "receipt-chain-hash"
+      ~doc:
+        "RECEIPTHASH Receipt-chain-hash of the payment that you want to prove"
+      (required receipt_chain_hash)
+  in
+  let address_flag =
+    flag "address" ~doc:"PUBLICKEY Public-key address of sender"
+      (required public_key)
+  in
+  Command.async ~summary:"Generate a proof of a payment as a merkle list"
+    (Daemon_cli.init (Args.t2 receipt_hash_flag address_flag)
+       ~f:(fun port (receipt_chain_hash, pk) ->
+         match%map
+           dispatch Prove_receipt.rpc
+             (receipt_chain_hash, Public_key.compress pk)
+             port
+         with
+         | Ok result -> print (module Prove_receipt.Output) true result
+         | Error e -> eprintf "%s" (Error.to_string_hum e) ))
 
 let get_nonce addr port =
   let open Deferred.Let_syntax in
@@ -295,13 +331,10 @@ let send_payment =
     flag "amount" ~doc:"VALUE Payment amount you want to send"
       (required txn_amount)
   in
-  let flag =
-    let open Command.Param in
-    return (fun a b c d -> (a, b, c, d))
-    <*> address_flag <*> privkey_read_path_flag <*> fee_flag <*> amount_flag
-  in
   Command.async ~summary:"Send payment to an address"
-    (Daemon_cli.init flag ~f:(fun port (address, from_account, fee, amount) ->
+    (Daemon_cli.init
+       (Args.t4 address_flag privkey_read_path_flag fee_flag amount_flag)
+       ~f:(fun port (address, from_account, fee, amount) ->
          let open Deferred.Let_syntax in
          let%bind sender_kp = read_keypair_exn' from_account in
          let%bind nonce = get_nonce_exn sender_kp.public_key port in
@@ -312,11 +345,16 @@ let send_payment =
              ~memo:User_command_memo.dummy
              ~body:(Payment {receiver= receiver_compressed; amount})
          in
-         let txn = User_command.sign sender_kp payload in
-         dispatch_with_message Client_lib.Send_user_commands.rpc
-           [(txn :> User_command.t)]
+         let payment = User_command.sign sender_kp payload in
+         dispatch_with_message Client_lib.Send_user_command.rpc
+           (payment :> User_command.t)
            port
-           ~success:(fun () -> "Successfully enqueued payment in pool")
+           ~success:(fun receipt ->
+             sprintf
+               !"Successfully enqueued payment in pool.\n\
+                 Receipt chain hash of the payment:\n\
+                 %{sexp:Receipt.Chain_hash.t}"
+               receipt )
            ~error:(fun e ->
              sprintf "Failed to send payment %s" (Error.to_string_hum e) ) ))
 
@@ -359,7 +397,7 @@ let generate_keypair =
     handle_exception_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
-    let kp = Keypair.create () in
+    let kp = Genesis_ledger.largest_account_keypair_exn () in
     let%bind () =
       write_keypair_exn kp ~privkey_path
         ~password:(lazy (prompt_password "Password for new private key file: "))
@@ -389,6 +427,7 @@ let command =
   Command.group ~summary:"Lightweight client process"
     [ ("get-balance", get_balance)
     ; ("get-public-keys", get_public_keys)
+    ; ("prove-payment", prove_payment)
     ; ("get-nonce", get_nonce_cmd)
     ; ("send-payment", send_payment)
     ; ("batch-send-payments", batch_send_payments)

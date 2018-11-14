@@ -83,6 +83,10 @@ let public_key =
       | None -> failwith "Invalid key"
       | Some pk' -> pk' )
 
+let receipt_chain_hash =
+  Command.Arg_type.create (fun s ->
+      Sexp.of_string s |> [%of_sexp: Coda_base.Receipt.Chain_hash.t] )
+
 let peer : Host_and_port.t Command.Arg_type.t =
   Command.Arg_type.create (fun s -> Host_and_port.of_string s)
 

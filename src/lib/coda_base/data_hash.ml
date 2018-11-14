@@ -16,6 +16,8 @@ module type Basic = sig
 
   val to_bytes : t -> string
 
+  val of_bytes : string -> t
+
   val length_in_triples : int
 
   val ( = ) : t -> t -> bool
@@ -88,6 +90,9 @@ struct
 
   let to_bytes t =
     Fold_lib.Fold.bool_t_to_string (Fold.of_list (Field.unpack t))
+
+  let of_bytes buf =
+    Field.project (Fold.to_list (Fold_lib.Fold.string_bits buf))
 
   let length_in_bits = M.length_in_bits
 
