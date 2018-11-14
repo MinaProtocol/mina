@@ -18,17 +18,21 @@ module Make (Inputs : Inputs.Base.S) :
 
     open With_hash
 
-    let equal {hash=a;_} {hash=b;_} = State_hash.equal a b
+    let equal {hash= a; _} {hash= b; _} = State_hash.equal a b
 
-    let hash {hash;_} = String.hash (State_hash.to_bytes hash)
-    let hash_fold_t state {hash;_} = String.hash_fold_t state (State_hash.to_bytes hash)
+    let hash {hash; _} = String.hash (State_hash.to_bytes hash)
 
-    let id {hash; _} = "\"" ^ Base64.encode_string (State_hash.to_bytes hash) ^ "\""
+    let hash_fold_t state {hash; _} =
+      String.hash_fold_t state (State_hash.to_bytes hash)
+
+    let id {hash; _} =
+      "\"" ^ Base64.encode_string (State_hash.to_bytes hash) ^ "\""
 
     let to_string_record t =
       Printf.sprintf "{%s|%s}"
         (Base64.encode_string (State_hash.to_bytes t.hash))
-        (Protocol_state.to_string_record (External_transition.protocol_state t.data))
+        (Protocol_state.to_string_record
+           (External_transition.protocol_state t.data))
   end
 
   module Transition_tree = Ktree.Make (Transition) (Security)
@@ -110,11 +114,13 @@ module Make (Inputs : Inputs.Base.S) :
     assert_state_valid t ;
     let t' = List.fold changes ~init:t ~f:apply in
     try assert_state_valid t' ; t' with exn ->
-      Printf.printf !"*** GOT FATAL EXCEPTION WHILE APPLYING CHANGES TO TRANSITION LOGIC STATE IN LEDGER BUILDER CONTROLLER\n";
+      Printf.printf
+        !"*** GOT FATAL EXCEPTION WHILE APPLYING CHANGES TO TRANSITION LOGIC \
+          STATE IN LEDGER BUILDER CONTROLLER\n" ;
       Option.iter t'.ktree ~f:(fun ktree ->
-        Transition_tree.Graph.output_graph Out_channel.stdout
-          (Transition_tree.to_graph ktree));
-      Printf.printf !"\n%!";
+          Transition_tree.Graph.output_graph Out_channel.stdout
+            (Transition_tree.to_graph ktree) ) ;
+      Printf.printf !"\n%!" ;
       raise exn
 
   let create ~consensus_local_state genesis_heavy =

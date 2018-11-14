@@ -167,6 +167,7 @@ module Make (Inputs : Inputs_intf) :
       include Segment_id
 
       let ( <= ) x y = UInt32.compare x y <= 0
+
       let ( < ) x y = UInt32.compare x y < 0
 
       let interval = Inputs.slot_interval
@@ -175,10 +176,10 @@ module Make (Inputs : Inputs_intf) :
         UInt32.of_int
           ( Inputs.probable_slots_per_transition_count
           * Inputs.unforkable_transition_count )
- 
-      let after_lock_checkpoint (slot : t) = 
+
+      let after_lock_checkpoint (slot : t) =
         let open UInt32.Infix in
-        slot < (unforkable_count * UInt32.of_int 2)
+        slot < unforkable_count * UInt32.of_int 2
 
       let in_seed_update_range (slot : t) =
         let open UInt32.Infix in
@@ -433,11 +434,12 @@ module Make (Inputs : Inputs_intf) :
         !"Checking vrf at %d:%d - owned_stake: %d, total_stake: %d, \
           evaluation: %{sexp: Output.value}"
          *)
-        !"Checking vrf at %d:%d - owned_stake: %d, total_stake: %d, evaluation: %{sexp: Bignum_bigint.t}"
+        !"Checking vrf at %d:%d - owned_stake: %d, total_stake: %d, \
+          evaluation: %{sexp: Bignum_bigint.t}"
         (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
         (Balance.to_int owned_stake)
         (Amount.to_int total_stake)
-        (Bignum_bigint.of_bit_fold_lsb (Sha256.Digest.fold_bits result));
+        (Bignum_bigint.of_bit_fold_lsb (Sha256.Digest.fold_bits result)) ;
       Option.some_if
         (Threshold.is_satisfied ~my_stake:owned_stake ~total_stake result)
         result
@@ -963,7 +965,8 @@ module Make (Inputs : Inputs_intf) :
     let to_lite = None
 
     let to_string_record t =
-      Printf.sprintf "{length|%s}|{epoch_length|%s}|{curr_epoch|%s}|{curr_slot|%s}|{total_currency|%s}"
+      Printf.sprintf
+        "{length|%s}|{epoch_length|%s}|{curr_epoch|%s}|{curr_slot|%s}|{total_currency|%s}"
         (Length.to_string t.length)
         (Length.to_string t.epoch_length)
         (Segment_id.to_string t.curr_epoch)
@@ -1045,80 +1048,100 @@ module Make (Inputs : Inputs_intf) :
     let open Consensus_state in
     let open Epoch_data in
     let logger = Logger.child logger "proof_of_stake" in
-    let string_of_option = function
-    | `Take -> "Take"
-    | `Keep -> "Keep"
+    let string_of_option = function `Take -> "Take" | `Keep -> "Keep" in
+    let log_result option msg =
+      Logger.debug logger "RESULT: %s -- %s" (string_of_option option) msg
     in
-    let log_result option msg = Logger.debug logger "RESULT: %s -- %s" (string_of_option option) msg in
     let log_choice ~precondition_msg ~choice_msg option =
-      let choice_msg = match option with
-      | `Take -> choice_msg
-      | `Keep -> Printf.sprintf "not (%s)" choice_msg
+      let choice_msg =
+        match option with
+        | `Take -> choice_msg
+        | `Keep -> Printf.sprintf "not (%s)" choice_msg
       in
       let msg = Printf.sprintf "(%s) && (%s)" precondition_msg choice_msg in
       log_result option msg
     in
-
-    Logger.info logger "SELECTING BEST CONSENSUS STATE";
-    Logger.info logger !"old consensus state: %{sexp:Consensus_state.value}" old_state;
-    Logger.info logger !"new consensus state: %{sexp:Consensus_state.value}" new_state;
-
+    Logger.info logger "SELECTING BEST CONSENSUS STATE" ;
+    Logger.info logger
+      !"old consensus state: %{sexp:Consensus_state.value}"
+      old_state ;
+    Logger.info logger
+      !"new consensus state: %{sexp:Consensus_state.value}"
+      new_state ;
     (* TODO: update time_received check and `Keep when it is not met *)
     if
       not
         (time_in_epoch_slot new_state
            Time.(of_span_since_epoch (Span.of_ms time_received)))
     then Logger.error logger "received a transition outside of it's slot time" ;
-
     (* TODO: add fork_before_checkpoint check *)
     (* Each branch contains a precondition predicate and a choice predicate,
      * which takes the new state when true. Each predicate is also decorated
      * with a string description, used for debugging messages *)
-    let (=) = Coda_base.State_hash.equal in
-    let (<) a b = Length.compare a b < 0 in
+    let ( = ) = Coda_base.State_hash.equal in
+    let ( < ) a b = Length.compare a b < 0 in
     let branches =
-      [ ( ( lazy (old_state.last_epoch_data.lock_checkpoint = new_state.last_epoch_data.lock_checkpoint)
+      [ ( ( lazy
+              ( old_state.last_epoch_data.lock_checkpoint
+              = new_state.last_epoch_data.lock_checkpoint )
           , "last epoch lock checkpoints are equal" )
         , ( lazy (old_state.length < new_state.length)
           , "new state is longer than old state" ) )
-
-      ; ( ( lazy (old_state.last_epoch_data.start_checkpoint = new_state.last_epoch_data.start_checkpoint)
+      ; ( ( lazy
+              ( old_state.last_epoch_data.start_checkpoint
+              = new_state.last_epoch_data.start_checkpoint )
           , "last epoch start checkpoints are equal" )
-        , ( lazy (old_state.last_epoch_data.length < new_state.last_epoch_data.length)
+        , ( lazy
+              ( old_state.last_epoch_data.length
+              < new_state.last_epoch_data.length )
           , "new state last epoch is longer than old state last epoch" ) )
-
-      (* these two could be condensed into one entry *)
-      ; ( ( lazy (old_state.curr_epoch_data.lock_checkpoint = new_state.last_epoch_data.lock_checkpoint)
-          , "new state last epoch lock checkpoint is equal to old state current epoch lock checkpoint" )
+        (* these two could be condensed into one entry *)
+      ; ( ( lazy
+              ( old_state.curr_epoch_data.lock_checkpoint
+              = new_state.last_epoch_data.lock_checkpoint )
+          , "new state last epoch lock checkpoint is equal to old state \
+             current epoch lock checkpoint" )
         , ( lazy (old_state.length < new_state.length)
           , "new state is longer than old state" ) )
-      ; ( ( lazy (old_state.last_epoch_data.lock_checkpoint = new_state.curr_epoch_data.lock_checkpoint)
-          , "new state current epoch lock checkpoint is equal to old state last epoch lock checkpoint" )
+      ; ( ( lazy
+              ( old_state.last_epoch_data.lock_checkpoint
+              = new_state.curr_epoch_data.lock_checkpoint )
+          , "new state current epoch lock checkpoint is equal to old state \
+             last epoch lock checkpoint" )
         , ( lazy (old_state.length < new_state.length)
           , "new state is longer than old state" ) )
-
-      ; ( ( lazy (old_state.curr_epoch_data.start_checkpoint = new_state.last_epoch_data.start_checkpoint)
-          , "new state last epoch start checkpoint is equal to old state current epoch start checkpoint" )
-        , ( lazy (old_state.curr_epoch_data.length < new_state.last_epoch_data.length)
+      ; ( ( lazy
+              ( old_state.curr_epoch_data.start_checkpoint
+              = new_state.last_epoch_data.start_checkpoint )
+          , "new state last epoch start checkpoint is equal to old state \
+             current epoch start checkpoint" )
+        , ( lazy
+              ( old_state.curr_epoch_data.length
+              < new_state.last_epoch_data.length )
           , "new state last epoch is longer than old state current epoch" ) )
-      ; ( ( lazy (old_state.last_epoch_data.start_checkpoint = new_state.curr_epoch_data.start_checkpoint)
-          , "new state current epoch start checkpoint is equal to old state last epoch start checkpoint" )
-        , ( lazy (old_state.last_epoch_data.length < new_state.curr_epoch_data.length)
-          , "new state current epoch is longer than old state last epoch" ) ) ]
+      ; ( ( lazy
+              ( old_state.last_epoch_data.start_checkpoint
+              = new_state.curr_epoch_data.start_checkpoint )
+          , "new state current epoch start checkpoint is equal to old state \
+             last epoch start checkpoint" )
+        , ( lazy
+              ( old_state.last_epoch_data.length
+              < new_state.curr_epoch_data.length )
+          , "new state current epoch is longer than old state last epoch" ) )
+      ]
     in
-
     match
-      List.find_map branches ~f:(fun ((precondition, precondition_msg), (choice, choice_msg)) ->
-        if Lazy.force precondition then
-          let option = if Lazy.force choice then `Take else `Keep in
-          log_choice ~precondition_msg ~choice_msg option;
-          Some option
-        else
-          None)
+      List.find_map branches
+        ~f:(fun ((precondition, precondition_msg), (choice, choice_msg)) ->
+          if Lazy.force precondition then (
+            let option = if Lazy.force choice then `Take else `Keep in
+            log_choice ~precondition_msg ~choice_msg option ;
+            Some option )
+          else None )
     with
     | Some option -> option
     | None ->
-        log_result `Keep "no predicates were matched";
+        log_result `Keep "no predicates were matched" ;
         `Keep
 
   let next_proposal now (state : Consensus_state.value) ~local_state ~keypair

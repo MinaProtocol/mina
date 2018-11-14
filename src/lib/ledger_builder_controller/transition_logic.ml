@@ -248,8 +248,9 @@ module Make (Inputs : Inputs_intf) :
           in
           let work =
             let locked_tip = With_hash.map locked_tip ~f:Tip.copy in
-            let longest_branch_tip = With_hash.map longest_branch_tip ~f:Tip.copy in
-
+            let longest_branch_tip =
+              With_hash.map longest_branch_tip ~f:Tip.copy
+            in
             (* Adjust the locked_ledger if necessary *)
             let%bind locked_tip =
               if transition_is_parent_of ~child:new_head ~parent:old_head then
@@ -265,8 +266,7 @@ module Make (Inputs : Inputs_intf) :
               with
               | None -> (locked_tip, new_best_path)
               | Some (i, _) ->
-                  ( longest_branch_tip
-                  , Path.drop new_best_path (i + 1) )
+                  (longest_branch_tip, Path.drop new_best_path (i + 1))
             in
             trace_event "step over path start" ;
             let last_transition = List.last_exn path.Path.path in

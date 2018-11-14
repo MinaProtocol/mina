@@ -169,7 +169,8 @@ end) : S = struct
 
   let to_string_record t =
     Printf.sprintf "{ledger_builder_hash|%s}|{ledger_hash|%s}|{timestamp|%s}"
-      (Base64.encode_string (Ledger_builder_hash.to_string t.ledger_builder_hash))
+      (Base64.encode_string
+         (Ledger_builder_hash.to_string t.ledger_builder_hash))
       (Base64.encode_string (Frozen_ledger_hash.to_bytes t.ledger_hash))
       (Time.to_string (Block_time.to_time t.timestamp))
 
