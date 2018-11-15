@@ -293,7 +293,7 @@ struct
 
   module Transaction = struct
     module T = struct
-      type t = Transaction_snark.Transition.t =
+      type t = Coda_base.Transaction.t =
         | User_command of User_command.With_valid_signature.t
         | Fee_transfer of Fee_transfer.t
         | Coinbase of Coinbase.t
@@ -307,8 +307,8 @@ struct
     include T
 
     include (
-      Transaction_snark.Transition :
-        module type of Transaction_snark.Transition with type t := t )
+      Coda_base.Transaction :
+        module type of Coda_base.Transaction with type t := t )
   end
 
   module Ledger = Ledger
@@ -995,7 +995,13 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let remainder =
       let open Option.Let_syntax in
       let%bind balance = get_balance t (Public_key.compress txn.sender)
-      and cost = User_command.Payload.sender_cost txn.payload |> Or_error.ok in
+      and cost =
+        let fee = txn.payload.common.fee in
+        match txn.payload.body with
+        | Stake_delegation (Set_delegate _) ->
+            Some (Currency.Amount.of_fee fee)
+        | Payment {amount; _} -> Currency.Amount.add_fee amount fee
+      in
       Currency.Balance.sub_amount balance cost
     in
     Option.is_some remainder

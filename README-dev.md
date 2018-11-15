@@ -74,6 +74,22 @@ let g:syntastic_ocaml_checkers=['merlin']
   * [OCaml and Reason IDE](https://marketplace.visualstudio.com/items?itemName=freebroccolo.reasonml)
   * [Dune](https://marketplace.visualstudio.com/items?itemName=maelvalais.dune)
 
+* If you use emacs, besides the `opam` packages mentioned above, also install `tuareg`, and add the following to your .emacs file:
+```lisp
+(let ((opam-share (ignore-errors (car (process-lines "opam" "config" "var" "share")))))
+  (when (and opam-share (file-directory-p opam-share))
+    ;; Register Merlin
+    (add-to-list 'load-path (expand-file-name "emacs/site-lisp" opam-share))
+    (load "tuareg-site-file")
+    (autoload 'merlin-mode "merlin" nil t nil)
+    ;; Automatically start it in OCaml buffers
+    (add-hook 'tuareg-mode-hook 'merlin-mode t)
+    (add-hook 'caml-mode-hook 'merlin-mode t)))
+```
+
+Emacs has a built-in autocomplete, via `M-x completion-at-point`, or simply `M-tab`. There are other
+Emacs autocompletion packages; see [Emacs from scratch] (https://github.com/ocaml/merlin/wiki/emacs-from-scratch).
+
 ## Using the makefile
 
 The makefile contains phony targets for all the common tasks that need to be done.
