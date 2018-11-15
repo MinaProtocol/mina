@@ -19,6 +19,14 @@ let concat_map (t : 'a t) ~(f : 'a -> 'b t) : 'b t =
       (fun ~init ~f:update ->
         t.fold ~init ~f:(fun acc x -> (f x).fold ~init:acc ~f:update) ) }
 
+let init n ~f:ith_elt =
+  { fold=
+      (fun ~init ~f ->
+        let rec go i acc =
+          if i = n then acc else go (i + 1) (f acc (ith_elt i))
+        in
+        go 0 init ) }
+
 include Monad.Make (struct
   type nonrec 'a t = 'a t
 

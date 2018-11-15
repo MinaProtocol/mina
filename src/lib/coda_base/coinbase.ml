@@ -38,7 +38,8 @@ let supply_increase {proposer= _; amount; fee_transfer} =
   | None -> Ok amount
   | Some (_, fee) ->
       Currency.Amount.sub amount (Currency.Amount.of_fee fee)
-      |> Option.value_map ~f:Or_error.return
+      |> Option.value_map
+           ~f:(fun _ -> Ok amount)
            ~default:(Or_error.error_string "Coinbase underflow")
 
 let fee_excess t =
