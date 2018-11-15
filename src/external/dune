@@ -1,0 +1,4 @@
+;; code in these subdirectories may have sources
+;;  containing dune files for building packages, which
+;;  we don't want to use when building Coda
+(ignored_subdirs (ocaml-dune))

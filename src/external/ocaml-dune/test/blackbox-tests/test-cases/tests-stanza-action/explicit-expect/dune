@@ -1,0 +1,4 @@
+(tests
+ (names my_test)
+ (action (run %{test} arg1 arg2 arg3))
+)

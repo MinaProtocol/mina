@@ -1,0 +1,376 @@
+(* -*- tuareg -*- *)
+open! Stdune;;
+Path.set_root (Path.External.cwd ());
+Path.set_build_dir (Path.Kind.of_string "_build");
+
+Printexc.record_backtrace false;;
+
+let r = Path.(relative root);;
+let e = Path.of_filename_relative_to_initial_cwd;;
+
+#install_printer Path.pp_debug;;
+
+let pp_path_local fmt l =
+  Format.pp_print_string fmt (Path.Local.to_string l);;
+
+#install_printer pp_path_local;;
+
+Path.(let p = relative root "foo" in descendant p ~of_:p)
+[%%expect{|
+- : unit = ()
+val r : string -> Path.t = <fun>
+val e : string -> Path.t = <fun>
+val pp_path_local : Format.formatter -> Path.Local.t -> unit = <fun>
+- : Path.t option = Some (In_source_tree ".")
+|}]
+
+(* different strings but same length *)
+Path.(descendant (relative root "foo") ~of_:(relative root "bar"))
+[%%expect{|
+- : Path.t option = None
+|}]
+
+Path.(is_descendant (r "foo") ~of_:(r "foo"))
+[%%expect{|
+- : bool = true
+|}]
+
+Path.(is_descendant (r "foo") ~of_:(r "foo/"))
+[%%expect{|
+- : bool = true
+|}]
+
+Path.(is_descendant (r "foo/") ~of_:(r "foo"))
+[%%expect{|
+- : bool = true
+|}]
+
+Path.(is_descendant (r "foo") ~of_:(r "bar"))
+[%%expect{|
+- : bool = false
+|}]
+
+Path.(is_descendant (r "foo") ~of_:(r "bar/"))
+[%%expect{|
+- : bool = false
+|}]
+
+Path.(is_descendant (r "foo/") ~of_:(r "bar"))
+[%%expect{|
+- : bool = false
+|}]
+
+Path.(is_descendant (r "glob/foo") ~of_:(r "glob"))
+[%%expect{|
+- : bool = true
+|}]
+
+Path.(is_descendant (r "glob/foo") ~of_:(r "glob/"))
+[%%expect{|
+- : bool = true
+|}]
+
+Path.(is_descendant (e "/foo/bar") ~of_:(e "/foo"))
+[%%expect{|
+- : bool = false
+|}]
+
+Path.(is_descendant (e "/foo/bar") ~of_:(e "/foo/bar"))
+[%%expect{|
+- : bool = false
+|}]
+
+Path.(is_descendant (e "/foo/bar") ~of_:(e "/foo/bar/"))
+[%%expect{|
+- : bool = false
+|}]
+
+Path.(is_descendant (e "/foo/bar/") ~of_:(e "/foo/bar"))
+[%%expect{|
+- : bool = false
+|}]
+
+Path.(is_descendant (e "/foo/bar") ~of_:(e "/"))
+[%%expect{|
+- : bool = false
+|}]
+
+Path.(descendant (r "foo") ~of_:(r "foo/"))
+[%%expect{|
+- : Path.t option = Some (In_source_tree ".")
+|}]
+
+Path.(descendant (r "foo/") ~of_:(r "foo"))
+[%%expect{|
+- : Path.t option = Some (In_source_tree ".")
+|}]
+
+Path.(descendant (r "foo/bar") ~of_:(r "foo"))
+[%%expect{|
+- : Path.t option = Some (In_source_tree "bar")
+|}]
+
+Path.(descendant Path.root ~of_:(r "foo"))
+[%%expect{|
+- : Path.t option = None
+|}]
+
+Path.(descendant Path.root ~of_:Path.root)
+[%%expect{|
+- : Path.t option = Some (In_source_tree ".")
+|}]
+
+Path.(descendant (r "foo") ~of_:Path.root)
+[%%expect{|
+- : Path.t option = Some (In_source_tree "foo")
+|}]
+
+Path.(descendant (relative build_dir "foo") ~of_:root)
+[%%expect{|
+- : Path.t option = Some (In_source_tree "_build/foo")
+|}]
+
+Path.(descendant (relative build_dir "foo") ~of_:(absolute "/foo/bar"))
+[%%expect{|
+File "test/unit-tests/path.mlt", line 133, characters 50-58:
+Error: Unbound value absolute
+|}]
+
+Path.(descendant (relative build_dir "foo/bar") ~of_:build_dir)
+[%%expect{|
+- : Path.t option = Some (In_source_tree "foo/bar")
+|}]
+
+Path.(descendant (relative build_dir "foo/bar") ~of_:(relative build_dir "foo"))
+[%%expect{|
+- : Path.t option = Some (In_source_tree "bar")
+|}]
+
+Path.(descendant (relative build_dir "foo/bar") ~of_:(relative build_dir "foo"))
+[%%expect{|
+- : Path.t option = Some (In_source_tree "bar")
+|}]
+
+Path.(descendant (absolute "/foo/bar") ~of_:(absolute "/foo"))
+[%%expect{|
+File "test/unit-tests/path.mlt", line 154, characters 18-26:
+Error: Unbound value absolute
+|}]
+
+Path.explode (Path.of_string "a/b/c");
+[%%expect{|
+- : string list option = Some ["a"; "b"; "c"]
+|}]
+
+Path.explode (Path.of_string "a/b");
+[%%expect{|
+- : string list option = Some ["a"; "b"]
+|}]
+
+Path.explode (Path.of_string "a");
+[%%expect{|
+- : string list option = Some ["a"]
+|}]
+
+Path.explode (Path.of_string "");
+[%%expect{|
+- : string list option = Some []
+|}]
+
+Path.reach (Path.of_string "/foo/baz") ~from:(Path.of_string "/foo/bar");
+[%%expect{|
+- : string = "/foo/baz"
+|}]
+
+Path.reach (Path.of_string "/foo/bar") ~from:(Path.of_string "baz")
+[%%expect{|
+- : string = "/foo/bar"
+|}]
+
+Path.reach (Path.of_string "bar/foo") ~from:(Path.of_string "bar/baz/y")
+[%%expect{|
+- : string = "../../foo"
+|}]
+
+Path.relative (Path.of_string "relative") "/absolute/path"
+[%%expect{|
+- : Path.t = (External "/absolute/path")
+|}]
+
+Path.relative (Path.of_string "/abs1") "/abs2"
+[%%expect{|
+- : Path.t = (External "/abs2")
+|}]
+
+Path.relative (Path.of_string "/abs1") ""
+[%%expect{|
+- : Path.t = (External "/abs1")
+|}]
+
+Path.relative Path.root "/absolute/path"
+[%%expect{|
+- : Path.t = (External "/absolute/path")
+|}]
+
+e "/absolute/path"
+[%%expect{|
+- : Path.t = (External "/absolute/path")
+|}]
+
+Path.is_managed (e "relative/path")
+[%%expect{|
+- : bool = false
+|}]
+
+Path.insert_after_build_dir_exn Path.root "foobar"
+[%%expect{|
+Exception:
+Code_error
+ (List
+   [Atom "Path.insert_after_build_dir_exn";
+    List [Atom "path"; List [Atom "In_source_tree"; Atom "."]];
+    List [Atom "insert"; Atom "foobar"]]).
+|}]
+
+Path.insert_after_build_dir_exn Path.build_dir "foobar"
+[%%expect{|
+- : Path.t = (In_build_dir "foobar")
+|}]
+
+Path.insert_after_build_dir_exn (Path.relative Path.build_dir "qux") "foobar"
+[%%expect{|
+- : Path.t = (In_build_dir "foobar/qux")
+|}]
+
+Path.append Path.build_dir (Path.relative Path.root "foo")
+[%%expect{|
+- : Path.t = (In_build_dir "foo")
+|}]
+
+Path.append Path.build_dir (Path.relative Path.build_dir "foo")
+[%%expect{|
+Exception:
+Code_error
+ (List
+   [Atom "Path.append called with directory that's not in the source tree";
+    List [Atom "a"; List [Atom "In_build_dir"; Atom "."]];
+    List [Atom "b"; List [Atom "In_build_dir"; Atom "foo"]]]).
+|}]
+
+Path.append Path.root (Path.relative Path.build_dir "foo")
+[%%expect{|
+Exception:
+Code_error
+ (List
+   [Atom "Path.append called with directory that's not in the source tree";
+    List [Atom "a"; List [Atom "In_source_tree"; Atom "."]];
+    List [Atom "b"; List [Atom "In_build_dir"; Atom "foo"]]]).
+|}]
+
+Path.append Path.root (Path.relative Path.root "foo")
+[%%expect{|
+- : Path.t = (In_source_tree "foo")
+|}]
+
+Path.append (Path.of_string "/root") (Path.relative Path.root "foo")
+[%%expect{|
+- : Path.t = (External "/root/foo")
+|}]
+
+Path.append (Path.of_string "/root") (Path.relative Path.build_dir "foo")
+[%%expect{|
+Exception:
+Code_error
+ (List
+   [Atom "Path.append called with directory that's not in the source tree";
+    List [Atom "a"; List [Atom "External"; Atom "/root"]];
+    List [Atom "b"; List [Atom "In_build_dir"; Atom "foo"]]]).
+|}]
+
+Path.rm_rf (Path.of_string "/does/not/exist/foo/bar/baz")
+[%%expect{|
+Exception:
+Code_error
+ (List
+   [Atom "Path.rm_rf called on external dir";
+    List
+     [Atom "t"; List [Atom "External"; Atom "/does/not/exist/foo/bar/baz"]]]).
+|}]
+
+Path.drop_build_context (Path.relative Path.build_dir "foo/bar")
+[%%expect{|
+- : Path.t option = Some (In_source_tree "bar")
+|}]
+
+Path.drop_build_context (Path.of_string "foo/bar")
+[%%expect{|
+- : Path.t option = None
+|}]
+
+Path.drop_build_context (e "/foo/bar")
+[%%expect{|
+- : Path.t option = None
+|}]
+
+Path.drop_build_context Path.build_dir
+[%%expect{|
+- : Path.t option = None
+|}]
+
+Path.is_in_build_dir Path.build_dir
+[%%expect{|
+- : bool = true
+|}]
+
+Path.is_strict_descendant_of_build_dir Path.build_dir
+[%%expect{|
+- : bool = false
+|}]
+
+Path.reach_for_running Path.build_dir ~from:Path.root
+[%%expect{|
+- : string = "./_build"
+|}]
+
+Path.(reach_for_running (relative build_dir "foo/baz")
+        ~from:(relative build_dir "foo/bar/baz"))
+[%%expect{|
+- : string = "../../baz"
+|}]
+
+Path.(reach_for_running (e "/fake/path")
+        ~from:(relative build_dir "foo/bar/baz"))
+[%%expect{|
+- : string = "/fake/path"
+|}]
+
+Path.(reach_for_running (relative root "foo") ~from:(Path.relative root "foo"))
+[%%expect{|
+- : string = "./."
+|}]
+
+Path.relative Path.root "_build"
+[%%expect{|
+- : Path.t = (In_build_dir ".")
+|}]
+
+(* This is not right, but kind of annoying to fix :/ *)
+Path.relative (r "foo") "../_build"
+[%%expect{|
+- : Path.t = (In_build_dir ".")
+|}]
+
+Path.local_part (Path.of_string "/c/d")
+[%%expect{|
+- : Path.Local.t = c/d
+|}]
+
+Path.local_part (Path.insert_after_build_dir_exn Path.build_dir "c/d")
+[%%expect{|
+- : Path.Local.t = c/d
+|}]
+
+Path.local_part (r "c/d")
+[%%expect{|
+- : Path.Local.t = c/d
+|}]

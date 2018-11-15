@@ -1,0 +1,3 @@
+(library
+ (name q)
+ (c_names q_stub))

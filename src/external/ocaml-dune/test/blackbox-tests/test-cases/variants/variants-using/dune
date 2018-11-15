@@ -1,0 +1,3 @@
+(library
+ (public_name foo)
+ (virtual_modules bar))

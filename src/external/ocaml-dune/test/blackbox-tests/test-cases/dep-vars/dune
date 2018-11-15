@@ -1,0 +1,11 @@
+(alias
+ (name runtest)
+ (deps (:foo a b) (:baz foo (alias x)) a b c)
+ (action (echo "foo = %{foo}\nbaz = %{baz}\n")))
+
+(rule (with-stdout-to a (echo "")))
+(rule (with-stdout-to b (echo "")))
+(rule (with-stdout-to c (echo "")))
+(rule (with-stdout-to foo (echo "")))
+
+(alias (name x))

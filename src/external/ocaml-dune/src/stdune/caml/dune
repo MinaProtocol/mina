@@ -1,0 +1,4 @@
+(library
+ (name dune_caml)
+ (public_name dune._caml)
+ (synopsis "[Internal] Wrapped version of the OCaml stdlib"))

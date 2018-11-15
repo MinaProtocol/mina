@@ -1,0 +1,9 @@
+(rule (with-stdout-to bar (echo "from bar")))
+
+(alias
+ (name default)
+ (action
+  (progn
+   (echo "Initial value of %{env:DUNE_FOO=unset}\n")
+   (setenv DUNE_FOO XXXX (echo "Now set: %{env:DUNE_FOO=unset}\n"))
+   (setenv DUNE_FOO %{read:bar} (echo "From bar: %{env:DUNE_FOO=unset}\n")))))

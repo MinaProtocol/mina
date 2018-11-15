@@ -1,0 +1,1 @@
+val hello : string

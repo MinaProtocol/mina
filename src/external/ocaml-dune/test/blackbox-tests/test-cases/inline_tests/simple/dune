@@ -1,0 +1,10 @@
+(library
+ (name backend_simple)
+ (modules ())
+ (inline_tests.backend
+  (generate_runner (run sed "s/(\\*TEST:\\(.*\\)\\*)/let () = \\1;;/" %{impl-files})
+  )))
+
+(library
+ (name foo_simple)
+ (inline_tests (backend backend_simple)))

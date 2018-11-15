@@ -33,13 +33,20 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - && \
     sudo apt-get update -y && sudo apt-get install google-cloud-sdk -y
 
-# Opam dependancies
+# Opam dependencies
 # Pull freshest repository
 RUN git -C /home/opam/opam-repository pull
 RUN opam update -y && opam upgrade -y
+# Install dune to get any external dependencies
 RUN opam depext -i dune
+# Uninstall dune, because we'll install a custom version
+RUN opam remove dune
 ADD /src/opam.export .
 RUN opam switch import opam.export ; rm opam.export
+
+# Source copy of dune (modified to link rocksdb for test runners)
+ADD /src/external/ocaml-dune /ocaml-dune
+RUN cd /ocaml-dune && yes | opam pin add .
 
 # Source copy of ocaml-sodium (modified for static linking)
 ADD /src/external/ocaml-sodium /ocaml-sodium

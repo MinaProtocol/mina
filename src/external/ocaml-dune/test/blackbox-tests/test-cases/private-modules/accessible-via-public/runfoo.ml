@@ -1,0 +1,1 @@
+ignore Foo.linkme

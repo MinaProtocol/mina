@@ -1,0 +1,4 @@
+(rule
+ (fallback)
+ (targets) 
+ (action (with-stdout-to foo.txt (echo "testing"))))

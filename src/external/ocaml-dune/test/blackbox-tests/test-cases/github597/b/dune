@@ -1,0 +1,4 @@
+(library
+ (name b)
+ (wrapped false)
+ (libraries a))
