@@ -19,6 +19,7 @@ module Make (Inputs : Inputs.S) : sig
      and type external_transition := Consensus_mechanism.External_transition.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type tip := Tip.t
+     and type public_key_compressed := Public_key.Compressed.t
 
   val ledger_builder_io : t -> Net.t
 end = struct
@@ -33,6 +34,7 @@ end = struct
           (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: Tip.t
       ; consensus_local_state: Consensus_mechanism.Local_state.t
+      ; proposer_public_key: Public_key.Compressed.t option
       ; longest_tip_location: string }
     [@@deriving make]
   end
@@ -168,6 +170,7 @@ end = struct
     in
     let state =
       Transition_logic_state.create
+        ?proposer_public_key:config.proposer_public_key
         ~consensus_local_state:config.consensus_local_state
         (With_hash.of_data tip ~hash_data:(fun tip ->
              tip.Tip.protocol_state |> Protocol_state.hash ))
@@ -514,7 +517,9 @@ let%test_module "test" =
             let protocol_state_proof _ = ()
           end
 
-          let lock_transition _ _ ~snarked_ledger:_ ~local_state:() = ()
+          let lock_transition ?proposer_public_key:_ _ _ ~snarked_ledger:_
+              ~local_state:() =
+            ()
 
           let select Consensus_state.({strength= s1})
               Consensus_state.({strength= s2}) ~logger:_ ~time_received:_ =
@@ -685,7 +690,7 @@ let%test_module "test" =
                    flow in within tree" =
       Backtrace.elide := false ;
       let config =
-        Lbc.config Lbc.no_catchup_transitions memory_storage_location
+        Lbc.config Lbc.no_catchup_transitions memory_storage_location ()
       in
       Lbc.assert_strongest_ledgers (Lbc.create config) ~expected:[1; 2; 5; 7]
 
@@ -701,14 +706,14 @@ let%test_module "test" =
         ; f 5 3 7
         (* Now we attach to the one from the network *) ]
       in
-      let config = Lbc.config transitions memory_storage_location in
+      let config = Lbc.config transitions memory_storage_location () in
       let lbc_deferred = Lbc.create config in
       Lbc.assert_strongest_ledgers lbc_deferred ~expected:[1; 2; 3; 5]
 
     let%test_unit "local_get_ledger can materialize a ledger locally" =
       Backtrace.elide := false ;
       let config =
-        Lbc.config Lbc.no_catchup_transitions memory_storage_location
+        Lbc.config Lbc.no_catchup_transitions memory_storage_location ()
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind lbc = Lbc.create config in
