@@ -1,0 +1,11 @@
+(lang dune 1.1)
+
+(env
+ (default
+  (ocamlc_flags (:standard -verbose))))
+
+(context
+ (default
+  (env
+   (default
+    (flags (:standard -machin))))))

@@ -1,0 +1,103 @@
+;; execute this to check the behavior when background jobs take time to finish:
+;;
+;; $ ./_build/default/bin/main.exe build @test/fail-with-background-jobs-running
+;;
+(alias
+ (name   sleep5)
+ (action (system "sleep 5")))
+
+(alias
+ (name   sleep1-and-fail)
+ (action (system "sleep 1; exit 1")))
+
+(alias
+ (name   sleep4-and-fail)
+ (action (system "sleep 4; exit 1")))
+
+(alias
+ (name fail-with-background-jobs-running)
+ (deps (alias sleep5)
+       (alias sleep4-and-fail)
+       (alias sleep1-and-fail)))
+
+;; execute this to test locks
+;;
+;; $ ./_build/default/bin/main.exe build -j10 @test/locks
+;;
+
+(alias
+ (name   locks)
+ (deps   (glob_files *.{foo,bar}))
+ (action (bash "\
+echo 'expected result: 10'
+echo 'without locking:' $(< x)
+echo 'with locking:   ' $(< y)
+rm -f *.{foo,bar} x y")))
+
+(rule (with-stdout-to incr.ml (echo "\
+let fn = Sys.argv.(1) in
+let x =
+  match open_in fn with
+  | ic ->
+    let x = int_of_string (input_line ic) in
+    close_in ic;
+    x
+  | exception _ -> 0
+in
+Unix.sleepf 0.2;
+Printf.fprintf (open_out fn) \"%d\\n\" (x + 1);
+Printf.fprintf (open_out Sys.argv.(2)) \"%g\n%!\" (Sys.time ())
+")))
+
+(executable (name incr) (libraries unix))
+
+(rule (targets 01.foo) (action (run ./incr.exe x %{targets})))
+(rule (targets 02.foo) (action (run ./incr.exe x %{targets})))
+(rule (targets 03.foo) (action (run ./incr.exe x %{targets})))
+(rule (targets 04.foo) (action (run ./incr.exe x %{targets})))
+(rule (targets 05.foo) (action (run ./incr.exe x %{targets})))
+(rule (targets 06.foo) (action (run ./incr.exe x %{targets})))
+(rule (targets 07.foo) (action (run ./incr.exe x %{targets})))
+(rule (targets 08.foo) (action (run ./incr.exe x %{targets})))
+(rule (targets 09.foo) (action (run ./incr.exe x %{targets})))
+(rule (targets 10.foo) (action (run ./incr.exe x %{targets})))
+
+(rule (targets 01.bar) (action (run ./incr.exe y %{targets})) (locks m))
+(rule (targets 02.bar) (action (run ./incr.exe y %{targets})) (locks m))
+(rule (targets 03.bar) (action (run ./incr.exe y %{targets})) (locks m))
+(rule (targets 04.bar) (action (run ./incr.exe y %{targets})) (locks m))
+(rule (targets 05.bar) (action (run ./incr.exe y %{targets})) (locks m))
+(rule (targets 06.bar) (action (run ./incr.exe y %{targets})) (locks m))
+(rule (targets 07.bar) (action (run ./incr.exe y %{targets})) (locks m))
+(rule (targets 08.bar) (action (run ./incr.exe y %{targets})) (locks m))
+(rule (targets 09.bar) (action (run ./incr.exe y %{targets})) (locks m))
+(rule (targets 10.bar) (action (run ./incr.exe y %{targets})) (locks m))
+
+(alias
+ (name runtest-no-deps)
+ (deps (alias_rec blackbox-tests/runtest-no-deps)
+       (alias_rec unit-tests/runtest)))
+
+;; Control the list of public libraries
+;;
+;; This test is to make sure we don't accidently publicize internal
+;; libraries for which we are not ready to commit to a stable API
+
+(rule
+ (targets dune-public-libs)
+ (deps (package dune))
+ (action
+  (system "\| dune installed-libraries | \
+          "\|   cut -d' ' -f1 | \
+          "\|   grep 'dune[.]' | \
+          "\|   grep -v '[.]_' > %{targets}
+)))
+
+;; Think twice before adding elements to this list!
+(rule
+ (with-stdout-to dune-public-libs.expected
+  (echo "dune.configurator\n")))
+
+(alias
+ (name runtest)
+ (action (diff dune-public-libs.expected dune-public-libs)))

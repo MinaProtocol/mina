@@ -1,0 +1,3 @@
+(library
+ (name vlib)
+ (virtual_modules vmod))

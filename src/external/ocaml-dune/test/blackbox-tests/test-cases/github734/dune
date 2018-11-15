@@ -1,0 +1,12 @@
+(alias
+ (name foo)
+ (deps (alias a)
+       (alias b)))
+
+(alias
+ (name a)
+ (deps src/stubs/x.c))
+
+(alias
+ (name b)
+ (deps src/bar.exe))

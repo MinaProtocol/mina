@@ -1,0 +1,3 @@
+(executable
+ (name foo)
+ (package foo))

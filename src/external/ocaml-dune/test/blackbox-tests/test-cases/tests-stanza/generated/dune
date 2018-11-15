@@ -1,0 +1,6 @@
+(rule
+ (with-stdout-to generated.expected (echo "foo\nbar\n")))
+
+(test
+ (name generated)
+ (modules generated))

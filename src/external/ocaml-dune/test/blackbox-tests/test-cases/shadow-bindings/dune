@@ -1,0 +1,15 @@
+
+(alias
+ (name runtest)
+ (deps (:workspace_root foo))
+ (action (echo "%{workspace_root}\n")))
+
+(alias
+ (name   runtest)
+ (deps   (:read x))
+ (action (progn
+          (echo %{read})
+          (echo %{read:y}))))
+
+(rule (with-stdout-to x (echo "a\n")))
+(rule (with-stdout-to y (echo "b\n")))

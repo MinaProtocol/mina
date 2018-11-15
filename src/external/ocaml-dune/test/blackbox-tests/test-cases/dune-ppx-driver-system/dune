@@ -1,0 +1,87 @@
+; No driver found
+(library
+ (name foo1)
+ (public_name foo.1)
+ (modules foo1)
+ (preprocess (pps)))
+
+; Too many drivers
+(library
+ (name foo2)
+ (public_name foo.2)
+ (modules foo2)
+ (preprocess (pps ppx1 ppx2)))
+
+; Incompatible with Dune
+(library
+ (name foo3)
+ (public_name foo.3)
+ (modules foo3)
+ (preprocess (pps ppx_other)))
+
+(rule (with-stdout-to foo1.ml (echo "")))
+(rule (with-stdout-to foo2.ml (echo "")))
+(rule (with-stdout-to foo3.ml (echo "")))
+
+(library
+ (name ppx1)
+ (public_name foo.ppx1)
+ (kind ppx_rewriter)
+ (modules ())
+ (libraries driver1))
+
+(library
+ (name ppx2)
+ (public_name foo.ppx2)
+ (kind ppx_rewriter)
+ (modules ())
+ (libraries driver2))
+
+(library
+ (name driver1)
+ (public_name foo.driver1)
+ (modules ())
+ (ppx.driver (main "(fun () -> assert false)")))
+
+(library
+ (name driver2)
+ (public_name foo.driver2)
+ (modules ())
+ (ppx.driver (main "(fun () -> assert false)")))
+
+(library
+ (name ppx_other)
+ (public_name foo.ppx-other)
+ (modules ())
+ (kind ppx_rewriter))
+
+(library
+ (name driver_print_args)
+ (modules ())
+ (ppx.driver (main "(fun () -> Array.iter print_endline Sys.argv)")))
+
+(rule (with-stdout-to test_ppx_args.ml (echo "")))
+
+(library
+ (name test_ppx_args)
+ (modules test_ppx_args)
+ (preprocess (pps -arg1 driver_print_args -arg2 -- -foo bar)))
+
+(library
+ (name driver_print_tool)
+ (modules ())
+ (libraries compiler-libs.common)
+ (ppx.driver (main "\| (fun () ->
+                   "\|    Ast_mapper.run_main (fun argv ->
+                   "\|      Printf.eprintf "tool name: %s\nargs:%s\n"
+                   "\|        (Ast_mapper.tool_name ())
+                   "\|        (String.concat " " argv);
+                   "\|      Ast_mapper.default_mapper))
+                   )))
+
+(rule (with-stdout-to test_ppx_staged.ml (echo "")))
+
+(library
+ (name test_ppx_staged)
+ (modules test_ppx_staged)
+ (preprocess (staged_pps -arg1 driver_print_tool -arg2 -- -foo bar)))
