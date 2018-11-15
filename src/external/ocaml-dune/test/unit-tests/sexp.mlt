@@ -1,0 +1,356 @@
+(* -*- tuareg -*- *)
+open! Stdune;;
+open Dune_lang.Decoder;;
+
+let print_loc ppf (_ : Loc.t) = Format.pp_print_string ppf "<loc>";;
+#install_printer print_loc;;
+[%%expect{|
+val print_loc : Format.formatter -> Loc.t -> unit = <fun>
+|}]
+
+Printexc.record_backtrace false;;
+[%%expect{|
+- : unit = ()
+|}]
+
+let sexp = lazy (Dune_lang.parse_string ~fname:"" ~mode:Single {|
+((foo 1)
+ (foo 2))
+|});;
+Dune_lang.Ast.remove_locs (Lazy.force sexp)
+[%%expect{|
+val sexp : ast lazy_t = <lazy>
+- : Dune_lang.t =
+List
+ [List [Atom (A "foo"); Atom (A "1")]; List [Atom (A "foo"); Atom (A "2")]]
+|}]
+
+let of_sexp = record (field "foo" int)
+let x = parse of_sexp Univ_map.empty (Lazy.force sexp)
+[%%expect{|
+val of_sexp : int t = <abstr>
+Exception: Decoder (<loc>, "Field \"foo\" is present too many times", None).
+|}]
+
+let of_sexp = record (multi_field "foo" int)
+let x = parse of_sexp Univ_map.empty (Lazy.force sexp)
+[%%expect{|
+val of_sexp : int list t = <abstr>
+val x : int list = [1; 2]
+|}]
+
+type 'res parse_result_diff =
+  { jbuild : ('res, string) result
+  ; dune   : ('res, string) result
+  }
+
+type 'res parse_result =
+  | Same of ('res, string) result
+  | Different of 'res parse_result_diff
+
+let parse s =
+  let f ~lexer =
+    try
+      Ok (Dune_lang.parse_string ~fname:"" ~mode:Many ~lexer s
+          |> List.map ~f:Dune_lang.Ast.remove_locs)
+    with
+    | Dune_lang.Parse_error e -> Error (Dune_lang.Parse_error.message e)
+    | Invalid_argument e -> Error e
+  in
+  let jbuild = f ~lexer:Dune_lang.Lexer.jbuild_token in
+  let dune   = f ~lexer:Dune_lang.Lexer.token        in
+  if jbuild <> dune then
+    Different { jbuild; dune }
+  else
+    Same jbuild
+[%%expect{|
+type 'res parse_result_diff = {
+  jbuild : ('res, string) Stdune.result;
+  dune : ('res, string) Stdune.result;
+}
+type 'res parse_result =
+    Same of ('res, string) Stdune.result
+  | Different of 'res parse_result_diff
+val parse : string -> Dune_lang.t list parse_result = <fun>
+|}]
+
+parse {| # ## x##y x||y a#b|c#d copy# |}
+[%%expect{|
+- : Dune_lang.t list parse_result =
+Same
+ (Ok
+   [Atom (A "#"); Atom (A "##"); Atom (A "x##y"); Atom (A "x||y");
+    Atom (A "a#b|c#d"); Atom (A "copy#")])
+|}]
+
+
+parse {|x #| comment |# y|}
+[%%expect{|
+- : Dune_lang.t list parse_result =
+Different
+ {jbuild = Ok [Atom (A "x"); Atom (A "y")];
+  dune =
+   Ok
+    [Atom (A "x"); Atom (A "#|"); Atom (A "comment"); Atom (A "|#");
+     Atom (A "y")]}
+|}]
+
+parse {|x#|y|}
+[%%expect{|
+- : Dune_lang.t list parse_result =
+Different
+ {jbuild = Error "jbuild atoms cannot contain #|";
+  dune = Ok [Atom (A "x#|y")]}
+|}]
+
+parse {|x|#y|}
+[%%expect{|
+- : Dune_lang.t list parse_result =
+Different
+ {jbuild = Error "jbuild atoms cannot contain |#";
+  dune = Ok [Atom (A "x|#y")]}
+|}]
+
+parse {|"\a"|}
+[%%expect{|
+- : Dune_lang.t list parse_result =
+Different
+ {jbuild = Ok [Quoted_string "\\a"]; dune = Error "unknown escape sequence"}
+|}]
+
+parse {|"\%{x}"|}
+[%%expect{|
+- : Dune_lang.t list parse_result =
+Different
+ {jbuild = Ok [Quoted_string "\\%{x}"]; dune = Ok [Quoted_string "%{x}"]}
+|}]
+
+parse {|"$foo"|}
+[%%expect{|
+- : Dune_lang.t list parse_result = Same (Ok [Quoted_string "$foo"])
+|}]
+
+parse {|"%foo"|}
+[%%expect{|
+- : Dune_lang.t list parse_result = Same (Ok [Quoted_string "%foo"])
+|}]
+
+parse {|"bar%foo"|}
+[%%expect{|
+- : Dune_lang.t list parse_result = Same (Ok [Quoted_string "bar%foo"])
+|}]
+
+parse {|"bar$foo"|}
+[%%expect{|
+- : Dune_lang.t list parse_result = Same (Ok [Quoted_string "bar$foo"])
+|}]
+
+parse {|"%bar$foo%"|}
+[%%expect{|
+- : Dune_lang.t list parse_result = Same (Ok [Quoted_string "%bar$foo%"])
+|}]
+
+parse {|"$bar%foo%"|}
+[%%expect{|
+- : Dune_lang.t list parse_result = Same (Ok [Quoted_string "$bar%foo%"])
+|}]
+
+parse {|\${foo}|}
+[%%expect{|
+- : Dune_lang.t list parse_result = Same (Ok [Atom (A "\\${foo}")])
+|}]
+
+parse {|\%{foo}|}
+[%%expect{|
+- : Dune_lang.t list parse_result =
+Different
+ {jbuild = Ok [Atom (A "\\%{foo}")];
+  dune =
+   Ok
+    [Template
+      {quoted = false;
+       parts =
+        [Text "\\";
+         Var {loc = <loc>; name = "foo"; payload = None; syntax = Percent}];
+       loc = <loc>}]}
+|}]
+
+parse {|\$bar%foo%|}
+[%%expect{|
+- : Dune_lang.t list parse_result = Same (Ok [Atom (A "\\$bar%foo%")])
+|}]
+
+parse {|\$bar\%foo%|}
+[%%expect{|
+- : Dune_lang.t list parse_result = Same (Ok [Atom (A "\\$bar\\%foo%")])
+|}]
+
+parse {|\$bar\%foo%{bar}|}
+[%%expect{|
+- : Dune_lang.t list parse_result =
+Different
+ {jbuild = Ok [Atom (A "\\$bar\\%foo%{bar}")];
+  dune =
+   Ok
+    [Template
+      {quoted = false;
+       parts =
+        [Text "\\$bar\\%foo";
+         Var {loc = <loc>; name = "bar"; payload = None; syntax = Percent}];
+       loc = <loc>}]}
+|}]
+
+parse {|"bar%{foo}"|}
+[%%expect{|
+- : Dune_lang.t list parse_result =
+Different
+ {jbuild = Ok [Quoted_string "bar%{foo}"];
+  dune =
+   Ok
+    [Template
+      {quoted = true;
+       parts =
+        [Text "bar";
+         Var {loc = <loc>; name = "foo"; payload = None; syntax = Percent}];
+       loc = <loc>}]}
+|}]
+
+parse {|"bar\%{foo}"|}
+[%%expect{|
+- : Dune_lang.t list parse_result =
+Different
+ {jbuild = Ok [Quoted_string "bar\\%{foo}"];
+  dune = Ok [Quoted_string "bar%{foo}"]}
+|}]
+
+parse {|bar%%{foo}|}
+[%%expect{|
+- : Dune_lang.t list parse_result =
+Different
+ {jbuild = Ok [Atom (A "bar%%{foo}")];
+  dune =
+   Ok
+    [Template
+      {quoted = false;
+       parts =
+        [Text "bar%";
+         Var {loc = <loc>; name = "foo"; payload = None; syntax = Percent}];
+       loc = <loc>}]}
+|}]
+
+parse {|"bar%%{foo}"|}
+[%%expect{|
+- : Dune_lang.t list parse_result =
+Different
+ {jbuild = Ok [Quoted_string "bar%%{foo}"];
+  dune =
+   Ok
+    [Template
+      {quoted = true;
+       parts =
+        [Text "bar%";
+         Var {loc = <loc>; name = "foo"; payload = None; syntax = Percent}];
+       loc = <loc>}]}
+|}]
+
+parse {|"bar\%foo"|}
+[%%expect{|
+- : Dune_lang.t list parse_result =
+Different
+ {jbuild = Ok [Quoted_string "bar\\%foo"];
+  dune = Error "unknown escape sequence"}
+|}]
+
+(* Printing tests *)
+
+let loc = Loc.none
+let a = Dune_lang.atom
+let s x = Dune_lang.Quoted_string x
+let t  x = Dune_lang.Template { quoted = false; parts = x; loc }
+let tq x = Dune_lang.Template { quoted = true ; parts = x; loc }
+let l x = Dune_lang.List x
+let var ?(syntax=Dune_lang.Template.Percent) ?payload name =
+  { Dune_lang.Template.
+    loc
+  ; name
+  ; payload
+  ; syntax
+  }
+
+type sexp = S of Dune_lang.syntax * Dune_lang.t
+
+let print_sexp ppf (S (syntax, sexp)) = Dune_lang.pp syntax ppf sexp;;
+#install_printer print_sexp
+
+type round_trip_result =
+  | Round_trip_success
+  | Did_not_round_trip of Dune_lang.t
+  | Did_not_parse_back of string
+
+let test syntax sexp =
+  (S (syntax, sexp),
+   let s = Format.asprintf "%a" (Dune_lang.pp syntax) sexp in
+   match
+     Dune_lang.parse_string s ~mode:Single ~fname:""
+       ~lexer:(match syntax with
+         | Jbuild -> Dune_lang.Lexer.jbuild_token
+         | Dune   -> Dune_lang.Lexer.token)
+   with
+   | sexp' ->
+     let sexp' = Dune_lang.Ast.remove_locs sexp' in
+     if sexp = sexp' then
+       Round_trip_success
+     else
+       Did_not_round_trip sexp'
+   | exception (Dune_lang.Parse_error e) ->
+     Did_not_parse_back (Dune_lang.Parse_error.message e))
+;;
+#install_printer print_sexp
+
+[%%expect{|
+val loc : Loc.t = <loc>
+val a : string -> Dune_lang.t = <fun>
+val s : string -> Dune_lang.t = <fun>
+val t : Dune_lang.Template.part list -> Dune_lang.t = <fun>
+val tq : Dune_lang.Template.part list -> Dune_lang.t = <fun>
+val l : Dune_lang.t list -> Dune_lang.t = <fun>
+val var :
+  ?syntax:Dune_lang.Template.var_syntax ->
+  ?payload:string -> string -> Dune_lang.Template.var = <fun>
+type sexp = S of Dune_lang.syntax * Dune_lang.t
+val print_sexp : Format.formatter -> sexp -> unit = <fun>
+type round_trip_result =
+    Round_trip_success
+  | Did_not_round_trip of Dune_lang.t
+  | Did_not_parse_back of string
+val test : Dune_lang.syntax -> Dune_lang.t -> sexp * round_trip_result =
+  <fun>
+|}]
+
+test Dune (a "toto")
+[%%expect{|
+- : sexp * round_trip_result = (toto, Round_trip_success)
+|}]
+
+test Dune (t [Text "x%{"])
+[%%expect{|
+Exception: Invalid_argument "Invalid text \"x%{\" in unquoted template".
+|}]
+
+test Dune (t [Text "x%"; Text "{"])
+[%%expect{|
+Exception: Invalid_argument "Invalid text \"x%{\" in unquoted template".
+|}]
+
+(* This round trip failure is expected *)
+test Dune (tq [Text "x%{"])
+[%%expect{|
+- : sexp * round_trip_result =
+("x\%{", Did_not_round_trip (Quoted_string "x%{"))
+|}]
+
+test Dune (tq [Text "x%"; Text "{"])
+[%%expect{|
+- : sexp * round_trip_result =
+("x\%{", Did_not_round_trip (Quoted_string "x%{"))
+|}]

@@ -1,0 +1,3 @@
+(library
+ (name root_lib2)
+ (public_name root.lib2))

@@ -1,0 +1,8 @@
+(alias
+ ((name runtest)
+  (deps ((alias x) foo (alias x)))
+  (action (echo "< = ${<}\n"))))
+
+(alias ((name x)))
+
+(rule (with-stdout-to foo (echo "")))

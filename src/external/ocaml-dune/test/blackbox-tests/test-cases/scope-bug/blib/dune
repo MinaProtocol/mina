@@ -1,0 +1,4 @@
+(library
+ (name blib)
+ (public_name blib)
+ (libraries sub))

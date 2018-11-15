@@ -1,0 +1,2 @@
+(library
+ (public_name hello_world))

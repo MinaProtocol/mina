@@ -1,0 +1,3 @@
+(rule
+(write-file target.txt %{findlib:pkg})
+)

@@ -1,0 +1,46 @@
+(library
+ (name foobar)
+ (libraries bytes)
+ (public_name foobar)
+ (synopsis "contains \"quotes\""))
+
+(library
+ (name foobar_baz)
+ (public_name foobar.baz)
+ (libraries bytes)
+ (modes byte)
+ (synopsis "sub library with modes set to byte"))
+
+(library
+ (name foobar_runtime_lib2)
+ (js_of_ocaml (javascript_files foobar_runtime.js foobar_runtime2.js))
+ (public_name foobar.runtime-lib2)
+ (synopsis "runtime library for foobar.rewriter2"))
+
+(library
+ (name foobar_rewriter)
+ (synopsis "ppx rewriter")
+ (libraries foobar foobar_rewriter2)
+ (public_name foobar.rewriter)
+ (ppx_runtime_libraries foobar_baz)
+ (kind ppx_rewriter))
+
+;; The ppx runtime libraries to this for library must end up in the requires(-ppx_driver)
+;; of foobar.rewriter
+(library
+ (name foobar_rewriter2)
+ (synopsis "ppx rewriter expander")
+ (libraries foobar)
+ (public_name foobar.rewriter2)
+ (ppx_runtime_libraries foobar_runtime_lib2))
+
+(library
+ (name foobar_ppd)
+ (public_name foobar.ppd)
+ (synopsis "pp'd with a rewriter")
+ (libraries foobar)
+ (preprocess (pps foobar_rewriter)))
+
+(alias
+ (name runtest)
+ (action (echo "%{read:META.foobar}")))

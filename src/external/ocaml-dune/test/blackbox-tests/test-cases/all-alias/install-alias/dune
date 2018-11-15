@@ -1,0 +1,5 @@
+(rule (with-stdout-to foo (run echo foo)))
+
+(alias
+ (name install)
+ (deps foo))

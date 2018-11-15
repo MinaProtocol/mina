@@ -1,0 +1,4 @@
+(library
+ (name impl)
+ (implements vlib)
+ (private_modules priv))
