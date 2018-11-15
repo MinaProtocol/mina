@@ -159,7 +159,7 @@ module Fee : sig
 
   include Arithmetic_intf with type t := t
 
-  include Jsonable.S with type t := t
+  include Codable.S with type t := t
 
   (* TODO: Get rid of signed fee, use signed amount *)
   module Signed :
@@ -181,7 +181,7 @@ module Amount : sig
 
   include Arithmetic_intf with type t := t
 
-  include Jsonable.S with type t := t
+  include Codable.S with type t := t
 
   module Signed :
     Signed_intf with type magnitude := t and type magnitude_var := var

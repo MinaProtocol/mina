@@ -13,7 +13,7 @@ let create_exn s =
 
 let dummy = create_exn ""
 
-include Jsonable.Make_from_string (struct
+include Codable.Make_of_string (struct
   type nonrec t = t
 
   let to_string memo = to_string memo |> B64.encode

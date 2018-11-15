@@ -271,8 +271,18 @@ module Make (Kernel : Kernel_intf) = struct
           Run.send_payment log coda (payment :> User_command.t)
         in
         let coda_prove_receipt (proving_receipt, resulting_receipt) =
-          Run.prove_receipt coda ~proving_receipt ~resulting_receipt
-          |> Deferred.Or_error.ok_exn
+          match%map
+            Run.prove_receipt coda ~proving_receipt ~resulting_receipt
+          with
+          | Ok proof ->
+              Logger.info log
+                !"Constructed proof for receipt: %{sexp:Receipt.Chain_hash.t}"
+                proving_receipt ;
+              proof
+          | Error e ->
+              failwithf
+                !"Failed to construct payment proof: %{sexp:Error.t}"
+                e ()
         in
         let coda_strongest_ledgers () =
           let r, w = Linear_pipe.create () in

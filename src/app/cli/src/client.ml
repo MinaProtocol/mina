@@ -93,11 +93,11 @@ end
 module Args = struct
   open Command.Param
 
-  let t2 = map2 ~f:(fun arg1 arg2 -> (arg1, arg2))
+  let zip2 = map2 ~f:(fun arg1 arg2 -> (arg1, arg2))
 
-  let t3 = map3 ~f:(fun arg1 arg2 arg3 -> (arg1, arg2, arg3))
+  let zip3 = map3 ~f:(fun arg1 arg2 arg3 -> (arg1, arg2, arg3))
 
-  let t4 arg1 arg2 arg3 arg4 =
+  let zip4 arg1 arg2 arg3 arg4 =
     return (fun a b c d -> (a, b, c, d)) <*> arg1 <*> arg2 <*> arg3 <*> arg4
 end
 
@@ -157,7 +157,7 @@ let prove_payment =
       (required public_key)
   in
   Command.async ~summary:"Generate a proof of a payment as a merkle list"
-    (Daemon_cli.init (Args.t2 receipt_hash_flag address_flag)
+    (Daemon_cli.init (Args.zip2 receipt_hash_flag address_flag)
        ~f:(fun port (receipt_chain_hash, pk) ->
          match%map
            dispatch Prove_receipt.rpc
@@ -333,7 +333,7 @@ let send_payment =
   in
   Command.async ~summary:"Send payment to an address"
     (Daemon_cli.init
-       (Args.t4 address_flag privkey_read_path_flag fee_flag amount_flag)
+       (Args.zip4 address_flag privkey_read_path_flag fee_flag amount_flag)
        ~f:(fun port (address, from_account, fee, amount) ->
          let open Deferred.Let_syntax in
          let%bind sender_kp = read_keypair_exn' from_account in
@@ -353,8 +353,8 @@ let send_payment =
              sprintf
                !"Successfully enqueued payment in pool.\n\
                  Receipt chain hash of the payment:\n\
-                 %{sexp:Receipt.Chain_hash.t}"
-               receipt )
+                 %s"
+               (Receipt.Chain_hash.to_string receipt) )
            ~error:(fun e ->
              sprintf "Failed to send payment %s" (Error.to_string_hum e) ) ))
 

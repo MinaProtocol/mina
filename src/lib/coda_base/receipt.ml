@@ -5,12 +5,16 @@ open Fold_lib
 module Chain_hash = struct
   include Data_hash.Make_full_size ()
 
-  include Jsonable.Make_from_string (struct
+  let to_string = Fn.compose B64.encode to_bytes
+
+  let of_string = Fn.compose of_bytes B64.decode
+
+  include Codable.Make_of_string (struct
     type nonrec t = t
 
-    let to_string = Fn.compose B64.encode to_bytes
+    let to_string = to_string
 
-    let of_string = Fn.compose of_bytes B64.decode
+    let of_string = of_string
   end)
 
   let empty =

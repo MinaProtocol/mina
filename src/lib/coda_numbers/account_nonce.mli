@@ -1,3 +1,3 @@
 include Nat.S
 
-include Jsonable.S with type t := t
+include Codable.S with type t := t

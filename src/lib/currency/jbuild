@@ -15,7 +15,7 @@
       snark_params
       unsigned_extended
       test_util
-      jsonable
+      codable
       ))
   (preprocess (pps (ppx_jane ppx_deriving.std)))
   (synopsis "Currency types")))

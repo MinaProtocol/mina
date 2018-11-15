@@ -3,7 +3,9 @@ open Snark_params.Tick
 module Chain_hash : sig
   include Data_hash.Full_size
 
-  include Jsonable.S with type t := t
+  include Codable.S with type t := t
+
+  val to_string : t -> string
 
   val empty : t
 

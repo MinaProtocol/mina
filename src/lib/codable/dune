@@ -1,6 +1,6 @@
 (library
- (name jsonable)
-  (public_name jsonable)
+ (name codable)
+  (public_name codable)
   (flags (:standard -short-paths -warn-error -58-39))
   (library_flags (-linkall))
   (inline_tests)

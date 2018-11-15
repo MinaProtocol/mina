@@ -556,7 +556,7 @@ module Fee = struct
       end)
 
   include T
-  include Jsonable.Make_from_int (T)
+  include Codable.Make_of_int (T)
 end
 
 module Amount = struct
@@ -576,7 +576,7 @@ module Amount = struct
        and module Signed = T.Signed
        and module Checked := T.Checked )
 
-  include Jsonable.Make_from_int (T)
+  include Codable.Make_of_int (T)
 
   let of_fee (fee : Fee.t) : t = fee
 

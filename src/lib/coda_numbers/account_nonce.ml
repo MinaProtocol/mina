@@ -1,4 +1,4 @@
 module T = Nat.Make32 ()
 
 include T
-include Jsonable.Make_from_int (T)
+include Codable.Make_of_int (T)
