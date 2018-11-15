@@ -58,8 +58,7 @@ let reraise_merkle_requests (With {request; respond}) =
   | Merkle_tree.Get_element addr -> respond (Reraise (Get_element addr))
   | _ -> unhandled
 
-let get t addr =
-  Merkle_tree.get_req ~depth (var_to_hash_packed t) addr
+let get t addr = Merkle_tree.get_req ~depth (var_to_hash_packed t) addr
 
 (*
    [modify_account t pk ~filter ~f] implements the following spec:
