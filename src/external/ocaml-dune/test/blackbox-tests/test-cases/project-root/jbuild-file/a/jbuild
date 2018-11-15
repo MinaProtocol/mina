@@ -1,0 +1,5 @@
+(alias
+  ((name runtest)
+   (action (echo "From jbuild/a/: ${SCOPE_ROOT}\n"))
+   )
+  )

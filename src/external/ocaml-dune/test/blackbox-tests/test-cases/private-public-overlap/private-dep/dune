@@ -1,0 +1,9 @@
+(library
+ (name privatelib)
+ (modules privatelib))
+
+(library
+ (name publiclib)
+ (public_name publiclib)
+ (libraries privatelib)
+ (modules publiclib))

@@ -1,0 +1,3 @@
+(copy_files# "no_dir/*")
+
+(executable (name demo))

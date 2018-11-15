@@ -1,0 +1,4 @@
+(library
+ (name        which_program_jbuilder)
+ (public_name dune._which-program.jbuilder)
+ (implements which_program))

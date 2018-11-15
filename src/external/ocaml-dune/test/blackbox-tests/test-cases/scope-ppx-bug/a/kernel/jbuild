@@ -1,0 +1,6 @@
+(jbuild_version 1)
+
+(library
+ ((name a_kernel)
+  (public_name a.kernel)
+  (kind ppx_rewriter)))

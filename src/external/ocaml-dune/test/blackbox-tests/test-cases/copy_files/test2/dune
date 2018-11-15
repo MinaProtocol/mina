@@ -1,0 +1,1 @@
+(rule (with-stdout-to dummy.txt (echo "hello")))
