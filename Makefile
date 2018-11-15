@@ -75,6 +75,16 @@ docker-toolchain:
 		echo "Repo is dirty, commit first." ;\
 	fi
 
+docker-rust-toolchain:
+	@if git diff-index --quiet HEAD ; then \
+		docker build --file dockerfiles/Dockerfile-rust-toolchain --tag codaprotocol/coda:rust-toolchain-$(GITLONGHASH) . && \
+		docker tag  codaprotocol/coda:rust-toolchain-$(GITLONGHASH) codaprotocol/coda:rust-toolchain-latest && \
+		docker push codaprotocol/coda:rust-toolchain-$(GITLONGHASH) && \
+		docker push codaprotocol/coda:rust-toolchain-latest ;\
+	else \
+		echo "Repo is dirty, commit first." ;\
+	fi
+
 # All in one step to build toolchain and binary for kademlia
 docker-toolchain-haskell:
 	@echo "Building codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG)" ;\
@@ -82,6 +92,8 @@ docker-toolchain-haskell:
     echo  'Extracting deb package' ;\
     mkdir -p src/_build ;\
     docker run --rm --entrypoint cat codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) /src/coda-kademlia.deb > src/_build/coda-kademlia.deb
+
+toolchains: docker-toolchain docker-rust-toolchain docker-toolchain-haskell
 
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
@@ -167,4 +179,4 @@ web:
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim container deb dev docker kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim container deb dev docker kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-rust-toolchain toolchains

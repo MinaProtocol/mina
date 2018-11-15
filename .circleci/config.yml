@@ -3,12 +3,12 @@ version: 2
 jobs:
     tracetool:
         docker:
-            - image: rust
+            - image: codaprotocol/coda:rust-toolchain-81b34876390b1627da715cd08d65b01b25ced13d
         steps:
             - checkout
             - run:
                 name: Build trace-tool
-                command: cd src/app/trace-tool && cargo build
+                command: cd src/app/trace-tool && cargo build --frozen
 
     build:
         resource_class: large
