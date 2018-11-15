@@ -74,6 +74,22 @@ let g:syntastic_ocaml_checkers=['merlin']
   * [OCaml and Reason IDE](https://marketplace.visualstudio.com/items?itemName=freebroccolo.reasonml)
   * [Dune](https://marketplace.visualstudio.com/items?itemName=maelvalais.dune)
 
+* If you use emacs, besides the `opam` packages mentioned above, also install `tuareg`, and add the following to your .emacs file:
+```lisp
+(let ((opam-share (ignore-errors (car (process-lines "opam" "config" "var" "share")))))
+  (when (and opam-share (file-directory-p opam-share))
+    ;; Register Merlin
+    (add-to-list 'load-path (expand-file-name "emacs/site-lisp" opam-share))
+    (load "tuareg-site-file")
+    (autoload 'merlin-mode "merlin" nil t nil)
+    ;; Automatically start it in OCaml buffers
+    (add-hook 'tuareg-mode-hook 'merlin-mode t)
+    (add-hook 'caml-mode-hook 'merlin-mode t)))
+```
+
+Emacs has a built-in autocomplete, via `M-x completion-at-point`, or simply `M-tab`. There are other
+Emacs autocompletion packages; see [Emacs from scratch] (https://github.com/ocaml/merlin/wiki/emacs-from-scratch).
+
 ## Using the makefile
 
 The makefile contains phony targets for all the common tasks that need to be done.
@@ -100,7 +116,7 @@ NOTE: all of the `test-*` targets (including `test-all`) won't run in the contai
 
 Coda has a variety of opam and system dependencies.
 
-You can see [`Dockerfile-base`](/dockerfiles/Dockerfile-base) for how we
+You can see [`Dockerfile-toolchain`](/dockerfiles/Dockerfile-toolchain) for how we
 install them all in the container. To get all the opam dependencies
 you need, you run `opam switch import src/opam.export`.
 
@@ -108,6 +124,7 @@ Some of our dependencies aren't taken from `opam`, and aren't integrated
 with `dune`, so you need to add them manually:
 
 * `opam pin add src/external/ocaml-sodium`
+* `opam pin add src/external/ocaml-rocksdb`
 
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles.

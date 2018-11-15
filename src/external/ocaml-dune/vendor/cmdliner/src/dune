@@ -1,0 +1,5 @@
+(library
+ (name      cmdliner)
+ (libraries dune_caml)
+ (wrapped   false)
+ (flags     (-w -3-6-27-32-33-35-50 -open Dune_caml)))

@@ -1,0 +1,4 @@
+(alias
+ (name x)
+ (deps (universe))
+ (action (echo "Hello, world!")))

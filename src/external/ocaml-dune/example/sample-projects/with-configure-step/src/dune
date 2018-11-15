@@ -1,0 +1,10 @@
+(executables
+ (names plop))
+
+(install
+ (section bin)
+ (files (plop.exe as plop)))
+
+(rule
+ (targets config.ml)
+ (action  (copy ../config.full %{targets})))

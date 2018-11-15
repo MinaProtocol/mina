@@ -1,0 +1,30 @@
+opam-version: "2.0"
+name: "orocksdb"
+version: "0.3.0"
+maintainer: "Jan Doms <jan.doms@gmail.com>"
+authors: "Jan Doms <jan.doms@gmail.com>"
+homepage: "https://github.com/domsj/orocksdb"
+bug-reports: "https://github.com/domsj/orocksdb"
+license: "MIT"
+dev-repo: "https://github.com/domsj/orocksdb.git"
+env: [ OROCKSDB_TAG_VERSION = "0.3.0"
+       OROCKSDB_GIT_REVISION = "none"
+     ]
+build: [ [ make ] ]
+install: [ make "install" ]
+remove: [ "ocamlfind" "remove" "rocks" ]
+depends: [
+  "ocamlfind" {build}
+  "ocamlbuild" {build}
+  "ctypes" {>= "0.4.0"}
+  "ctypes-foreign" {>= "0.4.0"}
+]
+depopts:[
+  [[ "debian" ] [ "g++-4.8" ]]
+  [[ "ubuntu" ] [ "g++-4.8" ]]
+]
+depexts:[
+  [[ "debian" ] [ "libgflags-dev" "libsnappy-dev" "libbz2-dev" ]]
+  [[ "ubuntu" ] [ "libgflags-dev" "libsnappy-dev" "libbz2-dev" ]]
+  [[ "source" "linux" ] [ "https://gist.githubusercontent.com/domsj/a801de01d33233229357413e9816e513/raw/ff3a93775134d8063a955ca8e10860af69687e7f/execute-local-install-rocksdb-script.sh" ]]
+]

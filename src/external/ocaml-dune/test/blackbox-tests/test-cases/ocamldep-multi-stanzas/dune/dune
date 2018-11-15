@@ -1,0 +1,7 @@
+(library
+ (name lib)
+ (modules :standard \ test))
+
+(executable
+ (name test)
+ (libraries lib))

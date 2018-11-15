@@ -1,0 +1,4 @@
+(library
+ (name        which_program_dune)
+ (public_name dune._which-program.dune)
+ (implements which_program))

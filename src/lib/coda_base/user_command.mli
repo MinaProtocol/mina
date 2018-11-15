@@ -25,10 +25,6 @@ module Stable : sig
   end
 end
 
-type var = (Payload.var, Public_key.var, Signature.var) t_
-
-val typ : (var, t) Typ.t
-
 (* Generate a single transaction between
  * $a, b \in keys$
  * for fee $\in [0,max_fee]$

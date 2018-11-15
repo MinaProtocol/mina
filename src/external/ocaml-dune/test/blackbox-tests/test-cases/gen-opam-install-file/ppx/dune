@@ -1,0 +1,3 @@
+(alias
+ (name default)
+ (action (echo "%{read:foo.install}")))

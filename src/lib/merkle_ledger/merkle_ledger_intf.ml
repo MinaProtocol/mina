@@ -31,6 +31,9 @@ module type S = sig
     -> finish:('accum -> 'stop)
     -> 'stop
 
+  val foldi :
+    t -> init:'accum -> f:(Addr.t -> 'accum -> account -> 'accum) -> 'accum
+
   module Location : sig
     type t [@@deriving sexp, compare, hash]
   end

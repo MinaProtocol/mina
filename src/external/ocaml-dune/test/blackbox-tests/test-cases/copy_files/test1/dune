@@ -1,0 +1,22 @@
+(copy_files# lexers/*.ml{,i})
+(copy_files# include/bar.h)
+
+(rule
+ (targets dummy.ml)
+ (action (with-stdout-to %{targets} (echo ""))))
+
+(library
+ (name foo)
+ (c_names bar)
+ (modules dummy)
+ (wrapped false))
+
+(executable
+ (name test)
+ (modules :standard \ dummy)
+ (libraries foo))
+
+(alias
+ (name bar-source)
+ (deps bar.h)
+ (action (echo "%{read:bar.h}")))

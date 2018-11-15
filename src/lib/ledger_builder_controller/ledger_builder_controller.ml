@@ -170,6 +170,7 @@ end = struct
     in
     let state =
       Transition_logic_state.create
+        ?proposer_public_key:config.proposer_public_key
         ~consensus_local_state:config.consensus_local_state
         (With_hash.of_data tip ~hash_data:(fun tip ->
              tip.Tip.protocol_state |> Protocol_state.hash ))
