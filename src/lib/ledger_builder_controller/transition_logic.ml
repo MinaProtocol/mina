@@ -182,7 +182,9 @@ module Make (Inputs : Inputs_intf) :
         | Transition_logic_state.Change.Longest_branch_tip tip -> Some tip
         | _ -> None )
     in
-    let new_state = Transition_logic_state.apply_all old_state changes in
+    let new_state =
+      Transition_logic_state.apply_all old_state changes ~logger:t.log
+    in
     t.state <- new_state ;
     match new_longest_branch_tip with
     | None -> Deferred.unit
@@ -447,8 +449,8 @@ module Make (Inputs : Inputs_intf) :
         else
           match
             Consensus_mechanism.select
-              (Protocol_state.consensus_state source_state)
-              (Protocol_state.consensus_state target_state)
+              ~existing:(Protocol_state.consensus_state source_state)
+              ~candidate:(Protocol_state.consensus_state target_state)
               ~logger:t.log ~time_received
           with
           | `Keep -> return None
@@ -478,12 +480,14 @@ module Make (Inputs : Inputs_intf) :
               let best_tip = locked_and_best old_tree |> snd in
               match
                 Consensus_mechanism.select
-                  ( transition_with_hash |> With_hash.data
-                  |> External_transition.protocol_state
-                  |> Protocol_state.consensus_state )
-                  ( best_tip |> With_hash.data
-                  |> External_transition.protocol_state
-                  |> Protocol_state.consensus_state )
+                  ~existing:
+                    ( transition_with_hash |> With_hash.data
+                    |> External_transition.protocol_state
+                    |> Protocol_state.consensus_state )
+                  ~candidate:
+                    ( best_tip |> With_hash.data
+                    |> External_transition.protocol_state
+                    |> Protocol_state.consensus_state )
                   ~logger:t.log ~time_received
               with
               | `Keep ->

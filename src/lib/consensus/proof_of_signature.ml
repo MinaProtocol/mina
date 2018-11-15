@@ -241,8 +241,8 @@ module Make (Inputs : Inputs_intf) :
       ~ledger:_ =
     ()
 
-  let select Consensus_state.({length= l1; _})
-      Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
+  let select ~existing:Consensus_state.({length= l1; _})
+      ~candidate:Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
     if l1 >= l2 then `Keep else `Take
 
   let next_proposal now _state ~local_state:_ ~keypair:_ ~logger:_ =

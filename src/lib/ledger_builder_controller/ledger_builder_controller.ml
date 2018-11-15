@@ -232,10 +232,12 @@ end = struct
           let {With_hash.data= last_transition; _}, _ = last in
           match
             Consensus_mechanism.select
-              (Protocol_state.consensus_state
-                 (External_transition.protocol_state last_transition))
-              (Protocol_state.consensus_state
-                 (External_transition.protocol_state current_transition))
+              ~existing:
+                (Protocol_state.consensus_state
+                   (External_transition.protocol_state last_transition))
+              ~candidate:
+                (Protocol_state.consensus_state
+                   (External_transition.protocol_state current_transition))
               ~logger:log ~time_received
           with
           | `Keep -> `Skip
@@ -520,8 +522,9 @@ let%test_module "test" =
 
           let lock_transition _ _ ~snarked_ledger:_ ~local_state:() = ()
 
-          let select Consensus_state.({strength= s1})
-              Consensus_state.({strength= s2}) ~logger:_ ~time_received:_ =
+          let select ~existing:Consensus_state.({strength= s1})
+              ~candidate:Consensus_state.({strength= s2}) ~logger:_
+              ~time_received:_ =
             if s1 >= s2 then `Keep else `Take
         end
 

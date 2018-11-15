@@ -176,7 +176,7 @@ module Make (Inputs : Inputs_intf) :
 
       let after_lock_checkpoint (slot : t) =
         let open UInt32.Infix in
-        slot < unforkable_count * UInt32.of_int 2
+        unforkable_count * UInt32.of_int 2 < slot
 
       let in_seed_update_range (slot : t) =
         let open UInt32.Infix in
@@ -504,14 +504,22 @@ module Make (Inputs : Inputs_intf) :
         if Coda_base.Frozen_ledger_hash.equal hash genesis_ledger_hash then
           Some Genesis_ledger.t
         else
-          let%bind last_epoch_ledger = local_state.last_epoch_ledger in
-          let last_epoch_ledger_hash =
-            Coda_base.Frozen_ledger_hash.of_ledger_hash
-              (Coda_base.Ledger.merkle_root last_epoch_ledger)
-          in
-          if Coda_base.Frozen_ledger_hash.equal hash last_epoch_ledger_hash
-          then Some last_epoch_ledger
-          else None
+          match local_state.last_epoch_ledger with
+          | None ->
+              Logger.error logger "epoch ledger is not available" ;
+              None
+          | Some last_epoch_ledger ->
+              let last_epoch_ledger_hash =
+                Coda_base.Frozen_ledger_hash.of_ledger_hash
+                  (Coda_base.Ledger.merkle_root last_epoch_ledger)
+              in
+              if Coda_base.Frozen_ledger_hash.equal hash last_epoch_ledger_hash
+              then Some last_epoch_ledger
+              else (
+                Logger.error logger
+                  "merkle root of epoch ledger in local state did not match \
+                   hash in consensus state" ;
+                None )
       in
       let%map account_location =
         Coda_base.Ledger.location_of_key ledger
@@ -1041,7 +1049,7 @@ module Make (Inputs : Inputs_intf) :
       ( transition |> Snark_transition.blockchain_state
       |> Blockchain_state.ledger_hash )
 
-  let select old_state new_state ~logger ~time_received =
+  let select ~existing ~candidate ~logger ~time_received =
     let open Consensus_state in
     let open Epoch_data in
     let logger = Logger.child logger "proof_of_stake" in
@@ -1060,15 +1068,15 @@ module Make (Inputs : Inputs_intf) :
     in
     Logger.info logger "SELECTING BEST CONSENSUS STATE" ;
     Logger.info logger
-      !"old consensus state: %{sexp:Consensus_state.value}"
-      old_state ;
+      !"existing consensus state: %{sexp:Consensus_state.value}"
+      existing ;
     Logger.info logger
-      !"new consensus state: %{sexp:Consensus_state.value}"
-      new_state ;
+      !"candidate consensus state: %{sexp:Consensus_state.value}"
+      candidate ;
     (* TODO: update time_received check and `Keep when it is not met *)
     if
       not
-        (time_in_epoch_slot new_state
+        (time_in_epoch_slot candidate
            Time.(of_span_since_epoch (Span.of_ms time_received)))
     then Logger.error logger "received a transition outside of it's slot time" ;
     (* TODO: add fork_before_checkpoint check *)
@@ -1079,53 +1087,52 @@ module Make (Inputs : Inputs_intf) :
     let ( < ) a b = Length.compare a b < 0 in
     let branches =
       [ ( ( lazy
-              ( old_state.last_epoch_data.lock_checkpoint
-              = new_state.last_epoch_data.lock_checkpoint )
+              ( existing.last_epoch_data.lock_checkpoint
+              = candidate.last_epoch_data.lock_checkpoint )
           , "last epoch lock checkpoints are equal" )
-        , ( lazy (old_state.length < new_state.length)
-          , "new state is longer than old state" ) )
+        , ( lazy (existing.length < candidate.length)
+          , "candidate is longer than existing" ) )
       ; ( ( lazy
-              ( old_state.last_epoch_data.start_checkpoint
-              = new_state.last_epoch_data.start_checkpoint )
+              ( existing.last_epoch_data.start_checkpoint
+              = candidate.last_epoch_data.start_checkpoint )
           , "last epoch start checkpoints are equal" )
         , ( lazy
-              ( old_state.last_epoch_data.length
-              < new_state.last_epoch_data.length )
-          , "new state last epoch is longer than old state last epoch" ) )
+              ( existing.last_epoch_data.length
+              < candidate.last_epoch_data.length )
+          , "candidate last epoch is longer than existing last epoch" ) )
         (* these two could be condensed into one entry *)
       ; ( ( lazy
-              ( old_state.curr_epoch_data.lock_checkpoint
-              = new_state.last_epoch_data.lock_checkpoint )
-          , "new state last epoch lock checkpoint is equal to old state \
+              ( existing.curr_epoch_data.lock_checkpoint
+              = candidate.last_epoch_data.lock_checkpoint )
+          , "candidate last epoch lock checkpoint is equal to existing \
              current epoch lock checkpoint" )
-        , ( lazy (old_state.length < new_state.length)
-          , "new state is longer than old state" ) )
+        , ( lazy (existing.length < candidate.length)
+          , "candidate is longer than existing" ) )
       ; ( ( lazy
-              ( old_state.last_epoch_data.lock_checkpoint
-              = new_state.curr_epoch_data.lock_checkpoint )
-          , "new state current epoch lock checkpoint is equal to old state \
+              ( existing.last_epoch_data.lock_checkpoint
+              = candidate.curr_epoch_data.lock_checkpoint )
+          , "candidate current epoch lock checkpoint is equal to existing \
              last epoch lock checkpoint" )
-        , ( lazy (old_state.length < new_state.length)
-          , "new state is longer than old state" ) )
+        , ( lazy (existing.length < candidate.length)
+          , "candidate is longer than existing" ) )
       ; ( ( lazy
-              ( old_state.curr_epoch_data.start_checkpoint
-              = new_state.last_epoch_data.start_checkpoint )
-          , "new state last epoch start checkpoint is equal to old state \
+              ( existing.curr_epoch_data.start_checkpoint
+              = candidate.last_epoch_data.start_checkpoint )
+          , "candidate last epoch start checkpoint is equal to existing \
              current epoch start checkpoint" )
         , ( lazy
-              ( old_state.curr_epoch_data.length
-              < new_state.last_epoch_data.length )
-          , "new state last epoch is longer than old state current epoch" ) )
+              ( existing.curr_epoch_data.length
+              < candidate.last_epoch_data.length )
+          , "candidate last epoch is longer than existing current epoch" ) )
       ; ( ( lazy
-              ( old_state.last_epoch_data.start_checkpoint
-              = new_state.curr_epoch_data.start_checkpoint )
-          , "new state current epoch start checkpoint is equal to old state \
+              ( existing.last_epoch_data.start_checkpoint
+              = candidate.curr_epoch_data.start_checkpoint )
+          , "candidate current epoch start checkpoint is equal to existing \
              last epoch start checkpoint" )
         , ( lazy
-              ( old_state.last_epoch_data.length
-              < new_state.curr_epoch_data.length )
-          , "new state current epoch is longer than old state last epoch" ) )
-      ]
+              ( existing.last_epoch_data.length
+              < candidate.curr_epoch_data.length )
+          , "candidate current epoch is longer than existing last epoch" ) ) ]
     in
     match
       List.find_map branches

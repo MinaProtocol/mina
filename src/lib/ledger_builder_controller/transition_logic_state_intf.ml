@@ -29,7 +29,7 @@ module type S = sig
     [@@deriving sexp]
   end
 
-  val apply_all : t -> Change.t list -> t
+  val apply_all : t -> Change.t list -> logger:Logger.t -> t
   (** Invariant: Changes must be applied to atomically result in a consistent state *)
 
   val create :

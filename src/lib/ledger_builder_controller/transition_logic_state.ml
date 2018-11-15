@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Make (Inputs : Inputs.Base.S) :
   Transition_logic_state_intf.S
@@ -110,20 +110,20 @@ module Make (Inputs : Inputs.Base.S) :
               assert_materialization_of t.locked_tip x ;
               assert_materialization_of t.longest_branch_tip last ) )
 
-  let apply_all t changes =
+  let apply_all t changes ~logger =
     assert_state_valid t ;
     let t' = List.fold changes ~init:t ~f:apply in
     try assert_state_valid t' ; t' with exn ->
-      Printf.printf
-        !"*** GOT FATAL EXCEPTION WHILE APPLYING CHANGES TO TRANSITION LOGIC \
-          STATE IN LEDGER BUILDER CONTROLLER\n" ;
-      Printf.printf
-        !"locked tip state hash: %s\n%!"
+      Logger.error logger
+        "fatal exception while applying changes to transition logic -- locked \
+         tip state hash: %s"
         (Base64.encode_string (State_hash.to_bytes t'.locked_tip.hash)) ;
       Option.iter t'.ktree ~f:(fun ktree ->
-          Transition_tree.Graph.output_graph Out_channel.stdout
-            (Transition_tree.to_graph ktree) ) ;
-      Printf.printf !"\n%!" ;
+          let filename, _ = Unix.mkstemp "lbc-graph" in
+          Out_channel.with_file filename ~f:(fun channel ->
+              Transition_tree.Graph.output_graph channel
+                (Transition_tree.to_graph ktree) ) ;
+          Logger.info logger "dot graph dumped to %s" filename ) ;
       raise exn
 
   let create ~consensus_local_state genesis_heavy =

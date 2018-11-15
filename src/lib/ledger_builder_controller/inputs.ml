@@ -104,8 +104,8 @@ module Base = struct
       (* This checks the SNARKs in State/LB and does the transition *)
 
       val select :
-           Consensus_state.value
-        -> Consensus_state.value
+           existing:Consensus_state.value
+        -> candidate:Consensus_state.value
         -> logger:Logger.t
         -> time_received:Unix_timestamp.t
         -> [`Keep | `Take]
