@@ -9,7 +9,9 @@ open Snark_bits
 open Fold_lib
 
 module Index = struct
-  type t = int [@@deriving bin_io]
+  include Int
+
+  let gen = Int.gen_incl 0 ((1 lsl Snark_params.ledger_depth) - 1)
 
   module Vector = struct
     include Int
@@ -24,6 +26,10 @@ module Index = struct
   end
 
   include (Bits.Vector.Make (Vector) : Bits_intf.S with type t := t)
+
+  let fold_bits = fold
+
+  let fold t = Fold.group3 ~default:false (fold_bits t)
 
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
 end

@@ -12,14 +12,6 @@ module Available_job = struct
   type ('a, 'd) t = Base of 'd | Merge of 'a * 'a [@@deriving sexp]
 end
 
-module type Spec_intf = sig
-  type data [@@deriving sexp_of]
-
-  type accum [@@deriving sexp_of]
-
-  type output [@@deriving sexp_of]
-end
-
 module State = struct
   include State
 
@@ -545,9 +537,6 @@ let current_data (state : ('a, 'd) State.t) =
 let parallelism : state:('a, 'd) State.t -> int =
  fun ~state -> State.parallelism state
 
-(*if the transaction queue does not have at least max_slots number of slots 
-before continuing onto the next queue, split max_slots = (x,y) 
-such that x = number of slots till the end of the current queue and y = max_slots - x (starts from the begining of the next queue)  *)
 let partition_if_overflowing ~max_slots state =
   let n = min (free_space ~state) max_slots in
   let parallelism = State.parallelism state in
