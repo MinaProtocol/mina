@@ -5,6 +5,7 @@ open Snarky
 open Tick
 open Let_syntax
 open Currency
+open Fold_lib
 
 module Merkle_tree =
   Snarky.Merkle_tree.Checked
@@ -43,6 +44,21 @@ let depth = Snark_params.ledger_depth
 
 include Data_hash.Make_full_size ()
 
+let merge ~height (h1 : t) (h2 : t) =
+  let open Tick.Pedersen in
+  State.digest
+    (hash_fold
+       Hash_prefix.merkle_tree.(height)
+       Fold.(Digest.fold (h1 :> field) +> Digest.fold (h2 :> field)))
+  |> of_hash
+
+let empty_hash =
+  Tick.Pedersen.digest_fold
+    (Tick.Pedersen.State.create Tick.Pedersen.params)
+    (Fold.string_triples "nothing up my sleeve") |> of_hash
+
+let of_digest = Fn.compose Fn.id of_hash
+      
 type path = Pedersen.Digest.t list
 
 type _ Request.t +=

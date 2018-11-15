@@ -41,6 +41,10 @@ struct
     ; location_tbl= Key.Table.create ()
     ; current_location= None }
 
+  let with_ledger ~name ~f =
+    let mask = create name in
+    f mask
+
   module Attached = struct
     type parent = Base.t
 
@@ -60,6 +64,11 @@ struct
     let create () =
       failwith
         "Mask.Attached.create: cannot create an attached mask; use \
+         Mask.create and Mask.set_parent"
+
+    let with_ledger ~name:_ ~f:_ =
+      failwith
+        "Mask.Attached.with_ledger: cannot create an attached mask; use \
          Mask.create and Mask.set_parent"
 
     let unset_parent t =
@@ -88,15 +97,22 @@ struct
     (* don't rely on a particular implementation *)
     let find_account t location = Location.Table.find t.account_tbl location
 
+    let find_all_accounts t = Location.Table.data t.account_tbl
+
     let set_account t location account =
       Location.Table.set t.account_tbl ~key:location ~data:account ;
-      set_location t (Account.public_key account) location
+      set_location t (Account.public_key_of_account account) location
 
     (* a read does a lookup in the account_tbl; if that fails, delegate to parent *)
     let get t location =
       match find_account t location with
       | Some account -> Some account
       | None -> Base.get (get_parent t) location
+
+    let account_list t =
+      let parent_accounts = Base.account_list (get_parent t) in
+      let mask_accounts = find_all_accounts t in
+      mask_accounts @ parent_accounts
 
     (* fixup_merkle_path patches a Merkle path reported by the parent, overriding
        with hashes which are stored in the mask
@@ -177,7 +193,7 @@ struct
       (* TODO : use stack database to save unused location, which can be
         used when allocating a location
       *)
-      Key.Table.remove t.location_tbl (Account.public_key account) ;
+      Key.Table.remove t.location_tbl (Account.public_key_of_account account) ;
       (* update hashes *)
       let account_address = Location.to_path_exn location in
       let account_hash = Hash.empty_account in
@@ -212,8 +228,8 @@ struct
       | Some existing_account ->
           if
             Key.equal
-              (Account.public_key account)
-              (Account.public_key existing_account)
+              (Account.public_key_of_account account)
+              (Account.public_key_of_account existing_account)
           then remove_account_and_update_hashes t location
       | None -> ()
 
@@ -259,7 +275,10 @@ struct
     let copy t =
       { t with
         account_tbl= Location.Table.copy t.account_tbl
-      ; hash_tbl= Addr.Table.copy t.hash_tbl }
+      ; location_tbl= Key.Table.copy t.location_tbl
+      ; hash_tbl= Addr.Table.copy t.hash_tbl
+      ; current_location = t.current_location
+      }
 
     let get_all_accounts_rooted_at_exn t address =
       (* accounts in parent and mask are disjoint sets *)
@@ -291,7 +310,11 @@ struct
 
     let num_accounts t = Location.Table.length t.account_tbl
 
-    let location_of_key t key = find_location t key
+    let location_of_key t key =
+      let mask_result = find_location t key in
+      match mask_result with
+      | Some _ -> mask_result
+      | None -> Base.location_of_key (get_parent t) key        
 
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
     let make_space_for _t _tot = failwith "make_space_for: not implemented"
@@ -324,11 +347,11 @@ struct
       (* removing accounts in parent succeeded, so proceed with removing accounts from mask *)
       List.iter mask_locations ~f:(remove_account_and_update_hashes t)
 
+    (* TODO : should destroy do a "commit" ? *)
     let destroy t =
-      Location.Table.iteri t.account_tbl ~f:(fun ~key ~data:_ ->
-          Location.Table.remove t.account_tbl key ) ;
-      Addr.Table.iteri t.hash_tbl ~f:(fun ~key ~data:_ ->
-          Addr.Table.remove t.hash_tbl key ) ;
+      Location.Table.clear t.account_tbl ;
+      Addr.Table.clear t.hash_tbl ;
+      Key.Table.clear t.location_tbl ;
       Base.destroy (get_parent t)
 
     (* NB: relies on location_of_key, not yet implemented for mask *)
@@ -366,19 +389,25 @@ struct
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t key account =
       match find_location t key with
-      | None ->
-          let maybe_location =
-            match t.current_location with
-            | None -> Some first_location
-            | Some loc -> Location.next loc
-          in
-          if not (Option.is_some maybe_location) then
-            Error Db_error.Out_of_leaves
-          else
-            let location = Option.value_exn maybe_location in
-            set t location account ;
-            t.current_location <- Some location ;
-            Ok (`Added, location)
+      | None -> (
+         (* not in mask, maybe in parent *)
+         match Base.location_of_key (get_parent t) key with
+         | Some location -> Ok (`Existed, location)
+         | None ->
+            (* not in parent, create new location *)
+            let maybe_location =
+              match t.current_location with
+              | None -> Some first_location
+              | Some loc -> Location.next loc
+            in
+            if not (Option.is_some maybe_location) then
+              Error Db_error.Out_of_leaves
+            else
+              let location = Option.value_exn maybe_location in
+              set t location account ;
+              set_location t key location;
+              t.current_location <- Some location ;
+              Ok (`Added, location) )
       | Some location -> Ok (`Existed, location)
 
     let get_or_create_account_exn t key account =
@@ -386,6 +415,15 @@ struct
       |> Result.map_error ~f:(fun err -> Db_error.Db_exception err)
       |> Result.ok_exn
 
+    let foldi t ~init ~f =
+      (* fold over parent, then mask *)
+      let parent_result = Base.foldi (get_parent t) ~init ~f in
+      Location.Table.fold t.account_tbl ~init:parent_result
+        ~f:(fun ~key:loc ~data:acct accum ->
+          (* loc is an account location, no exception can be raised here *)
+          let addr = Location.to_path_exn loc in
+          f addr accum acct)
+                            
     let sexp_of_location = Location.sexp_of_t
 
     let location_of_sexp = Location.t_of_sexp

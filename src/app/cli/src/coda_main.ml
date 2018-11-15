@@ -42,6 +42,10 @@ module Ledger_hash = struct
   include Ledger_hash.Stable.V1
 
   let to_bytes = Ledger_hash.to_bytes
+
+  let of_digest = Ledger_hash.of_digest
+
+  let merge = Ledger_hash.merge
 end
 
 module Frozen_ledger_hash = struct
@@ -367,12 +371,12 @@ struct
   module Ledger_builder_aux = Ledger_builder.Aux
 
   module Ledger_builder_transition = struct
-    type t = {old: Ledger_builder.t; diff: Ledger_builder_diff.t}
+    type t = {old: Ledger_builder.t sexp_opaque; diff: Ledger_builder_diff.t}
     [@@deriving sexp]
 
     module With_valid_signatures_and_proofs = struct
       type t =
-        { old: Ledger_builder.t
+        { old: Ledger_builder.t sexp_opaque
         ; diff: Ledger_builder_diff.With_valid_signatures_and_proofs.t }
       [@@deriving sexp]
     end
@@ -405,18 +409,23 @@ struct
 
   module Tip = struct
     type t =
-      { protocol_state: Protocol_state.value
+      { state: Protocol_state.value
       ; proof: Protocol_state_proof.t
-      ; ledger_builder: Ledger_builder.t }
-    [@@deriving sexp, bin_io, fields]
+      ; ledger_builder: Ledger_builder.t sexp_opaque }
+    [@@deriving sexp, fields]
+
+    type scan_state = Ledger_builder.Aux.t
 
     let of_transition_and_lb transition ledger_builder =
-      { protocol_state=
-          Consensus_mechanism.External_transition.protocol_state transition
+      { state= Consensus_mechanism.External_transition.protocol_state transition
       ; proof=
           Consensus_mechanism.External_transition.protocol_state_proof
             transition
       ; ledger_builder }
+
+    let bin_tip =
+      [%bin_type_class:
+        Protocol_state.value * Protocol_state_proof.t * Ledger_builder.Aux.t]
 
     let copy t = {t with ledger_builder= Ledger_builder.copy t.ledger_builder}
   end
@@ -561,9 +570,9 @@ struct
   module Sync_ledger =
     Syncable_ledger.Make (Ledger.Addr) (Account)
       (struct
-        include Merkle_hash
+        include Ledger_hash
 
-        let hash_account = Fn.compose Merkle_hash.of_digest Account.digest
+        let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
         let empty_account = hash_account Account.empty
       end)
@@ -571,7 +580,7 @@ struct
         include Ledger_hash
 
         let to_hash (h : t) =
-          Merkle_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
+          Ledger_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
       end)
       (struct
         include Ledger
@@ -793,7 +802,7 @@ module type Main_intf = sig
       val merkle_path :
            t
         -> Ledger.Location.t
-        -> [`Left of Merkle_hash.t | `Right of Merkle_hash.t] list
+        -> [`Left of Ledger_hash.t | `Right of Ledger_hash.t] list
 
       val num_accounts : t -> int
 
@@ -957,7 +966,8 @@ module type Main_intf = sig
 
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
 
-  val get_ledger : t -> Ledger_builder_hash.t -> Ledger.t Deferred.Or_error.t
+  val get_ledger :
+    t -> Ledger_builder_hash.t -> Ledger.account list Deferred.Or_error.t
 
   val receipt_chain_database : t -> Receipt_chain_database.t
 end

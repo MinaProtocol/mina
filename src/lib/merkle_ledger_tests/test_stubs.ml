@@ -106,6 +106,8 @@ module In_memory_kvdb : Intf.Key_value_database = struct
 
   type t = {uuid: Uuid.t; table: Bigstring_frozen.t Bigstring_frozen.Table.t}
 
+  let to_alist t = Bigstring_frozen.Table.to_alist t
+
   let get_uuid t = t.uuid
 
   let create ~directory:_ =
@@ -140,7 +142,7 @@ module Key = struct
 
   let empty = Account.empty.public_key
 
-  let to_string = Format.sprintf !"%{sexp: T.t}"
+  (*   let to_string = Format.sprintf !"%{sexp: T.t}" *)
 
   let gen_keys num_keys =
     (* TODO : the Quickcheck generator for Public_key.Compressed produces duplicates

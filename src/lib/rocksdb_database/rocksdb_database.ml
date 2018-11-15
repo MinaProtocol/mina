@@ -9,15 +9,16 @@ let create ~directory =
   Rocks.Options.set_create_if_missing opts true ;
   Rocks.open_db ~opts directory
 
-let destroy = Rocks.close
+let destroy t = Rocks.close t
 
-let get = Rocks.get ?pos:None ?len:None ?opts:None
+let get t ~(key : Bigstring.t) : Bigstring.t option =
+  Rocks.get ?pos:None ?len:None ?opts:None t key
 
-let set =
+let set t ~(key : Bigstring.t) ~(data : Bigstring.t) : unit =
   Rocks.put ?key_pos:None ?key_len:None ?value_pos:None ?value_len:None
-    ?opts:None
+    ?opts:None t key data
 
-let set_batch t ~key_data_pairs =
+let set_batch t ~(key_data_pairs : (Bigstring.t * Bigstring.t) list) : unit =
   let batch = Rocks.WriteBatch.create () in
   (* write to batch *)
   List.iter key_data_pairs ~f:(fun (key, data) ->
@@ -25,4 +26,19 @@ let set_batch t ~key_data_pairs =
   (* commit batch *)
   Rocks.write t batch
 
-let delete = Rocks.delete ?pos:None ?len:None ?opts:None
+let copy _t = failwith "copy: not implemented"
+
+let delete t ~(key : Bigstring.t) : unit =
+  Rocks.delete ?pos:None ?len:None ?opts:None t key
+
+let to_alist t : (Bigstring.t * Bigstring.t) list =
+  let iterator = Rocks.Iterator.create t in
+  Rocks.Iterator.seek_to_first iterator ;
+  let rec loop accum =
+    if Rocks.Iterator.is_valid iterator then
+      let key = Rocks.Iterator.get_key iterator in
+      let value = Rocks.Iterator.get_value iterator in
+      loop ((key, value) :: accum)
+    else accum
+  in
+  loop []

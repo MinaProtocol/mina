@@ -512,8 +512,8 @@ end = struct
         scan_state
         (* Invariant: this is the ledger after having applied all the transactions in
     the above state. *)
-    ; ledger: Ledger.t }
-  [@@deriving sexp, bin_io]
+    ; ledger: Ledger.t sexp_opaque }
+  [@@deriving sexp]
 
   let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
 
@@ -627,6 +627,11 @@ end = struct
     | Ok s -> `Non_empty s
     | Error `Empty -> `Empty
     | Error (`Error e) -> failwithf !"statement_exn: %{sexp:Error.t}" e ()
+
+  (* TODO : add this for building ledger_builder when loading tip;
+     takes no hash, does no checking, unlike the of_aux... fun below; is this OK?
+   *)
+  let of_aux_and_ledger_unchecked ~ledger ~aux = {ledger; scan_state= aux}
 
   let of_aux_and_ledger ~snarked_ledger_hash ~ledger ~aux =
     let open Deferred.Or_error.Let_syntax in
@@ -1909,6 +1914,8 @@ let%test_module "test" =
         (*TODO: Test with a ledger that's more comprehensive*)
         type t = int ref [@@deriving sexp, bin_io, compare]
 
+        type account = int
+
         type ledger_hash = Ledger_hash.t
 
         type transaction = Transaction.t [@@deriving sexp, bin_io]
@@ -1919,7 +1926,7 @@ let%test_module "test" =
           let transaction t = Ok t
         end
 
-        let create : unit -> t = fun () -> ref 0
+        let create : string -> t = fun _s -> ref 0
 
         let copy : t -> t = fun t -> ref !t
 
@@ -1953,6 +1960,8 @@ let%test_module "test" =
           Or_error.return ()
 
         let undo t (txn : Undo.t) = undo_transaction t txn
+
+        let account_list t = [!t]
       end
 
       module Sparse_ledger = struct

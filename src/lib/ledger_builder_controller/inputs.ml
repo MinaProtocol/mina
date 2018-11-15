@@ -145,6 +145,7 @@ module Base = struct
       with type ledger_builder := Ledger_builder.t
        and type protocol_state := Consensus_mechanism.Protocol_state.value
        and type protocol_state_proof := Protocol_state_proof.t
+       and type scan_state := Ledger_builder.Aux.t
        and type external_transition :=
                   Consensus_mechanism.External_transition.t
 

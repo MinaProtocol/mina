@@ -1,16 +1,13 @@
 open Core
 
-module Make (Key : sig
-  include Intf.Key
-
-  val to_string : t -> string
-end)
-(Account : Intf.Account with type key := Key.t)
-(Hash : Intf.Hash with type account := Account.t)
-(Depth : Intf.Depth)
-(Location : Location_intf.S)
-(Kvdb : Intf.Key_value_database)
-(Storage_locations : Intf.Storage_locations) :
+module Make
+    (Key : Intf.Key)
+    (Account : Intf.Account with type key := Key.t)
+    (Hash : Intf.Hash with type account := Account.t)
+    (Depth : Intf.Depth)
+    (Location : Location_intf.S)
+    (Kvdb : Intf.Key_value_database)
+    (Storage_locations : Intf.Storage_locations) :
   Database_intf.S
   with module Addr = Location.Addr
   with type account := Account.t
@@ -44,6 +41,13 @@ end)
 
   let destroy {uuid= _; kvdb} = Kvdb.destroy kvdb
 
+  let with_ledger ~name ~f =
+    let t = create name in
+    try
+      let result = f t in
+      destroy t ; result
+    with exn -> destroy t ; raise exn
+
   let empty_hashes =
     let empty_hashes =
       Array.create ~len:(Depth.depth + 1) Hash.empty_account
@@ -75,6 +79,21 @@ end)
     match get_bin mdb location Hash.bin_read_t with
     | Some hash -> hash
     | None -> Immutable_array.get empty_hashes (Location.height location)
+
+  let account_list_bin {kvdb; _} account_bin_read : Account.t list =
+    let all_keys_values = Kvdb.to_alist kvdb in
+    (* see comment at top of location.ml about encoding of locations *)
+     let account_location_byte = Char.to_int '\xfe' in
+    (* just want list of locations and accounts, ignoring other locations *)
+    let locations_accounts_bin =
+      List.filter all_keys_values ~f:(fun (loc, _v) ->
+          let ch = Bigstring.get_int8 loc ~pos:0 in
+          Int.equal ch account_location_byte )
+    in
+    List.map locations_accounts_bin ~f:(fun (_location_bin, account_bin) ->
+        account_bin_read account_bin ~pos_ref:(ref 0) )
+
+  let account_list mdb = account_list_bin mdb Account.bin_read_t
 
   let set_raw {kvdb; _} location bin =
     Kvdb.set kvdb ~key:(Location.serialize location) ~data:bin
@@ -128,8 +147,12 @@ end)
       assert (Location.is_generic location) ;
       get_raw mdb location
 
+    (* encodes a key as a location used as a database key, so we can find the account 
+       location associated with that key 
+     *)
     let build_location key =
-      Location.build_generic (Bigstring.of_string ("$" ^ Key.to_string key))
+      Location.build_generic
+        (Bigstring.of_string ("$" ^ Format.sprintf !"%{sexp: Key.t}" key))
 
     let get mdb key =
       match get_generic mdb (build_location key) with
@@ -303,7 +326,8 @@ end)
         | key :: rest -> (
           match Account_location.get t key with
           | Ok loc -> loop rest (loc :: accum)
-          | Error err -> raise (Db_error.Db_exception err) )
+          | Error err ->
+             raise (Db_error.Db_exception err) )
       in
       loop keys []
     in
@@ -338,4 +362,23 @@ end)
   let merkle_path_at_index_exn t index =
     let addr = Addr.of_int_exn index in
     merkle_path_at_addr_exn t addr
+
+  (* N.B.: loads entire database into memory
+     might be better for the underlying database to expose its 
+     iteration mechanism, and load one entry at a time
+   *)
+  let foldi t ~init ~f =
+    let alist = List.map (Kvdb.to_alist t.kvdb) ~f:(fun (loc_bin,acct_bin) ->
+                    ((Location.bin_read_t loc_bin ~pos_ref:(ref 0)),
+                     (Account.bin_read_t acct_bin ~pos_ref:(ref 0))))
+    in
+    List.fold_left
+      alist
+      ~init
+      ~f:(fun accum (loc,acct) ->
+        (* invariant: loc is an account location, so the 
+           to_path_exn should never raise an exception here
+         *)
+        let address = Location.to_path_exn loc in
+        f address accum acct)
 end

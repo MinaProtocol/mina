@@ -127,9 +127,14 @@ let fold_bits ({public_key; balance; nonce; receipt_chain_hash; delegate} : t)
   +> Receipt.Chain_hash.fold receipt_chain_hash
   +> Public_key.Compressed.fold delegate
 
-let hash_prefix = Hash_prefix.account
+let crypto_hash_prefix = Hash_prefix.account
 
-let hash t = Pedersen.hash_fold hash_prefix (fold_bits t)
+let crypto_hash t = Pedersen.hash_fold crypto_hash_prefix (fold_bits t)
+
+let empty_crypto_hash =
+  Pedersen.digest_fold
+    (Pedersen.State.create Pedersen.params)
+    (Fold_lib.Fold.string_triples "nothing up my sleeve")
 
 let empty =
   { public_key= Public_key.Compressed.empty
@@ -138,11 +143,9 @@ let empty =
   ; receipt_chain_hash= Receipt.Chain_hash.empty
   ; delegate= Public_key.Compressed.empty }
 
-let digest t = Pedersen.State.digest (hash t)
+let digest t = Pedersen.State.digest (crypto_hash t)
 
-let empty_hash = digest empty
-
-let pubkey t = t.public_key
+let public_key_of_account (t : t) = t.public_key
 
 let create public_key balance =
   { public_key
@@ -159,8 +162,9 @@ let gen =
 
 module Checked = struct
   let hash t =
-    var_to_triples t >>= Pedersen.Checked.hash_triples ~init:hash_prefix
+    var_to_triples t >>= Pedersen.Checked.hash_triples ~init:crypto_hash_prefix
 
   let digest t =
-    var_to_triples t >>= Pedersen.Checked.digest_triples ~init:hash_prefix
+    var_to_triples t
+    >>= Pedersen.Checked.digest_triples ~init:crypto_hash_prefix
 end

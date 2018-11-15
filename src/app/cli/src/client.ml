@@ -485,7 +485,7 @@ let dump_ledger =
          >>| function
          | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e
          | Ok (Error e) -> printf !"Ledger not found: %{sexp:Error.t}\n" e
-         | Ok (Ok ledger) -> printf !"%{sexp:Ledger.t}\n" ledger ))
+         | Ok (Ok ledger) -> printf !"%{sexp:Account.t list}\n" ledger ))
 
 let command =
   Command.group ~summary:"Lightweight client process"

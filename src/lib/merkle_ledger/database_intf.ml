@@ -9,7 +9,7 @@ module type S = sig
 
   type key
 
-  type t
+  type t [@@deriving sexp]
 
   module Db_error : sig
     type t = Account_location_not_found | Out_of_leaves | Malformed_database
@@ -23,11 +23,13 @@ module type S = sig
 
   val get_uuid : t -> Uuid.t
 
-  val create : unit -> t
+  val create : string -> t
 
   val location_of_key : t -> key -> location option
 
   val destroy : t -> unit
+
+  val with_ledger : name:string -> f:(t -> 'a) -> 'a
 
   val to_list : t -> account list
 
@@ -49,6 +51,8 @@ module type S = sig
   val get_or_create_account_exn :
     t -> key -> account -> [`Added | `Existed] * location
 
+  val foldi : t -> init:'accum -> f:(Addr.t -> 'accum -> account -> 'accum) -> 'accum
+    
   val merkle_path : t -> location -> Path.t
 
   val merkle_path_at_index_exn : t -> int -> Path.t
@@ -56,6 +60,8 @@ module type S = sig
   val remove_accounts_exn : t -> key list -> unit
 
   val copy : t -> t
+
+  val account_list : t -> account list
 
   include
     Syncable_intf.S

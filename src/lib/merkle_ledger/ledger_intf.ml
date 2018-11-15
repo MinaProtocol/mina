@@ -20,6 +20,9 @@ module type S = sig
   end
 
   val create : unit -> t
+  (** unlike the database create, does not take a name argument *)
+
+  val with_ledger : f:(t -> 'a) -> 'a
 
   val to_list : t -> account list
 

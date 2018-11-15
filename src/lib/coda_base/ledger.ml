@@ -3,19 +3,51 @@ open Snark_params
 open Currency
 open Signature_lib
 
+module Hash = struct
+  type t = Ledger_hash.t [@@deriving bin_io, sexp]
+
+  let merge = Ledger_hash.merge
+
+  let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
+
+  let empty_account = hash_account Account.empty
+end
+
+module Depth = struct
+  let depth = ledger_depth
+end
+
+module Location : Merkle_ledger.Location_intf.S =
+  Merkle_ledger.Location.Make (Depth)
+
+module Location_at_depth = Location
+
 module Make
-    (Ledger : Merkle_ledger.Merkle_ledger_intf.S
-              with type root_hash := Merkle_hash.t
-               and type hash := Merkle_hash.t
-               and type account := Account.t
-               and type key := Public_key.Compressed.t) =
+    (MaskedLedger : Merkle_ledger.Database_intf.S
+                    with type hash := Ledger_hash.t
+                     and type account := Account.t
+                     and type location := Location.t
+                     and type key := Public_key.Compressed.t) =
 struct
-  include Ledger
+  include MaskedLedger
+
+  (* inside MaskedLedger, the functor argument has assigned to location, account, and path
+     but the module signature for the functor result wants them, so we declare them here *)
+  type location = Location.t
+
+  type account = Account.t
+
+  type path = Path.t
+
+  let fold_until t ~init ~f ~finish =
+    let accounts = account_list t in
+    List.fold_until accounts ~init ~f ~finish
 
   let create_new_account_exn t pk account =
     let action, _ = get_or_create_account_exn t pk account in
     assert (action = `Added)
 
+  (* shadows definition in MaskedLedger, extra assurance hash is of right type  *)
   let merkle_root t =
     Ledger_hash.of_hash (merkle_root t :> Tick.Pedersen.Digest.t)
 
@@ -56,9 +88,9 @@ struct
     in
     (key, get ledger loc |> Option.value_exn, loc)
 
-  let create_empty ledger k =
+  let create_empty ledger key =
     let start_hash = merkle_root ledger in
-    match get_or_create_account_exn ledger k Account.empty with
+    match get_or_create_account_exn ledger key Account.empty with
     | `Existed, _ -> failwith "create_empty for a key already present"
     | `Added, new_loc ->
         Debug_assert.debug_assert (fun () ->
@@ -373,41 +405,122 @@ struct
     root
 
   let%test "apply fee transfer to the same account" =
-    let t = create () in
-    let {Keypair.public_key; _} = Signature_lib.Keypair.create () in
-    let public_key = Public_key.compress public_key in
-    let fee1 = 2 in
-    let fee2 = 5 in
-    let fee_transfer =
-      Fee_transfer.Two
-        ((public_key, fee1 |> Fee.of_int), (public_key, fee2 |> Fee.of_int))
-    in
-    assert (apply_fee_transfer t fee_transfer |> Or_error.is_ok) ;
-    let _, account, _ = get_or_create t public_key in
-    let expected_account =
-      let balance = Balance.of_int (fee1 + fee2) in
-      {(Account.initialize public_key) with balance}
-    in
-    Account.equal expected_account account
+    with_ledger ~name:"apply_fee_transfer_same_account" ~f:(fun t ->
+        let {Keypair.public_key; _} = Signature_lib.Keypair.create () in
+        let public_key = Public_key.compress public_key in
+        let fee1 = 2 in
+        let fee2 = 5 in
+        let fee_transfer =
+          Fee_transfer.Two
+            ((public_key, fee1 |> Fee.of_int), (public_key, fee2 |> Fee.of_int))
+        in
+        assert (apply_fee_transfer t fee_transfer |> Or_error.is_ok) ;
+        let _, account, _ = get_or_create t public_key in
+        let expected_account =
+          let balance = Balance.of_int (fee1 + fee2) in
+          {(Account.initialize public_key) with balance}
+        in
+        Account.equal expected_account account )
 end
 
-module Ledger = struct
-  include Merkle_ledger.Ledger.Make (Public_key.Compressed) (Account)
-            (struct
-              type t = Merkle_hash.t [@@deriving sexp, hash, compare, bin_io]
+module Masked_ledger = struct
+  open Merkle_ledger
 
-              let merge = Merkle_hash.merge
+  module Key = struct
+    module T = struct
+      type t = Account.key [@@deriving sexp, bin_io, compare, hash, eq]
+    end
 
-              let hash_account =
-                Fn.compose Merkle_hash.of_digest Account.digest
+    let empty = Account.empty.public_key
 
-              let empty_account = hash_account Account.empty
-            end)
-            (struct
-              let depth = ledger_depth
-            end)
+    include T
+    include Hashable.Make_binable (T)
+  end
 
-  type path = Path.t
+  module Kvdb : Intf.Key_value_database = Rocksdb_database
+
+  (* TODO : should this be persistent? *)
+  module Sdb : Intf.Stack_database = struct
+    type t = Bigstring.t Stack.t
+
+    let create ~filename:_ = Stack.create ()
+
+    let destroy t = Stack.clear t
+
+    let push t loc = Stack.push t loc
+
+    let pop t = Stack.pop t
+
+    let length t = Stack.length t
+
+    let copy t = Stack.copy t
+  end
+
+  module Storage_locations : Intf.Storage_locations = struct
+    let stack_db_file = "coda_stack_db"
+
+    let key_value_db_dir = "coda_key_value_db"
+  end
+
+  module Db : sig
+    include
+      Merkle_mask.Base_merkle_tree_intf.S
+      with module Addr = Location_at_depth.Addr
+       and type account := Account.t
+       and type hash := Hash.t
+       and type key := Key.t
+       and type location := Location_at_depth.t
+  end =
+    Database.Make (Key) (Account) (Hash) (Depth) (Location_at_depth) (Kvdb)
+      (Sdb)
+      (Storage_locations)
+
+  module Mask :
+    Merkle_mask.Masking_merkle_tree_intf.S
+    with module Addr = Location_at_depth.Addr
+     and module Attached.Addr = Location_at_depth.Addr
+    with type account := Account.t
+     and type location := Location_at_depth.t
+     and type key := Key.t
+     and type hash := Hash.t
+     and type parent := Db.t =
+    Merkle_mask.Masking_merkle_tree.Make (Key) (Account) (Hash)
+      (Location_at_depth)
+      (Db)
+
+  module Maskable :
+    Merkle_mask.Maskable_merkle_tree_intf.S
+    with module Addr = Location_at_depth.Addr
+    with type account := Account.t
+     and type location := Location_at_depth.t
+     and type key := Key.t
+     and type hash := Hash.t
+     and type unattached_mask := Mask.t
+     and type attached_mask := Mask.Attached.t =
+    Merkle_mask.Maskable_merkle_tree.Make (Key) (Account) (Hash)
+      (Location_at_depth)
+      (Db)
+      (Mask)
+
+  include Mask.Attached
+
+  (* Mask.Attached.create () fails, can't create an attached mask directly
+     shadow create in order to create an attached mask
+  *)
+  let create name =
+    let maskable = Maskable.create name in
+    let mask = Mask.create name in
+    Maskable.register_mask maskable mask
+
+  let with_ledger ~name ~f =
+    let ledger = create name in
+    try
+      Printexc.record_backtrace true;
+      let result = f ledger in
+      destroy ledger ;
+      result
+    with exn ->
+      destroy ledger ; raise exn
 end
 
-include Make (Ledger)
+include Make (Masked_ledger)

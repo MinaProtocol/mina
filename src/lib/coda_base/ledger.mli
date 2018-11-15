@@ -1,13 +1,28 @@
 open Core
-open Import
+open Signature_lib
+
+module Location : Merkle_ledger.Location_intf.S
 
 include
-  Merkle_ledger.Merkle_ledger_intf.S
-  with type root_hash := Ledger_hash.t
-   and type hash := Merkle_hash.t
+  Merkle_ledger.Database_intf.S
+  with type hash := Ledger_hash.t
    and type account := Account.t
    and type key := Public_key.Compressed.t
+   and type location := Location.t
 
+type account = Account.t
+
+type path = Path.t
+
+(* TODO : this is required by Coda_main.Main_intf.Ledger; how to reconcile with Database_intf.S ? *)
+val fold_until :
+     t
+  -> init:'accum
+  -> f:('accum -> Account.t -> ('accum, 'stop) Base.Continue_or_stop.t)
+  -> finish:('accum -> 'stop)
+  -> 'stop
+
+(* END of TODO *)
 module Undo : sig
   module User_command : sig
     module Common : sig
@@ -60,3 +75,5 @@ val merkle_root_after_user_command_exn :
   t -> User_command.With_valid_signature.t -> Ledger_hash.t
 
 val create_empty : t -> Public_key.Compressed.t -> Path.t * Account.t
+
+val num_accounts : t -> int

@@ -69,39 +69,44 @@ let%test_module "Database integration test" =
           let accounts =
             List.map2_exn public_keys balances ~f:Account.create
           in
-          let db = DB.create () in
-          let ledger = Ledger.create () in
-          let enumerate_dir_combinations max_depth =
-            Sequence.range 0 (max_depth - 1)
-            |> Sequence.fold ~init:[[]] ~f:(fun acc _ ->
-                   acc
-                   @ List.map acc ~f:(List.cons Direction.Left)
-                   @ List.map acc ~f:(List.cons Direction.Right) )
-          in
-          List.iter accounts ~f:(fun ({Account.public_key; _} as account) ->
-              ignore @@ DB.get_or_create_account_exn db public_key account ;
-              ignore
-              @@ Ledger.get_or_create_account_exn ledger public_key account ) ;
-          let binary_tree = Binary_tree.set_accounts accounts in
-          Sequence.iter
-            (enumerate_dir_combinations Depth.depth |> Sequence.of_list)
-            ~f:(fun dirs ->
-              let db_hash =
-                DB.get_inner_hash_at_addr_exn db (DB.Addr.of_directions dirs)
-              in
-              let ledger_hash =
-                Ledger.get_inner_hash_at_addr_exn ledger
-                  (Ledger.Addr.of_directions dirs)
-              in
-              let binary_hash =
-                Binary_tree.get_inner_hash_at_addr_exn binary_tree dirs
-              in
-              check_hash
-                (module Binary_tree_visualizor)
-                (module Ledger_visualizor)
-                (binary_tree, binary_hash) (ledger, ledger_hash) ;
-              check_hash
-                (module Binary_tree_visualizor)
-                (module DB_visualizor)
-                (binary_tree, binary_hash) (db, db_hash) ) )
+          let name = "databases_equiv_hash" in
+          DB.with_ledger ~name ~f:(fun db ->
+              Ledger.with_ledger ~f:(fun ledger ->
+                  let enumerate_dir_combinations max_depth =
+                    Sequence.range 0 (max_depth - 1)
+                    |> Sequence.fold ~init:[[]] ~f:(fun acc _ ->
+                           acc
+                           @ List.map acc ~f:(List.cons Direction.Left)
+                           @ List.map acc ~f:(List.cons Direction.Right) )
+                  in
+                  List.iter accounts
+                    ~f:(fun ({Account.public_key; _} as account) ->
+                      ignore
+                      @@ DB.get_or_create_account_exn db public_key account ;
+                      ignore
+                      @@ Ledger.get_or_create_account_exn ledger public_key
+                           account ) ;
+                  let binary_tree = Binary_tree.set_accounts accounts in
+                  Sequence.iter
+                    (enumerate_dir_combinations Depth.depth |> Sequence.of_list)
+                    ~f:(fun dirs ->
+                      let db_hash =
+                        DB.get_inner_hash_at_addr_exn db
+                          (DB.Addr.of_directions dirs)
+                      in
+                      let ledger_hash =
+                        Ledger.get_inner_hash_at_addr_exn ledger
+                          (Ledger.Addr.of_directions dirs)
+                      in
+                      let binary_hash =
+                        Binary_tree.get_inner_hash_at_addr_exn binary_tree dirs
+                      in
+                      check_hash
+                        (module Binary_tree_visualizor)
+                        (module Ledger_visualizor)
+                        (binary_tree, binary_hash) (ledger, ledger_hash) ;
+                      check_hash
+                        (module Binary_tree_visualizor)
+                        (module DB_visualizor)
+                        (binary_tree, binary_hash) (db, db_hash) ) ) ) )
   end )

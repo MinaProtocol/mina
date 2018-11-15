@@ -46,7 +46,7 @@ module Make (Depth : Intf.Depth) = struct
               Format.pp_print_string fmt (Bigstring.to_string bstr)]
       | Account of Addr.t
       | Hash of Addr.t
-    [@@deriving hash, sexp, compare, eq]
+    [@@deriving hash, sexp, compare, eq, bin_io]
   end
 
   include T

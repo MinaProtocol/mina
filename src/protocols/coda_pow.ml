@@ -131,7 +131,7 @@ module type Proof_intf = sig
 end
 
 module type Ledger_intf = sig
-  type t [@@deriving sexp, bin_io]
+  type t
 
   type transaction
 
@@ -145,7 +145,9 @@ module type Ledger_intf = sig
 
   type ledger_hash
 
-  val create : unit -> t
+  type account
+
+  val create : string -> t
 
   val copy : t -> t
 
@@ -156,6 +158,8 @@ module type Ledger_intf = sig
   val apply_transaction : t -> transaction -> Undo.t Or_error.t
 
   val undo : t -> Undo.t -> unit Or_error.t
+
+  val account_list : t -> account list
 end
 
 module Fee = struct
@@ -476,7 +480,7 @@ module type Ledger_builder_transition_intf = sig
 end
 
 module type Ledger_builder_base_intf = sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp]
 
   type diff
 
@@ -507,6 +511,8 @@ module type Ledger_builder_base_intf = sig
     -> ledger:ledger
     -> aux:Aux.t
     -> t Or_error.t Deferred.t
+
+  val of_aux_and_ledger_unchecked : ledger:ledger -> aux:Aux.t -> t
 
   val copy : t -> t
 
@@ -609,13 +615,21 @@ module type Tip_intf = sig
 
   type ledger_builder
 
+  (* serializable component of the ledger builder *)
+  type scan_state
+
   type external_transition
 
+  (* N.B.: can't derive bin_io for ledger builder containing persistent ledger *)
   type t =
-    { protocol_state: protocol_state
+    { state: protocol_state
     ; proof: protocol_state_proof
     ; ledger_builder: ledger_builder }
-  [@@deriving sexp, bin_io, fields]
+  [@@deriving sexp, fields]
+
+  (* serializer for tip components other than the ledger in the ledger builder *)
+  val bin_tip :
+    (protocol_state * protocol_state_proof * scan_state) Bin_prot.Type_class.t
 
   val of_transition_and_lb : external_transition -> ledger_builder -> t
 

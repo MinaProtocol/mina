@@ -120,6 +120,17 @@ end) : S = struct
       module T = struct
         type nonrec t = t
 
+        include Binable.Of_binable (struct
+                    type t = int * string [@@deriving bin_io]
+                  end)
+                  (struct
+                    type nonrec t = t
+
+                    let to_binable = to_tuple
+
+                    let of_binable = of_tuple
+                  end)
+
         let sexp_of_t = Fn.compose sexp_of_string to_string
 
         let t_of_sexp =
@@ -142,17 +153,6 @@ end) : S = struct
 
       include T
       include Hashable.Make (T)
-
-      include Binable.Of_binable (struct
-                  type t = int * string [@@deriving bin_io]
-                end)
-                (struct
-                  type nonrec t = t
-
-                  let to_binable = to_tuple
-
-                  let of_binable = of_tuple
-                end)
     end
   end
 

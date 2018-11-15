@@ -193,8 +193,8 @@ module Make (Inputs : Inputs_intf) :
         if
           not
             (Protocol_state.equal_value
-               (old_longest_branch_tip |> With_hash.data |> Tip.protocol_state)
-               (new_longest_branch_tip |> With_hash.data |> Tip.protocol_state))
+               (old_longest_branch_tip |> With_hash.data |> Tip.state)
+               (new_longest_branch_tip |> With_hash.data |> Tip.state))
         then
           Linear_pipe.write t.strongest_tip_writer
             (With_hash.data new_longest_branch_tip, transition)
@@ -417,9 +417,7 @@ module Make (Inputs : Inputs_intf) :
     and ktree = Transition_logic_state.ktree old_state in
     match ktree with
     | None -> (
-        let source_state =
-          Tip.protocol_state (With_hash.data longest_branch_tip)
-        in
+        let source_state = (With_hash.data longest_branch_tip).state in
         let target_state =
           External_transition.protocol_state
             (With_hash.data transition_with_hash)

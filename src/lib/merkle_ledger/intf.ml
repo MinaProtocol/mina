@@ -19,7 +19,7 @@ module type Account = sig
 
   type key
 
-  val public_key : t -> key
+  val public_key_of_account : t -> key
 
   val empty : t
 end
@@ -58,6 +58,8 @@ module type Key_value_database = sig
   val set_batch : t -> key_data_pairs:(Bigstring.t * Bigstring.t) list -> unit
 
   val delete : t -> key:Bigstring.t -> unit
+
+  val to_alist : t -> (Bigstring.t * Bigstring.t) list
 end
 
 module type Storage_locations = sig

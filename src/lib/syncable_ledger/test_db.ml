@@ -61,7 +61,7 @@ struct
     let make_space_for = MT.make_space_for
 
     let load_ledger num_accounts (balance : int) =
-      let ledger = MT.create () in
+      let ledger = MT.create "test_db:load_ledger" in
       let keys = Key.gen_keys num_accounts in
       let currency_balance = Currency.Balance.of_int balance in
       List.iter keys ~f:(fun key ->

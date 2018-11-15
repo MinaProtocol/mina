@@ -17,7 +17,7 @@ module type S = sig
 
   module Addr : Merkle_address.S
 
-  val create : unit -> t
+  val create : string -> t
   (** create a mask with no parent *)
 
   module Attached : sig

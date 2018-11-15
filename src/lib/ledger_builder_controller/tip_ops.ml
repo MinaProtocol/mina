@@ -46,7 +46,7 @@ module Make (Inputs : Inputs.Base.S) = struct
     in
     let tip' =
       { t with
-        Tip.protocol_state= External_transition.protocol_state transition
+        state= External_transition.protocol_state transition
       ; proof= External_transition.protocol_state_proof transition }
     in
     let res = {With_hash.data= tip'; hash= transition_state_hash} in
