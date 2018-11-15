@@ -208,22 +208,7 @@ struct
             Key.equal
               (Account.public_key account)
               (Account.public_key existing_account)
-          then (
-            (* remove from account table *)
-            remove_account t location ;
-            (* update hashes *)
-            let account_address = Location.to_path_exn location in
-            let account_hash = Hash.empty_account in
-            let merkle_path = merkle_path t location in
-            let addresses_and_hashes =
-              addresses_and_hashes_from_merkle_path_exn merkle_path
-                account_address account_hash
-            in
-            List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
-                set_hash t addr hash )
-            (* TODO : for the "else", move account to new location in mask, because there's a conflict
-            with parent; see issue #1048
-          *) )
+          then remove_account_and_update_hashes t location
       | None -> ()
 
     (* as for accounts, we see if we have it in the mask, else delegate to parent *)
