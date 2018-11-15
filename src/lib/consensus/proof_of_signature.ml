@@ -15,9 +15,16 @@ module Global_public_key = struct
     Public_key.Compressed.of_base64_exn
       "KBWuaAm5Sl5jH/dlpiTKQeUUsty/4Rq6Xz2Py2Y2i/VweJmDHwUAAAAB"
 
+  let genesis_private_key = Global_signer_private_key.t
+
   [%%else]
 
-  let compressed = fst Sample_keypairs.keypairs.(0)
+  let compressed =
+    Public_key.compress
+      (Genesis_ledger.largest_account_keypair_exn ()).public_key
+
+  let genesis_private_key =
+    (Genesis_ledger.largest_account_keypair_exn ()).private_key
 
   [%%endif]
 
@@ -50,7 +57,19 @@ module Make (Inputs : Inputs_intf) :
   module Local_state = struct
     type t = unit [@@deriving sexp]
 
-    let create () = ()
+    let create _ = ()
+  end
+
+  module Prover_state = struct
+    include Unit
+
+    let handler _ _ = Snarky.Request.unhandled
+  end
+
+  module Proposal_data = struct
+    include Private_key
+
+    let prover_state _ = ()
   end
 
   module Blockchain_state =
@@ -60,12 +79,7 @@ module Make (Inputs : Inputs_intf) :
   module Consensus_transition_data = struct
     type 'signature t_ = {signature: 'signature} [@@deriving bin_io, sexp]
 
-    module Elem = struct
-      type t = [`Signed of Signature.Stable.V1.t | `Genesis]
-      [@@deriving bin_io, sexp]
-    end
-
-    type value = Elem.t t_ [@@deriving bin_io, sexp]
+    type value = Signature.Stable.V1.t t_ [@@deriving bin_io, sexp]
 
     type var = Signature.var t_
 
@@ -75,18 +89,7 @@ module Make (Inputs : Inputs_intf) :
      fun H_list.([signature]) -> {signature}
 
     let data_spec =
-      let open Snark_params.Tock in
-      let inner_typ : (Signature.var, Elem.t) Snark_params.Tick.Typ.t =
-        Snark_params.Tick.Typ.transport
-          Blockchain_state.Signature.Signature.typ
-          ~there:(function
-            | `Genesis -> (Field.one, Field.one)
-            | `Signed signature -> signature)
-          ~back:(fun (x, y) ->
-            if Field.equal x Field.one && Field.equal y Field.one then `Genesis
-            else `Signed (x, y) )
-      in
-      Snark_params.Tick.Data_spec.[inner_typ]
+      Snark_params.Tick.Data_spec.[Blockchain_state.Signature.Signature.typ]
 
     let typ =
       Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
@@ -94,11 +97,12 @@ module Make (Inputs : Inputs_intf) :
         ~value_of_hlist:of_hlist
 
     let create_value ~private_key blockchain_state =
-      { signature=
-          `Signed
-            (Blockchain_state.Signature.sign private_key blockchain_state) }
+      {signature= Blockchain_state.Signature.sign private_key blockchain_state}
 
-    let genesis = {signature= `Genesis}
+    let genesis =
+      { signature=
+          Blockchain_state.Signature.sign Global_public_key.genesis_private_key
+            Blockchain_state.genesis }
   end
 
   module Consensus_state = struct
@@ -166,25 +170,27 @@ module Make (Inputs : Inputs_intf) :
     module Genesis_ledger = Inputs.Genesis_ledger
     module Blockchain_state = Blockchain_state
     module Consensus_data = Consensus_transition_data
+    module Prover_state = Prover_state
   end)
 
   module Internal_transition =
     Internal_transition.Make (Ledger_builder_diff) (Snark_transition)
+      (Prover_state)
   module External_transition =
     External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
   let block_interval_ms = Time.Span.to_ms proposal_interval
 
-  let generate_transition ~previous_protocol_state ~blockchain_state
-      ~local_state:_ ~time:_ ~keypair ~transactions:_ ~snarked_ledger_hash:_
-      ~supply_increase:_ ~logger:_ =
+  let generate_transition ~previous_protocol_state ~blockchain_state ~time:_
+      ~proposal_data ~transactions:_ ~snarked_ledger_hash:_ ~supply_increase:_
+      ~logger:_ =
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
     in
     (* TODO: sign protocol_state instead of blockchain_state *)
     let consensus_transition_data =
-      Consensus_transition_data.create_value
-        ~private_key:keypair.Signature_lib.Keypair.private_key blockchain_state
+      Consensus_transition_data.create_value ~private_key:proposal_data
+        blockchain_state
     in
     let consensus_state =
       let open Consensus_state in
@@ -196,10 +202,9 @@ module Make (Inputs : Inputs_intf) :
         ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
         ~blockchain_state ~consensus_state
     in
-    Some (protocol_state, consensus_transition_data)
+    (protocol_state, consensus_transition_data)
 
-  let is_transition_valid_checked (transition : Snark_transition.var)
-      (previous_state_hash : State_hash.var) =
+  let is_transition_valid_checked (transition : Snark_transition.var) =
     let Consensus_transition_data.({signature}) =
       Snark_transition.consensus_data transition
     in
@@ -207,18 +212,11 @@ module Make (Inputs : Inputs_intf) :
     let%bind (module Shifted) =
       Snark_params.Tick.Inner_curve.Checked.Shifted.create ()
     in
-    let%bind signature_verifies =
-      Blockchain_state.Signature.Checked.verifies
-        (module Shifted)
-        signature
-        (Public_key.var_of_t Global_public_key.t)
-        (transition |> Snark_transition.blockchain_state)
-    and previous_state_was_neg_one =
-      State_hash.equal_var previous_state_hash
-        (State_hash.var_of_t (Protocol_state.hash Protocol_state.negative_one))
-    in
-    Snark_params.Tick.Boolean.(
-      signature_verifies || previous_state_was_neg_one)
+    Blockchain_state.Signature.Checked.verifies
+      (module Shifted)
+      signature
+      (Public_key.var_of_t Global_public_key.t)
+      (transition |> Snark_transition.blockchain_state)
 
   let next_state_checked (state : Consensus_state.var) _state_hash _block
       _supply_increase =
@@ -240,9 +238,9 @@ module Make (Inputs : Inputs_intf) :
 
   let select Consensus_state.({length= l1; _})
       Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
-    if l1 >= l2 then `Keep else `Take
+    if Length.compare l1 l2 >= 0 then `Keep else `Take
 
-  let next_proposal now _state ~local_state:_ ~keypair:_ ~logger:_ =
+  let next_proposal now _state ~local_state:_ ~keypair ~logger:_ =
     let open Unix_timestamp in
     let time_since_last_interval =
       rem now (Time.Span.to_ms Inputs.proposal_interval)
@@ -250,7 +248,7 @@ module Make (Inputs : Inputs_intf) :
     let proposal_time =
       now - time_since_last_interval + Time.Span.to_ms Inputs.proposal_interval
     in
-    `Propose proposal_time
+    `Propose (proposal_time, keypair.Keypair.private_key)
 
   let lock_transition ?proposer_public_key:_ _ _ ~snarked_ledger:_
       ~local_state:_ =

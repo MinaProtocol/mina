@@ -116,7 +116,7 @@ NOTE: all of the `test-*` targets (including `test-all`) won't run in the contai
 
 Coda has a variety of opam and system dependencies.
 
-You can see [`Dockerfile-base`](/dockerfiles/Dockerfile-base) for how we
+You can see [`Dockerfile-toolchain`](/dockerfiles/Dockerfile-toolchain) for how we
 install them all in the container. To get all the opam dependencies
 you need, you run `opam switch import src/opam.export`.
 
@@ -124,6 +124,7 @@ Some of our dependencies aren't taken from `opam`, and aren't integrated
 with `dune`, so you need to add them manually:
 
 * `opam pin add src/external/ocaml-sodium`
+* `opam pin add src/external/ocaml-rocksdb`
 
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles.
