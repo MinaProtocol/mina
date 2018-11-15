@@ -7,6 +7,8 @@ module type S = sig
 
   type state_hash
 
+  type public_key_compressed
+
   module Transition_tree :
     Coda_lib.Ktree_intf
     with type elem := (external_transition, state_hash) With_hash.t
@@ -33,7 +35,8 @@ module type S = sig
   (** Invariant: Changes must be applied to atomically result in a consistent state *)
 
   val create :
-       consensus_local_state:consensus_local_state
+       ?proposer_public_key:public_key_compressed
+    -> consensus_local_state:consensus_local_state
     -> (tip, state_hash) With_hash.t
     -> t
 end

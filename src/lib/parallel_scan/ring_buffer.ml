@@ -39,6 +39,8 @@ let iter t ~f =
     f t.data.((t.position + i) mod n)
   done
 
+let fold t = Array.fold t.data
+
 let read t = t.data.(t.position)
 
 let filter t ~f =

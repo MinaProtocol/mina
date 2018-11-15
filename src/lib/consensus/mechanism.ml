@@ -85,7 +85,6 @@ module type S = sig
 
   val is_transition_valid_checked :
        Snark_transition.var
-    -> Coda_base.State_hash.var
     -> (Snark_params.Tick.Boolean.var, _) Snark_params.Tick.Checked.t
   (**
    * Create a checked boolean constraint for the validity of a transition.
@@ -128,7 +127,8 @@ module type S = sig
    *)
 
   val lock_transition :
-       Consensus_state.value
+       ?proposer_public_key:Signature_lib.Public_key.Compressed.t
+    -> Consensus_state.value
     -> Consensus_state.value
     -> snarked_ledger:(unit -> Coda_base.Ledger.t Or_error.t)
     -> local_state:Local_state.t
