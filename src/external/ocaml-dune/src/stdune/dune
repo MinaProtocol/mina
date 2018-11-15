@@ -1,0 +1,5 @@
+(library
+ (name stdune)
+ (public_name dune._stdune)
+ (synopsis "[Internal] Standard library of Dune")
+ (libraries dune_caml unix))

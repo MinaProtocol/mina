@@ -1,0 +1,7 @@
+(library
+ (name dune_lang)
+ (synopsis "[Internal] S-expression library")
+ (libraries stdune)
+ (public_name dune._dune_lang))
+
+(ocamllex dune_lexer jbuild_lexer)

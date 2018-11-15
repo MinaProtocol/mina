@@ -1,0 +1,2 @@
+  $ dune runtest --root .
+  hola

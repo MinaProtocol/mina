@@ -1,0 +1,6 @@
+package "ca-marche" (
+)
+
+package "ca-marche-pas" (
+  requires = "une-lib-qui-nexiste-pas"
+)

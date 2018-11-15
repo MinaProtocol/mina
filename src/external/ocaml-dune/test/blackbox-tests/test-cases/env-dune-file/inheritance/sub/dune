@@ -1,0 +1,9 @@
+(env
+ (_
+  (env-vars
+   (DUNE_FOO foo-sub))))
+
+(alias
+ (name runtest)
+ (action
+  (echo "DUNE_FOO: %{env:DUNE_FOO=unset}\nDUNE_BAR: %{env:DUNE_BAR=unset}")))

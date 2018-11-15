@@ -1,0 +1,11 @@
+(test
+ (name main)
+ (libraries foo)
+ (modules main))
+
+(library
+ (name foo)
+ (modules foo)
+ (c_names stub1 sub/stub2))
+
+(include_subdirs unqualified)

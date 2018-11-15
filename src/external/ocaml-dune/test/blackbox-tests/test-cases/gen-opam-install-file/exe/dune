@@ -1,0 +1,7 @@
+(executables
+ (names bar)
+ (public_names bar))
+
+(alias
+ (name default)
+ (action (echo "%{read:foo.install}")))

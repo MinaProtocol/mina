@@ -1,0 +1,5 @@
+
+(install
+ (section share_root)
+ (files (dune.el as emacs/site-lisp/dune.el)
+        (dune-flymake.el as emacs/site-lisp/dune-flymake.el)))
