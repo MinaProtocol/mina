@@ -670,6 +670,8 @@ struct
               next_state
               (Init.Consensus_mechanism.Internal_transition.snark_transition
                  transition)
+              (Init.Consensus_mechanism.Internal_transition.prover_state
+                 transition)
             >>| fun {Init.Blockchain.proof; _} -> proof
     end
   end)

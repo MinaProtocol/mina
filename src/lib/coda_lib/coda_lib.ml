@@ -496,7 +496,7 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let net_ivar = Ivar.create () in
         let consensus_local_state =
-          Consensus_mechanism.Local_state.create ()
+          Consensus_mechanism.Local_state.create config.propose_keypair
         in
         let lbc_deferred =
           Ledger_builder_controller.create
