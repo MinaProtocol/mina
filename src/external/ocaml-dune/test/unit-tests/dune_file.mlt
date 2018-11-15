@@ -1,0 +1,65 @@
+(* -*- tuareg -*- *)
+open Dune;;
+open! Stdune;;
+
+let sexp_pp = Dune_lang.pp Dune;;
+#install_printer Dune_file.Mode_conf.pp;;
+#install_printer Binary_kind.pp;;
+#install_printer Dune_file.Executables.Link_mode.pp;;
+#install_printer sexp_pp;;
+
+(* Dune_file.Executables.Link_mode.decode *)
+let test s =
+  Dune_lang.Decoder.parse Dune_file.Executables.Link_mode.decode Univ_map.empty
+    (Dune_lang.parse_string ~fname:"" ~mode:Dune_lang.Parser.Mode.Single s)
+[%%expect{|
+val sexp_pp : Format.formatter -> Dune_lang.t -> unit = <fun>
+val test : string -> Dune_file.Executables.Link_mode.t = <fun>
+|}]
+
+(* Link modes can be read as a (<mode> <kind>) list *)
+test "(best exe)"
+[%%expect{|
+- : Dune_file.Executables.Link_mode.t = { mode = best; kind = exe }
+|}]
+
+(* Some shortcuts also exist *)
+test "exe"
+[%%expect{|
+- : Dune_file.Executables.Link_mode.t = { mode = best; kind = exe }
+|}]
+test "object"
+[%%expect{|
+- : Dune_file.Executables.Link_mode.t = { mode = best; kind = object }
+|}]
+test "shared_object"
+[%%expect{|
+- : Dune_file.Executables.Link_mode.t = { mode = best; kind = shared_object }
+|}]
+test "byte"
+[%%expect{|
+- : Dune_file.Executables.Link_mode.t = { mode = byte; kind = exe }
+|}]
+test "native"
+[%%expect{|
+- : Dune_file.Executables.Link_mode.t = { mode = native; kind = exe }
+|}]
+
+(* Dune_file.Executables.Link_mode.encode *)
+let test l =
+  Dune_file.Executables.Link_mode.encode l
+[%%expect{|
+val test : Dune_file.Executables.Link_mode.t -> Dune_lang.t = <fun>
+|}]
+
+(* In the general case, modes are serialized as a list *)
+test {Dune_file.Executables.Link_mode.kind = Shared_object; mode = Byte; loc=Loc.none}
+[%%expect{|
+- : Dune_lang.t = (byte shared_object)
+|}]
+
+(* But the specialized ones are serialized in the minimal version *)
+test Dune_file.Executables.Link_mode.exe
+[%%expect{|
+- : Dune_lang.t = exe
+|}]

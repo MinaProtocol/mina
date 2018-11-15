@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open O1trace
 
 module Make (Inputs : Inputs.S) : sig
   open Inputs
@@ -18,6 +19,7 @@ module Make (Inputs : Inputs.S) : sig
      and type external_transition := Consensus_mechanism.External_transition.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type tip := Tip.t
+     and type public_key_compressed := Public_key.Compressed.t
 
   val ledger_builder_io : t -> Net.t
 end = struct
@@ -32,6 +34,7 @@ end = struct
           (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: Tip.t
       ; consensus_local_state: Consensus_mechanism.Local_state.t
+      ; proposer_public_key: Public_key.Compressed.t option
       ; longest_tip_location: string }
     [@@deriving make]
   end
@@ -167,6 +170,7 @@ end = struct
     in
     let state =
       Transition_logic_state.create
+        ?proposer_public_key:config.proposer_public_key
         ~consensus_local_state:config.consensus_local_state
         (With_hash.of_data tip ~hash_data:(fun tip ->
              tip.Tip.protocol_state |> Protocol_state.hash ))
@@ -188,36 +192,39 @@ end = struct
       ; handler= Transition_logic.create state log }
     in
     don't_wait_for
-      (Linear_pipe.iter (Transition_logic.strongest_tip t.handler)
-         ~f:(fun (tip, transition) ->
-           Linear_pipe.force_write_maybe_drop_head ~capacity:1 store_tip_writer
-             store_tip_reader tip ;
-           Deferred.return
-           @@ Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
-                t.strongest_ledgers_reader
-                (tip.ledger_builder, transition) )) ;
+    @@ trace_task "strongest_tip" (fun () ->
+           Linear_pipe.iter (Transition_logic.strongest_tip t.handler)
+             ~f:(fun (tip, transition) ->
+               Linear_pipe.force_write_maybe_drop_head ~capacity:1
+                 store_tip_writer store_tip_reader tip ;
+               Deferred.return
+               @@ Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
+                    t.strongest_ledgers_reader
+                    (tip.ledger_builder, transition) ) ) ;
     don't_wait_for
-      (Linear_pipe.iter store_tip_reader ~f:(fun tip ->
-           let open With_hash in
-           let tip_with_genesis_hash =
-             {data= tip; hash= genesis_tip_state_hash}
-           in
-           Store.store store_controller config.longest_tip_location
-             tip_with_genesis_hash )) ;
+    @@ trace_task "store_tip" (fun () ->
+           Linear_pipe.iter store_tip_reader ~f:(fun tip ->
+               let open With_hash in
+               let tip_with_genesis_hash =
+                 {data= tip; hash= genesis_tip_state_hash}
+               in
+               Store.store store_controller config.longest_tip_location
+                 tip_with_genesis_hash ) ) ;
     (* Handle new transitions *)
     let possibly_jobs =
-      Linear_pipe.filter_map_unordered ~max_concurrency:1
-        config.external_transitions ~f:(fun (transition, time_received) ->
-          let transition_with_hash =
-            With_hash.of_data transition ~hash_data:(fun t ->
-                t |> External_transition.protocol_state |> Protocol_state.hash
-            )
-          in
-          let%map job =
-            Transition_logic.on_new_transition catchup t.handler
-              transition_with_hash ~time_received
-          in
-          Option.map job ~f:(fun job -> (job, time_received)) )
+      trace_task "external transitions" (fun () ->
+          Linear_pipe.filter_map_unordered ~max_concurrency:1
+            config.external_transitions ~f:(fun (transition, time_received) ->
+              let transition_with_hash =
+                With_hash.of_data transition ~hash_data:(fun t ->
+                    t |> External_transition.protocol_state
+                    |> Protocol_state.hash )
+              in
+              let%map job =
+                Transition_logic.on_new_transition catchup t.handler
+                  transition_with_hash ~time_received
+              in
+              Option.map job ~f:(fun job -> (job, time_received)) ) )
     in
     let replace last
         ( {Job.input= {With_hash.data= current_transition; hash= _}; _}
@@ -238,25 +245,28 @@ end = struct
           | `Take -> `Cancel_and_do_next )
     in
     don't_wait_for
-      ( Linear_pipe.fold possibly_jobs ~init:None
-          ~f:(fun last
-             ( (({Job.input= current_transition_with_hash; _} as job), _) as
-             job_with_time )
-             ->
-            Deferred.return
-              ( match replace last job_with_time with
-              | `Skip -> last
-              | `Cancel_and_do_next ->
-                  Option.iter last ~f:(fun (input, ivar) ->
-                      Ivar.fill_if_empty ivar input ) ;
-                  let w, this_ivar = Job.run job in
-                  let () =
-                    Deferred.upon w.Interruptible.d (function
-                      | Ok () -> Logger.trace log "Job is completed"
-                      | Error () -> Logger.trace log "Job is destroyed" )
-                  in
-                  Some (current_transition_with_hash, this_ivar) ) )
-      >>| ignore ) ;
+    @@ trace_task "possible jobs" (fun () ->
+           Linear_pipe.fold possibly_jobs ~init:None
+             ~f:(fun last
+                ( (({Job.input= current_transition_with_hash; _} as job), _) as
+                job_with_time )
+                ->
+               Deferred.return
+                 ( match replace last job_with_time with
+                 | `Skip -> last
+                 | `Cancel_and_do_next ->
+                     Option.iter last ~f:(fun (input, ivar) ->
+                         Ivar.fill_if_empty ivar input ) ;
+                     let w, this_ivar =
+                       trace_task "running job" (fun () -> Job.run job)
+                     in
+                     let () =
+                       Deferred.upon w.Interruptible.d (function
+                         | Ok () -> Logger.trace log "Job is completed"
+                         | Error () -> Logger.trace log "Job is destroyed" )
+                     in
+                     Some (current_transition_with_hash, this_ivar) ) )
+           >>| ignore ) ;
     t
 
   module For_tests = struct
@@ -299,33 +309,45 @@ end = struct
           hash )
       ~f_result:(fun {With_hash.data= tip; hash= _} -> tip.Tip.ledger_builder)
 
+  let prev_hash = ref None
+
+  let prev_ledger = ref None
+
   let handle_sync_ledger_queries :
          t
       -> Ledger_hash.t * Sync_ledger.query
       -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t =
    fun t (hash, query) ->
-    (* TODO: We should cache, but in the future it will be free *)
+    (* TODO: this caching shouldn't be necessary *)
     let open Deferred.Or_error.Let_syntax in
     Logger.trace t.log
       !"Attempting to handle a sync-ledger query for %{sexp: Ledger_hash.t}"
       hash ;
     let%map ledger =
-      local_get_ledger' t hash
-        ~p_tip:(fun hash {With_hash.data= tip; hash= _} ->
-          Ledger_hash.equal
-            ( tip.Tip.ledger_builder |> Ledger_builder.ledger
-            |> Ledger.merkle_root )
-            hash )
-        ~p_trans:(fun hash {With_hash.data= trans; hash= _} ->
-          Ledger_hash.equal
-            ( trans |> External_transition.protocol_state
-            |> Protocol_state.blockchain_state
-            |> Blockchain_state.ledger_builder_hash
-            |> Ledger_builder_hash.ledger_hash )
-            hash )
-        ~f_result:(fun {With_hash.data= tip; hash= _} ->
-          tip.Tip.ledger_builder |> Ledger_builder.ledger )
-      >>| fst
+      if Option.equal Ledger_hash.equal (Some hash) !prev_hash then
+        return (Option.value_exn !prev_ledger)
+      else
+        let%map ll =
+          local_get_ledger' t hash
+            ~p_tip:(fun hash {With_hash.data= tip; hash= _} ->
+              Ledger_hash.equal
+                ( tip.Tip.ledger_builder |> Ledger_builder.ledger
+                |> Ledger.merkle_root )
+                hash )
+            ~p_trans:(fun hash {With_hash.data= trans; hash= _} ->
+              Ledger_hash.equal
+                ( trans |> External_transition.protocol_state
+                |> Protocol_state.blockchain_state
+                |> Blockchain_state.ledger_builder_hash
+                |> Ledger_builder_hash.ledger_hash )
+                hash )
+            ~f_result:(fun {With_hash.data= tip; hash= _} ->
+              tip.Tip.ledger_builder |> Ledger_builder.ledger )
+          >>| fst
+        in
+        prev_hash := Some hash ;
+        prev_ledger := Some ll ;
+        ll
     in
     let responder = Sync_ledger.Responder.create ledger ignore in
     (hash, Sync_ledger.Responder.answer_query responder query)
@@ -495,7 +517,9 @@ let%test_module "test" =
             let protocol_state_proof _ = ()
           end
 
-          let lock_transition _ _ ~snarked_ledger:_ ~local_state:() = ()
+          let lock_transition ?proposer_public_key:_ _ _ ~snarked_ledger:_
+              ~local_state:() =
+            ()
 
           let select Consensus_state.({strength= s1})
               Consensus_state.({strength= s2}) ~logger:_ ~time_received:_ =
@@ -597,7 +621,7 @@ let%test_module "test" =
         let r, w = Linear_pipe.create () in
         don't_wait_for
           (Deferred.List.iter xs ~f:(fun x ->
-               (* Without the wait here, we get interrupted before doing anything interesting *)
+               (* SUSP WAIT: Without the wait here, we get interrupted before doing anything interesting *)
                let%bind () = after (Time.Span.of_ms 100.) in
                let time =
                  Time.now () |> Time.to_span_since_epoch |> Time.Span.to_ms
@@ -666,7 +690,7 @@ let%test_module "test" =
                    flow in within tree" =
       Backtrace.elide := false ;
       let config =
-        Lbc.config Lbc.no_catchup_transitions memory_storage_location
+        Lbc.config Lbc.no_catchup_transitions memory_storage_location ()
       in
       Lbc.assert_strongest_ledgers (Lbc.create config) ~expected:[1; 2; 5; 7]
 
@@ -682,14 +706,14 @@ let%test_module "test" =
         ; f 5 3 7
         (* Now we attach to the one from the network *) ]
       in
-      let config = Lbc.config transitions memory_storage_location in
+      let config = Lbc.config transitions memory_storage_location () in
       let lbc_deferred = Lbc.create config in
       Lbc.assert_strongest_ledgers lbc_deferred ~expected:[1; 2; 3; 5]
 
     let%test_unit "local_get_ledger can materialize a ledger locally" =
       Backtrace.elide := false ;
       let config =
-        Lbc.config Lbc.no_catchup_transitions memory_storage_location
+        Lbc.config Lbc.no_catchup_transitions memory_storage_location ()
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind lbc = Lbc.create config in

@@ -22,6 +22,7 @@
       protocols
       core
       dummy_values
+      o1trace
       merkle_ledger
       snarky
       crypto_params
@@ -32,7 +33,7 @@
       debug_assert
       banlist_lib))
   (preprocessor_deps ("../../config.mlh"))
-  (preprocess (pps (ppx_jane ppx_deriving.eq ppx_deriving.ord)))
+  (preprocess (pps (ppx_jane ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord)))
   (synopsis "Snarks and friends necessary for keypair generation")))
 
 (rule

@@ -113,6 +113,7 @@
 .bg-brand-gradient { background-image: linear-gradient(to bottom, rgba(239, 242, 247, 0.01), rgba(239, 242, 247, 0.01)), linear-gradient(to bottom, rgba(255, 255, 255, 0.5), rgba(0, 0, 0, 0.5)); }
 
 .h2px { height: 2px; }
+.h1px { height: 1px; }
 .w310px { width: 310px; }
 
 /* To fix the CODA svg graphic */
@@ -132,6 +133,7 @@
   .mw55-ns { max-width: 20rem; }
 }
 .mw57 { max-width: 27rem; }
+.mw85 {max-width:80rem}
 
 .min-h7 { min-height: 48rem; }
 
@@ -226,6 +228,11 @@
 .w-55 {
   width:55%;
 }
+@media screen and (min-width:30em) {
+  .w-45-ns {
+    width:45%;
+  }
+}
 
 .ml-5px {
   margin-left:-5px;
@@ -264,3 +271,6 @@
 
 }
 
+.sticky { position: sticky; position: -webkit-sticky; }
+
+.no-mobile-highlight-jank {-webkit-tap-highlight-color: transparent;}

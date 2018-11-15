@@ -63,6 +63,12 @@ end = struct
 
   let fold_until = C.fold_until
 
+  let foldi t ~init ~f =
+    Dyn_array.fold_left
+      (fun (i, acc) x -> (i + 1, f (Addr.of_int_exn i) acc x))
+      (0, init) t.accounts
+    |> snd
+
   module Location = struct
     type t = index [@@deriving sexp, compare, hash]
   end

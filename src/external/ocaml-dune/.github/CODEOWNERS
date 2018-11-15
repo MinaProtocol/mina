@@ -1,0 +1,11 @@
+* @diml @rgrinberg @emillon
+
+src/menhir.* @fpottier
+
+src/odoc.* @rginberg
+
+src/configurator/* @rgrinberg
+
+src/js_of_ocaml* @hhugo
+
+editor_integration/emacs/* @Chris00

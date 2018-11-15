@@ -13,3 +13,5 @@ end
 open Snark_params.Tick
 
 type var = Inner_curve.Scalar.var * Inner_curve.Scalar.var
+
+val dummy : t

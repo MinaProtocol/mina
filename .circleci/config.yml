@@ -1,18 +1,24 @@
 # WARNING: config.yml file is generated from config.yml.jinja
 version: 2
 jobs:
+    tracetool:
+        docker:
+            - image: rust
+        steps:
+            - checkout
+            - run:
+                name: Build trace-tool
+                command: cd src/app/trace-tool && cargo build
+
     build:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
+        - image: codaprotocol/coda:toolchain-9aea9e820e487fabb79e3c8c27372a50fbf77289
         steps:
             - checkout
             - run:
                 name: Lint
                 command: eval `opam config env` && make check-format
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
             - run:
                 name: Build OCaml
                 command: eval `opam config env` && DUNE_PROFILE=dev make build 2>&1 | tee /tmp/buildocaml.log
@@ -34,12 +40,9 @@ jobs:
     build_withsnark:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
+        - image: codaprotocol/coda:toolchain-9aea9e820e487fabb79e3c8c27372a50fbf77289
         steps:
             - checkout
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
             - run:
                 name: Build OCaml
                 command: eval `opam config env` && DUNE_PROFILE=testnet make build 2>&1 | tee /tmp/buildocaml.log
@@ -52,18 +55,18 @@ jobs:
             - run:
                 name: Store Genesis keys
                 command: make genesiskeys
+            - run:
+                name: Upload deb to repo
+                command: make publish_deb
             - store_artifacts:
                 path: /tmp/artifacts
 
     build_public:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
+        - image: codaprotocol/coda:toolchain-9aea9e820e487fabb79e3c8c27372a50fbf77289
         steps:
             - checkout
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
             - run:
                 name: Build OCaml
                 command: eval `opam config env` && DUNE_PROFILE=testnet_public make build 2>&1 | tee /tmp/buildocaml.log
@@ -79,12 +82,9 @@ jobs:
     test-unit-test:
        resource_class: large
        docker:
-       - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
+       - image: codaprotocol/coda:toolchain-9aea9e820e487fabb79e3c8c27372a50fbf77289
        steps:
            - checkout
-           - run:
-               name: Build Haskell
-               command: source ~/.profile && make kademlia
            - run:
               name: Test make test-runtest
               command: source ~/.profile && make test-runtest
@@ -92,12 +92,9 @@ jobs:
     test-withsnark:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
+        - image: codaprotocol/coda:toolchain-9aea9e820e487fabb79e3c8c27372a50fbf77289
         steps:
             - checkout
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
             - run:
                 name: Build OCaml
                 command: eval `opam config env` && DUNE_PROFILE=test_snark make build 2>&1 | tee /tmp/buildocaml.log
@@ -109,15 +106,12 @@ jobs:
     test-all_sig_integration_tests:
       resource_class: large
       docker:
-      - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
+      - image: codaprotocol/coda:toolchain-9aea9e820e487fabb79e3c8c27372a50fbf77289
       steps:
           - checkout
           - run:
               name: Check .circleci Render
               command: make check-render-circleci
-          - run:
-              name: Build Haskell
-              command: source ~/.profile && make kademlia
           - run:
               name: Build OCaml
               command: eval `opam config env` && DUNE_PROFILE=test make build 2>&1 | tee /tmp/buildocaml.log
@@ -153,15 +147,12 @@ jobs:
     test-all_stake_integration_tests:
       resource_class: large
       docker:
-      - image: codaprotocol/coda:toolchain-e11592718bee89d2a4facfa7ca209844fa7b140c
+      - image: codaprotocol/coda:toolchain-9aea9e820e487fabb79e3c8c27372a50fbf77289
       steps:
           - checkout
           - run:
               name: Check .circleci Render
               command: make check-render-circleci
-          - run:
-              name: Build Haskell
-              command: source ~/.profile && make kademlia
           - run:
               name: Build OCaml
               command: eval `opam config env` && DUNE_PROFILE=test make build 2>&1 | tee /tmp/buildocaml.log
@@ -209,7 +200,9 @@ workflows:
             
             - test-withsnark
             - test-unit-test
-    # NOTES: Save this idea for later (nightly/scheduled workflows)
+            - tracetool
+
+# NOTES: Save this idea for later (nightly/scheduled workflows)
     # nightly:
     #     triggers:
     #         - schedule:

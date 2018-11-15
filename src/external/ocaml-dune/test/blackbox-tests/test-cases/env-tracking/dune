@@ -1,0 +1,14 @@
+(executable
+ (name a)
+)
+
+(alias
+ (name without_dep)
+ (action (run ./a.exe))
+)
+
+(alias
+ (name with_dep)
+ (deps (env_var X))
+ (action (run ./a.exe))
+)

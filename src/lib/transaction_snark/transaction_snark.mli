@@ -6,14 +6,6 @@ module Proof_type : sig
   type t = [`Merge | `Base] [@@deriving bin_io, sexp]
 end
 
-module Transition : sig
-  type t = Transaction.t =
-    | Payment of Payment.With_valid_signature.t
-    | Fee_transfer of Fee_transfer.t
-    | Coinbase of Coinbase.t
-  [@@deriving bin_io, sexp]
-end
-
 module Statement : sig
   type t =
     { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
@@ -117,38 +109,38 @@ module Verification : sig
   end) : S
 end
 
-val check_transition :
+val check_transaction :
      sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
-  -> Transition.t
+  -> Transaction.t
   -> Tick.Handler.t
   -> unit
 
-val check_payment :
+val check_user_command :
      sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
-  -> Payment.With_valid_signature.t
+  -> User_command.With_valid_signature.t
   -> Tick.Handler.t
   -> unit
 
 module type S = sig
   include Verification.S
 
-  val of_transition :
+  val of_transaction :
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> Transition.t
+    -> Transaction.t
     -> Tick.Handler.t
     -> t
 
-  val of_payment :
+  val of_user_command :
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> Payment.With_valid_signature.t
+    -> User_command.With_valid_signature.t
     -> Tick.Handler.t
     -> t
 
