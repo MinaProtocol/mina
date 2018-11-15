@@ -1,0 +1,4 @@
+
+(alias
+ (name runtest)
+ (action (echo "lines: %{read-lines:foo}")))

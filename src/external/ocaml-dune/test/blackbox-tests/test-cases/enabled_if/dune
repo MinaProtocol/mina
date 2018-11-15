@@ -1,0 +1,23 @@
+(alias
+ (name x)
+ (action (echo "Building alias x"))
+ (enabled_if false))
+
+(alias
+ (name y)
+ (action (echo "Building alias y"))
+ (enabled_if true))
+
+(rule
+ (targets a)
+ (action (progn
+          (echo "Building file a")
+          (with-stdout-to a (progn))))
+ (enabled_if false))
+
+(rule
+ (targets b)
+ (action (progn
+          (echo "Building file b")
+          (with-stdout-to b (progn))))
+ (enabled_if true))

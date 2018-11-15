@@ -1,0 +1,2 @@
+(executable (name foo))
+(include_subdirs unqualified)

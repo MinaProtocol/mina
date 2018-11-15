@@ -1,0 +1,4 @@
+(library
+ (name foo)
+ (c_names foo)
+ (self_build_stubs_archive (bar)))

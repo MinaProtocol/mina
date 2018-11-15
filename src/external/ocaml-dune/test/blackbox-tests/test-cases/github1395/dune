@@ -1,0 +1,24 @@
+(rule
+ (targets foo%{ext_obj})
+ (deps foo.c)
+ (action (run %{ocaml-config:c_compiler} -c -o %{targets} %{deps})))
+
+(rule
+ (targets libfoo_stubs.a)
+ (deps foo%{ext_obj})
+ (action (run ar rcs %{targets} %{deps})))
+
+(rule
+ (targets dllfoo_stubs%{ext_dll})
+ (deps foo%{ext_obj})
+ (action (run %{ocaml-config:c_compiler} -shared -o %{targets} %{deps})))
+
+(library
+ (name bar)
+ (self_build_stubs_archive (foo))
+ (modules bar))
+
+(executable
+ (name main)
+ (libraries bar)
+ (modules main))

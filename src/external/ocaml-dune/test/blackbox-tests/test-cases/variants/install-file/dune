@@ -1,0 +1,6 @@
+(alias
+ (name default)
+ (action
+  (progn
+    (echo "%{read:vlib.install}")
+    (echo "%{read:impl.install}"))))

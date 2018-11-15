@@ -1,0 +1,9 @@
+(env
+ (_
+  (env-vars
+   (DUNE_FOO foo-parent)
+   (DUNE_BAR bar-parent))))
+
+(alias
+ (name default)
+ (deps (alias_rec runtest)))

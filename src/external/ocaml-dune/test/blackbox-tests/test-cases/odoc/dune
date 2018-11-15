@@ -1,0 +1,31 @@
+(library
+ (name foo)
+ (modules foo foo2)
+ (wrapped false)
+ (public_name foo))
+
+(library
+ (name bar)
+ (public_name bar)
+ (modules bar))
+
+(library
+ (name foo_byte)
+ (modules foo_byte)
+ (modes byte)
+ (public_name foo.byte))
+
+(alias
+ (name runtest)
+ (deps _doc/_html/index.html)
+ (action (echo "%{read:_doc/_html/index.html}")))
+
+(alias
+ (name foo-mld)
+ (deps _doc/_mlds/foo/index.mld)
+ (action (echo "%{read:_doc/_mlds/foo/index.mld}")))
+
+(alias
+ (name bar-mld)
+ (deps _doc/_mlds/bar/index.mld)
+ (action (echo "%{read:_doc/_mlds/bar/index.mld}")))

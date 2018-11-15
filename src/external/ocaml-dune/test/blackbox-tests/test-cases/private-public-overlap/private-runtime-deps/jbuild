@@ -1,0 +1,17 @@
+(jbuild_version 1)
+
+(library
+ ((name private_runtime_dep)
+  (modules private_runtime_dep)))
+
+(library
+ ((name private_ppx)
+  (kind ppx_rewriter)
+  (ppx_runtime_libraries (private_runtime_dep))
+  (modules (:standard \ mylib private_runtime_dep))))
+
+(library
+ ((name mylib)
+  (public_name mylib)
+  (preprocess (pps (private_ppx)))
+  (modules mylib)))

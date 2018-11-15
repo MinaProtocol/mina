@@ -1,0 +1,5 @@
+
+(alias
+ (name default)
+ (deps %{lib:foo:theories/a})
+ (action (echo "deps: %{deps}\n")))
