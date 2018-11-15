@@ -45,6 +45,10 @@ RUN opam switch import opam.export ; rm opam.export
 ADD /src/external/ocaml-sodium /ocaml-sodium
 RUN cd /ocaml-sodium && yes | opam pin add .
 
+# Source copy of ocaml-rocksdb (exposes opaque types)
+ADD /src/external/ocaml-rocksdb /ocaml-rocksdb
+RUN cd /ocaml-rocksdb && yes | opam pin add .
+
 # Get coda-kademlia from packages repo
 RUN sudo apt-get install --yes apt-transport-https ca-certificates && \
       echo "deb [trusted=yes] https://packages.o1test.net unstable main" | sudo tee -a /etc/apt/sources.list.d/coda.list && \
