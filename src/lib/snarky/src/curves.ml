@@ -888,7 +888,7 @@ module Make_weierstrass_checked
        = b * t
     *)
     let open Let_syntax in
-    (* TODO SNARK optimization:
+    (* TODO #1152
         Can get away with using an unsafe add if we modify this a bit. *)
     let rec go acc two_to_the_i bits =
       match bits with
