@@ -11,10 +11,11 @@ fi
 filenames="
   $SCRIPTPATH/../dockerfiles/Dockerfile
   $SCRIPTPATH/../.circleci/config.yml.jinja
+  $SCRIPTPATH/../README-dev.md
 "
 
 for filename in $filenames
 do
   echo "Updating $filename with new toolchain reference: $1"
-  sed -i "s/toolchain-.*/toolchain-$1/g" $filename
+  sed -i "s/toolchain-[\`]*/toolchain-$1/g" $filename
 done
