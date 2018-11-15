@@ -11,6 +11,7 @@ fi
 filenames="
   $SCRIPTPATH/../dockerfiles/Dockerfile
   $SCRIPTPATH/../.circleci/config.yml.jinja
+  $SCRIPTPATH/../README-dev.md
 "
 
 for filename in $filenames
