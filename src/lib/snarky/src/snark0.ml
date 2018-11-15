@@ -1639,12 +1639,20 @@ module Make_basic (Backend : Backend_intf.S) = struct
           module Nary = struct
             type 'a t = Lit of 'a | And of 'a t list | Or of 'a t list
 
-            let rec of_binary : 'a Binary.t -> 'a t = function
+            let of_binary : 'a Binary.t -> 'a t =
+              let rec accumulate_and acc = function
+                | Binary.And (x, t) -> accumulate_and (Lit x :: acc) t
+                | Lit x -> And (Lit x :: acc)
+                | Or (x, t) -> accumulate_or [Lit x] t
+              and accumulate_or acc = function
+                | Binary.Or (x, t) -> accumulate_or (Lit x :: acc) t
+                | Lit x -> Or (Lit x :: acc)
+                | And (x, t) -> accumulate_and [Lit x] t
+              in
+              function
+              | And (x, t) -> accumulate_and [Lit x] t
+              | Or (x, t) -> accumulate_or [Lit x] t
               | Lit x -> Lit x
-              | And (x, And (y, t)) -> And [Lit x; Lit y; of_binary t]
-              | Or (x, Or (y, t)) -> Or [Lit x; Lit y; of_binary t]
-              | And (x, t) -> And [Lit x; of_binary t]
-              | Or (x, t) -> Or [Lit x; of_binary t]
 
             let rec eval =
               let open Checked.Let_syntax in
