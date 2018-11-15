@@ -511,8 +511,7 @@ module Make (Inputs : Inputs_intf) = struct
                  { ledger_builder= Ledger_builder.create ~ledger:Genesis.ledger
                  ; state= Genesis.state
                  ; proof= Genesis.proof }
-               ~consensus_local_state
-               ~ledger:Genesis.ledger
+               ~consensus_local_state ~ledger:Genesis.ledger
                ~longest_tip_location:config.ledger_builder_persistant_location
                ~external_transitions:external_transitions_reader ())
         in

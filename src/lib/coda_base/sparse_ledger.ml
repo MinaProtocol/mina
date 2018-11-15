@@ -28,7 +28,7 @@ let of_ledger_subset_exn (ledger : Ledger.t) keys =
                 key
                 (Ledger.get ledger loc |> Option.value_exn) )
         | None ->
-           let path, acct = Ledger.create_empty ledger key in
+            let path, acct = Ledger.create_empty ledger key in
             (key :: new_keys, add_path sl path key acct) )
       ~init:([], of_ledger_root ledger)
   in

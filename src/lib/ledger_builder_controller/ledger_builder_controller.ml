@@ -222,10 +222,10 @@ end = struct
     @@ trace_task "store_tip" (fun () ->
            Linear_pipe.iter store_tip_reader ~f:(fun tip ->
                let open With_hash in
-               let { Tip.state ; Tip.proof ; Tip.ledger_builder } = tip in
+               let {Tip.state; Tip.proof; Tip.ledger_builder} = tip in
                let aux = Ledger_builder.aux ledger_builder in
                let serializable_tip_with_genesis_hash =
-                 {data= (state,proof,aux); hash= genesis_tip_state_hash}
+                 {data= (state, proof, aux); hash= genesis_tip_state_hash}
                in
                Store.store store_controller config.longest_tip_location
                  serializable_tip_with_genesis_hash ) ) ;
@@ -730,7 +730,7 @@ let%test_module "test" =
       in
       Lbc.assert_strongest_ledgers (Lbc.create config) ~expected:[1; 2; 5; 7]
 
-(*    let%test_unit "strongest_ledgers updates appropriately using the network" =
+    (*    let%test_unit "strongest_ledgers updates appropriately using the network" =
       Backtrace.elide := false ;
       let transitions =
         let f = Lbc.create_transition in

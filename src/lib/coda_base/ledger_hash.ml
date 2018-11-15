@@ -55,10 +55,11 @@ let merge ~height (h1 : t) (h2 : t) =
 let empty_hash =
   Tick.Pedersen.digest_fold
     (Tick.Pedersen.State.create Tick.Pedersen.params)
-    (Fold.string_triples "nothing up my sleeve") |> of_hash
+    (Fold.string_triples "nothing up my sleeve")
+  |> of_hash
 
 let of_digest = Fn.compose Fn.id of_hash
-      
+
 type path = Pedersen.Digest.t list
 
 type _ Request.t +=

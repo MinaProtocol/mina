@@ -36,8 +36,9 @@ module Make
   let get_uuid t = t.uuid
 
   let create () =
-    let kvdb = Kvdb.create ~directory:Storage_locations.key_value_db_dir in
-    {uuid= Uuid.create (); kvdb}
+    let uuid = Uuid.create () in
+    let kvdb = Kvdb.create ~directory:(Uuid.to_string uuid) in
+    {uuid; kvdb}
 
   let destroy {uuid= _; kvdb} = Kvdb.destroy kvdb
 
@@ -83,7 +84,7 @@ module Make
   let account_list_bin {kvdb; _} account_bin_read : Account.t list =
     let all_keys_values = Kvdb.to_alist kvdb in
     (* see comment at top of location.ml about encoding of locations *)
-     let account_location_byte = Char.to_int '\xfe' in
+    let account_location_byte = Char.to_int '\xfe' in
     (* just want list of locations and accounts, ignoring other locations *)
     let locations_accounts_bin =
       List.filter all_keys_values ~f:(fun (loc, _v) ->
@@ -326,8 +327,7 @@ module Make
         | key :: rest -> (
           match Account_location.get t key with
           | Ok loc -> loop rest (loc :: accum)
-          | Error err ->
-             raise (Db_error.Db_exception err) )
+          | Error err -> raise (Db_error.Db_exception err) )
       in
       loop keys []
     in
@@ -368,17 +368,15 @@ module Make
      iteration mechanism, and load one entry at a time
    *)
   let foldi t ~init ~f =
-    let alist = List.map (Kvdb.to_alist t.kvdb) ~f:(fun (loc_bin,acct_bin) ->
-                    ((Location.bin_read_t loc_bin ~pos_ref:(ref 0)),
-                     (Account.bin_read_t acct_bin ~pos_ref:(ref 0))))
+    let alist =
+      List.map (Kvdb.to_alist t.kvdb) ~f:(fun (loc_bin, acct_bin) ->
+          ( Location.bin_read_t loc_bin ~pos_ref:(ref 0)
+          , Account.bin_read_t acct_bin ~pos_ref:(ref 0) ) )
     in
-    List.fold_left
-      alist
-      ~init
-      ~f:(fun accum (loc,acct) ->
+    List.fold_left alist ~init ~f:(fun accum (loc, acct) ->
         (* invariant: loc is an account location, so the 
            to_path_exn should never raise an exception here
          *)
         let address = Location.to_path_exn loc in
-        f address accum acct)
+        f address accum acct )
 end

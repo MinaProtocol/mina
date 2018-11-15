@@ -271,14 +271,17 @@ struct
       Location.Table.clear t.account_tbl ;
       Addr.Table.clear t.hash_tbl
 
-    (* copy tables in t; use same parent *)
+    (* copy tables in t, try to copy parent *)
     let copy t =
       { t with
-        account_tbl= Location.Table.copy t.account_tbl
+        parent=
+          ( try Base.copy (get_parent t) with Failure _ ->
+              (* not copyable, use existing parent *)
+              get_parent t )
+      ; account_tbl= Location.Table.copy t.account_tbl
       ; location_tbl= Key.Table.copy t.location_tbl
       ; hash_tbl= Addr.Table.copy t.hash_tbl
-      ; current_location = t.current_location
-      }
+      ; current_location= t.current_location }
 
     let get_all_accounts_rooted_at_exn t address =
       (* accounts in parent and mask are disjoint sets *)
@@ -314,7 +317,7 @@ struct
       let mask_result = find_location t key in
       match mask_result with
       | Some _ -> mask_result
-      | None -> Base.location_of_key (get_parent t) key        
+      | None -> Base.location_of_key (get_parent t) key
 
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
     let make_space_for _t _tot = failwith "make_space_for: not implemented"
@@ -390,10 +393,10 @@ struct
     let get_or_create_account t key account =
       match find_location t key with
       | None -> (
-         (* not in mask, maybe in parent *)
-         match Base.location_of_key (get_parent t) key with
-         | Some location -> Ok (`Existed, location)
-         | None ->
+        (* not in mask, maybe in parent *)
+        match Base.location_of_key (get_parent t) key with
+        | Some location -> Ok (`Existed, location)
+        | None ->
             (* not in parent, create new location *)
             let maybe_location =
               match t.current_location with
@@ -405,7 +408,7 @@ struct
             else
               let location = Option.value_exn maybe_location in
               set t location account ;
-              set_location t key location;
+              set_location t key location ;
               t.current_location <- Some location ;
               Ok (`Added, location) )
       | Some location -> Ok (`Existed, location)
@@ -422,8 +425,8 @@ struct
         ~f:(fun ~key:loc ~data:acct accum ->
           (* loc is an account location, no exception can be raised here *)
           let addr = Location.to_path_exn loc in
-          f addr accum acct)
-                            
+          f addr accum acct )
+
     let sexp_of_location = Location.sexp_of_t
 
     let location_of_sexp = Location.t_of_sexp

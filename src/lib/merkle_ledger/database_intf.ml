@@ -51,8 +51,9 @@ module type S = sig
   val get_or_create_account_exn :
     t -> key -> account -> [`Added | `Existed] * location
 
-  val foldi : t -> init:'accum -> f:(Addr.t -> 'accum -> account -> 'accum) -> 'accum
-    
+  val foldi :
+    t -> init:'accum -> f:(Addr.t -> 'accum -> account -> 'accum) -> 'accum
+
   val merkle_path : t -> location -> Path.t
 
   val merkle_path_at_index_exn : t -> int -> Path.t

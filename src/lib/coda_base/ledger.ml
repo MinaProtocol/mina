@@ -515,12 +515,10 @@ module Masked_ledger = struct
   let with_ledger ~name ~f =
     let ledger = create name in
     try
-      Printexc.record_backtrace true;
+      Printexc.record_backtrace true ;
       let result = f ledger in
-      destroy ledger ;
-      result
-    with exn ->
-      destroy ledger ; raise exn
+      destroy ledger ; result
+    with exn -> destroy ledger ; raise exn
 end
 
 include Make (Masked_ledger)
