@@ -12,7 +12,6 @@ IMG=codabuilder:latest
 
 MYUID=$(id -u)
 MYGID=$(id -g)
-
 DOCKERNAME="codabuilder-$MYUID"
 
 if [[ $1 == "restart" ]]; then
@@ -26,6 +25,7 @@ if [[ $1 == "restart" ]]; then
     echo "Starting new dev container - $DOCKERNAME"
     NAME=$(docker run \
       --volume $SCRIPTPATH/..:/home/opam/app \
+      --volume $HOME:/opt/home \
       --user $MYUID:$MYGID \
       --name $DOCKERNAME \
       --detach \
