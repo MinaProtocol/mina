@@ -82,7 +82,7 @@ docker-toolchain-rust:
 		docker push codaprotocol/coda:toolchain-rust-$(GITLONGHASH) && \
 		docker push codaprotocol/coda:toolchain-rust-latest ;\
 	else \
-		echo "Repo is dirty, commit first." ;\
+		echo "Repo has uncommited changes, commit first to set hash." ;\
 	fi
 
 # All in one step to build toolchain and binary for kademlia
