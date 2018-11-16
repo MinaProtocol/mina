@@ -5,9 +5,9 @@ open Fold_lib
 module Chain_hash = struct
   include Data_hash.Make_full_size ()
 
-  let to_string = Fn.compose B64.encode to_bytes
+  let to_string t = Binable.to_string (module Stable.V1) t |> B64.encode
 
-  let of_string = Fn.compose of_bytes B64.decode
+  let of_string s = B64.decode s |> Binable.of_string (module Stable.V1)
 
   include Codable.Make_of_string (struct
     type nonrec t = t
@@ -75,4 +75,8 @@ module Chain_hash = struct
           x
         in
         assert (equal unchecked checked) )
+
+  let%test_unit "json" =
+    Quickcheck.test gen ~sexp_of:sexp_of_t ~f:(fun t ->
+        assert (For_tests.check_encoding ~equal t) )
 end

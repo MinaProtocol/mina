@@ -8,10 +8,10 @@ module Common = struct
   module Stable = struct
     module V1 = struct
       type ('fee, 'nonce, 'memo) t_ = {fee: 'fee; nonce: 'nonce; memo: 'memo}
-      [@@deriving bin_io, eq, sexp, hash]
+      [@@deriving bin_io, eq, sexp, hash, yojson]
 
-      type t = (Currency.Fee.Stable.V1.t, Account_nonce.Stable.V1.t, Memo.t) t_
-      [@@deriving bin_io, eq, sexp, hash]
+      type t = (Currency.Fee.Stable.V1.t, Account_nonce.t, Memo.t) t_
+      [@@deriving bin_io, eq, sexp, hash, yojson]
     end
   end
 
@@ -65,7 +65,7 @@ module Body = struct
   module Stable = struct
     module V1 = struct
       type t = Payment of Payment_payload.Stable.V1.t
-      [@@deriving bin_io, eq, sexp, hash]
+      [@@deriving bin_io, eq, sexp, hash, yojson]
     end
   end
 
@@ -97,10 +97,10 @@ end
 module Stable = struct
   module V1 = struct
     type ('common, 'body) t_ = {common: 'common; body: 'body}
-    [@@deriving bin_io, eq, sexp, hash]
+    [@@deriving bin_io, eq, sexp, hash, yojson]
 
     type t = (Common.Stable.V1.t, Body.Stable.V1.t) t_
-    [@@deriving bin_io, eq, sexp, hash]
+    [@@deriving bin_io, eq, sexp, hash, yojson]
   end
 end
 

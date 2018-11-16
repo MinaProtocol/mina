@@ -63,12 +63,24 @@ module Get_balance = struct
     Rpc.Rpc.create ~name:"Get_balance" ~version:0 ~bin_query ~bin_response
 end
 
+module Verify_proof = struct
+  type query =
+    Public_key.Compressed.Stable.V1.t * User_command.t * Payment_proof.t
+  [@@deriving bin_io]
+
+  type response = unit Or_error.t [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Verify_proof" ~version:0 ~bin_query ~bin_response
+end
+
 module Prove_receipt = struct
   type query = Receipt.Chain_hash.t * Public_key.Compressed.Stable.V1.t
   [@@deriving bin_io]
 
-  type response = (Receipt.Chain_hash.t * User_command.t) list Or_error.t
-  [@@deriving bin_io, sexp]
+  type response = Payment_proof.t Or_error.t [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -76,55 +88,7 @@ module Prove_receipt = struct
     Rpc.Rpc.create ~name:"Prove_receipt" ~version:0 ~bin_query ~bin_response
 
   module Output = struct
-    type t = (Receipt.Chain_hash.t * User_command.t) list
-
-    module Json = struct
-      type payload =
-        { receiver: string
-        ; amount: Currency.Amount.t
-        ; fee: Currency.Fee.t
-        ; nonce: Coda_numbers.Account_nonce.t
-        ; memo: User_command_memo.t }
-      [@@deriving yojson]
-
-      type payment = {payload: payload; sender: string; signature: string}
-      [@@deriving yojson]
-
-      type merkle_node =
-        {receipt_chain_hash: Receipt.Chain_hash.t; payment: payment}
-      [@@deriving yojson]
-
-      type t = merkle_node list [@@deriving yojson]
-    end
-
-    let to_yojson (t : t) =
-      Json.to_yojson
-        (List.map t
-           ~f:(fun ( receipt_chain_hash
-                   , {User_command.payload; sender; signature} )
-              ->
-             let payload =
-               let fee = User_command_payload.fee payload in
-               let memo = User_command_payload.memo payload in
-               let nonce = User_command_payload.nonce payload in
-               let User_command_payload.Body.(Payment
-                                                { Payment_payload.receiver
-                                                ; amount }) =
-                 User_command_payload.body payload
-               in
-               { Json.receiver= Public_key.Compressed.to_base64 receiver
-               ; amount
-               ; fee
-               ; nonce
-               ; memo }
-             in
-             let payment =
-               { Json.payload
-               ; sender=
-                   Public_key.Compressed.to_base64 (Public_key.compress sender)
-               ; signature= Signature.to_base64 signature }
-             in
-             {Json.receipt_chain_hash; payment} ))
+    type t = Payment_proof.t [@@deriving yojson]
 
     let to_text merkle_list =
       sprintf
