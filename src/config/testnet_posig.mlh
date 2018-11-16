@@ -3,6 +3,6 @@
 [%%define integration_tests false]
 [%%define debug_logs true]
 [%%define call_logger false]
-[%%define force_updates true]
+[%%define force_updates false]
 [%%define global_signer_real true]
 [%%define tracing false]
