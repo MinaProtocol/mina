@@ -8,7 +8,7 @@ type ('payload, 'pk, 'signature) t_ =
 [@@deriving bin_io, eq, sexp, hash, yojson]
 
 type t = (Payload.t, Public_key.t, Signature.t) t_
-[@@deriving bin_io, eq, sexp, hash, yojson]
+[@@deriving bin_io, eq, sexp, hash, yojson, compare]
 
 module Stable : sig
   module V1 : sig
@@ -19,7 +19,7 @@ module Stable : sig
 
     type t =
       (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_
-    [@@deriving bin_io, eq, sexp, hash, yojson]
+    [@@deriving bin_io, eq, sexp, hash, yojson, compare]
 
     val compare : seed:string -> t -> t -> int
   end

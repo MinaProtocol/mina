@@ -4,14 +4,8 @@ open Receipt_chain_database_lib
 open Storage.Disk
 
 module Payment = struct
-  module T = struct
-    include User_command
-
-    let compare this that = compare this.payload that.payload
-  end
-
-  include T
-  include Hashable.Make_binable (T)
+  include User_command
+  include Hashable.Make_binable (User_command)
 end
 
 module Tree_node = struct
