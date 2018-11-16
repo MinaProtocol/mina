@@ -1,8 +1,8 @@
 FROM rust:latest
 
-# Simple toolchain & build container that compiles and patches a kademlia binary for coda use
-
-# Add OS tools
 ADD /src/app/trace-tool /src
+
+# Fetches + caches the cargo registry and our dependencies, as well as building
+# them so later builds are substantially faster.
 
 RUN cd /src ; cargo build
