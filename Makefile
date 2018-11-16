@@ -72,6 +72,16 @@ docker-toolchain:
 		echo "Repo has uncommited changes, commit first to set hash." ;\
 	fi
 
+docker-toolchain-rust:
+	@if git diff-index --quiet HEAD ; then \
+		docker build --file dockerfiles/Dockerfile-toolchain-rust --tag codaprotocol/coda:toolchain-rust-$(GITLONGHASH) . && \
+		docker tag  codaprotocol/coda:toolchain-rust-$(GITLONGHASH) codaprotocol/coda:toolchain-rust-latest && \
+		docker push codaprotocol/coda:toolchain-rust-$(GITLONGHASH) && \
+		docker push codaprotocol/coda:toolchain-rust-latest ;\
+	else \
+		echo "Repo has uncommited changes, commit first to set hash." ;\
+	fi
+
 # All in one step to build toolchain and binary for kademlia
 docker-toolchain-haskell:
 	@echo "Building codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG)" ;\
@@ -79,6 +89,8 @@ docker-toolchain-haskell:
     echo  'Extracting deb package' ;\
     mkdir -p src/_build ;\
     docker run --rm --entrypoint cat codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) /src/coda-kademlia.deb > src/_build/coda-kademlia.deb
+
+toolchains: docker-toolchain docker-toolchain-rust docker-toolchain-haskell
 
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
@@ -169,4 +181,4 @@ web:
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains
