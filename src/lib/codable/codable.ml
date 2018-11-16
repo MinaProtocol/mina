@@ -32,6 +32,13 @@ module Make (Iso : Iso_intf) = struct
   end
 end
 
+module For_tests = struct
+  let check_encoding (type t) (module M : S with type t = t) t ~equal =
+    match M.of_yojson (M.to_yojson t) with
+    | Ok result -> equal t result
+    | Error e -> failwithf !"%s" e ()
+end
+
 module Make_of_int (Iso : sig
   type t
 

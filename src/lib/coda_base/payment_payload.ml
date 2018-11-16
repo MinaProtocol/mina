@@ -11,10 +11,10 @@ module Fee = Currency.Fee
 module Stable = struct
   module V1 = struct
     type ('pk, 'amount) t_ = {receiver: 'pk; amount: 'amount}
-    [@@deriving bin_io, eq, sexp, hash, compare]
+    [@@deriving bin_io, eq, sexp, hash, compare, yojson]
 
     type t = (Public_key.Compressed.Stable.V1.t, Amount.Stable.V1.t) t_
-    [@@deriving bin_io, eq, sexp, hash, compare]
+    [@@deriving bin_io, eq, sexp, hash, compare, yojson]
   end
 end
 

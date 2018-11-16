@@ -5,7 +5,7 @@ module Payload = User_command_payload
 
 type ('payload, 'pk, 'signature) t_ =
   {payload: 'payload; sender: 'pk; signature: 'signature}
-[@@deriving bin_io, eq, sexp, hash]
+[@@deriving bin_io, eq, sexp, hash, yojson]
 
 type t = (Payload.t, Public_key.t, Signature.t) t_
 [@@deriving bin_io, eq, sexp, hash, yojson]
@@ -15,7 +15,7 @@ module Stable : sig
     type nonrec ('payload, 'pk, 'signature) t_ =
                                                 ('payload, 'pk, 'signature) t_ =
       {payload: 'payload; sender: 'pk; signature: 'signature}
-    [@@deriving bin_io, eq, sexp, hash]
+    [@@deriving bin_io, eq, sexp, hash, yojson]
 
     type t =
       (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_

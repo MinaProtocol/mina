@@ -10,7 +10,7 @@ open Tuple_lib
 type uint64 = Unsigned.uint64
 
 module type Basic = sig
-  type t [@@deriving bin_io, sexp, compare, hash]
+  type t [@@deriving bin_io, sexp, compare, hash, yojson]
 
   include Comparable.S with type t := t
 
@@ -18,7 +18,7 @@ module type Basic = sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
+      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash, yojson]
     end
   end
 
@@ -197,9 +197,14 @@ end = struct
     module V1 = struct
       module T = struct
         type t = Unsigned.t [@@deriving bin_io, sexp, compare, hash]
+
+        let of_int = Unsigned.of_int
+
+        let to_int = Unsigned.to_int
       end
 
       include T
+      include Codable.Make_of_int (T)
       include Hashable.Make (T)
       include Comparable.Make (T)
     end

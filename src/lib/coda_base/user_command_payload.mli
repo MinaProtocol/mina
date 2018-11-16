@@ -6,16 +6,16 @@ open Snark_params.Tick
 
 module Body : sig
   type t = Payment of Payment_payload.Stable.V1.t
-  [@@deriving bin_io, eq, sexp, hash]
+  [@@deriving bin_io, eq, sexp, hash, yojson]
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, eq, sexp, hash]
+      type nonrec t = t [@@deriving bin_io, eq, sexp, hash, yojson]
     end
   end
 end
 
-type t [@@deriving bin_io, eq, sexp, hash]
+type t [@@deriving bin_io, eq, sexp, hash, yojson]
 
 val create :
      fee:Currency.Fee.t
@@ -34,7 +34,7 @@ val dummy : t
 
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving bin_io, eq, sexp, hash]
+    type nonrec t = t [@@deriving bin_io, eq, sexp, hash, yojson]
   end
 end
 
