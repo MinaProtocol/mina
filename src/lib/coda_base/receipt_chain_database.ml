@@ -7,10 +7,6 @@ module Payment = struct
   module T = struct
     include User_command
 
-    type payload = Payload.Stable.V1.t
-
-    let payload {payload; _} = payload
-
     let compare this that = compare this.payload that.payload
   end
 

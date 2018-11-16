@@ -41,6 +41,8 @@ type value = t
 
 type var = (Payload.var, Public_key.var, Signature.var) t_
 
+let payload {payload; _} = payload
+
 let accounts_accessed ({payload; sender; _} : value) =
   Public_key.compress sender :: Payload.accounts_accessed payload
 

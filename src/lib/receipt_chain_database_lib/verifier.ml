@@ -3,7 +3,7 @@ open Core_kernel
 module Make
     (Payment : Intf.Payment)
     (Receipt_chain_hash : Intf.Receipt_chain_hash
-                          with type payment_payload := Payment.payload) :
+                          with type payment_payload := Payment.Payload.t) :
   Intf.Verifier
   with type receipt_chain_hash := Receipt_chain_hash.t
    and type payment := Payment.t = struct

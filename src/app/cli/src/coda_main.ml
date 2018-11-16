@@ -1034,13 +1034,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         Core.exit 1
 
   module Payment_verifier =
-    Receipt_chain_database_lib.Verifier.Make (struct
-        include User_command
-
-        type payload = User_command.Payload.t
-
-        let payload {payload; _} = payload
-      end)
+    Receipt_chain_database_lib.Verifier.Make
+      (User_command)
       (Receipt.Chain_hash)
 
   let verify_payment t (addr : Public_key.Compressed.Stable.V1.t)

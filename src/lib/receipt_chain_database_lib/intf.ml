@@ -90,7 +90,9 @@ end
 module type Payment = sig
   type t
 
-  type payload
+  module Payload : sig
+    type t
+  end
 
-  val payload : t -> payload
+  val payload : t -> Payload.t
 end
