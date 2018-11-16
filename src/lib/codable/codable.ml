@@ -23,6 +23,13 @@ module Make (Iso : Iso_intf) = struct
 
   let of_yojson json =
     Result.map ~f:Iso.decode (Iso.standardized_of_yojson json)
+
+  module For_tests = struct
+    let check_encoding t ~equal =
+      match of_yojson (to_yojson t) with
+      | Ok result -> equal t result
+      | Error e -> failwithf !"%s" e ()
+  end
 end
 
 module Make_of_int (Iso : sig

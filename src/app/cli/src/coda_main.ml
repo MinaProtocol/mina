@@ -1033,6 +1033,31 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
           parent_hash previous ;
         Core.exit 1
 
+  module Payment_verifier =
+    Receipt_chain_database_lib.Verifier.Make (struct
+        include User_command
+
+        type payload = User_command.Payload.t
+
+        let payload {payload; _} = payload
+      end)
+      (Receipt.Chain_hash)
+
+  let verify_payment t (addr : Public_key.Compressed.Stable.V1.t)
+      (verifying_txn : User_command.t) proof =
+    let account = get_account t addr |> Option.value_exn in
+    let resulting_receipt = Account.receipt_chain_hash account in
+    let open Or_error.Let_syntax in
+    let%bind () = Payment_verifier.verify ~resulting_receipt proof in
+    if
+      List.exists proof ~f:(fun (_, txn) ->
+          User_command.equal verifying_txn txn )
+    then Ok ()
+    else
+      Or_error.errorf
+        !"Merkle list proof does not contain payment %{sexp:User_command.t}"
+        verifying_txn
+
   let schedule_payment log t (txn : User_command.t) account_opt =
     if not (is_valid_payment t txn account_opt) then (
       Core.Printf.eprintf "Invalid payment: account balance is too low" ;
@@ -1058,7 +1083,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         schedule_payment log t txn account_opt )
 
   let prove_receipt t ~proving_receipt ~resulting_receipt :
-      (Receipt.Chain_hash.t * User_command.t) list Deferred.Or_error.t =
+      Payment_proof.t Deferred.Or_error.t =
     let receipt_chain_database = receipt_chain_database t in
     (* TODO: since we are making so many reads to `receipt_chain_database`, 
     reads should be async to not get IO-blocked. See #1125 *)
@@ -1170,6 +1195,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             Deferred.unit )
       ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
             return (get_balance coda pk) )
+      ; Rpc.Rpc.implement Client_lib.Verify_proof.rpc
+          (fun () (pk, tx, proof) -> return (verify_payment coda pk tx proof)
+        )
       ; Rpc.Rpc.implement Client_lib.Prove_receipt.rpc
           (fun () (proving_receipt, pk) ->
             let open Deferred.Or_error.Let_syntax in

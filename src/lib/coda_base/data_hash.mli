@@ -14,8 +14,6 @@ module type Basic = sig
 
   val to_bytes : t -> string
 
-  val of_bytes : string -> t
-
   val length_in_triples : int
 
   val ( = ) : t -> t -> bool

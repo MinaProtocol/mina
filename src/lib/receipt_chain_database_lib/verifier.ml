@@ -1,10 +1,12 @@
 open Core_kernel
 
 module Make
-    (Transaction : Intf.Payment)
+    (Payment : Intf.Payment)
     (Receipt_chain_hash : Intf.Receipt_chain_hash
-                          with type payment_payload := Transaction.payload) =
-struct
+                          with type payment_payload := Payment.payload) :
+  Intf.Verifier
+  with type receipt_chain_hash := Receipt_chain_hash.t
+   and type payment := Payment.t = struct
   let verify ~resulting_receipt = function
     | (proving_receipt, _) :: merkle_list ->
         let open Result.Let_syntax in
@@ -12,7 +14,7 @@ struct
           List.fold_result merkle_list ~init:proving_receipt
             ~f:(fun prev_receipt (expected_receipt, payment) ->
               let computed_receipt =
-                Receipt_chain_hash.cons payment prev_receipt
+                Receipt_chain_hash.cons (Payment.payload payment) prev_receipt
               in
               if Receipt_chain_hash.equal expected_receipt computed_receipt
               then Ok expected_receipt

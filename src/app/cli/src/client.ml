@@ -16,6 +16,15 @@ let dispatch rpc query port =
       | Error exn -> return (Or_error.of_exn exn)
       | Ok conn -> Rpc.Rpc.dispatch rpc conn query )
 
+let dispatch_with_message rpc arg port ~success ~error =
+  match%bind dispatch rpc arg port with
+  | Ok x ->
+      printf "%s\n" (success x) ;
+      Deferred.unit
+  | Error e ->
+      eprintf "%s\n" (error e) ;
+      exit 1
+
 let json_flag =
   Command.Param.(
     flag "json" no_arg ~doc:"Use json output (default: plaintext)")
@@ -167,6 +176,51 @@ let prove_payment =
          | Ok result -> print (module Prove_receipt.Output) true result
          | Error e -> eprintf "%s" (Error.to_string_hum e) ))
 
+let read_json filepath =
+  let%map json_contents = Reader.file_contents filepath in
+  Yojson.Safe.from_string json_contents
+
+let verify_payment =
+  let open Deferred.Let_syntax in
+  let open Client_lib in
+  let open Command.Param in
+  let proof_path_flag =
+    flag "proof-path"
+      ~doc:"PROOFFILE File to read json version of payment proof"
+      (required file)
+  in
+  let payment_path_flag =
+    flag "payment-path"
+      ~doc:"PAYMENTPATH File to read json version of verifying payment"
+      (required file)
+  in
+  let address_flag =
+    flag "address" ~doc:"PUBLICKEY Public-key address of sender"
+      (required public_key)
+  in
+  Command.async ~summary:"Generate a proof of a payment as a merkle list"
+    (Daemon_cli.init (Args.zip3 payment_path_flag proof_path_flag address_flag)
+       ~f:(fun port (payment_path, proof_path, pk) ->
+         let%bind payment_json = read_json payment_path
+         and proof_json = read_json proof_path in
+         let dispatch_result =
+           let open Deferred.Or_error.Let_syntax in
+           let to_deferred_or_error result =
+             Result.map_error result ~f:Error.of_string |> Deferred.return
+           in
+           let%bind payment =
+             User_command.of_yojson payment_json |> to_deferred_or_error
+           and proof =
+             Payment_proof.of_yojson proof_json |> to_deferred_or_error
+           in
+           dispatch Verify_proof.rpc
+             (Public_key.compress pk, payment, proof)
+             port
+         in
+         match%map dispatch_result with
+         | Ok (Ok ()) -> printf "Payment is valid on the existing blockchain!"
+         | Error e | Ok (Error e) -> eprintf "%s" (Error.to_string_hum e) ))
+
 let get_nonce addr port =
   let open Deferred.Let_syntax in
   match%map
@@ -232,15 +286,6 @@ let get_nonce_exn public_key port =
       eprintf "Failed to get nonce %s\n" e ;
       exit 1
   | Ok nonce -> return nonce
-
-let dispatch_with_message rpc arg port ~success ~error =
-  match%bind dispatch rpc arg port with
-  | Ok x ->
-      printf "%s\n" (success x) ;
-      Deferred.unit
-  | Error e ->
-      eprintf "%s\n" (error e) ;
-      exit 1
 
 let handle_exception_nicely (type a) (f : unit -> a Deferred.t) () :
     a Deferred.t =

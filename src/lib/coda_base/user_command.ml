@@ -33,6 +33,56 @@ module Stable = struct
       else
         let hash x = hash_with_seed (seed, x) in
         if fee_compare <> 0 then fee_compare else hash t - hash t'
+
+    include Codable.Make (struct
+      type original = t
+
+      type payload =
+        { receiver: string
+        ; amount: Currency.Amount.t
+        ; fee: Fee.t
+        ; nonce: Account_nonce.t
+        ; memo: User_command_memo.t }
+      [@@deriving yojson]
+
+      type standardized = {payload: payload; sender: string; signature: string}
+      [@@deriving yojson]
+
+      let encode ({payload; sender; signature} : original) =
+        let payload =
+          let open User_command_payload in
+          let fee = fee payload in
+          let memo = memo payload in
+          let nonce = nonce payload in
+          let Body.(Payment {Payment_payload.receiver; amount}) =
+            body payload
+          in
+          { receiver= Public_key.Compressed.to_base64 receiver
+          ; amount
+          ; fee
+          ; nonce
+          ; memo }
+        in
+        { payload
+        ; sender= Public_key.Compressed.to_base64 (Public_key.compress sender)
+        ; signature= Signature.to_base64 signature }
+
+      let decode
+          {payload= {receiver; amount; fee; nonce; memo}; sender; signature} :
+          original =
+        { sender=
+            Public_key.decompress (Public_key.Compressed.of_base64_exn sender)
+            |> Option.value_exn
+        ; signature= Signature.of_base64_exn signature
+        ; payload=
+            Payload.create ~fee ~nonce ~memo
+              ~body:
+                Payload.Body.(
+                  Payment
+                    { Payment_payload.amount
+                    ; receiver= Public_key.Compressed.of_base64_exn receiver })
+        }
+    end)
   end
 end
 
@@ -93,9 +143,15 @@ end
 let check_signature ({payload; sender; signature} : t) =
   Schnorr.verify signature (Inner_curve.of_coords sender) payload
 
-let%test_unit "completeness" =
+let gen_test =
   let keys = Array.init 2 ~f:(fun _ -> Signature_keypair.create ()) in
-  Quickcheck.test ~trials:20 (gen ~keys ~max_amount:10000 ~max_fee:1000)
-    ~f:(fun t -> assert (check_signature t) )
+  gen ~keys ~max_amount:10000 ~max_fee:1000
+
+let%test_unit "completeness" =
+  Quickcheck.test ~trials:20 gen_test ~f:(fun t -> assert (check_signature t))
+
+let%test_unit "json" =
+  Quickcheck.test ~trials:400 ~sexp_of:sexp_of_t gen_test ~f:(fun t ->
+      assert (For_tests.check_encoding ~equal t) )
 
 let check t = Option.some_if (check_signature t) t
