@@ -60,6 +60,12 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
   in
   let%bind punished_dir = Async.Unix.mkdtemp (banlist_dir_name ^/ "banned") in
   let banlist = Coda_base.Banlist.create ~suspicious_dir ~punished_dir in
+  let%bind receipt_chain_dir_name =
+    Async.Unix.mkdtemp (temp_conf_dir ^/ "receipt_chain")
+  in
+  let receipt_chain_database =
+    Coda_base.Receipt_chain_database.create ~directory:receipt_chain_dir_name
+  in
   let net_config =
     { Inputs.Net.Config.parent_log= log
     ; gossip_net_params=
@@ -79,7 +85,8 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
          ~transaction_pool_disk_location:(temp_conf_dir ^/ "transaction_pool")
          ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
          ~time_controller:(Inputs.Time.Controller.create ())
-         () ~banlist ~snark_work_fee:(Currency.Fee.of_int 0))
+         ~receipt_chain_database () ~banlist
+         ~snark_work_fee:(Currency.Fee.of_int 0))
   in
   don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers coda)) ;
   let wait_until_cond ~(f : t -> bool) ~(timeout : Float.t) =
@@ -150,13 +157,17 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
       Run.get_balance coda receiver_pk
       |> Option.value ~default:Currency.Balance.zero
     in
-    let%bind () = Run.send_payment log coda (payment :> User_command.t) in
+    let%bind _ : Receipt.Chain_hash.t =
+      Run.send_payment log coda (payment :> User_command.t)
+    in
     (* Send a similar the payment twice on purpose; this second one
     * will be rejected because the nonce is wrong *)
     let payment' =
       build_payment send_amount sender_sk receiver_pk (Currency.Fee.of_int 0)
     in
-    let%bind () = Run.send_payment log coda (payment' :> User_command.t) in
+    let%bind _ : Receipt.Chain_hash.t =
+      Run.send_payment log coda (payment' :> User_command.t)
+    in
     (* Let the system settle, mine some blocks *)
     let%map () =
       balance_change_or_timeout ~initial_receiver_balance:prev_receiver_balance
@@ -183,7 +194,9 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
           Option.value_exn
             (Currency.Balance.add_amount (Option.value_exn v) amount) )
     in
-    let%map () = Run.send_payment log coda (payment :> User_command.t) in
+    let%map _ : Receipt.Chain_hash.t =
+      Run.send_payment log coda (payment :> User_command.t)
+    in
     new_balance_sheet'
   in
   let send_payments accounts pks balance_sheet f_amount =

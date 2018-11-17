@@ -62,6 +62,10 @@ module Make (Kernel : Kernel_intf) = struct
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.send_payment
       ~arg:(sk, pk, amount, fee, memo)
 
+  let prove_receipt_exn (conn, proc, _) proving_receipt resulting_receipt =
+    Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.prove_receipt
+      ~arg:(proving_receipt, resulting_receipt)
+
   let strongest_ledgers_exn (conn, proc, _) =
     let%map r =
       Coda_worker.Connection.run_exn conn

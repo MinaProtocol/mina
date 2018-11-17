@@ -1,0 +1,9 @@
+(library
+ (name codable)
+  (public_name codable)
+  (flags (:standard -short-paths -warn-error -58-39))
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries core_kernel ppx_deriving_yojson.runtime yojson)
+  (preprocess (pps ppx_jane ppx_deriving_yojson))
+  (synopsis "Extension of Yojson to make it easy for a type to derive yojson"))

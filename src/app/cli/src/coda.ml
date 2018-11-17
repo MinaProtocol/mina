@@ -10,6 +10,20 @@ open Coda_main
 module YJ = Yojson.Safe
 module Git_sha = Client_lib.Git_sha
 
+[%%if
+tracing]
+
+let start_tracing () =
+  Writer.open_file
+    (sprintf "/tmp/coda-profile-%d" (Unix.getpid () |> Pid.to_int))
+  >>| O1trace.start_tracing
+
+[%%else]
+
+let start_tracing () = Deferred.unit
+
+[%%endif]
+
 let commit_id = Option.map [%getenv "CODA_COMMIT_SHA1"] ~f:Git_sha.of_string
 
 module type Coda_intf = sig
@@ -287,6 +301,7 @@ let daemon (module Kernel : Kernel_intf) log =
          let punished_dir = banlist_dir_name ^/ "banned" in
          let%bind () = Async.Unix.mkdir ~p:() suspicious_dir in
          let%bind () = Async.Unix.mkdir ~p:() punished_dir in
+         let%bind () = start_tracing () in
          let banlist =
            Coda_base.Banlist.create ~suspicious_dir ~punished_dir
          in
@@ -301,6 +316,12 @@ let daemon (module Kernel : Kernel_intf) log =
                ; me
                ; banlist } }
          in
+         let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
+         let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
+         let receipt_chain_database =
+           Coda_base.Receipt_chain_database.create
+             ~directory:receipt_chain_dir_name
+         in
          let%map coda =
            Run.create
              (Run.Config.make ~log ~net_config
@@ -309,7 +330,7 @@ let daemon (module Kernel : Kernel_intf) log =
                   (conf_dir ^/ "ledger_builder")
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
-                ~snark_work_fee:snark_work_fee_flag
+                ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
                 ~time_controller:(Inputs.Time.Controller.create ())
                 ?propose_keypair:Config0.propose_keypair () ~banlist)
          in
@@ -523,6 +544,7 @@ let coda_commands (module Kernel : Kernel_intf) log =
     let module Coda_shared_prefix_test = Coda_shared_prefix_test.Make (Kernel) in
     let module Coda_restart_node_test = Coda_restart_node_test.Make (Kernel) in
     let module Coda_shared_state_test = Coda_shared_state_test.Make (Kernel) in
+    let module Coda_receipt_chain_test = Coda_receipt_chain_test.Make (Kernel) in
     let module Coda_transitive_peers_test =
       Coda_transitive_peers_test.Make (Kernel) in
     [ (Coda_peers_test.name, Coda_peers_test.command)
@@ -531,6 +553,7 @@ let coda_commands (module Kernel : Kernel_intf) log =
     ; (Coda_transitive_peers_test.name, Coda_transitive_peers_test.command)
     ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
     ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
+    ; (Coda_receipt_chain_test.name, Coda_receipt_chain_test.command)
     ; ("full-test", Full_test.command (module Kernel))
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
   in
