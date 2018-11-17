@@ -28,7 +28,7 @@ struct
      can't "derive hash" to allow using hash tables here, which would be a simpler implementation
    *)
 
-  let (registered_masks : (t * Mask.Attached.t list) list ref) = ref []
+  let (registered_masks : Mask.Attached.t list Base.Uuid.Table.t) = Base.Uuid.Table.t
 
   let register_mask t mask =
     let attached_mask = Mask.set_parent mask t in

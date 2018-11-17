@@ -362,7 +362,6 @@ let%test_module "Test mask connected to underlying Merkle tree" =
       end =
         Database.Make (Key) (Account) (Hash) (Depth) (Location)
           (In_memory_kvdb)
-          (In_memory_sdb)
           (Storage_locations)
 
       (* the mask tree *)

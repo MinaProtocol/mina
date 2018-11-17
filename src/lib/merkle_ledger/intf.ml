@@ -41,7 +41,7 @@ module type Depth = sig
 end
 
 module type Key_value_database = sig
-  type t
+  type t [@@deriving hash,compare]
 
   val copy : t -> t
 
@@ -56,22 +56,6 @@ module type Key_value_database = sig
   val set_batch : t -> key_data_pairs:(Bigstring.t * Bigstring.t) list -> unit
 
   val delete : t -> key:Bigstring.t -> unit
-end
-
-module type Stack_database = sig
-  type t
-
-  val copy : t -> t
-
-  val create : filename:string -> t
-
-  val destroy : t -> unit
-
-  val push : t -> Bigstring.t -> unit
-
-  val pop : t -> Bigstring.t option
-
-  val length : t -> int
 end
 
 module type Storage_locations = sig

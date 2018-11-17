@@ -88,44 +88,68 @@ end
 
 module Intf = Merkle_ledger.Intf
 
+module Bigstring_frozen = struct
+  include Bigstring
+
+  (* we're not mutating Bigstrings, which would invalidate hashes
+     OK to use these hash functions 
+   *)
+  let hash = hash_t_frozen
+  let hash_fold_t = hash_fold_t_frozen
+end        
+            
 module In_memory_kvdb : Intf.Key_value_database = struct
-  type t = (string, Bigstring.t) Hashtbl.t
 
-  let create ~directory:_ = Hashtbl.create (module String)
+  include Hashable.Make_binable(Bigstring_frozen)
 
+  type uuid = int [@@deriving bin_io]
+        
+  let uuid_counter = ref 0
+        
+  type t = { uuid : uuid
+           ; table : Bigstring_frozen.t Table.t
+           } [@@deriving bin_io]
+
+  (* can't easily derive hash, compare for Table.t *)
+  let to_string t =
+    let bs =
+      Bigstring.create (bin_size_t t + Bin_prot.Utils.size_header_length)
+    in
+    let _ = Bigstring.write_bin_prot bs bin_writer_t t in
+    Bigstring.to_string bs 
+
+  let hash t = to_string t |> String.hash
+
+  let hash_fold_t state t = String.hash_fold_t state (to_string t)
+             
+  let compare t1 t2 = String.compare (to_string t1) (to_string t2)
+
+  let get_uuid t = t.uuid
+                    
+  let create ~directory:_ =
+    let result = { uuid = !uuid_counter
+                 ; table = Table.create ()
+                 }
+    in
+    incr uuid_counter;
+    result
+               
   let destroy _ = ()
 
-  let get tbl ~key = Hashtbl.find tbl (Bigstring.to_string key)
+  let get t ~key = Table.find t.table key
 
-  let set tbl ~key ~data = Hashtbl.set tbl ~key:(Bigstring.to_string key) ~data
+  let set t ~key ~data = Table.set t.table ~key ~data
 
   let set_batch tbl ~key_data_pairs =
     List.iter key_data_pairs ~f:(fun (key, data) -> set tbl ~key ~data)
 
-  let delete tbl ~key = Hashtbl.remove tbl (Bigstring.to_string key)
+  let delete t ~key =
+    Table.remove t.table key
 
-  let copy tbl = Hashtbl.copy tbl
-end
-
-module In_memory_sdb : Intf.Stack_database = struct
-  type t = Bigstring.t list ref
-
-  let create ~filename:_ = ref []
-
-  let destroy _ = ()
-
-  let push ls v = ls := v :: !ls
-
-  let pop ls =
-    match !ls with
-    | [] -> None
-    | h :: t ->
-        ls := t ;
-        Some h
-
-  let length ls = List.length !ls
-
-  let copy stack = ref !stack
+  let copy (t:t) =
+    { uuid = t.uuid
+    ; table = Table.copy t.table
+    }
 end
 
 module Storage_locations : Intf.Storage_locations = struct

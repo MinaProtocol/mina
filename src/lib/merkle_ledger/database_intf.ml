@@ -11,6 +11,11 @@ module type S = sig
 
   type t
 
+  module Uuid : sig
+    type t
+    module Table : Hashtbl.S with type key := t
+  end
+
   module Db_error : sig
     type t = Account_location_not_found | Out_of_leaves | Malformed_database
 
@@ -21,6 +26,8 @@ module type S = sig
 
   module Path : Merkle_path.S with type hash := hash
 
+  val get_uuid : t -> Uuid.t
+       
   val create : unit -> t
 
   val location_of_key : t -> key -> location option

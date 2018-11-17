@@ -1,5 +1,11 @@
 open Core
 
+let new_uuid =
+  let current_uuid = ref 0 in
+  fun () -> let result = !current_uuid in
+            incr current_uuid;
+            result
+
 module Make (Key : sig
   include Intf.Key
 
@@ -10,7 +16,6 @@ end)
 (Depth : Intf.Depth)
 (Location : Location_intf.S)
 (Kvdb : Intf.Key_value_database)
-(Sdb : Intf.Stack_database)
 (Storage_locations : Intf.Storage_locations) :
   Database_intf.S
   with module Addr = Location.Addr
@@ -35,14 +40,20 @@ end)
 
   type location = Location.t [@@deriving sexp]
 
-  type t = {kvdb: Kvdb.t sexp_opaque; sdb: Sdb.t sexp_opaque} [@@deriving sexp]
+  module Uuid = struct
+    type t = Int.t [@@deriving sexp]
+    include Hashable.Make(Int)
+  end
 
+  type t = {uuid : Uuid.t; kvdb: Kvdb.t sexp_opaque } [@@deriving sexp]
+
+  let get_uuid t = t.uuid
+         
   let create () =
     let kvdb = Kvdb.create ~directory:Storage_locations.key_value_db_dir in
-    let sdb = Sdb.create ~filename:Storage_locations.stack_db_file in
-    {kvdb; sdb}
+    {uuid = new_uuid (); kvdb}
 
-  let destroy {kvdb; sdb} = Kvdb.destroy kvdb ; Sdb.destroy sdb
+  let destroy {uuid=_;kvdb} = Kvdb.destroy kvdb
 
   let empty_hashes =
     let empty_hashes =
@@ -168,12 +179,7 @@ end)
                    next_account_location ) )
 
     let allocate mdb key =
-      let location_result =
-        match Sdb.pop mdb.sdb with
-        | None -> increment_last_account_location mdb
-        | Some location ->
-            Location.parse location
-            |> Result.map_error ~f:(fun () -> Db_error.Malformed_database)
+      let location_result = increment_last_account_location mdb
       in
       Result.map location_result ~f:(fun location ->
           set mdb key (Location.serialize location) ;
@@ -253,7 +259,7 @@ end)
   let num_accounts t =
     match Account_location.last_location_address t with
     | None -> 0
-    | Some addr -> Addr.to_int addr - Sdb.length t.sdb + 1
+    | Some addr -> Addr.to_int addr + 1
 
   let get_all_accounts_rooted_at_exn mdb address =
     let first_node, last_node = Addr.Range.subtree_range address in
@@ -297,7 +303,8 @@ end)
 
   let merkle_root mdb = get_hash mdb Location.root_hash
 
-  let copy {kvdb; sdb} = {kvdb= Kvdb.copy kvdb; sdb= Sdb.copy sdb}
+  (* for a copy, the uuid is fresh *)
+  let copy {uuid=_;kvdb} = {uuid=new_uuid();kvdb= Kvdb.copy kvdb}
 
   let remove_accounts_exn t keys =
     let locations =
