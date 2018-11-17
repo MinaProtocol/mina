@@ -60,6 +60,8 @@ module type S = sig
 
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
+  val to_string_record : value -> string
+
   module Message :
     Signature_lib.Checked.Message_intf
     with type ('a, 'b) checked := ('a, 'b) Tick.Checked.t
@@ -164,6 +166,13 @@ end) : S = struct
         Frozen_ledger_hash.of_ledger_hash
         @@ Ledger.merkle_root Genesis_ledger.t
     ; timestamp= genesis_time }
+
+  let to_string_record t =
+    Printf.sprintf "{ledger_builder_hash|%s}|{ledger_hash|%s}|{timestamp|%s}"
+      (Base64.encode_string
+         (Ledger_builder_hash.to_string t.ledger_builder_hash))
+      (Base64.encode_string (Frozen_ledger_hash.to_bytes t.ledger_hash))
+      (Time.to_string (Block_time.to_time t.timestamp))
 
   module Message = struct
     open Tick

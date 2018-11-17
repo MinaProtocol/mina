@@ -14,6 +14,8 @@ module Base = struct
       type t [@@deriving eq, sexp, compare, bin_io]
 
       val to_bits : t -> bool list
+
+      val to_bytes : t -> string
     end
 
     module Ledger_hash : sig
@@ -85,6 +87,8 @@ module Base = struct
         val equal_value : value -> value -> bool
 
         val hash : value -> State_hash.t
+
+        val to_string_record : value -> string
       end
 
       module External_transition : sig
@@ -100,8 +104,8 @@ module Base = struct
       (* This checks the SNARKs in State/LB and does the transition *)
 
       val select :
-           Consensus_state.value
-        -> Consensus_state.value
+           existing:Consensus_state.value
+        -> candidate:Consensus_state.value
         -> logger:Logger.t
         -> time_received:Unix_timestamp.t
         -> [`Keep | `Take]

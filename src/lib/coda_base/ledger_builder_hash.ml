@@ -46,6 +46,11 @@ let aux_hash {aux_hash; _} = aux_hash
 let dummy =
   {ledger_hash= Ledger_hash.of_hash Field.zero; aux_hash= Aux_hash.dummy}
 
+let to_string {ledger_hash; aux_hash} =
+  Printf.sprintf "%s:%s"
+    (Ledger_hash.to_bytes ledger_hash)
+    (Aux_hash.to_bytes aux_hash)
+
 let of_aux_and_ledger_hash aux_hash ledger_hash = {aux_hash; ledger_hash}
 
 let length_in_bits = 256

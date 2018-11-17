@@ -10,6 +10,20 @@ open Coda_main
 module YJ = Yojson.Safe
 module Git_sha = Client_lib.Git_sha
 
+[%%if
+tracing]
+
+let start_tracing () =
+  Writer.open_file
+    (sprintf "/tmp/coda-profile-%d" (Unix.getpid () |> Pid.to_int))
+  >>| O1trace.start_tracing
+
+[%%else]
+
+let start_tracing () = Deferred.unit
+
+[%%endif]
+
 let commit_id = Option.map [%getenv "CODA_COMMIT_SHA1"] ~f:Git_sha.of_string
 
 module type Coda_intf = sig
@@ -287,6 +301,7 @@ let daemon (module Kernel : Kernel_intf) log =
          let punished_dir = banlist_dir_name ^/ "banned" in
          let%bind () = Async.Unix.mkdir ~p:() suspicious_dir in
          let%bind () = Async.Unix.mkdir ~p:() punished_dir in
+         let%bind () = start_tracing () in
          let banlist =
            Coda_base.Banlist.create ~suspicious_dir ~punished_dir
          in
