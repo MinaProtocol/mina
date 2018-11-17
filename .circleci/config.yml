@@ -3,17 +3,17 @@ version: 2
 jobs:
     tracetool:
         docker:
-            - image: rust
+            - image: codaprotocol/coda:toolchain-rust-20660417b41b9cdbb3cc1b2c8a419970645c3e87
         steps:
             - checkout
             - run:
                 name: Build trace-tool
-                command: cd src/app/trace-tool && cargo build
+                command: cd src/app/trace-tool && cargo build --frozen
 
     build:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-9aea9e820e487fabb79e3c8c27372a50fbf77289
+        - image: codaprotocol/coda:toolchain-956136e7b621813f03881a1c2ab29b9ca24b539c
         steps:
             - checkout
             - run:
@@ -40,12 +40,12 @@ jobs:
     build_withsnark:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-9aea9e820e487fabb79e3c8c27372a50fbf77289
+        - image: codaprotocol/coda:toolchain-956136e7b621813f03881a1c2ab29b9ca24b539c
         steps:
             - checkout
             - run:
                 name: Build OCaml
-                command: eval `opam config env` && DUNE_PROFILE=testnet make build 2>&1 | tee /tmp/buildocaml.log
+                command: eval `opam config env` && DUNE_PROFILE=testnet_posig make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                 name: Build deb Package with verification keys
                 command: make deb
@@ -64,7 +64,7 @@ jobs:
     build_public:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-9aea9e820e487fabb79e3c8c27372a50fbf77289
+        - image: codaprotocol/coda:toolchain-956136e7b621813f03881a1c2ab29b9ca24b539c
         steps:
             - checkout
             - run:
@@ -82,7 +82,7 @@ jobs:
     test-unit-test:
        resource_class: large
        docker:
-       - image: codaprotocol/coda:toolchain-9aea9e820e487fabb79e3c8c27372a50fbf77289
+       - image: codaprotocol/coda:toolchain-956136e7b621813f03881a1c2ab29b9ca24b539c
        steps:
            - checkout
            - run:
@@ -92,7 +92,7 @@ jobs:
     test-withsnark:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-9aea9e820e487fabb79e3c8c27372a50fbf77289
+        - image: codaprotocol/coda:toolchain-956136e7b621813f03881a1c2ab29b9ca24b539c
         steps:
             - checkout
             - run:
@@ -106,7 +106,7 @@ jobs:
     test-all_sig_integration_tests:
       resource_class: large
       docker:
-      - image: codaprotocol/coda:toolchain-9aea9e820e487fabb79e3c8c27372a50fbf77289
+      - image: codaprotocol/coda:toolchain-956136e7b621813f03881a1c2ab29b9ca24b539c
       steps:
           - checkout
           - run:
@@ -147,7 +147,7 @@ jobs:
     test-all_stake_integration_tests:
       resource_class: large
       docker:
-      - image: codaprotocol/coda:toolchain-9aea9e820e487fabb79e3c8c27372a50fbf77289
+      - image: codaprotocol/coda:toolchain-956136e7b621813f03881a1c2ab29b9ca24b539c
       steps:
           - checkout
           - run:

@@ -4,7 +4,7 @@ open Tick
 open Fold_lib
 open Tuple_lib
 
-type t [@@deriving sexp, bin_io, eq, compare, hash]
+type t [@@deriving sexp, bin_io, eq, compare, hash, yojson]
 
 type var = Boolean.var list
 
