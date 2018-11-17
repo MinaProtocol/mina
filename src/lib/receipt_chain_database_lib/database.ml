@@ -3,7 +3,7 @@ open Core_kernel
 module Make
     (Payment : Intf.Payment)
     (Receipt_chain_hash : Intf.Receipt_chain_hash
-                          with type payment_payload := Payment.payload)
+                          with type payment_payload := Payment.Payload.t)
     (Key_value_db : Key_value_database.S
                     with type key := Receipt_chain_hash.t
                      and type value :=
@@ -79,7 +79,9 @@ let%test_module "receipt_database" =
     module Payment = struct
       include Char
 
-      type payload = t [@@deriving bin_io]
+      module Payload = struct
+        type nonrec t = t
+      end
 
       let payload = Fn.id
     end

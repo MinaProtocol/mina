@@ -3,6 +3,32 @@ open Async
 open Coda_base
 open Signature_lib
 
+module String_list_formatter = struct
+  type t = string list [@@deriving yojson]
+
+  let log10 i = i |> Float.of_int |> Float.log10 |> Float.to_int
+
+  let to_text pks =
+    let max_padding = Int.max 1 (List.length pks) |> log10 in
+    List.mapi pks ~f:(fun i pk ->
+        let i = i + 1 in
+        let padding = String.init (max_padding - log10 i) ~f:(fun _ -> ' ') in
+        sprintf "%s%i, %s" padding i pk )
+    |> String.concat ~sep:"\n"
+end
+
+module Send_user_command = struct
+  type query = User_command.Stable.V1.t [@@deriving bin_io]
+
+  type response = Receipt.Chain_hash.t [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Send_user_command" ~version:0 ~bin_query
+      ~bin_response
+end
+
 module Send_user_commands = struct
   type query = User_command.Stable.V1.t list [@@deriving bin_io]
 
@@ -35,6 +61,40 @@ module Get_balance = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_balance" ~version:0 ~bin_query ~bin_response
+end
+
+module Verify_proof = struct
+  type query =
+    Public_key.Compressed.Stable.V1.t * User_command.t * Payment_proof.t
+  [@@deriving bin_io]
+
+  type response = unit Or_error.t [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Verify_proof" ~version:0 ~bin_query ~bin_response
+end
+
+module Prove_receipt = struct
+  type query = Receipt.Chain_hash.t * Public_key.Compressed.Stable.V1.t
+  [@@deriving bin_io]
+
+  type response = Payment_proof.t Or_error.t [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Prove_receipt" ~version:0 ~bin_query ~bin_response
+
+  module Output = struct
+    type t = Payment_proof.t [@@deriving yojson]
+
+    let to_text merkle_list =
+      sprintf
+        !"Merkle List of transactions:\n%s"
+        (to_yojson merkle_list |> Yojson.Safe.pretty_to_string)
+  end
 end
 
 module Get_nonce = struct
@@ -171,20 +231,6 @@ module Status = struct
       |> String.concat ~sep:"\n"
     in
     title ^ output ^ "\n"
-end
-
-module String_list_formatter = struct
-  type t = string list [@@deriving yojson]
-
-  let log10 i = i |> Float.of_int |> Float.log10 |> Float.to_int
-
-  let to_text pks =
-    let max_padding = Int.max 1 (List.length pks) |> log10 in
-    List.mapi pks ~f:(fun i pk ->
-        let i = i + 1 in
-        let padding = String.init (max_padding - log10 i) ~f:(fun _ -> ' ') in
-        sprintf "%s%i, %s" padding i pk )
-    |> String.concat ~sep:"\n"
 end
 
 module Public_key_with_balances = struct
