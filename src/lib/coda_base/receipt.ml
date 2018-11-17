@@ -66,7 +66,8 @@ module Chain_hash = struct
             let open Snark_params.Tick.Let_syntax in
             let%bind payload =
               Schnorr.Message.var_of_payload
-                (User_command_payload.Checked.constant payload)
+                Transaction_union_payload.(
+                  Checked.constant (of_user_command_payload payload))
             in
             let%map res = Checked.cons ~payload (var_of_t base) in
             As_prover.read typ res
@@ -77,6 +78,6 @@ module Chain_hash = struct
         assert (equal unchecked checked) )
 
   let%test_unit "json" =
-    Quickcheck.test gen ~sexp_of:sexp_of_t ~f:(fun t ->
+    Quickcheck.test ~trials:20 gen ~sexp_of:sexp_of_t ~f:(fun t ->
         assert (For_tests.check_encoding ~equal t) )
 end

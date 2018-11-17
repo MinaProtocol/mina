@@ -1,0 +1,3 @@
+(executable
+ (name sanitize_dot_merlin)
+ (libraries str))

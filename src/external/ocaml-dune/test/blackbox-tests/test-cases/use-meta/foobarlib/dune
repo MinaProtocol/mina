@@ -1,0 +1,4 @@
+(library
+ (name foobarlib)
+ (public_name foobarlib)
+ (libraries str))

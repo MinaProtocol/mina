@@ -62,7 +62,7 @@ module Inputs = struct
         | Work.Single.Spec.Transition (input, t, l) ->
             let start = Time.now () in
             let res =
-              M.of_transition ~sok_digest ~source:input.Statement.source
+              M.of_transaction ~sok_digest ~source:input.Statement.source
                 ~target:input.target t
                 (unstage (Coda_base.Sparse_ledger.handler l))
             in

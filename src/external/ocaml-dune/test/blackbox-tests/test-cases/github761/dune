@@ -1,0 +1,7 @@
+(alias
+ (name foo/bar)
+ (action (echo toto)))
+
+(alias
+ (name bar)
+ (action (echo toto)))

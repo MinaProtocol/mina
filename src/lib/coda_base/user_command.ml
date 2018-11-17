@@ -39,8 +39,6 @@ include Stable.V1
 
 type value = t
 
-type var = (Payload.var, Public_key.var, Signature.var) t_
-
 let payload {payload; _} = payload
 
 let accounts_accessed ({payload; sender; _} : value) =
@@ -50,19 +48,6 @@ let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
   { payload
   ; sender= kp.public_key
   ; signature= Schnorr.sign kp.private_key payload }
-
-let typ : (var, t) Tick.Typ.t =
-  let spec = Data_spec.[Payload.typ; Public_key.typ; Schnorr.Signature.typ] in
-  let of_hlist
-        : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) t_
-      =
-    H_list.(fun [payload; sender; signature] -> {payload; sender; signature})
-  in
-  let to_hlist {payload; sender; signature} =
-    H_list.[payload; sender; signature]
-  in
-  Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-    ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
 let gen ~keys ~max_amount ~max_fee =
   let open Quickcheck.Generator.Let_syntax in
@@ -102,7 +87,7 @@ let%test_unit "completeness" =
   Quickcheck.test ~trials:20 gen_test ~f:(fun t -> assert (check_signature t))
 
 let%test_unit "json" =
-  Quickcheck.test ~trials:400 ~sexp_of:sexp_of_t gen_test ~f:(fun t ->
+  Quickcheck.test ~trials:20 ~sexp_of:sexp_of_t gen_test ~f:(fun t ->
       assert (Codable.For_tests.check_encoding (module Stable.V1) ~equal t) )
 
 let check t = Option.some_if (check_signature t) t

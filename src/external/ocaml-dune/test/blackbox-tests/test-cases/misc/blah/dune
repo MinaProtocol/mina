@@ -1,0 +1,3 @@
+(alias
+ (name runtest)
+ (deps %{project_root}/023e1a58-4d08-11e7-a041-aa000008c8a6))

@@ -21,3 +21,6 @@ type var = Inner_curve.Scalar.var * Inner_curve.Scalar.var
 val to_base64 : t -> string
 
 val of_base64_exn : string -> t
+
+val dummy : t
+

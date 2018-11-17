@@ -1,0 +1,29 @@
+(rule
+ (with-stdout-to dune.1 (run %{bin:dune} --help=groff)))
+
+(install
+ (section man)
+ (package dune)
+ (files   dune.1))
+
+(rule
+ (with-stdout-to dune-config.5
+  (run %{bin:jbuilder} help config --man-format=groff)))
+
+(install
+ (section man)
+ (package dune)
+ (files   dune-config.5))
+
+(include dune.inc)
+
+(rule
+ (targets dune.inc.gen)
+ (deps    (package dune))
+ (action
+  (with-stdout-to %{targets}
+   (run bash %{dep:update-jbuild.sh}))))
+
+(alias
+ (name runtest)
+ (action (diff dune.inc dune.inc.gen)))

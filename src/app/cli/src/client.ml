@@ -361,47 +361,65 @@ let batch_send_payments =
   Command.async ~summary:"send multiple payments from a file"
     (Daemon_cli.init arg ~f:main)
 
-let send_payment =
+let user_command (body_args : User_command_payload.Body.t Command.Param.t)
+    ~label ~summary ~error =
   let open Command.Param in
-  let address_flag =
-    flag "receiver"
-      ~doc:"PUBLICKEY Public-key address to which you want to send money"
-      (required public_key)
-  in
-  let fee_flag =
-    flag "fee" ~doc:"VALUE  Payment fee you're willing to pay (default: 1)"
+  let amount_flag =
+    flag "fee" ~doc:"VALUE  fee you're willing to pay (default: 1)"
       (optional txn_fee)
   in
-  let amount_flag =
-    flag "amount" ~doc:"VALUE Payment amount you want to send"
-      (required txn_amount)
+  let flag =
+    let open Command.Param in
+    return (fun a b c -> (a, b, c))
+    <*> body_args <*> privkey_read_path_flag <*> amount_flag
   in
-  Command.async ~summary:"Send payment to an address"
-    (Daemon_cli.init
-       (Args.zip4 address_flag privkey_read_path_flag fee_flag amount_flag)
-       ~f:(fun port (address, from_account, fee, amount) ->
+  Command.async ~summary
+    (Daemon_cli.init flag ~f:(fun port (body, from_account, fee) ->
          let open Deferred.Let_syntax in
          let%bind sender_kp = read_keypair_exn' from_account in
          let%bind nonce = get_nonce_exn sender_kp.public_key port in
-         let receiver_compressed = Public_key.compress address in
          let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
          let payload : User_command.Payload.t =
            User_command.Payload.create ~fee ~nonce
-             ~memo:User_command_memo.dummy
-             ~body:(Payment {receiver= receiver_compressed; amount})
+             ~memo:User_command_memo.dummy ~body
          in
          let payment = User_command.sign sender_kp payload in
          dispatch_with_message Client_lib.Send_user_command.rpc
            (payment :> User_command.t)
            port
-           ~success:(fun receipt ->
-             sprintf
-               !"Successfully enqueued payment in pool.\n\
-                 Receipt chain hash of the payment:\n\
-                 %s"
-               (Receipt.Chain_hash.to_string receipt) )
-           ~error:(fun e ->
-             sprintf "Failed to send payment %s" (Error.to_string_hum e) ) ))
+           ~success:(fun receipt_chain_hash -> 
+           sprintf "Successfully enqueued %s in pool\n\
+           Receipt_chain_hash: %s" label (Receipt.Chain_hash.to_string receipt_chain_hash))
+           ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e)) ))
+
+let send_payment =
+  let body =
+    let open Command.Let_syntax in
+    let%map_open receiver =
+      flag "receiver"
+        ~doc:"PUBLICKEY Public-key address to which you want to send money"
+        (required public_key_compressed)
+    and amount =
+      flag "amount" ~doc:"VALUE Payment amount you want to send"
+        (required txn_amount)
+    in
+    User_command_payload.Body.Payment {receiver; amount}
+  in
+  user_command body ~label:"payment" ~summary:"Send payment to an address"
+    ~error:"Failed to send payment"
+
+let delegate_stake =
+  let body =
+    let open Command.Let_syntax in
+    let%map_open new_delegate =
+      flag "delegate"
+        ~doc:"PUBLICKEY Public-key address you want to set as your delegate"
+        (required public_key_compressed)
+    in
+    User_command_payload.Body.Stake_delegation (Set_delegate {new_delegate})
+  in
+  user_command body ~label:"stake delegation"
+    ~summary:"Set your proof-of-stake delegate" ~error:"Failed to set delegate"
 
 let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"

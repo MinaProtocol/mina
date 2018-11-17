@@ -14,7 +14,7 @@ type t = (Public_key.Compressed.t, Currency.Amount.t) t_
 
 val dummy : t
 
-val gen : t Quickcheck.Generator.t
+val gen : max_amount:Currency.Amount.t -> t Quickcheck.Generator.t
 
 module Stable : sig
   module V1 : sig

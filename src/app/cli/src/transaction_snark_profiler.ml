@@ -68,8 +68,7 @@ let create_ledger_and_transactions num_transitions =
         |> Or_error.ok_exn
       in
       let transitions =
-        List.map transactions ~f:(fun t ->
-            Transaction_snark.Transition.User_command t )
+        List.map transactions ~f:(fun t -> Transaction.User_command t)
         @ [Coinbase coinbase; Fee_transfer fee_transfer]
       in
       (ledger, transitions)
@@ -101,7 +100,7 @@ let rec pair_up = function
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
 let profile (module T : Transaction_snark.S) sparse_ledger0
-    (transitions : Transaction_snark.Transition.t list) =
+    (transitions : Transaction.t list) =
   let (base_proof_time, _), base_proofs =
     List.fold_map transitions ~init:(Time.Span.zero, sparse_ledger0)
       ~f:(fun (max_span, sparse_ledger) t ->
@@ -110,7 +109,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         in
         let span, proof =
           time (fun () ->
-              T.of_transition ~sok_digest:Sok_message.Digest.default
+              T.of_transaction ~sok_digest:Sok_message.Digest.default
                 ~source:(Sparse_ledger.merkle_root sparse_ledger)
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
                 t
@@ -137,8 +136,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
   let total_time = merge_all base_proof_time base_proofs in
   Printf.sprintf !"Total time was: %{Time.Span}" total_time
 
-let check_base_snarks sparse_ledger0
-    (transitions : Transaction_snark.Transition.t list) =
+let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) =
   let _ =
     let sok_message =
       Sok_message.create ~fee:Currency.Fee.zero
@@ -150,7 +148,7 @@ let check_base_snarks sparse_ledger0
           Sparse_ledger.apply_transaction_exn sparse_ledger t
         in
         let () =
-          Transaction_snark.check_transition ~sok_message
+          Transaction_snark.check_transaction ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
             t

@@ -1,0 +1,27 @@
+#!/usr/bin/env ocaml
+(* -*- tuareg -*- *)
+
+#warnings "-40";;
+
+#use "config_common.ml"
+
+let () =
+  let enable_blah = ref Auto in
+  Arg.parse
+    (Arg.align
+       [ "--enable-blah", Unit (fun () -> enable_blah := Yes),
+         " Enable support for blah"
+       ; "--disable-blah", Unit (fun () -> enable_blah := No),
+         " Enable support for blah"
+       ])
+    (fun s -> raise (Arg.Bad (Printf.sprintf "don't know what to do with %S" s)))
+    "Usage: ./configure [OPTIONS]";
+  let oc = open_out_bin "config" in
+  Printf.fprintf oc {|
+let enable_blah = %s
+|}
+    (string_of_switch !enable_blah);
+  close_out oc
+;;
+
+#use "real_configure.ml"
