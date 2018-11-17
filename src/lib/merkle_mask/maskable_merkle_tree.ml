@@ -22,28 +22,55 @@ module Make
 struct
   include Base
 
-  (* registered masks *)
-  let (mask_children : Mask.Attached.t list ref) = ref []
+  (* use an assoc list of (maskable, mask children) for registered masks
+
+     because of the types used in the test stubs for the databases in the ledger tests,
+     can't "derive hash" to allow using hash tables here, which would be a simpler implementation
+   *)
+
+  let (registered_masks : (t * Mask.Attached.t list) list ref) = ref []
 
   let register_mask t mask =
     let attached_mask = Mask.set_parent mask t in
-    mask_children := attached_mask :: !mask_children ;
+    ( match List.Assoc.find !registered_masks ~equal:phys_equal t with
+    | None ->
+        (* no masks for this maskable yet *)
+        registered_masks :=
+          List.Assoc.add !registered_masks ~equal:phys_equal t [attached_mask]
+    | Some existing_masks ->
+        (* add new mask to existing ones *)
+        registered_masks :=
+          List.Assoc.add !registered_masks ~equal:phys_equal t
+            (attached_mask :: existing_masks) ) ;
     attached_mask
 
-  let unregister_mask_exn mask =
-    match
-      List.findi !mask_children ~f:(fun _ndx elt -> phys_equal elt mask)
-    with
-    | None -> failwith "unregister_mask: no such registered mask"
-    | Some (ndx, _mask) ->
-        let head, tail = List.split_n !mask_children ndx in
-        (* splice out mask *)
-        mask_children := List.take head (ndx - 1) @ tail ;
+  let unregister_mask_exn (t : t) (mask : Mask.Attached.t) =
+    let error_msg = "unregister_mask: no such registered mask" in
+    match List.Assoc.find !registered_masks ~equal:phys_equal t with
+    | None -> failwith error_msg
+    | Some masks ->
+        ( match List.findi masks ~f:(fun _ndx m -> phys_equal m mask) with
+        | None -> failwith error_msg
+        | Some (ndx, _mask) -> (
+            let head, tail = List.split_n masks ndx in
+            (* splice out mask *)
+            match List.take head (ndx - 1) @ tail with
+            | [] ->
+                (* no other masks for this maskable *)
+                registered_masks :=
+                  List.Assoc.remove !registered_masks ~equal:phys_equal t
+            | other_masks ->
+                registered_masks :=
+                  List.Assoc.add !registered_masks ~equal:phys_equal t
+                    other_masks ) ) ;
         Mask.Attached.unset_parent mask
 
   (** a set calls the Base implementation set, notifies registered mask childen *)
   let set t location account =
     Base.set t location account ;
-    List.iter !mask_children ~f:(fun child_mask ->
-        Mask.Attached.parent_set_notify child_mask location account )
+    match List.Assoc.find !registered_masks ~equal:phys_equal t with
+    | None -> ()
+    | Some masks ->
+        List.iter masks ~f:(fun mask ->
+            Mask.Attached.parent_set_notify mask location account )
 end

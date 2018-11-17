@@ -15,6 +15,6 @@ module type S = sig
 
   val register_mask : t -> unattached_mask -> attached_mask
 
-  val unregister_mask_exn : attached_mask -> unattached_mask
+  val unregister_mask_exn : t -> attached_mask -> unattached_mask
   (** raises an exception if mask is not registered *)
 end

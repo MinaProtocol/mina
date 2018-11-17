@@ -186,7 +186,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             in
             try
               let (_unattached_mask : Mask.t) =
-                Maskable.unregister_mask_exn attached_mask
+                Maskable.unregister_mask_exn maskable attached_mask
               in
               true
             with Failure _ -> false )
