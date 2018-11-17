@@ -35,6 +35,7 @@ module Extend (Impl : Snarky.Snark_intf.S) = struct
          and type ('a, 'b) checked := ('a, 'b) Checked.t
          and type boolean_var := Boolean.var
          and type comparison_result := Field.Checked.comparison_result
+         and type field_var := Field.Checked.t
     end
   end
 end
