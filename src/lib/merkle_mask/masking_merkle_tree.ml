@@ -30,7 +30,7 @@ struct
     ; account_tbl: Account.t Location.Table.t
     ; hash_tbl: Hash.t Addr.Table.t
     ; location_tbl: Location.t Key.Table.t
-    ; mutable current_location: Location.t option }
+    ; mutable current_location: Location.t option [@hash.ignore]}
 
   type unattached = t
 

@@ -41,7 +41,7 @@ module type Depth = sig
 end
 
 module type Key_value_database = sig
-  type t
+  type t [@@deriving hash,compare]
 
   val copy : t -> t
 
