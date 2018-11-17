@@ -1002,7 +1002,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let remainder =
       let open Option.Let_syntax in
       let%bind account = account_opt
-      and cost =       
+      and cost =
         let fee = txn.payload.common.fee in
         match txn.payload.body with
         | Stake_delegation (Set_delegate _) ->

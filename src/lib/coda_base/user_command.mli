@@ -26,6 +26,7 @@ module Stable : sig
 end
 
 val payload : t -> Payload.t
+
 (* Generate a single transaction between
  * $a, b \in keys$
  * for fee $\in [0,max_fee]$

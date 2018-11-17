@@ -387,9 +387,10 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
          dispatch_with_message Client_lib.Send_user_command.rpc
            (payment :> User_command.t)
            port
-           ~success:(fun receipt_chain_hash -> 
-           sprintf "Successfully enqueued %s in pool\n\
-           Receipt_chain_hash: %s" label (Receipt.Chain_hash.to_string receipt_chain_hash))
+           ~success:(fun receipt_chain_hash ->
+             sprintf "Successfully enqueued %s in pool\nReceipt_chain_hash: %s"
+               label
+               (Receipt.Chain_hash.to_string receipt_chain_hash) )
            ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e)) ))
 
 let send_payment =
