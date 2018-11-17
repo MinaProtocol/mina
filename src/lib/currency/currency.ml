@@ -245,10 +245,11 @@ end = struct
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
   include Unpacked
 
-  let var_to_number t = Number.of_bits (var_to_bits t)
+  let var_to_number t = Number.of_bits (var_to_bits t :> Boolean.var list)
 
   let var_to_triples t =
-    Bitstring.pad_to_triple_list ~default:Boolean.false_ (var_to_bits t)
+    Bitstring.pad_to_triple_list ~default:Boolean.false_
+      (var_to_bits t :> Boolean.var list)
 
   let var_of_bits (bits : Boolean.var Bitstring.Lsb_first.t) : var =
     let bits = (bits :> Boolean.var list) in
@@ -360,7 +361,7 @@ end = struct
 
     module Checked = struct
       let to_bits {magnitude; sgn} =
-        var_to_bits magnitude @ [Sgn.Checked.is_pos sgn]
+        (var_to_bits magnitude :> Boolean.var list) @ [Sgn.Checked.is_pos sgn]
 
       let constant {magnitude; sgn} =
         {magnitude= var_of_t magnitude; sgn= Sgn.Checked.constant sgn}
