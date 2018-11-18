@@ -425,6 +425,7 @@ module Make (Inputs : Inputs_intf) = struct
         Linear_pipe.Reader.t
     ; log: Logger.t
     ; mutable seen_jobs: Work_selector.State.t
+    ; receipt_chain_database: Coda_base.Receipt_chain_database.t
     ; ledger_builder_transition_backup_capacity: int
     ; snark_work_fee: Currency.Fee.t }
 
@@ -460,6 +461,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let snark_work_fee t = t.snark_work_fee
 
+  let receipt_chain_database t = t.receipt_chain_database
+
   let ledger_builder_ledger_proof t =
     let lb = best_ledger_builder t in
     Ledger_builder.current_ledger_proof lb
@@ -479,6 +482,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; ledger_builder_transition_backup_capacity: int [@default 10]
       ; time_controller: Time.Controller.t
       ; banlist: Coda_base.Banlist.t
+      ; receipt_chain_database: Coda_base.Receipt_chain_database.t
       ; snark_work_fee: Currency.Fee.t
       (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
       }
@@ -632,5 +636,6 @@ module Make (Inputs : Inputs_intf) = struct
           ; seen_jobs= Work_selector.State.init
           ; ledger_builder_transition_backup_capacity=
               config.ledger_builder_transition_backup_capacity
+          ; receipt_chain_database= config.receipt_chain_database
           ; snark_work_fee= config.snark_work_fee } )
 end

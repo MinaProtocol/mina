@@ -57,6 +57,7 @@ struct
           (* TODO: We'll need the full history in order to trust that
                the ledger builder we get is actually valid. See #285 *)
           | Ok lb ->
+              Option.iter !sl_ref ~f:Sync_ledger.destroy ;
               Sync_ledger.destroy (!sl_ref |> Option.value_exn) ;
               sl_ref := None ;
               let new_tree =

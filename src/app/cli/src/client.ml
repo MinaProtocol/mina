@@ -16,6 +16,15 @@ let dispatch rpc query port =
       | Error exn -> return (Or_error.of_exn exn)
       | Ok conn -> Rpc.Rpc.dispatch rpc conn query )
 
+let dispatch_with_message rpc arg port ~success ~error =
+  match%bind dispatch rpc arg port with
+  | Ok x ->
+      printf "%s\n" (success x) ;
+      Deferred.unit
+  | Error e ->
+      eprintf "%s\n" (error e) ;
+      exit 1
+
 let json_flag =
   Command.Param.(
     flag "json" no_arg ~doc:"Use json output (default: plaintext)")
@@ -90,6 +99,17 @@ module Daemon_cli = struct
     <*> Flag.port <*> arg_flag
 end
 
+module Args = struct
+  open Command.Param
+
+  let zip2 = map2 ~f:(fun arg1 arg2 -> (arg1, arg2))
+
+  let zip3 = map3 ~f:(fun arg1 arg2 arg3 -> (arg1, arg2, arg3))
+
+  let zip4 arg1 arg2 arg3 arg4 =
+    return (fun a b c d -> (a, b, c, d)) <*> arg1 <*> arg2 <*> arg3 <*> arg4
+end
+
 let get_balance =
   let open Command.Param in
   let open Deferred.Let_syntax in
@@ -130,6 +150,76 @@ let get_public_keys =
          else
            dispatch Get_public_keys.rpc () port
            >>| print (module String_list_formatter) json ))
+
+let prove_payment =
+  let open Deferred.Let_syntax in
+  let open Client_lib in
+  let open Command.Param in
+  let receipt_hash_flag =
+    flag "receipt-chain-hash"
+      ~doc:
+        "RECEIPTHASH Receipt-chain-hash of the payment that you want to prove"
+      (required receipt_chain_hash)
+  in
+  let address_flag =
+    flag "address" ~doc:"PUBLICKEY Public-key address of sender"
+      (required public_key)
+  in
+  Command.async ~summary:"Generate a proof of a payment as a merkle list"
+    (Daemon_cli.init (Args.zip2 receipt_hash_flag address_flag)
+       ~f:(fun port (receipt_chain_hash, pk) ->
+         match%map
+           dispatch Prove_receipt.rpc
+             (receipt_chain_hash, Public_key.compress pk)
+             port
+         with
+         | Ok result -> print (module Prove_receipt.Output) true result
+         | Error e -> eprintf "%s" (Error.to_string_hum e) ))
+
+let read_json filepath =
+  let%map json_contents = Reader.file_contents filepath in
+  Yojson.Safe.from_string json_contents
+
+let verify_payment =
+  let open Deferred.Let_syntax in
+  let open Client_lib in
+  let open Command.Param in
+  let proof_path_flag =
+    flag "proof-path"
+      ~doc:"PROOFFILE File to read json version of payment proof"
+      (required file)
+  in
+  let payment_path_flag =
+    flag "payment-path"
+      ~doc:"PAYMENTPATH File to read json version of verifying payment"
+      (required file)
+  in
+  let address_flag =
+    flag "address" ~doc:"PUBLICKEY Public-key address of sender"
+      (required public_key)
+  in
+  Command.async ~summary:"Generate a proof of a payment as a merkle list"
+    (Daemon_cli.init (Args.zip3 payment_path_flag proof_path_flag address_flag)
+       ~f:(fun port (payment_path, proof_path, pk) ->
+         let%bind payment_json = read_json payment_path
+         and proof_json = read_json proof_path in
+         let dispatch_result =
+           let open Deferred.Or_error.Let_syntax in
+           let to_deferred_or_error result =
+             Result.map_error result ~f:Error.of_string |> Deferred.return
+           in
+           let%bind payment =
+             User_command.of_yojson payment_json |> to_deferred_or_error
+           and proof =
+             Payment_proof.of_yojson proof_json |> to_deferred_or_error
+           in
+           dispatch Verify_proof.rpc
+             (Public_key.compress pk, payment, proof)
+             port
+         in
+         match%map dispatch_result with
+         | Ok (Ok ()) -> printf "Payment is valid on the existing blockchain!"
+         | Error e | Ok (Error e) -> eprintf "%s" (Error.to_string_hum e) ))
 
 let get_nonce addr port =
   let open Deferred.Let_syntax in
@@ -196,15 +286,6 @@ let get_nonce_exn public_key port =
       eprintf "Failed to get nonce %s\n" e ;
       exit 1
   | Ok nonce -> return nonce
-
-let dispatch_with_message rpc arg port ~success ~error =
-  match%bind dispatch rpc arg port with
-  | Ok x ->
-      printf "%s\n" (success x) ;
-      Deferred.unit
-  | Error e ->
-      eprintf "%s\n" (error e) ;
-      exit 1
 
 let handle_exception_nicely (type a) (f : unit -> a Deferred.t) () :
     a Deferred.t =
@@ -283,14 +364,14 @@ let batch_send_payments =
 let user_command (body_args : User_command_payload.Body.t Command.Param.t)
     ~label ~summary ~error =
   let open Command.Param in
-  let fee_flag =
+  let amount_flag =
     flag "fee" ~doc:"VALUE  fee you're willing to pay (default: 1)"
       (optional txn_fee)
   in
   let flag =
     let open Command.Param in
     return (fun a b c -> (a, b, c))
-    <*> body_args <*> privkey_read_path_flag <*> fee_flag
+    <*> body_args <*> privkey_read_path_flag <*> amount_flag
   in
   Command.async ~summary
     (Daemon_cli.init flag ~f:(fun port (body, from_account, fee) ->
@@ -302,11 +383,14 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
            User_command.Payload.create ~fee ~nonce
              ~memo:User_command_memo.dummy ~body
          in
-         let txn = User_command.sign sender_kp payload in
-         dispatch_with_message Client_lib.Send_user_commands.rpc
-           [(txn :> User_command.t)]
+         let payment = User_command.sign sender_kp payload in
+         dispatch_with_message Client_lib.Send_user_command.rpc
+           (payment :> User_command.t)
            port
-           ~success:(fun () -> sprintf "Successfully enqueued %s in pool" label)
+           ~success:(fun receipt_chain_hash ->
+             sprintf "Successfully enqueued %s in pool\nReceipt_chain_hash: %s"
+               label
+               (Receipt.Chain_hash.to_string receipt_chain_hash) )
            ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e)) ))
 
 let send_payment =
@@ -377,7 +461,7 @@ let generate_keypair =
     handle_exception_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
-    let kp = Keypair.create () in
+    let kp = Genesis_ledger.largest_account_keypair_exn () in
     let%bind () =
       write_keypair_exn kp ~privkey_path
         ~password:(lazy (prompt_password "Password for new private key file: "))
@@ -407,6 +491,7 @@ let command =
   Command.group ~summary:"Lightweight client process"
     [ ("get-balance", get_balance)
     ; ("get-public-keys", get_public_keys)
+    ; ("prove-payment", prove_payment)
     ; ("get-nonce", get_nonce_cmd)
     ; ("send-payment", send_payment)
     ; ("batch-send-payments", batch_send_payments)
