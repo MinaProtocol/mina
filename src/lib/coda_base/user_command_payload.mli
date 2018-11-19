@@ -8,11 +8,11 @@ module Body : sig
   type t =
     | Payment of Payment_payload.Stable.V1.t
     | Stake_delegation of Stake_delegation.Stable.V1.t
-  [@@deriving bin_io, eq, sexp, hash]
+  [@@deriving bin_io, eq, sexp, hash, yojson]
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, eq, sexp, hash]
+      type nonrec t = t [@@deriving bin_io, eq, sexp, hash, yojson]
     end
   end
 end
@@ -71,7 +71,7 @@ val dummy : t
 
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving bin_io, eq, sexp, hash]
+    type nonrec t = t [@@deriving bin_io, eq, sexp, hash, yojson]
   end
 end
 

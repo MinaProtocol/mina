@@ -21,7 +21,7 @@ open Core_kernel
     The key of the database is a receipt_chain_hash. 
     The value of the database is the payment corresponding to the
     receipt_chain_hash *)
-module type S = sig
+module type Database = sig
   type t
 
   type receipt_chain_hash
@@ -56,9 +56,20 @@ module type S = sig
       the computed receipt_chain_hash is returned *)
 end
 
+module type Verifier = sig
+  type receipt_chain_hash
+
+  type payment
+
+  val verify :
+       resulting_receipt:receipt_chain_hash
+    -> (receipt_chain_hash * payment) list
+    -> unit Or_error.t
+end
+
 module Test = struct
   module type S = sig
-    include S
+    include Database
 
     type database
 
@@ -77,9 +88,11 @@ module type Receipt_chain_hash = sig
 end
 
 module type Payment = sig
-  type t [@@deriving bin_io]
+  type t
 
-  type payload [@@deriving bin_io]
+  module Payload : sig
+    type t
+  end
 
-  val payload : t -> payload
+  val payload : t -> Payload.t
 end

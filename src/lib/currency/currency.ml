@@ -10,7 +10,7 @@ open Tuple_lib
 type uint64 = Unsigned.uint64
 
 module type Basic = sig
-  type t [@@deriving bin_io, sexp, compare, hash]
+  type t [@@deriving bin_io, sexp, compare, hash, yojson]
 
   val max_int : t
 
@@ -22,7 +22,7 @@ module type Basic = sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
+      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash, yojson]
     end
   end
 
@@ -206,9 +206,14 @@ end = struct
     module V1 = struct
       module T = struct
         type t = Unsigned.t [@@deriving bin_io, sexp, compare, hash]
+
+        let of_int = Unsigned.of_int
+
+        let to_int = Unsigned.to_int
       end
 
       include T
+      include Codable.Make_of_int (T)
       include Hashable.Make (T)
       include Comparable.Make (T)
     end
@@ -570,12 +575,17 @@ end
 
 let currency_length = 64
 
-module Fee =
-  Make
-    (Unsigned_extended.UInt64)
-    (struct
-      let length = currency_length
-    end)
+module Fee = struct
+  module T =
+    Make
+      (Unsigned_extended.UInt64)
+      (struct
+        let length = currency_length
+      end)
+
+  include T
+  include Codable.Make_of_int (T)
+end
 
 module Amount = struct
   module T =
@@ -593,6 +603,8 @@ module Amount = struct
       with type var = T.var
        and module Signed = T.Signed
        and module Checked := T.Checked )
+
+  include Codable.Make_of_int (T)
 
   let of_fee (fee : Fee.t) : t = fee
 

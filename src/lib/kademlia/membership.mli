@@ -1,6 +1,8 @@
 open Async_kernel
 open Core_kernel
 
+exception Child_died
+
 module Haskell : sig
   type t
 

@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+include Coda_transition_frontier
 
 module type Security_intf = sig
   val max_depth : [`Infinity | `Finite of int]
