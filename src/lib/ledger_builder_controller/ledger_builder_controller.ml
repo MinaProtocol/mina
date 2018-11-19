@@ -109,16 +109,11 @@ end = struct
   (** For tests *)
   module Transition_tree = Transition_logic_state.Transition_tree
 
-  type serializable_tip_components =
-    Consensus_mechanism.Protocol_state.value
-    * Protocol_state_proof.t
-    * Ledger_builder.Aux.t
-
   type t =
     { ledger_builder_io: Net.t
     ; log: Logger.t
     ; store_controller:
-        (serializable_tip_components, State_hash.t) With_hash.t
+        (Consensus_mechanism.Protocol_state.value * Protocol_state_proof.t * Ledger.serializable, State_hash.t) With_hash.t
         Store.Controller.t
     ; handler: Transition_logic.t
     ; strongest_ledgers_reader:
@@ -133,7 +128,7 @@ end = struct
 
   let load_tip_and_genesis_hash
       (controller :
-        (serializable_tip_components, State_hash.t) With_hash.t
+        (Consensus_mechanism.Protocol_state.value * Protocol_state_proof.t * Ledger_builder.serializable, State_hash.t) With_hash.t
         Store.Controller.t)
       {Config.longest_tip_location; genesis_tip; ledger; _} log =
     let genesis_state_hash = Protocol_state.hash genesis_tip.state in
@@ -142,9 +137,9 @@ end = struct
         (* we've loaded the serialized components of the tip; 
           to build a tip, we also need the ledger, which we pull out of the config
         *)
-        let state, proof, aux = data in
+        let state, proof, serialized = data in
         let ledger_builder =
-          Ledger_builder.of_aux_and_ledger_unchecked ~aux ~ledger
+          Ledger_builder.of_serialized_and_ledger ~serialized ~ledger
         in
         let tip = {Tip.state; Tip.proof; Tip.ledger_builder} in
         {With_hash.data= tip; hash}
@@ -223,9 +218,9 @@ end = struct
            Linear_pipe.iter store_tip_reader ~f:(fun tip ->
                let open With_hash in
                let {Tip.state; Tip.proof; Tip.ledger_builder} = tip in
-               let aux = Ledger_builder.aux ledger_builder in
+               let serializable = Ledger_builder.serializable ledger_builder in
                let serializable_tip_with_genesis_hash =
-                 {data= (state, proof, aux); hash= genesis_tip_state_hash}
+                 {data= (state, proof, serializable); hash= genesis_tip_state_hash}
                in
                Store.store store_controller config.longest_tip_location
                  serializable_tip_with_genesis_hash ) ) ;
@@ -438,6 +433,8 @@ let%test_module "test" =
         module Ledger = struct
           include Int
 
+          type serializable = t [@@deriving bin_io]
+                
           let merkle_root t = t
 
           let copy t = t
@@ -450,6 +447,8 @@ let%test_module "test" =
         module Ledger_builder = struct
           type t = int ref [@@deriving sexp, bin_io]
 
+          type serializable = int [@@deriving bin_io]
+                 
           module Aux = struct
             type t = int [@@deriving bin_io]
 
@@ -458,6 +457,8 @@ let%test_module "test" =
             let is_valid _ = true
           end
 
+          let serializable t = !t
+                     
           let ledger t = !t
 
           let create ~ledger = ref ledger
@@ -466,7 +467,7 @@ let%test_module "test" =
 
           let hash t = !t
 
-          let of_aux_and_ledger_unchecked ~ledger ~aux:_ = create ~ledger
+          let of_serialized_and_ledger ~serialized:_ ~ledger = create ~ledger
 
           let of_aux_and_ledger ~snarked_ledger_hash:_ ~ledger ~aux:_ =
             Deferred.return (Ok (create ~ledger))
@@ -577,7 +578,7 @@ let%test_module "test" =
             [%bin_type_class:
               Consensus_mechanism.Protocol_state.value
               * Protocol_state_proof.t
-              * Ledger_builder.Aux.t]
+              * Ledger_builder.serializable]
         end
 
         module Net = struct

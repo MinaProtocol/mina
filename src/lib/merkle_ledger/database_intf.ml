@@ -9,7 +9,7 @@ module type S = sig
 
   type key
 
-  type t [@@deriving sexp]
+  type t
 
   module Db_error : sig
     type t = Account_location_not_found | Out_of_leaves | Malformed_database
@@ -23,13 +23,13 @@ module type S = sig
 
   val get_uuid : t -> Uuid.t
 
-  val create : string -> t
+  val create : unit -> t
 
   val location_of_key : t -> key -> location option
 
   val destroy : t -> unit
 
-  val with_ledger : name:string -> f:(t -> 'a) -> 'a
+  val with_ledger : f:(t -> 'a) -> 'a
 
   val to_list : t -> account list
 

@@ -141,11 +141,19 @@ module type Ledger_intf = sig
     val transaction : t -> transaction Or_error.t
   end
 
+  type attached_mask
+
+  type unattached_mask     
+       
   type valid_user_command
 
   type ledger_hash
 
   type account
+
+  type serializable [@@deriving bin_io]
+
+  val serializable : t -> serializable
 
   val create : string -> t
 
@@ -160,6 +168,10 @@ module type Ledger_intf = sig
   val undo : t -> Undo.t -> unit Or_error.t
 
   val account_list : t -> account list
+
+  val register_mask : t -> unattached_mask -> attached_mask
+
+  val unregister_mask_exn : t -> attached_mask -> unattached_mask
 end
 
 module Fee = struct
@@ -494,6 +506,8 @@ module type Ledger_builder_base_intf = sig
 
   type ledger
 
+  type serializable
+
   module Aux : sig
     type t [@@deriving bin_io]
 
@@ -512,7 +526,7 @@ module type Ledger_builder_base_intf = sig
     -> aux:Aux.t
     -> t Or_error.t Deferred.t
 
-  val of_aux_and_ledger_unchecked : ledger:ledger -> aux:Aux.t -> t
+  val of_serialized_and_ledger : serialized:serializable -> ledger:ledger -> t
 
   val copy : t -> t
 
@@ -520,6 +534,8 @@ module type Ledger_builder_base_intf = sig
 
   val aux : t -> Aux.t
 
+  val serializable : t -> serializable
+    
   val apply :
     t -> diff -> logger:Logger.t -> ledger_proof option Deferred.Or_error.t
 
@@ -615,8 +631,7 @@ module type Tip_intf = sig
 
   type ledger_builder
 
-  (* serializable component of the ledger builder *)
-  type scan_state
+  type serializable
 
   type external_transition
 
@@ -627,9 +642,8 @@ module type Tip_intf = sig
     ; ledger_builder: ledger_builder }
   [@@deriving sexp, fields]
 
-  (* serializer for tip components other than the ledger in the ledger builder *)
-  val bin_tip :
-    (protocol_state * protocol_state_proof * scan_state) Bin_prot.Type_class.t
+  (* serializer for tip components other than the persistent database in the ledger builder *)
+  val bin_tip : serializable Bin_prot.Type_class.t
 
   val of_transition_and_lb : external_transition -> ledger_builder -> t
 
@@ -1053,6 +1067,7 @@ Merge Snark:
      and type protocol_state := Consensus_mechanism.Protocol_state.value
      and type protocol_state_proof := Protocol_state_proof.t
      and type external_transition := Consensus_mechanism.External_transition.t
+     and type serializable := Consensus_mechanism.Protocol_state.value * Protocol_state_proof.t * Ledger.serializable
 end
 
 module Make

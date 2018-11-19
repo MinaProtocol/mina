@@ -42,8 +42,8 @@ module Make
 
   let destroy {uuid= _; kvdb} = Kvdb.destroy kvdb
 
-  let with_ledger ~name ~f =
-    let t = create name in
+  let with_ledger ~f =
+    let t = create () in
     try
       let result = f t in
       destroy t ; result
