@@ -154,11 +154,7 @@ end) : S = struct
 
   let set_timestamp t timestamp = {t with timestamp}
 
-  let genesis_time =
-    Time.of_date_ofday ~zone:Time.Zone.utc
-      (Date.create_exn ~y:2018 ~m:Month.Feb ~d:2)
-      Time.Ofday.start_of_day
-    |> Block_time.of_time
+  let genesis_time = Genesis_state_timestamp.value |> Block_time.of_time
 
   let genesis =
     { ledger_builder_hash= Ledger_builder_hash.dummy

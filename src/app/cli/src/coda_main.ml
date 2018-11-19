@@ -121,17 +121,7 @@ module type Kernel_intf = sig
   module Verifier : Verifier.S with type blockchain := Blockchain.t
 end
 
-module Make_kernel
-    (Make_consensus_mechanism : functor
-      (Ledger_builder_diff :sig
-                            
-                            type t [@@deriving sexp, bin_io]
-                          end)
-      -> Consensus.Mechanism.S
-         with type Internal_transition.Ledger_builder_diff.t =
-                     Ledger_builder_diff.t
-          and type External_transition.Ledger_builder_diff.t =
-                     Ledger_builder_diff.t) : Kernel_intf = struct
+module Kernel = struct
   module Completed_work =
     Ledger_builder.Make_completed_work (Public_key.Compressed) (Ledger_proof)
       (Ledger_proof_statement)
@@ -146,7 +136,7 @@ module Make_kernel
     module Completed_work = Completed_work
   end)
 
-  module Consensus_mechanism = Make_consensus_mechanism (Ledger_builder_diff)
+  module Consensus_mechanism = Consensus.Mechanism.Make (Ledger_builder_diff)
   module Blockchain = Blockchain.Make (Consensus_mechanism)
   module Prover = Prover.Make (Consensus_mechanism) (Blockchain)
   module Verifier = Verifier.Make (Consensus_mechanism) (Blockchain)
@@ -198,8 +188,8 @@ module type Init_intf = sig
   val genesis_proof : Proof.t
 end
 
-let make_init ~should_propose (module Config : Config_intf)
-    (module Kernel : Kernel_intf) : (module Init_intf) Deferred.t =
+let make_init ~should_propose (module Config : Config_intf) :
+    (module Init_intf) Deferred.t =
   let open Config in
   let open Kernel in
   let%bind proposer_prover =

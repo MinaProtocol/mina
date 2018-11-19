@@ -199,9 +199,7 @@ module Make (Kernel : Kernel_intf) = struct
 
           let work_selection = work_selection
         end in
-        let%bind (module Init) =
-          make_init ~should_propose (module Config) (module Kernel)
-        in
+        let%bind (module Init) = make_init ~should_propose (module Config) in
         let module Main = Coda_main.Make_coda (Init) in
         let module Run = Run (Config) (Main) in
         let banlist_dir_name = conf_temp_dir ^/ "banlist" in

@@ -125,6 +125,7 @@ jobs:
           - run:
               name: Running test - Sig Tests | coda-transitive-peers-test
               command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-transitive-peers-test' 
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-transitive-peers-test' 
           - run:
               name: Running test - Sig Tests | coda-block-production-test
               command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-block-production-test' 

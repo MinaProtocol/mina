@@ -32,18 +32,9 @@ module type Coda_intf = sig
   module Make (Init : Init_intf) () : Main_intf
 end
 
-module type Consensus_mechanism_intf = sig
-  module Make (Ledger_builder_diff : sig
-    type t [@@deriving bin_io, sexp]
-  end) :
-    Consensus.Mechanism.S
-    with type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
-     and type External_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
-end
-
 let default_external_port = 8302
 
-let daemon (module Kernel : Kernel_intf) log =
+let daemon log =
   let open Command.Let_syntax in
   Command.async ~summary:"Coda daemon"
     (let%map_open conf_dir =
@@ -284,7 +275,6 @@ let daemon (module Kernel : Kernel_intf) log =
          make_init
            ~should_propose:(Option.is_some propose_keypair)
            (module Config0)
-           (module Kernel)
        in
        let module M = Coda_main.Make_coda (Init) in
        let module Run = Run (Config0) (M) in
@@ -341,28 +331,6 @@ let daemon (module Kernel : Kernel_intf) log =
          Run.run_snark_worker ~log ~client_port run_snark_worker_action
        in
        Async.never ())
-
-let exit1 ?msg =
-  match msg with
-  | None -> Core.exit 1
-  | Some msg ->
-      Core.Printf.eprintf "%s\n" msg ;
-      Core.exit 1
-
-let env name ~f ~default =
-  let name = Printf.sprintf "CODA_%s" name in
-  Unix.getenv name
-  |> Option.map ~f:(fun x ->
-         match f @@ String.uppercase x with
-         | Some v -> v
-         | None ->
-             exit1
-               ~msg:
-                 (Printf.sprintf
-                    "Inside env var %s, there was a value I don't understand \
-                     \"%s\""
-                    name x) )
-  |> Option.value ~default
 
 [%%if
 force_updates]
@@ -429,91 +397,6 @@ let ensure_testnet_id_still_good _ = Deferred.unit
 
 [%%endif]
 
-let consensus_mechanism () : (module Consensus_mechanism_intf) =
-  let mechanism =
-    env "CONSENSUS_MECHANISM" ~default:`Proof_of_signature ~f:(function
-      | "PROOF_OF_SIGNATURE" -> Some `Proof_of_signature
-      | "PROOF_OF_STAKE" -> Some `Proof_of_stake
-      | _ -> None )
-  in
-  match mechanism with
-  | `Proof_of_signature ->
-      ( module struct
-        module Make (Ledger_builder_diff : sig
-          type t [@@deriving sexp, bin_io]
-        end) =
-        Consensus.Proof_of_signature.Make (struct
-          module Genesis_ledger = Genesis_ledger
-          module Proof = Coda_base.Proof
-          module Ledger_builder_diff = Ledger_builder_diff
-          module Time = Coda_base.Block_time
-
-          let proposal_interval =
-            env "PROPOSAL_INTERVAL"
-              ~default:(Time.Span.of_ms @@ Int64.of_int 5000)
-              ~f:(fun str ->
-                try Some (Time.Span.of_ms @@ Int64.of_string str) with _ ->
-                  None )
-        end)
-      end )
-  | `Proof_of_stake ->
-      ( module struct
-        module Make (Ledger_builder_diff : sig
-          type t [@@deriving sexp, bin_io]
-        end) =
-        Consensus.Proof_of_stake.Make (struct
-          module Genesis_ledger = Genesis_ledger
-          module Proof = Coda_base.Proof
-          module Ledger_builder_diff = Ledger_builder_diff
-          module Time = Coda_base.Block_time
-
-          (* TODO: choose reasonable values *)
-          let genesis_state_timestamp =
-            let default =
-              Core.Time.of_date_ofday
-                (Core.Time.Zone.of_utc_offset ~hours:(-7))
-                (Core.Date.create_exn ~y:2018 ~m:Month.Sep ~d:1)
-                (Core.Time.Ofday.create ~hr:10 ())
-              |> Time.of_time
-            in
-            env "GENESIS_STATE_TIMESTAMP" ~default ~f:(fun str ->
-                try Some (Time.of_time @@ Core.Time.of_string str) with _ ->
-                  None )
-
-          let coinbase =
-            env "COINBASE" ~default:(Currency.Amount.of_int 20) ~f:(fun str ->
-                try Some (Currency.Amount.of_int @@ Int.of_string str)
-                with _ -> None )
-
-          let slot_interval =
-            env "SLOT_INTERVAL"
-              ~default:(Time.Span.of_ms (Int64.of_int 5000))
-              ~f:(fun str ->
-                try Some (Time.Span.of_ms @@ Int64.of_string str) with _ ->
-                  None )
-
-          let unforkable_transition_count =
-            env "UNFORKABLE_TRANSITION_COUNT" ~default:12 ~f:(fun str ->
-                try Some (Int.of_string str) with _ -> None )
-
-          let probable_slots_per_transition_count =
-            env "PROBABLE_SLOTS_PER_TRANSITION_COUNT" ~default:8 ~f:(fun str ->
-                try Some (Int.of_string str) with _ -> None )
-
-          (* Conservatively pick 1seconds *)
-          let expected_network_delay =
-            env "EXPECTED_NETWORK_DELAY"
-              ~default:(Time.Span.of_ms (Int64.of_int 1000))
-              ~f:(fun str ->
-                try Some (Time.Span.of_ms @@ Int64.of_string str) with _ ->
-                  None )
-
-          let approximate_network_diameter =
-            env "APPROXIMATE_NETWORK_DIAMETER" ~default:3 ~f:(fun str ->
-                try Some (Int.of_string str) with _ -> None )
-        end)
-      end )
-
 [%%if
 with_snark]
 
@@ -527,16 +410,16 @@ let internal_commands =
 
 [%%endif]
 
-let coda_commands (module Kernel : Kernel_intf) log =
+let coda_commands log =
   [ (Parallel.worker_command_name, Parallel.worker_command)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
-  ; ("daemon", daemon (module Kernel) log)
+  ; ("daemon", daemon log)
   ; ("client", Client.command) ]
 
 [%%if
 integration_tests]
 
-let coda_commands (module Kernel : Kernel_intf) log =
+let coda_commands log =
   let group =
     let module Coda_peers_test = Coda_peers_test.Make (Kernel) in
     let module Coda_block_production_test =
@@ -557,7 +440,7 @@ let coda_commands (module Kernel : Kernel_intf) log =
     ; ("full-test", Full_test.command (module Kernel))
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
   in
-  coda_commands (module Kernel) log
+  coda_commands log
   @ [("integration-tests", Command.group ~summary:"Integration tests" group)]
 
 [%%endif]
@@ -566,8 +449,5 @@ let () =
   Random.self_init () ;
   let log = Logger.create () in
   don't_wait_for (ensure_testnet_id_still_good log) ;
-  let (module Consensus_mechanism) = consensus_mechanism () in
-  let module Kernel = Make_kernel (Consensus_mechanism.Make) in
-  Command.run
-    (Command.group ~summary:"Coda" (coda_commands (module Kernel) log)) ;
+  Command.run (Command.group ~summary:"Coda" (coda_commands log)) ;
   Core.exit 0
