@@ -38,19 +38,20 @@ module Make (Inputs : Inputs_intf) :
   with type external_transition :=
               Inputs.Consensus_mechanism.External_transition.t
    and type syncable_ledger_query := Inputs.Syncable_ledger.query
-   and type syncable_ledger_answer := Inputs.Syncable_ledger.answer = struct
+   and type syncable_ledger_answer := Inputs.Syncable_ledger.answer
+   and type transition_frontier := Inputs.Transition_frontier.t  =
+struct
   open Inputs
 
-  let run ~transition_reader ~sync_query_reader ~sync_answer_writer =
+  let run ~frontier ~transition_reader ~sync_query_reader ~sync_answer_writer =
     let valid_transition_reader, valid_transition_writer =
       Linear_pipe.create ()
     in
     let catchup_job_reader, catchup_job_writer = Linear_pipe.create () in
-    let frontier = Transition_frontier.create () in
-    Transition_handler.Validator.run frontier ~transition_reader
+    Transition_handler.Validator.run ~transition_reader
       ~valid_transition_writer ;
-    Transition_handler.Processor.run frontier ~valid_transition_reader
+    Transition_handler.Processor.run ~frontier ~valid_transition_reader
       ~catchup_job_writer ;
-    Catchup.run frontier ~catchup_job_reader ;
-    Sync_handler.run frontier ~sync_query_reader ~sync_answer_writer
+    Catchup.run ~frontier ~catchup_job_reader ;
+    Sync_handler.run ~frontier ~sync_query_reader ~sync_answer_writer
 end

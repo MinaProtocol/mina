@@ -1,0 +1,6 @@
+(library
+  (name transition_frontier)
+  (public_name transition_frontier)
+  (inline_tests)
+  (libraries core_kernel protocols test_mocks)
+  (preprocess (pps ppx_jane)))
