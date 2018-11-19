@@ -78,6 +78,9 @@ module Make (Inputs : Inputs_intf) :
    and type merkle_mask := Inputs.Merkle_mask.t = struct
   open Inputs
 
+  exception Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
+  exception Already_exists of State_hash.t
+
   let max_length = Max_length.t
 
   module Breadcrumb = struct
@@ -189,7 +192,11 @@ module Make (Inputs : Inputs_intf) :
     let root_node = Hashtbl.find_exn t.table t.root in
     let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
     let parent_hash = Protocol_state.previous_state_hash protocol_state in
-    let parent_node = Hashtbl.find_exn t.table parent_hash in
+    let parent_node =
+      Option.value_exn
+        (Hashtbl.find t.table parent_hash)
+        ~error:(Error.of_exn (Parent_not_found (`Parent parent_hash, `Target hash)))
+    in
     (* 1.a *)
     let mask = Merkle_mask.derive (Breadcrumb.mask parent_node.breadcrumb) in
     (* 1.b *)
@@ -201,7 +208,8 @@ module Make (Inputs : Inputs_intf) :
       ; length= parent_node.length + 1 }
     in
     (* 2 *)
-    assert (`Ok = Hashtbl.add t.table ~key:hash ~data:node) ;
+    (if Hashtbl.add t.table ~key:hash ~data:node <> `Ok then
+       Error.raise (Error.of_exn (Already_exists hash)));
     (* 3 *)
     Hashtbl.set t.table ~key:parent_hash
       ~data:

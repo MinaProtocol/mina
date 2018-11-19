@@ -7,6 +7,9 @@ module type Transition_frontier_intf = sig
 
   type merkle_mask
 
+  exception Parent_not_found of [`Parent of state_hash] * [`Target of state_hash]
+  exception Already_exists of state_hash
+
   val max_length : int
 
   module Breadcrumb : sig
