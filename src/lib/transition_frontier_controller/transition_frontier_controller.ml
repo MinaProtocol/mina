@@ -39,8 +39,7 @@ module Make (Inputs : Inputs_intf) :
               Inputs.Consensus_mechanism.External_transition.t
    and type syncable_ledger_query := Inputs.Syncable_ledger.query
    and type syncable_ledger_answer := Inputs.Syncable_ledger.answer
-   and type transition_frontier := Inputs.Transition_frontier.t  =
-struct
+   and type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
   let run ~frontier ~transition_reader ~sync_query_reader ~sync_answer_writer =

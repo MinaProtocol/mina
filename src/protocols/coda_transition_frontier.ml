@@ -19,10 +19,7 @@ module type Transition_frontier_intf = sig
 
   type t
 
-  val create :
-       root:external_transition
-    -> ledger:merkle_ledger
-    -> t
+  val create : root:external_transition -> ledger:merkle_ledger -> t
 
   val root : t -> Breadcrumb.t
 

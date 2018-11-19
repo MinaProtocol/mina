@@ -28,6 +28,7 @@ end
 
 module type Hash_intf = sig
   include Equal.S
+
   include Hashable.S_binable with type t := t
 end
 
@@ -105,6 +106,7 @@ module type Frozen_ledger_hash_intf = sig
   include Ledger_hash_intf
 
   val of_ledger_hash : ledger_hash -> t
+
   val to_ledger_hash : t -> ledger_hash
 end
 
@@ -648,7 +650,9 @@ end
 
 module type Blockchain_state_intf = sig
   type ledger_builder_hash
+
   type frozen_ledger_hash
+
   type time
 
   type value [@@deriving sexp, bin_io]
@@ -670,7 +674,9 @@ end
 
 module type Protocol_state_intf = sig
   type state_hash
+
   type blockchain_state
+
   type consensus_state
 
   type value [@@deriving sexp, bin_io, eq, compare]
@@ -751,12 +757,14 @@ module type Consensus_mechanism_intf = sig
 
   module Consensus_state : Consensus_state_intf
 
-  module Blockchain_state : Blockchain_state_intf
+  module Blockchain_state :
+    Blockchain_state_intf
     with type ledger_builder_hash := ledger_builder_hash
      and type frozen_ledger_hash := frozen_ledger_hash
      and type time := time
 
-  module Protocol_state : Protocol_state_intf
+  module Protocol_state :
+    Protocol_state_intf
     with type state_hash := protocol_state_hash
      and type blockchain_state := Blockchain_state.value
      and type consensus_state := Consensus_state.value
@@ -806,7 +814,8 @@ module type Consensus_mechanism_intf = sig
     val ledger_builder_diff : t -> ledger_builder_diff
   end
 
-  module External_transition : External_transition_intf
+  module External_transition :
+    External_transition_intf
     with type protocol_state := Protocol_state.value
      and type protocol_state_proof := protocol_state_proof
      and type ledger_builder_diff := ledger_builder_diff

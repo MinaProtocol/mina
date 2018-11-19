@@ -3,30 +3,41 @@ open Protocols.Coda_pow
 
 module type Inputs_intf = sig
   module Time : Time_intf
+
   module Proof : Proof_intf
+
   module State_hash : Hash_intf
+
   module Ledger_hash : Ledger_hash_intf
-  module Frozen_ledger_hash : Frozen_ledger_hash_intf
-    with type ledger_hash := Ledger_hash.t
+
+  module Frozen_ledger_hash :
+    Frozen_ledger_hash_intf with type ledger_hash := Ledger_hash.t
+
   module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
-  module Ledger_builder_hash : Ledger_builder_hash_intf
+
+  module Ledger_builder_hash :
+    Ledger_builder_hash_intf
     with type ledger_hash := Ledger_hash.t
      and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+
   module Ledger_builder_diff : Ledger_builder_diff_intf
 
-  module Blockchain_state : Blockchain_state_intf
+  module Blockchain_state :
+    Blockchain_state_intf
     with type ledger_builder_hash := Ledger_builder_hash.t
      and type frozen_ledger_hash := Frozen_ledger_hash.t
      and type time := Time.t
 
   module Consensus_state : Consensus_state_intf
 
-  module Protocol_state : Protocol_state_intf
+  module Protocol_state :
+    Protocol_state_intf
     with type state_hash := State_hash.t
      and type blockchain_state := Blockchain_state.value
      and type consensus_state := Consensus_state.value
 
-  module External_transition : External_transition_intf
+  module External_transition :
+    External_transition_intf
     with type protocol_state := Protocol_state.value
      and type protocol_state_proof := Proof.t
      and type ledger_builder_diff := Ledger_builder_diff.t
@@ -35,8 +46,11 @@ module type Inputs_intf = sig
     type t
 
     val root : t -> Ledger_hash.t
+
     val derive : t -> t
+
     val merge : t -> t -> unit
+
     val apply : t -> Ledger_builder_diff.t -> unit
   end
 
@@ -44,7 +58,9 @@ module type Inputs_intf = sig
     type t
 
     val root : t -> Ledger_hash.t
+
     val derive : t -> Merkle_mask.t
+
     val merge : t -> Merkle_mask.t -> unit
   end
 
@@ -54,39 +70,30 @@ module type Inputs_intf = sig
 end
 
 (* NOTE: is Consensus_mechanism.select preferable over distance? *)
-module Make
-    (Inputs : Inputs_intf)
-  : Transition_frontier_intf
-    with type state_hash := Inputs.State_hash.t
-     and type external_transition := Inputs.External_transition.t
-     and type merkle_ledger := Inputs.Merkle_ledger.t
-     and type merkle_mask := Inputs.Merkle_mask.t =
-struct
+module Make (Inputs : Inputs_intf) :
+  Transition_frontier_intf
+  with type state_hash := Inputs.State_hash.t
+   and type external_transition := Inputs.External_transition.t
+   and type merkle_ledger := Inputs.Merkle_ledger.t
+   and type merkle_mask := Inputs.Merkle_mask.t = struct
   open Inputs
 
   let max_length = Max_length.t
 
   module Breadcrumb = struct
-    type t =
-      { transition: External_transition.t
-      ; mask: Merkle_mask.t }
+    type t = {transition: External_transition.t; mask: Merkle_mask.t}
     [@@deriving fields]
 
     let hash t =
-      t.transition
-      |> External_transition.protocol_state
-      |> Protocol_state.hash
+      t.transition |> External_transition.protocol_state |> Protocol_state.hash
 
     let parent_hash t =
-      t.transition
-      |> External_transition.protocol_state
+      t.transition |> External_transition.protocol_state
       |> Protocol_state.previous_state_hash
   end
 
   type node =
-    { breadcrumb: Breadcrumb.t
-    ; successor_hashes: State_hash.t list
-    ; length: int }
+    {breadcrumb: Breadcrumb.t; successor_hashes: State_hash.t list; length: int}
 
   type t =
     { root_ledger: Merkle_ledger.t
@@ -102,24 +109,20 @@ struct
       Ledger_hash.equal
         (Merkle_ledger.root ledger)
         (Frozen_ledger_hash.to_ledger_hash
-           (Blockchain_state.ledger_hash blockchain_state)));
-
+           (Blockchain_state.ledger_hash blockchain_state)) ) ;
     let mask = Merkle_ledger.derive ledger in
-    Merkle_mask.apply mask (External_transition.ledger_builder_diff root);
+    Merkle_mask.apply mask (External_transition.ledger_builder_diff root) ;
     assert (
-      Ledger_hash.equal
-        (Merkle_mask.root mask)
+      Ledger_hash.equal (Merkle_mask.root mask)
         (Ledger_builder_hash.ledger_hash
-           (Blockchain_state.ledger_builder_hash blockchain_state)));
-
+           (Blockchain_state.ledger_builder_hash blockchain_state)) ) ;
     let root_hash = Protocol_state.hash protocol_state in
-    let root_breadcrumb = {Breadcrumb.transition=root; mask} in
-    let root_node = {breadcrumb=root_breadcrumb; successor_hashes=[]; length=0} in
+    let root_breadcrumb = {Breadcrumb.transition= root; mask} in
+    let root_node =
+      {breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
+    in
     let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
-    { root_ledger= ledger
-    ; root= root_hash
-    ; best_tip= root_hash
-    ; table }
+    {root_ledger= ledger; root= root_hash; best_tip= root_hash; table}
 
   let find t hash =
     let open Option.Let_syntax in
@@ -134,10 +137,8 @@ struct
     let rec find_path b =
       let hash = Breadcrumb.hash b in
       let parent_hash = Breadcrumb.parent_hash b in
-      if State_hash.equal parent_hash t.root then
-        [hash]
-      else
-        hash :: find_path (find_exn t parent_hash)
+      if State_hash.equal parent_hash t.root then [hash]
+      else hash :: find_path (find_exn t parent_hash)
     in
     List.rev (find_path breadcrumb)
 
@@ -152,15 +153,17 @@ struct
     node.successor_hashes
 
   let rec successor_hashes_rec t hash =
-    List.concat (List.map (successor_hashes t hash) ~f:(fun succ_hash ->
-        succ_hash :: successor_hashes_rec t succ_hash))
+    List.concat
+      (List.map (successor_hashes t hash) ~f:(fun succ_hash ->
+           succ_hash :: successor_hashes_rec t succ_hash ))
 
   let successors t breadcrumb =
     List.map (successor_hashes t (Breadcrumb.hash breadcrumb)) ~f:(find_exn t)
 
   let rec successors_rec t breadcrumb =
-    List.concat (List.map (successors t breadcrumb) ~f:(fun succ ->
-        succ :: successors_rec t succ))
+    List.concat
+      (List.map (successors t breadcrumb) ~f:(fun succ ->
+           succ :: successors_rec t succ ))
 
   (* Adding a transition to the transition frontier is broken into the following steps:
    *   1) create a new node for a transition
@@ -187,51 +190,47 @@ struct
     let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
     let parent_hash = Protocol_state.previous_state_hash protocol_state in
     let parent_node = Hashtbl.find_exn t.table parent_hash in
-
     (* 1.a *)
     let mask = Merkle_mask.derive (Breadcrumb.mask parent_node.breadcrumb) in
     (* 1.b *)
-    Merkle_mask.apply mask (External_transition.ledger_builder_diff transition);
+    Merkle_mask.apply mask (External_transition.ledger_builder_diff transition) ;
     (* 1.c *)
     let node =
       { breadcrumb= {Breadcrumb.transition; mask}
       ; successor_hashes= []
-      ; length= parent_node.length + 1} in
-
+      ; length= parent_node.length + 1 }
+    in
     (* 2 *)
-    assert (`Ok = Hashtbl.add t.table ~key:hash ~data:node);
-
+    assert (`Ok = Hashtbl.add t.table ~key:hash ~data:node) ;
     (* 3 *)
-    Hashtbl.set t.table ~key:parent_hash ~data:(
-      { parent_node with
-        successor_hashes= hash :: parent_node.successor_hashes });
-
+    Hashtbl.set t.table ~key:parent_hash
+      ~data:
+        { parent_node with
+          successor_hashes= hash :: parent_node.successor_hashes } ;
     (* 4.a *)
     let distance_to_parent = root_node.length - node.length in
     (* 4.b *)
-    (if distance_to_parent > max_length then
+    if distance_to_parent > max_length then (
       (* 4.b.I *)
       let new_root_hash = List.hd_exn (path t node.breadcrumb) in
       (* 4.b.II *)
       let garbage_immediate_successors =
         List.filter root_node.successor_hashes ~f:(fun succ_hash ->
-            not (State_hash.equal succ_hash new_root_hash))
+            not (State_hash.equal succ_hash new_root_hash) )
       in
       (* 4.b.III *)
       let garbage =
-        t.root :: List.concat (
-          List.map garbage_immediate_successors ~f:(successor_hashes_rec t))
+        t.root
+        :: List.concat
+             (List.map garbage_immediate_successors ~f:(successor_hashes_rec t))
       in
-      t.root <- new_root_hash;
-      List.iter garbage ~f:(Hashtbl.remove t.table);
+      t.root <- new_root_hash ;
+      List.iter garbage ~f:(Hashtbl.remove t.table) ;
       (* 4.b.IV *)
-      Merkle_ledger.merge t.root_ledger (Breadcrumb.mask root_node.breadcrumb));
-
+      Merkle_ledger.merge t.root_ledger (Breadcrumb.mask root_node.breadcrumb) ) ;
     (* 5 *)
     let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
-    (if node.length > best_tip_node.length then
-       t.best_tip <- hash);
-
+    if node.length > best_tip_node.length then t.best_tip <- hash ;
     node.breadcrumb
 end
 
