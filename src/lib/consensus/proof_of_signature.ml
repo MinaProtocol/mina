@@ -11,9 +11,7 @@ module Global_public_key = struct
   [%%if
   global_signer_real]
 
-  let compressed =
-    Public_key.Compressed.of_base64_exn
-      "KBWuaAm5Sl5jH/dlpiTKQeUUsty/4Rq6Xz2Py2Y2i/VweJmDHwUAAAAB"
+  let compressed = Snark_params.Tick.Inner_curve.one |> Public_key.compress
 
   let genesis_private_key = Global_signer_private_key.t
 
