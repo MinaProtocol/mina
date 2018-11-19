@@ -1,11 +1,5 @@
 open Core
 
-let new_uuid =
-  let current_uuid = ref 0 in
-  fun () -> let result = !current_uuid in
-            incr current_uuid;
-            result
-
 module Make (Key : sig
   include Intf.Key
 
@@ -44,8 +38,6 @@ end)
 
   let get_uuid t = t.uuid
 
-  let get_uuid t = t.uuid
-         
   let create () =
     let kvdb = Kvdb.create ~directory:Storage_locations.key_value_db_dir in
     {uuid= Uuid.create (); kvdb}

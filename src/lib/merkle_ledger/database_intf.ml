@@ -11,11 +11,6 @@ module type S = sig
 
   type t
 
-  module Uuid : sig
-    type t
-    module Table : Hashtbl.S with type key := t
-  end
-
   module Db_error : sig
     type t = Account_location_not_found | Out_of_leaves | Malformed_database
 

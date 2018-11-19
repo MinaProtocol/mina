@@ -95,6 +95,7 @@ module Bigstring_frozen = struct
      OK to use these hash functions 
    *)
   let hash = hash_t_frozen
+
   let hash_fold_t = hash_fold_t_frozen
 end        
             
@@ -122,16 +123,6 @@ module In_memory_kvdb : Intf.Key_value_database = struct
   let create ~directory:_ =
     {uuid= Uuid.create (); table= Bigstring_frozen.Table.create ()}
 
-  let get_uuid t = t.uuid
-                    
-  let create ~directory:_ =
-    let result = { uuid = !uuid_counter
-                 ; table = Table.create ()
-                 }
-    in
-    incr uuid_counter;
-    result
-               
   let destroy _ = ()
 
   let get t ~key = Bigstring_frozen.Table.find t.table key
