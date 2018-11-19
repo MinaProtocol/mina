@@ -13,6 +13,11 @@ let to_char_pointer : t -> char ptr =
 
 let length : t -> int = foreign (func_name "length") (typ @-> returning int)
 
+let to_bigstring s =
+  let length = length s in
+  let ptr = to_char_pointer s in
+  Ctypes.bigarray_of_ptr Ctypes.array1 length Bigarray.Char ptr
+
 let delete : t -> unit = foreign (func_name "delete") (typ @-> returning void)
 
 let to_string (s : t) : string =
