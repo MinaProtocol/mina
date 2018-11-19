@@ -1,11 +1,5 @@
 open Core
 
-let new_uuid =
-  let current_uuid = ref 0 in
-  fun () -> let result = !current_uuid in
-            incr current_uuid;
-            result
-
 module Make (Key : sig
   include Intf.Key
 
@@ -40,20 +34,15 @@ end)
 
   type location = Location.t [@@deriving sexp]
 
-  module Uuid = struct
-    type t = Int.t [@@deriving sexp]
-    include Hashable.Make(Int)
-  end
-
-  type t = {uuid : Uuid.t; kvdb: Kvdb.t sexp_opaque } [@@deriving sexp]
+  type t = {uuid: Uuid.t; kvdb: Kvdb.t}
 
   let get_uuid t = t.uuid
-         
+
   let create () =
     let kvdb = Kvdb.create ~directory:Storage_locations.key_value_db_dir in
-    {uuid = new_uuid (); kvdb}
+    {uuid= Uuid.create (); kvdb}
 
-  let destroy {uuid=_;kvdb} = Kvdb.destroy kvdb
+  let destroy {uuid= _; kvdb} = Kvdb.destroy kvdb
 
   let empty_hashes =
     let empty_hashes =
@@ -179,8 +168,7 @@ end)
                    next_account_location ) )
 
     let allocate mdb key =
-      let location_result = increment_last_account_location mdb
-      in
+      let location_result = increment_last_account_location mdb in
       Result.map location_result ~f:(fun location ->
           set mdb key (Location.serialize location) ;
           location )
@@ -304,7 +292,7 @@ end)
   let merkle_root mdb = get_hash mdb Location.root_hash
 
   (* for a copy, the uuid is fresh *)
-  let copy {uuid=_;kvdb} = {uuid=new_uuid();kvdb= Kvdb.copy kvdb}
+  let copy {uuid= _; kvdb} = {uuid= Uuid.create (); kvdb= Kvdb.copy kvdb}
 
   let remove_accounts_exn t keys =
     let locations =

@@ -95,45 +95,19 @@ module Bigstring_frozen = struct
      OK to use these hash functions 
    *)
   let hash = hash_t_frozen
+
   let hash_fold_t = hash_fold_t_frozen
-end        
-            
+end
+
 module In_memory_kvdb : Intf.Key_value_database = struct
+  include Hashable.Make_binable (Bigstring_frozen)
 
-  include Hashable.Make_binable(Bigstring_frozen)
-
-  type uuid = int [@@deriving bin_io]
-        
-  let uuid_counter = ref 0
-        
-  type t = { uuid : uuid
-           ; table : Bigstring_frozen.t Table.t
-           } [@@deriving bin_io]
-
-  (* can't easily derive hash, compare for Table.t *)
-  let to_string t =
-    let bs =
-      Bigstring.create (bin_size_t t + Bin_prot.Utils.size_header_length)
-    in
-    let _ = Bigstring.write_bin_prot bs bin_writer_t t in
-    Bigstring.to_string bs 
-
-  let hash t = to_string t |> String.hash
-
-  let hash_fold_t state t = String.hash_fold_t state (to_string t)
-             
-  let compare t1 t2 = String.compare (to_string t1) (to_string t2)
+  type t = {uuid: Uuid.t; table: Bigstring_frozen.t Table.t}
 
   let get_uuid t = t.uuid
-                    
-  let create ~directory:_ =
-    let result = { uuid = !uuid_counter
-                 ; table = Table.create ()
-                 }
-    in
-    incr uuid_counter;
-    result
-               
+
+  let create ~directory:_ = {uuid= Uuid.create (); table= Table.create ()}
+
   let destroy _ = ()
 
   let get t ~key = Table.find t.table key
@@ -143,13 +117,9 @@ module In_memory_kvdb : Intf.Key_value_database = struct
   let set_batch tbl ~key_data_pairs =
     List.iter key_data_pairs ~f:(fun (key, data) -> set tbl ~key ~data)
 
-  let delete t ~key =
-    Table.remove t.table key
+  let delete t ~key = Table.remove t.table key
 
-  let copy (t:t) =
-    { uuid = t.uuid
-    ; table = Table.copy t.table
-    }
+  let copy (t : t) = {uuid= t.uuid; table= Table.copy t.table}
 end
 
 module Storage_locations : Intf.Storage_locations = struct
