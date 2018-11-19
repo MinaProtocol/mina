@@ -16,8 +16,9 @@ and test and debug.
 
 We are refactoring the existing ledger-builder-controller in order to make it
 easier to reason about the async control flow of information in the system. The
-old design didn't take this into account and as such, it's very hard to trace
-information.
+old system was not designed carefully taking asynchronous transactions and
+network delays into account. These involved lots of concurrency, and so it's
+very hard to trace information and there are subtle bugs.
 
 Since refactoring the control flow requires a rewrite, we decided to think
 carefully about more of the other pieces as well now that we know more about
@@ -25,9 +26,9 @@ the design of the rest of the protocol code.
 
 The new transition-frontier-controller is responsible for handling incoming
 transitions created by proposers either locally or remotely by: (a) validating
-them, (b) adding them to a transition-frontier-tree as described below if
+them, (b) adding them to a `Transition_frontier` as described below if
 possible, if not, (c) carefully triggering a sync-ledger catchup job to
-populate more information in our transition-frontier-tree and completing the
+populate more information in our transition-frontier and completing the
 add. It is also responsible for handling sync-ledger answers that catchup
 jobs started by other nodes trigger via sending queries.
 
@@ -56,7 +57,7 @@ just wire the pipes together for the new components:
 * [Transition Handler](#transition-handler)
 * [Transition Frontier](#transition-frontier)
 * [Ledger Catchup](#ledger-catchup)
-* [Sync Handler](#sync-handler)
+* [Query Handler](#query-handler)
 
 Note that all components communicate between each other solely through the use
 of pipes. By solely using pipes to connect components we can be more explicit about the [Async Control Flow](#async-control-flow).
@@ -81,9 +82,17 @@ state: Certain parts of the ledger-builder state are not checked in a SNARK and
 so we must get enough info to go back to the locked state (where we know we've
 achieved consensus).
 
-2. We take advantage of the merkle-mask to instead of transitions, putting a `Breadcrumb.t` which contains an `External_transition.t` and a now light-weight `Ledger_builder.t` it also has a notion of the prior breadcrumb. See [RFC-0007](0007-persistent-ledger-builder-controller) for more info on merkle masks, and [Transition frontier](#transition-frontier) for more info about how these masks are configured.
+2. There is now a notion of a `Breadcrumb.t` which contains an
+`External_transition.t` and a now light-weight `Ledger_builder.t` it also has a
+notion of the prior breadcrumb. We take advantage of the merkle-mask to put
+these breadcrumbs in each node of the transition-tree. See
+[RFC-0007](0007-persistent-ledger-builder-controller) for more info on merkle
+masks, and [Transition frontier](#transition-frontier) for more info about how
+these masks are configured.
 
-Rationale: We no longer need the asynchronous `Path_traversal` job that is present in the current ledger-builder-controller (simplifying complexity), and the frequent operation of answering sync-ledger queries no longer require materializing ledger-builders.
+Rationale: The frequent operation of answering sync-ledger queries no longer
+require materializing ledger-builders. We should optimize for operations that
+occur frequently.
 
 3. The `Ktree.t` is mutable and exposes an $O(1)$ `lookup : State_hash.t -> node_entry` where `node_entry` contains (in our case) a `Breadcrumb.t`. We will discuss this further in [Ktree](#ktree).
 
@@ -98,7 +107,8 @@ Processor
 #### Validator
 
 * Input: `External_transition.t`
-* Output: `External_transition.t` (we should consider making an `External_transition.Validated.t` for output here)
+* Output: `External_transition.t` (we should consider making an
+`External_transition.Validated.t` for output here)
 
 The validator receives as input external transitions from the network and
 performs a series of checks on the transition before passing it off to be
@@ -113,6 +123,9 @@ Particularly, we validate transitions with the following checks (in this order):
 
 This order is chosen because it's cheaper computationally to perform (1) and
 (2). So if we get lucky we can short-circuit before getting to the SNARK step.
+
+We also should rebroadcast validated transitions over the network to our
+neighbors.
 
 #### Processor
 
@@ -133,7 +146,7 @@ once, so it shares the add section and constructs the underlying breadcrumb wire
 The add process runs in two phases:
 
 1. Perform a `lookup` on the `Transition_frontier` for the previous `State_hash.t` of this transition. If it is absent, send to [catchup monitor](#catchup-monitor). If present, continue.
-2. Apply the `Ledger_builder_diff.t` to the `Breadcrumb.t` retrieved from (1). Note that this no longer mutates the underlying ledger-builder but rather constructs a new mask on top of the existing mask -- see [Transition Frontier](#transition-frontier) for more.
+2. Derive a mask from the parent retrieved in (1) and apply the `Ledger_builder_diff.t` of the breadcrumb to that new mask. See [Transition Frontier](#transition-frontier) for more.
 3. Construct the new `Breadcrumb.t` from the new mask and transition, and attempt a true mutate-add to the underlying [Transition Frontier](#transition-frontier) data.
 
 <a href="catchup-monitor"></a>
@@ -149,31 +162,19 @@ connected to the existing tree.
 <a href="transition-frontier"></a>
 ### Transition Frontier
 
-Input: Synchronous writes of `Breadcrumb.t` (coming soley from [Processor](#processor)); Lookup queries coming from all components
-Outputs: None
+The Transition Frontier is essentially a root `Breadcrumb.t` with some
+metadata. The root has a merkle database corresponding to the snarked ledger.
+This is needed for consensus with proof-of-stake. It then has the first mask
+layer exposing the staged-database and ledger-builder for the locked-tip. Each
+subsequent breadcrumb contains a light-weight ledger-builder with a masked
+merkle database built off of the breadcrumb prior. We store a hashtable of
+breadcrumb children and keep references to the root and best-tip hashes (which
+we can lookup later in the table).
 
-The Transition Frontier is essentially a `Breadcrumb.t` with metadata at the root of the tree. The root has a merkle database corresponding to the snarked ledger. This is needed for consensus with proof-of-stake. It then has the first mask layer exposing the staged-database and ledger-builder for the locked-tip. Each subsequent breadcrumb contains a light-weight ledger-builder with a masked merkle database built off of the breadcrumb prior.
-
-It's two orders of magnitude more computationally expensive to constantly coalesce masked merkle databases in the worst case than to just keep them separated (back of napkin math). Moreover, we are able to in $O(1)$ time answer sync ledger queries if we have ledger builders at every position.
-
-<a href="ktree"></a>
-#### Ktree
-
-An `Ktree.t` is a rose-tree with a fixed-depth. The new `ktree` will support the following $O(1)$ operations:
-
-```ocaml
-(* assuming a key_of_value : value -> key function is available *)
-lookup : key -> value
-add : value -> parent:key -> [`No_parent | `Added | `Repeat]
-```
-
-This is acheived by using a `(key, value node) Hash table` and a rose tree with
-a mutable children field. A `lookup` just checks the hash table. An `add`
-looks up `parent` in the hash table, if present it adds a child to that node.
-
-For now, we will wrap the existing ktree up in this signature and the
-operations will not be $O(1)$. If integration tests need this extra performance
-boost, we will then build this component.
+It's two orders of magnitude more computationally expensive to constantly
+coalesce masked merkle databases in the worst case than to just keep them
+separated (back of napkin math). Moreover, we are able to in $O(1)$ time answer
+sync ledger queries if we have ledger builders at every position.
 
 <a href="ledger-catchup"></a>
 ### Ledger Catchup
@@ -215,13 +216,13 @@ transition at a time.
 If we do pass the locked slot without reconnecting, we need to perform an
 additional step of invoking the sync ledger process.
 
-<a href="sync-handler"></a>
-### Sync Handler
+<a href="query-handler"></a>
+### Query Handler
 
 Input: Sync ledger queries (from network); history sync queries (from network)
 Output: Sync answers; history answers
 
-The sync handler is responsible for handling sync ledger queries and history
+The query handler is responsible for handling sync ledger queries and history
 sync queries coming from other nodes performing catchup. This component reads
 state from the transition frontier in order to answer the questions. Given the
 new underlying data structure, all answers will occur in $O(1)$ time.
@@ -234,13 +235,17 @@ flow of the full system in an attempt to make it very easy to trace data flow.
 
 Consult the following diagram:
 
-![](https://github.com/CodaProtocol/coda/blob/55b4ca6ee66d3783669494cb28cb9f979dcd48c0/docs/res/transition_frontier_controller.png)
+![](../docs/res/transition_frontier_controller.png)
 
-Blue arrows represent pipes and asynchronous boundaries of the system. Each arrow is annotated with the behavior when overflow of the pipe occurs.
+Blue arrows represent pipes and asynchronous boundaries of the system. Each
+arrow is annotated with the behavior when overflow of the pipe occurs.
 
 * `exception` means raise an exception if pipe buffer overflows (`write_exn`)
 * `blocking` means push back on a deffered if the buffer is full (`write`)
 * `drop old` means the buffer should drain oldest first when new data comes in
+
+Red arrows represent synchronous lines of access. Red components represent data
+and not processes.
 
 ### Non-synchronous modification of the Transition Frontier
 
