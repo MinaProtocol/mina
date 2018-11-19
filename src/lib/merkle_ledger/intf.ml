@@ -62,6 +62,4 @@ end
 
 module type Storage_locations = sig
   val key_value_db_dir : string
-
-  val stack_db_file : string
 end
