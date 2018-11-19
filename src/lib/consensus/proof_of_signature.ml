@@ -11,7 +11,9 @@ module Global_public_key = struct
   [%%if
   global_signer_real]
 
-  let compressed = Snark_params.Tick.Inner_curve.one |> Public_key.compress
+  let compressed =
+    Snark_params.Tick.Inner_curve.one
+    |> Non_zero_curve_point.of_inner_curve_exn |> Public_key.compress
 
   let genesis_private_key = Global_signer_private_key.t
 
