@@ -129,7 +129,7 @@ neighbors.
 
 #### Processor
 
-* Input: `External_transition.t` (from validator) and `Breadcrumb.t` (from catchup)
+* Input: `External_transition.t` (from validator) and `Breadcrumb.t list` (from catchup)
 * Outputs: `External_transition.t` (to ledger catchup); modifying transition frontier
 
 The processor receives a single validated external transitions from the
@@ -139,7 +139,9 @@ processor is the only "thread" allowed to write changes to the
 the processor.
 
 [Ledger Catchup](#ledger-catchup) needs to add a batch of transitions all at
-once, so it shares the add section and constructs the underlying breadcrumb wired up that can just be $O(1)$ added to the frontier tree.
+once, so it shares some of the add section and constructs the underlying
+breadcrumbs in such a way that only requires adding to transition frontier's
+table and not applying an ledger-builder-diffs.
 
 #### Adding to Transition Frontier
 
@@ -180,7 +182,7 @@ sync ledger queries if we have ledger builders at every position.
 ### Ledger Catchup
 
 Input: `External_transition.t` (from catchup monitor)
-Output: `Breadcrumb.t` (to processor)
+Output: `Breadcrumb.t list` (to processor)
 
 Ledger catchup runs a single catchup worker job at a time. Whenever catchup
 monitor descides it's time for a new catchup job to start, it will send
@@ -203,9 +205,9 @@ ledger-builder-controller.
 
 `history_sync transition` asynchronously walks backwards downloading each
 external transition until either (1) it reconnects with some existing breadcrumb
-or(2) it passes the locked slot without reconnecting. In either case, we then
+or (2) it passes the locked slot without reconnecting. In either case, we then
 walk forwards doing `Path_traversal` logic materializing masked ledger-builders
-all the way up the path. The root breadcrumb then gets dispatched back into the
+all the way up the path. The materialized breadcrumb list gets sent to the
 processor.
 
 The details of this download process are TBD. It will likely make sense to ask
@@ -215,6 +217,16 @@ transition at a time.
 
 If we do pass the locked slot without reconnecting, we need to perform an
 additional step of invoking the sync ledger process.
+
+#### Post Attachment
+
+We may receive additional external transitions that would connect to the
+existing catchup job in process. Rather than dropping those we can buffer
+them in a post-attachment pool. When a catchup job finishes we can dispatch
+a post attachment job that can breadcrumbify these transitions.
+
+This should not block catchup breadcrumbs from being added to the
+transition-frontier, however.
 
 <a href="query-handler"></a>
 ### Query Handler
