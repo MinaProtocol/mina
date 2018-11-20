@@ -1,0 +1,11 @@
+(library
+ (name coda_bench)
+ (libraries core coda_base consensus)
+ (modules :standard \ main)
+ (library_flags -linkall)
+ (preprocess (pps ppx_jane ppx_bench)))
+
+(executable
+ (name main)
+ (modules main)
+ (libraries coda_bench core_bench.inline_benchmarks))
