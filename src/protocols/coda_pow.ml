@@ -133,7 +133,22 @@ end
 module type Ledger_intf = sig
   type t
 
+  type attached_mask = t
+                     
+  type unattached_mask
+
+  type maskable_ledger
+     
   type transaction
+
+  type valid_user_command
+
+  type ledger_hash
+
+  type account
+
+  (* for masks, serializable is same as t *)
+  type serializable [@@deriving bin_io]
 
   module Undo : sig
     type t [@@deriving sexp, bin_io]
@@ -141,20 +156,10 @@ module type Ledger_intf = sig
     val transaction : t -> transaction Or_error.t
   end
 
-  type attached_mask
+  val serializable_of_t : t -> serializable
 
-  type unattached_mask     
-       
-  type valid_user_command
-
-  type ledger_hash
-
-  type account
-
-  type serializable [@@deriving bin_io]
-
-  val serializable : t -> serializable
-
+  val unattached_mask_of_serializable : serializable -> unattached_mask
+    
   val create : string -> t
 
   val copy : t -> t
@@ -169,9 +174,9 @@ module type Ledger_intf = sig
 
   val account_list : t -> account list
 
-  val register_mask : t -> unattached_mask -> attached_mask
+  val register_mask : maskable_ledger -> unattached_mask -> attached_mask
 
-  val unregister_mask_exn : t -> attached_mask -> unattached_mask
+  val unregister_mask_exn : maskable_ledger -> attached_mask -> unattached_mask
 end
 
 module Fee = struct
@@ -506,6 +511,11 @@ module type Ledger_builder_base_intf = sig
 
   type ledger
 
+  (* the ledger in a ledger builder is always a mask *)
+  type attached_mask = ledger
+
+  type maskable_ledger
+     
   type serializable
 
   module Aux : sig
@@ -518,7 +528,7 @@ module type Ledger_builder_base_intf = sig
 
   val ledger : t -> ledger
 
-  val create : ledger:ledger -> t
+  val create : ledger:maskable_ledger -> t
 
   val of_aux_and_ledger :
        snarked_ledger_hash:frozen_ledger_hash
@@ -526,7 +536,7 @@ module type Ledger_builder_base_intf = sig
     -> aux:Aux.t
     -> t Or_error.t Deferred.t
 
-  val of_serialized_and_ledger : serialized:serializable -> ledger:ledger -> t
+  val of_serialized_and_unserialized : serialized:serializable -> unserialized:maskable_ledger -> t
 
   val copy : t -> t
 
@@ -534,8 +544,8 @@ module type Ledger_builder_base_intf = sig
 
   val aux : t -> Aux.t
 
-  val serializable : t -> serializable
-    
+  val serializable_of_t : t -> serializable
+
   val apply :
     t -> diff -> logger:Logger.t -> ledger_proof option Deferred.Or_error.t
 
@@ -1067,7 +1077,10 @@ Merge Snark:
      and type protocol_state := Consensus_mechanism.Protocol_state.value
      and type protocol_state_proof := Protocol_state_proof.t
      and type external_transition := Consensus_mechanism.External_transition.t
-     and type serializable := Consensus_mechanism.Protocol_state.value * Protocol_state_proof.t * Ledger.serializable
+     and type serializable :=
+                Consensus_mechanism.Protocol_state.value
+                * Protocol_state_proof.t
+                * Ledger_builder.serializable
 end
 
 module Make

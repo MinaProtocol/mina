@@ -8,8 +8,6 @@ let pk = Public_key.Compressed.of_base64_exn
 let sk = Private_key.of_base64_exn
 
 module type Base_intf = sig
-  val name : string
-
   val accounts : (Private_key.t option * Account.t) list
 end
 
@@ -17,7 +15,7 @@ module Make_from_base (Base : Base_intf) : Intf.S = struct
   include Base
 
   let t =
-    let ledger = Ledger.create name in
+    let ledger = Ledger.create () in
     List.iter accounts ~f:(fun (_, account) ->
         let open Account in
         Ledger.create_new_account_exn ledger account.public_key account ) ;
@@ -72,8 +70,6 @@ module With_private = struct
 
   module Make (Source : Source_intf) : Intf.S = struct
     include Make_from_base (struct
-      let name = "private_accounts"
-
       let accounts =
         List.map Source.accounts ~f:(fun {pk; sk; balance} ->
             ( Some (Private_key.of_base64_exn sk)
@@ -93,8 +89,6 @@ module Without_private = struct
 
   module Make (Source : Source_intf) : Intf.S = struct
     include Make_from_base (struct
-      let name = "without_private_accounts"
-
       let accounts =
         List.map Source.accounts ~f:(fun {pk; balance} ->
             ( None

@@ -510,22 +510,25 @@ end = struct
   type t =
     { scan_state:
         scan_state
-    (* Invariant: this is the ledger after having applied all the transactions in
+        (* Invariant: this is the ledger after having applied all the transactions in
        the above state. *)
     ; ledger: Ledger.attached_mask sexp_opaque }
   [@@deriving sexp]
 
+  type maskable_ledger = Ledger.maskable_ledger
+  type attached_mask = Ledger.attached_mask
+  type unattached_mask = Ledger.unattached_mask
+                    
   type serializable = Aux.t * Ledger.serializable [@@deriving bin_io]
 
-  let serializable_pieces t = (t.scan_state,Ledger.serializable t.ledger)
+  let serializable_of_t t = (t.scan_state, Ledger.serializable_of_t t.ledger)
 
-  let of_serialized_and_ledger ~serialized:(scan_state,unattached_mask) ~ledger =
+  let of_serialized_and_unserialized ~serialized:(serialized:serializable) ~unserialized:(unserialized:Ledger.maskable_ledger) =
     (* reattach the serialized mask to the unserialized ledger *)
-    let attached_mask = Ledger.register_mask ledger unttached_ledger_mask in
-    { scan_state
-    ; ledger = attached_mask
-    }
-    
+    let (scan_state, serialized_mask) = serialized in
+    let attached_mask = Ledger.register_mask unserialized (Ledger.unattached_mask_of_serializable serialized_mask) in
+    {scan_state; ledger= attached_mask}
+
   let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
 
   let sequence_chunks_of seq ~n =

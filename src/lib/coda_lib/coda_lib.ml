@@ -171,6 +171,8 @@ module type Ledger_builder_controller_intf = sig
 
   type ledger
 
+  type maskable_ledger
+     
   type tip
 
   type net
@@ -196,7 +198,7 @@ module type Ledger_builder_controller_intf = sig
       ; external_transitions:
           (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: tip
-      ; ledger: ledger
+      ; ledger: maskable_ledger
       ; consensus_local_state: consensus_local_state
       ; proposer_public_key: public_key_compressed option
       ; longest_tip_location: string }
@@ -401,7 +403,7 @@ module type Inputs_intf = sig
   module Genesis : sig
     val state : Consensus_mechanism.Protocol_state.value
 
-    val ledger : Ledger.t
+    val ledger : Ledger.maskable_ledger
 
     val proof : Protocol_state_proof.t
   end

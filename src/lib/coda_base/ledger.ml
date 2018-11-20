@@ -405,7 +405,7 @@ struct
     root
 
   let%test "apply fee transfer to the same account" =
-    with_ledger ~name:"apply_fee_transfer_same_account" ~f:(fun t ->
+    with_ledger ~f:(fun t ->
         let {Keypair.public_key; _} = Signature_lib.Keypair.create () in
         let public_key = Public_key.compress public_key in
         let fee1 = 2 in
@@ -439,23 +439,6 @@ module Masked_ledger = struct
 
   module Kvdb : Intf.Key_value_database = Rocksdb_database
 
-  (* TODO : should this be persistent? *)
-  module Sdb : Intf.Stack_database = struct
-    type t = Bigstring.t Stack.t
-
-    let create ~filename:_ = Stack.create ()
-
-    let destroy t = Stack.clear t
-
-    let push t loc = Stack.push t loc
-
-    let pop t = Stack.pop t
-
-    let length t = Stack.length t
-
-    let copy t = Stack.copy t
-  end
-
   module Storage_locations : Intf.Storage_locations = struct
     let stack_db_file = "coda_stack_db"
 
@@ -472,7 +455,6 @@ module Masked_ledger = struct
        and type location := Location_at_depth.t
   end =
     Database.Make (Key) (Account) (Hash) (Depth) (Location_at_depth) (Kvdb)
-      (Sdb)
       (Storage_locations)
 
   module Mask :
@@ -507,13 +489,13 @@ module Masked_ledger = struct
   (* Mask.Attached.create () fails, can't create an attached mask directly
      shadow create in order to create an attached mask
   *)
-  let create name =
-    let maskable = Maskable.create name in
-    let mask = Mask.create name in
+  let create () =
+    let maskable = Maskable.create () in
+    let mask = Mask.create () in
     Maskable.register_mask maskable mask
 
-  let with_ledger ~name ~f =
-    let ledger = create name in
+  let with_ledger ~f =
+    let ledger = create () in
     try
       Printexc.record_backtrace true ;
       let result = f ledger in

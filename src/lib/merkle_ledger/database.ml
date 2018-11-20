@@ -31,7 +31,7 @@ module Make
 
   type location = Location.t [@@deriving sexp]
 
-  type t = {uuid: Uuid.t; kvdb: Kvdb.t}
+  type t = {uuid: Uuid.Stable.V1.t; kvdb: Kvdb.t} [@@deriving sexp]
 
   let get_uuid t = t.uuid
 

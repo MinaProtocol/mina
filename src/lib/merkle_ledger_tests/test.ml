@@ -69,8 +69,7 @@ let%test_module "Database integration test" =
           let accounts =
             List.map2_exn public_keys balances ~f:Account.create
           in
-          let name = "databases_equiv_hash" in
-          DB.with_ledger ~name ~f:(fun db ->
+          DB.with_ledger ~f:(fun db ->
               Ledger.with_ledger ~f:(fun ledger ->
                   let enumerate_dir_combinations max_depth =
                     Sequence.range 0 (max_depth - 1)

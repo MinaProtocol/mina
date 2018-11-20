@@ -40,7 +40,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
          and type unattached_mask := Mask.t
          and type attached_mask := Mask.Attached.t
 
-      val with_instances : string -> (Maskable.t -> Mask.t -> 'a) -> 'a
+      val with_instances : (Maskable.t -> Mask.t -> 'a) -> 'a
     end
 
     module Make (Test : Test_intf) = struct
@@ -80,7 +80,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         | `Added -> location
 
       let%test "parent, mask agree on set" =
-        Test.with_instances "test:parent_mask_agree_set" (fun maskable mask ->
+        Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             Maskable.set maskable dummy_location dummy_account ;
             Mask.Attached.set attached_mask dummy_location dummy_account ;
@@ -115,8 +115,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         test_hashes_at_address addr
 
       let%test "parent, mask agree on hashes; set in both mask and parent" =
-        Test.with_instances "test:parent_mask_agree_hashes"
-          (fun maskable mask ->
+        Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             (* set in both parent and mask *)
             Maskable.set maskable dummy_location dummy_account ;
@@ -126,8 +125,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
               attached_mask dummy_address )
 
       let%test "parent, mask agree on hashes; set only in parent" =
-        Test.with_instances "test:parent_mask_agree_hashes_set_only_parent"
-          (fun maskable mask ->
+        Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             (* set only in parent *)
             Maskable.set maskable dummy_location dummy_account ;
@@ -136,7 +134,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         )
 
       let%test "mask delegates to parent" =
-        Test.with_instances "test:mask_delegates" (fun maskable mask ->
+        Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             (* set to parent, get from mask *)
             Maskable.set maskable dummy_location dummy_account ;
@@ -147,7 +145,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             Account.equal dummy_account mask_account )
 
       let%test "mask prune after parent notification" =
-        Test.with_instances "test:mask_prune" (fun maskable mask ->
+        Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             (* set to mask *)
             Mask.Attached.set attached_mask dummy_location dummy_account ;
@@ -164,7 +162,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             else false )
 
       let%test "commit puts mask contents in parent, flushes mask" =
-        Test.with_instances "test:commit_works" (fun maskable mask ->
+        Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             (* set to mask *)
             Mask.Attached.set attached_mask dummy_location dummy_account ;
@@ -182,8 +180,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             else false )
 
       let%test "register and unregister mask" =
-        Test.with_instances "test:register_unregister_mask"
-          (fun maskable mask ->
+        Test.with_instances (fun maskable mask ->
             let (attached_mask : Mask.Attached.t) =
               Maskable.register_mask maskable mask
             in
@@ -195,8 +192,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             with Failure _ -> false )
 
       let%test "mask and parent agree on Merkle path" =
-        Test.with_instances "test:mask_parent_merkle_path"
-          (fun maskable mask ->
+        Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             Mask.Attached.set attached_mask dummy_location dummy_account ;
             (* set affects hashes along the path P from location to the root, while the Merkle path for the location 
@@ -217,16 +213,14 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             mask_merkle_path = maskable_merkle_path )
 
       let%test "mask and parent agree on Merkle root before set" =
-        Test.with_instances "test:mask_parent_merkle_root"
-          (fun maskable mask ->
+        Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             let mask_merkle_root = Mask.Attached.merkle_root attached_mask in
             let maskable_merkle_root = Maskable.merkle_root maskable in
             Hash.equal mask_merkle_root maskable_merkle_root )
 
       let%test "mask and parent agree on Merkle root after set" =
-        Test.with_instances "test:mask_parent_merkle_root_after_set"
-          (fun maskable mask ->
+        Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             (* the order of sets matters here; if we set in the mask first,
                the set in the maskable notifies the mask, which then removes
@@ -244,8 +238,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
       let%test_unit "add and retrieve a block of accounts" =
         (* see similar test in test_database *)
         if Test.depth <= 8 then
-          Test.with_instances "test:add_retrieve_block_accounts"
-            (fun maskable mask ->
+          Test.with_instances (fun maskable mask ->
               let attached_mask = Maskable.register_mask maskable mask in
               let num_accounts = 1 lsl Test.depth in
               let gen_values gen =
@@ -271,8 +264,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
           )
 
       let%test_unit "removing accounts from mask restores Merkle root" =
-        Test.with_instances "test:removing_accounts_from_mask"
-          (fun maskable mask ->
+        Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             let num_accounts = 5 in
             let keys = Key.gen_keys num_accounts in
@@ -293,8 +285,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             assert (Hash.equal merkle_root2 merkle_root0) )
 
       let%test_unit "removing accounts from parent restores Merkle root" =
-        Test.with_instances "test:removing_accounts_from_parent"
-          (fun maskable mask ->
+        Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             let num_accounts = 5 in
             let keys = Key.gen_keys num_accounts in
@@ -318,8 +309,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
 
       let%test_unit "removing accounts from parent and mask restores Merkle \
                      root" =
-        Test.with_instances "test:removing_accounts_from_mask_and_parent"
-          (fun maskable mask ->
+        Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             let num_accounts_parent = 5 in
             let num_accounts_mask = 5 in
@@ -402,9 +392,9 @@ let%test_module "Test mask connected to underlying Merkle tree" =
           (Mask)
 
       (* test runner *)
-      let with_instances name f =
-        let maskable = Maskable.create name in
-        let mask = Mask.create name in
+      let with_instances f =
+        let maskable = Maskable.create () in
+        let mask = Mask.create () in
         f maskable mask
     end
 

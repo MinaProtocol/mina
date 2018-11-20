@@ -9,7 +9,7 @@ module type S = sig
 
   type key
 
-  type t
+  type t [@@deriving sexp]
 
   module Db_error : sig
     type t = Account_location_not_found | Out_of_leaves | Malformed_database

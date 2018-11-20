@@ -26,11 +26,12 @@ struct
   module Addr = Location.Addr
 
   type t =
-    { uuid: Uuid.t
+    { uuid: Uuid.Stable.V1.t
     ; account_tbl: Account.t Location.Table.t
     ; hash_tbl: Hash.t Addr.Table.t
     ; location_tbl: Location.t Key.Table.t
     ; mutable current_location: Location.t option }
+  [@@deriving sexp]
 
   type unattached = t
 
@@ -41,20 +42,21 @@ struct
     ; location_tbl= Key.Table.create ()
     ; current_location= None }
 
-  let with_ledger ~name ~f =
-    let mask = create name in
+  let with_ledger ~f =
+    let mask = create () in
     f mask
 
   module Attached = struct
-    type parent = Base.t
+    type parent = Base.t [@@deriving sexp]
 
     type t =
-      { uuid: Uuid.t
+      { uuid: Uuid.Stable.V1.t
       ; parent: parent
       ; account_tbl: Account.t Location.Table.t
       ; hash_tbl: Hash.t Addr.Table.t
       ; location_tbl: Location.t Key.Table.t
       ; mutable current_location: Location.t option }
+    [@@deriving sexp]
 
     module Path = Base.Path
     module Db_error = Base.Db_error
@@ -66,7 +68,7 @@ struct
         "Mask.Attached.create: cannot create an attached mask; use \
          Mask.create and Mask.set_parent"
 
-    let with_ledger ~name:_ ~f:_ =
+    let with_ledger ~f:_ =
       failwith
         "Mask.Attached.with_ledger: cannot create an attached mask; use \
          Mask.create and Mask.set_parent"

@@ -97,6 +97,7 @@ module In_memory_kvdb : Intf.Key_value_database = struct
        OK to use these hash functions
        *)
       let hash = hash_t_frozen
+
       let hash_fold_t = hash_fold_t_frozen
     end
 
@@ -104,9 +105,11 @@ module In_memory_kvdb : Intf.Key_value_database = struct
     include Hashable.Make_binable (T)
   end
 
-  type t = {uuid: Uuid.t; table: Bigstring_frozen.t Bigstring_frozen.Table.t}
+  type t =
+    {uuid: Uuid.Stable.V1.t; table: Bigstring_frozen.t Bigstring_frozen.Table.t}
+  [@@deriving sexp]
 
-  let to_alist t = Bigstring_frozen.Table.to_alist t
+  let to_alist t = Bigstring_frozen.Table.to_alist t.table
 
   let get_uuid t = t.uuid
 

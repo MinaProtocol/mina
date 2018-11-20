@@ -4,7 +4,7 @@ open Protocols
 module type S = sig
   open Coda_pow
 
-  module Compressed_public_key : Compressed_public_key_intf
+  module Cmpressed_public_key : Compressed_public_key_intf
 
   module User_command :
     Coda_pow.User_command_intf with type public_key := Compressed_public_key.t

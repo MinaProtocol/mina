@@ -10,6 +10,7 @@ module Make (Inputs : Inputs.S) : sig
     with type ledger_builder := Ledger_builder.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type ledger := Ledger.t
+     and type maskable_ledger := Ledger.maskable_ledger
      and type ledger_proof := Ledger_proof.t
      and type net := Net.net
      and type protocol_state := Consensus_mechanism.Protocol_state.value
@@ -33,7 +34,7 @@ end = struct
       ; external_transitions:
           (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: Tip.t
-      ; ledger: Ledger.t
+      ; ledger: Ledger.maskable_ledger
       ; consensus_local_state: Consensus_mechanism.Local_state.t
       ; proposer_public_key: Public_key.Compressed.t option
       ; longest_tip_location: string }
@@ -113,7 +114,11 @@ end = struct
     { ledger_builder_io: Net.t
     ; log: Logger.t
     ; store_controller:
-        (Consensus_mechanism.Protocol_state.value * Protocol_state_proof.t * Ledger.serializable, State_hash.t) With_hash.t
+        ( Consensus_mechanism.Protocol_state.value
+          * Protocol_state_proof.t
+          * Ledger_builder.serializable
+        , State_hash.t )
+        With_hash.t
         Store.Controller.t
     ; handler: Transition_logic.t
     ; strongest_ledgers_reader:
@@ -128,18 +133,22 @@ end = struct
 
   let load_tip_and_genesis_hash
       (controller :
-        (Consensus_mechanism.Protocol_state.value * Protocol_state_proof.t * Ledger_builder.serializable, State_hash.t) With_hash.t
+        ( Consensus_mechanism.Protocol_state.value
+          * Protocol_state_proof.t
+          * Ledger_builder.serializable
+        , State_hash.t )
+        With_hash.t
         Store.Controller.t)
       {Config.longest_tip_location; genesis_tip; ledger; _} log =
     let genesis_state_hash = Protocol_state.hash genesis_tip.state in
     match%map Store.load controller longest_tip_location with
     | Ok {data; hash} ->
         (* we've loaded the serialized components of the tip; 
-          to build a tip, we also need the ledger, which we pull out of the config
+           to build a tip, we also need the ledger, which we pull out of the config
         *)
-        let state, proof, serialized = data in
+        let state, proof, mask = data in
         let ledger_builder =
-          Ledger_builder.of_serialized_and_ledger ~serialized ~ledger
+          Ledger_builder.of_serialized_and_unserialized ~serialized:mask ~unserialized:ledger
         in
         let tip = {Tip.state; Tip.proof; Tip.ledger_builder} in
         {With_hash.data= tip; hash}
@@ -218,9 +227,10 @@ end = struct
            Linear_pipe.iter store_tip_reader ~f:(fun tip ->
                let open With_hash in
                let {Tip.state; Tip.proof; Tip.ledger_builder} = tip in
-               let serializable = Ledger_builder.serializable ledger_builder in
+               let serializable = Ledger_builder.serializable_of_t ledger_builder in
                let serializable_tip_with_genesis_hash =
-                 {data= (state, proof, serializable); hash= genesis_tip_state_hash}
+                 { data= (state, proof, serializable)
+                 ; hash= genesis_tip_state_hash }
                in
                Store.store store_controller config.longest_tip_location
                  serializable_tip_with_genesis_hash ) ) ;
@@ -434,7 +444,7 @@ let%test_module "test" =
           include Int
 
           type serializable = t [@@deriving bin_io]
-                
+
           let merkle_root t = t
 
           let copy t = t
@@ -447,8 +457,13 @@ let%test_module "test" =
         module Ledger_builder = struct
           type t = int ref [@@deriving sexp, bin_io]
 
-          type serializable = int [@@deriving bin_io]
+          (* masking not tested here *)
+          type maskable_ledger = Ledger.t
                  
+          type unattached_mask = Ledger.t
+                 
+          type serializable = int [@@deriving bin_io]
+
           module Aux = struct
             type t = int [@@deriving bin_io]
 
@@ -457,8 +472,8 @@ let%test_module "test" =
             let is_valid _ = true
           end
 
-          let serializable t = !t
-                     
+          let serializable_of_t t = !t
+                            
           let ledger t = !t
 
           let create ~ledger = ref ledger
@@ -467,7 +482,7 @@ let%test_module "test" =
 
           let hash t = !t
 
-          let of_serialized_and_ledger ~serialized:_ ~ledger = create ~ledger
+          let of_serialized_and_unserialized ~serialized:_ ~unserialized:ledger = create ~ledger
 
           let of_aux_and_ledger ~snarked_ledger_hash:_ ~ledger ~aux:_ =
             Deferred.return (Ok (create ~ledger))

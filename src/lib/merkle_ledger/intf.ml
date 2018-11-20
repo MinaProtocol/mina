@@ -15,7 +15,7 @@ module type Balance = sig
 end
 
 module type Account = sig
-  type t [@@deriving bin_io, eq]
+  type t [@@deriving bin_io, eq, sexp]
 
   type key
 
@@ -41,7 +41,7 @@ module type Depth = sig
 end
 
 module type Key_value_database = sig
-  type t
+  type t [@@deriving sexp]
 
   val copy : t -> t
 

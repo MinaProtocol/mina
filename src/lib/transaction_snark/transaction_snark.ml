@@ -1310,7 +1310,7 @@ let%test_module "transaction_snark" =
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
-          Ledger.with_ledger ~name:"test:new_account" ~f:(fun ledger ->
+          Ledger.with_ledger ~f:(fun ledger ->
               Array.iter
                 (Array.sub wallets ~pos:1 ~len:(Array.length wallets - 1))
                 ~f:(fun {account; private_key= _} ->
