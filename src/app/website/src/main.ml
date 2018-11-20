@@ -458,8 +458,7 @@ let positions =
   ; ("Director of Business Development", "business-development")
   ; ("Product Manager", "product-manager")
   ; ("Engineering Manager", "engineering-manager")
-  ; ("Community Manager", "community-manager")
-  ]
+  ; ("Community Manager", "community-manager") ]
 
 let jobs () =
   let top scheme =
