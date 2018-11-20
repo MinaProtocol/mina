@@ -15,4 +15,4 @@ let private_key_generation = true
 
 let randomness = true
 
-let vrf_threshold_check = false
+let vrf_threshold_check = true
