@@ -504,6 +504,16 @@ void camlsnark_mnt6_g1_vector_delete(std::vector<libff::G1<ppT>>* v) {
   delete v;
 }
 
+void camlsnark_mnt6_g1_pedersen_inner(std::vector<libff::G1<ppT>> *params, size_t idx, bool b0, bool b1, bool b2, libff::G1<ppT>* acc) {
+    size_t start_idx = (size_t)idx * 4;
+    size_t mini_offset = (size_t)b0 + 2*(size_t)b1;
+    libff::G1<ppT> it = params->at(start_idx + mini_offset);
+    if (b2) {
+        it = -it;
+    }
+    *acc = *acc + it;
+}
+
 void camlsnark_mnt6_g2_delete(libff::G2<ppT>* a) {
   delete a;
 }

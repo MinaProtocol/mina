@@ -33,7 +33,13 @@ let pedersen_params ~loc =
     let loc = loc
   end) in
   let open E in
-  let arr = Crypto_params.Pedersen_params.params in
+  let params = Crypto_params.Pedersen_params.params in
+  let open Crypto_params.Tick_backend.Inner_curve.Vector in
+  let len = length params in
+  let arr = Array.init (len / 4)
+    ~f:(fun i ->
+      (get params i, get params (i+1), get params (i+2), get params (i+3))
+    ) in
   let arr_expr =
     List.init (Array.length arr) ~f:(fun i ->
         let g, _, _, _ = arr.(i) in

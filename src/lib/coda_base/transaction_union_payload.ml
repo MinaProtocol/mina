@@ -34,7 +34,7 @@ module Body = struct
         | Stake_delegation -> (Amount.zero, max_amount_without_overflow)
         | Fee_transfer -> (Amount.zero, max_amount_without_overflow)
         | Coinbase ->
-            (* In this case, 
+            (* In this case,
              fee - amount should be defined. In other words,
              fee >= amount. *)
             (Amount.zero, Amount.of_fee fee)
@@ -271,7 +271,7 @@ module Changes = struct
   end
 
   let%test_unit "checked-unchecked changes" =
-    Quickcheck.test gen ~f:(fun (t : payload) ->
+    Quickcheck.test gen ~trials:10 ~f:(fun (t : payload) ->
         Test_util.test_equal ~equal payload_typ typ Checked.of_payload
           of_payload t )
 end

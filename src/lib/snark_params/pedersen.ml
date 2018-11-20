@@ -5,6 +5,7 @@ open Tuple_lib
 
 module type S = sig
   type curve
+  type curve_vector
 
   module Digest : sig
     type t [@@deriving bin_io, sexp, eq, hash, compare]
@@ -25,7 +26,7 @@ module type S = sig
   end
 
   module Params : sig
-    type t = curve Quadruple.t array
+    type t = curve_vector
   end
 
   module State : sig
@@ -65,7 +66,10 @@ end)
 
     val unsafe_add_in_place : dst:t -> t -> t
 
-end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
+    module Vector : Snarky.Vector.S with type elt := t
+
+    val pedersen_inner : params:Vector.t -> i:int -> b0:bool -> b1:bool -> b2:bool -> acc:t -> unit
+end) : S with type curve := Curve.t and type Digest.t = Field.t and type curve_vector := Curve.Vector.t = struct
   module Digest = struct
     type t = Field.t [@@deriving sexp, bin_io, compare, hash, eq]
 
@@ -80,7 +84,16 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
   end
 
   module Params = struct
-    type t = Curve.t Quadruple.t array
+    type t = Curve.Vector.t
+
+    let of_array l =
+      let vec = Curve.Vector.create () in
+      Array.iter l ~f:(fun (e1, e2, e3, e4) ->
+      Curve.Vector.emplace_back vec e1 ;
+      Curve.Vector.emplace_back vec e2 ;
+      Curve.Vector.emplace_back vec e3 ;
+      Curve.Vector.emplace_back vec e4 ) ;
+      vec
   end
 
   module State = struct
@@ -92,12 +105,11 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
     let update_fold (t : t) (fold : bool Triple.t Fold.t) =
       let params = t.params in
       let acc, triples_consumed =
-        fold.fold ~init:(t.acc, t.triples_consumed) ~f:(fun (acc, i) triple ->
-            let term =
-              Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
-                triple
+        fold.fold ~init:(t.acc, t.triples_consumed) ~f:(fun (acc, i) (b0, b1, b2) ->
+            let () =
+              Curve.pedersen_inner ~params ~i ~b0 ~b1 ~b2 ~acc
             in
-            (Curve.unsafe_add_in_place ~dst:acc term, i + 1) )
+            (acc, i + 1) )
       in
       {t with acc; triples_consumed}
 

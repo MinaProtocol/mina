@@ -5,6 +5,7 @@ open Tuple_lib
 
 module type S = sig
   type curve
+  type curve_vector
 
   module Digest : sig
     type t [@@deriving bin_io, sexp, eq, hash, compare]
@@ -25,7 +26,7 @@ module type S = sig
   end
 
   module Params : sig
-    type t = curve Quadruple.t array
+    type t = curve_vector
   end
 
   module State : sig
@@ -64,4 +65,8 @@ end)
     val unsafe_add_in_place : dst:t -> t -> t
 
     val dup : t -> t
-end) : S with type curve := Curve.t and type Digest.t = Field.t
+
+    module Vector : Snarky.Vector.S with type elt := t
+
+    val pedersen_inner : params:Vector.t -> i:int -> b0:bool -> b1:bool -> b2:bool -> acc:t -> unit
+end) : S with type curve := Curve.t and type curve_vector := Curve.Vector.t and type Digest.t = Field.t

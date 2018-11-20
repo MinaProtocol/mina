@@ -2,7 +2,7 @@
   (name        crypto_params_init)
   (public_name crypto_params.init)
   (libraries
-    (snarky))
+    (snarky tuple_lib))
   (preprocess (pps (ppx_jane)))
   )
 )

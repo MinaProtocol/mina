@@ -235,7 +235,15 @@ module Tick = struct
 
     module Checked = struct
       include Snarky.Pedersen.Make (Tick0) (Inner_curve)
-                (Crypto_params.Pedersen_params)
+                (struct
+                  include Crypto_params.Pedersen_params
+                  open Inner_curve.Vector
+                  let len = length params
+                  let params = Array.init (len / 4)
+                    ~f:(fun i ->
+                      (get params i, get params (i+1), get params (i+2), get params (i+3))
+                    )
+                 end)
 
       let hash_triples ts ~(init : State.t) =
         hash ts ~init:(init.triples_consumed, `Value init.acc)

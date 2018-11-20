@@ -88,6 +88,8 @@ struct
     val print : t -> unit
 
     module Vector : Vector.S with type elt := t
+
+    val pedersen_inner : params:Vector.t -> i:int -> b0:bool -> b1:bool -> b2:bool -> acc:t -> unit
   end = struct
     type t = unit ptr
 
@@ -192,6 +194,13 @@ struct
         Fq.schedule_delete x ;
         let y = stub_y t in
         Fq.schedule_delete y ; (x, y)
+
+    let pedersen_inner =
+      let stub =
+        foreign (func_name "pedersen_inner") (Vector.typ @-> int @-> bool @-> bool @-> bool @-> typ @-> returning void)
+      in
+      fun ~(params : Vector.t) ~i ~b0 ~b1 ~b2 ~(acc:t) ->
+        stub params i b0 b1 b2 acc
   end
 end
 
