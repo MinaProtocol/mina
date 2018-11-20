@@ -3,9 +3,9 @@ open Async
 
 type 'a value = {path: string; value: 'a; checksum: Md5.t}
 
-let try_load bin_t path =
+let try_load bin path =
   let logger = Logger.create () in
-  let controller = Storage.Disk.Controller.create ~parent_log:logger bin_t in
+  let controller = Storage.Disk.Controller.create ~parent_log:logger bin in
   match%map Storage.Disk.load_with_checksum controller path with
   | Ok {Storage.Checked_data.data; checksum} ->
       Logger.info logger "Loaded value successfully from %s" path ;
@@ -24,17 +24,17 @@ module Component = struct
     | Load :
         { label: string
         ; f: 'env -> 'a
-        ; bin_t: 'a Bin_prot.Type_class.t }
+        ; bin: 'a Binable.m }
         -> ('a value, 'env) t
 
-  let load (Load {label; f= _; bin_t}) ~base_path =
+  let load (Load {label; f= _; bin}) ~base_path =
     let path = base_path ^ "_" ^ label in
-    try_load bin_t path
+    try_load bin path
 
-  let store (Load {label; f; bin_t}) ~base_path ~env =
+  let store (Load {label; f; bin}) ~base_path ~env =
     let path = base_path ^ "_" ^ label in
     let logger = Logger.create () in
-    let controller = Storage.Disk.Controller.create ~parent_log:logger bin_t in
+    let controller = Storage.Disk.Controller.create ~parent_log:logger bin in
     let value = f env in
     let%map checksum =
       Storage.Disk.store_with_checksum controller path value
@@ -85,8 +85,8 @@ module With_components = struct
       match t with
       | Pure x -> return x
       | Ap ((Load _ as c), tf) ->
-          let%map x = Component.store c ~base_path ~env
-          and f = store tf ~base_path ~env in
+          let%bind x = Component.store c ~base_path ~env in
+          let%map f = store tf ~base_path ~env in
           f x
 
   module Let_syntax = struct
@@ -108,8 +108,7 @@ include With_components
 
 type ('a, 'e) cached = ('a, 'e) t
 
-let component ~label ~f bin_t =
-  Ap (Component.Load {label; f; bin_t}, Pure Fn.id)
+let component ~label ~f bin = Ap (Component.Load {label; f; bin}, Pure Fn.id)
 
 module Spec = struct
   type 'a t =

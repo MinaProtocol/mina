@@ -152,7 +152,9 @@ end = struct
     let log = Logger.child config.parent_log "ledger_builder_controller" in
     let store_controller =
       Store.Controller.create
-        (With_hash.bin_t Tip.bin_t State_hash.bin_t)
+        ( module struct
+          type t = (Tip.t, State_hash.t) With_hash.t [@@deriving bin_io]
+        end )
         ~parent_log:config.parent_log
     in
     let genesis_tip_state_hash =
