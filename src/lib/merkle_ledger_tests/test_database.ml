@@ -331,7 +331,6 @@ let%test_module "test functor on in memory databases" =
       module MT : DB with type location := Location.t =
         Database.Make (Key) (Account) (Hash) (Depth) (Location)
           (In_memory_kvdb)
-          (In_memory_sdb)
           (Storage_locations)
 
       (* TODO: maybe this function should work with dynamic modules *)

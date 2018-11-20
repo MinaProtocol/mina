@@ -1,0 +1,4 @@
+(library
+ (name mylib)
+ (modules_without_implementation intf_only)
+ (wrapped (transition "Will be removed past 2020-20-20")))

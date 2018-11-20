@@ -26,7 +26,8 @@ struct
   module Addr = Location.Addr
 
   type t =
-    { account_tbl: Account.t Location.Table.t
+    { uuid: Uuid.t
+    ; account_tbl: Account.t Location.Table.t
     ; hash_tbl: Hash.t Addr.Table.t
     ; location_tbl: Location.t Key.Table.t
     ; mutable current_location: Location.t option }
@@ -34,7 +35,8 @@ struct
   type unattached = t
 
   let create () =
-    { account_tbl= Location.Table.create ()
+    { uuid= Uuid.create ()
+    ; account_tbl= Location.Table.create ()
     ; hash_tbl= Addr.Table.create ()
     ; location_tbl= Key.Table.create ()
     ; current_location= None }
@@ -43,7 +45,8 @@ struct
     type parent = Base.t
 
     type t =
-      { parent: parent
+      { uuid: Uuid.t
+      ; parent: parent
       ; account_tbl: Account.t Location.Table.t
       ; hash_tbl: Hash.t Addr.Table.t
       ; location_tbl: Location.t Key.Table.t
@@ -60,12 +63,15 @@ struct
          Mask.create and Mask.set_parent"
 
     let unset_parent t =
-      { account_tbl= t.account_tbl
+      { uuid= t.uuid
+      ; account_tbl= t.account_tbl
       ; hash_tbl= t.hash_tbl
       ; location_tbl= t.location_tbl
       ; current_location= t.current_location }
 
     let get_parent t = t.parent
+
+    let get_uuid t = t.uuid
 
     (* don't rely on a particular implementation *)
     let find_hash t address = Addr.Table.find t.hash_tbl address
@@ -204,9 +210,11 @@ struct
     let parent_set_notify t location account =
       match find_account t location with
       | Some existing_account ->
-          if Account.equal account existing_account then
-            (* optimization: remove from account table *)
-            remove_account_and_update_hashes t location
+          if
+            Key.equal
+              (Account.public_key account)
+              (Account.public_key existing_account)
+          then remove_account_and_update_hashes t location
       | None -> ()
 
     (* as for accounts, we see if we have it in the mask, else delegate to parent *)
@@ -386,7 +394,8 @@ struct
   end
 
   let set_parent t parent =
-    { Attached.parent
+    { uuid= t.uuid
+    ; Attached.parent
     ; account_tbl= t.account_tbl
     ; hash_tbl= t.hash_tbl
     ; location_tbl= t.location_tbl

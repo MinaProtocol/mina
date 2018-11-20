@@ -161,6 +161,9 @@ module Make (Inputs : Inputs_intf) :
         (fun {length; signer_public_key} ->
           { Lite_base.Consensus_state.length= Lite_compat.length length
           ; signer_public_key= Lite_compat.public_key signer_public_key } )
+
+    let to_string_record t =
+      Printf.sprintf "{length|%s}" (Length.to_string t.length)
   end
 
   module Protocol_state =
@@ -236,8 +239,8 @@ module Make (Inputs : Inputs_intf) :
       ~ledger:_ =
     ()
 
-  let select Consensus_state.({length= l1; _})
-      Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
+  let select ~existing:Consensus_state.({length= l1; _})
+      ~candidate:Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
     if Length.compare l1 l2 >= 0 then `Keep else `Take
 
   let next_proposal now _state ~local_state:_ ~keypair ~logger:_ =

@@ -5,29 +5,27 @@ module Payload = User_command_payload
 
 type ('payload, 'pk, 'signature) t_ =
   {payload: 'payload; sender: 'pk; signature: 'signature}
-[@@deriving bin_io, eq, sexp, hash]
+[@@deriving bin_io, eq, sexp, hash, yojson]
 
 type t = (Payload.t, Public_key.t, Signature.t) t_
-[@@deriving bin_io, eq, sexp, hash]
+[@@deriving bin_io, eq, sexp, hash, yojson]
 
 module Stable : sig
   module V1 : sig
     type nonrec ('payload, 'pk, 'signature) t_ =
                                                 ('payload, 'pk, 'signature) t_ =
       {payload: 'payload; sender: 'pk; signature: 'signature}
-    [@@deriving bin_io, eq, sexp, hash]
+    [@@deriving bin_io, eq, sexp, hash, yojson]
 
     type t =
       (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_
-    [@@deriving bin_io, eq, sexp, hash]
+    [@@deriving bin_io, eq, sexp, hash, yojson]
 
     val compare : seed:string -> t -> t -> int
   end
 end
 
-type var = (Payload.var, Public_key.var, Signature.var) t_
-
-val typ : (var, t) Typ.t
+val payload : t -> Payload.t
 
 (* Generate a single transaction between
  * $a, b \in keys$
