@@ -61,7 +61,7 @@ Proof_of_stake.Make (struct
   module Ledger_builder_diff = Ledger_builder_diff
   module Time = Coda_base.Block_time
 
-  (* TODO: change these variables into compile-time config variables. See #1176  *)
+  (* TODO: change these variables into variables for config file. See #1176  *)
   (* TODO: choose reasonable values *)
   let genesis_state_timestamp =
     let default = Coda_base.Genesis_state_timestamp.value |> Time.of_time in
