@@ -1,0 +1,6 @@
+(library
+ (name foo)
+ (public_name foo)
+ (wrapped false)
+ (optional)
+ (libraries lib_that_doesn't_exist))

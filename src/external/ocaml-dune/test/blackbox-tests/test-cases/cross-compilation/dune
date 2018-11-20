@@ -1,0 +1,1 @@
+(rule (with-stdout-to file (run ./bin/blah.exe)))

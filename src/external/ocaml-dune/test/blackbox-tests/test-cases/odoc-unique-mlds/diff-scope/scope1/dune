@@ -1,0 +1,3 @@
+(library
+ (name scope1)
+ (public_name scope1))

@@ -48,3 +48,5 @@ val ledger_hash : t -> Ledger_hash.t
 val aux_hash : t -> Aux_hash.t
 
 val of_aux_and_ledger_hash : Aux_hash.t -> Ledger_hash.t -> t
+
+val to_string : t -> string

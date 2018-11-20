@@ -1,0 +1,8 @@
+(env
+ (_
+  (env-vars
+   (DUNE_FOO PASS))))
+
+(alias
+ (name default)
+ (deps (alias_rec runtest)))

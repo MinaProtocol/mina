@@ -1,0 +1,6 @@
+(library
+ (name foobar_sub)
+ (public_name foobar.sub)
+ (libraries bytes)
+ (modes byte)
+ (synopsis "sub library in a sub dir"))

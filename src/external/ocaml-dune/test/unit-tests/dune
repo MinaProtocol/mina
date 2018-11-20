@@ -1,0 +1,110 @@
+(executable
+ (name expect_test)
+ (modules expect_test)
+ (link_flags (-linkall))
+ (modes byte)
+ (libraries which_program_dune unix dune compiler-libs.toplevel test_common))
+
+(ocamllex expect_test)
+
+(executable
+ (name sexp_tests)
+ (modules sexp_tests)
+ (libraries stdune dune_lang))
+
+(alias
+ (name runtest)
+ (action (run ./sexp_tests.exe)))
+
+(alias
+ (name runtest)
+ (deps (:t tests.mlt)
+  (glob_files %{project_root}/src/.dune.objs/*.cmi)
+  (glob_files %{project_root}/src/stdune/.stdune.objs/*.cmi)
+  (source_tree toolchain.d)
+  (source_tree findlib-db))
+ (action (chdir %{project_root}
+          (progn
+           (run %{exe:expect_test.exe} %{t})
+           (diff? %{t} %{t}.corrected)))))
+
+(alias
+ (name runtest)
+ (deps (:t filename.mlt)
+  (glob_files %{project_root}/src/.dune.objs/*.cmi)
+  (glob_files %{project_root}/src/stdune/.stdune.objs/*.cmi))
+ (action (chdir %{project_root}
+          (progn
+           (run %{exe:expect_test.exe} %{t})
+           (diff? %{t} %{t}.corrected)))))
+
+(alias
+ (name runtest)
+ (deps (:t fiber.mlt)
+  (glob_files %{project_root}/src/.dune.objs/*.cmi)
+  (glob_files %{project_root}/src/stdune/.stdune.objs/*.cmi)
+  (glob_files %{project_root}/src/fiber/.fiber.objs/*.cmi))
+ (action (chdir %{project_root}
+          (progn
+           (run %{exe:expect_test.exe} %{t})
+           (diff? %{t} %{t}.corrected)))))
+
+(alias
+ (name runtest)
+ (deps (:t import_dot_map.mlt)
+  (glob_files %{project_root}/src/.dune.objs/*.cmi)
+  (glob_files %{project_root}/src/stdune/.stdune.objs/*.cmi))
+ (action (chdir %{project_root}
+          (progn
+           (run %{exe:expect_test.exe} %{t})
+           (diff? %{t} %{t}.corrected)))))
+
+(alias
+ (name runtest)
+ (deps (:t action.mlt)
+  (glob_files %{project_root}/src/.dune.objs/*.cmi)
+  (glob_files %{project_root}/src/stdune/.stdune.objs/*.cmi))
+ (action (chdir %{project_root}
+          (progn
+           (run %{exe:expect_test.exe} %{t})
+           (diff? %{t} %{t}.corrected)))))
+
+(alias
+ (name runtest)
+ (deps (:t path.mlt)
+  (glob_files %{project_root}/src/.dune.objs/*.cmi)
+  (glob_files %{project_root}/src/stdune/.stdune.objs/*.cmi))
+ (action (chdir %{project_root}
+          (progn
+           (run %{exe:expect_test.exe} %{t})
+           (diff? %{t} %{t}.corrected)))))
+
+(alias
+ (name runtest)
+ (deps (:t sexp.mlt)
+  (glob_files %{project_root}/src/.dune.objs/*.cmi)
+  (glob_files %{project_root}/src/stdune/.stdune.objs/*.cmi))
+ (action (chdir %{project_root}
+          (progn
+           (run %{exe:expect_test.exe} %{t})
+           (diff? %{t} %{t}.corrected)))))
+
+(alias
+ (name runtest)
+ (deps (:t dune_file.mlt)
+  (glob_files %{project_root}/src/.dune.objs/*.cmi)
+  (glob_files %{project_root}/src/stdune/.stdune.objs/*.cmi))
+ (action (chdir %{project_root}
+          (progn
+           (run %{exe:expect_test.exe} %{t})
+           (diff? %{t} %{t}.corrected)))))
+
+(alias
+ (name runtest)
+ (deps (:t string.mlt)
+  (glob_files %{project_root}/src/.dune.objs/*.cmi)
+  (glob_files %{project_root}/src/stdune/.stdune.objs/*.cmi))
+ (action (chdir %{project_root}
+          (progn
+           (run %{exe:expect_test.exe} %{t})
+           (diff? %{t} %{t}.corrected)))))

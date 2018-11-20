@@ -1,0 +1,4 @@
+(executable
+ (name add)
+ (lint (pps correct_static_add))
+)

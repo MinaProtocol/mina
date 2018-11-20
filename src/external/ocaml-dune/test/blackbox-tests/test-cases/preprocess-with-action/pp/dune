@@ -1,0 +1,4 @@
+(executable
+ (name pp))
+
+(ocamllex pp)

@@ -7,24 +7,24 @@ open Sha256_lib
 open Import
 
 type ('pk, 'amount) t_ = {receiver: 'pk; amount: 'amount}
-[@@deriving bin_io, eq, sexp, hash]
+[@@deriving bin_io, eq, sexp, hash, yojson]
 
 type t = (Public_key.Compressed.t, Currency.Amount.t) t_
-[@@deriving bin_io, eq, sexp, hash]
+[@@deriving bin_io, eq, sexp, hash, yojson]
 
 val dummy : t
 
-val gen : t Quickcheck.Generator.t
+val gen : max_amount:Currency.Amount.t -> t Quickcheck.Generator.t
 
 module Stable : sig
   module V1 : sig
     type nonrec ('pk, 'amount) t_ = ('pk, 'amount) t_ =
       {receiver: 'pk; amount: 'amount}
-    [@@deriving bin_io, eq, sexp, hash]
+    [@@deriving bin_io, eq, sexp, hash, yojson]
 
     type t =
       (Public_key.Compressed.Stable.V1.t, Currency.Amount.Stable.V1.t) t_
-    [@@deriving bin_io, eq, sexp, hash]
+    [@@deriving bin_io, eq, sexp, hash, yojson]
   end
 end
 

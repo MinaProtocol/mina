@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 
 module Make (Inputs : Inputs.Base.S) :
   Transition_logic_state_intf.S
@@ -13,12 +13,30 @@ module Make (Inputs : Inputs.Base.S) :
   module Ops = Tip_ops.Make (Inputs)
   include Ops
 
-  module Transition_tree =
-    Ktree.Make (struct
-        type t = (External_transition.t, State_hash.t) With_hash.t
-        [@@deriving compare, bin_io, sexp]
-      end)
-      (Security)
+  module Transition = struct
+    type t = (External_transition.t, State_hash.t) With_hash.t
+    [@@deriving compare, bin_io, sexp]
+
+    open With_hash
+
+    let equal {hash= a; _} {hash= b; _} = State_hash.equal a b
+
+    let hash {hash; _} = String.hash (State_hash.to_bytes hash)
+
+    let hash_fold_t state {hash; _} =
+      String.hash_fold_t state (State_hash.to_bytes hash)
+
+    let id {hash; _} =
+      "\"" ^ Base64.encode_string (State_hash.to_bytes hash) ^ "\""
+
+    let to_string_record t =
+      Printf.sprintf "{%s|%s}"
+        (Base64.encode_string (State_hash.to_bytes t.hash))
+        (Protocol_state.to_string_record
+           (External_transition.protocol_state t.data))
+  end
+
+  module Transition_tree = Ktree.Make (Transition) (Security)
 
   module Change = struct
     type t =
@@ -94,10 +112,21 @@ module Make (Inputs : Inputs.Base.S) :
               assert_materialization_of t.locked_tip x ;
               assert_materialization_of t.longest_branch_tip last ) )
 
-  let apply_all t changes =
+  let apply_all t changes ~logger =
     assert_state_valid t ;
     let t' = List.fold changes ~init:t ~f:apply in
-    assert_state_valid t' ; t'
+    try assert_state_valid t' ; t' with exn ->
+      Logger.error logger
+        "fatal exception while applying changes to transition logic -- locked \
+         tip state hash: %s"
+        (Base64.encode_string (State_hash.to_bytes t'.locked_tip.hash)) ;
+      Option.iter t'.ktree ~f:(fun ktree ->
+          let filename, _ = Unix.mkstemp "lbc-graph" in
+          Out_channel.with_file filename ~f:(fun channel ->
+              Transition_tree.Graph.output_graph channel
+                (Transition_tree.to_graph ktree) ) ;
+          Logger.info logger "dot graph dumped to %s" filename ) ;
+      raise exn
 
   let create ?proposer_public_key ~consensus_local_state genesis_heavy =
     { locked_tip= genesis_heavy

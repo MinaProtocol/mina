@@ -1,0 +1,3 @@
+(jbuild_version 1)
+
+(rule (with-stdout-to foo (echo "foobar")))
