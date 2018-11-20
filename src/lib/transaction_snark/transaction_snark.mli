@@ -86,7 +86,8 @@ module Keys : sig
 
   val create : unit -> t
 
-  val cached : unit -> (Location.t * t * Checksum.t) Async.Deferred.t
+  val cached :
+    unit -> (Location.t * Verification.t * Checksum.t) Async.Deferred.t
 end
 
 module Verification : sig

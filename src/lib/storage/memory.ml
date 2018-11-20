@@ -8,7 +8,7 @@ include Checked_data
 
 module Controller = struct
   type nonrec 'a t =
-    {log: Logger.t; tc: 'a Bin_prot.Type_class.t; mem: 'a t Location.Table.t}
+    {log: Logger.t; tc: 'a Binable.m; mem: 'a t Location.Table.t}
 
   let create ~parent_log tc =
     { log= Logger.child parent_log "storage.with_checksum.memory"
@@ -16,21 +16,20 @@ module Controller = struct
     ; mem= Location.Table.create () }
 end
 
-let load_with_checksum (c : 'a Controller.t) location =
+let load_with_checksum (type a) (c : a Controller.t) location =
   Deferred.return
     ( match Location.Table.find c.mem location with
-    | Some t -> if valid c.tc t then Ok t else Error `Checksum_no_match
+    | Some t -> Ok t
     | None -> Error `No_exist )
 
 let load c location =
   Deferred.Result.map (load_with_checksum c location) ~f:(fun t -> t.data)
 
-let store (c : 'a Controller.t) location data =
+let store_with_checksum (type a) (c : a Controller.t) location (data : a) =
+  let checksum = md5 c.tc data in
   Deferred.return
-    (Location.Table.set c.mem ~key:location ~data:(wrap c.tc data))
+    ( Location.Table.set c.mem ~key:location ~data:{checksum; data} ;
+      checksum )
 
-let store_with_checksum (c : 'a Controller.t) location data =
-  let data = wrap c.tc data in
-  Deferred.return
-    ( Location.Table.set c.mem ~key:location ~data ;
-      data.checksum )
+let store (c : 'a Controller.t) location data : unit Deferred.t =
+  store_with_checksum c location data >>| ignore
