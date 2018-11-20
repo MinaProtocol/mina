@@ -778,6 +778,8 @@ module type Consensus_mechanism_intf = sig
     -> keypair:keypair
     -> logger:Logger.t
     -> [`Check_again of Int64.t | `Propose of Int64.t * Proposal_data.t]
+
+  val genesis_protocol_state : Protocol_state.value
 end
 
 module type Time_close_validator_intf = sig
