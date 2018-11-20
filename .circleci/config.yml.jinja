@@ -114,7 +114,7 @@ jobs:
               command: make check-render-circleci
           - run:
               name: Build OCaml
-              command: eval `opam config env` && DUNE_PROFILE=test make build 2>&1 | tee /tmp/buildocaml.log
+              command: eval `opam config env` && DUNE_PROFILE={{test.config}} make build 2>&1 | tee /tmp/buildocaml.log
             {% for action in test.actions %}
           - run:
               name: Running test - {{ test.friendly }} | {{ action }}
