@@ -21,6 +21,8 @@ module type S = sig
 
   module Path : Merkle_path.S with type hash := hash
 
+  val get_uuid : t -> Uuid.t
+
   val create : unit -> t
 
   val location_of_key : t -> key -> location option
