@@ -104,10 +104,13 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
       let x, _y = Curve.to_coords t.acc in
       x
 
-    let salt params s = update_fold (create params) (Fold.string_triples s)
+    let dup t = {t with acc= Curve.dup t.acc}
+
+    let salt params s =
+      update_fold (create params) (Fold.string_triples s) |> dup
   end
 
-  let hash_fold s fold = State.update_fold s fold
+  let hash_fold s fold = State.update_fold (State.dup s) fold
 
-  let digest_fold s fold = State.digest (hash_fold s fold)
+  let digest_fold s fold = State.digest (hash_fold (State.dup s) fold)
 end
