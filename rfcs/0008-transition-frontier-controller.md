@@ -192,7 +192,9 @@ something on the pipe.
 
 A worker is responsible for performing a history sync.
 
-In the future, we will support multiple catchup workers at once. See [unresolved questions](#unresolved-questions).
+In the future, we will support multiple catchup workers at once. This prevents
+a potential DoS attack where we're forced to catchup between two different forks
+and can never complete anything.
 
 New jobs handed to the same worker cause a retargeting action where we don't
 throw out existing data, but start again getting data from the source.
@@ -338,13 +340,11 @@ This is not expected to be resolved before landing this RFC.
 
 ### History catchup
 
-@es92 notes that there is some nuance to catching up to breadcrumbs for
-correctness reasons. The RFC as written does not specify this.
-
-This should probably be fleshed out before the RFC lands.
-
-In addition, we do not specify the mechanism by which efficient downloading
-should occur. This is a performance optimization and can be implemented later.
+We do not specify the mechanism by which efficient downloading should occur.
+This is a performance optimization and can be implemented later. We plan on
+postponing implementation of this component as long as possible. If everything
+is working properly, nodes in integration tests and test networks will not need
+this function unless they are late joiners.
 
 ### Miscellanea
 
