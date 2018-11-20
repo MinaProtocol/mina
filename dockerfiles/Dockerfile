@@ -1,4 +1,4 @@
-FROM codaprotocol/coda:toolchain-9aea9e820e487fabb79e3c8c27372a50fbf77289
+FROM codaprotocol/coda:toolchain-956136e7b621813f03881a1c2ab29b9ca24b539c
 
 ENV OPAM_DIR             "/home/opam/.opam/4.07"
 ENV PATH                 "${OPAM_DIR}/bin:$PATH"
@@ -25,7 +25,7 @@ RUN USER=opam && \
     sudo chown root:root /usr/local/bin/fixuid && \
     sudo chmod 4755 /usr/local/bin/fixuid && \
     sudo mkdir -p /etc/fixuid && \
-    sudo printf "user: $USER\ngroup: $GROUP\npaths: ['/home/opam','/nix']\n" | sudo tee /etc/fixuid/config.yml > /dev/null
+    sudo printf "user: $USER\ngroup: $GROUP\npaths: ['/home/opam']\n" | sudo tee /etc/fixuid/config.yml > /dev/null
 
 USER opam:opam
 ENTRYPOINT ["fixuid"]

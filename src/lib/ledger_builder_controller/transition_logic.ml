@@ -183,7 +183,9 @@ module Make (Inputs : Inputs_intf) :
         | Transition_logic_state.Change.Longest_branch_tip tip -> Some tip
         | _ -> None )
     in
-    let new_state = Transition_logic_state.apply_all old_state changes in
+    let new_state =
+      Transition_logic_state.apply_all old_state changes ~logger:t.log
+    in
     t.state <- new_state ;
     match new_longest_branch_tip with
     | None -> Deferred.unit
@@ -231,7 +233,7 @@ module Make (Inputs : Inputs_intf) :
 
     let run old_state ~on_success new_tree old_tree new_best_path logger
         _transition =
-      trace_task "path traversal" (fun () ->
+      trace_recurring_task "path traversal" (fun () ->
           let locked_tip = Transition_logic_state.locked_tip old_state
           and longest_branch_tip =
             Transition_logic_state.longest_branch_tip old_state
@@ -248,12 +250,18 @@ module Make (Inputs : Inputs_intf) :
               (Deferred.map (Ivar.read ivar) ~f:ignore)
           in
           let work =
+            let locked_tip = With_hash.map locked_tip ~f:Tip.copy in
+            let longest_branch_tip =
+              With_hash.map longest_branch_tip ~f:Tip.copy
+            in
             (* Adjust the locked_ledger if necessary *)
-            let%bind locked_tip =
+            let%bind locked_tip_changed, locked_tip =
               if transition_is_parent_of ~child:new_head ~parent:old_head then
-                let locked_tip = With_hash.map locked_tip ~f:Tip.copy in
-                transition_unchecked locked_tip.data new_head logger
-              else return locked_tip
+                let%map locked_tip =
+                  transition_unchecked locked_tip.data new_head logger
+                in
+                (true, locked_tip)
+              else return (false, locked_tip)
             in
             trace_event "done transition check" ;
             (* Now adjust the longest_branch_tip *)
@@ -262,10 +270,9 @@ module Make (Inputs : Inputs_intf) :
                 Path.findi new_best_path ~f:(fun _ x ->
                     is_materialization_of longest_branch_tip x )
               with
-              | None -> (With_hash.map locked_tip ~f:Tip.copy, new_best_path)
+              | None -> (With_hash.map ~f:Tip.copy locked_tip, new_best_path)
               | Some (i, _) ->
-                  ( With_hash.map longest_branch_tip ~f:Tip.copy
-                  , Path.drop new_best_path (i + 1) )
+                  (longest_branch_tip, Path.drop new_best_path (i + 1))
             in
             trace_event "step over path start" ;
             let last_transition = List.last_exn path.Path.path in
@@ -289,9 +296,12 @@ module Make (Inputs : Inputs_intf) :
             match result with
             | Some tip ->
                 assert_materialization_of tip last_transition ;
+                let locked_tip =
+                  if locked_tip_changed then Some locked_tip else None
+                in
                 let%map result =
                   Interruptible.uninterruptible
-                    (on_success ~longest_branch:tip ~ktree:new_tree
+                    (on_success ?locked_tip ~longest_branch:tip ~ktree:new_tree
                        ~transition:last_transition)
                 in
                 Some result
@@ -356,8 +366,11 @@ module Make (Inputs : Inputs_intf) :
               let job =
                 Path_traversal.create old_state ktree ktree path t.log
                   last_transition
-                  ~on_success:(fun ~longest_branch ~ktree:_ ~transition:_ ->
-                    Deferred.return longest_branch )
+                  ~on_success:(fun ?locked_tip:_
+                              ~longest_branch
+                              ~ktree:_
+                              ~transition:_
+                              -> Deferred.return longest_branch )
               in
               let w, _ = Job.run job in
               match%map w.d with
@@ -437,8 +450,8 @@ module Make (Inputs : Inputs_intf) :
         else
           match
             Consensus_mechanism.select
-              (Protocol_state.consensus_state source_state)
-              (Protocol_state.consensus_state target_state)
+              ~existing:(Protocol_state.consensus_state source_state)
+              ~candidate:(Protocol_state.consensus_state target_state)
               ~logger:t.log ~time_received
           with
           | `Keep -> return None
@@ -468,12 +481,14 @@ module Make (Inputs : Inputs_intf) :
               let best_tip = locked_and_best old_tree |> snd in
               match
                 Consensus_mechanism.select
-                  ( transition_with_hash |> With_hash.data
-                  |> External_transition.protocol_state
-                  |> Protocol_state.consensus_state )
-                  ( best_tip |> With_hash.data
-                  |> External_transition.protocol_state
-                  |> Protocol_state.consensus_state )
+                  ~existing:
+                    ( transition_with_hash |> With_hash.data
+                    |> External_transition.protocol_state
+                    |> Protocol_state.consensus_state )
+                  ~candidate:
+                    ( best_tip |> With_hash.data
+                    |> External_transition.protocol_state
+                    |> Protocol_state.consensus_state )
                   ~logger:t.log ~time_received
               with
               | `Keep ->
@@ -511,11 +526,21 @@ module Make (Inputs : Inputs_intf) :
                   (Some
                      ( Path_traversal.create old_state new_tree old_tree
                          new_best_path t.log transition_with_hash
-                         ~on_success:(fun ~longest_branch ~ktree ~transition ->
+                         ~on_success:(fun ?locked_tip
+                                     ~longest_branch
+                                     ~ktree
+                                     ~transition
+                                     ->
                            let changes =
                              [ Transition_logic_state.Change.Longest_branch_tip
                                  longest_branch
                              ; Transition_logic_state.Change.Ktree ktree ]
+                             @ Option.value ~default:[]
+                                 (Option.map
+                                    ~f:(fun t ->
+                                      [ Transition_logic_state.Change.Locked_tip
+                                          t ] )
+                                    locked_tip)
                            in
                            mutate_state t old_state changes
                              (With_hash.data transition) )
