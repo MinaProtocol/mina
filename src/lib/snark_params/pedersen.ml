@@ -91,7 +91,9 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
     let update_fold (t : t) (fold : bool Triple.t Fold.t) =
       let params = t.params in
       let acc, triples_consumed =
-        fold.fold ~init:(t.acc, t.triples_consumed) ~f:(fun (acc, i) triple ->
+        fold.fold
+          ~init:(Curve.dup t.acc, t.triples_consumed)
+          ~f:(fun (acc, i) triple ->
             let term =
               Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
                 triple
@@ -106,11 +108,10 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
 
     let dup t = {t with acc= Curve.dup t.acc}
 
-    let salt params s =
-      update_fold (create params) (Fold.string_triples s) |> dup
+    let salt params s = update_fold (create params) (Fold.string_triples s)
   end
 
-  let hash_fold s fold = State.update_fold (State.dup s) fold
+  let hash_fold s fold = State.update_fold s fold
 
-  let digest_fold s fold = State.digest (hash_fold (State.dup s) fold)
+  let digest_fold s fold = State.digest (hash_fold s fold)
 end
