@@ -86,7 +86,7 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
     type t = {triples_consumed: int; acc: Curve.t; params: Params.t}
 
     let create ?(triples_consumed = 0) ?(init = Curve.zero) params =
-      {acc= Curve.dup init; triples_consumed; params}
+      {acc= init; triples_consumed; params}
 
     let update_fold (t : t) (fold : bool Triple.t Fold.t) =
       let params = t.params in
@@ -105,8 +105,6 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
     let digest t =
       let x, _y = Curve.to_coords t.acc in
       x
-
-    let dup t = {t with acc= Curve.dup t.acc}
 
     let salt params s = update_fold (create params) (Fold.string_triples s)
   end
