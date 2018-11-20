@@ -6,3 +6,4 @@
 [%%define force_updates true]
 [%%define global_signer_real true]
 [%%define tracing false]
+[%%define consensus_mechanism "sigs"]
