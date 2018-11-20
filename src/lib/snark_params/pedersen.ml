@@ -60,6 +60,11 @@ end)
     val add : t -> t -> t
 
     val negate : t -> t
+
+    val dup : t -> t
+
+    val unsafe_add_in_place : dst:t -> t -> t
+
 end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
   module Digest = struct
     type t = Field.t [@@deriving sexp, bin_io, compare, hash, eq]
@@ -82,7 +87,7 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
     type t = {triples_consumed: int; acc: Curve.t; params: Params.t}
 
     let create ?(triples_consumed = 0) ?(init = Curve.zero) params =
-      {acc= init; triples_consumed; params}
+      {acc= Curve.dup init; triples_consumed; params}
 
     let update_fold (t : t) (fold : bool Triple.t Fold.t) =
       let params = t.params in
@@ -92,7 +97,7 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
               Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
                 triple
             in
-            (Curve.add acc term, i + 1) )
+            (Curve.unsafe_add_in_place ~dst:acc term, i + 1) )
       in
       {t with acc; triples_consumed}
 

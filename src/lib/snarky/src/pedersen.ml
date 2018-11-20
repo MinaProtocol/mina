@@ -17,6 +17,10 @@ module Make
 
         val negate : t -> t
 
+        val unsafe_add_in_place : dst:t -> t -> t
+
+        val dup : t -> t
+
         val add : t -> t -> t
 
         val zero : t

@@ -60,4 +60,8 @@ end)
     val add : t -> t -> t
 
     val negate : t -> t
+
+    val unsafe_add_in_place : dst:t -> t -> t
+
+    val dup : t -> t
 end) : S with type curve := Curve.t and type Digest.t = Field.t

@@ -59,6 +59,10 @@ struct
 
     val add : t -> t -> t
 
+    val unsafe_add_in_place : dst:t -> t -> t
+
+    val dup : t -> t
+
     val negate : t -> t
 
     val double : t -> t
@@ -148,6 +152,15 @@ struct
       fun x y ->
         let z = stub x y in
         schedule_delete z ; z
+
+    (* XXX: if add changes to not allocate, this is a problem *)
+    let dup x =
+      add zero x
+
+    let unsafe_add_in_place =
+      let stub = foreign (func_name "add_in_place") (typ @-> typ @-> returning void) in
+      fun ~dst y ->
+        stub dst y ; dst
 
     let scale =
       let stub =
