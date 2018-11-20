@@ -64,7 +64,6 @@ end)
     val dup : t -> t
 
     val unsafe_add_in_place : dst:t -> t -> t
-
 end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
   module Digest = struct
     type t = Field.t [@@deriving sexp, bin_io, compare, hash, eq]
