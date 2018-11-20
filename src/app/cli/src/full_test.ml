@@ -20,7 +20,7 @@ let with_snark = false
 
 [%%endif]
 
-let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
+let run_test () : unit Deferred.t =
   Parallel.init_master () ;
   let log = Logger.create () in
   let%bind temp_conf_dir =
@@ -297,8 +297,8 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
     in
     test_duplicate_payments sender_keypair receiver_keypair
 
-let command (module Kernel : Kernel_intf) =
+let command =
   let open Core in
   let open Async in
   Command.async ~summary:"Full coda end-to-end test"
-    (Command.Param.return (fun () -> run_test (module Kernel)))
+    (Command.Param.return run_test)
