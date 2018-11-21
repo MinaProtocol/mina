@@ -2212,7 +2212,7 @@ let%test_module "test" =
         Lb.create_diff lb ~self:self_pk ~logger ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work
       in
-      let%map (_, `Ledger_proof ledger_proof) =
+      let%map _, `Ledger_proof ledger_proof =
         Lb.apply lb (Test_input1.Ledger_builder_diff.forget diff) ~logger
       in
       (ledger_proof, Test_input1.Ledger_builder_diff.forget diff)
@@ -2262,11 +2262,12 @@ let%test_module "test" =
               in
               let%map proof, diff =
                 create_and_apply lb logger (Sequence.of_list all_ts)
-                  stmt_to_work |> Deferred.Or_error.ok_exn
+                  stmt_to_work
+                |> Deferred.Or_error.ok_exn
               in
               let fee_excess =
-                Option.value_map ~default:Currency.Fee.Signed.zero
-                  proof ~f:(fun proof ->
+                Option.value_map ~default:Currency.Fee.Signed.zero proof
+                  ~f:(fun proof ->
                     let stmt = Test_input1.Ledger_proof.statement proof in
                     stmt.fee_excess )
               in
@@ -2300,11 +2301,12 @@ let%test_module "test" =
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let ts = List.take all_ts i in
               let%map proof, diff =
-                create_and_apply lb logger (Sequence.of_list ts) stmt_to_work |> Deferred.Or_error.ok_exn
+                create_and_apply lb logger (Sequence.of_list ts) stmt_to_work
+                |> Deferred.Or_error.ok_exn
               in
               let fee_excess =
-                Option.value_map ~default:Currency.Fee.Signed.zero
-                  proof ~f:(fun proof ->
+                Option.value_map ~default:Currency.Fee.Signed.zero proof
+                  ~f:(fun proof ->
                     let stmt = Test_input1.Ledger_proof.statement proof in
                     stmt.fee_excess )
               in
@@ -2345,11 +2347,12 @@ let%test_module "test" =
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let ts = List.take all_ts i in
               let%map proof, diff =
-                create_and_apply lb logger (Sequence.of_list ts) get_work |> Deferred.Or_error.ok_exn
+                create_and_apply lb logger (Sequence.of_list ts) get_work
+                |> Deferred.Or_error.ok_exn
               in
               let fee_excess =
-                Option.value_map ~default:Currency.Fee.Signed.zero
-                  proof ~f:(fun proof ->
+                Option.value_map ~default:Currency.Fee.Signed.zero proof
+                  ~f:(fun proof ->
                     let stmt = Test_input1.Ledger_proof.statement proof in
                     stmt.fee_excess )
               in
@@ -2388,7 +2391,8 @@ let%test_module "test" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           Deferred.List.fold ~init:() txns ~f:(fun _ ts ->
               let%map _ =
-                create_and_apply lb logger (Sequence.of_list ts) get_work |> Deferred.Or_error.ok_exn
+                create_and_apply lb logger (Sequence.of_list ts) get_work
+                |> Deferred.Or_error.ok_exn
               in
               () ) )
 
@@ -2407,7 +2411,8 @@ let%test_module "test" =
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let ts = List.take all_ts i in
               let%map proof, _ =
-                create_and_apply lb logger (Sequence.of_list ts) stmt_to_work |> Deferred.Or_error.ok_exn
+                create_and_apply lb logger (Sequence.of_list ts) stmt_to_work
+                |> Deferred.Or_error.ok_exn
               in
               let last_snarked_ledger, snarked_ledger_hash =
                 Option.value_map

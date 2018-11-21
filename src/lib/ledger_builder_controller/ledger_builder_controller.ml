@@ -45,10 +45,10 @@ end = struct
     module Step = struct
       let apply' t diff logger =
         let open Deferred.Or_error.Let_syntax in
-        let%map (_, `Ledger_proof proof) = Ledger_builder.apply t diff ~logger in
-        (Option.map proof ~f:(fun proof ->
-             ( Ledger_proof.statement proof |> Ledger_proof_statement.target
-             , proof ) ))
+        let%map _, `Ledger_proof proof = Ledger_builder.apply t diff ~logger in
+        Option.map proof ~f:(fun proof ->
+            ( Ledger_proof.statement proof |> Ledger_proof_statement.target
+            , proof ) )
 
       let step logger {With_hash.data= tip; hash= tip_hash}
           {With_hash.data= transition; hash= transition_target_hash} =
@@ -417,6 +417,7 @@ let%test_module "test" =
         (* A ledger_builder transition will just add to a "ledger" integer *)
         module Ledger_builder_diff = struct
           type t = int [@@deriving bin_io, sexp]
+
           module With_valid_signatures_and_proofs = struct
             type t = int
           end

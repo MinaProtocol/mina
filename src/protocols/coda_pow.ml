@@ -517,10 +517,19 @@ module type Ledger_builder_base_intf = sig
   val aux : t -> Aux.t
 
   val apply :
-    t -> diff -> logger:Logger.t -> ([`Hash_after_applying of ledger_builder_hash] * [`Ledger_proof of ledger_proof option]) Deferred.Or_error.t
+       t
+    -> diff
+    -> logger:Logger.t
+    -> ( [`Hash_after_applying of ledger_builder_hash]
+       * [`Ledger_proof of ledger_proof option] )
+       Deferred.Or_error.t
 
   val apply_diff_unchecked :
-    t -> valid_diff -> ( [`Hash_after_applying of ledger_builder_hash] * [`Ledger_proof of ledger_proof option] ) Deferred.t
+       t
+    -> valid_diff
+    -> ( [`Hash_after_applying of ledger_builder_hash]
+       * [`Ledger_proof of ledger_proof option] )
+       Deferred.t
 
   val snarked_ledger :
     t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t
