@@ -277,28 +277,6 @@ end)
       | [] -> [] )
     |> ignore
 
-  module C : Container.S0 with type t := t and type elt := Account.t =
-  Container.Make0 (struct
-    module Elt = Account
-
-    type nonrec t = t
-
-    let fold t ~init ~f =
-      match Account_location.last_location_address t with
-      | None -> init
-      | Some last_addr ->
-          let last = Addr.to_int last_addr in
-          Sequence.range ~stop:`inclusive 0 last
-          |> Sequence.map ~f:(get_at_index_exn t)
-          |> Sequence.fold ~init ~f
-
-    let iter = `Define_using_fold
-  end)
-
-  let to_list = C.to_list
-
-  let fold_until = C.fold_until
-
   (* TODO : if key-value store supports iteration mechanism, like RocksDB,
      maybe use that here, instead of loading all accounts into memory
   *)
@@ -311,6 +289,23 @@ end)
         Sequence.range ~stop:`inclusive 0 last
         |> Sequence.map ~f:(get_at_index_exn t)
         |> Sequence.foldi ~init ~f:f'
+
+  module C : Container.S0 with type t := t and type elt := Account.t =
+  Container.Make0 (struct
+    module Elt = Account
+
+    type nonrec t = t
+
+    let fold t ~init ~f =
+      let f' _index accum account = f accum account in
+      foldi t ~init ~f:f'
+
+    let iter = `Define_using_fold
+  end)
+
+  let to_list = C.to_list
+
+  let fold_until = C.fold_until
 
   let merkle_root mdb = get_hash mdb Location.root_hash
 
