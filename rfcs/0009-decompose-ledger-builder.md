@@ -15,17 +15,17 @@ The ledger builder has been suffering from scope creep for some time now. As we 
 
 ![](../docs/res/ledger_builder_data_structures.png)
 
-### `Merkle_tree`
+### `Merkle_ledger`
 
-A `Merkle_tree.t` is a value and a first class module implementing a `Merkle_tree_intf`, which is a common subset of all ledgers. Having a first class module representation of a ledger allows us to build code which can be generic over an interface without functoring over it.
+A `Merkle_ledger.t` is a value and a first class module implementing a `Merkle_ledger_intf`, which is a common subset of all ledgers. Having a first class module representation of a ledger allows us to build code which can be generic over an interface without functoring over it.
 
-### `Merkle_tree_diff`
+### `Merkle_ledger_diff`
 
-A `Merkle_tree_diff.t` is a compressed difference from a base merkle tree to a target merkle tree. It can be applied to a base merkle tree to make it a target merkle tree. More formally, a `Merkle_tree_diff.t` is a base merkle root, a target merkle root, and a set of accounts. The set of accounts represents all of the accounts that have changed between the base and the target. A `Merkle_tree_diff.t` can be applied to a merkle tree by iterating through the set of accounts and writing them to the merkle tree. After applying to a merkle tree, the root of the merkle tree should be equal to the target merkle root iff the root before applying was equal to the base merkle root.
+A `Merkle_ledger_diff.t` is a compressed difference from a base ledger to a target ledger. It can be applied to a base ledger to make it a target ledger. More formally, a `Merkle_ledger_diff.t` is a base ledger, a target ledger, and a set of accounts. The set of accounts represents all of the accounts that have changed between the base and the target. A `Merkle_ledger_diff.t` can be applied to a ledger by iterating through the set of accounts and writing them to the ledger. After applying to a ledger, the root of the ledger should be equal to the target merkle root iff the root before applying was equal to the base merkle root.
 
 ### `Parallel_scan_state`
 
-A `Parallel_scan_state.t` is a generic data structure representing the state of a parallel scan operation. This state is represented as a binary tree of nodes and a binary operation (`node -> node -> node`) that reduces nodes. The state keeps track of multiple parallel sets of nodes that are being reduced at once, all fitted into a single tree. Interaction with the `Parallel_scan_state` is separated into steps in which both completed binary operations (or "work") are applied and new nodes are added to the leaves of the tree. When a set of nodes is reduced to the top, the `Parallel_scan_state` will emit the final value. The number of new nodes that can be added each step is limited by the amount of work that was submitted during that step.
+A `Parallel_scan_state.t` is a generic data structure representing the state of a parallel scan operation. This state represents as a binary tree of nodes and a binary operation (`node -> node -> node`) that reduces nodes. The state keeps track of multiple parallel sets of nodes that are being reduced at once, all fitted into a single tree. Interaction with the `Parallel_scan_state` is separated into steps in which both completed binary operations (or "work") are applied and new nodes are added to the leaves of the tree. When a set of nodes is reduced to the top, the `Parallel_scan_state` will emit the final value. The number of new nodes that can be added each step is limited by the amount of work that was submitted during that step.
 
 ### `Parallel_scan_state_diff`
 
@@ -33,7 +33,7 @@ A `Parallel_scan_state_diff.t` is a formalization around the difference between 
 
 ### `Transaction_snark_work`
 
-A `Transaction_snark_work.t` represents the work completed by a snark worker that contributes towards the generation of a single transaction snark proof. This can either be an initial proof of the application of a transaction to a merkle tree, or it can be a recursive composition of these application proofs.
+A `Transaction_snark_work.t` represents the work completed by a snark worker that contributes towards the generation of a single transaction snark proof. This can either be an initial proof of the application of a transaction to a ledger, or it can be a recursive composition of these application proofs.
 
 ### `Transaction_snark_scan_state`
 
@@ -41,11 +41,11 @@ A `Transaction_snark_scan_state.t` is an instantiation of the `Parallel_scan_sta
 
 ### `Staged_ledger`
 
-A `Staged_ledger.t` is a combination of a `Merkle_tree.t` and a `Transaction_snark_scan_state.t` which represents a state with staged transactions. The underlying `Merkle_tree.t` is a representation of a ledger in which all of the transactions in `Transaction_snark_scan_state.t` are applied, even though they have not been fully verified yet. The `Staged_ledger` allows for high level applications of transitions, emitting changes to be applied back to a fully verified ledger as they are available.
+A `Staged_ledger.t` is a combination of a `Merkle_ledger.t` and a `Transaction_snark_scan_state.t` which represents a state with staged transactions. The underlying `Merkle_ledger.t` is a representation of a ledger in which all of the transactions in `Transaction_snark_scan_state.t` are applied, even though they have not been fully verified yet. The `Staged_ledger` allows for high level applications of transitions, emitting changes to be applied back to a fully verified ledger as they are available.
 
 ### `Staged_ledger_diff`
 
-A `Staged_ledger_diff.t` is a combination of a `Merkle_tree_diff.t` and a `Transaction_snark_scan_state.Diff.t` (which is an instantiations of `Parallel_scan_state_diff.t`). It provides the difference between two staged ledgers and can be applied to a `Staged_ledger.t` to transition it.
+A `Staged_ledger_diff.t` is a combination of a `Merkle_ledger_diff.t` and a `Transaction_snark_scan_state.Diff.t` (which is an instantiations of `Parallel_scan_state_diff.t`). It provides the difference between two staged ledgers and can be applied to a `Staged_ledger.t` to transition it.
 
 ## Rationale
 [rationale]: #rationale
@@ -57,4 +57,4 @@ A `Staged_ledger_diff.t` is a combination of a `Merkle_tree_diff.t` and a `Trans
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-A `Staged_ledger_diff` could be more compact than it is. There is some duplication in information between the `Merkle_tree_diff` and the `Parallel_scan_state_diff`. Specifically, the `Merkle_tree_diff` can be constructed from the transactions in the `Parallel_scan_state_diff` along with a base `Merkle_tree`. The `Merkle_tree_diff` is a more effecient and compact format for application to a `Merkle_tree` however. Still, perhaps there is a better way to do this.
+A `Staged_ledger_diff` could be more compact than it is. There is some duplication in information between the `Merkle_ledger_diff` and the `Parallel_scan_state_diff`. Specifically, the `Merkle_ledger_diff` can be constructed from the transactions in the `Parallel_scan_state_diff` along with a base `Merkle_ledger`. The `Merkle_ledger_diff` is a more effecient and compact format for application to a `Merkle_ledger` however. Still, perhaps there is a better way to do this.
