@@ -10,9 +10,10 @@ module Make
     (Location : Merkle_ledger.Location_intf.S)
     (Base : Base_merkle_tree_intf.S
             with module Addr = Location.Addr
+            with module Location = Location
             with type key := Key.t
              and type hash := Hash.t
-             and type location := Location.t
+             and type root_hash := Hash.t
              and type account := Account.t) =
 struct
   type account = Account.t
@@ -23,6 +24,7 @@ struct
 
   type location = Location.t
 
+  module Location = Location
   module Addr = Location.Addr
 
   type t =
@@ -53,9 +55,14 @@ struct
       ; mutable current_location: Location.t option }
 
     module Path = Base.Path
-    module Db_error = Base.Db_error
     module Addr = Location.Addr
-    module For_tests = Base.For_tests
+    module Location = Location
+
+    type index = int
+
+    type path = Path.t
+
+    type root_hash = Hash.t
 
     let create () =
       failwith
@@ -144,8 +151,8 @@ struct
       let parent_merkle_path = Base.merkle_path (get_parent t) location in
       fixup_merkle_path t parent_merkle_path address
 
-    (* given a Merkle path corresponding to a starting address, calculate addresses and hash 
-       for each node affected by the starting hash; that is, along the path from the 
+    (* given a Merkle path corresponding to a starting address, calculate addresses and hash
+       for each node affected by the starting hash; that is, along the path from the
        account address to root
      *)
     let addresses_and_hashes_from_merkle_path_exn merkle_path starting_address
@@ -189,7 +196,7 @@ struct
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
           set_hash t addr hash )
 
-    (* a write writes only to the mask, parent is not involved 
+    (* a write writes only to the mask, parent is not involved
      need to update both account and hash pieces of the mask
        *)
     let set t location account =
@@ -373,7 +380,9 @@ struct
             | Some loc -> Location.next loc
           in
           if not (Option.is_some maybe_location) then
-            Error Db_error.Out_of_leaves
+            Error
+              (Error.create "get_or_create_account: Out of leaves" ()
+                 Unit.sexp_of_t)
           else
             let location = Option.value_exn maybe_location in
             set t location account ;
@@ -383,7 +392,7 @@ struct
 
     let get_or_create_account_exn t key account =
       get_or_create_account t key account
-      |> Result.map_error ~f:(fun err -> Db_error.Db_exception err)
+      |> Result.map_error ~f:(fun err -> raise (Error.to_exn err))
       |> Result.ok_exn
 
     let sexp_of_location = Location.sexp_of_t
@@ -391,6 +400,20 @@ struct
     let location_of_sexp = Location.t_of_sexp
 
     let depth = Base.depth
+
+    (* unimplemented functions required by Base_merkle_tree_intf.S *)
+
+    let recompute_tree _t = failwith "recompute_tree: Not implemented"
+
+    let key_of_index_exn _t = failwith "key_of_index_exn: Not implemented"
+
+    let key_of_index _t = failwith "key_of_index: Not implemented"
+
+    let set_at_addr_exn _t = failwith "set_at_addr_exn: Not implemented"
+
+    let foldi _t = failwith "foldi: Not implemented"
+
+    let fold_until _t = failwith "fold_until: Not implemented"
   end
 
   let set_parent t parent =

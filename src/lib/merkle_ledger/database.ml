@@ -12,11 +12,12 @@ end)
 (Kvdb : Intf.Key_value_database)
 (Storage_locations : Intf.Storage_locations) :
   Database_intf.S
-  with module Addr = Location.Addr
-  with type account := Account.t
+  with module Location = Location
+   and module Addr = Location.Addr
+   and type account := Account.t
+   and type root_hash := Hash.t
    and type hash := Hash.t
-   and type key := Key.t
-   and type location := Location.t = struct
+   and type key := Key.t = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   include Depth
 
@@ -31,10 +32,15 @@ end)
 
   module Path = Merkle_path.Make (Hash)
   module Addr = Location.Addr
+  module Location = Location
 
   type location = Location.t [@@deriving sexp]
 
-  type t = {uuid: Uuid.t; kvdb: Kvdb.t}
+  type index = int
+
+  type path = Path.t
+
+  type t = {uuid: Uuid.Stable.V1.t; kvdb: Kvdb.t sexp_opaque} [@@deriving sexp]
 
   let get_uuid t = t.uuid
 
@@ -231,17 +237,20 @@ end)
 
   let get_or_create_account mdb key account =
     match Account_location.get mdb key with
-    | Error Account_location_not_found ->
-        Account_location.allocate mdb key
-        |> Result.map ~f:(fun location ->
-               set mdb location account ;
-               (`Added, location) )
-    | Error err -> Error err
+    | Error Account_location_not_found -> (
+      match Account_location.allocate mdb key with
+      | Ok location ->
+          set mdb location account ;
+          Ok (`Added, location)
+      | Error err ->
+          Error (Error.create "get_or_create_account" err Db_error.sexp_of_t) )
+    | Error err ->
+        Error (Error.create "get_or_create_account" err Db_error.sexp_of_t)
     | Ok location -> Ok (`Existed, location)
 
   let get_or_create_account_exn mdb key account =
     get_or_create_account mdb key account
-    |> Result.map_error ~f:(fun err -> Db_error.Db_exception err)
+    |> Result.map_error ~f:(fun err -> raise (Error.to_exn err))
     |> Result.ok_exn
 
   let num_accounts t =
@@ -338,4 +347,20 @@ end)
   let merkle_path_at_index_exn t index =
     let addr = Addr.of_int_exn index in
     merkle_path_at_addr_exn t addr
+
+  (* functions required by Base_ledger_intf, not implemented *)
+
+  let not_implemented s = failwith (s ^ ": not implemented")
+
+  let foldi _t ~init:_ ~f:_ = not_implemented "foldi"
+
+  let fold_until _t ~init:_ ~f:_ ~finish:_ = not_implemented "fold_until"
+
+  let recompute_tree _t = not_implemented "recompute_tree"
+
+  let key_of_index _t _index = not_implemented "key_of_index"
+
+  let key_of_index_exn _t _index = not_implemented "key_of_index_exn"
+
+  let set_at_addr_exn _t _addr _account = not_implemented "set_at_addr_exn"
 end

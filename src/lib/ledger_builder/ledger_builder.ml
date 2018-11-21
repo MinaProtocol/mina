@@ -1908,6 +1908,8 @@ let%test_module "test" =
 
         type transaction = Transaction.t [@@deriving sexp, bin_io]
 
+        type account = int
+
         module Undo = struct
           type t = transaction [@@deriving sexp, bin_io]
 
@@ -1919,6 +1921,8 @@ let%test_module "test" =
         let copy : t -> t = fun t -> ref !t
 
         let merkle_root : t -> ledger_hash = fun t -> Int.to_string !t
+
+        let to_list t = [!t]
 
         let num_accounts _ = 0
 

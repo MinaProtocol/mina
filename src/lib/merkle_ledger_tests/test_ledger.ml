@@ -19,6 +19,8 @@ let%test_module "test functor on in memory databases" =
 
       type hash = Hash.t
 
+      type root_hash = Hash.t
+
       let load_ledger_with_keys keys balance =
         let ledger = create () in
         List.iter keys ~f:(fun public_key ->
@@ -53,7 +55,7 @@ let%test_module "test functor on in memory databases" =
       L16.num_accounts ledger = n
 
     let get (type t key account)
-        (module L : Merkle_ledger.Ledger_intf.S
+        (module L : Merkle_ledger.Merkle_ledger_intf.S
           with type t = t and type key = key and type account = account) ledger
         public_key =
       let open Option.Let_syntax in
@@ -164,7 +166,7 @@ let%test_module "test functor on in memory databases" =
       Path.check_path path (Hash.hash_account account) root
 
     let merkle_path (type t key hash)
-        (module L : Merkle_ledger.Ledger_intf.S
+        (module L : Merkle_ledger.Merkle_ledger_intf.S
           with type t = t and type key = key and type hash = hash) ledger
         public_key =
       L.location_of_key ledger public_key
