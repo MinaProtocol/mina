@@ -23,6 +23,8 @@ A `Merkle_ledger.t` is a value and a first class module implementing a `Merkle_l
 
 A `Merkle_ledger_diff.t` is a compressed difference from a base ledger to a target ledger. It can be applied to a base ledger to make it a target ledger. More formally, a `Merkle_ledger_diff.t` is a base ledger, a target ledger, and a set of updated accounts, and a set of new accounts. The set of updated accounts represents all of the accounts that have changed between the base and the target, while the set of new accounts contains new accounts to add along with the locations in the tree to add them to. A `Merkle_ledger_diff.t` can be applied to a ledger by iterating through each set of accounts and writing them to the ledger. After applying to a ledger, the root of the ledger should be equal to the target merkle root iff the root before applying was equal to the base merkle root.
 
+The long term goal for this data structure is that it will be the serialization target of `Merkle_mask`.
+
 ### `Parallel_scan_state`
 
 A `Parallel_scan_state.t` is a generic data structure representing the state of a parallel scan operation. This state represents as a binary tree of nodes and a binary operation (`node -> node -> node`) that reduces nodes. The state keeps track of multiple parallel sets of nodes that are being reduced at once, all fitted into a single tree. Interaction with the `Parallel_scan_state` is separated into steps in which both completed binary operations (or "work") are applied and new nodes are added to the leaves of the tree. When a set of nodes is reduced to the top, the `Parallel_scan_state` will emit the final value. The number of new nodes that can be added each step is limited by the amount of work that was submitted during that step.
