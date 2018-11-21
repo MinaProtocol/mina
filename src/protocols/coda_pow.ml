@@ -136,6 +136,8 @@ module type Ledger_intf = sig
 
   type transaction
 
+  type account
+
   module Undo : sig
     type t [@@deriving sexp, bin_io]
 
@@ -153,6 +155,8 @@ module type Ledger_intf = sig
   val num_accounts : t -> int
 
   val merkle_root : t -> ledger_hash
+
+  val to_list : t -> account list
 
   val apply_transaction : t -> transaction -> Undo.t Or_error.t
 

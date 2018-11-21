@@ -10,7 +10,7 @@ module type Inputs_intf = sig
   module Syncable_ledger :
     Syncable_ledger.S
     with type addr := Merkle_address.t
-     and type hash := Merkle_hash.t
+     and type hash := Ledger_hash.t
 
   module Transition_frontier : Transition_frontier_intf
 
@@ -27,7 +27,7 @@ module type Inputs_intf = sig
   module Sync_handler :
     Sync_handler_intf
     with type addr := Merkle_address.t
-     and type hash := Merkle_hash.t
+     and type hash := Ledger_hash.t
      and type syncable_ledger := Syncable_ledger.t
      and type syncable_ledger_query := Syncable_ledger.query
      and type syncable_ledger_answer := Syncable_ledger.answer
