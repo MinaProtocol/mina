@@ -21,7 +21,7 @@ A `Merkle_ledger.t` is a value and a first class module implementing a `Merkle_l
 
 ### `Merkle_ledger_diff`
 
-A `Merkle_ledger_diff.t` is a compressed difference from a base ledger to a target ledger. It can be applied to a base ledger to make it a target ledger. More formally, a `Merkle_ledger_diff.t` is a base ledger, a target ledger, and a set of accounts. The set of accounts represents all of the accounts that have changed between the base and the target. A `Merkle_ledger_diff.t` can be applied to a ledger by iterating through the set of accounts and writing them to the ledger. After applying to a ledger, the root of the ledger should be equal to the target merkle root iff the root before applying was equal to the base merkle root.
+A `Merkle_ledger_diff.t` is a compressed difference from a base ledger to a target ledger. It can be applied to a base ledger to make it a target ledger. More formally, a `Merkle_ledger_diff.t` is a base ledger, a target ledger, and a set of updated accounts, and a set of new accounts. The set of updated accounts represents all of the accounts that have changed between the base and the target, while the set of new accounts contains new accounts to add along with the locations in the tree to add them to. A `Merkle_ledger_diff.t` can be applied to a ledger by iterating through each set of accounts and writing them to the ledger. After applying to a ledger, the root of the ledger should be equal to the target merkle root iff the root before applying was equal to the base merkle root.
 
 ### `Parallel_scan_state`
 
