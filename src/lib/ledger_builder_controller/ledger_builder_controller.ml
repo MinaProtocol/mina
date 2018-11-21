@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Pipe_lib
 open O1trace
 
 module Make (Inputs : Inputs.S) : sig

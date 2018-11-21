@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Pipe_lib
 include Coda_transition_frontier
 
 module type Security_intf = sig
