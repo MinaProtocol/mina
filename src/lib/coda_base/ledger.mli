@@ -4,9 +4,11 @@ open Import
 include
   Merkle_ledger.Merkle_ledger_intf.S
   with type root_hash := Ledger_hash.t
-   and type hash := Merkle_hash.t
+   and type hash := Ledger_hash.t
    and type account := Account.t
    and type key := Public_key.Compressed.t
+
+type account = Account.t
 
 module Undo : sig
   module User_command : sig

@@ -10,6 +10,7 @@ let%test_module "test functor on in memory databases" =
       Merkle_ledger.Database_intf.S
       with type key := Key.t
        and type account := Account.t
+       and type root_hash := Hash.t
        and type hash := Hash.t
 
     module type Test_intf = sig
@@ -19,7 +20,7 @@ let%test_module "test functor on in memory databases" =
 
       module Addr : Merkle_address.S
 
-      module MT : DB with type location := Location.t
+      module MT : DB
 
       val with_instance : (MT.t -> 'a) -> 'a
     end
@@ -55,7 +56,7 @@ let%test_module "test functor on in memory databases" =
               MT.location_of_key mdb (Account.public_key account)
               |> Option.value_exn
             in
-            Test.Location.equal location location'
+            MT.Location.equal location location'
             &&
             match (MT.get mdb location, MT.get mdb location') with
             | Some acct, Some acct' -> Account.equal acct acct'
@@ -328,7 +329,7 @@ let%test_module "test functor on in memory databases" =
       module Location = Merkle_ledger.Location.Make (Depth)
       module Addr = Location.Addr
 
-      module MT : DB with type location := Location.t =
+      module MT : DB =
         Database.Make (Key) (Account) (Hash) (Depth) (Location)
           (In_memory_kvdb)
           (Storage_locations)
