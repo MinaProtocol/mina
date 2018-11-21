@@ -283,7 +283,6 @@ end)
 
     type nonrec t = t
 
-    (* TODO: This implementation does not consider empty indices from stack db. *)
     let fold t ~init ~f =
       match Account_location.last_location_address t with
       | None -> init
@@ -297,6 +296,21 @@ end)
   end)
 
   let to_list = C.to_list
+
+  let fold_until = C.fold_until
+
+  (* TODO : if key-value store supports iteration mechanism, like RocksDB,
+     maybe use that here, instead of loading all accounts into memory
+  *)
+  let foldi t ~init ~f =
+    let f' index accum account = f (Addr.of_int_exn index) accum account in
+    match Account_location.last_location_address t with
+    | None -> init
+    | Some last_addr ->
+        let last = Addr.to_int last_addr in
+        Sequence.range ~stop:`inclusive 0 last
+        |> Sequence.map ~f:(get_at_index_exn t)
+        |> Sequence.foldi ~init ~f:f'
 
   let merkle_root mdb = get_hash mdb Location.root_hash
 
@@ -347,20 +361,4 @@ end)
   let merkle_path_at_index_exn t index =
     let addr = Addr.of_int_exn index in
     merkle_path_at_addr_exn t addr
-
-  (* functions required by Base_ledger_intf, not implemented *)
-
-  let not_implemented s = failwith (s ^ ": not implemented")
-
-  let foldi _t ~init:_ ~f:_ = not_implemented "foldi"
-
-  let fold_until _t ~init:_ ~f:_ ~finish:_ = not_implemented "fold_until"
-
-  let recompute_tree _t = not_implemented "recompute_tree"
-
-  let key_of_index _t _index = not_implemented "key_of_index"
-
-  let key_of_index_exn _t _index = not_implemented "key_of_index_exn"
-
-  let set_at_addr_exn _t _addr _account = not_implemented "set_at_addr_exn"
 end

@@ -16,7 +16,7 @@ module Make
         val depth : int
     end) : sig
   include
-    Merkle_ledger_intf.S
+    Ledger_extras_intf.S
     with type hash := Hash.t
      and type root_hash := Hash.t
      and type account := Account.t

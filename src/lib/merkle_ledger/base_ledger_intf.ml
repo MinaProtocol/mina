@@ -33,15 +33,15 @@ module type S = sig
 
   val to_list : t -> account list
 
+  val foldi :
+    t -> init:'accum -> f:(Addr.t -> 'accum -> account -> 'accum) -> 'accum
+
   val fold_until :
        t
     -> init:'accum
     -> f:('accum -> account -> ('accum, 'stop) Base.Continue_or_stop.t)
     -> finish:('accum -> 'stop)
     -> 'stop
-
-  val foldi :
-    t -> init:'accum -> f:(Addr.t -> 'accum -> account -> 'accum) -> 'accum
 
   val location_of_key : t -> key -> Location.t option
 
@@ -67,13 +67,7 @@ module type S = sig
 
   val set_at_index_exn : t -> int -> account -> unit
 
-  val set_at_addr_exn : t -> Addr.t -> account -> unit
-
   val index_of_key_exn : t -> key -> int
-
-  val key_of_index : t -> index -> key option
-
-  val key_of_index_exn : t -> index -> key
 
   val merkle_root : t -> root_hash
 
@@ -84,6 +78,4 @@ module type S = sig
   val remove_accounts_exn : t -> key list -> unit
 
   val copy : t -> t
-
-  val recompute_tree : t -> unit
 end
