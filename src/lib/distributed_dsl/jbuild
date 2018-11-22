@@ -6,7 +6,7 @@
   (flags (:standard -short-paths -warn-error -33-34-32-27-9-58))
   (library_flags (-linkall))
   (inline_tests)
-  (libraries (logger core linear_pipe async async_extra extlib))
+  (libraries (logger core pipe_lib async async_extra extlib))
   (preprocess (pps (ppx_jane ppx_deriving.eq ppx_deriving.enum)))
   (synopsis "Distributed DSL")))
 
