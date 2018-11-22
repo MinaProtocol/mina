@@ -357,6 +357,25 @@ struct
       let parent_accounts = Base.to_list (get_parent t) in
       mask_accounts @ parent_accounts
 
+    let foldi t ~init ~f =
+      let parent_result = Base.foldi (get_parent t) ~init ~f in
+      let locations_and_accounts = Location.Table.to_alist t.account_tbl in
+      let f' accum (location, account) =
+        let address = Location.to_path_exn location in
+        f address accum account
+      in
+      List.fold locations_and_accounts ~init:parent_result ~f:f'
+
+    (* we would want fold_until to combine results from the parent and the mask
+       way (1): use the parent result as the init of the mask fold (or vice-versa)
+         the parent result may be of different type than the mask fold init, so
+         we get a less general type than the signature indicates, so compilation fails
+       way (2): make the folds independent, but there's not a specified way to combine
+         the results
+    *)
+    let fold_until _t ~init:_ ~f:_ ~finish:_ =
+      failwith "fold_until: not implemented"
+
     module For_testing = struct
       let location_in_mask t location =
         Option.is_some (find_account t location)
@@ -400,20 +419,6 @@ struct
     let location_of_sexp = Location.t_of_sexp
 
     let depth = Base.depth
-
-    (* unimplemented functions required by Base_merkle_tree_intf.S *)
-
-    let recompute_tree _t = failwith "recompute_tree: Not implemented"
-
-    let key_of_index_exn _t = failwith "key_of_index_exn: Not implemented"
-
-    let key_of_index _t = failwith "key_of_index: Not implemented"
-
-    let set_at_addr_exn _t = failwith "set_at_addr_exn: Not implemented"
-
-    let foldi _t = failwith "foldi: Not implemented"
-
-    let fold_until _t = failwith "fold_until: Not implemented"
   end
 
   let set_parent t parent =
