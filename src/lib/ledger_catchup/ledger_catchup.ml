@@ -14,7 +14,7 @@ module Make (Inputs : Inputs_intf) :
   with type external_transition :=
               Inputs.Consensus_mechanism.External_transition.t
    and type transition_frontier := Inputs.Transition_frontier.t = struct
-  let run ~catchup_job_reader _transition_frontier =
+  let run ~frontier:_ ~catchup_job_reader =
     don't_wait_for
       (Strict_pipe.Reader.iter catchup_job_reader ~f:(fun _ ->
            failwith "Intentionally unimplemented catchup" ))

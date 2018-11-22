@@ -5,11 +5,11 @@ module type Transition_frontier_intf = sig
 
   type external_transition
 
-  type merkle_ledger
+  type base_db
 
-  type merkle_mask
+  type staged_ledger
 
-  exception Parent_not_found of [`Parent of state_hash] * [`Target of state_hash]
+  exception Parent_not_found of ([`Parent of state_hash] * [`Target of state_hash])
   exception Already_exists of state_hash
 
   val max_length : int
@@ -19,12 +19,12 @@ module type Transition_frontier_intf = sig
 
     val transition : t -> external_transition
 
-    val mask : t -> merkle_mask
+    val mask : t -> staged_ledger
   end
 
   type t
 
-  val create : root:external_transition -> ledger:merkle_ledger -> t
+  val create : root:external_transition -> ledger:base_db -> t
 
   val root : t -> Breadcrumb.t
 

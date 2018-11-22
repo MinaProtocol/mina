@@ -42,26 +42,82 @@ module type Inputs_intf = sig
      and type protocol_state_proof := Proof.t
      and type ledger_builder_diff := Ledger_builder_diff.t
 
-  module Merkle_mask : sig
+  module Key : Merkle_ledger.Intf.Key
+  module Account : Merkle_ledger.Intf.Account with type key := Key.t
+  module Location : Merkle_ledger.Location_intf.S
+
+  module Any_base :
+    Merkle_mask.Base_merkle_tree_intf.S
+    with module Addr = Location.Addr
+     and module Location = Location
+     and type account := Account.t
+     and type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type key := Key.t
+
+  module Mask :
+    Merkle_mask.Masking_merkle_tree_intf.S
+    with module Addr = Location.Addr
+     and module Location = Location
+     and module Attached.Addr = Location.Addr
+    with type account := Account.t
+     and type location := Location.t
+     and type key := Key.t
+     and type hash := Ledger_hash.t
+     and type parent := Any_base.t
+
+  module Maskable :
+    Merkle_mask.Maskable_merkle_tree_intf.S
+    with module Location = Location
+     and module Addr = Location.Addr
+    with type account := Account.t
+     and type key := Key.t
+     and type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type unattached_mask := Mask.t
+     and type attached_mask := Mask.Attached.t
+     and type t := Any_base.t
+
+  module Base_db :
+    Merkle_ledger.Database_intf.S
+    with module Location = Location
+     and module Addr = Location.Addr
+     and type account := Account.t
+     and type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type key := Key.t
+
+  (* TODO: This should be not too hard to implement on the staged-ledger side *)
+  module Staged_ledger : sig
     type t
 
-    val root : t -> Ledger_hash.t
+    (* TODO *)
+    type staged_ledger_diff = Ledger_builder_diff.t
 
-    val derive : t -> t
+    (** Apply a diff to the base ledger, returning a new staged ledger
+     * whose ledger is a mask daisy-chained on this one.
+     *
+     * TODO: This may have to be deferred *)
+    val init : Base_db.t -> staged_ledger_diff -> t Or_error.t
 
-    val merge : t -> t -> unit
+    (** Same as init, but apply to another staged ledger *)
+    val apply : t -> staged_ledger_diff -> t Or_error.t
 
-    val apply : t -> Ledger_builder_diff.t -> unit
-  end
+    (** The merkle root of the underlying ledger *)
+    val merkle_root : t -> Ledger_hash.t
 
-  module Merkle_ledger : sig
-    type t
+    (** Unattach from any parent ledgers and destroy all data
+     *
+     * Note: After destroying, invoking any other functions on staged ledger
+     * will raise an exception *)
+    val destroy : t -> unit
 
-    val root : t -> Ledger_hash.t
-
-    val derive : t -> Merkle_mask.t
-
-    val merge : t -> Merkle_mask.t -> unit
+    (** Commit mask changes to the parent ledger and all of the children
+     * staged ledgers now belong to the parent.
+     *
+     * Note: After committing, invoking any other functions on staged ledger
+     * will raise an exception *)
+    val commit : t -> unit
   end
 
   module Max_length : sig
@@ -74,8 +130,8 @@ module Make (Inputs : Inputs_intf) :
   Transition_frontier_intf
   with type state_hash := Inputs.State_hash.t
    and type external_transition := Inputs.External_transition.t
-   and type merkle_ledger := Inputs.Merkle_ledger.t
-   and type merkle_mask := Inputs.Merkle_mask.t = struct
+   and type base_db := Inputs.Base_db.t
+   and type staged_ledger := Inputs.Staged_ledger.t = struct
   open Inputs
 
   exception Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
@@ -84,7 +140,7 @@ module Make (Inputs : Inputs_intf) :
   let max_length = Max_length.t
 
   module Breadcrumb = struct
-    type t = {transition: External_transition.t; mask: Merkle_mask.t}
+    type t = {transition: External_transition.t; mask: Staged_ledger.t}
     [@@deriving fields]
 
     let hash t =
@@ -99,7 +155,7 @@ module Make (Inputs : Inputs_intf) :
     {breadcrumb: Breadcrumb.t; successor_hashes: State_hash.t list; length: int}
 
   type t =
-    { root_ledger: Merkle_ledger.t
+    { root_ledger: Base_db.t
     ; mutable root: State_hash.t
     ; mutable best_tip: State_hash.t
     ; table: node State_hash.Table.t }
@@ -110,13 +166,13 @@ module Make (Inputs : Inputs_intf) :
     let blockchain_state = Protocol_state.blockchain_state protocol_state in
     assert (
       Ledger_hash.equal
-        (Merkle_ledger.root ledger)
+        (Base_db.merkle_root ledger)
         (Frozen_ledger_hash.to_ledger_hash
            (Blockchain_state.ledger_hash blockchain_state)) ) ;
-    let mask = Merkle_ledger.derive ledger in
-    Merkle_mask.apply mask (External_transition.ledger_builder_diff root) ;
+    (* TODO: Is it okay to ok_exn here? *)
+    let mask = Staged_ledger.init ledger (External_transition.ledger_builder_diff root) |> Or_error.ok_exn in
     assert (
-      Ledger_hash.equal (Merkle_mask.root mask)
+      Ledger_hash.equal (Staged_ledger.merkle_root mask)
         (Ledger_builder_hash.ledger_hash
            (Blockchain_state.ledger_builder_hash blockchain_state)) ) ;
     let root_hash = Protocol_state.hash protocol_state in
@@ -190,17 +246,22 @@ module Make (Inputs : Inputs_intf) :
     let protocol_state = External_transition.protocol_state transition in
     let hash = Protocol_state.hash protocol_state in
     let root_node = Hashtbl.find_exn t.table t.root in
-    let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
     let parent_hash = Protocol_state.previous_state_hash protocol_state in
     let parent_node =
       Option.value_exn
         (Hashtbl.find t.table parent_hash)
         ~error:(Error.of_exn (Parent_not_found (`Parent parent_hash, `Target hash)))
     in
-    (* 1.a *)
-    let mask = Merkle_mask.derive (Breadcrumb.mask parent_node.breadcrumb) in
-    (* 1.b *)
-    Merkle_mask.apply mask (External_transition.ledger_builder_diff transition) ;
+    (* 1.a ; b *)
+    match
+      Staged_ledger.apply
+        (Breadcrumb.mask parent_node.breadcrumb)
+        (External_transition.ledger_builder_diff transition)
+    with
+    | Error _e ->
+        (* TODO: Handle this error *)
+        failwith "Do something"
+    | Ok mask ->
     (* 1.c *)
     let node =
       { breadcrumb= {Breadcrumb.transition; mask}
@@ -235,7 +296,7 @@ module Make (Inputs : Inputs_intf) :
       t.root <- new_root_hash ;
       List.iter garbage ~f:(Hashtbl.remove t.table) ;
       (* 4.b.IV *)
-      Merkle_ledger.merge t.root_ledger (Breadcrumb.mask root_node.breadcrumb) ) ;
+      Staged_ledger.commit (Breadcrumb.mask root_node.breadcrumb) ) ;
     (* 5 *)
     let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
     if node.length > best_tip_node.length then t.best_tip <- hash ;

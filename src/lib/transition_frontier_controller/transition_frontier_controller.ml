@@ -50,8 +50,7 @@ module Make (Inputs : Inputs_intf) :
     let catchup_job_reader, catchup_job_writer =
       Strict_pipe.create (Buffered (`Capacity 5, `Overflow Drop_head))
     in
-    let catchup_job_reader, catchup_job_writer = Linear_pipe.create () in
-    Transition_handler.Validator.run ~transition_reader
+    Transition_handler.Validator.run ~frontier ~transition_reader
       ~valid_transition_writer ;
     Transition_handler.Processor.run ~frontier ~valid_transition_reader
       ~catchup_job_writer ;
