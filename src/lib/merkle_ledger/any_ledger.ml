@@ -1,3 +1,18 @@
+(** Any_ledger let's you use any arbitrary ledger whenever some ledger is
+ * required. This uses dynamic dispatch and is equivalent to the notion of
+ * consuming a value conforming to an interface in Java.
+ *
+ * It uses GADTs to type-erase the specific underlying first-class module
+ * for some given signature and delegates all function calls.
+ *
+ * The restriction here is that one cannot conform to some signature that
+ * exposes a `create` function because we can't magically pull a conforming
+ * module out of thin air. However, one can always just pack any concrete
+ * instance with the GADT constructor `witness`.
+ *
+ * Props to @nholland for showing me this trick.
+ * *)
+
 open Core_kernel
 open Async_kernel
 
@@ -18,8 +33,17 @@ struct
      and type root_hash := Hash.t
      and type account := Account.t
 
+  (** The type of the witness for a base ledger exposed here so that it can
+   * be easily accessed from outside this module *)
   type witness = T : (module Base_intf with type t = 't) * 't -> witness
 
+  (** M can be used wherever a base ledger is demanded, construct instances
+   * by using the witness constructor directly
+   *
+   * We delegate to the underlying functions in the base interface mechanically
+   *
+   * In the future, this should be a `ppx`.
+   *)
   module M : Base_intf with type t = witness = struct
     type t = witness
 
