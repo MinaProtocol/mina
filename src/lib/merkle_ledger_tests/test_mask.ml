@@ -12,7 +12,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
 
       module Location : Merkle_ledger.Location_intf.S
 
-      module Base_db :
+      module Base :
         Merkle_mask.Base_merkle_tree_intf.S
         with module Addr = Location.Addr
          and module Location = Location
@@ -20,6 +20,8 @@ let%test_module "Test mask connected to underlying Merkle tree" =
          and type root_hash := Hash.t
          and type hash := Hash.t
          and type key := Key.t
+
+      type base = Base.t
 
       module Mask :
         Merkle_mask.Masking_merkle_tree_intf.S
@@ -30,7 +32,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
          and type location := Location.t
          and type key := Key.t
          and type hash := Hash.t
-         and type parent := Base_db.t
+         and type parent := Base.t
 
       module Maskable :
         Merkle_mask.Maskable_merkle_tree_intf.S
@@ -42,8 +44,9 @@ let%test_module "Test mask connected to underlying Merkle tree" =
          and type hash := Hash.t
          and type unattached_mask := Mask.t
          and type attached_mask := Mask.Attached.t
+         and type t := base
 
-      val with_instances : (Maskable.t -> Mask.t -> 'a) -> 'a
+      val with_instances : (base -> Mask.t -> 'a) -> 'a
     end
 
     module Make (Test : Test_intf) = struct
@@ -355,19 +358,29 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         Merkle_ledger.Location.Make (Depth)
 
       (* underlying Merkle tree *)
-      module Base_db : sig
-        include
-          Merkle_mask.Base_merkle_tree_intf.S
+      module Base_db :
+        Merkle_ledger.Database_intf.S
           with module Location = Location
            and module Addr = Location.Addr
            and type account := Account.t
            and type root_hash := Hash.t
            and type hash := Hash.t
-           and type key := Key.t
-      end =
+           and type key := Key.t =
         Database.Make (Key) (Account) (Hash) (Depth) (Location)
           (In_memory_kvdb)
           (Storage_locations)
+
+      module Any_base =
+        Merkle_ledger.Any_ledger.Make_base
+          (Key)
+          (Account)
+          (Hash)
+          (Location)
+          (Depth)
+
+      module Base = Any_base.M
+
+      type base = Base.t
 
       (* the mask tree *)
       module Mask :
@@ -379,9 +392,9 @@ let%test_module "Test mask connected to underlying Merkle tree" =
          and type location := Location.t
          and type key := Key.t
          and type hash := Hash.t
-         and type parent := Base_db.t =
+         and type parent := Base.t =
         Merkle_mask.Masking_merkle_tree.Make (Key) (Account) (Hash) (Location)
-          (Base_db)
+          (Base)
 
       (* tree that can register masks *)
       module Maskable :
@@ -393,14 +406,17 @@ let%test_module "Test mask connected to underlying Merkle tree" =
          and type root_hash := Hash.t
          and type hash := Hash.t
          and type unattached_mask := Mask.t
-         and type attached_mask := Mask.Attached.t =
+         and type attached_mask := Mask.Attached.t
+         and type t := base =
         Merkle_mask.Maskable_merkle_tree.Make (Key) (Account) (Hash) (Location)
-          (Base_db)
+          (Base)
           (Mask)
 
       (* test runner *)
       let with_instances f =
-        let maskable = Maskable.create () in
+        let db = Base_db.create () in
+        let pack = Any_base.T ((module Base_db), db) in
+        let maskable = pack in
         let mask = Mask.create () in
         f maskable mask
     end
