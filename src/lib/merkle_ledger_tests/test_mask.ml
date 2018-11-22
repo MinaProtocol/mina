@@ -360,24 +360,19 @@ let%test_module "Test mask connected to underlying Merkle tree" =
       (* underlying Merkle tree *)
       module Base_db :
         Merkle_ledger.Database_intf.S
-          with module Location = Location
-           and module Addr = Location.Addr
-           and type account := Account.t
-           and type root_hash := Hash.t
-           and type hash := Hash.t
-           and type key := Key.t =
+        with module Location = Location
+         and module Addr = Location.Addr
+         and type account := Account.t
+         and type root_hash := Hash.t
+         and type hash := Hash.t
+         and type key := Key.t =
         Database.Make (Key) (Account) (Hash) (Depth) (Location)
           (In_memory_kvdb)
           (Storage_locations)
 
       module Any_base =
-        Merkle_ledger.Any_ledger.Make_base
-          (Key)
-          (Account)
-          (Hash)
-          (Location)
+        Merkle_ledger.Any_ledger.Make_base (Key) (Account) (Hash) (Location)
           (Depth)
-
       module Base = Any_base.M
 
       type base = Base.t

@@ -3,16 +3,16 @@ open Snark_params
 open Currency
 open Signature_lib
 
-module Make
-    (Ledger : sig
-      include Merkle_ledger.Merkle_ledger_intf.S
-              with type root_hash := Ledger_hash.t
-               and type hash := Ledger_hash.t
-               and type account := Account.t
-               and type key := Public_key.Compressed.t
+module Make (Ledger : sig
+  include
+    Merkle_ledger.Merkle_ledger_intf.S
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.t
+     and type key := Public_key.Compressed.t
 
-      val create : unit -> t
-    end) =
+  val create : unit -> t
+end) =
 struct
   include Ledger
 
