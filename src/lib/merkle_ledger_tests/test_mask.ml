@@ -12,35 +12,41 @@ let%test_module "Test mask connected to underlying Merkle tree" =
 
       module Location : Merkle_ledger.Location_intf.S
 
-      module Base_db :
+      module Base :
         Merkle_mask.Base_merkle_tree_intf.S
         with module Addr = Location.Addr
+         and module Location = Location
          and type account := Account.t
+         and type root_hash := Hash.t
          and type hash := Hash.t
          and type key := Key.t
-         and type location := Location.t
+
+      type base = Base.t
 
       module Mask :
         Merkle_mask.Masking_merkle_tree_intf.S
         with module Addr = Location.Addr
+         and module Location = Location
          and module Attached.Addr = Location.Addr
         with type account := Account.t
          and type location := Location.t
          and type key := Key.t
          and type hash := Hash.t
-         and type parent := Base_db.t
+         and type parent := Base.t
 
       module Maskable :
         Merkle_mask.Maskable_merkle_tree_intf.S
-        with module Addr = Location.Addr
+        with module Location = Location
+         and module Addr = Location.Addr
         with type account := Account.t
-         and type location := Location.t
          and type key := Key.t
+         and type root_hash := Hash.t
          and type hash := Hash.t
          and type unattached_mask := Mask.t
          and type attached_mask := Mask.Attached.t
+         and type t := base
 
-      val with_instances : (Maskable.t -> Mask.t -> 'a) -> 'a
+      val with_instances : (base -> Mask.t -> 'a) -> 'a
     end
 
     module Make (Test : Test_intf) = struct
@@ -186,7 +192,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             in
             try
               let (_unattached_mask : Mask.t) =
-                Maskable.unregister_mask_exn attached_mask
+                Maskable.unregister_mask_exn maskable attached_mask
               in
               true
             with Failure _ -> false )
@@ -195,8 +201,8 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
             Mask.Attached.set attached_mask dummy_location dummy_account ;
-            (* set affects hashes along the path P from location to the root, while the Merkle path for the location 
-               contains the siblings of P elements; to observe a hash in the Merkle path changed by the set, choose an 
+            (* set affects hashes along the path P from location to the root, while the Merkle path for the location
+               contains the siblings of P elements; to observe a hash in the Merkle path changed by the set, choose an
                address that is a sibling of an element in P; the Merkle path for that address will include a P element
              *)
             let address =
@@ -339,6 +345,40 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             (* should see original Merkle root after removing the accounts *)
             let merkle_root2 = Mask.Attached.merkle_root attached_mask in
             assert (Hash.equal merkle_root2 merkle_root0) )
+
+      let%test_unit "fold of addition over account balances in parent and mask"
+          =
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            let num_accounts_parent = 5 in
+            let num_accounts_mask = 5 in
+            let num_accounts = num_accounts_parent + num_accounts_mask in
+            let keys = Key.gen_keys num_accounts in
+            let balances =
+              Quickcheck.random_value
+                (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
+            in
+            let accounts = List.map2_exn keys balances ~f:Account.create in
+            let total =
+              List.fold balances ~init:0 ~f:(fun accum balance ->
+                  Balance.to_int balance + accum )
+            in
+            let parent_accounts, mask_accounts =
+              List.split_n accounts num_accounts_parent
+            in
+            (* add accounts to parent *)
+            List.iter parent_accounts ~f:(fun account ->
+                ignore @@ parent_create_new_account_exn maskable account ) ;
+            (* add accounts to mask *)
+            List.iter mask_accounts ~f:(fun account ->
+                ignore @@ create_new_account_exn attached_mask account ) ;
+            (* folding over mask also folds over maskable *)
+            let retrieved_total =
+              Mask.Attached.foldi attached_mask ~init:0
+                ~f:(fun _addr total account ->
+                  Balance.to_int (Account.balance account) + total )
+            in
+            assert (Int.equal retrieved_total total) )
     end
 
     module type Depth_S = sig
@@ -348,53 +388,64 @@ let%test_module "Test mask connected to underlying Merkle tree" =
     module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
       let depth = Depth.depth
 
-      module Location = Merkle_ledger.Location.Make (Depth)
+      module Location : Merkle_ledger.Location_intf.S =
+        Merkle_ledger.Location.Make (Depth)
 
       (* underlying Merkle tree *)
-      module Base_db : sig
-        include
-          Merkle_mask.Base_merkle_tree_intf.S
-          with module Addr = Location.Addr
-           and type account := Account.t
-           and type hash := Hash.t
-           and type key := Key.t
-           and type location := Location.t
-      end =
+      module Base_db :
+        Merkle_ledger.Database_intf.S
+        with module Location = Location
+         and module Addr = Location.Addr
+         and type account := Account.t
+         and type root_hash := Hash.t
+         and type hash := Hash.t
+         and type key := Key.t =
         Database.Make (Key) (Account) (Hash) (Depth) (Location)
           (In_memory_kvdb)
-          (In_memory_sdb)
           (Storage_locations)
+
+      module Any_base =
+        Merkle_ledger.Any_ledger.Make_base (Key) (Account) (Hash) (Location)
+          (Depth)
+      module Base = Any_base.M
+
+      type base = Base.t
 
       (* the mask tree *)
       module Mask :
         Merkle_mask.Masking_merkle_tree_intf.S
-        with module Addr = Location.Addr
+        with module Location = Location
+         and module Addr = Location.Addr
          and module Attached.Addr = Location.Addr
         with type account := Account.t
          and type location := Location.t
          and type key := Key.t
          and type hash := Hash.t
-         and type parent := Base_db.t =
+         and type parent := Base.t =
         Merkle_mask.Masking_merkle_tree.Make (Key) (Account) (Hash) (Location)
-          (Base_db)
+          (Base)
 
       (* tree that can register masks *)
       module Maskable :
         Merkle_mask.Maskable_merkle_tree_intf.S
         with module Addr = Location.Addr
+         and module Location = Location
         with type account := Account.t
-         and type location := Location.t
          and type key := Key.t
+         and type root_hash := Hash.t
          and type hash := Hash.t
          and type unattached_mask := Mask.t
-         and type attached_mask := Mask.Attached.t =
+         and type attached_mask := Mask.Attached.t
+         and type t := base =
         Merkle_mask.Maskable_merkle_tree.Make (Key) (Account) (Hash) (Location)
-          (Base_db)
+          (Base)
           (Mask)
 
       (* test runner *)
       let with_instances f =
-        let maskable = Maskable.create () in
+        let db = Base_db.create () in
+        let pack = Any_base.T ((module Base_db), db) in
+        let maskable = pack in
         let mask = Mask.create () in
         f maskable mask
     end

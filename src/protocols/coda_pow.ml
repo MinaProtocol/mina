@@ -135,6 +135,8 @@ module type Ledger_intf = sig
 
   type transaction
 
+  type account
+
   module Undo : sig
     type t [@@deriving sexp, bin_io]
 
@@ -152,6 +154,8 @@ module type Ledger_intf = sig
   val num_accounts : t -> int
 
   val merkle_root : t -> ledger_hash
+
+  val to_list : t -> account list
 
   val apply_transaction : t -> transaction -> Undo.t Or_error.t
 
@@ -480,6 +484,8 @@ module type Ledger_builder_base_intf = sig
 
   type diff
 
+  type valid_diff
+
   type ledger_builder_aux_hash
 
   type ledger_builder_hash
@@ -515,7 +521,19 @@ module type Ledger_builder_base_intf = sig
   val aux : t -> Aux.t
 
   val apply :
-    t -> diff -> logger:Logger.t -> ledger_proof option Deferred.Or_error.t
+       t
+    -> diff
+    -> logger:Logger.t
+    -> ( [`Hash_after_applying of ledger_builder_hash]
+       * [`Ledger_proof of ledger_proof option] )
+       Deferred.Or_error.t
+
+  val apply_diff_unchecked :
+       t
+    -> valid_diff
+    -> ( [`Hash_after_applying of ledger_builder_hash]
+       * [`Ledger_proof of ledger_proof option] )
+       Deferred.t
 
   val snarked_ledger :
     t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t
@@ -523,8 +541,6 @@ end
 
 module type Ledger_builder_intf = sig
   include Ledger_builder_base_intf
-
-  type valid_diff
 
   type ledger_hash
 
@@ -556,10 +572,7 @@ module type Ledger_builder_intf = sig
     -> logger:Logger.t
     -> transactions_by_fee:user_command_with_valid_signature Sequence.t
     -> get_completed_work:(statement -> completed_work option)
-    -> ( valid_diff
-       * [`Hash_after_applying of ledger_builder_hash]
-       * [`Ledger_proof of ledger_proof option] )
-       Deferred.t
+    -> valid_diff
 
   val all_work_pairs :
        t
