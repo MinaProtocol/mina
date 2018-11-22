@@ -1,5 +1,6 @@
 open Core
 open Async
+open Pipe_lib
 open O1trace
 
 module type Inputs_intf = sig

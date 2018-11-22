@@ -1,5 +1,6 @@
 open Protocols.Coda_pow
 open Coda_base
+open Pipe_lib
 
 module type Inputs_intf = sig
   module Consensus_mechanism : Consensus_mechanism_intf
@@ -43,9 +44,11 @@ module Make (Inputs : Inputs_intf) :
 
   let run ~transition_reader ~sync_query_reader ~sync_answer_writer =
     let valid_transition_reader, valid_transition_writer =
-      Linear_pipe.create ()
+      Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
     in
-    let catchup_job_reader, catchup_job_writer = Linear_pipe.create () in
+    let catchup_job_reader, catchup_job_writer =
+      Strict_pipe.create (Buffered (`Capacity 5, `Overflow Drop_head))
+    in
     let frontier = Transition_frontier.create () in
     Transition_handler.Validator.run frontier ~transition_reader
       ~valid_transition_writer ;

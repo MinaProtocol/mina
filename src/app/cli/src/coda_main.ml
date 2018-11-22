@@ -7,6 +7,7 @@ open Coda_base
 open Signature_lib
 open Blockchain_snark
 open Coda_numbers
+open Pipe_lib
 open O1trace
 module Fee = Protocols.Coda_pow.Fee
 
