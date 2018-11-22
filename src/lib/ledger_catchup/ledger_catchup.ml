@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Protocols.Coda_pow
+open Pipe_lib
 
 module type Inputs_intf = sig
   module Consensus_mechanism : Consensus_mechanism_intf
@@ -15,6 +16,6 @@ module Make (Inputs : Inputs_intf) :
    and type transition_frontier := Inputs.Transition_frontier.t = struct
   let run ~catchup_job_reader _transition_frontier =
     don't_wait_for
-      (Linear_pipe.iter catchup_job_reader ~f:(fun _ ->
+      (Strict_pipe.Reader.iter catchup_job_reader ~f:(fun _ ->
            failwith "Intentionally unimplemented catchup" ))
 end

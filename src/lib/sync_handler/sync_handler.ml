@@ -2,6 +2,7 @@ open Core_kernel
 open Async_kernel
 open Protocols.Coda_pow
 open Coda_base
+open Pipe_lib
 
 module type Inputs_intf = sig
   module Consensus_mechanism : Consensus_mechanism_intf
@@ -26,6 +27,6 @@ module Make (Inputs : Inputs_intf) :
    and type transition_frontier := Inputs.Transition_frontier.t = struct
   let run ~sync_query_reader ~sync_answer_writer:_ _transition_frontier =
     don't_wait_for
-      (Linear_pipe.iter sync_query_reader ~f:(fun _ ->
+      (Strict_pipe.Reader.iter sync_query_reader ~f:(fun _ ->
            failwith "Intentionally unimplemented sync_handler" ))
 end
