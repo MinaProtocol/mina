@@ -318,6 +318,59 @@ let%test_module "test functor on in memory databases" =
             (* should see original Merkle root after removing the accounts *)
             let merkle_root2 = MT.merkle_root mdb in
             assert (Hash.equal merkle_root2 merkle_root0) )
+
+      let%test_unit "fold over account balances" =
+        Test.with_instance (fun mdb ->
+            let num_accounts = 5 in
+            let keys = Key.gen_keys num_accounts in
+            let balances =
+              Quickcheck.random_value
+                (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
+            in
+            let total =
+              List.fold balances ~init:0 ~f:(fun accum balance ->
+                  Balance.to_int balance + accum )
+            in
+            let accounts = List.map2_exn keys balances ~f:Account.create in
+            List.iter accounts ~f:(fun account ->
+                ignore @@ create_new_account_exn mdb account ) ;
+            let retrieved_total =
+              MT.foldi mdb ~init:0 ~f:(fun _addr total account ->
+                  Balance.to_int (Account.balance account) + total )
+            in
+            assert (Int.equal retrieved_total total) )
+
+      let%test_unit "fold_until over account balances" =
+        Test.with_instance (fun mdb ->
+            let num_accounts = 5 in
+            let some_num = 3 in
+            let keys = Key.gen_keys num_accounts in
+            let some_keys = List.take keys some_num in
+            let last_key = List.hd_exn (List.rev some_keys) in
+            let balances =
+              Quickcheck.random_value
+                (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
+            in
+            let some_balances = List.take balances some_num in
+            let total =
+              List.fold some_balances ~init:0 ~f:(fun accum balance ->
+                  Balance.to_int balance + accum )
+            in
+            let accounts = List.map2_exn keys balances ~f:Account.create in
+            List.iter accounts ~f:(fun account ->
+                ignore @@ create_new_account_exn mdb account ) ;
+            (* stop folding on last_key, sum of balances in accounts should be same as some_balances *)
+            let retrieved_total =
+              MT.fold_until mdb ~init:0
+                ~f:(fun total account ->
+                  let current_balance = Account.balance account in
+                  let current_key = Account.public_key account in
+                  let new_total = Balance.to_int current_balance + total in
+                  if Key.equal current_key last_key then Stop new_total
+                  else Continue new_total )
+                ~finish:(fun total -> total)
+            in
+            assert (Int.equal retrieved_total total) )
     end
 
     module Make_db (Depth : sig
