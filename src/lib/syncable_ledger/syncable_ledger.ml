@@ -1,5 +1,6 @@
 open Core
 open Async_kernel
+open Pipe_lib
 
 let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 
@@ -226,7 +227,7 @@ module Make
         | [] ->
             let changed =
               match !node with
-              | Leaf (Some (s', h')) | Node ((s', h'), _, _) ->
+              | Leaf (Some (_, h')) | Node ((_, h'), _, _) ->
                   not @@ Hash.equal h h'
               | Leaf None -> false
             in

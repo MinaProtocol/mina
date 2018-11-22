@@ -454,8 +454,11 @@ let home () =
   wrap ~page_label:"" sections
 
 let positions =
-  [ ("Lead Designer", "lead-designer")
-  ; ("Protocol Engineer", "protocol-engineer") ]
+  [ ("Protocol Engineer", "protocol-engineer")
+  ; ("Director of Business Development", "business-development")
+  ; ("Product Manager", "product-manager")
+  ; ("Engineering Manager", "engineering-manager")
+  ; ("Community Manager", "community-manager") ]
 
 let jobs () =
   let top scheme =

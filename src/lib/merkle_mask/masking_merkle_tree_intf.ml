@@ -15,6 +15,8 @@ module type S = sig
 
   type key
 
+  module Location : Merkle_ledger.Location_intf.S
+
   module Addr : Merkle_address.S
 
   val create : unit -> t
@@ -23,8 +25,9 @@ module type S = sig
   module Attached : sig
     include
       Base_merkle_tree_intf.S
+      with module Location = Location
       with type account := account
-       and type location := location
+       and type root_hash := hash
        and type hash := hash
        and type key := key
 

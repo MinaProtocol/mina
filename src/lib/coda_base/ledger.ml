@@ -3,14 +3,20 @@ open Snark_params
 open Currency
 open Signature_lib
 
-module Make
-    (Ledger : Merkle_ledger.Merkle_ledger_intf.S
-              with type root_hash := Merkle_hash.t
-               and type hash := Merkle_hash.t
-               and type account := Account.t
-               and type key := Public_key.Compressed.t) =
+module Make (Ledger : sig
+  include
+    Merkle_ledger.Merkle_ledger_intf.S
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.t
+     and type key := Public_key.Compressed.t
+
+  val create : unit -> t
+end) =
 struct
   include Ledger
+
+  type account = Account.t
 
   let create_new_account_exn t pk account =
     let action, _ = get_or_create_account_exn t pk account in
@@ -394,20 +400,18 @@ end
 module Ledger = struct
   include Merkle_ledger.Ledger.Make (Public_key.Compressed) (Account)
             (struct
-              type t = Merkle_hash.t [@@deriving sexp, hash, compare, bin_io]
+              type t = Ledger_hash.t [@@deriving sexp, hash, compare, bin_io]
 
-              let merge = Merkle_hash.merge
+              let merge = Ledger_hash.merge
 
               let hash_account =
-                Fn.compose Merkle_hash.of_digest Account.digest
+                Fn.compose Ledger_hash.of_digest Account.digest
 
               let empty_account = hash_account Account.empty
             end)
             (struct
               let depth = ledger_depth
             end)
-
-  type path = Path.t
 end
 
 include Make (Ledger)

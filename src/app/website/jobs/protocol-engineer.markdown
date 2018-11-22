@@ -8,20 +8,20 @@ Cryptocurrency is a domain where correctness really counts. As such, a cornersto
 
 There is no need to have prior experience in cryptography, and we're hiring engineers to work on a bunch of exciting projects including:
 
-- Our OCaml DSL for writing zk-SNARKs (a cryptographic primitive for certified computation).
-- The design of a virtual machine and higher-level languages for smart contracts (there a lot of interesting challenges here since the VM has to be efficient inside SNARKs).
-- Working on the core networking, cryptography, and reliability aspects of the protocol.
+* Our OCaml DSL for writing zk-SNARKs (a cryptographic primitive for certified computation).
+* The design of a virtual machine and higher-level languages for smart contracts (there a lot of interesting challenges here since the VM has to be efficient inside SNARKs).
+* Working on the core networking, cryptography, and reliability aspects of the protocol.
 
 This is a chance to join a small, collaborative team and have a ton of independence while working on fascinating cross-disciplinary problems in computing. We also offer competitive compensation both in salary and equity as well as top-of-the-market benefits.
 
 Ideal candidates will be interested in any of:
 
-- functional programming
-- programming language theory
-- security
-- distributed systems
-- cryptography
-- cryptocurrency
+* Functional programming
+* Programming language theory
+* Security
+* Distributed systems
+* Cryptography
+* Cryptocurrency
 
 There are no hard requirements and we're more interested in learning about your individual background.
 

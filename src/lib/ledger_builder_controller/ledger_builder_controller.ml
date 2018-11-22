@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Pipe_lib
 open O1trace
 
 module Make (Inputs : Inputs.S) : sig
@@ -44,12 +45,11 @@ end = struct
 
     module Step = struct
       let apply' t diff logger =
-        Deferred.Or_error.map
-          (Ledger_builder.apply t diff ~logger)
-          ~f:
-            (Option.map ~f:(fun proof ->
-                 ( Ledger_proof.statement proof |> Ledger_proof_statement.target
-                 , proof ) ))
+        let open Deferred.Or_error.Let_syntax in
+        let%map _, `Ledger_proof proof = Ledger_builder.apply t diff ~logger in
+        Option.map proof ~f:(fun proof ->
+            ( Ledger_proof.statement proof |> Ledger_proof_statement.target
+            , proof ) )
 
       let step logger {With_hash.data= tip; hash= tip_hash}
           {With_hash.data= transition; hash= transition_target_hash} =
@@ -152,7 +152,9 @@ end = struct
     let log = Logger.child config.parent_log "ledger_builder_controller" in
     let store_controller =
       Store.Controller.create
-        (With_hash.bin_t Tip.bin_t State_hash.bin_t)
+        ( module struct
+          type t = (Tip.t, State_hash.t) With_hash.t [@@deriving bin_io]
+        end )
         ~parent_log:config.parent_log
     in
     let genesis_tip_state_hash =
@@ -414,7 +416,13 @@ let%test_module "test" =
         end
 
         (* A ledger_builder transition will just add to a "ledger" integer *)
-        module Ledger_builder_diff = Int
+        module Ledger_builder_diff = struct
+          type t = int [@@deriving bin_io, sexp]
+
+          module With_valid_signatures_and_proofs = struct
+            type t = int
+          end
+        end
 
         module Ledger = struct
           include Int
@@ -454,7 +462,10 @@ let%test_module "test" =
 
           let apply (t : t) (x : Ledger_builder_diff.t) ~logger:_ =
             t := x ;
-            return (Ok (Some x))
+            return (Ok (`Hash_after_applying (hash t), `Ledger_proof (Some x)))
+
+          let apply_diff_unchecked (_t : t) (_x : 'a) =
+            failwith "Unimplemented"
 
           let snarked_ledger :
                  t

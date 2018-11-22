@@ -19,6 +19,8 @@ let%test_module "test functor on in memory databases" =
 
       type hash = Hash.t
 
+      type root_hash = Hash.t
+
       let load_ledger_with_keys keys balance =
         let ledger = create () in
         List.iter keys ~f:(fun public_key ->
@@ -53,7 +55,7 @@ let%test_module "test functor on in memory databases" =
       L16.num_accounts ledger = n
 
     let get (type t key account)
-        (module L : Merkle_ledger.Ledger_intf.S
+        (module L : Merkle_ledger.Ledger_extras_intf.S
           with type t = t and type key = key and type account = account) ledger
         public_key =
       let open Option.Let_syntax in
@@ -164,7 +166,7 @@ let%test_module "test functor on in memory databases" =
       Path.check_path path (Hash.hash_account account) root
 
     let merkle_path (type t key hash)
-        (module L : Merkle_ledger.Ledger_intf.S
+        (module L : Merkle_ledger.Ledger_extras_intf.S
           with type t = t and type key = key and type hash = hash) ledger
         public_key =
       L.location_of_key ledger public_key
@@ -276,7 +278,7 @@ let%test_module "test functor on in memory databases" =
          given numbers of accounts n and m, where m > n, the key list produced by load_ledger on n
          is not necessarily a prefix of the list for load_ledger on m
 
-         therefore, we produce the key list separately, take a prefix, and pass that to load_ledger_with_keys 
+         therefore, we produce the key list separately, take a prefix, and pass that to load_ledger_with_keys
        *)
       let all_keys = Key.gen_keys 10 in
       let l1_keys = List.take all_keys 8 in

@@ -1,5 +1,6 @@
 open Protocols.Coda_pow
 open Coda_base
+open Pipe_lib
 
 module type Inputs_intf = sig
   module Consensus_mechanism : Consensus_mechanism_intf
@@ -9,7 +10,7 @@ module type Inputs_intf = sig
   module Syncable_ledger :
     Syncable_ledger.S
     with type addr := Merkle_address.t
-     and type hash := Merkle_hash.t
+     and type hash := Ledger_hash.t
 
   module Transition_frontier : Transition_frontier_intf
 
@@ -26,7 +27,7 @@ module type Inputs_intf = sig
   module Sync_handler :
     Sync_handler_intf
     with type addr := Merkle_address.t
-     and type hash := Merkle_hash.t
+     and type hash := Ledger_hash.t
      and type syncable_ledger := Syncable_ledger.t
      and type syncable_ledger_query := Syncable_ledger.query
      and type syncable_ledger_answer := Syncable_ledger.answer
@@ -44,7 +45,10 @@ module Make (Inputs : Inputs_intf) :
 
   let run ~frontier ~transition_reader ~sync_query_reader ~sync_answer_writer =
     let valid_transition_reader, valid_transition_writer =
-      Linear_pipe.create ()
+      Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
+    in
+    let catchup_job_reader, catchup_job_writer =
+      Strict_pipe.create (Buffered (`Capacity 5, `Overflow Drop_head))
     in
     let catchup_job_reader, catchup_job_writer = Linear_pipe.create () in
     Transition_handler.Validator.run ~transition_reader

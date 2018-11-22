@@ -17,8 +17,6 @@ struct
   module L = struct
     include Merkle_ledger.Ledger.Make (Key) (Account) (Hash) (Inputs)
 
-    type path = Path.t
-
     type addr = Addr.t
 
     type account = Account.t

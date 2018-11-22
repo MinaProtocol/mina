@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Pipe_lib
 
 module type Peer_intf = sig
   type t [@@deriving eq, hash, compare, sexp]

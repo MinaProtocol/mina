@@ -7,6 +7,7 @@ open Coda_base
 open Signature_lib
 open Blockchain_snark
 open Coda_numbers
+open Pipe_lib
 open O1trace
 module Fee = Protocols.Coda_pow.Fee
 
@@ -42,6 +43,10 @@ end
 
 module Ledger_hash = struct
   include Ledger_hash.Stable.V1
+
+  let of_digest = Ledger_hash.of_digest
+
+  let merge = Ledger_hash.merge
 
   let to_bytes = Ledger_hash.to_bytes
 end
@@ -563,9 +568,9 @@ struct
   module Sync_ledger =
     Syncable_ledger.Make (Ledger.Addr) (Account)
       (struct
-        include Merkle_hash
+        include Ledger_hash
 
-        let hash_account = Fn.compose Merkle_hash.of_digest Account.digest
+        let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
         let empty_account = hash_account Account.empty
       end)
@@ -573,7 +578,7 @@ struct
         include Ledger_hash
 
         let to_hash (h : t) =
-          Merkle_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
+          Ledger_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
       end)
       (struct
         include Ledger
@@ -785,6 +790,8 @@ module type Main_intf = sig
     module Ledger : sig
       type t [@@deriving sexp]
 
+      type account
+
       val copy : t -> t
 
       val location_of_key :
@@ -795,7 +802,7 @@ module type Main_intf = sig
       val merkle_path :
            t
         -> Ledger.Location.t
-        -> [`Left of Merkle_hash.t | `Right of Merkle_hash.t] list
+        -> [`Left of Ledger_hash.t | `Right of Ledger_hash.t] list
 
       val num_accounts : t -> int
 
@@ -959,7 +966,8 @@ module type Main_intf = sig
 
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
 
-  val get_ledger : t -> Ledger_builder_hash.t -> Ledger.t Deferred.Or_error.t
+  val get_ledger :
+    t -> Ledger_builder_hash.t -> Account.t list Deferred.Or_error.t
 
   val receipt_chain_database : t -> Receipt_chain_database.t
 end
