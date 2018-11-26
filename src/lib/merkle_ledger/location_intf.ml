@@ -14,7 +14,7 @@ module type S = sig
   end
 
   type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
-  [@@deriving eq, sexp]
+  [@@deriving sexp, compare, hash, eq]
 
   include Hashable.S with type t := t
 
