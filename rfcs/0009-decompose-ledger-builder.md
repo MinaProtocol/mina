@@ -1,3 +1,11 @@
+## TODO
+
+- specify leaves of parallel scan state
+- rm parenthetical
+- rationale
+  - why ledger builder is bad
+  - ???
+
 ## Summary
 [summary]: #summary
 
