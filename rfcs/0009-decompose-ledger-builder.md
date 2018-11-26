@@ -1,11 +1,3 @@
-## TODO
-
-- specify leaves of parallel scan state
-- rm parenthetical
-- rationale
-  - why ledger builder is bad
-  - ???
-
 ## Summary
 [summary]: #summary
 
@@ -35,7 +27,7 @@ The long term goal for this data structure is that it will be the serialization 
 
 ### `Parallel_scan_state`
 
-A `Parallel_scan_state.t` is a generic data structure representing the state of a parallel scan operation. This state represents as a binary tree of nodes and a binary operation (`node -> node -> node`) that reduces nodes. The state keeps track of multiple parallel sets of nodes that are being reduced at once, all fitted into a single tree. Interaction with the `Parallel_scan_state` is separated into steps in which both completed binary operations (or "work") are applied and new nodes are added to the leaves of the tree. When a set of nodes is reduced to the top, the `Parallel_scan_state` will emit the final value. The number of new nodes that can be added each step is limited by the amount of work that was submitted during that step.
+A `Parallel_scan_state.t` is a generic data structure representing the state of a parallel scan operation. This state represents as a binary tree of nodes and a binary operation (`node -> node -> node`) that reduces nodes, with a set of data leaves at the bottom (which are lifted into tree nodes via a unary operation `data -> node`). The state keeps track of multiple parallel sets of nodes that are being reduced at once, all fitted into a single tree. Interaction with the `Parallel_scan_state` is separated into steps in which both completed binary operations (or "work") are applied and new nodes are added to the leaves of the tree. When a set of nodes is reduced to the top, the `Parallel_scan_state` will emit the final value. The number of new nodes that can be added each step is limited by the amount of work that was submitted during that step.
 
 ### `Parallel_scan_state_diff`
 
@@ -55,10 +47,14 @@ A `Staged_ledger.t` is a combination of a `Merkle_ledger.t` and a `Transaction_s
 
 ### `Staged_ledger_diff`
 
-A `Staged_ledger_diff.t` is a combination of a `Merkle_ledger_diff.t` and a `Transaction_snark_scan_state.Diff.t` (which is an instantiations of `Parallel_scan_state_diff.t`). It provides the difference between two staged ledgers and can be applied to a `Staged_ledger.t` to transition it.
+A `Staged_ledger_diff.t` is a combination of a `Merkle_ledger_diff.t` and a `Parallel_scan_state_diff.t` instantiated for the `Transaction_snark_scan_state` (`type data = Transaction.t and type node = Transaction_snark_work.t`). It provides the difference between two staged ledgers and can be applied to a `Staged_ledger.t` to transition it.
 
 ## Rationale
 [rationale]: #rationale
+
+### Why change the `Ledger_builder`?
+
+The `Ledger_builder` abstraction was too large in scope, which was making tight asynchronous design of components involving it more difficult. By decomposing it into various components of smaller scope, designing the asynchronous control flow the new `Transition_frontier` became simpler and allowed us to be more thoughtful of computational costs. Furthermore, we want the new abstraction to be independent of any particular implementation of the `Merkle_ledger` so that we can take advantage of chained `Merkle_mask`s.
 
 ### `Ledger_builder` -> `Staged_ledger`
 
