@@ -413,7 +413,7 @@ struct
       { protocol_state: Protocol_state.value
       ; proof: Protocol_state_proof.t
       ; ledger_builder: Ledger_builder.t }
-    [@@deriving sexp, bin_io, fields]
+    [@@deriving sexp, fields]
 
     let of_transition_and_lb transition ledger_builder =
       { protocol_state=
@@ -786,7 +786,7 @@ module type Main_intf = sig
     module Time : Protocols.Coda_pow.Time_intf
 
     module Ledger : sig
-      type t [@@deriving sexp]
+      type t
 
       type account
 

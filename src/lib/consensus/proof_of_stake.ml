@@ -144,8 +144,8 @@ module Make (Inputs : Inputs_intf) :
 
   module Local_state = struct
     type t =
-      { mutable last_epoch_ledger: Coda_base.Ledger.t option
-      ; mutable curr_epoch_ledger: Coda_base.Ledger.t option
+      { mutable last_epoch_ledger: Coda_base.Ledger.t option sexp_opaque
+      ; mutable curr_epoch_ledger: Coda_base.Ledger.t option sexp_opaque
       ; mutable delegators: Currency.Balance.t Coda_base.Account.Index.Table.t
       }
     [@@deriving sexp]

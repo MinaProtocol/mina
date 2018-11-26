@@ -111,7 +111,6 @@ end = struct
   type t =
     { ledger_builder_io: Net.t
     ; log: Logger.t
-    ; store_controller: (Tip.t, State_hash.t) With_hash.t Store.Controller.t
     ; handler: Transition_logic.t
     ; strongest_ledgers_reader:
         (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t }
@@ -124,44 +123,21 @@ end = struct
   let ledger_builder_io {ledger_builder_io; _} = ledger_builder_io
 
   let load_tip_and_genesis_hash
-      (controller : (Tip.t, State_hash.t) With_hash.t Store.Controller.t)
-      {Config.longest_tip_location; genesis_tip; _} log =
+      {Config.genesis_tip; _} log =
     let genesis_state_hash =
       Protocol_state.hash genesis_tip.Tip.protocol_state
     in
-    match%map Store.load controller longest_tip_location with
-    | Ok tip_and_genesis_hash -> tip_and_genesis_hash
-    | Error `No_exist ->
-        Logger.info log
-          "File for ledger builder controller tip does not exist. Using \
-           Genesis tip" ;
-        {data= genesis_tip; hash= genesis_state_hash}
-    | Error (`IO_error e) ->
-        Logger.error log
-          !"IO error: %s\nUsing Genesis tip"
-          (Error.to_string_hum e) ;
-        {data= genesis_tip; hash= genesis_state_hash}
-    | Error `Checksum_no_match ->
-        Logger.error log
-          !"Checksum from location %s does not match with data\n\
-            Using Genesis tip"
-          longest_tip_location ;
-        {data= genesis_tip; hash= genesis_state_hash}
+    Logger.warn log
+          "TODO: Re-enable serialization, for now we're genesis tipping";
+    return {With_hash.data= genesis_tip; hash= genesis_state_hash}
 
   let create (config : Config.t) =
     let log = Logger.child config.parent_log "ledger_builder_controller" in
-    let store_controller =
-      Store.Controller.create
-        ( module struct
-          type t = (Tip.t, State_hash.t) With_hash.t [@@deriving bin_io]
-        end )
-        ~parent_log:config.parent_log
-    in
     let genesis_tip_state_hash =
       Protocol_state.hash config.genesis_tip.Tip.protocol_state
     in
     let%bind {data= tip; hash= stored_genesis_state_hash} =
-      load_tip_and_genesis_hash store_controller config log
+      load_tip_and_genesis_hash config log
     in
     let tip =
       if State_hash.equal genesis_tip_state_hash stored_genesis_state_hash then
@@ -185,11 +161,9 @@ end = struct
     let strongest_ledgers_reader, strongest_ledgers_writer =
       Linear_pipe.create ()
     in
-    let store_tip_reader, store_tip_writer = Linear_pipe.create () in
     let t =
       { ledger_builder_io= net
       ; log
-      ; store_controller
       ; strongest_ledgers_reader
       ; handler= Transition_logic.create state log }
     in
@@ -197,21 +171,10 @@ end = struct
     @@ trace_task "strongest_tip" (fun () ->
            Linear_pipe.iter (Transition_logic.strongest_tip t.handler)
              ~f:(fun (tip, transition) ->
-               Linear_pipe.force_write_maybe_drop_head ~capacity:1
-                 store_tip_writer store_tip_reader tip ;
                Deferred.return
                @@ Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
                     t.strongest_ledgers_reader
                     (tip.ledger_builder, transition) ) ) ;
-    don't_wait_for
-    @@ trace_task "store_tip" (fun () ->
-           Linear_pipe.iter store_tip_reader ~f:(fun tip ->
-               let open With_hash in
-               let tip_with_genesis_hash =
-                 {data= tip; hash= genesis_tip_state_hash}
-               in
-               Store.store store_controller config.longest_tip_location
-                 tip_with_genesis_hash ) ) ;
     (* Handle new transitions *)
     let possibly_jobs =
       trace_task "external transitions" (fun () ->
@@ -277,7 +240,7 @@ end = struct
       let open With_hash in
       let open Deferred.Let_syntax in
       let%map {data= tip; _} =
-        load_tip_and_genesis_hash t.store_controller config t.log
+        load_tip_and_genesis_hash config t.log
       in
       tip
   end

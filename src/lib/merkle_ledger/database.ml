@@ -3,7 +3,7 @@ open Core
 module Make (Key : sig
   include Intf.Key
 
-  val to_string : t -> string
+  val to_base64 : t -> string
 end)
 (Account : Intf.Account with type key := Key.t)
 (Hash : Intf.Hash with type account := Account.t)
@@ -135,7 +135,7 @@ end)
       get_raw mdb location
 
     let build_location key =
-      Location.build_generic (Bigstring.of_string ("$" ^ Key.to_string key))
+      Location.build_generic (Bigstring.of_string ("$" ^ Key.to_base64 key))
 
     let get mdb key =
       match get_generic mdb (build_location key) with

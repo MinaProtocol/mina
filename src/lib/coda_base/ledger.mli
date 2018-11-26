@@ -2,7 +2,7 @@ open Core
 open Import
 
 include
-  Merkle_ledger.Merkle_ledger_intf.S
+  Merkle_ledger.Database_intf.S
   with type root_hash := Ledger_hash.t
    and type hash := Ledger_hash.t
    and type account := Account.t

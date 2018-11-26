@@ -132,7 +132,7 @@ module type Proof_intf = sig
 end
 
 module type Ledger_intf = sig
-  type t [@@deriving sexp, bin_io]
+  type t
 
   type transaction
 
@@ -481,7 +481,7 @@ module type Ledger_builder_transition_intf = sig
 end
 
 module type Ledger_builder_base_intf = sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp]
 
   type diff
 
@@ -629,7 +629,7 @@ module type Tip_intf = sig
     { protocol_state: protocol_state
     ; proof: protocol_state_proof
     ; ledger_builder: ledger_builder }
-  [@@deriving sexp, bin_io, fields]
+  [@@deriving sexp, fields]
 
   val of_transition_and_lb : external_transition -> ledger_builder -> t
 

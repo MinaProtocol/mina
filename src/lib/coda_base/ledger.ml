@@ -5,7 +5,7 @@ open Signature_lib
 
 module Make (Ledger : sig
   include
-    Merkle_ledger.Merkle_ledger_intf.S
+    Merkle_ledger.Database_intf.S
     with type root_hash := Ledger_hash.t
      and type hash := Ledger_hash.t
      and type account := Account.t
@@ -397,21 +397,70 @@ struct
     Account.equal expected_account account
 end
 
-module Ledger = struct
-  include Merkle_ledger.Ledger.Make (Public_key.Compressed) (Account)
-            (struct
-              type t = Ledger_hash.t [@@deriving sexp, hash, compare, bin_io]
+module Depth = struct
+  let depth = ledger_depth
+end
+module Location0 = Merkle_ledger.Location.Make(Depth)
+module In_memory_kvdb : Merkle_ledger.Intf.Key_value_database = struct
+  module Bigstring_frozen = struct
+    module T = struct
+      include Bigstring
 
-              let merge = Ledger_hash.merge
+      (* we're not mutating Bigstrings, which would invalidate hashes
+       OK to use these hash functions
+       *)
+      let hash = hash_t_frozen
 
-              let hash_account =
-                Fn.compose Ledger_hash.of_digest Account.digest
+      let hash_fold_t = hash_fold_t_frozen
+    end
 
-              let empty_account = hash_account Account.empty
-            end)
-            (struct
-              let depth = ledger_depth
-            end)
+    include T
+    include Hashable.Make_binable (T)
+  end
+
+  type t = {uuid: Uuid.t; table: Bigstring_frozen.t Bigstring_frozen.Table.t}
+
+  let get_uuid t = t.uuid
+
+  let create ~directory:_ =
+    {uuid= Uuid.create (); table= Bigstring_frozen.Table.create ()}
+
+  let destroy _ = ()
+
+  let get t ~key = Bigstring_frozen.Table.find t.table key
+
+  let set t ~key ~data = Bigstring_frozen.Table.set t.table ~key ~data
+
+  let set_batch tbl ~key_data_pairs =
+    List.iter key_data_pairs ~f:(fun (key, data) -> set tbl ~key ~data)
+
+  let delete t ~key = Bigstring_frozen.Table.remove t.table key
+
+  let copy (t : t) =
+    {uuid= Uuid.create (); table= Bigstring_frozen.Table.copy t.table}
 end
 
+module Storage_locations : Merkle_ledger.Intf.Storage_locations = struct
+  (* TODO: The name of this value should be dynamically generated per test run*)
+  let key_value_db_dir = ""
+end
+module Ledger = struct
+  include Merkle_ledger.Database.Make
+    (Public_key.Compressed)
+    (Account)
+    (struct
+      type t = Ledger_hash.t [@@deriving sexp, hash, compare, bin_io]
+
+      let merge = Ledger_hash.merge
+
+      let hash_account =
+        Fn.compose Ledger_hash.of_digest Account.digest
+
+      let empty_account = hash_account Account.empty
+    end)
+    (Depth)
+    (Location0)
+    (In_memory_kvdb)
+    (Storage_locations)
+end
 include Make (Ledger)

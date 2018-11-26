@@ -512,8 +512,8 @@ end = struct
         scan_state
         (* Invariant: this is the ledger after having applied all the transactions in
     the above state. *)
-    ; ledger: Ledger.t }
-  [@@deriving sexp, bin_io]
+    ; ledger: Ledger.t sexp_opaque }
+  [@@deriving sexp]
 
   let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
 
