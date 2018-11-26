@@ -8,7 +8,7 @@
       core
       debug_assert
       client_lib
-      linear_pipe
+      pipe_lib
       coda_networking
       proposer
       gossip_net
