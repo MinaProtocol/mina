@@ -1,5 +1,6 @@
 open Core
 open Async
+open Pipe_lib
 open Kademlia
 open O1trace
 module Membership = Membership.Haskell

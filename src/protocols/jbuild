@@ -6,7 +6,7 @@
   (flags (:standard -short-paths))
   (inline_tests)
   (library_flags (-linkall))
-  (libraries (core snark_work_lib currency async linear_pipe logger with_hash))
+  (libraries (core snark_work_lib currency async pipe_lib logger with_hash))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "Lib powering the client interactions with the daemon")))
 

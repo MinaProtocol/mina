@@ -132,8 +132,8 @@ let merge_unordered rs =
 
 let fork reader n =
   let pipes = List.init n ~f:(fun _ -> create ()) in
-  let writers = List.map pipes ~f:(fun (r, w) -> w) in
-  let readers = List.map pipes ~f:(fun (r, w) -> r) in
+  let writers = List.map pipes ~f:(fun (_, w) -> w) in
+  let readers = List.map pipes ~f:(fun (r, _) -> r) in
   don't_wait_for
     (iter reader ~f:(fun x ->
          Deferred.List.iter writers ~f:(fun writer ->
@@ -209,9 +209,9 @@ let latest_ref t ~initial =
   don't_wait_for (iter t ~f:(fun a -> return (cell := a))) ;
   cell
 
-let values_available ({pipe} : 'a Reader.t) = Pipe.values_available pipe
+let values_available ({pipe; _} : 'a Reader.t) = Pipe.values_available pipe
 
-let peek ({pipe} : 'a Reader.t) = Pipe.peek pipe
+let peek ({pipe; _} : 'a Reader.t) = Pipe.peek pipe
 
 let release_has_reader (reader : 'a Reader.t) =
   if not reader.has_reader then
@@ -223,10 +223,10 @@ let read_now reader =
   let res = Pipe.read_now reader.pipe in
   release_has_reader reader ; res
 
-let read' ?max_queue_length ({pipe} : 'a Reader.t) =
+let read' ?max_queue_length ({pipe; _} : 'a Reader.t) =
   Pipe.read' ?max_queue_length pipe
 
-let read ({pipe} : 'a Reader.t) = Pipe.read pipe
+let read ({pipe; _} : 'a Reader.t) = Pipe.read pipe
 
 let read_exn reader =
   match%map read reader with

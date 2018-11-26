@@ -9,12 +9,14 @@ module Make
     (Location : Merkle_ledger.Location_intf.S)
     (Base : Base_merkle_tree_intf.S
             with module Addr = Location.Addr
-            with type account := Account.t
+             and module Location = Location
+             and type account := Account.t
+             and type root_hash := Hash.t
              and type hash := Hash.t
-             and type location := Location.t
              and type key := Key.t)
     (Mask : Masking_merkle_tree_intf.S
-            with type account := Account.t
+            with module Location = Location
+             and type account := Account.t
              and type location := Location.t
              and type hash := Hash.t
              and type key := Key.t

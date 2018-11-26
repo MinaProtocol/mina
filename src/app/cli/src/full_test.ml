@@ -6,6 +6,7 @@ open Async_kernel
 open Coda_base
 open Coda_main
 open Signature_lib
+open Pipe_lib
 
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
