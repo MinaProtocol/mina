@@ -15,6 +15,8 @@
       test_util
       vrf_lib
       unix_timestamp
+      global_signer_private_key
       non_zero_curve_point ))
+  (preprocessor_deps ("../../config.mlh"))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "Consensus mechanisms")))

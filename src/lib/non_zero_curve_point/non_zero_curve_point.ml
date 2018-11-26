@@ -41,7 +41,24 @@ module Compressed = struct
 
   module Stable = struct
     module V1 = struct
-      type t = (Field.t, bool) t_ [@@deriving bin_io, sexp, eq, compare, hash]
+      module T = struct
+        type t = (Field.t, bool) t_
+        [@@deriving bin_io, sexp, eq, compare, hash]
+      end
+
+      include T
+
+      let to_base64 t = Binable.to_string (module T) t |> B64.encode
+
+      let of_base64_exn s = B64.decode s |> Binable.of_string (module T)
+
+      include Codable.Make_of_string (struct
+        type nonrec t = t
+
+        let to_string = to_base64
+
+        let of_string = of_base64_exn
+      end)
     end
   end
 
@@ -79,10 +96,10 @@ module Compressed = struct
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
-  let var_of_t ({x; is_odd}: t) : var =
+  let var_of_t ({x; is_odd} : t) : var =
     {x= Field.Checked.constant x; is_odd= Boolean.var_of_value is_odd}
 
-  let assert_equal (t1: var) (t2: var) =
+  let assert_equal (t1 : var) (t2 : var) =
     let open Let_syntax in
     let%map () = Field.Checked.Assert.equal t1.x t2.x
     and () = Boolean.Assert.(t1.is_odd = t2.is_odd) in
@@ -95,7 +112,7 @@ module Compressed = struct
 
   (* TODO: Right now everyone could switch to using the other unpacking...
    Either decide this is ok or assert bitstring lt field size *)
-  let var_to_triples ({x; is_odd}: var) =
+  let var_to_triples ({x; is_odd} : var) =
     let open Let_syntax in
     let%map x_bits =
       Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
@@ -112,6 +129,11 @@ module Compressed = struct
       let%bind odd_eq = Boolean.equal t1.is_odd t2.is_odd in
       Boolean.(x_eq && odd_eq)
 
+    let if_ cond ~then_:t1 ~else_:t2 =
+      let%map x = Field.Checked.if_ cond ~then_:t1.x ~else_:t2.x
+      and is_odd = Boolean.if_ cond ~then_:t1.is_odd ~else_:t2.is_odd in
+      {x; is_odd}
+
     module Assert = struct
       let equal t1 t2 =
         let%map () = Field.Checked.Assert.equal t1.x t2.x
@@ -124,7 +146,7 @@ end
 open Tick
 open Let_syntax
 
-let decompress ({x; is_odd}: Compressed.t) =
+let decompress ({x; is_odd} : Compressed.t) =
   Option.map (Tick.Inner_curve.find_y x) ~f:(fun y ->
       let y_parity = parity y in
       let y = if Bool.(is_odd = y_parity) then y else Field.negate y in
@@ -136,7 +158,7 @@ let parity_var y =
   let%map bs = Field.Checked.unpack_full y in
   List.hd_exn (Bitstring_lib.Bitstring.Lsb_first.to_list bs)
 
-let decompress_var ({x; is_odd} as c: Compressed.var) =
+let decompress_var ({x; is_odd} as c : Compressed.var) =
   let%bind y =
     provide_witness Typ.field
       As_prover.(
@@ -148,7 +170,7 @@ let decompress_var ({x; is_odd} as c: Compressed.var) =
 
 let compress : t -> Compressed.t = Compressed.compress
 
-let compress_var ((x, y): var) : (Compressed.var, _) Checked.t =
+let compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
   with_label __LOC__
     (let%map is_odd = parity_var y in
      {Compressed.x; is_odd})

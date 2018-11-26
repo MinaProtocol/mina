@@ -1,0 +1,50 @@
+;; Test for %{deps} with globs in rules
+
+(rule
+ (targets result expected)
+ (deps    dune (glob_files *.txt))
+ (action  (progn
+           (with-stdout-to result   (echo %{deps}))
+           (with-stdout-to expected (echo "dune a.txt b.txt c.txt")))))
+
+(rule
+ (targets result2 expected2)
+ (deps    (source_tree sub-tree))
+ (action  (progn
+           (with-stdout-to result2   (echo %{deps}))
+           (with-stdout-to expected2 (echo "sub-tree/a sub-tree/dir/b")))))
+
+(alias
+ (name   runtest)
+ (deps   result expected)
+ (action (run diff -u result expected)))
+
+(alias
+ (name   runtest)
+ (deps   result2 expected2)
+ (action (run diff -u result2 expected2)))
+
+;; Test inferred rules
+
+(rule (copy dune dune-plop))
+
+(alias
+ (name   runtest)
+ (deps   dune dune-plop)
+ (action (run diff -u %{deps})))
+
+;; For some tests in subdirs
+
+(rule (with-stdout-to 023e1a58-4d08-11e7-a041-aa000008c8a6 (echo "plop")))
+
+;; Test for globs
+
+(alias
+ (name runtest)
+ (deps (glob_files dir-that-doesnt-exist/*)))
+
+;; Check that %{ocaml_bin} expands to a directory and not a path
+
+(alias
+ (name runtest)
+ (action (ignore-stdout (echo %{ocaml_bin}))))

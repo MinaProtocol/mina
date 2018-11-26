@@ -58,7 +58,7 @@ module Value = struct
 
   let random () = List.init length ~f:(fun _ -> Random.bool ())
 
-  let hash (bs: var) = Knapsack.Checked.hash_to_bits knapsack bs
+  let hash (bs : var) = Knapsack.Checked.hash_to_bits knapsack bs
 end
 
 module Merkle_tree_checked = Merkle_tree.Checked (Snark) (Hash) (Value)
@@ -85,7 +85,7 @@ let input () =
    computations in a very natural style.
 *)
 let update_many root_start
-    (updates: (Value.var * Merkle_tree_checked.Address.var) list) root_end :
+    (updates : (Value.var * Merkle_tree_checked.Address.var) list) root_end :
     ( unit
       (* 1. The return type. Here it is [unit], indicating we return
         only the [unit] value. *)

@@ -3,38 +3,38 @@ open Async
 
 type 'a value = {path: string; value: 'a; checksum: Md5.t}
 
-let try_load bin_t path =
+let try_load bin path =
   let logger = Logger.create () in
-  let controller = Storage.Disk.Controller.create ~parent_log:logger bin_t in
+  let controller = Storage.Disk.Controller.create ~parent_log:logger bin in
   match%map Storage.Disk.load_with_checksum controller path with
   | Ok {Storage.Checked_data.data; checksum} ->
       Logger.info logger "Loaded value successfully from %s" path ;
       Ok {path; value= data; checksum}
   | Error `Checksum_no_match -> Or_error.error_string "Checksum failure"
-  | Error ((`IO_error _ | `No_exist) as err) ->
+  | Error ((`IO_error _ | `No_exist) as err) -> (
     match err with
     | `IO_error e ->
         Or_error.errorf "Could not load value. The error was: %s"
           (Error.to_string_hum e)
     | `No_exist ->
-        Or_error.error_string "Cached value not found in default location"
+        Or_error.error_string "Cached value not found in default location" )
 
 module Component = struct
   type (_, 'env) t =
-    | Load:
+    | Load :
         { label: string
         ; f: 'env -> 'a
-        ; bin_t: 'a Bin_prot.Type_class.t }
+        ; bin: 'a Binable.m }
         -> ('a value, 'env) t
 
-  let load (Load {label; f= _; bin_t}) ~base_path =
+  let load (Load {label; f= _; bin}) ~base_path =
     let path = base_path ^ "_" ^ label in
-    try_load bin_t path
+    try_load bin path
 
-  let store (Load {label; f; bin_t}) ~base_path ~env =
+  let store (Load {label; f; bin}) ~base_path ~env =
     let path = base_path ^ "_" ^ label in
     let logger = Logger.create () in
-    let controller = Storage.Disk.Controller.create ~parent_log:logger bin_t in
+    let controller = Storage.Disk.Controller.create ~parent_log:logger bin in
     let value = f env in
     let%map checksum =
       Storage.Disk.store_with_checksum controller path value
@@ -45,8 +45,8 @@ end
 module With_components = struct
   module T = struct
     type ('a, 'env) t =
-      | Pure: 'a -> ('a, 'env) t
-      | Ap: ('a, 'env) Component.t * ('a -> 'b, 'env) t -> ('b, 'env) t
+      | Pure : 'a -> ('a, 'env) t
+      | Ap : ('a, 'env) Component.t * ('a -> 'b, 'env) t -> ('b, 'env) t
 
     let return x = Pure x
 
@@ -85,8 +85,8 @@ module With_components = struct
       match t with
       | Pure x -> return x
       | Ap ((Load _ as c), tf) ->
-          let%map x = Component.store c ~base_path ~env
-          and f = store tf ~base_path ~env in
+          let%bind x = Component.store c ~base_path ~env in
+          let%map f = store tf ~base_path ~env in
           f x
 
   module Let_syntax = struct
@@ -99,9 +99,7 @@ module With_components = struct
 
       let both t1 t2 = apply (map t1 ~f:(fun x y -> (x, y))) t2
 
-      module Open_on_rhs = struct
-        
-      end
+      module Open_on_rhs = struct end
     end
   end
 end
@@ -110,12 +108,11 @@ include With_components
 
 type ('a, 'e) cached = ('a, 'e) t
 
-let component ~label ~f bin_t =
-  Ap (Component.Load {label; f; bin_t}, Pure Fn.id)
+let component ~label ~f bin = Ap (Component.Load {label; f; bin}, Pure Fn.id)
 
 module Spec = struct
   type 'a t =
-    | T:
+    | T :
         { load: ('a, 'env) With_components.t
         ; name: string
         ; autogen_path: string
@@ -156,7 +153,7 @@ let run
       Core.printf "Loaded %s from manual installation path %s\n" name
         manual_install_path ;
       return x
-  | Error _e ->
+  | Error _e -> (
       Core.printf
         "Could not load %s from manual installation path %s. Trying the \
          autogen path %s...\n"
@@ -171,4 +168,4 @@ let run
             "Could not load %s from autogen path %s. Autogenerating...\n" name
             autogen_path ;
           let%bind () = Unix.mkdir ~p:() autogen_path in
-          With_components.store load ~base_path ~env:(create_env input)
+          With_components.store load ~base_path ~env:(create_env input) )

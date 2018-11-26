@@ -1,5 +1,4 @@
 open Core
-open Unsigned
 
 module Make (Key : sig
   include Intf.Key
@@ -9,157 +8,47 @@ end)
 (Account : Intf.Account with type key := Key.t)
 (Hash : Intf.Hash with type account := Account.t)
 (Depth : Intf.Depth)
+(Location : Location_intf.S)
 (Kvdb : Intf.Key_value_database)
-(Sdb : Intf.Stack_database)
-(Storage_locations : Intf.Storage_locations) : sig
-  include Database_intf.S
-          with type account := Account.t
-           and type hash := Hash.t
-           and type key := Key.t
-end = struct
+(Storage_locations : Intf.Storage_locations) :
+  Database_intf.S
+  with module Location = Location
+   and module Addr = Location.Addr
+   and type account := Account.t
+   and type root_hash := Hash.t
+   and type hash := Hash.t
+   and type key := Key.t = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   include Depth
 
   let () = assert (Depth.depth < 0xfe)
 
-  type error =
-    | Account_location_not_found
-    | Out_of_leaves
-    | Malformed_database
-  [@@deriving sexp]
-
-  module Path = Merkle_path.Make (Hash)
-
-  module Addr = Merkle_address.Make (struct
-    let depth = Depth.depth
-  end)
-
-  (* Locations are a bitstring prefixed by a byte. In the case of accounts, the prefix
-   * byte is 0xfe. In the case of a hash node in the merkle tree, the prefix is between
-   * 1 and N (where N is the height of the root of the merkle tree, with 1 representing
-   * the leafs of the tree, and N representing the root of the merkle tree. For account
-   * and node locations, the bitstring represents the path in the tree where that node exists.
-   * For all other locations (generic locations), the prefix is 0xff. Generic locations can contain
-   * any bitstring.
-   *)
-  module Location = struct
-    module Prefix = struct
-      let generic = UInt8.of_int 0xff
-
-      let account = UInt8.of_int 0xfe
-
-      let hash depth = UInt8.of_int (Depth.depth - depth)
-    end
-
-    type t =
-      | Generic of Bigstring.t [@printer
-                                 fun fmt bstr ->
-                                   Format.pp_print_string fmt
-                                     (Bigstring.to_string bstr)]
-      | Account of Addr.t
-      | Hash of Addr.t
+  module Db_error = struct
+    type t = Account_location_not_found | Out_of_leaves | Malformed_database
     [@@deriving sexp]
 
-    let is_generic = function Generic _ -> true | _ -> false
-
-    let is_account = function Account _ -> true | _ -> false
-
-    let is_hash = function Hash _ -> true | _ -> false
-
-    let height : t -> int = function
-      | Generic _ ->
-          raise (Invalid_argument "height: generic location has no height")
-      | Account _ -> 0
-      | Hash path -> Addr.height path
-
-    let path : t -> Addr.t = function
-      | Generic _ ->
-          raise (Invalid_argument "generic location has no directions")
-      | Account path | Hash path -> path
-
-    let root_hash : t = Hash (Addr.root ())
-
-    let last_direction path =
-      Direction.of_bool (Addr.get path (Addr.depth path - 1) <> 0)
-
-    let build_generic (data: Bigstring.t) : t = Generic data
-
-    let parse (str: Bigstring.t) : (t, unit) Result.t =
-      let prefix = Bigstring.get str 0 |> Char.to_int |> UInt8.of_int in
-      let data = Bigstring.sub str ~pos:1 ~len:(Bigstring.length str - 1) in
-      if prefix = Prefix.generic then Result.return (Generic data)
-      else
-        let path = Addr.of_byte_string (Bigstring.to_string data) in
-        let slice_path = Addr.slice path 0 in
-        if prefix = Prefix.account then
-          Result.return (Account (slice_path Depth.depth))
-        else if UInt8.to_int prefix <= Depth.depth then
-          Result.return (Hash (slice_path (Depth.depth - UInt8.to_int prefix)))
-        else Result.fail ()
-
-    let prefix_bigstring prefix src =
-      let src_len = Bigstring.length src in
-      let dst = Bigstring.create (src_len + 1) in
-      Bigstring.set dst 0 (Char.of_int_exn (UInt8.to_int prefix)) ;
-      Bigstring.blit ~src ~src_pos:0 ~dst ~dst_pos:1 ~len:src_len ;
-      dst
-
-    let to_path_exn = function
-      | Account path -> path
-      | Hash path -> path
-      | Generic _ ->
-          raise (Invalid_argument "to_path_exn: generic does not have a path")
-
-    let serialize = function
-      | Generic data -> prefix_bigstring Prefix.generic data
-      | Account path ->
-          assert (Addr.depth path = Depth.depth) ;
-          prefix_bigstring Prefix.account (Addr.serialize path)
-      | Hash path ->
-          assert (Addr.depth path <= Depth.depth) ;
-          prefix_bigstring
-            (Prefix.hash (Addr.depth path))
-            (Addr.serialize path)
-
-    let parent : t -> t = function
-      | Generic _ ->
-          raise (Invalid_argument "parent: generic locations have no parent")
-      | Account _ ->
-          raise (Invalid_argument "parent: account locations have no parent")
-      | Hash path ->
-          assert (Addr.depth path > 0) ;
-          Hash (Addr.parent_exn path)
-
-    let next : t -> t Option.t = function
-      | Generic _ ->
-          raise
-            (Invalid_argument "next: generic locations have no next location")
-      | Account path ->
-          Addr.next path |> Option.map ~f:(fun next -> Account next)
-      | Hash path -> Addr.next path |> Option.map ~f:(fun next -> Hash next)
-
-    let sibling : t -> t = function
-      | Generic _ ->
-          raise (Invalid_argument "sibling: generic locations have no sibling")
-      | Account path -> Account (Addr.sibling path)
-      | Hash path -> Hash (Addr.sibling path)
-
-    let order_siblings (location: t) (base: 'a) (sibling: 'a) : 'a * 'a =
-      match last_direction (path location) with
-      | Left -> (base, sibling)
-      | Right -> (sibling, base)
+    exception Db_exception of t
   end
+
+  module Path = Merkle_path.Make (Hash)
+  module Addr = Location.Addr
+  module Location = Location
 
   type location = Location.t [@@deriving sexp]
 
-  type t = {kvdb: Kvdb.t sexp_opaque; sdb: Sdb.t sexp_opaque} [@@deriving sexp]
+  type index = int
+
+  type path = Path.t
+
+  type t = {uuid: Uuid.Stable.V1.t; kvdb: Kvdb.t sexp_opaque} [@@deriving sexp]
+
+  let get_uuid t = t.uuid
 
   let create () =
     let kvdb = Kvdb.create ~directory:Storage_locations.key_value_db_dir in
-    let sdb = Sdb.create ~filename:Storage_locations.stack_db_file in
-    {kvdb; sdb}
+    {uuid= Uuid.create (); kvdb}
 
-  let destroy {kvdb; sdb} = Kvdb.destroy kvdb ; Sdb.destroy sdb
+  let destroy {uuid= _; kvdb} = Kvdb.destroy kvdb
 
   let empty_hashes =
     let empty_hashes =
@@ -180,9 +69,8 @@ end = struct
   let get_bin mdb location bin_read =
     get_raw mdb location |> Option.map ~f:(fun v -> bin_read v ~pos_ref:(ref 0))
 
-  let get_generic mdb location =
-    assert (Location.is_generic location) ;
-    get_raw mdb location
+  let delete_raw {kvdb; _} location =
+    Kvdb.delete kvdb ~key:(Location.serialize location)
 
   let get mdb location =
     assert (Location.is_account location) ;
@@ -197,11 +85,24 @@ end = struct
   let set_raw {kvdb; _} location bin =
     Kvdb.set kvdb ~key:(Location.serialize location) ~data:bin
 
+  let set_raw_batch {kvdb; _} locations_bins =
+    let serialize_location (loc, bin) = (Location.serialize loc, bin) in
+    let serialized = List.map locations_bins ~f:serialize_location in
+    Kvdb.set_batch kvdb ~key_data_pairs:serialized
+
   let set_bin mdb location bin_size bin_write v =
-    let size = bin_size v in
-    let buf = Bigstring.create size in
+    let buf = Bigstring.create (bin_size v) in
     ignore (bin_write buf ~pos:0 v) ;
     set_raw mdb location buf
+
+  let set_bin_batch mdb bin_size bin_write locations_vs =
+    let create_buf (loc, v) =
+      let buf = Bigstring.create (bin_size v) in
+      ignore (bin_write buf ~pos:0 v) ;
+      (loc, buf)
+    in
+    let locs_bufs = List.map locations_vs ~f:create_buf in
+    set_raw_batch mdb locs_bufs
 
   let rec set_hash mdb location new_hash =
     assert (Location.is_hash location) ;
@@ -226,18 +127,24 @@ end = struct
     assert (Addr.depth address <= Depth.depth) ;
     set_bin mdb (Location.Hash address) Hash.bin_size_t Hash.bin_write_t hash
 
-  let make_space_for t tot = ()
+  let make_space_for _t _tot = ()
 
   module Account_location = struct
+    let get_generic mdb location =
+      assert (Location.is_generic location) ;
+      get_raw mdb location
+
     let build_location key =
       Location.build_generic (Bigstring.of_string ("$" ^ Key.to_string key))
 
     let get mdb key =
       match get_generic mdb (build_location key) with
-      | None -> Error Account_location_not_found
+      | None -> Error Db_error.Account_location_not_found
       | Some location_bin ->
           Location.parse location_bin
-          |> Result.map_error ~f:(fun () -> Malformed_database)
+          |> Result.map_error ~f:(fun () -> Db_error.Malformed_database)
+
+    let delete mdb key = delete_raw mdb (build_location key)
 
     let set mdb key location = set_raw mdb (build_location key) location
 
@@ -255,25 +162,19 @@ end = struct
           in
           set_raw mdb location (Location.serialize first_location) ;
           Result.return first_location
-      | Some prev_location ->
+      | Some prev_location -> (
         match Location.parse prev_location with
-        | Error () -> Error Malformed_database
+        | Error () -> Error Db_error.Malformed_database
         | Ok prev_account_location ->
             Location.next prev_account_location
-            |> Result.of_option ~error:Out_of_leaves
+            |> Result.of_option ~error:Db_error.Out_of_leaves
             |> Result.map ~f:(fun next_account_location ->
                    set_raw mdb location
                      (Location.serialize next_account_location) ;
-                   next_account_location )
+                   next_account_location ) )
 
     let allocate mdb key =
-      let location_result =
-        match Sdb.pop mdb.sdb with
-        | None -> increment_last_account_location mdb
-        | Some location ->
-            Location.parse location
-            |> Result.map_error ~f:(fun () -> Malformed_database)
-      in
+      let location_result = increment_last_account_location mdb in
       Result.map location_result ~f:(fun location ->
           set mdb key (Location.serialize location) ;
           location )
@@ -295,7 +196,7 @@ end = struct
   module For_tests = struct
     let gen_account_location =
       let open Quickcheck.Let_syntax in
-      let build_account (path: Direction.t list) =
+      let build_account (path : Direction.t list) =
         assert (List.length path = Depth.depth) ;
         Location.Account (Addr.of_directions path)
       in
@@ -308,8 +209,18 @@ end = struct
   let set mdb location account =
     set_bin mdb location Account.bin_size_t Account.bin_write_t account ;
     set_hash mdb
-      (Location.Hash (Location.path location))
+      (Location.Hash (Location.to_path_exn location))
       (Hash.hash_account account)
+
+  let set_batch mdb locations_accounts =
+    set_bin_batch mdb Account.bin_size_t Account.bin_write_t locations_accounts ;
+    let set_one_hash (location, account) =
+      set_hash mdb
+        (Location.Hash (Location.to_path_exn location))
+        (Hash.hash_account account)
+    in
+    (* TODO: is there something better we can do? *)
+    List.iter locations_accounts ~f:set_one_hash
 
   let index_of_key_exn mdb key =
     let location = location_of_key mdb key |> Option.value_exn in
@@ -326,25 +237,26 @@ end = struct
 
   let get_or_create_account mdb key account =
     match Account_location.get mdb key with
-    | Error Account_location_not_found ->
-        Account_location.allocate mdb key
-        |> Result.map ~f:(fun location ->
-               set mdb location account ;
-               (`Added, location) )
-    | Error err -> Error err
+    | Error Account_location_not_found -> (
+      match Account_location.allocate mdb key with
+      | Ok location ->
+          set mdb location account ;
+          Ok (`Added, location)
+      | Error err ->
+          Error (Error.create "get_or_create_account" err Db_error.sexp_of_t) )
+    | Error err ->
+        Error (Error.create "get_or_create_account" err Db_error.sexp_of_t)
     | Ok location -> Ok (`Existed, location)
-
-  exception Error_exception of error
 
   let get_or_create_account_exn mdb key account =
     get_or_create_account mdb key account
-    |> Result.map_error ~f:(fun err -> Error_exception err)
+    |> Result.map_error ~f:(fun err -> raise (Error.to_exn err))
     |> Result.ok_exn
 
   let num_accounts t =
     match Account_location.last_location_address t with
     | None -> 0
-    | Some addr -> Addr.to_int addr - Sdb.length t.sdb + 1
+    | Some addr -> Addr.to_int addr + 1
 
   let get_all_accounts_rooted_at_exn mdb address =
     let first_node, last_node = Addr.Range.subtree_range address in
@@ -355,48 +267,76 @@ end = struct
     in
     List.rev_filter_map result ~f:Fn.id
 
-  let set_all_accounts_rooted_at_exn mdb address (accounts: Account.t list) =
+  let set_all_accounts_rooted_at_exn mdb address (accounts : Account.t list) =
     let first_node, last_node = Addr.Range.subtree_range address in
     Addr.Range.fold (first_node, last_node) ~init:accounts ~f:(fun bit_index ->
-        function
+      function
       | head :: tail ->
           set mdb (Location.Account bit_index) head ;
           tail
       | [] -> [] )
     |> ignore
 
-  module C :
-    Container.S0 with type t := t and type elt := Account.t =
+  (* TODO : if key-value store supports iteration mechanism, like RocksDB,
+     maybe use that here, instead of loading all accounts into memory
+  *)
+  let foldi t ~init ~f =
+    let f' index accum account = f (Addr.of_int_exn index) accum account in
+    match Account_location.last_location_address t with
+    | None -> init
+    | Some last_addr ->
+        let last = Addr.to_int last_addr in
+        Sequence.range ~stop:`inclusive 0 last
+        |> Sequence.map ~f:(get_at_index_exn t)
+        |> Sequence.foldi ~init ~f:f'
+
+  module C : Container.S0 with type t := t and type elt := Account.t =
   Container.Make0 (struct
     module Elt = Account
 
     type nonrec t = t
 
-    (* TODO: This implementation does not consider empty indices from stack db. *)
     let fold t ~init ~f =
-      match Account_location.last_location_address t with
-      | None -> init
-      | Some last_addr ->
-          let last = Addr.to_int last_addr in
-          Sequence.range ~stop:`inclusive 0 last
-          |> Sequence.map ~f:(get_at_index_exn t)
-          |> Sequence.fold ~init ~f
+      let f' _index accum account = f accum account in
+      foldi t ~init ~f:f'
 
     let iter = `Define_using_fold
   end)
 
   let to_list = C.to_list
 
+  let fold_until = C.fold_until
+
   let merkle_root mdb = get_hash mdb Location.root_hash
 
-  let copy {kvdb; sdb} = {kvdb= Kvdb.copy kvdb; sdb= Sdb.copy sdb}
+  (* for a copy, the uuid is fresh *)
+  let copy {uuid= _; kvdb} = {uuid= Uuid.create (); kvdb= Kvdb.copy kvdb}
 
-  let remove_accounts_exn _ _ = failwith "TODO: Implement"
+  let remove_accounts_exn t keys =
+    let locations =
+      (* if we don't have a location for all keys, raise an exception *)
+      let rec loop keys accum =
+        match keys with
+        | [] -> accum (* no need to reverse *)
+        | key :: rest -> (
+          match Account_location.get t key with
+          | Ok loc -> loop rest (loc :: accum)
+          | Error err -> raise (Db_error.Db_exception err) )
+      in
+      loop keys []
+    in
+    (* N.B.: we're not using stack database here to make available newly-freed locations *)
+    List.iter keys ~f:(Account_location.delete t) ;
+    List.iter locations ~f:(fun loc -> delete_raw t loc) ;
+    (* recalculate hashes for each removed account *)
+    List.iter locations ~f:(fun loc ->
+        let hash_loc = Location.Hash (Location.to_path_exn loc) in
+        set_hash t hash_loc Hash.empty_account )
 
   let merkle_path mdb location =
     let location =
       if Location.is_account location then
-        Location.Hash (Location.path location)
+        Location.Hash (Location.to_path_exn location)
       else location
     in
     assert (Location.is_hash location) ;
@@ -404,7 +344,7 @@ end = struct
       if Location.height k >= Depth.depth then []
       else
         let sibling = Location.sibling k in
-        let sibling_dir = Location.last_direction (Location.path k) in
+        let sibling_dir = Location.last_direction (Location.to_path_exn k) in
         let hash = get_hash mdb sibling in
         Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)
         :: loop (Location.parent k)

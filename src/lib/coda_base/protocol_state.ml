@@ -28,9 +28,13 @@ module type Consensus_state_intf = sig
   (** For status *)
 
   val to_lite : (value -> Lite_base.Consensus_state.t) option
+
+  val to_string_record : value -> string
 end
 
 module type S = sig
+  module Blockchain_state : Blockchain_state.S
+
   module Consensus_state : Consensus_state_intf
 
   type ('a, 'b, 'c) t [@@deriving bin_io, sexp]
@@ -74,11 +78,17 @@ module type S = sig
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
   val hash : value -> State_hash.Stable.V1.t
+
+  val to_string_record : value -> string
 end
 
-module Make (Consensus_state : Consensus_state_intf) :
-  S with module Consensus_state = Consensus_state =
-struct
+module Make
+    (Blockchain_state : Blockchain_state.S)
+    (Consensus_state : Consensus_state_intf) :
+  S
+  with module Blockchain_state = Blockchain_state
+   and module Consensus_state = Consensus_state = struct
+  module Blockchain_state = Blockchain_state
   module Consensus_state = Consensus_state
 
   type ('state_hash, 'blockchain_state, 'consensus_state) t =
@@ -157,7 +167,7 @@ struct
     |> State_hash.of_hash
 
   [%%if
-  log_calls]
+  call_logger]
 
   let hash s =
     Coda_debug.Call_logger.record_call "Protocol_state.hash" ;
@@ -170,4 +180,9 @@ struct
         State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
     ; blockchain_state= Blockchain_state.genesis
     ; consensus_state= Consensus_state.genesis }
+
+  let to_string_record t =
+    Printf.sprintf "{blockchain|%s}|{consensus|%s}"
+      (Blockchain_state.to_string_record t.blockchain_state)
+      (Consensus_state.to_string_record t.consensus_state)
 end

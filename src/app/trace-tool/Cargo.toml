@@ -1,0 +1,9 @@
+[package]
+name = "trace-tool"
+version = "0.1.0"
+authors = ["Corey Richardson <cmr@o1labs.org>"]
+
+[dependencies]
+clap = "2.32.0"
+nom = "4.1.1"
+memmap = "0.7.0"

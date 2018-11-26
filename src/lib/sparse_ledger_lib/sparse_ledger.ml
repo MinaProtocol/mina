@@ -210,10 +210,10 @@ let%test_module "sparse-ledger-test" =
       let rec prune_hash_branches = function
         | Hash h -> Hash h
         | Account a -> Account a
-        | Node (h, l, r) ->
+        | Node (h, l, r) -> (
           match (prune_hash_branches l, prune_hash_branches r) with
           | Hash _, Hash _ -> Hash h
-          | l, r -> Node (h, l, r)
+          | l, r -> Node (h, l, r) )
       in
       let rec gen depth =
         if depth = 0 then Account.gen >>| fun a -> Account a

@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Pipe_lib
 
 module type Time_intf = sig
   module Stable : sig
@@ -83,7 +84,7 @@ module type Public_key_intf = sig
   type t [@@deriving sexp, eq]
 end
 
-module type Transaction_intf = sig
+module type User_command_intf = sig
   type t [@@deriving sexp, eq]
 
   module With_valid_signature : sig
@@ -228,7 +229,7 @@ module type Inputs_intf = sig
 
   module Public_key : Public_key_intf
 
-  module Transaction : Transaction_intf
+  module User_command : User_command_intf
 
   module Block_nonce : Nonce_intf
 
@@ -238,7 +239,7 @@ module type Inputs_intf = sig
 
   module Ledger :
     Ledger_intf
-    with type valid_transaction := Transaction.With_valid_signature.t
+    with type valid_transaction := User_command.With_valid_signature.t
      and type ledger_hash := Ledger_hash.t
 
   module Transition :
@@ -262,14 +263,15 @@ module type Inputs_intf = sig
   module State_hash : State_hash_intf
 
   module State : sig
-    include State_intf
-            with type ledger_hash := Ledger_hash.t
-             and type state_hash := State_hash.t
-             and type difficulty := Difficulty.t
-             and type strength := Strength.t
-             and type time := Time.t
-             and type nonce := Block_nonce.t
-             and type pow := Pow.t
+    include
+      State_intf
+      with type ledger_hash := Ledger_hash.t
+       and type state_hash := State_hash.t
+       and type difficulty := Difficulty.t
+       and type strength := Strength.t
+       and type time := Time.t
+       and type nonce := Block_nonce.t
+       and type pow := Pow.t
 
     module Proof : Proof_intf with type input = t
   end
@@ -308,7 +310,7 @@ struct
 
   type t = {state: Proof_carrying_state.t} [@@deriving fields]
 
-  let step' t (transition: Transition.t) : t Deferred.t =
+  let step' t (transition : Transition.t) : t Deferred.t =
     let state = t.state.data in
     let proof = t.state.proof in
     let next_difficulty =
@@ -331,8 +333,8 @@ struct
 
   let create ~initial : t = {state= initial}
 
-  let check_state (old_pcd: Proof_carrying_state.t)
-      (new_pcd: Proof_carrying_state.t) =
+  let check_state (old_pcd : Proof_carrying_state.t)
+      (new_pcd : Proof_carrying_state.t) =
     let new_strength = new_pcd.data.strength in
     let old_strength = old_pcd.data.strength in
     if
@@ -341,10 +343,10 @@ struct
     then State.Proof.verify new_pcd.proof new_pcd.data
     else return false
 
-  let step (t: t) = function
+  let step (t : t) = function
     | Event.Found transition -> step' t transition
-    | Event.New_state pcd ->
+    | Event.New_state pcd -> (
         match%map check_state t.state pcd with
         | true -> {state= pcd}
-        | false -> t
+        | false -> t )
 end

@@ -1,0 +1,15 @@
+(library
+ (public_name lib)
+ (modules foo priv)
+ (private_modules priv))
+
+(library
+ (name lib_foo)
+ (public_name lib.foo)
+ (wrapped false)
+ (modules bar priv2)
+ (private_modules priv2))
+
+(alias
+ (name default)
+ (action (echo "%{read:lib.install}")))

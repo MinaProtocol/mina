@@ -78,7 +78,7 @@ module type Basic = sig
   
   and Data_spec : sig
     type ('r_var, 'r_value, 'k_var, 'k_value) t =
-      | ( :: ):
+      | ( :: ) :
           ('var, 'value) Typ.t * ('r_var, 'r_value, 'k_var, 'k_value) t
           -> ('r_var, 'r_value, 'var -> 'k_var, 'value -> 'k_value) t
       | [] : ('r_var, 'r_value, 'r_var, 'r_value) t
@@ -252,7 +252,7 @@ module type Basic = sig
        and type 'a t = 'a list
        and type boolean := Boolean.var
 
-    type _ Request.t += Choose_preimage: field * int -> bool list Request.t
+    type _ Request.t += Choose_preimage : field * int -> bool list Request.t
   end
   
   and Field : sig
@@ -466,7 +466,7 @@ module type Basic = sig
   val unhandled : response
 
   type request = Request.request =
-    | With:
+    | With :
         { request: 'a Request.t
         ; respond: 'a Request.Response.t -> response }
         -> request

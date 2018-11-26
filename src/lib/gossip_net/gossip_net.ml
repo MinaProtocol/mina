@@ -1,6 +1,8 @@
 open Core
 open Async
+open Pipe_lib
 open Kademlia
+open O1trace
 module Membership = Membership.Haskell
 
 type ('q, 'r) dispatch =
@@ -9,9 +11,10 @@ type ('q, 'r) dispatch =
 module type Message_intf = sig
   type msg
 
-  include Versioned_rpc.Both_convert.One_way.S
-          with type callee_msg := msg
-           and type caller_msg := msg
+  include
+    Versioned_rpc.Both_convert.One_way.S
+    with type callee_msg := msg
+     and type caller_msg := msg
 end
 
 module type Config_intf = sig
@@ -91,9 +94,9 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             create_connection_with_menu r w
             >>=? fun conn -> dispatch conn query ) )
     >>| function
-      | Ok (Ok result) -> Ok result
-      | Ok (Error exn) -> Error exn
-      | Error exn -> Or_error.of_exn exn
+    | Ok (Ok result) -> Ok result
+    | Ok (Error exn) -> Error exn
+    | Error exn -> Or_error.of_exn exn
 
   let broadcast_selected t peers msg =
     let peers = List.map peers ~f:(fun peer -> Peer.external_rpc peer) in
@@ -102,6 +105,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         (fun conn m -> return (Message.dispatch_multi conn m))
         msg
     in
+    trace_event "broadcasting message" ;
     Deferred.List.iter ~how:`Parallel peers ~f:(fun p ->
         match%map send p with
         | Ok () -> ()
@@ -111,75 +115,81 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     let selected_peers = random_sublist (Hash_set.to_list t.peers) n in
     broadcast_selected t selected_peers msg
 
-  let create (config: Config.t) implementations =
+  let create (config : Config.t) implementations =
     let log = Logger.child config.parent_log __MODULE__ in
-    let%map membership =
-      match%map
-        Membership.connect ~initial_peers:config.initial_peers ~me:config.me
-          ~conf_dir:config.conf_dir ~parent_log:log ~banlist:config.banlist
-      with
-      | Ok membership -> membership
-      | Error e ->
-          failwith
-            (Printf.sprintf "Failed to connect to kademlia process: %s\n"
-               (Error.to_string_hum e))
-    in
-    let peer_events = Membership.changes membership in
-    let broadcast_reader, broadcast_writer = Linear_pipe.create () in
-    let received_reader, received_writer = Linear_pipe.create () in
-    let t =
-      { timeout= config.timeout
-      ; log
-      ; target_peer_count= config.target_peer_count
-      ; broadcast_writer
-      ; received_reader
-      ; peers= Peer.Hash_set.create () }
-    in
-    don't_wait_for
-      (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader ~f:
-         (fun m ->
-           Logger.trace log "broadcasting message" ;
-           broadcast_random t t.target_peer_count m )) ;
-    let broadcast_received_capacity = 64 in
-    let implementations =
-      let implementations =
-        Versioned_rpc.Menu.add
-          ( Message.implement_multi (fun () ~version:_ msg ->
-                Linear_pipe.force_write_maybe_drop_head
-                  ~capacity:broadcast_received_capacity received_writer
-                  received_reader msg )
-          @ implementations )
-      in
-      Rpc.Implementations.create_exn ~implementations
-        ~on_unknown_rpc:`Close_connection
-    in
-    don't_wait_for
-      (Linear_pipe.iter_unordered ~max_concurrency:64 peer_events ~f:(function
-        | Connect peers ->
-            Logger.info log "Some peers connected %s"
-              (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
-            List.iter peers ~f:(fun peer -> Hash_set.add t.peers peer) ;
-            Deferred.unit
-        | Disconnect peers ->
-            Logger.info log "Some peers disconnected %s"
-              (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
-            List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer) ;
-            Deferred.unit )) ;
-    ignore
-      (Tcp.Server.create
-         ~on_handler_error:
-           (`Call
-             (fun _ exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
-         (Tcp.Where_to_listen.of_port (snd config.me))
-         (fun _ reader writer ->
-           Rpc.Connection.server_with_close reader writer ~implementations
-             ~connection_state:(fun _ -> ())
-             ~on_handshake_error:
+    trace_task "gossip net" (fun () ->
+        let%map membership =
+          match%map
+            trace_task "membership" (fun () ->
+                Membership.connect ~initial_peers:config.initial_peers
+                  ~me:config.me ~conf_dir:config.conf_dir ~parent_log:log
+                  ~banlist:config.banlist )
+          with
+          | Ok membership -> membership
+          | Error e ->
+              failwith
+                (Printf.sprintf "Failed to connect to kademlia process: %s\n"
+                   (Error.to_string_hum e))
+        in
+        let peer_events = Membership.changes membership in
+        let broadcast_reader, broadcast_writer = Linear_pipe.create () in
+        let received_reader, received_writer = Linear_pipe.create () in
+        let t =
+          { timeout= config.timeout
+          ; log
+          ; target_peer_count= config.target_peer_count
+          ; broadcast_writer
+          ; received_reader
+          ; peers= Peer.Hash_set.create () }
+        in
+        trace_task "rebroadcasting messages" (fun () ->
+            don't_wait_for
+              (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
+                 ~f:(fun m ->
+                   Logger.trace log "broadcasting message" ;
+                   broadcast_random t t.target_peer_count m )) ) ;
+        let broadcast_received_capacity = 64 in
+        let implementations =
+          let implementations =
+            Versioned_rpc.Menu.add
+              ( Message.implement_multi (fun () ~version:_ msg ->
+                    Linear_pipe.force_write_maybe_drop_head
+                      ~capacity:broadcast_received_capacity received_writer
+                      received_reader msg )
+              @ implementations )
+          in
+          Rpc.Implementations.create_exn ~implementations
+            ~on_unknown_rpc:`Close_connection
+        in
+        trace_task "peer events" (fun () ->
+            Linear_pipe.iter_unordered ~max_concurrency:64 peer_events
+              ~f:(function
+              | Connect peers ->
+                  Logger.info log "Some peers connected %s"
+                    (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
+                  List.iter peers ~f:(fun peer -> Hash_set.add t.peers peer) ;
+                  Deferred.unit
+              | Disconnect peers ->
+                  Logger.info log "Some peers disconnected %s"
+                    (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
+                  List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer) ;
+                  Deferred.unit )
+            |> ignore ) ;
+        ignore
+          (Tcp.Server.create
+             ~on_handler_error:
                (`Call
-                 (fun exn ->
-                   Logger.error log "%s" (Exn.to_string_mach exn) ;
-                   Deferred.unit )) )) ;
-    t
+                 (fun _ exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
+             (Tcp.Where_to_listen.of_port (snd config.me))
+             (fun _ reader writer ->
+               Rpc.Connection.server_with_close reader writer ~implementations
+                 ~connection_state:(fun _ -> ())
+                 ~on_handshake_error:
+                   (`Call
+                     (fun exn ->
+                       Logger.error log "%s" (Exn.to_string_mach exn) ;
+                       Deferred.unit )) )) ;
+        t )
 
   let received t = t.received_reader
 
@@ -197,11 +207,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
 
   let random_peers t n = random_sublist (Hash_set.to_list t.peers) n
 
-  let random_peers_except t n ~(except: Peer.Hash_set.t) =
+  let random_peers_except t n ~(except : Peer.Hash_set.t) =
     let new_peers = Hash_set.(diff t.peers except |> to_list) in
     random_sublist new_peers n
 
-  let query_peer t (peer: Peer.t) rpc query =
+  let query_peer t (peer : Peer.t) rpc query =
     Logger.trace t.log !"Querying peer %{sexp: Peer.t}" peer ;
     let peer = Peer.external_rpc peer in
     try_call_rpc peer t.timeout rpc query

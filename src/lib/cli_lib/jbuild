@@ -6,7 +6,7 @@
   (flags (:standard -short-paths -warn-error -58-39)) ; 39 for ppx_deriving_yojson
   (library_flags (-linkall))
   (inline_tests)
-  (modules (cli_lib secret_box))
+  (modules (cli_lib secret_box secret_file))
   (libraries
     ( core
       async_unix

@@ -7,15 +7,19 @@ open Tuple_lib
 type uint64 = Unsigned.uint64
 
 module type Basic = sig
-  type t [@@deriving bin_io, sexp, compare, hash]
+  type t [@@deriving bin_io, sexp, compare, hash, yojson]
+
+  val max_int : t
 
   include Comparable.S with type t := t
+
+  val gen_incl : t -> t -> t Quickcheck.Generator.t
 
   val gen : t Quickcheck.Generator.t
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
+      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash, yojson]
     end
   end
 
@@ -26,6 +30,8 @@ module type Basic = sig
   val length_in_triples : int
 
   val zero : t
+
+  val one : t
 
   val of_string : string -> t
 
@@ -77,6 +83,9 @@ module type Checked_arithmetic_intf = sig
 
   val sub_flagged :
     var -> var -> (var * [`Underflow of Boolean.var], _) Checked.t
+
+  val add_flagged :
+    var -> var -> (var * [`Overflow of Boolean.var], _) Checked.t
 
   val ( + ) : var -> var -> (var, _) Checked.t
 
@@ -157,16 +166,18 @@ module Fee : sig
 
   include Arithmetic_intf with type t := t
 
-  (* TODO: Get rid of signed fee, use signed amount *)
+  include Codable.S with type t := t
 
+  (* TODO: Get rid of signed fee, use signed amount *)
   module Signed :
     Signed_intf with type magnitude := t and type magnitude_var := var
 
   module Checked : sig
-    include Checked_arithmetic_intf
-            with type var := var
-             and type signed_var := Signed.var
-             and type t := t
+    include
+      Checked_arithmetic_intf
+      with type var := var
+       and type signed_var := Signed.var
+       and type t := t
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
   end
@@ -176,6 +187,8 @@ module Amount : sig
   include Basic
 
   include Arithmetic_intf with type t := t
+
+  include Codable.S with type t := t
 
   module Signed :
     Signed_intf with type magnitude := t and type magnitude_var := var
@@ -189,10 +202,11 @@ module Amount : sig
   val add_fee : t -> Fee.t -> t option
 
   module Checked : sig
-    include Checked_arithmetic_intf
-            with type var := var
-             and type signed_var := Signed.var
-             and type t := t
+    include
+      Checked_arithmetic_intf
+      with type var := var
+       and type signed_var := Signed.var
+       and type t := t
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
 
@@ -206,6 +220,8 @@ end
 
 module Balance : sig
   include Basic
+
+  val to_amount : t -> Amount.t
 
   val add_amount : t -> Amount.t -> t option
 

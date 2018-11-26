@@ -6,6 +6,8 @@ open Fold_lib
 
 type t = Field.t * Field.t [@@deriving bin_io, sexp, hash]
 
+include Codable.S with type t := t
+
 module Stable : sig
   module V1 : sig
     type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
@@ -25,11 +27,15 @@ val of_private_key_exn : Private_key.t -> t
 module Compressed : sig
   type ('field, 'boolean) t_ = {x: 'field; is_odd: 'boolean}
 
-  type t = (Field.t, bool) t_ [@@deriving bin_io, sexp, hash]
+  type t = (Field.t, bool) t_ [@@deriving bin_io, sexp, hash, yojson]
+
+  include Codable.S with type t := t
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, bin_io, eq, compare, hash]
+      type nonrec t = t [@@deriving sexp, bin_io, eq, compare, hash, yojson]
+
+      include Codable.S with type t := t
     end
   end
 
@@ -60,11 +66,15 @@ module Compressed : sig
   module Checked : sig
     val equal : var -> var -> (Boolean.var, _) Checked.t
 
+    val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+
     module Assert : sig
       val equal : var -> var -> (unit, _) Checked.t
     end
   end
 end
+
+val gen : t Quickcheck.Generator.t
 
 val of_bigstring : Bigstring.t -> t Or_error.t
 

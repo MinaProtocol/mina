@@ -60,5 +60,4 @@ end)
     val add : t -> t -> t
 
     val negate : t -> t
-end) :
-  S with type curve := Curve.t and type Digest.t = Field.t
+end) : S with type curve := Curve.t and type Digest.t = Field.t

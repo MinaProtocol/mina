@@ -1,15 +1,11 @@
-FROM gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
+FROM codaprotocol/coda:toolchain-956136e7b621813f03881a1c2ab29b9ca24b539c
 
-ENV PATH "/home/opam/.opam/4.07.0/bin:$PATH"
-ENV CAML_LD_LIBRARY_PATH "/home/opam/.opam/4.07.0/lib/stublibs"
-ENV MANPATH "/home/opam/.opam/4.07.0/man:"
-ENV PERL5LIB "/home/opam/.opam/4.07.0/lib/perl5"
-ENV OCAML_TOPLEVEL_PATH "/home/opam/.opam/4.07.0/lib/toplevel"
-
-RUN sudo apt-get install --yes python
-RUN CLOUDSDK_CORE_DISABLE_PROMPTS=1 curl https://sdk.cloud.google.com | bash
-RUN ~/google-cloud-sdk/bin/gcloud --quiet components update
-RUN ~/google-cloud-sdk/bin/gcloud components install kubectl
+ENV OPAM_DIR             "/home/opam/.opam/4.07"
+ENV PATH                 "${OPAM_DIR}/bin:$PATH"
+ENV CAML_LD_LIBRARY_PATH "${OPAM_DIR}/lib/stublibs"
+ENV MANPATH              "${OPAM_DIR}/man:"
+ENV PERL5LIB             "${OPAM_DIR}/lib/perl5"
+ENV OCAML_TOPLEVEL_PATH  "${OPAM_DIR}/lib/toplevel"
 
 WORKDIR /home/opam/app
 
@@ -29,7 +25,7 @@ RUN USER=opam && \
     sudo chown root:root /usr/local/bin/fixuid && \
     sudo chmod 4755 /usr/local/bin/fixuid && \
     sudo mkdir -p /etc/fixuid && \
-    sudo printf "user: $USER\ngroup: $GROUP\npaths: ['/home/opam','/nix']\n" | sudo tee /etc/fixuid/config.yml > /dev/null
+    sudo printf "user: $USER\ngroup: $GROUP\npaths: ['/home/opam']\n" | sudo tee /etc/fixuid/config.yml > /dev/null
 
 USER opam:opam
 ENTRYPOINT ["fixuid"]

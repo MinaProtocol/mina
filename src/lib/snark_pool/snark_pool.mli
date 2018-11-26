@@ -32,13 +32,9 @@ module Make (Proof : sig
 end) (Fee : sig
   type t [@@deriving sexp, bin_io]
 
-  val gen : t Quickcheck.Generator.t
-
   include Comparable.S with type t := t
 end) (Work : sig
   type t [@@deriving sexp, bin_io]
-
-  val gen : t Quickcheck.Generator.t
 
   include Hashable.S_binable with type t := t
 end) :

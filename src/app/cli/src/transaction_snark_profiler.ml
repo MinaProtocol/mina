@@ -20,22 +20,21 @@ let create_ledger_and_transactions num_transitions =
   Array.iter keys ~f:(fun k ->
       let public_key = Public_key.compress k.public_key in
       Ledger.create_new_account_exn ledger public_key
-        { public_key
-        ; balance= Currency.Balance.of_int 10_000
-        ; receipt_chain_hash= Receipt.Chain_hash.empty
-        ; nonce= Account.Nonce.zero } ) ;
-  let txn from_kp (to_kp: Signature_lib.Keypair.t) amount fee nonce =
-    let payload : Transaction.Payload.t =
-      {receiver= Public_key.compress to_kp.public_key; fee; amount; nonce}
+        (Account.create public_key (Currency.Balance.of_int 10_000)) ) ;
+  let txn from_kp (to_kp : Signature_lib.Keypair.t) amount fee nonce =
+    let payload : User_command.Payload.t =
+      User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
+        ~body:
+          (Payment {receiver= Public_key.compress to_kp.public_key; amount})
     in
-    Transaction.sign from_kp payload
+    User_command.sign from_kp payload
   in
   let nonces =
     Public_key.Compressed.Table.of_alist_exn
       (List.map (Array.to_list keys) ~f:(fun k ->
            (Public_key.compress k.public_key, Account.Nonce.zero) ))
   in
-  let random_transaction () : Transaction.With_valid_signature.t =
+  let random_transaction () : User_command.With_valid_signature.t =
     let sender_idx = Random.int num_accounts in
     let sender = keys.(sender_idx) in
     let receiver = keys.(Random.int num_accounts) in
@@ -56,7 +55,9 @@ let create_ledger_and_transactions num_transitions =
         let open Currency.Fee in
         let total_fee =
           List.fold transactions ~init:zero ~f:(fun acc t ->
-              Option.value_exn (add acc (t :> Transaction.t).payload.fee) )
+              Option.value_exn
+                (add acc
+                   (User_command.Payload.fee (t :> User_command.t).payload)) )
         in
         Fee_transfer.One (Public_key.compress keys.(0).public_key, total_fee)
       in
@@ -67,8 +68,7 @@ let create_ledger_and_transactions num_transitions =
         |> Or_error.ok_exn
       in
       let transitions =
-        List.map transactions ~f:(fun t ->
-            Transaction_snark.Transition.Transaction t )
+        List.map transactions ~f:(fun t -> Transaction.User_command t)
         @ [Coinbase coinbase; Fee_transfer fee_transfer]
       in
       (ledger, transitions)
@@ -84,7 +84,7 @@ let create_ledger_and_transactions num_transitions =
           Currency.Fee.zero
           (Account.Nonce.succ Account.Nonce.zero)
       in
-      (ledger, [Transaction a; Transaction b])
+      (ledger, [User_command a; User_command b])
 
 let time thunk =
   let start = Time.now () in
@@ -100,16 +100,16 @@ let rec pair_up = function
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
 let profile (module T : Transaction_snark.S) sparse_ledger0
-    (transitions: Transaction_snark.Transition.t list) =
+    (transitions : Transaction.t list) =
   let (base_proof_time, _), base_proofs =
-    List.fold_map transitions ~init:(Time.Span.zero, sparse_ledger0) ~f:
-      (fun (max_span, sparse_ledger) t ->
+    List.fold_map transitions ~init:(Time.Span.zero, sparse_ledger0)
+      ~f:(fun (max_span, sparse_ledger) t ->
         let sparse_ledger' =
-          Sparse_ledger.apply_super_transaction_exn sparse_ledger t
+          Sparse_ledger.apply_transaction_exn sparse_ledger t
         in
         let span, proof =
           time (fun () ->
-              T.of_transition ~sok_digest:Sok_message.Digest.default
+              T.of_transaction ~sok_digest:Sok_message.Digest.default
                 ~source:(Sparse_ledger.merkle_root sparse_ledger)
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
                 t
@@ -122,8 +122,8 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
     | [x] -> serial_time
     | _ ->
         let layer_time, new_proofs =
-          List.fold_map (pair_up proofs) ~init:Time.Span.zero ~f:
-            (fun max_time (x, y) ->
+          List.fold_map (pair_up proofs) ~init:Time.Span.zero
+            ~f:(fun max_time (x, y) ->
               let pair_time, proof =
                 time (fun () ->
                     T.merge ~sok_digest:Sok_message.Digest.default x y
@@ -136,8 +136,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
   let total_time = merge_all base_proof_time base_proofs in
   Printf.sprintf !"Total time was: %{Time.Span}" total_time
 
-let check_base_snarks sparse_ledger0
-    (transitions: Transaction_snark.Transition.t list) =
+let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) =
   let _ =
     let sok_message =
       Sok_message.create ~fee:Currency.Fee.zero
@@ -146,10 +145,10 @@ let check_base_snarks sparse_ledger0
     in
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
         let sparse_ledger' =
-          Sparse_ledger.apply_super_transaction_exn sparse_ledger t
+          Sparse_ledger.apply_transaction_exn sparse_ledger t
         in
         let () =
-          Transaction_snark.check_transition ~sok_message
+          Transaction_snark.check_transaction ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
             t
@@ -167,9 +166,9 @@ let run profiler num_transactions =
            match t with
            | Fee_transfer t ->
                List.map (Fee_transfer.to_list t) ~f:(fun (pk, _) -> pk)
-           | Transaction t ->
-               let t = (t :> Transaction.t) in
-               [t.payload.receiver; Public_key.compress t.sender]
+           | User_command t ->
+               let t = (t :> User_command.t) in
+               User_command.accounts_accessed t
            | Coinbase {proposer; fee_transfer} ->
                proposer :: Option.to_list (Option.map fee_transfer ~f:fst) ))
   in

@@ -1,0 +1,11 @@
+(library
+ (name        hello)
+ (public_name hello)
+ (modules ())
+ (libraries plop.ca-marche))
+
+(library
+ (name        pas_de_bol)
+ (public_name pas-de-bol)
+ (modules a b)
+ (libraries plop.ca-marche-pas))

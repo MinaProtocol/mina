@@ -1,3 +1,6 @@
+[%%import
+"../../../config.mlh"]
+
 open Core
 open Async
 open Coda_base
@@ -28,6 +31,7 @@ module type S = sig
     -> Blockchain.t
     -> Consensus_mechanism.Protocol_state.value
     -> Consensus_mechanism.Snark_transition.value
+    -> Consensus_mechanism.Prover_state.t
     -> Blockchain.t Deferred.Or_error.t
 end
 
@@ -47,6 +51,7 @@ struct
            Blockchain.t
         -> Consensus_mechanism.Protocol_state.value
         -> Consensus_mechanism.Snark_transition.value
+        -> Consensus_mechanism.Prover_state.t
         -> Blockchain.t
 
       val verify : Consensus_mechanism.Protocol_state.value -> Proof.t -> bool
@@ -69,8 +74,8 @@ struct
           open Keys
           module Consensus_mechanism = Keys.Consensus_mechanism
           module Transaction_snark = Transaction_snark
-          module Blockchain_state = Blockchain_state.Make (Keys.
-                                                           Consensus_mechanism)
+          module Blockchain_state =
+            Blockchain_state.Make (Keys.Consensus_mechanism)
           module State = Blockchain_state.Make_update (Transaction_snark)
 
           let wrap hash proof =
@@ -80,9 +85,10 @@ struct
               Wrap.input {Wrap.Prover_state.proof} Wrap.main
               (Wrap_input.of_tick_field hash)
 
-          let extend_blockchain (chain: Blockchain.t)
-              (next_state: Keys.Consensus_mechanism.Protocol_state.value)
-              (block: Keys.Consensus_mechanism.Snark_transition.value) =
+          let extend_blockchain (chain : Blockchain.t)
+              (next_state : Keys.Consensus_mechanism.Protocol_state.value)
+              (block : Keys.Consensus_mechanism.Snark_transition.value)
+              state_for_handler =
             let next_state_top_hash = Keys.Step.instance_hash next_state in
             let prover_state =
               { Keys.Step.Prover_state.prev_proof= chain.proof
@@ -90,11 +96,14 @@ struct
               ; prev_state= chain.state
               ; update= block }
             in
+            let main x =
+              Tick.handle (Keys.Step.main x)
+                (Consensus_mechanism.Prover_state.handler state_for_handler)
+            in
             let prev_proof =
               Tick.prove
                 (Tick.Keypair.pk Keys.Step.keys)
-                (Keys.Step.input ()) prover_state Keys.Step.main
-                next_state_top_hash
+                (Keys.Step.input ()) prover_state main next_state_top_hash
             in
             { Blockchain.state= next_state
             ; proof= wrap next_state_top_hash prev_proof }
@@ -121,31 +130,57 @@ struct
     let create input output f : ('i, 'o) t = (input, output, f)
 
     let initialized =
-      create bin_unit [%bin_type_class : [`Initialized]] (fun w () ->
+      create bin_unit [%bin_type_class: [`Initialized]] (fun w () ->
           let%map (module W) = Worker_state.get w in
           `Initialized )
 
+    [%%if
+    with_snark]
+
     let extend_blockchain =
       create
-        [%bin_type_class
-          : Blockchain.t
-            * Consensus_mechanism.Protocol_state.value
-            * Consensus_mechanism.Snark_transition.value] Blockchain.bin_t
+        [%bin_type_class:
+          Blockchain.t
+          * Consensus_mechanism.Protocol_state.value
+          * Consensus_mechanism.Snark_transition.value
+          * Consensus_mechanism.Prover_state.t] Blockchain.bin_t
         (fun w
         ( ({Blockchain.state= prev_state; proof= prev_proof} as chain)
         , next_state
-        , transition )
+        , transition
+        , prover_state )
         ->
           let%map (module W) = Worker_state.get w in
-          if Insecure.extend_blockchain then
-            let proof = Precomputed_values.base_proof in
-            {Blockchain.proof; state= next_state}
-          else W.extend_blockchain chain next_state transition )
+          W.extend_blockchain chain next_state transition prover_state )
 
     let verify_blockchain =
       create Blockchain.bin_t bin_bool (fun w {Blockchain.state; proof} ->
           let%map (module W) = Worker_state.get w in
-          if Insecure.verify_blockchain then true else W.verify state proof )
+          W.verify state proof )
+
+    [%%else]
+
+    let extend_blockchain =
+      create
+        [%bin_type_class:
+          Blockchain.t
+          * Consensus_mechanism.Protocol_state.value
+          * Consensus_mechanism.Snark_transition.value
+          * Consensus_mechanism.Prover_state.t] Blockchain.bin_t
+        (fun w
+        ( {Blockchain.state= prev_state; proof= prev_proof}
+        , next_state
+        , transition
+        , prover_state )
+        ->
+          let proof = Precomputed_values.base_proof in
+          Deferred.return {Blockchain.proof; state= next_state} )
+
+    let verify_blockchain =
+      create Blockchain.bin_t bin_bool (fun w {Blockchain.state; proof} ->
+          Deferred.return true )
+
+    [%%endif]
   end
 
   module Worker = struct
@@ -159,6 +194,7 @@ struct
             , Blockchain.t
               * Consensus_mechanism.Protocol_state.value
               * Consensus_mechanism.Snark_transition.value
+              * Consensus_mechanism.Prover_state.t
             , Blockchain.t )
             F.t
         ; verify_blockchain: ('w, Blockchain.t, bool) F.t }
@@ -212,9 +248,9 @@ struct
   let initialized {connection; _} =
     Worker.Connection.run connection ~f:Worker.functions.initialized ~arg:()
 
-  let extend_blockchain {connection; _} chain next_state block =
+  let extend_blockchain {connection; _} chain next_state block prover_state =
     Worker.Connection.run connection ~f:Worker.functions.extend_blockchain
-      ~arg:(chain, next_state, block)
+      ~arg:(chain, next_state, block, prover_state)
 
   let verify_blockchain {connection; _} chain =
     Worker.Connection.run connection ~f:Worker.functions.verify_blockchain

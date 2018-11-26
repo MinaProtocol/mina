@@ -15,14 +15,12 @@ module Let_syntax : sig
 
     val both : ('a, 'e) t -> ('b, 'e) t -> ('a * 'b, 'e) t
 
-    module Open_on_rhs : sig
-      
-    end
+    module Open_on_rhs : sig end
   end
 end
 
 val component :
-  label:string -> f:('e -> 'a) -> 'a Bin_prot.Type_class.t -> ('a value, 'e) t
+  label:string -> f:('e -> 'a) -> 'a Binable.m -> ('a value, 'e) t
 
 type ('a, 'e) cached = ('a, 'e) t
 

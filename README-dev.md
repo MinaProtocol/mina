@@ -2,14 +2,15 @@
 
 Coda is a new cryptocurrency protocol with a lightweight, constant sized blockchain.
 
-* [Coda Protocol Website](https://codaprotocol.com/)
-* [Coda Protocol Roadmap](https://github.com/orgs/CodaProtocol/projects/1)
+* [Developer homepage](https://codaprotocol.com/code.html)
+* [Roadmap](https://github.com/orgs/CodaProtocol/projects/1)
+* [Repository Readme](README.md)
 
 If you haven't seen it yet, [CONTRIBUTING.md](CONTRIBUTING.md) has information
 about our development process and how to contribute. If you just want to build
 Coda, this is the right file!
 
-# Building Coda
+## Building Coda
 
 Building Coda can be slightly involved. There are many C library dependencies that need
 to be present in the system, as well as some OCaml-specific setup.
@@ -18,63 +19,47 @@ Currently, Coda only builds/runs on Linux. Building on macOS [is tracked in this
 
 The short version:
 
-1. Install Docker, GNU make, and bash
-2. `make USEDOCKER=TRUE dev`
-3. `make USEDOCKER=TRUE deb`
+ 1. Start with Ubuntu 18 or run it in a [virtual machine](https://www.osboxes.org/ubuntu/)
+ 2. Install Docker, GNU make, and bash
+ 3. `make USEDOCKER=TRUE dev`
+ 4. `make USEDOCKER=TRUE deb`
 
-Now you'll have a `_build/codaclient.deb` ready to install on Ubuntu or Debian!
+Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debian!
 
-## Developer Setup
+### Developer Setup
 
-### Setup Docker CE on Linux
-[Ubuntu Setup Instructions](https://docs.docker.com/install/linux/docker-ce/ubuntu/)
+#### Install or have Ubuntu 18
 
-### Setup Google Cloud gcloud
-We use gcloud to store developer container images
+* [VM Images](https://www.osboxes.org/ubuntu/)
 
-[Instructions to install gcloud sdk](https://cloud.google.com/sdk/install)
+#### Setup Docker CE on Ubuntu
 
-### Take a Snapshot
-If developing on a VM, now is a good time to take a snapshot and save your state.
+* [Ubuntu Setup Instructions](https://docs.docker.com/install/linux/docker-ce/ubuntu/)
 
-### Login and test gcloud access
+#### Toolchain docker image
 
-* Authorize gcloud with your o1 account\
-`gcloud auth login`
+* Pull down developer container image  (~2GB download, go stretch your legs)
 
-* Setup docker to use google cloud registry\
-`gcloud auth configure-docker`
+`docker pull codaprotocol/coda:toolchain-9aea9e820e487fabb79e3c8c27372a50fbf77289`
 
-* Setup project id (o1 internal id)\
-`gcloud config set project o1labs-192920`
+* Create local builder image
 
-* Test gcloud/docker access\
-`docker run -it gcr.io/o1labs-192920/hellocoda`
+`make codabuilder`
 
-### Build a dev docker image
-* clone this repository
-* Pull down dev container  (~7GB download, go stretch your legs)\
-`make docker`
+* Start developer container
 
-### First code build
+`make containerstart`
 
-* Change your shell path to include our scripts directory.\
-(REMEMBER to change the HOME and SOURCE directory to match yours)
+* Start a build (go stretch your arms)
+
+`make USEDOCKER=TRUE build`
+
+#### Customizing your dev environment for autocomplete/merlin
+
+* If you use vim, add this snippet in your vimrc to use merlin. (REMEMBER to change the HOME directory to match yours)
 
 ```bash
-export PATH=path/to/coda/scripts:$PATH
-```
-
-* Start a build (go stretch your arms)\
-`make dev`
-
-### Customizing your dev environment for autocomplete/merlin
-
-* If you use vim, add this snippet in your vimrc to use merlin.\
-(REMEMBER to change the HOME directory to match yours)
-
-```bash
-let s:ocamlmerlin="/Users/bkase/.opam/4.06.0/share/merlin"
+let s:ocamlmerlin="/Users/USERNAME/.opam/4.07/share/merlin"
 execute "set rtp+=".s:ocamlmerlin."/vim"
 execute "set rtp+=".s:ocamlmerlin."/vimbufsync"
 let g:syntastic_ocaml_checkers=['merlin']
@@ -85,10 +70,25 @@ let g:syntastic_ocaml_checkers=['merlin']
 * Now `/usr/bin/opam install merlin ocp-indent core async ppx_jane ppx_deriving` (everything we depend on, that you want autocompletes for) for doc reasons
 * Make sure you have `au FileType ocaml set omnifunc=merlin#Complete` in your vimrc
 * Install an auto-completer (such as YouCompleteMe) and a syntastic (such syntastic or ALE)
-
 * If you use vscode, you might like these extensions
-   * [OCaml and Reason IDE](https://marketplace.visualstudio.com/items?itemName=freebroccolo.reasonml)
-   * [Dune](https://marketplace.visualstudio.com/items?itemName=maelvalais.dune)
+  * [OCaml and Reason IDE](https://marketplace.visualstudio.com/items?itemName=freebroccolo.reasonml)
+  * [Dune](https://marketplace.visualstudio.com/items?itemName=maelvalais.dune)
+
+* If you use emacs, besides the `opam` packages mentioned above, also install `tuareg`, and add the following to your .emacs file:
+```lisp
+(let ((opam-share (ignore-errors (car (process-lines "opam" "config" "var" "share")))))
+  (when (and opam-share (file-directory-p opam-share))
+    ;; Register Merlin
+    (add-to-list 'load-path (expand-file-name "emacs/site-lisp" opam-share))
+    (load "tuareg-site-file")
+    (autoload 'merlin-mode "merlin" nil t nil)
+    ;; Automatically start it in OCaml buffers
+    (add-hook 'tuareg-mode-hook 'merlin-mode t)
+    (add-hook 'caml-mode-hook 'merlin-mode t)))
+```
+
+Emacs has a built-in autocomplete, via `M-x completion-at-point`, or simply `M-tab`. There are other
+Emacs autocompletion packages; see [Emacs from scratch] (https://github.com/ocaml/merlin/wiki/emacs-from-scratch).
 
 ## Using the makefile
 
@@ -99,13 +99,13 @@ You should probably use `USEDOCKER=TRUE` unless you've done the [building withou
 
 These are the most important `make` targets:
 
-- `kademlia`: build the kademlia helper
-- `build`: build everything
-- `docker`: build the container
-- `container`: restart the development container (or start it if it's not yet)
-- `dev`: does `docker`, `container`, and `build`
-- `test`: run the tests
-- `web`: build the website, including the state explorer
+* `kademlia`: build the kademlia helper
+* `build`: build everything
+* `docker`: build the container
+* `container`: restart the development container (or start it if it's not yet)
+* `dev`: does `docker`, `container`, and `build`
+* `test`: run the tests
+* `web`: build the website, including the state explorer
 
 We use the [dune](https://github.com/ocaml/dune/) buildsystem for our OCaml code.
 
@@ -116,14 +116,15 @@ NOTE: all of the `test-*` targets (including `test-all`) won't run in the contai
 
 Coda has a variety of opam and system dependencies.
 
-You can see [`Dockerfile-base`](/dockerfiles/Dockerfile-base) for how we
+You can see [`Dockerfile-toolchain`](/dockerfiles/Dockerfile-toolchain) for how we
 install them all in the container. To get all the opam dependencies
 you need, you run `opam switch import src/opam.export`.
 
 Some of our dependencies aren't taken from `opam`, and aren't integrated
 with `dune`, so you need to add them manually:
 
-- `opam pin add src/external/ocaml-sodium`
+* `opam pin add src/external/ocaml-sodium`
+* `opam pin add src/external/ocaml-rocksdb`
 
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles.
@@ -137,19 +138,19 @@ in the form of `dune exec coda -- integration-tests $SOME_TEST`.
 
 You might see a build error like this:
 
-```
+```text
 Error: Files external/digestif/src-c/.digestif_c.objs/digestif.cmx
        and external/digestif/src-c/.digestif_c.objs/rakia.cmx
        make inconsistent assumptions over implementation Rakia
 ```
 
-You can work around it with `rm -r _build/default/src/$OFFENDING_PATH` and a rebuild.
+You can work around it with `rm -r src/_build/default/src/$OFFENDING_PATH` and a rebuild.
 Here, the offending path is `external/digestif/src-c/.diestif_c.objs`.
 
 ## Docker Image Family Tree
 
 Container Stages:
-* [ocaml/ocaml:debian-stable](https://hub.docker.com/r/ocaml/ocaml/) (community image, ~856MB) 
-* ocaml407 (built by us, stored in gcr, ~1.7GB)
-* ocaml-base (built by us, stored in gcr, ~7.1GB -- external dependencies and haskell)
-* nanotest (built with `make docker`, used with `make dev`, ~7.8GB)
+
+* Stage 0: Initial Image [ocaml/opam2:debian-9-ocaml-4.07](https://hub.docker.com/r/ocaml/opam2/) (opam community image, ~880MB)
+* Stage 1: [coda toolchain](https://github.com/CodaProtocol/coda/blob/master/dockerfiles/Dockerfile-toolchain) (built by us, stored on docker hub, ~2GB compressed)
+* Stage 2: [codabuilder](https://github.com/CodaProtocol/coda/blob/master/dockerfiles/Dockerfile) (built with `make codabuilder`, used with `make build`, ~2GB compressed)

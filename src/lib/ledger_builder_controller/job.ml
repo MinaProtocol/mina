@@ -8,11 +8,11 @@ type ('input, 'output) t =
 
 let create input ~f = {input; fn= f; after= Fn.id}
 
-let run ({input; fn; after}: ('input, 'output) t) =
+let run ({input; fn; after} : ('input, 'output) t) =
   let interruptible, ivar = fn input in
   (Interruptible.finally interruptible ~f:after, ivar)
 
-let map ({input; fn; after}: ('input, 'output) t) ~f =
+let map ({input; fn; after} : ('input, 'output) t) ~f =
   { input
   ; fn=
       Fn.compose

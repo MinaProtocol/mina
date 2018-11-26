@@ -22,10 +22,11 @@ let of_single_list xs =
 let fee_excess = function
   | One (_, fee) ->
       Ok (Currency.Fee.Signed.negate @@ Currency.Fee.Signed.of_unsigned fee)
-  | Two ((_, fee1), (_, fee2)) ->
+  | Two ((_, fee1), (_, fee2)) -> (
     match Currency.Fee.add fee1 fee2 with
     | None -> Or_error.error_string "Fee_transfer.fee_excess: overflow"
     | Some res ->
         Ok (Currency.Fee.Signed.negate @@ Currency.Fee.Signed.of_unsigned res)
+    )
 
 let receivers t = List.map (to_list t) ~f:(fun (pk, _) -> pk)

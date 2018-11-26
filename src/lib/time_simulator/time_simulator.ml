@@ -97,7 +97,7 @@ let now = Controller.now
 module Timeout = struct
   type 'a t = {d: 'a Deferred.t; elt: Action.t Heap.Elt.t; cancel: 'a Ivar.t}
 
-  let create (ctrl: Controller.t) span ~f =
+  let create (ctrl : Controller.t) span ~f =
     let ivar = Ivar.create () in
     let cancel = Ivar.create () in
     let d = Deferred.any [Ivar.read ivar >>| f; Ivar.read cancel] in
@@ -113,7 +113,7 @@ module Timeout = struct
 
   let peek {d; _} = Deferred.peek d
 
-  let cancel (ctrl: Controller.t) {elt; cancel; _} a =
+  let cancel (ctrl : Controller.t) {elt; cancel; _} a =
     Heap.remove ctrl.actions elt ;
     Ivar.fill_if_empty cancel a
 end
@@ -128,12 +128,12 @@ let%test_unit "tick triggers timeouts and fast-forwards to event time" =
       ~f:(fun _t -> fired := true)
   in
   Async.Thread_safe.block_on_async_exn (fun () ->
-      [%test_result : Bool.t]
+      [%test_result: Bool.t]
         ~message:"Time in simulator land doesn't progress until with tick"
         ~expect:false !fired ;
       let%map () = Controller.tick ctrl in
-      [%test_result : Bool.t] ~message:"We ticked" ~expect:true !fired ;
-      [%test_result : Bool.t]
+      [%test_result: Bool.t] ~message:"We ticked" ~expect:true !fired ;
+      [%test_result: Bool.t]
         ~message:"Time fast-forwads to at least event time" ~expect:true
         (diff (now ctrl) start >= Int64.of_int 5000) )
 
@@ -148,12 +148,12 @@ let%test_unit "tick triggers timeouts and adjusts to system time" =
   in
   Async.Thread_safe.block_on_async_exn (fun () ->
       let%bind () = Async.after (Time.Span.of_ms 5.) in
-      [%test_result : Bool.t]
+      [%test_result: Bool.t]
         ~message:"Time in simulator land doesn't progress until with tick"
         ~expect:false !fired ;
       let%map () = Controller.tick ctrl in
-      [%test_result : Bool.t] ~message:"We ticked" ~expect:true !fired ;
-      [%test_result : Bool.t]
+      [%test_result: Bool.t] ~message:"We ticked" ~expect:true !fired ;
+      [%test_result: Bool.t]
         ~message:
           "Since 10ms of real time passed, we need to jump more than the 5ms \
            of the event"
@@ -173,14 +173,14 @@ let%test_unit "tick handles multiple timeouts if necessary" =
   List.iter [2; 3; 5; 500] ~f:timeout ;
   Async.Thread_safe.block_on_async_exn (fun () ->
       let%bind () = Async.after (Time.Span.of_ms 7.) in
-      [%test_result : Int.t]
+      [%test_result: Int.t]
         ~message:"Time in simulator land doesn't progress until with tick"
         ~expect:0 !count ;
       let%map () = Controller.tick ctrl in
-      [%test_result : Int.t]
+      [%test_result: Int.t]
         ~message:"Sys time elapsed so we triggered more than one event"
         ~expect:3 !count ;
-      [%test_result : Bool.t]
+      [%test_result: Bool.t]
         ~message:
           "Since 10ms of real time passed, we need to jump more than the 5ms \
            of the event"
@@ -201,6 +201,6 @@ let%test_unit "cancelling a timeout means it won't fire" =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let%bind () = Async.after (Time.Span.of_ms 7.) in
       let%map () = Controller.tick ctrl in
-      [%test_result : String.t]
+      [%test_result: String.t]
         ~message:"We only triggered the events that we didn't cancel"
         ~expect:"ac" !message )

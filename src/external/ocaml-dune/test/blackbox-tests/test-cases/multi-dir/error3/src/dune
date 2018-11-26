@@ -1,0 +1,5 @@
+(library (name foo))
+
+(rule (with-stdout-to generated.ml (run gen/gen.exe)))
+
+(include_subdirs unqualified)

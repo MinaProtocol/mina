@@ -8,7 +8,7 @@ module Pos = struct
   type t = {x: float; y: float}
 end
 
-let float_to_string value = Js.to_string (Js.number_of_float value) ## toString
+let float_to_string value = Js.to_string (Js.number_of_float value)##toString
 
 module Svg = struct
   open Virtual_dom.Vdom
@@ -37,7 +37,7 @@ module Svg = struct
 
   (* Make little merkle tree for mobile *)
 
-  let circle ~radius ~color ~(center: Pos.t) =
+  let circle ~radius ~color ~(center : Pos.t) =
     Node.svg "circle"
       [ Attr.create "r" (float_to_string radius)
       ; Attr.create "cx" (float_to_string center.x)
@@ -45,7 +45,7 @@ module Svg = struct
       ; Attr.create "style" (sprintf "fill:%s" color) ]
       []
 
-  let rect ?radius ~color ~width ~height ~(center: Pos.t) =
+  let rect ?radius ~color ~width ~height ~(center : Pos.t) =
     let corner_x = center.x -. (width /. 2.) in
     let corner_y = center.y -. (height /. 2.) in
     let rad_attrs =
@@ -61,7 +61,7 @@ module Svg = struct
       @ rad_attrs )
       []
 
-  let triangle ?radius ~color ~width ~height ~(center: Pos.t) =
+  let triangle ?radius ~color ~width ~height ~(center : Pos.t) =
     let p0x, p0y = (center.x -. (width /. 2.0), center.y +. (height /. 2.0)) in
     let p1x, p1y = (center.x +. (width /. 2.0), center.y +. (height /. 2.0)) in
     let p2x, p2y = (center.x, center.y -. (height /. 2.0)) in
@@ -77,18 +77,8 @@ module Svg = struct
       []
 end
 
-let rest_server_port = 8080
-
-let url s = sprintf "http://localhost:%d/%s" rest_server_port s
-
 let get_account _pk on_sucess on_error =
   let url = sprintf !"%s/chain" Web_response.s3_link in
-  (* IF serialization does not work, please try the following code:
-  
-  let url = sprintf !"%s/sample_chain" s3_link in
-
-     Use "%s/chain" in production
-   *)
   Web_response.get url
     (fun s ->
       let chain = Binable.of_string (module Lite_chain) (B64.decode s) in
@@ -118,11 +108,11 @@ module State = struct
   let chain_length chain =
     chain.Lite_chain.protocol_state.consensus_state.length
 
-  let should_update state (new_chain: Lite_chain.t) =
+  let should_update state (new_chain : Lite_chain.t) =
     Length.compare (chain_length new_chain) (chain_length state.chain) > 0
 end
 
-let color_of_hash (h: Pedersen.Digest.t) : string =
+let color_of_hash (h : Pedersen.Digest.t) : string =
   let int_to_hex_char n =
     assert (0 <= n) ;
     assert (n < 16) ;
@@ -246,7 +236,7 @@ module Html = struct
     let create ~active ~text ?alt_text ~arity () =
       {text; alt_text; active; arity}
 
-    let body ?(extra_style= Style.empty) text_node =
+    let body ?(extra_style = Style.empty) text_node =
       div
         [ Style.(
             render
@@ -353,8 +343,8 @@ module Html = struct
                     + if important then of_class "f8" else of_class "f7" )) ]
               [text value] ]
 
-      let create verification ?(extra_style= Style.empty) ?width
-          ?(important= false) label value =
+      let create verification ?(extra_style = Style.empty) ?width
+          ?(important = false) label value =
         let _ = width in
         {label; value; verification; extra_style; important}
     end
@@ -362,14 +352,14 @@ module Html = struct
     module Row = struct
       type t = Entry.t list
 
-      let render (t: t) = div [Style.just "mb2"] (List.map ~f:Entry.render t)
+      let render (t : t) = div [Style.just "mb2"] (List.map ~f:Entry.render t)
     end
 
     type t = {style: Style.t; rows: Row.t list; heading: string option}
 
-    let create ?(style= Style.empty) heading rows = {style; rows; heading}
+    let create ?(style = Style.empty) heading rows = {style; rows; heading}
 
-    let render ?tooltip ?(grouping= `Separate) {style; rows; heading} width =
+    let render ?tooltip ?(grouping = `Separate) {style; rows; heading} width =
       let width =
         match width with
         | `Wide -> Style.of_class "mw5"
@@ -424,7 +414,7 @@ let hash_colors = [|"#76cd87"; "#4782a0"; "#ac80a0"; "#89aae6"; "#3685b5"|]
 
 let color_at_layer i = hash_colors.(i mod Array.length hash_colors)
 
-let hoverable ?(extra_style= Style.empty) state node target =
+let hoverable ?(extra_style = Style.empty) state node target =
   let update_tooltip _ =
     if not (js_is_mobile_small ()) then
       !g_update_state_and_vdom {state with State.tooltip_stage= target} ;
@@ -438,13 +428,13 @@ let hoverable ?(extra_style= Style.empty) state node target =
   in
   let mobile_update_toggle _ =
     ( if js_is_mobile_small () then
-        let target' =
-          match (state.State.tooltip_stage, target) with
-          | Tooltip_stage.None, _ -> target
-          | x, y when Tooltip_stage.equal x y -> Tooltip_stage.None
-          | _ -> target
-        in
-        !g_update_state_and_vdom {state with State.tooltip_stage= target'} ) ;
+      let target' =
+        match (state.State.tooltip_stage, target) with
+        | Tooltip_stage.None, _ -> target
+        | x, y when Tooltip_stage.equal x y -> Tooltip_stage.None
+        | _ -> target
+      in
+      !g_update_state_and_vdom {state with State.tooltip_stage= target'} ) ;
     Event.Stop_propagation
   in
   let open Node in
@@ -504,14 +494,14 @@ let merkle_tree num_layers_to_show =
 *)
     (x_uncompressed, y_uncompressed)
   in
-  fun state (tree0: ('hash, 'account) Sparse_ledger_lib.Sparse_ledger.tree)
+  fun state (tree0 : ('hash, 'account) Sparse_ledger_lib.Sparse_ledger.tree)
       ~extra_style ->
     let verification = state.State.verification in
     let create_entry = Html.Record.Entry.create verification in
     let tree0 = drop_top_of_tree ~desired_layers:num_layers_to_show tree0 in
     let specs =
       let rec go acc layer index
-          (t: ('h, 'a) Sparse_ledger_lib.Sparse_ledger.tree) =
+          (t : ('h, 'a) Sparse_ledger_lib.Sparse_ledger.tree) =
         let pos : Pos.t = {x= x_pos ~layer ~index; y= y_pos ~layer} in
         let hash_spec = Spec.Node {pos; color= color_at_layer layer} in
         let finish x = List.rev (x :: acc) in
@@ -555,7 +545,8 @@ let merkle_tree num_layers_to_show =
         match List.last_exn specs with
         | Spec.Node _ -> None
         | Spec.Account
-            {pos= _; account= {public_key; balance; nonce; receipt_chain_hash}} ->
+            {pos= _; account= {public_key; balance; nonce; receipt_chain_hash}}
+          ->
             let record =
               let open Html.Record in
               create None
@@ -629,8 +620,8 @@ let merkle_tree num_layers_to_show =
         else colors
       in
       let sibling_nodes =
-        List.map2_exn sibling_edge_positions colors ~f:
-          (fun (_, dest, right) _ ->
+        List.map2_exn sibling_edge_positions colors
+          ~f:(fun (_, dest, right) _ ->
             let color = "#bcbcbc" in
             let size = 12.0 in
             let center =
@@ -787,7 +778,8 @@ let state_html state =
          in
          div
            [Style.(render (of_class "flex justify-center"))]
-           [ div [Style.render heading_style]
+           [ div
+               [Style.render heading_style]
                [ div
                    [ Style.(
                        render
@@ -837,7 +829,8 @@ let state_html state =
       Style.(of_class "silver tc mt0 mb4 f5 mw6 center fw3 lh-copy")
     in
     let br = Node.create "br" in
-    Node.h2 [Style.render heading_style]
+    Node.h2
+      [Style.render heading_style]
       [ Node.text
           "The properties below constitute the full, live Coda protocol state \
            and are being fully verified in your browser."
@@ -858,6 +851,17 @@ let state_html state =
   then div [Style.(render (of_class "animate-opacity o-0"))] contents
   else div [Style.(render (of_class "animate-opacity o-100"))] contents
 
+(* HACK: To get a web worker running for the verifier from s3 and avoid remote origin issues,
+  we have to download the code via a get request, encapsulate it in a Blob object to get 
+  an url link and then feed the url link into verifier*)
+let run_verifier ~f =
+  let verifier_url = sprintf !"%s/verifier_main.bc.js" Web_response.s3_link in
+  Web_response.get verifier_url (fun verifier_code ->
+      let blob = File.blob_from_string verifier_code in
+      let url = Dom_html.window##._URL##createObjectURL blob in
+      let verifier = Verifier.create @@ Js.to_string url in
+      f verifier )
+
 let main ~render ~get_data =
   let state = ref State.init in
   let vdom = ref (render !state) in
@@ -872,39 +876,45 @@ let main ~render ~get_data =
     vdom := new_vdom
   in
   g_update_state_and_vdom := update_state_and_vdom ;
-  let verifier = Verifier.create () in
-  Verifier.set_on_message verifier ~f:(fun resp ->
-      match !state.verification with
-      | `Pending id when id = Verifier.Response.id resp ->
-          update_state_and_vdom
-            { !state with
-              verification= `Complete (Verifier.Response.result resp) }
-      | _ -> () ) ;
-  let latest_completed = ref (-1) in
-  let count = ref 0 in
-  let loop () =
-    let id = !count in
-    incr count ;
-    get_data ~on_result:(fun chain ->
-        if id > !latest_completed then (
-          latest_completed := id ;
-          if State.should_update !state chain then (
-            let new_state = {!state with verification= `Pending id; chain} in
-            update_state_and_vdom new_state ;
-            Verifier.send_verify_message verifier (chain, id) ) ) )
-  in
-  loop () ;
-  ignore
-    (Dom_html.window ## setInterval
-       (Js.wrap_callback (fun _ -> loop ()))
-       5_000.) ;
-  Dom_html.window ## setTimeout
-    (Js.wrap_callback (fun _ -> update_state_and_vdom !state))
-    5_000.
+  run_verifier
+    ~f:(fun verifier ->
+      Verifier.set_on_message verifier ~f:(fun resp ->
+          match !state.verification with
+          | `Pending id when id = Verifier.Response.id resp ->
+              update_state_and_vdom
+                { !state with
+                  verification= `Complete (Verifier.Response.result resp) }
+          | _ -> () ) ;
+      let latest_completed = ref (-1) in
+      let count = ref 0 in
+      let loop () =
+        let id = !count in
+        incr count ;
+        get_data ~on_result:(fun chain ->
+            if id > !latest_completed then (
+              latest_completed := id ;
+              if State.should_update !state chain then (
+                let new_state =
+                  {!state with verification= `Pending id; chain}
+                in
+                update_state_and_vdom new_state ;
+                Verifier.send_verify_message verifier (chain, id) ) ) )
+      in
+      loop () ;
+      ignore
+        (Dom_html.window##setInterval
+           (Js.wrap_callback (fun _ -> loop ()))
+           5_000.) ;
+      Dom_html.window##setTimeout
+        (Js.wrap_callback (fun _ -> update_state_and_vdom !state))
+        5_000.
+      |> ignore )
+    (fun e ->
+      printf "Could not retrieve verifier code: %s" (Error.to_string_hum e) )
 
 let _ =
   main
     ~get_data:(fun ~on_result ->
       get_account () on_result (fun e ->
-          Firebug.console ## log (Error.to_string_hum e) ) )
+          Firebug.console##log (Error.to_string_hum e) ) )
     ~render:state_html

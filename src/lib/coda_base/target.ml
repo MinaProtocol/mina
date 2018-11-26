@@ -46,7 +46,8 @@ let assert_mem x xs =
 
 (* TODO: Use a "dual" variable to ensure the bit_length constraint is actually always
    enforced. *)
-include Bits.Snarkable.Small (Tick)
+include Bits.Snarkable.Small
+          (Tick)
           (struct
             let bit_length = bit_length
           end)
@@ -60,5 +61,5 @@ module Bits =
 open Tick
 open Let_syntax
 
-let var_to_unpacked (x: Field.Checked.t) =
+let var_to_unpacked (x : Field.Checked.t) =
   Field.Checked.unpack ~length:bit_length x

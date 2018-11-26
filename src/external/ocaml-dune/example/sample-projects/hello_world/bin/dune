@@ -1,0 +1,7 @@
+(executables
+ (names main)
+ (libraries hello_world))
+
+(install
+ (section bin)
+ (files (main.exe as hello_world)))

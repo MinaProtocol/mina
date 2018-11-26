@@ -25,7 +25,7 @@ struct
     | Add_solved_work (_, {proof= _; fee}) ->
         Printf.sprintf !"Snark_pool_diff add with fee %{sexp: Fee.t}" fee
 
-  let apply (pool: Pool.t) (t: t) : t Or_error.t Deferred.t =
+  let apply (pool : Pool.t) (t : t) : t Or_error.t Deferred.t =
     let to_or_error = function
       | `Don't_rebroadcast ->
           Or_error.error_string "Worse fee or already in pool"

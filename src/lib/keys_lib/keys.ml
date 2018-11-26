@@ -73,7 +73,8 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) = struct
           let keys = tx_vk
         end) in
         let module B =
-          Blockchain_snark.Blockchain_transition.Make (Consensus_mechanism) (T) in
+          Blockchain_snark.Blockchain_transition.Make (Consensus_mechanism) (T)
+        in
         let module Step = B.Step (struct
           let keys = Tick.Keypair.create ~pk:bc_pk.step ~vk:bc_vk.step
         end) in
@@ -83,7 +84,8 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) = struct
             end)
             (struct
               let keys = Tock.Keypair.create ~pk:bc_pk.wrap ~vk:bc_vk.wrap
-            end) in
+            end)
+        in
         let module M = struct
           module Consensus_mechanism = Consensus_mechanism
 
@@ -132,7 +134,8 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) = struct
             end
 
             let main x =
-              let there {Prover_state.wrap_vk; prev_proof; prev_state; update} =
+              let there {Prover_state.wrap_vk; prev_proof; prev_state; update}
+                  =
                 {Step.Prover_state.wrap_vk; prev_proof; prev_state; update}
               in
               let back

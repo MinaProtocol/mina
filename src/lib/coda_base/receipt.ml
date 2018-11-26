@@ -5,17 +5,29 @@ open Fold_lib
 module Chain_hash = struct
   include Data_hash.Make_full_size ()
 
+  let to_string t = Binable.to_string (module Stable.V1) t |> B64.encode
+
+  let of_string s = B64.decode s |> Binable.of_string (module Stable.V1)
+
+  include Codable.Make_of_string (struct
+    type nonrec t = t
+
+    let to_string = to_string
+
+    let of_string = of_string
+  end)
+
   let empty =
     of_hash
       (Pedersen.(State.salt params "CodaReceiptEmpty") |> Pedersen.State.digest)
 
   let cons payload t =
     Pedersen.digest_fold Hash_prefix.receipt_chain
-      Fold.(Transaction.Payload.fold payload +> fold t)
+      Fold.(User_command.Payload.fold payload +> fold t)
     |> of_hash
 
   module Checked = struct
-    let constant (t: t) =
+    let constant (t : t) =
       var_of_hash_packed (Field.Checked.constant (t :> Field.t))
 
     type t = var
@@ -35,7 +47,7 @@ module Chain_hash = struct
         Pedersen.Checked.Section.extend init bs
           ~start:
             ( Hash_prefix.length_in_triples
-            + Transaction.Payload.length_in_triples )
+            + User_command.Payload.length_in_triples )
       in
       let%map s = Pedersen.Checked.Section.disjoint_union_exn payload with_t in
       let digest, _ =
@@ -46,15 +58,16 @@ module Chain_hash = struct
 
   let%test_unit "checked-unchecked equivalence" =
     let open Quickcheck in
-    test ~trials:20 (Generator.tuple2 gen Transaction_payload.gen) ~f:
-      (fun (base, payload) ->
+    test ~trials:20 (Generator.tuple2 gen User_command_payload.gen)
+      ~f:(fun (base, payload) ->
         let unchecked = cons payload base in
         let checked =
           let comp =
             let open Snark_params.Tick.Let_syntax in
             let%bind payload =
               Schnorr.Message.var_of_payload
-                (Transaction_payload.var_of_t payload)
+                Transaction_union_payload.(
+                  Checked.constant (of_user_command_payload payload))
             in
             let%map res = Checked.cons ~payload (var_of_t base) in
             As_prover.read typ res
@@ -63,4 +76,8 @@ module Chain_hash = struct
           x
         in
         assert (equal unchecked checked) )
+
+  let%test_unit "json" =
+    Quickcheck.test ~trials:20 gen ~sexp_of:sexp_of_t ~f:(fun t ->
+        assert (For_tests.check_encoding ~equal t) )
 end

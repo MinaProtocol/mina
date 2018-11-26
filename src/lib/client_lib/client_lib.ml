@@ -3,22 +3,48 @@ open Async
 open Coda_base
 open Signature_lib
 
-module Send_transactions = struct
-  type query = Transaction.Stable.V1.t list [@@deriving bin_io]
+module String_list_formatter = struct
+  type t = string list [@@deriving yojson]
+
+  let log10 i = i |> Float.of_int |> Float.log10 |> Float.to_int
+
+  let to_text pks =
+    let max_padding = Int.max 1 (List.length pks) |> log10 in
+    List.mapi pks ~f:(fun i pk ->
+        let i = i + 1 in
+        let padding = String.init (max_padding - log10 i) ~f:(fun _ -> ' ') in
+        sprintf "%s%i, %s" padding i pk )
+    |> String.concat ~sep:"\n"
+end
+
+module Send_user_command = struct
+  type query = User_command.Stable.V1.t [@@deriving bin_io]
+
+  type response = Receipt.Chain_hash.t [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Send_user_command" ~version:0 ~bin_query
+      ~bin_response
+end
+
+module Send_user_commands = struct
+  type query = User_command.Stable.V1.t list [@@deriving bin_io]
 
   type response = unit [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
   let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Send_transactions" ~version:0 ~bin_query
+    Rpc.Rpc.create ~name:"Send_user_commands" ~version:0 ~bin_query
       ~bin_response
 end
 
 module Get_ledger = struct
   type query = Ledger_builder_hash.Stable.V1.t [@@deriving bin_io]
 
-  type response = Ledger.t Or_error.t [@@deriving bin_io]
+  type response = Account.t list Or_error.t [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -37,6 +63,40 @@ module Get_balance = struct
     Rpc.Rpc.create ~name:"Get_balance" ~version:0 ~bin_query ~bin_response
 end
 
+module Verify_proof = struct
+  type query =
+    Public_key.Compressed.Stable.V1.t * User_command.t * Payment_proof.t
+  [@@deriving bin_io]
+
+  type response = unit Or_error.t [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Verify_proof" ~version:0 ~bin_query ~bin_response
+end
+
+module Prove_receipt = struct
+  type query = Receipt.Chain_hash.t * Public_key.Compressed.Stable.V1.t
+  [@@deriving bin_io]
+
+  type response = Payment_proof.t Or_error.t [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Prove_receipt" ~version:0 ~bin_query ~bin_response
+
+  module Output = struct
+    type t = Payment_proof.t [@@deriving yojson]
+
+    let to_text merkle_list =
+      sprintf
+        !"Merkle List of transactions:\n%s"
+        (to_yojson merkle_list |> Yojson.Safe.pretty_to_string)
+  end
+end
+
 module Get_nonce = struct
   type query = Public_key.Compressed.Stable.V1.t [@@deriving bin_io]
 
@@ -49,7 +109,7 @@ module Get_nonce = struct
 end
 
 module type Printable_intf = sig
-  type t [@@deriving yojson]
+  type t [@@deriving to_yojson]
 
   val to_text : t -> string
 end
@@ -74,13 +134,13 @@ module Status = struct
     ; commit_id: Git_sha.t option
     ; conf_dir: string
     ; peers: string list
-    ; transactions_sent: int
+    ; user_commands_sent: int
     ; run_snark_worker: bool
     ; external_transition_latency: Perf_histograms.Report.t option
     ; snark_worker_transition_time: Perf_histograms.Report.t option
     ; snark_worker_merge_time: Perf_histograms.Report.t option
-    ; propose: bool }
-  [@@deriving yojson, bin_io, fields]
+    ; propose_pubkey: Public_key.t option }
+  [@@deriving to_yojson, bin_io, fields]
 
   (* Text response *)
   let to_text s =
@@ -129,8 +189,8 @@ module Status = struct
           , Printf.sprintf "Total: %d " (List.length peers)
             ^ List.to_string ~f:Fn.id peers )
           :: acc )
-        ~transactions_sent:(fun acc x ->
-          ("Transactions Sent", Int.to_string (f x)) :: acc )
+        ~user_commands_sent:(fun acc x ->
+          ("User_commands Sent", Int.to_string (f x)) :: acc )
         ~run_snark_worker:(fun acc x ->
           ("Snark Worker Running", Bool.to_string (f x)) :: acc )
         ~external_transition_latency:(fun acc x ->
@@ -148,8 +208,13 @@ module Status = struct
           | None -> acc
           | Some report ->
               ("Snark Worker Merge (hist.)", summarize_report report) :: acc )
-        ~propose:(fun acc x ->
-          ("Proposer Running", Bool.to_string (f x)) :: acc )
+        ~propose_pubkey:(fun acc x ->
+          match f x with
+          | None -> ("Proposer Running", "false") :: acc
+          | Some pubkey ->
+              ( "Proposer Running"
+              , Printf.sprintf !"%{sexp: Public_key.t}" pubkey )
+              :: acc )
       |> List.rev
     in
     let max_key_length =
@@ -166,20 +231,6 @@ module Status = struct
       |> String.concat ~sep:"\n"
     in
     title ^ output ^ "\n"
-end
-
-module String_list_formatter = struct
-  type t = string list [@@deriving yojson]
-
-  let log10 i = i |> Float.of_int |> Float.log10 |> Float.to_int
-
-  let to_text pks =
-    let max_padding = Int.max 1 (List.length pks) |> log10 in
-    List.mapi pks ~f:(fun i pk ->
-        let i = i + 1 in
-        let padding = String.init (max_padding - log10 i) ~f:(fun _ -> ' ') in
-        sprintf "%s%i, %s" padding i pk )
-    |> String.concat ~sep:"\n"
 end
 
 module Public_key_with_balances = struct

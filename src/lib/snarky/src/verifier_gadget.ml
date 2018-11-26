@@ -39,7 +39,7 @@ struct
 
     let delete = foreign (func_name "delete") (typ @-> returning void)
 
-    let conv_input conv (all_bits: input) =
+    let conv_input conv (all_bits : input) =
       let bits = Pb.Variable_array.create () in
       List.iter all_bits ~f:(fun b ->
           Pb.Variable_array.emplace_back bits (conv (b :> Field.Checked.t)) ) ;
@@ -50,8 +50,8 @@ struct
         foreign (func_name "create")
           (Pb.typ @-> Pb.Variable_array.typ @-> int @-> returning typ)
       in
-      fun pb (conv: Field.Checked.t -> Pb.Variable.t)
-          (bits: Pb.Variable_array.t) ->
+      fun pb (conv : Field.Checked.t -> Pb.Variable.t)
+          (bits : Pb.Variable_array.t) ->
         let t = stub pb bits Info.input_size in
         Caml.Gc.finalise delete t ; t
 
@@ -153,8 +153,8 @@ struct
         ( Pb.typ @-> Verification_key.typ @-> Pb.Variable_array.typ @-> int
         @-> Proof.typ @-> Pb.Variable.typ @-> returning typ )
 
-    let create pb (conv: Field.Checked.t -> Pb.Variable.t)
-        (conv_back: Pb.Variable.t -> Field.Checked.t)
+    let create pb (conv : Field.Checked.t -> Pb.Variable.t)
+        (conv_back : Pb.Variable.t -> Field.Checked.t)
         {vk; input; elt_size; proof} =
       let input_pb = Pb.Variable_array.create () in
       List.iter

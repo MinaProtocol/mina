@@ -6,8 +6,8 @@ module type S = sig
 
   module Compressed_public_key : Compressed_public_key_intf
 
-  module Transaction :
-    Coda_pow.Transaction_intf with type public_key := Compressed_public_key.t
+  module User_command :
+    Coda_pow.User_command_intf with type public_key := Compressed_public_key.t
 
   module Fee_transfer :
     Coda_pow.Fee_transfer_intf with type public_key := Compressed_public_key.t
@@ -17,9 +17,9 @@ module type S = sig
     with type public_key := Compressed_public_key.t
      and type fee_transfer := Fee_transfer.single
 
-  module Super_transaction :
-    Coda_pow.Super_transaction_intf
-    with type valid_transaction := Transaction.With_valid_signature.t
+  module Transaction :
+    Coda_pow.Transaction_intf
+    with type valid_user_command := User_command.With_valid_signature.t
      and type fee_transfer := Fee_transfer.t
      and type coinbase := Coinbase.t
 
@@ -43,11 +43,12 @@ module type S = sig
     Sok_message_intf with type public_key_compressed := Compressed_public_key.t
 
   module Ledger_proof : sig
-    include Coda_pow.Ledger_proof_intf
-            with type statement := Ledger_proof_statement.t
-             and type ledger_hash := Frozen_ledger_hash.t
-             and type proof := Proof.t
-             and type sok_digest := Sok_message.Digest.t
+    include
+      Coda_pow.Ledger_proof_intf
+      with type statement := Ledger_proof_statement.t
+       and type ledger_hash := Frozen_ledger_hash.t
+       and type proof := Proof.t
+       and type sok_digest := Sok_message.Digest.t
 
     include Binable.S with type t := t
 
@@ -63,8 +64,8 @@ module type S = sig
   module Ledger :
     Coda_pow.Ledger_intf
     with type ledger_hash := Ledger_hash.t
-     and type super_transaction := Super_transaction.t
-     and type valid_transaction := Transaction.With_valid_signature.t
+     and type transaction := Transaction.t
+     and type valid_user_command := User_command.With_valid_signature.t
 
   module Sparse_ledger : sig
     type t [@@deriving sexp, bin_io]
@@ -73,7 +74,7 @@ module type S = sig
 
     val merkle_root : t -> Ledger_hash.t
 
-    val apply_super_transaction_exn : t -> Super_transaction.t -> t
+    val apply_transaction_exn : t -> Transaction.t -> t
   end
 
   module Ledger_builder_aux_hash : Coda_pow.Ledger_builder_aux_hash_intf
@@ -93,9 +94,9 @@ module type S = sig
     Coda_pow.Ledger_builder_diff_intf
     with type completed_work := Completed_work.t
      and type completed_work_checked := Completed_work.Checked.t
-     and type transaction := Transaction.t
-     and type transaction_with_valid_signature :=
-                Transaction.With_valid_signature.t
+     and type user_command := User_command.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
      and type public_key := Compressed_public_key.t
      and type ledger_builder_hash := Ledger_builder_hash.t
 

@@ -1,5 +1,4 @@
 open Core
-open Unsigned
 
 module Make (Inputs : sig
   val depth : int
@@ -18,8 +17,6 @@ struct
   module L = struct
     include Merkle_ledger.Ledger.Make (Key) (Account) (Hash) (Inputs)
 
-    type path = Path.t
-
     type addr = Addr.t
 
     type account = Account.t
@@ -28,11 +25,12 @@ struct
 
     let load_ledger n b =
       let ledger = create () in
-      let keys = List.init n ~f:(fun i -> Int.to_string i) in
-      List.iter keys ~f:(fun k ->
+      let keys = Merkle_ledger_tests.Test_stubs.Key.gen_keys n in
+      let balance = Currency.Balance.of_int b in
+      List.iter keys ~f:(fun public_key ->
           ignore
-          @@ get_or_create_account_exn ledger k
-               {Account.balance= UInt64.of_int b; public_key= k} ) ;
+          @@ get_or_create_account_exn ledger public_key
+               (Account.create public_key balance) ) ;
       (ledger, keys)
   end
 

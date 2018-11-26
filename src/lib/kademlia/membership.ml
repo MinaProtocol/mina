@@ -1,6 +1,9 @@
 open Async_kernel
 open Core_kernel
 open Banlist_lib
+open Pipe_lib
+
+exception Child_died
 
 module type S = sig
   type t
@@ -55,19 +58,23 @@ let keep_trying :
   let rec go e xs : 'b Deferred.Or_error.t =
     match xs with
     | [] -> return e
-    | x :: xs ->
+    | x :: xs -> (
         match%bind f x with
         | Ok r -> return (Ok r)
-        | Error e -> go (Error e) xs
+        | Error e -> go (Error e) xs )
   in
   go (Or_error.error_string "empty input") xs
 
 module Haskell_process = struct
   open Async
 
-  type t = {process: Process.t; lock_path: string}
+  type t =
+    { failure_response: [`Die | `Ignore] ref
+    ; process: Process.t
+    ; lock_path: string }
 
-  let kill {process; lock_path} =
+  let kill {failure_response; process; lock_path} =
+    failure_response := `Ignore ;
     let%bind _ =
       Process.run_exn ~prog:"kill"
         ~args:[Pid.to_string (Process.pid process)]
@@ -116,9 +123,22 @@ module Haskell_process = struct
           ; kademlia_binary
           ; test_prefix ^ kademlia_binary ]
           ~f:(fun prog -> Process.create ~prog ~args ())
-        |> Deferred.Or_error.map ~f:(fun process -> {process; lock_path})
+        |> Deferred.Or_error.map ~f:(fun process ->
+               {failure_response= ref `Die; process; lock_path} )
       with
-      | Ok p -> Ok p
+      | Ok p ->
+          (* If the Kademlia process dies, kill the parent daemon process. Fix
+           * for #550 *)
+          Deferred.upon (Process.wait p.process) (fun code ->
+              match (!(p.failure_response), code) with
+              | `Ignore, _ | _, Ok () -> ()
+              | `Die, Error e ->
+                  Logger.fatal log
+                    !"Kademlia process died: %{sexp: \
+                      Unix.Exit_or_signal.error}%!"
+                    e ;
+                  raise Child_died ) ;
+          Ok p
       | Error e ->
           Or_error.error_string
             ( "If you are a dev, did you forget to `make kademlia` and set \
@@ -154,7 +174,7 @@ module Haskell_process = struct
     with
     | `Yes ->
         let%bind t = run_kademlia () in
-        let {process; lock_path} = t in
+        let {failure_response= _; process; lock_path} = t in
         let%map () =
           write_lock_file lock_path (Process.pid process)
           |> Deferred.map ~f:Or_error.return
@@ -344,7 +364,7 @@ let%test_module "Tests" =
 
       type punishment = unit
 
-      let lookup (_: t) (_: Host_and_port.t) = `Normal
+      let lookup (_ : t) (_ : Host_and_port.t) = `Normal
     end
 
     module type S_test = sig
@@ -500,8 +520,8 @@ let%test_module "Tests" =
       retry 3 (fun () ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               File_system.with_temp_dir (conf_dir ^ "1") ~f:(fun conf_dir_1 ->
-                  File_system.with_temp_dir (conf_dir ^ "2") ~f:
-                    (fun conf_dir_2 -> f conf_dir_1 conf_dir_2 ) ) ) )
+                  File_system.with_temp_dir (conf_dir ^ "2")
+                    ~f:(fun conf_dir_2 -> f conf_dir_1 conf_dir_2 ) ) ) )
 
     let create_banlist () =
       Haskell.Banlist.create ~suspicious_dir:"" ~punished_dir:""
@@ -554,7 +574,8 @@ let%test_module "Tests" =
 
         module Punished_db =
           Banlist.Punished_db.Make (Host_and_port) (Time) (Punishment_record)
-            (Banlist.Key_value_database.Make_mock (Host_and_port)
+            (Banlist.Key_value_database.Make_mock
+               (Host_and_port)
                (Punishment_record))
 
         let ban_threshold = 100

@@ -3,7 +3,7 @@
 (library
  ((name coda_base)
   (public_name coda_base)
-  (flags (:standard -short-paths -warn-error -35-32-33-9-27-34-58))
+  (flags (:standard -short-paths -warn-error -35-32-33-9-27-34-58-39))
   (inline_tests)
   (library_flags (-linkall))
   (libraries
@@ -22,6 +22,7 @@
       protocols
       core
       dummy_values
+      o1trace
       merkle_ledger
       snarky
       crypto_params
@@ -30,9 +31,13 @@
       bignum_bigint
       coda_numbers
       debug_assert
-      banlist_lib))
+      banlist_lib
+      receipt_chain_database_lib
+      storage
+      yojson
+      codable))
   (preprocessor_deps ("../../config.mlh"))
-  (preprocess (pps (ppx_jane ppx_deriving.eq ppx_deriving.ord)))
+  (preprocess (pps (ppx_jane ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord ppx_deriving_yojson)))
   (synopsis "Snarks and friends necessary for keypair generation")))
 
 (rule

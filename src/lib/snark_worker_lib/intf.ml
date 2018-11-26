@@ -2,12 +2,14 @@ open Core
 open Async
 open Signature_lib
 
+let command_name = "snark-worker"
+
 module type Inputs_intf = sig
   module Sparse_ledger : sig
     type t [@@deriving bin_io, sexp]
   end
 
-  module Super_transaction : sig
+  module Transaction : sig
     type t [@@deriving bin_io, sexp]
   end
 
@@ -33,7 +35,7 @@ module type Inputs_intf = sig
        Worker_state.t
     -> message:Coda_base.Sok_message.t
     -> ( Statement.t
-       , Super_transaction.t
+       , Transaction.t
        , Sparse_ledger.t
        , Proof.t )
        Work.Single.Spec.t

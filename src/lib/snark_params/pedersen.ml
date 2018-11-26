@@ -60,9 +60,7 @@ end)
     val add : t -> t -> t
 
     val negate : t -> t
-end) :
-  S with type curve := Curve.t and type Digest.t = Field.t =
-struct
+end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
   module Digest = struct
     type t = Field.t [@@deriving sexp, bin_io, compare, hash, eq]
 
@@ -83,10 +81,10 @@ struct
   module State = struct
     type t = {triples_consumed: int; acc: Curve.t; params: Params.t}
 
-    let create ?(triples_consumed= 0) ?(init= Curve.zero) params =
+    let create ?(triples_consumed = 0) ?(init = Curve.zero) params =
       {acc= init; triples_consumed; params}
 
-    let update_fold (t: t) (fold: bool Triple.t Fold.t) =
+    let update_fold (t : t) (fold : bool Triple.t Fold.t) =
       let params = t.params in
       let acc, triples_consumed =
         fold.fold ~init:(t.acc, t.triples_consumed) ~f:(fun (acc, i) triple ->

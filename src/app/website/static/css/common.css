@@ -33,9 +33,45 @@
     font-style: normal;
 }
 
+.ibmplex {font-family:'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  src: url("/static/font/IBMPlexSans-Regular-Latin1.woff2") format("woff2"),
+    url("/static/font/IBMPlexSans-Regular-Latin1.woff") format("woff");
+  unicode-range: U+0000, U+000D, U+0020-007E, U+00A0-00A3, U+00A4-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+2074, U+20AC, U+2122, U+2212, U+FB01-FB02;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  src: url("/static/font/IBMPlexSans-Medium-Latin1.woff2") format("woff2"),
+    url("/static/font/IBMPlexSans-Medium-Latin1.woff") format("woff");
+  unicode-range: U+0000, U+000D, U+0020-007E, U+00A0-00A3, U+00A4-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+2074, U+20AC, U+2122, U+2212, U+FB01-FB02;
+}
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  src: url("/static/font/IBMPlexSans-SemiBold-Latin1.woff2") format("woff2"),
+    url("/static/font/IBMPlexSans-SemiBold-Latin1.woff") format("woff");
+  unicode-range: U+0000, U+000D, U+0020-007E, U+00A0-00A3, U+00A4-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+2074, U+20AC, U+2122, U+2212, U+FB01-FB02;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 700;
+  src: url("/static/font/IBMPlexSans-Bold-Latin1.woff2") format("woff2"),
+    url("/static/font/IBMPlexSans-Bold-Latin1.woff") format("woff");
+  unicode-range: U+0000, U+000D, U+0020-007E, U+00A0-00A3, U+00A4-00FF, U+0131, U+0152-0153, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201A, U+201C-201E, U+2020-2022, U+2026, U+2030, U+2039-203A, U+2044, U+2074, U+20AC, U+2122, U+2212, U+FB01-FB02; }
+
 @import url('https://fonts.googleapis.com/css?family=Roboto');
 .roboto { font-family:'roboto', Arial, Helvetica, sans-serif; }
 
+.menlo { font-family:'Menlo', 'Consolas', "Liberation Mono", 'Monaco', "Lucida Console", monospace; }
 
 .f8 { font-size:0.625rem; }
 @media screen and (min-width:30em) {
@@ -49,12 +85,14 @@
 
 .blacklike { color: #1F2D3D; }
 .silver { color: #8492A6; }
+.lightsilver { color: #8192a8; }
 .darksnow { color: #EFF2F7; }
 .ocean { color: #4782a0; }
 .darkocean { color: #144f6d; }
 .grass { color: #76cd87; }
 .bluesilver { color: #526e80; }
 .sky { color: #96cbec; }
+.offwhite { color: #f5f5f5; }
 
 .wb { word-break: break-all; }
 
@@ -65,20 +103,37 @@
 .bg-snow { background-color: #F9FAFC; }
 .bg-white { background-color: #fff; }
 .bg-extradarksnow { background-color: #E5E9F2; }
+.bg-superdarksnow { background-color: #506887; }
 .bg-silver { background-color: #8492A6; }
 .bg-dullgrey { background-color: #bcbcbc; }
 .bg-brightred { background-color: #ef5b5b; }
 .bg-lemoncurry { background-color: #D19C1D; }
+.bg-offwhite { background-color: #f5f5f5; }
+
+.bg-brand-gradient { background-image: linear-gradient(to bottom, rgba(239, 242, 247, 0.01), rgba(239, 242, 247, 0.01)), linear-gradient(to bottom, rgba(255, 255, 255, 0.5), rgba(0, 0, 0, 0.5)); }
+
+.h2px { height: 2px; }
+.h1px { height: 1px; }
+.w310px { width: 310px; }
+
+/* To fix the CODA svg graphic */
+.ml-20px { margin-left: -20px; }
+@media screen and (min-width:30em) {
+  .ml-15px-ns { margin-left: -15px; }
+}
 
 .b-silver { border: solid 1px #8192a8; }
 .b-darksnow { border: solid 1px #EFF2F7; }
 .b-grass { border: solid 1px #76bb81; }
 .b-sky {  border: solid 1px #96cbec; }
+.b0 { border: 0; }
 
 .mw55 { max-width: 20rem; }
 @media screen and (min-width:30em) {
   .mw55-ns { max-width: 20rem; }
 }
+.mw57 { max-width: 27rem; }
+.mw85 {max-width:80rem}
 
 .min-h7 { min-height: 48rem; }
 
@@ -131,6 +186,9 @@
 .shadow-small2 {
   box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.5);
 }
+.shadow-inset1 {
+  box-shadow: inset 0 1px 14px 0 rgba(0, 0, 0, 0.12);
+}
 
 .mobile-jank-fix {
  -webkit-tap-highlight-color: rgba(0,0,0,0);
@@ -170,6 +228,11 @@
 .w-55 {
   width:55%;
 }
+@media screen and (min-width:30em) {
+  .w-45-ns {
+    width:45%;
+  }
+}
 
 .ml-5px {
   margin-left:-5px;
@@ -207,3 +270,7 @@
   padding-bottom: 8px;
 
 }
+
+.sticky { position: sticky; position: -webkit-sticky; }
+
+.no-mobile-highlight-jank {-webkit-tap-highlight-color: transparent;}

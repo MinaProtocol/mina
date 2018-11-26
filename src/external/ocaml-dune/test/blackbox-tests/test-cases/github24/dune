@@ -1,0 +1,5 @@
+(library
+ (name x)
+ (public_name x)
+ (ppx_runtime_libraries library_that_dont_exist)
+ (optional))

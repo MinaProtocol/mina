@@ -9,11 +9,11 @@ module Call_ring = struct
 
   let create name : t = (name, ref 0, Array.create ~len:window 0)
 
-  let report ((name, epoch, cs): t) =
+  let report ((name, epoch, cs) : t) =
     Printf.printf !"$$$ %s@%d: [%s]\n%!" name !epoch
       (String.concat ~sep:"," (Array.to_list (Array.map cs ~f:string_of_int)))
 
-  let record ((name, epoch, cs): t) =
+  let record ((name, epoch, cs) : t) =
     let now = Time.now () in
     let span_since_genesis = Time.diff now genesis in
     let mins_since_genesis =

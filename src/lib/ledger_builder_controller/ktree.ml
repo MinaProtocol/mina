@@ -23,6 +23,13 @@ module Rose = struct
     let iter = `Define_using_fold
   end)
 
+  let rec fold_edges ~init ~f (Rose (base, successors)) =
+    List.fold successors
+      ~init:
+        (List.fold successors ~init ~f:(fun init (Rose (child, _)) ->
+             f init base child ))
+      ~f:(fun init succ -> fold_edges succ ~init ~f)
+
   let to_list = C.to_list
 
   let to_array = C.to_array
@@ -34,7 +41,11 @@ end
 
 (** A Rose tree with max-depth k. Whenever we want to add a node that would increase the depth past k, we instead move the tree forward and root it at the node towards that path *)
 module Make (Elem : sig
-  type t [@@deriving compare, bin_io, sexp]
+  type t [@@deriving compare, bin_io, sexp, eq, hash]
+
+  val id : t -> string
+
+  val to_string_record : t -> string
 end)
 (Security : Protocols.Coda_pow.Security_intf) =
 struct
@@ -57,7 +68,7 @@ struct
     in
     go tree [] |> Option.map ~f:List.rev
 
-  let singleton (e: Elem.t) : t =
+  let singleton (e : Elem.t) : t =
     {tree= Rose.singleton e; elems= Elem_set.singleton e}
 
   let gen elem_gen =
@@ -120,7 +131,7 @@ struct
         ; elems= Elem_set.add t.elems e }
       in
       match tree_and_depths with
-      | [] | [_] -> `Added default
+      | [] -> `Added default
       | _ ->
           let longest_subtree, longest_depth =
             List.max_elt tree_and_depths ~compare:(fun (_, d) (_, d') ->
@@ -135,26 +146,56 @@ struct
               { tree= longest_subtree
               ; elems= Elem_set.of_list (Rose.to_list longest_subtree) }
           else `Added default
+
+  module Graph = struct
+    module G = Graph.Persistent.Digraph.ConcreteBidirectional (Elem)
+    include G
+
+    include Graph.Graphviz.Dot (struct
+      include G
+
+      let graph_attributes _ = []
+
+      let get_subgraph _ = None
+
+      let default_vertex_attributes _ = [`Shape `Record]
+
+      let vertex_name elem = Elem.id elem
+
+      let vertex_attributes elem = [`Label (Elem.to_string_record elem)]
+
+      let default_edge_attributes _ = []
+
+      let edge_attributes _ = []
+    end)
+  end
+
+  let to_graph t = Rose.fold_edges t.tree ~init:Graph.empty ~f:Graph.add_edge
 end
 
 let%test_module "K-tree" =
   ( module struct
     module Make_quickchecks (Elem : sig
-      type t [@@deriving eq, compare, bin_io, sexp]
+      type t [@@deriving eq, compare, bin_io, sexp, hash]
+
+      val id : t -> string
+
+      val to_string_record : t -> string
 
       val gen : t Quickcheck.Generator.t
     end) (Security : sig
       val max_depth : int
     end) =
     struct
-      include Make (Elem)
+      include Make
+                (Elem)
                 (struct
                   let max_depth = `Finite Security.max_depth
                 end)
 
       let%test_unit "Adding an element either changes the tree or it was \
                      already in the set" =
-        Quickcheck.test ~sexp_of:[%sexp_of : t * Elem.t * Elem.t]
+        Quickcheck.test ~sexp_of:[%sexp_of: t * Elem.t * Elem.t]
           (let open Quickcheck.Generator.Let_syntax in
           let%bind r = gen Elem.gen and e = Elem.gen in
           let candidates = Rose.to_array r.tree in
@@ -169,7 +210,7 @@ let%test_module "K-tree" =
 
       let%test_unit "Adding to the end of the longest_path extends the path \
                      (modulo the last thing / first-thing)" =
-        Quickcheck.test ~sexp_of:[%sexp_of : t * Elem.t]
+        Quickcheck.test ~sexp_of:[%sexp_of: t * Elem.t]
           ( Quickcheck.Generator.tuple2 (gen Elem.gen) Elem.gen
           |> Quickcheck.Generator.filter ~f:(fun (r, e) ->
                  not (Rose.mem r.tree e ~equal:Elem.equal) ) )
@@ -192,7 +233,7 @@ let%test_module "K-tree" =
                        path' ) )
 
       let%test_unit "There exists a path between the root and any node" =
-        Quickcheck.test ~sexp_of:[%sexp_of : t * Elem.t]
+        Quickcheck.test ~sexp_of:[%sexp_of: t * Elem.t]
           (let open Quickcheck.Generator.Let_syntax in
           let%bind r = gen Elem.gen in
           let%map e =
@@ -201,7 +242,40 @@ let%test_module "K-tree" =
           (r, e))
           ~f:(fun (r, e) -> assert (Option.is_some (path r ~f:(Elem.equal e))))
 
-      let%test_unit "Extending a tree with depth-k, extends full-tree properly" =
+      let%test_unit "The tree size never exceeds depth-k" =
+        let elems =
+          Quickcheck.random_value ~seed:(`Deterministic "seed")
+            (Quickcheck.Generator.list_with_length
+               (Security.max_depth + 60_000)
+               Elem.gen)
+        in
+        match elems with
+        | [] -> failwith "Generated bad list"
+        | e0 :: es ->
+            let t =
+              let rec go i t parent es =
+                match es with
+                | [] -> ()
+                | e1 :: es -> (
+                    let next_expected_size =
+                      Int.min (i + 1) Security.max_depth
+                    in
+                    match add t e1 ~parent:(Elem.equal parent) with
+                    | `No_parent -> failwith "There should always be a parent"
+                    | `Repeat -> go i t parent es
+                    | `Added t' ->
+                        [%test_result: Int.t]
+                          ~message:"Expected size was not count increase"
+                          ~expect:next_expected_size
+                          (List.length (longest_path t')) ;
+                        go next_expected_size t' e1 es )
+              in
+              go 1 (singleton e0) e0 es
+            in
+            ignore t
+
+      let%test_unit "Extending a tree with depth-k, extends full-tree properly"
+          =
         let elem_pairs =
           Quickcheck.random_value ~seed:(`Deterministic "seed")
             (Quickcheck.Generator.list_with_length Security.max_depth
@@ -234,14 +308,24 @@ let%test_module "K-tree" =
                 ~equal:Elem.equal )
     end
 
+    module Int_elem = struct
+      include Int
+
+      let id = string_of_int
+
+      let to_string_record = string_of_int
+    end
+
     module Tree =
-      Make_quickchecks (Int)
+      Make_quickchecks
+        (Int_elem)
         (struct
           let max_depth = 10
         end)
 
     module Big_tree =
-      Make_quickchecks (Int)
+      Make_quickchecks
+        (Int_elem)
         (struct
           let max_depth = 50
         end)

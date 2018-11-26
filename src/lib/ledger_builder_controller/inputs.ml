@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Pipe_lib
 
 module Base = struct
   module type S = sig
@@ -10,15 +11,12 @@ module Base = struct
     module Public_key :
       Protocols.Coda_pow.Public_key_intf with module Private_key = Private_key
 
-    module Keypair :
-      Protocols.Coda_pow.Keypair_intf
-      with type public_key := Public_key.t
-       and type private_key := Private_key.t
-
     module State_hash : sig
       type t [@@deriving eq, sexp, compare, bin_io]
 
       val to_bits : t -> bool list
+
+      val to_bytes : t -> string
     end
 
     module Ledger_hash : sig
@@ -37,10 +35,10 @@ module Base = struct
 
     module Ledger_builder_diff : sig
       type t [@@deriving sexp, bin_io]
-    end
 
-    module Internal_transition : sig
-      type t [@@deriving sexp]
+      module With_valid_signatures_and_proofs : sig
+        type t
+      end
     end
 
     module Ledger : sig
@@ -59,14 +57,6 @@ module Base = struct
       type t
     end
 
-    module Blockchain_state : sig
-      type value [@@deriving eq]
-
-      val ledger_hash : value -> Frozen_ledger_hash.t
-
-      val ledger_builder_hash : value -> Ledger_builder_hash.t
-    end
-
     module Consensus_mechanism : sig
       module Local_state : sig
         type t
@@ -74,6 +64,14 @@ module Base = struct
 
       module Consensus_state : sig
         type value
+      end
+
+      module Blockchain_state : sig
+        type value [@@deriving eq]
+
+        val ledger_hash : value -> Frozen_ledger_hash.t
+
+        val ledger_builder_hash : value -> Ledger_builder_hash.t
       end
 
       module Protocol_state : sig
@@ -94,6 +92,8 @@ module Base = struct
         val equal_value : value -> value -> bool
 
         val hash : value -> State_hash.t
+
+        val to_string_record : value -> string
       end
 
       module External_transition : sig
@@ -109,14 +109,15 @@ module Base = struct
       (* This checks the SNARKs in State/LB and does the transition *)
 
       val select :
-           Consensus_state.value
-        -> Consensus_state.value
+           existing:Consensus_state.value
+        -> candidate:Consensus_state.value
         -> logger:Logger.t
         -> time_received:Unix_timestamp.t
         -> [`Keep | `Take]
 
       val lock_transition :
-           Consensus_state.value
+           ?proposer_public_key:Public_key.Compressed.t
+        -> Consensus_state.value
         -> Consensus_state.value
         -> snarked_ledger:(unit -> Ledger.t Or_error.t)
         -> local_state:Local_state.t
@@ -139,11 +140,12 @@ module Base = struct
       Protocols.Coda_pow.Ledger_builder_base_intf
       with type ledger_builder_hash := Ledger_builder_hash.t
        and type frozen_ledger_hash := Frozen_ledger_hash.t
+       and type valid_diff :=
+                  Ledger_builder_diff.With_valid_signatures_and_proofs.t
        and type diff := Ledger_builder_diff.t
        and type ledger_proof := Ledger_proof.t
        and type ledger := Ledger.t
        and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
-       and type public_key := Public_key.Compressed.t
 
     module Tip :
       Protocols.Coda_pow.Tip_intf
@@ -152,6 +154,11 @@ module Base = struct
        and type protocol_state_proof := Protocol_state_proof.t
        and type external_transition :=
                   Consensus_mechanism.External_transition.t
+
+    val verify_blockchain :
+         Protocol_state_proof.t
+      -> Consensus_mechanism.Protocol_state.value
+      -> bool Deferred.Or_error.t
   end
 end
 
@@ -191,14 +198,14 @@ module Synchronizing = struct
     end
 
     module Net : sig
-      include Coda_lib.Ledger_builder_io_intf
-              with type sync_ledger_query := Sync_ledger.query
-               and type sync_ledger_answer := Sync_ledger.answer
-               and type ledger_builder_hash := Ledger_builder_hash.t
-               and type ledger_builder_aux := Ledger_builder.Aux.t
-               and type ledger_hash := Ledger_hash.t
-               and type protocol_state :=
-                          Consensus_mechanism.Protocol_state.value
+      include
+        Coda_lib.Ledger_builder_io_intf
+        with type sync_ledger_query := Sync_ledger.query
+         and type sync_ledger_answer := Sync_ledger.answer
+         and type ledger_builder_hash := Ledger_builder_hash.t
+         and type ledger_builder_aux := Ledger_builder.Aux.t
+         and type ledger_hash := Ledger_hash.t
+         and type protocol_state := Consensus_mechanism.Protocol_state.value
     end
   end
 end
@@ -207,9 +214,4 @@ module type S = sig
   include Synchronizing.S
 
   module Store : Storage.With_checksum_intf with type location = string
-
-  val verify_blockchain :
-       Protocol_state_proof.t
-    -> Consensus_mechanism.Protocol_state.value
-    -> bool Deferred.Or_error.t
 end

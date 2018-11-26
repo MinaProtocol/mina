@@ -6,14 +6,6 @@ module Proof_type : sig
   type t = [`Merge | `Base] [@@deriving bin_io, sexp]
 end
 
-module Transition : sig
-  type t = Super_transaction.t =
-    | Transaction of Transaction.With_valid_signature.t
-    | Fee_transfer of Fee_transfer.t
-    | Coinbase of Coinbase.t
-  [@@deriving bin_io, sexp]
-end
-
 module Statement : sig
   type t =
     { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
@@ -94,7 +86,8 @@ module Keys : sig
 
   val create : unit -> t
 
-  val cached : unit -> (Location.t * t * Checksum.t) Async.Deferred.t
+  val cached :
+    unit -> (Location.t * Verification.t * Checksum.t) Async.Deferred.t
 end
 
 module Verification : sig
@@ -114,42 +107,41 @@ module Verification : sig
 
   module Make (K : sig
     val keys : Keys.Verification.t
-  end) :
-    S
+  end) : S
 end
-
-val check_transition :
-     sok_message:Sok_message.t
-  -> source:Frozen_ledger_hash.t
-  -> target:Frozen_ledger_hash.t
-  -> Transition.t
-  -> Tick.Handler.t
-  -> unit
 
 val check_transaction :
      sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
-  -> Transaction.With_valid_signature.t
+  -> Transaction.t
+  -> Tick.Handler.t
+  -> unit
+
+val check_user_command :
+     sok_message:Sok_message.t
+  -> source:Frozen_ledger_hash.t
+  -> target:Frozen_ledger_hash.t
+  -> User_command.With_valid_signature.t
   -> Tick.Handler.t
   -> unit
 
 module type S = sig
   include Verification.S
 
-  val of_transition :
-       sok_digest:Sok_message.Digest.t
-    -> source:Frozen_ledger_hash.t
-    -> target:Frozen_ledger_hash.t
-    -> Transition.t
-    -> Tick.Handler.t
-    -> t
-
   val of_transaction :
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> Transaction.With_valid_signature.t
+    -> Transaction.t
+    -> Tick.Handler.t
+    -> t
+
+  val of_user_command :
+       sok_digest:Sok_message.Digest.t
+    -> source:Frozen_ledger_hash.t
+    -> target:Frozen_ledger_hash.t
+    -> User_command.With_valid_signature.t
     -> Tick.Handler.t
     -> t
 
@@ -166,5 +158,4 @@ end
 
 module Make (K : sig
   val keys : Keys.t
-end) :
-  S
+end) : S

@@ -8,6 +8,7 @@
       snarkette
       coda_base
       lite_base
+      genesis_ledger
     )
    (preprocess (pps ppx_jane ppxlib.runner))
    (modes native))

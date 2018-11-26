@@ -1,0 +1,4 @@
+(alias
+ (name glob)
+ (deps (glob_files foo/*))
+ (action (echo %{deps})))

@@ -1,3 +1,6 @@
+[%%import
+"../../config.mlh"]
+
 open Core_kernel
 open Coda_numbers
 open Coda_base
@@ -5,12 +8,25 @@ open Fold_lib
 open Signature_lib
 
 module Global_public_key = struct
+  [%%if
+  global_signer_real]
+
   let compressed =
-    match Signer_private_key.mode with
-    | `Dev -> fst Sample_keypairs.keypairs.(0)
-    | `Prod ->
-        Public_key.Compressed.of_base64_exn
-          "KBWuaAm5Sl5jH/dlpiTKQeUUsty/4Rq6Xz2Py2Y2i/VweJmDHwUAAAAB"
+    Public_key.Compressed.of_base64_exn
+      "KBWuaAm5Sl5jH/dlpiTKQeUUsty/4Rq6Xz2Py2Y2i/VweJmDHwUAAAAB"
+
+  let genesis_private_key = Global_signer_private_key.t
+
+  [%%else]
+
+  let compressed =
+    Public_key.compress
+      (Genesis_ledger.largest_account_keypair_exn ()).public_key
+
+  let genesis_private_key =
+    (Genesis_ledger.largest_account_keypair_exn ()).private_key
+
+  [%%endif]
 
   let t = Public_key.decompress_exn compressed
 end
@@ -22,6 +38,10 @@ module type Inputs_intf = sig
     type t [@@deriving bin_io, sexp]
   end
 
+  module Genesis_ledger : sig
+    val t : Coda_base.Ledger.t
+  end
+
   val proposal_interval : Time.Span.t
 end
 
@@ -30,16 +50,31 @@ module Make (Inputs : Inputs_intf) :
   with type Internal_transition.Ledger_builder_diff.t =
               Inputs.Ledger_builder_diff.t
    and type External_transition.Ledger_builder_diff.t =
-              Inputs.Ledger_builder_diff.t =
-struct
+              Inputs.Ledger_builder_diff.t = struct
   open Inputs
   module Ledger_builder_diff = Ledger_builder_diff
 
   module Local_state = struct
     type t = unit [@@deriving sexp]
 
-    let create () = ()
+    let create _ = ()
   end
+
+  module Prover_state = struct
+    include Unit
+
+    let handler _ _ = Snarky.Request.unhandled
+  end
+
+  module Proposal_data = struct
+    include Private_key
+
+    let prover_state _ = ()
+  end
+
+  module Blockchain_state =
+    Coda_base.Blockchain_state.Make (Inputs.Genesis_ledger)
+  module Lite_compat = Lite_compat.Make (Blockchain_state)
 
   module Consensus_transition_data = struct
     type 'signature t_ = {signature: 'signature} [@@deriving bin_io, sexp]
@@ -61,12 +96,13 @@ struct
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
-    let create_value blockchain_state =
-      { signature=
-          Blockchain_state.Signature.sign Signer_private_key.signer_private_key
-            blockchain_state }
+    let create_value ~private_key blockchain_state =
+      {signature= Blockchain_state.Signature.sign private_key blockchain_state}
 
-    let genesis = create_value Blockchain_state.genesis
+    let genesis =
+      { signature=
+          Blockchain_state.Signature.sign Global_public_key.genesis_private_key
+            Blockchain_state.genesis }
   end
 
   module Consensus_state = struct
@@ -125,23 +161,39 @@ struct
         (fun {length; signer_public_key} ->
           { Lite_base.Consensus_state.length= Lite_compat.length length
           ; signer_public_key= Lite_compat.public_key signer_public_key } )
+
+    let to_string_record t =
+      Printf.sprintf "{length|%s}" (Length.to_string t.length)
   end
 
-  module Protocol_state = Protocol_state.Make (Consensus_state)
-  module Snark_transition = Snark_transition.Make (Consensus_transition_data)
+  module Protocol_state =
+    Protocol_state.Make (Blockchain_state) (Consensus_state)
+
+  module Snark_transition = Coda_base.Snark_transition.Make (struct
+    module Genesis_ledger = Inputs.Genesis_ledger
+    module Blockchain_state = Blockchain_state
+    module Consensus_data = Consensus_transition_data
+    module Prover_state = Prover_state
+  end)
+
   module Internal_transition =
     Internal_transition.Make (Ledger_builder_diff) (Snark_transition)
+      (Prover_state)
   module External_transition =
     External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
-  let generate_transition ~previous_protocol_state ~blockchain_state
-      ~local_state:_ ~time:_ ~keypair:_ ~transactions:_ =
+  let block_interval_ms = Time.Span.to_ms proposal_interval
+
+  let generate_transition ~previous_protocol_state ~blockchain_state ~time:_
+      ~proposal_data ~transactions:_ ~snarked_ledger_hash:_ ~supply_increase:_
+      ~logger:_ =
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
     in
     (* TODO: sign protocol_state instead of blockchain_state *)
     let consensus_transition_data =
-      Consensus_transition_data.create_value blockchain_state
+      Consensus_transition_data.create_value ~private_key:proposal_data
+        blockchain_state
     in
     let consensus_state =
       let open Consensus_state in
@@ -153,9 +205,9 @@ struct
         ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
         ~blockchain_state ~consensus_state
     in
-    Some (protocol_state, consensus_transition_data)
+    (protocol_state, consensus_transition_data)
 
-  let is_transition_valid_checked (transition: Snark_transition.var) =
+  let is_transition_valid_checked (transition : Snark_transition.var) =
     let Consensus_transition_data.({signature}) =
       Snark_transition.consensus_data transition
     in
@@ -169,7 +221,8 @@ struct
       (Public_key.var_of_t Global_public_key.t)
       (transition |> Snark_transition.blockchain_state)
 
-  let next_state_checked (state: Consensus_state.var) _state_hash _block =
+  let next_state_checked (state : Consensus_state.var) _state_hash _block
+      _supply_increase =
     let open Consensus_state in
     let open Snark_params.Tick.Let_syntax in
     let%bind length = Length.increment_var state.length in
@@ -186,11 +239,23 @@ struct
       ~ledger:_ =
     ()
 
-  let select Consensus_state.({length= l1; _})
-      Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
-    if l1 >= l2 then `Keep else `Take
+  let select ~existing:Consensus_state.({length= l1; _})
+      ~candidate:Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
+    if Length.compare l1 l2 >= 0 then `Keep else `Take
 
-  let lock_transition _ _ ~snarked_ledger:_ ~local_state:_ = ()
+  let next_proposal now _state ~local_state:_ ~keypair ~logger:_ =
+    let open Unix_timestamp in
+    let time_since_last_interval =
+      rem now (Time.Span.to_ms Inputs.proposal_interval)
+    in
+    let proposal_time =
+      now - time_since_last_interval + Time.Span.to_ms Inputs.proposal_interval
+    in
+    `Propose (proposal_time, keypair.Keypair.private_key)
+
+  let lock_transition ?proposer_public_key:_ _ _ ~snarked_ledger:_
+      ~local_state:_ =
+    ()
 
   let genesis_protocol_state =
     Protocol_state.create_value

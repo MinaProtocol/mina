@@ -1,0 +1,48 @@
+; Example script taken from re2
+
+; With normal strings
+(alias
+ (name old)
+ (action (echo "\
+ARFLAGS=rsc
+CXX=g++
+CXXFLAGS=\"-Wall -O3 -g -pthread\"
+if ! ${.ARCH_SIXTYFOUR}; then
+  CXX=\"$CXX -m32\"
+fi
+${.MAKE} -s -C libre2 clean
+${.MAKE} -s -C libre2 \\
+  ARFLAGS=\"$ARFLAGS\" \\
+  CXX=\"$CXX\" \\
+  CXXFLAGS=\"$CXXFLAGS\" \\
+  obj/libre2.a obj/so/libre2.so
+cp libre2/obj/libre2.a libre2_c_stubs.a
+cp libre2/obj/so/libre2.so dllre2_c_stubs.so
+${.MAKE} -s -C libre2 clean
+")))
+
+; With block strings
+(alias
+ (name new)
+ (action (echo "\> ARFLAGS=rsc
+               "\> CXX=g++
+               "\> CXXFLAGS="-Wall -O3 -g -pthread"
+               "\> if ! ${.ARCH_SIXTYFOUR}; then
+               "\>   CXX="$CXX -m32"
+               "\> fi
+               "\> ${.MAKE} -s -C libre2 clean
+               "\> ${.MAKE} -s -C libre2 \
+               "\>   ARFLAGS="$ARFLAGS" \
+               "\>   CXX="$CXX" \
+               "\>   CXXFLAGS="$CXXFLAGS" \
+               "\>   obj/libre2.a obj/so/libre2.so
+               "\> cp libre2/obj/libre2.a libre2_c_stubs.a
+               "\> cp libre2/obj/so/libre2.so dllre2_c_stubs.so
+               "\> ${.MAKE} -s -C libre2 clean
+)))
+
+(alias
+ (name quoting-test)
+ (action (echo "\| normal: \065
+               "\> raw:    \065
+)))

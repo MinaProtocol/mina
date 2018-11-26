@@ -3,11 +3,17 @@ open Tuple_lib
 open Fold_lib
 open Coda_numbers
 
+module type Prover_state_intf = sig
+  type t [@@deriving bin_io, sexp]
+
+  val handler : t -> Snark_params.Tick.Handler.t
+end
+
 module type S = sig
   module Local_state : sig
     type t [@@deriving sexp]
 
-    val create : unit -> t
+    val create : Signature_lib.Keypair.t option -> t
   end
 
   module Consensus_transition_data : sig
@@ -38,32 +44,52 @@ module type S = sig
     val length : value -> Length.t
 
     val to_lite : (value -> Lite_base.Consensus_state.t) option
+
+    val to_string_record : value -> string
   end
 
+  module Blockchain_state : Coda_base.Blockchain_state.S
+
+  module Prover_state : Prover_state_intf
+
   module Protocol_state :
-    Coda_base.Protocol_state.S with module Consensus_state = Consensus_state
+    Coda_base.Protocol_state.S
+    with module Blockchain_state = Blockchain_state
+     and module Consensus_state = Consensus_state
 
   module Snark_transition :
     Coda_base.Snark_transition.S
-    with module Consensus_data = Consensus_transition_data
+    with module Blockchain_state = Blockchain_state
+     and module Consensus_data = Consensus_transition_data
 
   module Internal_transition :
     Coda_base.Internal_transition.S
     with module Snark_transition = Snark_transition
+     and module Prover_state := Prover_state
 
   module External_transition :
     Coda_base.External_transition.S with module Protocol_state = Protocol_state
+
+  module Proposal_data : sig
+    type t
+
+    val prover_state : t -> Prover_state.t
+  end
+
+  val block_interval_ms : int64
 
   val genesis_protocol_state : Protocol_state.value
 
   val generate_transition :
        previous_protocol_state:Protocol_state.value
-    -> blockchain_state:Coda_base.Blockchain_state.value
-    -> local_state:Local_state.t
+    -> blockchain_state:Blockchain_state.value
     -> time:Unix_timestamp.t
-    -> keypair:Signature_lib.Keypair.t
-    -> transactions:Coda_base.Transaction.t list
-    -> (Protocol_state.value * Consensus_transition_data.value) option
+    -> proposal_data:Proposal_data.t
+    -> transactions:Coda_base.User_command.t list
+    -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
+    -> supply_increase:Currency.Amount.t
+    -> logger:Logger.t
+    -> Protocol_state.value * Consensus_transition_data.value
   (**
    * Generate a new protocol state and consensus specific transition data
    * for a new transition. Called from the proposer in order to generate
@@ -82,6 +108,7 @@ module type S = sig
        Consensus_state.var
     -> Coda_base.State_hash.var
     -> Snark_transition.var
+    -> Currency.Amount.var
     -> (Consensus_state.var, _) Snark_params.Tick.Checked.t
   (**
    * Create a constrained, checked var for the next consensus state of
@@ -89,10 +116,10 @@ module type S = sig
    *)
 
   val select :
-       Consensus_state.value
-    -> Consensus_state.value
+       existing:Consensus_state.value
+    -> candidate:Consensus_state.value
     -> logger:Logger.t
-    -> time_received:Int64.t
+    -> time_received:Unix_timestamp.t
     -> [`Keep | `Take]
   (**
    * Select between two ledger builder controller tips given the consensus
@@ -100,8 +127,23 @@ module type S = sig
    * kept, or `\`Take` if the second tip should be taken instead.
    *)
 
+  val next_proposal :
+       Unix_timestamp.t
+    -> Consensus_state.value
+    -> local_state:Local_state.t
+    -> keypair:Signature_lib.Keypair.t
+    -> logger:Logger.t
+    -> [ `Check_again of Unix_timestamp.t
+       | `Propose of Unix_timestamp.t * Proposal_data.t ]
+  (**
+   * Determine if and when to perform the next transition proposal. Either
+   * informs the callee to check again at some time in the future, or to
+   * schedule a proposal at some time in the future.
+   *)
+
   val lock_transition :
-       Consensus_state.value
+       ?proposer_public_key:Signature_lib.Public_key.Compressed.t
+    -> Consensus_state.value
     -> Consensus_state.value
     -> snarked_ledger:(unit -> Coda_base.Ledger.t Or_error.t)
     -> local_state:Local_state.t

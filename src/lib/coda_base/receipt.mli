@@ -3,9 +3,13 @@ open Snark_params.Tick
 module Chain_hash : sig
   include Data_hash.Full_size
 
+  include Codable.S with type t := t
+
+  val to_string : t -> string
+
   val empty : t
 
-  val cons : Transaction.Payload.t -> t -> t
+  val cons : User_command.Payload.t -> t -> t
 
   module Checked : sig
     val constant : t -> var

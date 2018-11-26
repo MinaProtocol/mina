@@ -4,13 +4,10 @@ open Coda_worker
 open Coda_main
 open Signature_lib
 open Coda_base
+open Pipe_lib
 
-module Make
-    (Ledger_proof : Ledger_proof_intf)
-    (Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof.t)
-    (Coda : Coda_intf.S with type ledger_proof = Ledger_proof.t) =
-struct
-  module Coda_processes = Coda_processes.Make (Ledger_proof) (Kernel) (Coda)
+module Make (Kernel : Kernel_intf) = struct
+  module Coda_processes = Coda_processes.Make (Kernel)
   open Coda_processes
 
   module Api = struct
@@ -21,7 +18,7 @@ struct
           (int * Coda_process.Coda_worker.Input.t * (unit -> unit))
           Linear_pipe.Writer.t
       ; online: bool Array.t
-      ; transaction_writer:
+      ; payment_writer:
           ( int
           * Private_key.t
           * Public_key.Compressed.t
@@ -29,29 +26,51 @@ struct
           * Currency.Fee.t )
           Linear_pipe.Writer.t }
 
-    let create configs workers transaction_writer start_writer =
+    let create configs workers payment_writer start_writer =
       let online = Array.init (List.length workers) ~f:(fun _ -> true) in
-      {workers; configs; start_writer; online; transaction_writer}
+      {workers; configs; start_writer; online; payment_writer}
 
-    let online t i = (t.online).(i)
+    let online t i = t.online.(i)
+
+    let run_online_worker ~f ~arg t i =
+      let worker = List.nth_exn t.workers i in
+      if online t i then Deferred.map (f ~worker arg) ~f:(fun x -> Some x)
+      else return None
 
     let get_balance t i pk =
-      let worker = List.nth_exn t.workers i in
-      if online t i then
-        Deferred.map (Coda_process.get_balance_exn worker pk) ~f:(fun x ->
-            Some x )
-      else return None
+      run_online_worker ~arg:pk
+        ~f:(fun ~worker pk -> Coda_process.get_balance_exn worker pk)
+        t i
 
     let start t i =
       Linear_pipe.write t.start_writer
-        (i, List.nth_exn t.configs i, fun () -> (t.online).(i) <- true)
+        (i, List.nth_exn t.configs i, fun () -> t.online.(i) <- true)
 
     let stop t i =
-      (t.online).(i) <- false ;
+      t.online.(i) <- false ;
       Coda_process.disconnect (List.nth_exn t.workers i)
 
-    let send_transaction t i sk pk amount fee =
-      Linear_pipe.write t.transaction_writer (i, sk, pk, amount, fee)
+    let send_payment t i sk pk amount fee =
+      Linear_pipe.write t.payment_writer (i, sk, pk, amount, fee)
+
+    let send_payment_with_receipt t i sk pk amount fee =
+      run_online_worker ~arg:(sk, pk, amount, fee)
+        ~f:(fun ~worker (sk, pk, amount, fee) ->
+          Coda_process.send_payment_exn worker sk pk amount fee
+            User_command_memo.dummy )
+        t i
+
+    (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the 
+      merkle_list of receipts up to the current state of a sender's receipt_chain hash for some blockchain. 
+      However, whenever we get a new transition, the blockchain does not update and `prove_receipt` would not query 
+      the merkle list that we are looking for *)
+    let prove_receipt t i proving_receipt resulting_receipt =
+      run_online_worker
+        ~arg:(proving_receipt, resulting_receipt)
+        ~f:(fun ~worker (proving_receipt, resulting_receipt) ->
+          Coda_process.prove_receipt_exn worker proving_receipt
+            resulting_receipt )
+        t i
   end
 
   let start_prefix_check log workers events proposal_interval testnet =
@@ -104,8 +123,8 @@ struct
        go ()) ;
     don't_wait_for
       (Deferred.ignore
-         (Linear_pipe.fold ~init:chains all_transitions_r ~f:
-            (fun chains (prev, curr, i) ->
+         (Linear_pipe.fold ~init:chains all_transitions_r
+            ~f:(fun chains (prev, curr, i) ->
               let bits_to_str b =
                 let str =
                   String.concat
@@ -125,8 +144,8 @@ struct
       (Linear_pipe.iter events ~f:(function `Transition (i, (prev, curr)) ->
            Linear_pipe.write all_transitions_w (prev, curr, i) ))
 
-  let start_transaction_check log events transactions workers proposal_interval
-      testnet =
+  let start_payment_check log events payments workers proposal_interval testnet
+      =
     let block_counts = Array.init (List.length workers) ~f:(fun _ -> 0) in
     let active_accounts = ref [] in
     let get_balances pk =
@@ -145,8 +164,8 @@ struct
     in
     let check_active_accounts () =
       let%map new_aa =
-        Deferred.List.filter !active_accounts ~f:
-          (fun (pk, send_block_counts, send_balances) ->
+        Deferred.List.filter !active_accounts
+          ~f:(fun (pk, send_block_counts, send_balances) ->
             let%bind balances = get_balances pk in
             let current_block_counts = Array.to_list block_counts in
             let%map dones =
@@ -182,10 +201,13 @@ struct
            block_counts.(i) <- 1 + block_counts.(i) ;
            Deferred.unit )) ;
     don't_wait_for
-      (Linear_pipe.iter transactions ~f:(fun (i, sk, pk, amount, fee) ->
+      (Linear_pipe.iter payments ~f:(fun (i, sk, pk, amount, fee) ->
            let%bind () = add_to_active_accounts pk in
-           Coda_process.send_transaction_exn (List.nth_exn workers i) sk pk
-             amount fee )) ;
+           let%map _ : Receipt.Chain_hash.t =
+             Coda_process.send_payment_exn (List.nth_exn workers i) sk pk
+               amount fee User_command_memo.dummy
+           in
+           () )) ;
     don't_wait_for
       (let rec go () =
          let%bind () = check_active_accounts () in
@@ -215,23 +237,25 @@ struct
     List.iteri workers ~f:(fun i w -> don't_wait_for (connect_worker i w)) ;
     event_r
 
-  let start_checks log workers proposal_interval transaction_reader
-      start_reader testnet =
+  let start_checks log workers proposal_interval payment_reader start_reader
+      testnet =
     let event_pipe = events workers start_reader in
-    let prefix_events, transaction_events = Linear_pipe.fork2 event_pipe in
+    let prefix_events, payment_events = Linear_pipe.fork2 event_pipe in
     start_prefix_check log workers prefix_events proposal_interval testnet ;
-    start_transaction_check log transaction_events transaction_reader workers
+    start_payment_check log payment_events payment_reader workers
       proposal_interval testnet
 
   (* note: this is very declarative, maybe this should be more imperative? *)
   (* next steps:
-   *   add more powerful api hooks to enable sending transactions on certain conditions
+   *   add more powerful api hooks to enable sending payments on certain conditions
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-  let test ?(proposal_interval= 1000) log n should_propose
-      snark_work_public_keys work_selection =
+  let test log n should_propose snark_work_public_keys work_selection =
     let log = Logger.child log "worker_testnet" in
+    let proposal_interval =
+      Int64.to_int_exn Kernel.Consensus_mechanism.block_interval_ms
+    in
     let%bind program_dir = Unix.getcwd () in
     Coda_processes.init () ;
     let configs =
@@ -241,10 +265,10 @@ struct
         ~work_selection
     in
     let%map workers = Coda_processes.spawn_local_processes_exn configs in
-    let transaction_reader, transaction_writer = Linear_pipe.create () in
+    let payment_reader, payment_writer = Linear_pipe.create () in
     let start_reader, start_writer = Linear_pipe.create () in
-    let testnet = Api.create configs workers transaction_writer start_writer in
-    start_checks log workers proposal_interval transaction_reader start_reader
+    let testnet = Api.create configs workers payment_writer start_writer in
+    start_checks log workers proposal_interval payment_reader start_reader
       testnet ;
     testnet
 end

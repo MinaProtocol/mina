@@ -25,14 +25,16 @@ module type Fake_timer_transport_intf = sig
   val stop_listening : t -> me:peer -> unit
 end
 
-module type Fake_timer_transport_s = functor (Message :sig
-                                                         
-                                                         type t
-end) -> functor (Message_delay :
-  Message_delay_intf with type message := Message.t) -> functor (Peer :
-  Node.Peer_intf) -> Fake_timer_transport_intf
-                     with type message := Message.t
-                      and type peer := Peer.t
+module type Fake_timer_transport_s = functor
+  (Message :sig
+            
+            type t
+          end)
+  (Message_delay : Message_delay_intf with type message := Message.t)
+  (Peer : Node.Peer_intf)
+  -> Fake_timer_transport_intf
+     with type message := Message.t
+      and type peer := Peer.t
 
 module type Trivial_peer_intf = sig
   type t = int [@@deriving eq, hash, compare, sexp]
@@ -42,30 +44,35 @@ end
 
 module Trivial_peer : Trivial_peer_intf
 
-module type S = functor (State :sig
-                                  
-                                  type t [@@deriving eq, sexp]
-end) -> functor (Message :sig
-                            
-                            type t
-end) -> functor (Message_delay :
-  Message_delay_intf with type message := Message.t) -> functor (Message_label :
-sig
-  
-  type label [@@deriving enum, sexp]
+module type S = functor
+  (State :sig
+          
+          type t [@@deriving eq, sexp]
+        end)
+  (Message :sig
+            
+            type t
+          end)
+  (Message_delay : Message_delay_intf with type message := Message.t)
+  (Message_label :sig
+                  
+                  type label [@@deriving enum, sexp]
 
-  include Hashable.S with type t = label
-end) -> functor (Timer_label :sig
-                                
-                                type label [@@deriving enum, sexp]
+                  include Hashable.S with type t = label
+                end)
+  (Timer_label :sig
+                
+                type label [@@deriving enum, sexp]
 
-                                include Hashable.S with type t = label
-end) -> functor (Condition_label :sig
-                                    
-                                    type label [@@deriving enum, sexp]
+                include Hashable.S with type t = label
+              end)
+  (Condition_label :sig
+                    
+                    type label [@@deriving enum, sexp]
 
-                                    include Hashable.S with type t = label
-end) -> sig
+                    include Hashable.S with type t = label
+                  end)
+  -> sig
   type t
 
   module Timer_transport :

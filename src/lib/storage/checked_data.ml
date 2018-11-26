@@ -2,11 +2,11 @@ open Core_kernel
 
 type 'a t = {checksum: Md5.t; data: 'a} [@@deriving bin_io]
 
-let md5 (tc: 'a Bin_prot.Type_class.t) data =
-  let buf = Bigstring.create (tc.writer.size data) in
-  ignore (tc.writer.write buf ~pos:0 data) ;
-  Md5.digest_string (Bigstring.to_string buf)
+let md5 (tc : 'a Binable.m) data =
+  Md5.digest_string (Binable.to_string tc data)
 
-let wrap tc data : 'a t = {checksum= md5 tc data; data}
+let wrap tc data : string t =
+  let data = Binable.to_string tc data in
+  {checksum= Md5.digest_string data; data}
 
-let valid c t = Md5.(md5 c t.data = t.checksum)
+let valid {checksum; data} = Md5.(equal (digest_string data) checksum)

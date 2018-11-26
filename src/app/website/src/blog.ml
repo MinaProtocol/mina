@@ -4,7 +4,7 @@ open Config
 open Stationary
 open Common
 
-let post_url (post: Post.t) = blog_base ^/ "posts" ^/ post.basename ^ ".html"
+let post_url (post : Post.t) = blog_base ^/ "posts" ^/ post.basename ^ ".html"
 
 let comments_section post =
   sprintf
@@ -53,7 +53,7 @@ let call_to_action_footer =
 
 let blog_footer = Html_concise.(div [class_ "blog-footer"] [])
 
-let wrap_post ~standalone (post: Post.t) =
+let wrap_post ~standalone (post : Post.t) =
   let url = post_url post in
   let open Html_concise in
   div [class_ "post-container"]
@@ -67,7 +67,7 @@ let wrap_post ~standalone (post: Post.t) =
     else [div [class_ "post-separator"] []] )
 
 let load_posts () =
-  let assert_no_duplicate_titles (posts: Post.t list) =
+  let assert_no_duplicate_titles (posts : Post.t list) =
     let has_dup =
       List.contains_dup
         ~compare:(fun p1 p2 -> String.compare p1.Post.basename p2.basename)
@@ -106,7 +106,7 @@ let headers =
 
 let wrap ?title cs = wrap ?title ~headers cs
 
-let index (posts: Post.t list) =
+let index (posts : Post.t list) =
   let open Html_concise in
   wrap ~title:"Blog"
     [ Fn.const

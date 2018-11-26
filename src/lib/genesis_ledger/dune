@@ -1,0 +1,6 @@
+(library
+  (public_name genesis_ledger)
+  (name genesis_ledger)
+  (libraries core_kernel coda_base)
+  (preprocessor_deps "../../config.mlh")
+  (preprocess (pps ppx_optcomp)))

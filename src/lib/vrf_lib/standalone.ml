@@ -138,7 +138,8 @@ end = struct
 
     let typ =
       let open Snarky.H_list in
-      Impl.Typ.of_hlistable [Message.typ; Public_key.typ]
+      Impl.Typ.of_hlistable
+        [Message.typ; Public_key.typ]
         ~var_to_hlist:(fun {Context.message; public_key} ->
           [message; public_key] )
         ~var_of_hlist:(fun [message; public_key] -> {message; public_key})
@@ -178,7 +179,8 @@ end = struct
 
     let typ : (var, t) Impl.Typ.t =
       let open Snarky.H_list in
-      Impl.Typ.of_hlistable [Discrete_log_equality.typ; Group.typ]
+      Impl.Typ.of_hlistable
+        [Discrete_log_equality.typ; Group.typ]
         ~var_to_hlist:(fun {discrete_log_equality; scaled_message_hash} ->
           [discrete_log_equality; scaled_message_hash] )
         ~value_to_hlist:(fun {discrete_log_equality; scaled_message_hash} ->
@@ -188,7 +190,7 @@ end = struct
         ~var_of_hlist:(fun [discrete_log_equality; scaled_message_hash] ->
           {discrete_log_equality; scaled_message_hash} )
 
-    let create (k: Private_key.t) message : t =
+    let create (k : Private_key.t) message : t =
       let public_key = Group.scale Group.generator k in
       let message_hash = Message.hash_to_group message in
       let discrete_log_equality : Discrete_log_equality.t =
@@ -203,8 +205,8 @@ end = struct
       {discrete_log_equality; scaled_message_hash= Group.scale message_hash k}
 
     let verified_output
-        ({scaled_message_hash; discrete_log_equality= {c; s}}: t)
-        ({message; public_key}: Context.t) =
+        ({scaled_message_hash; discrete_log_equality= {c; s}} : t)
+        ({message; public_key} : Context.t) =
       let g = Group.generator in
       let ( + ) = Group.add in
       let ( * ) s g = Group.scale g s in
@@ -220,10 +222,10 @@ end = struct
 
     module Checked = struct
       let verified_output (type shifted)
-          ((module Shifted) as shifted:
+          ((module Shifted) as shifted :
             (module Group.Checked.Shifted.S with type t = shifted))
-          ({scaled_message_hash; discrete_log_equality= {c; s}}: var)
-          ({message; public_key}: Context.var) =
+          ({scaled_message_hash; discrete_log_equality= {c; s}} : var)
+          ({message; public_key} : Context.var) =
         let open Impl.Let_syntax in
         let%bind () =
           let%bind a =
@@ -461,7 +463,7 @@ let%test_module "vrf-test" =
 
       let typ = Curve.typ
 
-      let to_bits (t: t) =
+      let to_bits (t : t) =
         let x, y = Curve.to_coords t in
         List.hd_exn (Field.unpack y) :: Field.unpack x
 
@@ -481,8 +483,8 @@ let%test_module "vrf-test" =
 
       let%test_unit "scaling associates" =
         let open Quickcheck in
-        test ~trials:50 (Generator.tuple2 Scalar.gen Scalar.gen) ~f:
-          (fun (a, b) ->
+        test ~trials:50 (Generator.tuple2 Scalar.gen Scalar.gen)
+          ~f:(fun (a, b) ->
             assert (
               equal
                 (scale generator (Scalar.mul a b))
@@ -491,7 +493,7 @@ let%test_module "vrf-test" =
       module Checked = struct
         include Curve.Checked
 
-        let to_bits ((x, y): var) =
+        let to_bits ((x, y) : var) =
           let open Let_syntax in
           let%map x =
             Field.Checked.choose_preimage_var ~length:Field.size_in_bits x
@@ -548,8 +550,8 @@ let%test_module "vrf-test" =
       | [b1; b2] -> [(b1, b2, default)]
 
     let hash_bits bits =
-      List.foldi ~init:Curve.zero (bits_to_triples ~default:false bits) ~f:
-        (fun i acc triple ->
+      List.foldi ~init:Curve.zero (bits_to_triples ~default:false bits)
+        ~f:(fun i acc triple ->
           Curve.add acc
             (Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
                triple) )

@@ -24,8 +24,7 @@ module Make
            and type value := Punishment_record.t) :
   Key_value_database.S
   with type key := Peer.t
-   and type value := Punishment_record.t =
-struct
+   and type value := Punishment_record.t = struct
   type t = {db: DB.t}
 
   let create ~directory =
@@ -68,7 +67,7 @@ module Mock_time = struct
   let set_event ~f time =
     ignore
       ( Time_simulator.Timeout.create !controller time ~f
-      : unit Time_simulator.Timeout.t )
+        : unit Time_simulator.Timeout.t )
 end
 
 let%test_module "banlist" =
@@ -101,10 +100,10 @@ let%test_module "banlist" =
           schedule_punishment_lookup db is_punished (Int64.succ evict_time) ;
           Async.Thread_safe.block_on_async_exn (fun () ->
               let%bind () = Mock_time.tick () in
-              [%test_result : Bool.t] ~message:"peer should still be banned"
+              [%test_result: Bool.t] ~message:"peer should still be banned"
                 ~expect:true !is_punished ;
               let%map () = Mock_time.tick () in
-              [%test_result : Bool.t] ~message:"peer is not banned anymore"
+              [%test_result: Bool.t] ~message:"peer is not banned anymore"
                 ~expect:false !is_punished ) )
 
     let%test_unit "updating a peer's ban record will override their time to \
@@ -123,9 +122,9 @@ let%test_module "banlist" =
           Mock_db.set db ~key:peer ~data:new_evict_time ;
           Async.Thread_safe.block_on_async_exn (fun () ->
               let%bind () = Mock_time.tick () in
-              [%test_result : Bool.t] ~message:"peer should still be banned"
+              [%test_result: Bool.t] ~message:"peer should still be banned"
                 ~expect:true !is_punished ;
               let%map () = Mock_time.tick () in
-              [%test_result : Bool.t] ~message:"peer is not banned anymore"
+              [%test_result: Bool.t] ~message:"peer is not banned anymore"
                 ~expect:false !is_punished ) )
   end )

@@ -1,0 +1,3 @@
+(rule
+ (targets x)
+ (action (with-stdout-to %{targets} (echo %{ocaml-config:system}))))

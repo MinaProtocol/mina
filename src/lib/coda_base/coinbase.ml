@@ -16,7 +16,8 @@ let is_valid {proposer= _; amount; fee_transfer} =
   | None -> true
   | Some (_, fee) -> Currency.Amount.(of_fee fee <= amount)
 
-include Binable.Of_binable (T)
+include Binable.Of_binable
+          (T)
           (struct
             type nonrec t = t
 
@@ -37,7 +38,8 @@ let supply_increase {proposer= _; amount; fee_transfer} =
   | None -> Ok amount
   | Some (_, fee) ->
       Currency.Amount.sub amount (Currency.Amount.of_fee fee)
-      |> Option.value_map ~f:Or_error.return
+      |> Option.value_map
+           ~f:(fun _ -> Ok amount)
            ~default:(Or_error.error_string "Coinbase underflow")
 
 let fee_excess t =

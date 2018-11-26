@@ -111,7 +111,7 @@ module Timeout = struct
   let cancel () {cancel; _} value = cancel value
 end
 
-let field_var_to_unpacked (x: Tick.Field.Checked.t) =
+let field_var_to_unpacked (x : Tick.Field.Checked.t) =
   Tick.Field.Checked.unpack ~length:64 x
 
 let epoch = of_time Time.epoch

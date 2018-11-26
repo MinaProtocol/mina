@@ -21,9 +21,7 @@ end
 module Make_mock
     (Key : Hashable.S) (Value : sig
         type t
-    end) :
-  S with type key := Key.t and type value := Value.t =
-struct
+    end) : S with type key := Key.t and type value := Value.t = struct
   type t = Value.t Key.Table.t
 
   let create ~directory:_ = Key.Table.create ()
