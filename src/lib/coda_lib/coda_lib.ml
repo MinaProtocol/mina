@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Protocols
+open Pipe_lib
 open O1trace
 
 module type Ledger_builder_io_intf = sig

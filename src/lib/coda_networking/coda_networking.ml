@@ -2,6 +2,7 @@ open Core_kernel
 open Async
 open Kademlia
 open Coda_base
+open Pipe_lib
 
 module type Sync_ledger_intf = sig
   type query [@@deriving bin_io]

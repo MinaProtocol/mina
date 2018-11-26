@@ -9,11 +9,12 @@ module Make
     (Kvdb : Intf.Key_value_database)
     (Storage_locations : Intf.Storage_locations) :
   Database_intf.S
-  with module Addr = Location.Addr
-  with type account := Account.t
+  with module Location = Location
+   and module Addr = Location.Addr
+   and type account := Account.t
+   and type root_hash := Hash.t
    and type hash := Hash.t
-   and type key := Key.t
-   and type location := Location.t = struct
+   and type key := Key.t = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   include Depth
 
@@ -28,16 +29,26 @@ module Make
 
   module Path = Merkle_path.Make (Hash)
   module Addr = Location.Addr
+  module Location = Location
 
   type location = Location.t [@@deriving sexp]
 
-  type t = {uuid: Uuid.Stable.V1.t; kvdb: Kvdb.t} [@@deriving sexp]
+  type index = int
+
+  type path = Path.t
+
+  type t = {uuid: Uuid.Stable.V1.t; kvdb: Kvdb.t sexp_opaque} [@@deriving sexp]
 
   let get_uuid t = t.uuid
 
-  let create () =
+  let create ?directory_name () =
     let uuid = Uuid.create () in
-    let kvdb = Kvdb.create ~directory:(Uuid.to_string uuid) in
+    let directory =
+      match directory_name with
+      | None -> Uuid.to_string uuid
+      | Some name -> name
+    in
+    let kvdb = Kvdb.create ~directory in
     {uuid; kvdb}
 
   let destroy {uuid= _; kvdb} = Kvdb.destroy kvdb
@@ -94,7 +105,7 @@ module Make
     List.map locations_accounts_bin ~f:(fun (_location_bin, account_bin) ->
         account_bin_read account_bin ~pos_ref:(ref 0) )
 
-  let account_list mdb = account_list_bin mdb Account.bin_read_t
+  let to_list mdb = account_list_bin mdb Account.bin_read_t
 
   let set_raw {kvdb; _} location bin =
     Kvdb.set kvdb ~key:(Location.serialize location) ~data:bin
@@ -255,17 +266,20 @@ module Make
 
   let get_or_create_account mdb key account =
     match Account_location.get mdb key with
-    | Error Account_location_not_found ->
-        Account_location.allocate mdb key
-        |> Result.map ~f:(fun location ->
-               set mdb location account ;
-               (`Added, location) )
-    | Error err -> Error err
+    | Error Account_location_not_found -> (
+      match Account_location.allocate mdb key with
+      | Ok location ->
+          set mdb location account ;
+          Ok (`Added, location)
+      | Error err ->
+          Error (Error.create "get_or_create_account" err Db_error.sexp_of_t) )
+    | Error err ->
+        Error (Error.create "get_or_create_account" err Db_error.sexp_of_t)
     | Ok location -> Ok (`Existed, location)
 
   let get_or_create_account_exn mdb key account =
     get_or_create_account mdb key account
-    |> Result.map_error ~f:(fun err -> Db_error.Db_exception err)
+    |> Result.map_error ~f:(fun err -> raise (Error.to_exn err))
     |> Result.ok_exn
 
   let num_accounts t =
@@ -292,26 +306,33 @@ module Make
       | [] -> [] )
     |> ignore
 
+  (* TODO : if key-value store supports iteration mechanism, like RocksDB,
+     maybe use that here, instead of loading all accounts into memory
+  *)
+  let foldi t ~init ~f =
+    let f' index accum account = f (Addr.of_int_exn index) accum account in
+    match Account_location.last_location_address t with
+    | None -> init
+    | Some last_addr ->
+        let last = Addr.to_int last_addr in
+        Sequence.range ~stop:`inclusive 0 last
+        |> Sequence.map ~f:(get_at_index_exn t)
+        |> Sequence.foldi ~init ~f:f'
+
   module C : Container.S0 with type t := t and type elt := Account.t =
   Container.Make0 (struct
     module Elt = Account
 
     type nonrec t = t
 
-    (* TODO: This implementation does not consider empty indices from stack db. *)
     let fold t ~init ~f =
-      match Account_location.last_location_address t with
-      | None -> init
-      | Some last_addr ->
-          let last = Addr.to_int last_addr in
-          Sequence.range ~stop:`inclusive 0 last
-          |> Sequence.map ~f:(get_at_index_exn t)
-          |> Sequence.fold ~init ~f
+      let f' _index accum account = f accum account in
+      foldi t ~init ~f:f'
 
     let iter = `Define_using_fold
   end)
 
-  let to_list = C.to_list
+  let fold_until = C.fold_until
 
   let merkle_root mdb = get_hash mdb Location.root_hash
 

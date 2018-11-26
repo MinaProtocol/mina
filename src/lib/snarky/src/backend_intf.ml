@@ -39,7 +39,7 @@ module type S = sig
   end
 
   module Proving_key : sig
-    type t
+    type t [@@deriving bin_io]
 
     val to_string : t -> string
 

@@ -7,6 +7,7 @@ open Coda_base
 open Signature_lib
 open Blockchain_snark
 open Coda_numbers
+open Pipe_lib
 open O1trace
 module Fee = Protocols.Coda_pow.Fee
 
@@ -40,6 +41,10 @@ end
 
 module Ledger_hash = struct
   include Ledger_hash.Stable.V1
+
+  let of_digest = Ledger_hash.of_digest
+
+  let merge = Ledger_hash.merge
 
   let to_bytes = Ledger_hash.to_bytes
 
@@ -792,6 +797,8 @@ module type Main_intf = sig
     module Ledger : sig
       type t [@@deriving sexp]
 
+      type account
+
       val copy : t -> t
 
       val location_of_key :
@@ -967,7 +974,7 @@ module type Main_intf = sig
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
 
   val get_ledger :
-    t -> Ledger_builder_hash.t -> Ledger.account list Deferred.Or_error.t
+    t -> Ledger_builder_hash.t -> Account.t list Deferred.Or_error.t
 
   val receipt_chain_database : t -> Receipt_chain_database.t
 end

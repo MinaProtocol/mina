@@ -4,25 +4,20 @@ open Signature_lib
 module Location : Merkle_ledger.Location_intf.S
 
 include
-  Merkle_ledger.Database_intf.S
-  with type hash := Ledger_hash.t
+  Merkle_ledger.Base_ledger_intf.S
+  with module Location := Location
+  with type root_hash := Ledger_hash.t
+   and type hash := Ledger_hash.t
    and type account := Account.t
    and type key := Public_key.Compressed.t
-   and type location := Location.t
 
-type account = Account.t
+val with_ledger : f:(t -> 'a) -> 'a
 
-type path = Path.t
+val create : ?directory_name:string -> unit -> t
 
-(* TODO : this is required by Coda_main.Main_intf.Ledger; how to reconcile with Database_intf.S ? *)
-val fold_until :
-     t
-  -> init:'accum
-  -> f:('accum -> Account.t -> ('accum, 'stop) Base.Continue_or_stop.t)
-  -> finish:('accum -> 'stop)
-  -> 'stop
+(** This is not _really_ copy, merely a stop-gap until we remove usages of copy in our codebase. What this actually does is creates a new empty mask on top of the current ledger *)
+val copy : t -> t
 
-(* END of TODO *)
 module Undo : sig
   module User_command : sig
     module Common : sig

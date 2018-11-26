@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Pipe_lib
 
 module type Pool_intf = sig
   type t

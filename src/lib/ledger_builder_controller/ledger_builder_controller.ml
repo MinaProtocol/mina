@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Pipe_lib
 open O1trace
 
 module Make (Inputs : Inputs.S) : sig
@@ -46,12 +47,11 @@ end = struct
 
     module Step = struct
       let apply' t diff logger =
-        Deferred.Or_error.map
-          (Ledger_builder.apply t diff ~logger)
-          ~f:
-            (Option.map ~f:(fun proof ->
-                 ( Ledger_proof.statement proof |> Ledger_proof_statement.target
-                 , proof ) ))
+        let open Deferred.Or_error.Let_syntax in
+        let%map _, `Ledger_proof proof = Ledger_builder.apply t diff ~logger in
+        Option.map proof ~f:(fun proof ->
+            ( Ledger_proof.statement proof |> Ledger_proof_statement.target
+            , proof ) )
 
       let step logger {With_hash.data= tip; hash= tip_hash}
           {With_hash.data= transition; hash= transition_target_hash} =
@@ -113,13 +113,6 @@ end = struct
   type t =
     { ledger_builder_io: Net.t
     ; log: Logger.t
-    ; store_controller:
-        ( Consensus_mechanism.Protocol_state.value
-          * Protocol_state_proof.t
-          * Ledger_builder.serializable
-        , State_hash.t )
-        With_hash.t
-        Store.Controller.t
     ; handler: Transition_logic.t
     ; strongest_ledgers_reader:
         (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t }
@@ -132,55 +125,19 @@ end = struct
   let ledger_builder_io {ledger_builder_io; _} = ledger_builder_io
 
   let load_tip_and_genesis_hash
-      (controller :
-        ( Consensus_mechanism.Protocol_state.value
-          * Protocol_state_proof.t
-          * Ledger_builder.serializable
-        , State_hash.t )
-        With_hash.t
-        Store.Controller.t)
-      {Config.longest_tip_location; genesis_tip; ledger; _} log =
+      {Config.genesis_tip; ledger; _} log =
     let genesis_state_hash = Protocol_state.hash genesis_tip.state in
-    match%map Store.load controller longest_tip_location with
-    | Ok {data; hash} ->
-        (* we've loaded the serialized components of the tip; 
-           to build a tip, we also need the ledger, which we pull out of the config
-        *)
-        let state, proof, mask = data in
-        let ledger_builder =
-          Ledger_builder.of_serialized_and_unserialized ~serialized:mask ~unserialized:ledger
-        in
-        let tip = {Tip.state; Tip.proof; Tip.ledger_builder} in
-        {With_hash.data= tip; hash}
-    | Error `No_exist ->
-        Logger.info log
-          "File for ledger builder controller tip does not exist. Using \
+    Logger.info log
+       "TODO: re-implement serialization File for ledger builder controller tip does not exist. Using \
            Genesis tip" ;
         {data= genesis_tip; hash= genesis_state_hash}
-    | Error (`IO_error e) ->
-        Logger.error log
-          !"IO error: %s\nUsing Genesis tip"
-          (Error.to_string_hum e) ;
-        {data= genesis_tip; hash= genesis_state_hash}
-    | Error `Checksum_no_match ->
-        Logger.error log
-          !"Checksum from location %s does not match with data\n\
-            Using Genesis tip"
-          longest_tip_location ;
-        {data= genesis_tip; hash= genesis_state_hash}
-
   let create (config : Config.t) =
     let log = Logger.child config.parent_log "ledger_builder_controller" in
-    let store_controller =
-      Store.Controller.create
-        (With_hash.bin_t Tip.bin_tip State_hash.bin_t)
-        ~parent_log:config.parent_log
-    in
     let genesis_tip_state_hash =
       Protocol_state.hash config.genesis_tip.state
     in
     let%bind {data= tip; hash= stored_genesis_state_hash} =
-      load_tip_and_genesis_hash store_controller config log
+      load_tip_and_genesis_hash config log
     in
     let tip =
       if State_hash.equal genesis_tip_state_hash stored_genesis_state_hash then
@@ -208,7 +165,6 @@ end = struct
     let t =
       { ledger_builder_io= net
       ; log
-      ; store_controller
       ; strongest_ledgers_reader
       ; handler= Transition_logic.create state log }
     in
@@ -232,7 +188,7 @@ end = struct
                  { data= (state, proof, serializable)
                  ; hash= genesis_tip_state_hash }
                in
-               Store.store store_controller config.longest_tip_location
+               Store.store config.longest_tip_location
                  serializable_tip_with_genesis_hash ) ) ;
     (* Handle new transitions *)
     let possibly_jobs =
@@ -299,7 +255,7 @@ end = struct
       let open With_hash in
       let open Deferred.Let_syntax in
       let%map {data= tip; _} =
-        load_tip_and_genesis_hash t.store_controller config t.log
+        load_tip_and_genesis_hash config t.log
       in
       tip
   end
@@ -438,7 +394,13 @@ let%test_module "test" =
         end
 
         (* A ledger_builder transition will just add to a "ledger" integer *)
-        module Ledger_builder_diff = Int
+        module Ledger_builder_diff = struct
+          type t = int [@@deriving bin_io, sexp]
+
+          module With_valid_signatures_and_proofs = struct
+            type t = int
+          end
+        end
 
         module Ledger = struct
           include Int
@@ -491,7 +453,10 @@ let%test_module "test" =
 
           let apply (t : t) (x : Ledger_builder_diff.t) ~logger:_ =
             t := x ;
-            return (Ok (Some x))
+            return (Ok (`Hash_after_applying (hash t), `Ledger_proof (Some x)))
+
+          let apply_diff_unchecked (_t : t) (_x : 'a) =
+            failwith "Unimplemented"
 
           let snarked_ledger :
                  t

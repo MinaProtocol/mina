@@ -23,11 +23,15 @@ module Location : Merkle_ledger.Location_intf.S =
 module Location_at_depth = Location
 
 module Make
-    (MaskedLedger : Merkle_ledger.Database_intf.S
-                    with type hash := Ledger_hash.t
+    (MaskedLedger : sig
+      include Merkle_ledger.Base_ledger_intf.S
+                    with module Location := Location
+                    with type root_hash := Ledger_hash.t
+                     and type hash := Ledger_hash.t
                      and type account := Account.t
-                     and type location := Location.t
-                     and type key := Public_key.Compressed.t) =
+                     and type key := Public_key.Compressed.t
+      val with_ledger : f:(t -> 'a) -> 'a
+    end) =
 struct
   include MaskedLedger
 
@@ -35,12 +39,8 @@ struct
      but the module signature for the functor result wants them, so we declare them here *)
   type location = Location.t
 
-  type account = Account.t
-
-  type path = Path.t
-
   let fold_until t ~init ~f ~finish =
-    let accounts = account_list t in
+    let accounts = to_list t in
     List.fold_until accounts ~init ~f ~finish
 
   let create_new_account_exn t pk account =
@@ -445,26 +445,27 @@ module Masked_ledger = struct
     let key_value_db_dir = "coda_key_value_db"
   end
 
-  module Db : sig
-    include
-      Merkle_mask.Base_merkle_tree_intf.S
+  module Db :
+    Merkle_ledger.Database_intf.S
+      with module Location = Location_at_depth
       with module Addr = Location_at_depth.Addr
+      with type root_hash := Ledger_hash.t
+       and type hash := Ledger_hash.t
        and type account := Account.t
-       and type hash := Hash.t
-       and type key := Key.t
-       and type location := Location_at_depth.t
-  end =
+       and type key := Public_key.Compressed.t
+    =
     Database.Make (Key) (Account) (Hash) (Depth) (Location_at_depth) (Kvdb)
       (Storage_locations)
 
   module Mask :
     Merkle_mask.Masking_merkle_tree_intf.S
+    with module Location = Location_at_depth
     with module Addr = Location_at_depth.Addr
      and module Attached.Addr = Location_at_depth.Addr
     with type account := Account.t
-     and type location := Location_at_depth.t
      and type key := Key.t
      and type hash := Hash.t
+     and type location := Location_at_depth.t
      and type parent := Db.t =
     Merkle_mask.Masking_merkle_tree.Make (Key) (Account) (Hash)
       (Location_at_depth)
@@ -472,13 +473,15 @@ module Masked_ledger = struct
 
   module Maskable :
     Merkle_mask.Maskable_merkle_tree_intf.S
+    with module Location = Location_at_depth
     with module Addr = Location_at_depth.Addr
     with type account := Account.t
-     and type location := Location_at_depth.t
      and type key := Key.t
      and type hash := Hash.t
+     and type root_hash := Hash.t
      and type unattached_mask := Mask.t
-     and type attached_mask := Mask.Attached.t =
+     and type attached_mask := Mask.Attached.t
+     and type t := Db.t =
     Merkle_mask.Maskable_merkle_tree.Make (Key) (Account) (Hash)
       (Location_at_depth)
       (Db)
@@ -489,8 +492,8 @@ module Masked_ledger = struct
   (* Mask.Attached.create () fails, can't create an attached mask directly
      shadow create in order to create an attached mask
   *)
-  let create () =
-    let maskable = Maskable.create () in
+  let create ?directory_name () =
+    let maskable = Db.create ?directory_name () in
     let mask = Mask.create () in
     Maskable.register_mask maskable mask
 

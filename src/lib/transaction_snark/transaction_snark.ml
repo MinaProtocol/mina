@@ -380,11 +380,11 @@ module Base = struct
       let open Cached.Let_syntax in
       let%map verification =
         Cached.component ~label:"verification" ~f:Keypair.vk
-          Verification_key.bin_t
+          (module Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Keypair.pk Proving_key.bin_t
+        Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
       in
-      (verification, proving)
+      (verification, {proving with value= ()})
     in
     Cached.Spec.create ~load ~name:"transaction-snark base keys"
       ~autogen_path:Cache_dir.autogen_path
@@ -624,11 +624,11 @@ module Merge = struct
       let open Cached.Let_syntax in
       let%map verification =
         Cached.component ~label:"verification" ~f:Keypair.vk
-          Verification_key.bin_t
+          (module Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Keypair.pk Proving_key.bin_t
+        Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
       in
-      (verification, proving)
+      (verification, {proving with value= ()})
     in
     Cached.Spec.create ~load ~name:"transaction-snark merge keys"
       ~autogen_path:Cache_dir.autogen_path
@@ -869,11 +869,11 @@ struct
       let open Cached.Let_syntax in
       let%map verification =
         Cached.component ~label:"verification" ~f:Keypair.vk
-          Verification_key.bin_t
+          (module Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Keypair.pk Proving_key.bin_t
+        Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
       in
-      (verification, proving)
+      (verification, {proving with value= ()})
     in
     Cached.Spec.create ~load ~name:"transaction-snark wrap keys"
       ~autogen_path:Cache_dir.autogen_path
@@ -1100,10 +1100,10 @@ module Keys = struct
       let open Storage in
       let parent_log = Logger.create () in
       let tick_controller =
-        Controller.create ~parent_log Tick.Verification_key.bin_t
+        Controller.create ~parent_log (module Tick.Verification_key)
       in
       let tock_controller =
-        Controller.create ~parent_log Tock.Verification_key.bin_t
+        Controller.create ~parent_log (module Tock.Verification_key)
       in
       let open Async in
       let load c p =
@@ -1134,10 +1134,10 @@ module Keys = struct
       let open Storage in
       let parent_log = Logger.create () in
       let tick_controller =
-        Controller.create ~parent_log Tick.Proving_key.bin_t
+        Controller.create ~parent_log (module Tick.Proving_key)
       in
       let tock_controller =
-        Controller.create ~parent_log Tock.Proving_key.bin_t
+        Controller.create ~parent_log (module Tock.Proving_key)
       in
       let open Async in
       let load c p =
@@ -1205,8 +1205,8 @@ module Keys = struct
   let cached () =
     let paths path = Cache_dir.possible_paths (Filename.basename path) in
     let open Async in
-    let%bind base_vk, base_pk = Cached.run Base.cached
-    and merge_vk, merge_pk = Cached.run Merge.cached in
+    let%bind base_vk, base_pk = Cached.run Base.cached in
+    let%bind merge_vk, merge_pk = Cached.run Merge.cached in
     let%map wrap_vk, wrap_pk =
       let module Wrap = Wrap (struct
         let base = base_vk.value
@@ -1215,11 +1215,8 @@ module Keys = struct
       end) in
       Cached.run Wrap.cached
     in
-    let t =
-      { proving=
-          {base= base_pk.value; merge= merge_pk.value; wrap= wrap_pk.value}
-      ; verification=
-          {base= base_vk.value; merge= merge_vk.value; wrap= wrap_vk.value} }
+    let t : Verification.t =
+      {base= base_vk.value; merge= merge_vk.value; wrap= wrap_vk.value}
     in
     let location : Location.t =
       { proving=
