@@ -33,32 +33,48 @@ module type Catchup_intf = sig
     -> unit
 end
 
+module type Transition_handler_validator_intf = sig
+  type external_transition
+
+  type transition_frontier
+
+  val run :
+       transition_reader:external_transition Reader.t
+    -> valid_transition_writer:( external_transition
+                               , drop_head buffered
+                               , _ )
+                               Writer.t
+    -> transition_frontier
+    -> unit
+end
+
+module type Transition_handler_processor_intf = sig
+  type external_transition
+
+  type transition_frontier
+
+  val run :
+       valid_transition_reader:external_transition Reader.t
+    -> catchup_job_writer:( external_transition
+                          , drop_head buffered
+                          , _ )
+                          Writer.t
+    -> transition_frontier
+    -> unit
+end
+
 module type Transition_handler_intf = sig
   type external_transition
 
   type transition_frontier
 
-  module Validator : sig
-    val run :
-         transition_reader:external_transition Reader.t
-      -> valid_transition_writer:( external_transition
-                                 , drop_head buffered
-                                 , _ )
-                                 Writer.t
-      -> transition_frontier
-      -> unit
-  end
+  module Validator : Transition_handler_validator_intf
+    with type external_transition := external_transition
+     and type transition_frontier := transition_frontier
 
-  module Processor : sig
-    val run :
-         valid_transition_reader:external_transition Reader.t
-      -> catchup_job_writer:( external_transition
-                            , drop_head buffered
-                            , _ )
-                            Writer.t
-      -> transition_frontier
-      -> unit
-  end
+  module Processor : Transition_handler_processor_intf
+    with type external_transition := external_transition
+     and type transition_frontier := transition_frontier
 end
 
 module type Sync_handler_intf = sig

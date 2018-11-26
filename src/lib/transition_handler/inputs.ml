@@ -2,10 +2,12 @@ open Protocols.Coda_pow
 
 module type S = sig
   module Proof : Proof_intf
-  module Consensus_mechanism : Consensus.Mechanism.S
+  module Time : Time_intf
+  module Consensus_mechanism : Consensus_mechanism_intf
   module Transition_frontier : Transition_frontier_intf
 end
 
+(*
 module Test : S = struct
   module Proof = Test_mocks.Proof.Bool
 
@@ -21,3 +23,4 @@ module Test : S = struct
     end)
   end
 end
+ *)

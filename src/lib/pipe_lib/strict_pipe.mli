@@ -25,6 +25,8 @@ type (_, _) type_ =
 module Reader : sig
   type 't t
 
+  val join_with_priority
+
   val fold :
        ?consumer:Pipe.Consumer.t
     -> 'a t
