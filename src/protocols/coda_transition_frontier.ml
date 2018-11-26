@@ -15,7 +15,10 @@ module type Transition_frontier_intf = sig
 
   type t
 
-  val create : root:(external_transition, state_hash) With_hash.t -> ledger:merkle_ledger -> t
+  val create :
+       root:(external_transition, state_hash) With_hash.t
+    -> ledger:merkle_ledger
+    -> t
 
   val root : t -> Breadcrumb.t
 
@@ -31,7 +34,8 @@ module type Transition_frontier_intf = sig
 
   val iter : t -> f:(Breadcrumb.t -> unit) -> unit
 
-  val add_exn : t -> (external_transition, state_hash) With_hash.t -> Breadcrumb.t
+  val add_exn :
+    t -> (external_transition, state_hash) With_hash.t -> Breadcrumb.t
 end
 
 module type Catchup_intf = sig
@@ -43,7 +47,8 @@ module type Catchup_intf = sig
 
   val run :
        frontier:transition_frontier
-    -> catchup_job_reader:(external_transition, state_hash) With_hash.t Reader.t
+    -> catchup_job_reader:(external_transition, state_hash) With_hash.t
+                          Reader.t
     -> unit
 end
 
@@ -57,14 +62,16 @@ module type Transition_handler_intf = sig
   module Validator : sig
     val run :
          transition_reader:external_transition Linear_pipe.Reader.t
-      -> valid_transition_writer:(external_transition, state_hash) With_hash.t Linear_pipe.Writer.t
+      -> valid_transition_writer:(external_transition, state_hash) With_hash.t
+                                 Linear_pipe.Writer.t
       -> unit
   end
 
   module Processor : sig
     val run :
          frontier:transition_frontier
-      -> valid_transition_reader:(external_transition, state_hash) With_hash.t Reader.t
+      -> valid_transition_reader:(external_transition, state_hash) With_hash.t
+                                 Reader.t
       -> catchup_job_writer:( (external_transition, state_hash) With_hash.t
                             , drop_head buffered
                             , _ )

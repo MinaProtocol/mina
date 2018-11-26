@@ -4,8 +4,8 @@ open Coda_base
 open Pipe_lib
 
 module type Inputs_intf = sig
-  module Consensus_mechanism : Consensus_mechanism_intf
-    with type protocol_state_hash := State_hash.t
+  module Consensus_mechanism :
+    Consensus_mechanism_intf with type protocol_state_hash := State_hash.t
 
   module Merkle_address : Merkle_address.S
 
@@ -51,7 +51,8 @@ module Make (Inputs : Inputs_intf) :
   open Inputs
   open Consensus_mechanism
 
-  let run ~genesis_transition ~transition_reader ~sync_query_reader ~sync_answer_writer =
+  let run ~genesis_transition ~transition_reader ~sync_query_reader
+      ~sync_answer_writer =
     let valid_transition_reader, valid_transition_writer =
       Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
     in
@@ -62,16 +63,17 @@ module Make (Inputs : Inputs_intf) :
     (* TODO: initialize transition frontier from disk *)
     let frontier =
       Transition_frontier.create
-        ~root:(
-          With_hash.of_data
-            genesis_transition
-            ~hash_data:(Fn.compose
-              Protocol_state.hash
-              External_transition.protocol_state))
+        ~root:
+          (With_hash.of_data genesis_transition
+             ~hash_data:
+               (Fn.compose Protocol_state.hash
+                  External_transition.protocol_state))
         ~ledger:Genesis_ledger.t
     in
-    Transition_handler.Validator.run ~transition_reader ~valid_transition_writer ;
-    Transition_handler.Processor.run ~valid_transition_reader ~catchup_job_writer ~frontier ;
+    Transition_handler.Validator.run ~transition_reader
+      ~valid_transition_writer ;
+    Transition_handler.Processor.run ~valid_transition_reader
+      ~catchup_job_writer ~frontier ;
     Catchup.run ~catchup_job_reader ~frontier ;
     Sync_handler.run ~sync_query_reader ~sync_answer_writer ~frontier
 end
