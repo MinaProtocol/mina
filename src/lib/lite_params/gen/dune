@@ -11,6 +11,7 @@
      coda_base
      lite_compat
      precomputed_values)
+   (link_flags (-cclib -lrocksdb))
    (preprocessor_deps "../../../config.mlh")
    (preprocess (pps ppx_jane ppxlib.metaquot ppxlib.runner))
    (modes native))

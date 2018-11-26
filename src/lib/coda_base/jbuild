@@ -8,6 +8,7 @@
   (library_flags (-linkall))
   (libraries
     ( lite_base
+      rocksdb_database
       hash_prefixes
       base64
       signature_lib

@@ -12,7 +12,6 @@ let%test_module "Database integration test" =
     module Location = Merkle_ledger.Location.Make (Depth)
     module DB =
       Database.Make (Key) (Account) (Hash) (Depth) (Location) (In_memory_kvdb)
-        (Storage_locations)
     module Ledger = Ledger.Make (Key) (Account) (Hash) (Depth)
     module Binary_tree = Binary_tree.Make (Account) (Hash) (Depth)
 
@@ -69,7 +68,9 @@ let%test_module "Database integration test" =
           let accounts =
             List.map2_exn public_keys balances ~f:Account.create
           in
-          let db = DB.create () in
+          let db =
+            DB.create ~directory:Filename.(temp_dir "coda-test-db" "")
+          in
           let ledger = Ledger.create () in
           let enumerate_dir_combinations max_depth =
             Sequence.range 0 (max_depth - 1)

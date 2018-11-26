@@ -122,13 +122,12 @@ end = struct
 
   let ledger_builder_io {ledger_builder_io; _} = ledger_builder_io
 
-  let load_tip_and_genesis_hash
-      {Config.genesis_tip; _} log =
+  let load_tip_and_genesis_hash {Config.genesis_tip; _} log =
     let genesis_state_hash =
       Protocol_state.hash genesis_tip.Tip.protocol_state
     in
     Logger.warn log
-          "TODO: Re-enable serialization, for now we're genesis tipping";
+      "TODO: Re-enable serialization, for now we're genesis tipping" ;
     return {With_hash.data= genesis_tip; hash= genesis_state_hash}
 
   let create (config : Config.t) =
@@ -239,9 +238,7 @@ end = struct
     let load_tip t config =
       let open With_hash in
       let open Deferred.Let_syntax in
-      let%map {data= tip; _} =
-        load_tip_and_genesis_hash config t.log
-      in
+      let%map {data= tip; _} = load_tip_and_genesis_hash config t.log in
       tip
   end
 

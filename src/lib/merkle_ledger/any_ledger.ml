@@ -56,8 +56,6 @@ struct
 
     module Addr = Location.Addr
 
-    let copy (T ((module Base), t)) = T ((module Base), Base.copy t)
-
     let remove_accounts_exn (T ((module Base), t)) = Base.remove_accounts_exn t
 
     let merkle_path_at_index_exn (T ((module Base), t)) =

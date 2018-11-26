@@ -15,8 +15,6 @@ include
    and type account := Account.t
    and type key := Public_key.Compressed.t
 
-val create : unit -> t
-
 type account = Account.t
 
 module Undo : sig

@@ -10,4 +10,8 @@ module type S = sig
   val key_of_index_exn : t -> index -> key
 
   val recompute_tree : t -> unit
+
+  val create : unit -> t
+
+  val copy : t -> t
 end

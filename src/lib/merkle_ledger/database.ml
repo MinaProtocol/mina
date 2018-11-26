@@ -9,8 +9,7 @@ end)
 (Hash : Intf.Hash with type account := Account.t)
 (Depth : Intf.Depth)
 (Location : Location_intf.S)
-(Kvdb : Intf.Key_value_database)
-(Storage_locations : Intf.Storage_locations) :
+(Kvdb : Intf.Key_value_database) :
   Database_intf.S
   with module Location = Location
    and module Addr = Location.Addr
@@ -44,8 +43,8 @@ end)
 
   let get_uuid t = t.uuid
 
-  let create () =
-    let kvdb = Kvdb.create ~directory:Storage_locations.key_value_db_dir in
+  let create ~directory =
+    let kvdb = Kvdb.create ~directory in
     {uuid= Uuid.create (); kvdb}
 
   let destroy {uuid= _; kvdb} = Kvdb.destroy kvdb
@@ -308,9 +307,6 @@ end)
   let fold_until = C.fold_until
 
   let merkle_root mdb = get_hash mdb Location.root_hash
-
-  (* for a copy, the uuid is fresh *)
-  let copy {uuid= _; kvdb} = {uuid= Uuid.create (); kvdb= Kvdb.copy kvdb}
 
   let remove_accounts_exn t keys =
     let locations =

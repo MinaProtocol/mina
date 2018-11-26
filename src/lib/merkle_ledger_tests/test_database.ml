@@ -188,32 +188,6 @@ let%test_module "test functor on in memory databases" =
                 let result = MT.get_all_accounts_rooted_at_exn mdb address in
                 assert (List.equal ~equal:Account.equal accounts result) ) )
 
-      let%test_unit "copy" =
-        Test.with_instance (fun mdb ->
-            let gift = 1 in
-            let balance_gen = Int.gen_incl gift (Int.max_value - gift) in
-            let public_key =
-              Quickcheck.random_value ~seed:(`Deterministic "pk") Key.gen
-            in
-            let balance_int = Quickcheck.random_value balance_gen in
-            let balance = Balance.of_int balance_int in
-            let account = Account.create public_key balance in
-            let account_location = create_new_account_exn mdb account in
-            let mdb_copy = MT.copy mdb in
-            (* because of bounds on balance_int, sum won't overflow *)
-            let balance_with_gift =
-              Balance.of_int (Int.( + ) balance_int gift)
-            in
-            let updated_account =
-              {account with Account.balance= balance_with_gift}
-            in
-            MT.set mdb_copy account_location updated_account ;
-            let account' = MT.get mdb account_location |> Option.value_exn in
-            let updated_account' =
-              MT.get mdb_copy account_location |> Option.value_exn
-            in
-            assert (account' <> updated_account') )
-
       let%test "get_at_index_exn t (index_of_key_exn t public_key) = account" =
         Test.with_instance (fun mdb ->
             let max_height = Int.min MT.depth 5 in
@@ -385,11 +359,10 @@ let%test_module "test functor on in memory databases" =
       module MT : DB =
         Database.Make (Key) (Account) (Hash) (Depth) (Location)
           (In_memory_kvdb)
-          (Storage_locations)
 
       (* TODO: maybe this function should work with dynamic modules *)
       let with_instance (type a) (f : MT.t -> a) =
-        let mdb = MT.create () in
+        let mdb = MT.create ~directory:(Filename.temp_dir "coda-test-db" "") in
         f mdb
     end)
 

@@ -25,7 +25,6 @@ struct
     module MT =
       Merkle_ledger.Database.Make (Key) (Account) (Hash) (Depth) (Location)
         (In_memory_kvdb)
-        (Storage_locations)
     module Addr = MT.Addr
 
     type root_hash = Hash.t
@@ -61,7 +60,9 @@ struct
     let make_space_for = MT.make_space_for
 
     let load_ledger num_accounts (balance : int) =
-      let ledger = MT.create () in
+      let ledger =
+        MT.create ~directory:Filename.(temp_dir "coda-test-db" "")
+      in
       let keys = Key.gen_keys num_accounts in
       let currency_balance = Currency.Balance.of_int balance in
       List.iter keys ~f:(fun key ->

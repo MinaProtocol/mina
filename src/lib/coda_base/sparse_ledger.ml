@@ -53,7 +53,9 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
     let privkey = Private_key.create () in
     (privkey, Public_key.of_private_key_exn privkey |> Public_key.compress)
   in
-  let ledger = Ledger.create () in
+  let ledger =
+    Ledger.create ~directory:(Filename.temp_dir "coda-test-db" "")
+  in
   let _, pub1 = keygen () in
   let _, pub2 = keygen () in
   let sl = of_ledger_subset_exn ledger [pub1; pub2] in

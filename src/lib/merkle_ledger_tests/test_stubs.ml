@@ -122,9 +122,6 @@ module In_memory_kvdb : Intf.Key_value_database = struct
     List.iter key_data_pairs ~f:(fun (key, data) -> set tbl ~key ~data)
 
   let delete t ~key = Bigstring_frozen.Table.remove t.table key
-
-  let copy (t : t) =
-    {uuid= Uuid.create (); table= Bigstring_frozen.Table.copy t.table}
 end
 
 module Storage_locations : Intf.Storage_locations = struct
@@ -142,6 +139,7 @@ module Key = struct
   let empty = Account.empty.public_key
 
   let to_string = Format.sprintf !"%{sexp: T.t}"
+
   let to_base64 = to_string
 
   let gen_keys num_keys =

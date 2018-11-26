@@ -15,7 +15,9 @@ module Make_from_base (Base : Base_intf) : Intf.S = struct
   include Base
 
   let t =
-    let ledger = Ledger.create () in
+    let ledger =
+      Ledger.create ~directory:(Core.Filename.temp_dir "coda-test-db" "")
+    in
     List.iter accounts ~f:(fun (_, account) ->
         let open Account in
         Ledger.create_new_account_exn ledger account.public_key account ) ;

@@ -10,8 +10,6 @@ module Make (Ledger : sig
      and type hash := Ledger_hash.t
      and type account := Account.t
      and type key := Public_key.Compressed.t
-
-  val create : unit -> t
 end) =
 struct
   include Ledger
@@ -379,7 +377,8 @@ struct
     root
 
   let%test "apply fee transfer to the same account" =
-    let t = create () in
+    let directory = Filename.(temp_dir "coda-test-db" "") in
+    let t = create ~directory in
     let {Keypair.public_key; _} = Signature_lib.Keypair.create () in
     let public_key = Public_key.compress public_key in
     let fee1 = 2 in
@@ -400,7 +399,9 @@ end
 module Depth = struct
   let depth = ledger_depth
 end
-module Location0 = Merkle_ledger.Location.Make(Depth)
+
+module Location0 = Merkle_ledger.Location.Make (Depth)
+
 module In_memory_kvdb : Merkle_ledger.Intf.Key_value_database = struct
   module Bigstring_frozen = struct
     module T = struct
@@ -440,35 +441,25 @@ module In_memory_kvdb : Merkle_ledger.Intf.Key_value_database = struct
     {uuid= Uuid.create (); table= Bigstring_frozen.Table.copy t.table}
 end
 
-module Storage_locations : Merkle_ledger.Intf.Storage_locations = struct
-  (* TODO: The name of this value should be dynamically generated per test run*)
-  let key_value_db_dir = ""
-end
 module Hash = struct
-      type t = Ledger_hash.t [@@deriving sexp, hash, compare, bin_io]
+  type t = Ledger_hash.t [@@deriving sexp, hash, compare, bin_io]
 
-      let merge = Ledger_hash.merge
+  let merge = Ledger_hash.merge
 
-      let hash_account =
-        Fn.compose Ledger_hash.of_digest Account.digest
+  let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
-      let empty_account = hash_account Account.empty
+  let empty_account = hash_account Account.empty
 end
+
 module Ledger = struct
-  include Merkle_ledger.Database.Make
-    (Public_key.Compressed)
-    (Account)
-    (Hash)
-    (Depth)
-    (Location0)
-    (In_memory_kvdb)
-    (Storage_locations)
+  include Merkle_ledger.Database.Make (Public_key.Compressed) (Account) (Hash)
+            (Depth)
+            (Location0)
+            (Rocksdb_database)
 end
+
 module Any_ledger =
-  Merkle_ledger.Any_ledger.Make_base
-    (Public_key.Compressed)
-    (Account)
-    (Hash)
+  Merkle_ledger.Any_ledger.Make_base (Public_key.Compressed) (Account) (Hash)
     (Location0)
     (Depth)
 module Any = Any_ledger.M

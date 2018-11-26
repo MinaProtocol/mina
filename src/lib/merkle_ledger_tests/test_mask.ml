@@ -426,7 +426,6 @@ let%test_module "Test mask connected to underlying Merkle tree" =
          and type key := Key.t =
         Database.Make (Key) (Account) (Hash) (Depth) (Location)
           (In_memory_kvdb)
-          (Storage_locations)
 
       module Any_base =
         Merkle_ledger.Any_ledger.Make_base (Key) (Account) (Hash) (Location)
@@ -465,9 +464,11 @@ let%test_module "Test mask connected to underlying Merkle tree" =
           (Base)
           (Mask)
 
+      let tmp_dir () = Filename.(temp_dir "coda-db-test" "")
+
       (* test runner *)
       let with_instances f =
-        let db = Base_db.create () in
+        let db = Base_db.create ~directory:(tmp_dir ()) in
         let maskable = Any_base.T ((module Base_db), db) in
         let mask = Mask.create () in
         f maskable mask

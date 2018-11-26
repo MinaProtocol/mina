@@ -1307,7 +1307,9 @@ let%test_module "transaction_snark" =
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
-          let ledger = Ledger.create () in
+          let ledger =
+            Ledger.create ~directory:(Filename.temp_dir "coda-test-db" "")
+          in
           Array.iter
             (Array.sub wallets ~pos:1 ~len:(Array.length wallets - 1))
             ~f:(fun {account; private_key= _} ->
@@ -1340,7 +1342,9 @@ let%test_module "transaction_snark" =
     let%test "base_and_merge" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
-          let ledger = Ledger.create () in
+          let ledger =
+            Ledger.create ~directory:(Filename.temp_dir "coda-test-db" "")
+          in
           Array.iter wallets ~f:(fun {account; private_key= _} ->
               Ledger.create_new_account_exn ledger account.public_key account
           ) ;

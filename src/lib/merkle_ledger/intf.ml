@@ -43,8 +43,6 @@ end
 module type Key_value_database = sig
   type t
 
-  val copy : t -> t
-
   val create : directory:string -> t
 
   val get_uuid : t -> Uuid.t
