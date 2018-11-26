@@ -1,0 +1,12 @@
+(test
+ (name test_a)
+ (modules test_a)
+ (package a)
+)
+
+(test
+ (name test_b)
+ (modules test_b)
+ (package b)
+ (libraries does-not-exist)
+)

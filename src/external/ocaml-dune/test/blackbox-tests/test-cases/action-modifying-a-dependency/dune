@@ -1,0 +1,9 @@
+;; This test erroneously modify one of its dependencies
+(alias
+ (name   x)
+ (deps   data (universe))
+ (action (system "\| echo hello >> data
+                 "\| # To force the mtime to change:
+                 "\| # https://github.com/ocaml/dune/pull/1359
+                 "\| touch -t 01010000 data
+                 )))

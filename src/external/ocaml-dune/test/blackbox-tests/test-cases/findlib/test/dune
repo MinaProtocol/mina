@@ -1,0 +1,3 @@
+(library
+ (name test)
+ (libraries a b c))

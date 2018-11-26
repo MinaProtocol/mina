@@ -1,0 +1,11 @@
+(rule (with-stdout-to x.gen (echo "toto")))
+
+(alias
+ (name blah)
+ (action (diff x x.gen)))
+
+(rule (with-stdout-to y.gen (echo "titi")))
+
+(alias
+ (name blah2)
+ (action (diff y y.gen)))

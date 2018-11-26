@@ -1,0 +1,4 @@
+(library
+  (name ledger_catchup)
+  (public_name ledger_catchup)
+  (libraries async_kernel core_kernel protocols pipe_lib syncable_ledger merkle_address))

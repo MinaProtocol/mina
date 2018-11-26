@@ -1,0 +1,5 @@
+(alias
+ (name runtest)
+ (action (run ./main.exe)))
+
+(executable (name main))

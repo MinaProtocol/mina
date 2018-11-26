@@ -1,0 +1,5 @@
+(library
+ (name        ocaml_config)
+ (public_name dune._ocaml_config)
+ (libraries   stdune)
+ (synopsis    "[Internal] Interpret the output of 'ocamlc -config'"))

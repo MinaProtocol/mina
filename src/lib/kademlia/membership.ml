@@ -1,6 +1,9 @@
 open Async_kernel
 open Core_kernel
 open Banlist_lib
+open Pipe_lib
+
+exception Child_died
 
 module type S = sig
   type t
@@ -134,7 +137,7 @@ module Haskell_process = struct
                     !"Kademlia process died: %{sexp: \
                       Unix.Exit_or_signal.error}%!"
                     e ;
-                  don't_wait_for @@ exit 1 ) ;
+                  raise Child_died ) ;
           Ok p
       | Error e ->
           Or_error.error_string

@@ -1,4 +1,3 @@
-open Core_kernel
 open Coda_base
 open Snark_params
 open Tick

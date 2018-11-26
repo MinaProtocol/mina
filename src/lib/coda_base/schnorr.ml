@@ -14,7 +14,7 @@ module Message = struct
 
   let var_of_payload payload =
     let open Let_syntax in
-    let%bind bs = User_command_payload.Checked.to_triples payload in
+    let%bind bs = Transaction_union_payload.Checked.to_triples payload in
     Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty bs
       ~start:Hash_prefix.length_in_triples
 

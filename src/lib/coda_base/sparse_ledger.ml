@@ -3,17 +3,17 @@ open Import
 open Snark_params.Tick
 
 include Sparse_ledger_lib.Sparse_ledger.Make (struct
-            include Merkle_hash
+            include Ledger_hash
           end)
           (Public_key.Compressed.Stable.V1)
           (struct
             include Account.Stable.V1
 
-            let hash = Fn.compose Merkle_hash.of_digest Account.digest
+            let hash = Fn.compose Ledger_hash.of_digest Account.digest
           end)
 
 let of_root (h : Ledger_hash.t) =
-  of_hash ~depth:Ledger.depth (Merkle_hash.of_digest (h :> Pedersen.Digest.t))
+  of_hash ~depth:Ledger.depth (Ledger_hash.of_digest (h :> Pedersen.Digest.t))
 
 let of_ledger_root ledger = of_root (Ledger.merkle_root ledger)
 
@@ -61,47 +61,58 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
     (Ledger.merkle_root ledger)
     ((merkle_root sl :> Pedersen.Digest.t) |> Ledger_hash.of_hash)
 
+let get_or_initialize_exn public_key t idx =
+  let account = get_exn t idx in
+  if Public_key.Compressed.(equal empty account.public_key) then
+    {account with delegate= public_key; public_key}
+  else account
+
 let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
     =
   let sender_idx = find_index_exn t (Public_key.compress sender) in
   let sender_account = get_exn t sender_idx in
   let nonce = User_command.Payload.nonce payload in
+  let fee = User_command.Payload.fee payload in
   assert (Account.Nonce.equal sender_account.nonce nonce) ;
   if not Insecure.fee_collection then
     failwith "Bundle.Sparse_ledger: Insecure.fee_collection" ;
   let open Currency in
-  let t =
-    set_exn t sender_idx
-      { sender_account with
-        nonce= Account.Nonce.succ sender_account.nonce
-      ; balance=
-          (let sender_cost =
-             User_command.Payload.sender_cost payload |> Or_error.ok_exn
-           in
-           Balance.sub_amount sender_account.balance sender_cost
-           |> Option.value_exn)
-      ; receipt_chain_hash=
-          Receipt.Chain_hash.cons payload sender_account.receipt_chain_hash }
+  let sender_account =
+    { sender_account with
+      nonce= Account.Nonce.succ sender_account.nonce
+    ; receipt_chain_hash=
+        Receipt.Chain_hash.cons payload sender_account.receipt_chain_hash
+    ; balance=
+        Balance.sub_amount sender_account.balance (Amount.of_fee fee)
+        |> Option.value_exn }
   in
-  match User_command.Payload.body payload with Payment {amount; receiver} ->
-    let receiver_idx = find_index_exn t receiver in
-    let receiver_account = get_exn t receiver_idx in
-    set_exn t receiver_idx
-      { receiver_account with
-        public_key= receiver
-      ; balance=
-          Option.value_exn (Balance.add_amount receiver_account.balance amount)
-      }
+  match User_command.Payload.body payload with
+  | Stake_delegation (Set_delegate {new_delegate}) ->
+      set_exn t sender_idx {sender_account with delegate= new_delegate}
+  | Payment {amount; receiver} ->
+      let t =
+        set_exn t sender_idx
+          { sender_account with
+            balance=
+              Balance.sub_amount sender_account.balance amount
+              |> Option.value_exn }
+      in
+      let receiver_idx = find_index_exn t receiver in
+      let receiver_account = get_or_initialize_exn receiver t receiver_idx in
+      set_exn t receiver_idx
+        { receiver_account with
+          balance=
+            Option.value_exn
+              (Balance.add_amount receiver_account.balance amount) }
 
 let apply_fee_transfer_exn =
   let apply_single t ((pk, fee) : Fee_transfer.single) =
     let index = find_index_exn t pk in
-    let account = get_exn t index in
+    let account = get_or_initialize_exn pk t index in
     let open Currency in
     set_exn t index
       { account with
-        public_key= pk (* explicitly set because receipient could be new *)
-      ; balance=
+        balance=
           Option.value_exn
             (Balance.add_amount account.balance (Amount.of_fee fee)) }
   in
@@ -112,12 +123,9 @@ let apply_coinbase_exn t ({proposer; fee_transfer} : Coinbase.t) =
   let open Currency in
   let add_to_balance t pk amount =
     let idx = find_index_exn t pk in
-    let a = get_exn t idx in
+    let a = get_or_initialize_exn pk t idx in
     set_exn t idx
-      { a with
-        public_key= pk
-      ; (* set as above *)
-        balance= Option.value_exn (Balance.add_amount a.balance amount) }
+      {a with balance= Option.value_exn (Balance.add_amount a.balance amount)}
   in
   let proposer_reward, t =
     match fee_transfer with

@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Protocols
+open Pipe_lib
 open O1trace
 
 module type Ledger_builder_io_intf = sig
@@ -425,6 +426,7 @@ module Make (Inputs : Inputs_intf) = struct
         Linear_pipe.Reader.t
     ; log: Logger.t
     ; mutable seen_jobs: Work_selector.State.t
+    ; receipt_chain_database: Coda_base.Receipt_chain_database.t
     ; ledger_builder_transition_backup_capacity: int
     ; snark_work_fee: Currency.Fee.t }
 
@@ -444,7 +446,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let get_ledger t lh =
     Ledger_builder_controller.local_get_ledger t.ledger_builder lh
-    |> Deferred.Or_error.map ~f:(fun (lb, _) -> Ledger_builder.ledger lb)
+    |> Deferred.Or_error.map ~f:(fun (lb, _) ->
+           Ledger_builder.ledger lb |> Ledger.to_list )
 
   let best_ledger t = Ledger_builder.ledger (best_ledger_builder t)
 
@@ -459,6 +462,8 @@ module Make (Inputs : Inputs_intf) = struct
   let peers t = Net.peers t.net
 
   let snark_work_fee t = t.snark_work_fee
+
+  let receipt_chain_database t = t.receipt_chain_database
 
   let ledger_builder_ledger_proof t =
     let lb = best_ledger_builder t in
@@ -479,6 +484,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; ledger_builder_transition_backup_capacity: int [@default 10]
       ; time_controller: Time.Controller.t
       ; banlist: Coda_base.Banlist.t
+      ; receipt_chain_database: Coda_base.Receipt_chain_database.t
       ; snark_work_fee: Currency.Fee.t
       (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
       }
@@ -632,5 +638,6 @@ module Make (Inputs : Inputs_intf) = struct
           ; seen_jobs= Work_selector.State.init
           ; ledger_builder_transition_backup_capacity=
               config.ledger_builder_transition_backup_capacity
+          ; receipt_chain_database= config.receipt_chain_database
           ; snark_work_fee= config.snark_work_fee } )
 end

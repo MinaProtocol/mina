@@ -7,6 +7,7 @@ open Coda_base
 open Signature_lib
 open Blockchain_snark
 open Coda_numbers
+open Pipe_lib
 open O1trace
 module Fee = Protocols.Coda_pow.Fee
 
@@ -40,6 +41,10 @@ end
 
 module Ledger_hash = struct
   include Ledger_hash.Stable.V1
+
+  let of_digest = Ledger_hash.of_digest
+
+  let merge = Ledger_hash.merge
 
   let to_bytes = Ledger_hash.to_bytes
 end
@@ -293,7 +298,7 @@ struct
 
   module Transaction = struct
     module T = struct
-      type t = Transaction_snark.Transition.t =
+      type t = Coda_base.Transaction.t =
         | User_command of User_command.With_valid_signature.t
         | Fee_transfer of Fee_transfer.t
         | Coinbase of Coinbase.t
@@ -307,8 +312,8 @@ struct
     include T
 
     include (
-      Transaction_snark.Transition :
-        module type of Transaction_snark.Transition with type t := t )
+      Coda_base.Transaction :
+        module type of Coda_base.Transaction with type t := t )
   end
 
   module Ledger = Ledger
@@ -561,9 +566,9 @@ struct
   module Sync_ledger =
     Syncable_ledger.Make (Ledger.Addr) (Account)
       (struct
-        include Merkle_hash
+        include Ledger_hash
 
-        let hash_account = Fn.compose Merkle_hash.of_digest Account.digest
+        let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
         let empty_account = hash_account Account.empty
       end)
@@ -571,7 +576,7 @@ struct
         include Ledger_hash
 
         let to_hash (h : t) =
-          Merkle_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
+          Ledger_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
       end)
       (struct
         include Ledger
@@ -783,6 +788,8 @@ module type Main_intf = sig
     module Ledger : sig
       type t [@@deriving sexp]
 
+      type account
+
       val copy : t -> t
 
       val location_of_key :
@@ -793,7 +800,7 @@ module type Main_intf = sig
       val merkle_path :
            t
         -> Ledger.Location.t
-        -> [`Left of Merkle_hash.t | `Right of Merkle_hash.t] list
+        -> [`Left of Ledger_hash.t | `Right of Ledger_hash.t] list
 
       val num_accounts : t -> int
 
@@ -912,6 +919,7 @@ module type Main_intf = sig
       ; ledger_builder_transition_backup_capacity: int [@default 10]
       ; time_controller: Inputs.Time.Controller.t
       ; banlist: Banlist.t
+      ; receipt_chain_database: Receipt_chain_database.t
       ; snark_work_fee: Currency.Fee.t }
     [@@deriving make]
   end
@@ -956,7 +964,10 @@ module type Main_intf = sig
 
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
 
-  val get_ledger : t -> Ledger_builder_hash.t -> Ledger.t Deferred.Or_error.t
+  val get_ledger :
+    t -> Ledger_builder_hash.t -> Account.t list Deferred.Or_error.t
+
+  val receipt_chain_database : t -> Receipt_chain_database.t
 end
 
 module Run (Config_in : Config_intf) (Program : Main_intf) = struct
@@ -969,11 +980,15 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   module Lite_compat = Lite_compat.Make (Consensus_mechanism.Blockchain_state)
 
-  let get_balance t (addr : Public_key.Compressed.t) =
+  let get_account t (addr : Public_key.Compressed.t) =
     let open Option.Let_syntax in
     let ledger = best_ledger t in
     let%bind location = Ledger.location_of_key ledger addr in
-    let%map account = Ledger.get ledger location in
+    Ledger.get ledger location
+
+  let get_balance t (addr : Public_key.Compressed.t) =
+    let open Option.Let_syntax in
+    let%map account = get_account t addr in
     account.Account.balance
 
   let get_accounts t =
@@ -991,21 +1006,69 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
            ( Account.balance account |> Currency.Balance.to_int
            , string_of_public_key account ) )
 
-  let is_valid_payment t (txn : User_command.t) =
+  let is_valid_payment t (txn : User_command.t) account_opt =
     let remainder =
       let open Option.Let_syntax in
-      let%bind balance = get_balance t (Public_key.compress txn.sender)
-      and cost = User_command.Payload.sender_cost txn.payload |> Or_error.ok in
-      Currency.Balance.sub_amount balance cost
+      let%bind account = account_opt
+      and cost =
+        let fee = txn.payload.common.fee in
+        match txn.payload.body with
+        | Stake_delegation (Set_delegate _) ->
+            Some (Currency.Amount.of_fee fee)
+        | Payment {amount; _} -> Currency.Amount.add_fee amount fee
+      in
+      Currency.Balance.sub_amount account.Account.balance cost
     in
     Option.is_some remainder
 
   (** For status *)
   let txn_count = ref 0
 
-  let schedule_payment log t txn =
-    let open Deferred.Let_syntax in
-    if not (is_valid_payment t txn) then (
+  let record_payment ~log t (txn : User_command.t) account =
+    let previous = Account.receipt_chain_hash account in
+    let receipt_chain_database = receipt_chain_database t in
+    match Receipt_chain_database.add receipt_chain_database ~previous txn with
+    | `Ok hash ->
+        Logger.debug log
+          !"Added  payment %{sexp:User_command.t} into receipt_chain \
+            database. You should wait for a bit to see your account's receipt \
+            chain hash update as %{sexp:Receipt.Chain_hash.t}"
+          txn hash ;
+        hash
+    | `Duplicate hash ->
+        Logger.warn log !"Already sent transaction %{sexp:User_command.t}" txn ;
+        hash
+    | `Error_multiple_previous_receipts parent_hash ->
+        Logger.fatal log
+          !"A payment is derived from two different blockchain states \
+            (%{sexp:Receipt.Chain_hash.t}, %{sexp:Receipt.Chain_hash.t}). \
+            Receipt.Chain_hash is supposed to be collision resistant. This \
+            collision should not happen."
+          parent_hash previous ;
+        Core.exit 1
+
+  module Payment_verifier =
+    Receipt_chain_database_lib.Verifier.Make
+      (User_command)
+      (Receipt.Chain_hash)
+
+  let verify_payment t (addr : Public_key.Compressed.Stable.V1.t)
+      (verifying_txn : User_command.t) proof =
+    let account = get_account t addr |> Option.value_exn in
+    let resulting_receipt = Account.receipt_chain_hash account in
+    let open Or_error.Let_syntax in
+    let%bind () = Payment_verifier.verify ~resulting_receipt proof in
+    if
+      List.exists proof ~f:(fun (_, txn) ->
+          User_command.equal verifying_txn txn )
+    then Ok ()
+    else
+      Or_error.errorf
+        !"Merkle list proof does not contain payment %{sexp:User_command.t}"
+        verifying_txn
+
+  let schedule_payment log t (txn : User_command.t) account_opt =
+    if not (is_valid_payment t txn account_opt) then (
       Core.Printf.eprintf "Invalid payment: account balance is too low" ;
       Core.exit 1 ) ;
     let txn_pool = transaction_pool t in
@@ -1015,9 +1078,29 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       txn ;
     txn_count := !txn_count + 1
 
-  let send_payment log t txn = schedule_payment log t txn ; Deferred.unit
+  let send_payment log t (txn : User_command.t) =
+    let public_key = Public_key.compress txn.sender in
+    let account_opt = get_account t public_key in
+    schedule_payment log t txn account_opt ;
+    Deferred.return @@ record_payment ~log t txn (Option.value_exn account_opt)
 
-  let schedule_payments log t txns = List.iter txns ~f:(schedule_payment log t)
+  (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
+  let schedule_payments log t txns =
+    List.iter txns ~f:(fun (txn : User_command.t) ->
+        let public_key = Public_key.compress txn.sender in
+        let account_opt = get_account t public_key in
+        schedule_payment log t txn account_opt )
+
+  let prove_receipt t ~proving_receipt ~resulting_receipt :
+      Payment_proof.t Deferred.Or_error.t =
+    let receipt_chain_database = receipt_chain_database t in
+    (* TODO: since we are making so many reads to `receipt_chain_database`, 
+    reads should be async to not get IO-blocked. See #1125 *)
+    let result =
+      Receipt_chain_database.prove receipt_chain_database ~proving_receipt
+        ~resulting_receipt
+    in
+    Deferred.return result
 
   let get_nonce t (addr : Public_key.Compressed.t) =
     let open Option.Let_syntax in
@@ -1114,11 +1197,32 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
     let client_impls =
-      [ Rpc.Rpc.implement Client_lib.Send_user_commands.rpc (fun () ts ->
+      [ Rpc.Rpc.implement Client_lib.Send_user_command.rpc (fun () tx ->
+            send_payment log coda tx )
+      ; Rpc.Rpc.implement Client_lib.Send_user_commands.rpc (fun () ts ->
             schedule_payments log coda ts ;
             Deferred.unit )
       ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
             return (get_balance coda pk) )
+      ; Rpc.Rpc.implement Client_lib.Verify_proof.rpc
+          (fun () (pk, tx, proof) -> return (verify_payment coda pk tx proof)
+        )
+      ; Rpc.Rpc.implement Client_lib.Prove_receipt.rpc
+          (fun () (proving_receipt, pk) ->
+            let open Deferred.Or_error.Let_syntax in
+            let%bind account =
+              get_account coda pk
+              |> Result.of_option
+                   ~error:
+                     (Error.of_string
+                        (sprintf
+                           !"Could not find account of public key %{sexp: \
+                             Public_key.Compressed.t}"
+                           pk))
+              |> Deferred.return
+            in
+            prove_receipt coda ~proving_receipt
+              ~resulting_receipt:(Account.receipt_chain_hash account) )
       ; Rpc.Rpc.implement Client_lib.Get_public_keys_with_balances.rpc
           (fun () () -> return (get_keys_with_balances coda) )
       ; Rpc.Rpc.implement Client_lib.Get_public_keys.rpc (fun () () ->

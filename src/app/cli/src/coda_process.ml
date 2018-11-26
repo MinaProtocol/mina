@@ -3,6 +3,7 @@ open Async
 open Coda_worker
 open Coda_base
 open Coda_main
+open Pipe_lib
 
 module Make (Kernel : Kernel_intf) = struct
   module Coda_worker = Coda_worker.Make (Kernel)
@@ -61,6 +62,10 @@ module Make (Kernel : Kernel_intf) = struct
   let send_payment_exn (conn, proc, _) sk pk amount fee memo =
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.send_payment
       ~arg:(sk, pk, amount, fee, memo)
+
+  let prove_receipt_exn (conn, proc, _) proving_receipt resulting_receipt =
+    Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.prove_receipt
+      ~arg:(proving_receipt, resulting_receipt)
 
   let strongest_ledgers_exn (conn, proc, _) =
     let%map r =

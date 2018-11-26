@@ -1,0 +1,9 @@
+(library
+ (name foo)
+ (modules foo)
+ (c_names stubs/x))
+
+(executable
+ (name bar)
+ (modules bar)
+ (libraries foo))

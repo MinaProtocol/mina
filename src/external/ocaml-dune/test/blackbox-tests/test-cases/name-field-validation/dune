@@ -1,0 +1,9 @@
+(library
+ (modules foo)
+ (name foo.bar)
+ (wrapped false))
+
+(executable
+ (modules bar)
+ (name bar)
+ (libraries foo.bar))

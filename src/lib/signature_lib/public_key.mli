@@ -6,7 +6,7 @@ open Fold_lib
 
 type t = Field.t * Field.t [@@deriving bin_io, sexp, hash]
 
-val to_yojson : t -> Yojson.Safe.json
+include Codable.S with type t := t
 
 module Stable : sig
   module V1 : sig
@@ -27,11 +27,15 @@ val of_private_key_exn : Private_key.t -> t
 module Compressed : sig
   type ('field, 'boolean) t_ = {x: 'field; is_odd: 'boolean}
 
-  type t = (Field.t, bool) t_ [@@deriving bin_io, sexp, hash]
+  type t = (Field.t, bool) t_ [@@deriving bin_io, sexp, hash, yojson]
+
+  include Codable.S with type t := t
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, bin_io, eq, compare, hash]
+      type nonrec t = t [@@deriving sexp, bin_io, eq, compare, hash, yojson]
+
+      include Codable.S with type t := t
     end
   end
 

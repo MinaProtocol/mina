@@ -1,0 +1,4 @@
+(alias
+ (name default)
+ (action (echo foo))
+ (action (echo bar)))
