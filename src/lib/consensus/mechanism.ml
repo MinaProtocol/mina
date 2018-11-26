@@ -31,7 +31,7 @@ let env name ~f ~default =
 defined consensus_mechanism]
 
 [%%if
-consensus_mechanism = "sigs"]
+consensus_mechanism = "proof_of_signature"]
 
 module Make (Ledger_builder_diff : sig
   type t [@@deriving sexp, bin_io]
@@ -50,7 +50,7 @@ Proof_of_signature.Make (struct
 end)
 
 [%%elif
-consensus_mechanism = "stakes"]
+consensus_mechanism = "proof_of_stake"]
 
 module Make (Ledger_builder_diff : sig
   type t [@@deriving sexp, bin_io]

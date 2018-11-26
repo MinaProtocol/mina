@@ -6,4 +6,4 @@
 [%%define force_updates false]
 [%%define global_signer_real true]
 [%%define tracing true]
-[%%define consensus_mechanism "stakes"]
+[%%define consensus_mechanism "proof_of_stake"]

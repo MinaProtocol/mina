@@ -6,7 +6,7 @@ eval `opam config env`
 
 run_dune() {
   if [ "${DUNE_PROFILE}" = "" ]; then
-    DUNE_PROFILE=test
+    DUNE_PROFILE=test_sigs
   fi
   dune $1 --profile="${DUNE_PROFILE}" ${@:2}
 }
@@ -62,11 +62,13 @@ run_all_integration_tests() {
 }
 
 run_all_sig_integration_tests() {
+    DUNE_PROFILE=test_sigs \
     CODA_PROPOSAL_INTERVAL=1000 \
     run_all_integration_tests
 }
 
 run_all_stake_integration_tests() {
+    DUNE_PROFILE=test_stakes \
     CODA_SLOT_INTERVAL=1000 \
     CODA_UNFORKABLE_TRANSITION_COUNT=24 \
     CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 \
@@ -74,6 +76,7 @@ run_all_stake_integration_tests() {
 }
 
 run_epoch_stake_integration_test() {
+    DUNE_PROFILE=test_stakes \
     CODA_SLOT_INTERVAL=1000 \
     CODA_UNFORKABLE_TRANSITION_COUNT=2 \
     CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=2 \

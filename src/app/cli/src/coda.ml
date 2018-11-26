@@ -370,9 +370,7 @@ let rec ensure_testnet_id_still_good log =
         (* Maybe the Git_sha.of_string is a bit gratuitous *)
         let finish local_id remote_ids =
           let str x = Git_sha.sexp_of_t x |> Sexp.to_string in
-          exit1
-            ~msg:
-              (sprintf
+          (eprintf
                  "The version for the testnet has changed, and this client \
                   (version %s) is no longer compatible. Please download the \
                   latest Coda software!\n\
@@ -380,7 +378,8 @@ let rec ensure_testnet_id_still_good log =
                   %s"
                  ( local_id |> Option.map ~f:str
                  |> Option.value ~default:"[COMMIT_SHA1 not set]" )
-                 remote_ids)
+                 remote_ids);
+          exit 1
         in
         match commit_id with
         | None -> finish None body_string
@@ -421,13 +420,6 @@ integration_tests]
 
 let coda_commands log =
   let group =
-    let module Coda_peers_test = Coda_peers_test in
-    let module Coda_block_production_test = Coda_block_production_test in
-    let module Coda_shared_prefix_test = Coda_shared_prefix_test in
-    let module Coda_restart_node_test = Coda_restart_node_test in
-    let module Coda_shared_state_test = Coda_shared_state_test in
-    let module Coda_receipt_chain_test = Coda_receipt_chain_test in
-    let module Coda_transitive_peers_test = Coda_transitive_peers_test in
     [ (Coda_peers_test.name, Coda_peers_test.command)
     ; (Coda_block_production_test.name, Coda_block_production_test.command)
     ; (Coda_shared_state_test.name, Coda_shared_state_test.command)

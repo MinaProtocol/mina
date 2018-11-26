@@ -87,7 +87,7 @@ jobs:
            - checkout
            - run:
               name: Test make test-runtest
-              command: source ~/.profile && DUNE_PROFILE=test_sigs && make test-runtest
+              command: source ~/.profile && DUNE_PROFILE=test_sigs make test-runtest
 
     test-withsnark:
         resource_class: large
@@ -118,7 +118,7 @@ jobs:
             {% for action in test.actions %}
           - run:
               name: Running test - {{ test.friendly }} | {{ action }}
-              command: source ~/.profile && DUNE_PROFILE={{test.config}} && source scripts/test_all.sh && cd src/ && {{test.env_str}} 'run_integration_test' '{{ action }}' {% endfor %}
+              command: source ~/.profile && DUNE_PROFILE={{test.config}} source scripts/test_all.sh && cd src/ && {{test.env_str}} 'run_integration_test' '{{ action }}' {% endfor %}
       {% endfor %}
 
 workflows:
