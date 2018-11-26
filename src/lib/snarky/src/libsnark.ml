@@ -153,7 +153,7 @@ struct
         let z = stub x y in
         schedule_delete z ; z
 
-    let dup = foreign (func_name "dup") (typ @-> return typ)
+    let dup = foreign (func_name "dup") (typ @-> returning typ)
 
     let unsafe_add_in_place =
       let stub =
