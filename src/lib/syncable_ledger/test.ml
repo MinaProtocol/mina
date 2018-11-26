@@ -1,5 +1,6 @@
 open Core
 open Async_kernel
+open Pipe_lib
 
 module type Ledger_intf = sig
   include Merkle_ledger.Syncable_intf.S
