@@ -2,6 +2,7 @@ open Core
 open Async
 open Coda_base
 open Signature_lib
+open Pipe_lib
 
 let request_service_name = "CODA_WEB_CLIENT_SERVICE"
 

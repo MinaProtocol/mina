@@ -5,8 +5,8 @@
   (public_name syncable_ledger)
   (modules (syncable_ledger))
   (library_flags (-linkall))
-  (flags (:standard -short-paths -warn-error -32-34-27-58))
-  (libraries (core async async_extra linear_pipe merkle_ledger logger interruptible))
+  (flags (:standard -short-paths -warn-error -32-34-58))
+  (libraries (core async async_extra pipe_lib merkle_ledger logger interruptible))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "Synchronization of Merkle-tree backed ledgers")))
 

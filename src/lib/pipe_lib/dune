@@ -1,0 +1,5 @@
+(library
+  (name pipe_lib)
+  (public_name pipe_lib)
+  (libraries core_kernel async_kernel)
+  (preprocess (pps ppx_jane)))

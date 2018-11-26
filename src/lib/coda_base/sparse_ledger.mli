@@ -7,7 +7,7 @@ type t [@@deriving bin_io, sexp]
 val merkle_root : t -> Ledger_hash.t
 
 val path_exn :
-  t -> int -> [`Left of Merkle_hash.t | `Right of Merkle_hash.t] list
+  t -> int -> [`Left of Ledger_hash.t | `Right of Ledger_hash.t] list
 
 val of_root : Ledger_hash.t -> t
 

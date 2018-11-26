@@ -1,0 +1,4 @@
+(library
+  (name sync_handler)
+  (public_name sync_handler)
+  (libraries async_kernel core_kernel protocols coda_base syncable_ledger merkle_address))

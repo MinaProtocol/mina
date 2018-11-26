@@ -3,6 +3,7 @@ open Async
 open Coda_worker
 open Coda_base
 open Coda_main
+open Pipe_lib
 
 module Make (Kernel : Kernel_intf) = struct
   module Coda_worker = Coda_worker.Make (Kernel)

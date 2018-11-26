@@ -4,6 +4,7 @@ open Coda_worker
 open Coda_main
 open Signature_lib
 open Coda_base
+open Pipe_lib
 
 module Make (Kernel : Kernel_intf) = struct
   module Coda_processes = Coda_processes.Make (Kernel)
