@@ -61,9 +61,11 @@ module type Transition_handler_intf = sig
 
   module Validator : sig
     val run :
-         transition_reader:external_transition Linear_pipe.Reader.t
-      -> valid_transition_writer:(external_transition, state_hash) With_hash.t
-                                 Linear_pipe.Writer.t
+         transition_reader:external_transition Reader.t
+      -> valid_transition_writer:( (external_transition, state_hash) With_hash.t
+                                 , drop_head buffered
+                                 , _ )
+                                 Writer.t
       -> unit
   end
 
