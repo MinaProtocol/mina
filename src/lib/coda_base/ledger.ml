@@ -452,10 +452,17 @@ module Hash = struct
 end
 
 module Ledger = struct
-  include Merkle_ledger.Database.Make (Public_key.Compressed) (Account) (Hash)
-            (Depth)
+  module Base_db =
+    Merkle_ledger.Database.Make (Public_key.Compressed) (Account) (Hash)
+      (Depth)
+      (Location0)
+      (Rocksdb_database)
+  include Merkle_mask.Masking_merkle_tree.Make
+            (Public_key.Compressed)
+            (Account)
+            (Hash)
             (Location0)
-            (Rocksdb_database)
+            (Base_db)
 end
 
 module Any_ledger =
