@@ -1,6 +1,13 @@
 open Core
 open Import
 
+module Any :
+  Merkle_ledger.Base_ledger_intf.S
+  with type root_hash := Ledger_hash.t
+   and type hash := Ledger_hash.t
+   and type account := Account.t
+   and type key := Public_key.Compressed.t
+
 include
   Merkle_ledger.Database_intf.S
   with type root_hash := Ledger_hash.t

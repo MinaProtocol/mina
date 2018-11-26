@@ -444,11 +444,7 @@ module Storage_locations : Merkle_ledger.Intf.Storage_locations = struct
   (* TODO: The name of this value should be dynamically generated per test run*)
   let key_value_db_dir = ""
 end
-module Ledger = struct
-  include Merkle_ledger.Database.Make
-    (Public_key.Compressed)
-    (Account)
-    (struct
+module Hash = struct
       type t = Ledger_hash.t [@@deriving sexp, hash, compare, bin_io]
 
       let merge = Ledger_hash.merge
@@ -457,10 +453,23 @@ module Ledger = struct
         Fn.compose Ledger_hash.of_digest Account.digest
 
       let empty_account = hash_account Account.empty
-    end)
+end
+module Ledger = struct
+  include Merkle_ledger.Database.Make
+    (Public_key.Compressed)
+    (Account)
+    (Hash)
     (Depth)
     (Location0)
     (In_memory_kvdb)
     (Storage_locations)
 end
+module Any_ledger =
+  Merkle_ledger.Any_ledger.Make_base
+    (Public_key.Compressed)
+    (Account)
+    (Hash)
+    (Location0)
+    (Depth)
+module Any = Any_ledger.M
 include Make (Ledger)
