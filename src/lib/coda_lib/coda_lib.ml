@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Protocols
+open Pipe_lib
 open O1trace
 
 module type Ledger_builder_io_intf = sig
@@ -445,7 +446,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let get_ledger t lh =
     Ledger_builder_controller.local_get_ledger t.ledger_builder lh
-    |> Deferred.Or_error.map ~f:(fun (lb, _) -> Ledger_builder.ledger lb)
+    |> Deferred.Or_error.map ~f:(fun (lb, _) ->
+           Ledger_builder.ledger lb |> Ledger.to_list )
 
   let best_ledger t = Ledger_builder.ledger (best_ledger_builder t)
 

@@ -14,7 +14,14 @@ module type S = sig
     | Set : Account.Index.t * Account.t -> unit Request.t
     | Find_index : Public_key.Compressed.t -> Account.Index.t Request.t
 
+
   val get : var -> Account.Index.Unpacked.var -> (Account.var, _) Checked.t
+
+  val merge : height:int -> t -> t -> t
+
+  val empty_hash : t
+
+  val of_digest : Pedersen.Digest.t -> t
 
   val modify_account_send :
        var

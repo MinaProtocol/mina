@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Pipe_lib
 
 module Direction = struct
   type t = Left | Right [@@deriving sexp, bin_io]
