@@ -153,8 +153,7 @@ struct
         let z = stub x y in
         schedule_delete z ; z
 
-    (* XXX: if add changes to not allocate, this is a problem *)
-    let dup x = add zero x
+    let dup = foreign (func_name "dup") (typ @-> return typ)
 
     let unsafe_add_in_place =
       let stub =

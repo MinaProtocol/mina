@@ -433,6 +433,10 @@ libff::G1<ppT>* camlsnark_mnt4_g1_add (libff::G1<ppT>* a, libff::G1<ppT>* b) {
   return new libff::G1<ppT>((*a) + (*b));
 }
 
+libff::G1<ppT>* camlsnark_mnt4_g1_dup (libff::G1<ppT>* a) {
+  return new libff::G1<ppT>(*a);
+}
+
 void camlsnark_mnt4_g1_add_in_place (libff::G1<ppT>* dst, libff::G1<ppT>* b) {
     *dst = *dst + *b;
 }
