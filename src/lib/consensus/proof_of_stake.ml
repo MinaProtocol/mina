@@ -1382,11 +1382,11 @@ module Make (Inputs : Inputs_intf) :
               local_state.delegators <- compute_delegators pk l ) ) ;
       local_state.curr_epoch_ledger <- Some ledger )
 
-  (* TODO: determine correct definition of genesis state *)
   let genesis_protocol_state =
     let consensus_state =
       Or_error.ok_exn
-        (Consensus_state.update ~proposer_vrf_result:(failwith "TODO")
+        (Consensus_state.update
+           ~proposer_vrf_result:(Sha256.digest_string "CodaInitialVRFResult")
            ~previous_consensus_state:
              Protocol_state.(consensus_state negative_one)
            ~previous_protocol_state_hash:Protocol_state.(hash negative_one)
