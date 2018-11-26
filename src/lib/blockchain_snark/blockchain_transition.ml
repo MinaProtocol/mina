@@ -33,10 +33,10 @@ module Keys = struct
       let open Storage in
       let parent_log = Logger.create () in
       let tick_controller =
-        Controller.create ~parent_log Tick.Proving_key.bin_t
+        Controller.create ~parent_log (module Tick.Proving_key)
       in
       let tock_controller =
-        Controller.create ~parent_log Tock.Proving_key.bin_t
+        Controller.create ~parent_log (module Tock.Proving_key)
       in
       let open Async in
       let load c p =
@@ -71,10 +71,10 @@ module Keys = struct
       let open Storage in
       let parent_log = Logger.create () in
       let tick_controller =
-        Controller.create ~parent_log Tick.Verification_key.bin_t
+        Controller.create ~parent_log (module Tick.Verification_key)
       in
       let tock_controller =
-        Controller.create ~parent_log Tock.Verification_key.bin_t
+        Controller.create ~parent_log (module Tock.Verification_key)
       in
       let open Async in
       let load c p =
@@ -201,11 +201,11 @@ struct
         let open Cached.Let_syntax in
         let%map verification =
           Cached.component ~label:"verification" ~f:Keypair.vk
-            Verification_key.bin_t
+            (module Verification_key)
         and proving =
-          Cached.component ~label:"proving" ~f:Keypair.pk Proving_key.bin_t
+          Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
         in
-        (verification, proving)
+        (verification, {proving with value= ()})
       in
       Cached.Spec.create ~load ~name:"blockchain-snark step keys"
         ~autogen_path:Cache_dir.autogen_path
@@ -228,11 +228,11 @@ struct
           let open Cached.Let_syntax in
           let%map verification =
             Cached.component ~label:"verification" ~f:Keypair.vk
-              Verification_key.bin_t
+              (module Verification_key)
           and proving =
-            Cached.component ~label:"proving" ~f:Keypair.pk Proving_key.bin_t
+            Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
           in
-          (verification, proving)
+          (verification, {proving with value= ()})
         in
         Cached.Spec.create ~load ~name:"blockchain-snark wrap keys"
           ~autogen_path:Cache_dir.autogen_path
@@ -254,10 +254,7 @@ struct
             Verification.checksum ~step:step_vk.checksum ~wrap:wrap_vk.checksum
         }
       in
-      let t =
-        { proving= {step= step_pk.value; wrap= wrap_pk.value}
-        ; verification= {step= step_vk.value; wrap= wrap_vk.value} }
-      in
+      let t : Verification.t = {step= step_vk.value; wrap= wrap_vk.value} in
       (location, t, checksum)
   end
 end
