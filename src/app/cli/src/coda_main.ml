@@ -295,7 +295,8 @@ module type Main_intf = sig
 
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
 
-  val get_ledger : t -> Ledger_builder_hash.t -> Account.t list Deferred.Or_error.t
+  val get_ledger :
+    t -> Ledger_builder_hash.t -> Account.t list Deferred.Or_error.t
 
   val receipt_chain_database : t -> Receipt_chain_database.t
 end
