@@ -47,6 +47,10 @@ let%test_module "Test mask connected to underlying Merkle tree" =
          and type t := base
 
       val with_instances : (base -> Mask.t -> 'a) -> 'a
+
+      val with_chain : (base -> Mask.Attached.t -> Mask.Attached.t -> 'a) -> 'a
+      (** Here we provide a base ledger and two layers of attached masks
+       * one ontop another *)
     end
 
     module Make (Test : Test_intf) = struct
@@ -184,6 +188,26 @@ let%test_module "Test mask connected to underlying Merkle tree" =
                     dummy_location))
               && Option.is_some (Maskable.get maskable dummy_location) )
             else false )
+
+      let%test_unit "commit at layer2, dumps to layer1, not in base" =
+        Test.with_chain (fun base level1 level2 ->
+            Mask.Attached.set level2 dummy_location dummy_account ;
+            (* verify account is in the layer2 mask *)
+            assert (
+              Mask.Attached.For_testing.location_in_mask level2 dummy_location
+            ) ;
+            Mask.Attached.commit level2 ;
+            (* account is no longer in layer2 *)
+            assert (
+              not
+                (Mask.Attached.For_testing.location_in_mask level2
+                   dummy_location) ) ;
+            (* account is still not in base *)
+            assert (Option.is_none @@ Maskable.get base dummy_location) ;
+            (* account is present in layer1 *)
+            assert (
+              Mask.Attached.For_testing.location_in_mask level1 dummy_location
+            ) )
 
       let%test "register and unregister mask" =
         Test.with_instances (fun maskable mask ->
@@ -444,10 +468,17 @@ let%test_module "Test mask connected to underlying Merkle tree" =
       (* test runner *)
       let with_instances f =
         let db = Base_db.create () in
-        let pack = Any_base.T ((module Base_db), db) in
-        let maskable = pack in
+        let maskable = Any_base.T ((module Base_db), db) in
         let mask = Mask.create () in
         f maskable mask
+
+      let with_chain f =
+        with_instances (fun maskable mask ->
+            let attached1 = Maskable.register_mask maskable mask in
+            let pack2 = Any_base.T ((module Mask.Attached), attached1) in
+            let mask2 = Mask.create () in
+            let attached2 = Maskable.register_mask pack2 mask2 in
+            f maskable attached1 attached2 )
     end
 
     module Make_maskable_and_mask (Depth : Depth_S) =

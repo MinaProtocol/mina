@@ -1,9 +1,11 @@
+open Core_kernel
 open Protocols.Coda_pow
 open Coda_base
 open Pipe_lib
 
 module type Inputs_intf = sig
-  module Consensus_mechanism : Consensus_mechanism_intf
+  module Consensus_mechanism :
+    Consensus_mechanism_intf with type protocol_state_hash := State_hash.t
 
   module Merkle_address : Merkle_address.S
 
@@ -12,16 +14,22 @@ module type Inputs_intf = sig
     with type addr := Merkle_address.t
      and type hash := Ledger_hash.t
 
-  module Transition_frontier : Transition_frontier_intf
+  module Transition_frontier :
+    Transition_frontier_intf
+    with type external_transition := Consensus_mechanism.External_transition.t
+     and type state_hash := State_hash.t
+     and type merkle_ledger := Ledger.t
 
   module Transition_handler :
     Transition_handler_intf
     with type external_transition := Consensus_mechanism.External_transition.t
+     and type state_hash := State_hash.t
      and type transition_frontier := Transition_frontier.t
 
   module Catchup :
     Catchup_intf
     with type external_transition := Consensus_mechanism.External_transition.t
+     and type state_hash := State_hash.t
      and type transition_frontier := Transition_frontier.t
 
   module Sync_handler :
@@ -42,18 +50,30 @@ module Make (Inputs : Inputs_intf) :
    and type syncable_ledger_answer := Inputs.Syncable_ledger.answer
    and type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
+  open Consensus_mechanism
 
-  let run ~frontier ~transition_reader ~sync_query_reader ~sync_answer_writer =
+  let run ~genesis_transition ~transition_reader ~sync_query_reader
+      ~sync_answer_writer =
     let valid_transition_reader, valid_transition_writer =
       Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
     in
     let catchup_job_reader, catchup_job_writer =
       Strict_pipe.create (Buffered (`Capacity 5, `Overflow Drop_head))
     in
-    Transition_handler.Validator.run ~frontier ~transition_reader
+    (* TODO: initialize transition frontier from disk *)
+    let frontier =
+      Transition_frontier.create
+        ~root:
+          (With_hash.of_data genesis_transition
+             ~hash_data:
+               (Fn.compose Protocol_state.hash
+                  External_transition.protocol_state))
+        ~ledger:Genesis_ledger.t
+    in
+    Transition_handler.Validator.run ~transition_reader
       ~valid_transition_writer ;
-    Transition_handler.Processor.run ~frontier ~valid_transition_reader
-      ~catchup_job_writer ;
-    Catchup.run ~frontier ~catchup_job_reader ;
-    Sync_handler.run ~frontier ~sync_query_reader ~sync_answer_writer
+    Transition_handler.Processor.run ~valid_transition_reader
+      ~catchup_job_writer ~frontier ;
+    Catchup.run ~catchup_job_reader ~frontier ;
+    Sync_handler.run ~sync_query_reader ~sync_answer_writer ~frontier
 end

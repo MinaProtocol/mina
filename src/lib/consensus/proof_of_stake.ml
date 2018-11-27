@@ -96,7 +96,7 @@ let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64
 let iter_none ~f opt = match opt with None -> f () ; None | Some x -> Some x
 
 module Make (Inputs : Inputs_intf) :
-  Mechanism.S
+  Intf.S
   with type Internal_transition.Ledger_builder_diff.t =
               Inputs.Ledger_builder_diff.t
    and type External_transition.Ledger_builder_diff.t =
