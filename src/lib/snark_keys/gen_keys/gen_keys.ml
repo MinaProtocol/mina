@@ -202,6 +202,10 @@ let gen_keys () =
       module Ledger_builder_hash = struct
         include Ledger_builder_hash.Stable.V1
 
+        let ledger_hash = Ledger_builder_hash.ledger_hash
+
+        let aux_hash = Ledger_builder_hash.aux_hash
+
         let of_aux_and_ledger_hash = Ledger_builder_hash.of_aux_and_ledger_hash
       end
     end)
