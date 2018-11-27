@@ -8,10 +8,6 @@ open Fold_lib
 open Signature_lib
 
 module type Inputs_intf = sig
-  module Ledger_builder_diff : sig
-    type t [@@deriving bin_io, sexp]
-  end
-
   module Time : sig
     type t
 
@@ -95,13 +91,7 @@ let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64
 
 let iter_none ~f opt = match opt with None -> f () ; None | Some x -> Some x
 
-module Make (Inputs : Inputs_intf) :
-  Intf.S
-  with type Internal_transition.Ledger_builder_diff.t =
-              Inputs.Ledger_builder_diff.t
-   and type External_transition.Ledger_builder_diff.t =
-              Inputs.Ledger_builder_diff.t = struct
-  module Ledger_builder_diff = Inputs.Ledger_builder_diff
+module Make (Inputs : Inputs_intf) : Intf.S = struct
   module Time = Inputs.Time
 
   module Proposal_data = struct
@@ -1024,12 +1014,6 @@ module Make (Inputs : Inputs_intf) :
     module Consensus_data = Consensus_transition_data
   end)
 
-  module Internal_transition =
-    Coda_base.Internal_transition.Make (Ledger_builder_diff) (Snark_transition)
-      (Prover_state)
-  module External_transition =
-    Coda_base.External_transition.Make (Ledger_builder_diff) (Protocol_state)
-
   (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
   let generate_transition ~(previous_protocol_state : Protocol_state.value)
       ~blockchain_state ~time ~proposal_data ~transactions:_
@@ -1282,10 +1266,6 @@ end
 let%test_module "Proof_of_stake tests" =
   ( module struct
     module Proof_of_stake = Make (struct
-      module Ledger_builder_diff = struct
-        type t = int [@@deriving bin_io, sexp]
-      end
-
       module Time = Coda_base.Block_time
       module Genesis_ledger = Genesis_ledger
 

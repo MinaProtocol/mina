@@ -62,14 +62,6 @@ module type S = sig
     with module Blockchain_state = Blockchain_state
      and module Consensus_data = Consensus_transition_data
 
-  module Internal_transition :
-    Coda_base.Internal_transition.S
-    with module Snark_transition = Snark_transition
-     and module Prover_state := Prover_state
-
-  module External_transition :
-    Coda_base.External_transition.S with module Protocol_state = Protocol_state
-
   module Proposal_data : sig
     type t
 

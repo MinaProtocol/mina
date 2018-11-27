@@ -9,7 +9,7 @@ module Make (Inputs : sig
     Transition_logic_state_intf.S
     with type tip := Tip.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
-     and type external_transition := Consensus_mechanism.External_transition.t
+     and type external_transition := External_transition.t
      and type state_hash := State_hash.t
      and type public_key_compressed := Public_key.Compressed.t
 end) =

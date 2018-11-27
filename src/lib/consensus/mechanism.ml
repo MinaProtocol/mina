@@ -33,13 +33,9 @@ defined consensus_mechanism]
 [%%if
 consensus_mechanism = "proof_of_signature"]
 
-module Make (Ledger_builder_diff : sig
-  type t [@@deriving sexp, bin_io]
-end) =
-Proof_of_signature.Make (struct
+include Proof_of_signature.Make (struct
   module Genesis_ledger = Genesis_ledger
   module Proof = Coda_base.Proof
-  module Ledger_builder_diff = Ledger_builder_diff
   module Time = Coda_base.Block_time
 
   let proposal_interval =
@@ -52,13 +48,9 @@ end)
 [%%elif
 consensus_mechanism = "proof_of_stake"]
 
-module Make (Ledger_builder_diff : sig
-  type t [@@deriving sexp, bin_io]
-end) =
-Proof_of_stake.Make (struct
+include Proof_of_stake.Make (struct
   module Genesis_ledger = Genesis_ledger
   module Proof = Coda_base.Proof
-  module Ledger_builder_diff = Ledger_builder_diff
   module Time = Coda_base.Block_time
 
   (* TODO: change these variables into variables for config file. See #1176  *)
