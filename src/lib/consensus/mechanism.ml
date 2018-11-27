@@ -97,19 +97,14 @@ module type S = sig
    * transition cannot be generated.
    *)
 
-  val is_transition_valid_checked :
-       Snark_transition.var
-    -> (Snark_params.Tick.Boolean.var, _) Snark_params.Tick.Checked.t
-  (**
-   * Create a checked boolean constraint for the validity of a transition.
-   *)
-
   val next_state_checked :
-       Consensus_state.var
-    -> Coda_base.State_hash.var
+       prev_state:Protocol_state.var
+    -> prev_state_hash:Coda_base.State_hash.var
     -> Snark_transition.var
     -> Currency.Amount.var
-    -> (Consensus_state.var, _) Snark_params.Tick.Checked.t
+    -> ( [`Success of Snark_params.Tick.Boolean.var] * Consensus_state.var
+       , _ )
+       Snark_params.Tick.Checked.t
   (**
    * Create a constrained, checked var for the next consensus state of
    * a given consensus state and snark transition.

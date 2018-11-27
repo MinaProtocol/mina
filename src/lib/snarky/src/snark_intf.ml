@@ -369,6 +369,11 @@ module type Basic = sig
 
     val equal : t -> t -> (Boolean.var, _) Checked.t
 
+    val lt_value :
+         Boolean.var Bitstring_lib.Bitstring.Msb_first.t
+      -> bool Bitstring_lib.Bitstring.Msb_first.t
+      -> (Boolean.var, _) Checked.t
+
     module Assert : sig
       val equal : t -> t -> (unit, _) Checked.t
     end
