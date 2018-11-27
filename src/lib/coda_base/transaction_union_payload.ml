@@ -271,7 +271,7 @@ module Changes = struct
   end
 
   let%test_unit "checked-unchecked changes" =
-    Quickcheck.test gen ~trials:10 ~f:(fun (t : payload) ->
+    Quickcheck.test gen ~f:(fun (t : payload) ->
         Test_util.test_equal ~equal payload_typ typ Checked.of_payload
           of_payload t )
 end

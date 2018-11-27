@@ -1,5 +1,3 @@
-(* Benchmark the scheduler *)
-
 open Core
 open Coda_base
 
@@ -12,7 +10,8 @@ module Pos = Consensus.Proof_of_stake.Make (struct
           module Ledger_builder_diff = Int
           module Time = Coda_base.Block_time
 
-          (* TODO: choose reasonable values *)
+          (* These parameters shouldn't matter for the benches below *)
+
           let genesis_state_timestamp =
               Core.Time.of_date_ofday
                 ~zone:(Core.Time.Zone.of_utc_offset ~hours:(-7))
@@ -28,7 +27,6 @@ module Pos = Consensus.Proof_of_stake.Make (struct
 
           let probable_slots_per_transition_count = 8
 
-          (* Conservatively pick 1seconds *)
           let expected_network_delay = Time.Span.of_ms (Int64.of_int 1000)
 
           let approximate_network_diameter = 3

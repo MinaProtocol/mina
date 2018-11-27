@@ -56,11 +56,11 @@ end)
 
     val to_coords : t -> Field.t * Field.t
 
+    val zero : t
+
     val add : t -> t -> t
 
     val negate : t -> t
-
-    val zero : t
 
     module Vector : Snarky.Vector.S with type elt := t
 
@@ -81,15 +81,6 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t and type curve_v
 
   module Params = struct
     type t = Curve.Vector.t
-
-    let of_array l =
-      let vec = Curve.Vector.create () in
-      Array.iter l ~f:(fun (e1, e2, e3, e4) ->
-      Curve.Vector.emplace_back vec e1 ;
-      Curve.Vector.emplace_back vec e2 ;
-      Curve.Vector.emplace_back vec e3 ;
-      Curve.Vector.emplace_back vec e4 ) ;
-      vec
   end
 
   module State = struct
