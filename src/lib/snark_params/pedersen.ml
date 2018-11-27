@@ -102,9 +102,9 @@ end) :
         fold.fold ~init:0 ~f:(fun i (b0, b1, b2) ->
             Bitstring.(
               let i = i * 3 in
-              put bs i (Bool.to_int b0) ;
+              put bs i (Bool.to_int b2) ;
               put bs (i + 1) (Bool.to_int b1) ;
-              put bs (i + 2) (Bool.to_int b2)) ;
+              put bs (i + 2) (Bool.to_int b0)) ;
             i + 1 )
       in
       let bits, _, _ = bs in
