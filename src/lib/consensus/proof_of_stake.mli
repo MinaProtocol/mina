@@ -53,7 +53,7 @@ module type Inputs_intf = sig
 end
 
 module Make (Inputs : Inputs_intf) :
-  Mechanism.S
+  Intf.S
   with type Internal_transition.Ledger_builder_diff.t =
               Inputs.Ledger_builder_diff.t
    and type External_transition.Ledger_builder_diff.t =
