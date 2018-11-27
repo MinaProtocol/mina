@@ -85,7 +85,8 @@ struct
 
     module Vector : Vector.S with type elt := t
 
-    val pedersen_inner : params:Vector.t -> bits:Bytes.t -> start:int -> triples:int -> t
+    val pedersen_inner :
+      params:Vector.t -> bits:Bytes.t -> start:int -> triples:int -> t
   end = struct
     type t = unit ptr
 
@@ -184,15 +185,12 @@ struct
 
     let pedersen_inner =
       let stub =
-        foreign (func_name "pedersen_inner") (Vector.typ @-> ocaml_bytes @-> int @-> int @-> int @-> returning typ)
+        foreign
+          (func_name "pedersen_inner")
+          (Vector.typ @-> ocaml_bytes @-> int @-> int @-> int @-> returning typ)
       in
       fun ~params ~(bits : Bytes.t) ~start ~triples ->
-        stub
-         params
-         (ocaml_bytes_start bits)
-         (Bytes.length bits)
-         start
-         triples
+        stub params (ocaml_bytes_start bits) (Bytes.length bits) start triples
   end
 end
 

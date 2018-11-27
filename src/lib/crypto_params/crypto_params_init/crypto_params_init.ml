@@ -25,14 +25,18 @@ end
 module Tick0 = Snarky.Snark.Make (Tick_backend)
 module Tock0 = Snarky.Snark.Make (Tock_backend)
 
-let dense_curve_quad_array (l : Tick_backend.Inner_curve.t Tuple_lib.Quadruple.t array) : Tick_backend.Inner_curve.Vector.t =
+let dense_curve_quad_array
+    (l : Tick_backend.Inner_curve.t Tuple_lib.Quadruple.t array) :
+    Tick_backend.Inner_curve.Vector.t =
   let open Tick_backend.Inner_curve.Vector in
   let vec = create () in
-  Array.iter (fun (e1, e2, e3, e4) ->
-  emplace_back vec e1 ;
-  emplace_back vec e2 ;
-  emplace_back vec e3 ;
-  emplace_back vec e4 ) l;
+  Array.iter
+    (fun (e1, e2, e3, e4) ->
+      emplace_back vec e1 ;
+      emplace_back vec e2 ;
+      emplace_back vec e3 ;
+      emplace_back vec e4 )
+    l ;
   vec
 
 module Wrap_input = struct

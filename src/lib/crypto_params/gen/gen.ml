@@ -83,9 +83,10 @@ let structure ~loc =
     let loc = loc
   end) in
   let open E in
-  [%str open Crypto_params_init
+  [%str
+    open Crypto_params_init
 
-        let params = dense_curve_quad_array [%e params ~loc]]
+    let params = dense_curve_quad_array [%e params ~loc]]
 
 let main () =
   let fmt =

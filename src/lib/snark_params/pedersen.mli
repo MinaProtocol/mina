@@ -5,6 +5,7 @@ open Tuple_lib
 
 module type S = sig
   type curve
+
   type curve_vector
 
   module Digest : sig
@@ -64,5 +65,10 @@ end)
 
     module Vector : Snarky.Vector.S with type elt := t
 
-    val pedersen_inner : params:Vector.t -> bits:Bytes.t -> start:int -> triples:int -> t
-end) : S with type curve := Curve.t and type curve_vector := Curve.Vector.t and type Digest.t = Field.t
+    val pedersen_inner :
+      params:Vector.t -> bits:Bytes.t -> start:int -> triples:int -> t
+end) :
+  S
+  with type curve := Curve.t
+   and type curve_vector := Curve.Vector.t
+   and type Digest.t = Field.t

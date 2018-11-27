@@ -5,6 +5,7 @@ open Tuple_lib
 
 module type S = sig
   type curve
+
   type curve_vector
 
   module Digest : sig
@@ -64,8 +65,13 @@ end)
 
     module Vector : Snarky.Vector.S with type elt := t
 
-    val pedersen_inner : params:Vector.t -> bits:Bytes.t -> start:int -> triples:int -> t
-end) : S with type curve := Curve.t and type Digest.t = Field.t and type curve_vector := Curve.Vector.t = struct
+    val pedersen_inner :
+      params:Vector.t -> bits:Bytes.t -> start:int -> triples:int -> t
+end) :
+  S
+  with type curve := Curve.t
+   and type Digest.t = Field.t
+   and type curve_vector := Curve.Vector.t = struct
   module Digest = struct
     type t = Field.t [@@deriving sexp, bin_io, compare, hash, eq]
 
@@ -93,20 +99,21 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t and type curve_v
       let params = t.params in
       let bs = Bitstring.create_bitstring (Curve.Vector.length params) in
       let triples_consumed_here =
-        fold.fold
-          ~init:0
-          ~f:(fun i (b0, b1, b2) ->
+        fold.fold ~init:0 ~f:(fun i (b0, b1, b2) ->
             Bitstring.(
               let i = i * 3 in
               put bs i (Bool.to_int b0) ;
-              put bs (i+1) (Bool.to_int b1) ;
-              put bs (i+2) (Bool.to_int b2)
-            ) ;
-            i + 1)
+              put bs (i + 1) (Bool.to_int b1) ;
+              put bs (i + 2) (Bool.to_int b2)) ;
+            i + 1 )
       in
-      let (bits, _, _) = bs in
-      let acc = Curve.add t.acc @@ Curve.pedersen_inner ~params ~bits ~start:t.triples_consumed ~triples:triples_consumed_here in
-      {t with acc; triples_consumed= t.triples_consumed+triples_consumed_here}
+      let bits, _, _ = bs in
+      let acc =
+        Curve.add t.acc
+        @@ Curve.pedersen_inner ~params ~bits ~start:t.triples_consumed
+             ~triples:triples_consumed_here
+      in
+      {t with acc; triples_consumed= t.triples_consumed + triples_consumed_here}
 
     let digest t =
       let x, _y = Curve.to_coords t.acc in
