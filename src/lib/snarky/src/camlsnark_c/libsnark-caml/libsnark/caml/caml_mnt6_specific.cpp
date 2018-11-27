@@ -537,7 +537,6 @@ libff::G1<ppT>* camlsnark_mnt6_g1_pedersen_inner(std::vector<libff::G1<ppT>>* pa
 
     auto sum = libff::G1<ppT>::zero();
 
-    fprintf(stderr, "start %d %d %d\n", bits_len, offset, triple_count);
     #pragma omp declare reduction (G1_sum : libff::G1<ppT> : omp_out = omp_out + omp_in) initializer(omp_priv = libff::G1<ppT>::zero())
     #pragma omp parallel for reduction(G1_sum:sum)
     for (int i = 0; i < triple_count; i++) {
@@ -548,7 +547,6 @@ libff::G1<ppT>* camlsnark_mnt6_g1_pedersen_inner(std::vector<libff::G1<ppT>>* pa
       }
       sum = sum + it;
     }
-    std::cerr << "done" << std::endl;
     return new libff::G1<ppT>(sum);
 }
 

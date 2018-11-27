@@ -58,6 +58,8 @@ end)
 
     val add : t -> t -> t
 
+    val negate : t -> t
+
     val zero : t
 
     module Vector : Snarky.Vector.S with type elt := t
@@ -112,7 +114,6 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t and type curve_v
             i + 1)
       in
       let (bits, _, _) = bs in
-      printf !"%{sexp:Bytes.t}\n%!" bits ;
       let acc = Curve.add t.acc @@ Curve.pedersen_inner ~params ~bits ~start:t.triples_consumed ~triples:triples_consumed_here in
       {t with acc; triples_consumed= t.triples_consumed+triples_consumed_here}
 

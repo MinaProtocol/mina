@@ -62,10 +62,6 @@ end)
 
     val negate : t -> t
 
-    val unsafe_add_in_place : dst:t -> t -> t
-
-    val dup : t -> t
-
     module Vector : Snarky.Vector.S with type elt := t
 
     val pedersen_inner : params:Vector.t -> bits:Bytes.t -> start:int -> triples:int -> t
