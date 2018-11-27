@@ -979,7 +979,7 @@ module type Inputs_intf = sig
     with type valid_user_command := User_command.With_valid_signature.t
      and type transaction := Transaction.t
      and type ledger_hash := Ledger_hash.t
-
+       
   module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
 
   module Ledger_builder_hash :
@@ -1057,6 +1057,7 @@ Merge Snark:
      and type ledger_proof_statement := Ledger_proof_statement.t
      and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
      and type transaction := Transaction.t
+     and type maskable_ledger := Ledger.maskable_ledger
 
   module Ledger_builder_transition :
     Ledger_builder_transition_intf

@@ -30,8 +30,10 @@ module Make
                      and type hash := Ledger_hash.t
                      and type account := Account.t
                      and type key := Public_key.Compressed.t
+      val create : ?directory_name:string -> unit -> t
       val with_ledger : f:(t -> 'a) -> 'a
-    end) =
+      val copy : t -> t
+     end) =
 struct
   include MaskedLedger
 

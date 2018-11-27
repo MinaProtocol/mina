@@ -46,6 +46,9 @@ module type S = sig
     val parent_set_notify : t -> location -> account -> unit
     (** called when parent sets an account; update local state *)
 
+    val copy : t -> t
+    (* makes new mask instance with empty tables, re-use parent *)
+      
     (** already have module For_testing from include above *)
     module For_testing : sig
       val location_in_mask : t -> location -> bool

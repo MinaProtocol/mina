@@ -4,7 +4,7 @@ open Protocols
 module type S = sig
   open Coda_pow
 
-  module Cmpressed_public_key : Compressed_public_key_intf
+  module Compressed_public_key : Compressed_public_key_intf
 
   module User_command :
     Coda_pow.User_command_intf with type public_key := Compressed_public_key.t
@@ -49,7 +49,7 @@ module type S = sig
        and type ledger_hash := Frozen_ledger_hash.t
        and type proof := Proof.t
        and type sok_digest := Sok_message.Digest.t
-
+    
     include Binable.S with type t := t
 
     include Sexpable.S with type t := t
@@ -66,7 +66,7 @@ module type S = sig
     with type ledger_hash := Ledger_hash.t
      and type transaction := Transaction.t
      and type valid_user_command := User_command.With_valid_signature.t
-
+       
   module Sparse_ledger : sig
     type t [@@deriving sexp, bin_io]
 

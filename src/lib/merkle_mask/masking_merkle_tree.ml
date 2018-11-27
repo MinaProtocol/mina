@@ -275,17 +275,14 @@ struct
       Location.Table.clear t.account_tbl ;
       Addr.Table.clear t.hash_tbl
 
-    (* copy tables in t, try to copy parent *)
+    (* copy tables in t; use same parent *)
     let copy t =
-      { t with
-        parent=
-          ( try Base.copy (get_parent t) with Failure _ ->
-              (* not copyable, use existing parent *)
-              get_parent t )
-      ; account_tbl= Location.Table.copy t.account_tbl
-      ; location_tbl= Key.Table.copy t.location_tbl
-      ; hash_tbl= Addr.Table.copy t.hash_tbl
-      ; current_location= t.current_location }
+      { uuid=Uuid.create ()
+      ; parent=get_parent t
+      ; account_tbl= Location.Table.create ()
+      ; location_tbl= Key.Table.create ()
+      ; hash_tbl= Addr.Table.create ()
+      ; current_location= None }
 
     let get_all_accounts_rooted_at_exn t address =
       (* accounts in parent and mask are disjoint sets *)

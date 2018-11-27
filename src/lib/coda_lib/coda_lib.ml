@@ -386,7 +386,8 @@ module type Inputs_intf = sig
      and type ledger_proof := Ledger_proof.t
      and type tip := Tip.t
      and type public_key_compressed := Public_key.Compressed.t
-
+     and type maskable_ledger := Ledger.maskable_ledger
+       
   module Proposer :
     Proposer_intf
     with type ledger_hash := Ledger_hash.t

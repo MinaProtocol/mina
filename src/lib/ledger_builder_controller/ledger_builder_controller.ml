@@ -130,13 +130,13 @@ end = struct
     Logger.info log
        "TODO: re-implement serialization File for ledger builder controller tip does not exist. Using \
            Genesis tip" ;
-        {data= genesis_tip; hash= genesis_state_hash}
+        {With_hash.data= genesis_tip; hash= genesis_state_hash}
   let create (config : Config.t) =
     let log = Logger.child config.parent_log "ledger_builder_controller" in
     let genesis_tip_state_hash =
       Protocol_state.hash config.genesis_tip.state
     in
-    let%bind {data= tip; hash= stored_genesis_state_hash} =
+    let {With_hash.data= tip; hash= stored_genesis_state_hash} =
       load_tip_and_genesis_hash config log
     in
     let tip =
@@ -161,7 +161,6 @@ end = struct
     let strongest_ledgers_reader, strongest_ledgers_writer =
       Linear_pipe.create ()
     in
-    let store_tip_reader, store_tip_writer = Linear_pipe.create () in
     let t =
       { ledger_builder_io= net
       ; log
@@ -172,24 +171,10 @@ end = struct
     @@ trace_task "strongest_tip" (fun () ->
            Linear_pipe.iter (Transition_logic.strongest_tip t.handler)
              ~f:(fun (tip, transition) ->
-               Linear_pipe.force_write_maybe_drop_head ~capacity:1
-                 store_tip_writer store_tip_reader tip ;
                Deferred.return
                @@ Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
                     t.strongest_ledgers_reader
                     (tip.ledger_builder, transition) ) ) ;
-    don't_wait_for
-    @@ trace_task "store_tip" (fun () ->
-           Linear_pipe.iter store_tip_reader ~f:(fun tip ->
-               let open With_hash in
-               let {Tip.state; Tip.proof; Tip.ledger_builder} = tip in
-               let serializable = Ledger_builder.serializable_of_t ledger_builder in
-               let serializable_tip_with_genesis_hash =
-                 { data= (state, proof, serializable)
-                 ; hash= genesis_tip_state_hash }
-               in
-               Store.store config.longest_tip_location
-                 serializable_tip_with_genesis_hash ) ) ;
     (* Handle new transitions *)
     let possibly_jobs =
       trace_task "external transitions" (fun () ->
@@ -255,7 +240,7 @@ end = struct
       let open With_hash in
       let open Deferred.Let_syntax in
       let%map {data= tip; _} =
-        load_tip_and_genesis_hash config t.log
+        Deferred.return (load_tip_and_genesis_hash config t.log)
       in
       tip
   end

@@ -336,9 +336,6 @@ module Make
 
   let merkle_root mdb = get_hash mdb Location.root_hash
 
-  (* for a copy, the uuid is fresh *)
-  let copy {uuid= _; kvdb} = {uuid= Uuid.create (); kvdb= Kvdb.copy kvdb}
-
   let remove_accounts_exn t keys =
     let locations =
       (* if we don't have a location for all keys, raise an exception *)

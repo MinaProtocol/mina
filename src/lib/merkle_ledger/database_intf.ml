@@ -1,5 +1,3 @@
-open Core
-
 module type S = sig
   include Base_ledger_intf.S
 
