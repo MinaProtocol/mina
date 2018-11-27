@@ -406,11 +406,6 @@ let%test_module "test" =
         module Ledger_builder = struct
           type t = int ref [@@deriving sexp, bin_io]
 
-          (* masking not tested here *)
-          type maskable_ledger = Ledger.t
-                 
-          type attached_mask = Ledger.t
-                 
           type serializable = int [@@deriving bin_io]
 
           module Aux = struct

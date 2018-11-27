@@ -515,9 +515,6 @@ end = struct
     ; ledger: Ledger.attached_mask sexp_opaque }
   [@@deriving sexp]
 
-  type maskable_ledger = Ledger.maskable_ledger
-  type attached_mask = Ledger.attached_mask
-                    
   type serializable = Aux.t * Ledger.serializable [@@deriving bin_io]
 
   let serializable_of_t t = (t.scan_state, Ledger.serializable_of_t t.ledger)
@@ -1693,6 +1690,10 @@ let%test_module "test" =
         let create ~fee:_ ~prover:_ = ()
       end
 
+      module Account = struct
+        type t = int
+      end
+
       module User_command = struct
         type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
 
@@ -1917,8 +1918,6 @@ let%test_module "test" =
         (*TODO: Test with a ledger that's more comprehensive*)
         type t = int ref [@@deriving sexp, bin_io, compare]
 
-        type account = int
-
         type ledger_hash = Ledger_hash.t
 
         type transaction = Transaction.t [@@deriving sexp, bin_io]
@@ -1929,7 +1928,7 @@ let%test_module "test" =
           let transaction t = Ok t
         end
 
-        let create : string -> t = fun _s -> ref 0
+        let create ?directory_name:_ () = ref 0
 
         let copy : t -> t = fun t -> ref !t
 
@@ -1981,8 +1980,6 @@ let%test_module "test" =
           Or_error.return ()
 
         let undo t (txn : Undo.t) = undo_transaction t txn
-
-        let account_list t = [!t]
       end
 
       module Sparse_ledger = struct

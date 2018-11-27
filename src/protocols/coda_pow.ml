@@ -146,7 +146,7 @@ module type Ledger_intf = sig
                      
   type unattached_mask = Mask.t
 
-  type maskable_ledger
+  type maskable_ledger = t
      
   type transaction
 
@@ -169,7 +169,7 @@ module type Ledger_intf = sig
 
   val unattached_mask_of_serializable : serializable -> unattached_mask
     
-  val create : string -> t
+  val create : ?directory_name:string -> unit -> t
 
   val copy : t -> t
 
@@ -182,8 +182,6 @@ module type Ledger_intf = sig
   val apply_transaction : t -> transaction -> Undo.t Or_error.t
 
   val undo : t -> Undo.t -> unit Or_error.t
-
-  val account_list : t -> account list
 
   val register_mask : maskable_ledger -> unattached_mask -> attached_mask
 
@@ -522,14 +520,10 @@ module type Ledger_builder_base_intf = sig
 
   type ledger_proof
 
+  (** The ledger in a ledger builder is always a mask *)
   type ledger
 
-  (* the ledger in a ledger builder is always a mask *)
-  type attached_mask = ledger
-
-  type maskable_ledger
-     
-  type serializable
+  type serializable [@@deriving bin_io]
 
   module Aux : sig
     type t [@@deriving bin_io]
@@ -541,7 +535,7 @@ module type Ledger_builder_base_intf = sig
 
   val ledger : t -> ledger
 
-  val create : ledger:attached_mask -> t
+  val create : ledger:ledger -> t
 
   val of_aux_and_ledger :
        snarked_ledger_hash:frozen_ledger_hash
@@ -549,7 +543,7 @@ module type Ledger_builder_base_intf = sig
     -> aux:Aux.t
     -> t Or_error.t Deferred.t
 
-  val of_serialized_and_unserialized : serialized:serializable -> unserialized:maskable_ledger -> t
+  val of_serialized_and_unserialized : serialized:serializable -> unserialized:ledger -> t
 
   val copy : t -> t
 
@@ -982,11 +976,14 @@ module type Inputs_intf = sig
      and type ledger_proof := Ledger_proof.t
      and type statement := Ledger_proof_statement.t
 
+  module Account : sig type t end
+
   module Ledger :
     Ledger_intf
     with type valid_user_command := User_command.With_valid_signature.t
      and type transaction := Transaction.t
      and type ledger_hash := Ledger_hash.t
+     and type account := Account.t
        
   module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
 
@@ -1065,7 +1062,6 @@ Merge Snark:
      and type ledger_proof_statement := Ledger_proof_statement.t
      and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
      and type transaction := Transaction.t
-     and type maskable_ledger := Ledger.maskable_ledger
 
   module Ledger_builder_transition :
     Ledger_builder_transition_intf

@@ -33,7 +33,7 @@ struct
     ; hash_tbl: Hash.t Addr.Table.t
     ; location_tbl: Location.t Key.Table.t
     ; mutable current_location: Location.t option }
-  [@@deriving sexp]
+  [@@deriving sexp, bin_io]
 
   type unattached = t
 

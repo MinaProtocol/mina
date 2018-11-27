@@ -10,7 +10,7 @@ module type S = sig
     end
   end
 
-  include Hashable.S with type t := t
+  include Hashable.S_binable with type t := t
 
   val of_byte_string : string -> t
 
@@ -152,7 +152,7 @@ end) : S = struct
       end
 
       include T
-      include Hashable.Make (T)
+      include Hashable.Make_binable (T)
     end
   end
 

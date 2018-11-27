@@ -1,7 +1,7 @@
 (* masking_merkle_tree_intf.ml *)
 (* the type of a Merkle tree mask associated with a parent Merkle tree *)
 module type S = sig
-  type t
+  type t [@@deriving bin_io]
 
   type unattached = t
 

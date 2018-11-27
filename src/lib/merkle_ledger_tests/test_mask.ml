@@ -468,14 +468,14 @@ let%test_module "Test mask connected to underlying Merkle tree" =
       (* test runner *)
       let with_instances f =
         let db = Base_db.create () in
-        let maskable = Any_base.T ((module Base_db), db) in
+        let maskable = Any_base.cast (module Base_db) db in
         let mask = Mask.create () in
         f maskable mask
 
       let with_chain f =
         with_instances (fun maskable mask ->
             let attached1 = Maskable.register_mask maskable mask in
-            let pack2 = Any_base.T ((module Mask.Attached), attached1) in
+            let pack2 = Any_base.cast (module Mask.Attached) attached1 in
             let mask2 = Mask.create () in
             let attached2 = Maskable.register_mask pack2 mask2 in
             f maskable attached1 attached2 )

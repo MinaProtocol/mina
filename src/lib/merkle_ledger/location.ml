@@ -50,7 +50,7 @@ module Make (Depth : Intf.Depth) = struct
   end
 
   include T
-  include Hashable.Make (T)
+  include Hashable.Make_binable (T)
 
   let is_generic = function Generic _ -> true | _ -> false
 

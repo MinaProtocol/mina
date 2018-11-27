@@ -14,7 +14,28 @@
  * *)
 
 open Core_kernel
-open Async_kernel
+
+module type S = sig
+  type key
+  type account
+  type hash
+  module Location : Location_intf.S
+
+  type witness [@@deriving sexp_of]
+
+  module type Base_intf =
+    Base_ledger_intf.S
+    with module Addr = Location.Addr
+    with module Location = Location
+    with type key := key
+     and type hash := hash
+     and type root_hash := hash
+     and type account := account
+
+  val cast : (module Base_intf with type t = 'a) -> 'a -> witness
+
+  module M : Base_intf with type t = witness
+end
 
 module Make_base
     (Key : Intf.Key)
@@ -22,8 +43,15 @@ module Make_base
     (Hash : Intf.Hash with type account := Account.t)
     (Location : Location_intf.S) (Depth : sig
         val depth : int
-    end) =
+    end) :
+      S with module Location = Location
+        with type key := Key.t
+         and type hash := Hash.t
+         and type account := Account.t
+=
 struct
+  module Location = Location
+
   module type Base_intf =
     Base_ledger_intf.S
     with module Addr = Location.Addr
@@ -37,11 +65,11 @@ struct
    * be easily accessed from outside this module *)
   type witness = T : (module Base_intf with type t = 't) * 't -> witness
 
+  let cast (m : (module Base_intf with type t = 'a)) (t : 'a) =
+    T (m, t)
+
   let sexp_of_witness (T ((module B), t)) =
     B.sexp_of_t t
-
-  let witness_of_sexp (T ((module B), t)) =
-    failwith "witness_of_sexp unimplemented"
 
   (** M can be used wherever a base ledger is demanded, construct instances
    * by using the witness constructor directly

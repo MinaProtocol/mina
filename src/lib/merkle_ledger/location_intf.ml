@@ -16,7 +16,7 @@ module type S = sig
   type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
   [@@deriving eq, sexp, bin_io, hash, compare]
 
-  include Hashable.S with type t := t
+  include Hashable.S_binable with type t := t
 
   val is_generic : t -> bool
 
