@@ -29,7 +29,7 @@ if [[ $1 == "restart" ]]; then
     #  or ocaml build tests inside the container
     NAME=$(docker run \
       --volume $SCRIPTPATH/..:/home/opam/app \
-      --volume $HOME:/opt/home \ 
+      --volume $HOME:/opt/home \
       --user $MYUID:$MYGID \
       --name $DOCKERNAME \
       --detach \

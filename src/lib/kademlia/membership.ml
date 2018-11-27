@@ -1,6 +1,7 @@
 open Async_kernel
 open Core_kernel
 open Banlist_lib
+open Pipe_lib
 
 exception Child_died
 

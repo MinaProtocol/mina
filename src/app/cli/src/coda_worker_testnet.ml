@@ -4,6 +4,7 @@ open Coda_worker
 open Coda_main
 open Signature_lib
 open Coda_base
+open Pipe_lib
 
 module Api = struct
   type t =

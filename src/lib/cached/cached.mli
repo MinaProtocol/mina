@@ -20,7 +20,7 @@ module Let_syntax : sig
 end
 
 val component :
-  label:string -> f:('e -> 'a) -> 'a Bin_prot.Type_class.t -> ('a value, 'e) t
+  label:string -> f:('e -> 'a) -> 'a Binable.m -> ('a value, 'e) t
 
 type ('a, 'e) cached = ('a, 'e) t
 

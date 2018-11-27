@@ -3,17 +3,17 @@ open Import
 open Snark_params.Tick
 
 include Sparse_ledger_lib.Sparse_ledger.Make (struct
-            include Merkle_hash
+            include Ledger_hash
           end)
           (Public_key.Compressed.Stable.V1)
           (struct
             include Account.Stable.V1
 
-            let hash = Fn.compose Merkle_hash.of_digest Account.digest
+            let hash = Fn.compose Ledger_hash.of_digest Account.digest
           end)
 
 let of_root (h : Ledger_hash.t) =
-  of_hash ~depth:Ledger.depth (Merkle_hash.of_digest (h :> Pedersen.Digest.t))
+  of_hash ~depth:Ledger.depth (Ledger_hash.of_digest (h :> Pedersen.Digest.t))
 
 let of_ledger_root ledger = of_root (Ledger.merkle_root ledger)
 
