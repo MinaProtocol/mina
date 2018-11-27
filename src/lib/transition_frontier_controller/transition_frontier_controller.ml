@@ -59,7 +59,6 @@ module Make (Inputs : Inputs_intf) :
     let catchup_job_reader, catchup_job_writer =
       Strict_pipe.create (Buffered (`Capacity 5, `Overflow Drop_head))
     in
-    let catchup_job_reader, catchup_job_writer = Linear_pipe.create () in
     (* TODO: initialize transition frontier from disk *)
     let frontier =
       Transition_frontier.create
