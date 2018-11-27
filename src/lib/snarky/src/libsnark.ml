@@ -1040,7 +1040,7 @@ module Make_proof_system (M : sig
 end) =
 struct
   module Proving_key : sig
-    type t
+    type t [@@deriving bin_io]
 
     val typ : t Ctypes.typ
 
@@ -1064,23 +1064,67 @@ struct
 
     let delete = foreign (with_prefix prefix "delete") (typ @-> returning void)
 
+    let to_cpp_string_stub : t -> Cpp_string.t =
+      foreign (func_name "to_string") (typ @-> returning Cpp_string.typ)
+
     let to_string : t -> string =
-      let stub =
-        foreign (func_name "to_string") (typ @-> returning Cpp_string.typ)
-      in
-      fun t ->
-        let s = stub t in
-        let r = Cpp_string.to_string s in
-        Cpp_string.delete s ; r
+     fun t ->
+      let s = to_cpp_string_stub t in
+      let r = Cpp_string.to_string s in
+      Cpp_string.delete s ; r
+
+    let of_cpp_string_stub =
+      foreign (func_name "of_string") (Cpp_string.typ @-> returning typ)
 
     let of_string : string -> t =
-      let stub =
-        foreign (func_name "of_string") (Cpp_string.typ @-> returning typ)
-      in
-      fun s ->
-        let str = Cpp_string.of_string_don't_delete s in
-        let t = stub str in
-        Cpp_string.delete str ; t
+     fun s ->
+      let str = Cpp_string.of_string_don't_delete s in
+      let t = of_cpp_string_stub str in
+      Cpp_string.delete str ; t
+
+    include Bin_prot.Utils.Of_minimal (struct
+      type nonrec t = t
+
+      let bin_shape_t = String.bin_shape_t
+
+      let bin_size_t t =
+        let s = to_cpp_string_stub t in
+        let len = Cpp_string.length s in
+        let plen = Bin_prot.Nat0.of_int len in
+        let size_len = Bin_prot.Size.bin_size_nat0 plen in
+        let res = size_len + len in
+        Cpp_string.delete s ; res
+
+      let bin_write_t buf ~pos t =
+        let s = to_cpp_string_stub t in
+        let len = Cpp_string.length s in
+        let plen = Bin_prot.Nat0.unsafe_of_int len in
+        let new_pos = Bin_prot.Write.bin_write_nat0 buf ~pos plen in
+        let next = new_pos + len in
+        Bin_prot.Common.check_next buf next ;
+        let bs = Cpp_string.to_bigstring s in
+        Bigstring.blit ~src:bs ~dst:buf ~src_pos:0 ~dst_pos:new_pos ~len ;
+        Cpp_string.delete s ;
+        next
+
+      let bin_read_t buf ~pos_ref =
+        let len = (Bin_prot.Read.bin_read_nat0 buf ~pos_ref :> int) in
+        let pos = !pos_ref in
+        let next = pos + len in
+        Bin_prot.Common.check_next buf next ;
+        pos_ref := next ;
+        let cpp_str =
+          let pointer =
+            Ctypes.( +@ ) (Ctypes.bigarray_start Ctypes.array1 buf) pos
+          in
+          Cpp_string.of_char_pointer_don't_delete pointer len
+        in
+        let result = of_cpp_string_stub cpp_str in
+        Cpp_string.delete cpp_str ; result
+
+      let __bin_read_t__ _buf ~pos_ref _vint =
+        Bin_prot.Common.raise_variant_wrong_type "Proving_key.t" !pos_ref
+    end)
 
     let to_bigstring : t -> Bigstring.t =
       let stub =
@@ -1742,7 +1786,7 @@ module type S = sig
   val field_size : Bigint.R.t
 
   module Proving_key : sig
-    type t
+    type t [@@deriving bin_io]
 
     val typ : t Ctypes.typ
 

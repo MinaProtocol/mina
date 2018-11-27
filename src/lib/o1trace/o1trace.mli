@@ -1,5 +1,7 @@
 val trace_event : string -> unit
 
+val trace_recurring_task : string -> (unit -> 'a) -> 'a
+
 val trace_task : string -> (unit -> 'a) -> 'a
 
 val measure : string -> (unit -> 'a) -> 'a

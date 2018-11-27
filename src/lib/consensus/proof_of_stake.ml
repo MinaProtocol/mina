@@ -96,7 +96,7 @@ let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64
 let iter_none ~f opt = match opt with None -> f () ; None | Some x -> Some x
 
 module Make (Inputs : Inputs_intf) :
-  Mechanism.S
+  Intf.S
   with type Internal_transition.Ledger_builder_diff.t =
               Inputs.Ledger_builder_diff.t
    and type External_transition.Ledger_builder_diff.t =
@@ -198,6 +198,7 @@ module Make (Inputs : Inputs_intf) :
 
     module Slot = struct
       include Segment_id
+      include Comparable.Make (Segment_id)
 
       let interval = Inputs.slot_interval
 
@@ -206,12 +207,13 @@ module Make (Inputs : Inputs_intf) :
           ( Inputs.probable_slots_per_transition_count
           * Inputs.unforkable_transition_count )
 
-      let in_seed_update_range (slot : t) =
-        let open UInt32 in
+      let after_lock_checkpoint (slot : t) =
         let open UInt32.Infix in
-        let ( <= ) x y = compare x y <= 0 in
-        let ( < ) x y = compare x y < 0 in
-        unforkable_count <= slot && slot < unforkable_count * of_int 2
+        unforkable_count * UInt32.of_int 2 < slot
+
+      let in_seed_update_range (slot : t) =
+        let open UInt32.Infix in
+        unforkable_count <= slot && slot < unforkable_count * UInt32.of_int 2
 
       let in_seed_update_range_var (slot : Unpacked.var) =
         let open Snark_params.Tick in
@@ -464,7 +466,7 @@ module Make (Inputs : Inputs_intf) :
               (Output)
 
     let check ~local_state ~epoch ~slot ~seed ~lock_checkpoint ~private_key
-        ~total_stake ~ledger_hash =
+        ~total_stake ~ledger_hash ~logger =
       let open Message in
       let open Option.Let_syntax in
       let%bind ledger =
@@ -472,6 +474,8 @@ module Make (Inputs : Inputs_intf) :
         then Some Genesis_ledger.t
         else local_state.Local_state.last_epoch_ledger
       in
+      Logger.info logger "Checking vrf evaluations at %d:%d"
+        (Epoch.to_int epoch) (Epoch.Slot.to_int slot) ;
       with_return (fun {return} ->
           Hashtbl.iteri local_state.delegators
             ~f:(fun ~key:delegator ~data:balance ->
@@ -479,6 +483,13 @@ module Make (Inputs : Inputs_intf) :
                 eval ~private_key
                   {epoch; slot; seed; lock_checkpoint; delegator}
               in
+              Logger.info logger
+                !"vrf result for %d: %d/%d -> %{sexp: Bignum_bigint.t}"
+                (Coda_base.Account.Index.to_int delegator)
+                (Balance.to_int balance)
+                (Amount.to_int total_stake)
+                (Bignum_bigint.of_bit_fold_lsb
+                   (Sha256.Digest.fold_bits vrf_result)) ;
               if
                 Threshold.is_satisfied ~my_stake:balance ~total_stake
                   vrf_result
@@ -984,6 +995,15 @@ module Make (Inputs : Inputs_intf) :
     let length (t : value) = t.length
 
     let to_lite = None
+
+    let to_string_record t =
+      Printf.sprintf
+        "{length|%s}|{epoch_length|%s}|{curr_epoch|%s}|{curr_slot|%s}|{total_currency|%s}"
+        (Length.to_string t.length)
+        (Length.to_string t.epoch_length)
+        (Segment_id.to_string t.curr_epoch)
+        (Segment_id.to_string t.curr_slot)
+        (Amount.to_string t.total_currency)
   end
 
   module Blockchain_state =
@@ -1053,35 +1073,104 @@ module Make (Inputs : Inputs_intf) :
       ( transition |> Snark_transition.blockchain_state
       |> Blockchain_state.ledger_hash )
 
-  let select this that ~logger ~time_received =
+  let select ~existing ~candidate ~logger ~time_received =
     let open Consensus_state in
     let open Epoch_data in
     let logger = Logger.child logger "proof_of_stake" in
+    let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
+    let log_result choice msg =
+      Logger.debug logger "RESULT: %s -- %s" (string_of_choice choice) msg
+    in
+    let log_choice ~precondition_msg ~choice_msg choice =
+      let choice_msg =
+        match choice with
+        | `Take -> choice_msg
+        | `Keep -> Printf.sprintf "not (%s)" choice_msg
+      in
+      let msg = Printf.sprintf "(%s) && (%s)" precondition_msg choice_msg in
+      log_result choice msg
+    in
+    Logger.info logger "SELECTING BEST CONSENSUS STATE" ;
+    Logger.info logger
+      !"existing consensus state: %{sexp:Consensus_state.value}"
+      existing ;
+    Logger.info logger
+      !"candidate consensus state: %{sexp:Consensus_state.value}"
+      candidate ;
     (* TODO: update time_received check and `Keep when it is not met *)
     if
       not
-        (time_in_epoch_slot that
+        (time_in_epoch_slot candidate
            Time.(of_span_since_epoch (Span.of_ms time_received)))
     then Logger.error logger "received a transition outside of it's slot time" ;
     (* TODO: add fork_before_checkpoint check *)
-    (* not (List.exists this.checkpoints ~f:(fun c ->
-     *   List.exists that.checkpoints ~f:(
-     *     Coda_base.State_hash.equal c)))
-     *)
-    if
-      Coda_base.State_hash.equal this.last_epoch_data.lock_checkpoint
-        that.last_epoch_data.lock_checkpoint
-    then if Length.compare this.length that.length < 0 then `Take else `Keep
-    else if
-      Coda_base.State_hash.equal this.last_epoch_data.start_checkpoint
-        that.last_epoch_data.start_checkpoint
-    then
-      if
-        Length.compare this.last_epoch_data.length that.last_epoch_data.length
-        < 0
-      then `Take
-      else `Keep
-    else `Keep
+    (* Each branch contains a precondition predicate and a choice predicate,
+     * which takes the new state when true. Each predicate is also decorated
+     * with a string description, used for debugging messages *)
+    let ( = ) = Coda_base.State_hash.equal in
+    let ( < ) a b = Length.compare a b < 0 in
+    let branches =
+      [ ( ( lazy
+              ( existing.last_epoch_data.lock_checkpoint
+              = candidate.last_epoch_data.lock_checkpoint )
+          , "last epoch lock checkpoints are equal" )
+        , ( lazy (existing.length < candidate.length)
+          , "candidate is longer than existing" ) )
+      ; ( ( lazy
+              ( existing.last_epoch_data.start_checkpoint
+              = candidate.last_epoch_data.start_checkpoint )
+          , "last epoch start checkpoints are equal" )
+        , ( lazy
+              ( existing.last_epoch_data.length
+              < candidate.last_epoch_data.length )
+          , "candidate last epoch is longer than existing last epoch" ) )
+        (* these two could be condensed into one entry *)
+      ; ( ( lazy
+              ( existing.curr_epoch_data.lock_checkpoint
+              = candidate.last_epoch_data.lock_checkpoint )
+          , "candidate last epoch lock checkpoint is equal to existing \
+             current epoch lock checkpoint" )
+        , ( lazy (existing.length < candidate.length)
+          , "candidate is longer than existing" ) )
+      ; ( ( lazy
+              ( existing.last_epoch_data.lock_checkpoint
+              = candidate.curr_epoch_data.lock_checkpoint )
+          , "candidate current epoch lock checkpoint is equal to existing \
+             last epoch lock checkpoint" )
+        , ( lazy (existing.length < candidate.length)
+          , "candidate is longer than existing" ) )
+      ; ( ( lazy
+              ( existing.curr_epoch_data.start_checkpoint
+              = candidate.last_epoch_data.start_checkpoint )
+          , "candidate last epoch start checkpoint is equal to existing \
+             current epoch start checkpoint" )
+        , ( lazy
+              ( existing.curr_epoch_data.length
+              < candidate.last_epoch_data.length )
+          , "candidate last epoch is longer than existing current epoch" ) )
+      ; ( ( lazy
+              ( existing.last_epoch_data.start_checkpoint
+              = candidate.curr_epoch_data.start_checkpoint )
+          , "candidate current epoch start checkpoint is equal to existing \
+             last epoch start checkpoint" )
+        , ( lazy
+              ( existing.last_epoch_data.length
+              < candidate.curr_epoch_data.length )
+          , "candidate current epoch is longer than existing last epoch" ) ) ]
+    in
+    match
+      List.find_map branches
+        ~f:(fun ((precondition, precondition_msg), (choice, choice_msg)) ->
+          if Lazy.force precondition then (
+            let choice = if Lazy.force choice then `Take else `Keep in
+            log_choice ~precondition_msg ~choice_msg choice ;
+            Some choice )
+          else None )
+    with
+    | Some choice -> choice
+    | None ->
+        log_result `Keep "no predicates were matched" ;
+        `Keep
 
   let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
       ~logger =
@@ -1129,7 +1218,7 @@ module Make (Inputs : Inputs_intf) :
         Vrf.check ~epoch ~slot ~seed:epoch_data.seed ~local_state
           ~lock_checkpoint:epoch_data.lock_checkpoint
           ~private_key:keypair.private_key ~total_stake
-          ~ledger_hash:epoch_data.ledger.hash
+          ~ledger_hash:epoch_data.ledger.hash ~logger
       in
       let rec find_winning_slot slot =
         if UInt32.of_int (Epoch.Slot.to_int slot) >= Epoch.size then None

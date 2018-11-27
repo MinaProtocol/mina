@@ -1,5 +1,6 @@
 open Core
 open Async
+open Pipe_lib
 open O1trace
 
 module type Inputs_intf = sig
@@ -141,13 +142,20 @@ module Make (Inputs : Inputs_intf) :
       ~ledger_builder ~transactions ~get_completed_work ~logger
       ~(keypair : Keypair.t) ~proposal_data =
     let open Interruptible.Let_syntax in
-    let%bind ( diff
-             , `Hash_after_applying next_ledger_builder_hash
-             , `Ledger_proof ledger_proof_opt ) =
+    let%bind diff, next_ledger_builder_hash, ledger_proof_opt =
       Interruptible.uninterruptible
-        (Ledger_builder.create_diff ledger_builder
-           ~self:(Public_key.compress keypair.public_key)
-           ~logger ~transactions_by_fee:transactions ~get_completed_work)
+        (let open Deferred.Let_syntax in
+        let diff =
+          Ledger_builder.create_diff ledger_builder
+            ~self:(Public_key.compress keypair.public_key)
+            ~logger ~transactions_by_fee:transactions ~get_completed_work
+        in
+        let lb2 = Ledger_builder.copy ledger_builder in
+        let%map ( `Hash_after_applying next_ledger_builder_hash
+                , `Ledger_proof ledger_proof_opt ) =
+          Ledger_builder.apply_diff_unchecked lb2 diff
+        in
+        (diff, next_ledger_builder_hash, ledger_proof_opt))
     in
     let%bind protocol_state, consensus_transition_data =
       lift_sync (fun () ->

@@ -1,0 +1,22 @@
+digraph G {
+  // rankdir=LR;
+
+  Network -> "Transition_handler.Validator" [label="transitions (overflow: drop old)",color=blue];
+  Network -> Sync_handler [label="sync queries (overflow: drop old)",color=blue];
+
+  "transition has parent" [shape=diamond];
+  "Transition_handler.Validator" -> "Transition_handler.Processor" [label="valid transitions (overflow: drop old)",color=blue];
+  "Transition_handler.Processor" -> "transition has parent";
+  "transition has parent" -> Frontier [label="yes",color=red];
+  "transition has parent" -> "Catchup.Monitor" [label="no"];
+  "Transition_handler.Processor" -> "Catchup.Monitor" [label="notify"];
+
+  "after timeout" [shape=diamond];
+  "Catchup.Monitor" -> "after timeout";
+  "after timeout" -> "Catchup.Worker" [label="catchup job (overflow: drop old)",color=blue];
+  "Catchup.Worker" -> "Transition_handler.Processor" [label="bulk breadcrumbs (overflow: blocking)",color=blue];
+
+  Frontier [shape=circle,color=red];
+  Frontier -> Sync_handler [color=red];
+  Sync_handler -> Frontier [color=red];
+}
