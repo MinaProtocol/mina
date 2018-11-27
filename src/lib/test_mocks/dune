@@ -1,0 +1,5 @@
+(library
+  (name test_mocks)
+  (public_name test_mocks)
+  (libraries core_kernel protocols coda_base)
+  (preprocess (pps ppx_jane)))

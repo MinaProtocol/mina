@@ -21,7 +21,7 @@ let with_snark = false
 
 [%%endif]
 
-let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
+let run_test () : unit Deferred.t =
   Parallel.init_master () ;
   let log = Logger.create () in
   let%bind temp_conf_dir =
@@ -48,9 +48,7 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
 
     let work_selection = Protocols.Coda_pow.Work_selection.Seq
   end in
-  let%bind (module Init) =
-    make_init ~should_propose:true (module Config) (module Kernel)
-  in
+  let%bind (module Init) = make_init ~should_propose:true (module Config) in
   let module Main = Coda_main.Make_coda (Init) in
   let module Run = Run (Config) (Main) in
   let open Main in
@@ -300,8 +298,8 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
     in
     test_duplicate_payments sender_keypair receiver_keypair
 
-let command (module Kernel : Kernel_intf) =
+let command =
   let open Core in
   let open Async in
   Command.async ~summary:"Full coda end-to-end test"
-    (Command.Param.return (fun () -> run_test (module Kernel)))
+    (Command.Param.return run_test)
