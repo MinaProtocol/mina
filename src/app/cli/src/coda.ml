@@ -370,15 +370,15 @@ let rec ensure_testnet_id_still_good log =
         (* Maybe the Git_sha.of_string is a bit gratuitous *)
         let finish local_id remote_ids =
           let str x = Git_sha.sexp_of_t x |> Sexp.to_string in
-          (eprintf
-                 "The version for the testnet has changed, and this client \
-                  (version %s) is no longer compatible. Please download the \
-                  latest Coda software!\n\
-                  Valid versions:\n\
-                  %s"
-                 ( local_id |> Option.map ~f:str
-                 |> Option.value ~default:"[COMMIT_SHA1 not set]" )
-                 remote_ids);
+          eprintf
+            "The version for the testnet has changed, and this client \
+             (version %s) is no longer compatible. Please download the latest \
+             Coda software!\n\
+             Valid versions:\n\
+             %s"
+            ( local_id |> Option.map ~f:str
+            |> Option.value ~default:"[COMMIT_SHA1 not set]" )
+            remote_ids ;
           exit 1
         in
         match commit_id with
