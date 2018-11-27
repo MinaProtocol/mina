@@ -324,41 +324,44 @@ module Make (Inputs : Inputs_intf) :
     node.breadcrumb
 end
 
-(*
-let%test "transitions can be added and interface will work at any point" =
-  let module Frontier = Make (struct
-    module State_hash = Test_mocks.Hash.Int_unchecked
-    module External_transition = Test_mocks.External_transition.T
-    module Max_length = struct
-      let t = 5
-    end
-  end) in
-  let open Frontier in
-  let t = create ~log:(Logger.create ()) in
+let%test_module "Transition_frontier tests" = (module struct
+  (*
+  let%test "transitions can be added and interface will work at any point" =
+                                                p
+    let module Frontier = Make (struct
+      module State_hash = Test_mocks.Hash.Int_unchecked
+      module External_transition = Test_mocks.External_transition.T
+      module Max_length = struct
+        let t = 5
+      end
+    end) in
+    let open Frontier in
+    let t = create ~log:(Logger.create ()) in
 
-  (* test that functions that shouldn't throw exceptions don't *)
-  let interface_works () =
-    let r = root t in
-    ignore (best_tip t);
-    ignore (successor_hashes_rec r);
-    ignore (successors_rec r);
-    iter t ~f:(fun b ->
-        let h = Breadcrumb.hash b in
-        find_exn t h;
-        ignore (successor_hashes t h)
-        ignore (successors t b))
-  in
+    (* test that functions that shouldn't throw exceptions don't *)
+    let interface_works () =
+      let r = root t in
+      ignore (best_tip t);
+      ignore (successor_hashes_rec r);
+      ignore (successors_rec r);
+      iter t ~f:(fun b ->
+          let h = Breadcrumb.hash b in
+          find_exn t h;
+          ignore (successor_hashes t h)
+          ignore (successors t b))
+    in
 
-  (* add a single random transition based off a random node *)
-  let add_transition () =
-    let base_hash = List.head_exn (List.shuffle (hashes t)) in
-    let trans = Quickcheck.random_value (External_transition.gen base_hash) in
-    add_exn t trans
-  in
+    (* add a single random transition based off a random node *)
+    let add_transition () =
+      let base_hash = List.head_exn (List.shuffle (hashes t)) in
+      let trans = Quickcheck.random_value (External_transition.gen base_hash) in
+      add_exn t trans
+    in
 
-  interface_works ();
-  for i = 1 to 200 do
-    add_transition ();
-    interface_works ()
-  done
-*)
+    interface_works ();
+    for i = 1 to 200 do
+      add_transition ();
+      interface_works ()
+    done
+  *)
+end)
