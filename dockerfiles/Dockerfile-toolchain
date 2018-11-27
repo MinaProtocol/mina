@@ -31,6 +31,12 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - && \
     sudo apt-get update -y && sudo apt-get install google-cloud-sdk -y
 
+# Source copy of ocaml-rocksdb (exposes opaque types)
+ADD /src/external/ocaml-rocksdb /ocaml-rocksdb
+# This installs librocksdb-dev and librocksdb v5.x from sources
+RUN cd /ocaml-rocksdb && rm -rf rocksdb && ./install_rocksdb.sh
+RUN cd /ocaml-rocksdb && yes | opam pin add .
+
 # Opam dependencies
 # Pull freshest repository
 RUN git -C /home/opam/opam-repository pull
@@ -49,12 +55,6 @@ RUN cd /ocaml-dune && yes | opam pin add .
 # Source copy of ocaml-sodium (modified for static linking)
 ADD /src/external/ocaml-sodium /ocaml-sodium
 RUN cd /ocaml-sodium && yes | opam pin add .
-
-# Source copy of ocaml-rocksdb (exposes opaque types)
-ADD /src/external/ocaml-rocksdb /ocaml-rocksdb
-RUN cd /ocaml-rocksdb && yes | opam pin add .
-# This installs librocksdb-dev and librocksdb v5.x from sources
-RUN cd /ocaml-rocksdb && ./install_rocksdb.sh
 
 # Get coda-kademlia from packages repo
 RUN sudo apt-get install --yes apt-transport-https ca-certificates && \
