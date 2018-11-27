@@ -1,4 +1,4 @@
 (library
   (name transition_frontier_controller)
   (public_name transition_frontier_controller)
-  (libraries core_kernel protocols coda_base syncable_ledger merkle_address))
+  (libraries core_kernel protocols coda_base syncable_ledger merkle_address genesis_ledger))
