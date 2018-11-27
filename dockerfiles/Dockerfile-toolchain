@@ -34,7 +34,7 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
 # Source copy of ocaml-rocksdb (exposes opaque types)
 ADD /src/external/ocaml-rocksdb /ocaml-rocksdb
 # This installs librocksdb-dev and librocksdb v5.x from sources
-RUN cd /ocaml-rocksdb && rm -rf rocksdb && ./install_rocksdb.sh
+RUN cd /ocaml-rocksdb && sudo rm -rf rocksdb && ./install_rocksdb.sh
 RUN cd /ocaml-rocksdb && yes | opam pin add .
 
 # Opam dependencies
