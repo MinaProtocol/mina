@@ -324,8 +324,9 @@ module Make (Inputs : Inputs_intf) :
     node.breadcrumb
 end
 
-let%test_module "Transition_frontier tests" = (module struct
-  (*
+let%test_module "Transition_frontier tests" =
+  ( module struct
+    (*
   let%test "transitions can be added and interface will work at any point" =
                                                 p
     let module Frontier = Make (struct
@@ -364,4 +365,5 @@ let%test_module "Transition_frontier tests" = (module struct
       interface_works ()
     done
   *)
-end)
+  
+  end )
