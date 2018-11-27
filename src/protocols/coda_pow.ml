@@ -131,12 +131,20 @@ module type Proof_intf = sig
   val verify : t -> input -> bool Deferred.t
 end
 
+module type Mask_intf = sig
+  type t [@@deriving bin_io]
+
+  val create : unit -> t
+end
+
 module type Ledger_intf = sig
+  module Mask : Mask_intf
+
   type t
 
   type attached_mask = t
                      
-  type unattached_mask
+  type unattached_mask = Mask.t
 
   type maskable_ledger
      
@@ -533,7 +541,7 @@ module type Ledger_builder_base_intf = sig
 
   val ledger : t -> ledger
 
-  val create : ledger:maskable_ledger -> t
+  val create : ledger:attached_mask -> t
 
   val of_aux_and_ledger :
        snarked_ledger_hash:frozen_ledger_hash

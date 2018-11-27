@@ -125,7 +125,7 @@ end = struct
   let ledger_builder_io {ledger_builder_io; _} = ledger_builder_io
 
   let load_tip_and_genesis_hash
-      {Config.genesis_tip; ledger; _} log =
+      {Config.genesis_tip; _} log =
     let genesis_state_hash = Protocol_state.hash genesis_tip.state in
     Logger.info log
        "TODO: re-implement serialization File for ledger builder controller tip does not exist. Using \
@@ -392,6 +392,8 @@ let%test_module "test" =
 
           type serializable = t [@@deriving bin_io]
 
+          type maskable_ledger = int
+
           let merkle_root t = t
 
           let copy t = t
@@ -407,7 +409,7 @@ let%test_module "test" =
           (* masking not tested here *)
           type maskable_ledger = Ledger.t
                  
-          type unattached_mask = Ledger.t
+          type attached_mask = Ledger.t
                  
           type serializable = int [@@deriving bin_io]
 

@@ -3,6 +3,38 @@ open Signature_lib
 
 module Location : Merkle_ledger.Location_intf.S
 
+module Db :
+  Merkle_ledger.Database_intf.S
+    with module Location = Location
+    with module Addr = Location.Addr
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.t
+     and type key := Public_key.Compressed.t
+
+module Mask :
+  Merkle_mask.Masking_merkle_tree_intf.S
+  with module Location = Location
+  with module Addr = Location.Addr
+   and module Attached.Addr = Location.Addr
+  with type account := Account.t
+   and type key := Public_key.Compressed.t
+   and type hash := Ledger_hash.t
+   and type location := Location.t
+   and type parent := Db.t
+
+module Maskable :
+  Merkle_mask.Maskable_merkle_tree_intf.S
+  with module Location = Location
+  with module Addr = Location.Addr
+  with type account := Account.t
+   and type key := Public_key.Compressed.t
+   and type hash := Ledger_hash.t
+   and type root_hash := Ledger_hash.t
+   and type unattached_mask := Mask.t
+   and type attached_mask := Mask.Attached.t
+   and type t := Db.t
+
 include
   Merkle_ledger.Base_ledger_intf.S
   with module Location := Location

@@ -5,6 +5,7 @@
   (public_name rocksdb_database)
   (flags (:standard -short-paths -warn-error -58))
   (library_flags (-linkall))
+  (c_library_flags (-lrocksdb))
   (libraries (core rocks))
   (preprocess (pps (ppx_jane)))
   (synopsis "RocksDB Database module")))

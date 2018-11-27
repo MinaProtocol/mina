@@ -517,7 +517,6 @@ end = struct
 
   type maskable_ledger = Ledger.maskable_ledger
   type attached_mask = Ledger.attached_mask
-  type unattached_mask = Ledger.unattached_mask
                     
   type serializable = Aux.t * Ledger.serializable [@@deriving bin_io]
 
@@ -641,11 +640,6 @@ end = struct
     | Ok s -> `Non_empty s
     | Error `Empty -> `Empty
     | Error (`Error e) -> failwithf !"statement_exn: %{sexp:Error.t}" e ()
-
-  (* TODO : add this for building ledger_builder when loading tip;
-     takes no hash, does no checking, unlike the of_aux... fun below; is this OK?
-   *)
-  let of_aux_and_ledger_unchecked ~ledger ~aux = {ledger; scan_state= aux}
 
   let of_aux_and_ledger ~snarked_ledger_hash ~ledger ~aux =
     let open Deferred.Or_error.Let_syntax in
@@ -1929,8 +1923,6 @@ let%test_module "test" =
 
         type transaction = Transaction.t [@@deriving sexp, bin_io]
 
-        type account = int
-
         module Undo = struct
           type t = transaction [@@deriving sexp, bin_io]
 
@@ -1946,6 +1938,22 @@ let%test_module "test" =
         let to_list t = [!t]
 
         let num_accounts _ = 0
+
+        (* BEGIN BOILERPLATE UNUSED *)
+        type serializable = int [@@deriving bin_io]
+        type maskable_ledger = t
+        type attached_mask = t
+        module Mask = struct
+          type t = int [@@deriving bin_io]
+          let create () = 4
+        end
+        type unattached_mask = Mask.t
+
+        let unregister_mask_exn _ = failwith "unimplemented"
+        let register_mask _ = failwith "unimplemented"
+        let unattached_mask_of_serializable _ = failwith "unimplemented"
+        let serializable_of_t _ = failwith "unimplemented"
+        (* END BOILERPLATE UNUSED *)
 
         let apply_transaction : t -> Undo.t -> Undo.t Or_error.t =
          fun t s ->

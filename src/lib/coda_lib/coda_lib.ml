@@ -173,7 +173,7 @@ module type Ledger_builder_controller_intf = sig
   type ledger
 
   type maskable_ledger
-     
+
   type tip
 
   type net
@@ -512,7 +512,12 @@ module Make (Inputs : Inputs_intf) = struct
                       k.public_key |> Public_key.compress ))
                ~parent_log:config.log ~net_deferred:(Ivar.read net_ivar)
                ~genesis_tip:
-                 { ledger_builder= Ledger_builder.create ~ledger:Genesis.ledger
+                 { ledger_builder= Ledger_builder.create
+                    ~ledger:(
+                        Ledger.register_mask
+                          Genesis.ledger
+                          (Ledger.Mask.create ())
+                    )
                  ; state= Genesis.state
                  ; proof= Genesis.proof }
                ~consensus_local_state ~ledger:Genesis.ledger

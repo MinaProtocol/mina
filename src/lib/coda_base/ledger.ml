@@ -3,6 +3,50 @@ open Snark_params
 open Currency
 open Signature_lib
 
+module Depth = struct
+  let depth = ledger_depth
+end
+
+module Location0 : Merkle_ledger.Location_intf.S =
+  Merkle_ledger.Location.Make (Depth)
+
+module Location_at_depth = Location0
+
+module type Inputs_intf = sig
+  open Merkle_ledger
+  module Db :
+  Merkle_ledger.Database_intf.S
+    with module Location = Location_at_depth
+    with module Addr = Location_at_depth.Addr
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.t
+     and type key := Public_key.Compressed.t
+
+  module Mask :
+    Merkle_mask.Masking_merkle_tree_intf.S
+    with module Location = Location_at_depth
+    with module Addr = Location_at_depth.Addr
+     and module Attached.Addr = Location_at_depth.Addr
+    with type account := Account.t
+     and type key := Public_key.Compressed.t
+     and type hash := Ledger_hash.t
+     and type location := Location_at_depth.t
+     and type parent := Db.t
+
+  module Maskable :
+    Merkle_mask.Maskable_merkle_tree_intf.S
+    with module Location = Location_at_depth
+    with module Addr = Location_at_depth.Addr
+    with type account := Account.t
+     and type key := Public_key.Compressed.t
+     and type hash := Ledger_hash.t
+     and type root_hash := Ledger_hash.t
+     and type unattached_mask := Mask.t
+     and type attached_mask := Mask.Attached.t
+     and type t := Db.t
+end
+
 module Hash = struct
   type t = Ledger_hash.t [@@deriving bin_io, sexp]
 
@@ -13,29 +57,25 @@ module Hash = struct
   let empty_account = hash_account Account.empty
 end
 
-module Depth = struct
-  let depth = ledger_depth
-end
+module Make (Inputs: Inputs_intf) = struct
+  include Inputs
+  include Mask.Attached
 
-module Location : Merkle_ledger.Location_intf.S =
-  Merkle_ledger.Location.Make (Depth)
+  (* Mask.Attached.create () fails, can't create an attached mask directly
+     shadow create in order to create an attached mask
+  *)
+  let create ?directory_name () =
+    let maskable = Db.create ?directory_name () in
+    let mask = Mask.create () in
+    Maskable.register_mask maskable mask
 
-module Location_at_depth = Location
-
-module Make
-    (MaskedLedger : sig
-      include Merkle_ledger.Base_ledger_intf.S
-                    with module Location := Location
-                    with type root_hash := Ledger_hash.t
-                     and type hash := Ledger_hash.t
-                     and type account := Account.t
-                     and type key := Public_key.Compressed.t
-      val create : ?directory_name:string -> unit -> t
-      val with_ledger : f:(t -> 'a) -> 'a
-      val copy : t -> t
-     end) =
-struct
-  include MaskedLedger
+  let with_ledger ~f =
+    let ledger = create () in
+    try
+      Printexc.record_backtrace true ;
+      let result = f ledger in
+      destroy ledger ; result
+    with exn -> destroy ledger ; raise exn
 
   (* inside MaskedLedger, the functor argument has assigned to location, account, and path
      but the module signature for the functor result wants them, so we declare them here *)
@@ -425,7 +465,7 @@ struct
         Account.equal expected_account account )
 end
 
-module Masked_ledger = struct
+module Inputs: Inputs_intf = struct
   open Merkle_ledger
 
   module Key = struct
@@ -488,24 +528,6 @@ module Masked_ledger = struct
       (Location_at_depth)
       (Db)
       (Mask)
-
-  include Mask.Attached
-
-  (* Mask.Attached.create () fails, can't create an attached mask directly
-     shadow create in order to create an attached mask
-  *)
-  let create ?directory_name () =
-    let maskable = Db.create ?directory_name () in
-    let mask = Mask.create () in
-    Maskable.register_mask maskable mask
-
-  let with_ledger ~f =
-    let ledger = create () in
-    try
-      Printexc.record_backtrace true ;
-      let result = f ledger in
-      destroy ledger ; result
-    with exn -> destroy ledger ; raise exn
 end
 
-include Make (Masked_ledger)
+include Make (Inputs)
