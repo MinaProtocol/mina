@@ -1,3 +1,5 @@
+#undef NDEBUG
+#include <cassert>
 #include <libsnark/caml/caml_mnt6.hpp>
 #include <libsnark/gadgetlib1/gadgets/verifiers/r1cs_ppzksnark_verifier_gadget.hpp>
 #include <libsnark/gadgetlib1/gadgets/verifiers/r1cs_se_ppzksnark_verifier_gadget.hpp>
@@ -504,14 +506,50 @@ void camlsnark_mnt6_g1_vector_delete(std::vector<libff::G1<ppT>>* v) {
   delete v;
 }
 
-void camlsnark_mnt6_g1_pedersen_inner(std::vector<libff::G1<ppT>> *params, size_t idx, bool b0, bool b1, bool b2, libff::G1<ppT>* acc) {
-    size_t start_idx = (size_t)idx * 4;
-    size_t mini_offset = (size_t)b0 + 2*(size_t)b1;
-    libff::G1<ppT> it = params->at(start_idx + mini_offset);
-    if (b2) {
-        it = -it;
+// ported from https://gitlab.com/robigalia/rust-bitmap/blob/master/src/lib.rs#L187, specialized to 3
+
+static unsigned char extract_triple(unsigned char *data, int triple_index) {
+  size_t bits = sizeof(unsigned char) * 8;
+  size_t bit_offset = triple_index * 3;
+  size_t word_offset = bit_offset / bits;
+  size_t in_word_offset = bit_offset % bits;
+  size_t value = 0;
+  size_t bits_left = 3;
+  while (bits_left > 0) {
+    size_t can_get = std::min(bits - in_word_offset, bits_left);
+    unsigned char word = data[word_offset];
+    size_t from_this_word = (word >> in_word_offset) & (~0 >> ((bits - can_get) % bits));
+    value <<= can_get;
+    value |= from_this_word;
+
+    bit_offset += can_get;
+    in_word_offset = 0;
+    word_offset++;
+    bits_left -= can_get;
+  }
+  return value;
+}
+
+libff::G1<ppT>* camlsnark_mnt6_g1_pedersen_inner(std::vector<libff::G1<ppT>>* params, unsigned char *bits, int bits_len, int offset, int triple_count) {
+    size_t start_idx = (size_t)offset * 4;
+    assert(triple_count * 3 <= bits_len * 8);
+    assert(start_idx + triple_count*4 <= params->size());
+
+    auto sum = libff::G1<ppT>::zero();
+
+    fprintf(stderr, "start %d %d %d\n", bits_len, offset, triple_count);
+    #pragma omp declare reduction (G1_sum : libff::G1<ppT> : omp_out = omp_out + omp_in) initializer(omp_priv = libff::G1<ppT>::zero())
+    #pragma omp parallel for reduction(G1_sum:sum)
+    for (int i = 0; i < triple_count; i++) {
+      unsigned char triple = extract_triple(bits, i);
+      libff::G1<ppT> it = (*params)[start_idx + i*4 + (triple & 3)];
+      if (triple & 4) {
+          it = -it;
+      }
+      sum = sum + it;
     }
-    *acc = *acc + it;
+    std::cerr << "done" << std::endl;
+    return new libff::G1<ppT>(sum);
 }
 
 void camlsnark_mnt6_g2_delete(libff::G2<ppT>* a) {

@@ -68,5 +68,5 @@ end)
 
     module Vector : Snarky.Vector.S with type elt := t
 
-    val pedersen_inner : params:Vector.t -> i:int -> b0:bool -> b1:bool -> b2:bool -> acc:t -> unit
+    val pedersen_inner : params:Vector.t -> bits:Bytes.t -> start:int -> triples:int -> t
 end) : S with type curve := Curve.t and type curve_vector := Curve.Vector.t and type Digest.t = Field.t

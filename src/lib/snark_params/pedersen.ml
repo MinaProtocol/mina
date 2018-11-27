@@ -47,7 +47,7 @@ module type S = sig
 end
 
 module Make (Field : sig
-  type t [@@deriving sexp, bin_io, compare, hash, eq]
+  type t [@@deriving sexp, bin_io, compare, hash]
 
   include Snarky.Field_intf.S with type t := t
 end)
@@ -56,19 +56,13 @@ end)
 
     val to_coords : t -> Field.t * Field.t
 
-    val zero : t
-
     val add : t -> t -> t
 
-    val negate : t -> t
-
-    val dup : t -> t
-
-    val unsafe_add_in_place : dst:t -> t -> t
+    val zero : t
 
     module Vector : Snarky.Vector.S with type elt := t
 
-    val pedersen_inner : params:Vector.t -> i:int -> b0:bool -> b1:bool -> b2:bool -> acc:t -> unit
+    val pedersen_inner : params:Vector.t -> bits:Bytes.t -> start:int -> triples:int -> t
 end) : S with type curve := Curve.t and type Digest.t = Field.t and type curve_vector := Curve.Vector.t = struct
   module Digest = struct
     type t = Field.t [@@deriving sexp, bin_io, compare, hash, eq]
@@ -100,18 +94,27 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t and type curve_v
     type t = {triples_consumed: int; acc: Curve.t; params: Params.t}
 
     let create ?(triples_consumed = 0) ?(init = Curve.zero) params =
-      {acc= Curve.dup init; triples_consumed; params}
+      {acc= init; triples_consumed; params}
 
     let update_fold (t : t) (fold : bool Triple.t Fold.t) =
       let params = t.params in
-      let acc, triples_consumed =
-        fold.fold ~init:(t.acc, t.triples_consumed) ~f:(fun (acc, i) (b0, b1, b2) ->
-            let () =
-              Curve.pedersen_inner ~params ~i ~b0 ~b1 ~b2 ~acc
-            in
-            (acc, i + 1) )
+      let bs = Bitstring.create_bitstring (Curve.Vector.length params) in
+      let triples_consumed_here =
+        fold.fold
+          ~init:0
+          ~f:(fun i (b0, b1, b2) ->
+            Bitstring.(
+              let i = i * 3 in
+              put bs i (Bool.to_int b0) ;
+              put bs (i+1) (Bool.to_int b1) ;
+              put bs (i+2) (Bool.to_int b2)
+            ) ;
+            i + 1)
       in
-      {t with acc; triples_consumed}
+      let (bits, _, _) = bs in
+      printf !"%{sexp:Bytes.t}\n%!" bits ;
+      let acc = Curve.add t.acc @@ Curve.pedersen_inner ~params ~bits ~start:t.triples_consumed ~triples:triples_consumed_here in
+      {t with acc; triples_consumed= t.triples_consumed+triples_consumed_here}
 
     let digest t =
       let x, _y = Curve.to_coords t.acc in
