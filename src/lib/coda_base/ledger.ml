@@ -45,6 +45,7 @@ module type Inputs_intf = sig
      and type unattached_mask := Mask.t
      and type attached_mask := Mask.Attached.t
      and type t := Db.t
+
 end
 
 module Hash = struct
@@ -72,11 +73,14 @@ module Make (Inputs: Inputs_intf) = struct
   let with_ledger ~f =
     let ledger = create () in
     try
-      Printexc.record_backtrace true ;
       let result = f ledger in
       destroy ledger ; result
     with exn -> destroy ledger ; raise exn
 
+  let register_mask t mask =
+    let pack = Any_base.T ((module Mask.Attached), t) in
+    Maskable.register_mask pack mask
+    
   (* inside MaskedLedger, the functor argument has assigned to location, account, and path
      but the module signature for the functor result wants them, so we declare them here *)
   type location = Location.t
@@ -528,6 +532,19 @@ module Inputs: Inputs_intf = struct
       (Location_at_depth)
       (Db)
       (Mask)
+
+  module Any_base : Merkle_ledger.Base_ledger_intf.S
+    with module Location = Location_at_depth
+    with module Addr = Location_at_depth.Addr
+    with type account := Account.t
+     and type key := Key.t
+     and type hash := Hash.t
+     and type root_hash := Hash.t
+     and type t := Mask.Attached.t
+     and type path := Mask.Attached.Path.t =
+    Merkle_ledger.Any_ledger.Make_base (Key) (Account) (Hash) (Location_at_depth)
+      (Depth)
+
 end
 
 include Make (Inputs)
