@@ -45,7 +45,7 @@ module Base = struct
       type t
 
       type maskable_ledger
-         
+
       type serializable [@@deriving bin_io]
 
       val copy : t -> t

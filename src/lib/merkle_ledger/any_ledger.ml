@@ -17,8 +17,11 @@ open Core_kernel
 
 module type S = sig
   type key
+
   type account
+
   type hash
+
   module Location : Location_intf.S
 
   type witness [@@deriving sexp_of]
@@ -44,12 +47,11 @@ module Make_base
     (Location : Location_intf.S) (Depth : sig
         val depth : int
     end) :
-      S with module Location = Location
-        with type key := Key.t
-         and type hash := Hash.t
-         and type account := Account.t
-=
-struct
+  S
+  with module Location = Location
+  with type key := Key.t
+   and type hash := Hash.t
+   and type account := Account.t = struct
   module Location = Location
 
   module type Base_intf =
@@ -65,11 +67,9 @@ struct
    * be easily accessed from outside this module *)
   type witness = T : (module Base_intf with type t = 't) * 't -> witness
 
-  let cast (m : (module Base_intf with type t = 'a)) (t : 'a) =
-    T (m, t)
+  let cast (m : (module Base_intf with type t = 'a)) (t : 'a) = T (m, t)
 
-  let sexp_of_witness (T ((module B), t)) =
-    B.sexp_of_t t
+  let sexp_of_witness (T ((module B), t)) = B.sexp_of_t t
 
   (** M can be used wherever a base ledger is demanded, construct instances
    * by using the witness constructor directly
@@ -80,6 +80,7 @@ struct
    *)
   module M : Base_intf with type t = witness = struct
     type t = witness [@@deriving sexp_of]
+
     let t_of_sexp _ = failwith "t_of_sexp unimplemented"
 
     type index = int

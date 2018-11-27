@@ -300,6 +300,7 @@ struct
   module Fee_transfer = Coda_base.Fee_transfer
   module Coinbase = Coda_base.Coinbase
   module Account = Account
+
   module Transaction = struct
     module T = struct
       type t = Coda_base.Transaction.t =
@@ -431,7 +432,9 @@ struct
 
     let bin_tip =
       [%bin_type_class:
-        Protocol_state.value * Protocol_state_proof.t * Ledger_builder.serializable]
+        Protocol_state.value
+        * Protocol_state_proof.t
+        * Ledger_builder.serializable]
 
     let copy t = {t with ledger_builder= Ledger_builder.copy t.ledger_builder}
   end

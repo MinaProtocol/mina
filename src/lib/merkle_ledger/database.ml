@@ -308,6 +308,7 @@ module Make
 
   (* TODO : if key-value store supports iteration mechanism, like RocksDB,
      maybe use that here, instead of loading all accounts into memory
+     See Issue #1191
   *)
   let foldi t ~init ~f =
     let f' index accum account = f (Addr.of_int_exn index) accum account in
@@ -380,21 +381,4 @@ module Make
   let merkle_path_at_index_exn t index =
     let addr = Addr.of_int_exn index in
     merkle_path_at_addr_exn t addr
-
-  (* N.B.: loads entire database into memory
-     might be better for the underlying database to expose its 
-     iteration mechanism, and load one entry at a time
-   *)
-  let foldi t ~init ~f =
-    let alist =
-      List.map (Kvdb.to_alist t.kvdb) ~f:(fun (loc_bin, acct_bin) ->
-          ( Location.bin_read_t loc_bin ~pos_ref:(ref 0)
-          , Account.bin_read_t acct_bin ~pos_ref:(ref 0) ) )
-    in
-    List.fold_left alist ~init ~f:(fun accum (loc, acct) ->
-        (* invariant: loc is an account location, so the 
-           to_path_exn should never raise an exception here
-         *)
-        let address = Location.to_path_exn loc in
-        f address accum acct )
 end

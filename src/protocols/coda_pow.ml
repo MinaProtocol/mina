@@ -143,11 +143,11 @@ module type Ledger_intf = sig
   type t
 
   type attached_mask = t
-                     
+
   type unattached_mask = Mask.t
 
   type maskable_ledger = t
-     
+
   type transaction
 
   type valid_user_command
@@ -168,7 +168,7 @@ module type Ledger_intf = sig
   val serializable_of_t : t -> serializable
 
   val unattached_mask_of_serializable : serializable -> unattached_mask
-    
+
   val create : ?directory_name:string -> unit -> t
 
   val copy : t -> t
@@ -543,7 +543,8 @@ module type Ledger_builder_base_intf = sig
     -> aux:Aux.t
     -> t Or_error.t Deferred.t
 
-  val of_serialized_and_unserialized : serialized:serializable -> unserialized:ledger -> t
+  val of_serialized_and_unserialized :
+    serialized:serializable -> unserialized:ledger -> t
 
   val copy : t -> t
 
@@ -976,7 +977,9 @@ module type Inputs_intf = sig
      and type ledger_proof := Ledger_proof.t
      and type statement := Ledger_proof_statement.t
 
-  module Account : sig type t end
+  module Account : sig
+    type t
+  end
 
   module Ledger :
     Ledger_intf
@@ -984,7 +987,7 @@ module type Inputs_intf = sig
      and type transaction := Transaction.t
      and type ledger_hash := Ledger_hash.t
      and type account := Account.t
-       
+
   module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
 
   module Ledger_builder_hash :

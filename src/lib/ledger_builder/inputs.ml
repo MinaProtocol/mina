@@ -49,7 +49,7 @@ module type S = sig
        and type ledger_hash := Frozen_ledger_hash.t
        and type proof := Proof.t
        and type sok_digest := Sok_message.Digest.t
-    
+
     include Binable.S with type t := t
 
     include Sexpable.S with type t := t
@@ -61,7 +61,9 @@ module type S = sig
      and type message := Sok_message.t
      and type ledger_proof := Ledger_proof.t
 
-  module Account : sig type t end
+  module Account : sig
+    type t
+  end
 
   module Ledger :
     Coda_pow.Ledger_intf

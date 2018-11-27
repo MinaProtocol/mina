@@ -277,8 +277,8 @@ struct
 
     (* copy tables in t; use same parent *)
     let copy t =
-      { uuid=Uuid.create ()
-      ; parent=get_parent t
+      { uuid= Uuid.create ()
+      ; parent= get_parent t
       ; account_tbl= Location.Table.create ()
       ; location_tbl= Key.Table.create ()
       ; hash_tbl= Addr.Table.create ()

@@ -44,22 +44,23 @@ end
 
 module Db :
   Merkle_ledger.Database_intf.S
-    with module Location = Location_at_depth
-    with module Addr = Location_at_depth.Addr
-    with type root_hash := Ledger_hash.t
-     and type hash := Ledger_hash.t
-     and type account := Account.t
-     and type key := Public_key.Compressed.t
-  =
+  with module Location = Location_at_depth
+  with module Addr = Location_at_depth.Addr
+  with type root_hash := Ledger_hash.t
+   and type hash := Ledger_hash.t
+   and type account := Account.t
+   and type key := Public_key.Compressed.t =
   Database.Make (Key) (Account) (Hash) (Depth) (Location_at_depth) (Kvdb)
     (Storage_locations)
 
-module Any_ledger : Merkle_ledger.Any_ledger.S
+module Any_ledger :
+  Merkle_ledger.Any_ledger.S
   with module Location = Location_at_depth
   with type account := Account.t
    and type key := Key.t
-   and type hash := Hash.t
-= Merkle_ledger.Any_ledger.Make_base (Key) (Account) (Hash) (Location_at_depth) (Depth)
+   and type hash := Hash.t =
+  Merkle_ledger.Any_ledger.Make_base (Key) (Account) (Hash) (Location_at_depth)
+    (Depth)
 
 module Mask :
   Merkle_mask.Masking_merkle_tree_intf.S
@@ -111,20 +112,21 @@ let with_ledger ~f =
     destroy ledger ; result
   with exn -> destroy ledger ; raise exn
 
-let packed t = 
-  Any_ledger.cast (module Mask.Attached) t
-let register_mask t mask =
-  Maskable.register_mask (packed t) mask
-let unregister_mask_exn t mask =
-  Maskable.unregister_mask_exn (packed t) mask
+let packed t = Any_ledger.cast (module Mask.Attached) t
+
+let register_mask t mask = Maskable.register_mask (packed t) mask
+
+let unregister_mask_exn t mask = Maskable.unregister_mask_exn (packed t) mask
 
 (* TODO: Implement the serialization/deserialization *)
-let unattached_mask_of_serializable _ =
-  failwith "unimplmented"
-let serializable_of_t _ =
-  failwith "unimplented"
+let unattached_mask_of_serializable _ = failwith "unimplmented"
+
+let serializable_of_t _ = failwith "unimplented"
+
 type serializable = int [@@deriving bin_io]
+
 type unattached_mask = Mask.t
+
 type attached_mask = Mask.Attached.t
 
 (* inside MaskedLedger, the functor argument has assigned to location, account, and path
@@ -151,9 +153,7 @@ let get' ledger tag location =
   error_opt (sprintf "%s account not found" tag) (get ledger location)
 
 let location_of_key' ledger tag key =
-  error_opt
-    (sprintf "%s location not found" tag)
-    (location_of_key ledger key)
+  error_opt (sprintf "%s location not found" tag) (location_of_key ledger key)
 
 let add_amount balance amount =
   error_opt "overflow" (Balance.add_amount balance amount)
@@ -435,8 +435,7 @@ let undo_user_command ledger
         balance; nonce; receipt_chain_hash= previous_receipt_chain_hash }
   in
   match (User_command.Payload.body payload, body) with
-  | Stake_delegation (Set_delegate _), Stake_delegation {previous_delegate}
-    ->
+  | Stake_delegation (Set_delegate _), Stake_delegation {previous_delegate} ->
       set ledger sender_location
         {sender_account with delegate= previous_delegate} ;
       return ()
@@ -449,9 +448,7 @@ let undo_user_command ledger
         let%bind receiver_location =
           location_of_key' ledger "receiver" receiver
         in
-        let%bind receiver_account =
-          get' ledger "receiver" receiver_location
-        in
+        let%bind receiver_account = get' ledger "receiver" receiver_location in
         let%map receiver_balance' =
           sub_amount receiver_account.balance amount
         in
@@ -486,8 +483,7 @@ let apply_transaction ledger (t : Transaction.t) =
         Or_error.map (apply_fee_transfer ledger t) ~f:(fun u ->
             Undo.Fee_transfer u )
     | Coinbase t ->
-        Or_error.map (apply_coinbase ledger t) ~f:(fun u -> Undo.Coinbase u)
-    )
+        Or_error.map (apply_coinbase ledger t) ~f:(fun u -> Undo.Coinbase u) )
     ~f:(fun varying -> {Undo.previous_hash; varying})
 
 let merkle_root_after_user_command_exn ledger payment =

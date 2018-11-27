@@ -5,14 +5,15 @@ module Location : Merkle_ledger.Location_intf.S
 
 module Db :
   Merkle_ledger.Database_intf.S
-    with module Location = Location
-    with module Addr = Location.Addr
-    with type root_hash := Ledger_hash.t
-     and type hash := Ledger_hash.t
-     and type account := Account.t
-     and type key := Public_key.Compressed.t
+  with module Location = Location
+  with module Addr = Location.Addr
+  with type root_hash := Ledger_hash.t
+   and type hash := Ledger_hash.t
+   and type account := Account.t
+   and type key := Public_key.Compressed.t
 
-module Any_ledger : Merkle_ledger.Any_ledger.S
+module Any_ledger :
+  Merkle_ledger.Any_ledger.S
   with module Location = Location
   with type account := Account.t
    and type key := Public_key.Compressed.t
@@ -58,18 +59,20 @@ type maskable_ledger = t
 
 (* TODO: Replace with a Mask.Serializable.S *)
 type serializable = int [@@deriving bin_io]
+
 val unattached_mask_of_serializable : serializable -> unattached_mask
+
 val serializable_of_t : t -> serializable
 
 val with_ledger : f:(t -> 'a) -> 'a
 
 val create : ?directory_name:string -> unit -> t
 
-(** This is not _really_ copy, merely a stop-gap until we remove usages of copy in our codebase. What this actually does is creates a new empty mask on top of the current ledger *)
 val copy : t -> t
+(** This is not _really_ copy, merely a stop-gap until we remove usages of copy in our codebase. What this actually does is creates a new empty mask on top of the current ledger *)
 
 val register_mask : t -> Mask.t -> Mask.Attached.t
-  
+
 module Undo : sig
   module User_command : sig
     module Common : sig

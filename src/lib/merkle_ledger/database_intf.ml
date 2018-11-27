@@ -1,8 +1,7 @@
 module type S = sig
   include Base_ledger_intf.S
 
-  val create :
-    ?directory_name:string -> unit -> t
+  val create : ?directory_name:string -> unit -> t
 
   val with_ledger : f:(t -> 'a) -> 'a
 

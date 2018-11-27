@@ -519,10 +519,14 @@ end = struct
 
   let serializable_of_t t = (t.scan_state, Ledger.serializable_of_t t.ledger)
 
-  let of_serialized_and_unserialized ~serialized:(serialized:serializable) ~unserialized:(unserialized:Ledger.maskable_ledger) =
+  let of_serialized_and_unserialized ~(serialized : serializable)
+      ~(unserialized : Ledger.maskable_ledger) =
     (* reattach the serialized mask to the unserialized ledger *)
-    let (scan_state, serialized_mask) = serialized in
-    let attached_mask = Ledger.register_mask unserialized (Ledger.unattached_mask_of_serializable serialized_mask) in
+    let scan_state, serialized_mask = serialized in
+    let attached_mask =
+      Ledger.register_mask unserialized
+        (Ledger.unattached_mask_of_serializable serialized_mask)
+    in
     {scan_state; ledger= attached_mask}
 
   let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
@@ -1940,18 +1944,27 @@ let%test_module "test" =
 
         (* BEGIN BOILERPLATE UNUSED *)
         type serializable = int [@@deriving bin_io]
+
         type maskable_ledger = t
+
         type attached_mask = t
+
         module Mask = struct
           type t = int [@@deriving bin_io]
+
           let create () = 4
         end
+
         type unattached_mask = Mask.t
 
         let unregister_mask_exn _ = failwith "unimplemented"
+
         let register_mask _ = failwith "unimplemented"
+
         let unattached_mask_of_serializable _ = failwith "unimplemented"
+
         let serializable_of_t _ = failwith "unimplemented"
+
         (* END BOILERPLATE UNUSED *)
 
         let apply_transaction : t -> Undo.t -> Undo.t Or_error.t =

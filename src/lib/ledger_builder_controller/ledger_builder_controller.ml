@@ -124,13 +124,13 @@ end = struct
 
   let ledger_builder_io {ledger_builder_io; _} = ledger_builder_io
 
-  let load_tip_and_genesis_hash
-      {Config.genesis_tip; _} log =
+  let load_tip_and_genesis_hash {Config.genesis_tip; _} log =
     let genesis_state_hash = Protocol_state.hash genesis_tip.state in
     Logger.info log
-       "TODO: re-implement serialization File for ledger builder controller tip does not exist. Using \
-           Genesis tip" ;
-        {With_hash.data= genesis_tip; hash= genesis_state_hash}
+      "TODO: re-implement serialization File for ledger builder controller \
+       tip does not exist. Using Genesis tip" ;
+    {With_hash.data= genesis_tip; hash= genesis_state_hash}
+
   let create (config : Config.t) =
     let log = Logger.child config.parent_log "ledger_builder_controller" in
     let genesis_tip_state_hash =
@@ -417,7 +417,7 @@ let%test_module "test" =
           end
 
           let serializable_of_t t = !t
-                            
+
           let ledger t = !t
 
           let create ~ledger = ref ledger
@@ -426,7 +426,9 @@ let%test_module "test" =
 
           let hash t = !t
 
-          let of_serialized_and_unserialized ~serialized:_ ~unserialized:ledger = create ~ledger
+          let of_serialized_and_unserialized ~serialized:_ ~unserialized:ledger
+              =
+            create ~ledger
 
           let of_aux_and_ledger ~snarked_ledger_hash:_ ~ledger ~aux:_ =
             Deferred.return (Ok (create ~ledger))

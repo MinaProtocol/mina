@@ -48,7 +48,7 @@ module type S = sig
 
     val copy : t -> t
     (* makes new mask instance with empty tables, re-use parent *)
-      
+
     (** already have module For_testing from include above *)
     module For_testing : sig
       val location_in_mask : t -> location -> bool
