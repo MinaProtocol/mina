@@ -1982,6 +1982,10 @@ let%test_module "test" =
 
         type ledger_builder_aux_hash = Ledger_builder_aux_hash.t
 
+        let ledger_hash _ = failwith "stub"
+
+        let aux_hash _ = failwith "stub"
+
         let of_aux_and_ledger_hash :
             ledger_builder_aux_hash -> ledger_hash -> t =
          fun ah h -> ah ^ h

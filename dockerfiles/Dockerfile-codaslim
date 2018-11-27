@@ -14,8 +14,8 @@ RUN apt-get -y update && \
 
 # coda package
 # FIXME: The copy creates a layer, wasting space.
-COPY codaclient.deb /tmp/
-RUN dpkg -i /tmp/codaclient.deb
+COPY coda.deb /tmp/
+RUN dpkg -i /tmp/coda.deb
 
 # FIXME: unpack verification keys
 
