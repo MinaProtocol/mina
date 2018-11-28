@@ -38,8 +38,20 @@ module Make (Impl : Snark_intf.Basic) = struct
     assert (n < Field.size_in_bits) ;
     { upper_bound= Bignum_bigint.(pow2 n - one)
     ; lower_bound= Bignum_bigint.zero
-    ; var= Field.Checked.project bs
+    ; var= Field.Checked.pack bs
     ; bits= Some bs }
+
+  let mul_pow_2 n (`Two_to_the k) =
+    let%map bits = to_bits n in
+    let multiplied = List.init k ~f:(fun _ -> Boolean.false_) @ bits in
+    let upper_bound =
+      Bignum_bigint.(n.upper_bound * pow (of_int 2) (of_int k))
+    in
+    assert (Bignum_bigint.(upper_bound < Field.size)) ;
+    { upper_bound
+    ; lower_bound= Bignum_bigint.(n.lower_bound * pow (of_int 2) (of_int k))
+    ; var= Field.Checked.pack multiplied
+    ; bits= Some multiplied }
 
   let div_pow_2 n (`Two_to_the k) =
     let%map bits = to_bits n in

@@ -120,6 +120,8 @@ module Checked
     -> f:(Elt.var -> (Elt.var, 's) Checked.t)
     -> (Hash.var, 's) Checked.t
 
+  val get_req : depth:int -> Hash.var -> Address.var -> (Elt.var, 's) Checked.t
+
   (* TODO: Change [prev] to be [prev_hash : Hash.var] since there may be no need
     to certify that the hash of the element is a particular value. *)
 

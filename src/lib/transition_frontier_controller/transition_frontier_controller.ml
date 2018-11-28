@@ -7,6 +7,12 @@ module type Inputs_intf = sig
   module Consensus_mechanism :
     Consensus_mechanism_intf with type protocol_state_hash := State_hash.t
 
+  module External_transition :
+    External_transition_intf
+    with type protocol_state := Consensus_mechanism.Protocol_state.value
+     and type ledger_builder_diff := Consensus_mechanism.ledger_builder_diff
+     and type protocol_state_proof := Consensus_mechanism.protocol_state_proof
+
   module Merkle_address : Merkle_address.S
 
   module Ledger_builder_diff : Ledger_builder_diff_intf
@@ -98,7 +104,7 @@ module type Inputs_intf = sig
 
   module Transition_frontier :
     Transition_frontier_intf
-    with type external_transition := Consensus_mechanism.External_transition.t
+    with type external_transition := External_transition.t
      and type state_hash := State_hash.t
      and type ledger_database := Ledger_database.t
      and type transaction_snark_scan_state := Transaction_snark_scan_state.t
@@ -115,13 +121,13 @@ module type Inputs_intf = sig
 
   module Transition_handler :
     Transition_handler_intf
-    with type external_transition := Consensus_mechanism.External_transition.t
+    with type external_transition := External_transition.t
      and type state_hash := State_hash.t
      and type transition_frontier := Transition_frontier.t
 
   module Catchup :
     Catchup_intf
-    with type external_transition := Consensus_mechanism.External_transition.t
+    with type external_transition := External_transition.t
      and type state_hash := State_hash.t
      and type transition_frontier := Transition_frontier.t
 
@@ -137,8 +143,7 @@ end
 
 module Make (Inputs : Inputs_intf) :
   Transition_frontier_controller_intf
-  with type external_transition :=
-              Inputs.Consensus_mechanism.External_transition.t
+  with type external_transition := Inputs.External_transition.t
    and type syncable_ledger_query := Inputs.Syncable_ledger.query
    and type syncable_ledger_answer := Inputs.Syncable_ledger.answer
    and type transition_frontier := Inputs.Transition_frontier.t = struct
