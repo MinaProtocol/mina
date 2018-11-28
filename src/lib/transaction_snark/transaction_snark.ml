@@ -1339,11 +1339,10 @@ let%test_module "transaction_snark" =
                 ~target t1
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
-    (*
     let%test "base_and_merge" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
-          Ledger.with_ledger ~name:"test:base_and_merge" ~f:(fun ledger ->
+          Ledger.with_ledger ~f:(fun ledger ->
               Array.iter wallets ~f:(fun {account; private_key= _} ->
                   Ledger.create_new_account_exn ledger account.public_key
                     account ) ;
@@ -1419,5 +1418,5 @@ let%test_module "transaction_snark" =
                 (Wrap_input.of_tick_field
                    (merge_top_hash ~sok_digest ~state1 ~state2:state3
                       ~supply_increase:Amount.zero ~fee_excess:total_fees
-                      wrap_vk_bits)) ) ) *)
+                      wrap_vk_bits)) ) )
   end )

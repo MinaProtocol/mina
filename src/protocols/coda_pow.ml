@@ -157,6 +157,16 @@ module type Mask_intf = sig
   val create : unit -> t
 end
 
+module type Mask_serializable_intf = sig
+  type t
+  type unattached_mask
+  type serializable [@@deriving bin_io]
+
+  val unattached_mask_of_serializable : serializable -> unattached_mask
+
+  val serializable_of_t : t -> serializable
+end
+
 module type Ledger_intf = sig
   module Mask : Mask_intf
 
@@ -177,17 +187,15 @@ module type Ledger_intf = sig
   type account
 
   (* for masks, serializable is same as t *)
-  type serializable [@@deriving bin_io]
+  include Mask_serializable_intf
+    with type t := t
+     and type unattached_mask := unattached_mask
 
   module Undo : sig
     type t [@@deriving sexp, bin_io]
 
     val transaction : t -> transaction Or_error.t
   end
-
-  val serializable_of_t : t -> serializable
-
-  val unattached_mask_of_serializable : serializable -> unattached_mask
 
   val create : ?directory_name:string -> unit -> t
 
