@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Pipe_lib
 
 module Direction = struct
   type t = Left | Right [@@deriving sexp, bin_io]
@@ -10,14 +11,6 @@ module Queue = Queue
 
 module Available_job = struct
   type ('a, 'd) t = Base of 'd | Merge of 'a * 'a [@@deriving sexp]
-end
-
-module type Spec_intf = sig
-  type data [@@deriving sexp_of]
-
-  type accum [@@deriving sexp_of]
-
-  type output [@@deriving sexp_of]
 end
 
 module State = struct
@@ -73,6 +66,42 @@ module State = struct
     of_parallelism_log_2 4 ;
     of_parallelism_log_2 5 ;
     of_parallelism_log_2 10
+
+  let visualize state ~draw_a ~draw_d =
+    let maybe f = function None -> "_" | Some x -> f x in
+    let draw_job = function
+      | Job.Merge (x, y) ->
+          Printf.sprintf "(%s,%s)" (maybe draw_a x) (maybe draw_a y)
+      | Job.Base d -> maybe draw_d d
+    in
+    let jobs = jobs state in
+    let layers_rev =
+      Ring_buffer.fold jobs ~init:[[]] ~f:(fun layers job ->
+          let len = Int.pow 2 (List.length layers) in
+          match layers with
+          | [] -> failwith "impossible"
+          | hd :: rest ->
+              if List.length hd >= len then [job] :: layers
+              else (job :: hd) :: rest )
+    in
+    let to_draw_rev =
+      List.mapi layers_rev ~f:(fun i layer ->
+          let mould = Int.pow 2 (i + 1) in
+          let strs =
+            List.map layer ~f:(fun e ->
+                let job_str = draw_job e in
+                let job_out_len = Int.min (String.length job_str) mould in
+                let sliced = String.slice job_str 0 job_out_len in
+                let leftovers = mould - job_out_len in
+                let leftovers_2 = leftovers / 2 in
+                let spaces x = String.init x ~f:(Fn.const ' ') in
+                spaces leftovers_2 ^ sliced
+                ^ spaces (leftovers_2 + if leftovers mod 2 = 1 then 1 else 0)
+            )
+          in
+          String.concat strs )
+    in
+    String.concat ~sep:"\n" (List.rev to_draw_rev)
 
   (**  A parallel scan state holds a sequence of jobs that needs to be completed.
   *  A job can be a base job (Base d) or a merge job (Merge (a, a)).
@@ -509,9 +538,6 @@ let current_data (state : ('a, 'd) State.t) =
 let parallelism : state:('a, 'd) State.t -> int =
  fun ~state -> State.parallelism state
 
-(*if the transaction queue does not have at least max_slots number of slots 
-before continuing onto the next queue, split max_slots = (x,y) 
-such that x = number of slots till the end of the current queue and y = max_slots - x (starts from the begining of the next queue)  *)
 let partition_if_overflowing ~max_slots state =
   let n = min (free_space ~state) max_slots in
   let parallelism = State.parallelism state in

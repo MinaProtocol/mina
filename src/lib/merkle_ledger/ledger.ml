@@ -16,10 +16,13 @@ module Make
         val depth : int
     end) : sig
   include
-    Ledger_intf.S
+    Ledger_extras_intf.S
     with type hash := Hash.t
+     and type root_hash := Hash.t
      and type account := Account.t
      and type key := Key.t
+
+  val create : unit -> t
 
   module For_tests : sig
     val get_leaf_hash_at_addr : t -> Addr.t -> Hash.t
@@ -28,7 +31,7 @@ end = struct
   include Depth
   module Addr = Merkle_address.Make (Depth)
 
-  type index = int [@@deriving sexp, compare, hash]
+  type index = int [@@deriving sexp, compare, hash, eq]
 
   type leafs = int Key.Table.t [@@deriving sexp, bin_io]
 
@@ -46,7 +49,8 @@ end = struct
     ; mutable dirty_indices: int list }
   [@@deriving sexp, bin_io]
 
-  type t = {accounts: accounts; tree: tree} [@@deriving sexp, bin_io]
+  type t = {uuid: Uuid.Stable.V1.t; accounts: accounts; tree: tree}
+  [@@deriving sexp, bin_io]
 
   module C : Container.S0 with type t := t and type elt := Account.t =
   Container.Make0 (struct
@@ -63,8 +67,14 @@ end = struct
 
   let fold_until = C.fold_until
 
+  let foldi t ~init ~f =
+    Dyn_array.fold_left
+      (fun (i, acc) x -> (i + 1, f (Addr.of_int_exn i) acc x))
+      (0, init) t.accounts
+    |> snd
+
   module Location = struct
-    type t = index [@@deriving sexp, compare, hash]
+    type t = index [@@deriving sexp, compare, hash, eq]
   end
 
   let copy t =
@@ -77,9 +87,13 @@ end = struct
       ; nodes= List.map tree.nodes ~f:Dyn_array.copy
       ; dirty_indices= tree.dirty_indices }
     in
-    {accounts= Dyn_array.copy t.accounts; tree= copy_tree t.tree}
+    { uuid= Uuid.create ()
+    ; accounts= Dyn_array.copy t.accounts
+    ; tree= copy_tree t.tree }
 
   module Path = Merkle_path.Make (Hash)
+
+  type path = Path.t
 
   let empty_hash_at_heights depth =
     let empty_hash_at_heights =
@@ -99,7 +113,8 @@ end = struct
 
   (* if depth = N, leafs = 2^N *)
   let create () =
-    { accounts= Dyn_array.create ()
+    { uuid= Uuid.create ()
+    ; accounts= Dyn_array.create ()
     ; tree=
         { leafs= Key.Table.create ()
         ; unset_slots= Int.Set.empty
@@ -108,6 +123,10 @@ end = struct
         ; nodes_height= 0
         ; nodes= []
         ; dirty_indices= [] } }
+
+  let destroy _t = failwith "destroy: not implemented"
+
+  let get_uuid t = t.uuid
 
   let num_accounts t = Key.Table.length t.tree.leafs
 
@@ -147,17 +166,24 @@ end = struct
     (t.tree).dirty_indices <- merkle_index :: t.tree.dirty_indices ;
     merkle_index
 
-  let get_or_create_account_exn t key account =
+  let get_or_create_account t key account =
     match location_of_key t key with
     | None ->
         let new_index = allocate t key account in
         let max_accounts = 1 lsl Depth.depth in
         if new_index > 1 lsl Depth.depth then
-          failwith
-            (sprintf "Reached max capacity for number of accounts %d"
-               max_accounts)
-        else (`Added, new_index)
-    | Some index -> (`Existed, index)
+          Error
+            (Error.create
+               "get_or_create_account: Reached max capacity for number of \
+                accounts"
+               max_accounts Int.sexp_of_t)
+        else Ok (`Added, new_index)
+    | Some index -> Ok (`Existed, index)
+
+  let get_or_create_account_exn t key account =
+    get_or_create_account t key account
+    |> Result.map_error ~f:(fun err -> raise (Error.to_exn err))
+    |> Result.ok_exn
 
   let set_at_index_exn t index account =
     if index < Dyn_array.length t.accounts then
@@ -166,6 +192,10 @@ end = struct
     else failwith (index_not_found "set_at_index_exn" index)
 
   let set = set_at_index_exn
+
+  let set_batch t indexes_and_accounts =
+    List.iter indexes_and_accounts ~f:(fun (index, account) ->
+        set t index account )
 
   let extend_tree t =
     let leafs = Dyn_array.length t.accounts in
@@ -258,12 +288,6 @@ end = struct
         go (i - 1) hash
     in
     go (depth - height) base_root
-
-  let hash t = Hash.hash (merkle_root t)
-
-  let hash_fold_t state t = Ppx_hash_lib.Std.Hash.fold_int state (hash t)
-
-  let compare t t' = Hash.compare (merkle_root t) (merkle_root t')
 
   let merkle_path_at_index_exn t index =
     if index >= Dyn_array.length t.accounts then

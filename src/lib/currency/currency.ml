@@ -10,15 +10,19 @@ open Tuple_lib
 type uint64 = Unsigned.uint64
 
 module type Basic = sig
-  type t [@@deriving bin_io, sexp, compare, hash]
+  type t [@@deriving bin_io, sexp, compare, hash, yojson]
+
+  val max_int : t
 
   include Comparable.S with type t := t
+
+  val gen_incl : t -> t -> t Quickcheck.Generator.t
 
   val gen : t Quickcheck.Generator.t
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
+      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash, yojson]
     end
   end
 
@@ -49,6 +53,8 @@ module type Basic = sig
   val of_uint64 : uint64 -> t
 
   val var_of_t : t -> var
+
+  val var_to_number : var -> Number.t
 
   val var_to_triples : var -> Boolean.var Triple.t list
 end
@@ -150,6 +156,9 @@ module type Checked_arithmetic_intf = sig
   val sub_flagged :
     var -> var -> (var * [`Underflow of Boolean.var], _) Checked.t
 
+  val add_flagged :
+    var -> var -> (var * [`Overflow of Boolean.var], _) Checked.t
+
   val ( + ) : var -> var -> (var, _) Checked.t
 
   val ( - ) : var -> var -> (var, _) Checked.t
@@ -189,6 +198,8 @@ end) : sig
 
   val pack_var : var -> Field.Checked.t
 end = struct
+  let max_int = Unsigned.max_int
+
   let length_in_bits = M.length
 
   let length_in_triples = (length_in_bits + 2) / 3
@@ -197,9 +208,14 @@ end = struct
     module V1 = struct
       module T = struct
         type t = Unsigned.t [@@deriving bin_io, sexp, compare, hash]
+
+        let of_int = Unsigned.of_int
+
+        let to_int = Unsigned.to_int
       end
 
       include T
+      include Codable.Make_of_int (T)
       include Hashable.Make (T)
       include Comparable.Make (T)
     end
@@ -218,6 +234,13 @@ end = struct
   let of_string = Unsigned.of_string
 
   let to_string = Unsigned.to_string
+
+  let gen_incl a b : t Quickcheck.Generator.t =
+    let a = Bignum_bigint.of_string Unsigned.(to_string a) in
+    let b = Bignum_bigint.of_string Unsigned.(to_string b) in
+    Quickcheck.Generator.map
+      Bignum_bigint.(gen_incl a b)
+      ~f:(fun n -> of_string (Bignum_bigint.to_string n))
 
   let gen : t Quickcheck.Generator.t =
     let m = Bignum_bigint.of_string Unsigned.(to_string max_int) in
@@ -243,8 +266,11 @@ end = struct
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
   include Unpacked
 
+  let var_to_number t = Number.of_bits (var_to_bits t :> Boolean.var list)
+
   let var_to_triples t =
-    Bitstring.pad_to_triple_list ~default:Boolean.false_ (var_to_bits t)
+    Bitstring.pad_to_triple_list ~default:Boolean.false_
+      (var_to_bits t :> Boolean.var list)
 
   let var_of_bits (bits : Boolean.var Bitstring.Lsb_first.t) : var =
     let bits = (bits :> Boolean.var list) in
@@ -356,7 +382,7 @@ end = struct
 
     module Checked = struct
       let to_bits {magnitude; sgn} =
-        var_to_bits magnitude @ [Sgn.Checked.is_pos sgn]
+        (var_to_bits magnitude :> Boolean.var list) @ [Sgn.Checked.is_pos sgn]
 
       let constant {magnitude; sgn} =
         {magnitude= var_of_t magnitude; sgn= Sgn.Checked.constant sgn}
@@ -467,6 +493,13 @@ end = struct
     let add (x : Unpacked.var) (y : Unpacked.var) =
       unpack_var (Field.Checked.add (pack_var x) (pack_var y))
 
+    let add_flagged x y =
+      let z = Field.Checked.add (pack_var x) (pack_var y) in
+      let%map bits, `Success no_overflow =
+        Field.Checked.unpack_flagged z ~length:length_in_bits
+      in
+      (bits, `Overflow (Boolean.not no_overflow))
+
     let ( - ) = sub
 
     let ( + ) = add
@@ -547,12 +580,17 @@ end
 
 let currency_length = 64
 
-module Fee =
-  Make
-    (Unsigned_extended.UInt64)
-    (struct
-      let length = currency_length
-    end)
+module Fee = struct
+  module T =
+    Make
+      (Unsigned_extended.UInt64)
+      (struct
+        let length = currency_length
+      end)
+
+  include T
+  include Codable.Make_of_int (T)
+end
 
 module Amount = struct
   module T =
@@ -570,6 +608,8 @@ module Amount = struct
       with type var = T.var
        and module Signed = T.Signed
        and module Checked := T.Checked )
+
+  include Codable.Make_of_int (T)
 
   let of_fee (fee : Fee.t) : t = fee
 

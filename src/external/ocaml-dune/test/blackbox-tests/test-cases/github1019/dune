@@ -1,0 +1,5 @@
+(library (name foo) (public_name foo))
+
+(alias
+ (name default)
+ (action (echo %{lib:foo:foo.ml})))

@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Pipe_lib
 
 module Base = struct
   module type S = sig
@@ -14,6 +15,8 @@ module Base = struct
       type t [@@deriving eq, sexp, compare, bin_io]
 
       val to_bits : t -> bool list
+
+      val to_bytes : t -> string
     end
 
     module Ledger_hash : sig
@@ -32,6 +35,10 @@ module Base = struct
 
     module Ledger_builder_diff : sig
       type t [@@deriving sexp, bin_io]
+
+      module With_valid_signatures_and_proofs : sig
+        type t
+      end
     end
 
     module Ledger : sig
@@ -85,33 +92,36 @@ module Base = struct
         val equal_value : value -> value -> bool
 
         val hash : value -> State_hash.t
-      end
 
-      module External_transition : sig
-        type t [@@deriving bin_io, eq, compare, sexp]
-
-        val protocol_state : t -> Protocol_state.value
-
-        val protocol_state_proof : t -> Protocol_state_proof.t
-
-        val ledger_builder_diff : t -> Ledger_builder_diff.t
+        val to_string_record : value -> string
       end
 
       (* This checks the SNARKs in State/LB and does the transition *)
 
       val select :
-           Consensus_state.value
-        -> Consensus_state.value
+           existing:Consensus_state.value
+        -> candidate:Consensus_state.value
         -> logger:Logger.t
         -> time_received:Unix_timestamp.t
         -> [`Keep | `Take]
 
       val lock_transition :
-           Consensus_state.value
+           ?proposer_public_key:Public_key.Compressed.t
+        -> Consensus_state.value
         -> Consensus_state.value
         -> snarked_ledger:(unit -> Ledger.t Or_error.t)
         -> local_state:Local_state.t
         -> unit
+    end
+
+    module External_transition : sig
+      type t [@@deriving bin_io, eq, compare, sexp]
+
+      val protocol_state : t -> Consensus_mechanism.Protocol_state.value
+
+      val protocol_state_proof : t -> Protocol_state_proof.t
+
+      val ledger_builder_diff : t -> Ledger_builder_diff.t
     end
 
     module Ledger_proof_statement : sig
@@ -130,6 +140,8 @@ module Base = struct
       Protocols.Coda_pow.Ledger_builder_base_intf
       with type ledger_builder_hash := Ledger_builder_hash.t
        and type frozen_ledger_hash := Frozen_ledger_hash.t
+       and type valid_diff :=
+                  Ledger_builder_diff.With_valid_signatures_and_proofs.t
        and type diff := Ledger_builder_diff.t
        and type ledger_proof := Ledger_proof.t
        and type ledger := Ledger.t
@@ -140,8 +152,7 @@ module Base = struct
       with type ledger_builder := Ledger_builder.t
        and type protocol_state := Consensus_mechanism.Protocol_state.value
        and type protocol_state_proof := Protocol_state_proof.t
-       and type external_transition :=
-                  Consensus_mechanism.External_transition.t
+       and type external_transition := External_transition.t
 
     val verify_blockchain :
          Protocol_state_proof.t

@@ -3,14 +3,20 @@ open Snark_params
 open Currency
 open Signature_lib
 
-module Make
-    (Ledger : Merkle_ledger.Merkle_ledger_intf.S
-              with type root_hash := Merkle_hash.t
-               and type hash := Merkle_hash.t
-               and type account := Account.t
-               and type key := Public_key.Compressed.t) =
+module Make (Ledger : sig
+  include
+    Merkle_ledger.Merkle_ledger_intf.S
+    with type root_hash := Ledger_hash.t
+     and type hash := Ledger_hash.t
+     and type account := Account.t
+     and type key := Public_key.Compressed.t
+
+  val create : unit -> t
+end) =
 struct
   include Ledger
+
+  type account = Account.t
 
   let create_new_account_exn t pk account =
     let action, _ = get_or_create_account_exn t pk account in
@@ -66,11 +72,25 @@ struct
         (merkle_path ledger new_loc, Account.empty)
 
   module Undo = struct
-    type user_command =
-      { user_command: User_command.t
-      ; previous_empty_accounts: Public_key.Compressed.t list
-      ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
-    [@@deriving sexp, bin_io]
+    module UC = User_command
+
+    module User_command = struct
+      module Common = struct
+        type t =
+          { user_command: User_command.t
+          ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
+        [@@deriving sexp, bin_io]
+      end
+
+      module Body = struct
+        type t =
+          | Payment of {previous_empty_accounts: Public_key.Compressed.t list}
+          | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+        [@@deriving sexp, bin_io]
+      end
+
+      type t = {common: Common.t; body: Body.t} [@@deriving sexp, bin_io]
+    end
 
     type fee_transfer =
       { fee_transfer: Fee_transfer.t
@@ -83,7 +103,7 @@ struct
     [@@deriving sexp, bin_io]
 
     type varying =
-      | User_command of user_command
+      | User_command of User_command.t
       | Fee_transfer of fee_transfer
       | Coinbase of coinbase
     [@@deriving sexp, bin_io]
@@ -97,7 +117,7 @@ struct
       match varying with
       | User_command tr ->
           Option.value_map ~default:(Or_error.error_string "Bad signature")
-            (User_command.check tr.user_command) ~f:(fun x ->
+            (UC.check tr.common.user_command) ~f:(fun x ->
               Ok (Transaction.User_command x) )
       | Fee_transfer f -> Ok (Fee_transfer f.fee_transfer)
       | Coinbase c -> Ok (Coinbase c.coinbase)
@@ -112,42 +132,52 @@ struct
     let nonce = User_command.Payload.nonce payload in
     let open Or_error.Let_syntax in
     let%bind sender_location = location_of_key' ledger "" sender in
-    let%bind sender_account = get' ledger "sender" sender_location in
-    let%bind () = validate_nonces nonce sender_account.nonce in
-    let%bind sender_balance' =
-      let%bind sender_cost = User_command.Payload.sender_cost payload in
-      sub_amount sender_account.balance sender_cost
+    (* We unconditionally deduct the fee if this transaction succeeds *)
+    let%bind sender_account, common =
+      let%bind account = get' ledger "sender" sender_location in
+      let%bind balance =
+        sub_amount account.balance
+          (Amount.of_fee (User_command.Payload.fee payload))
+      in
+      let common : Undo.User_command.Common.t =
+        {user_command; previous_receipt_chain_hash= account.receipt_chain_hash}
+      in
+      let%bind () = validate_nonces nonce account.nonce in
+      let account =
+        { account with
+          nonce= Account.Nonce.succ account.nonce
+        ; receipt_chain_hash=
+            Receipt.Chain_hash.cons payload account.receipt_chain_hash }
+      in
+      return ({account with balance}, common)
     in
-    let sender_account_without_balance_modified =
-      { sender_account with
-        nonce= Account.Nonce.succ sender_account.nonce
-      ; receipt_chain_hash=
-          Receipt.Chain_hash.cons payload sender_account.receipt_chain_hash }
-    in
-    let undo =
-      { Undo.user_command
-      ; previous_empty_accounts= []
-      ; previous_receipt_chain_hash= sender_account.receipt_chain_hash }
-    in
-    match User_command.Payload.body payload
-    with Payment {Payment_payload.amount; receiver} ->
-      if Public_key.Compressed.equal sender receiver then (
-        ignore
-        @@ set ledger sender_location sender_account_without_balance_modified ;
-        return undo )
-      else
-        let previous_empty_accounts, receiver_account, receiver_location =
-          get_or_create ledger receiver
+    match User_command.Payload.body payload with
+    | Stake_delegation (Set_delegate {new_delegate}) ->
+        set ledger sender_location {sender_account with delegate= new_delegate} ;
+        return
+          { Undo.User_command.common
+          ; body= Stake_delegation {previous_delegate= sender_account.delegate}
+          }
+    | Payment {Payment_payload.amount; receiver} ->
+        let%bind sender_balance' = sub_amount sender_account.balance amount in
+        let undo emptys : Undo.User_command.t =
+          {common; body= Payment {previous_empty_accounts= emptys}}
         in
-        let%map receiver_balance' =
-          add_amount receiver_account.balance amount
-        in
-        set ledger sender_location
-          { sender_account_without_balance_modified with
-            balance= sender_balance' } ;
-        set ledger receiver_location
-          {receiver_account with balance= receiver_balance'} ;
-        {undo with previous_empty_accounts}
+        if Public_key.Compressed.equal sender receiver then (
+          ignore @@ set ledger sender_location sender_account ;
+          return (undo []) )
+        else
+          let previous_empty_accounts, receiver_account, receiver_location =
+            get_or_create ledger receiver
+          in
+          let%map receiver_balance' =
+            add_amount receiver_account.balance amount
+          in
+          set ledger sender_location
+            {sender_account with balance= sender_balance'} ;
+          set ledger receiver_location
+            {receiver_account with balance= receiver_balance'} ;
+          undo previous_empty_accounts
 
   let apply_user_command ledger
       (user_command : User_command.With_valid_signature.t) =
@@ -194,7 +224,8 @@ struct
     remove_accounts_exn t previous_empty_accounts
 
   (* TODO: Better system needed for making atomic changes. Could use a monad. *)
-  let apply_coinbase t ({proposer; fee_transfer; _} as cb : Coinbase.t) =
+  let apply_coinbase t
+      ({proposer; fee_transfer; amount= coinbase_amount} as cb : Coinbase.t) =
     let get_or_initialize pk =
       let initial_account = Account.initialize pk in
       match get_or_create_account_exn t pk (Account.initialize pk) with
@@ -204,14 +235,14 @@ struct
     let open Or_error.Let_syntax in
     let%bind proposer_reward, emptys1, receiver_update =
       match fee_transfer with
-      | None -> return (Protocols.Coda_praos.coinbase_amount, [], None)
+      | None -> return (coinbase_amount, [], None)
       | Some (receiver, fee) ->
           (* This assertion will pass because of how coinbase is produced by Ledger_builder.apply_diff *)
           assert (not @@ Public_key.Compressed.equal receiver proposer) ;
           let fee = Amount.of_fee fee in
           let%bind proposer_reward =
             error_opt "Coinbase fee transfer too large"
-              (Amount.sub Protocols.Coda_praos.coinbase_amount fee)
+              (Amount.sub coinbase_amount fee)
           in
           let receiver_location, receiver_account, emptys =
             get_or_initialize receiver
@@ -232,10 +263,11 @@ struct
   (* Don't have to be atomic here because these should never fail. In fact, none of
    the undo functions should ever return an error. This should be fixed in the types. *)
   let undo_coinbase t
-      {Undo.coinbase= {proposer; fee_transfer; _}; previous_empty_accounts} =
+      { Undo.coinbase= {proposer; fee_transfer; amount= coinbase_amount}
+      ; previous_empty_accounts } =
     let proposer_reward =
       match fee_transfer with
-      | None -> Protocols.Coda_praos.coinbase_amount
+      | None -> coinbase_amount
       | Some (receiver, fee) ->
           let fee = Amount.of_fee fee in
           let receiver_location =
@@ -249,8 +281,7 @@ struct
               balance=
                 Option.value_exn
                   (Balance.sub_amount receiver_account.balance fee) } ;
-          Amount.sub Protocols.Coda_praos.coinbase_amount fee
-          |> Option.value_exn
+          Amount.sub coinbase_amount fee |> Option.value_exn
     in
     let proposer_location =
       Or_error.ok_exn (location_of_key' t "receiver" proposer)
@@ -266,44 +297,52 @@ struct
     remove_accounts_exn t previous_empty_accounts
 
   let undo_user_command ledger
-      { Undo.user_command= {payload; sender; signature= _}
-      ; previous_empty_accounts
-      ; previous_receipt_chain_hash } =
+      { Undo.User_command.common=
+          { user_command= {payload; sender; signature= _}
+          ; previous_receipt_chain_hash }
+      ; body } =
     let sender = Public_key.compress sender in
     let nonce = User_command.Payload.nonce payload in
     let open Or_error.Let_syntax in
     let%bind sender_location = location_of_key' ledger "sender" sender in
-    let%bind sender_account = get' ledger "sender" sender_location in
-    let%bind sender_balance' =
-      let%bind sender_cost = User_command.Payload.sender_cost payload in
-      add_amount sender_account.balance sender_cost
+    let%bind sender_account =
+      let%bind account = get' ledger "sender" sender_location in
+      let%bind balance =
+        add_amount account.balance
+          (Amount.of_fee (User_command.Payload.fee payload))
+      in
+      let%bind () = validate_nonces (Account.Nonce.succ nonce) account.nonce in
+      return
+        { account with
+          balance; nonce; receipt_chain_hash= previous_receipt_chain_hash }
     in
-    let%bind () =
-      validate_nonces (Account.Nonce.succ nonce) sender_account.nonce
-    in
-    let sender_account_without_balance_modified =
-      { sender_account with
-        nonce; receipt_chain_hash= previous_receipt_chain_hash }
-    in
-    match User_command.Payload.body payload
-    with Payment {amount; receiver} ->
-      if Public_key.Compressed.equal sender receiver then (
-        set ledger sender_location sender_account_without_balance_modified ;
-        return () )
-      else
-        let%bind receiver_location =
-          location_of_key' ledger "receiver" receiver
-        in
-        let%bind receiver_account = get' ledger "receiver" receiver_location in
-        let%map receiver_balance' =
-          sub_amount receiver_account.balance amount
-        in
+    match (User_command.Payload.body payload, body) with
+    | Stake_delegation (Set_delegate _), Stake_delegation {previous_delegate}
+      ->
         set ledger sender_location
-          { sender_account_without_balance_modified with
-            balance= sender_balance' } ;
-        set ledger receiver_location
-          {receiver_account with balance= receiver_balance'} ;
-        remove_accounts_exn ledger previous_empty_accounts
+          {sender_account with delegate= previous_delegate} ;
+        return ()
+    | Payment {amount; receiver}, Payment {previous_empty_accounts} ->
+        let%bind sender_balance' = add_amount sender_account.balance amount in
+        if Public_key.Compressed.equal sender receiver then (
+          set ledger sender_location sender_account ;
+          return () )
+        else
+          let%bind receiver_location =
+            location_of_key' ledger "receiver" receiver
+          in
+          let%bind receiver_account =
+            get' ledger "receiver" receiver_location
+          in
+          let%map receiver_balance' =
+            sub_amount receiver_account.balance amount
+          in
+          set ledger sender_location
+            {sender_account with balance= sender_balance'} ;
+          set ledger receiver_location
+            {receiver_account with balance= receiver_balance'} ;
+          remove_accounts_exn ledger previous_empty_accounts
+    | _, _ -> failwith "Undo/command mismatch"
 
   let undo : t -> Undo.t -> unit Or_error.t =
    fun ledger undo ->
@@ -361,20 +400,18 @@ end
 module Ledger = struct
   include Merkle_ledger.Ledger.Make (Public_key.Compressed) (Account)
             (struct
-              type t = Merkle_hash.t [@@deriving sexp, hash, compare, bin_io]
+              type t = Ledger_hash.t [@@deriving sexp, hash, compare, bin_io]
 
-              let merge = Merkle_hash.merge
+              let merge = Ledger_hash.merge
 
               let hash_account =
-                Fn.compose Merkle_hash.of_digest Account.digest
+                Fn.compose Ledger_hash.of_digest Account.digest
 
               let empty_account = hash_account Account.empty
             end)
             (struct
               let depth = ledger_depth
             end)
-
-  type path = Path.t
 end
 
 include Make (Ledger)

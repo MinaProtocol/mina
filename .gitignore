@@ -4,3 +4,4 @@ _build*
 result
 test.log
 build.log
+src/config.mlh

@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Pipe_lib
 open O1trace
 
 module Make (Inputs : Inputs.S) : sig
@@ -16,9 +17,10 @@ module Make (Inputs : Inputs.S) : sig
      and type ledger_hash := Ledger_hash.t
      and type sync_query := Sync_ledger.query
      and type sync_answer := Sync_ledger.answer
-     and type external_transition := Consensus_mechanism.External_transition.t
+     and type external_transition := External_transition.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type tip := Tip.t
+     and type public_key_compressed := Public_key.Compressed.t
 
   val ledger_builder_io : t -> Net.t
 end = struct
@@ -33,6 +35,7 @@ end = struct
           (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: Tip.t
       ; consensus_local_state: Consensus_mechanism.Local_state.t
+      ; proposer_public_key: Public_key.Compressed.t option
       ; longest_tip_location: string }
     [@@deriving make]
   end
@@ -42,12 +45,11 @@ end = struct
 
     module Step = struct
       let apply' t diff logger =
-        Deferred.Or_error.map
-          (Ledger_builder.apply t diff ~logger)
-          ~f:
-            (Option.map ~f:(fun proof ->
-                 ( Ledger_proof.statement proof |> Ledger_proof_statement.target
-                 , proof ) ))
+        let open Deferred.Or_error.Let_syntax in
+        let%map _, `Ledger_proof proof = Ledger_builder.apply t diff ~logger in
+        Option.map proof ~f:(fun proof ->
+            ( Ledger_proof.statement proof |> Ledger_proof_statement.target
+            , proof ) )
 
       let step logger {With_hash.data= tip; hash= tip_hash}
           {With_hash.data= transition; hash= transition_target_hash} =
@@ -150,7 +152,9 @@ end = struct
     let log = Logger.child config.parent_log "ledger_builder_controller" in
     let store_controller =
       Store.Controller.create
-        (With_hash.bin_t Tip.bin_t State_hash.bin_t)
+        ( module struct
+          type t = (Tip.t, State_hash.t) With_hash.t [@@deriving bin_io]
+        end )
         ~parent_log:config.parent_log
     in
     let genesis_tip_state_hash =
@@ -168,6 +172,7 @@ end = struct
     in
     let state =
       Transition_logic_state.create
+        ?proposer_public_key:config.proposer_public_key
         ~consensus_local_state:config.consensus_local_state
         (With_hash.of_data tip ~hash_data:(fun tip ->
              tip.Tip.protocol_state |> Protocol_state.hash ))
@@ -232,10 +237,12 @@ end = struct
           let {With_hash.data= last_transition; _}, _ = last in
           match
             Consensus_mechanism.select
-              (Protocol_state.consensus_state
-                 (External_transition.protocol_state last_transition))
-              (Protocol_state.consensus_state
-                 (External_transition.protocol_state current_transition))
+              ~existing:
+                (Protocol_state.consensus_state
+                   (External_transition.protocol_state last_transition))
+              ~candidate:
+                (Protocol_state.consensus_state
+                   (External_transition.protocol_state current_transition))
               ~logger:log ~time_received
           with
           | `Keep -> `Skip
@@ -254,9 +261,8 @@ end = struct
                  | `Cancel_and_do_next ->
                      Option.iter last ~f:(fun (input, ivar) ->
                          Ivar.fill_if_empty ivar input ) ;
-                     let w, this_ivar =
-                       trace_task "running job" (fun () -> Job.run job)
-                     in
+                     trace_event "running a job" ;
+                     let w, this_ivar = Job.run job in
                      let () =
                        Deferred.upon w.Interruptible.d (function
                          | Ok () -> Logger.trace log "Job is completed"
@@ -316,38 +322,40 @@ end = struct
       -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t =
    fun t (hash, query) ->
     (* TODO: this caching shouldn't be necessary *)
-    let open Deferred.Or_error.Let_syntax in
-    Logger.trace t.log
-      !"Attempting to handle a sync-ledger query for %{sexp: Ledger_hash.t}"
-      hash ;
-    let%map ledger =
-      if Option.equal Ledger_hash.equal (Some hash) !prev_hash then
-        return (Option.value_exn !prev_ledger)
-      else
-        let%map ll =
-          local_get_ledger' t hash
-            ~p_tip:(fun hash {With_hash.data= tip; hash= _} ->
-              Ledger_hash.equal
-                ( tip.Tip.ledger_builder |> Ledger_builder.ledger
-                |> Ledger.merkle_root )
-                hash )
-            ~p_trans:(fun hash {With_hash.data= trans; hash= _} ->
-              Ledger_hash.equal
-                ( trans |> External_transition.protocol_state
-                |> Protocol_state.blockchain_state
-                |> Blockchain_state.ledger_builder_hash
-                |> Ledger_builder_hash.ledger_hash )
-                hash )
-            ~f_result:(fun {With_hash.data= tip; hash= _} ->
-              tip.Tip.ledger_builder |> Ledger_builder.ledger )
-          >>| fst
+    trace_recurring_task "answer sync query" (fun () ->
+        let open Deferred.Or_error.Let_syntax in
+        Logger.trace t.log
+          !"Attempting to handle a sync-ledger query for %{sexp: Ledger_hash.t}"
+          hash ;
+        let%map ledger =
+          if Option.equal Ledger_hash.equal (Some hash) !prev_hash then
+            return (Option.value_exn !prev_ledger)
+          else
+            let%map ll =
+              local_get_ledger' t hash
+                ~p_tip:(fun hash {With_hash.data= tip; hash= _} ->
+                  Ledger_hash.equal
+                    ( tip.Tip.ledger_builder |> Ledger_builder.ledger
+                    |> Ledger.merkle_root )
+                    hash )
+                ~p_trans:(fun hash {With_hash.data= trans; hash= _} ->
+                  Ledger_hash.equal
+                    ( trans |> External_transition.protocol_state
+                    |> Protocol_state.blockchain_state
+                    |> Blockchain_state.ledger_builder_hash
+                    |> Ledger_builder_hash.ledger_hash )
+                    hash )
+                ~f_result:(fun {With_hash.data= tip; hash= _} ->
+                  tip.Tip.ledger_builder |> Ledger_builder.ledger )
+              >>| fst
+            in
+            prev_hash := Some hash ;
+            prev_ledger := Some ll ;
+            ll
         in
-        prev_hash := Some hash ;
-        prev_ledger := Some ll ;
-        ll
-    in
-    let responder = Sync_ledger.Responder.create ledger ignore in
-    (hash, Sync_ledger.Responder.answer_query responder query)
+        trace_event "local ledger get" ;
+        let responder = Sync_ledger.Responder.create ledger ignore in
+        (hash, Sync_ledger.Responder.answer_query responder query) )
 end
 
 let%test_module "test" =
@@ -408,7 +416,13 @@ let%test_module "test" =
         end
 
         (* A ledger_builder transition will just add to a "ledger" integer *)
-        module Ledger_builder_diff = Int
+        module Ledger_builder_diff = struct
+          type t = int [@@deriving bin_io, sexp]
+
+          module With_valid_signatures_and_proofs = struct
+            type t = int
+          end
+        end
 
         module Ledger = struct
           include Int
@@ -448,7 +462,10 @@ let%test_module "test" =
 
           let apply (t : t) (x : Ledger_builder_diff.t) ~logger:_ =
             t := x ;
-            return (Ok (Some x))
+            return (Ok (`Hash_after_applying (hash t), `Ledger_proof (Some x)))
+
+          let apply_diff_unchecked (_t : t) (_x : 'a) =
+            failwith "Unimplemented"
 
           let snarked_ledger :
                  t
@@ -461,6 +478,8 @@ let%test_module "test" =
           include Int
 
           let to_bits t = [t <> 0]
+
+          let to_bytes = string_of_int
         end
 
         module Protocol_state_proof = Unit
@@ -500,25 +519,30 @@ let%test_module "test" =
               { previous_state_hash= -1
               ; blockchain_state= {ledger_builder_hash= 0; ledger_hash= 0}
               ; consensus_state= {strength= 0} }
+
+            let to_string_record _ = "<opaque>"
           end
 
-          module External_transition = struct
-            include Protocol_state
+          let lock_transition ?proposer_public_key:_ _ _ ~snarked_ledger:_
+              ~local_state:() =
+            ()
 
-            let protocol_state = Fn.id
-
-            let of_state = Fn.id
-
-            let ledger_builder_diff = Protocol_state.hash
-
-            let protocol_state_proof _ = ()
-          end
-
-          let lock_transition _ _ ~snarked_ledger:_ ~local_state:() = ()
-
-          let select Consensus_state.({strength= s1})
-              Consensus_state.({strength= s2}) ~logger:_ ~time_received:_ =
+          let select ~existing:Consensus_state.({strength= s1})
+              ~candidate:Consensus_state.({strength= s2}) ~logger:_
+              ~time_received:_ =
             if s1 >= s2 then `Keep else `Take
+        end
+
+        module External_transition = struct
+          include Consensus_mechanism.Protocol_state
+
+          let protocol_state = Fn.id
+
+          let of_state = Fn.id
+
+          let ledger_builder_diff = Consensus_mechanism.Protocol_state.hash
+
+          let protocol_state_proof _ = ()
         end
 
         module Tip = struct
@@ -532,12 +556,8 @@ let%test_module "test" =
             {t with ledger_builder= Ledger_builder.copy t.ledger_builder}
 
           let of_transition_and_lb transition ledger_builder =
-            { protocol_state=
-                Consensus_mechanism.External_transition.protocol_state
-                  transition
-            ; proof=
-                Consensus_mechanism.External_transition.protocol_state_proof
-                  transition
+            { protocol_state= External_transition.protocol_state transition
+            ; proof= External_transition.protocol_state_proof transition
             ; ledger_builder }
         end
 
@@ -632,7 +652,7 @@ let%test_module "test" =
           ~net_deferred:(return net_input)
           ~external_transitions:
             (Linear_pipe.map ledger_builder_transitions
-               ~f:Consensus_mechanism.External_transition.of_state)
+               ~f:External_transition.of_state)
           ~genesis_tip:
             { protocol_state= Inputs.Consensus_mechanism.Protocol_state.genesis
             ; proof= ()
@@ -685,7 +705,7 @@ let%test_module "test" =
                    flow in within tree" =
       Backtrace.elide := false ;
       let config =
-        Lbc.config Lbc.no_catchup_transitions memory_storage_location
+        Lbc.config Lbc.no_catchup_transitions memory_storage_location ()
       in
       Lbc.assert_strongest_ledgers (Lbc.create config) ~expected:[1; 2; 5; 7]
 
@@ -701,14 +721,14 @@ let%test_module "test" =
         ; f 5 3 7
         (* Now we attach to the one from the network *) ]
       in
-      let config = Lbc.config transitions memory_storage_location in
+      let config = Lbc.config transitions memory_storage_location () in
       let lbc_deferred = Lbc.create config in
       Lbc.assert_strongest_ledgers lbc_deferred ~expected:[1; 2; 3; 5]
 
     let%test_unit "local_get_ledger can materialize a ledger locally" =
       Backtrace.elide := false ;
       let config =
-        Lbc.config Lbc.no_catchup_transitions memory_storage_location
+        Lbc.config Lbc.no_catchup_transitions memory_storage_location ()
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind lbc = Lbc.create config in

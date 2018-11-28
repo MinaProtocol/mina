@@ -8,7 +8,7 @@ GITLONGHASH = $(shell git rev-parse HEAD)
 MYUID = $(shell id -u)
 DOCKERNAME = codabuilder-$(MYUID) 
 
-# Unique signature of kademlia coda tree
+# Unique signature of kademlia code tree
 KADEMLIA_SIG = $(shell cd src/app/kademlia-haskell ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
 
 ifeq ($(DUNE_PROFILE),)
@@ -27,7 +27,7 @@ endif
 ########################################
 ## Code
 
-all: clean docker container build
+all: clean codabuilder containerstart build
 
 clean:
 	$(info Removing previous build artifacts)
@@ -35,7 +35,7 @@ clean:
 
 kademlia:
 	@# FIXME: Bash wrap here is awkward but required to get nix-env
-	$(WRAP) bash -c "source ~/.profile && cd src/app/kademlia-haskell && nix-build release2.nix"
+	bash -c "source ~/.profile && cd src/app/kademlia-haskell && nix-build release2.nix"
 
 # Alias
 dht: kademlia
@@ -60,9 +60,6 @@ check-format:
 ########################################
 ## Containers and container management
 
-# customized local docker
-docker:
-	docker build --file dockerfiles/Dockerfile --tag codabuilder .
 
 # push steps require auth on docker hub
 docker-toolchain:
@@ -72,7 +69,17 @@ docker-toolchain:
 		docker push codaprotocol/coda:toolchain-$(GITLONGHASH) && \
 		docker push codaprotocol/coda:toolchain-latest ;\
 	else \
-		echo "Repo is dirty, commit first." ;\
+		echo "Repo has uncommited changes, commit first to set hash." ;\
+	fi
+
+docker-toolchain-rust:
+	@if git diff-index --quiet HEAD ; then \
+		docker build --file dockerfiles/Dockerfile-toolchain-rust --tag codaprotocol/coda:toolchain-rust-$(GITLONGHASH) . && \
+		docker tag  codaprotocol/coda:toolchain-rust-$(GITLONGHASH) codaprotocol/coda:toolchain-rust-latest && \
+		docker push codaprotocol/coda:toolchain-rust-$(GITLONGHASH) && \
+		docker push codaprotocol/coda:toolchain-rust-latest ;\
+	else \
+		echo "Repo has uncommited changes, commit first to set hash." ;\
 	fi
 
 # All in one step to build toolchain and binary for kademlia
@@ -83,11 +90,18 @@ docker-toolchain-haskell:
     mkdir -p src/_build ;\
     docker run --rm --entrypoint cat codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) /src/coda-kademlia.deb > src/_build/coda-kademlia.deb
 
+toolchains: docker-toolchain docker-toolchain-rust docker-toolchain-haskell
+
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
 	cd .circleci; python2 render.py > config.yml
 
-container:
+# Local 'codabuilder' docker image (based off docker-toolchain)
+codabuilder:
+	docker build --file dockerfiles/Dockerfile --tag codabuilder .
+
+# Restarts codabuilder
+containerstart:
 	@./scripts/container.sh restart
 
 ########################################
@@ -100,10 +114,18 @@ deb:
 
 # deb-s3 https://github.com/krobertson/deb-s3
 publish_kademlia_deb:
-	deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --codename unstable --component main src/_build/coda-kademlia.deb
+	@if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
+		deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --codename stable   --component main src/_build/coda-kademlia.deb ; \
+	else \
+		deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --codename unstable --component main src/_build/coda-kademlia.deb ; \
+	fi
 
 publish_deb:
-	deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --codename unstable --component main src/_build/coda.deb
+	@if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
+		deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --codename stable   --component main src/_build/coda.deb ; \
+	else \
+		deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --codename unstable --component main src/_build/coda.deb ; \
+	fi
 
 publish_debs: publish_deb publish_kademlia_deb
 
@@ -122,9 +144,9 @@ genesiskeys:
 
 codaslim:
 	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
-	@cp src/_build/codaclient.deb .
+	@cp src/_build/coda.deb .
 	@./scripts/rebuild-docker.sh codaslim dockerfiles/Dockerfile-codaslim
-	@rm codaclient.deb
+	@rm coda.deb
 
 ########################################
 ## Tests
@@ -140,7 +162,7 @@ test:
 
 test-all: | test-runtest \
 			test-sigs \
-			test-stakes 
+			test-stakes
 
 test-runtest: SHELL := /bin/bash
 test-runtest:
@@ -156,7 +178,7 @@ test-stakes:
 
 test-withsnark: SHELL := /bin/bash
 test-withsnark:
-	source scripts/test_all.sh ; cd src; CODA_CONSENSUS_MECHANISM=proof_of_signature WITH_SNARKS=true run_integration_test full-test
+	source scripts/test_all.sh ; cd src; CODA_PROPOSAL_INTERVAL=30000 WITH_SNARKS=true DUNE_PROFILE=test_snark run_integration_test full-test
 
 web:
 	./scripts/web.sh
@@ -167,4 +189,4 @@ web:
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim container deb dev docker kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains

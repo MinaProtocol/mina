@@ -9,7 +9,9 @@ open Snark_bits
 open Fold_lib
 
 module Index = struct
-  type t = int [@@deriving bin_io]
+  include Int
+
+  let gen = Int.gen_incl 0 ((1 lsl Snark_params.ledger_depth) - 1)
 
   module Vector = struct
     include Int
@@ -24,6 +26,10 @@ module Index = struct
   end
 
   include (Bits.Vector.Make (Vector) : Bits_intf.S with type t := t)
+
+  let fold_bits = fold
+
+  let fold t = Fold.group3 ~default:false (fold_bits t)
 
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
 end
@@ -72,10 +78,8 @@ let initialize public_key : t =
   { public_key
   ; balance= Balance.zero
   ; nonce= Nonce.zero
-  ; receipt_chain_hash=
-      Receipt.Chain_hash.empty
-      (* TODO: In the next PR this should be replaced by [public_key] *)
-  ; delegate= Public_key.Compressed.empty }
+  ; receipt_chain_hash= Receipt.Chain_hash.empty
+  ; delegate= public_key }
 
 let typ : (var, value) Typ.t =
   let spec =
@@ -144,10 +148,8 @@ let create public_key balance =
   { public_key
   ; balance
   ; nonce= Nonce.zero
-  ; receipt_chain_hash=
-      Receipt.Chain_hash.empty
-      (* TODO: In the next PR this should be replaced by [public_key] *)
-  ; delegate= Public_key.Compressed.empty }
+  ; receipt_chain_hash= Receipt.Chain_hash.empty
+  ; delegate= public_key }
 
 let gen =
   let open Quickcheck.Let_syntax in

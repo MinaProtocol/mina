@@ -202,6 +202,10 @@ let gen_keys () =
       module Ledger_builder_hash = struct
         include Ledger_builder_hash.Stable.V1
 
+        let ledger_hash = Ledger_builder_hash.ledger_hash
+
+        let aux_hash = Ledger_builder_hash.aux_hash
+
         let of_aux_and_ledger_hash = Ledger_builder_hash.of_aux_and_ledger_hash
       end
     end)
@@ -211,7 +215,7 @@ let gen_keys () =
       Blockchain_snark.Blockchain_transition.Make
         (Consensus_mechanism)
         (Transaction_snark.Verification.Make (struct
-          let keys = tx_keys.verification
+          let keys = tx_keys
         end))
   in
   let%map bc_keys_location, _bc_keys, bc_keys_checksum = M.Keys.cached () in

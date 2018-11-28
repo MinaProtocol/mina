@@ -1,0 +1,4 @@
+(library
+ (name foo)
+ (public_name foo)
+ (wrapped false))

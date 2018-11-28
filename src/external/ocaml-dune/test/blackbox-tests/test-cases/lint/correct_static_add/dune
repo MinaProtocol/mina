@@ -1,0 +1,5 @@
+(library
+ (name correct_static_add)
+ (kind ppx_rewriter)
+ (libraries ppxlib)
+)

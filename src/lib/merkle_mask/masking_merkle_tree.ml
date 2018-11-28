@@ -10,9 +10,10 @@ module Make
     (Location : Merkle_ledger.Location_intf.S)
     (Base : Base_merkle_tree_intf.S
             with module Addr = Location.Addr
+            with module Location = Location
             with type key := Key.t
              and type hash := Hash.t
-             and type location := Location.t
+             and type root_hash := Hash.t
              and type account := Account.t) =
 struct
   type account = Account.t
@@ -23,10 +24,12 @@ struct
 
   type location = Location.t
 
+  module Location = Location
   module Addr = Location.Addr
 
   type t =
-    { account_tbl: Account.t Location.Table.t
+    { uuid: Uuid.t
+    ; account_tbl: Account.t Location.Table.t
     ; hash_tbl: Hash.t Addr.Table.t
     ; location_tbl: Location.t Key.Table.t
     ; mutable current_location: Location.t option }
@@ -34,7 +37,8 @@ struct
   type unattached = t
 
   let create () =
-    { account_tbl= Location.Table.create ()
+    { uuid= Uuid.create ()
+    ; account_tbl= Location.Table.create ()
     ; hash_tbl= Addr.Table.create ()
     ; location_tbl= Key.Table.create ()
     ; current_location= None }
@@ -43,16 +47,22 @@ struct
     type parent = Base.t
 
     type t =
-      { parent: parent
+      { uuid: Uuid.t
+      ; parent: parent
       ; account_tbl: Account.t Location.Table.t
       ; hash_tbl: Hash.t Addr.Table.t
       ; location_tbl: Location.t Key.Table.t
       ; mutable current_location: Location.t option }
 
     module Path = Base.Path
-    module Db_error = Base.Db_error
     module Addr = Location.Addr
-    module For_tests = Base.For_tests
+    module Location = Location
+
+    type index = int
+
+    type path = Path.t
+
+    type root_hash = Hash.t
 
     let create () =
       failwith
@@ -60,12 +70,15 @@ struct
          Mask.create and Mask.set_parent"
 
     let unset_parent t =
-      { account_tbl= t.account_tbl
+      { uuid= t.uuid
+      ; account_tbl= t.account_tbl
       ; hash_tbl= t.hash_tbl
       ; location_tbl= t.location_tbl
       ; current_location= t.current_location }
 
     let get_parent t = t.parent
+
+    let get_uuid t = t.uuid
 
     (* don't rely on a particular implementation *)
     let find_hash t address = Addr.Table.find t.hash_tbl address
@@ -138,8 +151,8 @@ struct
       let parent_merkle_path = Base.merkle_path (get_parent t) location in
       fixup_merkle_path t parent_merkle_path address
 
-    (* given a Merkle path corresponding to a starting address, calculate addresses and hash 
-       for each node affected by the starting hash; that is, along the path from the 
+    (* given a Merkle path corresponding to a starting address, calculate addresses and hash
+       for each node affected by the starting hash; that is, along the path from the
        account address to root
      *)
     let addresses_and_hashes_from_merkle_path_exn merkle_path starting_address
@@ -183,7 +196,7 @@ struct
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
           set_hash t addr hash )
 
-    (* a write writes only to the mask, parent is not involved 
+    (* a write writes only to the mask, parent is not involved
      need to update both account and hash pieces of the mask
        *)
     let set t location account =
@@ -204,9 +217,11 @@ struct
     let parent_set_notify t location account =
       match find_account t location with
       | Some existing_account ->
-          if Account.equal account existing_account then
-            (* optimization: remove from account table *)
-            remove_account_and_update_hashes t location
+          if
+            Key.equal
+              (Account.public_key account)
+              (Account.public_key existing_account)
+          then remove_account_and_update_hashes t location
       | None -> ()
 
     (* as for accounts, we see if we have it in the mask, else delegate to parent *)
@@ -342,6 +357,25 @@ struct
       let parent_accounts = Base.to_list (get_parent t) in
       mask_accounts @ parent_accounts
 
+    let foldi t ~init ~f =
+      let parent_result = Base.foldi (get_parent t) ~init ~f in
+      let locations_and_accounts = Location.Table.to_alist t.account_tbl in
+      let f' accum (location, account) =
+        let address = Location.to_path_exn location in
+        f address accum account
+      in
+      List.fold locations_and_accounts ~init:parent_result ~f:f'
+
+    (* we would want fold_until to combine results from the parent and the mask
+       way (1): use the parent result as the init of the mask fold (or vice-versa)
+         the parent result may be of different type than the mask fold init, so
+         we get a less general type than the signature indicates, so compilation fails
+       way (2): make the folds independent, but there's not a specified way to combine
+         the results
+    *)
+    let fold_until _t ~init:_ ~f:_ ~finish:_ =
+      failwith "fold_until: not implemented"
+
     module For_testing = struct
       let location_in_mask t location =
         Option.is_some (find_account t location)
@@ -365,7 +399,9 @@ struct
             | Some loc -> Location.next loc
           in
           if not (Option.is_some maybe_location) then
-            Error Db_error.Out_of_leaves
+            Error
+              (Error.create "get_or_create_account: Out of leaves" ()
+                 Unit.sexp_of_t)
           else
             let location = Option.value_exn maybe_location in
             set t location account ;
@@ -375,7 +411,7 @@ struct
 
     let get_or_create_account_exn t key account =
       get_or_create_account t key account
-      |> Result.map_error ~f:(fun err -> Db_error.Db_exception err)
+      |> Result.map_error ~f:(fun err -> raise (Error.to_exn err))
       |> Result.ok_exn
 
     let sexp_of_location = Location.sexp_of_t
@@ -386,7 +422,8 @@ struct
   end
 
   let set_parent t parent =
-    { Attached.parent
+    { uuid= t.uuid
+    ; Attached.parent
     ; account_tbl= t.account_tbl
     ; hash_tbl= t.hash_tbl
     ; location_tbl= t.location_tbl

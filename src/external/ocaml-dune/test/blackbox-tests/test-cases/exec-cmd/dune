@@ -1,0 +1,8 @@
+(executable
+ (modules foo)
+ (name foo))
+
+(executable
+ (modules bar)
+ (name bar)
+ (public_name dunetestbar))

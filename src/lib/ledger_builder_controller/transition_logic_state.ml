@@ -1,23 +1,41 @@
-open Core_kernel
+open Core
 
 module Make (Inputs : Inputs.Base.S) :
   Transition_logic_state_intf.S
   with type tip := Inputs.Tip.t
    and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
-   and type external_transition :=
-              Inputs.Consensus_mechanism.External_transition.t
+   and type external_transition := Inputs.External_transition.t
+   and type public_key_compressed := Inputs.Public_key.Compressed.t
    and type state_hash := Inputs.State_hash.t = struct
   open Inputs
   open Consensus_mechanism
   module Ops = Tip_ops.Make (Inputs)
   include Ops
 
-  module Transition_tree =
-    Ktree.Make (struct
-        type t = (External_transition.t, State_hash.t) With_hash.t
-        [@@deriving compare, bin_io, sexp]
-      end)
-      (Security)
+  module Transition = struct
+    type t = (External_transition.t, State_hash.t) With_hash.t
+    [@@deriving compare, bin_io, sexp]
+
+    open With_hash
+
+    let equal {hash= a; _} {hash= b; _} = State_hash.equal a b
+
+    let hash {hash; _} = String.hash (State_hash.to_bytes hash)
+
+    let hash_fold_t state {hash; _} =
+      String.hash_fold_t state (State_hash.to_bytes hash)
+
+    let id {hash; _} =
+      "\"" ^ Base64.encode_string (State_hash.to_bytes hash) ^ "\""
+
+    let to_string_record t =
+      Printf.sprintf "{%s|%s}"
+        (Base64.encode_string (State_hash.to_bytes t.hash))
+        (Protocol_state.to_string_record
+           (External_transition.protocol_state t.data))
+  end
+
+  module Transition_tree = Ktree.Make (Transition) (Security)
 
   module Change = struct
     type t =
@@ -46,6 +64,7 @@ module Make (Inputs : Inputs.Base.S) :
     ; longest_branch_tip: (Tip.t, State_hash.t) With_hash.t
     ; ktree: Transition_tree.t option
     ; consensus_local_state: Local_state.t
+    ; proposer_public_key: Public_key.Compressed.t option
     (* TODO: This impl assumes we have the original Ouroboros assumption. In
        order to work with the Praos assumption we'll need to keep a linked
        list as well at the prefix of size (#blocks possible out of order)
@@ -64,7 +83,7 @@ module Make (Inputs : Inputs.Base.S) :
           Tip.protocol_state old_tip |> Protocol_state.blockchain_state
           |> Blockchain_state.ledger_hash
         in
-        lock_transition
+        lock_transition ?proposer_public_key:t.proposer_public_key
           (consensus_state_of_tip old_tip)
           (consensus_state_of_tip new_tip)
           ~snarked_ledger:(fun () ->
@@ -92,14 +111,26 @@ module Make (Inputs : Inputs.Base.S) :
               assert_materialization_of t.locked_tip x ;
               assert_materialization_of t.longest_branch_tip last ) )
 
-  let apply_all t changes =
+  let apply_all t changes ~logger =
     assert_state_valid t ;
     let t' = List.fold changes ~init:t ~f:apply in
-    assert_state_valid t' ; t'
+    try assert_state_valid t' ; t' with exn ->
+      Logger.error logger
+        "fatal exception while applying changes to transition logic -- locked \
+         tip state hash: %s"
+        (Base64.encode_string (State_hash.to_bytes t'.locked_tip.hash)) ;
+      Option.iter t'.ktree ~f:(fun ktree ->
+          let filename, _ = Unix.mkstemp "lbc-graph" in
+          Out_channel.with_file filename ~f:(fun channel ->
+              Transition_tree.Graph.output_graph channel
+                (Transition_tree.to_graph ktree) ) ;
+          Logger.info logger "dot graph dumped to %s" filename ) ;
+      raise exn
 
-  let create ~consensus_local_state genesis_heavy =
+  let create ?proposer_public_key ~consensus_local_state genesis_heavy =
     { locked_tip= genesis_heavy
     ; longest_branch_tip= genesis_heavy
     ; ktree= None
+    ; proposer_public_key
     ; consensus_local_state }
 end

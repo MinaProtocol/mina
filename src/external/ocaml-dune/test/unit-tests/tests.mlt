@@ -1,0 +1,119 @@
+(* -*- tuareg -*- *)
+
+#warnings "-40";;
+
+open Dune
+open Import
+
+let () =
+  Path.set_root (Path.External.cwd ());
+  Path.set_build_dir (Path.Kind.of_string "_build")
+;;
+
+let print_pkg ppf pkg =
+  Format.fprintf ppf "<package:%s>"
+    (Lib_name.to_string (Findlib.Package.name pkg))
+;;
+
+#install_printer Lib_name.pp_quoted;;
+#install_printer print_pkg;;
+#install_printer String.Map.pp;;
+
+[%%expect{|
+val print_pkg : Format.formatter -> Findlib.Package.t -> unit = <fun>
+|}]
+
+let findlib =
+  let cwd = Path.of_filename_relative_to_initial_cwd (Sys.getcwd ()) in
+    Findlib.create
+    ~stdlib_dir:cwd
+    ~paths:[Path.relative cwd "test/unit-tests/findlib-db"]
+    ~version:(Ocaml_version.make (4, 02, 3))
+;;
+
+[%%expect{|
+val findlib : Findlib.t = <abstr>
+|}]
+
+let pkg =
+  match Findlib.find findlib (Lib_name.of_string_exn ~loc:None "foo") with
+  | Ok x -> x
+  | Error _ -> assert false;;
+
+[%%expect{|
+val pkg : Findlib.Package.t = <package:foo>
+|}]
+
+(* "foo" should depend on "baz" *)
+Findlib.Package.requires pkg;;
+
+[%%expect{|
+- : Lib_name.t list = ["baz"]
+|}]
+
+(* Meta parsing/simplification *)
+
+open Meta
+#install_printer Simplified.pp;;
+
+let meta =
+  Path.in_source "test/unit-tests/findlib-db/foo/META"
+  |> Meta.load ~name:(Some (Lib_name.of_string_exn ~loc:None "foo"))
+
+[%%expect{|
+val meta : Simplified.t =
+  { name = "foo"
+  ; vars =
+     (requires =
+       { set_rules =
+          [ { var = "requires"
+            ; predicates = []
+            ; action = Set
+            ; value = "bar"
+            }
+          ; { var = "requires"
+            ; predicates = [ "+ppx_driver" ]
+            ; action = Set
+            ; value = "baz"
+            }
+          ]
+       ; add_rules = []
+       })
+  ; subs = []
+  }
+|}]
+
+#install_printer Findlib.Config.pp;;
+
+let conf =
+  Findlib.Config.load (Path.in_source "test/unit-tests/toolchain")
+    ~toolchain:"tlc" ~context:"<context>"
+
+[%%expect{|
+val conf : Findlib.Config.t =
+  { vars =
+     [ (FOO_BAR, { set_rules =
+                    [ { preds_required = [ "tlc"; "env" ]
+                      ; preds_forbidden = []
+                      ; value = "my variable"
+                      }
+                    ]
+                 ; add_rules = []
+                 })
+     ]
+  ; preds = [ "tlc" ]
+  }
+|}]
+
+let env_pp fmt env = Sexp.pp fmt (Env.to_sexp env);;
+#install_printer env_pp;;
+
+[%%expect{|
+val env_pp : Format.formatter -> Env.t -> unit = <fun>
+|}]
+
+let env = Findlib.Config.env conf
+
+[%%expect{|
+val env : Env.t = ((FOO_BAR "my variable"))
+|}]

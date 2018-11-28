@@ -1,0 +1,6 @@
+
+(library
+ (name foo_ppx_rewriter_dune)
+ (public_name foo.ppx_rewriter_dune)
+ (ppx.driver (main Foo_ppx_rewriter_dune.main))
+ (kind ppx_rewriter))

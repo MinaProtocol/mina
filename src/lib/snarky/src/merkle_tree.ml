@@ -423,6 +423,23 @@ struct
        implied_root next_entry_hash addr0 prev_path)
 
   (* addr0 should have least significant bit first *)
+  let get_req ~(depth : int) root addr0 : (Elt.var, 's) Checked.t =
+    let open Let_syntax in
+    with_label "Merkle_tree.Checked.update_req"
+      (let%bind prev, prev_path =
+         request_witness
+           Typ.(Elt.typ * Path.typ ~depth)
+           As_prover.(
+             map (read (Address.typ ~depth) addr0) ~f:(fun a -> Get_element a))
+       in
+       let%bind () =
+         let%bind prev_entry_hash = Elt.hash prev in
+         implied_root prev_entry_hash addr0 prev_path
+         >>= Hash.assert_equal root
+       in
+       return prev)
+
+  (* addr0 should have least significant bit first *)
   let update_req ~(depth : int) ~root ~prev ~next addr0 :
       (Hash.var, _) Checked.t =
     let open Let_syntax in

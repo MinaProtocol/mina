@@ -61,7 +61,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
   module Proving_key = struct
     include Proving_key
-    include Binable.Of_stringable (Proving_key)
   end
 
   module Keypair = struct
@@ -1529,37 +1528,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
       Checked.choose_preimage_flagged v ~length
   end
 
-  module Bitstring_checked = struct
-    type t = Checked.Boolean.var list
-
-    let chunk_for_equality (t1 : t) (t2 : t) =
-      let chunk_size = Field.size_in_bits - 1 in
-      let rec go acc t1 t2 =
-        match (t1, t2) with
-        | [], [] -> acc
-        | _, _ ->
-            let t1_a, t1_b = List.split_n t1 chunk_size in
-            let t2_a, t2_b = List.split_n t2 chunk_size in
-            go ((Cvar1.pack t1_a, Cvar1.pack t2_a) :: acc) t1_b t2_b
-      in
-      go [] t1 t2
-
-    let equal t1 t2 =
-      let open Checked in
-      all
-        (Core.List.map (chunk_for_equality t1 t2) ~f:(fun (x1, x2) ->
-             equal x1 x2 ))
-      >>= Boolean.all
-
-    module Assert = struct
-      let equal t1 t2 =
-        let open Checked in
-        Core.List.map (chunk_for_equality t1 t2) ~f:(fun (x1, x2) ->
-            Constraint.equal x1 x2 )
-        |> assert_all ~label:"Bitstring.Assert.equal"
-    end
-  end
-
   module Field = struct
     include Field0
 
@@ -1691,6 +1659,39 @@ module Make_basic (Backend : Backend_intf.S) = struct
           >>= Checked.Boolean.Assert.is_true
         in
         res
+    end
+  end
+
+  module Bitstring_checked = struct
+    type t = Checked.Boolean.var list
+
+    let lt_value = Field.Checked.lt_bitstring_value
+
+    let chunk_for_equality (t1 : t) (t2 : t) =
+      let chunk_size = Field.size_in_bits - 1 in
+      let rec go acc t1 t2 =
+        match (t1, t2) with
+        | [], [] -> acc
+        | _, _ ->
+            let t1_a, t1_b = List.split_n t1 chunk_size in
+            let t2_a, t2_b = List.split_n t2 chunk_size in
+            go ((Cvar1.pack t1_a, Cvar1.pack t2_a) :: acc) t1_b t2_b
+      in
+      go [] t1 t2
+
+    let equal t1 t2 =
+      let open Checked in
+      all
+        (Core.List.map (chunk_for_equality t1 t2) ~f:(fun (x1, x2) ->
+             equal x1 x2 ))
+      >>= Boolean.all
+
+    module Assert = struct
+      let equal t1 t2 =
+        let open Checked in
+        Core.List.map (chunk_for_equality t1 t2) ~f:(fun (x1, x2) ->
+            Constraint.equal x1 x2 )
+        |> assert_all ~label:"Bitstring.Assert.equal"
     end
   end
 

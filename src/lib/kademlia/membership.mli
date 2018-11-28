@@ -1,5 +1,8 @@
 open Async_kernel
 open Core_kernel
+open Pipe_lib
+
+exception Child_died
 
 module Haskell : sig
   type t

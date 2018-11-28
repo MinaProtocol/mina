@@ -14,3 +14,5 @@ let signature_hash_function = true
 let private_key_generation = true
 
 let randomness = true
+
+let vrf_threshold_check = true

@@ -89,49 +89,46 @@ end
 module Intf = Merkle_ledger.Intf
 
 module In_memory_kvdb : Intf.Key_value_database = struct
-  type t = (string, Bigstring.t) Hashtbl.t
+  module Bigstring_frozen = struct
+    module T = struct
+      include Bigstring
 
-  let create ~directory:_ = Hashtbl.create (module String)
+      (* we're not mutating Bigstrings, which would invalidate hashes
+       OK to use these hash functions
+       *)
+      let hash = hash_t_frozen
+
+      let hash_fold_t = hash_fold_t_frozen
+    end
+
+    include T
+    include Hashable.Make_binable (T)
+  end
+
+  type t = {uuid: Uuid.t; table: Bigstring_frozen.t Bigstring_frozen.Table.t}
+
+  let get_uuid t = t.uuid
+
+  let create ~directory:_ =
+    {uuid= Uuid.create (); table= Bigstring_frozen.Table.create ()}
 
   let destroy _ = ()
 
-  let get tbl ~key = Hashtbl.find tbl (Bigstring.to_string key)
+  let get t ~key = Bigstring_frozen.Table.find t.table key
 
-  let set tbl ~key ~data = Hashtbl.set tbl ~key:(Bigstring.to_string key) ~data
+  let set t ~key ~data = Bigstring_frozen.Table.set t.table ~key ~data
 
   let set_batch tbl ~key_data_pairs =
     List.iter key_data_pairs ~f:(fun (key, data) -> set tbl ~key ~data)
 
-  let delete tbl ~key = Hashtbl.remove tbl (Bigstring.to_string key)
+  let delete t ~key = Bigstring_frozen.Table.remove t.table key
 
-  let copy tbl = Hashtbl.copy tbl
-end
-
-module In_memory_sdb : Intf.Stack_database = struct
-  type t = Bigstring.t list ref
-
-  let create ~filename:_ = ref []
-
-  let destroy _ = ()
-
-  let push ls v = ls := v :: !ls
-
-  let pop ls =
-    match !ls with
-    | [] -> None
-    | h :: t ->
-        ls := t ;
-        Some h
-
-  let length ls = List.length !ls
-
-  let copy stack = ref !stack
+  let copy (t : t) =
+    {uuid= Uuid.create (); table= Bigstring_frozen.Table.copy t.table}
 end
 
 module Storage_locations : Intf.Storage_locations = struct
-  (* TODO: The names of these values should be dynamically generated per test run*)
-  let stack_db_file = ""
-
+  (* TODO: The name of this value should be dynamically generated per test run*)
   let key_value_db_dir = ""
 end
 

@@ -55,7 +55,11 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) :
           Tick.Checked.t =
         with_label __LOC__
           (let supply_increase = Snark_transition.supply_increase transition in
-           let%bind good_body =
+           let%bind `Success updated_consensus_state, consensus_state =
+             Consensus_mechanism.next_state_checked ~prev_state:previous_state
+               ~prev_state_hash:previous_state_hash transition supply_increase
+           in
+           let%bind success =
              let%bind correct_transaction_snark =
                T.verify_complete_merge
                  (Snark_transition.sok_digest transition)
@@ -73,19 +77,11 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) :
                  |> Blockchain_state.ledger_hash )
                  ( transition |> Snark_transition.blockchain_state
                  |> Blockchain_state.ledger_hash )
-             and consensus_data_is_valid =
-               Consensus_mechanism.is_transition_valid_checked transition
-                 (previous_state |> Protocol_state.previous_state_hash)
              in
              let%bind correct_snark =
                Boolean.(correct_transaction_snark || ledger_hash_didn't_change)
              in
-             Boolean.(correct_snark && consensus_data_is_valid)
-           in
-           let%bind consensus_state =
-             Consensus_mechanism.next_state_checked
-               (Protocol_state.consensus_state previous_state)
-               previous_state_hash transition supply_increase
+             Boolean.(correct_snark && updated_consensus_state)
            in
            let new_state =
              Protocol_state.create_var ~previous_state_hash
@@ -107,7 +103,7 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) :
            in
            ( State_hash.var_of_hash_packed state_hash
            , new_state
-           , `Success good_body ))
+           , `Success success ))
     end
   end
 

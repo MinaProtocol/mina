@@ -6,6 +6,7 @@ open Async_kernel
 open Coda_base
 open Coda_main
 open Signature_lib
+open Pipe_lib
 
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
@@ -20,7 +21,7 @@ let with_snark = false
 
 [%%endif]
 
-let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
+let run_test () : unit Deferred.t =
   Parallel.init_master () ;
   let log = Logger.create () in
   let%bind temp_conf_dir =
@@ -47,9 +48,7 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
 
     let work_selection = Protocols.Coda_pow.Work_selection.Seq
   end in
-  let%bind (module Init) =
-    make_init ~should_propose:true (module Config) (module Kernel)
-  in
+  let%bind (module Init) = make_init ~should_propose:true (module Config) in
   let module Main = Coda_main.Make_coda (Init) in
   let module Run = Run (Config) (Main) in
   let open Main in
@@ -60,6 +59,12 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
   in
   let%bind punished_dir = Async.Unix.mkdtemp (banlist_dir_name ^/ "banned") in
   let banlist = Coda_base.Banlist.create ~suspicious_dir ~punished_dir in
+  let%bind receipt_chain_dir_name =
+    Async.Unix.mkdtemp (temp_conf_dir ^/ "receipt_chain")
+  in
+  let receipt_chain_database =
+    Coda_base.Receipt_chain_database.create ~directory:receipt_chain_dir_name
+  in
   let net_config =
     { Inputs.Net.Config.parent_log= log
     ; gossip_net_params=
@@ -79,7 +84,8 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
          ~transaction_pool_disk_location:(temp_conf_dir ^/ "transaction_pool")
          ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
          ~time_controller:(Inputs.Time.Controller.create ())
-         () ~banlist ~snark_work_fee:(Currency.Fee.of_int 0))
+         ~receipt_chain_database () ~banlist
+         ~snark_work_fee:(Currency.Fee.of_int 0))
   in
   don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers coda)) ;
   let wait_until_cond ~(f : t -> bool) ~(timeout : Float.t) =
@@ -150,13 +156,17 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
       Run.get_balance coda receiver_pk
       |> Option.value ~default:Currency.Balance.zero
     in
-    let%bind () = Run.send_payment log coda (payment :> User_command.t) in
+    let%bind _ : Receipt.Chain_hash.t =
+      Run.send_payment log coda (payment :> User_command.t)
+    in
     (* Send a similar the payment twice on purpose; this second one
     * will be rejected because the nonce is wrong *)
     let payment' =
       build_payment send_amount sender_sk receiver_pk (Currency.Fee.of_int 0)
     in
-    let%bind () = Run.send_payment log coda (payment' :> User_command.t) in
+    let%bind _ : Receipt.Chain_hash.t =
+      Run.send_payment log coda (payment' :> User_command.t)
+    in
     (* Let the system settle, mine some blocks *)
     let%map () =
       balance_change_or_timeout ~initial_receiver_balance:prev_receiver_balance
@@ -183,7 +193,9 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
           Option.value_exn
             (Currency.Balance.add_amount (Option.value_exn v) amount) )
     in
-    let%map () = Run.send_payment log coda (payment :> User_command.t) in
+    let%map _ : Receipt.Chain_hash.t =
+      Run.send_payment log coda (payment :> User_command.t)
+    in
     new_balance_sheet'
   in
   let send_payments accounts pks balance_sheet f_amount =
@@ -273,11 +285,11 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
   if with_snark then
     let accounts = List.take other_accounts 2 in
     let%bind block_count' =
-      test_multiple_payments accounts (pks accounts) 7.
+      test_multiple_payments accounts (pks accounts) 15.
     in
     (*wait for a block after the ledger_proof is emitted*)
     let%map () =
-      wait_until_cond ~f:(fun t -> block_count t > block_count') ~timeout:1.
+      wait_until_cond ~f:(fun t -> block_count t > block_count') ~timeout:5.
     in
     assert (block_count coda > block_count')
   else
@@ -286,8 +298,8 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
     in
     test_duplicate_payments sender_keypair receiver_keypair
 
-let command (module Kernel : Kernel_intf) =
+let command =
   let open Core in
   let open Async in
   Command.async ~summary:"Full coda end-to-end test"
-    (Command.Param.return (fun () -> run_test (module Kernel)))
+    (Command.Param.return run_test)
