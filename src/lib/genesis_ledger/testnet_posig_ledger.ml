@@ -25,5 +25,7 @@ include Make (struct
       ; 1_000 ]
     in
     List.mapi balances ~f:(fun i b ->
-      {balance= b; pk= fst Coda_base.Sample_keypairs.keypairs.(i); sk = snd Coda_base.Sample_keypairs.keypairs.(i)} )
+        { balance= b
+        ; pk= fst Coda_base.Sample_keypairs.keypairs.(i)
+        ; sk= snd Coda_base.Sample_keypairs.keypairs.(i) } )
 end)
