@@ -121,6 +121,13 @@ module Make (Depth : Intf.Depth) = struct
     | Account path -> Addr.next path |> Option.map ~f:(fun next -> Account next)
     | Hash path -> Addr.next path |> Option.map ~f:(fun next -> Hash next)
 
+  let prev : t -> t Option.t = function
+    | Generic _ ->
+        raise
+          (Invalid_argument "prev: generic locations have no prev location")
+    | Account path -> Addr.prev path |> Option.map ~f:(fun prev -> Account prev)
+    | Hash path -> Addr.prev path |> Option.map ~f:(fun prev -> Hash prev)
+
   let sibling : t -> t = function
     | Generic _ ->
         raise (Invalid_argument "sibling: generic locations have no sibling")
