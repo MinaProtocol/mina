@@ -412,7 +412,10 @@ struct
             let maybe_location =
               match t.current_location with
               | None -> Some first_location
-              | Some loc -> Location.next loc
+              | Some loc -> (
+                match get t loc with
+                | None -> Some loc
+                | Some _ -> Location.next loc )
             in
             if not (Option.is_some maybe_location) then
               Or_error.error_string "Db_error.Out_of_leaves"
