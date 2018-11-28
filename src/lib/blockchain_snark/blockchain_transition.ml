@@ -166,13 +166,15 @@ struct
                   let typ : (var, value) Tick.Typ.t =
                     Tick.Pedersen.Checked.Digest.Unpacked.typ
 
-                  let var_to_bits (x : var) = (x :> Tick.Boolean.var list)
+                  let var_to_bits (x : var) =
+                    Bitstring_lib.Bitstring.Lsb_first.of_list
+                      (x :> Tick.Boolean.var list)
 
                   let var_to_triples xs =
                     let open Fold in
                     to_list
                       (group3 ~default:Tick.Boolean.false_
-                         (of_list (var_to_bits xs)))
+                         (of_list (var_to_bits xs :> Tick.Boolean.var list)))
 
                   let var_of_value =
                     Tick.Pedersen.Checked.Digest.Unpacked.constant

@@ -25,7 +25,7 @@ module Make (Inputs : Inputs_intf) :
    and type syncable_ledger_query := Inputs.Syncable_ledger.query
    and type syncable_ledger_answer := Inputs.Syncable_ledger.answer
    and type transition_frontier := Inputs.Transition_frontier.t = struct
-  let run ~sync_query_reader ~sync_answer_writer:_ _transition_frontier =
+  let run ~frontier:_ ~sync_query_reader ~sync_answer_writer:_ =
     don't_wait_for
       (Strict_pipe.Reader.iter sync_query_reader ~f:(fun _ ->
            failwith "Intentionally unimplemented sync_handler" ))

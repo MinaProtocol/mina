@@ -18,7 +18,7 @@ module Make (Inputs : Inputs.S) : sig
      and type ledger_hash := Ledger_hash.t
      and type sync_query := Sync_ledger.query
      and type sync_answer := Sync_ledger.answer
-     and type external_transition := Consensus_mechanism.External_transition.t
+     and type external_transition := External_transition.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type tip := Tip.t
      and type public_key_compressed := Public_key.Compressed.t
@@ -498,18 +498,6 @@ let%test_module "test" =
             let to_string_record _ = "<opaque>"
           end
 
-          module External_transition = struct
-            include Protocol_state
-
-            let protocol_state = Fn.id
-
-            let of_state = Fn.id
-
-            let ledger_builder_diff = Protocol_state.hash
-
-            let protocol_state_proof _ = ()
-          end
-
           let lock_transition ?proposer_public_key:_ _ _ ~snarked_ledger:_
               ~local_state:() =
             ()
@@ -518,6 +506,18 @@ let%test_module "test" =
               ~candidate:Consensus_state.({strength= s2}) ~logger:_
               ~time_received:_ =
             if s1 >= s2 then `Keep else `Take
+        end
+
+        module External_transition = struct
+          include Consensus_mechanism.Protocol_state
+
+          let protocol_state = Fn.id
+
+          let of_state = Fn.id
+
+          let ledger_builder_diff = Consensus_mechanism.Protocol_state.hash
+
+          let protocol_state_proof _ = ()
         end
 
         module Tip = struct
@@ -530,12 +530,8 @@ let%test_module "test" =
           let copy t = t
 
           let of_transition_and_lb transition ledger_builder =
-            { state=
-                Consensus_mechanism.External_transition.protocol_state
-                  transition
-            ; proof=
-                Consensus_mechanism.External_transition.protocol_state_proof
-                  transition
+            { state= External_transition.protocol_state transition
+            ; proof= External_transition.protocol_state_proof transition
             ; ledger_builder }
 
           let bin_tip =
@@ -638,7 +634,7 @@ let%test_module "test" =
           ~net_deferred:(return net_input)
           ~external_transitions:
             (Linear_pipe.map ledger_builder_transitions
-               ~f:Consensus_mechanism.External_transition.of_state)
+               ~f:External_transition.of_state)
           ~genesis_tip:
             { state= Inputs.Consensus_mechanism.Protocol_state.genesis
             ; proof= ()

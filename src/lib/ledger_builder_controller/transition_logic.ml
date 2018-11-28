@@ -10,7 +10,7 @@ module type Inputs_intf = sig
     Transition_logic_state_intf.S
     with type tip := Tip.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
-     and type external_transition := Consensus_mechanism.External_transition.t
+     and type external_transition := External_transition.t
      and type state_hash := State_hash.t
      and type public_key_compressed := Public_key.Compressed.t
 
@@ -20,7 +20,7 @@ module type Inputs_intf = sig
     val step :
          Logger.t
       -> (Tip.t, State_hash.t) With_hash.t
-      -> (Consensus_mechanism.External_transition.t, State_hash.t) With_hash.t
+      -> (External_transition.t, State_hash.t) With_hash.t
       -> (Tip.t, State_hash.t) With_hash.t Deferred.Or_error.t
   end
 
@@ -32,12 +32,10 @@ module type Inputs_intf = sig
       -> old_state:Transition_logic_state.t
       -> state_mutator:(   Transition_logic_state.t
                         -> Transition_logic_state.Change.t list
-                        -> Consensus_mechanism.External_transition.t
+                        -> External_transition.t
                         -> unit Deferred.t)
-      -> (Consensus_mechanism.External_transition.t, State_hash.t) With_hash.t
-      -> ( (Consensus_mechanism.External_transition.t, State_hash.t) With_hash.t
-         , unit )
-         Job.t
+      -> (External_transition.t, State_hash.t) With_hash.t
+      -> ((External_transition.t, State_hash.t) With_hash.t, unit) Job.t
   end
 end
 
@@ -81,7 +79,7 @@ end
 module Make (Inputs : Inputs_intf) :
   S
   with type catchup := Inputs.Catchup.t
-   and type transition := Inputs.Consensus_mechanism.External_transition.t
+   and type transition := Inputs.External_transition.t
    and type transition_logic_state := Inputs.Transition_logic_state.t
    and type handler_state_change := Inputs.Transition_logic_state.Change.t
    and type tip := Inputs.Tip.t

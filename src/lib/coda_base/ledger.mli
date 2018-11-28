@@ -57,12 +57,12 @@ include
  * work off of this type *)
 type maskable_ledger = t
 
-(* TODO: Replace with a Mask.Serializable.S *)
-type serializable = int [@@deriving bin_io]
-
-val unattached_mask_of_serializable : serializable -> unattached_mask
-
-val serializable_of_t : t -> serializable
+(* TODO: Actually implement serializable properly #1206 *)
+include
+  Protocols.Coda_pow.Mask_serializable_intf
+  with type serializable = int
+   and type t := t
+   and type unattached_mask := unattached_mask
 
 val with_ledger : f:(t -> 'a) -> 'a
 

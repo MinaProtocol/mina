@@ -3,7 +3,7 @@ version: 2
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-f198a0d5d65b18b232f7c42469f1fc2bab7b2c96
+            - image: codaprotocol/coda:toolchain-rust-9550052452627b39ffb0643afe24d4348aceb102
         steps:
             - checkout
             - run:
@@ -13,7 +13,7 @@ jobs:
     build:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-f198a0d5d65b18b232f7c42469f1fc2bab7b2c96
+        - image: codaprotocol/coda:toolchain-9550052452627b39ffb0643afe24d4348aceb102
         steps:
             - checkout
             - run:
@@ -40,7 +40,7 @@ jobs:
     build_withsnark:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-f198a0d5d65b18b232f7c42469f1fc2bab7b2c96
+        - image: codaprotocol/coda:toolchain-9550052452627b39ffb0643afe24d4348aceb102
         steps:
             - checkout
             - run:
@@ -64,7 +64,7 @@ jobs:
     build_public:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-f198a0d5d65b18b232f7c42469f1fc2bab7b2c96
+        - image: codaprotocol/coda:toolchain-9550052452627b39ffb0643afe24d4348aceb102
         steps:
             - checkout
             - run:
@@ -82,17 +82,17 @@ jobs:
     test-unit-test:
        resource_class: large
        docker:
-       - image: codaprotocol/coda:toolchain-f198a0d5d65b18b232f7c42469f1fc2bab7b2c96
+       - image: codaprotocol/coda:toolchain-9550052452627b39ffb0643afe24d4348aceb102
        steps:
            - checkout
            - run:
               name: Test make test-runtest
-              command: source ~/.profile && make test-runtest
+              command: source ~/.profile && DUNE_PROFILE=test_sigs make test-runtest
 
     test-withsnark:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-f198a0d5d65b18b232f7c42469f1fc2bab7b2c96
+        - image: codaprotocol/coda:toolchain-9550052452627b39ffb0643afe24d4348aceb102
         steps:
             - checkout
             - run:
@@ -106,7 +106,7 @@ jobs:
     test-all_sig_integration_tests:
       resource_class: large
       docker:
-      - image: codaprotocol/coda:toolchain-f198a0d5d65b18b232f7c42469f1fc2bab7b2c96
+      - image: codaprotocol/coda:toolchain-9550052452627b39ffb0643afe24d4348aceb102
       steps:
           - checkout
           - run:
@@ -114,40 +114,40 @@ jobs:
               command: make check-render-circleci
           - run:
               name: Build OCaml
-              command: eval `opam config env` && DUNE_PROFILE=test make build 2>&1 | tee /tmp/buildocaml.log
+              command: eval `opam config env` && DUNE_PROFILE=test_sigs make build 2>&1 | tee /tmp/buildocaml.log
             
           - run:
               name: Running test - Sig Tests | full-test
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'full-test' 
+              command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'full-test' 
           - run:
               name: Running test - Sig Tests | coda-peers-test
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-peers-test' 
+              command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-peers-test' 
           - run:
               name: Running test - Sig Tests | coda-transitive-peers-test
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-transitive-peers-test' 
+              command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-transitive-peers-test' 
           - run:
               name: Running test - Sig Tests | coda-block-production-test
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-block-production-test' 
+              command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-block-production-test' 
           - run:
               name: Running test - Sig Tests | coda-shared-prefix-test -who-proposes 0
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0' 
+              command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0' 
           - run:
               name: Running test - Sig Tests | coda-shared-prefix-test -who-proposes 1
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1' 
+              command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1' 
           - run:
               name: Running test - Sig Tests | coda-shared-state-test
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-state-test' 
+              command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-state-test' 
           - run:
               name: Running test - Sig Tests | coda-restart-node-test
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-restart-node-test' 
+              command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-restart-node-test' 
           - run:
               name: Running test - Sig Tests | transaction-snark-profiler -check-only
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'transaction-snark-profiler -check-only' 
+              command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'transaction-snark-profiler -check-only' 
       
     test-all_stake_integration_tests:
       resource_class: large
       docker:
-      - image: codaprotocol/coda:toolchain-f198a0d5d65b18b232f7c42469f1fc2bab7b2c96
+      - image: codaprotocol/coda:toolchain-9550052452627b39ffb0643afe24d4348aceb102
       steps:
           - checkout
           - run:
@@ -155,35 +155,35 @@ jobs:
               command: make check-render-circleci
           - run:
               name: Build OCaml
-              command: eval `opam config env` && DUNE_PROFILE=test make build 2>&1 | tee /tmp/buildocaml.log
+              command: eval `opam config env` && DUNE_PROFILE=test_stakes make build 2>&1 | tee /tmp/buildocaml.log
             
           - run:
               name: Running test - Stake Tests | full-test
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'full-test' 
+              command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'full-test' 
           - run:
               name: Running test - Stake Tests | coda-peers-test
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-peers-test' 
+              command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-peers-test' 
           - run:
               name: Running test - Stake Tests | coda-transitive-peers-test
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-transitive-peers-test' 
+              command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-transitive-peers-test' 
           - run:
               name: Running test - Stake Tests | coda-block-production-test
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-block-production-test' 
+              command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-block-production-test' 
           - run:
               name: Running test - Stake Tests | coda-shared-prefix-test -who-proposes 0
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0' 
+              command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0' 
           - run:
               name: Running test - Stake Tests | coda-shared-prefix-test -who-proposes 1
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1' 
+              command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1' 
           - run:
               name: Running test - Stake Tests | coda-shared-state-test
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-state-test' 
+              command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-state-test' 
           - run:
               name: Running test - Stake Tests | coda-restart-node-test
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-restart-node-test' 
+              command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-restart-node-test' 
           - run:
               name: Running test - Stake Tests | transaction-snark-profiler -check-only
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'transaction-snark-profiler -check-only' 
+              command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'transaction-snark-profiler -check-only' 
       
 
 workflows:
