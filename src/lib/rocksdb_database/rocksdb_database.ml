@@ -36,12 +36,14 @@ let delete t ~(key : Bigstring.t) : unit =
 
 let to_alist t : (Bigstring.t * Bigstring.t) list =
   let iterator = Rocks.Iterator.create t.db in
-  Rocks.Iterator.seek_to_first iterator ;
+  Rocks.Iterator.seek_to_last iterator ;
+  (* iterate backwards and cons, to build list sorted by key *)
   let rec loop accum =
-    if Rocks.Iterator.is_valid iterator then
+    if Rocks.Iterator.is_valid iterator then (
       let key = Rocks.Iterator.get_key iterator in
       let value = Rocks.Iterator.get_value iterator in
-      loop ((key, value) :: accum)
+      Rocks.Iterator.prev iterator ;
+      loop ((key, value) :: accum) )
     else accum
   in
   loop []

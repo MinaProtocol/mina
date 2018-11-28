@@ -95,12 +95,14 @@ module Make
   let account_list_bin {kvdb; _} account_bin_read : Account.t list =
     let all_keys_values = Kvdb.to_alist kvdb in
     (* see comment at top of location.ml about encoding of locations *)
-    let account_location_byte = Char.to_int '\xfe' in
+    let account_location_prefix =
+      Location.Prefix.account |> Unsigned.UInt8.to_int
+    in
     (* just want list of locations and accounts, ignoring other locations *)
     let locations_accounts_bin =
       List.filter all_keys_values ~f:(fun (loc, _v) ->
-          let ch = Bigstring.get_int8 loc ~pos:0 in
-          Int.equal ch account_location_byte )
+          let ch = Bigstring.get_uint8 loc ~pos:0 in
+          Int.equal ch account_location_prefix )
     in
     List.map locations_accounts_bin ~f:(fun (_location_bin, account_bin) ->
         account_bin_read account_bin ~pos_ref:(ref 0) )

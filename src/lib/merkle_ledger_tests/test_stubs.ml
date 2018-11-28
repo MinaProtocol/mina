@@ -109,7 +109,12 @@ module In_memory_kvdb : Intf.Key_value_database = struct
     {uuid: Uuid.Stable.V1.t; table: Bigstring_frozen.t Bigstring_frozen.Table.t}
   [@@deriving sexp]
 
-  let to_alist t = Bigstring_frozen.Table.to_alist t.table
+  let to_alist t =
+    let unsorted = Bigstring_frozen.Table.to_alist t.table in
+    (* sort by key *)
+    List.sort
+      ~compare:(fun (k1, _) (k2, _) -> Bigstring_frozen.compare k1 k2)
+      unsorted
 
   let get_uuid t = t.uuid
 
