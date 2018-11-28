@@ -345,11 +345,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         {epoch: 'epoch; slot: 'slot; seed: 'epoch_seed; delegator: 'delegator}
 
       type value =
-        ( Epoch.t
-        , Epoch.Slot.t
-        , Epoch_seed.t
-        , Coda_base.Account.Index.t )
-        t
+        (Epoch.t, Epoch.Slot.t, Epoch_seed.t, Coda_base.Account.Index.t) t
 
       type var =
         ( Epoch.Unpacked.var
@@ -363,8 +359,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
 
       let of_hlist :
              ( unit
-             , 'epoch -> 'slot -> 'epoch_seed -> 'del -> unit
-             )
+             , 'epoch -> 'slot -> 'epoch_seed -> 'del -> unit )
              Coda_base.H_list.t
           -> ('epoch, 'slot, 'epoch_seed, 'del) t =
        fun Coda_base.H_list.([epoch; slot; seed; delegator]) ->
