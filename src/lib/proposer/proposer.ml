@@ -11,7 +11,7 @@ module type Inputs_intf = sig
          prev_state:Consensus_mechanism.Protocol_state.value
       -> prev_state_proof:Protocol_state_proof.t
       -> next_state:Consensus_mechanism.Protocol_state.value
-      -> Consensus_mechanism.Internal_transition.t
+      -> Internal_transition.t
       -> Protocol_state_proof.t Deferred.Or_error.t
   end
 end
@@ -84,8 +84,7 @@ end
 
 module Make (Inputs : Inputs_intf) :
   Coda_lib.Proposer_intf
-  with type external_transition :=
-              Inputs.Consensus_mechanism.External_transition.t
+  with type external_transition := Inputs.External_transition.t
    and type ledger_hash := Inputs.Ledger_hash.t
    and type ledger_builder := Inputs.Ledger_builder.t
    and type transaction := Inputs.User_command.With_valid_signature.t

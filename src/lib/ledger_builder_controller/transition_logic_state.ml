@@ -4,8 +4,7 @@ module Make (Inputs : Inputs.Base.S) :
   Transition_logic_state_intf.S
   with type tip := Inputs.Tip.t
    and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
-   and type external_transition :=
-              Inputs.Consensus_mechanism.External_transition.t
+   and type external_transition := Inputs.External_transition.t
    and type public_key_compressed := Inputs.Public_key.Compressed.t
    and type state_hash := Inputs.State_hash.t = struct
   open Inputs

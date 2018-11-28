@@ -34,10 +34,6 @@ end
 module type Inputs_intf = sig
   module Time : Protocols.Coda_pow.Time_intf
 
-  module Ledger_builder_diff : sig
-    type t [@@deriving bin_io, sexp]
-  end
-
   module Genesis_ledger : sig
     val t : Coda_base.Ledger.t
   end
@@ -45,14 +41,8 @@ module type Inputs_intf = sig
   val proposal_interval : Time.Span.t
 end
 
-module Make (Inputs : Inputs_intf) :
-  Intf.S
-  with type Internal_transition.Ledger_builder_diff.t =
-              Inputs.Ledger_builder_diff.t
-   and type External_transition.Ledger_builder_diff.t =
-              Inputs.Ledger_builder_diff.t = struct
+module Make (Inputs : Inputs_intf) : Intf.S = struct
   open Inputs
-  module Ledger_builder_diff = Ledger_builder_diff
 
   module Local_state = struct
     type t = unit [@@deriving sexp]
@@ -175,12 +165,6 @@ module Make (Inputs : Inputs_intf) :
     module Consensus_data = Consensus_transition_data
     module Prover_state = Prover_state
   end)
-
-  module Internal_transition =
-    Internal_transition.Make (Ledger_builder_diff) (Snark_transition)
-      (Prover_state)
-  module External_transition =
-    External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
   let block_interval_ms = Time.Span.to_ms proposal_interval
 

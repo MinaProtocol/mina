@@ -360,7 +360,7 @@ module type Inputs_intf = sig
 
   module Net :
     Network_intf
-    with type state_with_witness := Consensus_mechanism.External_transition.t
+    with type state_with_witness := External_transition.t
      and type ledger_builder := Ledger_builder.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type protocol_state := Consensus_mechanism.Protocol_state.value
@@ -377,7 +377,7 @@ module type Inputs_intf = sig
      and type ledger := Ledger.t
      and type ledger_builder := Ledger_builder.t
      and type ledger_builder_hash := Ledger_builder_hash.t
-     and type external_transition := Consensus_mechanism.External_transition.t
+     and type external_transition := External_transition.t
      and type protocol_state := Consensus_mechanism.Protocol_state.value
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type sync_query := Sync_ledger.query
@@ -398,7 +398,7 @@ module type Inputs_intf = sig
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type completed_work_statement := Completed_work.Statement.t
      and type completed_work_checked := Completed_work.Checked.t
-     and type external_transition := Consensus_mechanism.External_transition.t
+     and type external_transition := External_transition.t
      and type time_controller := Time.Controller.t
      and type keypair := Keypair.t
 
@@ -419,15 +419,13 @@ module Make (Inputs : Inputs_intf) = struct
     ; run_snark_worker: bool
     ; net: Net.t
     ; external_transitions:
-        (Consensus_mechanism.External_transition.t * Unix_timestamp.t)
-        Linear_pipe.Writer.t
+        (External_transition.t * Unix_timestamp.t) Linear_pipe.Writer.t
         (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
     ; ledger_builder: Ledger_builder_controller.t
     ; strongest_ledgers:
-        (Ledger_builder.t * Consensus_mechanism.External_transition.t)
-        Linear_pipe.Reader.t
+        (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t
     ; log: Logger.t
     ; mutable seen_jobs: Work_selector.State.t
     ; receipt_chain_database: Coda_base.Receipt_chain_database.t
@@ -587,8 +585,7 @@ module Make (Inputs : Inputs_intf) = struct
             Linear_pipe.transfer strongest_ledgers_for_miner tips_w
               ~f:(fun (ledger_builder, transition) ->
                 let protocol_state =
-                  Consensus_mechanism.External_transition.protocol_state
-                    transition
+                  External_transition.protocol_state transition
                 in
                 Debug_assert.debug_assert (fun () ->
                     match Ledger_builder.statement_exn ledger_builder with
@@ -617,8 +614,7 @@ module Make (Inputs : Inputs_intf) = struct
                 Proposer.Tip_change
                   { protocol_state=
                       ( protocol_state
-                      , Consensus_mechanism.External_transition
-                        .protocol_state_proof transition )
+                      , External_transition.protocol_state_proof transition )
                   ; ledger_builder
                   ; transactions=
                       Transaction_pool.transactions transaction_pool } )

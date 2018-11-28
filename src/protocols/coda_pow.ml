@@ -759,6 +759,28 @@ module type Protocol_state_intf = sig
   val hash : value -> state_hash
 end
 
+module type Internal_transition_intf = sig
+  type snark_transition
+
+  type ledger_builder_diff
+
+  type prover_state
+
+  type t [@@deriving sexp, bin_io]
+
+  val create :
+       snark_transition:snark_transition
+    -> prover_state:prover_state
+    -> ledger_builder_diff:ledger_builder_diff
+    -> t
+
+  val snark_transition : t -> snark_transition
+
+  val prover_state : t -> prover_state
+
+  val ledger_builder_diff : t -> ledger_builder_diff
+end
+
 module type External_transition_intf = sig
   type protocol_state
 
@@ -858,28 +880,6 @@ module type Consensus_mechanism_intf = sig
 
     val consensus_data : value -> Consensus_transition_data.value
   end
-
-  module Internal_transition : sig
-    type t [@@deriving sexp]
-
-    val create :
-         snark_transition:Snark_transition.value
-      -> prover_state:Prover_state.t
-      -> ledger_builder_diff:ledger_builder_diff
-      -> t
-
-    val snark_transition : t -> Snark_transition.value
-
-    val prover_state : t -> Prover_state.t
-
-    val ledger_builder_diff : t -> ledger_builder_diff
-  end
-
-  module External_transition :
-    External_transition_intf
-    with type protocol_state := Protocol_state.value
-     and type protocol_state_proof := protocol_state_proof
-     and type ledger_builder_diff := ledger_builder_diff
 
   val generate_transition :
        previous_protocol_state:Protocol_state.value
@@ -1161,12 +1161,24 @@ Merge Snark:
      and type keypair := Keypair.t
      and type time := Time.t
 
+  module Internal_transition :
+    Internal_transition_intf
+    with type snark_transition := Consensus_mechanism.Snark_transition.value
+     and type prover_state := Consensus_mechanism.Prover_state.t
+     and type ledger_builder_diff := Ledger_builder_diff.t
+
+  module External_transition :
+    External_transition_intf
+    with type protocol_state := Consensus_mechanism.Protocol_state.value
+     and type ledger_builder_diff := Ledger_builder_diff.t
+     and type protocol_state_proof := Protocol_state_proof.t
+
   module Tip :
     Tip_intf
     with type ledger_builder := Ledger_builder.t
      and type protocol_state := Consensus_mechanism.Protocol_state.value
      and type protocol_state_proof := Protocol_state_proof.t
-     and type external_transition := Consensus_mechanism.External_transition.t
+     and type external_transition := External_transition.t
      and type serializable :=
                 Consensus_mechanism.Protocol_state.value
                 * Protocol_state_proof.t
@@ -1183,9 +1195,7 @@ module Make
                                      and type protocol_state_proof :=
                                                 Inputs.Protocol_state_proof.t
                                      and type internal_transition :=
-                                                Inputs.Consensus_mechanism
-                                                .Internal_transition
-                                                .t) =
+                                                Inputs.Internal_transition.t) =
 struct
   open Inputs
 
@@ -1198,7 +1208,7 @@ struct
 
   module Event = struct
     type t =
-      | Found of Consensus_mechanism.Internal_transition.t
+      | Found of Internal_transition.t
       | New_state of Proof_carrying_state.t * Ledger_builder_transition.t
   end
 
