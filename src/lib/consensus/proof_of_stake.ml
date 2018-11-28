@@ -348,7 +348,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         ( Epoch.t
         , Epoch.Slot.t
         , Epoch_seed.t
-        , Coda_base.State_hash.t
         , Coda_base.Account.Index.t )
         t
 
@@ -356,7 +355,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         ( Epoch.Unpacked.var
         , Epoch.Slot.Unpacked.var
         , Epoch_seed.var
-        , Coda_base.State_hash.var
         , Coda_base.Account.Index.Unpacked.var )
         t
 
@@ -365,10 +363,10 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
 
       let of_hlist :
              ( unit
-             , 'epoch -> 'slot -> 'epoch_seed -> 'state_hash -> 'del -> unit
+             , 'epoch -> 'slot -> 'epoch_seed -> 'del -> unit
              )
              Coda_base.H_list.t
-          -> ('epoch, 'slot, 'epoch_seed, 'state_hash, 'del) t =
+          -> ('epoch, 'slot, 'epoch_seed, 'del) t =
        fun Coda_base.H_list.([epoch; slot; seed; delegator]) ->
         {epoch; slot; seed; delegator}
 
@@ -377,7 +375,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         [ Epoch.Unpacked.typ
         ; Epoch.Slot.Unpacked.typ
         ; Epoch_seed.typ
-        ; Coda_base.State_hash.typ
         ; Coda_base.Account.Index.Unpacked.typ ]
 
       let typ =
@@ -1017,7 +1014,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           (module M)
           ~epoch_ledger:last_data.ledger ~epoch:transition_data.epoch
           ~slot:transition_data.slot ~seed:last_data.seed
-          ~lock_checkpoint:last_data.lock_checkpoint
       in
       let%bind curr_data =
         let%map seed =
@@ -1305,7 +1301,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       let total_stake = epoch_data.ledger.total_currency in
       let proposal_data slot =
         Vrf.check ~epoch ~slot ~seed:epoch_data.seed ~local_state
-          ~lock_checkpoint:epoch_data.lock_checkpoint
           ~private_key:keypair.private_key ~total_stake
           ~ledger_hash:epoch_data.ledger.hash ~logger
       in
