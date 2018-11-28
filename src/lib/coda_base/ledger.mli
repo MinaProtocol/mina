@@ -58,7 +58,8 @@ include
 type maskable_ledger = t
 
 (* TODO: Actually implement serializable properly #1206 *)
-include Protocols.Coda_pow.Mask_serializable_intf
+include
+  Protocols.Coda_pow.Mask_serializable_intf
   with type serializable = int
    and type t := t
    and type unattached_mask := unattached_mask

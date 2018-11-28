@@ -159,7 +159,9 @@ end
 
 module type Mask_serializable_intf = sig
   type t
+
   type unattached_mask
+
   type serializable [@@deriving bin_io]
 
   val unattached_mask_of_serializable : serializable -> unattached_mask
@@ -187,7 +189,8 @@ module type Ledger_intf = sig
   type account
 
   (* for masks, serializable is same as t *)
-  include Mask_serializable_intf
+  include
+    Mask_serializable_intf
     with type t := t
      and type unattached_mask := unattached_mask
 
