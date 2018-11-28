@@ -12,8 +12,8 @@ module Global_public_key = struct
   global_signer_real]
 
   let compressed =
-    Public_key.Compressed.of_base64_exn
-      "KBWuaAm5Sl5jH/dlpiTKQeUUsty/4Rq6Xz2Py2Y2i/VweJmDHwUAAAAB"
+    Snark_params.Tick.Inner_curve.one
+    |> Non_zero_curve_point.of_inner_curve_exn |> Public_key.compress
 
   let genesis_private_key = Global_signer_private_key.t
 
@@ -205,19 +205,20 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       (Public_key.var_of_t Global_public_key.t)
       (transition |> Snark_transition.blockchain_state)
 
-  let next_state_checked (state : Consensus_state.var) _state_hash _block
-      _supply_increase =
+  let next_state_checked ~(prev_state : Protocol_state.var) ~prev_state_hash:_
+      block _supply_increase =
     let open Consensus_state in
     let open Snark_params.Tick.Let_syntax in
-    let%bind length = Length.increment_var state.length in
+    let prev_state = Protocol_state.consensus_state prev_state in
+    let%bind length = Length.increment_var prev_state.length in
     let signer_public_key =
       Public_key.Compressed.var_of_t @@ Global_public_key.compressed
     in
     let%map () =
-      Public_key.Compressed.Checked.Assert.equal state.signer_public_key
+      Public_key.Compressed.Checked.Assert.equal prev_state.signer_public_key
         signer_public_key
-    in
-    {length; signer_public_key}
+    and success = is_transition_valid_checked block in
+    (`Success success, {length; signer_public_key})
 
   let update_local_state _ ~previous_consensus_state:_ ~next_consensus_state:_
       ~ledger:_ =

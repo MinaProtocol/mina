@@ -51,6 +51,8 @@ module type Basic = sig
 
   val var_of_t : t -> var
 
+  val var_to_number : var -> Number.t
+
   val var_to_triples : var -> Boolean.var Triple.t list
 end
 
