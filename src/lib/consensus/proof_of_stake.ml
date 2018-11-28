@@ -342,10 +342,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
 
     module Message = struct
       type ('epoch, 'slot, 'epoch_seed, 'delegator) t =
-        { epoch: 'epoch
-        ; slot: 'slot
-        ; seed: 'epoch_seed
-        ; delegator: 'delegator }
+        {epoch: 'epoch; slot: 'slot; seed: 'epoch_seed; delegator: 'delegator}
 
       type value =
         ( Epoch.t
@@ -406,7 +403,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           let%map seed_triples = Epoch_seed.var_to_triples seed in
           Epoch.Unpacked.var_to_triples epoch
           @ Epoch.Slot.Unpacked.var_to_triples slot
-          @ seed_triples 
+          @ seed_triples
           @ Coda_base.Account.Index.Unpacked.var_to_triples delegator
 
         let hash_to_group msg =
@@ -567,11 +564,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         in
         let%bind result, my_stake =
           get_vrf_evaluation shifted ~ledger:epoch_ledger.hash
-            ~message:
-              { Message.epoch
-              ; slot
-              ; seed
-              ; delegator= winner_addr }
+            ~message:{Message.epoch; slot; seed; delegator= winner_addr}
         in
         let%map satisifed =
           Threshold.Checked.is_satisfied ~my_stake
@@ -580,8 +573,8 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         (satisifed, result)
     end
 
-    let check ~local_state ~epoch ~slot ~seed ~private_key
-        ~total_stake ~ledger_hash ~logger =
+    let check ~local_state ~epoch ~slot ~seed ~private_key ~total_stake
+        ~ledger_hash ~logger =
       let open Message in
       let open Option.Let_syntax in
       let%bind ledger =
@@ -595,8 +588,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           Hashtbl.iteri local_state.delegators
             ~f:(fun ~key:delegator ~data:balance ->
               let vrf_result =
-                T.eval ~private_key
-                  {epoch; slot; seed; delegator}
+                T.eval ~private_key {epoch; slot; seed; delegator}
               in
               Logger.info logger
                 !"vrf result for %d: %d/%d -> %{sexp: Bignum_bigint.t}"
