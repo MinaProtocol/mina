@@ -114,10 +114,18 @@ deb:
 
 # deb-s3 https://github.com/krobertson/deb-s3
 publish_kademlia_deb:
-	deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --codename unstable --component main src/_build/coda-kademlia.deb
+	@if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
+		deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --codename stable   --component main src/_build/coda-kademlia.deb ; \
+	else \
+		deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --codename unstable --component main src/_build/coda-kademlia.deb ; \
+	fi
 
 publish_deb:
-	deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --codename unstable --component main src/_build/coda.deb
+	@if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
+		deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --codename stable   --component main src/_build/coda.deb ; \
+	else \
+		deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --codename unstable --component main src/_build/coda.deb ; \
+	fi
 
 publish_debs: publish_deb publish_kademlia_deb
 
@@ -136,9 +144,9 @@ genesiskeys:
 
 codaslim:
 	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
-	@cp src/_build/codaclient.deb .
+	@cp src/_build/coda.deb .
 	@./scripts/rebuild-docker.sh codaslim dockerfiles/Dockerfile-codaslim
-	@rm codaclient.deb
+	@rm coda.deb
 
 ########################################
 ## Tests
@@ -170,7 +178,7 @@ test-stakes:
 
 test-withsnark: SHELL := /bin/bash
 test-withsnark:
-	source scripts/test_all.sh ; cd src; CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=30000 WITH_SNARKS=true DUNE_PROFILE=test_snark run_integration_test full-test
+	source scripts/test_all.sh ; cd src; CODA_PROPOSAL_INTERVAL=30000 WITH_SNARKS=true DUNE_PROFILE=test_snark run_integration_test full-test
 
 web:
 	./scripts/web.sh

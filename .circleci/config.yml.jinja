@@ -87,7 +87,7 @@ jobs:
            - checkout
            - run:
               name: Test make test-runtest
-              command: source ~/.profile && make test-runtest
+              command: source ~/.profile && DUNE_PROFILE=test_sigs make test-runtest
 
     test-withsnark:
         resource_class: large
@@ -114,11 +114,11 @@ jobs:
               command: make check-render-circleci
           - run:
               name: Build OCaml
-              command: eval `opam config env` && DUNE_PROFILE=test make build 2>&1 | tee /tmp/buildocaml.log
+              command: eval `opam config env` && DUNE_PROFILE={{test.config}} make build 2>&1 | tee /tmp/buildocaml.log
             {% for action in test.actions %}
           - run:
               name: Running test - {{ test.friendly }} | {{ action }}
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && {{test.env_str}} 'run_integration_test' '{{ action }}' {% endfor %}
+              command: source ~/.profile && DUNE_PROFILE={{test.config}} source scripts/test_all.sh && cd src/ && {{test.env_str}} 'run_integration_test' '{{ action }}' {% endfor %}
       {% endfor %}
 
 workflows:
