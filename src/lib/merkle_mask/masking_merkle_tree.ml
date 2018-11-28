@@ -358,7 +358,6 @@ struct
       Key.Table.clear t.location_tbl ;
       Base.destroy (get_parent t)
 
-    (* NB: relies on location_of_key, not yet implemented for mask *)
     let index_of_key_exn t key =
       let location = location_of_key t key |> Option.value_exn in
       let addr = Location.to_path_exn location in
@@ -413,6 +412,7 @@ struct
               match t.current_location with
               | None -> Some first_location
               | Some loc -> (
+                (* reuse the current location, if the corresponding account has been removed *)
                 match get t loc with
                 | None -> Some loc
                 | Some _ -> Location.next loc )
