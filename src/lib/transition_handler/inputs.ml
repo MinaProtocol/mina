@@ -4,7 +4,10 @@ module type S = sig
   module Proof : Proof_intf
   module Time : Time_intf
   module Consensus_mechanism : Consensus_mechanism_intf
+    with type protocol_state_hash := Coda_base.State_hash.t
   module Transition_frontier : Transition_frontier_intf
+    with type state_hash := Coda_base.State_hash.t
+     and type external_transition := Consensus_mechanism.External_transition.t
 end
 
 (*

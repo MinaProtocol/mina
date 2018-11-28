@@ -1,29 +1,48 @@
+open Core_kernel
 open Protocols.Coda_pow
+open Pipe_lib.Strict_pipe
 
-module Make (Inputs : Inputs.S) : Transition_handler_processor_intf = struct
+module Make
+    (Inputs : Inputs.S)
+  : Transition_handler_processor_intf
+    with type state_hash := Coda_base.State_hash.t
+     and type time_controller := Inputs.Time.Controller.t
+     and type external_transition := Inputs.Consensus_mechanism.External_transition.t
+     and type transition_frontier := Inputs.Transition_frontier.t
+     and type transition_frontier_breadcrumb := Inputs.Transition_frontier.Breadcrumb.t = struct
   open Inputs
+  open Consensus_mechanism
+  module Catchup_monitor = Catchup_monitor.Make (Inputs)
 
-  let run ~logger ~valid_transition_reader ~catchup_job_writer ~catchup_breadcrumbs_reader frontier =
-    let logger = Logger.parent logger "Transition_handler.Catchup" in
+  (* TODO: calculate a sensible value from postake consensus arguments *)
+  let catchup_timeout_duration = Time.Span.of_ms 6000L
+
+  let transition_parent_hash t =
+    External_transition.protocol_state t
+    |> Protocol_state.previous_state_hash
+
+  let breadcrumb_parent_hash b =
+    Transition_frontier.Breadcrumb.transition_with_hash b
+    |> With_hash.data
+    |> transition_parent_hash
+
+  let run ~logger ~time_controller ~frontier ~valid_transition_reader ~catchup_job_writer ~catchup_breadcrumbs_reader =
+    let logger = Logger.child logger "Transition_handler.Catchup" in
     let catchup_monitor = Catchup_monitor.create ~catchup_job_writer in
-    
-    Reader.iter 
-      (Reader.Priority.create [catchup_transitions_reader; valid_transition_reader])
-      ~f:(function
-        | `Catchup_transitions [] -> Logger.error logger "read empty catchup transitions"
-        | `Catchup_transitions ((root_breadcrumb :: _) as breadcrumbs) ->
-            (match Transition_frontier.lookup frontier (breadcrumb_parent_hash root_breadcrumb) with
-            | None ->
-                Logger.error logger "read catchup transitions which did not fit into frontier"
-            | Some parent ->
-                List.fold breadcrumbs ~init:parent ~f(fun parent breadcrumb -> 
-                    Transition_frontier.add frontier ~parent ~breadcrumb))
-        | `Valid_transition transition ->
-            (match Transition_frontier.lookup frontier (transition_parent_hash transition) with
-            | None ->
-                Catchup_monitor.watch catchup_monitor transition  
-            | Some parent ->
-                let breadcrumb = Transition_frontier.Breadcrumb.create frontier ~parent ~transition in
-                Transition_frontier.add_exn frontier ~parent ~breadcrumb;
-                Catchup_monitor.notify catchup_monitor transition))
+
+    ignore (
+      Reader.Merge.iter_sync
+        [ Reader.map catchup_breadcrumbs_reader ~f:(fun cb -> `Catchup_breadcrumbs cb)
+        ; Reader.map valid_transition_reader ~f:(fun vt -> `Valid_transition vt) ]
+        ~f:(function
+          | `Catchup_breadcrumbs [] -> Logger.error logger "read empty catchup transitions"
+          | `Catchup_breadcrumbs ((_ :: _) as breadcrumbs) ->
+              List.iter breadcrumbs ~f:(Transition_frontier.attach_breadcrumb_exn frontier)
+          | `Valid_transition transition ->
+              (match Transition_frontier.find frontier (transition_parent_hash (With_hash.data transition)) with
+              | None ->
+                  Catchup_monitor.watch catchup_monitor ~logger ~time_controller ~timeout_duration:catchup_timeout_duration ~transition
+              | Some _ ->
+                  ignore (Transition_frontier.add_transition_exn frontier transition);
+                  Catchup_monitor.notify catchup_monitor ~time_controller ~transition)))
 end
