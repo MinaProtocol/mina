@@ -96,16 +96,6 @@ module Base = struct
         val to_string_record : value -> string
       end
 
-      module External_transition : sig
-        type t [@@deriving bin_io, eq, compare, sexp]
-
-        val protocol_state : t -> Protocol_state.value
-
-        val protocol_state_proof : t -> Protocol_state_proof.t
-
-        val ledger_builder_diff : t -> Ledger_builder_diff.t
-      end
-
       (* This checks the SNARKs in State/LB and does the transition *)
 
       val select :
@@ -122,6 +112,16 @@ module Base = struct
         -> snarked_ledger:(unit -> Ledger.t Or_error.t)
         -> local_state:Local_state.t
         -> unit
+    end
+
+    module External_transition : sig
+      type t [@@deriving bin_io, eq, compare, sexp]
+
+      val protocol_state : t -> Consensus_mechanism.Protocol_state.value
+
+      val protocol_state_proof : t -> Protocol_state_proof.t
+
+      val ledger_builder_diff : t -> Ledger_builder_diff.t
     end
 
     module Ledger_proof_statement : sig
@@ -152,8 +152,7 @@ module Base = struct
       with type ledger_builder := Ledger_builder.t
        and type protocol_state := Consensus_mechanism.Protocol_state.value
        and type protocol_state_proof := Protocol_state_proof.t
-       and type external_transition :=
-                  Consensus_mechanism.External_transition.t
+       and type external_transition := External_transition.t
 
     val verify_blockchain :
          Protocol_state_proof.t

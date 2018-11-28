@@ -38,7 +38,7 @@ module Snarkable = struct
 
       val typ : (var, value) typ
 
-      val var_to_bits : var -> boolean_var list
+      val var_to_bits : var -> boolean_var Bitstring_lib.Bitstring.Lsb_first.t
 
       val var_to_triples : var -> boolean_var Triple.t list
 
@@ -71,9 +71,11 @@ module Snarkable = struct
   end
 
   module type Small = sig
-    include Faithful
-
     type comparison_result
+
+    type field_var
+
+    include Faithful with type Packed.var = private field_var
 
     val compare_var :
       Unpacked.var -> Unpacked.var -> (comparison_result, _) checked
@@ -86,6 +88,8 @@ module Snarkable = struct
     val assert_equal_var : Unpacked.var -> Unpacked.var -> (unit, _) checked
 
     val equal_var : Unpacked.var -> Unpacked.var -> (boolean_var, _) checked
+
+    val var_of_field : field_var -> (Unpacked.var, _) checked
 
     val if_ :
          boolean_var

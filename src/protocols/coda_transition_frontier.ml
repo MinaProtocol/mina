@@ -5,19 +5,37 @@ module type Transition_frontier_intf = sig
 
   type external_transition
 
-  type merkle_ledger
+  type ledger_database
+
+  type transaction_snark_scan_state
+
+  type ledger_diff
+
+  type staged_ledger
+
+  exception
+    Parent_not_found of ([`Parent of state_hash] * [`Target of state_hash])
+
+  exception Already_exists of state_hash
+
+  val max_length : int
 
   module Breadcrumb : sig
     type t
 
-    val transition : t -> (external_transition, state_hash) With_hash.t
+    val transition_with_hash :
+      t -> (external_transition, state_hash) With_hash.t
+
+    val staged_ledger : t -> staged_ledger
   end
 
   type t
 
   val create :
-       root:(external_transition, state_hash) With_hash.t
-    -> ledger:merkle_ledger
+       root_transition:(external_transition, state_hash) With_hash.t
+    -> root_snarked_ledger:ledger_database
+    -> root_transaction_snark_scan_state:transaction_snark_scan_state
+    -> root_staged_ledger_diff:ledger_diff
     -> t
 
   val root : t -> Breadcrumb.t
@@ -26,7 +44,13 @@ module type Transition_frontier_intf = sig
 
   val path : t -> Breadcrumb.t -> state_hash list
 
-  val get : t -> state_hash -> Breadcrumb.t
+  val find : t -> state_hash -> Breadcrumb.t option
+
+  val find_exn : t -> state_hash -> Breadcrumb.t
+
+  val successor_hashes : t -> state_hash -> state_hash list
+
+  val successor_hashes_rec : t -> state_hash -> state_hash list
 
   val successors : t -> Breadcrumb.t -> Breadcrumb.t list
 
@@ -108,6 +132,8 @@ module type Transition_frontier_controller_intf = sig
   type syncable_ledger_query
 
   type syncable_ledger_answer
+
+  type transition_frontier
 
   val run :
        genesis_transition:external_transition

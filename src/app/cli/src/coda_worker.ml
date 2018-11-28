@@ -280,10 +280,7 @@ module T = struct
         let r, w = Linear_pipe.create () in
         don't_wait_for
           (Linear_pipe.iter (Main.strongest_ledgers coda) ~f:(fun t ->
-               let p =
-                 Main.Inputs.Consensus_mechanism.External_transition
-                 .protocol_state t
-               in
+               let p = Main.Inputs.External_transition.protocol_state t in
                let prev_state_hash =
                  Main.Inputs.Consensus_mechanism.Protocol_state
                  .previous_state_hash p
