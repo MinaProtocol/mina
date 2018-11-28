@@ -341,47 +341,35 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     end
 
     module Message = struct
-      type ('epoch, 'slot, 'epoch_seed, 'state_hash, 'delegator) t =
-        { epoch: 'epoch
-        ; slot: 'slot
-        ; seed: 'epoch_seed
-        ; lock_checkpoint: 'state_hash
-        ; delegator: 'delegator }
+      type ('epoch, 'slot, 'epoch_seed, 'delegator) t =
+        {epoch: 'epoch; slot: 'slot; seed: 'epoch_seed; delegator: 'delegator}
 
       type value =
-        ( Epoch.t
-        , Epoch.Slot.t
-        , Epoch_seed.t
-        , Coda_base.State_hash.t
-        , Coda_base.Account.Index.t )
-        t
+        (Epoch.t, Epoch.Slot.t, Epoch_seed.t, Coda_base.Account.Index.t) t
 
       type var =
         ( Epoch.Unpacked.var
         , Epoch.Slot.Unpacked.var
         , Epoch_seed.var
-        , Coda_base.State_hash.var
         , Coda_base.Account.Index.Unpacked.var )
         t
 
-      let to_hlist {epoch; slot; seed; lock_checkpoint; delegator} =
-        Coda_base.H_list.[epoch; slot; seed; lock_checkpoint; delegator]
+      let to_hlist {epoch; slot; seed; delegator} =
+        Coda_base.H_list.[epoch; slot; seed; delegator]
 
       let of_hlist :
              ( unit
-             , 'epoch -> 'slot -> 'epoch_seed -> 'state_hash -> 'del -> unit
-             )
+             , 'epoch -> 'slot -> 'epoch_seed -> 'del -> unit )
              Coda_base.H_list.t
-          -> ('epoch, 'slot, 'epoch_seed, 'state_hash, 'del) t =
-       fun Coda_base.H_list.([epoch; slot; seed; lock_checkpoint; delegator]) ->
-        {epoch; slot; seed; lock_checkpoint; delegator}
+          -> ('epoch, 'slot, 'epoch_seed, 'del) t =
+       fun Coda_base.H_list.([epoch; slot; seed; delegator]) ->
+        {epoch; slot; seed; delegator}
 
       let data_spec =
         let open Snark_params.Tick.Data_spec in
         [ Epoch.Unpacked.typ
         ; Epoch.Slot.Unpacked.typ
         ; Epoch_seed.typ
-        ; Coda_base.State_hash.typ
         ; Coda_base.Account.Index.Unpacked.typ ]
 
       let typ =
@@ -389,10 +377,9 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
 
-      let fold {epoch; slot; seed; lock_checkpoint; delegator} =
+      let fold {epoch; slot; seed; delegator} =
         let open Fold in
         Epoch.fold epoch +> Epoch.Slot.fold slot +> Epoch_seed.fold seed
-        +> Coda_base.State_hash.fold lock_checkpoint
         +> Coda_base.Account.Index.fold delegator
 
       let hash_to_group msg =
@@ -403,15 +390,12 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         msg_hash_state.acc
 
       module Checked = struct
-        let var_to_triples {epoch; slot; seed; lock_checkpoint; delegator} =
+        let var_to_triples {epoch; slot; seed; delegator} =
           let open Snark_params.Tick.Let_syntax in
-          let%map seed_triples = Epoch_seed.var_to_triples seed
-          and lock_checkpoint_triples =
-            Coda_base.State_hash.var_to_triples lock_checkpoint
-          in
+          let%map seed_triples = Epoch_seed.var_to_triples seed in
           Epoch.Unpacked.var_to_triples epoch
           @ Epoch.Slot.Unpacked.var_to_triples slot
-          @ seed_triples @ lock_checkpoint_triples
+          @ seed_triples
           @ Coda_base.Account.Index.Unpacked.var_to_triples delegator
 
         let hash_to_group msg =
@@ -427,9 +411,8 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         let%map epoch = Epoch.gen
         and slot = Epoch.Slot.gen
         and seed = Epoch_seed.gen
-        and lock_checkpoint = Coda_base.State_hash.gen
         and delegator = Coda_base.Account.Index.gen in
-        {epoch; slot; seed; lock_checkpoint; delegator}
+        {epoch; slot; seed; delegator}
     end
 
     module Output = struct
@@ -564,8 +547,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       (evaluation, account.balance)
 
     module Checked = struct
-      let check shifted ~(epoch_ledger : Epoch_ledger.var) ~epoch ~slot ~seed
-          ~lock_checkpoint =
+      let check shifted ~(epoch_ledger : Epoch_ledger.var) ~epoch ~slot ~seed =
         let open Snark_params.Tick in
         let open Let_syntax in
         let%bind winner_addr =
@@ -574,12 +556,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         in
         let%bind result, my_stake =
           get_vrf_evaluation shifted ~ledger:epoch_ledger.hash
-            ~message:
-              { Message.epoch
-              ; slot
-              ; seed
-              ; lock_checkpoint
-              ; delegator= winner_addr }
+            ~message:{Message.epoch; slot; seed; delegator= winner_addr}
         in
         let%map satisifed =
           Threshold.Checked.is_satisfied ~my_stake
@@ -588,8 +565,8 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         (satisifed, result)
     end
 
-    let check ~local_state ~epoch ~slot ~seed ~lock_checkpoint ~private_key
-        ~total_stake ~ledger_hash ~logger =
+    let check ~local_state ~epoch ~slot ~seed ~private_key ~total_stake
+        ~ledger_hash ~logger =
       let open Message in
       let open Option.Let_syntax in
       let%bind ledger =
@@ -603,8 +580,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           Hashtbl.iteri local_state.delegators
             ~f:(fun ~key:delegator ~data:balance ->
               let vrf_result =
-                T.eval ~private_key
-                  {epoch; slot; seed; lock_checkpoint; delegator}
+                T.eval ~private_key {epoch; slot; seed; delegator}
               in
               Logger.info logger
                 !"vrf result for %d: %d/%d -> %{sexp: Bignum_bigint.t}"
@@ -1033,7 +1009,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           (module M)
           ~epoch_ledger:last_data.ledger ~epoch:transition_data.epoch
           ~slot:transition_data.slot ~seed:last_data.seed
-          ~lock_checkpoint:last_data.lock_checkpoint
       in
       let%bind curr_data =
         let%map seed =
@@ -1321,7 +1296,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       let total_stake = epoch_data.ledger.total_currency in
       let proposal_data slot =
         Vrf.check ~epoch ~slot ~seed:epoch_data.seed ~local_state
-          ~lock_checkpoint:epoch_data.lock_checkpoint
           ~private_key:keypair.private_key ~total_stake
           ~ledger_hash:epoch_data.ledger.hash ~logger
       in
