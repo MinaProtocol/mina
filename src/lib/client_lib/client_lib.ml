@@ -292,4 +292,15 @@ module Get_public_keys = struct
     Rpc.Rpc.create ~name:"Get_public_keys" ~version:0 ~bin_query ~bin_response
 end
 
+module Stop_daemon = struct
+  type query = unit [@@deriving bin_io]
+
+  type response = unit [@@deriving bin_io]
+
+  type error = unit
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Stop_daemon" ~version:0 ~bin_query ~bin_response
+end
+
 module Git_sha = Git_sha

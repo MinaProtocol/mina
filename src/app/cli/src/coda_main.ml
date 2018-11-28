@@ -1166,7 +1166,10 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       ; Rpc.Rpc.implement Client_lib.Clear_hist_status.rpc (fun () () ->
             return (clear_hist_status coda) )
       ; Rpc.Rpc.implement Client_lib.Get_ledger.rpc (fun () lh ->
-            get_ledger coda lh ) ]
+            get_ledger coda lh )
+      ; Rpc.Rpc.implement Client_lib.Stop_daemon.rpc (fun () () ->
+            Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
+            Deferred.unit ) ]
     in
     let snark_worker_impls =
       [ Rpc.Rpc.implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
