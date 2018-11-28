@@ -403,6 +403,31 @@ let%test_module "Test mask connected to underlying Merkle tree" =
                   Balance.to_int (Account.balance account) + total )
             in
             assert (Int.equal retrieved_total total) )
+
+      let%test_unit "reuse of locations for removed accounts" =
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            let num_accounts = 5 in
+            let keys = Key.gen_keys num_accounts in
+            let balances =
+              Quickcheck.random_value
+                (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
+            in
+            let accounts = List.map2_exn keys balances ~f:Account.create in
+            assert (
+              Option.is_none
+                (Mask.Attached.For_testing.current_location attached_mask) ) ;
+            (* add accounts to mask *)
+            List.iter accounts ~f:(fun account ->
+                ignore @@ create_new_account_exn attached_mask account ) ;
+            assert (
+              Option.is_some
+                (Mask.Attached.For_testing.current_location attached_mask) ) ;
+            (* remove accounts *)
+            Mask.Attached.remove_accounts_exn attached_mask keys ;
+            assert (
+              Option.is_none
+                (Mask.Attached.For_testing.current_location attached_mask) ) )
     end
 
     module type Depth_S = sig

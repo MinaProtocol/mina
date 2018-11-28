@@ -198,6 +198,12 @@ struct
         used when allocating a location
       *)
       Key.Table.remove t.location_tbl (Account.public_key_of_account account) ;
+      (* reuse location if possible *)
+      let curr_loc = Option.value_exn t.current_location in
+      ( if Location.equal location curr_loc then
+        match Location.prev location with
+        | Some prev_loc -> t.current_location <- Some prev_loc
+        | None -> t.current_location <- None ) ;
       (* update hashes *)
       let account_address = Location.to_path_exn location in
       let account_hash = Hash.empty_account in
@@ -348,8 +354,15 @@ struct
          if raised, the parent hasn't removed any accounts,
           and we don't try to remove any accounts from mask *)
       Base.remove_accounts_exn (get_parent t) parent_keys ;
-      (* removing accounts in parent succeeded, so proceed with removing accounts from mask *)
-      List.iter mask_locations ~f:(remove_account_and_update_hashes t)
+      (* removing accounts in parent succeeded, so proceed with removing accounts from mask
+         we sort mask locations in reverse order, potentially allowing reuse of locations
+      *)
+      let rev_sorted_mask_locations =
+        List.sort mask_locations ~compare:(fun loc1 loc2 ->
+            Location.compare loc2 loc1 )
+      in
+      List.iter rev_sorted_mask_locations
+        ~f:(remove_account_and_update_hashes t)
 
     (* TODO : should destroy do a "commit" ? *)
     let destroy t =
@@ -391,6 +404,8 @@ struct
         Option.is_some (find_account t location)
 
       let address_in_mask t addr = Option.is_some (find_hash t addr)
+
+      let current_location t = t.current_location
     end
 
     (* leftmost location *)
@@ -411,11 +426,7 @@ struct
             let maybe_location =
               match t.current_location with
               | None -> Some first_location
-              | Some loc -> (
-                (* reuse the current location, if the corresponding account has been removed *)
-                match get t loc with
-                | None -> Some loc
-                | Some _ -> Location.next loc )
+              | Some loc -> Location.next loc
             in
             if not (Option.is_some maybe_location) then
               Or_error.error_string "Db_error.Out_of_leaves"

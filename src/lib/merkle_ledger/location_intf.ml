@@ -43,6 +43,7 @@ module type S = sig
   val parent : t -> t
 
   val next : t -> t Option.t
+
   val prev : t -> t Option.t
 
   val sibling : t -> t

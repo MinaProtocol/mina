@@ -337,7 +337,7 @@ end) : S = struct
         match next address with
         | None -> ()
         | Some addr' ->
-          [%test_result: t option] ~expect:(Some address) (prev addr') )
+            [%test_result: t option] ~expect:(Some address) (prev addr') )
 end
 
 let%test_module "Address" =
