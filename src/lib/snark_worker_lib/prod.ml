@@ -43,7 +43,7 @@ module Inputs = struct
   module Public_key = struct
     include Public_key.Compressed
 
-    let arg_type = Cli_lib.public_key_compressed
+    let arg_type = Cli_lib.Arg_type.public_key_compressed
   end
 
   module Transaction = Coda_base.Transaction
