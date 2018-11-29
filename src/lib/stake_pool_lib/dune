@@ -1,0 +1,10 @@
+(library
+  (name stake_pool_lib)
+  (public_name stake_pool_lib)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (libraries
+    sodium
+    protocols
+    signature_lib
+    core_kernel
+    coda_base))
