@@ -20,7 +20,7 @@ Specifically [Core](https://opensource.janestreet.com/core/) (common datastructu
 On top of most files you'll see some variant of `open Core` and `open Async`.
 Here in [client.ml](../src/app/cli/src/client.ml) we see that too. `Async` shadows the `Command` type and lets us declaratively express the details of each command.
 If you scroll to the bottom of [client.ml](../src/app/cli/src/client.ml), you'll find we register the `send-payment` command to the function `send_payment`.
-Here we describe the flags this action depends on: `receiver` a [public key](#public-key), a fee, an amount, and a path to your [private key](#private-key). These flag param kinds are defined in [client_lib.ml](../src/lib/client_lib.ml).
+Here we describe the flags this action depends on: `receiver` a [public key](#public-key), a fee, an amount, and a path to your [private key](#private-key). These flag param kinds are defined in [daemon_rpcs.ml](../src/lib/daemon_rpcs.ml).
 In the body of `send_payment` we build a payment and send it over to the [daemon](#daemon).
 
 <a name="payment"></a>
@@ -137,7 +137,7 @@ Let's assume we have an instance of `Run.t` already created, and we'll circle ba
 <a name="client-rpc"></a>
 ### Client_rpc
 
-In [client_lib.ml](../src/lib/client_lib/client_lib.ml), we define the concrete RPC calls that the client uses to communicate to the daemon. We use [Async](https://opensource.janestreet.com/async/)'s RPC library for this. `Send_payments` defined the RPC call we use to send the payment: the query type is the input -- the payments we want to send -- and the response is the output -- in this case `unit`, because we don't get any meaningful feedback other than "the payment has been enqueued" on success.
+In [daemon_rpcs.ml](../src/lib/daemon_rpcs/daemon_rpcs.ml), we define the concrete RPC calls that the client uses to communicate to the daemon. We use [Async](https://opensource.janestreet.com/async/)'s RPC library for this. `Send_payments` defined the RPC call we use to send the payment: the query type is the input -- the payments we want to send -- and the response is the output -- in this case `unit`, because we don't get any meaningful feedback other than "the payment has been enqueued" on success.
 
 ### Schedule payment into Transaction pool
 
