@@ -9,17 +9,9 @@ open Blockchain_snark
 open Cli_lib
 
 module type S = sig
-  module Worker_state : sig
-    type t
-
-    val create : unit -> t Deferred.t
-  end
-
   type t
 
-  val create : conf_dir:string -> t Deferred.t
-
-  val initialized : t -> [`Initialized] Deferred.Or_error.t
+  val create : conf_dir:string -> logger:Logger.t -> t Deferred.t
 
   val extend_blockchain :
        t
@@ -27,7 +19,7 @@ module type S = sig
     -> Consensus.Mechanism.Protocol_state.value
     -> Consensus.Mechanism.Snark_transition.value
     -> Consensus.Mechanism.Prover_state.t
-    -> Blockchain.t Deferred.Or_error.t
+    -> Blockchain.t Deferred.t
 end
 
 module Consensus_mechanism = Consensus.Mechanism
@@ -119,11 +111,6 @@ module Functions = struct
 
   let create input output f : ('i, 'o) t = (input, output, f)
 
-  let initialized =
-    create bin_unit [%bin_type_class: [`Initialized]] (fun w () ->
-        let%map (module W) = Worker_state.get w in
-        `Initialized )
-
   [%%if
   with_snark]
 
@@ -178,8 +165,7 @@ module Worker = struct
     module F = Rpc_parallel.Function
 
     type 'w functions =
-      { initialized: ('w, unit, [`Initialized]) F.t
-      ; extend_blockchain:
+      { extend_blockchain:
           ( 'w
           , Blockchain.t
             * Consensus_mechanism.Protocol_state.value
@@ -209,8 +195,7 @@ module Worker = struct
             ~bin_input:i ~bin_output:o ()
         in
         let open Functions in
-        { initialized= f initialized
-        ; extend_blockchain= f extend_blockchain
+        { extend_blockchain= f extend_blockchain
         ; verify_blockchain= f verify_blockchain }
 
       let init_worker_state () = Worker_state.create ()
@@ -222,26 +207,28 @@ module Worker = struct
   include Rpc_parallel.Make (T)
 end
 
-type t = {connection: Worker.Connection.t; process: Process.t}
+type t = {connection: Worker.Connection.t; logger: Logger.t}
 
-let create ~conf_dir =
-  let%map connection, process =
-    (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
-    Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-      ~on_failure:Error.raise ~shutdown_on:Disconnect
-      ~connection_state_init_arg:() ()
-  in
-  File_system.dup_stdout process ;
-  File_system.dup_stderr process ;
-  {connection; process}
+let create ~conf_dir ~logger =
+  (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
+  Parallel.run_connection ~logger ~error_message:"Cannot create prover process"
+    (Worker.spawn_in_foreground ~connection_timeout:(Time.Span.of_min 1.)
+       ~on_failure:Error.raise ~shutdown_on:Disconnect
+       ~connection_state_init_arg:() ())
+    ~on_success:(fun (connection, process) ->
+      File_system.dup_stdout process ;
+      File_system.dup_stderr process ;
+      {connection; logger} )
 
-let initialized {connection; _} =
-  Worker.Connection.run connection ~f:Worker.functions.initialized ~arg:()
+let extend_blockchain {connection; logger} chain next_state block prover_state
+    =
+  Parallel.run_connection ~logger ~error_message:"Cannot connect to prover"
+    ~on_success:Fn.id
+    (Worker.Connection.run connection ~f:Worker.functions.extend_blockchain
+       ~arg:(chain, next_state, block, prover_state))
 
-let extend_blockchain {connection; _} chain next_state block prover_state =
-  Worker.Connection.run connection ~f:Worker.functions.extend_blockchain
-    ~arg:(chain, next_state, block, prover_state)
-
-let verify_blockchain {connection; _} chain =
-  Worker.Connection.run connection ~f:Worker.functions.verify_blockchain
-    ~arg:chain
+let verify_blockchain {connection; logger} chain =
+  Parallel.run_connection ~logger ~error_message:"Cannot connect to prover"
+    ~on_success:Fn.id
+    (Worker.Connection.run connection ~f:Worker.functions.verify_blockchain
+       ~arg:chain)

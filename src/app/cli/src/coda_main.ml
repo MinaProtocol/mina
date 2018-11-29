@@ -351,10 +351,11 @@ let make_init ~should_propose (module Config : Config_intf) :
     (module Init_intf) Deferred.t =
   let open Config in
   let%bind proposer_prover =
-    if should_propose then Prover.create ~conf_dir >>| fun p -> `Proposer p
+    if should_propose then
+      Prover.create ~logger ~conf_dir >>| fun p -> `Proposer p
     else return `Non_proposer
   in
-  let%map verifier = Verifier.create ~conf_dir in
+  let%map verifier = Verifier.create ~logger ~conf_dir in
   let (module Make_work_selector : Work_selector_F) =
     match work_selection with
     | Seq -> (module Work_selector.Sequence.Make : Work_selector_F)
@@ -412,15 +413,7 @@ struct
     type input = Protocol_state.value
 
     let verify state_proof state =
-      match%map
-        Verifier.verify_blockchain Init.verifier {proof= state_proof; state}
-      with
-      | Ok b -> b
-      | Error e ->
-          Logger.error Init.logger
-            !"Could not connect to verifier: %{sexp:Error.t}"
-            e ;
-          false
+      Verifier.verify_blockchain Init.verifier {proof= state_proof; state}
   end
 
   module Fee_transfer = Coda_base.Fee_transfer
@@ -796,7 +789,7 @@ struct
         match Init.proposer_prover with
         | `Non_proposer -> failwith "prove: Coda not run as proposer"
         | `Proposer prover ->
-            let open Deferred.Or_error.Let_syntax in
+            let open Deferred.Let_syntax in
             Prover.extend_blockchain prover
               (Blockchain.create ~proof:prev_state_proof ~state:prev_state)
               next_state
@@ -853,16 +846,7 @@ module Make_coda (Init : Init_intf) = struct
                 stmt)
              0)
       then Deferred.return false
-      else
-        match%map
-          Verifier.verify_transaction_snark Init.verifier t ~message
-        with
-        | Ok b -> b
-        | Error e ->
-            Logger.warn Init.logger
-              !"Bad transaction snark: %{sexp: Error.t}"
-              e ;
-            false
+      else Verifier.verify_transaction_snark Init.verifier t ~message
   end
 
   module Inputs = struct

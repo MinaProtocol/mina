@@ -53,7 +53,6 @@ end = struct
 
       let step logger {With_hash.data= tip; hash= tip_hash}
           {With_hash.data= transition; hash= transition_target_hash} =
-        let open Deferred.Or_error.Let_syntax in
         let old_state = tip.Tip.protocol_state in
         let new_state = External_transition.protocol_state transition in
         let%bind verified =
@@ -61,6 +60,7 @@ end = struct
             (External_transition.protocol_state_proof transition)
             new_state
         in
+        let open Deferred.Or_error.Let_syntax in
         let%bind ledger_hash =
           match%map
             apply' tip.ledger_builder
@@ -626,7 +626,7 @@ let%test_module "test" =
 
         module Store = Store
 
-        let verify_blockchain _ _ = Deferred.Or_error.return true
+        let verify_blockchain _ _ = Deferred.return true
       end
 
       include Make (Inputs)

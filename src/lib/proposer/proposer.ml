@@ -12,7 +12,7 @@ module type Inputs_intf = sig
       -> prev_state_proof:Protocol_state_proof.t
       -> next_state:Consensus_mechanism.Protocol_state.value
       -> Internal_transition.t
-      -> Protocol_state_proof.t Deferred.Or_error.t
+      -> Protocol_state_proof.t Deferred.t
   end
 end
 
@@ -266,9 +266,9 @@ module Make (Inputs : Inputs_intf) :
               | None -> Interruptible.return ()
               | Some (protocol_state, internal_transition) ->
                   lift_sync (fun () ->
-                      let open Deferred.Or_error.Let_syntax in
                       ignore
                         (let t0 = Time.now time_controller in
+                         let open Deferred.Let_syntax in
                          let%map protocol_state_proof =
                            Prover.prove ~prev_state:previous_protocol_state
                              ~prev_state_proof:previous_protocol_state_proof

@@ -157,7 +157,7 @@ module Base = struct
     val verify_blockchain :
          Protocol_state_proof.t
       -> Consensus_mechanism.Protocol_state.value
-      -> bool Deferred.Or_error.t
+      -> bool Deferred.t
   end
 end
 

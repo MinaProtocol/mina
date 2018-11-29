@@ -394,17 +394,13 @@ module Make (Inputs : Inputs_intf) :
     let transition = With_hash.data transition_with_hash in
     let proof = External_transition.protocol_state_proof transition in
     let protocol_state = External_transition.protocol_state transition in
-    match%bind verify_blockchain proof protocol_state with
-    | Error e ->
-        Logger.error log !"Could not connect to verifier: %{sexp:Error.t}" e ;
-        Deferred.return None
-    | Ok false ->
-        Logger.faulty_peer log
-          !"Recieved malicious transition. Will not add external transition \
-            %{sexp:External_transition.t}"
-          transition ;
-        Deferred.return None
-    | Ok true -> on_success ()
+    if%bind verify_blockchain proof protocol_state then on_success ()
+    else (
+      Logger.faulty_peer log
+        !"Recieved malicious transition. Will not add external transition \
+          %{sexp:External_transition.t}"
+        transition ;
+      Deferred.return None )
 
   let unguarded_on_new_transition catchup t transition_with_hash ~time_received
       :

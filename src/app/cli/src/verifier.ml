@@ -12,15 +12,12 @@ open Snark_params
 module type S = sig
   type t
 
-  val create : conf_dir:string -> t Deferred.t
+  val create : conf_dir:string -> logger:Logger.t -> t Deferred.t
 
-  val verify_blockchain : t -> Blockchain.t -> bool Or_error.t Deferred.t
+  val verify_blockchain : t -> Blockchain.t -> bool Deferred.t
 
   val verify_transaction_snark :
-       t
-    -> Transaction_snark.t
-    -> message:Sok_message.t
-    -> bool Or_error.t Deferred.t
+    t -> Transaction_snark.t -> message:Sok_message.t -> bool Deferred.t
 end
 
 module Worker_state = struct
@@ -127,21 +124,26 @@ module Worker = struct
   include Rpc_parallel.Make (T)
 end
 
-type t = Worker.Connection.t
+type t = {connection: Worker.Connection.t; logger: Logger.t}
 
-let create ~conf_dir =
-  let%map connection, process =
-    Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-      ~on_failure:Error.raise ~shutdown_on:Disconnect
-      ~connection_state_init_arg:() ()
-  in
-  File_system.dup_stdout process ;
-  File_system.dup_stderr process ;
-  connection
+let create ~conf_dir ~logger =
+  Parallel.run_connection ~logger ~error_message:"Verifier process died"
+    (Worker.spawn_in_foreground ~connection_timeout:(Time.Span.of_min 1.)
+       ~on_failure:Error.raise ~shutdown_on:Disconnect
+       ~connection_state_init_arg:() ())
+    ~on_success:(fun (connection, process) ->
+      File_system.dup_stdout process ;
+      File_system.dup_stderr process ;
+      {connection; logger} )
 
-let verify_blockchain t chain =
-  Worker.Connection.run t ~f:Worker.functions.verify_blockchain ~arg:chain
+let verify_blockchain {connection; logger} chain =
+  Parallel.run_connection ~logger
+    ~error_message:"Could not connect to verifier" ~on_success:Fn.id
+    (Worker.Connection.run connection ~f:Worker.functions.verify_blockchain
+       ~arg:chain)
 
-let verify_transaction_snark t snark ~message =
-  Worker.Connection.run t ~f:Worker.functions.verify_transaction_snark
-    ~arg:(snark, message)
+let verify_transaction_snark {connection; logger} snark ~message =
+  Parallel.run_connection ~logger
+    ~error_message:"Could not connect to verifier" ~on_success:Fn.id
+    (Worker.Connection.run connection
+       ~f:Worker.functions.verify_transaction_snark ~arg:(snark, message))
