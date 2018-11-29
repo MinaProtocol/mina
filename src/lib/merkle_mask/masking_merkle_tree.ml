@@ -97,6 +97,10 @@ struct
     let set_hash t address hash =
       Addr.Table.set t.hash_tbl ~key:address ~data:hash
 
+    let set_inner_hash_at_addr_exn t address hash =
+      assert (Addr.depth address <= Base.depth) ;
+      set_hash t address hash
+
     (* don't rely on a particular implementation *)
     let find_location t public_key = Key.Table.find t.location_tbl public_key
 
@@ -184,8 +188,25 @@ struct
         ~init:[(starting_address, starting_hash)]
         ~f:get_addresses_hashes
 
+    (* WARNING: This is n*log(n) and shouldn't be. See issue #1219 *)
+    let recompute_tree t =
+      let locations_and_accounts = Location.Table.to_alist t.account_tbl in
+      List.iter locations_and_accounts ~f:(fun (location, account) ->
+          let starting_address = Location.to_path_exn location in
+          let merkle_path = merkle_path t location in
+          let account_hash =
+            find_hash t starting_address |> Option.value_exn
+          in
+          let addresses_and_hashes =
+            addresses_and_hashes_from_merkle_path_exn merkle_path
+              starting_address account_hash
+          in
+          List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
+              set_inner_hash_at_addr_exn t addr hash ) )
+
     (* use mask Merkle root, if it exists, else get from parent *)
     let merkle_root t =
+      recompute_tree t ;
       match find_hash t (Addr.root ()) with
       | Some hash -> hash
       | None -> Base.merkle_root (get_parent t)
@@ -291,7 +312,7 @@ struct
       ; current_location= t.current_location }
 
     let get_all_accounts_rooted_at_exn t address =
-      (* accounts in parent and mask are disjoint sets *)
+      (* accounts in parent and mask are not necessarily disjoint sets *)
       let parent_accounts =
         Base.get_all_accounts_rooted_at_exn (get_parent t) address
       in
@@ -304,7 +325,22 @@ struct
             account :: acc )
       in
       let mask_accounts = List.rev_filter_map mask_maybe_accounts ~f:Fn.id in
-      mask_accounts @ parent_accounts
+      (* Prefer the later of duplicates *)
+      let dedup_keep_latter ~equal xs =
+        let rec go acc = function
+          | [] -> List.rev acc
+          | x :: xs ->
+              if List.mem xs x ~equal then go acc xs else go (x :: acc) xs
+        in
+        go [] xs
+      in
+      (* prefer accounts from the mask if they are also in the parent *)
+      dedup_keep_latter
+        ~equal:(fun a1 a2 ->
+          Key.equal
+            (Account.public_key_of_account a1)
+            (Account.public_key_of_account a2) )
+        (parent_accounts @ mask_accounts)
 
     (* set accounts in mask *)
     let set_all_accounts_rooted_at_exn t address (accounts : Account.t list) =
@@ -318,7 +354,8 @@ struct
         | [] -> [] )
       |> ignore
 
-    let num_accounts t = Location.Table.length t.account_tbl
+    let num_accounts t =
+      Base.num_accounts (get_parent t) + Location.Table.length t.account_tbl
 
     let location_of_key t key =
       let mask_result = find_location t key in
@@ -327,11 +364,7 @@ struct
       | None -> Base.location_of_key (get_parent t) key
 
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
-    let make_space_for _t _tot = failwith "make_space_for: not implemented"
-
-    let set_inner_hash_at_addr_exn t address hash =
-      assert (Addr.depth address <= Base.depth) ;
-      set_hash t address hash
+    let make_space_for t = Base.make_space_for (get_parent t)
 
     let get_inner_hash_at_addr_exn t address =
       assert (Addr.depth address <= Base.depth) ;
