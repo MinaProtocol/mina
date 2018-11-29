@@ -527,7 +527,8 @@ let%test_module "test" =
             ; ledger_builder: Ledger_builder.t }
           [@@deriving sexp, fields]
 
-          let copy t = t
+          let copy t =
+            {t with ledger_builder= Ledger_builder.copy t.ledger_builder}
 
           let of_transition_and_lb transition ledger_builder =
             { state= External_transition.protocol_state transition
