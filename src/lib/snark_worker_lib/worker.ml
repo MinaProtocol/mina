@@ -114,7 +114,7 @@ module Make (Inputs : Intf.Inputs_intf) :
           ~doc:"HOST-AND-PORT address daemon is listening on"
       and public_key =
         flag "public-key"
-          (required Cli_lib.public_key_compressed)
+          (required Cli_lib.Arg_type.public_key_compressed)
           ~doc:"PUBLICKEY Public key to send SNARKing fees to"
       and shutdown_on_disconnect =
         flag "shutdown-on-disconnect" (optional bool)

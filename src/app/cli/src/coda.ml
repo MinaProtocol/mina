@@ -8,7 +8,7 @@ open Blockchain_snark
 open Cli_lib
 open Coda_main
 module YJ = Yojson.Safe
-module Git_sha = Client_lib.Git_sha
+module Git_sha = Daemon_rpcs.Types.Git_sha
 
 [%%if
 tracing]
@@ -32,10 +32,9 @@ module type Coda_intf = sig
   module Make (Init : Init_intf) () : Main_intf
 end
 
-let default_external_port = 8302
-
 let daemon log =
   let open Command.Let_syntax in
+  let open Cli_lib.Arg_type in
   Command.async ~summary:"Coda daemon"
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
@@ -66,14 +65,14 @@ let daemon log =
            (Printf.sprintf
               "PORT Base server port for daemon TCP (discovery UDP on port+1) \
                (default: %d)"
-              default_external_port)
+              Port.default_external)
          (optional int16)
      and client_port =
        flag "client-port"
          ~doc:
            (Printf.sprintf
               "PORT Client to daemon local communication (default: %d)"
-              default_client_port)
+              Port.default_client)
          (optional int16)
      and rest_server_port =
        flag "rest-port"
@@ -154,11 +153,11 @@ let daemon log =
        in
        let external_port : int =
          or_from_config YJ.Util.to_int_option "external-port"
-           ~default:default_external_port external_port
+           ~default:Port.default_external external_port
        in
        let client_port =
          or_from_config YJ.Util.to_int_option "client-port"
-           ~default:default_client_port client_port
+           ~default:Port.default_client client_port
        in
        let transaction_capacity_log_2 =
          or_from_config YJ.Util.to_int_option "txn-capacity" ~default:8
@@ -246,7 +245,8 @@ let daemon log =
          | None -> Deferred.return None
        in
        let%bind propose_keypair =
-         Option.map ~f:Cli_lib.read_keypair_exn' propose_key |> sequence
+         Option.map ~f:Cli_lib.Keypair.Terminal_stdin.read_exn propose_key
+         |> sequence
        in
        let%bind client_whitelist =
          Reader.load_sexp

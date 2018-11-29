@@ -60,7 +60,7 @@ module type Config_intf = sig
   val transaction_capacity_log_2 : int
   (** Capacity of transactions per block *)
 
-  val commit_id : Client_lib.Git_sha.t option
+  val commit_id : Daemon_rpcs.Types.Git_sha.t option
 
   val work_selection : Protocols.Coda_pow.Work_selection.t
 end
@@ -1062,7 +1062,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       Time_ns.diff (Time_ns.now ()) start_time
       |> Time_ns.Span.to_sec |> Int.of_float
     in
-    { Client_lib.Status.num_accounts
+    { Daemon_rpcs.Types.Status.num_accounts
     ; block_count= Int.of_string (Length.to_string block_count)
     ; uptime_secs
     ; ledger_merkle_root
@@ -1129,17 +1129,17 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
     let client_impls =
-      [ Rpc.Rpc.implement Client_lib.Send_user_command.rpc (fun () tx ->
+      [ Rpc.Rpc.implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
             send_payment log coda tx )
-      ; Rpc.Rpc.implement Client_lib.Send_user_commands.rpc (fun () ts ->
+      ; Rpc.Rpc.implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
             schedule_payments log coda ts ;
             Deferred.unit )
-      ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
+      ; Rpc.Rpc.implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
             return (get_balance coda pk) )
-      ; Rpc.Rpc.implement Client_lib.Verify_proof.rpc
+      ; Rpc.Rpc.implement Daemon_rpcs.Verify_proof.rpc
           (fun () (pk, tx, proof) -> return (verify_payment coda pk tx proof)
         )
-      ; Rpc.Rpc.implement Client_lib.Prove_receipt.rpc
+      ; Rpc.Rpc.implement Daemon_rpcs.Prove_receipt.rpc
           (fun () (proving_receipt, pk) ->
             let open Deferred.Or_error.Let_syntax in
             let%bind account =
@@ -1155,19 +1155,19 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             in
             prove_receipt coda ~proving_receipt
               ~resulting_receipt:(Account.receipt_chain_hash account) )
-      ; Rpc.Rpc.implement Client_lib.Get_public_keys_with_balances.rpc
+      ; Rpc.Rpc.implement Daemon_rpcs.Get_public_keys_with_balances.rpc
           (fun () () -> return (get_keys_with_balances coda) )
-      ; Rpc.Rpc.implement Client_lib.Get_public_keys.rpc (fun () () ->
+      ; Rpc.Rpc.implement Daemon_rpcs.Get_public_keys.rpc (fun () () ->
             return (get_public_keys coda) )
-      ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun () pk ->
+      ; Rpc.Rpc.implement Daemon_rpcs.Get_nonce.rpc (fun () pk ->
             return (get_nonce coda pk) )
-      ; Rpc.Rpc.implement Client_lib.Get_status.rpc (fun () () ->
+      ; Rpc.Rpc.implement Daemon_rpcs.Get_status.rpc (fun () () ->
             return (get_status coda) )
-      ; Rpc.Rpc.implement Client_lib.Clear_hist_status.rpc (fun () () ->
+      ; Rpc.Rpc.implement Daemon_rpcs.Clear_hist_status.rpc (fun () () ->
             return (clear_hist_status coda) )
-      ; Rpc.Rpc.implement Client_lib.Get_ledger.rpc (fun () lh ->
+      ; Rpc.Rpc.implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
             get_ledger coda lh )
-      ; Rpc.Rpc.implement Client_lib.Stop_daemon.rpc (fun () () ->
+      ; Rpc.Rpc.implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
             Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
             Deferred.unit ) ]
     in
@@ -1211,7 +1211,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                   match Uri.path uri with
                   | "/status" ->
                       Server.respond_string
-                        ( get_status coda |> Client_lib.Status.to_yojson
+                        ( get_status coda |> Daemon_rpcs.Types.Status.to_yojson
                         |> Yojson.Safe.pretty_to_string )
                   | _ -> route_not_found () )) )
         |> ignore ) ;

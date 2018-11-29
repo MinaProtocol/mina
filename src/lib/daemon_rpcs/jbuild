@@ -1,8 +1,8 @@
 (jbuild_version 1)
 
 (library
- ((name client_lib)
-  (public_name client_lib)
+ ((name daemon_rpcs)
+  (public_name daemon_rpcs)
   (flags (:standard -short-paths -warn-error -58-39))
   (library_flags (-linkall))
   (inline_tests)
