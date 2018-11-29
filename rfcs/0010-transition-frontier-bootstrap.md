@@ -33,7 +33,7 @@ A `transition_frontier_root_hash` is valid iff one of the following conditions i
 1. `transition.transition_frontier_root_hash = genesis_state_hash && transition.protocol_state.blockchain_state.length < K`
 2. `transition.transition_frontier_root_hash = transition_frontier.root_hash_at_length(transition.protocol_state.blockchain_state.length - K)`
 
-In order to check conditino #2, the transition frontier now contains and maintains a transition frontier root history, updating it on root transitions. The transition frontier can be created with an initial history, allowing the program to pass the history accumulated during the bootstrapping phase to the transition frontier when it is initialized.
+In order to check condition #2, the transition frontier now contains and maintains a transition frontier root history, updating it on root transitions. The transition frontier can be created with an initial history, allowing the program to pass the history accumulated during the bootstrapping phase to the transition frontier when it is initialized.
 
 ### Bootstrapping
 [detailed-design-bootstrapping]: #detailed-design-bootstrapping
