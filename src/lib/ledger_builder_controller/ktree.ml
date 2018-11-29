@@ -173,7 +173,6 @@ struct
   let to_graph t = Rose.fold_edges t.tree ~init:Graph.empty ~f:Graph.add_edge
 end
 
-(*
 let%test_module "K-tree" =
   ( module struct
     module Make_quickchecks (Elem : sig
@@ -352,4 +351,3 @@ let%test_module "K-tree" =
           (Tree.path sample_tree ~f:(Int.equal 2) |> Option.value_exn)
           [1; 2] )
   end )
-*)
