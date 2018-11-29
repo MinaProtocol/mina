@@ -110,6 +110,17 @@ module Args = struct
     return (fun a b c d -> (a, b, c, d)) <*> arg1 <*> arg2 <*> arg3 <*> arg4
 end
 
+let stop_daemon =
+  let open Deferred.Let_syntax in
+  let open Client_lib in
+  let open Command.Param in
+  Command.async ~summary:"Stop the daemon"
+    (Daemon_cli.init (return ()) ~f:(fun port () ->
+         match%map dispatch Stop_daemon.rpc () port with
+         | Ok () -> printf "Daemon stopping\n"
+         | Error e ->
+             printf "Daemon likely stopped: %s\n" (Error.to_string_hum e) ))
+
 let get_balance =
   let open Command.Param in
   let open Deferred.Let_syntax in
@@ -494,6 +505,7 @@ let command =
     ; ("prove-payment", prove_payment)
     ; ("get-nonce", get_nonce_cmd)
     ; ("send-payment", send_payment)
+    ; ("stop-daemon", stop_daemon)
     ; ("batch-send-payments", batch_send_payments)
     ; ("status", status)
     ; ("status-clear-hist", status_clear_hist)
