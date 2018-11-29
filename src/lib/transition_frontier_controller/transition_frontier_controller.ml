@@ -134,7 +134,7 @@ module type Inputs_intf = sig
   module Sync_handler :
     Sync_handler_intf
     with type addr := Merkle_address.t
-     and type hash := Ledger_hash.t
+     and type hash := State_hash.t
      and type syncable_ledger := Syncable_ledger.t
      and type syncable_ledger_query := Syncable_ledger.query
      and type syncable_ledger_answer := Syncable_ledger.answer
@@ -146,7 +146,8 @@ module Make (Inputs : Inputs_intf) :
   with type external_transition := Inputs.External_transition.t
    and type syncable_ledger_query := Inputs.Syncable_ledger.query
    and type syncable_ledger_answer := Inputs.Syncable_ledger.answer
-   and type transition_frontier := Inputs.Transition_frontier.t = struct
+   and type transition_frontier := Inputs.Transition_frontier.t
+   and type state_hash := State_hash.t = struct
   open Inputs
   open Consensus_mechanism
 

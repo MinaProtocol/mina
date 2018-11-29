@@ -121,8 +121,11 @@ module type Sync_handler_intf = sig
 
   val run :
        frontier:transition_frontier
-    -> sync_query_reader:syncable_ledger_query Reader.t
-    -> sync_answer_writer:(syncable_ledger_answer, synchronous, _) Writer.t
+    -> sync_query_reader:(hash * syncable_ledger_query) Reader.t
+    -> sync_answer_writer:( hash * syncable_ledger_answer
+                          , synchronous
+                          , unit Async.Deferred.t )
+                          Writer.t
     -> unit
 end
 
@@ -135,10 +138,15 @@ module type Transition_frontier_controller_intf = sig
 
   type transition_frontier
 
+  type state_hash
+
   val run :
        genesis_transition:external_transition
     -> transition_reader:external_transition Reader.t
-    -> sync_query_reader:syncable_ledger_query Reader.t
-    -> sync_answer_writer:(syncable_ledger_answer, synchronous, _) Writer.t
+    -> sync_query_reader:(state_hash * syncable_ledger_query) Reader.t
+    -> sync_answer_writer:( state_hash * syncable_ledger_answer
+                          , synchronous
+                          , unit Async.Deferred.t )
+                          Writer.t
     -> unit
 end

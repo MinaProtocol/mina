@@ -25,6 +25,11 @@ type (_, _) type_ =
 module Reader = struct
   type 't t = {reader: 't Pipe.Reader.t; mutable has_reader: bool}
 
+  let assert_not_read reader =
+    if reader.has_reader then raise Multiple_reads_attempted
+
+  let wrap_reader reader = {reader; has_reader= false}
+
   let enforce_single_reader reader deferred =
     if reader.has_reader then raise Multiple_reads_attempted
     else (
@@ -39,6 +44,16 @@ module Reader = struct
   let iter ?consumer ?continue_on_error reader ~f =
     enforce_single_reader reader
       (Pipe.iter reader.reader ?consumer ?continue_on_error ~f)
+
+  let map reader ~f =
+    assert_not_read reader ;
+    reader.has_reader <- true ;
+    wrap_reader (Pipe.map reader.reader ~f)
+
+  let filter_map reader ~f =
+    assert_not_read reader ;
+    reader.has_reader <- true ;
+    wrap_reader (Pipe.filter_map reader.reader ~f)
 end
 
 module Writer = struct
@@ -72,3 +87,6 @@ let create type_ =
     (Reader.{reader; has_reader= false}, Writer.{type_; reader; writer})
   in
   (reader, writer)
+
+let transfer reader {Writer.writer; _} ~f =
+  Reader.enforce_single_reader reader (Pipe.transfer reader.reader writer ~f)
