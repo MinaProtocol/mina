@@ -119,7 +119,8 @@ let apply_fee_transfer_exn =
   fun t transfer ->
     List.fold (Fee_transfer.to_list transfer) ~f:apply_single ~init:t
 
-let apply_coinbase_exn t ({proposer; fee_transfer} : Coinbase.t) =
+let apply_coinbase_exn t
+    ({proposer; fee_transfer; amount= coinbase_amount} : Coinbase.t) =
   let open Currency in
   let add_to_balance t pk amount =
     let idx = find_index_exn t pk in
@@ -129,13 +130,10 @@ let apply_coinbase_exn t ({proposer; fee_transfer} : Coinbase.t) =
   in
   let proposer_reward, t =
     match fee_transfer with
-    | None -> (Protocols.Coda_praos.coinbase_amount, t)
+    | None -> (coinbase_amount, t)
     | Some (receiver, fee) ->
         let fee = Amount.of_fee fee in
-        let reward =
-          Amount.sub Protocols.Coda_praos.coinbase_amount fee
-          |> Option.value_exn
-        in
+        let reward = Amount.sub coinbase_amount fee |> Option.value_exn in
         (reward, add_to_balance t receiver fee)
   in
   add_to_balance t proposer proposer_reward
