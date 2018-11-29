@@ -1,0 +1,6 @@
+graph G {
+  Transaction_snark_work -- Transaction_snark_scan_state -- Parallel_scan_state -- Parallel_scan_state_diff;
+  Staged_ledger -- Transaction_snark_scan_state;
+  Parallel_scan_state_diff -- Staged_ledger_diff;
+  Staged_ledger -- Merkle_tree -- Merkle_tree_diff -- Staged_ledger_diff;
+}
