@@ -285,10 +285,10 @@ struct
     let copy t =
       { uuid= Uuid.create ()
       ; parent= get_parent t
-      ; account_tbl= Location.Table.create ()
-      ; location_tbl= Key.Table.create ()
-      ; hash_tbl= Addr.Table.create ()
-      ; current_location= None }
+      ; account_tbl= Location.Table.copy t.account_tbl
+      ; location_tbl= Key.Table.copy t.location_tbl
+      ; hash_tbl= Addr.Table.copy t.hash_tbl
+      ; current_location= t.current_location }
 
     let get_all_accounts_rooted_at_exn t address =
       (* accounts in parent and mask are disjoint sets *)
