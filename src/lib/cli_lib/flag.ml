@@ -17,7 +17,6 @@ let privkey_read_path =
 let port =
   Command.Param.flag "daemon-port"
     ~doc:
-      (Printf.sprintf
-          "PORT Client to daemon local communication (default: %d)"
-          Port.default_client)
+      (Printf.sprintf "PORT Client to daemon local communication (default: %d)"
+         Port.default_client)
     (Command.Param.optional Arg_type.int16)

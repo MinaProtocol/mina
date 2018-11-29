@@ -245,7 +245,8 @@ let daemon log =
          | None -> Deferred.return None
        in
        let%bind propose_keypair =
-         Option.map ~f:Cli_lib.Keypair.Terminal_stdin.read_exn propose_key |> sequence
+         Option.map ~f:Cli_lib.Keypair.Terminal_stdin.read_exn propose_key
+         |> sequence
        in
        let%bind client_whitelist =
          Reader.load_sexp

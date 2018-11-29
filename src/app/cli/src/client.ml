@@ -228,7 +228,9 @@ let batch_send_payments =
     type t = {receiver: string; amount: Currency.Amount.t; fee: Currency.Fee.t}
     [@@deriving sexp]
   end in
-  let payment_path_flag = Command.Param.(anon @@ "payments-file" %: string) in
+  let payment_path_flag =
+    Command.Param.(anon @@ ("payments-file" %: string))
+  in
   let get_infos payments_path =
     match%bind
       Reader.load_sexp payments_path [%of_sexp: Payment_info.t list]
@@ -296,7 +298,9 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
     (Cli_lib.Background_daemon.init flag
        ~f:(fun port (body, from_account, fee) ->
          let open Deferred.Let_syntax in
-         let%bind sender_kp = Cli_lib.Keypair.Terminal_stdin.read_exn from_account in
+         let%bind sender_kp =
+           Cli_lib.Keypair.Terminal_stdin.read_exn from_account
+         in
          let%bind nonce = get_nonce_exn sender_kp.public_key port in
          let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
          let payload : User_command.Payload.t =

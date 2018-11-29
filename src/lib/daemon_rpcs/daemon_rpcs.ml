@@ -5,7 +5,7 @@ open Signature_lib
 
 module Types = struct
   module Git_sha = struct
-    type t = string [@@deriving sexp, yojson, bin_io]
+    type t = string [@@deriving sexp, yojson, bin_io, eq]
 
     let of_string s = s
   end

@@ -60,7 +60,7 @@ let read_exn' path =
     ~password:(lazy (Password.read "Secret key password: "))
 
 module Terminal_stdin = struct
-  let read_exn path = 
+  let read_exn path =
     read_exn ~privkey_path:path
       ~password:(lazy (Password.read "Secret key password: "))
 
