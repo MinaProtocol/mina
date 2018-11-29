@@ -1,16 +1,18 @@
+open Async_kernel
 open Core_kernel
+open Pipe_lib.Strict_pipe
 
-module Make (Inputs : Inputs_intf.S) = struct
+module Make (Inputs : Inputs.S) = struct
   open Inputs
   open Consensus_mechanism
 
-  let validate_transition frontier t =
+  let validate_transition ~logger ~frontier t =
     let log_assert condition error_msg =
       let log () = Logger.info logger "transition rejected: %s" error_msg; false in
       condition || log ()
     in
     let consensus_state = Fn.compose Protocol_state.consensus_state External_transition.protocol_state in
-    let root = Transition_frontier.Root.transition (Transition_frontier.root frontier) in
+    let root = With_hash.data (Transition_frontier.Breadcrumb.transition_with_hash (Transition_frontier.root frontier)) in
     log_assert
       (Consensus_mechanism.is_valid (consensus_state t))
       "failed consensus validation"
@@ -21,12 +23,14 @@ module Make (Inputs : Inputs_intf.S) = struct
       (Proof.check (External_transition.proof t))
       "proof was invalid"
 
-  let run ~transition_reader ~valid_transition_writer frontier =
-    don't_wait_for (Linear_pipe.Reader.iter ~f:(fun transition ->
-        if validate_transition frontier transition then
-          Linear_pipe.write valid_transition_writer transition
+  let run ~logger ~frontier ~transition_reader ~valid_transition_writer =
+    let logger = Logger.child logger "transition_handler_validator" in
+    don't_wait_for (Reader.iter_sync transition_reader ~f:(fun transition ->
+        if validate_transition ~logger ~frontier transition then
+          Writer.write valid_transition_writer transition
         else
-          Deferred.unit))
+          (* TODO: punish *)
+          Logger.warn logger "failed to verify transition from the network!"))
 end
 
 (*

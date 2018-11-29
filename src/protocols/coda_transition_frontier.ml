@@ -115,7 +115,7 @@ module type Transition_handler_processor_intf = sig
     -> valid_transition_reader:(external_transition, state_hash) With_hash.t Reader.t
     -> catchup_job_writer:( (external_transition, state_hash) With_hash.t
                           , drop_head buffered
-                          , _ )
+                          , unit )
                           Writer.t
     -> catchup_breadcrumbs_reader:transition_frontier_breadcrumb list Reader.t
     -> unit
