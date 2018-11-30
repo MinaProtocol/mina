@@ -123,6 +123,11 @@ val peek : 'a Reader.t -> 'a option
 
 val read_now : 'a Reader.t -> [`Eof | `Nothing_available | `Ok of 'a]
 
+val read_now' :
+     ?max_queue_length:int
+  -> 'a Reader.t
+  -> [`Eof | `Nothing_available | `Ok of 'a Queue.t]
+
 val read' :
   ?max_queue_length:int -> 'a Reader.t -> [`Eof | `Ok of 'a Queue.t] Deferred.t
 

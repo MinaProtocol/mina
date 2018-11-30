@@ -675,6 +675,8 @@ module type Consensus_mechanism_intf = sig
     type value
 
     type var
+
+    val length : value -> Coda_numbers.Length.t
   end
 
   module Blockchain_state : sig
@@ -772,6 +774,8 @@ module type Consensus_mechanism_intf = sig
     val protocol_state : t -> Protocol_state.value
 
     val protocol_state_proof : t -> protocol_state_proof
+
+    val ledger_builder_diff : t -> ledger_builder_diff
   end
 
   val generate_transition :

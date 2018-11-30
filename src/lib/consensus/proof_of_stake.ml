@@ -198,7 +198,6 @@ module Make (Inputs : Inputs_intf) :
 
     module Slot = struct
       include Segment_id
-      include Comparable.Make (Segment_id)
 
       let interval = Inputs.slot_interval
 

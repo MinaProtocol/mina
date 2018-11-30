@@ -226,6 +226,9 @@ let read_now reader =
 let read' ?max_queue_length ({pipe; _} : 'a Reader.t) =
   Pipe.read' ?max_queue_length pipe
 
+let read_now' ?max_queue_length ({pipe; _} : 'a Reader.t) =
+  Pipe.read_now' ?max_queue_length pipe
+
 let read ({pipe; _} : 'a Reader.t) = Pipe.read pipe
 
 let read_exn reader =

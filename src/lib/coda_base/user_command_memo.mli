@@ -6,6 +6,8 @@ open Tuple_lib
 
 type t [@@deriving sexp, bin_io, eq, compare, hash, yojson]
 
+include Hashable.S with type t := t
+
 type var = Boolean.var list
 
 val var_to_triples : var -> Boolean.var Triple.t list

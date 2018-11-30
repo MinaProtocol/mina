@@ -1,6 +1,7 @@
 open Core
 open Sha256_lib
 include Sha256.Digest
+include Hashable.Make (Sha256.Digest)
 
 (*TODO Currently sha-ing a string. Actula data in the memo needs to be decided *)
 let max_size_in_bytes = 1000
