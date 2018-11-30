@@ -151,9 +151,7 @@ module Make (Inputs : Inputs_intf) :
    and type staged_ledger := Inputs.Staged_ledger.t
    and type protocol_state := Inputs.Protocol_state.value
    and type protocol_state_proof := Inputs.Proof.t
-   and type ledger_builder_diff := Inputs.Ledger_builder_diff.t
-    = struct
-   
+   and type ledger_builder_diff := Inputs.Ledger_builder_diff.t = struct
   open Inputs
 
   exception
@@ -262,7 +260,7 @@ module Make (Inputs : Inputs_intf) :
     List.bind (successors t breadcrumb) ~f:(fun succ ->
         succ :: successors_rec t succ )
 
-  let compute_new_successor_root_hash t parent_node =
+  let root_successor t parent_node =
     let new_length = parent_node.length + 1 in
     let root_node = Hashtbl.find_exn t.table t.root in
     let root_hash = With_hash.hash root_node.breadcrumb.transition_with_hash in
@@ -270,26 +268,6 @@ module Make (Inputs : Inputs_intf) :
     if distance_to_root > max_length then
       `Changed_root (List.hd_exn (path t parent_node.breadcrumb))
     else `Same_root root_hash
-
-  let create_external_transition t ~protocol_state ~protocol_state_proof
-      ~ledger_builder_diff =
-    let parent_hash = Protocol_state.previous_state_hash protocol_state in
-    let parent_node =
-      Option.value_exn
-        (Hashtbl.find t.table parent_hash)
-        ~error:
-          (Error.of_exn
-             (Parent_not_found
-                ( `Parent parent_hash
-                , `Target (Protocol_state.hash protocol_state) )))
-    in
-    let transition_frontier_root_hash =
-      match compute_new_successor_root_hash t parent_node with
-      | `Changed_root hash -> hash
-      | `Same_root hash -> hash
-    in
-    External_transition.create ~protocol_state ~protocol_state_proof
-      ~ledger_builder_diff ~transition_frontier_root_hash
 
   (* Adding a transition to the transition frontier is broken into the following steps:
    *   1) create a new node for a transition
@@ -345,7 +323,7 @@ module Make (Inputs : Inputs_intf) :
         { parent_node with
           successor_hashes= hash :: parent_node.successor_hashes } ;
     (* 4. *)
-    ( match compute_new_successor_root_hash t parent_node with
+    ( match root_successor t parent_node with
     | `Changed_root new_root_hash ->
         (* 4.b *)
         let garbage_immediate_successors =
@@ -367,6 +345,10 @@ module Make (Inputs : Inputs_intf) :
     (* 5 *)
     if node.length > best_tip_node.length then t.best_tip <- hash ;
     node.breadcrumb
+
+  let root_successor t hash =
+    match root_successor t (Hashtbl.find_exn t.table hash) with
+    | `Same_root h | `Changed_root h -> h
 end
 
 let%test_module "Transition_frontier tests" =

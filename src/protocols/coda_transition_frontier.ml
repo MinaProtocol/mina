@@ -67,12 +67,7 @@ module type Transition_frontier_intf = sig
   val add_exn :
     t -> (external_transition, state_hash) With_hash.t -> Breadcrumb.t
 
-  val create_external_transition :
-       t
-    -> protocol_state:protocol_state
-    -> protocol_state_proof:protocol_state_proof
-    -> ledger_builder_diff:ledger_builder_diff
-    -> external_transition
+  val root_successor : t -> state_hash -> state_hash
 end
 
 module type Catchup_intf = sig
