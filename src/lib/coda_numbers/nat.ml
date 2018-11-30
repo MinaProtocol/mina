@@ -6,6 +6,8 @@ open Tuple_lib
 module type S = sig
   type t [@@deriving bin_io, sexp, compare, eq, hash]
 
+  include Hashable.S with type t := t
+
   module Stable : sig
     module V1 : sig
       type nonrec t = t [@@deriving bin_io, sexp, eq, compare, hash]
