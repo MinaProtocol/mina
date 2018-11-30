@@ -50,7 +50,7 @@ module type S = sig
     (** called when parent sets an account; update local state *)
 
     val copy : t -> t
-    (* makes new mask instance with empty tables, re-use parent *)
+    (* makes new mask instance with copied tables, re-use parent *)
 
     (** already have module For_testing from include above *)
     module For_testing : sig
