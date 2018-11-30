@@ -61,11 +61,16 @@ module type S = sig
      and type message := Sok_message.t
      and type ledger_proof := Ledger_proof.t
 
+  module Account : sig
+    type t
+  end
+
   module Ledger :
     Coda_pow.Ledger_intf
     with type ledger_hash := Ledger_hash.t
      and type transaction := Transaction.t
      and type valid_user_command := User_command.With_valid_signature.t
+     and type account := Account.t
 
   module Sparse_ledger : sig
     type t [@@deriving sexp, bin_io]

@@ -31,6 +31,8 @@
       bignum_bigint
       coda_numbers
       debug_assert
+      merkle_mask
+      rocksdb_database
       banlist_lib
       receipt_chain_database_lib
       storage
