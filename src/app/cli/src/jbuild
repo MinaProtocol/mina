@@ -7,7 +7,7 @@
     ( base64
       core
       debug_assert
-      client_lib
+      daemon_rpcs
       pipe_lib
       coda_networking
       proposer

@@ -38,6 +38,10 @@ module Reader : sig
     -> 'a t
     -> f:('a -> unit Deferred.t)
     -> unit Deferred.t
+
+  val map : 'a t -> f:('a -> 'b) -> 'b t
+
+  val filter_map : 'a t -> f:('a -> 'b option) -> 'b t
 end
 
 module Writer : sig
@@ -49,3 +53,9 @@ end
 val create :
      ('type_, 'write_return) type_
   -> 't Reader.t * ('t, 'type_, 'write_return) Writer.t
+
+val transfer :
+     'a Reader.t
+  -> ('b, synchronous, unit Deferred.t) Writer.t
+  -> f:('a -> 'b)
+  -> unit Deferred.t
