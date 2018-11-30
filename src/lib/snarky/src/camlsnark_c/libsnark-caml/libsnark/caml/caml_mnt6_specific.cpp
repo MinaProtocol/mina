@@ -511,7 +511,7 @@ libff::G1<ppT>* camlsnark_mnt6_g1_pedersen_inner(std::vector<libff::G1<ppT>>* pa
 
     auto sum = libff::G1<ppT>::zero();
 
-    #pragma omp declare reduction (G1_sum : libff::G1<ppT> : omp_out = omp_out + omp_in) initializer(omp_priv = libff::G1<ppT>::zero())
+    #pragma omp declare reduction (G1_sum : libff::G1<ppT> : omp_out = omp_out + omp_in) initializer(omp_priv = omp_orig)
     #pragma omp parallel for reduction(G1_sum:sum)
     for (int i = 0; i < triple_count; i++) {
       unsigned char triple = bits[i];
