@@ -36,7 +36,6 @@ module type Inputs_intf = sig
      and type blockchain_state := Blockchain_state.value
      and type consensus_state := Consensus_state.value
 
-  (* TODO: This should replace the current existing external transition *)
   module External_transition :
     sig
       include External_transition_intf
