@@ -38,7 +38,7 @@ let pedersen_params ~loc =
   let len = length params in
   let arr =
     Array.init (len / 4) ~f:(fun i ->
-      let i = i * 4 in
+        let i = i * 4 in
         ( get params i
         , get params (i + 1)
         , get params (i + 2)
