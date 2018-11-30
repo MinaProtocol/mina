@@ -10,6 +10,8 @@ open Coda_numbers
 module type Consensus_state_intf = sig
   type value [@@deriving hash, compare, bin_io, sexp]
 
+  val gen : value Quickcheck.Generator.t
+
   include Snarkable.S with type value := value
 
   val equal_value : value -> value -> bool
@@ -42,6 +44,8 @@ module type S = sig
   type value =
     (State_hash.Stable.V1.t, Blockchain_state.value, Consensus_state.value) t
   [@@deriving bin_io, sexp]
+
+  val gen : value Quickcheck.Generator.t
 
   type var = (State_hash.var, Blockchain_state.var, Consensus_state.var) t
 
@@ -79,6 +83,21 @@ module type S = sig
 
   val hash : value -> State_hash.Stable.V1.t
 
+  module Summary : sig
+    type t
+
+    module Stable : sig
+      module V1 : sig
+        type nonrec t = t [@@deriving bin_io]
+      end
+    end
+
+    val create : value -> t
+
+    val to_hash :
+      t -> previous_state_hash:State_hash.t -> State_hash.t Or_error.t
+  end
+
   val to_string_record : value -> string
 end
 
@@ -96,6 +115,13 @@ module Make
     ; blockchain_state: 'blockchain_state
     ; consensus_state: 'consensus_state }
   [@@deriving eq, ord, bin_io, hash, sexp]
+
+  let gen =
+    let open Quickcheck.Let_syntax in
+    let%map previous_state_hash = State_hash.gen
+    and blockchain_state = Blockchain_state.gen
+    and consensus_state = Consensus_state.gen in
+    {previous_state_hash; blockchain_state; consensus_state}
 
   module Value = struct
     type value =
@@ -165,6 +191,55 @@ module Make
   let hash s =
     Snark_params.Tick.Pedersen.digest_fold Hash_prefix.protocol_state (fold s)
     |> State_hash.of_hash
+
+  module Summary = struct
+    module Stable = struct
+      module V1 = struct
+        type t = Non_zero_curve_point.Compressed.Stable.V1.t
+        [@@deriving bin_io]
+      end
+    end
+
+    include Stable.V1
+    module P = Snark_params.Tick.Pedersen
+
+    let create {previous_state_hash= _; blockchain_state; consensus_state} =
+      let s =
+        P.State.create P.params ~init:Inner_curve.zero
+          ~triples_consumed:State_hash.length_in_triples
+      in
+      let s =
+        P.State.update_fold s
+          Fold.(
+            Blockchain_state.fold blockchain_state
+            +> Consensus_state.fold consensus_state)
+      in
+      Non_zero_curve_point.compress
+        (Non_zero_curve_point.of_inner_curve_exn s.acc)
+
+    let to_hash t ~previous_state_hash =
+      match Non_zero_curve_point.decompress t with
+      | None -> Or_error.error_string "could not decompress summary"
+      | Some t ->
+          let s =
+            P.State.create P.params
+              ~triples_consumed:Hash_prefix.length_in_triples
+              ~init:
+                (Inner_curve.add Hash_prefix.protocol_state.acc
+                   (Non_zero_curve_point.to_inner_curve t))
+          in
+          Ok
+            (State_hash.of_hash
+               (P.digest_fold s (State_hash.fold previous_state_hash)))
+
+    let%test_unit "summary-test" =
+      Quickcheck.test gen ~f:(fun s ->
+          let t = create s in
+          [%test_eq: State_hash.t]
+            (Or_error.ok_exn
+               (to_hash t ~previous_state_hash:s.previous_state_hash))
+            (hash s) )
+  end
 
   [%%if
   call_logger]
