@@ -105,7 +105,16 @@ module In_memory_kvdb : Intf.Key_value_database = struct
     include Hashable.Make_binable (T)
   end
 
-  type t = {uuid: Uuid.t; table: Bigstring_frozen.t Bigstring_frozen.Table.t}
+  type t =
+    {uuid: Uuid.Stable.V1.t; table: Bigstring_frozen.t Bigstring_frozen.Table.t}
+  [@@deriving sexp]
+
+  let to_alist t =
+    let unsorted = Bigstring_frozen.Table.to_alist t.table in
+    (* sort by key *)
+    List.sort
+      ~compare:(fun (k1, _) (k2, _) -> Bigstring_frozen.compare k1 k2)
+      unsorted
 
   let get_uuid t = t.uuid
 
@@ -140,8 +149,6 @@ module Key = struct
   end
 
   let empty = Account.empty.public_key
-
-  let to_string = Format.sprintf !"%{sexp: T.t}"
 
   let gen_keys num_keys =
     (* TODO : the Quickcheck generator for Public_key.Compressed produces duplicates

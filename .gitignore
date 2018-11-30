@@ -5,3 +5,5 @@ result
 test.log
 build.log
 src/config.mlh
+src/external/ocaml-rocksdb/rocksdb
+

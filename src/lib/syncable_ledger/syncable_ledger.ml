@@ -5,7 +5,7 @@ open Pipe_lib
 let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 
 module type S = sig
-  type t
+  type t [@@deriving sexp]
 
   type merkle_tree
 
@@ -307,6 +307,10 @@ module Make
     ; waiting_content: Hash.t Addr.Table.t
     ; mutable validity_listener:
         [`Ok | `Target_changed of Root_hash.t option * Root_hash.t] Ivar.t }
+
+  let t_of_sexp _ = failwith "t_of_sexp: not implemented"
+
+  let sexp_of_t _ = failwith "sexp_of_t: not implemented"
 
   let desired_root_exn {desired_root; _} = desired_root |> Option.value_exn
 

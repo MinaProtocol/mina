@@ -32,6 +32,7 @@ module type S = sig
      and type t := t
 
   val to_list : t -> account list
+  (** list of accounts, in increasing order of their storage locations *)
 
   val foldi :
     t -> init:'accum -> f:(Addr.t -> 'accum -> account -> 'accum) -> 'accum
@@ -74,6 +75,4 @@ module type S = sig
   val merkle_path_at_index_exn : t -> int -> Path.t
 
   val remove_accounts_exn : t -> key list -> unit
-
-  val copy : t -> t
 end
