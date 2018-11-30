@@ -6,10 +6,6 @@ type 'a t =
   ; queue: (Length.t * 'a) Doubly_linked.t
   ; by_length: (Length.t * 'a) Doubly_linked.Elt.t Length.Table.t }
 
-let length_max x y = if Length.compare x y > 0 then x else y
-
-let length_min x y = if Length.compare x y < 0 then x else y
-
 let remove_old_data newest t =
   let rec go () =
     match Doubly_linked.first t.queue with
