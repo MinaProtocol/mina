@@ -30,11 +30,27 @@ let push t ~length ~data =
   | exception _ -> `Length_did_not_increase
   | () -> `Ok
 
-let find t length =
-  Option.map (Hashtbl.find t.by_length length) ~f:(fun e ->
-      snd (Doubly_linked.Elt.value e) )
+let interval t =
+  let open Option.Let_syntax in
+  let%map oldest, _ = Doubly_linked.first t.queue
+  and newest, _ = Doubly_linked.last t.queue in
+  (oldest, newest)
 
-let find_exn t length = Option.value_exn (find t length)
+let find t length =
+  match interval t with
+  | None -> `Unknown
+  | Some (oldest, newest) ->
+      if Length.(oldest <= length && length <= newest) then
+        match Hashtbl.find t.by_length length with
+        | Some x -> `Known (snd (Doubly_linked.Elt.value x))
+        | None -> `Unknown
+      else `Out_of_bounds
+
+let find_exn t length =
+  match find t length with
+  | `Known x -> x
+  | `Out_of_bounds -> failwith "Root_history.find_exn: out of bounds"
+  | `Unknown -> failwith "Root_history.find_exn: unknown"
 
 let create ~max_size =
   {max_size; queue= Doubly_linked.create (); by_length= Length.Table.create ()}
@@ -59,9 +75,7 @@ let%test_unit "max_size invariant" =
     ~f:(fun (max_size, ps) ->
       let t = create ~max_size in
       List.iter ps ~f:(fun length -> push_exn t ~length ~data:()) ;
-      match
-        Option.both (Doubly_linked.last t.queue) (Doubly_linked.first t.queue)
-      with
+      match interval t with
       | None -> ()
-      | Some ((oldest, _), (newest, _)) ->
+      | Some (oldest, newest) ->
           assert (Length.to_int newest - Length.to_int oldest <= max_size) )
