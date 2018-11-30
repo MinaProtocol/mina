@@ -38,3 +38,30 @@ let find_exn t length = Option.value_exn (find t length)
 
 let create ~max_size =
   {max_size; queue= Doubly_linked.create (); by_length= Length.Table.create ()}
+
+let%test_unit "max_size invariant" =
+  let open Quickcheck in
+  let pushes =
+    let open Generator in
+    let open Let_syntax in
+    let rec go n acc prev =
+      if n = 0 then return (List.rev (prev :: acc))
+      else
+        let%bind k = small_positive_int in
+        let prev' = Fn.apply_n_times ~n:k Length.succ prev in
+        go (n - 1) (prev :: acc) prev'
+    in
+    let%bind n = small_positive_int in
+    go n [] Coda_numbers.Length.zero
+  in
+  test
+    Generator.(tuple2 small_positive_int pushes)
+    ~f:(fun (max_size, ps) ->
+      let t = create ~max_size in
+      List.iter ps ~f:(fun length -> push_exn t ~length ~data:()) ;
+      match
+        Option.both (Doubly_linked.last t.queue) (Doubly_linked.first t.queue)
+      with
+      | None -> ()
+      | Some ((oldest, _), (newest, _)) ->
+          assert (Length.to_int newest - Length.to_int oldest <= max_size) )
