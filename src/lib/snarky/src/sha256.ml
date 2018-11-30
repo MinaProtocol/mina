@@ -14,7 +14,9 @@ end)
   open Impl
 
   module Digest : sig
-    type t [@@deriving sexp, bin_io, eq, compare, hash]
+    type t [@@deriving sexp, bin_io, compare, hash]
+
+    include Comparable.S with type t := t
 
     type var = Boolean.var list
 
@@ -87,11 +89,16 @@ end = struct
   struct
     include M
 
-    type t = string [@@deriving sexp, bin_io, eq, compare, hash]
+    let bit_at s i = (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1
+
+    module T = struct
+      type t = string [@@deriving sexp, bin_io, eq, compare, hash]
+    end
+
+    include T
+    include Comparable.Make (T)
 
     type var = Boolean.var list
-
-    let bit_at s i = (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1
 
     let var_to_triples t =
       Fold.(to_list (group3 ~default:Boolean.false_ (of_list t)))
@@ -101,7 +108,7 @@ end = struct
           (fun ~init ~f ->
             let n = 8 * String.length s in
             let rec go acc i =
-              if i = n then acc
+              if Int.equal i n then acc
               else
                 let b = bit_at s i in
                 go (f acc b) (i + 1)
@@ -110,7 +117,8 @@ end = struct
 
     let fold t = Fold.group3 ~default:false (fold_bits t)
 
-    let chunks_of n xs = List.groupi ~break:(fun i _ _ -> i mod n = 0) xs
+    let chunks_of n xs =
+      List.groupi ~break:(fun i _ _ -> Int.equal (i mod n) 0) xs
 
     let bits_to_string bs =
       let bits_to_char_big_endian bs =
@@ -153,14 +161,14 @@ end = struct
 
     let%test_unit "to_bits compatible with fold" =
       Quickcheck.test gen ~f:(fun t ->
-          assert (Fold.to_list (fold_bits t) = to_bits t) )
+          [%test_eq: bool list] (Fold.to_list (fold_bits t)) (to_bits t) )
 
     let%test_unit "of_bits . to_bits = id" =
       Quickcheck.test gen ~f:(fun t -> assert (equal (of_bits (to_bits t)) t))
 
     let%test_unit "to_bits . of_bits = id" =
       Quickcheck.test (List.gen_with_length length_in_bits Bool.gen)
-        ~f:(fun t -> assert (to_bits (of_bits t) = t) )
+        ~f:(fun t -> [%test_eq: bool list] (to_bits (of_bits t)) t )
   end
 
   module Digest = Bits (struct
@@ -219,6 +227,7 @@ end = struct
     let default_init =
       let init =
         List.init length_in_bits ~f:(fun i ->
+            let open Int in
             (init_words.(i / 32) lsr (31 - (i mod 32))) land 1 = 1 )
       in
       bits_to_string init
