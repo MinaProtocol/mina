@@ -18,10 +18,17 @@ let remove_old_data newest t =
   in
   go ()
 
-let push t ~length ~data =
+let push_exn t ~length ~data =
+  Option.iter (Doubly_linked.last t.queue) ~f:(fun (l, _) ->
+      assert (Length.( < ) l length) ) ;
   let elt = Doubly_linked.insert_last t.queue (length, data) in
   Hashtbl.set t.by_length ~key:length ~data:elt ;
   remove_old_data length t
+
+let push t ~length ~data =
+  match push_exn t ~length ~data with
+  | exception _ -> `Length_did_not_increase
+  | () -> `Ok
 
 let find t length =
   Option.map (Hashtbl.find t.by_length length) ~f:(fun e ->
