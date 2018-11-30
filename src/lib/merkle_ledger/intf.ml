@@ -17,7 +17,7 @@ module type Balance = sig
 end
 
 module type Account = sig
-  type t [@@deriving bin_io, eq]
+  type t [@@deriving bin_io, eq, sexp]
 
   type key
 
@@ -43,7 +43,7 @@ module type Depth = sig
 end
 
 module type Key_value_database = sig
-  type t
+  type t [@@deriving sexp]
 
   val copy : t -> t
 
@@ -60,6 +60,9 @@ module type Key_value_database = sig
   val set_batch : t -> key_data_pairs:(Bigstring.t * Bigstring.t) list -> unit
 
   val delete : t -> key:Bigstring.t -> unit
+
+  val to_alist : t -> (Bigstring.t * Bigstring.t) list
+  (* an association list, sorted by key *)
 end
 
 module type Storage_locations = sig

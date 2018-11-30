@@ -515,9 +515,23 @@ end = struct
     { scan_state:
         scan_state
         (* Invariant: this is the ledger after having applied all the transactions in
-    the above state. *)
-    ; ledger: Ledger.t }
-  [@@deriving sexp, bin_io]
+       the above state. *)
+    ; ledger: Ledger.attached_mask sexp_opaque }
+  [@@deriving sexp]
+
+  type serializable = Aux.t * Ledger.serializable [@@deriving bin_io]
+
+  let serializable_of_t t = (t.scan_state, Ledger.serializable_of_t t.ledger)
+
+  let of_serialized_and_unserialized ~(serialized : serializable)
+      ~(unserialized : Ledger.maskable_ledger) =
+    (* reattach the serialized mask to the unserialized ledger *)
+    let scan_state, serialized_mask = serialized in
+    let attached_mask =
+      Ledger.register_mask unserialized
+        (Ledger.unattached_mask_of_serializable serialized_mask)
+    in
+    {scan_state; ledger= attached_mask}
 
   let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
 
@@ -1705,6 +1719,10 @@ let%test_module "test" =
         let create ~fee:_ ~prover:_ = ()
       end
 
+      module Account = struct
+        type t = int
+      end
+
       module User_command = struct
         type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
 
@@ -1933,15 +1951,13 @@ let%test_module "test" =
 
         type transaction = Transaction.t [@@deriving sexp, bin_io]
 
-        type account = int
-
         module Undo = struct
           type t = transaction [@@deriving sexp, bin_io]
 
           let transaction t = Ok t
         end
 
-        let create : unit -> t = fun () -> ref 0
+        let create ?directory_name:_ () = ref 0
 
         let copy : t -> t = fun t -> ref !t
 
@@ -1950,6 +1966,31 @@ let%test_module "test" =
         let to_list t = [!t]
 
         let num_accounts _ = 0
+
+        (* BEGIN BOILERPLATE UNUSED *)
+        type serializable = int [@@deriving bin_io]
+
+        type maskable_ledger = t
+
+        type attached_mask = t
+
+        module Mask = struct
+          type t = int [@@deriving bin_io]
+
+          let create () = 4
+        end
+
+        type unattached_mask = Mask.t
+
+        let unregister_mask_exn _ = failwith "unimplemented"
+
+        let register_mask _ = failwith "unimplemented"
+
+        let unattached_mask_of_serializable _ = failwith "unimplemented"
+
+        let serializable_of_t _ = failwith "unimplemented"
+
+        (* END BOILERPLATE UNUSED *)
 
         let apply_transaction : t -> Undo.t -> Undo.t Or_error.t =
          fun t s ->
