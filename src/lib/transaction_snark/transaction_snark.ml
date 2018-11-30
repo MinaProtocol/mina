@@ -1415,3 +1415,18 @@ let%test_module "transaction_snark" =
                   ~supply_increase:Amount.zero ~fee_excess:total_fees
                   wrap_vk_bits)) )
   end )
+
+let constraint_system_digests () =
+  let module W = Wrap (struct
+    let merge = Dummy_values.Tick.verification_key
+
+    let base = Dummy_values.Tick.verification_key
+  end) in
+  let digest = Tick.R1CS_constraint_system.digest in
+  let digest' = Tock.R1CS_constraint_system.digest in
+  [ ( "transaction-merge"
+    , digest Merge.(Tick.constraint_system ~exposing:(input ()) main) )
+  ; ( "transaction-base"
+    , digest Base.(Tick.constraint_system ~exposing:(tick_input ()) main) )
+  ; ( "transaction-wrap"
+    , digest' W.(Tock.constraint_system ~exposing:wrap_input main) ) ]

@@ -159,3 +159,5 @@ end
 module Make (K : sig
   val keys : Keys.t
 end) : S
+
+val constraint_system_digests : unit -> (string * Md5.t) list
