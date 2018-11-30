@@ -44,6 +44,10 @@ module Base = struct
     module Ledger : sig
       type t
 
+      type maskable_ledger
+
+      type serializable [@@deriving bin_io]
+
       val copy : t -> t
 
       val merkle_root : t -> Ledger_hash.t
@@ -152,6 +156,10 @@ module Base = struct
       with type ledger_builder := Ledger_builder.t
        and type protocol_state := Consensus_mechanism.Protocol_state.value
        and type protocol_state_proof := Protocol_state_proof.t
+       and type serializable :=
+                  Consensus_mechanism.Protocol_state.value
+                  * Protocol_state_proof.t
+                  * Ledger_builder.serializable
        and type external_transition := External_transition.t
 
     val verify_blockchain :

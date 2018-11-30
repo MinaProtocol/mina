@@ -242,6 +242,48 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             in
             mask_merkle_path = maskable_merkle_path )
 
+      let%test_unit "root hash invariant if interior changes but not accounts"
+          =
+        if Test.depth <= 8 then
+          Test.with_instances (fun maskable mask ->
+              let attached_mask = Maskable.register_mask maskable mask in
+              Mask.Attached.set attached_mask dummy_location dummy_account ;
+              (* Make some accounts *)
+              let num_accounts = 1 lsl Test.depth in
+              let gen_values gen =
+                Quickcheck.random_value
+                  (Quickcheck.Generator.list_with_length num_accounts gen)
+              in
+              let public_keys = Key.gen_keys num_accounts in
+              let balances = gen_values Balance.gen in
+              let accounts =
+                List.map2_exn public_keys balances
+                  ~f:(fun public_key balance ->
+                    Account.create public_key balance )
+              in
+              List.iter accounts ~f:(fun account ->
+                  ignore @@ create_new_account_exn attached_mask account ) ;
+              (* Set some inner hashes *)
+              let reset_hash_of_parent_of_index i =
+                let a1 = List.nth_exn accounts i in
+                let key = Account.public_key a1 in
+                let location =
+                  Mask.Attached.location_of_key attached_mask key
+                  |> Option.value_exn
+                in
+                let addr = Test.Location.to_path_exn location in
+                let parent_addr =
+                  Test.Location.Addr.parent addr |> Or_error.ok_exn
+                in
+                Mask.Attached.set_inner_hash_at_addr_exn attached_mask
+                  parent_addr Hash.empty_account
+              in
+              let root_hash = Mask.Attached.merkle_root attached_mask in
+              reset_hash_of_parent_of_index 0 ;
+              reset_hash_of_parent_of_index 3 ;
+              let root_hash' = Mask.Attached.merkle_root attached_mask in
+              assert (Hash.equal root_hash root_hash') )
+
       let%test "mask and parent agree on Merkle root before set" =
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
@@ -403,6 +445,31 @@ let%test_module "Test mask connected to underlying Merkle tree" =
                   Balance.to_int (Account.balance account) + total )
             in
             assert (Int.equal retrieved_total total) )
+
+      let%test_unit "reuse of locations for removed accounts" =
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            let num_accounts = 5 in
+            let keys = Key.gen_keys num_accounts in
+            let balances =
+              Quickcheck.random_value
+                (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
+            in
+            let accounts = List.map2_exn keys balances ~f:Account.create in
+            assert (
+              Option.is_none
+                (Mask.Attached.For_testing.current_location attached_mask) ) ;
+            (* add accounts to mask *)
+            List.iter accounts ~f:(fun account ->
+                ignore @@ create_new_account_exn attached_mask account ) ;
+            assert (
+              Option.is_some
+                (Mask.Attached.For_testing.current_location attached_mask) ) ;
+            (* remove accounts *)
+            Mask.Attached.remove_accounts_exn attached_mask keys ;
+            assert (
+              Option.is_none
+                (Mask.Attached.For_testing.current_location attached_mask) ) )
     end
 
     module type Depth_S = sig
@@ -468,14 +535,14 @@ let%test_module "Test mask connected to underlying Merkle tree" =
       (* test runner *)
       let with_instances f =
         let db = Base_db.create () in
-        let maskable = Any_base.T ((module Base_db), db) in
+        let maskable = Any_base.cast (module Base_db) db in
         let mask = Mask.create () in
         f maskable mask
 
       let with_chain f =
         with_instances (fun maskable mask ->
             let attached1 = Maskable.register_mask maskable mask in
-            let pack2 = Any_base.T ((module Mask.Attached), attached1) in
+            let pack2 = Any_base.cast (module Mask.Attached) attached1 in
             let mask2 = Mask.create () in
             let attached2 = Maskable.register_mask pack2 mask2 in
             f maskable attached1 attached2 )

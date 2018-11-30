@@ -43,5 +43,6 @@ let gen_test =
   gen ~keys ~max_amount:10000 ~max_fee:1000
 
 let%test_unit "json" =
-  Quickcheck.test ~trials:20 gen_test ~sexp_of:sexp_of_t ~f:(fun t ->
-      assert (For_tests.check_encoding ~equal t) )
+  Quickcheck.test ~seed:(`Deterministic "seed") ~trials:20 gen_test
+    ~sexp_of:sexp_of_t ~f:(fun t -> assert (For_tests.check_encoding ~equal t)
+  )

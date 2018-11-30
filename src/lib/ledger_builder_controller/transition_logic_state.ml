@@ -75,12 +75,12 @@ module Make (Inputs : Inputs.Base.S) :
   let apply t = function
     | Locked_tip locked_tip ->
         let consensus_state_of_tip tip =
-          Tip.protocol_state tip |> Protocol_state.consensus_state
+          Tip.state tip |> Protocol_state.consensus_state
         in
         let old_tip = t.locked_tip.data in
         let new_tip = locked_tip.data in
         let snarked_ledger_hash =
-          Tip.protocol_state old_tip |> Protocol_state.blockchain_state
+          Tip.state old_tip |> Protocol_state.blockchain_state
           |> Blockchain_state.ledger_hash
         in
         lock_transition ?proposer_public_key:t.proposer_public_key

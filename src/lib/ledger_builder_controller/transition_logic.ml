@@ -192,8 +192,8 @@ module Make (Inputs : Inputs_intf) :
         if
           not
             (Protocol_state.equal_value
-               (old_longest_branch_tip |> With_hash.data |> Tip.protocol_state)
-               (new_longest_branch_tip |> With_hash.data |> Tip.protocol_state))
+               (old_longest_branch_tip |> With_hash.data |> Tip.state)
+               (new_longest_branch_tip |> With_hash.data |> Tip.state))
         then
           Linear_pipe.write t.strongest_tip_writer
             (With_hash.data new_longest_branch_tip, transition)
@@ -287,7 +287,7 @@ module Make (Inputs : Inputs_intf) :
                       | Ok tip -> return (Some tip)
                       | Error e ->
                           (* TODO: Punish sender *)
-                          Logger.warn logger "Recieved malicious transition %s"
+                          Logger.warn logger "Received malicious transition %s"
                             (Error.to_string_hum e) ;
                           return None ) )
             in
@@ -400,7 +400,7 @@ module Make (Inputs : Inputs_intf) :
         Deferred.return None
     | Ok false ->
         Logger.faulty_peer log
-          !"Recieved malicious transition. Will not add external transition \
+          !"Received malicious transition. Will not add external transition \
             %{sexp:External_transition.t}"
           transition ;
         Deferred.return None
@@ -416,9 +416,7 @@ module Make (Inputs : Inputs_intf) :
     and ktree = Transition_logic_state.ktree old_state in
     match ktree with
     | None -> (
-        let source_state =
-          Tip.protocol_state (With_hash.data longest_branch_tip)
-        in
+        let source_state = (With_hash.data longest_branch_tip).state in
         let target_state =
           External_transition.protocol_state
             (With_hash.data transition_with_hash)
