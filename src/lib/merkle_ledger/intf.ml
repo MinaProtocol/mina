@@ -19,7 +19,7 @@ module type Account = sig
 
   type key
 
-  val public_key_of_account : t -> key
+  val public_key : t -> key
 
   val empty : t
 end

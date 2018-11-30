@@ -114,7 +114,7 @@ struct
 
     let set_account t location account =
       Location.Table.set t.account_tbl ~key:location ~data:account ;
-      set_location t (Account.public_key_of_account account) location
+      set_location t (Account.public_key account) location
 
     (* a read does a lookup in the account_tbl; if that fails, delegate to parent *)
     let get t location =
@@ -218,7 +218,7 @@ struct
       (* TODO : use stack database to save unused location, which can be
         used when allocating a location
       *)
-      Key.Table.remove t.location_tbl (Account.public_key_of_account account) ;
+      Key.Table.remove t.location_tbl (Account.public_key account) ;
       (* reuse location if possible *)
       Option.iter t.current_location ~f:(fun curr_loc ->
           if Location.equal location curr_loc then
@@ -259,8 +259,8 @@ struct
       | Some existing_account ->
           if
             Key.equal
-              (Account.public_key_of_account account)
-              (Account.public_key_of_account existing_account)
+              (Account.public_key account)
+              (Account.public_key existing_account)
           then remove_account_and_update_hashes t location
       | None -> ()
 
@@ -337,9 +337,7 @@ struct
       (* prefer accounts from the mask if they are also in the parent *)
       dedup_keep_latter
         ~equal:(fun a1 a2 ->
-          Key.equal
-            (Account.public_key_of_account a1)
-            (Account.public_key_of_account a2) )
+          Key.equal (Account.public_key a1) (Account.public_key a2) )
         (parent_accounts @ mask_accounts)
 
     (* set accounts in mask *)
@@ -397,12 +395,12 @@ struct
       List.iter rev_sorted_mask_locations
         ~f:(remove_account_and_update_hashes t)
 
-    (* TODO : should destroy do a "commit" ? *)
+    (* Destroy intentionally does not commit before destroying
+     * as sometimes this is desired behavior *)
     let destroy t =
       Location.Table.clear t.account_tbl ;
       Addr.Table.clear t.hash_tbl ;
-      Key.Table.clear t.location_tbl ;
-      Base.destroy (get_parent t)
+      Key.Table.clear t.location_tbl
 
     let index_of_key_exn t key =
       let location = location_of_key t key |> Option.value_exn in
@@ -454,21 +452,20 @@ struct
         (* not in mask, maybe in parent *)
         match Base.location_of_key (get_parent t) key with
         | Some location -> Ok (`Existed, location)
-        | None ->
+        | None -> (
             (* not in parent, create new location *)
             let maybe_location =
               match t.current_location with
               | None -> Some first_location
               | Some loc -> Location.next loc
             in
-            if not (Option.is_some maybe_location) then
-              Or_error.error_string "Db_error.Out_of_leaves"
-            else
-              let location = Option.value_exn maybe_location in
-              set t location account ;
-              set_location t key location ;
-              t.current_location <- Some location ;
-              Ok (`Added, location) )
+            match maybe_location with
+            | None -> Or_error.error_string "Db_error.Out_of_leaves"
+            | Some location ->
+                set t location account ;
+                set_location t key location ;
+                t.current_location <- Some location ;
+                Ok (`Added, location) ) )
       | Some location -> Ok (`Existed, location)
 
     let get_or_create_account_exn t key account =

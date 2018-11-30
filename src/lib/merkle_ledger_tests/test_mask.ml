@@ -266,7 +266,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
               (* Set some inner hashes *)
               let reset_hash_of_parent_of_index i =
                 let a1 = List.nth_exn accounts i in
-                let key = Account.public_key_of_account a1 in
+                let key = Account.public_key a1 in
                 let location =
                   Mask.Attached.location_of_key attached_mask key
                   |> Option.value_exn

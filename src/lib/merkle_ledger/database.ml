@@ -300,11 +300,11 @@ module Make
 
   let set_all_accounts_rooted_at_exn mdb address (accounts : Account.t list) =
     let first_node, last_node = Addr.Range.subtree_range address in
-    Addr.Range.fold (first_node, last_node) ~init:accounts ~f:(fun bit_index ->
+    Addr.Range.fold (first_node, last_node) ~init:accounts ~f:(fun addr ->
       function
-      | head :: tail ->
-          set mdb (Location.Account bit_index) head ;
-          tail
+      | account :: accounts ->
+          set mdb (Location.Account addr) account ;
+          accounts
       | [] -> [] )
     |> ignore
 

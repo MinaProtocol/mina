@@ -122,7 +122,7 @@ end = struct
 
   let key_of_index t index =
     if index >= Dyn_array.length t.accounts then None
-    else Some (Dyn_array.get t.accounts index |> Account.public_key_of_account)
+    else Some (Dyn_array.get t.accounts index |> Account.public_key)
 
   let location_of_key t key = Hashtbl.find t.tree.leafs key
 
@@ -146,9 +146,7 @@ end = struct
   let replace t index old_key account =
     Dyn_array.set t.accounts index account ;
     Hashtbl.remove t.tree.leafs old_key ;
-    Hashtbl.set t.tree.leafs
-      ~key:(Account.public_key_of_account account)
-      ~data:index ;
+    Hashtbl.set t.tree.leafs ~key:(Account.public_key account) ~data:index ;
     (t.tree).dirty_indices <- index :: t.tree.dirty_indices
 
   let allocate t key account =
@@ -180,7 +178,7 @@ end = struct
   let set_at_index_exn t index account =
     if index < Dyn_array.length t.accounts then
       let old_account = Dyn_array.get t.accounts index in
-      replace t index (Account.public_key_of_account old_account) account
+      replace t index (Account.public_key old_account) account
     else failwith (index_not_found "set_at_index_exn" index)
 
   let set = set_at_index_exn

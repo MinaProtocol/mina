@@ -133,6 +133,7 @@ type attached_mask = Mask.Attached.t
    but the module signature for the functor result wants them, so we declare them here *)
 type location = Location.t
 
+(* TODO: Don't allocate: see Issue #1191 *)
 let fold_until t ~init ~f ~finish =
   let accounts = to_list t in
   List.fold_until accounts ~init ~f ~finish

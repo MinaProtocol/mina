@@ -150,8 +150,6 @@ module Key = struct
 
   let empty = Account.empty.public_key
 
-  (*   let to_string = Format.sprintf !"%{sexp: T.t}" *)
-
   let gen_keys num_keys =
     (* TODO : the Quickcheck generator for Public_key.Compressed produces duplicates
        as a workaround, we generate extra keys, remove duplicates, and take as many as needed

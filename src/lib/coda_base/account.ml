@@ -131,11 +131,6 @@ let crypto_hash_prefix = Hash_prefix.account
 
 let crypto_hash t = Pedersen.hash_fold crypto_hash_prefix (fold_bits t)
 
-let empty_crypto_hash =
-  Pedersen.digest_fold
-    (Pedersen.State.create Pedersen.params)
-    (Fold_lib.Fold.string_triples "nothing up my sleeve")
-
 let empty =
   { public_key= Public_key.Compressed.empty
   ; balance= Balance.zero
@@ -144,8 +139,6 @@ let empty =
   ; delegate= Public_key.Compressed.empty }
 
 let digest t = Pedersen.State.digest (crypto_hash t)
-
-let public_key_of_account (t : t) = t.public_key
 
 let create public_key balance =
   { public_key

@@ -24,6 +24,8 @@ module type S = sig
 
   module Location : Location_intf.S
 
+  (** The type of the witness for a base ledger exposed here so that it can
+   * be easily accessed from outside this module *)
   type witness [@@deriving sexp_of]
 
   module type Base_intf =
@@ -63,8 +65,6 @@ module Make_base
      and type root_hash := Hash.t
      and type account := Account.t
 
-  (** The type of the witness for a base ledger exposed here so that it can
-   * be easily accessed from outside this module *)
   type witness = T : (module Base_intf with type t = 't) * 't -> witness
 
   let cast (m : (module Base_intf with type t = 'a)) (t : 'a) = T (m, t)
