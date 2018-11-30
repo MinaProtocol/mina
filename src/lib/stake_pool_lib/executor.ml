@@ -8,18 +8,22 @@ module Pending_payout = struct
     { receiver: Public_key.Compressed.t
     ; amount: Currency.Amount.t
     ; nonce: Account.Nonce.t }
+  [@@deriving sexp]
 end
 
 type t =
   { progress: Coda_numbers.Length.t Account.Nonce.Table.t
   ; payouts: Pending_payout.t Queue.t
   ; mutable next_nonce: Account.Nonce.t
-  ; broadcast: User_command_payload.t -> unit }
+  ; broadcast: (User_command_payload.t -> unit) sexp_opaque
+  ; fee: Currency.Fee.t }
+[@@deriving sexp]
 
-let create ~account_nonce ~broadcast =
+let create ~account_nonce ~fee ~broadcast =
   { progress= Account.Nonce.Table.create ()
   ; payouts= Queue.create ()
   ; next_nonce= account_nonce
+  ; fee
   ; broadcast }
 
 let long_tip_confirm t ~account_nonce ~length =
@@ -49,6 +53,11 @@ let locked_tip_confirm t ~account_nonce =
   in
   clear_payouts () ; res
 
+let memo = User_command_memo.create_exn "empty"
+
 let payout t ~receiver ~amount =
   let nonce = t.next_nonce in
-  Queue.enqueue t.payouts {receiver; amount; nonce}
+  t.next_nonce <- Account.Nonce.succ t.next_nonce ;
+  Queue.enqueue t.payouts {receiver; amount; nonce} ;
+  t.broadcast
+    {common= {fee= t.fee; nonce; memo}; body= Payment {receiver; amount}}

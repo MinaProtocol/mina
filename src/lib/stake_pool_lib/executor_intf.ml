@@ -5,10 +5,11 @@ open Signature_lib
    To do so, it may need to periodically bump the fee. *)
 
 module type S = sig
-  type t
+  type t [@@deriving sexp]
 
   val create :
        account_nonce:Account.Nonce.t
+    -> fee:Currency.Fee.t
     -> broadcast:(User_command.Payload.t -> unit)
     -> t
 
