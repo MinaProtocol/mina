@@ -25,6 +25,44 @@ end
 
 [%%endif]
 
+module Ledger_builder_aux_hash = struct
+  include Ledger_builder_hash.Aux_hash.Stable.V1
+
+  let of_bytes = Ledger_builder_hash.Aux_hash.of_bytes
+end
+
+module Ledger_builder_hash = struct
+  include Ledger_builder_hash.Stable.V1
+
+  let ledger_hash = Ledger_builder_hash.ledger_hash
+
+  let aux_hash = Ledger_builder_hash.aux_hash
+
+  let of_aux_and_ledger_hash = Ledger_builder_hash.of_aux_and_ledger_hash
+end
+
+module Ledger_hash = struct
+  include Ledger_hash.Stable.V1
+
+  let of_digest = Ledger_hash.of_digest
+
+  let merge = Ledger_hash.merge
+
+  let to_bytes = Ledger_hash.to_bytes
+
+  let of_digest = Ledger_hash.of_digest
+
+  let merge = Ledger_hash.merge
+end
+
+module Frozen_ledger_hash = struct
+  include Frozen_ledger_hash.Stable.V1
+
+  let to_bytes = Frozen_ledger_hash.to_bytes
+
+  let of_ledger_hash = Frozen_ledger_hash.of_ledger_hash
+end
+
 module type Ledger_proof_verifier_intf = sig
   val verify :
        Ledger_proof.t
@@ -99,8 +137,6 @@ module type Main_intf = sig
 
     module Ledger : sig
       type t [@@deriving sexp]
-
-      type account
 
       val copy : t -> t
 
@@ -272,40 +308,6 @@ module type Main_intf = sig
   val receipt_chain_database : t -> Receipt_chain_database.t
 end
 
-module Ledger_builder_aux_hash = struct
-  include Ledger_builder_hash.Aux_hash.Stable.V1
-
-  let of_bytes = Ledger_builder_hash.Aux_hash.of_bytes
-end
-
-module Ledger_builder_hash = struct
-  include Ledger_builder_hash.Stable.V1
-
-  let ledger_hash = Ledger_builder_hash.ledger_hash
-
-  let aux_hash = Ledger_builder_hash.aux_hash
-
-  let of_aux_and_ledger_hash = Ledger_builder_hash.of_aux_and_ledger_hash
-end
-
-module Ledger_hash = struct
-  include Ledger_hash.Stable.V1
-
-  let of_digest = Ledger_hash.of_digest
-
-  let merge = Ledger_hash.merge
-
-  let to_bytes = Ledger_hash.to_bytes
-end
-
-module Frozen_ledger_hash = struct
-  include Frozen_ledger_hash.Stable.V1
-
-  let to_bytes = Frozen_ledger_hash.to_bytes
-
-  let of_ledger_hash = Frozen_ledger_hash.of_ledger_hash
-end
-
 module User_command = struct
   include (
     User_command :
@@ -425,6 +427,7 @@ struct
 
   module Fee_transfer = Coda_base.Fee_transfer
   module Coinbase = Coda_base.Coinbase
+  module Account = Account
 
   module Transaction = struct
     module T = struct
@@ -464,6 +467,7 @@ struct
   module Ledger_builder = struct
     module Inputs = struct
       module Sok_message = Sok_message
+      module Account = Account
       module Proof = Proof
       module Sparse_ledger = Sparse_ledger
       module Amount = Amount
@@ -502,12 +506,12 @@ struct
   module Ledger_builder_aux = Ledger_builder.Aux
 
   module Ledger_builder_transition = struct
-    type t = {old: Ledger_builder.t; diff: Ledger_builder_diff.t}
+    type t = {old: Ledger_builder.t sexp_opaque; diff: Ledger_builder_diff.t}
     [@@deriving sexp]
 
     module With_valid_signatures_and_proofs = struct
       type t =
-        { old: Ledger_builder.t
+        { old: Ledger_builder.t sexp_opaque
         ; diff: Ledger_builder_diff.With_valid_signatures_and_proofs.t }
       [@@deriving sexp]
     end
@@ -545,15 +549,23 @@ struct
 
   module Tip = struct
     type t =
-      { protocol_state: Protocol_state.value
+      { state: Protocol_state.value
       ; proof: Protocol_state_proof.t
-      ; ledger_builder: Ledger_builder.t }
-    [@@deriving sexp, bin_io, fields]
+      ; ledger_builder: Ledger_builder.t sexp_opaque }
+    [@@deriving sexp, fields]
+
+    type scan_state = Ledger_builder.Aux.t
 
     let of_transition_and_lb transition ledger_builder =
-      { protocol_state= External_transition.protocol_state transition
+      { state= External_transition.protocol_state transition
       ; proof= External_transition.protocol_state_proof transition
       ; ledger_builder }
+
+    let bin_tip =
+      [%bin_type_class:
+        Protocol_state.value
+        * Protocol_state_proof.t
+        * Ledger_builder.serializable]
 
     let copy t = {t with ledger_builder= Ledger_builder.copy t.ledger_builder}
   end

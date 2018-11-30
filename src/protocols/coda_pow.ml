@@ -151,12 +151,48 @@ module type Proof_intf = sig
   val verify : t -> input -> bool Deferred.t
 end
 
+module type Mask_intf = sig
+  type t [@@deriving bin_io]
+
+  val create : unit -> t
+end
+
+module type Mask_serializable_intf = sig
+  type t
+
+  type unattached_mask
+
+  type serializable [@@deriving bin_io]
+
+  val unattached_mask_of_serializable : serializable -> unattached_mask
+
+  val serializable_of_t : t -> serializable
+end
+
 module type Ledger_intf = sig
-  type t [@@deriving sexp, bin_io]
+  module Mask : Mask_intf
+
+  type t
+
+  type attached_mask = t
+
+  type unattached_mask = Mask.t
+
+  type maskable_ledger = t
 
   type transaction
 
+  type valid_user_command
+
+  type ledger_hash
+
   type account
+
+  (* for masks, serializable is same as t *)
+  include
+    Mask_serializable_intf
+    with type t := t
+     and type unattached_mask := unattached_mask
 
   module Undo : sig
     type t [@@deriving sexp, bin_io]
@@ -164,11 +200,7 @@ module type Ledger_intf = sig
     val transaction : t -> transaction Or_error.t
   end
 
-  type valid_user_command
-
-  type ledger_hash
-
-  val create : unit -> t
+  val create : ?directory_name:string -> unit -> t
 
   val copy : t -> t
 
@@ -181,6 +213,10 @@ module type Ledger_intf = sig
   val apply_transaction : t -> transaction -> Undo.t Or_error.t
 
   val undo : t -> Undo.t -> unit Or_error.t
+
+  val register_mask : maskable_ledger -> unattached_mask -> attached_mask
+
+  val unregister_mask_exn : maskable_ledger -> attached_mask -> unattached_mask
 end
 
 module Fee = struct
@@ -501,7 +537,7 @@ module type Ledger_builder_transition_intf = sig
 end
 
 module type Ledger_builder_base_intf = sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp]
 
   type diff
 
@@ -515,7 +551,10 @@ module type Ledger_builder_base_intf = sig
 
   type ledger_proof
 
+  (** The ledger in a ledger builder is always a mask *)
   type ledger
+
+  type serializable [@@deriving bin_io]
 
   module Aux : sig
     type t [@@deriving bin_io]
@@ -535,11 +574,16 @@ module type Ledger_builder_base_intf = sig
     -> aux:Aux.t
     -> t Or_error.t Deferred.t
 
+  val of_serialized_and_unserialized :
+    serialized:serializable -> unserialized:ledger -> t
+
   val copy : t -> t
 
   val hash : t -> ledger_builder_hash
 
   val aux : t -> Aux.t
+
+  val serializable_of_t : t -> serializable
 
   val apply :
        t
@@ -643,13 +687,19 @@ module type Tip_intf = sig
 
   type ledger_builder
 
+  type serializable
+
   type external_transition
 
+  (* N.B.: can't derive bin_io for ledger builder containing persistent ledger *)
   type t =
-    { protocol_state: protocol_state
+    { state: protocol_state
     ; proof: protocol_state_proof
     ; ledger_builder: ledger_builder }
-  [@@deriving sexp, bin_io, fields]
+  [@@deriving sexp, fields]
+
+  (* serializer for tip components other than the persistent database in the ledger builder *)
+  val bin_tip : serializable Bin_prot.Type_class.t
 
   val of_transition_and_lb : external_transition -> ledger_builder -> t
 
@@ -1010,11 +1060,16 @@ module type Inputs_intf = sig
      and type ledger_proof := Ledger_proof.t
      and type statement := Ledger_proof_statement.t
 
+  module Account : sig
+    type t
+  end
+
   module Ledger :
     Ledger_intf
     with type valid_user_command := User_command.With_valid_signature.t
      and type transaction := Transaction.t
      and type ledger_hash := Ledger_hash.t
+     and type account := Account.t
 
   module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
 
@@ -1137,6 +1192,10 @@ Merge Snark:
      and type protocol_state := Consensus_mechanism.Protocol_state.value
      and type protocol_state_proof := Protocol_state_proof.t
      and type external_transition := External_transition.t
+     and type serializable :=
+                Consensus_mechanism.Protocol_state.value
+                * Protocol_state_proof.t
+                * Ledger_builder.serializable
 end
 
 module Make
