@@ -58,6 +58,7 @@ While this is not a fully optimal solution, as layed out in the [drawbacks](#dra
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
+- It's potentially possible for a bootstrapping node to be tricked by an adversary indefinetly if the adversary performs an operation between bad answers to invalidate the record in the banlist (such as changing the ip address). This is not very probable, as the adversary would need to have enough nodes in the network to be reliably have at least one node connected to the same peer each time they recover, but it is still theoretically possible. Is there anyway to mitigate this further?
 - Are there any vulnerabilities introduced by this change which were not discussed already?
 - What is the cost of checking the validity of the `transition_frontier_root_hash` of every transition to already bootstrapped nodes?
   - At what point in the validation process should this be checked (the order of validation steps is significant)?
