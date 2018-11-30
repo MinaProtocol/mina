@@ -1211,14 +1211,23 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     (* Each branch contains a precondition predicate and a choice predicate,
      * which takes the new state when true. Each predicate is also decorated
      * with a string description, used for debugging messages *)
+    let candidate_vrf_is_bigger =
+      let d = Fn.compose Sha256.digest_string Vrf.Output.to_string in
+      Sha256.Digest.( > )
+        (d candidate.last_vrf_output)
+        (d existing.last_vrf_output)
+    in
+    let ( << ) a b =
+      let c = Length.compare a b in
+      c < 0 || (c = 0 && candidate_vrf_is_bigger)
+    in
     let ( = ) = Coda_base.State_hash.equal in
-    let ( < ) a b = Length.compare a b < 0 in
     let branches =
       [ ( ( lazy
               ( existing.last_epoch_data.lock_checkpoint
               = candidate.last_epoch_data.lock_checkpoint )
           , "last epoch lock checkpoints are equal" )
-        , ( lazy (existing.length < candidate.length)
+        , ( lazy (existing.length << candidate.length)
           , "candidate is longer than existing" ) )
       ; ( ( lazy
               ( existing.last_epoch_data.start_checkpoint
@@ -1226,7 +1235,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           , "last epoch start checkpoints are equal" )
         , ( lazy
               ( existing.last_epoch_data.length
-              < candidate.last_epoch_data.length )
+              << candidate.last_epoch_data.length )
           , "candidate last epoch is longer than existing last epoch" ) )
         (* these two could be condensed into one entry *)
       ; ( ( lazy
@@ -1234,20 +1243,15 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
               = candidate.last_epoch_data.lock_checkpoint )
           , "candidate last epoch lock checkpoint is equal to existing \
              current epoch lock checkpoint" )
-        , ( lazy (existing.length < candidate.length)
+        , ( lazy (existing.length << candidate.length)
           , "candidate is longer than existing" ) )
       ; ( ( lazy
               ( existing.last_epoch_data.lock_checkpoint
               = candidate.curr_epoch_data.lock_checkpoint )
           , "candidate current epoch lock checkpoint is equal to existing \
              last epoch lock checkpoint" )
-        , ( lazy
-              ( existing.length < candidate.length
-              || Length.equal existing.length candidate.length
-                 && Vrf.Output.( < ) candidate.last_vrf_output
-                      existing.last_vrf_output )
-          , "candidate is longer than existing or is equal length and has a \
-             smaller VRF evaluation" ) )
+        , ( lazy (existing.length << candidate.length)
+          , "candidate is longer than existing" ) )
       ; ( ( lazy
               ( existing.curr_epoch_data.start_checkpoint
               = candidate.last_epoch_data.start_checkpoint )
@@ -1255,7 +1259,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
              current epoch start checkpoint" )
         , ( lazy
               ( existing.curr_epoch_data.length
-              < candidate.last_epoch_data.length )
+              << candidate.last_epoch_data.length )
           , "candidate last epoch is longer than existing current epoch" ) )
       ; ( ( lazy
               ( existing.last_epoch_data.start_checkpoint
@@ -1264,7 +1268,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
              last epoch start checkpoint" )
         , ( lazy
               ( existing.last_epoch_data.length
-              < candidate.curr_epoch_data.length )
+              << candidate.curr_epoch_data.length )
           , "candidate current epoch is longer than existing last epoch" ) ) ]
     in
     match
