@@ -5,6 +5,8 @@ open Snark_params.Tick
 
 type t
 
+val gen : t Quickcheck.Generator.t
+
 include Hashable.S with type t := t
 
 type var
@@ -29,6 +31,8 @@ val dummy : t
 
 module Aux_hash : sig
   type t
+
+  val gen : t Quickcheck.Generator.t
 
   module Stable : sig
     module V1 : sig

@@ -100,6 +100,11 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       {length: 'length; signer_public_key: 'public_key}
     [@@deriving eq, bin_io, sexp, hash, compare]
 
+    let gen =
+      let open Quickcheck.Let_syntax in
+      let%map length = Length.gen in
+      {length; signer_public_key= Global_public_key.compressed}
+
     type value = (Length.t, Public_key.Compressed.t) t_
     [@@deriving bin_io, sexp, hash, compare]
 

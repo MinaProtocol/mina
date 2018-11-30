@@ -23,6 +23,8 @@ module Aux_hash = struct
   let dummy : t = String.init length_in_bytes ~f:(fun _ -> '\000')
 
   let fold = Fold.string_triples
+
+  let gen = String.gen_with_length length_in_bytes Char.gen
 end
 
 module Stable = struct
@@ -42,6 +44,11 @@ include Stable.V1
 let ledger_hash {ledger_hash; _} = ledger_hash
 
 let aux_hash {aux_hash; _} = aux_hash
+
+let gen =
+  let open Quickcheck.Generator.Let_syntax in
+  let%map ledger_hash = Ledger_hash.gen and aux_hash = Aux_hash.gen in
+  {ledger_hash; aux_hash}
 
 let dummy =
   {ledger_hash= Ledger_hash.of_hash Field.zero; aux_hash= Aux_hash.dummy}

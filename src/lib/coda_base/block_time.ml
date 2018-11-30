@@ -14,6 +14,8 @@ module Stable = struct
   end
 end
 
+let gen = Quickcheck.Generator.map Int64.gen ~f:UInt64.of_int64
+
 module Controller = struct
   type t = unit
 

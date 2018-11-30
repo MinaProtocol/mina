@@ -27,6 +27,8 @@ module type S = sig
   module Consensus_state : sig
     type value [@@deriving hash, eq, compare, bin_io, sexp]
 
+    val gen : value Quickcheck.Generator.t
+
     include Snark_params.Tick.Snarkable.S with type value := value
 
     val genesis : value

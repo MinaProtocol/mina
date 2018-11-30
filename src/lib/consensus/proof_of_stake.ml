@@ -266,6 +266,12 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     type value = (Coda_base.Frozen_ledger_hash.t, Amount.t) t
     [@@deriving sexp, bin_io, eq, compare, hash]
 
+    let gen =
+      let open Quickcheck.Generator.Let_syntax in
+      let%map hash = Coda_base.Frozen_ledger_hash.gen
+      and total_currency = Amount.gen in
+      {hash; total_currency}
+
     type var = (Coda_base.Frozen_ledger_hash.var, Amount.var) t
 
     let to_hlist {hash; total_currency} =
@@ -618,6 +624,15 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       (Epoch_ledger.value, Epoch_seed.t, Coda_base.State_hash.t, Length.t) t
     [@@deriving sexp, bin_io, eq, compare, hash]
 
+    let gen =
+      let open Quickcheck.Generator.Let_syntax in
+      let%map ledger = Epoch_ledger.gen
+      and seed = Epoch_seed.gen
+      and start_checkpoint = Coda_base.State_hash.gen
+      and lock_checkpoint = Coda_base.State_hash.gen
+      and length = Length.gen in
+      {ledger; seed; start_checkpoint; lock_checkpoint; length}
+
     type var =
       ( Epoch_ledger.var
       , Epoch_seed.var
@@ -827,6 +842,23 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     type value =
       (Length.t, Amount.t, Epoch.t, Epoch.Slot.t, Epoch_data.value) t
     [@@deriving sexp, bin_io, eq, compare, hash]
+
+    let gen =
+      let open Quickcheck.Generator.Let_syntax in
+      let%map length = Length.gen
+      and epoch_length = Length.gen
+      and total_currency = Amount.gen
+      and curr_epoch = Epoch.gen
+      and curr_slot = Epoch.Slot.gen
+      and last_epoch_data = Epoch_data.gen
+      and curr_epoch_data = Epoch_data.gen in
+      { length
+      ; epoch_length
+      ; total_currency
+      ; curr_epoch
+      ; curr_slot
+      ; last_epoch_data
+      ; curr_epoch_data }
 
     type var =
       ( Length.Unpacked.var

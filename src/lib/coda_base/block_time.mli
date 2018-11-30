@@ -6,6 +6,8 @@ open Fold_lib
 
 type t [@@deriving sexp, eq]
 
+val gen : t Quickcheck.Generator.t
+
 type t0 = t
 
 module Controller : sig
