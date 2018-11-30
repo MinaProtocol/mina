@@ -4,6 +4,6 @@
 [%%define debug_logs true]
 [%%define call_logger false]
 [%%define force_updates false]
-[%%define global_signer_real true]
+[%%define global_signer_real false]
 [%%define tracing false]
 [%%define consensus_mechanism "proof_of_stake"]

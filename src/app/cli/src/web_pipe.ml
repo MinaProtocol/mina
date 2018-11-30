@@ -21,10 +21,8 @@ module type Coda_intf = sig
         -> 'stop
     end
 
-    module Consensus_mechanism : sig
-      module External_transition : sig
-        type t
-      end
+    module External_transition : sig
+      type t
     end
   end
 
@@ -35,7 +33,7 @@ module type Coda_intf = sig
   val best_ledger : t -> Inputs.Ledger.t
 
   val strongest_ledgers :
-    t -> Inputs.Consensus_mechanism.External_transition.t Linear_pipe.Reader.t
+    t -> Inputs.External_transition.t Linear_pipe.Reader.t
 end
 
 let to_base64 m x = B64.encode (Binable.to_string m x)

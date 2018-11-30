@@ -62,7 +62,8 @@ module Make_from_base (Base : Base_intf) : Intf.S = struct
 end
 
 module With_private = struct
-  type account_data = {pk: string; sk: string; balance: int}
+  type account_data =
+    {pk: Public_key.Compressed.t; sk: Private_key.t; balance: int}
 
   module type Source_intf = sig
     val accounts : account_data list
@@ -72,16 +73,13 @@ module With_private = struct
     include Make_from_base (struct
       let accounts =
         List.map Source.accounts ~f:(fun {pk; sk; balance} ->
-            ( Some (Private_key.of_base64_exn sk)
-            , Account.create
-                (Public_key.Compressed.of_base64_exn pk)
-                (Balance.of_int balance) ) )
+            (Some sk, Account.create pk (Balance.of_int balance)) )
     end)
   end
 end
 
 module Without_private = struct
-  type account_data = {pk: string; balance: int}
+  type account_data = {pk: Public_key.Compressed.t; balance: int}
 
   module type Source_intf = sig
     val accounts : account_data list
@@ -91,10 +89,7 @@ module Without_private = struct
     include Make_from_base (struct
       let accounts =
         List.map Source.accounts ~f:(fun {pk; balance} ->
-            ( None
-            , Account.create
-                (Public_key.Compressed.of_base64_exn pk)
-                (Balance.of_int balance) ) )
+            (None, Account.create pk (Balance.of_int balance)) )
     end)
   end
 end
