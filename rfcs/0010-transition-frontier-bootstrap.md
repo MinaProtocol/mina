@@ -18,7 +18,7 @@ This field exists outside of the protocol state so that it does not have to be p
 
 ### Constants
 
-Thoughout the design, we will describe terms in relation to a constant `K`. The constant `K` is a natural number representing the transitions before finality can be assumed. As per Ouroboros proof of stake, `K = unforkable_slot_count * probable_slots_per_block`. The maximum length of a branch in the transition frontier is `K`, as the transition frontier root represents the point of finality of the network.
+Thoughout the design, we will describe terms in relation to a constant `K`. The constant `K` is a natural number representing the transitions before finality can be assumed. As per Ouroboros proof of stake, `K = unforkable_slot_count = 2160`. The maximum length of a branch in the transition frontier is `K`, as the transition frontier root represents the point of finality of the network.
 
 ### Transition frontier root history
 
