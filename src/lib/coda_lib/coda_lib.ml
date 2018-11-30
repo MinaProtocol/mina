@@ -172,6 +172,8 @@ module type Ledger_builder_controller_intf = sig
 
   type ledger
 
+  type maskable_ledger
+
   type tip
 
   type net
@@ -197,6 +199,7 @@ module type Ledger_builder_controller_intf = sig
       ; external_transitions:
           (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: tip
+      ; ledger: maskable_ledger
       ; consensus_local_state: consensus_local_state
       ; proposer_public_key: public_key_compressed option
       ; longest_tip_location: string }
@@ -383,6 +386,7 @@ module type Inputs_intf = sig
      and type ledger_proof := Ledger_proof.t
      and type tip := Tip.t
      and type public_key_compressed := Public_key.Compressed.t
+     and type maskable_ledger := Ledger.maskable_ledger
 
   module Proposer :
     Proposer_intf
@@ -401,7 +405,7 @@ module type Inputs_intf = sig
   module Genesis : sig
     val state : Consensus_mechanism.Protocol_state.value
 
-    val ledger : Ledger.t
+    val ledger : Ledger.maskable_ledger
 
     val proof : Protocol_state_proof.t
   end
@@ -436,11 +440,11 @@ module Make (Inputs : Inputs_intf) = struct
     (Ledger_builder_controller.strongest_tip t.ledger_builder).ledger_builder
 
   let best_protocol_state t =
-    (Ledger_builder_controller.strongest_tip t.ledger_builder).protocol_state
+    (Ledger_builder_controller.strongest_tip t.ledger_builder).state
 
   let best_tip t =
     let tip = Ledger_builder_controller.strongest_tip t.ledger_builder in
-    (Ledger_builder.ledger tip.ledger_builder, tip.protocol_state, tip.proof)
+    (Ledger_builder.ledger tip.ledger_builder, tip.state, tip.proof)
 
   let get_ledger t lh =
     Ledger_builder_controller.local_get_ledger t.ledger_builder lh
@@ -506,10 +510,14 @@ module Make (Inputs : Inputs_intf) = struct
                       k.public_key |> Public_key.compress ))
                ~parent_log:config.log ~net_deferred:(Ivar.read net_ivar)
                ~genesis_tip:
-                 { ledger_builder= Ledger_builder.create ~ledger:Genesis.ledger
-                 ; protocol_state= Genesis.state
+                 { ledger_builder=
+                     Ledger_builder.create
+                       ~ledger:
+                         (Ledger.register_mask Genesis.ledger
+                            (Ledger.Mask.create ()))
+                 ; state= Genesis.state
                  ; proof= Genesis.proof }
-               ~consensus_local_state
+               ~consensus_local_state ~ledger:Genesis.ledger
                ~longest_tip_location:config.ledger_builder_persistant_location
                ~external_transitions:external_transitions_reader ())
         in
@@ -570,7 +578,7 @@ module Make (Inputs : Inputs_intf) = struct
              in
              Linear_pipe.write_without_pushback tips_w
                (Proposer.Tip_change
-                  { protocol_state= (tip.protocol_state, tip.proof)
+                  { protocol_state= (tip.state, tip.proof)
                   ; transactions=
                       Transaction_pool.transactions transaction_pool
                   ; ledger_builder= tip.ledger_builder })) ;

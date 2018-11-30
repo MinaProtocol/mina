@@ -13,4 +13,5 @@
      precomputed_values)
    (preprocessor_deps "../../../config.mlh")
    (preprocess (pps ppx_jane ppxlib.metaquot ppxlib.runner))
+   (flags (-cclib -lrocksdb))
    (modes native))

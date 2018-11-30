@@ -3,10 +3,10 @@
 (library
  ((name ledger_builder_controller)
   (public_name ledger_builder_controller)
-  (flags (:standard -short-paths -warn-error -58))
+  (flags (:standard -short-paths -warn-error -58-32))
   (library_flags (-linkall))
   (inline_tests)
-  (libraries (core storage debug_assert logger protocols coda_lib async async_extra interruptible unix_timestamp ocamlgraph o1trace with_hash))
+  (libraries (core storage debug_assert logger protocols coda_lib merkle_mask async async_extra interruptible unix_timestamp ocamlgraph o1trace with_hash))
   (preprocess (pps (ppx_jane ppx_deriving.std)))
   (synopsis "Ledger builder controller manages ledger-builders attached to blocks")))
 
