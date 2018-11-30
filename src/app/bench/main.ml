@@ -1,2 +1,1 @@
-;;
-Inline_benchmarks_public.Runner.main ~libname:"coda_bench"
+let () = Inline_benchmarks_public.Runner.main ~libname:"coda_bench"
