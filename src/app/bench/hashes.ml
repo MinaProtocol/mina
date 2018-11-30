@@ -2,7 +2,7 @@ open Core
 open Coda_base
 
 let%bench "merging empty hashes" =
-  Merkle_hash.(merge ~height:0 empty_hash empty_hash) |> ignore
+  Ledger_hash.(merge ~height:0 empty_hash empty_hash) |> ignore
 
 module Pos = Consensus.Proof_of_stake.Make (struct
   module Genesis_ledger = Genesis_ledger

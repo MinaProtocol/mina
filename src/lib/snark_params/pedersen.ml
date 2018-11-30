@@ -97,17 +97,16 @@ end) :
 
     let update_fold (t : t) (fold : bool Triple.t Fold.t) =
       let params = t.params in
-      let bs = Bitstring.create_bitstring (Curve.Vector.length params) in
+      let max_num_params = Curve.Vector.length params / 4 in
+      (* As much space as we could need: we can only have up to [length params] triples before we overflow that, and each triple is packed into a single byte *)
+      let bs = Bigstring.create max_num_params in
       let triples_consumed_here =
         fold.fold ~init:0 ~f:(fun i (b0, b1, b2) ->
-            Bitstring.(
-              let i = i * 3 in
-              put bs i (Bool.to_int b2) ;
-              put bs (i + 1) (Bool.to_int b1) ;
-              put bs (i + 2) (Bool.to_int b0)) ;
+            Bigstring.set_uint8 bs ~pos:i
+              ((4 * Bool.to_int b2) + (2 * Bool.to_int b1) + Bool.to_int b0) ;
             i + 1 )
       in
-      let bits, _, _ = bs in
+      let bits = Bigstring.to_bytes bs in
       let acc =
         Curve.add t.acc
         @@ Curve.pedersen_inner ~params ~bits ~start:t.triples_consumed
