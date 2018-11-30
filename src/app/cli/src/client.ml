@@ -1,14 +1,11 @@
 open Core
 open Async
-open Cli_lib
 open Signature_lib
 open Coda_base
 
-let of_local_port port = Host_and_port.create ~host:"127.0.0.1" ~port
-
 let dispatch rpc query port =
   Tcp.with_connection
-    (Tcp.Where_to_connect.of_host_and_port (of_local_port port))
+    (Tcp.Where_to_connect.of_host_and_port (Cli_lib.Port.of_local port))
     ~timeout:(Time.Span.of_sec 1.)
     (fun _ r w ->
       let open Deferred.Let_syntax in
@@ -16,8 +13,8 @@ let dispatch rpc query port =
       | Error exn -> return (Or_error.of_exn exn)
       | Ok conn -> Rpc.Rpc.dispatch rpc conn query )
 
-let dispatch_with_message rpc arg port ~success ~error =
-  match%bind dispatch rpc arg port with
+let dispatch_with_message rpc query port ~success ~error =
+  match%bind dispatch rpc query port with
   | Ok x ->
       printf "%s\n" (success x) ;
       Deferred.unit
@@ -25,79 +22,10 @@ let dispatch_with_message rpc arg port ~success ~error =
       eprintf "%s\n" (error e) ;
       exit 1
 
-let json_flag =
-  Command.Param.(
-    flag "json" no_arg ~doc:"Use json output (default: plaintext)")
-
-module Daemon_cli = struct
-  module Flag = struct
-    open Command.Param
-
-    let port =
-      flag "daemon-port"
-        ~doc:
-          (Printf.sprintf
-             "PORT Client to daemon local communication (default: %d)"
-             default_client_port)
-        (optional int16)
-  end
-
-  type state = Start | Run_client | Abort | No_daemon
-
-  let reader = Reader.stdin
-
-  let does_daemon_exist port =
-    let open Deferred.Let_syntax in
-    let%map result =
-      Rpc.Connection.client
-        (Tcp.Where_to_connect.of_host_and_port (of_local_port port))
-    in
-    Result.is_ok result
-
-  let kill p =
-    Process.run_exn () ~prog:"kill" ~args:[Pid.to_string @@ Process.pid p]
-
-  let timeout = Time.Span.of_sec 10.0
-
-  let heartbeat = Time.Span.of_sec 0.5
-
-  let invoke_daemon port =
-    let rec check_daemon () =
-      let%bind result = does_daemon_exist port in
-      if result then Deferred.unit
-      else
-        let%bind () = Async.after heartbeat in
-        check_daemon ()
-    in
-    let our_binary = Sys.executable_name in
-    let args = ["daemon"; "-background"; "-client-port"; sprintf "%d" port] in
-    let%bind p = Process.create_exn () ~prog:our_binary ~args in
-    (* Wait for process to start the client server *)
-    match%bind Async.Clock.with_timeout timeout (check_daemon ()) with
-    | `Result _ -> Deferred.unit
-    | `Timeout ->
-        let%bind _ = kill p in
-        failwith "Cannot connect to daemon"
-
-  let run ~f port arg =
-    let port = Option.value port ~default:default_client_port in
-    let rec go = function
-      | Start ->
-          let%bind has_daemon = does_daemon_exist port in
-          if has_daemon then go Run_client else go No_daemon
-      | No_daemon ->
-          Print.printf !"Error: daemon not running. See `coda daemon`\n" ;
-          go Abort
-      | Run_client -> f port arg
-      | Abort -> Deferred.unit
-    in
-    go Start
-
-  let init ~f arg_flag =
-    let open Command.Param.Applicative_infix in
-    Command.Param.return (fun port arg () -> run ~f port arg)
-    <*> Flag.port <*> arg_flag
-end
+let dispatch_pretty_message (type t)
+    (module Print : Cli_lib.Render.Printable_intf with type t = t)
+    ?(json = true) rpc query port =
+  dispatch rpc query port >>| Cli_lib.Render.print (module Print) json
 
 module Args = struct
   open Command.Param
@@ -110,6 +38,17 @@ module Args = struct
     return (fun a b c d -> (a, b, c, d)) <*> arg1 <*> arg2 <*> arg3 <*> arg4
 end
 
+let stop_daemon =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Stop the daemon"
+    (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
+         match%map dispatch Stop_daemon.rpc () port with
+         | Ok () -> printf "Daemon stopping\n"
+         | Error e ->
+             printf "Daemon likely stopped: %s\n" (Error.to_string_hum e) ))
+
 let get_balance =
   let open Command.Param in
   let open Deferred.Let_syntax in
@@ -117,12 +56,12 @@ let get_balance =
     flag "address"
       ~doc:
         "PUBLICKEY Public-key address of which you want to check the balance"
-      (required public_key)
+      (required Cli_lib.Arg_type.public_key)
   in
   Command.async ~summary:"Get balance associated with an address"
-    (Daemon_cli.init address_flag ~f:(fun port address ->
+    (Cli_lib.Background_daemon.init address_flag ~f:(fun port address ->
          match%map
-           dispatch Client_lib.Get_balance.rpc
+           dispatch Daemon_rpcs.Get_balance.rpc
              (Public_key.compress address)
              port
          with
@@ -134,27 +73,30 @@ let get_balance =
 
 let get_public_keys =
   let open Deferred.Let_syntax in
-  let open Client_lib in
+  let open Daemon_rpcs in
   let open Command.Param in
   let with_balances_flag =
     flag "with-balances" no_arg
       ~doc:"Show corresponding balances to public keys"
   in
   Command.async ~summary:"Get public keys"
-    (Daemon_cli.init
-       (return (fun a b -> (a, b)) <*> with_balances_flag <*> json_flag)
+    (Cli_lib.Background_daemon.init
+       (return (fun a b -> (a, b)) <*> with_balances_flag <*> Cli_lib.Flag.json)
        ~f:(fun port (is_balance_included, json) ->
          if is_balance_included then
-           dispatch Get_public_keys_with_balances.rpc () port
-           >>| print (module Public_key_with_balances) json
+           dispatch_pretty_message ~json
+             (module Cli_lib.Render.Public_key_with_balances)
+             Get_public_keys_with_balances.rpc () port
          else
-           dispatch Get_public_keys.rpc () port
-           >>| print (module String_list_formatter) json ))
+           dispatch_pretty_message ~json
+             (module Cli_lib.Render.String_list_formatter)
+             Get_public_keys.rpc () port ))
 
 let prove_payment =
   let open Deferred.Let_syntax in
-  let open Client_lib in
+  let open Daemon_rpcs in
   let open Command.Param in
+  let open Cli_lib.Arg_type in
   let receipt_hash_flag =
     flag "receipt-chain-hash"
       ~doc:
@@ -166,15 +108,15 @@ let prove_payment =
       (required public_key)
   in
   Command.async ~summary:"Generate a proof of a payment as a merkle list"
-    (Daemon_cli.init (Args.zip2 receipt_hash_flag address_flag)
+    (Cli_lib.Background_daemon.init (Args.zip2 receipt_hash_flag address_flag)
        ~f:(fun port (receipt_chain_hash, pk) ->
-         match%map
-           dispatch Prove_receipt.rpc
-             (receipt_chain_hash, Public_key.compress pk)
-             port
-         with
-         | Ok result -> print (module Prove_receipt.Output) true result
-         | Error e -> eprintf "%s" (Error.to_string_hum e) ))
+         dispatch_with_message Prove_receipt.rpc
+           (receipt_chain_hash, Public_key.compress pk)
+           port
+           ~success:(function
+             | Ok result -> Cli_lib.Render.Prove_receipt.to_text result
+             | Error e -> Error.to_string_hum e)
+           ~error:Error.to_string_hum ))
 
 let read_json filepath =
   let%map json_contents = Reader.file_contents filepath in
@@ -182,8 +124,9 @@ let read_json filepath =
 
 let verify_payment =
   let open Deferred.Let_syntax in
-  let open Client_lib in
+  let open Daemon_rpcs in
   let open Command.Param in
+  let open Cli_lib.Arg_type in
   let proof_path_flag =
     flag "proof-path"
       ~doc:"PROOFFILE File to read json version of payment proof"
@@ -199,7 +142,8 @@ let verify_payment =
       (required public_key)
   in
   Command.async ~summary:"Generate a proof of a payment as a merkle list"
-    (Daemon_cli.init (Args.zip3 payment_path_flag proof_path_flag address_flag)
+    (Cli_lib.Background_daemon.init
+       (Args.zip3 payment_path_flag proof_path_flag address_flag)
        ~f:(fun port (payment_path, proof_path, pk) ->
          let%bind payment_json = read_json payment_path
          and proof_json = read_json proof_path in
@@ -224,7 +168,7 @@ let verify_payment =
 let get_nonce addr port =
   let open Deferred.Let_syntax in
   match%map
-    dispatch Client_lib.Get_nonce.rpc (Public_key.compress addr) port
+    dispatch Daemon_rpcs.Get_nonce.rpc (Public_key.compress addr) port
   with
   | Ok (Some n) -> Ok n
   | Ok None -> Error "No account found at that public_key"
@@ -234,10 +178,10 @@ let get_nonce_cmd =
   let open Command.Param in
   let address_flag =
     flag "address" ~doc:"PUBLICKEY Public-key address you want the nonce for"
-      (required public_key)
+      (required Cli_lib.Arg_type.public_key)
   in
   Command.async ~summary:"Get the current nonce for an account"
-    (Daemon_cli.init address_flag ~f:(fun port address ->
+    (Cli_lib.Background_daemon.init address_flag ~f:(fun port address ->
          match%bind get_nonce address port with
          | Error e ->
              eprintf "Failed to get nonce: %s\n" e ;
@@ -248,37 +192,21 @@ let get_nonce_cmd =
 
 let status =
   let open Deferred.Let_syntax in
-  let open Client_lib in
+  let open Daemon_rpcs in
   Command.async ~summary:"Get running daemon status"
-    (Daemon_cli.init json_flag ~f:(fun port json ->
-         dispatch Get_status.rpc () port >>| print (module Status) json ))
+    (Cli_lib.Background_daemon.init Cli_lib.Flag.json ~f:(fun port json ->
+         dispatch_pretty_message ~json
+           (module Daemon_rpcs.Types.Status)
+           Get_status.rpc () port ))
 
 let status_clear_hist =
   let open Deferred.Let_syntax in
-  let open Client_lib in
+  let open Daemon_rpcs in
   Command.async ~summary:"Clear histograms reported in status"
-    (Daemon_cli.init json_flag ~f:(fun port json ->
-         dispatch Clear_hist_status.rpc () port >>| print (module Status) json
-     ))
-
-let rec prompt_password prompt =
-  let open Deferred.Or_error.Let_syntax in
-  let%bind pw1 = read_password_exn prompt in
-  let%bind pw2 = read_password_exn "Again to confirm: " in
-  if not (Bytes.equal pw1 pw2) then (
-    eprintf "Error: passwords don't match, try again\n" ;
-    prompt_password prompt )
-  else return pw2
-
-let privkey_path_flag =
-  let open Command.Param in
-  flag "privkey-path"
-    ~doc:"FILE File to write private key into (public key will be FILE.pub)"
-    (required file)
-
-let privkey_read_path_flag =
-  let open Command.Param in
-  flag "privkey-path" ~doc:"FILE File to read private key from" (required file)
+    (Cli_lib.Background_daemon.init Cli_lib.Flag.json ~f:(fun port json ->
+         dispatch_pretty_message ~json
+           (module Daemon_rpcs.Types.Status)
+           Clear_hist_status.rpc () port ))
 
 let get_nonce_exn public_key port =
   match%bind get_nonce public_key port with
@@ -295,23 +223,13 @@ let handle_exception_nicely (type a) (f : unit -> a Deferred.t) () :
       eprintf "Error: %s" (Error.to_string_hum e) ;
       exit 1
 
-let read_keypair path =
-  handle_exception_nicely
-    (fun () ->
-      read_keypair_exn ~privkey_path:path
-        ~password:(lazy (read_password_exn "Secret key password: ")) )
-    ()
-
 let batch_send_payments =
   let module Payment_info = struct
     type t = {receiver: string; amount: Currency.Amount.t; fee: Currency.Fee.t}
     [@@deriving sexp]
   end in
-  let arg =
-    let open Command.Let_syntax in
-    let%map_open privkey_path = privkey_read_path_flag
-    and payments_path = anon ("payments-file" %: string) in
-    (privkey_path, payments_path)
+  let payment_path_flag =
+    Command.Param.(anon @@ ("payments-file" %: string))
   in
   let get_infos payments_path =
     match%bind
@@ -337,7 +255,7 @@ let batch_send_payments =
   in
   let main port (privkey_path, payments_path) =
     let open Deferred.Let_syntax in
-    let%bind keypair = read_keypair_exn' privkey_path
+    let%bind keypair = Cli_lib.Keypair.Terminal_stdin.read_exn privkey_path
     and infos = get_infos payments_path in
     let%bind nonce0 = get_nonce_exn keypair.public_key port in
     let _, ts =
@@ -351,7 +269,7 @@ let batch_send_payments =
                       { receiver= Public_key.Compressed.of_base64_exn receiver
                       ; amount })) ) )
     in
-    dispatch_with_message Client_lib.Send_user_commands.rpc
+    dispatch_with_message Daemon_rpcs.Send_user_commands.rpc
       (ts :> User_command.t list)
       port
       ~success:(fun () -> "Successfully enqueued payments in pool")
@@ -359,11 +277,14 @@ let batch_send_payments =
         sprintf "Failed to send payments %s" (Error.to_string_hum e) )
   in
   Command.async ~summary:"send multiple payments from a file"
-    (Daemon_cli.init arg ~f:main)
+    (Cli_lib.Background_daemon.init
+       (Args.zip2 Cli_lib.Flag.privkey_read_path payment_path_flag)
+       ~f:main)
 
 let user_command (body_args : User_command_payload.Body.t Command.Param.t)
     ~label ~summary ~error =
   let open Command.Param in
+  let open Cli_lib.Arg_type in
   let amount_flag =
     flag "fee" ~doc:"VALUE  fee you're willing to pay (default: 1)"
       (optional txn_fee)
@@ -371,12 +292,15 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
   let flag =
     let open Command.Param in
     return (fun a b c -> (a, b, c))
-    <*> body_args <*> privkey_read_path_flag <*> amount_flag
+    <*> body_args <*> Cli_lib.Flag.privkey_read_path <*> amount_flag
   in
   Command.async ~summary
-    (Daemon_cli.init flag ~f:(fun port (body, from_account, fee) ->
+    (Cli_lib.Background_daemon.init flag
+       ~f:(fun port (body, from_account, fee) ->
          let open Deferred.Let_syntax in
-         let%bind sender_kp = read_keypair_exn' from_account in
+         let%bind sender_kp =
+           Cli_lib.Keypair.Terminal_stdin.read_exn from_account
+         in
          let%bind nonce = get_nonce_exn sender_kp.public_key port in
          let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
          let payload : User_command.Payload.t =
@@ -384,7 +308,7 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
              ~memo:User_command_memo.dummy ~body
          in
          let payment = User_command.sign sender_kp payload in
-         dispatch_with_message Client_lib.Send_user_command.rpc
+         dispatch_with_message Daemon_rpcs.Send_user_command.rpc
            (payment :> User_command.t)
            port
            ~success:(fun receipt_chain_hash ->
@@ -396,6 +320,7 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
 let send_payment =
   let body =
     let open Command.Let_syntax in
+    let open Cli_lib.Arg_type in
     let%map_open receiver =
       flag "receiver"
         ~doc:"PUBLICKEY Public-key address to which you want to send money"
@@ -412,6 +337,7 @@ let send_payment =
 let delegate_stake =
   let body =
     let open Command.Let_syntax in
+    let open Cli_lib.Arg_type in
     let%map_open new_delegate =
       flag "delegate"
         ~doc:"PUBLICKEY Public-key address you want to set as your delegate"
@@ -425,30 +351,30 @@ let delegate_stake =
 let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
     (let open Command.Let_syntax in
-    let%map_open privkey_path = privkey_path_flag in
+    let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
     handle_exception_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%bind privkey =
-      hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
+      Cli_lib.Password.hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
     in
     let pk =
       Private_key.of_base64_exn (privkey |> Or_error.ok_exn |> Bytes.to_string)
     in
     let kp = Keypair.of_private_key_exn pk in
-    write_keypair_exn kp ~privkey_path
-      ~password:(lazy (prompt_password "Password for new private key file: ")))
+    Cli_lib.Keypair.Terminal_stdin.write_exn kp ~privkey_path)
 
 let dump_keypair =
   Command.async ~summary:"Print out a keypair from a private key file"
     (let open Command.Let_syntax in
-    let%map_open privkey_path = privkey_read_path_flag in
+    let%map_open privkey_path = Cli_lib.Flag.privkey_read_path in
     handle_exception_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%map kp =
-      read_keypair_exn ~privkey_path
-        ~password:(lazy (read_password_exn "Password for private key file: "))
+      Cli_lib.Keypair.read_exn ~privkey_path
+        ~password:
+          (lazy (Cli_lib.Password.read "Password for private key file: "))
     in
     printf "Public key: %s\nPrivate key: %s\n"
       (kp.public_key |> Public_key.compress |> Public_key.Compressed.to_base64)
@@ -457,15 +383,12 @@ let dump_keypair =
 let generate_keypair =
   Command.async ~summary:"Generate a new public-key/private-key pair"
     (let open Command.Let_syntax in
-    let%map_open privkey_path = privkey_path_flag in
+    let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
     handle_exception_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
     let kp = Genesis_ledger.largest_account_keypair_exn () in
-    let%bind () =
-      write_keypair_exn kp ~privkey_path
-        ~password:(lazy (prompt_password "Password for new private key file: "))
-    in
+    let%bind () = Cli_lib.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
     printf "Public key: %s\n"
       (kp.public_key |> Public_key.compress |> Public_key.Compressed.to_base64) ;
     exit 0)
@@ -480,8 +403,8 @@ let dump_ledger =
     anon ("ledger-builder-hash" %: h)
   in
   Command.async ~summary:"Print the ledger with given merkle root as a sexp"
-    (Daemon_cli.init lb_hash ~f:(fun port lb_hash ->
-         dispatch Client_lib.Get_ledger.rpc lb_hash port
+    (Cli_lib.Background_daemon.init lb_hash ~f:(fun port lb_hash ->
+         dispatch Daemon_rpcs.Get_ledger.rpc lb_hash port
          >>| function
          | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e
          | Ok (Error e) -> printf !"Ledger not found: %{sexp:Error.t}\n" e
@@ -494,6 +417,7 @@ let command =
     ; ("prove-payment", prove_payment)
     ; ("get-nonce", get_nonce_cmd)
     ; ("send-payment", send_payment)
+    ; ("stop-daemon", stop_daemon)
     ; ("batch-send-payments", batch_send_payments)
     ; ("status", status)
     ; ("status-clear-hist", status_clear_hist)

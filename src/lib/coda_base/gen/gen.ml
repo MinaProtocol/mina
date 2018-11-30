@@ -59,10 +59,21 @@ let structure ~loc =
   let open E in
   [%str let keypairs = [%e expr ~loc]]
 
+let json =
+  `List
+    (List.map keypairs ~f:(fun kp ->
+         `Assoc
+           [ ( "public_key"
+             , `String
+                 Public_key.(Compressed.to_base64 (compress kp.public_key)) )
+           ; ("private_key", `String (Private_key.to_base64 kp.private_key)) ]
+     ))
+
 let main () =
   let fmt =
     Format.formatter_of_out_channel (Out_channel.create "sample_keypairs.ml")
   in
+  Yojson.pretty_to_channel (Out_channel.create "sample_keypairs.json") json ;
   Pprintast.top_phrase fmt (Ptop_def (structure ~loc:Ppxlib.Location.none)) ;
   exit 0
 

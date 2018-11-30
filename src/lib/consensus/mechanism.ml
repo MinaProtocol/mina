@@ -1,154 +1,101 @@
-open Core_kernel
-open Tuple_lib
-open Fold_lib
-open Coda_numbers
+[%%import
+"../../config.mlh"]
 
-module type Prover_state_intf = sig
-  type t [@@deriving bin_io, sexp]
+open Core
+open Async
+include Intf
 
-  val handler : t -> Snark_params.Tick.Handler.t
-end
+let exit1 ?msg =
+  match msg with
+  | None -> Core.exit 1
+  | Some msg ->
+      Core.Printf.eprintf "%s\n" msg ;
+      Core.exit 1
 
-module type S = sig
-  module Local_state : sig
-    type t [@@deriving sexp]
+let env name ~f ~default =
+  let name = Printf.sprintf "CODA_%s" name in
+  Unix.getenv name
+  |> Option.map ~f:(fun x ->
+         match f @@ String.uppercase x with
+         | Some v -> v
+         | None ->
+             exit1
+               ~msg:
+                 (Printf.sprintf
+                    "Inside env var %s, there was a value I don't understand \
+                     \"%s\""
+                    name x) )
+  |> Option.value ~default
 
-    val create : Signature_lib.Keypair.t option -> t
-  end
+[%%if
+defined consensus_mechanism]
 
-  module Consensus_transition_data : sig
-    type value [@@deriving bin_io, sexp]
+[%%if
+consensus_mechanism = "proof_of_signature"]
 
-    include Snark_params.Tick.Snarkable.S with type value := value
+include Proof_of_signature.Make (struct
+  module Genesis_ledger = Genesis_ledger
+  module Proof = Coda_base.Proof
+  module Time = Coda_base.Block_time
 
-    val genesis : value
-  end
+  let proposal_interval =
+    env "PROPOSAL_INTERVAL"
+      ~default:(Time.Span.of_ms @@ Int64.of_int 5000)
+      ~f:(fun str ->
+        try Some (Time.Span.of_ms @@ Int64.of_string str) with _ -> None )
+end)
 
-  module Consensus_state : sig
-    type value [@@deriving hash, eq, compare, bin_io, sexp]
+[%%elif
+consensus_mechanism = "proof_of_stake"]
 
-    include Snark_params.Tick.Snarkable.S with type value := value
+include Proof_of_stake.Make (struct
+  module Genesis_ledger = Genesis_ledger
+  module Proof = Coda_base.Proof
+  module Time = Coda_base.Block_time
 
-    val genesis : value
+  (* TODO: change these variables into variables for config file. See #1176  *)
+  (* TODO: choose reasonable values *)
+  let genesis_state_timestamp =
+    let default = Coda_base.Genesis_state_timestamp.value |> Time.of_time in
+    env "GENESIS_STATE_TIMESTAMP" ~default ~f:(fun str ->
+        try Some (Time.of_time @@ Core.Time.of_string str) with _ -> None )
 
-    val length_in_triples : int
+  let coinbase =
+    env "COINBASE" ~default:(Currency.Amount.of_int 20) ~f:(fun str ->
+        try Some (Currency.Amount.of_int @@ Int.of_string str) with _ -> None
+    )
 
-    val var_to_triples :
-         var
-      -> ( Snark_params.Tick.Boolean.var Triple.t list
-         , _ )
-         Snark_params.Tick.Checked.t
+  let slot_interval =
+    env "SLOT_INTERVAL"
+      ~default:(Time.Span.of_ms (Int64.of_int 5000))
+      ~f:(fun str ->
+        try Some (Time.Span.of_ms @@ Int64.of_string str) with _ -> None )
 
-    val fold : value -> bool Triple.t Fold.t
+  let unforkable_transition_count =
+    env "UNFORKABLE_TRANSITION_COUNT" ~default:12 ~f:(fun str ->
+        try Some (Int.of_string str) with _ -> None )
 
-    val length : value -> Length.t
+  let probable_slots_per_transition_count =
+    env "PROBABLE_SLOTS_PER_TRANSITION_COUNT" ~default:8 ~f:(fun str ->
+        try Some (Int.of_string str) with _ -> None )
 
-    val to_lite : (value -> Lite_base.Consensus_state.t) option
+  (* Conservatively pick 1seconds *)
+  let expected_network_delay =
+    env "EXPECTED_NETWORK_DELAY"
+      ~default:(Time.Span.of_ms (Int64.of_int 1000))
+      ~f:(fun str ->
+        try Some (Time.Span.of_ms @@ Int64.of_string str) with _ -> None )
 
-    val to_string_record : value -> string
-  end
+  let approximate_network_diameter =
+    env "APPROXIMATE_NETWORK_DIAMETER" ~default:3 ~f:(fun str ->
+        try Some (Int.of_string str) with _ -> None )
+end)
 
-  module Blockchain_state : Coda_base.Blockchain_state.S
+[%%endif]
 
-  module Prover_state : Prover_state_intf
+[%%else]
 
-  module Protocol_state :
-    Coda_base.Protocol_state.S
-    with module Blockchain_state = Blockchain_state
-     and module Consensus_state = Consensus_state
+[%%error
+"\"consensus_mechanism\" not set in config.mlh"]
 
-  module Snark_transition :
-    Coda_base.Snark_transition.S
-    with module Blockchain_state = Blockchain_state
-     and module Consensus_data = Consensus_transition_data
-
-  module Internal_transition :
-    Coda_base.Internal_transition.S
-    with module Snark_transition = Snark_transition
-     and module Prover_state := Prover_state
-
-  module External_transition :
-    Coda_base.External_transition.S with module Protocol_state = Protocol_state
-
-  module Proposal_data : sig
-    type t
-
-    val prover_state : t -> Prover_state.t
-  end
-
-  val block_interval_ms : int64
-
-  val genesis_protocol_state : Protocol_state.value
-
-  val generate_transition :
-       previous_protocol_state:Protocol_state.value
-    -> blockchain_state:Blockchain_state.value
-    -> time:Unix_timestamp.t
-    -> proposal_data:Proposal_data.t
-    -> transactions:Coda_base.User_command.t list
-    -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
-    -> supply_increase:Currency.Amount.t
-    -> logger:Logger.t
-    -> Protocol_state.value * Consensus_transition_data.value
-  (**
-   * Generate a new protocol state and consensus specific transition data
-   * for a new transition. Called from the proposer in order to generate
-   * a new transition to propose to the network. Returns `None` if a new
-   * transition cannot be generated.
-   *)
-
-  val is_transition_valid_checked :
-       Snark_transition.var
-    -> (Snark_params.Tick.Boolean.var, _) Snark_params.Tick.Checked.t
-  (**
-   * Create a checked boolean constraint for the validity of a transition.
-   *)
-
-  val next_state_checked :
-       Consensus_state.var
-    -> Coda_base.State_hash.var
-    -> Snark_transition.var
-    -> Currency.Amount.var
-    -> (Consensus_state.var, _) Snark_params.Tick.Checked.t
-  (**
-   * Create a constrained, checked var for the next consensus state of
-   * a given consensus state and snark transition.
-   *)
-
-  val select :
-       existing:Consensus_state.value
-    -> candidate:Consensus_state.value
-    -> logger:Logger.t
-    -> time_received:Unix_timestamp.t
-    -> [`Keep | `Take]
-  (**
-   * Select between two ledger builder controller tips given the consensus
-   * states for the two tips. Returns `\`Keep` if the first tip should be
-   * kept, or `\`Take` if the second tip should be taken instead.
-   *)
-
-  val next_proposal :
-       Unix_timestamp.t
-    -> Consensus_state.value
-    -> local_state:Local_state.t
-    -> keypair:Signature_lib.Keypair.t
-    -> logger:Logger.t
-    -> [ `Check_again of Unix_timestamp.t
-       | `Propose of Unix_timestamp.t * Proposal_data.t ]
-  (**
-   * Determine if and when to perform the next transition proposal. Either
-   * informs the callee to check again at some time in the future, or to
-   * schedule a proposal at some time in the future.
-   *)
-
-  val lock_transition :
-       ?proposer_public_key:Signature_lib.Public_key.Compressed.t
-    -> Consensus_state.value
-    -> Consensus_state.value
-    -> snarked_ledger:(unit -> Coda_base.Ledger.t Or_error.t)
-    -> local_state:Local_state.t
-    -> unit
-  (**
-   * A hook for managing local state when the locked tip is updated.
-   *)
-end
+[%%endif]
