@@ -243,6 +243,7 @@ module Tick = struct
 
                   let params =
                     Array.init (len / 4) ~f:(fun i ->
+                      let i = i * 4 in
                         ( get params i
                         , get params (i + 1)
                         , get params (i + 2)
