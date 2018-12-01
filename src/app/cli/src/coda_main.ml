@@ -1121,12 +1121,14 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
               Lite_compat.digest
                 ( Consensus.Mechanism.Protocol_state.previous_state_hash state
                   :> Snark_params.Tick.Pedersen.Digest.t )
-          ; blockchain_state=
-              Lite_compat.blockchain_state
-                (Consensus.Mechanism.Protocol_state.blockchain_state state)
-          ; consensus_state=
-              consensus_state_to_lite
-                (Consensus.Mechanism.Protocol_state.consensus_state state) }
+          ; body=
+              { blockchain_state=
+                  Lite_compat.blockchain_state
+                    (Consensus.Mechanism.Protocol_state.blockchain_state state)
+              ; consensus_state=
+                  consensus_state_to_lite
+                    (Consensus.Mechanism.Protocol_state.consensus_state state)
+              } }
         in
         let proof = Lite_compat.proof proof in
         {Lite_base.Lite_chain.proof; ledger; protocol_state} )
