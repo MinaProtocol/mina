@@ -13,12 +13,6 @@ module type Transition_frontier_intf = sig
 
   type staged_ledger
 
-  type protocol_state
-
-  type protocol_state_proof
-
-  type ledger_builder_diff
-
   exception
     Parent_not_found of ([`Parent of state_hash] * [`Target of state_hash])
 
@@ -66,8 +60,6 @@ module type Transition_frontier_intf = sig
 
   val add_exn :
     t -> (external_transition, state_hash) With_hash.t -> Breadcrumb.t
-
-  val root_successor : t -> state_hash -> state_hash
 end
 
 module type Catchup_intf = sig
