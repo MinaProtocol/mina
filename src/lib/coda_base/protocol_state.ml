@@ -37,13 +37,22 @@ module type S = sig
 
   module Consensus_state : Consensus_state_intf
 
-  type ('a, 'b, 'c) t [@@deriving bin_io, sexp]
+  module Body : sig
+    type ('a, 'b) t [@@deriving bin_io, sexp]
 
-  type value =
-    (State_hash.Stable.V1.t, Blockchain_state.value, Consensus_state.value) t
-  [@@deriving bin_io, sexp]
+    type value = (Blockchain_state.value, Consensus_state.value) t
+    [@@deriving bin_io, sexp]
 
-  type var = (State_hash.var, Blockchain_state.var, Consensus_state.var) t
+    type var = (Blockchain_state.var, Consensus_state.var) t
+
+    val hash : value -> State_body_hash.t
+  end
+
+  type ('a, 'body) t [@@deriving bin_io, sexp]
+
+  type value = (State_hash.Stable.V1.t, Body.value) t [@@deriving bin_io, sexp]
+
+  type var = (State_hash.var, Body.var) t
 
   include Snarkable.S with type value := value and type var := var
 
@@ -52,6 +61,8 @@ module type S = sig
   val equal_value : value -> value -> bool
 
   val compare_value : value -> value -> int
+
+  val create : previous_state_hash:'a -> body:'b -> ('a, 'b) t
 
   val create_value :
        previous_state_hash:State_hash.Stable.V1.t
@@ -65,15 +76,15 @@ module type S = sig
     -> consensus_state:Consensus_state.var
     -> var
 
-  val previous_state_hash : ('a, _, _) t -> 'a
+  val previous_state_hash : ('a, _) t -> 'a
 
-  val blockchain_state : (_, 'a, _) t -> 'a
+  val body : (_, 'a) t -> 'a
 
-  val consensus_state : (_, _, 'a) t -> 'a
+  val blockchain_state : (_, ('a, _) Body.t) t -> 'a
+
+  val consensus_state : (_, (_, 'a) Body.t) t -> 'a
 
   val negative_one : value
-
-  val length_in_triples : int
 
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
@@ -91,76 +102,113 @@ module Make
   module Blockchain_state = Blockchain_state
   module Consensus_state = Consensus_state
 
-  type ('state_hash, 'blockchain_state, 'consensus_state) t =
-    { previous_state_hash: 'state_hash
-    ; blockchain_state: 'blockchain_state
-    ; consensus_state: 'consensus_state }
+  module Body = struct
+    type ('blockchain_state, 'consensus_state) t =
+      {blockchain_state: 'blockchain_state; consensus_state: 'consensus_state}
+    [@@deriving eq, ord, bin_io, hash, sexp]
+
+    type value = (Blockchain_state.value, Consensus_state.value) t
+    [@@deriving eq, ord, bin_io, hash, sexp]
+
+    type var = (Blockchain_state.var, Consensus_state.var) t
+
+    let to_hlist {blockchain_state; consensus_state} =
+      H_list.[blockchain_state; consensus_state]
+
+    let of_hlist : (unit, 'bs -> 'cs -> unit) H_list.t -> ('bs, 'cs) t =
+     fun H_list.([blockchain_state; consensus_state]) ->
+      {blockchain_state; consensus_state}
+
+    let data_spec = Data_spec.[Blockchain_state.typ; Consensus_state.typ]
+
+    let typ =
+      Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+    let fold {blockchain_state; consensus_state} =
+      let open Fold in
+      Blockchain_state.fold blockchain_state
+      +> Consensus_state.fold consensus_state
+
+    let hash s =
+      Snark_params.Tick.Pedersen.digest_fold Hash_prefix.protocol_state_body
+        (fold s)
+      |> State_body_hash.of_hash
+
+    let var_to_triples {blockchain_state; consensus_state} =
+      let open Let_syntax in
+      let%map blockchain_state =
+        Blockchain_state.var_to_triples blockchain_state
+      and consensus_state = Consensus_state.var_to_triples consensus_state in
+      blockchain_state @ consensus_state
+
+    let hash_checked (t : var) =
+      let open Let_syntax in
+      var_to_triples t
+      >>= Snark_params.Tick.Pedersen.Checked.digest_triples
+            ~init:Hash_prefix.protocol_state_body
+      >>| State_body_hash.var_of_hash_packed
+  end
+
+  type ('state_hash, 'body) t = {previous_state_hash: 'state_hash; body: 'body}
   [@@deriving eq, ord, bin_io, hash, sexp]
 
   module Value = struct
-    type value =
-      (State_hash.Stable.V1.t, Blockchain_state.value, Consensus_state.value) t
-    [@@deriving bin_io, sexp, hash, compare]
+    type value = (State_hash.Stable.V1.t, Body.value) t
+    [@@deriving bin_io, sexp, hash, compare, eq]
 
-    type t = value [@@deriving bin_io, sexp, hash, compare]
+    type t = value [@@deriving bin_io, sexp, hash, compare, eq]
   end
 
-  type value = Value.t [@@deriving bin_io, sexp, hash, compare]
+  type value = Value.t [@@deriving bin_io, sexp, hash, compare, eq]
 
   include Hashable.Make (Value)
 
-  type var = (State_hash.var, Blockchain_state.var, Consensus_state.var) t
+  type var = (State_hash.var, Body.var) t
 
   module Proof = Proof
   module Hash = State_hash
 
-  let equal_value =
-    equal State_hash.equal Blockchain_state.equal Consensus_state.equal_value
+  let create ~previous_state_hash ~body = {previous_state_hash; body}
 
-  let create ~previous_state_hash ~blockchain_state ~consensus_state =
-    {previous_state_hash; blockchain_state; consensus_state}
+  let create' ~previous_state_hash ~blockchain_state ~consensus_state =
+    {previous_state_hash; body= {Body.blockchain_state; consensus_state}}
 
-  let create_value = create
+  let create_value = create'
 
-  let create_var = create
+  let create_var = create'
+
+  let body {body; _} = body
 
   let previous_state_hash {previous_state_hash; _} = previous_state_hash
 
-  let blockchain_state {blockchain_state; _} = blockchain_state
+  let blockchain_state {body= {Body.blockchain_state; _}; _} = blockchain_state
 
-  let consensus_state {consensus_state; _} = consensus_state
+  let consensus_state {body= {Body.consensus_state; _}; _} = consensus_state
 
-  let to_hlist {previous_state_hash; blockchain_state; consensus_state} =
-    H_list.[previous_state_hash; blockchain_state; consensus_state]
+  let to_hlist {previous_state_hash; body} = H_list.[previous_state_hash; body]
 
-  let of_hlist :
-      (unit, 'psh -> 'bs -> 'cs -> unit) H_list.t -> ('psh, 'bs, 'cs) t =
-   fun H_list.([previous_state_hash; blockchain_state; consensus_state]) ->
-    {previous_state_hash; blockchain_state; consensus_state}
+  let of_hlist : (unit, 'psh -> 'body -> unit) H_list.t -> ('psh, 'body) t =
+   fun H_list.([previous_state_hash; body]) -> {previous_state_hash; body}
 
-  let data_spec =
-    Data_spec.[State_hash.typ; Blockchain_state.typ; Consensus_state.typ]
+  let data_spec = Data_spec.[State_hash.typ; Body.typ]
 
   let typ =
     Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let var_to_triples {previous_state_hash; blockchain_state; consensus_state} =
+  let var_to_triples {previous_state_hash; body} =
     let open Let_syntax in
     let%map previous_state_hash = State_hash.var_to_triples previous_state_hash
-    and blockchain_state = Blockchain_state.var_to_triples blockchain_state
-    and consensus_state = Consensus_state.var_to_triples consensus_state in
-    previous_state_hash @ blockchain_state @ consensus_state
+    and body_hash =
+      Body.hash_checked body >>= State_body_hash.var_to_triples
+    in
+    previous_state_hash @ body_hash
 
-  let length_in_triples =
-    State_hash.length_in_triples + Blockchain_state.length_in_triples
-    + Consensus_state.length_in_triples
-
-  let fold {previous_state_hash; blockchain_state; consensus_state} =
+  let fold {previous_state_hash; body} =
     let open Fold in
     State_hash.fold previous_state_hash
-    +> Blockchain_state.fold blockchain_state
-    +> Consensus_state.fold consensus_state
+    +> State_body_hash.fold (Body.hash body)
 
   let hash s =
     Snark_params.Tick.Pedersen.digest_fold Hash_prefix.protocol_state (fold s)
@@ -178,11 +226,12 @@ module Make
   let negative_one =
     { previous_state_hash=
         State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
-    ; blockchain_state= Blockchain_state.genesis
-    ; consensus_state= Consensus_state.genesis }
+    ; body=
+        { Body.blockchain_state= Blockchain_state.genesis
+        ; consensus_state= Consensus_state.genesis } }
 
-  let to_string_record t =
+  let to_string_record (t : value) =
     Printf.sprintf "{blockchain|%s}|{consensus|%s}"
-      (Blockchain_state.to_string_record t.blockchain_state)
-      (Consensus_state.to_string_record t.consensus_state)
+      (Blockchain_state.to_string_record t.body.blockchain_state)
+      (Consensus_state.to_string_record t.body.consensus_state)
 end
