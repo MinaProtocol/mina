@@ -248,12 +248,12 @@ module type Snark_pool_proof_intf = sig
 end
 
 module type User_command_intf = sig
-  type t [@@deriving sexp, compare, eq, bin_io]
+  type t [@@deriving sexp, eq, bin_io]
 
   type public_key
 
   module With_valid_signature : sig
-    type nonrec t = private t [@@deriving sexp, compare, eq]
+    type nonrec t = private t [@@deriving sexp, eq]
   end
 
   val check : t -> With_valid_signature.t option

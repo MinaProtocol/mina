@@ -1,79 +1,179 @@
 open Core_kernel
 open Protocols.Coda_pow
+   
+module Time : Time_intf = Coda_base.Block_time
 
-module type Inputs_intf = sig
-  module Time : Time_intf
-
-  module Proof : Proof_intf
-
-  module State_hash : Hash_intf
-
-  module Ledger_hash : Ledger_hash_intf
-
-  module Frozen_ledger_hash :
-    Frozen_ledger_hash_intf with type ledger_hash := Ledger_hash.t
-
-  module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
-
-  module Ledger_builder_hash :
-    Ledger_builder_hash_intf
-    with type ledger_hash := Ledger_hash.t
-     and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
-
-  module Ledger_builder_diff : Ledger_builder_diff_intf
-
-  module Blockchain_state :
-    Blockchain_state_intf
-    with type ledger_builder_hash := Ledger_builder_hash.t
-     and type frozen_ledger_hash := Frozen_ledger_hash.t
-     and type time := Time.t
-
-  module Consensus_state : Consensus_state_intf
-
-  module Protocol_state :
-    Protocol_state_intf
-    with type state_hash := State_hash.t
-     and type blockchain_state := Blockchain_state.value
-     and type consensus_state := Consensus_state.value
-
-  module External_transition :
-    External_transition_intf
-    with type protocol_state := Protocol_state.value
-     and type protocol_state_proof := Proof.t
-     and type ledger_builder_diff := Ledger_builder_diff.t
-
-  module Key : Merkle_ledger.Intf.Key
-
-  module Account : Merkle_ledger.Intf.Account with type key := Key.t
-
-  module Location : Merkle_ledger.Location_intf.S
-
-  module Ledger_diff : sig
-    type t
+module Proof : Proof_intf =
+  struct
+    (* TODO: missing bits *)
+    include Coda_base.Proof
+    type input
+    let verify _ = failwith "verify: missing"
   end
 
-  module Any_base :
-    Merkle_mask.Base_merkle_tree_intf.S
-    with module Addr = Location.Addr
-     and module Location = Location
-     and type account := Account.t
-     and type root_hash := Ledger_hash.t
-     and type hash := Ledger_hash.t
-     and type key := Key.t
+module State_hash : Hash_intf = Coda_base.State_hash
 
+module Ledger_hash : Ledger_hash_intf with type t := Coda_base.Ledger_hash.t = Coda_base.Ledger_hash
+
+module Frozen_ledger_hash : Frozen_ledger_hash_intf
+       with type ledger_hash := Coda_base.Ledger_hash.t
+        and type t := Coda_base.Frozen_ledger_hash.t =
+  Coda_base.Frozen_ledger_hash
+
+module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
+       with type t = Coda_base.Ledger_builder_hash.Aux_hash.t =
+  struct
+    include Coda_base.Ledger_builder_hash.Aux_hash.Stable.V1
+    let of_bytes = Coda_base.Ledger_builder_hash.Aux_hash.of_bytes
+  end
+
+module Ledger_builder_hash :
+Ledger_builder_hash_intf
+       with type t := Coda_base.Ledger_builder_hash.t
+       and type ledger_hash := Coda_base.Ledger_hash.t
+        and type ledger_builder_aux_hash := Coda_base.Ledger_builder_hash.Aux_hash.t =
+  struct
+    include Coda_base.Ledger_builder_hash.Stable.V1
+
+    let ledger_hash = Coda_base.Ledger_builder_hash.ledger_hash
+
+    let aux_hash = Coda_base.Ledger_builder_hash.aux_hash
+
+    let of_aux_and_ledger_hash = Coda_base.Ledger_builder_hash.of_aux_and_ledger_hash
+  end
+
+module Ledger_proof = struct type t [@@deriving sexp, bin_io]
+                      end
+  
+module Ledger_proof_statement = Transaction_snark.Statement
+
+module Completed_work =   Ledger_builder.Make_completed_work (Signature_lib.Public_key.Compressed) (Ledger_proof)
+    (Ledger_proof_statement)
+
+module User_command = struct
+  (* TODO: write missing bits *)
+  include Coda_base.User_command
+  let check _ = failwith "check: missing"
+  let fee _ = failwith "fee: missing"
+  let sender _ = failwith "fee: missing"
+end
+            
+module Inputs_ledger_builder_diff = struct
+  module Ledger_hash = Coda_base.Ledger_hash
+  module Ledger_proof = Ledger_proof
+  module Ledger_builder_aux_hash = Ledger_builder_aux_hash
+  module Compressed_public_key = Signature_lib.Public_key.Compressed
+  module User_command = User_command
+  module Completed_work =
+    Ledger_builder.Make_completed_work (Signature_lib.Public_key.Compressed) (Ledger_proof)
+      (Ledger_proof_statement)
+  module Ledger_builder_hash = Coda_base.Ledger_builder_hash
+
+end
+  
+module Ledger_builder_diff : Ledger_builder_diff_intf
+       with type completed_work_checked := Completed_work.Checked.t
+        and type completed_work := Completed_work.t
+        and type ledger_builder_hash := Coda_base.Ledger_builder_hash.t
+        and type public_key := Signature_lib.Public_key.Compressed.t
+        and type user_command := Coda_base.User_command.t
+        and type user_command_with_valid_signature :=
+              Coda_base.User_command.With_valid_signature.t
+=
+  Ledger_builder.Make_diff(Inputs_ledger_builder_diff)
+  
+module Blockchain_state : Blockchain_state_intf
+       with type ledger_builder_hash := Coda_base.Ledger_builder_hash.t
+        and type frozen_ledger_hash := Coda_base.Frozen_ledger_hash.t
+        and type time := Coda_base.Block_time.t =
+  Consensus.Mechanism.Protocol_state.Blockchain_state
+
+module Inputs_protocol_state : Consensus.Proof_of_signature.Inputs_intf = struct
+  module Time = Time
+  module Genesis_ledger = Genesis_ledger
+  (* TODO : what's a good interval *)
+  let proposal_interval = Time.Span.of_ms 100L
+end
+  
+module Protocol_state :
+Protocol_state_intf
+       with type state_hash := Coda_base.State_hash.t
+        and type blockchain_state := Consensus.Mechanism.Protocol_state.Blockchain_state.value
+        and type consensus_state := Consensus.Mechanism.Protocol_state.Consensus_state.value
+  = Consensus.Mechanism.Protocol_state
+  
+module External_transition :
+External_transition_intf
+       with type protocol_state := Consensus.Mechanism.Protocol_state.value
+        and type protocol_state_proof := Coda_base.Proof.t
+        and type ledger_builder_diff := Ledger_builder_diff.t =
+  Coda_base.External_transition.Make (Ledger_builder_diff) (Consensus.Mechanism.Protocol_state)
+
+
+module Key : Merkle_ledger.Intf.Key
+     with type t = Coda_base.Account.key = struct
+  module T = struct
+    type t = Coda_base.Account.key [@@deriving sexp, bin_io, compare, hash, eq]
+  end
+
+  let empty = Coda_base.Account.empty.public_key
+
+  include T
+  include Hashable.Make_binable (T)
+end
+
+module Depth = struct let depth = Snark_params.ledger_depth end
+  
+module Location : Merkle_ledger.Location_intf.S =
+  Merkle_ledger.Location.Make (Depth)
+
+module Ledger_diff : sig
+  type t
+end = struct
+  type t = int (* TODO : use valid type *)
+end
+
+module Hash = struct
+  type t = Coda_base.Ledger_hash.t [@@deriving bin_io, sexp]
+
+  let merge = Coda_base.Ledger_hash.merge
+
+  let hash_account = Fn.compose Coda_base.Ledger_hash.of_digest Coda_base.Account.digest
+
+  let empty_account = hash_account Coda_base.Account.empty
+end
+
+module Any_ledger : 
+  Merkle_ledger.Any_ledger.S
+  with module Location = Location
+  with type account := Coda_base.Account.t
+   and type key := Coda_base.Account.key
+   and type hash := Hash.t =
+  Merkle_ledger.Any_ledger.Make_base (Key) (Coda_base.Account) (Hash) (Location)
+    (Depth)
+
+(* Merkle_mask.Base_merkle_tree_intf.S
+       with module Addr = Location.Addr
+        and module Location = Location
+        and type account := Account.t
+        and type root_hash := Coda_base.Ledger_hash.t
+        and type hash := Coda_base.Ledger_hash.t
+        and type key := Key.t =
+ *) 
+module type Inputs_intf = sig
   module Ledger_mask : sig
     include
       Merkle_mask.Masking_merkle_tree_intf.S
       with module Addr = Location.Addr
        and module Location = Location
        and module Attached.Addr = Location.Addr
-       and type account := Account.t
+       and type account := Coda_base.Account.t
        and type location := Location.t
        and type key := Key.t
-       and type hash := Ledger_hash.t
+       and type hash := Coda_base.Ledger_hash.t
        and type parent := Any_base.t
 
-    val merkle_root : t -> Ledger_hash.t
+    val merkle_root : t -> Coda_base.Ledger_hash.t
 
     val apply : t -> Ledger_diff.t -> unit
 
@@ -85,9 +185,9 @@ module type Inputs_intf = sig
       Merkle_ledger.Database_intf.S
       with module Location = Location
        and module Addr = Location.Addr
-       and type account := Account.t
-       and type root_hash := Ledger_hash.t
-       and type hash := Ledger_hash.t
+       and type account := Coda_base.Account.t
+       and type root_hash := Coda_base.Ledger_hash.t
+       and type hash := Coda_base.Ledger_hash.t
        and type key := Key.t
 
     val derive : t -> Ledger_mask.t
@@ -127,8 +227,8 @@ end
 (* NOTE: is Consensus_mechanism.select preferable over distance? *)
 module Make (Inputs : Inputs_intf) :
   Transition_frontier_intf
-  with type state_hash := Inputs.State_hash.t
-   and type external_transition := Inputs.External_transition.t
+  with type state_hash := Coda_base.State_hash.t
+   and type external_transition := External_transition.t
    and type ledger_database := Inputs.Ledger_database.t
    and type transaction_snark_scan_state :=
               Inputs.Transaction_snark_scan_state.t
@@ -137,34 +237,34 @@ module Make (Inputs : Inputs_intf) :
   open Inputs
 
   exception
-    Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
+    Parent_not_found of ([`Parent of Coda_base.State_hash.t] * [`Target of Coda_base.State_hash.t])
 
-  exception Already_exists of State_hash.t
+  exception Already_exists of Coda_base.State_hash.t
 
   let max_length = Max_length.t
 
   module Breadcrumb = struct
     type t =
-      { transition_with_hash: (External_transition.t, State_hash.t) With_hash.t
+      { transition_with_hash: (External_transition.t, Coda_base.State_hash.t) With_hash.t
       ; staged_ledger: Staged_ledger.t }
     [@@deriving fields]
 
     let hash {transition_with_hash; _} = With_hash.hash transition_with_hash
 
     let parent_hash {transition_with_hash; _} =
-      Protocol_state.previous_state_hash
+      Consensus.Mechanism.Protocol_state.previous_state_hash
         (External_transition.protocol_state
            (With_hash.data transition_with_hash))
   end
 
   type node =
-    {breadcrumb: Breadcrumb.t; successor_hashes: State_hash.t list; length: int}
+    {breadcrumb: Breadcrumb.t; successor_hashes: Coda_base.State_hash.t list; length: int}
 
   type t =
     { root_snarked_ledger: Ledger_database.t
-    ; mutable root: State_hash.t
-    ; mutable best_tip: State_hash.t
-    ; table: node State_hash.Table.t }
+    ; mutable root: Coda_base.State_hash.t
+    ; mutable best_tip: Coda_base.State_hash.t
+    ; table: node Coda_base.State_hash.Table.t }
 
   (* TODO: load from and write to disk *)
   let create ~root_transition ~root_snarked_ledger
@@ -174,20 +274,20 @@ module Make (Inputs : Inputs_intf) :
       External_transition.protocol_state (With_hash.data root_transition)
     in
     let root_blockchain_state =
-      Protocol_state.blockchain_state root_protocol_state
+      Consensus.Mechanism.Protocol_state.blockchain_state root_protocol_state
     in
     assert (
       Ledger_hash.equal
         (Ledger_database.merkle_root root_snarked_ledger)
         (Frozen_ledger_hash.to_ledger_hash
-           (Blockchain_state.ledger_hash root_blockchain_state)) ) ;
+           (  Consensus.Mechanism.Protocol_state.Blockchain_state.ledger_hash root_blockchain_state)) ) ;
     let root_staged_ledger_mask = Ledger_database.derive root_snarked_ledger in
     Ledger_mask.apply root_staged_ledger_mask root_staged_ledger_diff ;
     assert (
       Ledger_hash.equal
         (Ledger_mask.merkle_root root_staged_ledger_mask)
         (Ledger_builder_hash.ledger_hash
-           (Blockchain_state.ledger_builder_hash root_blockchain_state)) ) ;
+           (  Consensus.Mechanism.Protocol_state.Blockchain_state.ledger_builder_hash root_blockchain_state)) ) ;
     let root_staged_ledger =
       Staged_ledger.create
         ~transaction_snark_scan_state:root_transaction_snark_scan_state
@@ -200,7 +300,7 @@ module Make (Inputs : Inputs_intf) :
     let root_node =
       {breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
     in
-    let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
+    let table = Coda_base.State_hash.Table.of_alist_exn [(root_hash, root_node)] in
     {root_snarked_ledger; root= root_hash; best_tip= root_hash; table}
 
   let find t hash =
@@ -216,7 +316,7 @@ module Make (Inputs : Inputs_intf) :
     let rec find_path b =
       let hash = Breadcrumb.hash b in
       let parent_hash = Breadcrumb.parent_hash b in
-      if State_hash.equal parent_hash t.root then [hash]
+      if Coda_base.State_hash.equal parent_hash t.root then [hash]
       else hash :: find_path (find_exn t parent_hash)
     in
     List.rev (find_path breadcrumb)
@@ -306,7 +406,7 @@ module Make (Inputs : Inputs_intf) :
       (* 4.b.II *)
       let garbage_immediate_successors =
         List.filter root_node.successor_hashes ~f:(fun succ_hash ->
-            not (State_hash.equal succ_hash new_root_hash) )
+            not (Coda_base.State_hash.equal succ_hash new_root_hash) )
       in
       (* 4.b.III *)
       let garbage =
@@ -330,7 +430,7 @@ let%test_module "Transition_frontier tests" =
   let%test "transitions can be added and interface will work at any point" =
                                                 p
     let module Frontier = Make (struct
-      module State_hash = Test_mocks.Hash.Int_unchecked
+      module Coda_base.State_hash = Test_mocks.Hash.Int_unchecked
       module External_transition = Test_mocks.External_transition.T
       module Max_length = struct
         let t = 5
