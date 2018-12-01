@@ -243,6 +243,7 @@ module Make (Inputs : Inputs_intf) :
         succ :: successors_rec t succ )
 
   let attach_node_to t ~parent_node ~node =
+    let hash = Breadcrumb.hash node.breadcrumb in
     (if not (State_hash.equal (Breadcrumb.hash parent_node.breadcrumb) (Breadcrumb.parent_hash node.breadcrumb)) then
        failwith "invalid call to attach_to: hash parent_node <> parent_hash node");
     (if Hashtbl.add t.table ~key:(Breadcrumb.hash node.breadcrumb) ~data:node <> `Ok then
@@ -253,11 +254,13 @@ module Make (Inputs : Inputs_intf) :
           successor_hashes= hash :: parent_node.successor_hashes }
 
   let attach_breadcrumb_exn t breadcrumb =
+    let hash = Breadcrumb.hash breadcrumb in
+    let parent_hash = Breadcrumb.parent_hash breadcrumb in
     let parent_node =
       Option.value_exn
         (Hashtbl.find t.table parent_hash)
         ~error:
-          (Error.of_exn (Parent_not_found (`Parent (Breadcrumb.parent_hash breadcrumb), `Target hash)))
+          (Error.of_exn (Parent_not_found (`Parent parent_hash, `Target hash)))
     in
     let node = {breadcrumb; successor_hashes= []; length= parent_node.length + 1} in
     attach_node_to t ~parent_node ~node
@@ -298,9 +301,10 @@ module Make (Inputs : Inputs_intf) :
            (External_transition.ledger_builder_diff transition))
       |> Or_error.ok_exn
     in
-    let breadcrumb = {Breadcrumb.transition_with_hash; staged_ledger}
+    let breadcrumb = {Breadcrumb.transition_with_hash; staged_ledger} in
     (* 2 *)
-    attach_breadcrumb t breadcrumb;
+    attach_breadcrumb_exn t breadcrumb;
+    let node = Hashtbl.find_exn t.table hash in
     (* 3.a *)
     let distance_to_parent = root_node.length - node.length in
     (* 3.b *)

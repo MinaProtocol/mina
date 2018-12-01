@@ -76,7 +76,7 @@ module type S = sig
     val prover_state : t -> Prover_state.t
   end
 
-  val block_interval_ms : int64
+  val block_interval_ms : Int64.t
 
   val genesis_protocol_state : Protocol_state.value
 
@@ -95,6 +95,11 @@ module type S = sig
    * for a new transition. Called from the proposer in order to generate
    * a new transition to propose to the network. Returns `None` if a new
    * transition cannot be generated.
+   *)
+
+  val is_valid : Consensus_state.value -> time_received:Unix_timestamp.t -> bool
+  (**
+   * Check transition invariants to determin the validity of an external transition
    *)
 
   val is_transition_valid_checked :

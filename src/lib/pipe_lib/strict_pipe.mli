@@ -50,16 +50,12 @@ module Reader : sig
 
   module Merge : sig
     val iter :
-         ?consumer:Pipe.Consumer.t
-      -> ?continue_on_error:bool
-      -> 'a t list
+        'a t list
       -> f:('a -> unit Deferred.t)
       -> unit Deferred.t
 
     val iter_sync :
-         ?consumer:Pipe.Consumer.t
-      -> ?continue_on_error:bool
-      -> 'a t list
+         'a t list
       -> f:('a -> unit)
       -> unit Deferred.t
   end

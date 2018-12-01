@@ -1,10 +1,13 @@
 open Protocols.Coda_pow
 
 module type S = sig
-  module Proof : Proof_intf
   module Time : Time_intf
   module Consensus_mechanism : Consensus_mechanism_intf
     with type protocol_state_hash := Coda_base.State_hash.t
+     and type protocol_state_proof := Coda_base.Proof.t
+  module Proof : Proof_intf
+    with type input := Consensus_mechanism.Protocol_state.value
+     and type t := Coda_base.Proof.t
   module Transition_frontier : Transition_frontier_intf
     with type state_hash := Coda_base.State_hash.t
      and type external_transition := Consensus_mechanism.External_transition.t

@@ -47,7 +47,7 @@ module Reader = struct
 
   let map reader ~f =
     assert_not_read reader;
-    reader.has_reader <-true;
+    reader.has_reader <- true;
     {reader= Pipe.map reader.reader ~f; has_reader= false}
 
   module Merge = struct
@@ -64,7 +64,10 @@ module Reader = struct
               in
               List.find_exn readers ~f:not_empty
         in
-        Deferred.bind (f (Pipe.read_now ready_reader.reader)) ~f:read_deferred
+        match Pipe.read_now ready_reader.reader with
+        | `Nothing_available -> failwith "impossible"
+        | `Eof -> Deferred.return ()
+        | `Ok value -> Deferred.bind (f value) ~f:read_deferred
       in
       List.iter readers ~f:assert_not_read;
       read_deferred ()
