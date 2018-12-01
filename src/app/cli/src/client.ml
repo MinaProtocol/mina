@@ -387,7 +387,7 @@ let generate_keypair =
     handle_exception_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
-    let kp = Genesis_ledger.largest_account_keypair_exn () in
+    let kp = Keypair.create () in
     let%bind () = Cli_lib.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
     printf "Public key: %s\n"
       (kp.public_key |> Public_key.compress |> Public_key.Compressed.to_base64) ;
