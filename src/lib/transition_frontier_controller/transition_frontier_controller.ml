@@ -9,6 +9,12 @@ module type Inputs_intf = sig
   module Consensus_mechanism :
     Consensus_mechanism_intf with type protocol_state_hash := State_hash.t
 
+  module External_transition :
+    External_transition_intf
+    with type protocol_state := Consensus_mechanism.Protocol_state.value
+     and type ledger_builder_diff := Consensus_mechanism.ledger_builder_diff
+     and type protocol_state_proof := Consensus_mechanism.protocol_state_proof
+
   module Merkle_address : Merkle_address.S
 
   module Ledger_builder_diff : Ledger_builder_diff_intf
@@ -100,7 +106,7 @@ module type Inputs_intf = sig
 
   module Transition_frontier :
     Transition_frontier_intf
-    with type external_transition := Consensus_mechanism.External_transition.t
+    with type external_transition := External_transition.t
      and type state_hash := State_hash.t
      and type ledger_database := Ledger_database.t
      and type transaction_snark_scan_state := Transaction_snark_scan_state.t
@@ -118,22 +124,24 @@ module type Inputs_intf = sig
   module Transition_handler :
     Transition_handler_intf
     with type time_controller := Time.Controller.t
-     and type external_transition := Consensus_mechanism.External_transition.t
+     and type external_transition := External_transition.t
      and type state_hash := State_hash.t
      and type transition_frontier := Transition_frontier.t
-     and type transition_frontier_breadcrumb := Transition_frontier.Breadcrumb.t
+     and type transition_frontier_breadcrumb :=
+                Transition_frontier.Breadcrumb.t
 
   module Catchup :
     Catchup_intf
-    with type external_transition := Consensus_mechanism.External_transition.t
+    with type external_transition := External_transition.t
      and type state_hash := State_hash.t
      and type transition_frontier := Transition_frontier.t
-     and type transition_frontier_breadcrumb := Transition_frontier.Breadcrumb.t
+     and type transition_frontier_breadcrumb :=
+                Transition_frontier.Breadcrumb.t
 
   module Sync_handler :
     Sync_handler_intf
     with type addr := Merkle_address.t
-     and type hash := Ledger_hash.t
+     and type hash := State_hash.t
      and type syncable_ledger := Syncable_ledger.t
      and type syncable_ledger_query := Syncable_ledger.query
      and type syncable_ledger_answer := Syncable_ledger.answer
@@ -143,16 +151,16 @@ end
 module Make (Inputs : Inputs_intf) :
   Transition_frontier_controller_intf
   with type time_controller := Inputs.Time.Controller.t
-   and type external_transition :=
-              Inputs.Consensus_mechanism.External_transition.t
+   and type external_transition := Inputs.External_transition.t
    and type syncable_ledger_query := Inputs.Syncable_ledger.query
    and type syncable_ledger_answer := Inputs.Syncable_ledger.answer
-   and type transition_frontier := Inputs.Transition_frontier.t = struct
+   and type transition_frontier := Inputs.Transition_frontier.t
+   and type state_hash := State_hash.t = struct
   open Inputs
   open Consensus_mechanism
 
-  let run ~logger ~time_controller ~genesis_transition ~transition_reader ~sync_query_reader
-      ~sync_answer_writer =
+  let run ~logger ~time_controller ~genesis_transition ~transition_reader
+      ~sync_query_reader ~sync_answer_writer =
     let logger = Logger.child logger "transition_frontier_controller" in
     let valid_transition_reader, valid_transition_writer =
       Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
@@ -177,8 +185,8 @@ module Make (Inputs : Inputs_intf) :
     in
     Transition_handler.Validator.run ~frontier ~transition_reader
       ~valid_transition_writer ;
-    Transition_handler.Processor.run ~logger ~time_controller ~frontier ~valid_transition_reader
-      ~catchup_job_writer ~catchup_breadcrumbs_reader ;
+    Transition_handler.Processor.run ~logger ~time_controller ~frontier
+      ~valid_transition_reader ~catchup_job_writer ~catchup_breadcrumbs_reader ;
     Catchup.run ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer ;
     Sync_handler.run ~sync_query_reader ~sync_answer_writer ~frontier
 end

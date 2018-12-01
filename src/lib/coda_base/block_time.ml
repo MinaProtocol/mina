@@ -134,4 +134,4 @@ let modulus t span = UInt64.rem t span
 
 let unpacked_to_number var =
   let bits = Span.Unpacked.var_to_bits var in
-  Number.of_bits bits
+  Number.of_bits (bits :> Boolean.var list)

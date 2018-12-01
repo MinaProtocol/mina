@@ -26,10 +26,13 @@ type (_, _) type_ =
 module Reader = struct
   type 't t = {reader: 't Pipe.Reader.t; mutable has_reader: bool}
 
-  let assert_not_read reader = (if reader.has_reader then raise Multiple_reads_attempted)
+  let assert_not_read reader =
+    if reader.has_reader then raise Multiple_reads_attempted
+
+  let wrap_reader reader = {reader; has_reader= false}
 
   let enforce_single_reader reader deferred =
-    assert_not_read reader;
+    assert_not_read reader ;
     reader.has_reader <- true ;
     let%map result = deferred in
     reader.has_reader <- false ;
@@ -42,13 +45,18 @@ module Reader = struct
     enforce_single_reader reader
       (Pipe.iter reader.reader ?consumer ?continue_on_error ~f)
 
-  let iter_sync ?consumer ?continue_on_error reader ~f =
-    iter ?consumer ?continue_on_error reader ~f:(fun x -> f x; Deferred.unit)
-
   let map reader ~f =
-    assert_not_read reader;
-    reader.has_reader <- true;
-    {reader= Pipe.map reader.reader ~f; has_reader= false}
+    assert_not_read reader ;
+    reader.has_reader <- true ;
+    wrap_reader (Pipe.map reader.reader ~f)
+
+  let filter_map reader ~f =
+    assert_not_read reader ;
+    reader.has_reader <- true ;
+    wrap_reader (Pipe.filter_map reader.reader ~f)
+
+  let iter_sync ?consumer ?continue_on_error reader ~f =
+    iter ?consumer ?continue_on_error reader ~f:(fun x -> f x ; Deferred.unit)
 
   module Merge = struct
     let iter readers ~f =
@@ -58,9 +66,11 @@ module Reader = struct
           match List.find readers ~f:not_empty with
           | Some reader -> Deferred.return reader
           | None ->
-              let%map () = Deferred.choose (
-                List.map readers ~f:(fun r ->
-                    Deferred.choice (Pipe.values_available r.reader) (fun _ -> ())))
+              let%map () =
+                Deferred.choose
+                  (List.map readers ~f:(fun r ->
+                       Deferred.choice (Pipe.values_available r.reader)
+                         (fun _ -> () ) ))
               in
               List.find_exn readers ~f:not_empty
         in
@@ -69,11 +79,10 @@ module Reader = struct
         | `Eof -> Deferred.return ()
         | `Ok value -> Deferred.bind (f value) ~f:read_deferred
       in
-      List.iter readers ~f:assert_not_read;
+      List.iter readers ~f:assert_not_read ;
       read_deferred ()
 
-    let iter_sync readers ~f =
-      iter readers ~f:(fun x -> f x; Deferred.unit)
+    let iter_sync readers ~f = iter readers ~f:(fun x -> f x ; Deferred.unit)
   end
 end
 
@@ -108,3 +117,6 @@ let create type_ =
     (Reader.{reader; has_reader= false}, Writer.{type_; reader; writer})
   in
   (reader, writer)
+
+let transfer reader {Writer.writer; _} ~f =
+  Reader.enforce_single_reader reader (Pipe.transfer reader.reader writer ~f)

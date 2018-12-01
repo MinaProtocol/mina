@@ -12,7 +12,7 @@ let main () =
   let log = Logger.create () in
   let log = Logger.child log name in
   let proposal_interval =
-    Int64.to_int_exn Consensus_mechanism.block_interval_ms
+    Int64.to_int_exn Consensus.Mechanism.block_interval_ms
   in
   let work_selection = Protocols.Coda_pow.Work_selection.Seq in
   Coda_processes.init () ;

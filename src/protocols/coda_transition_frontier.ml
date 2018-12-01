@@ -60,7 +60,8 @@ module type Transition_frontier_intf = sig
 
   val attach_breadcrumb_exn : t -> Breadcrumb.t -> unit
 
-  val add_transition_exn : t -> (external_transition, state_hash) With_hash.t -> Breadcrumb.t
+  val add_transition_exn :
+    t -> (external_transition, state_hash) With_hash.t -> Breadcrumb.t
 end
 
 module type Catchup_intf = sig
@@ -76,7 +77,10 @@ module type Catchup_intf = sig
        frontier:transition_frontier
     -> catchup_job_reader:(external_transition, state_hash) With_hash.t
                           Reader.t
-    -> catchup_breadcrumbs_writer:(transition_frontier_breadcrumb list, crash buffered, _) Writer.t
+    -> catchup_breadcrumbs_writer:( transition_frontier_breadcrumb list
+                                  , crash buffered
+                                  , _ )
+                                  Writer.t
     -> unit
 end
 
@@ -112,7 +116,8 @@ module type Transition_handler_processor_intf = sig
        logger:Logger.t
     -> time_controller:time_controller
     -> frontier:transition_frontier
-    -> valid_transition_reader:(external_transition, state_hash) With_hash.t Reader.t
+    -> valid_transition_reader:(external_transition, state_hash) With_hash.t
+                               Reader.t
     -> catchup_job_writer:( (external_transition, state_hash) With_hash.t
                           , drop_head buffered
                           , unit )
@@ -132,12 +137,14 @@ module type Transition_handler_intf = sig
 
   type transition_frontier_breadcrumb
 
-  module Validator : Transition_handler_validator_intf
+  module Validator :
+    Transition_handler_validator_intf
     with type state_hash := state_hash
      and type external_transition := external_transition
      and type transition_frontier := transition_frontier
 
-  module Processor : Transition_handler_processor_intf
+  module Processor :
+    Transition_handler_processor_intf
     with type time_controller := time_controller
      and type external_transition := external_transition
      and type state_hash := state_hash
@@ -160,8 +167,11 @@ module type Sync_handler_intf = sig
 
   val run :
        frontier:transition_frontier
-    -> sync_query_reader:syncable_ledger_query Reader.t
-    -> sync_answer_writer:(syncable_ledger_answer, synchronous, _) Writer.t
+    -> sync_query_reader:(hash * syncable_ledger_query) Reader.t
+    -> sync_answer_writer:( hash * syncable_ledger_answer
+                          , synchronous
+                          , unit Async.Deferred.t )
+                          Writer.t
     -> unit
 end
 
@@ -176,12 +186,17 @@ module type Transition_frontier_controller_intf = sig
 
   type transition_frontier
 
+  type state_hash
+
   val run :
        logger:Logger.t
     -> time_controller:time_controller
     -> genesis_transition:external_transition
     -> transition_reader:external_transition Reader.t
-    -> sync_query_reader:syncable_ledger_query Reader.t
-    -> sync_answer_writer:(syncable_ledger_answer, synchronous, _) Writer.t
+    -> sync_query_reader:(state_hash * syncable_ledger_query) Reader.t
+    -> sync_answer_writer:( state_hash * syncable_ledger_answer
+                          , synchronous
+                          , unit Async.Deferred.t )
+                          Writer.t
     -> unit
 end

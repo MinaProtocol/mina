@@ -10,22 +10,35 @@ module Make (Inputs : Inputs.S) = struct
   let validate_transition ~logger ~frontier ~time_received t =
     let time_received =
       Time.to_span_since_epoch time_received
-      |> Time.Span.to_ms
-      |> Unix_timestamp.of_int64
+      |> Time.Span.to_ms |> Unix_timestamp.of_int64
     in
     let log_assert condition error_msg =
-      let log () = Logger.info logger "transition rejected: %s" error_msg; false in
+      let log () =
+        Logger.info logger "transition rejected: %s" error_msg ;
+        false
+      in
       condition || log ()
     in
-    let consensus_state = Fn.compose Protocol_state.consensus_state External_transition.protocol_state in
-    let root = With_hash.data (Transition_frontier.Breadcrumb.transition_with_hash (Transition_frontier.root frontier)) in
+    let consensus_state =
+      Fn.compose Protocol_state.consensus_state
+        External_transition.protocol_state
+    in
+    let root =
+      With_hash.data
+        (Transition_frontier.Breadcrumb.transition_with_hash
+           (Transition_frontier.root frontier))
+    in
     if
       log_assert
         (Consensus_mechanism.is_valid (consensus_state t) ~time_received)
         "failed consensus validation"
       && log_assert
-        (Consensus_mechanism.select ~logger ~existing:(consensus_state root) ~candidate:(consensus_state t) ~time_received = `Take)
-        "was not better than transition frontier root";
+           ( Consensus_mechanism.select ~logger
+               ~existing:(consensus_state root) ~candidate:(consensus_state t)
+               ~time_received
+           = `Take )
+           "was not better than transition frontier root"
+    then
       (* TODO:
       let length = External_transition.protocol_state t |> Protocol_state.blockchain_state |> Blockchain_state.length in
       log_assert
@@ -37,20 +50,26 @@ module Make (Inputs : Inputs.S) = struct
           false)
         "transition frontier root hash was invalid"
       *)
-    then
-      let%map proof_is_valid = Proof.verify (External_transition.protocol_state_proof t) (External_transition.protocol_state t) in
+      let%map proof_is_valid =
+        Proof.verify
+          (External_transition.protocol_state_proof t)
+          (External_transition.protocol_state t)
+      in
       log_assert proof_is_valid "proof was invalid"
-    else
-      Deferred.return false
+    else Deferred.return false
 
   let run ~logger ~frontier ~transition_reader ~valid_transition_writer =
     let logger = Logger.child logger "transition_handler_validator" in
-    don't_wait_for (Reader.iter transition_reader ~f:(fun (`Transition transition, `Time_received time_received) ->
-        if%map validate_transition ~logger ~frontier ~time_received transition then
-          Writer.write valid_transition_writer transition
-        else
-          (* TODO: punish *)
-          Logger.warn logger "failed to verify transition from the network!"))
+    don't_wait_for
+      (Reader.iter transition_reader
+         ~f:(fun (`Transition transition, `Time_received time_received) ->
+           if%map
+             validate_transition ~logger ~frontier ~time_received transition
+           then Writer.write valid_transition_writer transition
+           else
+             (* TODO: punish *)
+             Logger.warn logger "failed to verify transition from the network!"
+       ))
 end
 
 (*

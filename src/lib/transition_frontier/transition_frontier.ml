@@ -244,11 +244,20 @@ module Make (Inputs : Inputs_intf) :
 
   let attach_node_to t ~parent_node ~node =
     let hash = Breadcrumb.hash node.breadcrumb in
-    (if not (State_hash.equal (Breadcrumb.hash parent_node.breadcrumb) (Breadcrumb.parent_hash node.breadcrumb)) then
-       failwith "invalid call to attach_to: hash parent_node <> parent_hash node");
-    (if Hashtbl.add t.table ~key:(Breadcrumb.hash node.breadcrumb) ~data:node <> `Ok then
-       Error.raise (Error.of_exn (Already_exists hash)));
-    Hashtbl.set t.table ~key:(Breadcrumb.hash parent_node.breadcrumb)
+    if
+      not
+        (State_hash.equal
+           (Breadcrumb.hash parent_node.breadcrumb)
+           (Breadcrumb.parent_hash node.breadcrumb))
+    then
+      failwith
+        "invalid call to attach_to: hash parent_node <> parent_hash node" ;
+    if
+      Hashtbl.add t.table ~key:(Breadcrumb.hash node.breadcrumb) ~data:node
+      <> `Ok
+    then Error.raise (Error.of_exn (Already_exists hash)) ;
+    Hashtbl.set t.table
+      ~key:(Breadcrumb.hash parent_node.breadcrumb)
       ~data:
         { parent_node with
           successor_hashes= hash :: parent_node.successor_hashes }
@@ -262,7 +271,9 @@ module Make (Inputs : Inputs_intf) :
         ~error:
           (Error.of_exn (Parent_not_found (`Parent parent_hash, `Target hash)))
     in
-    let node = {breadcrumb; successor_hashes= []; length= parent_node.length + 1} in
+    let node =
+      {breadcrumb; successor_hashes= []; length= parent_node.length + 1}
+    in
     attach_node_to t ~parent_node ~node
 
   (* Adding a transition to the transition frontier is broken into the following steps:
@@ -289,9 +300,9 @@ module Make (Inputs : Inputs_intf) :
         (External_transition.protocol_state transition)
     in
     let parent =
-      Option.value_exn
-        (find t parent_hash)
-        ~error:(Error.of_exn (Parent_not_found (`Parent parent_hash, `Target hash)))
+      Option.value_exn (find t parent_hash)
+        ~error:
+          (Error.of_exn (Parent_not_found (`Parent parent_hash, `Target hash)))
     in
     (* 1 *)
     let staged_ledger =
@@ -303,7 +314,7 @@ module Make (Inputs : Inputs_intf) :
     in
     let breadcrumb = {Breadcrumb.transition_with_hash; staged_ledger} in
     (* 2 *)
-    attach_breadcrumb_exn t breadcrumb;
+    attach_breadcrumb_exn t breadcrumb ;
     let node = Hashtbl.find_exn t.table hash in
     (* 3.a *)
     let distance_to_parent = root_node.length - node.length in

@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Tuple_lib
 open Fold_lib
 open Coda_numbers
@@ -62,14 +62,6 @@ module type S = sig
     with module Blockchain_state = Blockchain_state
      and module Consensus_data = Consensus_transition_data
 
-  module Internal_transition :
-    Coda_base.Internal_transition.S
-    with module Snark_transition = Snark_transition
-     and module Prover_state := Prover_state
-
-  module External_transition :
-    Coda_base.External_transition.S with module Protocol_state = Protocol_state
-
   module Proposal_data : sig
     type t
 
@@ -97,24 +89,20 @@ module type S = sig
    * transition cannot be generated.
    *)
 
-  val is_valid : Consensus_state.value -> time_received:Unix_timestamp.t -> bool
+  val is_valid :
+    Consensus_state.value -> time_received:Unix_timestamp.t -> bool
   (**
    * Check transition invariants to determin the validity of an external transition
    *)
 
-  val is_transition_valid_checked :
-       Snark_transition.var
-    -> (Snark_params.Tick.Boolean.var, _) Snark_params.Tick.Checked.t
-  (**
-   * Create a checked boolean constraint for the validity of a transition.
-   *)
-
   val next_state_checked :
-       Consensus_state.var
-    -> Coda_base.State_hash.var
+       prev_state:Protocol_state.var
+    -> prev_state_hash:Coda_base.State_hash.var
     -> Snark_transition.var
     -> Currency.Amount.var
-    -> (Consensus_state.var, _) Snark_params.Tick.Checked.t
+    -> ( [`Success of Snark_params.Tick.Boolean.var] * Consensus_state.var
+       , _ )
+       Snark_params.Tick.Checked.t
   (**
    * Create a constrained, checked var for the next consensus state of
    * a given consensus state and snark transition.

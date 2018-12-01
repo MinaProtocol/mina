@@ -158,6 +158,7 @@ module Snarkable = struct
     with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
      and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
      and type boolean_var := Impl.Boolean.var
+     and type field_var := Impl.Field.Checked.t
      and type Packed.var = Impl.Field.Checked.t
      and type Packed.value = V.t
      and type Unpacked.var = Impl.Boolean.var list
@@ -227,7 +228,7 @@ module Snarkable = struct
           (Typ.list ~length:V.length Boolean.typ)
           ~there:(v_to_list V.length) ~back:v_of_list
 
-      let var_to_bits = Fn.id
+      let var_to_bits = Bitstring_lib.Bitstring.Lsb_first.of_list
 
       let var_to_triples (bs : var) =
         Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_ bs
@@ -237,6 +238,8 @@ module Snarkable = struct
     end
 
     let unpack_var x = Impl.Field.Checked.unpack x ~length:bit_length
+
+    let var_of_field = unpack_var
 
     let unpack_value (x : Packed.value) : Unpacked.value = x
 
@@ -309,7 +312,7 @@ module Snarkable = struct
           ~there:(unpack_field Field.unpack ~bit_length)
           ~back:Field.project
 
-      let var_to_bits = Fn.id
+      let var_to_bits = Bitstring_lib.Bitstring.Lsb_first.of_list
 
       let var_to_triples (bs : var) =
         Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_ bs

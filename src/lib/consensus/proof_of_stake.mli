@@ -1,10 +1,6 @@
 open Currency
 
 module type Inputs_intf = sig
-  module Ledger_builder_diff : sig
-    type t [@@deriving bin_io, sexp]
-  end
-
   module Time : sig
     type t
 
@@ -49,9 +45,4 @@ module type Inputs_intf = sig
   end
 end
 
-module Make (Inputs : Inputs_intf) :
-  Intf.S
-  with type Internal_transition.Ledger_builder_diff.t =
-              Inputs.Ledger_builder_diff.t
-   and type External_transition.Ledger_builder_diff.t =
-              Inputs.Ledger_builder_diff.t
+module Make (Inputs : Inputs_intf) : Intf.S
