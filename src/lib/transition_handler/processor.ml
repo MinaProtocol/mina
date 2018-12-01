@@ -6,8 +6,7 @@ module Make (Inputs : Inputs.S) :
   Transition_handler_processor_intf
   with type state_hash := Coda_base.State_hash.t
    and type time_controller := Inputs.Time.Controller.t
-   and type external_transition :=
-              Inputs.External_transition.t
+   and type external_transition := Inputs.External_transition.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
               Inputs.Transition_frontier.Breadcrumb.t = struct

@@ -8,7 +8,8 @@ module type S = sig
     with type protocol_state_hash := Coda_base.State_hash.t
      and type protocol_state_proof := Coda_base.Proof.t
 
-  module External_transition : External_transition_intf
+  module External_transition :
+    External_transition_intf
     with type protocol_state := Consensus_mechanism.Protocol_state.value
      and type protocol_state_proof := Coda_base.Proof.t
 
