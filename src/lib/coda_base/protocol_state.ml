@@ -91,6 +91,18 @@ module type S = sig
   val hash : value -> State_hash.Stable.V1.t
 
   val to_string_record : value -> string
+
+  module Ancestor_proof : sig
+    module Stable : sig
+      module V1 : sig
+        type t = State_body_hash.Stable.V1.t list [@@deriving bin_io]
+      end
+    end
+
+    type t = Stable.V1.t
+
+    val verify : t -> ancestor:value -> target_hash:State_hash.t -> bool
+  end
 end
 
 module Make
@@ -205,14 +217,39 @@ module Make
     in
     previous_state_hash @ body_hash
 
-  let fold {previous_state_hash; body} =
+  let fold' ~fold_body {previous_state_hash; body} =
     let open Fold in
-    State_hash.fold previous_state_hash
-    +> State_body_hash.fold (Body.hash body)
+    State_hash.fold previous_state_hash +> fold_body body
+
+  let fold t = fold' ~fold_body:(Fn.compose State_body_hash.fold Body.hash) t
 
   let hash s =
     Snark_params.Tick.Pedersen.digest_fold Hash_prefix.protocol_state (fold s)
     |> State_hash.of_hash
+
+  module Ancestor_proof = struct
+    module Stable = struct
+      module V1 = struct
+        type t = State_body_hash.Stable.V1.t list [@@deriving bin_io]
+      end
+    end
+
+    include Stable.V1
+
+    let verify t ~ancestor ~target_hash =
+      let rec go acc = function
+        | [] -> acc
+        | h :: hs ->
+            let acc =
+              Snark_params.Tick.Pedersen.digest_fold Hash_prefix.protocol_state
+                (fold' ~fold_body:State_body_hash.fold
+                   {previous_state_hash= acc; body= h})
+              |> State_hash.of_hash
+            in
+            go acc hs
+      in
+      State_hash.equal target_hash (go (hash ancestor) t)
+  end
 
   [%%if
   call_logger]
