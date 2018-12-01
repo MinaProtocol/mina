@@ -158,8 +158,6 @@ module Make (Inputs : Inputs_intf) :
 
   exception Already_exists of State_hash.t
 
-  exception Bad_root_hash_in_transition of State_hash.t
-
   let max_length = Max_length.t
 
   module Breadcrumb = struct
@@ -301,7 +299,6 @@ module Make (Inputs : Inputs_intf) :
         ~error:
           (Error.of_exn (Parent_not_found (`Parent parent_hash, `Target hash)))
     in
-    let parent_root_suc = root_successor t parent_node in
     (* 1.a ; b *)
     let staged_ledger =
       Staged_ledger.apply
@@ -319,21 +316,13 @@ module Make (Inputs : Inputs_intf) :
     (* 2 *)
     if Hashtbl.add t.table ~key:hash ~data:node <> `Ok then
       Error.raise (Error.of_exn (Already_exists hash)) ;
-    (let h =
-       match parent_root_suc with `Changed_root h | `Same_root h -> h
-     in
-     if
-       not
-         (State_hash.equal h
-            (External_transition.transition_frontier_root_hash transition))
-     then raise (Bad_root_hash_in_transition h)) ;
     (* 3 *)
     Hashtbl.set t.table ~key:parent_hash
       ~data:
         { parent_node with
           successor_hashes= hash :: parent_node.successor_hashes } ;
     (* 4. *)
-    ( match parent_root_suc with
+    ( match root_successor t parent_node with
     | `Changed_root new_root_hash ->
         (* 4.b *)
         let garbage_immediate_successors =
