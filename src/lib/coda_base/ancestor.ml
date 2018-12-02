@@ -11,9 +11,7 @@ module Input = struct
   include Stable.V1
 end
 
-module Output = struct
-  type t = State_hash.t
-end
+module Output = State_hash
 
 module Proof = struct
   module Stable = struct
