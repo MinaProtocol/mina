@@ -18,7 +18,8 @@ module type S = sig
 
   val path : 'a t -> source:Key.t -> ancestor:Key.t -> 'a list option
 
-  val ancestor_of_depth : 'a t -> source:Key.t -> depth:int-> (Key.t * 'a list) option
+  val ancestor_of_depth :
+    'a t -> source:Key.t -> depth:int -> (Key.t * 'a list) option
 
   val create : max_size:int -> 'a t
 end
@@ -62,19 +63,13 @@ module Make (Key : Key) : S with module Key = Key = struct
 
   let ancestor_of_depth =
     let rec go acc d (node : _ Node.t) =
-      if d = 0
-      then Some (node.key, acc)
+      if d = 0 then Some (node.key, acc)
       else
         match node.parent with
-        | `Node parent ->
-          go (node.value :: acc) (d - 1) parent
-        | `Key k ->
-          if d = 1
-          then Some (k, node.value :: acc)
-          else None
+        | `Node parent -> go (node.value :: acc) (d - 1) parent
+        | `Key k -> if d = 1 then Some (k, node.value :: acc) else None
     in
-    fun t ~source ~depth ->
-      Option.bind (lookup_node t source) ~f:(go [] depth)
+    fun t ~source ~depth -> Option.bind (lookup_node t source) ~f:(go [] depth)
 
   let is_old ~max_size ~newest l =
     Length.to_int newest - Length.to_int l > max_size
