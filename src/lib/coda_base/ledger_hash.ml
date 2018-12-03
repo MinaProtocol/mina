@@ -78,7 +78,7 @@ let reraise_merkle_requests (With {request; respond}) =
 let get t addr = Merkle_tree.get_req ~depth (var_to_hash_packed t) addr
 
 let empty_account = hash_account Account.empty
-               
+
 (*
    [modify_account t pk ~filter ~f] implements the following spec:
 

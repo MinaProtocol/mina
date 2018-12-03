@@ -57,7 +57,7 @@ module Stable = struct
       t_
     [@@deriving sexp, bin_io, eq, hash, compare]
 
-    (* monomorphize field selector *)      
+    (* monomorphize field selector *)
     let public_key (t : t) : key = t.public_key
   end
 end
