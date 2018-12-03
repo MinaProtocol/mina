@@ -964,19 +964,20 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         Logger.debug log
           !"Added  payment %{sexp:User_command.t} into receipt_chain \
             database. You should wait for a bit to see your account's receipt \
-            chain hash update as %{sexp:Receipt.Chain_hash.t}"
-          txn hash ;
+            chain hash update as %s"
+          txn
+          (Receipt.Chain_hash.to_string hash) ;
         hash
     | `Duplicate hash ->
         Logger.warn log !"Already sent transaction %{sexp:User_command.t}" txn ;
         hash
     | `Error_multiple_previous_receipts parent_hash ->
         Logger.fatal log
-          !"A payment is derived from two different blockchain states \
-            (%{sexp:Receipt.Chain_hash.t}, %{sexp:Receipt.Chain_hash.t}). \
-            Receipt.Chain_hash is supposed to be collision resistant. This \
-            collision should not happen."
-          parent_hash previous ;
+          !"A payment is derived from two different blockchain states (%s, \
+            %s). Receipt.Chain_hash is supposed to be collision resistant. \
+            This collision should not happen."
+          (Receipt.Chain_hash.to_string parent_hash)
+          (Receipt.Chain_hash.to_string previous) ;
         Core.exit 1
 
   module Payment_verifier =
