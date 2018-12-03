@@ -44,6 +44,9 @@ jobs:
         steps:
             - checkout
             - run:
+                name: Download Stable Proving Keys
+                command: scripts/getkeys.sh
+            - run:
                 name: Build OCaml
                 command: eval `opam config env` && DUNE_PROFILE=testnet_posig make build 2>&1 | tee /tmp/buildocaml.log
             - run:
