@@ -410,6 +410,20 @@ let dump_ledger =
          | Ok (Error e) -> printf !"Ledger not found: %{sexp:Error.t}\n" e
          | Ok (Ok accounts) -> printf !"%{sexp:Account.t list}\n" accounts ))
 
+let constraint_system_digests =
+  Command.async ~summary:"Print the md5 digest of each SNARK constraint system"
+    (Command.Param.return (fun () ->
+         let all =
+           Transaction_snark.constraint_system_digests ()
+           @ Blockchain_snark.Blockchain_transition.constraint_system_digests
+               ()
+         in
+         let all =
+           List.sort (fun (k1, _) (k2, _) -> String.compare k1 k2) all
+         in
+         List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
+         Deferred.unit ))
+
 let command =
   Command.group ~summary:"Lightweight client process"
     [ ("get-balance", get_balance)
@@ -424,4 +438,5 @@ let command =
     ; ("wrap-key", wrap_key)
     ; ("dump-keypair", dump_keypair)
     ; ("dump-ledger", dump_ledger)
+    ; ("constraint-system-digests", constraint_system_digests)
     ; ("generate-keypair", generate_keypair) ]

@@ -851,14 +851,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
     let assert_equal ?label x y = assert_ (Constraint.equal ?label x y)
 
-    let time label f =
-      let start_time = Time.now () in
-      let x = f () in
-      let end_time = Time.now () in
-      printf "%s: %s\n%!" label
-        Time.(Span.to_string_hum (diff end_time start_time)) ;
-      x
-
     (* TODO-someday: Add pass to unify variables which have an Equal constraint *)
     let constraint_system ~num_inputs (t : (unit, 's) t) :
         R1CS_constraint_system.t =
@@ -893,7 +885,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
             let () = go stack (check var) in
             go stack (k {Handle.var; value= None})
       in
-      time "constraint_system" (fun () -> go [] t) ;
+      O1trace.measure "constraint_system" (fun () -> go [] t) ;
       let auxiliary_input_size = !next_auxiliary - (1 + num_inputs) in
       R1CS_constraint_system.set_auxiliary_input_size system
         auxiliary_input_size ;
@@ -981,7 +973,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
             go (k {Handle.var; value= Some value}) handler s'
         | Next_auxiliary k -> go (k !next_auxiliary) handler s
       in
-      time "auxiliary_input" (fun () -> ignore (go t0 Request.Handler.fail s0)) ;
+      O1trace.measure "auxiliary_input" (fun () ->
+          ignore (go t0 Request.Handler.fail s0) ) ;
       aux
 
     let run_unchecked (type a s) (t0 : (a, s) t) (s0 : s) =
