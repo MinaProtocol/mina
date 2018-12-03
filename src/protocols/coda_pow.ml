@@ -791,22 +791,17 @@ module type External_transition_intf = sig
 
   type ledger_builder_diff
 
-  type state_hash
-
   type t [@@deriving sexp]
 
   val create :
        protocol_state:protocol_state
     -> protocol_state_proof:protocol_state_proof
     -> ledger_builder_diff:ledger_builder_diff
-    -> transition_frontier_root_hash:state_hash
     -> t
 
   val protocol_state : t -> protocol_state
 
   val protocol_state_proof : t -> protocol_state_proof
-
-  val transition_frontier_root_hash : t -> state_hash
 
   val ledger_builder_diff : t -> ledger_builder_diff
 end
@@ -1190,7 +1185,6 @@ Merge Snark:
     with type protocol_state := Consensus_mechanism.Protocol_state.value
      and type ledger_builder_diff := Ledger_builder_diff.t
      and type protocol_state_proof := Protocol_state_proof.t
-     and type state_hash := Protocol_state_hash.t
 
   module Tip :
     Tip_intf

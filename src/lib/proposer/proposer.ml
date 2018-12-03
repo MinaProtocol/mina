@@ -6,12 +6,6 @@ open O1trace
 module type Inputs_intf = sig
   include Protocols.Coda_pow.Inputs_intf
 
-  module Transition_frontier : sig
-    type t
-
-    val root_successor : t -> Protocol_state_hash.t -> Protocol_state_hash.t
-  end
-
   module Prover : sig
     val prove :
          prev_state:Consensus_mechanism.Protocol_state.value
@@ -100,8 +94,7 @@ module Make (Inputs : Inputs_intf) :
    and type completed_work_statement := Inputs.Completed_work.Statement.t
    and type completed_work_checked := Inputs.Completed_work.Checked.t
    and type time_controller := Inputs.Time.Controller.t
-   and type keypair := Inputs.Keypair.t
-   and type transition_frontier := Inputs.Transition_frontier.t = struct
+   and type keypair := Inputs.Keypair.t = struct
   open Inputs
   open Consensus_mechanism
 
@@ -240,7 +233,7 @@ module Make (Inputs : Inputs_intf) :
   let transition_capacity = 64
 
   let create ~parent_log ~get_completed_work ~change_feeder:tip_reader
-      ~time_controller ~keypair ~consensus_local_state ~transition_frontier =
+      ~time_controller ~keypair ~consensus_local_state =
     trace_task "proposer" (fun () ->
         let logger = Logger.child parent_log "proposer" in
         let transition_reader, transition_writer = Linear_pipe.create () in
@@ -293,11 +286,6 @@ module Make (Inputs : Inputs_intf) :
                              ~ledger_builder_diff:
                                (Internal_transition.ledger_builder_diff
                                   internal_transition)
-                             ~transition_frontier_root_hash:
-                               (Transition_frontier.root_successor
-                                  transition_frontier
-                                  (Protocol_state.previous_state_hash
-                                     protocol_state))
                          in
                          let time =
                            Time.now time_controller |> Time.to_span_since_epoch
