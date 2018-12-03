@@ -188,7 +188,7 @@ module type S' = sig
      and type statement := Ledger_proof_statement.t
      and type public_key := Compressed_public_key.t
 
-  module Ledger_builder_diff :
+  module Staged_ledger_diff :
     Coda_pow.Ledger_builder_diff_intf
     with type completed_work := Transaction_snark_work.t
      and type completed_work_checked := Transaction_snark_work.Checked.t
@@ -198,12 +198,7 @@ module type S' = sig
      and type public_key := Compressed_public_key.t
      and type ledger_builder_hash := Staged_ledger_hash.t
 
-  module Merkle_address : Merkle_address.S
-
-  module Syncable_ledger :
-    Syncable_ledger.S
-    with type addr := Merkle_address.t
-     and type hash := Ledger_hash.t
+  (*module Merkle_address : Merkle_address.S
 
   module Key : Merkle_ledger.Intf.Key
 
@@ -243,6 +238,27 @@ module type S' = sig
     val apply : t -> Ledger_diff.t -> unit
 
     val commit : t -> unit
+  end *)
+
+  module Account : sig
+    type t
+  end
+
+  module Ledger :
+    Coda_pow.Ledger_intf
+    with type ledger_hash := Ledger_hash.t
+     and type transaction := Transaction.t
+     and type valid_user_command := User_command.With_valid_signature.t
+     and type account := Account.t
+
+  module Sparse_ledger : sig
+    type t [@@deriving sexp, bin_io]
+
+    val of_ledger_subset_exn : Ledger.t -> Compressed_public_key.t list -> t
+
+    val merkle_root : t -> Ledger_hash.t
+
+    val apply_transaction_exn : t -> Transaction.t -> t
   end
 
   module Transaction_snark_scan_state : sig
@@ -254,7 +270,7 @@ module type S' = sig
       type t
 
       (* hack until Parallel_scan_state().Diff.t fully diverges from Ledger_builder_diff.t and is included in External_transition *)
-      val of_ledger_builder_diff : Ledger_builder_diff.t -> t
+      val of_ledger_builder_diff : Staged_ledger_diff.t -> t
     end
   end
 
@@ -263,7 +279,7 @@ module type S' = sig
 
     val create :
          transaction_snark_scan_state:Transaction_snark_scan_state.t
-      -> ledger_mask:Ledger_mask.t
+      -> ledger_mask:Ledger.Mask.t
       -> t
 
     val apply : t -> Transaction_snark_scan_state.Diff.t -> t Or_error.t

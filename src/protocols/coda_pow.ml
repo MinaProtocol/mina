@@ -172,7 +172,7 @@ end
 module type Ledger_intf = sig
   module Mask : Mask_intf
 
-  type t
+  type t [@@deriving sexp, bin_io]
 
   type attached_mask = t
 
@@ -656,6 +656,8 @@ module type Ledger_builder_intf = sig
 
   val statement_exn : t -> [`Non_empty of ledger_proof_statement | `Empty]
 end
+
+module type Staged_ledger_intf = Ledger_builder_intf
 
 module type Work_selector_intf = sig
   type ledger_builder

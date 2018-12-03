@@ -41,20 +41,20 @@ module Make_diff = Staged_ledger_diff.Make
 module Make (Inputs : Inputs.S') : sig
   include
     Coda_pow.Ledger_builder_intf
-    with type diff := Inputs.Ledger_builder_diff.t
+    with type diff := Inputs.Staged_ledger_diff.t
      and type valid_diff :=
-                Inputs.Ledger_builder_diff.With_valid_signatures_and_proofs.t
+                Inputs.Staged_ledger_diff.With_valid_signatures_and_proofs.t
      and type ledger_hash := Inputs.Ledger_hash.t
      and type frozen_ledger_hash := Inputs.Frozen_ledger_hash.t
-     and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
+     and type ledger_builder_hash := Inputs.Staged_ledger_hash.t
      and type public_key := Inputs.Compressed_public_key.t
      and type ledger := Inputs.Ledger.t
      and type user_command_with_valid_signature :=
                 Inputs.User_command.With_valid_signature.t
-     and type statement := Inputs.Completed_work.Statement.t
-     and type completed_work := Inputs.Completed_work.Checked.t
+     and type statement := Inputs.Transaction_snark_work.Statement.t
+     and type completed_work := Inputs.Transaction_snark_work.Checked.t
      and type ledger_proof := Inputs.Ledger_proof.t
-     and type ledger_builder_aux_hash := Inputs.Ledger_builder_aux_hash.t
+     and type ledger_builder_aux_hash := Inputs.Staged_ledger_aux_hash.t
      and type sparse_ledger := Inputs.Sparse_ledger.t
      and type ledger_proof_statement := Inputs.Ledger_proof_statement.t
      and type ledger_proof_statement_set := Inputs.Ledger_proof_statement.Set.t
@@ -103,7 +103,7 @@ end = struct
           (Binable.to_string (module Transaction_with_witness))
         :> string )
 
-    let hash t = Ledger_builder_aux_hash.of_bytes (hash_to_string t)
+    let hash t = Staged_ledger_aux_hash.of_bytes (hash_to_string t)
 
     let create_expected_statement
         {Transaction_with_witness.transaction_with_info; witness; _} =
@@ -142,7 +142,7 @@ end = struct
           (Ledger_proof_statement.t, [`Error of Error.t | `Empty]) Result.t M.t
           =
         let write_error description =
-          sprintf !"Ledger_builder.scan_statement: %s" description
+          sprintf !"Staged_ledger.scan_statement: %s" description
         in
         let open M.Let_syntax in
         let with_error ~f message =
@@ -304,8 +304,22 @@ end = struct
         scan_state
         (* Invariant: this is the ledger after having applied all the transactions in
     the above state. *)
-    ; ledger: Ledger.t }
-  [@@deriving sexp, bin_io]
+    ; ledger: Ledger.attached_mask sexp_opaque }
+  [@@deriving sexp]
+
+  type serializable = Aux.t * Ledger.serializable [@@deriving bin_io]
+
+  let serializable_of_t t = (t.scan_state, Ledger.serializable_of_t t.ledger)
+
+  let of_serialized_and_unserialized ~(serialized : serializable)
+      ~(unserialized : Ledger.maskable_ledger) =
+    (* reattach the serialized mask to the unserialized ledger *)
+    let scan_state, serialized_mask = serialized in
+    let attached_mask =
+      Ledger.register_mask unserialized
+        (Ledger.unattached_mask_of_serializable serialized_mask)
+    in
+    {scan_state; ledger= attached_mask}
 
   let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
 
@@ -444,15 +458,15 @@ end = struct
     { scan_state= Parallel_scan.State.copy scan_state
     ; ledger= Ledger.copy ledger }
 
-  let hash {scan_state; ledger} : Ledger_builder_hash.t =
-    Ledger_builder_hash.of_aux_and_ledger_hash (Aux.hash scan_state)
+  let hash {scan_state; ledger} : Staged_ledger_hash.t =
+    Staged_ledger_hash.of_aux_and_ledger_hash (Aux.hash scan_state)
       (Ledger.merkle_root ledger)
 
   [%%if
   call_logger]
 
   let hash t =
-    Coda_debug.Call_logger.record_call "Ledger_builder.hash" ;
+    Coda_debug.Call_logger.record_call "Staged_ledger.hash" ;
     hash t
 
   [%%endif]
@@ -525,10 +539,10 @@ end = struct
     | Some statement ->
         Inputs.Ledger_proof_verifier.verify proof statement ~message
 
-  let total_proofs (works : Completed_work.t list) =
+  let total_proofs (works : Transaction_snark_work.t list) =
     List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
 
-  let fill_in_completed_work (state : Aux.t) (works : Completed_work.t list) :
+  let fill_in_completed_work (state : Aux.t) (works : Transaction_snark_work.t list) :
       Ledger_proof.t option Or_error.t =
     let open Or_error.Let_syntax in
     let%bind next_jobs =
@@ -536,7 +550,7 @@ end = struct
     in
     let%bind scanable_work_list =
       map2_or_error next_jobs
-        (List.concat_map works ~f:(fun {Completed_work.fee; proofs; prover} ->
+        (List.concat_map works ~f:(fun {Transaction_snark_work.fee; proofs; prover} ->
              List.map proofs ~f:(fun proof -> (fee, proof, prover)) ))
         ~f:completed_work_to_scanable_work
     in
@@ -620,7 +634,7 @@ end = struct
     in
     go [] [] ts
 
-  let check_completed_works t (completed_works : Completed_work.t list) =
+  let check_completed_works t (completed_works : Transaction_snark_work.t list) =
     Result_with_rollback.with_no_rollback
       (let open Deferred.Or_error.Let_syntax in
       let%bind jobses =
@@ -630,7 +644,7 @@ end = struct
             Parallel_scan.next_k_jobs ~state:t.scan_state
               ~k:(total_proofs completed_works)
           in
-          chunks_of jobs ~n:Completed_work.proofs_length)
+          chunks_of jobs ~n:Transaction_snark_work.proofs_length)
       in
       Deferred.List.for_all (List.zip_exn jobses completed_works)
         ~f:(fun (jobs, work) ->
@@ -643,7 +657,7 @@ end = struct
     let singles =
       (if Fee.Unsigned.(equal zero delta) then [] else [(public_key, delta)])
       @ List.filter_map completed_works
-          ~f:(fun {Completed_work.fee; prover; _} ->
+          ~f:(fun {Transaction_snark_work.fee; prover; _} ->
             if Fee.Unsigned.equal fee Fee.Unsigned.zero then None
             else Some (prover, fee) )
     in
@@ -683,7 +697,7 @@ end = struct
         ^ ") \n %!" )
         (Currency.Amount.sub a1 a2)
     in
-    let single {Completed_work.fee; prover; _} =
+    let single {Transaction_snark_work.fee; prover; _} =
       if
         Fee.Unsigned.equal fee Fee.Unsigned.zero
         || Compressed_public_key.equal prover proposer
@@ -696,7 +710,7 @@ end = struct
       let%bind _ =
         overflow_err rem_coinbase
           (Option.value_map ~default:Currency.Amount.zero w2
-             ~f:(fun {Completed_work.fee; _} -> Currency.Amount.of_fee fee ))
+             ~f:(fun {Transaction_snark_work.fee; _} -> Currency.Amount.of_fee fee ))
       in
       let%bind cb1 =
         Coinbase.create ~amount:amt ~proposer ~fee_transfer:(fee_transfer w1)
@@ -718,7 +732,7 @@ end = struct
     | `Two None ->
         let amt = Currency.Amount.of_int 1 in
         two_parts amt None None
-    | `Two (Some ((w1 : Completed_work.t), w2)) ->
+    | `Two (Some ((w1 : Transaction_snark_work.t), w2)) ->
         let amt = Currency.Amount.of_fee w1.fee in
         two_parts amt (Some w1) w2
 
@@ -730,7 +744,7 @@ end = struct
       )
     in
     let%bind work_fee =
-      sum_fees completed_works ~f:(fun {Completed_work.fee; _} -> fee)
+      sum_fees completed_works ~f:(fun {Transaction_snark_work.fee; _} -> fee)
     in
     option "budget did not suffice" (Fee.Unsigned.sub budget work_fee)
 
@@ -744,7 +758,7 @@ end = struct
   end
 
   let apply_pre_diff t coinbase_parts proposer
-      (diff : Ledger_builder_diff.diff) =
+      (diff : Staged_ledger_diff.diff) =
     let open Result_with_rollback.Let_syntax in
     let%bind user_commands =
       let%map user_commands' =
@@ -794,10 +808,10 @@ end = struct
     ; coinbase_parts_count= List.length coinbase }
 
   (* TODO: when we move to a disk-backed db, this should call "Ledger.commit_changes" at the end. *)
-  let apply_diff t (diff : Ledger_builder_diff.t) ~logger =
+  let apply_diff t (diff : Staged_ledger_diff.t) ~logger =
     let open Result_with_rollback.Let_syntax in
     let apply_pre_diff_with_at_most_two
-        (pre_diff1 : Ledger_builder_diff.diff_with_at_most_two_coinbase) =
+        (pre_diff1 : Staged_ledger_diff.diff_with_at_most_two_coinbase) =
       let coinbase_parts =
         match pre_diff1.coinbase_parts with
         | Zero -> `Zero
@@ -807,7 +821,7 @@ end = struct
       apply_pre_diff t coinbase_parts diff.creator pre_diff1.diff
     in
     let apply_pre_diff_with_at_most_one
-        (pre_diff2 : Ledger_builder_diff.diff_with_at_most_one_coinbase) =
+        (pre_diff2 : Staged_ledger_diff.diff_with_at_most_one_coinbase) =
       let coinbase_added =
         match pre_diff2.coinbase_added with Zero -> `Zero | One x -> `One x
       in
@@ -817,10 +831,10 @@ end = struct
       let curr_hash = hash t in
       check_or_error
         (sprintf
-           !"bad prev_hash: Expected %{sexp:Ledger_builder_hash.t}, got \
-             %{sexp:Ledger_builder_hash.t}"
+           !"bad prev_hash: Expected %{sexp:Staged_ledger_hash.t}, got \
+             %{sexp:Staged_ledger_hash.t}"
            curr_hash diff.prev_hash)
-        (Ledger_builder_hash.equal diff.prev_hash (hash t))
+        (Staged_ledger_hash.equal diff.prev_hash (hash t))
       |> Result_with_rollback.of_or_error
     in
     let%bind data, works, user_commands_count, cb_parts_count =
@@ -871,12 +885,12 @@ end = struct
   let apply t witness ~logger =
     Result_with_rollback.run (apply_diff t witness ~logger)
 
-  let forget_work_opt = Option.map ~f:Completed_work.forget
+  let forget_work_opt = Option.map ~f:Transaction_snark_work.forget
 
   let apply_pre_diff_unchecked t coinbase_parts proposer
-      (diff : Ledger_builder_diff.With_valid_signatures_and_proofs.diff) =
+      (diff : Staged_ledger_diff.With_valid_signatures_and_proofs.diff) =
     let user_commands = diff.user_commands in
-    let txn_works = List.map ~f:Completed_work.forget diff.completed_works in
+    let txn_works = List.map ~f:Transaction_snark_work.forget diff.completed_works in
     let coinbase_work =
       match coinbase_parts with
       | `One (Some w) -> [w]
@@ -906,10 +920,10 @@ end = struct
     (new_data, txn_works, coinbase_work)
 
   let apply_diff_unchecked t
-      (diff : Ledger_builder_diff.With_valid_signatures_and_proofs.t) =
+      (diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) =
     let apply_pre_diff_with_at_most_two
         (pre_diff1 :
-          Ledger_builder_diff.With_valid_signatures_and_proofs
+          Staged_ledger_diff.With_valid_signatures_and_proofs
           .diff_with_at_most_two_coinbase) =
       let coinbase_parts =
         match pre_diff1.coinbase_parts with
@@ -918,13 +932,13 @@ end = struct
         | Two x ->
             `Two
               (Option.map x ~f:(fun (w, w_opt) ->
-                   (Completed_work.forget w, forget_work_opt w_opt) ))
+                   (Transaction_snark_work.forget w, forget_work_opt w_opt) ))
       in
       apply_pre_diff_unchecked t coinbase_parts diff.creator pre_diff1.diff
     in
     let apply_pre_diff_with_at_most_one
         (pre_diff2 :
-          Ledger_builder_diff.With_valid_signatures_and_proofs
+          Staged_ledger_diff.With_valid_signatures_and_proofs
           .diff_with_at_most_one_coinbase) =
       let coinbase_added =
         match pre_diff2.coinbase_added with
@@ -954,9 +968,9 @@ end = struct
     Or_error.ok_exn (verify_scan_state_after_apply t.ledger t.scan_state) ;
     (`Hash_after_applying (hash t), `Ledger_proof res_opt)
 
-  let work_to_do scan_state : Completed_work.Statement.t Sequence.t =
+  let work_to_do scan_state : Transaction_snark_work.Statement.t Sequence.t =
     let work_seq = Parallel_scan.next_jobs_sequence ~state:scan_state in
-    sequence_chunks_of ~n:Completed_work.proofs_length
+    sequence_chunks_of ~n:Transaction_snark_work.proofs_length
     @@ Sequence.map work_seq ~f:(fun maybe_work ->
            match statement_of_job maybe_work with
            | None -> assert false
@@ -997,12 +1011,12 @@ end = struct
       ; work_done: int
       ; user_commands:
           (User_command.With_valid_signature.t * Ledger.Undo.t) list
-      ; completed_works: Completed_work.Checked.t list
+      ; completed_works: Transaction_snark_work.Checked.t list
       ; coinbase_parts:
-          ( Completed_work.Checked.t Ledger_builder_diff.At_most_two.t
-          , Completed_work.Checked.t Ledger_builder_diff.At_most_one.t )
+          ( Transaction_snark_work.Checked.t Staged_ledger_diff.At_most_two.t
+          , Transaction_snark_work.Checked.t Staged_ledger_diff.At_most_one.t )
           Either.t
-      ; completed_works_for_coinbase: Completed_work.Checked.t list
+      ; completed_works_for_coinbase: Transaction_snark_work.Checked.t list
       ; self_pk: Compressed_public_key.t }
     [@@deriving sexp]
 
@@ -1051,13 +1065,13 @@ end = struct
           match t.coinbase_parts with
           | First w ->
               let%map cb =
-                Ledger_builder_diff.At_most_two.increase w
+                Staged_ledger_diff.At_most_two.increase w
                   t.completed_works_for_coinbase
               in
               First cb
           | Second w ->
               let%map cb =
-                Ledger_builder_diff.At_most_one.increase w
+                Staged_ledger_diff.At_most_one.increase w
                   t.completed_works_for_coinbase
               in
               Second cb
@@ -1081,19 +1095,19 @@ end = struct
           (module Int)
           t.completed_works_for_coinbase
           ~f:(fun wc ->
-            let w = Completed_work.forget wc in
+            let w = Transaction_snark_work.forget wc in
             List.length w.proofs )
       in
       work_done >= (t.queue_consumption.coinbase_part_count + 1) * 2
 
-    let add_work_for_coinbase t (wc : Completed_work.Checked.t) =
+    let add_work_for_coinbase t (wc : Transaction_snark_work.Checked.t) =
       let open Or_error.Let_syntax in
       let coinbase = Protocols.Coda_praos.coinbase_amount in
       let%bind coinbase_used_up =
         List.fold ~init:(Ok Currency.Fee.zero)
           ~f:(fun acc w ->
             let%bind acc = acc in
-            let w' = Completed_work.forget w in
+            let w' = Transaction_snark_work.forget w in
             option "overflow" (Currency.Fee.add acc w'.fee) )
           (wc :: t.completed_works_for_coinbase)
       in
@@ -1105,9 +1119,9 @@ end = struct
         { t with
           completed_works_for_coinbase= wc :: t.completed_works_for_coinbase }
 
-    let add_work t (wc : Completed_work.Checked.t) =
+    let add_work t (wc : Transaction_snark_work.Checked.t) =
       let open Or_error.Let_syntax in
-      let w = Completed_work.forget wc in
+      let w = Transaction_snark_work.forget wc in
       let%bind budget =
         option "overflow"
           (Fee.Signed.add t.budget
@@ -1138,7 +1152,7 @@ end = struct
   module Resource_util = struct
     type t =
       { resources: Resources.t
-      ; work_to_do: Completed_work.Statement.t Sequence.t
+      ; work_to_do: Transaction_snark_work.Statement.t Sequence.t
       ; user_commands_to_include:
           User_command.With_valid_signature.t Sequence.t }
   end
@@ -1300,7 +1314,7 @@ end = struct
       available_queue_space ~add_coinbase =
     let init_resources =
       Resources.init ~available_queue_space ~self
-        (Second Ledger_builder_diff.At_most_one.Zero)
+        (Second Staged_ledger_diff.At_most_one.Zero)
     in
     let init_res_util =
       { Resource_util.resources= init_resources
@@ -1324,7 +1338,7 @@ end = struct
       (*: (Resources_util.t, Resources.t * Resources.t option) Either.t*) =
     let init_resources =
       Resources.init ~available_queue_space:(fst partitions) ~self
-        (First Ledger_builder_diff.At_most_two.Zero)
+        (First Staged_ledger_diff.At_most_two.Zero)
     in
     let init_res_util =
       { Resource_util.resources= init_resources
@@ -1392,30 +1406,30 @@ end = struct
   let generate_prediff logger ws_seq ts_seq get_completed_work ledger self
       partitions =
     let diff (res : Resources.t) :
-        Ledger_builder_diff.With_valid_signatures_and_proofs.diff =
+        Staged_ledger_diff.With_valid_signatures_and_proofs.diff =
       (* We have to reverse here because we only know they work in THIS order *)
       { user_commands= List.rev_map res.user_commands ~f:fst
       ; completed_works= List.rev res.completed_works }
     in
     let make_diff_with_one (res : Resources.t) :
-        Ledger_builder_diff.With_valid_signatures_and_proofs
+        Staged_ledger_diff.With_valid_signatures_and_proofs
         .diff_with_at_most_one_coinbase =
       match res.coinbase_parts with
       | First _ ->
           Logger.error logger
             "Error while creating a diff: Invalid resource configuration" ;
-          {diff= diff res; coinbase_added= Ledger_builder_diff.At_most_one.Zero}
+          {diff= diff res; coinbase_added= Staged_ledger_diff.At_most_one.Zero}
       | Second w -> {diff= diff res; coinbase_added= w}
     in
     let make_diff_with_two (res : Resources.t) :
-        Ledger_builder_diff.With_valid_signatures_and_proofs
+        Staged_ledger_diff.With_valid_signatures_and_proofs
         .diff_with_at_most_two_coinbase =
       match res.coinbase_parts with
       | First w -> {diff= diff res; coinbase_parts= w}
       | Second _ ->
           Logger.error logger
             "Error while creating a diff: Invalid resource configuration" ;
-          {diff= diff res; coinbase_parts= Ledger_builder_diff.At_most_two.Zero}
+          {diff= diff res; coinbase_parts= Staged_ledger_diff.At_most_two.Zero}
     in
     match partitions with
     | `One x ->
@@ -1439,7 +1453,7 @@ end = struct
   let create_diff t ~self ~logger
       ~(transactions_by_fee : User_command.With_valid_signature.t Sequence.t)
       ~(get_completed_work :
-         Completed_work.Statement.t -> Completed_work.Checked.t option) =
+         Transaction_snark_work.Statement.t -> Transaction_snark_work.Checked.t option) =
     (* TODO: Don't copy *)
     let curr_hash = hash t in
     let t' = copy t in
@@ -1454,7 +1468,7 @@ end = struct
         get_completed_work ledger self partitions
     in
     trace_event "prediffs done" ;
-    { Ledger_builder_diff.With_valid_signatures_and_proofs.pre_diffs
+    { Staged_ledger_diff.With_valid_signatures_and_proofs.pre_diffs
     ; creator= self
     ; prev_hash= curr_hash }
 end
@@ -1761,18 +1775,18 @@ let%test_module "test" =
           !l
       end
 
-      module Ledger_builder_aux_hash = struct
+      module Staged_ledger_aux_hash = struct
         include String
 
         let of_bytes : string -> t = fun s -> s
       end
 
-      module Ledger_builder_hash = struct
+      module Staged_ledger_hash = struct
         include String
 
         type ledger_hash = Ledger_hash.t
 
-        type ledger_builder_aux_hash = Ledger_builder_aux_hash.t
+        type ledger_builder_aux_hash = Staged_ledger_aux_hash.t
 
         let ledger_hash _ = failwith "stub"
 
@@ -1783,7 +1797,7 @@ let%test_module "test" =
          fun ah h -> ah ^ h
       end
 
-      module Completed_work = struct
+      module Transaction_snark_work = struct
         let proofs_length = 2
 
         type proof = Ledger_proof.t [@@deriving sexp, bin_io, compare]
@@ -1829,11 +1843,11 @@ let%test_module "test" =
           {fee= f; proofs= p; prover= pr}
       end
 
-      module Ledger_builder_diff = struct
-        type completed_work = Completed_work.t
+      module Staged_ledger_diff = struct
+        type completed_work = Transaction_snark_work.t
         [@@deriving sexp, bin_io, compare]
 
-        type completed_work_checked = Completed_work.Checked.t
+        type completed_work_checked = Transaction_snark_work.Checked.t
         [@@deriving sexp, bin_io, compare]
 
         type user_command = User_command.t [@@deriving sexp, bin_io, compare]
@@ -1845,7 +1859,7 @@ let%test_module "test" =
         type public_key = Compressed_public_key.t
         [@@deriving sexp, bin_io, compare]
 
-        type ledger_builder_hash = Ledger_builder_hash.t
+        type ledger_builder_hash = Staged_ledger_hash.t
         [@@deriving sexp, bin_io, compare]
 
         module At_most_two = struct
@@ -1936,10 +1950,10 @@ let%test_module "test" =
 
         let forget_diff
             {With_valid_signatures_and_proofs.completed_works; user_commands} =
-          { completed_works= List.map ~f:Completed_work.forget completed_works
+          { completed_works= List.map ~f:Transaction_snark_work.forget completed_works
           ; user_commands= (user_commands :> User_command.t list) }
 
-        let forget_work_opt = Option.map ~f:Completed_work.forget
+        let forget_work_opt = Option.map ~f:Transaction_snark_work.forget
 
         let forget_pre_diff_with_at_most_two
             {With_valid_signatures_and_proofs.diff; coinbase_parts} =
@@ -1950,7 +1964,7 @@ let%test_module "test" =
             | Two cw_pair ->
                 Two
                   (Option.map cw_pair ~f:(fun (cw, cw_opt) ->
-                       (Completed_work.forget cw, forget_work_opt cw_opt) ))
+                       (Transaction_snark_work.forget cw, forget_work_opt cw_opt) ))
           in
           {diff= forget_diff diff; coinbase_parts= forget_cw}
 
@@ -1984,25 +1998,25 @@ let%test_module "test" =
       end
 
       let check :
-             Completed_work.t
-          -> Completed_work.statement list
-          -> Completed_work.Checked.t option Deferred.t =
+             Transaction_snark_work.t
+          -> Transaction_snark_work.statement list
+          -> Transaction_snark_work.Checked.t option Deferred.t =
        fun {fee= f; proofs= p; prover= pr} _ ->
         Deferred.return
-        @@ Some {Completed_work.Checked.fee= f; proofs= p; prover= pr}
+        @@ Some {Transaction_snark_work.Checked.fee= f; proofs= p; prover= pr}
     end
 
     module Lb = Make (Test_input1)
 
     let self_pk = "me"
 
-    let stmt_to_work (stmts : Test_input1.Completed_work.Statement.t) :
-        Test_input1.Completed_work.Checked.t option =
+    let stmt_to_work (stmts : Test_input1.Transaction_snark_work.Statement.t) :
+        Test_input1.Transaction_snark_work.Checked.t option =
       let prover =
         List.fold stmts ~init:"P" ~f:(fun p stmt -> p ^ stmt.target)
       in
       Some
-        { Test_input1.Completed_work.Checked.fee= Fee.Unsigned.of_int 1
+        { Test_input1.Transaction_snark_work.Checked.fee= Fee.Unsigned.of_int 1
         ; proofs= stmts
         ; prover }
 
@@ -2013,22 +2027,22 @@ let%test_module "test" =
           ~get_completed_work:stmt_to_work
       in
       let%map _, `Ledger_proof ledger_proof =
-        Lb.apply lb (Test_input1.Ledger_builder_diff.forget diff) ~logger
+        Lb.apply lb (Test_input1.Staged_ledger_diff.forget diff) ~logger
       in
-      (ledger_proof, Test_input1.Ledger_builder_diff.forget diff)
+      (ledger_proof, Test_input1.Staged_ledger_diff.forget diff)
 
     let txns n f g = List.zip_exn (List.init n ~f) (List.init n ~f:g)
 
     let coinbase_added_first_prediff = function
-      | Test_input1.Ledger_builder_diff.At_most_two.Zero -> 0
+      | Test_input1.Staged_ledger_diff.At_most_two.Zero -> 0
       | One _ -> 1
       | _ -> 2
 
     let coinbase_added_second_prediff = function
-      | Test_input1.Ledger_builder_diff.At_most_one.Zero -> 0
+      | Test_input1.Staged_ledger_diff.At_most_one.Zero -> 0
       | _ -> 1
 
-    let coinbase_added (diff : Test_input1.Ledger_builder_diff.t) =
+    let coinbase_added (diff : Test_input1.Staged_ledger_diff.t) =
       match diff.pre_diffs with
       | First d -> coinbase_added_second_prediff d.coinbase_added
       | Second (d1, d2) ->
@@ -2080,7 +2094,7 @@ let%test_module "test" =
               assert (cb > 0 && cb < 3) ;
               let x =
                 List.length
-                  (Test_input1.Ledger_builder_diff.user_commands diff)
+                  (Test_input1.Staged_ledger_diff.user_commands diff)
               in
               assert_at_least_coinbase_added x cb ;
               let expected_value = expected_ledger x all_ts old_ledger in
@@ -2119,7 +2133,7 @@ let%test_module "test" =
               assert (cb > 0 && cb < 3) ;
               let x =
                 List.length
-                  (Test_input1.Ledger_builder_diff.user_commands diff)
+                  (Test_input1.Staged_ledger_diff.user_commands diff)
               in
               assert_at_least_coinbase_added x cb ;
               let expected_value = expected_ledger x all_ts old_ledger in
@@ -2127,10 +2141,10 @@ let%test_module "test" =
 
     let%test_unit "Be able to include random number of user_commands (One \
                    prover)" =
-      let get_work (stmts : Test_input1.Completed_work.Statement.t) :
-          Test_input1.Completed_work.Checked.t option =
+      let get_work (stmts : Test_input1.Transaction_snark_work.Statement.t) :
+          Test_input1.Transaction_snark_work.Checked.t option =
         Some
-          { Test_input1.Completed_work.Checked.fee= Fee.Unsigned.of_int 1
+          { Test_input1.Transaction_snark_work.Checked.fee= Fee.Unsigned.of_int 1
           ; proofs= stmts
           ; prover= "P" }
       in
@@ -2165,7 +2179,7 @@ let%test_module "test" =
               assert (cb = 1) ;
               let x =
                 List.length
-                  (Test_input1.Ledger_builder_diff.user_commands diff)
+                  (Test_input1.Staged_ledger_diff.user_commands diff)
               in
               assert_at_least_coinbase_added x cb ;
               let expected_value = expected_ledger x all_ts old_ledger in
@@ -2174,10 +2188,10 @@ let%test_module "test" =
     let%test_unit "Reproduce invalid statement error" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
-      let get_work (stmts : Test_input1.Completed_work.Statement.t) :
-          Test_input1.Completed_work.Checked.t option =
+      let get_work (stmts : Test_input1.Transaction_snark_work.Statement.t) :
+          Test_input1.Transaction_snark_work.Checked.t option =
         Some
-          { Test_input1.Completed_work.Checked.fee= Fee.Unsigned.zero
+          { Test_input1.Transaction_snark_work.Checked.fee= Fee.Unsigned.zero
           ; proofs= stmts
           ; prover= "P" }
       in
