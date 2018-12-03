@@ -24,6 +24,8 @@ include T
 
 let protocol_state = create "CodaProtoState"
 
+let protocol_state_body = create "CodaProtoStateBody"
+
 let account = create "CodaAccount"
 
 let merkle_tree i = create (Printf.sprintf "CodaMklTree%03d" i)
