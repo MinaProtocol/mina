@@ -51,6 +51,8 @@ module type S = sig
 
   val new_goal : t -> root_hash -> unit
 
+  val valid_tree : t -> merkle_tree option
+
   val wait_until_valid :
        t
     -> root_hash
@@ -511,6 +513,11 @@ module Make
       |> ignore ;
       Linear_pipe.write_without_pushback t.queries (h, Num_accounts) )
     else Logger.info t.log "new_goal to same hash, not doing anything"
+
+  let valid_tree t =
+    Option.bind (Ivar.peek t.validity_listener) ~f:(function
+      | `Ok -> Some t.tree
+      | `Target_changed _ -> None )
 
   let wait_until_valid t h =
     if not (Root_hash.equal h (desired_root_exn t)) then

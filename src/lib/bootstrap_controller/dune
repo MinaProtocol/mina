@@ -1,0 +1,11 @@
+(library
+  (name bootstrap_controller)
+  (public_name bootstrap_controller)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (libraries
+    core
+    coda_base
+    syncable_ledger
+    pipe_lib
+    consensus
+    ))
