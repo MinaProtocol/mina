@@ -1,0 +1,8 @@
+(library
+  (name root_history)
+  (public_name root_history)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (libraries
+    core
+    coda_numbers
+    ))

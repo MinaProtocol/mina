@@ -12,9 +12,15 @@ let state_and_instance_hash ~wrap_vk =
       (Proof_system.Verification_key.fold wrap_vk)
   in
   let hash_state s =
+    let fold_body b =
+      Pedersen.digest_fold
+        (salt Hash_prefixes.protocol_state_body)
+        (Lite_base.Protocol_state.Body.fold b)
+      |> Lite_base.Pedersen.Digest.fold
+    in
     Pedersen.digest_fold
       (salt Hash_prefixes.protocol_state)
-      (Lite_base.Protocol_state.fold s)
+      (Lite_base.Protocol_state.fold ~fold_body s)
   in
   stage (fun state ->
       let state_hash = hash_state state in
@@ -32,7 +38,7 @@ let verify_chain pvk state_and_instance_hash
   let check b lab = if b then Ok () else Or_error.error_string lab in
   let open Or_error.Let_syntax in
   let lb_ledger_hash =
-    protocol_state.blockchain_state.ledger_builder_hash.ledger_hash
+    protocol_state.body.blockchain_state.ledger_builder_hash.ledger_hash
   in
   let%bind () =
     check
