@@ -1,6 +1,7 @@
 open Core_kernel
 open Protocols.Coda_pow
 open Pipe_lib.Strict_pipe
+open O1trace
 
 module Make (Inputs : Inputs.S) :
   Transition_handler_processor_intf
@@ -30,23 +31,27 @@ module Make (Inputs : Inputs.S) :
                `Catchup_breadcrumbs cb )
          ; Reader.map valid_transition_reader ~f:(fun vt ->
                `Valid_transition vt ) ]
-         ~f:(function
-           | `Catchup_breadcrumbs [] ->
-               Logger.error logger "read empty catchup transitions"
-           | `Catchup_breadcrumbs (_ :: _ as breadcrumbs) ->
-               List.iter breadcrumbs
-                 ~f:(Transition_frontier.attach_breadcrumb_exn frontier)
-           | `Valid_transition transition -> (
-             match
-               Transition_frontier.find frontier
-                 (transition_parent_hash (With_hash.data transition))
-             with
-             | None ->
-                 Catchup_monitor.watch catchup_monitor ~logger ~time_controller
-                   ~timeout_duration:catchup_timeout_duration ~transition
-             | Some _ ->
-                 ignore
-                   (Transition_frontier.add_transition_exn frontier transition) ;
-                 Catchup_monitor.notify catchup_monitor ~time_controller
-                   ~transition )))
+         ~f:(fun msg ->
+           trace_task "transition_handler_processor" (fun () ->
+               match msg with
+               | `Catchup_breadcrumbs [] ->
+                   Logger.error logger "read empty catchup transitions"
+               | `Catchup_breadcrumbs (_ :: _ as breadcrumbs) ->
+                   List.iter breadcrumbs
+                     ~f:(Transition_frontier.attach_breadcrumb_exn frontier)
+               | `Valid_transition transition -> (
+                 match
+                   Transition_frontier.find frontier
+                     (transition_parent_hash (With_hash.data transition))
+                 with
+                 | None ->
+                     Catchup_monitor.watch catchup_monitor ~logger
+                       ~time_controller
+                       ~timeout_duration:catchup_timeout_duration ~transition
+                 | Some _ ->
+                     ignore
+                       (Transition_frontier.add_transition_exn frontier
+                          transition) ;
+                     Catchup_monitor.notify catchup_monitor ~time_controller
+                       ~transition ) ) ))
 end

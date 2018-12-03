@@ -1202,7 +1202,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
            (candidate.curr_epoch, candidate.curr_slot)
            ~time_received)
     then (
-      Logger.error logger "received a transition outside of it's slot time" ;
+      Logger.error logger "received a transition outside of its slot time" ;
       `Keep )
     else
       (* TODO: add fork_before_checkpoint check *)

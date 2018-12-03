@@ -92,7 +92,7 @@ module type S = sig
   val is_valid :
     Consensus_state.value -> time_received:Unix_timestamp.t -> bool
   (**
-   * Check transition invariants to determin the validity of an external transition
+   * Check transition invariants to determine the validity of an external transition
    *)
 
   val next_state_checked :
