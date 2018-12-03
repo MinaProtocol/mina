@@ -11,7 +11,6 @@ module type S = sig
        protocol_state:Protocol_state.value
     -> protocol_state_proof:Proof.t
     -> ledger_builder_diff:Ledger_builder_diff.t
-    -> transition_frontier_root_hash:State_hash.t
     -> t
 
   val protocol_state : t -> Protocol_state.value
@@ -19,8 +18,6 @@ module type S = sig
   val protocol_state_proof : t -> Proof.t
 
   val ledger_builder_diff : t -> Ledger_builder_diff.t
-
-  val transition_frontier_root_hash : t -> State_hash.t
 
   val timestamp : t -> Block_time.t
 end
@@ -39,8 +36,7 @@ end)
   type t =
     { protocol_state: Protocol_state.value
     ; protocol_state_proof: Proof.Stable.V1.t
-    ; ledger_builder_diff: Ledger_builder_diff.t
-    ; transition_frontier_root_hash: State_hash.t }
+    ; ledger_builder_diff: Ledger_builder_diff.t }
   [@@deriving sexp, fields, bin_io]
 
   (* TODO: Important for bkase to review *)
@@ -50,12 +46,8 @@ end)
   let equal t1 t2 =
     Protocol_state.equal_value t1.protocol_state t2.protocol_state
 
-  let create ~protocol_state ~protocol_state_proof ~ledger_builder_diff
-      ~transition_frontier_root_hash =
-    { protocol_state
-    ; protocol_state_proof
-    ; ledger_builder_diff
-    ; transition_frontier_root_hash }
+  let create ~protocol_state ~protocol_state_proof ~ledger_builder_diff =
+    {protocol_state; protocol_state_proof; ledger_builder_diff}
 
   let timestamp {protocol_state; _} =
     Protocol_state.blockchain_state protocol_state

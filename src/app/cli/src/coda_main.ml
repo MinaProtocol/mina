@@ -785,12 +785,6 @@ struct
     include Ledger_builder_controller.Make (Inputs)
   end
 
-  module Transition_frontier = struct
-    type t
-
-    let root_successor _ = failwith "TODO"
-  end
-
   module Proposer = Proposer.Make (struct
     include Inputs0
     module Ledger_builder_diff = Ledger_builder_diff
@@ -807,7 +801,6 @@ struct
     module Keypair = Keypair
     module Compressed_public_key = Public_key.Compressed
     module Consensus_mechanism = Consensus.Mechanism
-    module Transition_frontier = Transition_frontier
 
     module Prover = struct
       let prove ~prev_state ~prev_state_proof ~next_state
