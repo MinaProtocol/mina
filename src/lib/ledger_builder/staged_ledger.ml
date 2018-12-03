@@ -35,7 +35,7 @@ module type Monad_with_Or_error_intf = sig
   end
 end
 
-module Make_transaction_snark_work = Transaction_snark_work.Make
+module Make_completed_work = Transaction_snark_work.Make
 module Make_diff = Staged_ledger_diff.Make
 
 module Make (Inputs : Inputs.S') : sig
@@ -303,7 +303,7 @@ end = struct
     { scan_state:
         scan_state
         (* Invariant: this is the ledger after having applied all the transactions in
-    the above state. *)
+       the above state. *)
     ; ledger: Ledger.attached_mask sexp_opaque }
   [@@deriving sexp]
 
@@ -542,7 +542,8 @@ end = struct
   let total_proofs (works : Transaction_snark_work.t list) =
     List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
 
-  let fill_in_completed_work (state : Aux.t) (works : Transaction_snark_work.t list) :
+  let fill_in_completed_work (state : Aux.t)
+      (works : Transaction_snark_work.t list) :
       Ledger_proof.t option Or_error.t =
     let open Or_error.Let_syntax in
     let%bind next_jobs =
@@ -550,7 +551,8 @@ end = struct
     in
     let%bind scanable_work_list =
       map2_or_error next_jobs
-        (List.concat_map works ~f:(fun {Transaction_snark_work.fee; proofs; prover} ->
+        (List.concat_map works
+           ~f:(fun {Transaction_snark_work.fee; proofs; prover} ->
              List.map proofs ~f:(fun proof -> (fee, proof, prover)) ))
         ~f:completed_work_to_scanable_work
     in
@@ -634,7 +636,8 @@ end = struct
     in
     go [] [] ts
 
-  let check_completed_works t (completed_works : Transaction_snark_work.t list) =
+  let check_completed_works t (completed_works : Transaction_snark_work.t list)
+      =
     Result_with_rollback.with_no_rollback
       (let open Deferred.Or_error.Let_syntax in
       let%bind jobses =
@@ -710,7 +713,8 @@ end = struct
       let%bind _ =
         overflow_err rem_coinbase
           (Option.value_map ~default:Currency.Amount.zero w2
-             ~f:(fun {Transaction_snark_work.fee; _} -> Currency.Amount.of_fee fee ))
+             ~f:(fun {Transaction_snark_work.fee; _} ->
+               Currency.Amount.of_fee fee ))
       in
       let%bind cb1 =
         Coinbase.create ~amount:amt ~proposer ~fee_transfer:(fee_transfer w1)
@@ -757,8 +761,8 @@ end = struct
       ; coinbase_parts_count: int }
   end
 
-  let apply_pre_diff t coinbase_parts proposer
-      (diff : Staged_ledger_diff.diff) =
+  let apply_pre_diff t coinbase_parts proposer (diff : Staged_ledger_diff.diff)
+      =
     let open Result_with_rollback.Let_syntax in
     let%bind user_commands =
       let%map user_commands' =
@@ -890,7 +894,9 @@ end = struct
   let apply_pre_diff_unchecked t coinbase_parts proposer
       (diff : Staged_ledger_diff.With_valid_signatures_and_proofs.diff) =
     let user_commands = diff.user_commands in
-    let txn_works = List.map ~f:Transaction_snark_work.forget diff.completed_works in
+    let txn_works =
+      List.map ~f:Transaction_snark_work.forget diff.completed_works
+    in
     let coinbase_work =
       match coinbase_parts with
       | `One (Some w) -> [w]
@@ -1014,7 +1020,8 @@ end = struct
       ; completed_works: Transaction_snark_work.Checked.t list
       ; coinbase_parts:
           ( Transaction_snark_work.Checked.t Staged_ledger_diff.At_most_two.t
-          , Transaction_snark_work.Checked.t Staged_ledger_diff.At_most_one.t )
+          , Transaction_snark_work.Checked.t Staged_ledger_diff.At_most_one.t
+          )
           Either.t
       ; completed_works_for_coinbase: Transaction_snark_work.Checked.t list
       ; self_pk: Compressed_public_key.t }
@@ -1453,7 +1460,8 @@ end = struct
   let create_diff t ~self ~logger
       ~(transactions_by_fee : User_command.With_valid_signature.t Sequence.t)
       ~(get_completed_work :
-         Transaction_snark_work.Statement.t -> Transaction_snark_work.Checked.t option) =
+            Transaction_snark_work.Statement.t
+         -> Transaction_snark_work.Checked.t option) =
     (* TODO: Don't copy *)
     let curr_hash = hash t in
     let t' = copy t in
@@ -1484,6 +1492,10 @@ let%test_module "test" =
         include Unit
 
         let create ~fee:_ ~prover:_ = ()
+      end
+
+      module Account = struct
+        type t = int
       end
 
       module User_command = struct
@@ -1714,15 +1726,13 @@ let%test_module "test" =
 
         type transaction = Transaction.t [@@deriving sexp, bin_io]
 
-        type account = int
-
         module Undo = struct
           type t = transaction [@@deriving sexp, bin_io]
 
           let transaction t = Ok t
         end
 
-        let create : unit -> t = fun () -> ref 0
+        let create ?directory_name:_ () = ref 0
 
         let copy : t -> t = fun t -> ref !t
 
@@ -1731,6 +1741,31 @@ let%test_module "test" =
         let to_list t = [!t]
 
         let num_accounts _ = 0
+
+        (* BEGIN BOILERPLATE UNUSED *)
+        type serializable = int [@@deriving bin_io]
+
+        type maskable_ledger = t
+
+        type attached_mask = t
+
+        module Mask = struct
+          type t = int [@@deriving bin_io]
+
+          let create () = 4
+        end
+
+        type unattached_mask = Mask.t
+
+        let unregister_mask_exn _ = failwith "unimplemented"
+
+        let register_mask _ = failwith "unimplemented"
+
+        let unattached_mask_of_serializable _ = failwith "unimplemented"
+
+        let serializable_of_t _ = failwith "unimplemented"
+
+        (* END BOILERPLATE UNUSED *)
 
         let apply_transaction : t -> Undo.t -> Undo.t Or_error.t =
          fun t s ->
@@ -1950,7 +1985,8 @@ let%test_module "test" =
 
         let forget_diff
             {With_valid_signatures_and_proofs.completed_works; user_commands} =
-          { completed_works= List.map ~f:Transaction_snark_work.forget completed_works
+          { completed_works=
+              List.map ~f:Transaction_snark_work.forget completed_works
           ; user_commands= (user_commands :> User_command.t list) }
 
         let forget_work_opt = Option.map ~f:Transaction_snark_work.forget
@@ -1964,7 +2000,8 @@ let%test_module "test" =
             | Two cw_pair ->
                 Two
                   (Option.map cw_pair ~f:(fun (cw, cw_opt) ->
-                       (Transaction_snark_work.forget cw, forget_work_opt cw_opt) ))
+                       ( Transaction_snark_work.forget cw
+                       , forget_work_opt cw_opt ) ))
           in
           {diff= forget_diff diff; coinbase_parts= forget_cw}
 
@@ -2093,8 +2130,7 @@ let%test_module "test" =
               (*At worst case number of provers coinbase should not be split more than two times*)
               assert (cb > 0 && cb < 3) ;
               let x =
-                List.length
-                  (Test_input1.Staged_ledger_diff.user_commands diff)
+                List.length (Test_input1.Staged_ledger_diff.user_commands diff)
               in
               assert_at_least_coinbase_added x cb ;
               let expected_value = expected_ledger x all_ts old_ledger in
@@ -2132,8 +2168,7 @@ let%test_module "test" =
               (*At worst case number of provers coinbase should not be split more than two times*)
               assert (cb > 0 && cb < 3) ;
               let x =
-                List.length
-                  (Test_input1.Staged_ledger_diff.user_commands diff)
+                List.length (Test_input1.Staged_ledger_diff.user_commands diff)
               in
               assert_at_least_coinbase_added x cb ;
               let expected_value = expected_ledger x all_ts old_ledger in
@@ -2144,7 +2179,8 @@ let%test_module "test" =
       let get_work (stmts : Test_input1.Transaction_snark_work.Statement.t) :
           Test_input1.Transaction_snark_work.Checked.t option =
         Some
-          { Test_input1.Transaction_snark_work.Checked.fee= Fee.Unsigned.of_int 1
+          { Test_input1.Transaction_snark_work.Checked.fee=
+              Fee.Unsigned.of_int 1
           ; proofs= stmts
           ; prover= "P" }
       in
@@ -2178,8 +2214,7 @@ let%test_module "test" =
               (*With just one prover, coinbase should never be split*)
               assert (cb = 1) ;
               let x =
-                List.length
-                  (Test_input1.Staged_ledger_diff.user_commands diff)
+                List.length (Test_input1.Staged_ledger_diff.user_commands diff)
               in
               assert_at_least_coinbase_added x cb ;
               let expected_value = expected_ledger x all_ts old_ledger in

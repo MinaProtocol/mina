@@ -239,7 +239,6 @@ module type S' = sig
 
     val commit : t -> unit
   end *)
-
   module Account : sig
     type t
   end
@@ -261,7 +260,7 @@ module type S' = sig
     val apply_transaction_exn : t -> Transaction.t -> t
   end
 
-  module Transaction_snark_scan_state : sig
+  (*module Transaction_snark_scan_state : sig
     type t
 
     val empty : t
@@ -283,8 +282,7 @@ module type S' = sig
       -> t
 
     val apply : t -> Transaction_snark_scan_state.Diff.t -> t Or_error.t
-  end
-
+  end*)
   module Config : sig
     val transaction_capacity_log_2 : int
   end

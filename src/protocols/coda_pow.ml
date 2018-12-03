@@ -172,7 +172,7 @@ end
 module type Ledger_intf = sig
   module Mask : Mask_intf
 
-  type t [@@deriving sexp, bin_io]
+  type t
 
   type attached_mask = t
 
