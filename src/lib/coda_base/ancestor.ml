@@ -70,36 +70,31 @@ end = struct
   let add t ~prev_hash ~hash ~length ~body_hash =
     ignore (T.add t ~prev_key:prev_hash ~key:hash ~length ~data:body_hash)
 
-  let check cond err =
-    if cond then Ok () else Or_error.error_string err
+  let check cond err = if cond then Ok () else Or_error.error_string err
 
-  let verify_and_add
-    =
+  let verify_and_add =
     let rec go hs acc length = function
       | [] -> (acc, List.rev hs)
       | body :: bs ->
-        let length = Coda_numbers.Length.succ length in
-        let full_state_hash =
-          Protocol_state.hash ~hash_body:Fn.id
-            {previous_state_hash=acc; body}
-        in
-        go ((acc, full_state_hash, length, body) :: hs)
-          full_state_hash
-          length
-          bs
+          let length = Coda_numbers.Length.succ length in
+          let full_state_hash =
+            Protocol_state.hash ~hash_body:Fn.id
+              {previous_state_hash= acc; body}
+          in
+          go
+            ((acc, full_state_hash, length, body) :: hs)
+            full_state_hash length bs
     in
-    fun (t : t)
-        ({descendant; generations} : Input.t)
-        (ancestor : Output.t)
-        ~ancestor_length
-        (proof : Proof.t) ->
-    let open Or_error.Let_syntax in
-    let%bind () = check (List.length proof = generations) "Wrong proof length" in
-    let h, to_add = go [] ancestor ancestor_length proof in
-    let%map () = check (State_hash.equal h descendant) "Bad merkle proof" in
-    List.iter to_add ~f:(fun (prev, h, length, body) ->
-      add t ~prev_hash:prev ~hash:h ~length ~body_hash:body)
-  ;;
+    fun (t : t) ({descendant; generations} : Input.t) (ancestor : Output.t)
+        ~ancestor_length (proof : Proof.t) ->
+      let open Or_error.Let_syntax in
+      let%bind () =
+        check (List.length proof = generations) "Wrong proof length"
+      in
+      let h, to_add = go [] ancestor ancestor_length proof in
+      let%map () = check (State_hash.equal h descendant) "Bad merkle proof" in
+      List.iter to_add ~f:(fun (prev, h, length, body) ->
+          add t ~prev_hash:prev ~hash:h ~length ~body_hash:body )
 
   let prove (t : t) {Input.descendant; generations} :
       (Output.t * Proof.t) option =
