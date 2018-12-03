@@ -37,10 +37,24 @@ module type Inputs_intf = sig
      and type consensus_state := Consensus_state.value
 
   module External_transition :
-    External_transition_intf
+    sig
+      include External_transition_intf
+
+      type transition_frontier_root_hash
+
+      val create :
+           protocol_state:protocol_state
+        -> protocol_state_proof:protocol_state_proof
+        -> ledger_builder_diff:ledger_builder_diff
+        -> transition_frontier_root_hash:transition_frontier_root_hash
+        -> t
+
+      val transition_frontier_root_hash : t -> transition_frontier_root_hash
+    end
     with type protocol_state := Protocol_state.value
      and type protocol_state_proof := Proof.t
      and type ledger_builder_diff := Ledger_builder_diff.t
+     and type transition_frontier_root_hash := State_hash.t
 
   module Key : Merkle_ledger.Intf.Key
 
@@ -133,7 +147,10 @@ module Make (Inputs : Inputs_intf) :
    and type transaction_snark_scan_state :=
               Inputs.Transaction_snark_scan_state.t
    and type ledger_diff := Inputs.Ledger_diff.t
-   and type staged_ledger := Inputs.Staged_ledger.t = struct
+   and type staged_ledger := Inputs.Staged_ledger.t
+   and type protocol_state := Inputs.Protocol_state.value
+   and type protocol_state_proof := Inputs.Proof.t
+   and type ledger_builder_diff := Inputs.Ledger_builder_diff.t = struct
   open Inputs
 
   exception
@@ -276,17 +293,24 @@ module Make (Inputs : Inputs_intf) :
     in
     attach_node_to t ~parent_node ~node
 
+  let root_successor t parent_node =
+    let new_length = parent_node.length + 1 in
+    let root_node = Hashtbl.find_exn t.table t.root in
+    let root_hash = With_hash.hash root_node.breadcrumb.transition_with_hash in
+    let distance_to_root = new_length - root_node.length in
+    if distance_to_root > max_length then
+      `Changed_root (List.hd_exn (path t parent_node.breadcrumb))
+    else `Same_root root_hash
+
   (* Adding a transition to the transition frontier is broken into the following steps:
    *   1) create a new breadcrumb for a transition
    *   2) attach the breadcrumb to the transition frontier
    *   3) move the root if the path to the new node is longer than the max length
-   *     a) calculate the distance from the new node to the parent
-   *     b) if the distance is greater than the max length:
-   *       I  ) find the immediate successor of the old root in the path to the
-   *            longest node and make it the new root
-   *       II ) find all successors of the other immediate successors of the old root
-   *       III) remove the old root and all of the nodes found in (II) from the table
-   *       IV ) merge the old root's merkle mask into the root ledger
+   *     a) find the immediate successor of the old root in the path to the
+   *          longest node and make it the new root
+   *     b) find all successors of the other immediate successors of the old root
+   *     c) remove the old root and all of the nodes found in (b) from the table
+   *     d) merge the old root's merkle mask into the root ledger
    *   4) set the new node as the best tip if the new node has a greater length than
    *      the current best tip
    *)
@@ -299,15 +323,15 @@ module Make (Inputs : Inputs_intf) :
       Protocol_state.previous_state_hash
         (External_transition.protocol_state transition)
     in
-    let parent =
-      Option.value_exn (find t parent_hash)
+    let parent_node =
+      Option.value_exn (Hashtbl.find t.table parent_hash)
         ~error:
           (Error.of_exn (Parent_not_found (`Parent parent_hash, `Target hash)))
     in
     (* 1 *)
     let staged_ledger =
       Staged_ledger.apply
-        (Breadcrumb.staged_ledger parent)
+        (Breadcrumb.staged_ledger parent_node.breadcrumb)
         (Transaction_snark_scan_state.Diff.of_ledger_builder_diff
            (External_transition.ledger_builder_diff transition))
       |> Or_error.ok_exn
@@ -317,30 +341,32 @@ module Make (Inputs : Inputs_intf) :
     attach_breadcrumb_exn t breadcrumb ;
     let node = Hashtbl.find_exn t.table hash in
     (* 3.a *)
-    let distance_to_parent = root_node.length - node.length in
-    (* 3.b *)
-    if distance_to_parent > max_length then (
-      (* 3.b.I *)
-      let new_root_hash = List.hd_exn (path t node.breadcrumb) in
-      (* 3.b.II *)
-      let garbage_immediate_successors =
-        List.filter root_node.successor_hashes ~f:(fun succ_hash ->
-            not (State_hash.equal succ_hash new_root_hash) )
-      in
-      (* 3.b.III *)
-      let garbage =
-        t.root
-        :: List.bind garbage_immediate_successors ~f:(successor_hashes_rec t)
-      in
-      t.root <- new_root_hash ;
-      List.iter garbage ~f:(Hashtbl.remove t.table) ;
-      (* 3.b.IV *)
-      Ledger_mask.commit
-        (Staged_ledger.ledger_mask
-           (Breadcrumb.staged_ledger root_node.breadcrumb)) ) ;
+    ( match root_successor t parent_node with
+    | `Changed_root new_root_hash ->
+        (* 3.b *)
+        let garbage_immediate_successors =
+          List.filter root_node.successor_hashes ~f:(fun succ_hash ->
+              not (State_hash.equal succ_hash new_root_hash) )
+        in
+        (* 3.c *)
+        let garbage =
+          t.root
+          :: List.bind garbage_immediate_successors ~f:(successor_hashes_rec t)
+        in
+        t.root <- new_root_hash ;
+        List.iter garbage ~f:(Hashtbl.remove t.table) ;
+        (* 3.d *)
+        Ledger_mask.commit
+          (Staged_ledger.ledger_mask
+             (Breadcrumb.staged_ledger root_node.breadcrumb))
+    | `Same_root _same_hash -> () ) ;
     (* 4 *)
     if node.length > best_tip_node.length then t.best_tip <- hash ;
     node.breadcrumb
+
+  let root_successor t hash =
+    match root_successor t (Hashtbl.find_exn t.table hash) with
+    | `Same_root h | `Changed_root h -> h
 end
 
 let%test_module "Transition_frontier tests" =
