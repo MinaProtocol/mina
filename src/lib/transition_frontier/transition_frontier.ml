@@ -152,16 +152,8 @@ Merkle_ledger.Any_ledger.S
   Merkle_ledger.Any_ledger.Make_base (Key) (Coda_base.Account) (Hash) (Location)
     (Depth)
 
-module Any_base (* : Merkle_mask.Base_merkle_tree_intf.S
-       with module Addr = Location.Addr
-        and module Location = Location
-        and type account := Coda_base.Account.t
-        and type root_hash := Coda_base.Ledger_hash.t
-        and type hash := Coda_base.Ledger_hash.t
-        and type key := Key.t *) = Any_ledger.M
-
-type base = Any_base.t
-                                 
+(* N.B. entering a module signature here prevents "derive" below from typing *)
+module Any_base = Any_ledger.M
 
 (* a mask module that can accept any base ledger *)
 module Ledger_mask : sig
@@ -174,7 +166,7 @@ module Ledger_mask : sig
      and type location := Location.t
      and type key := Key.t
      and type hash := Coda_base.Ledger_hash.t
-     and type parent := base
+     and type parent := Any_base.t
 
 (*  to be added to Attached part of Masking_merkle_tree_intf.S 
       val apply : t -> Ledger_diff.t -> unit 
@@ -192,7 +184,7 @@ module Maskable : Merkle_mask.Maskable_merkle_tree_intf.S
         and type hash := Hash.t
         and type unattached_mask := Ledger_mask.t
         and type attached_mask := Ledger_mask.Attached.t
-        and type t := base =
+        and type t := Any_base.t =
   Merkle_mask.Maskable_merkle_tree.Make (Key) (Coda_base.Account) (Hash) (Location)
     (Any_base)
     (Ledger_mask)
