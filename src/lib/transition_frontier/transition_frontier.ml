@@ -158,6 +158,8 @@ module Make (Inputs : Inputs_intf) :
 
   exception Already_exists of State_hash.t
 
+  exception Bad_root_hash_in_transition of State_hash.t
+
   let max_length = Max_length.t
 
   module Breadcrumb = struct
@@ -328,7 +330,8 @@ module Make (Inputs : Inputs_intf) :
         ~error:
           (Error.of_exn (Parent_not_found (`Parent parent_hash, `Target hash)))
     in
-    (* 1 *)
+    let parent_root_suc = root_successor t parent_node in
+    (* 1.a ; b *)
     let staged_ledger =
       Staged_ledger.apply
         (Breadcrumb.staged_ledger parent_node.breadcrumb)
@@ -341,7 +344,7 @@ module Make (Inputs : Inputs_intf) :
     attach_breadcrumb_exn t breadcrumb ;
     let node = Hashtbl.find_exn t.table hash in
     (* 3.a *)
-    ( match root_successor t parent_node with
+    ( match parent_root_suc with
     | `Changed_root new_root_hash ->
         (* 3.b *)
         let garbage_immediate_successors =
