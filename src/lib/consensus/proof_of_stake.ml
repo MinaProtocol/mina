@@ -421,9 +421,11 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     end
 
     module Output = struct
-      type value = Sha256.Digest.t [@@deriving sexp]
+      include Sha256.Digest
 
-      type var = Sha256.Digest.var
+      type value = t [@@deriving sexp]
+
+      let dummy = Sha256.digest_string ""
 
       let hash msg g =
         let open Fold in
@@ -819,9 +821,10 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
   end
 
   module Consensus_state = struct
-    type ('length, 'amount, 'epoch, 'slot, 'epoch_data) t =
+    type ('length, 'vrf_output, 'amount, 'epoch, 'slot, 'epoch_data) t =
       { length: 'length
       ; epoch_length: 'length
+      ; last_vrf_output: 'vrf_output
       ; total_currency: 'amount
       ; curr_epoch: 'epoch
       ; curr_slot: 'slot
@@ -830,11 +833,18 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     [@@deriving sexp, bin_io, eq, compare, hash]
 
     type value =
-      (Length.t, Amount.t, Epoch.t, Epoch.Slot.t, Epoch_data.value) t
+      ( Length.t
+      , Vrf.Output.t
+      , Amount.t
+      , Epoch.t
+      , Epoch.Slot.t
+      , Epoch_data.value )
+      t
     [@@deriving sexp, bin_io, eq, compare, hash]
 
     type var =
       ( Length.Unpacked.var
+      , Vrf.Output.var
       , Amount.var
       , Epoch.Unpacked.var
       , Epoch.Slot.Unpacked.var
@@ -844,6 +854,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     let to_hlist
         { length
         ; epoch_length
+        ; last_vrf_output
         ; total_currency
         ; curr_epoch
         ; curr_slot
@@ -852,6 +863,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       let open Coda_base.H_list in
       [ length
       ; epoch_length
+      ; last_vrf_output
       ; total_currency
       ; curr_epoch
       ; curr_slot
@@ -862,6 +874,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
            ( unit
            ,    'length
              -> 'length
+             -> 'vrf_output
              -> 'amount
              -> 'epoch
              -> 'slot
@@ -869,9 +882,10 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
              -> 'epoch_data
              -> unit )
            Coda_base.H_list.t
-        -> ('length, 'amount, 'epoch, 'slot, 'epoch_data) t =
+        -> ('length, 'vrf_output, 'amount, 'epoch, 'slot, 'epoch_data) t =
      fun Coda_base.H_list.([ length
                            ; epoch_length
+                           ; last_vrf_output
                            ; total_currency
                            ; curr_epoch
                            ; curr_slot
@@ -879,6 +893,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
                            ; curr_epoch_data ]) ->
       { length
       ; epoch_length
+      ; last_vrf_output
       ; total_currency
       ; curr_epoch
       ; curr_slot
@@ -889,6 +904,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       let open Snark_params.Tick.Data_spec in
       [ Length.Unpacked.typ
       ; Length.Unpacked.typ
+      ; Vrf.Output.typ
       ; Amount.typ
       ; Epoch.Unpacked.typ
       ; Epoch.Slot.Unpacked.typ
@@ -903,6 +919,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     let var_to_triples
         { length
         ; epoch_length
+        ; last_vrf_output
         ; total_currency
         ; curr_epoch
         ; curr_slot
@@ -916,6 +933,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       in
       Length.Unpacked.var_to_triples length
       @ Length.Unpacked.var_to_triples epoch_length
+      @ Vrf.Output.var_to_triples last_vrf_output
       @ Epoch.Unpacked.var_to_triples curr_epoch
       @ Epoch.Slot.Unpacked.var_to_triples curr_slot
       @ Amount.var_to_triples total_currency
@@ -924,26 +942,30 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     let fold
         { length
         ; epoch_length
+        ; last_vrf_output
         ; curr_epoch
         ; curr_slot
         ; total_currency
         ; last_epoch_data
         ; curr_epoch_data } =
       let open Fold in
-      Length.fold length +> Length.fold epoch_length +> Epoch.fold curr_epoch
-      +> Epoch.Slot.fold curr_slot +> Amount.fold total_currency
+      Length.fold length +> Length.fold epoch_length
+      +> Vrf.Output.fold last_vrf_output
+      +> Epoch.fold curr_epoch +> Epoch.Slot.fold curr_slot
+      +> Amount.fold total_currency
       +> Epoch_data.fold last_epoch_data
       +> Epoch_data.fold curr_epoch_data
 
     let length_in_triples =
       Length.length_in_triples + Length.length_in_triples
-      + Epoch.length_in_triples + Epoch.Slot.length_in_triples
-      + Amount.length_in_triples + Epoch_data.length_in_triples
-      + Epoch_data.length_in_triples
+      + Vrf.Output.length_in_triples + Epoch.length_in_triples
+      + Epoch.Slot.length_in_triples + Amount.length_in_triples
+      + Epoch_data.length_in_triples + Epoch_data.length_in_triples
 
     let genesis : value =
       { length= Length.zero
       ; epoch_length= Length.zero
+      ; last_vrf_output= Vrf.Output.dummy
       ; total_currency= genesis_ledger_total_currency
       ; curr_epoch= Epoch.zero
       ; curr_slot= Epoch.Slot.zero
@@ -982,6 +1004,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       in
       { length= Length.succ previous_consensus_state.length
       ; epoch_length
+      ; last_vrf_output= proposer_vrf_result
       ; total_currency
       ; curr_epoch= consensus_transition_data.epoch
       ; curr_slot= consensus_transition_data.slot
@@ -1075,6 +1098,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         ( `Success threshold_satisfied
         , { length
           ; epoch_length
+          ; last_vrf_output= vrf_result
           ; curr_epoch= transition_data.epoch
           ; curr_slot= transition_data.slot
           ; total_currency= new_total_currency
@@ -1209,14 +1233,23 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       (* Each branch contains a precondition predicate and a choice predicate,
        * which takes the new state when true. Each predicate is also decorated
        * with a string description, used for debugging messages *)
+      let candidate_vrf_is_bigger =
+        let d = Fn.compose Sha256.digest_string Vrf.Output.to_string in
+        Sha256.Digest.( > )
+          (d candidate.last_vrf_output)
+          (d existing.last_vrf_output)
+      in
+      let ( << ) a b =
+        let c = Length.compare a b in
+        c < 0 || (c = 0 && candidate_vrf_is_bigger)
+      in
       let ( = ) = Coda_base.State_hash.equal in
-      let ( < ) a b = Length.compare a b < 0 in
       let branches =
         [ ( ( lazy
                 ( existing.last_epoch_data.lock_checkpoint
                 = candidate.last_epoch_data.lock_checkpoint )
             , "last epoch lock checkpoints are equal" )
-          , ( lazy (existing.length < candidate.length)
+          , ( lazy (existing.length << candidate.length)
             , "candidate is longer than existing" ) )
         ; ( ( lazy
                 ( existing.last_epoch_data.start_checkpoint
@@ -1224,7 +1257,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
             , "last epoch start checkpoints are equal" )
           , ( lazy
                 ( existing.last_epoch_data.length
-                < candidate.last_epoch_data.length )
+                << candidate.last_epoch_data.length )
             , "candidate last epoch is longer than existing last epoch" ) )
           (* these two could be condensed into one entry *)
         ; ( ( lazy
@@ -1232,14 +1265,14 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
                 = candidate.last_epoch_data.lock_checkpoint )
             , "candidate last epoch lock checkpoint is equal to existing \
                current epoch lock checkpoint" )
-          , ( lazy (existing.length < candidate.length)
+          , ( lazy (existing.length << candidate.length)
             , "candidate is longer than existing" ) )
         ; ( ( lazy
                 ( existing.last_epoch_data.lock_checkpoint
                 = candidate.curr_epoch_data.lock_checkpoint )
             , "candidate current epoch lock checkpoint is equal to existing \
                last epoch lock checkpoint" )
-          , ( lazy (existing.length < candidate.length)
+          , ( lazy (existing.length << candidate.length)
             , "candidate is longer than existing" ) )
         ; ( ( lazy
                 ( existing.curr_epoch_data.start_checkpoint
@@ -1248,7 +1281,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
                current epoch start checkpoint" )
           , ( lazy
                 ( existing.curr_epoch_data.length
-                < candidate.last_epoch_data.length )
+                << candidate.last_epoch_data.length )
             , "candidate last epoch is longer than existing current epoch" ) )
         ; ( ( lazy
                 ( existing.last_epoch_data.start_checkpoint
@@ -1257,7 +1290,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
                last epoch start checkpoint" )
           , ( lazy
                 ( existing.last_epoch_data.length
-                < candidate.curr_epoch_data.length )
+                << candidate.curr_epoch_data.length )
             , "candidate current epoch is longer than existing last epoch" ) )
         ]
       in

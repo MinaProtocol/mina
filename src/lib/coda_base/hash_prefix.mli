@@ -4,6 +4,8 @@ val length_in_triples : int
 
 val protocol_state : Tick.Pedersen.State.t
 
+val protocol_state_body : Tick.Pedersen.State.t
+
 val signature : Tick.Pedersen.State.t
 
 val account : Tick.Pedersen.State.t
