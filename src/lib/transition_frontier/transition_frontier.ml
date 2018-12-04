@@ -181,9 +181,12 @@ struct
         ; best_tip= root_hash
         ; table }
 
-  let all_breadcrumbs t = List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb;_} -> breadcrumb)
+  let all_breadcrumbs t =
+    List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb; _} -> breadcrumb)
 
-  let all_hashes t = List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb;_} -> Breadcrumb.hash breadcrumb)
+  let all_hashes t =
+    List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb; _} ->
+        Breadcrumb.hash breadcrumb )
 
   let find t hash =
     let open Option.Let_syntax in
