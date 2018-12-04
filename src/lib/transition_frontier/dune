@@ -2,5 +2,5 @@
   (name transition_frontier)
   (public_name transition_frontier)
   (inline_tests)
-  (libraries core_kernel with_hash merkle_mask protocols test_mocks)
+  (libraries signature_lib core_kernel with_hash consensus genesis_ledger ledger_builder merkle_mask coda_base protocols rocksdb_database transaction_snark test_mocks)
   (preprocess (pps ppx_jane ppx_deriving.eq bisect_ppx -conditional)))
