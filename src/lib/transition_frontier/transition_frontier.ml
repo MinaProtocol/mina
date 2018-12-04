@@ -39,6 +39,8 @@ module Make
       val to_ledger_aux : t -> Ledger_builder.Aux.t
       val of_ledger_aux : Ledger_builder.Aux.t -> t
 
+      val empty : t
+
       module Diff : sig
         type t
 
@@ -51,6 +53,9 @@ module Make
 
       let of_ledger_aux = Fn.id
       let to_ledger_aux = Fn.id
+
+      (* TODO: Don't hardcode parallelism_log_2 *)
+      let empty = Ledger_builder.Aux.empty ~parallelism_log_2:4
 
       module Diff = struct
         type nonrec t = Ledger_builder_diff.t

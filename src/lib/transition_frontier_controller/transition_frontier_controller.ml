@@ -2,6 +2,7 @@ open Core_kernel
 open Protocols.Coda_pow
 open Coda_base
 open Pipe_lib
+open Signature_lib
 
 module type Inputs_intf = sig
   module Consensus_mechanism :
@@ -13,53 +14,31 @@ module type Inputs_intf = sig
      and type ledger_builder_diff := Consensus_mechanism.ledger_builder_diff
      and type protocol_state_proof := Consensus_mechanism.protocol_state_proof
 
-  module Merkle_address : Merkle_address.S
-
   module Ledger_builder_diff : Ledger_builder_diff_intf
+
+  module Merkle_address : Merkle_address.S
 
   module Syncable_ledger :
     Syncable_ledger.S
     with type addr := Merkle_address.t
      and type hash := Ledger_hash.t
 
-  module Key : Merkle_ledger.Intf.Key
-
-  module Account : Merkle_ledger.Intf.Account with type key := Key.t
-
-  module Location : Merkle_ledger.Location_intf.S
+  module Ledger_builder : Ledger_builder_intf
+    with type diff := Ledger_builder_diff.t
+     and type valid_diff :=
+                Ledger_builder_diff.With_valid_signatures_and_proofs.t
+     and type ledger_builder_hash := Ledger_builder_hash.t
+     and type ledger_hash := Ledger_hash.t
+     and type frozen_ledger_hash := Frozen_ledger_hash.t
+     and type public_key := Public_key.Compressed.t
+     and type ledger := Ledger.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
 
   module Ledger_diff : sig
     type t
 
     val empty : t
-  end
-
-  module Any_base :
-    Merkle_mask.Base_merkle_tree_intf.S
-    with module Addr = Location.Addr
-     and module Location = Location
-     and type account := Account.t
-     and type root_hash := Ledger_hash.t
-     and type hash := Ledger_hash.t
-     and type key := Key.t
-
-  module Ledger_mask : sig
-    include
-      Merkle_mask.Masking_merkle_tree_intf.S
-      with module Addr = Location.Addr
-       and module Location = Location
-       and module Attached.Addr = Location.Addr
-       and type account := Account.t
-       and type location := Location.t
-       and type key := Key.t
-       and type hash := Ledger_hash.t
-       and type parent := Any_base.t
-
-    val merkle_root : t -> Ledger_hash.t
-
-    val apply : t -> Ledger_diff.t -> unit
-
-    val commit : t -> unit
   end
 
   module Transition_frontier :
@@ -68,7 +47,6 @@ module type Inputs_intf = sig
      and type state_hash := State_hash.t
      and type ledger_database := Ledger.Db.t
      and type ledger_diff := Ledger_diff.t
-     and type staged_ledger := Staged_ledger.t
 
   type ledger_database
 
@@ -94,9 +72,7 @@ module type Inputs_intf = sig
     Sync_handler_intf
     with type addr := Merkle_address.t
      and type hash := State_hash.t
-     and type syncable_ledger := Syncable_ledger.t
-     and type syncable_ledger_query := Syncable_ledger.query
-     and type syncable_ledger_answer := Syncable_ledger.answer
+     and type syncable_ledger := Ledger.t
      and type transition_frontier := Transition_frontier.t
 end
 
@@ -126,9 +102,14 @@ module Make (Inputs : Inputs_intf) :
              ~hash_data:
                (Fn.compose Protocol_state.hash
                   External_transition.protocol_state))
-        ~root_snarked_ledger:(Ledger.Db.of_ledger Genesis_ledger.t)
-        ~root_transaction_snark_scan_state:Transaction_snark_scan_state.empty
-        ~root_staged_ledger_diff:Ledger_diff.empty
+        ~root_snarked_ledger:(
+            Ledger.foldi Genesis_ledger.t ~init:(Ledger.Db.create ()) ~f:(fun _addr db account ->
+            let key = Account.public_key account in
+            ignore (Ledger.Db.get_or_create_account_exn db key account);
+            db
+            ) )
+        ~root_transaction_snark_scan_state:Transition_frontier.Transaction_snark_scan_state.empty
+        ~root_staged_ledger_diff:Ledger_builder_diff.empty
         ~logger
     in
     Transition_handler.Validator.run ~transition_reader

@@ -7,8 +7,6 @@ module type Transition_frontier_intf = sig
 
   type ledger_database
 
-  type transaction_snark_scan_state
-
   type ledger_diff
 
   type staged_ledger
@@ -19,6 +17,12 @@ module type Transition_frontier_intf = sig
   exception Already_exists of state_hash
 
   val max_length : int
+
+  module Transaction_snark_scan_state : sig
+    type t
+
+    val empty : t
+  end
 
   module Breadcrumb : sig
     type t
@@ -34,7 +38,7 @@ module type Transition_frontier_intf = sig
   val create :
        root_transition:(external_transition, state_hash) With_hash.t
     -> root_snarked_ledger:ledger_database
-    -> root_transaction_snark_scan_state:transaction_snark_scan_state
+    -> root_transaction_snark_scan_state:Transaction_snark_scan_state.t
     -> root_staged_ledger_diff:ledger_diff
     -> logger:Logger.t
     -> t

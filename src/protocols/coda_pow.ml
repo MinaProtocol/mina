@@ -562,6 +562,8 @@ module type Ledger_builder_base_intf = sig
     val hash : t -> ledger_builder_aux_hash
 
     val is_valid : t -> bool
+
+    val empty : parallelism_log_2:int -> t
   end
 
   val ledger : t -> ledger
