@@ -7,5 +7,5 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core async bitstring file_system integers))
-  (preprocess (pps (ppx_jane)))
+  (preprocess (pps (ppx_jane bisect_ppx -conditional)))
   (synopsis "File representing a stack")))

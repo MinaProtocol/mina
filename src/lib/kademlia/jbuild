@@ -7,6 +7,6 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core logger pipe_lib async async_extra file_system banlist_lib coda_base))
-  (preprocess (pps (ppx_jane)))
+  (preprocess (pps (ppx_jane bisect_ppx -conditional)))
   (synopsis "Kademlia DHT -- only being used for it's membership")))
 

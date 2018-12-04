@@ -11,6 +11,6 @@
       integers
       snark_params
       ))
-  (preprocess (pps (ppx_jane ppx_deriving.std)))
+  (preprocess (pps (ppx_jane ppx_deriving.std bisect_ppx -conditional)))
   (synopsis "Unsigned integer functions")))
 

@@ -45,7 +45,9 @@ module Make
 
   let get_payment t ~receipt =
     Key_value_db.get t ~key:receipt
-    |> Option.bind ~f:(function Root -> None | Child {value; _} -> Some value)
+    |> Option.bind ~f:(function
+         | Tree_node.Root -> None
+         | Child {value; _} -> Some value )
 
   let add t ~previous (payment : Payment.t) =
     let payload = Payment.payload payment in

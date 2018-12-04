@@ -7,6 +7,6 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core fold_lib async async_extra bignum))
-  (preprocess (pps (ppx_jane)))
+  (preprocess (pps (ppx_jane bisect_ppx -conditional)))
   (synopsis "Bignum's bigint re-exported as Bignum_bigint")))
 

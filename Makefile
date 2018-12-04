@@ -25,6 +25,11 @@ else
 endif
 
 ########################################
+# Coverage directory
+
+COVERAGE_DIR=_coverage
+
+########################################
 ## Code
 
 all: clean codabuilder containerstart build
@@ -32,6 +37,7 @@ all: clean codabuilder containerstart build
 clean:
 	$(info Removing previous build artifacts)
 	@rm -rf src/_build
+	@rm -rf src/$(COVERAGE_DIR)
 
 kademlia:
 	@# FIXME: Bash wrap here is awkward but required to get nix-env
@@ -185,6 +191,34 @@ test-withsnark:
 web:
 	./scripts/web.sh
 
+########################################
+# Coverage testing and output
+
+test-coverage: SHELL := /bin/bash
+test-coverage:
+	source scripts/test_all.sh ; cd src ; run_unit_tests_with_coverage
+
+# we don't depend on test-coverage, which forces a run of all unit tests
+coverage-html:
+ifeq ($(shell find src/_build/default -name bisect\*.out),"")
+	echo "No coverage output; run make test-coverage"
+else
+	cd src && bisect-ppx-report -I _build/default/ -html $(COVERAGE_DIR) `find . -name bisect\*.out`
+endif
+
+coverage-text:
+ifeq ($(shell find src/_build/default -name bisect\*.out),"")
+	echo "No coverage output; run make test-coverage"
+else
+	cd src && bisect-ppx-report -I _build/default/ -text $(COVERAGE_DIR)/coverage.txt `find . -name bisect\*.out`
+endif
+
+coverage-coveralls:
+ifeq ($(shell find src/_build/default -name bisect\*.out),"")
+	echo "No coverage output; run make test-coverage"
+else
+	cd src && bisect-ppx-report -I _build/default/ -coveralls $(COVERAGE_DIR)/coveralls.json `find . -name bisect\*.out`
+endif
 
 ########################################
 # To avoid unintended conflicts with file names, always add to .PHONY

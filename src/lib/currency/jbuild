@@ -17,6 +17,6 @@
       test_util
       codable
       ))
-  (preprocess (pps (ppx_jane ppx_deriving.std ppx_deriving_yojson)))
+  (preprocess (pps (ppx_jane ppx_deriving.std ppx_deriving_yojson bisect_ppx -conditional)))
   (synopsis "Currency types")))
 

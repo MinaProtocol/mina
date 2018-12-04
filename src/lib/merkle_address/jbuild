@@ -7,5 +7,5 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries ( core bitstring direction))
-  (preprocess (pps (ppx_jane ppx_hash ppx_deriving.eq bitstring.ppx)))
+  (preprocess (pps (ppx_jane ppx_hash ppx_deriving.eq bitstring.ppx bisect_ppx -conditional)))
   (synopsis "Address for merkle database representations")))

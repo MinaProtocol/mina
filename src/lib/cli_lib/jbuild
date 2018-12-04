@@ -14,6 +14,6 @@
       yojson
       coda_base
       daemon_rpcs))
-  (preprocess (pps (ppx_jane ppx_deriving_yojson ppx_deriving.make)))
+  (preprocess (pps (ppx_jane ppx_deriving_yojson ppx_deriving.make bisect_ppx -conditional)))
   (synopsis "Library to communicate with Coda as cli as the front-end")))
 

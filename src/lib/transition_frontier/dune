@@ -3,4 +3,4 @@
   (public_name transition_frontier)
   (inline_tests)
   (libraries core_kernel with_hash merkle_mask protocols test_mocks)
-  (preprocess (pps ppx_jane)))
+  (preprocess (pps ppx_jane ppx_deriving.eq bisect_ppx -conditional)))

@@ -9,6 +9,6 @@
   (libraries
     ( core_kernel currency signature_lib
       ))
-  (preprocess (pps (ppx_jane)))
+  (preprocess (pps (ppx_jane bisect_ppx -conditional)))
   (synopsis "Snark work types")))
 

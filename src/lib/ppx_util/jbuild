@@ -8,6 +8,6 @@
   (inline_tests)
   (libraries
     ( core ppxlib ))
-  (preprocess (pps (ppx_jane ppxlib.metaquot ppxlib.runner)))
+  (preprocess (pps (bisect_ppx -conditional ppx_jane ppxlib.metaquot ppxlib.runner)))
   (synopsis "PPX utilities")))
 

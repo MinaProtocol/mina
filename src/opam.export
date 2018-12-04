@@ -111,6 +111,7 @@ installed: [
   "ppx_base.v0.11.0"
   "ppx_bench.v0.11.0"
   "ppx_bin_prot.v0.11.1"
+  "ppx_bisect.v1.4.0"
   "ppx_compare.v0.11.1"
   "ppx_custom_printf.v0.11.0"
   "ppx_derivers.1.0"
