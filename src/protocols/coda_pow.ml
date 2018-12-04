@@ -536,6 +536,82 @@ module type Ledger_builder_transition_intf = sig
   val forget : With_valid_signatures_and_proofs.t -> t
 end
 
+module type Transaction_snark_scan_state_intf = sig
+  type ledger
+
+  type ledger_proof_statement
+
+  type sparse_ledger
+
+  type sok_message
+
+  type transaction
+
+  type t [@@deriving sexp, bin_io]
+
+  type ledger_proof
+
+  type hash
+
+  type transaction_snark_work
+
+  type ledger_undo
+
+  module Transaction_with_witness : sig
+    (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
+    type t =
+      { transaction_with_info: ledger_undo
+      ; statement: ledger_proof_statement
+      ; witness: sparse_ledger }
+  end
+
+  module Ledger_proof_with_sok_message : sig
+    type t = ledger_proof * sok_message
+  end
+
+  module Available_job : sig
+    type t =
+      | Base of Transaction_with_witness.t
+      | Merge of
+          Ledger_proof_with_sok_message.t * Ledger_proof_with_sok_message.t
+  end
+
+  val create : transaction_capacity_log_2:int -> t
+
+  val enqueue_transactions :
+    t -> Transaction_with_witness.t list -> unit Or_error.t
+
+  val fill_snark_work :
+       t
+    -> Ledger_proof_with_sok_message.t list
+    -> Ledger_proof_with_sok_message.t option Or_error.t
+
+  val latest_ledger_proof : t -> Ledger_proof_with_sok_message.t option
+
+  val free_space : t -> int
+
+  val next_k_jobs : t -> k:int -> Available_job.t list Or_error.t
+
+  val next_jobs : t -> Available_job.t list
+
+  val next_jobs_sequence : t -> Available_job.t Sequence.t
+
+  val is_valid : t -> bool
+
+  val hash : t -> hash
+
+  val staged_transactions : t -> Transaction_with_witness.t list
+
+  val extract_from_job :
+       Available_job.t
+    -> (transaction, ledger_proof * ledger_proof) Either.t Or_error.t
+
+  val copy : t -> t
+
+  val partition_if_overflowing :
+    t -> max_slots:int -> [`One of int | `Two of int * int]
+end
+
 module type Ledger_builder_base_intf = sig
   type t [@@deriving sexp]
 

@@ -1,6 +1,6 @@
-[%%import
+(*[%%import
 "../../config.mlh"]
-
+*)
 open Core_kernel
 open Async_kernel
 open Protocols
@@ -62,7 +62,7 @@ module Make (Inputs : Inputs.S') : sig
 end = struct
   open Inputs
 
-  module Transaction_with_witness = struct
+  (*module Transaction_with_witness = struct
     (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
     type t =
       { transaction_with_info: Ledger.Undo.t
@@ -295,6 +295,18 @@ end = struct
                   assert (is_valid t) ;
                   t
               end)
+  end*)
+
+  module TSS = Transaction_snark_scan_state.Make (Inputs)
+
+  type job = TSS.Available_job.t
+
+  module Aux = struct
+    type t = TSS.t [@@deriving sexp, bin_io]
+
+    let is_valid = TSS.is_valid
+
+    let hash t = Staged_ledger_aux_hash.of_bytes (TSS.hash t :> string)
   end
 
   type scan_state = Aux.t [@@deriving sexp, bin_io]
@@ -336,8 +348,8 @@ end = struct
             | _ -> Skip (x :: acc, i + 1, seq) ) )
 
   let all_work_pairs t =
-    let all_jobs = Parallel_scan.next_jobs ~state:t.scan_state in
-    let module A = Parallel_scan.Available_job in
+    let all_jobs = TSS.next_jobs t.scan_state in
+    let module A = TSS.Available_job in
     let module L = Ledger_proof_statement in
     let single_spec (job : job) =
       match job with
@@ -376,22 +388,23 @@ end = struct
     let {Ledger_proof_statement.target; _} = Ledger_proof.statement proof in
     target
 
-  let verify_scan_state_after_apply ledger (aux : Aux.t) =
-    let error_prefix =
+  let verify_scan_state_after_apply _ledger (_aux : Aux.t) = Ok ()
+
+  (* TODO   let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
-    match Parallel_scan.last_emitted_value aux with
+    match TSS.latest_ledger_proof aux with
     | None ->
-        Aux.Statement_scanner.check_invariants aux error_prefix ledger None
+        TSS.Statement_scanner.check_invariants aux error_prefix ledger None
     | Some proof ->
-        Aux.Statement_scanner.check_invariants aux error_prefix ledger
-          (Some (get_target proof))
+        TSS.Statement_scanner.check_invariants aux error_prefix ledger
+          (Some (get_target proof)) *)
 
   let snarked_ledger :
       t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t =
    fun {ledger; scan_state; _} ~snarked_ledger_hash:expected_target ->
     let open Or_error.Let_syntax in
-    let txns_still_being_worked_on = Parallel_scan.current_data scan_state in
+    let txns_still_being_worked_on = TSS.staged_transactions scan_state in
     Debug_assert.debug_assert (fun () ->
         let parallelism =
           Int.pow 2 (Inputs.Config.transaction_capacity_log_2 + 1)
@@ -415,7 +428,7 @@ end = struct
           %{sexp:Frozen_ledger_hash.t}: "
         expected_target
     else
-      match Parallel_scan.last_emitted_value scan_state with
+      match TSS.latest_ledger_proof scan_state with
       | None -> return snarked_ledger
       | Some proof ->
           let target = get_target proof in
@@ -428,14 +441,17 @@ end = struct
                 Frozen_ledger_hash.t}))"
               target expected_target
 
-  let statement_exn t =
-    match Aux.Statement_scanner.scan_statement t.scan_state with
+  let statement_exn _t = failwith "unimp"
+
+  (*TODO match Aux.Statement_scanner.scan_statement t.scan_state with
     | Ok s -> `Non_empty s
     | Error `Empty -> `Empty
-    | Error (`Error e) -> failwithf !"statement_exn: %{sexp:Error.t}" e ()
+    | Error (`Error e) -> failwithf !"statement_exn: %{sexp:Error.t}" e ()*)
 
-  let of_aux_and_ledger ~snarked_ledger_hash ~ledger ~aux =
-    let open Deferred.Or_error.Let_syntax in
+  let of_aux_and_ledger = failwith "unimp"
+
+  (*~snarked_ledger_hash ~ledger ~aux = *)
+  (* TODO let open Deferred.Or_error.Let_syntax in
     let verify_snarked_ledger t snarked_ledger_hash =
       match snarked_ledger t ~snarked_ledger_hash with
       | Ok _ -> Ok ()
@@ -452,17 +468,16 @@ end = struct
     let%map () =
       Deferred.return @@ verify_snarked_ledger t snarked_ledger_hash
     in
-    t
+    t*)
 
   let copy {scan_state; ledger} =
-    { scan_state= Parallel_scan.State.copy scan_state
-    ; ledger= Ledger.copy ledger }
+    {scan_state= TSS.copy scan_state; ledger= Ledger.copy ledger}
 
   let hash {scan_state; ledger} : Staged_ledger_hash.t =
     Staged_ledger_hash.of_aux_and_ledger_hash (Aux.hash scan_state)
       (Ledger.merkle_root ledger)
 
-  [%%if
+  (* [%%if
   call_logger]
 
   let hash t =
@@ -470,18 +485,16 @@ end = struct
     hash t
 
   [%%endif]
-
+*)
   let ledger {ledger; _} = ledger
 
   let create ~ledger : t =
     let open Config in
     (* Transaction capacity log_2 is half the capacity for work parallelism *)
-    { scan_state=
-        Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 1)
-    ; ledger }
+    {scan_state= TSS.create ~transaction_capacity_log_2; ledger}
 
   let current_ledger_proof t =
-    Option.map (Parallel_scan.last_emitted_value t.scan_state) ~f:fst
+    Option.map (TSS.latest_ledger_proof t.scan_state) ~f:fst
 
   let statement_of_job : job -> Ledger_proof_statement.t option = function
     | Base {statement; _} -> Some statement
@@ -504,7 +517,7 @@ end = struct
         ; fee_excess
         ; proof_type= `Merge }
 
-  let completed_work_to_scanable_work (job : job) (fee, current_proof, prover)
+  (*let completed_work_to_scanable_work (job : job) (fee, current_proof, prover)
       : parallel_scan_completed_job Or_error.t =
     let sok_digest = Ledger_proof.sok_digest current_proof
     and proof = Ledger_proof.underlying_proof current_proof in
@@ -531,7 +544,7 @@ end = struct
         in
         Parallel_scan.State.Completed_job.Merged
           ( Ledger_proof.create ~statement ~sok_digest ~proof
-          , Sok_message.create ~fee ~prover )
+          , Sok_message.create ~fee ~prover ) *)
 
   let verify ~message job proof =
     match statement_of_job job with
@@ -542,10 +555,12 @@ end = struct
   let total_proofs (works : Transaction_snark_work.t list) =
     List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
 
-  let fill_in_completed_work (state : Aux.t)
-      (works : Transaction_snark_work.t list) :
+  let fill_in_completed_work (_state : Aux.t)
+      (_works : Transaction_snark_work.t list) :
       Ledger_proof.t option Or_error.t =
-    let open Or_error.Let_syntax in
+    failwith "unimp"
+
+  (*  let open Or_error.Let_syntax in
     let%bind next_jobs =
       Parallel_scan.next_k_jobs ~state ~k:(total_proofs works)
     in
@@ -560,10 +575,12 @@ end = struct
       Parallel_scan.fill_in_completed_jobs ~state
         ~completed_jobs:scanable_work_list
     in
-    Option.map result ~f:fst
+    Option.map result ~f:fst*)
 
-  let enqueue_data_with_rollback state data : unit Result_with_rollback.t =
-    Result_with_rollback.of_or_error @@ Parallel_scan.enqueue_data ~state ~data
+  let enqueue_data_with_rollback _state _data : unit Result_with_rollback.t =
+    failwith "unimp"
+
+  (*Result_with_rollback.of_or_error @@ Parallel_scan.enqueue_data ~state ~data *)
 
   let sum_fees xs ~f =
     with_return (fun {return} ->
@@ -615,8 +632,9 @@ end = struct
     let open Or_error.Let_syntax in
     let%map undo, statement = r in
     ( undo
-    , {Transaction_with_witness.transaction_with_info= undo; witness; statement}
-    )
+    , { TSS.Transaction_with_witness.transaction_with_info= undo
+      ; witness
+      ; statement } )
 
   let update_ledger_and_get_statements ledger ts =
     let undo_transactions undos =
@@ -644,8 +662,7 @@ end = struct
         Deferred.return
           (let open Or_error.Let_syntax in
           let%map jobs =
-            Parallel_scan.next_k_jobs ~state:t.scan_state
-              ~k:(total_proofs completed_works)
+            TSS.next_k_jobs t.scan_state ~k:(total_proofs completed_works)
           in
           chunks_of jobs ~n:Transaction_snark_work.proofs_length)
       in
@@ -970,12 +987,12 @@ end = struct
     let res_opt =
       Or_error.ok_exn (fill_in_completed_work t.scan_state works)
     in
-    Or_error.ok_exn (Parallel_scan.enqueue_data ~state:t.scan_state ~data) ;
+    Or_error.ok_exn (TSS.enqueue_transactions t.scan_state data) ;
     Or_error.ok_exn (verify_scan_state_after_apply t.ledger t.scan_state) ;
     (`Hash_after_applying (hash t), `Ledger_proof res_opt)
 
   let work_to_do scan_state : Transaction_snark_work.Statement.t Sequence.t =
-    let work_seq = Parallel_scan.next_jobs_sequence ~state:scan_state in
+    let work_seq = TSS.next_jobs_sequence scan_state in
     sequence_chunks_of ~n:Transaction_snark_work.proofs_length
     @@ Sequence.map work_seq ~f:(fun maybe_work ->
            match statement_of_job maybe_work with
@@ -1464,15 +1481,16 @@ end = struct
          -> Transaction_snark_work.Checked.t option) =
     (* TODO: Don't copy *)
     let curr_hash = hash t in
-    let t' = copy t in
-    let ledger = ledger t' in
+    (*let t' = copy t in*)
+    let cur_ledger = ledger t in
+    let new_mask = Inputs.Ledger.Mask.create () in
+    let ledger = Inputs.Ledger.register_mask cur_ledger new_mask in
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
     let partitions =
-      Parallel_scan.partition_if_overflowing ~max_slots:max_throughput
-        t'.scan_state
+      TSS.partition_if_overflowing ~max_slots:max_throughput t.scan_state
     in
     let pre_diffs =
-      generate_prediff logger (work_to_do t'.scan_state) transactions_by_fee
+      generate_prediff logger (work_to_do t.scan_state) transactions_by_fee
         get_completed_work ledger self partitions
     in
     trace_event "prediffs done" ;
@@ -1752,14 +1770,14 @@ let%test_module "test" =
         module Mask = struct
           type t = int [@@deriving bin_io]
 
-          let create () = 4
+          let create () = 0
         end
 
         type unattached_mask = Mask.t
 
         let unregister_mask_exn _ = failwith "unimplemented"
 
-        let register_mask _ = failwith "unimplemented"
+        let register_mask l m = ref (!l + m)
 
         let unattached_mask_of_serializable _ = failwith "unimplemented"
 
