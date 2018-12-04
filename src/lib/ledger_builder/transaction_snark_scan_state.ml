@@ -34,7 +34,7 @@ module Make (Inputs : Inputs.S') : sig
               (*and type valid_diff :=
                 Inputs.Staged_ledger_diff.With_valid_signatures_and_proofs.t*)
               (*and type ledger_hash := Inputs.Ledger_hash.t*)
-              (*and type frozen_ledger_hash := Inputs.Frozen_ledger_hash.t*)
+              (**)
               (*and type ledger_builder_hash := Inputs.Staged_ledger_hash.t*)
               (*and type public_key := Inputs.Compressed_public_key.t*)
                 ledger :=
@@ -42,7 +42,7 @@ module Make (Inputs : Inputs.S') : sig
     (*and type user_command_with_valid_signature :=
                 Inputs.User_command.With_valid_signature.t*)
     (*and type statement := Inputs.Transaction_snark_work.Statement.t*)
-     and type transaction_snark_work := Inputs.Transaction_snark_work.Checked.t
+     and type transaction_snark_work := Inputs.Transaction_snark_work.t
      and type ledger_proof := Inputs.Ledger_proof.t
     (*and type ledger_builder_aux_hash := Inputs.Staged_ledger_aux_hash.t*)
      and type sparse_ledger := Inputs.Sparse_ledger.t
@@ -50,7 +50,8 @@ module Make (Inputs : Inputs.S') : sig
     (*and type ledger_proof_statement_set := Inputs.Ledger_proof_statement.Set.t*)
      and type transaction := Inputs.Transaction.t
      and type hash := Digestif.SHA256.t
-     and type ledger_undo := Inputs.Ledger.Undo.t
+     and type transaction_with_info := Inputs.Ledger.Undo.t
+     and type frozen_ledger_hash := Inputs.Frozen_ledger_hash.t
 end = struct
   open Inputs
 
@@ -67,18 +68,13 @@ end = struct
     type t = Ledger_proof.t * Sok_message.t [@@deriving sexp, bin_io]
   end
 
-  type job =
-    ( Ledger_proof_with_sok_message.t
+  module Available_job = struct
+    type t = ( Ledger_proof_with_sok_message.t
     , Transaction_with_witness.t )
     Parallel_scan.Available_job.t
-  [@@deriving sexp_of]
-
-  module Available_job = struct
-    type t =
-      | Base of Transaction_with_witness.t
-      | Merge of
-          Ledger_proof_with_sok_message.t * Ledger_proof_with_sok_message.t
   end
+
+  type job = Available_job.t
 
   type sok_message = Sok_message.t
 
@@ -292,6 +288,27 @@ end = struct
                 t
             end)
 
+  let statement_of_job : job -> Ledger_proof_statement.t option = function
+    | Base {statement; _} -> Some statement
+    | Merge ((p1, _), (p2, _)) ->
+        let stmt1 = Ledger_proof.statement p1
+        and stmt2 = Ledger_proof.statement p2 in
+        let open Option.Let_syntax in
+        let%bind () =
+          Option.some_if
+            (Frozen_ledger_hash.equal stmt1.target stmt2.source)
+            ()
+        in
+        let%map fee_excess = Currency.Fee.Signed.add stmt1.fee_excess stmt2.fee_excess
+        and supply_increase =
+          Currency.Amount.add stmt1.supply_increase stmt2.supply_increase
+        in
+        { Ledger_proof_statement.source= stmt1.source
+        ; target= stmt2.target
+        ; supply_increase
+        ; fee_excess
+        ; proof_type= `Merge }
+
   (************************completed work to scanable work**************)
   let completed_work_to_scanable_work (job : job) (fee, current_proof, prover)
       : parallel_scan_completed_job Or_error.t =
@@ -325,12 +342,12 @@ end = struct
   let total_proofs (works : Transaction_snark_work.t list) =
     List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
 
-  let _fill_in_completed_work (state : t)
+  let fill_in_transaction_snark_work t
       (works : Transaction_snark_work.t list) :
       Ledger_proof.t option Or_error.t =
     let open Or_error.Let_syntax in
     let%bind next_jobs =
-      Parallel_scan.next_k_jobs ~state ~k:(total_proofs works)
+      Parallel_scan.next_k_jobs ~state:t ~k:(total_proofs works)
     in
     let%bind scanable_work_list =
       map2_or_error next_jobs
@@ -340,38 +357,34 @@ end = struct
         ~f:completed_work_to_scanable_work
     in
     let%map result =
-      Parallel_scan.fill_in_completed_jobs ~state
+      Parallel_scan.fill_in_completed_jobs ~state:t
         ~completed_jobs:scanable_work_list
     in
     Option.map result ~f:fst
 
-  let _enqueue_data_with_rollback state data : unit Result_with_rollback.t =
-    Result_with_rollback.of_or_error @@ Parallel_scan.enqueue_data ~state ~data
-
-  (*******************************************)
-
   let create ~transaction_capacity_log_2:_ = failwith "unimp"
 
-  let enqueue_transactions _t _transactions = failwith "unimp"
+  let enqueue_transactions t transactions = Parallel_scan.enqueue_data ~state:t ~data:transactions
 
-  let fill_snark_work _t _work_list = failwith "unimp"
+  let latest_ledger_proof = Parallel_scan.last_emitted_value
 
-  let latest_ledger_proof _t = failwith "unimp"
+  let free_space t = Parallel_scan.free_space ~state:t
 
-  let free_space _t = failwith "unimp"
+  let next_k_jobs t ~k = Parallel_scan.next_k_jobs ~state:t ~k
 
-  let next_k_jobs _t ~k:_ = failwith "unimp"
+  let next_jobs t = Parallel_scan.next_jobs ~state:t
 
-  let next_jobs _t = failwith "unimp"
+  let next_jobs_sequence t = Parallel_scan.next_jobs_sequence ~state:t
 
-  let next_jobs_sequence _t = failwith "unimp"
+  let staged_transactions = Parallel_scan.current_data
 
-  let staged_transactions _t = failwith "Parallel_scan.current_data"
+  let copy = Parallel_scan.State.copy
 
-  let extract_from_job _t = failwith "unimp"
+  let partition_if_overflowing t ~max_slots = Parallel_scan.partition_if_overflowing t ~max_slots
 
-  let copy _t = failwith "Parallel_scan.State.copy"
+  let extract_from_job (job: job) =
+    match job with
+    | Parallel_scan.Available_job.Base d -> First (d.transaction_with_info, d.statement, d.witness)
+    | Merge ((p1, _), (p2,_)) -> Second (p1,p2)
 
-  let partition_if_overflowing _t ~max_slots:_ =
-    failwith "Parallel_scan.partition_if_overflowing t ~max_slots"
 end

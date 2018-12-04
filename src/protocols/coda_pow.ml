@@ -555,12 +555,14 @@ module type Transaction_snark_scan_state_intf = sig
 
   type transaction_snark_work
 
-  type ledger_undo
+  type transaction_with_info
+
+  type frozen_ledger_hash
 
   module Transaction_with_witness : sig
     (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
     type t =
-      { transaction_with_info: ledger_undo
+      { transaction_with_info: transaction_with_info
       ; statement: ledger_proof_statement
       ; witness: sparse_ledger }
   end
@@ -570,10 +572,12 @@ module type Transaction_snark_scan_state_intf = sig
   end
 
   module Available_job : sig
-    type t =
+    type t  
+    
+    (* =
       | Base of Transaction_with_witness.t
       | Merge of
-          Ledger_proof_with_sok_message.t * Ledger_proof_with_sok_message.t
+          Ledger_proof_with_sok_message.t * Ledger_proof_with_sok_message.t*)
   end
 
   val create : transaction_capacity_log_2:int -> t
@@ -581,10 +585,10 @@ module type Transaction_snark_scan_state_intf = sig
   val enqueue_transactions :
     t -> Transaction_with_witness.t list -> unit Or_error.t
 
-  val fill_snark_work :
+  val fill_in_transaction_snark_work :
        t
-    -> Ledger_proof_with_sok_message.t list
-    -> Ledger_proof_with_sok_message.t option Or_error.t
+    -> transaction_snark_work list
+    -> ledger_proof option Or_error.t
 
   val latest_ledger_proof : t -> Ledger_proof_with_sok_message.t option
 
@@ -604,12 +608,14 @@ module type Transaction_snark_scan_state_intf = sig
 
   val extract_from_job :
        Available_job.t
-    -> (transaction, ledger_proof * ledger_proof) Either.t Or_error.t
+    -> (transaction_with_info * ledger_proof_statement * sparse_ledger, ledger_proof * ledger_proof) Either.t
 
   val copy : t -> t
 
   val partition_if_overflowing :
     t -> max_slots:int -> [`One of int | `Two of int * int]
+
+  val statement_of_job : Available_job.t -> ledger_proof_statement option
 end
 
 module type Ledger_builder_base_intf = sig

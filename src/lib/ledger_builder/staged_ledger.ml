@@ -1,6 +1,6 @@
-(*[%%import
+[%%import
 "../../config.mlh"]
-*)
+
 open Core_kernel
 open Async_kernel
 open Protocols
@@ -352,14 +352,14 @@ end = struct
     let module A = TSS.Available_job in
     let module L = Ledger_proof_statement in
     let single_spec (job : job) =
-      match job with
-      | A.Base d ->
+      match TSS.extract_from_job job with
+      | First (transaction_with_info, statement, witness) ->
           let transaction =
-            Or_error.ok_exn @@ Ledger.Undo.transaction d.transaction_with_info
+            Or_error.ok_exn @@ Ledger.Undo.transaction transaction_with_info
           in
           Snark_work_lib.Work.Single.Spec.Transition
-            (d.statement, transaction, d.witness)
-      | A.Merge ((p1, _), (p2, _)) ->
+            (statement, transaction, witness)
+      | Second (p1, p2) ->
           let merged =
             Ledger_proof_statement.merge
               (Ledger_proof.statement p1)
@@ -496,7 +496,7 @@ end = struct
   let current_ledger_proof t =
     Option.map (TSS.latest_ledger_proof t.scan_state) ~f:fst
 
-  let statement_of_job : job -> Ledger_proof_statement.t option = function
+  (*let statement_of_job : job -> Ledger_proof_statement.t option = function
     | Base {statement; _} -> Some statement
     | Merge ((p1, _), (p2, _)) ->
         let stmt1 = Ledger_proof.statement p1
@@ -517,7 +517,7 @@ end = struct
         ; fee_excess
         ; proof_type= `Merge }
 
-  (*let completed_work_to_scanable_work (job : job) (fee, current_proof, prover)
+  let completed_work_to_scanable_work (job : job) (fee, current_proof, prover)
       : parallel_scan_completed_job Or_error.t =
     let sok_digest = Ledger_proof.sok_digest current_proof
     and proof = Ledger_proof.underlying_proof current_proof in
@@ -547,7 +547,7 @@ end = struct
           , Sok_message.create ~fee ~prover ) *)
 
   let verify ~message job proof =
-    match statement_of_job job with
+    match TSS.statement_of_job job with
     | None -> return false
     | Some statement ->
         Inputs.Ledger_proof_verifier.verify proof statement ~message
@@ -555,10 +555,9 @@ end = struct
   let total_proofs (works : Transaction_snark_work.t list) =
     List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
 
-  let fill_in_completed_work (_state : Aux.t)
-      (_works : Transaction_snark_work.t list) :
-      Ledger_proof.t option Or_error.t =
-    failwith "unimp"
+  let fill_in_completed_work (state : scan_state)
+      (works : Transaction_snark_work.t list) :
+      Ledger_proof.t option Or_error.t = TSS.fill_in_transaction_snark_work state works
 
   (*  let open Or_error.Let_syntax in
     let%bind next_jobs =
@@ -577,10 +576,8 @@ end = struct
     in
     Option.map result ~f:fst*)
 
-  let enqueue_data_with_rollback _state _data : unit Result_with_rollback.t =
-    failwith "unimp"
-
-  (*Result_with_rollback.of_or_error @@ Parallel_scan.enqueue_data ~state ~data *)
+  let enqueue_data_with_rollback state data : unit Result_with_rollback.t =
+    Result_with_rollback.of_or_error @@ TSS.enqueue_transactions state data
 
   let sum_fees xs ~f =
     with_return (fun {return} ->
@@ -995,7 +992,7 @@ end = struct
     let work_seq = TSS.next_jobs_sequence scan_state in
     sequence_chunks_of ~n:Transaction_snark_work.proofs_length
     @@ Sequence.map work_seq ~f:(fun maybe_work ->
-           match statement_of_job maybe_work with
+           match TSS.statement_of_job maybe_work with
            | None -> assert false
            | Some work -> work )
 
