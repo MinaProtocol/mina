@@ -2,7 +2,6 @@ open Core_kernel
 open Protocols.Coda_pow
 open Coda_base
 open Signature_lib
-open Async_kernel
 
 module Max_length = struct
   let length = 2160
@@ -96,12 +95,11 @@ struct
     type t = Ledger_builder.t
 
     let create ~transaction_snark_scan_state ~ledger =
-      Async.Thread_safe.block_on_async_exn (fun () ->
-          Ledger_builder.of_aux_and_ledger
-            ~snarked_ledger_hash:(failwith "TODO") ~ledger
-            ~aux:
-              (Transaction_snark_scan_state.to_ledger_aux
-                 transaction_snark_scan_state) )
+      Ledger_builder.of_aux_and_ledger ~snarked_ledger_hash:(failwith "TODO")
+        ~ledger
+        ~aux:
+          (Transaction_snark_scan_state.to_ledger_aux
+             transaction_snark_scan_state)
 
     let transaction_snark_scan_state t =
       Transaction_snark_scan_state.of_ledger_aux (Ledger_builder.aux t)
@@ -115,20 +113,18 @@ struct
       in
       let ledger = Ledger_builder.ledger t in
       let masked_ledger = derive_mask ledger in
-      Async.Thread_safe.block_on_async_exn (fun () ->
-          let open Deferred.Or_error.Let_syntax in
-          let%bind fresh_ledger_builder =
-            Deferred.return
-              (create
-                 ~transaction_snark_scan_state:(transaction_snark_scan_state t)
-                 ~ledger:masked_ledger)
-          in
-          let%map _output =
-            Ledger_builder.apply fresh_ledger_builder
-              (Transaction_snark_scan_state.Diff.to_ledger_builder_diff diff)
-              ~logger
-          in
-          fresh_ledger_builder )
+      let open Or_error.Let_syntax in
+      let%bind fresh_ledger_builder =
+        create
+          ~transaction_snark_scan_state:(transaction_snark_scan_state t)
+          ~ledger:masked_ledger
+      in
+      let%map _output =
+        Ledger_builder.apply fresh_ledger_builder
+          (Transaction_snark_scan_state.Diff.to_ledger_builder_diff diff)
+          ~logger
+      in
+      fresh_ledger_builder
   end
 
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
@@ -161,6 +157,7 @@ struct
     { root_snarked_ledger: Ledger.Db.t
     ; mutable root: State_hash.t
     ; mutable best_tip: State_hash.t
+    ; logger: Logger.t
     ; table: node State_hash.Table.t }
 
   (* TODO: load from and write to disk *)
@@ -209,7 +206,11 @@ struct
           {breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
         in
         let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
-        {root_snarked_ledger; root= root_hash; best_tip= root_hash; table}
+        { logger
+        ; root_snarked_ledger
+        ; root= root_hash
+        ; best_tip= root_hash
+        ; table }
 
   let find t hash =
     let open Option.Let_syntax in
@@ -307,7 +308,7 @@ struct
    *   4) set the new node as the best tip if the new node has a greater length than
    *      the current best tip
    *)
-  let add_transition_exn ~logger t transition_with_hash =
+  let add_transition_exn t transition_with_hash =
     let root_node = Hashtbl.find_exn t.table t.root in
     let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
     let transition = With_hash.data transition_with_hash in
@@ -324,7 +325,7 @@ struct
     in
     (* 1.a ; b *)
     let staged_ledger =
-      Staged_ledger.apply ~logger
+      Staged_ledger.apply ~logger:t.logger
         (Breadcrumb.staged_ledger parent_node.breadcrumb)
         (Transaction_snark_scan_state.Diff.of_ledger_builder_diff
            (External_transition.ledger_builder_diff transition))
