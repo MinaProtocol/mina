@@ -37,15 +37,12 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
 # Pull freshest repository
 RUN git -C /home/opam/opam-repository pull
 RUN opam update -y && opam upgrade -y
-# Install dune to get any external dependencies
-RUN opam depext -i dune
-# Uninstall dune, because we'll install a custom version
-RUN opam remove dune
 
 # Source copy of dune (modified to link rocksdb for test runners)
 ADD /src/external/ocaml-dune /ocaml-dune
 RUN cd /ocaml-dune && yes | opam pin add .
 
+# Install other OPAM packages
 ADD /src/opam.export .
 RUN opam switch import opam.export ; rm opam.export
 
