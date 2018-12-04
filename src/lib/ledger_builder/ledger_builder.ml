@@ -313,6 +313,8 @@ end = struct
 
     let hash t = Ledger_builder_aux_hash.of_bytes (hash_to_string t)
 
+    let empty ~parallelism_log_2 = Parallel_scan.start ~parallelism_log_2
+
     let create_expected_statement
         {Transaction_with_witness.transaction_with_info; witness; _} =
       let open Or_error.Let_syntax in
