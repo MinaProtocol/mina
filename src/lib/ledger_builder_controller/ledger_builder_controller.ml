@@ -414,6 +414,8 @@ let%test_module "test" =
             let hash t = t
 
             let is_valid _ = true
+
+            let empty ~parallelism_log_2:_ = 0
           end
 
           let serializable_of_t t = !t

@@ -50,7 +50,7 @@ module Make (Inputs : Inputs.S) :
                        ~timeout_duration:catchup_timeout_duration ~transition
                  | Some _ ->
                      ignore
-                       (Transition_frontier.add_transition_exn frontier
+                       (Transition_frontier.add_transition_exn ~logger frontier
                           transition) ;
                      Catchup_monitor.notify catchup_monitor ~time_controller
                        ~transition ) ) ))

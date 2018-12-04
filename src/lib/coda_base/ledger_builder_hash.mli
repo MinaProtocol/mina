@@ -3,9 +3,9 @@ open Fold_lib
 open Tuple_lib
 open Snark_params.Tick
 
-type t
+type t [@@deriving bin_io, sexp, eq, compare, hash]
 
-include Hashable.S with type t := t
+include Hashable_binable with type t := t
 
 type var
 
