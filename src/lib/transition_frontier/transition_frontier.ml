@@ -192,22 +192,28 @@ struct
         ~ledger:root_masked_ledger
     with
     | Error e -> failwith (Error.to_string_hum e)
-    | Ok pre_root_staged_ledger -> (
-      match
-        Staged_ledger.apply pre_root_staged_ledger root_staged_ledger_diff
-          ~logger
-      with
-      | Error e -> failwith (Error.to_string_hum e)
-      | Ok root_staged_ledger ->
-          let root_breadcrumb =
-            { Breadcrumb.transition_with_hash= root_transition
-            ; staged_ledger= root_staged_ledger }
-          in
-          let root_node =
-            {breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
-          in
-          let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
-          {root_snarked_ledger; root= root_hash; best_tip= root_hash; table} )
+    | Ok pre_root_staged_ledger ->
+
+    let root_staged_ledger =
+      match root_staged_ledger_diff with
+      | None -> pre_root_staged_ledger
+      | Some diff ->
+        (match
+          Staged_ledger.apply pre_root_staged_ledger diff
+            ~logger
+        with
+        | Error e -> failwith (Error.to_string_hum e)
+        | Ok root_staged_ledger -> root_staged_ledger)
+    in
+    let root_breadcrumb =
+      { Breadcrumb.transition_with_hash= root_transition
+      ; staged_ledger= root_staged_ledger }
+    in
+    let root_node =
+      {breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
+    in
+    let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
+    {root_snarked_ledger; root= root_hash; best_tip= root_hash; table}
 
   let find t hash =
     let open Option.Let_syntax in

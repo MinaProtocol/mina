@@ -39,7 +39,7 @@ module type Transition_frontier_intf = sig
        root_transition:(external_transition, state_hash) With_hash.t
     -> root_snarked_ledger:ledger_database
     -> root_transaction_snark_scan_state:Transaction_snark_scan_state.t
-    -> root_staged_ledger_diff:ledger_diff
+    -> root_staged_ledger_diff:ledger_diff option
     -> logger:Logger.t
     -> t
 
