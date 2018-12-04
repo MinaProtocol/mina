@@ -82,6 +82,8 @@ module type Inputs_intf = sig
      and type hash := State_hash.t
      and type syncable_ledger := Ledger.t
      and type transition_frontier := Transition_frontier.t
+     and type syncable_ledger_query := Syncable_ledger.query
+     and type syncable_ledger_answer := Syncable_ledger.answer
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -123,8 +125,7 @@ module Make (Inputs : Inputs_intf) :
                db ))
         ~root_transaction_snark_scan_state:
           Transition_frontier.Transaction_snark_scan_state.empty
-        ~root_staged_ledger_diff:None
-        ~logger
+        ~root_staged_ledger_diff:None ~logger
     in
     Transition_handler.Validator.run ~frontier ~transition_reader
       ~valid_transition_writer ;

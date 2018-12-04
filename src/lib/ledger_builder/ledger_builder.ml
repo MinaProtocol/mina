@@ -162,9 +162,9 @@ end) :
   [@@deriving sexp, bin_io]
 
   type t =
-      { pre_diffs: pre_diffs
-      ; prev_hash: Ledger_builder_hash.t
-      ; creator: Compressed_public_key.t }
+    { pre_diffs: pre_diffs
+    ; prev_hash: Ledger_builder_hash.t
+    ; creator: Compressed_public_key.t }
   [@@deriving sexp, bin_io]
 
   module With_valid_signatures_and_proofs = struct
