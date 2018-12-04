@@ -52,6 +52,7 @@ let merge ~height (h1 : t) (h2 : t) =
        Fold.(Digest.fold (h1 :> field) +> Digest.fold (h2 :> field)))
   |> of_hash
 
+(* TODO: @ihm cryptography review *)
 let empty_hash =
   Tick.Pedersen.digest_fold
     (Tick.Pedersen.State.create Tick.Pedersen.params)
