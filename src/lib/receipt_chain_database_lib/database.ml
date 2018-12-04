@@ -149,8 +149,8 @@ let%test_module "receipt_database" =
             ( Receipt_db.prove db ~proving_receipt ~resulting_receipt
             |> Or_error.ok_exn ) )
 
-    let%test_unit "There exists a valid proof if a path exists in a \
-                   tree of payments" =
+    let%test_unit "There exists a valid proof if a path exists in a tree of \
+                   payments" =
       Quickcheck.test
         ~sexp_of:[%sexp_of: Receipt_chain_hash.t * Payment.t * Payment.t list]
         Quickcheck.Generator.(
@@ -179,17 +179,17 @@ let%test_module "receipt_database" =
               ~f:(Fn.compose not (String.equal prev_receipt_chain))
             |> List.random_element_exn
           in
-          let merkle_list =
+          let proof =
             Receipt_db.prove db ~proving_receipt:initial_receipt_chain
               ~resulting_receipt:random_receipt_chain
             |> Or_error.ok_exn
           in
           assert (
-            Verifier.verify merkle_list ~resulting_receipt:random_receipt_chain
+            Verifier.verify proof ~resulting_receipt:random_receipt_chain
             |> Result.is_ok ) )
 
-    let%test_unit "A proof should not exist if a proving receipt does \
-                   not exist in the database" =
+    let%test_unit "A proof should not exist if a proving receipt does not \
+                   exist in the database" =
       Quickcheck.test
         ~sexp_of:[%sexp_of: Receipt_chain_hash.t * Payment.t * Payment.t list]
         Quickcheck.Generator.(

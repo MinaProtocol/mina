@@ -35,9 +35,9 @@ module type Database = sig
     -> proving_receipt:receipt_chain_hash
     -> resulting_receipt:receipt_chain_hash
     -> (receipt_chain_hash, payment) Payment_proof.t Or_error.t
-  (** Prove will provide a proof of a proving_receipt hash up to an underlying 
-      resulting_receipt hash. The proof will consist of a initial_receipt as
-      proving_receipt and a list of payments leading to resulting_receipt *)
+  (** Prove will provide a proof of a `proving_receipt` hash up to an underlying 
+      `resulting_receipt` hash. The proof will consist of an initial proving_receipt
+       and a list of payments leading to resulting_receipt *)
 
   val get_payment : t -> receipt:receipt_chain_hash -> payment option
 
