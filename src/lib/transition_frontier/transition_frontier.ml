@@ -79,7 +79,9 @@ module Make (Inputs : Inputs_intf) :
    and type masked_ledger := Ledger.Mask.Attached.t
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t =
 struct
-  type ledger_diff = Inputs.Staged_ledger_diff.t
+  open Inputs
+
+  type ledger_diff = Staged_ledger_diff.t
 
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
 
@@ -179,8 +181,9 @@ struct
         ; best_tip= root_hash
         ; table }
 
-  let all_breadcrumbs t =
-    List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb; _} -> breadcrumb)
+  let all_breadcrumbs t = List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb;_} -> breadcrumb)
+
+  let all_hashes t = List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb;_} -> Breadcrumb.hash breadcrumb)
 
   let find t hash =
     let open Option.Let_syntax in
@@ -254,15 +257,6 @@ struct
       {breadcrumb; successor_hashes= []; length= parent_node.length + 1}
     in
     attach_node_to t ~parent_node ~node
-
-  let _root_successor t parent_node =
-    let new_length = parent_node.length + 1 in
-    let root_node = Hashtbl.find_exn t.table t.root in
-    let root_hash = With_hash.hash root_node.breadcrumb.transition_with_hash in
-    let distance_to_root = new_length - root_node.length in
-    if distance_to_root > max_length then
-      `Changed_root (List.hd_exn (path t parent_node.breadcrumb))
-    else `Same_root root_hash
 
   (* Adding a transition to the transition frontier is broken into the following steps:
    *   1) create a new breadcrumb for a transition

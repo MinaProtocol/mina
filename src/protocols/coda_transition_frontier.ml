@@ -49,6 +49,8 @@ module type Transition_frontier_intf = sig
 
   val all_breadcrumbs : t -> Breadcrumb.t list
 
+  val all_hashes : t -> state_hash list
+
   val root : t -> Breadcrumb.t
 
   val best_tip : t -> Breadcrumb.t
@@ -70,7 +72,9 @@ module type Transition_frontier_intf = sig
   val attach_breadcrumb_exn : t -> Breadcrumb.t -> unit
 
   val add_transition_exn :
-    t -> (external_transition, state_hash) With_hash.t -> Breadcrumb.t
+       t
+    -> (external_transition, state_hash) With_hash.t
+    -> Breadcrumb.t
 end
 
 module type Catchup_intf = sig

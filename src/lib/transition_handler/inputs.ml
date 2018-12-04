@@ -3,7 +3,6 @@ open Coda_base
 
 module type S = sig
   module Time : Time_intf
-
   include Transition_frontier.Inputs_intf
 
   module State_proof :

@@ -59,28 +59,99 @@ end
 
 let%test_module "Transition_handler.Processor tests" = (module struct
   module Time = Coda_base.Block_time
-  module Proof = Coda_base.Proof
-  module Blockchain_state = Coda_base.Blockchain_state.Make (Genesis_ledger)
-  module Protocol_state = Coda_base.Protocol_state.Make (Blockchain_state) (Consensus.Mechanism.Consensus_state)
+  module Proof = struct
+    include Coda_base.Proof
+
+    let verify _ = failwith "stub"
+  end
+  module Ledger_proof = struct
+    type t = Transaction_snark.Statement.t * Coda_base.Sok_message.Digest.Stable.V1.t
+    [@@deriving sexp, bin_io]
+
+    type statement = Transaction_snark.Statement.t
+
+    let underlying_proof (_ : t) = Proof.dummy
+
+    let statement ((t, _) : t) : Transaction_snark.Statement.t = t
+
+    let statement_target (t : Transaction_snark.Statement.t) = t.target
+
+    let sok_digest (_, d) = d
+
+    let create ~statement ~sok_digest ~proof = (statement, sok_digest)
+  end
+  module Ledger_proof_statement = Transaction_snark.Statement
+  module Ledger_proof_verifier = struct
+    let verify _ = failwith "stub"
+  end
+  module Ledger_builder_aux_hash = struct
+    include Coda_base.Ledger_builder_hash.Aux_hash.Stable.V1
+    let of_bytes = Coda_base.Ledger_builder_hash.Aux_hash.of_bytes
+  end
+  module User_command = struct
+    include (
+      Coda_base.User_command :
+        module type of Coda_base.User_command
+        with module With_valid_signature := Coda_base.User_command.With_valid_signature )
+
+    let fee (t : t) = Payload.fee t.payload
+
+    let sender (t : t) = Signature_lib.Public_key.compress t.sender
+
+    let seed = Coda_base.Secure_random.string ()
+
+    let compare t1 t2 = Coda_base.User_command.Stable.V1.compare ~seed t1 t2
+
+    module With_valid_signature = struct
+      module T = struct
+        include Coda_base.User_command.With_valid_signature
+
+        let compare t1 t2 = Coda_base.User_command.With_valid_signature.compare ~seed t1 t2
+      end
+
+      include T
+      include Comparable.Make (T)
+    end
+  end
+  module Transaction = struct
+    module T = struct
+      type t = Coda_base.Transaction.t =
+        | User_command of User_command.With_valid_signature.t
+        | Fee_transfer of Coda_base.Fee_transfer.t
+        | Coinbase of Coda_base.Coinbase.t
+      [@@deriving compare, eq]
+    end
+
+    let fee_excess = Coda_base.Transaction.fee_excess
+
+    let supply_increase = Coda_base.Transaction.supply_increase
+
+    include T
+
+    include (
+      Coda_base.Transaction :
+        module type of Coda_base.Transaction with type t := t )
+  end
   module Completed_work = Ledger_builder.Make_completed_work
       (Signature_lib.Public_key.Compressed)
+      (Ledger_proof)
       (Ledger_proof_statement)
   module Ledger_builder_diff = Ledger_builder.Make_diff (struct
     module Ledger_hash = Coda_base.Ledger_hash
     module Ledger_proof = Ledger_proof
-    module Ledger_builder_aux_hash = Coda_base.Ledger_builder_hash.Aux_hash
+    module Ledger_builder_aux_hash = Ledger_builder_aux_hash
     module Ledger_builder_hash = Coda_base.Ledger_builder_hash
     module Compressed_public_key = Signature_lib.Public_key.Compressed
-    module User_command = Coda_base.User_command
+    module User_command = User_command
     module Completed_work = Completed_work
   end)
-  module External_transition = Coda_base.External_transition.Make (Ledger_builder_diff) (Protocol_state)
+  module External_transition = Coda_base.External_transition.Make (Ledger_builder_diff) (Consensus.Mechanism.Protocol_state)
   module Ledger_builder = Ledger_builder.Make (struct
     module Compressed_public_key = Signature_lib.Public_key.Compressed
-    module User_command = Coda_base.User_command
+    module User_command = User_command
     module Fee_transfer = Coda_base.Fee_transfer
     module Coinbase = Coda_base.Coinbase
-    module Transaction = Coda_base.Transaction
+    module Transaction = Transaction
     module Ledger_hash = Coda_base.Ledger_hash
     module Frozen_ledger_hash = Coda_base.Frozen_ledger_hash
     module Ledger_proof_statement = Ledger_proof_statement
@@ -91,7 +162,7 @@ let%test_module "Transition_handler.Processor tests" = (module struct
     module Account = Coda_base.Account
     module Ledger = Coda_base.Ledger
     module Sparse_ledger = Coda_base.Sparse_ledger
-    module Ledger_builder_aux_hash = Coda_base.Ledger_builder_hash.Aux_hash
+    module Ledger_builder_aux_hash = Ledger_builder_aux_hash
     module Ledger_builder_hash = Coda_base.Ledger_builder_hash
     module Completed_work = Completed_work
     module Ledger_builder_diff = Ledger_builder_diff
@@ -101,24 +172,29 @@ let%test_module "Transition_handler.Processor tests" = (module struct
 
     let check = failwith "stub"
   end)
-  module Transition_frontier = Transition_frontier.Make
-      (Ledger_builder_diff)
-      (External_transition)
-      (Ledger_builder)
+  module Transition_frontier = Transition_frontier.Make (struct
+    module Ledger_proof = Ledger_proof
+    module Completed_work = Completed_work
+    module Ledger_builder_diff = Ledger_builder_diff
+    module External_transition = External_transition 
+    module Ledger_builder = Ledger_builder
+  end)
   module Processor = Make (struct
     module Time = Time
-    module Consensus_mechanism = Consensus.Mechanism
+    module Ledger_proof = Ledger_proof
+    module Completed_work = Completed_work
+    module Ledger_builder_diff = Ledger_builder_diff
     module External_transition = External_transition
     module Proof = Proof
     module Transition_frontier = Transition_frontier
   end)
 
-  let gen_transition ~seed ~choice =
+  let gen_transition ~seed ~choice frontier =
     if choice then
       let parent_hash = 
-        Transition_frontier.hashes frontier
-        |> List.shuffle
-        |> List.head_exn
+        Transition_frontier.all_hashes frontier
+        |> List.permute
+        |> List.hd_exn
       in
       (`Exists, Quickcheck.random_value ~seed (External_transition.gen_with_parent parent_hash))
     else
@@ -146,7 +222,7 @@ let%test_module "Transition_handler.Processor tests" = (module struct
       don't_wait_for (Reader.iter_sync catchup_job_reader ~f:check_catchup_job);
 
       for i = 1 to test_size do
-        let (status, transition) = gen_transition ~seed ~choice:(Quickcheck.random_value ~seed Bool.gen) in
+        let (status, transition) = gen_transition ~seed ~choice:(Quickcheck.random_value ~seed Bool.gen) frontier in
         let hash = Protocol_state.hash (External_transition.protocol_state transition) in
         let transition_with_hash = With_hash.{hash; data= transition} in
         (match status with
