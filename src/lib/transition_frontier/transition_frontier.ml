@@ -364,7 +364,7 @@ let%test_module "Transition_frontier tests" =
     (* add a single random transition based off a random node *)
     let add_transition () =
       let base_hash = List.head_exn (List.shuffle (hashes t)) in
-      let trans = Quickcheck.random_value (External_transition.gen base_hash) in
+      let trans = Quickcheck.random_value ~seed:`Nondeterministic (External_transition.gen base_hash) in
       add_exn t trans
     in
 
