@@ -41,12 +41,13 @@ RUN opam update -y && opam upgrade -y
 RUN opam depext -i dune
 # Uninstall dune, because we'll install a custom version
 RUN opam remove dune
-ADD /src/opam.export .
-RUN opam switch import opam.export ; rm opam.export
 
 # Source copy of dune (modified to link rocksdb for test runners)
 ADD /src/external/ocaml-dune /ocaml-dune
 RUN cd /ocaml-dune && yes | opam pin add .
+
+ADD /src/opam.export .
+RUN opam switch import opam.export ; rm opam.export
 
 # Source copy of ocaml-sodium (modified for static linking)
 ADD /src/external/ocaml-sodium /ocaml-sodium
