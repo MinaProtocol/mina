@@ -9,120 +9,132 @@ module Max_length = struct
 end
 
 module Make
-  (Ledger_builder_diff : Ledger_builder_diff_intf
-    with type user_command := User_command.t
-    and  type user_command_with_valid_signature := User_command.With_valid_signature.t
-    and type ledger_builder_hash := Ledger_builder_hash.t
-    and type public_key := Public_key.Compressed.t)
-  (External_transition :
-      External_transition.S
-      with module Protocol_state = Consensus.Mechanism.Protocol_state
-       and module Ledger_builder_diff := Ledger_builder_diff)
-  (Ledger_builder :
-    Ledger_builder_intf
-    with type diff := Ledger_builder_diff.t
-     and type valid_diff :=
-                Ledger_builder_diff.With_valid_signatures_and_proofs.t
-     and type ledger_builder_hash := Ledger_builder_hash.t
-     and type ledger_hash := Ledger_hash.t
-     and type frozen_ledger_hash := Frozen_ledger_hash.t
-     and type public_key := Public_key.Compressed.t
-     and type ledger := Ledger.t
-     and type user_command_with_valid_signature :=
-                User_command.With_valid_signature.t)
-  = struct
-    (* Right now Transaction_snark_scan_state is not different from a
+    (Ledger_builder_diff : Ledger_builder_diff_intf
+                           with type user_command := User_command.t
+                            and type user_command_with_valid_signature :=
+                                       User_command.With_valid_signature.t
+                            and type ledger_builder_hash :=
+                                       Ledger_builder_hash.t
+                            and type public_key := Public_key.Compressed.t)
+    (External_transition : External_transition.S
+                           with module Protocol_state = Consensus.Mechanism
+                                                        .Protocol_state
+                            and module Ledger_builder_diff := Ledger_builder_diff)
+    (Ledger_builder : Ledger_builder_intf
+                      with type diff := Ledger_builder_diff.t
+                       and type valid_diff :=
+                                  Ledger_builder_diff
+                                  .With_valid_signatures_and_proofs
+                                  .t
+                       and type ledger_builder_hash := Ledger_builder_hash.t
+                       and type ledger_hash := Ledger_hash.t
+                       and type frozen_ledger_hash := Frozen_ledger_hash.t
+                       and type public_key := Public_key.Compressed.t
+                       and type ledger := Ledger.t
+                       and type user_command_with_valid_signature :=
+                                  User_command.With_valid_signature.t) =
+struct
+  (* Right now Transaction_snark_scan_state is not different from a
      * ledger-builder diff *)
-    module Transaction_snark_scan_state : sig
+  module Transaction_snark_scan_state : sig
+    type t
+
+    val to_ledger_aux : t -> Ledger_builder.Aux.t
+
+    val of_ledger_aux : Ledger_builder.Aux.t -> t
+
+    val empty : t
+
+    module Diff : sig
       type t
 
-      val to_ledger_aux : t -> Ledger_builder.Aux.t
-      val of_ledger_aux : Ledger_builder.Aux.t -> t
+      (* hack until Parallel_scan_state().Diff.t fully diverges from Ledger_builder_diff.t and is included in External_transition *)
+      val of_ledger_builder_diff : Ledger_builder_diff.t -> t
 
-      val empty : t
-
-      module Diff : sig
-        type t
-
-        (* hack until Parallel_scan_state().Diff.t fully diverges from Ledger_builder_diff.t and is included in External_transition *)
-        val of_ledger_builder_diff : Ledger_builder_diff.t -> t
-        val to_ledger_builder_diff : t -> Ledger_builder_diff.t
-      end
-    end = struct
-      type t = Ledger_builder.Aux.t
-
-      let of_ledger_aux = Fn.id
-      let to_ledger_aux = Fn.id
-
-      (* TODO: Don't hardcode parallelism_log_2 *)
-      let empty = Ledger_builder.Aux.empty ~parallelism_log_2:4
-
-      module Diff = struct
-        type nonrec t = Ledger_builder_diff.t
-
-        let of_ledger_builder_diff = Fn.id
-        let to_ledger_builder_diff = Fn.id
-      end
+      val to_ledger_builder_diff : t -> Ledger_builder_diff.t
     end
+  end = struct
+    type t = Ledger_builder.Aux.t
 
-    (* Right now, Staged_ledger is a thin wrapper over Ledger_builder *)
-    module Staged_ledger : sig
-      type t
+    let of_ledger_aux = Fn.id
 
-      val create :
-           transaction_snark_scan_state:Transaction_snark_scan_state.t
-        -> ledger:Ledger.Mask.Attached.t
-        -> t Or_error.t
+    let to_ledger_aux = Fn.id
 
-      val transaction_snark_scan_state : t -> Transaction_snark_scan_state.t
+    (* TODO: Don't hardcode parallelism_log_2 *)
+    let empty = Ledger_builder.Aux.empty ~parallelism_log_2:4
 
-      val ledger : t -> Ledger.Mask.Attached.t
+    module Diff = struct
+      type nonrec t = Ledger_builder_diff.t
 
-      val apply : t -> Transaction_snark_scan_state.Diff.t -> logger:Logger.t -> t Or_error.t
-    end = struct
-      (* TODO *)
+      let of_ledger_builder_diff = Fn.id
 
-      type t = Ledger_builder.t
+      let to_ledger_builder_diff = Fn.id
+    end
+  end
 
-      let create ~transaction_snark_scan_state ~ledger =
-        Async.Thread_safe.block_on_async_exn (fun () ->
+  (* Right now, Staged_ledger is a thin wrapper over Ledger_builder *)
+  module Staged_ledger : sig
+    type t
+
+    val create :
+         transaction_snark_scan_state:Transaction_snark_scan_state.t
+      -> ledger:Ledger.Mask.Attached.t
+      -> t Or_error.t
+
+    val transaction_snark_scan_state : t -> Transaction_snark_scan_state.t
+
+    val ledger : t -> Ledger.Mask.Attached.t
+
+    val apply :
+         t
+      -> Transaction_snark_scan_state.Diff.t
+      -> logger:Logger.t
+      -> t Or_error.t
+  end = struct
+    (* TODO *)
+
+    type t = Ledger_builder.t
+
+    let create ~transaction_snark_scan_state ~ledger =
+      Async.Thread_safe.block_on_async_exn (fun () ->
           Ledger_builder.of_aux_and_ledger
-            ~snarked_ledger_hash:(failwith "TODO")
-            ~ledger
-            ~aux:(Transaction_snark_scan_state.to_ledger_aux transaction_snark_scan_state)
-        )
+            ~snarked_ledger_hash:(failwith "TODO") ~ledger
+            ~aux:
+              (Transaction_snark_scan_state.to_ledger_aux
+                 transaction_snark_scan_state) )
 
-      let transaction_snark_scan_state t =
-        Transaction_snark_scan_state.of_ledger_aux (Ledger_builder.aux t)
+    let transaction_snark_scan_state t =
+      Transaction_snark_scan_state.of_ledger_aux (Ledger_builder.aux t)
 
-      let ledger t =
-        Ledger_builder.ledger t
+    let ledger t = Ledger_builder.ledger t
 
-      let apply t diff ~logger =
-        let derive_mask ledger =
-          let mask = Ledger.Mask.create () in
-          Ledger.register_mask ledger mask
-        in
-        let ledger = Ledger_builder.ledger t in
-        let masked_ledger = derive_mask ledger in
-        Async.Thread_safe.block_on_async_exn (fun () ->
+    let apply t diff ~logger =
+      let derive_mask ledger =
+        let mask = Ledger.Mask.create () in
+        Ledger.register_mask ledger mask
+      in
+      let ledger = Ledger_builder.ledger t in
+      let masked_ledger = derive_mask ledger in
+      Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Or_error.Let_syntax in
           let%bind fresh_ledger_builder =
             Deferred.return
               (create
-                ~transaction_snark_scan_state:(transaction_snark_scan_state t)
-                ~ledger:masked_ledger)
+                 ~transaction_snark_scan_state:(transaction_snark_scan_state t)
+                 ~ledger:masked_ledger)
           in
-          let%map _output = Ledger_builder.apply fresh_ledger_builder (Transaction_snark_scan_state.Diff.to_ledger_builder_diff diff) ~logger in
-          fresh_ledger_builder
-        )
-    end
+          let%map _output =
+            Ledger_builder.apply fresh_ledger_builder
+              (Transaction_snark_scan_state.Diff.to_ledger_builder_diff diff)
+              ~logger
+          in
+          fresh_ledger_builder )
+  end
 
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
 
   exception
-    Parent_not_found of
-      ([`Parent of State_hash.t] * [`Target of State_hash.t])
+    Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
 
   exception Already_exists of State_hash.t
 
@@ -130,8 +142,7 @@ module Make
 
   module Breadcrumb = struct
     type t =
-      { transition_with_hash:
-          (External_transition.t, State_hash.t) With_hash.t
+      { transition_with_hash: (External_transition.t, State_hash.t) With_hash.t
       ; staged_ledger: Staged_ledger.t }
     [@@deriving fields]
 
@@ -139,13 +150,12 @@ module Make
 
     let parent_hash {transition_with_hash; _} =
       Consensus.Mechanism.Protocol_state.previous_state_hash
-        (External_transition.protocol_state (With_hash.data transition_with_hash))
+        (External_transition.protocol_state
+           (With_hash.data transition_with_hash))
   end
 
   type node =
-    { breadcrumb: Breadcrumb.t
-    ; successor_hashes: State_hash.t list
-    ; length: int }
+    {breadcrumb: Breadcrumb.t; successor_hashes: State_hash.t list; length: int}
 
   type t =
     { root_snarked_ledger: Ledger.Db.t
@@ -154,8 +164,8 @@ module Make
     ; table: node State_hash.Table.t }
 
   (* TODO: load from and write to disk *)
-  let create ~root_transition ~root_snarked_ledger
-      ~root_transaction_snark_scan_state ~root_staged_ledger_diff ~logger =
+  let create ~logger ~root_transition ~root_snarked_ledger
+      ~root_transaction_snark_scan_state ~root_staged_ledger_diff =
     let root_hash = With_hash.hash root_transition in
     let root_protocol_state =
       External_transition.protocol_state (With_hash.data root_transition)
@@ -169,7 +179,6 @@ module Make
         (Frozen_ledger_hash.to_ledger_hash
            (Consensus.Mechanism.Protocol_state.Blockchain_state.ledger_hash
               root_blockchain_state)) ) ;
-
     let root_masked_ledger = Ledger.of_database root_snarked_ledger in
     assert (
       Ledger_hash.equal
@@ -178,30 +187,27 @@ module Make
            (Consensus.Mechanism.Protocol_state.Blockchain_state
             .ledger_builder_hash root_blockchain_state)) ) ;
     match
-      (Staged_ledger.create
-          ~transaction_snark_scan_state:root_transaction_snark_scan_state
-          ~ledger:root_masked_ledger)
+      Staged_ledger.create
+        ~transaction_snark_scan_state:root_transaction_snark_scan_state
+        ~ledger:root_masked_ledger
     with
     | Error e -> failwith (Error.to_string_hum e)
-    | Ok pre_root_staged_ledger ->
-
-    match
-      Staged_ledger.apply pre_root_staged_ledger root_staged_ledger_diff
-        ~logger
-    with
-    | Error e -> failwith (Error.to_string_hum e)
-    | Ok root_staged_ledger ->
-    let root_breadcrumb =
-      { Breadcrumb.transition_with_hash= root_transition
-      ; staged_ledger= root_staged_ledger }
-    in
-    let root_node =
-      {breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
-    in
-    let table =
-      State_hash.Table.of_alist_exn [(root_hash, root_node)]
-    in
-    {root_snarked_ledger; root= root_hash; best_tip= root_hash; table}
+    | Ok pre_root_staged_ledger -> (
+      match
+        Staged_ledger.apply pre_root_staged_ledger root_staged_ledger_diff
+          ~logger
+      with
+      | Error e -> failwith (Error.to_string_hum e)
+      | Ok root_staged_ledger ->
+          let root_breadcrumb =
+            { Breadcrumb.transition_with_hash= root_transition
+            ; staged_ledger= root_staged_ledger }
+          in
+          let root_node =
+            {breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
+          in
+          let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
+          {root_snarked_ledger; root= root_hash; best_tip= root_hash; table} )
 
   let find t hash =
     let open Option.Let_syntax in
@@ -242,14 +248,53 @@ module Make
     List.bind (successors t breadcrumb) ~f:(fun succ ->
         succ :: successors_rec t succ )
 
+  let attach_node_to t ~parent_node ~node =
+    let hash = Breadcrumb.hash node.breadcrumb in
+    if
+      not
+        (State_hash.equal
+           (Breadcrumb.hash parent_node.breadcrumb)
+           (Breadcrumb.parent_hash node.breadcrumb))
+    then
+      failwith
+        "invalid call to attach_to: hash parent_node <> parent_hash node" ;
+    if
+      Hashtbl.add t.table ~key:(Breadcrumb.hash node.breadcrumb) ~data:node
+      <> `Ok
+    then Error.raise (Error.of_exn (Already_exists hash)) ;
+    Hashtbl.set t.table
+      ~key:(Breadcrumb.hash parent_node.breadcrumb)
+      ~data:
+        { parent_node with
+          successor_hashes= hash :: parent_node.successor_hashes }
+
+  let attach_breadcrumb_exn t breadcrumb =
+    let hash = Breadcrumb.hash breadcrumb in
+    let parent_hash = Breadcrumb.parent_hash breadcrumb in
+    let parent_node =
+      Option.value_exn
+        (Hashtbl.find t.table parent_hash)
+        ~error:
+          (Error.of_exn (Parent_not_found (`Parent parent_hash, `Target hash)))
+    in
+    let node =
+      {breadcrumb; successor_hashes= []; length= parent_node.length + 1}
+    in
+    attach_node_to t ~parent_node ~node
+
+  let root_successor t parent_node =
+    let new_length = parent_node.length + 1 in
+    let root_node = Hashtbl.find_exn t.table t.root in
+    let root_hash = With_hash.hash root_node.breadcrumb.transition_with_hash in
+    let distance_to_root = new_length - root_node.length in
+    if distance_to_root > max_length then
+      `Changed_root (List.hd_exn (path t parent_node.breadcrumb))
+    else `Same_root root_hash
+
   (* Adding a transition to the transition frontier is broken into the following steps:
-   *   1) create a new node for a transition
-   *     a) derive a new mask from the parent mask
-   *     b) apply the ledger builder diff to the new mask
-   *     c) form the breadcrumb and node records
-   *   2) add the node to the table
-   *   3) add the successor_hashes entry to the parent node
-   *   4) move the root if the path to the new node is longer than the max length
+   *   1) create a new breadcrumb for a transition
+   *   2) attach the breadcrumb to the transition frontier
+   *   3) move the root if the path to the new node is longer than the max length
    *     a) calculate the distance from the new node to the parent
    *     b) if the distance is greater than the max length:
    *       I  ) find the immediate successor of the old root in the path to the
@@ -257,10 +302,10 @@ module Make
    *       II ) find all successors of the other immediate successors of the old root
    *       III) remove the old root and all of the nodes found in (II) from the table
    *       IV ) merge the old root's merkle mask into the root ledger
-   *   5) set the new node as the best tip if the new node has a greater length than
+   *   4) set the new node as the best tip if the new node has a greater length than
    *      the current best tip
    *)
-  let add_exn t transition_with_hash ~logger =
+  let add_transition_exn ~logger t transition_with_hash =
     let root_node = Hashtbl.find_exn t.table t.root in
     let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
     let transition = With_hash.data transition_with_hash in
@@ -277,49 +322,38 @@ module Make
     in
     (* 1.a ; b *)
     let staged_ledger =
-      Staged_ledger.apply
-          ~logger
+      Staged_ledger.apply ~logger
         (Breadcrumb.staged_ledger parent_node.breadcrumb)
         (Transaction_snark_scan_state.Diff.of_ledger_builder_diff
            (External_transition.ledger_builder_diff transition))
       |> Or_error.ok_exn
     in
-    (* 1.c *)
-    let node =
-      { breadcrumb= {Breadcrumb.transition_with_hash; staged_ledger}
-      ; successor_hashes= []
-      ; length= parent_node.length + 1 }
-    in
+    let breadcrumb = {Breadcrumb.transition_with_hash; staged_ledger} in
     (* 2 *)
-    if Hashtbl.add t.table ~key:hash ~data:node <> `Ok then
-      Error.raise (Error.of_exn (Already_exists hash)) ;
-    (* 3 *)
-    Hashtbl.set t.table ~key:parent_hash
-      ~data:
-        {parent_node with successor_hashes= hash :: parent_node.successor_hashes} ;
-    (* 4.a *)
+    attach_breadcrumb_exn t breadcrumb ;
+    let node = Hashtbl.find_exn t.table hash in
+    (* 3.a *)
     let distance_to_parent = root_node.length - node.length in
-    (* 4.b *)
+    (* 3.b *)
     if distance_to_parent > max_length then (
-      (* 4.b.I *)
+      (* 3.b.I *)
       let new_root_hash = List.hd_exn (path t node.breadcrumb) in
-      (* 4.b.II *)
+      (* 3.b.II *)
       let garbage_immediate_successors =
         List.filter root_node.successor_hashes ~f:(fun succ_hash ->
             not (State_hash.equal succ_hash new_root_hash) )
       in
-      (* 4.b.III *)
+      (* 3.b.III *)
       let garbage =
         t.root
         :: List.bind garbage_immediate_successors ~f:(successor_hashes_rec t)
       in
       t.root <- new_root_hash ;
       List.iter garbage ~f:(Hashtbl.remove t.table) ;
-      (* 4.b.IV *)
+      (* 3.b.IV *)
       Ledger.Mask.Attached.commit
-        (Staged_ledger.ledger
-           (Breadcrumb.staged_ledger root_node.breadcrumb)) ) ;
-    (* 5 *)
+        (Staged_ledger.ledger (Breadcrumb.staged_ledger root_node.breadcrumb)) ) ;
+    (* 4 *)
     if node.length > best_tip_node.length then t.best_tip <- hash ;
     node.breadcrumb
 end

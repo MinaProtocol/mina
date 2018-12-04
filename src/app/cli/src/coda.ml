@@ -413,7 +413,8 @@ let coda_commands log =
   [ (Parallel.worker_command_name, Parallel.worker_command)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
   ; ("daemon", daemon log)
-  ; ("client", Client.command) ]
+  ; ("client", Client.command)
+  ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
 
 [%%if
 integration_tests]

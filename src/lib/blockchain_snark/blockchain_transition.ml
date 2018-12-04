@@ -260,3 +260,21 @@ struct
       (location, t, checksum)
   end
 end
+
+let constraint_system_digests () =
+  let module M =
+    Make
+      (Consensus.Mechanism)
+      (Transaction_snark.Verification.Make (struct
+        let keys = Transaction_snark.Keys.Verification.dummy
+      end))
+  in
+  let module W = M.Wrap_base (struct
+    let verification_key = Dummy_values.Tick.verification_key
+  end) in
+  let digest = Tick.R1CS_constraint_system.digest in
+  let digest' = Tock.R1CS_constraint_system.digest in
+  [ ( "blockchain-step"
+    , digest M.Step_base.(Tick.constraint_system ~exposing:(input ()) main) )
+  ; ("blockchain-wrap", digest' W.(Tock.constraint_system ~exposing:input main))
+  ]

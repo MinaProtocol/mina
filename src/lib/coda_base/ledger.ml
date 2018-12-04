@@ -113,8 +113,7 @@ let of_database db =
 (* Mask.Attached.create () fails, can't create an attached mask directly
    shadow create in order to create an attached mask
 *)
-let create ?directory_name () =
-  of_database (Db.create ?directory_name ())
+let create ?directory_name () = of_database (Db.create ?directory_name ())
 
 let with_ledger ~f =
   let ledger = create () in

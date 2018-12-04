@@ -164,9 +164,9 @@ end) :
   type t =
     | Empty
     | Not_empty of
-      { pre_diffs: pre_diffs
-      ; prev_hash: Ledger_builder_hash.t
-      ; creator: Compressed_public_key.t }
+        { pre_diffs: pre_diffs
+        ; prev_hash: Ledger_builder_hash.t
+        ; creator: Compressed_public_key.t }
   [@@deriving sexp, bin_io]
 
   module With_valid_signatures_and_proofs = struct
@@ -315,8 +315,7 @@ end = struct
 
     let hash t = Ledger_builder_aux_hash.of_bytes (hash_to_string t)
 
-    let empty ~parallelism_log_2 =
-      Parallel_scan.start ~parallelism_log_2
+    let empty ~parallelism_log_2 = Parallel_scan.start ~parallelism_log_2
 
     let create_expected_statement
         {Transaction_with_witness.transaction_with_info; witness; _} =
@@ -692,7 +691,6 @@ end = struct
     { scan_state=
         Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 1)
     ; ledger }
-
 
   let current_ledger_proof t =
     Option.map (Parallel_scan.last_emitted_value t.scan_state) ~f:fst
