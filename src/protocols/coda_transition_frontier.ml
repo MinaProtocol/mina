@@ -36,6 +36,7 @@ module type Transition_frontier_intf = sig
     -> root_snarked_ledger:ledger_database
     -> root_transaction_snark_scan_state:transaction_snark_scan_state
     -> root_staged_ledger_diff:ledger_diff
+    -> logger:Logger.t
     -> t
 
   val root : t -> Breadcrumb.t
@@ -59,7 +60,7 @@ module type Transition_frontier_intf = sig
   val iter : t -> f:(Breadcrumb.t -> unit) -> unit
 
   val add_exn :
-    t -> (external_transition, state_hash) With_hash.t -> Breadcrumb.t
+    t -> logger:Logger.t -> (external_transition, state_hash) With_hash.t -> Breadcrumb.t
 end
 
 module type Catchup_intf = sig

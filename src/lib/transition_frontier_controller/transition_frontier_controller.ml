@@ -62,52 +62,11 @@ module type Inputs_intf = sig
     val commit : t -> unit
   end
 
-  module Ledger_database : sig
-    include
-      Merkle_ledger.Database_intf.S
-      with module Location = Location
-       and module Addr = Location.Addr
-       and type account := Account.t
-       and type root_hash := Ledger_hash.t
-       and type hash := Ledger_hash.t
-       and type key := Key.t
-
-    val derive : t -> Ledger_mask.t
-
-    (* TODO: should be Any_base.t *)
-    val of_ledger : Ledger.t -> t
-  end
-
-  module Transaction_snark_scan_state : sig
-    type t
-
-    val empty : t
-
-    module Diff : sig
-      type t
-
-      (* hack until Parallel_scan_state().Diff.t fully diverges from Ledger_builder_diff.t and is included in External_transition *)
-      val of_ledger_builder_diff : Ledger_builder_diff.t -> t
-    end
-  end
-
-  module Staged_ledger : sig
-    type t
-
-    val create :
-         transaction_snark_scan_state:Transaction_snark_scan_state.t
-      -> ledger_mask:Ledger_mask.t
-      -> t
-
-    val apply : t -> Transaction_snark_scan_state.Diff.t -> t Or_error.t
-  end
-
   module Transition_frontier :
     Transition_frontier_intf
     with type external_transition := External_transition.t
      and type state_hash := State_hash.t
-     and type ledger_database := Ledger_database.t
-     and type transaction_snark_scan_state := Transaction_snark_scan_state.t
+     and type ledger_database := Ledger.Db.t
      and type ledger_diff := Ledger_diff.t
      and type staged_ledger := Staged_ledger.t
 
@@ -152,7 +111,7 @@ module Make (Inputs : Inputs_intf) :
   open Consensus_mechanism
 
   let run ~genesis_transition ~transition_reader ~sync_query_reader
-      ~sync_answer_writer =
+      ~sync_answer_writer ~logger =
     let valid_transition_reader, valid_transition_writer =
       Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
     in
@@ -167,9 +126,10 @@ module Make (Inputs : Inputs_intf) :
              ~hash_data:
                (Fn.compose Protocol_state.hash
                   External_transition.protocol_state))
-        ~root_snarked_ledger:(Ledger_database.of_ledger Genesis_ledger.t)
+        ~root_snarked_ledger:(Ledger.Db.of_ledger Genesis_ledger.t)
         ~root_transaction_snark_scan_state:Transaction_snark_scan_state.empty
         ~root_staged_ledger_diff:Ledger_diff.empty
+        ~logger
     in
     Transition_handler.Validator.run ~transition_reader
       ~valid_transition_writer ;

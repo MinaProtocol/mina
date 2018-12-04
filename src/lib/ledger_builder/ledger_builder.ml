@@ -688,6 +688,7 @@ end = struct
         Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 1)
     ; ledger }
 
+
   let current_ledger_proof t =
     Option.map (Parallel_scan.last_emitted_value t.scan_state) ~f:fst
 

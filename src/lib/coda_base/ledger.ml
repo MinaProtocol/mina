@@ -105,6 +105,17 @@ let create ?directory_name () =
   let mask = Mask.create () in
   Maskable.register_mask casted mask
 
+let of_database db =
+  let casted = Any_ledger.cast (module Db) db in
+  let mask = Mask.create () in
+  Maskable.register_mask casted mask
+
+(* Mask.Attached.create () fails, can't create an attached mask directly
+   shadow create in order to create an attached mask
+*)
+let create ?directory_name () =
+  of_database (Db.create ?directory_name ())
+
 let with_ledger ~f =
   let ledger = create () in
   try
