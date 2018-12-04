@@ -107,7 +107,7 @@ let prove_payment =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
       (required public_key)
   in
-  Command.async ~summary:"Generate a proof of a payment as a merkle list"
+  Command.async ~summary:"Generate a proof of a payment"
     (Cli_lib.Background_daemon.init (Args.zip2 receipt_hash_flag address_flag)
        ~f:(fun port (receipt_chain_hash, pk) ->
          dispatch_with_message Prove_receipt.rpc
@@ -141,7 +141,7 @@ let verify_payment =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
       (required public_key)
   in
-  Command.async ~summary:"Generate a proof of a payment as a merkle list"
+  Command.async ~summary:"Verify a proof of a sent payment"
     (Cli_lib.Background_daemon.init
        (Args.zip3 payment_path_flag proof_path_flag address_flag)
        ~f:(fun port (payment_path, proof_path, pk) ->

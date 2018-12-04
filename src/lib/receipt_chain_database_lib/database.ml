@@ -19,7 +19,7 @@ module Make
   let prove t ~proving_receipt ~resulting_receipt =
     let open Or_error.Let_syntax in
     let rec parent_traversal start_receipt last_receipt :
-        (Receipt_chain_hash.t * Payment.t) list Or_error.t =
+        Payment.t list Or_error.t =
       match%bind
         Key_value_db.get t ~key:last_receipt
         |> Result.of_option
@@ -35,13 +35,13 @@ module Make
             last_receipt
       | Child {value; parent; _} ->
           if Receipt_chain_hash.equal start_receipt last_receipt then
-            Or_error.return [(start_receipt, value)]
+            Or_error.return [value]
           else
             let%map subresult = parent_traversal start_receipt parent in
-            (last_receipt, value) :: subresult
+            value :: subresult
     in
     let%map result = parent_traversal proving_receipt resulting_receipt in
-    List.rev result
+    {Payment_proof.initial_receipt= proving_receipt; payments= List.rev result}
 
   let get_payment t ~receipt =
     Key_value_db.get t ~key:receipt
@@ -117,38 +117,39 @@ let%test_module "receipt_database" =
       |> ignore
 
     let%test_unit "Recording a sequence of payments can generate a valid \
-                   merkle list from the first payment to the last payment" =
+                   proof from the first payment to the last payment" =
       Quickcheck.test
         ~sexp_of:[%sexp_of: Receipt_chain_hash.t * Payment.t list]
         Quickcheck.Generator.(
           tuple2 Receipt_chain_hash.gen (list_non_empty Payment.gen))
         ~f:(fun (initial_receipt_chain, payments) ->
           let db = Receipt_db.create ~directory:"" in
-          let _, expected_merkle_path =
+          let resulting_receipt, expected_merkle_path =
             List.fold_map payments ~init:initial_receipt_chain
               ~f:(fun prev_receipt_chain payment ->
                 match
                   Receipt_db.add db ~previous:prev_receipt_chain payment
                 with
-                | `Ok new_receipt_chain ->
-                    (new_receipt_chain, (new_receipt_chain, payment))
+                | `Ok new_receipt_chain -> (new_receipt_chain, payment)
                 | `Duplicate _ ->
                     failwith
                       "Each receipt chain in a sequence should be unique"
                 | `Error_multiple_previous_receipts _ ->
                     failwith "We should not have multiple previous receipts" )
           in
-          let (proving_receipt, _), (resulting_receipt, _) =
-            ( List.hd_exn expected_merkle_path
-            , List.last_exn expected_merkle_path )
+          let proving_receipt =
+            Receipt_chain_hash.cons (List.hd_exn payments)
+              initial_receipt_chain
           in
-          [%test_result: (Receipt_chain_hash.t * Payment.t) List.t]
-            ~message:"Merkle paths should be equal"
-            ~expect:expected_merkle_path
+          [%test_result: (Receipt_chain_hash.t, Payment.t) Payment_proof.t]
+            ~message:"Proofs should be equal"
+            ~expect:
+              { Payment_proof.initial_receipt= proving_receipt
+              ; payments= expected_merkle_path }
             ( Receipt_db.prove db ~proving_receipt ~resulting_receipt
             |> Or_error.ok_exn ) )
 
-    let%test_unit "There exists a valid merkle list if a path exists in a \
+    let%test_unit "There exists a valid proof if a path exists in a \
                    tree of payments" =
       Quickcheck.test
         ~sexp_of:[%sexp_of: Receipt_chain_hash.t * Payment.t * Payment.t list]
@@ -187,7 +188,7 @@ let%test_module "receipt_database" =
             Verifier.verify merkle_list ~resulting_receipt:random_receipt_chain
             |> Result.is_ok ) )
 
-    let%test_unit "A merkle list should not exist if a proving receipt does \
+    let%test_unit "A proof should not exist if a proving receipt does \
                    not exist in the database" =
       Quickcheck.test
         ~sexp_of:[%sexp_of: Receipt_chain_hash.t * Payment.t * Payment.t list]

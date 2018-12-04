@@ -3,18 +3,18 @@ open Core_kernel
 (** Receipt_chain_database is a data structure that stores a client's 
     payments and their corresponding receipt_chain_hash. A client 
     uses this database to prove that they sent a payment by showing 
-    a verifier a Merkle list of their receipt chain from their latest 
+    a verifier a Merkle list of their payment from their latest 
     payment to the payment that they are trying to prove.
     
     Each account has a receipt_chain_hash field, which is a certificate 
     of all the payments that an account has send. If an account has 
-    send payments t_n ... t_1 and p_n ... p_1 is the hash of the 
+    send payments p_n ... p_1 and h_n ... h_1 is the hash of the 
     payload of these payments, then the receipt_chain_hash, $r_n$, 
     is equal to the following:
     
-    $$ r_n = h(p_n, h(p_{n - 1}, ...)) $$
+    $$ r_n = H(h_n, H(h_{n - 1}, ...)) $$
     
-    where h is the hash function that determines the receipt_chain_hash 
+    where H is the hash function that determines the receipt_chain_hash 
     that takes as input the hash of a payment payload and it's 
     preceding receipt_chain_hash.
   
@@ -34,12 +34,10 @@ module type Database = sig
        t
     -> proving_receipt:receipt_chain_hash
     -> resulting_receipt:receipt_chain_hash
-    -> (receipt_chain_hash * payment) list Or_error.t
-  (** Prove will provide a merkle list of a proving receipt h_1 and 
-      it's corresponding payment t_1 to a resulting_receipt r_k 
-      and it's corresponding payment r_k, inclusively. Therefore, 
-      the output will be in the form of [(t_1, r_1), ... (t_k, r_k)],
-      where r_i = h(r_{i-1}, i_k) for i = 2...k *)
+    -> (receipt_chain_hash, payment) Payment_proof.t Or_error.t
+  (** Prove will provide a proof of a proving_receipt hash up to an underlying 
+      resulting_receipt hash. The proof will consist of a initial_receipt as
+      proving_receipt and a list of payments leading to resulting_receipt *)
 
   val get_payment : t -> receipt:receipt_chain_hash -> payment option
 
@@ -63,7 +61,7 @@ module type Verifier = sig
 
   val verify :
        resulting_receipt:receipt_chain_hash
-    -> (receipt_chain_hash * payment) list
+    -> (receipt_chain_hash, payment) Payment_proof.t
     -> unit Or_error.t
 end
 
