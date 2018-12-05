@@ -34,7 +34,8 @@ end) :
    and type staged_ledger_hash := Inputs.Staged_ledger_hash.t
    and type public_key := Inputs.Compressed_public_key.t
    and type completed_work := Inputs.Transaction_snark_work.t
-   and type completed_work_checked := Inputs.Transaction_snark_work.Checked.t = struct
+   and type completed_work_checked := Inputs.Transaction_snark_work.Checked.t =
+struct
   open Inputs
 
   module At_most_two = struct
@@ -62,7 +63,8 @@ end) :
   end
 
   type diff =
-    {completed_works: Transaction_snark_work.t list; user_commands: User_command.t list}
+    { completed_works: Transaction_snark_work.t list
+    ; user_commands: User_command.t list }
   [@@deriving sexp, bin_io]
 
   type diff_with_at_most_two_coinbase =
@@ -93,12 +95,14 @@ end) :
 
     type diff_with_at_most_two_coinbase =
       { diff: diff
-      ; coinbase_parts: Inputs.Transaction_snark_work.Checked.t At_most_two.t }
+      ; coinbase_parts: Inputs.Transaction_snark_work.Checked.t At_most_two.t
+      }
     [@@deriving sexp]
 
     type diff_with_at_most_one_coinbase =
       { diff: diff
-      ; coinbase_added: Inputs.Transaction_snark_work.Checked.t At_most_one.t }
+      ; coinbase_added: Inputs.Transaction_snark_work.Checked.t At_most_one.t
+      }
     [@@deriving sexp]
 
     type pre_diffs =

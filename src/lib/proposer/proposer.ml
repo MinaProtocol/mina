@@ -91,7 +91,8 @@ module Make (Inputs : Inputs_intf) :
    and type protocol_state := Inputs.Consensus_mechanism.Protocol_state.value
    and type protocol_state_proof := Inputs.Protocol_state_proof.t
    and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
-   and type completed_work_statement := Inputs.Transaction_snark_work.Statement.t
+   and type completed_work_statement :=
+              Inputs.Transaction_snark_work.Statement.t
    and type completed_work_checked := Inputs.Transaction_snark_work.Checked.t
    and type time_controller := Inputs.Time.Controller.t
    and type keypair := Inputs.Keypair.t = struct

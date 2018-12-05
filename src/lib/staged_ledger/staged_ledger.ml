@@ -1147,8 +1147,7 @@ end = struct
       match
         two_prediffs logger ws_seq ts_seq get_completed_work ledger self (x, y)
       with
-      | First res ->
-          First (make_diff_with_one res)
+      | First res -> First (make_diff_with_one res)
       | Second (res1, res2) ->
           Second (make_diff_with_two res1, make_diff_with_one res2) )
 
@@ -1521,8 +1520,8 @@ let%test_module "test" =
 
         let aux_hash _ = failwith "stub"
 
-        let of_aux_and_ledger_hash :
-            staged_ledger_aux_hash -> ledger_hash -> t =
+        let of_aux_and_ledger_hash : staged_ledger_aux_hash -> ledger_hash -> t
+            =
          fun ah h -> ah ^ h
       end
 

@@ -497,7 +497,8 @@ struct
               Deferred.List.for_all ps ~f:(fun (proof, stmt) ->
                   Transaction_snark.verify ~message proof stmt )
             in
-            Option.some_if good (Transaction_snark_work.Checked.create_unsafe t)
+            Option.some_if good
+              (Transaction_snark_work.Checked.create_unsafe t)
     end
 
     include Staged_ledger.Make (Inputs)
@@ -832,7 +833,9 @@ struct
       type t = Transaction_snark_work.Checked.t
 
       let fee t =
-        let {Transaction_snark_work.fee; _} = Transaction_snark_work.forget t in
+        let {Transaction_snark_work.fee; _} =
+          Transaction_snark_work.forget t
+        in
         fee
     end
   end

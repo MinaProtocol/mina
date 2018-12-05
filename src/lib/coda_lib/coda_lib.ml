@@ -88,9 +88,9 @@ module type Network_intf = sig
   val create :
        Config.t
     -> get_staged_ledger_aux_at_hash:(   staged_ledger_hash
-                                       -> (parallel_scan_state * ledger_hash)
-                                          option
-                                          Deferred.t)
+                                      -> (parallel_scan_state * ledger_hash)
+                                         option
+                                         Deferred.t)
     -> answer_sync_ledger_query:(   ledger_hash * sync_ledger_query
                                  -> (ledger_hash * sync_ledger_answer)
                                     Deferred.Or_error.t)
@@ -301,8 +301,7 @@ module type State_with_witness_intf = sig
   [@@deriving sexp]
 
   module Stripped : sig
-    type t =
-      {staged_ledger_transition: staged_ledger_transition; state: state}
+    type t = {staged_ledger_transition: staged_ledger_transition; state: state}
   end
 
   val strip : t -> Stripped.t
@@ -573,9 +572,7 @@ module Make (Inputs : Inputs_intf) = struct
         ( match config.propose_keypair with
         | Some keypair ->
             let tips_r, tips_w = Linear_pipe.create () in
-            (let tip =
-               Ledger_builder_controller.strongest_tip staged_ledger
-             in
+            (let tip = Ledger_builder_controller.strongest_tip staged_ledger in
              Linear_pipe.write_without_pushback tips_w
                (Proposer.Tip_change
                   { protocol_state= (tip.state, tip.proof)

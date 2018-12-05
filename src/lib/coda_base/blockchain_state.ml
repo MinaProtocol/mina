@@ -149,8 +149,8 @@ end) : S = struct
       +> Block_time.fold timestamp)
 
   let length_in_triples =
-    Staged_ledger_hash.length_in_triples
-    + Frozen_ledger_hash.length_in_triples + Block_time.length_in_triples
+    Staged_ledger_hash.length_in_triples + Frozen_ledger_hash.length_in_triples
+    + Block_time.length_in_triples
 
   let set_timestamp t timestamp = {t with timestamp}
 
@@ -163,8 +163,7 @@ end) : S = struct
 
   let to_string_record t =
     Printf.sprintf "{staged_ledger_hash|%s}|{ledger_hash|%s}|{timestamp|%s}"
-      (Base64.encode_string
-         (Staged_ledger_hash.to_string t.staged_ledger_hash))
+      (Base64.encode_string (Staged_ledger_hash.to_string t.staged_ledger_hash))
       (Base64.encode_string (Frozen_ledger_hash.to_bytes t.ledger_hash))
       (Time.to_string (Block_time.to_time t.timestamp))
 

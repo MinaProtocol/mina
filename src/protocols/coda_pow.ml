@@ -507,9 +507,7 @@ module type Staged_ledger_diff_intf = sig
     [@@deriving sexp]
 
     type t =
-      { pre_diffs: pre_diffs
-      ; prev_hash: staged_ledger_hash
-      ; creator: public_key }
+      {pre_diffs: pre_diffs; prev_hash: staged_ledger_hash; creator: public_key}
     [@@deriving sexp]
 
     val user_commands : t -> user_command_with_valid_signature list

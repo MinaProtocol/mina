@@ -351,8 +351,7 @@ module Make (Inputs : Inputs_intf) = struct
               Rpcs.Get_staged_ledger_aux_at_hash.dispatch_multi
               staged_ledger_hash
           with
-          | Ok (Some (staged_ledger_aux, staged_ledger_aux_merkle_sibling))
-            ->
+          | Ok (Some (staged_ledger_aux, staged_ledger_aux_merkle_sibling)) ->
               let implied_staged_ledger_hash =
                 Staged_ledger_hash.of_aux_and_ledger_hash
                   (Staged_ledger_aux.hash staged_ledger_aux)
