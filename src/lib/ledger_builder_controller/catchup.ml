@@ -71,7 +71,7 @@ struct
               assert_materialization_of new_tip transition_with_hash ;
               Logger.debug log
                 !"Successfully caught up to full ledger-builder %{sexp: \
-                  Ledger_builder_hash.t}"
+                  Staged_ledger_hash.t}"
                 (Staged_ledger.hash lb) ;
               let open Transition_logic_state.Change in
               Interruptible.uninterruptible
@@ -86,7 +86,7 @@ struct
               Interruptible.return ()
         in
         let h =
-          Ledger_builder_hash.ledger_hash
+          Staged_ledger_hash.ledger_hash
             (ledger_builder_hash_of_transition transition)
         in
         (* Lazily recreate the sync_ledger if necessary *)

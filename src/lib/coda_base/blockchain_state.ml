@@ -15,7 +15,7 @@ module type S = sig
     ; timestamp: 'time }
   [@@deriving sexp, eq, compare, fields]
 
-  type t = (Ledger_builder_hash.t, Frozen_ledger_hash.t, Block_time.t) t_
+  type t = (Staged_ledger_hash.t, Frozen_ledger_hash.t, Block_time.t) t_
   [@@deriving sexp, eq, compare, hash]
 
   module Stable : sig
@@ -25,7 +25,7 @@ module type S = sig
       [@@deriving bin_io, sexp, eq, compare, hash]
 
       type nonrec t =
-        ( Ledger_builder_hash.Stable.V1.t
+        ( Staged_ledger_hash.Stable.V1.t
         , Frozen_ledger_hash.Stable.V1.t
         , Block_time.Stable.V1.t )
         t_
@@ -38,14 +38,14 @@ module type S = sig
   include
     Snarkable.S
     with type var =
-                ( Ledger_builder_hash.var
+                ( Staged_ledger_hash.var
                 , Frozen_ledger_hash.var
                 , Block_time.Unpacked.var )
                 t_
      and type value := value
 
   val create_value :
-       ledger_builder_hash:Ledger_builder_hash.Stable.V1.t
+       ledger_builder_hash:Staged_ledger_hash.Stable.V1.t
     -> ledger_hash:Frozen_ledger_hash.Stable.V1.t
     -> timestamp:Block_time.Stable.V1.t
     -> value
@@ -96,7 +96,7 @@ end) : S = struct
       [@@deriving bin_io, sexp, fields, eq, compare, hash]
 
       type t =
-        ( Ledger_builder_hash.Stable.V1.t
+        ( Staged_ledger_hash.Stable.V1.t
         , Frozen_ledger_hash.Stable.V1.t
         , Block_time.Stable.V1.t )
         t_
@@ -107,7 +107,7 @@ end) : S = struct
   include Stable.V1
 
   type var =
-    ( Ledger_builder_hash.var
+    ( Staged_ledger_hash.var
     , Frozen_ledger_hash.var
     , Block_time.Unpacked.var )
     t_
@@ -128,7 +128,7 @@ end) : S = struct
 
   let data_spec =
     let open Data_spec in
-    [Ledger_builder_hash.typ; Frozen_ledger_hash.typ; Block_time.Unpacked.typ]
+    [Staged_ledger_hash.typ; Frozen_ledger_hash.typ; Block_time.Unpacked.typ]
 
   let typ : (var, value) Typ.t =
     Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
@@ -137,25 +137,25 @@ end) : S = struct
   let var_to_triples ({ledger_builder_hash; ledger_hash; timestamp} : var) =
     let%map ledger_hash_triples = Frozen_ledger_hash.var_to_triples ledger_hash
     and ledger_builder_hash_triples =
-      Ledger_builder_hash.var_to_triples ledger_builder_hash
+      Staged_ledger_hash.var_to_triples ledger_builder_hash
     in
     ledger_builder_hash_triples @ ledger_hash_triples
     @ Block_time.Unpacked.var_to_triples timestamp
 
   let fold ({ledger_builder_hash; ledger_hash; timestamp} : value) =
     Fold.(
-      Ledger_builder_hash.fold ledger_builder_hash
+      Staged_ledger_hash.fold ledger_builder_hash
       +> Frozen_ledger_hash.fold ledger_hash
       +> Block_time.fold timestamp)
 
   let length_in_triples =
-    Ledger_builder_hash.length_in_triples
+    Staged_ledger_hash.length_in_triples
     + Frozen_ledger_hash.length_in_triples + Block_time.length_in_triples
 
   let set_timestamp t timestamp = {t with timestamp}
 
   let genesis =
-    { ledger_builder_hash= Ledger_builder_hash.dummy
+    { ledger_builder_hash= Staged_ledger_hash.dummy
     ; ledger_hash=
         Frozen_ledger_hash.of_ledger_hash
         @@ Ledger.merkle_root Genesis_ledger.t
@@ -164,7 +164,7 @@ end) : S = struct
   let to_string_record t =
     Printf.sprintf "{ledger_builder_hash|%s}|{ledger_hash|%s}|{timestamp|%s}"
       (Base64.encode_string
-         (Ledger_builder_hash.to_string t.ledger_builder_hash))
+         (Staged_ledger_hash.to_string t.ledger_builder_hash))
       (Base64.encode_string (Frozen_ledger_hash.to_bytes t.ledger_hash))
       (Time.to_string (Block_time.to_time t.timestamp))
 

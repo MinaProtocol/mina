@@ -27,7 +27,7 @@ module Base = struct
       type t [@@deriving eq, bin_io, sexp, eq]
     end
 
-    module Ledger_builder_hash : sig
+    module Staged_ledger_hash : sig
       type t [@@deriving eq, sexp, compare]
 
       val ledger_hash : t -> Ledger_hash.t
@@ -53,7 +53,7 @@ module Base = struct
       val merkle_root : t -> Ledger_hash.t
     end
 
-    module Ledger_builder_aux_hash : sig
+    module Staged_ledger_aux_hash : sig
       type t [@@deriving sexp]
     end
 
@@ -75,7 +75,7 @@ module Base = struct
 
         val ledger_hash : value -> Frozen_ledger_hash.t
 
-        val ledger_builder_hash : value -> Ledger_builder_hash.t
+        val ledger_builder_hash : value -> Staged_ledger_hash.t
       end
 
       module Protocol_state : sig
@@ -142,14 +142,14 @@ module Base = struct
 
     module Staged_ledger :
       Protocols.Coda_pow.Staged_ledger_base_intf
-      with type ledger_builder_hash := Ledger_builder_hash.t
+      with type ledger_builder_hash := Staged_ledger_hash.t
        and type frozen_ledger_hash := Frozen_ledger_hash.t
        and type valid_diff :=
                   Staged_ledger_diff.With_valid_signatures_and_proofs.t
        and type diff := Staged_ledger_diff.t
        and type ledger_proof := Ledger_proof.t
        and type ledger := Ledger.t
-       and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+       and type ledger_builder_aux_hash := Staged_ledger_aux_hash.t
 
     module Tip :
       Protocols.Coda_pow.Tip_intf
@@ -209,7 +209,7 @@ module Synchronizing = struct
         Coda_lib.Ledger_builder_io_intf
         with type sync_ledger_query := Sync_ledger.query
          and type sync_ledger_answer := Sync_ledger.answer
-         and type ledger_builder_hash := Ledger_builder_hash.t
+         and type ledger_builder_hash := Staged_ledger_hash.t
          and type ledger_builder_aux := Staged_ledger.Aux.t
          and type ledger_hash := Ledger_hash.t
          and type protocol_state := Consensus_mechanism.Protocol_state.value

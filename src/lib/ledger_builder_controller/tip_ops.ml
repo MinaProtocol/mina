@@ -11,10 +11,10 @@ module Make (Inputs : Inputs.Base.S) = struct
       ~message:
         "Protocol state in tip should be the target state of the transition"
       ~expect:transition_state_hash tip_state_hash ;
-    [%test_result: Ledger_builder_hash.t]
+    [%test_result: Staged_ledger_hash.t]
       ~message:
         (Printf.sprintf
-           !"Ledger_builder_hash inside protocol state inconsistent with \
+           !"Staged_ledger_hash inside protocol state inconsistent with \
              materialized ledger_builder's hash for transition: %{sexp: \
              External_transition.t}"
            transition)

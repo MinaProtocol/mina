@@ -362,7 +362,7 @@ module type Inputs_intf = sig
     Network_intf
     with type state_with_witness := External_transition.t
      and type ledger_builder := Staged_ledger.t
-     and type ledger_builder_hash := Ledger_builder_hash.t
+     and type ledger_builder_hash := Staged_ledger_hash.t
      and type protocol_state := Consensus_mechanism.Protocol_state.value
      and type snark_pool_diff := Snark_pool.pool_diff
      and type transaction_pool_diff := Transaction_pool.pool_diff
@@ -376,7 +376,7 @@ module type Inputs_intf = sig
     with type net := Net.t
      and type ledger := Ledger.t
      and type ledger_builder := Staged_ledger.t
-     and type ledger_builder_hash := Ledger_builder_hash.t
+     and type ledger_builder_hash := Staged_ledger_hash.t
      and type external_transition := External_transition.t
      and type protocol_state := Consensus_mechanism.Protocol_state.value
      and type consensus_local_state := Consensus_mechanism.Local_state.t

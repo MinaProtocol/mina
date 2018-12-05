@@ -91,11 +91,11 @@ module Make_diff (Inputs : sig
     type t [@@deriving sexp, bin_io]
   end
 
-  module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
+  module Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf
 
-  module Ledger_builder_hash :
-    Ledger_builder_hash_intf
-    with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+  module Staged_ledger_hash :
+    Staged_ledger_hash_intf
+    with type ledger_builder_aux_hash := Staged_ledger_aux_hash.t
      and type ledger_hash := Ledger_hash.t
 
   module Compressed_public_key : Compressed_public_key_intf
@@ -113,7 +113,7 @@ end) :
   with type user_command := Inputs.User_command.t
    and type user_command_with_valid_signature :=
               Inputs.User_command.With_valid_signature.t
-   and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
+   and type ledger_builder_hash := Inputs.Staged_ledger_hash.t
    and type public_key := Inputs.Compressed_public_key.t
    and type completed_work := Inputs.Transaction_snark_work.t
    and type completed_work_checked := Inputs.Transaction_snark_work.Checked.t = struct
@@ -163,7 +163,7 @@ end) :
 
   type t =
     { pre_diffs: pre_diffs
-    ; prev_hash: Ledger_builder_hash.t
+    ; prev_hash: Staged_ledger_hash.t
     ; creator: Compressed_public_key.t }
   [@@deriving sexp, bin_io]
 
@@ -191,7 +191,7 @@ end) :
 
     type t =
       { pre_diffs: pre_diffs
-      ; prev_hash: Ledger_builder_hash.t
+      ; prev_hash: Staged_ledger_hash.t
       ; creator: Compressed_public_key.t }
     [@@deriving sexp]
 
@@ -254,7 +254,7 @@ module Make (Inputs : Inputs.S) : sig
                 Inputs.Staged_ledger_diff.With_valid_signatures_and_proofs.t
      and type ledger_hash := Inputs.Ledger_hash.t
      and type frozen_ledger_hash := Inputs.Frozen_ledger_hash.t
-     and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
+     and type ledger_builder_hash := Inputs.Staged_ledger_hash.t
      and type public_key := Inputs.Compressed_public_key.t
      and type ledger := Inputs.Ledger.t
      and type user_command_with_valid_signature :=
@@ -262,7 +262,7 @@ module Make (Inputs : Inputs.S) : sig
      and type statement := Inputs.Transaction_snark_work.Statement.t
      and type completed_work := Inputs.Transaction_snark_work.Checked.t
      and type ledger_proof := Inputs.Ledger_proof.t
-     and type ledger_builder_aux_hash := Inputs.Ledger_builder_aux_hash.t
+     and type ledger_builder_aux_hash := Inputs.Staged_ledger_aux_hash.t
      and type sparse_ledger := Inputs.Sparse_ledger.t
      and type ledger_proof_statement := Inputs.Ledger_proof_statement.t
      and type ledger_proof_statement_set := Inputs.Ledger_proof_statement.Set.t
@@ -311,7 +311,7 @@ end = struct
           (Binable.to_string (module Transaction_with_witness))
         :> string )
 
-    let hash t = Ledger_builder_aux_hash.of_bytes (hash_to_string t)
+    let hash t = Staged_ledger_aux_hash.of_bytes (hash_to_string t)
 
     let create_expected_statement
         {Transaction_with_witness.transaction_with_info; witness; _} =
@@ -666,8 +666,8 @@ end = struct
     { scan_state= Parallel_scan.State.copy scan_state
     ; ledger= Ledger.copy ledger }
 
-  let hash {scan_state; ledger} : Ledger_builder_hash.t =
-    Ledger_builder_hash.of_aux_and_ledger_hash (Aux.hash scan_state)
+  let hash {scan_state; ledger} : Staged_ledger_hash.t =
+    Staged_ledger_hash.of_aux_and_ledger_hash (Aux.hash scan_state)
       (Ledger.merkle_root ledger)
 
   [%%if
@@ -1039,10 +1039,10 @@ end = struct
       let curr_hash = hash t in
       check_or_error
         (sprintf
-           !"bad prev_hash: Expected %{sexp:Ledger_builder_hash.t}, got \
-             %{sexp:Ledger_builder_hash.t}"
+           !"bad prev_hash: Expected %{sexp:Staged_ledger_hash.t}, got \
+             %{sexp:Staged_ledger_hash.t}"
            curr_hash diff.prev_hash)
-        (Ledger_builder_hash.equal diff.prev_hash (hash t))
+        (Staged_ledger_hash.equal diff.prev_hash (hash t))
       |> Result_with_rollback.of_or_error
     in
     let%bind data, works, user_commands_count, cb_parts_count =
@@ -2010,18 +2010,18 @@ end*)
           !l
       end
 
-      module Ledger_builder_aux_hash = struct
+      module Staged_ledger_aux_hash = struct
         include String
 
         let of_bytes : string -> t = fun s -> s
       end
 
-      module Ledger_builder_hash = struct
+      module Staged_ledger_hash = struct
         include String
 
         type ledger_hash = Ledger_hash.t
 
-        type ledger_builder_aux_hash = Ledger_builder_aux_hash.t
+        type ledger_builder_aux_hash = Staged_ledger_aux_hash.t
 
         let ledger_hash _ = failwith "stub"
 
@@ -2094,7 +2094,7 @@ end*)
         type public_key = Compressed_public_key.t
         [@@deriving sexp, bin_io, compare]
 
-        type ledger_builder_hash = Ledger_builder_hash.t
+        type ledger_builder_hash = Staged_ledger_hash.t
         [@@deriving sexp, bin_io, compare]
 
         module At_most_two = struct

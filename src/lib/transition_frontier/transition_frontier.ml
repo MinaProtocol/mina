@@ -13,18 +13,18 @@ module type Inputs_intf = sig
   module Frozen_ledger_hash :
     Frozen_ledger_hash_intf with type ledger_hash := Ledger_hash.t
 
-  module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
+  module Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf
 
-  module Ledger_builder_hash :
-    Ledger_builder_hash_intf
+  module Staged_ledger_hash :
+    Staged_ledger_hash_intf
     with type ledger_hash := Ledger_hash.t
-     and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+     and type ledger_builder_aux_hash := Staged_ledger_aux_hash.t
 
   module Staged_ledger_diff : Staged_ledger_diff_intf
 
   module Blockchain_state :
     Blockchain_state_intf
-    with type ledger_builder_hash := Ledger_builder_hash.t
+    with type ledger_builder_hash := Staged_ledger_hash.t
      and type frozen_ledger_hash := Frozen_ledger_hash.t
      and type time := Time.t
 
@@ -186,7 +186,7 @@ module Make (Inputs : Inputs_intf) :
     assert (
       Ledger_hash.equal
         (Ledger_mask.merkle_root root_staged_ledger_mask)
-        (Ledger_builder_hash.ledger_hash
+        (Staged_ledger_hash.ledger_hash
            (Blockchain_state.ledger_builder_hash root_blockchain_state)) ) ;
     let root_staged_ledger =
       Staged_ledger.create

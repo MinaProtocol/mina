@@ -25,20 +25,20 @@ end
 
 [%%endif]
 
-module Ledger_builder_aux_hash = struct
-  include Ledger_builder_hash.Aux_hash.Stable.V1
+module Staged_ledger_aux_hash = struct
+  include Staged_ledger_hash.Aux_hash.Stable.V1
 
-  let of_bytes = Ledger_builder_hash.Aux_hash.of_bytes
+  let of_bytes = Staged_ledger_hash.Aux_hash.of_bytes
 end
 
-module Ledger_builder_hash = struct
-  include Ledger_builder_hash.Stable.V1
+module Staged_ledger_hash = struct
+  include Staged_ledger_hash.Stable.V1
 
-  let ledger_hash = Ledger_builder_hash.ledger_hash
+  let ledger_hash = Staged_ledger_hash.ledger_hash
 
-  let aux_hash = Ledger_builder_hash.aux_hash
+  let aux_hash = Staged_ledger_hash.aux_hash
 
-  let of_aux_and_ledger_hash = Ledger_builder_hash.of_aux_and_ledger_hash
+  let of_aux_and_ledger_hash = Staged_ledger_hash.of_aux_and_ledger_hash
 end
 
 module Ledger_hash = struct
@@ -117,7 +117,7 @@ module type Init_intf = sig
     with type completed_work_checked := Transaction_snark_work.Checked.t
      and type completed_work := Transaction_snark_work.t
      and type public_key := Public_key.Compressed.t
-     and type ledger_builder_hash := Ledger_builder_hash.t
+     and type ledger_builder_hash := Staged_ledger_hash.t
      and type user_command := User_command.t
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
@@ -223,14 +223,14 @@ module type Main_intf = sig
       type t
     end
 
-    module Ledger_builder_hash : sig
+    module Staged_ledger_hash : sig
       type t [@@deriving sexp]
     end
 
     module Staged_ledger : sig
       type t
 
-      val hash : t -> Ledger_builder_hash.t
+      val hash : t -> Staged_ledger_hash.t
     end
 
     module Staged_ledger_diff : sig
@@ -303,7 +303,7 @@ module type Main_intf = sig
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
 
   val get_ledger :
-    t -> Ledger_builder_hash.t -> Account.t list Deferred.Or_error.t
+    t -> Staged_ledger_hash.t -> Account.t list Deferred.Or_error.t
 
   val receipt_chain_database : t -> Receipt_chain_database.t
 end
@@ -342,8 +342,8 @@ module Transaction_snark_work =
 module Staged_ledger_diff = Staged_ledger.Make_diff (struct
   module Ledger_proof = Ledger_proof
   module Ledger_hash = Ledger_hash
-  module Ledger_builder_hash = Ledger_builder_hash
-  module Ledger_builder_aux_hash = Ledger_builder_aux_hash
+  module Staged_ledger_hash = Staged_ledger_hash
+  module Staged_ledger_aux_hash = Staged_ledger_aux_hash
   module Compressed_public_key = Public_key.Compressed
   module User_command = User_command
   module Transaction_snark_work = Transaction_snark_work
@@ -484,8 +484,8 @@ struct
       module Ledger_hash = Ledger_hash
       module Frozen_ledger_hash = Frozen_ledger_hash
       module Staged_ledger_diff = Staged_ledger_diff
-      module Ledger_builder_hash = Ledger_builder_hash
-      module Ledger_builder_aux_hash = Ledger_builder_aux_hash
+      module Staged_ledger_hash = Staged_ledger_hash
+      module Staged_ledger_aux_hash = Staged_ledger_aux_hash
       module Config = Init
 
       let check (Transaction_snark_work.({fee; prover; proofs}) as t) stmts =
@@ -503,7 +503,7 @@ struct
     include Staged_ledger.Make (Inputs)
   end
 
-  module Ledger_builder_aux = Staged_ledger.Aux
+  module Staged_ledger_aux = Staged_ledger.Aux
 
   module Ledger_builder_transition = struct
     type t = {old: Staged_ledger.t sexp_opaque; diff: Staged_ledger_diff.t}
@@ -582,8 +582,8 @@ struct
   module Blockchain_state = Coda_base.Blockchain_state
   module Staged_ledger_diff = Staged_ledger_diff
   module Transaction_snark_work = Transaction_snark_work
-  module Ledger_builder_hash = Ledger_builder_hash
-  module Ledger_builder_aux_hash = Ledger_builder_aux_hash
+  module Staged_ledger_hash = Staged_ledger_hash
+  module Staged_ledger_aux_hash = Staged_ledger_aux_hash
   module Ledger_proof_verifier = Ledger_proof_verifier
   module Ledger_hash = Ledger_hash
   module Frozen_ledger_hash = Frozen_ledger_hash
@@ -729,9 +729,9 @@ struct
     module Snark_pool = Snark_pool
     module Snark_pool_diff = Snark_pool.Diff
     module Sync_ledger = Sync_ledger
-    module Ledger_builder_hash = Ledger_builder_hash
+    module Staged_ledger_hash = Staged_ledger_hash
     module Ledger_hash = Ledger_hash
-    module Ledger_builder_aux_hash = Ledger_builder_aux_hash
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Blockchain_state = Consensus.Mechanism.Blockchain_state
   end)
 
@@ -755,11 +755,11 @@ struct
 
       module Keypair = Keypair
       module Ledger_proof_statement = Ledger_proof_statement
-      module Ledger_builder_hash = Ledger_builder_hash
+      module Staged_ledger_hash = Staged_ledger_hash
       module Ledger = Ledger
       module Staged_ledger_diff = Staged_ledger_diff
-      module Ledger_builder_aux_hash = Ledger_builder_aux_hash
-      module Staged_ledger = Ledger_builder
+      module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+      module Staged_ledger = Staged_ledger
       module Blockchain_state = Blockchain_state
       module Consensus_mechanism = Consensus.Mechanism
       module Protocol_state = Protocol_state
@@ -790,8 +790,8 @@ struct
     module Staged_ledger_diff = Staged_ledger_diff
     module Ledger_proof_verifier = Ledger_proof_verifier
     module Transaction_snark_work = Transaction_snark_work
-    module Ledger_builder_hash = Ledger_builder_hash
-    module Ledger_builder_aux_hash = Ledger_builder_aux_hash
+    module Staged_ledger_hash = Staged_ledger_hash
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Ledger_proof_statement = Ledger_proof_statement
     module Ledger_hash = Ledger_hash
     module Frozen_ledger_hash = Frozen_ledger_hash
@@ -824,7 +824,7 @@ struct
     module Transaction = Transaction
     module Ledger_hash = Ledger_hash
     module Ledger_proof = Ledger_proof
-    module Staged_ledger = Ledger_builder
+    module Staged_ledger = Staged_ledger
     module Fee = Fee.Unsigned
     module Snark_pool = Snark_pool
 
@@ -1080,7 +1080,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; ledger_merkle_root
     ; ledger_builder_hash=
         best_ledger_builder t |> Staged_ledger.hash
-        |> Ledger_builder_hash.sexp_of_t |> Sexp.to_string
+        |> Staged_ledger_hash.sexp_of_t |> Sexp.to_string
     ; state_hash
     ; external_transition_latency=
         Perf_histograms.report ~name:"external_transition_latency"

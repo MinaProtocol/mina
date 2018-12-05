@@ -136,21 +136,21 @@ let main () =
             let to_bytes = Ledger_hash.to_bytes
           end
 
-          module Ledger_builder_aux_hash = struct
-            include Ledger_builder_hash.Aux_hash.Stable.V1
+          module Staged_ledger_aux_hash = struct
+            include Staged_ledger_hash.Aux_hash.Stable.V1
 
-            let of_bytes = Ledger_builder_hash.Aux_hash.of_bytes
+            let of_bytes = Staged_ledger_hash.Aux_hash.of_bytes
           end
 
-          module Ledger_builder_hash = struct
-            include Ledger_builder_hash.Stable.V1
+          module Staged_ledger_hash = struct
+            include Staged_ledger_hash.Stable.V1
 
-            let ledger_hash = Ledger_builder_hash.ledger_hash
+            let ledger_hash = Staged_ledger_hash.ledger_hash
 
-            let aux_hash = Ledger_builder_hash.aux_hash
+            let aux_hash = Staged_ledger_hash.aux_hash
 
             let of_aux_and_ledger_hash =
-              Ledger_builder_hash.of_aux_and_ledger_hash
+              Staged_ledger_hash.of_aux_and_ledger_hash
           end
         end)
       end) in

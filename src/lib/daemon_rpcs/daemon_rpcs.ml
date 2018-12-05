@@ -154,7 +154,7 @@ module Send_user_commands = struct
 end
 
 module Get_ledger = struct
-  type query = Ledger_builder_hash.Stable.V1.t [@@deriving bin_io]
+  type query = Staged_ledger_hash.Stable.V1.t [@@deriving bin_io]
 
   type response = Account.t list Or_error.t [@@deriving bin_io]
 

@@ -82,12 +82,12 @@ module type S = sig
     val apply_transaction_exn : t -> Transaction.t -> t
   end
 
-  module Ledger_builder_aux_hash : Coda_pow.Ledger_builder_aux_hash_intf
+  module Staged_ledger_aux_hash : Coda_pow.Staged_ledger_aux_hash_intf
 
-  module Ledger_builder_hash :
-    Coda_pow.Ledger_builder_hash_intf
+  module Staged_ledger_hash :
+    Coda_pow.Staged_ledger_hash_intf
     with type ledger_hash := Ledger_hash.t
-     and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+     and type ledger_builder_aux_hash := Staged_ledger_aux_hash.t
 
   module Transaction_snark_work :
     Coda_pow.Transaction_snark_work_intf
@@ -103,7 +103,7 @@ module type S = sig
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
      and type public_key := Compressed_public_key.t
-     and type ledger_builder_hash := Ledger_builder_hash.t
+     and type ledger_builder_hash := Staged_ledger_hash.t
 
   module Config : sig
     val transaction_capacity_log_2 : int
@@ -175,10 +175,10 @@ module type S' = sig
      and type message := Sok_message.t
      and type ledger_proof := Ledger_proof.t
 
-  module Staged_ledger_aux_hash : Coda_pow.Ledger_builder_aux_hash_intf
+  module Staged_ledger_aux_hash : Coda_pow.Staged_ledger_aux_hash_intf
 
   module Staged_ledger_hash :
-    Coda_pow.Ledger_builder_hash_intf
+    Coda_pow.Staged_ledger_hash_intf
     with type ledger_hash := Ledger_hash.t
      and type ledger_builder_aux_hash := Staged_ledger_aux_hash.t
 

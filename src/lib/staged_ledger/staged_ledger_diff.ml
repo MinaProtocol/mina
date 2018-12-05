@@ -9,11 +9,11 @@ module Make (Inputs : sig
     type t [@@deriving sexp, bin_io]
   end
 
-  module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
+  module Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf
 
-  module Ledger_builder_hash :
-    Ledger_builder_hash_intf
-    with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+  module Staged_ledger_hash :
+    Staged_ledger_hash_intf
+    with type ledger_builder_aux_hash := Staged_ledger_aux_hash.t
      and type ledger_hash := Ledger_hash.t
 
   module Compressed_public_key : Compressed_public_key_intf
@@ -31,7 +31,7 @@ end) :
   with type user_command := Inputs.User_command.t
    and type user_command_with_valid_signature :=
               Inputs.User_command.With_valid_signature.t
-   and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
+   and type ledger_builder_hash := Inputs.Staged_ledger_hash.t
    and type public_key := Inputs.Compressed_public_key.t
    and type completed_work := Inputs.Transaction_snark_work.t
    and type completed_work_checked := Inputs.Transaction_snark_work.Checked.t = struct
@@ -81,7 +81,7 @@ end) :
 
   type t =
     { pre_diffs: pre_diffs
-    ; prev_hash: Ledger_builder_hash.t
+    ; prev_hash: Staged_ledger_hash.t
     ; creator: Compressed_public_key.t }
   [@@deriving sexp, bin_io]
 
@@ -109,7 +109,7 @@ end) :
 
     type t =
       { pre_diffs: pre_diffs
-      ; prev_hash: Ledger_builder_hash.t
+      ; prev_hash: Staged_ledger_hash.t
       ; creator: Compressed_public_key.t }
     [@@deriving sexp]
 

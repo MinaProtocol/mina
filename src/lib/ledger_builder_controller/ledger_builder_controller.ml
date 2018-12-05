@@ -9,7 +9,7 @@ module Make (Inputs : Inputs.S) : sig
   include
     Coda_lib.Ledger_builder_controller_intf
     with type ledger_builder := Staged_ledger.t
-     and type ledger_builder_hash := Ledger_builder_hash.t
+     and type ledger_builder_hash := Staged_ledger_hash.t
      and type ledger := Ledger.t
      and type maskable_ledger := Ledger.maskable_ledger
      and type ledger_proof := Ledger_proof.t
@@ -78,7 +78,7 @@ end = struct
         let%map () =
           if
             verified
-            && Ledger_builder_hash.equal ledger_builder_hash
+            && Staged_ledger_hash.equal ledger_builder_hash
                  ( new_state |> Protocol_state.blockchain_state
                  |> Blockchain_state.ledger_builder_hash )
             && Frozen_ledger_hash.equal ledger_hash
@@ -260,15 +260,15 @@ end = struct
    fresh ledger at a specific hash if necessary; also gives back target_state *)
   let local_get_ledger t hash =
     Logger.trace t.log
-      !"Attempting to local-get-ledger for %{sexp: Ledger_builder_hash.t}"
+      !"Attempting to local-get-ledger for %{sexp: Staged_ledger_hash.t}"
       hash ;
     local_get_ledger' t hash
       ~p_tip:(fun hash {With_hash.data= tip; hash= _} ->
-        Ledger_builder_hash.equal
+        Staged_ledger_hash.equal
           (Staged_ledger.hash tip.Tip.ledger_builder)
           hash )
       ~p_trans:(fun hash {With_hash.data= trans; hash= _} ->
-        Ledger_builder_hash.equal
+        Staged_ledger_hash.equal
           ( trans |> External_transition.protocol_state
           |> Protocol_state.blockchain_state
           |> Blockchain_state.ledger_builder_hash )
@@ -306,7 +306,7 @@ end = struct
                     ( trans |> External_transition.protocol_state
                     |> Protocol_state.blockchain_state
                     |> Blockchain_state.ledger_builder_hash
-                    |> Ledger_builder_hash.ledger_hash )
+                    |> Staged_ledger_hash.ledger_hash )
                     hash )
                 ~f_result:(fun {With_hash.data= tip; hash= _} ->
                   tip.Tip.ledger_builder |> Staged_ledger.ledger )
@@ -372,7 +372,7 @@ let%test_module "test" =
           let of_private_key_exn t = t
         end
 
-        module Ledger_builder_hash = struct
+        module Staged_ledger_hash = struct
           include Int
 
           let ledger_hash = Fn.id
@@ -399,7 +399,7 @@ let%test_module "test" =
           let copy t = t
         end
 
-        module Ledger_builder_aux_hash = struct
+        module Staged_ledger_aux_hash = struct
           type t = int [@@deriving sexp]
         end
 
@@ -466,7 +466,7 @@ let%test_module "test" =
 
           module Blockchain_state = struct
             type value =
-              { ledger_builder_hash: Ledger_builder_hash.t
+              { ledger_builder_hash: Staged_ledger_hash.t
               ; ledger_hash: Ledger_hash.t }
             [@@deriving eq, sexp, fields, bin_io, compare]
           end

@@ -121,13 +121,13 @@ module type Protocol_state_proof_intf = sig
   type t
 end
 
-module type Ledger_builder_aux_hash_intf = sig
+module type Staged_ledger_aux_hash_intf = sig
   type t [@@deriving bin_io, sexp, eq]
 
   val of_bytes : string -> t
 end
 
-module type Ledger_builder_hash_intf = sig
+module type Staged_ledger_hash_intf = sig
   type t [@@deriving bin_io, sexp, eq, compare]
 
   type ledger_hash
@@ -1182,11 +1182,11 @@ module type Inputs_intf = sig
      and type ledger_hash := Ledger_hash.t
      and type account := Account.t
 
-  module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
+  module Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf
 
-  module Ledger_builder_hash :
-    Ledger_builder_hash_intf
-    with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+  module Staged_ledger_hash :
+    Staged_ledger_hash_intf
+    with type ledger_builder_aux_hash := Staged_ledger_aux_hash.t
      and type ledger_hash := Ledger_hash.t
 
   (*
@@ -1230,7 +1230,7 @@ Merge Snark:
     with type user_command := User_command.t
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
-     and type ledger_builder_hash := Ledger_builder_hash.t
+     and type ledger_builder_hash := Staged_ledger_hash.t
      and type public_key := Public_key.Compressed.t
      and type completed_work := Transaction_snark_work.t
      and type completed_work_checked := Transaction_snark_work.Checked.t
@@ -1244,8 +1244,8 @@ Merge Snark:
     with type diff := Staged_ledger_diff.t
      and type valid_diff :=
                 Staged_ledger_diff.With_valid_signatures_and_proofs.t
-     and type ledger_builder_hash := Ledger_builder_hash.t
-     and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+     and type ledger_builder_hash := Staged_ledger_hash.t
+     and type ledger_builder_aux_hash := Staged_ledger_aux_hash.t
      and type ledger_hash := Ledger_hash.t
      and type frozen_ledger_hash := Frozen_ledger_hash.t
      and type public_key := Public_key.Compressed.t
@@ -1277,7 +1277,7 @@ Merge Snark:
      and type protocol_state_hash := Protocol_state_hash.t
      and type protocol_state_proof := Protocol_state_proof.t
      and type frozen_ledger_hash := Frozen_ledger_hash.t
-     and type ledger_builder_hash := Ledger_builder_hash.t
+     and type ledger_builder_hash := Staged_ledger_hash.t
      and type ledger_builder_diff := Staged_ledger_diff.t
      and type user_command := User_command.t
      and type sok_digest := Sok_message.Digest.t
