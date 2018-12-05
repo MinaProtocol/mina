@@ -36,6 +36,7 @@
       keys_lib
       storage
       logger
+      transition_frontier
       async
       async_extra
       rpc_parallel
