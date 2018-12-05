@@ -16,7 +16,7 @@ let check_or_error label b =
 module Make_completed_work = Transaction_snark_work.Make
 module Make_diff = Staged_ledger_diff.Make
 
-module Make (Inputs : Inputs.S') : sig
+module Make (Inputs : Inputs.S) : sig
   include
     Coda_pow.Staged_ledger_intf
     with type diff := Inputs.Staged_ledger_diff.t
@@ -1142,17 +1142,14 @@ end = struct
           one_prediff logger ws_seq ts_seq get_completed_work ledger self x
             ~add_coinbase:true
         in
-        (*let _ = undo_txns ledger res.user_commands in*)
         First (make_diff_with_one res)
     | `Two (x, y) -> (
       match
         two_prediffs logger ws_seq ts_seq get_completed_work ledger self (x, y)
       with
       | First res ->
-          (*let _ = undo_txns ledger res.user_commands in*)
           First (make_diff_with_one res)
       | Second (res1, res2) ->
-          (*let _ = undo_txns ledger (res2.user_commands @ res1.user_commands) in*)
           Second (make_diff_with_two res1, make_diff_with_one res2) )
 
   let create_diff t ~self ~logger
@@ -1160,19 +1157,17 @@ end = struct
       ~(get_completed_work :
             Transaction_snark_work.Statement.t
          -> Transaction_snark_work.Checked.t option) =
-    (* TODO: Don't copy *)
     let curr_hash = hash t in
-    (*let t' = copy t in*)
     let cur_ledger = ledger t in
     let new_mask = Inputs.Ledger.Mask.create () in
-    let ledger = Inputs.Ledger.register_mask cur_ledger new_mask in
+    let tmp_ledger = Inputs.Ledger.register_mask cur_ledger new_mask in
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
     let partitions =
       TSS.partition_if_overflowing ~max_slots:max_throughput t.scan_state
     in
     let pre_diffs =
       generate_prediff logger (work_to_do t.scan_state) transactions_by_fee
-        get_completed_work ledger self partitions
+        get_completed_work tmp_ledger self partitions
     in
     trace_event "prediffs done" ;
     { Staged_ledger_diff.With_valid_signatures_and_proofs.pre_diffs

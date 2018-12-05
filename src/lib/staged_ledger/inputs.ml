@@ -1,7 +1,7 @@
 open Core
 open Protocols
 
-module type S = sig
+(*module type S = sig
   open Coda_pow
 
   module Compressed_public_key : Compressed_public_key_intf
@@ -114,8 +114,8 @@ module type S = sig
     -> Ledger_proof_statement.t list
     -> Transaction_snark_work.Checked.t option Async_kernel.Deferred.t
 end
-
-module type S' = sig
+*)
+module type S = sig
   open Coda_pow
 
   module Compressed_public_key : Compressed_public_key_intf
@@ -198,47 +198,6 @@ module type S' = sig
      and type public_key := Compressed_public_key.t
      and type staged_ledger_hash := Staged_ledger_hash.t
 
-  (*module Merkle_address : Merkle_address.S
-
-  module Key : Merkle_ledger.Intf.Key
-
-  module Account : Merkle_ledger.Intf.Account with type key := Key.t
-
-  module Location : Merkle_ledger.Location_intf.S
-
-  module Ledger_diff : sig
-    type t
-
-    val empty : t
-  end
-
-  module Any_base :
-    Merkle_mask.Base_merkle_tree_intf.S
-    with module Addr = Location.Addr
-     and module Location = Location
-     and type account := Account.t
-     and type root_hash := Ledger_hash.t
-     and type hash := Ledger_hash.t
-     and type key := Key.t
-
-  module Ledger_mask : sig
-    include
-      Merkle_mask.Masking_merkle_tree_intf.S
-      with module Addr = Location.Addr
-       and module Location = Location
-       and module Attached.Addr = Location.Addr
-       and type account := Account.t
-       and type location := Location.t
-       and type key := Key.t
-       and type hash := Ledger_hash.t
-       and type parent := Any_base.t
-
-    val merkle_root : t -> Ledger_hash.t
-
-    val apply : t -> Ledger_diff.t -> unit
-
-    val commit : t -> unit
-  end *)
   module Account : sig
     type t
   end

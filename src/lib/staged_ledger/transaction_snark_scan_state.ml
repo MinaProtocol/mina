@@ -26,7 +26,7 @@ module type Monad_with_Or_error_intf = sig
   end
 end
 
-module Make (Inputs : Inputs.S') : sig
+module Make (Inputs : Inputs.S) : sig
   include
     Coda_pow.Transaction_snark_scan_state_intf
     with type ledger_mask := Inputs.Ledger.attached_mask
