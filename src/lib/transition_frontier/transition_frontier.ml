@@ -1,5 +1,6 @@
 open Core_kernel
 open Protocols.Coda_pow
+open Protocols.Coda_transition_frontier
 open Coda_base
 open Signature_lib
 
@@ -31,8 +32,16 @@ module Make
                        and type public_key := Public_key.Compressed.t
                        and type ledger := Ledger.t
                        and type user_command_with_valid_signature :=
-                                  User_command.With_valid_signature.t) =
-struct
+                                  User_command.With_valid_signature.t) :
+  Transition_frontier_intf
+  with type state_hash := State_hash.t
+   and type external_transition := External_transition.t
+   and type ledger_database := Ledger.Db.t = struct
+  type ledger_diff = Ledger_builder_diff.t
+
+  (* Transaction_snark_scan_state and Staged_ledger long-term will not live in
+  * this module *)
+  
   (* Right now Transaction_snark_scan_state is not different from a
      * ledger-builder diff *)
   module Transaction_snark_scan_state : sig
@@ -45,7 +54,7 @@ struct
     val empty : t
 
     module Diff : sig
-      type t
+      type t = ledger_diff
 
       (* hack until Parallel_scan_state().Diff.t fully diverges from Ledger_builder_diff.t and is included in External_transition *)
       val of_ledger_builder_diff : Ledger_builder_diff.t -> t
@@ -63,7 +72,7 @@ struct
     let empty = Ledger_builder.Aux.empty ~parallelism_log_2:4
 
     module Diff = struct
-      type nonrec t = Ledger_builder_diff.t
+      type nonrec t = ledger_diff
 
       let of_ledger_builder_diff = Fn.id
 
@@ -71,28 +80,28 @@ struct
     end
   end
 
+  type staged_ledger = Ledger_builder.t
+
   (* Right now, Staged_ledger is a thin wrapper over Ledger_builder *)
   module Staged_ledger : sig
-    type t
+    type t = staged_ledger
 
     val create :
          transaction_snark_scan_state:Transaction_snark_scan_state.t
       -> ledger:Ledger.Mask.Attached.t
       -> t Or_error.t
 
-    val transaction_snark_scan_state : t -> Transaction_snark_scan_state.t
+    val _transaction_snark_scan_state : t -> Transaction_snark_scan_state.t
 
     val ledger : t -> Ledger.Mask.Attached.t
 
     val apply :
          t
-      -> Transaction_snark_scan_state.Diff.t
       -> logger:Logger.t
+      -> Transaction_snark_scan_state.Diff.t
       -> t Or_error.t
   end = struct
-    (* TODO *)
-
-    type t = Ledger_builder.t
+    type t = staged_ledger
 
     let create ~transaction_snark_scan_state ~ledger =
       Ledger_builder.of_aux_and_ledger ~snarked_ledger_hash:(failwith "TODO")
@@ -101,12 +110,12 @@ struct
           (Transaction_snark_scan_state.to_ledger_aux
              transaction_snark_scan_state)
 
-    let transaction_snark_scan_state t =
+    let _transaction_snark_scan_state t =
       Transaction_snark_scan_state.of_ledger_aux (Ledger_builder.aux t)
 
     let ledger t = Ledger_builder.ledger t
 
-    let apply t diff ~logger =
+    let apply t ~logger diff =
       let derive_mask ledger =
         let mask = Ledger.Mask.create () in
         Ledger.register_mask ledger mask
@@ -116,7 +125,7 @@ struct
       let open Or_error.Let_syntax in
       let%bind fresh_ledger_builder =
         create
-          ~transaction_snark_scan_state:(transaction_snark_scan_state t)
+          ~transaction_snark_scan_state:(_transaction_snark_scan_state t)
           ~ledger:masked_ledger
       in
       let%map _output =
@@ -285,7 +294,7 @@ struct
     in
     attach_node_to t ~parent_node ~node
 
-  let root_successor t parent_node =
+  let _root_successor t parent_node =
     let new_length = parent_node.length + 1 in
     let root_node = Hashtbl.find_exn t.table t.root in
     let root_hash = With_hash.hash root_node.breadcrumb.transition_with_hash in
