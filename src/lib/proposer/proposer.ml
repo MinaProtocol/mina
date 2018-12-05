@@ -186,7 +186,7 @@ module Make (Inputs : Inputs_intf) :
           Consensus_mechanism.generate_transition ~previous_protocol_state
             ~blockchain_state ~time ~proposal_data
             ~transactions:
-              ( Ledger_builder_diff.With_valid_signatures_and_proofs
+              ( Staged_ledger_diff.With_valid_signatures_and_proofs
                 .user_commands diff
                 :> User_command.t list )
             ~snarked_ledger_hash:
@@ -214,7 +214,7 @@ module Make (Inputs : Inputs_intf) :
         let internal_transition =
           Internal_transition.create ~snark_transition
             ~prover_state:(Proposal_data.prover_state proposal_data)
-            ~ledger_builder_diff:(Ledger_builder_diff.forget diff)
+            ~ledger_builder_diff:(Staged_ledger_diff.forget diff)
         in
         Some (protocol_state, internal_transition) )
 

@@ -15,7 +15,7 @@ module type Inputs_intf = sig
 
   module Merkle_address : Merkle_address.S
 
-  module Ledger_builder_diff : Ledger_builder_diff_intf
+  module Staged_ledger_diff : Staged_ledger_diff_intf
 
   module Syncable_ledger :
     Syncable_ledger.S
@@ -86,8 +86,8 @@ module type Inputs_intf = sig
     module Diff : sig
       type t
 
-      (* hack until Parallel_scan_state().Diff.t fully diverges from Ledger_builder_diff.t and is included in External_transition *)
-      val of_ledger_builder_diff : Ledger_builder_diff.t -> t
+      (* hack until Parallel_scan_state().Diff.t fully diverges from Staged_ledger_diff.t and is included in External_transition *)
+      val of_ledger_builder_diff : Staged_ledger_diff.t -> t
     end
   end
 

@@ -150,7 +150,7 @@ let gen_keys () =
 
     let private_key = None
 
-    module Ledger_builder_diff = Staged_ledger.Make_diff (struct
+    module Staged_ledger_diff = Staged_ledger.Make_diff (struct
       open Coda_base
       module Compressed_public_key = Public_key.Compressed
 

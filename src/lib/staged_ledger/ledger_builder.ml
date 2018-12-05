@@ -109,7 +109,7 @@ module Make_diff (Inputs : sig
      and type statement := Transaction_snark.Statement.t
      and type proof := Ledger_proof.t
 end) :
-  Coda_pow.Ledger_builder_diff_intf
+  Coda_pow.Staged_ledger_diff_intf
   with type user_command := Inputs.User_command.t
    and type user_command_with_valid_signature :=
               Inputs.User_command.With_valid_signature.t
@@ -249,9 +249,9 @@ end
 module Make (Inputs : Inputs.S) : sig
   include
     Coda_pow.Ledger_builder_intf
-    with type diff := Inputs.Ledger_builder_diff.t
+    with type diff := Inputs.Staged_ledger_diff.t
      and type valid_diff :=
-                Inputs.Ledger_builder_diff.With_valid_signatures_and_proofs.t
+                Inputs.Staged_ledger_diff.With_valid_signatures_and_proofs.t
      and type ledger_hash := Inputs.Ledger_hash.t
      and type frozen_ledger_hash := Inputs.Frozen_ledger_hash.t
      and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
@@ -966,7 +966,7 @@ end = struct
   end
 
   let apply_pre_diff t coinbase_parts proposer
-      (diff : Ledger_builder_diff.diff) =
+      (diff : Staged_ledger_diff.diff) =
     let open Result_with_rollback.Let_syntax in
     let%bind user_commands =
       let%map user_commands' =
@@ -1016,10 +1016,10 @@ end = struct
     ; coinbase_parts_count= List.length coinbase }
 
   (* TODO: when we move to a disk-backed db, this should call "Ledger.commit_changes" at the end. *)
-  let apply_diff t (diff : Ledger_builder_diff.t) ~logger =
+  let apply_diff t (diff : Staged_ledger_diff.t) ~logger =
     let open Result_with_rollback.Let_syntax in
     let apply_pre_diff_with_at_most_two
-        (pre_diff1 : Ledger_builder_diff.diff_with_at_most_two_coinbase) =
+        (pre_diff1 : Staged_ledger_diff.diff_with_at_most_two_coinbase) =
       let coinbase_parts =
         match pre_diff1.coinbase_parts with
         | Zero -> `Zero
@@ -1029,7 +1029,7 @@ end = struct
       apply_pre_diff t coinbase_parts diff.creator pre_diff1.diff
     in
     let apply_pre_diff_with_at_most_one
-        (pre_diff2 : Ledger_builder_diff.diff_with_at_most_one_coinbase) =
+        (pre_diff2 : Staged_ledger_diff.diff_with_at_most_one_coinbase) =
       let coinbase_added =
         match pre_diff2.coinbase_added with Zero -> `Zero | One x -> `One x
       in
@@ -1096,7 +1096,7 @@ end = struct
   let forget_work_opt = Option.map ~f:Completed_work.forget
 
   let apply_pre_diff_unchecked t coinbase_parts proposer
-      (diff : Ledger_builder_diff.With_valid_signatures_and_proofs.diff) =
+      (diff : Staged_ledger_diff.With_valid_signatures_and_proofs.diff) =
     let user_commands = diff.user_commands in
     let txn_works = List.map ~f:Completed_work.forget diff.completed_works in
     let coinbase_work =
@@ -1128,10 +1128,10 @@ end = struct
     (new_data, txn_works, coinbase_work)
 
   let apply_diff_unchecked t
-      (diff : Ledger_builder_diff.With_valid_signatures_and_proofs.t) =
+      (diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) =
     let apply_pre_diff_with_at_most_two
         (pre_diff1 :
-          Ledger_builder_diff.With_valid_signatures_and_proofs
+          Staged_ledger_diff.With_valid_signatures_and_proofs
           .diff_with_at_most_two_coinbase) =
       let coinbase_parts =
         match pre_diff1.coinbase_parts with
@@ -1146,7 +1146,7 @@ end = struct
     in
     let apply_pre_diff_with_at_most_one
         (pre_diff2 :
-          Ledger_builder_diff.With_valid_signatures_and_proofs
+          Staged_ledger_diff.With_valid_signatures_and_proofs
           .diff_with_at_most_one_coinbase) =
       let coinbase_added =
         match pre_diff2.coinbase_added with
@@ -1221,8 +1221,8 @@ end = struct
           (User_command.With_valid_signature.t * Ledger.Undo.t) list
       ; completed_works: Completed_work.Checked.t list
       ; coinbase_parts:
-          ( Completed_work.Checked.t Ledger_builder_diff.At_most_two.t
-          , Completed_work.Checked.t Ledger_builder_diff.At_most_one.t )
+          ( Completed_work.Checked.t Staged_ledger_diff.At_most_two.t
+          , Completed_work.Checked.t Staged_ledger_diff.At_most_one.t )
           Either.t
       ; completed_works_for_coinbase: Completed_work.Checked.t list
       ; self_pk: Compressed_public_key.t }
@@ -1273,13 +1273,13 @@ end = struct
           match t.coinbase_parts with
           | First w ->
               let%map cb =
-                Ledger_builder_diff.At_most_two.increase w
+                Staged_ledger_diff.At_most_two.increase w
                   t.completed_works_for_coinbase
               in
               First cb
           | Second w ->
               let%map cb =
-                Ledger_builder_diff.At_most_one.increase w
+                Staged_ledger_diff.At_most_one.increase w
                   t.completed_works_for_coinbase
               in
               Second cb
@@ -1522,7 +1522,7 @@ end = struct
       available_queue_space ~add_coinbase =
     let init_resources =
       Resources.init ~available_queue_space ~self
-        (Second Ledger_builder_diff.At_most_one.Zero)
+        (Second Staged_ledger_diff.At_most_one.Zero)
     in
     let init_res_util =
       { Resource_util.resources= init_resources
@@ -1546,7 +1546,7 @@ end = struct
       (*: (Resources_util.t, Resources.t * Resources.t option) Either.t*) =
     let init_resources =
       Resources.init ~available_queue_space:(fst partitions) ~self
-        (First Ledger_builder_diff.At_most_two.Zero)
+        (First Staged_ledger_diff.At_most_two.Zero)
     in
     let init_res_util =
       { Resource_util.resources= init_resources
@@ -1614,30 +1614,30 @@ end = struct
   let generate_prediff logger ws_seq ts_seq get_completed_work ledger self
       partitions =
     let diff (res : Resources.t) :
-        Ledger_builder_diff.With_valid_signatures_and_proofs.diff =
+        Staged_ledger_diff.With_valid_signatures_and_proofs.diff =
       (* We have to reverse here because we only know they work in THIS order *)
       { user_commands= List.rev_map res.user_commands ~f:fst
       ; completed_works= List.rev res.completed_works }
     in
     let make_diff_with_one (res : Resources.t) :
-        Ledger_builder_diff.With_valid_signatures_and_proofs
+        Staged_ledger_diff.With_valid_signatures_and_proofs
         .diff_with_at_most_one_coinbase =
       match res.coinbase_parts with
       | First _ ->
           Logger.error logger
             "Error while creating a diff: Invalid resource configuration" ;
-          {diff= diff res; coinbase_added= Ledger_builder_diff.At_most_one.Zero}
+          {diff= diff res; coinbase_added= Staged_ledger_diff.At_most_one.Zero}
       | Second w -> {diff= diff res; coinbase_added= w}
     in
     let make_diff_with_two (res : Resources.t) :
-        Ledger_builder_diff.With_valid_signatures_and_proofs
+        Staged_ledger_diff.With_valid_signatures_and_proofs
         .diff_with_at_most_two_coinbase =
       match res.coinbase_parts with
       | First w -> {diff= diff res; coinbase_parts= w}
       | Second _ ->
           Logger.error logger
             "Error while creating a diff: Invalid resource configuration" ;
-          {diff= diff res; coinbase_parts= Ledger_builder_diff.At_most_two.Zero}
+          {diff= diff res; coinbase_parts= Staged_ledger_diff.At_most_two.Zero}
     in
     match partitions with
     | `One x ->
@@ -1676,7 +1676,7 @@ end = struct
         get_completed_work ledger self partitions
     in
     trace_event "prediffs done" ;
-    { Ledger_builder_diff.With_valid_signatures_and_proofs.pre_diffs
+    { Staged_ledger_diff.With_valid_signatures_and_proofs.pre_diffs
     ; creator= self
     ; prev_hash= curr_hash }
 end*)
@@ -2078,7 +2078,7 @@ end*)
           {fee= f; proofs= p; prover= pr}
       end
 
-      module Ledger_builder_diff = struct
+      module Staged_ledger_diff = struct
         type completed_work = Completed_work.t
         [@@deriving sexp, bin_io, compare]
 
@@ -2262,22 +2262,22 @@ end*)
           ~get_completed_work:stmt_to_work
       in
       let%map _, `Ledger_proof ledger_proof =
-        Lb.apply lb (Test_input1.Ledger_builder_diff.forget diff) ~logger
+        Lb.apply lb (Test_input1.Staged_ledger_diff.forget diff) ~logger
       in
-      (ledger_proof, Test_input1.Ledger_builder_diff.forget diff)
+      (ledger_proof, Test_input1.Staged_ledger_diff.forget diff)
 
     let txns n f g = List.zip_exn (List.init n ~f) (List.init n ~f:g)
 
     let coinbase_added_first_prediff = function
-      | Test_input1.Ledger_builder_diff.At_most_two.Zero -> 0
+      | Test_input1.Staged_ledger_diff.At_most_two.Zero -> 0
       | One _ -> 1
       | _ -> 2
 
     let coinbase_added_second_prediff = function
-      | Test_input1.Ledger_builder_diff.At_most_one.Zero -> 0
+      | Test_input1.Staged_ledger_diff.At_most_one.Zero -> 0
       | _ -> 1
 
-    let coinbase_added (diff : Test_input1.Ledger_builder_diff.t) =
+    let coinbase_added (diff : Test_input1.Staged_ledger_diff.t) =
       match diff.pre_diffs with
       | First d -> coinbase_added_second_prediff d.coinbase_added
       | Second (d1, d2) ->
@@ -2329,7 +2329,7 @@ end*)
               assert (cb > 0 && cb < 3) ;
               let x =
                 List.length
-                  (Test_input1.Ledger_builder_diff.user_commands diff)
+                  (Test_input1.Staged_ledger_diff.user_commands diff)
               in
               assert_at_least_coinbase_added x cb ;
               let expected_value = expected_ledger x all_ts old_ledger in
@@ -2368,7 +2368,7 @@ end*)
               assert (cb > 0 && cb < 3) ;
               let x =
                 List.length
-                  (Test_input1.Ledger_builder_diff.user_commands diff)
+                  (Test_input1.Staged_ledger_diff.user_commands diff)
               in
               assert_at_least_coinbase_added x cb ;
               let expected_value = expected_ledger x all_ts old_ledger in
@@ -2414,7 +2414,7 @@ end*)
               assert (cb = 1) ;
               let x =
                 List.length
-                  (Test_input1.Ledger_builder_diff.user_commands diff)
+                  (Test_input1.Staged_ledger_diff.user_commands diff)
               in
               assert_at_least_coinbase_added x cb ;
               let expected_value = expected_ledger x all_ts old_ledger in

@@ -379,7 +379,7 @@ let%test_module "test" =
         end
 
         (* A ledger_builder transition will just add to a "ledger" integer *)
-        module Ledger_builder_diff = struct
+        module Staged_ledger_diff = struct
           type t = int [@@deriving bin_io, sexp]
 
           module With_valid_signatures_and_proofs = struct
@@ -435,7 +435,7 @@ let%test_module "test" =
 
           let aux t = !t
 
-          let apply (t : t) (x : Ledger_builder_diff.t) ~logger:_ =
+          let apply (t : t) (x : Staged_ledger_diff.t) ~logger:_ =
             t := x ;
             return (Ok (`Hash_after_applying (hash t), `Ledger_proof (Some x)))
 

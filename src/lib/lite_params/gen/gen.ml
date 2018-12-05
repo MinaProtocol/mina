@@ -22,7 +22,7 @@ module Proof_of_signature = Consensus.Proof_of_signature.Make (struct
 
   let proposal_interval = Time.Span.of_ms Int64.zero
 
-  module Ledger_builder_diff = Unit
+  module Staged_ledger_diff = Unit
   module Genesis_ledger = Genesis_ledger
 end)
 

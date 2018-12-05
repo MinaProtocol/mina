@@ -20,7 +20,7 @@ module type Inputs_intf = sig
     with type ledger_hash := Ledger_hash.t
      and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
 
-  module Ledger_builder_diff : Ledger_builder_diff_intf
+  module Staged_ledger_diff : Staged_ledger_diff_intf
 
   module Blockchain_state :
     Blockchain_state_intf
@@ -40,7 +40,7 @@ module type Inputs_intf = sig
     External_transition_intf
     with type protocol_state := Protocol_state.value
      and type protocol_state_proof := Proof.t
-     and type ledger_builder_diff := Ledger_builder_diff.t
+     and type ledger_builder_diff := Staged_ledger_diff.t
 
   module Key : Merkle_ledger.Intf.Key
 
@@ -99,8 +99,8 @@ module type Inputs_intf = sig
     module Diff : sig
       type t
 
-      (* hack until Parallel_scan_state().Diff.t fully diverges from Ledger_builder_diff.t and is included in External_transition *)
-      val of_ledger_builder_diff : Ledger_builder_diff.t -> t
+      (* hack until Parallel_scan_state().Diff.t fully diverges from Staged_ledger_diff.t and is included in External_transition *)
+      val of_ledger_builder_diff : Staged_ledger_diff.t -> t
     end
   end
 

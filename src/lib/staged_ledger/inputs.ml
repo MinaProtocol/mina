@@ -95,8 +95,8 @@ module type S = sig
      and type statement := Ledger_proof_statement.t
      and type public_key := Compressed_public_key.t
 
-  module Ledger_builder_diff :
-    Coda_pow.Ledger_builder_diff_intf
+  module Staged_ledger_diff :
+    Coda_pow.Staged_ledger_diff_intf
     with type completed_work := Completed_work.t
      and type completed_work_checked := Completed_work.Checked.t
      and type user_command := User_command.t
@@ -189,7 +189,7 @@ module type S' = sig
      and type public_key := Compressed_public_key.t
 
   module Staged_ledger_diff :
-    Coda_pow.Ledger_builder_diff_intf
+    Coda_pow.Staged_ledger_diff_intf
     with type completed_work := Transaction_snark_work.t
      and type completed_work_checked := Transaction_snark_work.Checked.t
      and type user_command := User_command.t
@@ -268,7 +268,7 @@ module type S' = sig
     module Diff : sig
       type t
 
-      (* hack until Parallel_scan_state().Diff.t fully diverges from Ledger_builder_diff.t and is included in External_transition *)
+      (* hack until Parallel_scan_state().Diff.t fully diverges from Staged_ledger_diff.t and is included in External_transition *)
       val of_ledger_builder_diff : Staged_ledger_diff.t -> t
     end
   end

@@ -112,8 +112,8 @@ module type Init_intf = sig
      and type statement := Transaction_snark.Statement.t
      and type proof := Ledger_proof.t
 
-  module Ledger_builder_diff :
-    Protocols.Coda_pow.Ledger_builder_diff_intf
+  module Staged_ledger_diff :
+    Protocols.Coda_pow.Staged_ledger_diff_intf
     with type completed_work_checked := Completed_work.Checked.t
      and type completed_work := Completed_work.t
      and type public_key := Public_key.Compressed.t
@@ -233,7 +233,7 @@ module type Main_intf = sig
       val hash : t -> Ledger_builder_hash.t
     end
 
-    module Ledger_builder_diff : sig
+    module Staged_ledger_diff : sig
       type t [@@deriving sexp, bin_io]
     end
 
@@ -241,12 +241,12 @@ module type Main_intf = sig
       Coda_base.Internal_transition.S
       with module Snark_transition = Consensus.Mechanism.Snark_transition
        and module Prover_state := Consensus.Mechanism.Prover_state
-       and module Ledger_builder_diff := Ledger_builder_diff
+       and module Staged_ledger_diff := Staged_ledger_diff
 
     module External_transition :
       Coda_base.External_transition.S
       with module Protocol_state = Consensus.Mechanism.Protocol_state
-       and module Ledger_builder_diff := Ledger_builder_diff
+       and module Staged_ledger_diff := Staged_ledger_diff
   end
 
   module Config : sig
@@ -339,7 +339,7 @@ module Completed_work =
   Staged_ledger.Make_completed_work (Public_key.Compressed) (Ledger_proof)
     (Ledger_proof_statement)
 
-module Ledger_builder_diff = Staged_ledger.Make_diff (struct
+module Staged_ledger_diff = Staged_ledger.Make_diff (struct
   module Ledger_proof = Ledger_proof
   module Ledger_hash = Ledger_hash
   module Ledger_builder_hash = Ledger_builder_hash
@@ -364,7 +364,7 @@ let make_init ~should_propose (module Config : Config_intf) :
   in
   let module Init = struct
     module Completed_work = Completed_work
-    module Ledger_builder_diff = Ledger_builder_diff
+    module Staged_ledger_diff = Staged_ledger_diff
     module Make_work_selector = Make_work_selector
     include Config
 
@@ -483,7 +483,7 @@ struct
       module Ledger_proof_statement = Ledger_proof_statement
       module Ledger_hash = Ledger_hash
       module Frozen_ledger_hash = Frozen_ledger_hash
-      module Ledger_builder_diff = Ledger_builder_diff
+      module Staged_ledger_diff = Staged_ledger_diff
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger_builder_aux_hash = Ledger_builder_aux_hash
       module Config = Init
@@ -506,27 +506,27 @@ struct
   module Ledger_builder_aux = Staged_ledger.Aux
 
   module Ledger_builder_transition = struct
-    type t = {old: Staged_ledger.t sexp_opaque; diff: Ledger_builder_diff.t}
+    type t = {old: Staged_ledger.t sexp_opaque; diff: Staged_ledger_diff.t}
     [@@deriving sexp]
 
     module With_valid_signatures_and_proofs = struct
       type t =
         { old: Staged_ledger.t sexp_opaque
-        ; diff: Ledger_builder_diff.With_valid_signatures_and_proofs.t }
+        ; diff: Staged_ledger_diff.With_valid_signatures_and_proofs.t }
       [@@deriving sexp]
     end
 
     let forget {With_valid_signatures_and_proofs.old; diff} =
-      {old; diff= Ledger_builder_diff.forget diff}
+      {old; diff= Staged_ledger_diff.forget diff}
   end
 
   module Internal_transition =
     Coda_base.Internal_transition.Make
-      (Ledger_builder_diff)
+      (Staged_ledger_diff)
       (Consensus.Mechanism.Snark_transition)
       (Consensus.Mechanism.Prover_state)
   module External_transition =
-    Coda_base.External_transition.Make (Ledger_builder_diff) (Protocol_state)
+    Coda_base.External_transition.Make (Staged_ledger_diff) (Protocol_state)
 
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (User_command)
@@ -580,7 +580,7 @@ struct
   module Inputs0 = Make_inputs0 (Init) (Ledger_proof_verifier)
   include Inputs0
   module Blockchain_state = Coda_base.Blockchain_state
-  module Ledger_builder_diff = Ledger_builder_diff
+  module Staged_ledger_diff = Staged_ledger_diff
   module Completed_work = Completed_work
   module Ledger_builder_hash = Ledger_builder_hash
   module Ledger_builder_aux_hash = Ledger_builder_aux_hash
@@ -757,7 +757,7 @@ struct
       module Ledger_proof_statement = Ledger_proof_statement
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger = Ledger
-      module Ledger_builder_diff = Ledger_builder_diff
+      module Staged_ledger_diff = Staged_ledger_diff
       module Ledger_builder_aux_hash = Ledger_builder_aux_hash
       module Staged_ledger = Ledger_builder
       module Blockchain_state = Blockchain_state
@@ -787,7 +787,7 @@ struct
 
   module Proposer = Proposer.Make (struct
     include Inputs0
-    module Ledger_builder_diff = Ledger_builder_diff
+    module Staged_ledger_diff = Staged_ledger_diff
     module Ledger_proof_verifier = Ledger_proof_verifier
     module Completed_work = Completed_work
     module Ledger_builder_hash = Ledger_builder_hash

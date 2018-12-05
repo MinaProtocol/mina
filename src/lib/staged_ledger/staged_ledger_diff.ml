@@ -27,7 +27,7 @@ module Make (Inputs : sig
      and type statement := Transaction_snark.Statement.t
      and type proof := Ledger_proof.t
 end) :
-  Coda_pow.Ledger_builder_diff_intf
+  Coda_pow.Staged_ledger_diff_intf
   with type user_command := Inputs.User_command.t
    and type user_command_with_valid_signature :=
               Inputs.User_command.With_valid_signature.t

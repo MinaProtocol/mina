@@ -33,7 +33,7 @@ module Base = struct
       val ledger_hash : t -> Ledger_hash.t
     end
 
-    module Ledger_builder_diff : sig
+    module Staged_ledger_diff : sig
       type t [@@deriving sexp, bin_io]
 
       module With_valid_signatures_and_proofs : sig
@@ -125,7 +125,7 @@ module Base = struct
 
       val protocol_state_proof : t -> Protocol_state_proof.t
 
-      val ledger_builder_diff : t -> Ledger_builder_diff.t
+      val ledger_builder_diff : t -> Staged_ledger_diff.t
     end
 
     module Ledger_proof_statement : sig
@@ -145,8 +145,8 @@ module Base = struct
       with type ledger_builder_hash := Ledger_builder_hash.t
        and type frozen_ledger_hash := Frozen_ledger_hash.t
        and type valid_diff :=
-                  Ledger_builder_diff.With_valid_signatures_and_proofs.t
-       and type diff := Ledger_builder_diff.t
+                  Staged_ledger_diff.With_valid_signatures_and_proofs.t
+       and type diff := Staged_ledger_diff.t
        and type ledger_proof := Ledger_proof.t
        and type ledger := Ledger.t
        and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t

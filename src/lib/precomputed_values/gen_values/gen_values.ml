@@ -92,7 +92,7 @@ let main () =
 
         let proposal_interval = Time.Span.of_ms @@ Int64.of_int 5000
 
-        module Ledger_builder_diff = Staged_ledger.Make_diff (struct
+        module Staged_ledger_diff = Staged_ledger.Make_diff (struct
           open Signature_lib
           open Coda_base
           module Compressed_public_key = Public_key.Compressed

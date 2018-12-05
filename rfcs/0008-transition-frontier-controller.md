@@ -148,7 +148,7 @@ table and not applying an ledger-builder-diffs.
 The add process runs in two phases:
 
 1. Perform a `lookup` on the `Transition_frontier` for the previous `State_hash.t` of this transition. If it is absent, send to [catchup monitor](#catchup-monitor). If present, continue.
-2. Derive a mask from the parent retrieved in (1) and apply the `Ledger_builder_diff.t` of the breadcrumb to that new mask. See [Transition Frontier](#transition-frontier) for more.
+2. Derive a mask from the parent retrieved in (1) and apply the `Staged_ledger_diff.t` of the breadcrumb to that new mask. See [Transition Frontier](#transition-frontier) for more.
 3. Construct the new `Breadcrumb.t` from the new mask and transition, and attempt a true mutate-add to the underlying [Transition Frontier](#transition-frontier) data.
 
 <a href="catchup-monitor"></a>
