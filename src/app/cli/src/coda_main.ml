@@ -457,6 +457,8 @@ struct
 
   module Ledger = Ledger
   module Ledger_db = Ledger.Db
+  module Ledger_transfer =
+    Ledger_transfer.Make(Ledger)(Ledger_db)
 
   module Transaction_snark = struct
     include Ledger_proof

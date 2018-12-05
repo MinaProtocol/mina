@@ -198,14 +198,14 @@ module type Transition_frontier_controller_intf = sig
 
   type syncable_ledger_answer
 
-  type transition_frontier
-
   type state_hash
+
+  type transition_frontier
 
   val run :
        logger:Logger.t
     -> time_controller:time_controller
-    -> genesis_transition:external_transition
+    -> frontier:transition_frontier
     -> transition_reader:external_transition Reader.t
     -> sync_query_reader:(state_hash * syncable_ledger_query) Reader.t
     -> sync_answer_writer:( state_hash * syncable_ledger_answer

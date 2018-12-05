@@ -412,6 +412,11 @@ module type Inputs_intf = sig
      and type transition_frontier := Transition_frontier.t
      and type transaction_pool := Transaction_pool.t
 
+  module Ledger_transfer :
+    Coda_pow.Ledger_transfer_intf
+      with type src := Ledger.t
+       and type dest := Ledger_db.t
+
   module Genesis : sig
     val state : Consensus_mechanism.Protocol_state.value
 
@@ -542,7 +547,9 @@ module Make (Inputs : Inputs_intf) = struct
               Transition_frontier.Transaction_snark_scan_state.empty
             ~root_staged_ledger_diff:None
             ~root_snarked_ledger:
-              (Ledger_db.create ?directory_name:config.ledger_db_location ())
+              (Ledger_transfer.transfer_accounts
+                ~src:Genesis.ledger
+                ~dest:(Ledger_db.create ?directory_name:config.ledger_db_location ()))
         in
         let lbc_deferred =
           Ledger_builder_controller.create

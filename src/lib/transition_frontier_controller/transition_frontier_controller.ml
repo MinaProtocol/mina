@@ -1,4 +1,3 @@
-open Core_kernel
 open Protocols.Coda_pow
 open Coda_base
 open Pipe_lib
@@ -95,9 +94,8 @@ module Make (Inputs : Inputs_intf) :
    and type transition_frontier := Inputs.Transition_frontier.t
    and type state_hash := State_hash.t = struct
   open Inputs
-  open Consensus_mechanism
 
-  let run ~logger ~time_controller ~genesis_transition ~transition_reader
+  let run ~logger ~time_controller ~frontier ~transition_reader
       ~sync_query_reader ~sync_answer_writer =
     let logger = Logger.child logger "transition_frontier_controller" in
     let valid_transition_reader, valid_transition_writer =
@@ -108,24 +106,6 @@ module Make (Inputs : Inputs_intf) :
     in
     let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
       Strict_pipe.create (Buffered (`Capacity 3, `Overflow Crash))
-    in
-    (* TODO: initialize transition frontier from disk *)
-    let frontier =
-      Transition_frontier.create
-        ~root_transition:
-          (With_hash.of_data genesis_transition
-             ~hash_data:
-               (Fn.compose Protocol_state.hash
-                  External_transition.protocol_state))
-        ~root_snarked_ledger:
-          (Ledger.foldi Genesis_ledger.t ~init:(Ledger.Db.create ())
-             ~f:(fun _addr db account ->
-               let key = Account.public_key account in
-               ignore (Ledger.Db.get_or_create_account_exn db key account) ;
-               db ))
-        ~root_transaction_snark_scan_state:
-          Transition_frontier.Transaction_snark_scan_state.empty
-        ~root_staged_ledger_diff:None ~logger
     in
     Transition_handler.Validator.run ~frontier ~transition_reader
       ~valid_transition_writer ;
