@@ -14,5 +14,5 @@
  ((name tests)
   (inline_tests)
   (libraries (core snarky test_util signature_lib snark_params vrf_lib coda_base sha256_lib fold_lib))
-  (preprocess (pps (ppx_jane ppx_deriving.eq)))
+  (preprocess (pps (ppx_jane ppx_deriving.eq bisect_ppx -conditional)))
   (modules (integrated_test))))

@@ -7,6 +7,6 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core protocols async async_extra))
-  (preprocess (pps (ppx_jane ppx_deriving.std)))
+  (preprocess (pps (ppx_jane ppx_deriving.std bisect_ppx -conditional)))
   (synopsis "Ledger fetcher fetches ledgers over the network")))
 

@@ -7,6 +7,6 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core async))
-  (preprocess (pps (ppx_jane)))
+  (preprocess (pps (ppx_jane bisect_ppx -conditional)))
   (synopsis "Logging library")))
 

@@ -10,6 +10,6 @@
     ( core
       storage
       async ))
-  (preprocess (pps (ppx_jane)))
+  (preprocess (pps (ppx_jane bisect_ppx -conditional)))
   (synopsis "Cache computation results on disk")))
 

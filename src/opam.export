@@ -51,6 +51,7 @@ installed: [
   "bignum.v0.11.0"
   "bin_prot.v0.11.0"
   "biniou.1.2.0"
+  "bisect_ppx.1.4.0"
   "bitstring.3.1.0"
   "camlp4.4.07+1"
   "camomile.1.0.1"

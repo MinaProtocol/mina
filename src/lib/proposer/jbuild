@@ -16,5 +16,5 @@
       unix_timestamp
       o1trace
       interruptible ))
-  (preprocess (pps (ppx_jane)))
+  (preprocess (pps (ppx_jane bisect_ppx -conditional)))
   (synopsis "Coda block proposer")))

@@ -18,6 +18,6 @@
       keys_lib
       perf_histograms
       sparse_ledger_lib ))
-  (preprocess (pps (ppx_jane)))
+  (preprocess (pps (ppx_jane bisect_ppx -conditional)))
   (synopsis "Lib powering the snark_worker interactions with the daemon")))
 

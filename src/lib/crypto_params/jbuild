@@ -8,7 +8,7 @@
   (inline_tests)
   (libraries
     ( snarky bignum_bigint crypto_params_init ))
-  (preprocess (pps (ppx_jane)))
+  (preprocess (pps (ppx_jane bisect_ppx -conditional)))
   (synopsis "Cryptographic parameters")))
 
 (rule

@@ -17,6 +17,13 @@ run_unit_tests() {
   run_dune runtest --verbose -j${myprocs}
 }
 
+run_unit_tests_with_coverage() {
+  date
+  myprocs=`nproc --all`  # Linux specific
+  # force to make sure all coverage files generated
+  BISECT_ENABLE=YES run_dune runtest --force -j${myprocs}
+}
+
 run_integration_test() {
   echo "------------------------------------------------------------------------------------------"
 
