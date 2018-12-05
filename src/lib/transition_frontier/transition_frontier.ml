@@ -32,12 +32,11 @@ module Make
                        and type public_key := Public_key.Compressed.t
                        and type ledger := Ledger.t
                        and type user_command_with_valid_signature :=
-                                  User_command.With_valid_signature.t)
-    : Transition_frontier_intf
-    with type state_hash := State_hash.t
-     and type external_transition := External_transition.t
-     and type ledger_database := Ledger.Db.t =
-struct
+                                  User_command.With_valid_signature.t) :
+  Transition_frontier_intf
+  with type state_hash := State_hash.t
+   and type external_transition := External_transition.t
+   and type ledger_database := Ledger.Db.t = struct
   type ledger_diff = Ledger_builder_diff.t
 
   (* Right now Transaction_snark_scan_state is not different from a
