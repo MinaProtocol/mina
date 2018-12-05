@@ -388,7 +388,13 @@ module type Inputs_intf = sig
      and type public_key_compressed := Public_key.Compressed.t
      and type maskable_ledger := Ledger.maskable_ledger
 
-  module Transition_frontier : sig type t end
+  module Ledger_db : Coda_pow.Ledger_creatable_intf
+
+  module Transition_frontier :
+    Protocols.Coda_transition_frontier.Transition_frontier_base_intf
+      with type state_hash := Protocol_state_hash.t
+       and type external_transition := External_transition.t
+       and type ledger_database := Ledger_db.t
 
   module Proposer :
     Proposer_intf
@@ -479,6 +485,7 @@ module Make (Inputs : Inputs_intf) = struct
     Linear_pipe.map t.strongest_ledgers ~f:(fun (_, x) -> x)
 
   module Config = struct
+   (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
     type t =
       { log: Logger.t
       ; propose_keypair: Keypair.t option
@@ -487,6 +494,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
+      ; ledger_db_location: string option
       ; ledger_builder_transition_backup_capacity: int [@default 10]
       ; time_controller: Time.Controller.t
       ; banlist: Coda_base.Banlist.t
@@ -505,6 +513,20 @@ module Make (Inputs : Inputs_intf) = struct
         let net_ivar = Ivar.create () in
         let consensus_local_state =
           Consensus_mechanism.Local_state.create config.propose_keypair
+        in
+        let first_transition =
+          failwith "TODO: Bootstrap should emit this transition"
+        in
+        let transition_frontier =
+          Transition_frontier.create
+            ~logger:config.log
+            ~root_transition:(With_hash.of_data first_transition
+             ~hash_data:
+               (Fn.compose Consensus_mechanism.Protocol_state.hash
+                  External_transition.protocol_state))
+            ~root_transaction_snark_scan_state:Transition_frontier.Transaction_snark_scan_state.empty
+            ~root_staged_ledger_diff:None
+            ~root_snarked_ledger:(Ledger_db.create ?directory_name:config.ledger_db_location ())
         in
         let lbc_deferred =
           Ledger_builder_controller.create
@@ -613,7 +635,7 @@ module Make (Inputs : Inputs_intf) = struct
                 ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
                 ~time_controller:config.time_controller ~keypair
                 ~consensus_local_state
-                ~transition_frontier:(failwith "TODO")
+                ~transition_frontier
             in
             don't_wait_for
               (Linear_pipe.transfer_id transitions external_transitions_writer)

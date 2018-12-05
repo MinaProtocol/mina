@@ -181,6 +181,7 @@ module Make
   (* TODO: load from and write to disk *)
   let create ~logger ~root_transition ~root_snarked_ledger
       ~root_transaction_snark_scan_state ~root_staged_ledger_diff =
+    let logger = Logger.child logger __MODULE__ in
     let root_hash = With_hash.hash root_transition in
     let root_protocol_state =
       External_transition.protocol_state (With_hash.data root_transition)

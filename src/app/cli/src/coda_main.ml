@@ -250,6 +250,7 @@ module type Main_intf = sig
   end
 
   module Config : sig
+   (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
     type t =
       { log: Logger.t
       ; propose_keypair: Keypair.t option
@@ -258,6 +259,7 @@ module type Main_intf = sig
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
+      ; ledger_db_location: string option
       ; ledger_builder_transition_backup_capacity: int [@default 10]
       ; time_controller: Inputs.Time.Controller.t
       ; banlist: Banlist.t
@@ -450,6 +452,7 @@ struct
   end
 
   module Ledger = Ledger
+  module Ledger_db = Ledger.Db
 
   module Transaction_snark = struct
     include Ledger_proof
@@ -617,34 +620,34 @@ struct
       , Protocol_state_proof.t )
       Protocols.Coda_pow.Proof_carrying_data.t
     [@@deriving sexp, bin_io]
-  end
+end
 
   module State_with_witness = struct
     type t =
       { ledger_builder_transition:
-          Ledger_builder_transition.With_valid_signatures_and_proofs.t
+        Ledger_builder_transition.With_valid_signatures_and_proofs.t
       ; state: Proof_carrying_state.t }
-    [@@deriving sexp]
+      [@@deriving sexp]
 
-    module Stripped = struct
-      type t =
-        { ledger_builder_transition: Ledger_builder_transition.t
+      module Stripped = struct
+        type t =
+          { ledger_builder_transition: Ledger_builder_transition.t
         ; state: Proof_carrying_state.t }
-    end
+  end
 
-    let strip {ledger_builder_transition; state} =
-      { Stripped.ledger_builder_transition=
-          Ledger_builder_transition.forget ledger_builder_transition
+        let strip {ledger_builder_transition; state} =
+          { Stripped.ledger_builder_transition=
+            Ledger_builder_transition.forget ledger_builder_transition
       ; state }
 
-    let forget_witness {ledger_builder_transition; state} = state
+        let forget_witness {ledger_builder_transition; state} = state
 
     (* TODO: How do we check this *)
     let add_witness ledger_builder_transition state =
       Or_error.return {ledger_builder_transition; state}
 
     let add_witness_exn l s = add_witness l s |> Or_error.ok_exn
-  end
+      end
 
   module Genesis = struct
     let state = Consensus.Mechanism.genesis_protocol_state
@@ -668,9 +671,9 @@ struct
           let r = compare t1.fee t2.fee in
           if Int.( <> ) r 0 then r
           else Public_key.Compressed.compare t1.prover t2.prover
-      end
+  end
 
-      include T
+        include T
       include Comparable.Make (T)
 
       let gen =
@@ -682,10 +685,10 @@ struct
           and is_odd = Bool.gen in
           let x = Bigint.(to_field (of_bignum_bigint x)) in
           {Public_key.Compressed.x; is_odd}
-        in
+          in
         Quickcheck.Generator.map2 Fee.Unsigned.gen pk ~f:(fun fee prover ->
-            {fee; prover} )
-    end
+          {fee; prover} )
+      end
 
     module Pool = Snark_pool.Make (Proof) (Fee) (Work)
     module Diff = Network_pool.Snark_pool_diff.Make (Proof) (Fee) (Work) (Pool)
@@ -711,39 +714,39 @@ struct
     let add_completed_work t
         (res :
           (('a, 'b, 'c, 'd) Single.Spec.t Spec.t, Ledger_proof.t) Result.t) =
-      apply_and_broadcast t
+            apply_and_broadcast t
         (Add_solved_work
            ( List.map res.spec.instances ~f:Single.Spec.statement
            , {proof= res.proofs; fee= {fee= res.spec.fee; prover= res.prover}}
-           ))
-  end
+        ))
+    end
 
   module Sync_ledger =
     Syncable_ledger.Make (Ledger.Addr) (Account)
-      (struct
-        include Ledger_hash
+    (struct
+      include Ledger_hash
 
         let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
         let empty_account = hash_account Account.empty
-      end)
-      (struct
-        include Ledger_hash
+  end)
+    (struct
+      include Ledger_hash
 
         let to_hash (h : t) =
           Ledger_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
-      end)
-      (struct
-        include Ledger
+    end)
+    (struct
+      include Ledger
 
         let f = Account.hash
-      end)
-      (struct
-        let subtree_height = 3
-      end)
+    end)
+    (struct
+      let subtree_height = 3
+    end)
 
-  module Net = Coda_networking.Make (struct
-    include Inputs0
+    module Net = Coda_networking.Make (struct
+      include Inputs0
     module Snark_pool = Snark_pool
     module Snark_pool_diff = Snark_pool.Diff
     module Sync_ledger = Sync_ledger
@@ -751,15 +754,15 @@ struct
     module Ledger_hash = Ledger_hash
     module Ledger_builder_aux_hash = Ledger_builder_aux_hash
     module Blockchain_state = Consensus.Mechanism.Blockchain_state
-  end)
+    end)
 
-  module Ledger_builder_controller = struct
-    module Inputs = struct
-      module Security = struct
-        let max_depth = Init.lbc_tree_max_depth
-      end
+    module Ledger_builder_controller = struct
+      module Inputs = struct
+        module Security = struct
+          let max_depth = Init.lbc_tree_max_depth
+    end
 
-      module Tip = Tip
+        module Tip = Tip
       module Snark_pool = Snark_pool
       module Ledger_hash = Ledger_hash
       module Frozen_ledger_hash = Frozen_ledger_hash
@@ -769,7 +772,7 @@ struct
       module Public_key = struct
         module Private_key = Private_key
         include Public_key
-      end
+        end
 
       module Keypair = Keypair
       module Ledger_proof_statement = Ledger_proof_statement
@@ -806,7 +809,6 @@ struct
   module Proposer = Proposer.Make (struct
     include Inputs0
     module State_hash = State_hash
-    module Ledger_db = Ledger.Db
     module Ledger_builder_diff = Ledger_builder_diff
     module Ledger_proof_verifier = Ledger_proof_verifier
     module Completed_work = Completed_work

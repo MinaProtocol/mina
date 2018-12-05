@@ -1,13 +1,33 @@
 open Pipe_lib.Strict_pipe
 
-module type Transition_frontier_intf = sig
+module type Transition_frontier_base_intf = sig
   type state_hash
 
   type external_transition
 
+  module Transaction_snark_scan_state : sig
+    type t
+
+    val empty : t
+  end
+
   type ledger_database
 
   type ledger_diff
+
+  type t
+
+  val create :
+       logger:Logger.t
+    -> root_transition:(external_transition, state_hash) With_hash.t
+    -> root_snarked_ledger:ledger_database
+    -> root_transaction_snark_scan_state:Transaction_snark_scan_state.t
+    -> root_staged_ledger_diff:ledger_diff option
+    -> t
+end
+
+module type Transition_frontier_intf = sig
+  include Transition_frontier_base_intf
 
   type staged_ledger
 
@@ -20,12 +40,6 @@ module type Transition_frontier_intf = sig
 
   val max_length : int
 
-  module Transaction_snark_scan_state : sig
-    type t
-
-    val empty : t
-  end
-
   module Breadcrumb : sig
     type t [@@deriving sexp]
 
@@ -34,16 +48,6 @@ module type Transition_frontier_intf = sig
 
     val staged_ledger : t -> staged_ledger
   end
-
-  type t
-
-  val create :
-       logger:Logger.t
-    -> root_transition:(external_transition, state_hash) With_hash.t
-    -> root_snarked_ledger:ledger_database
-    -> root_transaction_snark_scan_state:Transaction_snark_scan_state.t
-    -> root_staged_ledger_diff:ledger_diff option
-    -> t
 
   val hack_temporary_ledger_builder_of_staged_ledger : staged_ledger -> ledger_builder
 
