@@ -36,11 +36,11 @@ module type Transition_frontier_intf = sig
   type t
 
   val create :
-       root_transition:(external_transition, state_hash) With_hash.t
+       logger:Logger.t
+    -> root_transition:(external_transition, state_hash) With_hash.t
     -> root_snarked_ledger:ledger_database
     -> root_transaction_snark_scan_state:Transaction_snark_scan_state.t
     -> root_staged_ledger_diff:ledger_diff option
-    -> logger:Logger.t
     -> t
 
   val root : t -> Breadcrumb.t
