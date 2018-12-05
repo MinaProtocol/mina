@@ -573,8 +573,7 @@ module type Transaction_snark_scan_state_intf = sig
 
   module Transaction_with_witness : sig
     (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
-    type t =
-      { transaction_with_info: transaction_with_info
+    type t = { transaction_with_info: transaction_with_info
       ; statement: ledger_proof_statement
       ; witness: sparse_ledger }
   end
@@ -641,7 +640,7 @@ module type Transaction_snark_scan_state_intf = sig
 
   val hash : t -> hash
 
-  val staged_transactions : t -> Transaction_with_witness.t list
+  val staged_transactions : t -> transaction_with_info list
 
   val extract_from_job :
        Available_job.t

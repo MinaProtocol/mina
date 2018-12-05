@@ -29,23 +29,11 @@ end
 module Make (Inputs : Inputs.S') : sig
   include
     Coda_pow.Transaction_snark_scan_state_intf
-    with type (*type diff := Inputs.Staged_ledger_diff.t*)
-              (*and type valid_diff :=
-                Inputs.Staged_ledger_diff.With_valid_signatures_and_proofs.t*)
-              (*and type ledger_hash := Inputs.Ledger_hash.t*)
-              (*and type ledger_builder_hash := Inputs.Staged_ledger_hash.t*)
-              (*and type public_key := Inputs.Compressed_public_key.t*)
-                ledger_mask :=
-                Inputs.Ledger.attached_mask
-    (*and type user_command_with_valid_signature :=
-                Inputs.User_command.With_valid_signature.t*)
-    (*and type statement := Inputs.Transaction_snark_work.Statement.t*)
+    with type ledger_mask := Inputs.Ledger.attached_mask
      and type transaction_snark_work := Inputs.Transaction_snark_work.t
      and type ledger_proof := Inputs.Ledger_proof.t
-    (*and type ledger_builder_aux_hash := Inputs.Staged_ledger_aux_hash.t*)
      and type sparse_ledger := Inputs.Sparse_ledger.t
      and type ledger_proof_statement := Inputs.Ledger_proof_statement.t
-    (*and type ledger_proof_statement_set := Inputs.Ledger_proof_statement.Set.t*)
      and type transaction := Inputs.Transaction.t
      and type hash := Digestif.SHA256.t
      and type transaction_with_info := Inputs.Ledger.Undo.t
@@ -77,7 +65,6 @@ end = struct
   type job = Available_job.t
 
   type parallel_scan_completed_job =
-    (*For the parallel scan*)
     Ledger_proof_with_sok_message.t Parallel_scan.State.Completed_job.t
   [@@deriving sexp, bin_io]
 
@@ -96,7 +83,25 @@ end = struct
       (Binable.to_string (module Ledger_proof_with_sok_message))
       (Binable.to_string (module Transaction_with_witness))
 
-  (*let _hash t = Staged_ledger_aux_hash.of_bytes (hash_to_string t)*)
+  let is_valid t =
+    Parallel_scan.parallelism ~state:t
+    = Int.pow 2 (Config.transaction_capacity_log_2 + 1)
+    && Parallel_scan.is_valid t
+
+  include Binable.Of_binable
+            (T)
+            (struct
+              type nonrec t = t
+
+              let to_binable = Fn.id
+
+              let of_binable t =
+                assert (is_valid t) ;
+                t
+            end)
+
+
+  (**********Helpers*************)
 
   let create_expected_statement
       {Transaction_with_witness.transaction_with_info; witness; _} =
@@ -119,6 +124,40 @@ end = struct
     ; fee_excess
     ; supply_increase
     ; proof_type= `Base }
+
+  let completed_work_to_scanable_work (job : job) (fee, current_proof, prover)
+      : parallel_scan_completed_job Or_error.t =
+    let sok_digest = Ledger_proof.sok_digest current_proof
+    and proof = Ledger_proof.underlying_proof current_proof in
+    match job with
+    | Base {statement; _} ->
+        let ledger_proof = Ledger_proof.create ~statement ~sok_digest ~proof in
+        Ok (Lifted (ledger_proof, Sok_message.create ~fee ~prover))
+    | Merge ((p, _), (p', _)) ->
+        let s = Ledger_proof.statement p and s' = Ledger_proof.statement p' in
+        let open Or_error.Let_syntax in
+        let%map fee_excess =
+          Currency.Fee.Signed.add s.fee_excess s'.fee_excess
+          |> option "Error adding fees"
+        and supply_increase =
+          Currency.Amount.add s.supply_increase s'.supply_increase
+          |> option "Error adding supply_increases"
+        in
+        let statement =
+          { Ledger_proof_statement.source= s.source
+          ; target= s'.target
+          ; supply_increase
+          ; fee_excess
+          ; proof_type= `Merge }
+        in
+        Parallel_scan.State.Completed_job.Merged
+          ( Ledger_proof.create ~statement ~sok_digest ~proof
+          , Sok_message.create ~fee ~prover )
+
+  let total_proofs (works : Transaction_snark_work.t list) =
+    List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
+
+  (*************exposed functions*****************)
 
   module Make_statement_scanner
       (M : Monad_with_Or_error_intf) (Verifier : sig
@@ -251,22 +290,6 @@ end = struct
           ()
   end
 
-  let is_valid t =
-    Parallel_scan.parallelism ~state:t
-    = Int.pow 2 (Config.transaction_capacity_log_2 + 1)
-    && Parallel_scan.is_valid t
-
-  include Binable.Of_binable
-            (T)
-            (struct
-              type nonrec t = t
-
-              let to_binable = Fn.id
-
-              let of_binable t =
-                assert (is_valid t) ;
-                t
-            end)
 
   let statement_of_job : job -> Ledger_proof_statement.t option = function
     | Base {statement; _} -> Some statement
@@ -290,39 +313,6 @@ end = struct
         ; fee_excess
         ; proof_type= `Merge }
 
-  (************************completed work to scanable work**************)
-  let completed_work_to_scanable_work (job : job) (fee, current_proof, prover)
-      : parallel_scan_completed_job Or_error.t =
-    let sok_digest = Ledger_proof.sok_digest current_proof
-    and proof = Ledger_proof.underlying_proof current_proof in
-    match job with
-    | Base {statement; _} ->
-        let ledger_proof = Ledger_proof.create ~statement ~sok_digest ~proof in
-        Ok (Lifted (ledger_proof, Sok_message.create ~fee ~prover))
-    | Merge ((p, _), (p', _)) ->
-        let s = Ledger_proof.statement p and s' = Ledger_proof.statement p' in
-        let open Or_error.Let_syntax in
-        let%map fee_excess =
-          Currency.Fee.Signed.add s.fee_excess s'.fee_excess
-          |> option "Error adding fees"
-        and supply_increase =
-          Currency.Amount.add s.supply_increase s'.supply_increase
-          |> option "Error adding supply_increases"
-        in
-        let statement =
-          { Ledger_proof_statement.source= s.source
-          ; target= s'.target
-          ; supply_increase
-          ; fee_excess
-          ; proof_type= `Merge }
-        in
-        Parallel_scan.State.Completed_job.Merged
-          ( Ledger_proof.create ~statement ~sok_digest ~proof
-          , Sok_message.create ~fee ~prover )
-
-  let total_proofs (works : Transaction_snark_work.t list) =
-    List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
-
   let fill_in_transaction_snark_work t (works : Transaction_snark_work.t list)
       : Ledger_proof.t option Or_error.t =
     let open Or_error.Let_syntax in
@@ -342,7 +332,7 @@ end = struct
     in
     Option.map result ~f:fst
 
-  let create ~transaction_capacity_log_2:_ = failwith "unimp"
+  let create ~transaction_capacity_log_2 = Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 1)
 
   let enqueue_transactions t transactions =
     Parallel_scan.enqueue_data ~state:t ~data:transactions
@@ -357,7 +347,7 @@ end = struct
 
   let next_jobs_sequence t = Parallel_scan.next_jobs_sequence ~state:t
 
-  let staged_transactions = Parallel_scan.current_data
+  let staged_transactions t = List.map (Parallel_scan.current_data t) ~f:(fun (t:Transaction_with_witness.t) -> t.transaction_with_info)
 
   let copy = Parallel_scan.State.copy
 
