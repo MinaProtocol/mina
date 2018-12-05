@@ -8,7 +8,7 @@ module Make (Inputs : Inputs.S) : sig
 
   include
     Coda_lib.Ledger_builder_controller_intf
-    with type ledger_builder := Ledger_builder.t
+    with type ledger_builder := Staged_ledger.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type ledger := Ledger.t
      and type maskable_ledger := Ledger.maskable_ledger
@@ -48,7 +48,7 @@ end = struct
     module Step = struct
       let apply' t diff logger =
         let open Deferred.Or_error.Let_syntax in
-        let%map _, `Ledger_proof proof = Ledger_builder.apply t diff ~logger in
+        let%map _, `Ledger_proof proof = Staged_ledger.apply t diff ~logger in
         Option.map proof ~f:(fun proof ->
             ( Ledger_proof.statement proof |> Ledger_proof_statement.target
             , proof ) )
@@ -74,7 +74,7 @@ end = struct
               old_state |> Protocol_state.blockchain_state
               |> Blockchain_state.ledger_hash
         in
-        let ledger_builder_hash = Ledger_builder.hash tip.ledger_builder in
+        let ledger_builder_hash = Staged_ledger.hash tip.ledger_builder in
         let%map () =
           if
             verified
@@ -115,7 +115,7 @@ end = struct
     ; log: Logger.t
     ; handler: Transition_logic.t
     ; strongest_ledgers_reader:
-        (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t }
+        (Staged_ledger.t * External_transition.t) Linear_pipe.Reader.t }
 
   let strongest_tip t =
     let state = Transition_logic.state t.handler in
@@ -265,7 +265,7 @@ end = struct
     local_get_ledger' t hash
       ~p_tip:(fun hash {With_hash.data= tip; hash= _} ->
         Ledger_builder_hash.equal
-          (Ledger_builder.hash tip.Tip.ledger_builder)
+          (Staged_ledger.hash tip.Tip.ledger_builder)
           hash )
       ~p_trans:(fun hash {With_hash.data= trans; hash= _} ->
         Ledger_builder_hash.equal
@@ -298,7 +298,7 @@ end = struct
               local_get_ledger' t hash
                 ~p_tip:(fun hash {With_hash.data= tip; hash= _} ->
                   Ledger_hash.equal
-                    ( tip.Tip.ledger_builder |> Ledger_builder.ledger
+                    ( tip.Tip.ledger_builder |> Staged_ledger.ledger
                     |> Ledger.merkle_root )
                     hash )
                 ~p_trans:(fun hash {With_hash.data= trans; hash= _} ->
@@ -309,7 +309,7 @@ end = struct
                     |> Ledger_builder_hash.ledger_hash )
                     hash )
                 ~f_result:(fun {With_hash.data= tip; hash= _} ->
-                  tip.Tip.ledger_builder |> Ledger_builder.ledger )
+                  tip.Tip.ledger_builder |> Staged_ledger.ledger )
               >>| fst
             in
             prev_hash := Some hash ;
@@ -403,7 +403,7 @@ let%test_module "test" =
           type t = int [@@deriving sexp]
         end
 
-        module Ledger_builder = struct
+        module Staged_ledger = struct
           type t = int ref [@@deriving sexp, bin_io]
 
           type serializable = int [@@deriving bin_io]
@@ -524,11 +524,11 @@ let%test_module "test" =
           type t =
             { state: Consensus_mechanism.Protocol_state.value
             ; proof: Protocol_state_proof.t
-            ; ledger_builder: Ledger_builder.t }
+            ; ledger_builder: Staged_ledger.t }
           [@@deriving sexp, fields]
 
           let copy t =
-            {t with ledger_builder= Ledger_builder.copy t.ledger_builder}
+            {t with ledger_builder= Staged_ledger.copy t.ledger_builder}
 
           let of_transition_and_lb transition ledger_builder =
             { state= External_transition.protocol_state transition
@@ -539,7 +539,7 @@ let%test_module "test" =
             [%bin_type_class:
               Consensus_mechanism.Protocol_state.value
               * Protocol_state_proof.t
-              * Ledger_builder.serializable]
+              * Staged_ledger.serializable]
         end
 
         module Net = struct
@@ -629,8 +629,8 @@ let%test_module "test" =
       let config transitions longest_tip_location =
         let ledger_builder_transitions = slowly_pipe_of_list transitions in
         let net_input = transitions in
-        let ledger_builder = Ledger_builder.create ~ledger:0 in
-        let ledger = Ledger_builder.ledger ledger_builder in
+        let ledger_builder = Staged_ledger.create ~ledger:0 in
+        let ledger = Staged_ledger.ledger ledger_builder in
         Config.make ~parent_log:(Logger.create ())
           ~net_deferred:(return net_input)
           ~external_transitions:

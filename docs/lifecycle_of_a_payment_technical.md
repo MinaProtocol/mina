@@ -89,7 +89,7 @@ Fees are handled out-of-band see the [fee excess system](#fee-excess).
 
 This is encoded inside the SNARK in [transaction_snark.ml](../src/lib/transaction_snark/transaction_snark.ml), specifically the `apply_tagged_transaction` function, although you'll need to look at how the bool flags are set in the `is_normal` case.
 
-It's captured outside the SNARK here: (TODO: where is this? Ledger_builder somewhere?)
+It's captured outside the SNARK here: (TODO: where is this? Staged_ledger somewhere?)
 
 <a name="account-nonce"></a>
 ### Account Nonce

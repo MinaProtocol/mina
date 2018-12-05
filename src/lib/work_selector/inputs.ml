@@ -38,7 +38,7 @@ module type Inputs_intf = sig
       t -> Ledger_proof_statement.t list -> Completed_work.t option
   end
 
-  module Ledger_builder : sig
+  module Staged_ledger : sig
     type t
 
     val all_work_pairs :
@@ -88,7 +88,7 @@ module Test_input = struct
     let add_snark t ~work ~fee = Work.Table.add_exn t ~key:work ~data:fee
   end
 
-  module Ledger_builder = struct
+  module Staged_ledger = struct
     type t = int List.t
 
     let work i = Snark_work_lib.Work.Single.Spec.Transition (i, i, i)

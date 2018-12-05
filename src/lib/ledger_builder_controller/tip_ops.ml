@@ -22,7 +22,7 @@ module Make (Inputs : Inputs.Base.S) = struct
         ( External_transition.protocol_state transition
         |> Protocol_state.blockchain_state
         |> Blockchain_state.ledger_builder_hash )
-      (Ledger_builder.hash t.Tip.ledger_builder)
+      (Staged_ledger.hash t.Tip.ledger_builder)
 
   let transition_unchecked t
       ( {With_hash.data= transition; hash= transition_state_hash} as
@@ -30,7 +30,7 @@ module Make (Inputs : Inputs.Base.S) = struct
     let%map () =
       let open Deferred.Let_syntax in
       match%map
-        Ledger_builder.apply t.Tip.ledger_builder
+        Staged_ledger.apply t.Tip.ledger_builder
           (External_transition.ledger_builder_diff transition)
           ~logger
       with

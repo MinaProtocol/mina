@@ -1,4 +1,4 @@
-[%%import
+(*[%%import
 "../../config.mlh"]
 
 open Core_kernel
@@ -350,7 +350,7 @@ end = struct
           (Ledger_proof_statement.t, [`Error of Error.t | `Empty]) Result.t M.t
           =
         let write_error description =
-          sprintf !"Ledger_builder.scan_statement: %s" description
+          sprintf !"Staged_ledger.scan_statement: %s" description
         in
         let open M.Let_syntax in
         let with_error ~f message =
@@ -674,7 +674,7 @@ end = struct
   call_logger]
 
   let hash t =
-    Coda_debug.Call_logger.record_call "Ledger_builder.hash" ;
+    Coda_debug.Call_logger.record_call "Staged_ledger.hash" ;
     hash t
 
   [%%endif]
@@ -1679,9 +1679,9 @@ end = struct
     { Ledger_builder_diff.With_valid_signatures_and_proofs.pre_diffs
     ; creator= self
     ; prev_hash= curr_hash }
-end
+end*)
 
-let%test_module "test" =
+(*let%test_module "test" =
   ( module struct
     module Test_input1 = struct
       open Coda_pow
@@ -2476,4 +2476,4 @@ let%test_module "test" =
                 Or_error.ok_exn @@ Lb.snarked_ledger lb ~snarked_ledger_hash
               in
               assert (!expected_snarked_ledger = !materialized_ledger) ) )
-  end )
+  end ) *)

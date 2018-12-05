@@ -573,7 +573,8 @@ module type Transaction_snark_scan_state_intf = sig
 
   module Transaction_with_witness : sig
     (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
-    type t = { transaction_with_info: transaction_with_info
+    type t =
+      { transaction_with_info: transaction_with_info
       ; statement: ledger_proof_statement
       ; witness: sparse_ledger }
   end
@@ -656,7 +657,7 @@ module type Transaction_snark_scan_state_intf = sig
   val statement_of_job : Available_job.t -> ledger_proof_statement option
 end
 
-module type Ledger_builder_base_intf = sig
+module type Staged_ledger_base_intf = sig
   type t [@@deriving sexp]
 
   type diff
@@ -724,8 +725,8 @@ module type Ledger_builder_base_intf = sig
     t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t
 end
 
-module type Ledger_builder_intf = sig
-  include Ledger_builder_base_intf
+module type Staged_ledger_intf = sig
+  include Staged_ledger_base_intf
 
   type ledger_hash
 
@@ -776,8 +777,6 @@ module type Ledger_builder_intf = sig
 
   val statement_exn : t -> [`Non_empty of ledger_proof_statement | `Empty]
 end
-
-module type Staged_ledger_intf = Ledger_builder_intf
 
 module type Work_selector_intf = sig
   type ledger_builder
@@ -1240,8 +1239,8 @@ Merge Snark:
     type t
   end
 
-  module Ledger_builder :
-    Ledger_builder_intf
+  module Staged_ledger :
+    Staged_ledger_intf
     with type diff := Ledger_builder_diff.t
      and type valid_diff :=
                 Ledger_builder_diff.With_valid_signatures_and_proofs.t
@@ -1264,7 +1263,7 @@ Merge Snark:
   module Ledger_builder_transition :
     Ledger_builder_transition_intf
     with type diff := Ledger_builder_diff.t
-     and type ledger_builder := Ledger_builder.t
+     and type ledger_builder := Staged_ledger.t
      and type diff_with_valid_signatures_and_proofs :=
                 Ledger_builder_diff.With_valid_signatures_and_proofs.t
 
@@ -1300,14 +1299,14 @@ Merge Snark:
 
   module Tip :
     Tip_intf
-    with type ledger_builder := Ledger_builder.t
+    with type ledger_builder := Staged_ledger.t
      and type protocol_state := Consensus_mechanism.Protocol_state.value
      and type protocol_state_proof := Protocol_state_proof.t
      and type external_transition := External_transition.t
      and type serializable :=
                 Consensus_mechanism.Protocol_state.value
                 * Protocol_state_proof.t
-                * Ledger_builder.serializable
+                * Staged_ledger.serializable
 end
 
 module Make

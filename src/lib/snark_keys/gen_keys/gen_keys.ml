@@ -150,7 +150,7 @@ let gen_keys () =
 
     let private_key = None
 
-    module Ledger_builder_diff = Ledger_builder.Make_diff (struct
+    module Ledger_builder_diff = Staged_ledger.Make_diff (struct
       open Coda_base
       module Compressed_public_key = Public_key.Compressed
 
@@ -179,7 +179,7 @@ let gen_keys () =
       module Ledger_proof = Transaction_snark
 
       module Completed_work = struct
-        include Ledger_builder.Make_completed_work
+        include Staged_ledger.Make_completed_work
                   (Compressed_public_key)
                   (Ledger_proof)
                   (Transaction_snark.Statement)

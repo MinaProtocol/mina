@@ -83,7 +83,7 @@ so we must get enough info to go back to the locked state (where we know we've
 achieved consensus).
 
 2. There is now a notion of a `Breadcrumb.t` which contains an
-`External_transition.t` and a now light-weight `Ledger_builder.t` it also has a
+`External_transition.t` and a now light-weight `Staged_ledger.t` it also has a
 notion of the prior breadcrumb. We take advantage of the merkle-mask to put
 these breadcrumbs in each node of the transition-tree. See
 [RFC-0007](0007-persistent-ledger-builder-controller) for more info on merkle

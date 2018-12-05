@@ -18,7 +18,7 @@ module Make_diff = Staged_ledger_diff.Make
 
 module Make (Inputs : Inputs.S') : sig
   include
-    Coda_pow.Ledger_builder_intf
+    Coda_pow.Staged_ledger_intf
     with type diff := Inputs.Staged_ledger_diff.t
      and type valid_diff :=
                 Inputs.Staged_ledger_diff.With_valid_signatures_and_proofs.t
@@ -39,7 +39,6 @@ module Make (Inputs : Inputs.S') : sig
      and type transaction := Inputs.Transaction.t
 end = struct
   open Inputs
-
   module TSS = Transaction_snark_scan_state.Make (Inputs)
 
   type job = TSS.Available_job.t
@@ -236,7 +235,7 @@ end = struct
     Staged_ledger_hash.of_aux_and_ledger_hash (Aux.hash scan_state)
       (Ledger.merkle_root ledger)
 
-   [%%if
+  [%%if
   call_logger]
 
   let hash t =
@@ -571,8 +570,9 @@ end = struct
           eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e ) ;
       Result_with_rollback.of_or_error r
     in
-    let%bind () = 
-      Result_with_rollback.of_or_error @@ TSS.enqueue_transactions t.scan_state data
+    let%bind () =
+      Result_with_rollback.of_or_error
+      @@ TSS.enqueue_transactions t.scan_state data
     in
     let%map () =
       verify_scan_state_after_apply t.ledger t.scan_state

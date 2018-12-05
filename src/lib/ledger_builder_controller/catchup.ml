@@ -51,7 +51,7 @@ struct
           let open Interruptible.Let_syntax in
           match%bind
             Interruptible.uninterruptible
-              (Ledger_builder.of_aux_and_ledger ~snarked_ledger_hash ~ledger
+              (Staged_ledger.of_aux_and_ledger ~snarked_ledger_hash ~ledger
                  ~aux)
           with
           (* TODO: We'll need the full history in order to trust that
@@ -72,7 +72,7 @@ struct
               Logger.debug log
                 !"Successfully caught up to full ledger-builder %{sexp: \
                   Ledger_builder_hash.t}"
-                (Ledger_builder.hash lb) ;
+                (Staged_ledger.hash lb) ;
               let open Transition_logic_state.Change in
               Interruptible.uninterruptible
                 (state_mutator old_state
@@ -95,7 +95,7 @@ struct
           | None ->
               trace_recurring_task "sync ledger" (fun () ->
                   let ledger =
-                    Ledger_builder.ledger locked_tip.ledger_builder
+                    Staged_ledger.ledger locked_tip.ledger_builder
                     |> Ledger.copy
                   in
                   let sl = Sync_ledger.create ledger ~parent_log:log in

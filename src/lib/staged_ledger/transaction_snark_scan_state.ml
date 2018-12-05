@@ -100,7 +100,6 @@ end = struct
                 t
             end)
 
-
   (**********Helpers*************)
 
   let create_expected_statement
@@ -290,7 +289,6 @@ end = struct
           ()
   end
 
-
   let statement_of_job : job -> Ledger_proof_statement.t option = function
     | Base {statement; _} -> Some statement
     | Merge ((p1, _), (p2, _)) ->
@@ -332,7 +330,8 @@ end = struct
     in
     Option.map result ~f:fst
 
-  let create ~transaction_capacity_log_2 = Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 1)
+  let create ~transaction_capacity_log_2 =
+    Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 1)
 
   let enqueue_transactions t transactions =
     Parallel_scan.enqueue_data ~state:t ~data:transactions
@@ -347,7 +346,9 @@ end = struct
 
   let next_jobs_sequence t = Parallel_scan.next_jobs_sequence ~state:t
 
-  let staged_transactions t = List.map (Parallel_scan.current_data t) ~f:(fun (t:Transaction_with_witness.t) -> t.transaction_with_info)
+  let staged_transactions t =
+    List.map (Parallel_scan.current_data t)
+      ~f:(fun (t : Transaction_with_witness.t) -> t.transaction_with_info )
 
   let copy = Parallel_scan.State.copy
 

@@ -86,7 +86,7 @@ module Make (Inputs : Inputs_intf) :
   Coda_lib.Proposer_intf
   with type external_transition := Inputs.External_transition.t
    and type ledger_hash := Inputs.Ledger_hash.t
-   and type ledger_builder := Inputs.Ledger_builder.t
+   and type ledger_builder := Inputs.Staged_ledger.t
    and type transaction := Inputs.User_command.With_valid_signature.t
    and type protocol_state := Inputs.Consensus_mechanism.Protocol_state.value
    and type protocol_state_proof := Inputs.Protocol_state_proof.t
@@ -145,14 +145,14 @@ module Make (Inputs : Inputs_intf) :
       Interruptible.uninterruptible
         (let open Deferred.Let_syntax in
         let diff =
-          Ledger_builder.create_diff ledger_builder
+          Staged_ledger.create_diff ledger_builder
             ~self:(Public_key.compress keypair.public_key)
             ~logger ~transactions_by_fee:transactions ~get_completed_work
         in
-        let lb2 = Ledger_builder.copy ledger_builder in
+        let lb2 = Staged_ledger.copy ledger_builder in
         let%map ( `Hash_after_applying next_ledger_builder_hash
                 , `Ledger_proof ledger_proof_opt ) =
-          Ledger_builder.apply_diff_unchecked lb2 diff
+          Staged_ledger.apply_diff_unchecked lb2 diff
         in
         (diff, next_ledger_builder_hash, ledger_proof_opt))
     in
@@ -222,7 +222,7 @@ module Make (Inputs : Inputs_intf) :
     type t =
       { protocol_state:
           Protocol_state.value * Protocol_state_proof.t sexp_opaque
-      ; ledger_builder: Ledger_builder.t sexp_opaque
+      ; ledger_builder: Staged_ledger.t sexp_opaque
       ; transactions:
           User_command.With_valid_signature.t Sequence.t sexp_opaque }
     [@@deriving sexp_of]

@@ -12,7 +12,7 @@
       blockchain_snark
       async
       core
-      ledger_builder
+      staged_ledger
     ))
    (link_flags (-cclib -lrocksdb))
    (preprocessor_deps ("../../../config.mlh"))
