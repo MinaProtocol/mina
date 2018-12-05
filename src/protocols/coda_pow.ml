@@ -536,8 +536,20 @@ module type Ledger_builder_transition_intf = sig
   val forget : With_valid_signatures_and_proofs.t -> t
 end
 
+module type Monad_with_Or_error_intf = sig
+  type 'a t
+
+  include Monad.S with type 'a t := 'a t
+
+  module Or_error : sig
+    type nonrec 'a t = 'a Or_error.t t
+
+    include Monad.S with type 'a t := 'a t
+  end
+end
+
 module type Transaction_snark_scan_state_intf = sig
-  type ledger
+  type ledger_mask
 
   type ledger_proof_statement
 
@@ -572,13 +584,40 @@ module type Transaction_snark_scan_state_intf = sig
   end
 
   module Available_job : sig
-    type t  
-    
-    (* =
-      | Base of Transaction_with_witness.t
-      | Merge of
-          Ledger_proof_with_sok_message.t * Ledger_proof_with_sok_message.t*)
+    type t
   end
+
+  (******************)
+  module Make_statement_scanner
+      (M : Monad_with_Or_error_intf) (Verifier : sig
+          val verify :
+               ledger_proof
+            -> ledger_proof_statement
+            -> message:sok_message
+            -> sexp_bool M.t
+      end) : sig
+    (*module Fold :
+      sig
+        val fold_chronological_until :
+          ('a, 'd) Parallel_scan.State.t ->
+          init:'acc ->
+          f:('acc ->
+             ('a, 'd) Parallel_scan.State.Job.t ->
+             ('acc, 'stop) Container.Continue_or_stop.t M.t) ->
+          finish:('acc -> 'stop M.t) -> 'stop M.t
+    end*)
+    val scan_statement :
+      t -> (ledger_proof_statement, [`Empty | `Error of Error.t]) result M.t
+
+    val check_invariants :
+         t
+      -> error_prefix:string
+      -> ledger_mask
+      -> frozen_ledger_hash sexp_option
+      -> (unit, Error.t) result M.t
+  end
+
+  (******************)
 
   val create : transaction_capacity_log_2:int -> t
 
@@ -586,9 +625,7 @@ module type Transaction_snark_scan_state_intf = sig
     t -> Transaction_with_witness.t list -> unit Or_error.t
 
   val fill_in_transaction_snark_work :
-       t
-    -> transaction_snark_work list
-    -> ledger_proof option Or_error.t
+    t -> transaction_snark_work list -> ledger_proof option Or_error.t
 
   val latest_ledger_proof : t -> Ledger_proof_with_sok_message.t option
 
@@ -608,7 +645,9 @@ module type Transaction_snark_scan_state_intf = sig
 
   val extract_from_job :
        Available_job.t
-    -> (transaction_with_info * ledger_proof_statement * sparse_ledger, ledger_proof * ledger_proof) Either.t
+    -> ( transaction_with_info * ledger_proof_statement * sparse_ledger
+       , ledger_proof * ledger_proof )
+       Either.t
 
   val copy : t -> t
 

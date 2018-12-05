@@ -307,6 +307,25 @@ end = struct
     let is_valid = TSS.is_valid
 
     let hash t = Staged_ledger_aux_hash.of_bytes (TSS.hash t :> string)
+
+    module Statement_scanner = struct
+      module T = struct
+        include Monad.Ident
+        module Or_error = Or_error
+      end
+
+      include TSS.Make_statement_scanner
+                (T)
+                (struct
+                  let verify (_ : Ledger_proof.t)
+                      (_ : Ledger_proof_statement.t)
+                      ~message:(_ : Sok_message.t) =
+                    true
+                end)
+    end
+
+    module Statement_scanner_with_proofs =
+      TSS.Make_statement_scanner (Deferred) (Inputs.Ledger_proof_verifier)
   end
 
   type scan_state = Aux.t [@@deriving sexp, bin_io]
@@ -388,17 +407,16 @@ end = struct
     let {Ledger_proof_statement.target; _} = Ledger_proof.statement proof in
     target
 
-  let verify_scan_state_after_apply _ledger (_aux : Aux.t) = Ok ()
-
-  (* TODO   let error_prefix =
+  let verify_scan_state_after_apply ledger (aux : Aux.t) =
+    let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
     match TSS.latest_ledger_proof aux with
     | None ->
-        TSS.Statement_scanner.check_invariants aux error_prefix ledger None
+        Aux.Statement_scanner.check_invariants aux ~error_prefix ledger None
     | Some proof ->
-        TSS.Statement_scanner.check_invariants aux error_prefix ledger
-          (Some (get_target proof)) *)
+        Aux.Statement_scanner.check_invariants aux ~error_prefix ledger
+          (Some (get_target proof))
 
   let snarked_ledger :
       t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t =
@@ -441,17 +459,14 @@ end = struct
                 Frozen_ledger_hash.t}))"
               target expected_target
 
-  let statement_exn _t = failwith "unimp"
-
-  (*TODO match Aux.Statement_scanner.scan_statement t.scan_state with
+  let statement_exn t =
+    match Aux.Statement_scanner.scan_statement t.scan_state with
     | Ok s -> `Non_empty s
     | Error `Empty -> `Empty
-    | Error (`Error e) -> failwithf !"statement_exn: %{sexp:Error.t}" e ()*)
+    | Error (`Error e) -> failwithf !"statement_exn: %{sexp:Error.t}" e ()
 
-  let of_aux_and_ledger = failwith "unimp"
-
-  (*~snarked_ledger_hash ~ledger ~aux = *)
-  (* TODO let open Deferred.Or_error.Let_syntax in
+  let of_aux_and_ledger ~snarked_ledger_hash ~ledger ~aux =
+    let open Deferred.Or_error.Let_syntax in
     let verify_snarked_ledger t snarked_ledger_hash =
       match snarked_ledger t ~snarked_ledger_hash with
       | Ok _ -> Ok ()
@@ -463,12 +478,13 @@ end = struct
     let t = {ledger; scan_state= aux} in
     let%bind () =
       Aux.Statement_scanner_with_proofs.check_invariants aux
-        "Ledger_hash.of_aux_and_ledger" ledger (Some snarked_ledger_hash)
+        ~error_prefix:"Ledger_hash.of_aux_and_ledger" ledger
+        (Some snarked_ledger_hash)
     in
     let%map () =
       Deferred.return @@ verify_snarked_ledger t snarked_ledger_hash
     in
-    t*)
+    t
 
   let copy {scan_state; ledger} =
     {scan_state= TSS.copy scan_state; ledger= Ledger.copy ledger}
@@ -557,7 +573,8 @@ end = struct
 
   let fill_in_completed_work (state : scan_state)
       (works : Transaction_snark_work.t list) :
-      Ledger_proof.t option Or_error.t = TSS.fill_in_transaction_snark_work state works
+      Ledger_proof.t option Or_error.t =
+    TSS.fill_in_transaction_snark_work state works
 
   (*  let open Or_error.Let_syntax in
     let%bind next_jobs =

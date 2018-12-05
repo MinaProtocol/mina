@@ -1,5 +1,4 @@
 open Core_kernel
-open Async_kernel
 open Protocols
 
 let option lab =
@@ -34,11 +33,10 @@ module Make (Inputs : Inputs.S') : sig
               (*and type valid_diff :=
                 Inputs.Staged_ledger_diff.With_valid_signatures_and_proofs.t*)
               (*and type ledger_hash := Inputs.Ledger_hash.t*)
-              (**)
               (*and type ledger_builder_hash := Inputs.Staged_ledger_hash.t*)
               (*and type public_key := Inputs.Compressed_public_key.t*)
-                ledger :=
-                Inputs.Ledger.t
+                ledger_mask :=
+                Inputs.Ledger.attached_mask
     (*and type user_command_with_valid_signature :=
                 Inputs.User_command.With_valid_signature.t*)
     (*and type statement := Inputs.Transaction_snark_work.Statement.t*)
@@ -52,6 +50,7 @@ module Make (Inputs : Inputs.S') : sig
      and type hash := Digestif.SHA256.t
      and type transaction_with_info := Inputs.Ledger.Undo.t
      and type frozen_ledger_hash := Inputs.Frozen_ledger_hash.t
+     and type sok_message := Inputs.Sok_message.t
 end = struct
   open Inputs
 
@@ -69,14 +68,13 @@ end = struct
   end
 
   module Available_job = struct
-    type t = ( Ledger_proof_with_sok_message.t
-    , Transaction_with_witness.t )
-    Parallel_scan.Available_job.t
+    type t =
+      ( Ledger_proof_with_sok_message.t
+      , Transaction_with_witness.t )
+      Parallel_scan.Available_job.t
   end
 
   type job = Available_job.t
-
-  type sok_message = Sok_message.t
 
   type parallel_scan_completed_job =
     (*For the parallel scan*)
@@ -222,7 +220,7 @@ end = struct
       | Ok (Some res) -> Ok res
       | Error e -> Error (`Error e)
 
-    let _check_invariants t error_prefix ledger snarked_ledger_hash =
+    let check_invariants t ~error_prefix ledger snarked_ledger_hash =
       let clarify_error cond err =
         if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
       in
@@ -253,24 +251,6 @@ end = struct
           ()
   end
 
-  module Statement_scanner = struct
-    module T = struct
-      include Monad.Ident
-      module Or_error = Or_error
-    end
-
-    include Make_statement_scanner
-              (T)
-              (struct
-                let verify (_ : Ledger_proof.t) (_ : Ledger_proof_statement.t)
-                    ~message:(_ : Sok_message.t) =
-                  true
-              end)
-  end
-
-  module Statement_scanner_with_proofs =
-    Make_statement_scanner (Deferred) (Inputs.Ledger_proof_verifier)
-
   let is_valid t =
     Parallel_scan.parallelism ~state:t
     = Int.pow 2 (Config.transaction_capacity_log_2 + 1)
@@ -299,7 +279,8 @@ end = struct
             (Frozen_ledger_hash.equal stmt1.target stmt2.source)
             ()
         in
-        let%map fee_excess = Currency.Fee.Signed.add stmt1.fee_excess stmt2.fee_excess
+        let%map fee_excess =
+          Currency.Fee.Signed.add stmt1.fee_excess stmt2.fee_excess
         and supply_increase =
           Currency.Amount.add stmt1.supply_increase stmt2.supply_increase
         in
@@ -342,9 +323,8 @@ end = struct
   let total_proofs (works : Transaction_snark_work.t list) =
     List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
 
-  let fill_in_transaction_snark_work t
-      (works : Transaction_snark_work.t list) :
-      Ledger_proof.t option Or_error.t =
+  let fill_in_transaction_snark_work t (works : Transaction_snark_work.t list)
+      : Ledger_proof.t option Or_error.t =
     let open Or_error.Let_syntax in
     let%bind next_jobs =
       Parallel_scan.next_k_jobs ~state:t ~k:(total_proofs works)
@@ -364,7 +344,8 @@ end = struct
 
   let create ~transaction_capacity_log_2:_ = failwith "unimp"
 
-  let enqueue_transactions t transactions = Parallel_scan.enqueue_data ~state:t ~data:transactions
+  let enqueue_transactions t transactions =
+    Parallel_scan.enqueue_data ~state:t ~data:transactions
 
   let latest_ledger_proof = Parallel_scan.last_emitted_value
 
@@ -380,11 +361,12 @@ end = struct
 
   let copy = Parallel_scan.State.copy
 
-  let partition_if_overflowing t ~max_slots = Parallel_scan.partition_if_overflowing t ~max_slots
+  let partition_if_overflowing t ~max_slots =
+    Parallel_scan.partition_if_overflowing t ~max_slots
 
-  let extract_from_job (job: job) =
+  let extract_from_job (job : job) =
     match job with
-    | Parallel_scan.Available_job.Base d -> First (d.transaction_with_info, d.statement, d.witness)
-    | Merge ((p1, _), (p2,_)) -> Second (p1,p2)
-
+    | Parallel_scan.Available_job.Base d ->
+        First (d.transaction_with_info, d.statement, d.witness)
+    | Merge ((p1, _), (p2, _)) -> Second (p1, p2)
 end
