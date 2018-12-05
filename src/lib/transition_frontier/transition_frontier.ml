@@ -39,6 +39,9 @@ module Make
    and type ledger_database := Ledger.Db.t = struct
   type ledger_diff = Ledger_builder_diff.t
 
+  (* Transaction_snark_scan_state and Staged_ledger long-term will not live in
+  * this module *)
+  
   (* Right now Transaction_snark_scan_state is not different from a
      * ledger-builder diff *)
   module Transaction_snark_scan_state : sig
@@ -98,8 +101,6 @@ module Make
       -> Transaction_snark_scan_state.Diff.t
       -> t Or_error.t
   end = struct
-    (* TODO *)
-
     type t = staged_ledger
 
     let create ~transaction_snark_scan_state ~ledger =
