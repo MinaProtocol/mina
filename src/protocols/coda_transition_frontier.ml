@@ -1,22 +1,9 @@
 open Pipe_lib.Strict_pipe
 
-module type Transition_frontier_intf = sig
+module type Transition_frontier_base_intf = sig
   type state_hash
 
   type external_transition
-
-  type ledger_database
-
-  type ledger_diff
-
-  type staged_ledger
-
-  exception
-    Parent_not_found of ([`Parent of state_hash] * [`Target of state_hash])
-
-  exception Already_exists of state_hash
-
-  val max_length : int
 
   module Transaction_snark_scan_state : sig
     type t
@@ -24,14 +11,9 @@ module type Transition_frontier_intf = sig
     val empty : t
   end
 
-  module Breadcrumb : sig
-    type t
+  type ledger_database
 
-    val transition_with_hash :
-      t -> (external_transition, state_hash) With_hash.t
-
-    val staged_ledger : t -> staged_ledger
-  end
+  type ledger_diff
 
   type t
 
@@ -42,6 +24,33 @@ module type Transition_frontier_intf = sig
     -> root_transaction_snark_scan_state:Transaction_snark_scan_state.t
     -> root_staged_ledger_diff:ledger_diff option
     -> t
+end
+
+module type Transition_frontier_intf = sig
+  include Transition_frontier_base_intf
+
+  type staged_ledger
+
+  type ledger_builder
+
+  exception
+    Parent_not_found of ([`Parent of state_hash] * [`Target of state_hash])
+
+  exception Already_exists of state_hash
+
+  val max_length : int
+
+  module Breadcrumb : sig
+    type t [@@deriving sexp]
+
+    val transition_with_hash :
+      t -> (external_transition, state_hash) With_hash.t
+
+    val staged_ledger : t -> staged_ledger
+  end
+
+  val hack_temporary_ledger_builder_of_staged_ledger :
+    staged_ledger -> ledger_builder
 
   val root : t -> Breadcrumb.t
 
