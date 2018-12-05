@@ -1,12 +1,12 @@
 ########################################
-## Docker Wrapper 
+## Docker Wrapper
 ## Hint: export USEDOCKER=TRUE
 
 GITHASH = $(shell git rev-parse --short=8 HEAD)
 GITLONGHASH = $(shell git rev-parse HEAD)
 
 MYUID = $(shell id -u)
-DOCKERNAME = codabuilder-$(MYUID) 
+DOCKERNAME = codabuilder-$(MYUID)
 
 # Unique signature of kademlia code tree
 KADEMLIA_SIG = $(shell cd src/app/kademlia-haskell ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
@@ -62,6 +62,17 @@ reformat:
 
 check-format:
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
+
+########################################
+## Merlin fixup for docker builds
+
+merlin-fixup:
+ifeq ($(USEDOCKER),TRUE)
+	@echo "Fixing up .merlin files for Docker build"
+	@./scripts/merlin-fixup.sh
+else
+	@echo "Not building in Docker, .merlin files unchanged"
+endif
 
 ########################################
 ## Containers and container management

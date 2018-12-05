@@ -29,5 +29,3 @@ RUN USER=opam && \
 
 USER opam:opam
 ENTRYPOINT ["fixuid"]
-
-
