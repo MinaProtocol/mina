@@ -178,7 +178,7 @@ let gen_keys () =
 
       module Ledger_proof = Transaction_snark
 
-      module Completed_work = struct
+      module Transaction_snark_work = struct
         include Staged_ledger.Make_completed_work
                   (Compressed_public_key)
                   (Ledger_proof)

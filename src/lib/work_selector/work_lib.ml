@@ -52,7 +52,7 @@ module Make (Inputs : Inputs.Inputs_intf) = struct
     Option.value_map ~default:true
       (Inputs.Snark_pool.get_completed_work snark_pool statements)
       ~f:(fun priced_proof ->
-        let competing_fee = Inputs.Completed_work.fee priced_proof in
+        let competing_fee = Inputs.Transaction_snark_work.fee priced_proof in
         Inputs.Fee.compare fee competing_fee < 0 )
 
   module For_tests = struct

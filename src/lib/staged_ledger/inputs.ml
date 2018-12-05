@@ -89,16 +89,16 @@ module type S = sig
     with type ledger_hash := Ledger_hash.t
      and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
 
-  module Completed_work :
-    Coda_pow.Completed_work_intf
+  module Transaction_snark_work :
+    Coda_pow.Transaction_snark_work_intf
     with type proof := Ledger_proof.t
      and type statement := Ledger_proof_statement.t
      and type public_key := Compressed_public_key.t
 
   module Staged_ledger_diff :
     Coda_pow.Staged_ledger_diff_intf
-    with type completed_work := Completed_work.t
-     and type completed_work_checked := Completed_work.Checked.t
+    with type completed_work := Transaction_snark_work.t
+     and type completed_work_checked := Transaction_snark_work.Checked.t
      and type user_command := User_command.t
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
@@ -110,9 +110,9 @@ module type S = sig
   end
 
   val check :
-       Completed_work.t
+       Transaction_snark_work.t
     -> Ledger_proof_statement.t list
-    -> Completed_work.Checked.t option Async_kernel.Deferred.t
+    -> Transaction_snark_work.Checked.t option Async_kernel.Deferred.t
 end
 
 module type S' = sig
@@ -183,7 +183,7 @@ module type S' = sig
      and type ledger_builder_aux_hash := Staged_ledger_aux_hash.t
 
   module Transaction_snark_work :
-    Coda_pow.Completed_work_intf
+    Coda_pow.Transaction_snark_work_intf
     with type proof := Ledger_proof.t
      and type statement := Ledger_proof_statement.t
      and type public_key := Compressed_public_key.t

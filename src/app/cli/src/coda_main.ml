@@ -106,16 +106,16 @@ end
 module type Init_intf = sig
   include Config_intf
 
-  module Completed_work :
-    Protocols.Coda_pow.Completed_work_intf
+  module Transaction_snark_work :
+    Protocols.Coda_pow.Transaction_snark_work_intf
     with type public_key := Public_key.Compressed.t
      and type statement := Transaction_snark.Statement.t
      and type proof := Ledger_proof.t
 
   module Staged_ledger_diff :
     Protocols.Coda_pow.Staged_ledger_diff_intf
-    with type completed_work_checked := Completed_work.Checked.t
-     and type completed_work := Completed_work.t
+    with type completed_work_checked := Transaction_snark_work.Checked.t
+     and type completed_work := Transaction_snark_work.t
      and type public_key := Public_key.Compressed.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type user_command := User_command.t
@@ -335,7 +335,7 @@ module User_command = struct
 end
 
 module Ledger_proof_statement = Transaction_snark.Statement
-module Completed_work =
+module Transaction_snark_work =
   Staged_ledger.Make_completed_work (Public_key.Compressed) (Ledger_proof)
     (Ledger_proof_statement)
 
@@ -346,7 +346,7 @@ module Staged_ledger_diff = Staged_ledger.Make_diff (struct
   module Ledger_builder_aux_hash = Ledger_builder_aux_hash
   module Compressed_public_key = Public_key.Compressed
   module User_command = User_command
-  module Completed_work = Completed_work
+  module Transaction_snark_work = Transaction_snark_work
 end)
 
 let make_init ~should_propose (module Config : Config_intf) :
@@ -363,7 +363,7 @@ let make_init ~should_propose (module Config : Config_intf) :
     | Random -> (module Work_selector.Random.Make : Work_selector_F)
   in
   let module Init = struct
-    module Completed_work = Completed_work
+    module Transaction_snark_work = Transaction_snark_work
     module Staged_ledger_diff = Staged_ledger_diff
     module Make_work_selector = Make_work_selector
     include Config
@@ -460,7 +460,7 @@ struct
   module Ledger_proof = Ledger_proof
   module Sparse_ledger = Coda_base.Sparse_ledger
 
-  module Completed_work_proof = struct
+  module Transaction_snark_work_proof = struct
     type t = Ledger_proof.t list [@@deriving sexp, bin_io]
   end
 
@@ -471,7 +471,7 @@ struct
       module Proof = Proof
       module Sparse_ledger = Sparse_ledger
       module Amount = Amount
-      module Completed_work = Completed_work
+      module Transaction_snark_work = Transaction_snark_work
       module Compressed_public_key = Public_key.Compressed
       module User_command = User_command
       module Fee_transfer = Fee_transfer
@@ -488,7 +488,7 @@ struct
       module Ledger_builder_aux_hash = Ledger_builder_aux_hash
       module Config = Init
 
-      let check (Completed_work.({fee; prover; proofs}) as t) stmts =
+      let check (Transaction_snark_work.({fee; prover; proofs}) as t) stmts =
         let message = Sok_message.create ~fee ~prover in
         match List.zip proofs stmts with
         | None -> return None
@@ -497,7 +497,7 @@ struct
               Deferred.List.for_all ps ~f:(fun (proof, stmt) ->
                   Transaction_snark.verify ~message proof stmt )
             in
-            Option.some_if good (Completed_work.Checked.create_unsafe t)
+            Option.some_if good (Transaction_snark_work.Checked.create_unsafe t)
     end
 
     include Staged_ledger.Make (Inputs)
@@ -581,7 +581,7 @@ struct
   include Inputs0
   module Blockchain_state = Coda_base.Blockchain_state
   module Staged_ledger_diff = Staged_ledger_diff
-  module Completed_work = Completed_work
+  module Transaction_snark_work = Transaction_snark_work
   module Ledger_builder_hash = Ledger_builder_hash
   module Ledger_builder_aux_hash = Ledger_builder_aux_hash
   module Ledger_proof_verifier = Ledger_proof_verifier
@@ -637,8 +637,8 @@ struct
   end
 
   module Snark_pool = struct
-    module Work = Completed_work.Statement
-    module Proof = Completed_work_proof
+    module Work = Transaction_snark_work.Statement
+    module Proof = Transaction_snark_work_proof
 
     module Fee = struct
       module T = struct
@@ -680,8 +680,8 @@ struct
       Option.map
         (Pool.request_proof (pool t) statement)
         ~f:(fun {proof; fee= {fee; prover}} ->
-          Completed_work.Checked.create_unsafe
-            {Completed_work.fee; proofs= proof; prover} )
+          Transaction_snark_work.Checked.create_unsafe
+            {Transaction_snark_work.fee; proofs= proof; prover} )
 
     let load ~parent_log ~disk_location ~incoming_diffs =
       match%map Reader.load_bin_prot disk_location Pool.bin_reader_t with
@@ -789,7 +789,7 @@ struct
     include Inputs0
     module Staged_ledger_diff = Staged_ledger_diff
     module Ledger_proof_verifier = Ledger_proof_verifier
-    module Completed_work = Completed_work
+    module Transaction_snark_work = Transaction_snark_work
     module Ledger_builder_hash = Ledger_builder_hash
     module Ledger_builder_aux_hash = Ledger_builder_aux_hash
     module Ledger_proof_statement = Ledger_proof_statement
@@ -828,11 +828,11 @@ struct
     module Fee = Fee.Unsigned
     module Snark_pool = Snark_pool
 
-    module Completed_work = struct
-      type t = Completed_work.Checked.t
+    module Transaction_snark_work = struct
+      type t = Transaction_snark_work.Checked.t
 
       let fee t =
-        let {Completed_work.fee; _} = Completed_work.forget t in
+        let {Transaction_snark_work.fee; _} = Transaction_snark_work.forget t in
         fee
     end
   end

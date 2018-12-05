@@ -11,7 +11,7 @@ module Make
 
       val gen : t Quickcheck.Generator.t
     end) :
-  Coda_pow.Completed_work_intf
+  Coda_pow.Transaction_snark_work_intf
   with type proof := Ledger_proof.t
    and type statement := Ledger_proof_statement.t
    and type public_key := Compressed_public_key.t = struct

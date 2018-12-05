@@ -21,8 +21,8 @@ module Make (Inputs : sig
   module User_command :
     User_command_intf with type public_key := Compressed_public_key.t
 
-  module Completed_work :
-    Completed_work_intf
+  module Transaction_snark_work :
+    Transaction_snark_work_intf
     with type public_key := Compressed_public_key.t
      and type statement := Transaction_snark.Statement.t
      and type proof := Ledger_proof.t
@@ -33,8 +33,8 @@ end) :
               Inputs.User_command.With_valid_signature.t
    and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
    and type public_key := Inputs.Compressed_public_key.t
-   and type completed_work := Inputs.Completed_work.t
-   and type completed_work_checked := Inputs.Completed_work.Checked.t = struct
+   and type completed_work := Inputs.Transaction_snark_work.t
+   and type completed_work_checked := Inputs.Transaction_snark_work.Checked.t = struct
   open Inputs
 
   module At_most_two = struct
@@ -62,15 +62,15 @@ end) :
   end
 
   type diff =
-    {completed_works: Completed_work.t list; user_commands: User_command.t list}
+    {completed_works: Transaction_snark_work.t list; user_commands: User_command.t list}
   [@@deriving sexp, bin_io]
 
   type diff_with_at_most_two_coinbase =
-    {diff: diff; coinbase_parts: Completed_work.t At_most_two.t}
+    {diff: diff; coinbase_parts: Transaction_snark_work.t At_most_two.t}
   [@@deriving sexp, bin_io]
 
   type diff_with_at_most_one_coinbase =
-    {diff: diff; coinbase_added: Completed_work.t At_most_one.t}
+    {diff: diff; coinbase_added: Transaction_snark_work.t At_most_one.t}
   [@@deriving sexp, bin_io]
 
   type pre_diffs =
@@ -87,18 +87,18 @@ end) :
 
   module With_valid_signatures_and_proofs = struct
     type diff =
-      { completed_works: Completed_work.Checked.t list
+      { completed_works: Transaction_snark_work.Checked.t list
       ; user_commands: User_command.With_valid_signature.t list }
     [@@deriving sexp]
 
     type diff_with_at_most_two_coinbase =
       { diff: diff
-      ; coinbase_parts: Inputs.Completed_work.Checked.t At_most_two.t }
+      ; coinbase_parts: Inputs.Transaction_snark_work.Checked.t At_most_two.t }
     [@@deriving sexp]
 
     type diff_with_at_most_one_coinbase =
       { diff: diff
-      ; coinbase_added: Inputs.Completed_work.Checked.t At_most_one.t }
+      ; coinbase_added: Inputs.Transaction_snark_work.Checked.t At_most_one.t }
     [@@deriving sexp]
 
     type pre_diffs =
@@ -122,10 +122,10 @@ end) :
 
   let forget_diff
       {With_valid_signatures_and_proofs.completed_works; user_commands} =
-    { completed_works= List.map ~f:Completed_work.forget completed_works
+    { completed_works= List.map ~f:Transaction_snark_work.forget completed_works
     ; user_commands= (user_commands :> User_command.t list) }
 
-  let forget_work_opt = Option.map ~f:Completed_work.forget
+  let forget_work_opt = Option.map ~f:Transaction_snark_work.forget
 
   let forget_pre_diff_with_at_most_two
       {With_valid_signatures_and_proofs.diff; coinbase_parts} =
@@ -136,7 +136,7 @@ end) :
       | Two cw_pair ->
           Two
             (Option.map cw_pair ~f:(fun (cw, cw_opt) ->
-                 (Completed_work.forget cw, forget_work_opt cw_opt) ))
+                 (Transaction_snark_work.forget cw, forget_work_opt cw_opt) ))
     in
     {diff= forget_diff diff; coinbase_parts= forget_cw}
 

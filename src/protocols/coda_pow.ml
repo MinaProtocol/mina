@@ -397,7 +397,7 @@ module Work_selection = struct
   type t = Seq | Random [@@deriving bin_io]
 end
 
-module type Completed_work_intf = sig
+module type Transaction_snark_work_intf = sig
   type proof
 
   type statement
@@ -438,7 +438,7 @@ module type Completed_work_intf = sig
   val proofs_length : int
 end
 
-module type Ledger_builder_diff_intf = sig
+module type Staged_ledger_diff_intf = sig
   type user_command
 
   type user_command_with_valid_signature
@@ -1219,21 +1219,21 @@ Merge Snark:
   module Time_close_validator :
     Time_close_validator_intf with type time := Time.t
 
-  module Completed_work :
-    Completed_work_intf
+  module Transaction_snark_work :
+    Transaction_snark_work_intf
     with type proof := Ledger_proof.t
      and type statement := Ledger_proof_statement.t
      and type public_key := Public_key.Compressed.t
 
-  module Ledger_builder_diff :
-    Ledger_builder_diff_intf
+  module Staged_ledger_diff :
+    Staged_ledger_diff_intf
     with type user_command := User_command.t
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type public_key := Public_key.Compressed.t
-     and type completed_work := Completed_work.t
-     and type completed_work_checked := Completed_work.Checked.t
+     and type completed_work := Transaction_snark_work.t
+     and type completed_work_checked := Transaction_snark_work.Checked.t
 
   module Sparse_ledger : sig
     type t
@@ -1241,9 +1241,9 @@ Merge Snark:
 
   module Staged_ledger :
     Staged_ledger_intf
-    with type diff := Ledger_builder_diff.t
+    with type diff := Staged_ledger_diff.t
      and type valid_diff :=
-                Ledger_builder_diff.With_valid_signatures_and_proofs.t
+                Staged_ledger_diff.With_valid_signatures_and_proofs.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
      and type ledger_hash := Ledger_hash.t
@@ -1253,8 +1253,8 @@ Merge Snark:
      and type ledger_proof := Ledger_proof.t
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
-     and type statement := Completed_work.Statement.t
-     and type completed_work := Completed_work.Checked.t
+     and type statement := Transaction_snark_work.Statement.t
+     and type completed_work := Transaction_snark_work.Checked.t
      and type sparse_ledger := Sparse_ledger.t
      and type ledger_proof_statement := Ledger_proof_statement.t
      and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
@@ -1262,10 +1262,10 @@ Merge Snark:
 
   module Ledger_builder_transition :
     Ledger_builder_transition_intf
-    with type diff := Ledger_builder_diff.t
+    with type diff := Staged_ledger_diff.t
      and type ledger_builder := Staged_ledger.t
      and type diff_with_valid_signatures_and_proofs :=
-                Ledger_builder_diff.With_valid_signatures_and_proofs.t
+                Staged_ledger_diff.With_valid_signatures_and_proofs.t
 
   module Protocol_state_hash : Protocol_state_hash_intf
 
@@ -1278,7 +1278,7 @@ Merge Snark:
      and type protocol_state_proof := Protocol_state_proof.t
      and type frozen_ledger_hash := Frozen_ledger_hash.t
      and type ledger_builder_hash := Ledger_builder_hash.t
-     and type ledger_builder_diff := Ledger_builder_diff.t
+     and type ledger_builder_diff := Staged_ledger_diff.t
      and type user_command := User_command.t
      and type sok_digest := Sok_message.Digest.t
      and type ledger := Ledger.t
@@ -1289,12 +1289,12 @@ Merge Snark:
     Internal_transition_intf
     with type snark_transition := Consensus_mechanism.Snark_transition.value
      and type prover_state := Consensus_mechanism.Prover_state.t
-     and type ledger_builder_diff := Ledger_builder_diff.t
+     and type ledger_builder_diff := Staged_ledger_diff.t
 
   module External_transition :
     External_transition_intf
     with type protocol_state := Consensus_mechanism.Protocol_state.value
-     and type ledger_builder_diff := Ledger_builder_diff.t
+     and type ledger_builder_diff := Staged_ledger_diff.t
      and type protocol_state_proof := Protocol_state_proof.t
 
   module Tip :

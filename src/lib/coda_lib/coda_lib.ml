@@ -331,8 +331,8 @@ module type Inputs_intf = sig
 
   module Snark_pool :
     Snark_pool_intf
-    with type completed_work_statement := Completed_work.Statement.t
-     and type completed_work_checked := Completed_work.Checked.t
+    with type completed_work_statement := Transaction_snark_work.Statement.t
+     and type completed_work_checked := Transaction_snark_work.Checked.t
 
   module Work_selector :
     Coda_pow.Work_selector_intf
@@ -396,8 +396,8 @@ module type Inputs_intf = sig
      and type protocol_state := Consensus_mechanism.Protocol_state.value
      and type protocol_state_proof := Protocol_state_proof.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
-     and type completed_work_statement := Completed_work.Statement.t
-     and type completed_work_checked := Completed_work.Checked.t
+     and type completed_work_statement := Transaction_snark_work.Statement.t
+     and type completed_work_checked := Transaction_snark_work.Checked.t
      and type external_transition := External_transition.t
      and type time_controller := Time.Controller.t
      and type keypair := Keypair.t
