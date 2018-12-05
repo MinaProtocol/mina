@@ -66,10 +66,7 @@ module type Transition_frontier_intf = sig
   val attach_breadcrumb_exn : t -> Breadcrumb.t -> unit
 
   val add_transition_exn :
-       t
-    -> logger:Logger.t
-    -> (external_transition, state_hash) With_hash.t
-    -> Breadcrumb.t
+    t -> (external_transition, state_hash) With_hash.t -> Breadcrumb.t
 end
 
 module type Catchup_intf = sig
