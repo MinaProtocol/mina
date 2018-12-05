@@ -1412,6 +1412,36 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       ~previous_state_hash:Protocol_state.(hash negative_one)
       ~blockchain_state:Snark_transition.(blockchain_state genesis)
       ~consensus_state
+
+  let to_unix_timestamp recieved_time =
+    recieved_time |> Time.to_span_since_epoch |> Time.Span.to_ms
+    |> Unix_timestamp.of_int64
+
+  let%test "Receive a valid consensus_state with a bit of delay" =
+    let {Consensus_state.curr_epoch; curr_slot; _} = Consensus_state.genesis in
+    let delay = Constants.network_delay / 2 |> UInt32.of_int in
+    let new_slot = UInt32.Infix.(curr_slot + delay) in
+    let time_received = Epoch.slot_start_time curr_epoch new_slot in
+    is_valid Consensus_state.genesis
+      ~time_received:(to_unix_timestamp time_received)
+
+  let%test "Receive an invalid consensus_state" =
+    let epoch = Epoch.of_int 5 in
+    let start_time = Epoch.start_time epoch in
+    let curr_epoch, curr_slot = Epoch.epoch_and_slot_of_time_exn start_time in
+    let consensus_state =
+      {Consensus_state.genesis with curr_epoch; curr_slot}
+    in
+    let too_early = Epoch.start_time Consensus_state.genesis.curr_slot in
+    let too_late =
+      let delay = Constants.network_delay * 2 |> UInt32.of_int in
+      let delayed_slot = UInt32.Infix.(curr_slot + delay) in
+      Epoch.slot_start_time curr_epoch delayed_slot
+    in
+    let times = [too_late; too_early] in
+    List.for_all times ~f:(fun time ->
+        not (is_valid consensus_state ~time_received:(to_unix_timestamp time))
+    )
 end
 
 let%test_module "Proof_of_stake tests" =
