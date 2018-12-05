@@ -9,13 +9,19 @@ module Max_length = struct
 end
 
 module Make
+    (Completed_work : sig
+      type t
+      module Checked : sig type t end
+    end)
     (Ledger_builder_diff : Ledger_builder_diff_intf
                            with type user_command := User_command.t
                             and type user_command_with_valid_signature :=
                                        User_command.With_valid_signature.t
                             and type ledger_builder_hash :=
                                        Ledger_builder_hash.t
-                            and type public_key := Public_key.Compressed.t)
+                            and type public_key := Public_key.Compressed.t
+                            and type completed_work := Completed_work.t
+                            and type completed_work_checked := Completed_work.Checked.t)
     (External_transition : External_transition.S
                            with module Protocol_state = Consensus.Mechanism
                                                         .Protocol_state
@@ -32,7 +38,9 @@ module Make
                        and type public_key := Public_key.Compressed.t
                        and type ledger := Ledger.t
                        and type user_command_with_valid_signature :=
-                                  User_command.With_valid_signature.t) :
+                                  User_command.With_valid_signature.t
+                       and type completed_work := Completed_work.Checked.t
+    ) :
   Transition_frontier_intf
   with type state_hash := State_hash.t
    and type external_transition := External_transition.t

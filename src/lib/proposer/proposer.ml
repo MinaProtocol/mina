@@ -6,6 +6,16 @@ open O1trace
 module type Inputs_intf = sig
   include Protocols.Coda_pow.Inputs_intf
 
+  module State_hash : sig type t end
+
+  module Ledger_db : sig type t end
+
+  module Transition_frontier :
+    Protocols.Coda_transition_frontier.Transition_frontier_intf
+      with type state_hash := State_hash.t
+       and type external_transition := External_transition.t
+       and type ledger_database := Ledger_db.t
+
   module Prover : sig
     val prove :
          prev_state:Consensus_mechanism.Protocol_state.value
@@ -94,7 +104,8 @@ module Make (Inputs : Inputs_intf) :
    and type completed_work_statement := Inputs.Completed_work.Statement.t
    and type completed_work_checked := Inputs.Completed_work.Checked.t
    and type time_controller := Inputs.Time.Controller.t
-   and type keypair := Inputs.Keypair.t = struct
+   and type keypair := Inputs.Keypair.t
+   and type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
   open Consensus_mechanism
 
@@ -233,7 +244,7 @@ module Make (Inputs : Inputs_intf) :
   let transition_capacity = 64
 
   let create ~parent_log ~get_completed_work ~change_feeder:tip_reader
-      ~time_controller ~keypair ~consensus_local_state =
+      ~time_controller ~keypair ~consensus_local_state ~transition_frontier:_ =
     trace_task "proposer" (fun () ->
         let logger = Logger.child parent_log "proposer" in
         let transition_reader, transition_writer = Linear_pipe.create () in

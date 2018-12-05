@@ -528,6 +528,24 @@ struct
   module External_transition =
     Coda_base.External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
+  module Transition_frontier =
+    Transition_frontier.Make
+      (Completed_work)
+      (Ledger_builder_diff)
+      (External_transition)
+      (struct
+        (* This monkey patching is justified because we're about to rip out
+         * ledger builder *)
+        include Ledger_builder
+        type sparse_ledger = Sparse_ledger.t
+        type ledger_proof_statement_set = Ledger_proof_statement.Set.t
+        type ledger_proof_statement = Ledger_proof_statement.t
+        type statement = Completed_work.Statement.t
+        type transaction = Transaction.t
+        type ledger_proof = Ledger_proof.t
+        type ledger_builder_aux_hash = Ledger_builder_aux_hash.t
+      end)
+
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (User_command)
     include Network_pool.Make (Pool) (Pool.Diff)
@@ -787,6 +805,8 @@ struct
 
   module Proposer = Proposer.Make (struct
     include Inputs0
+    module State_hash = State_hash
+    module Ledger_db = Ledger.Db
     module Ledger_builder_diff = Ledger_builder_diff
     module Ledger_proof_verifier = Ledger_proof_verifier
     module Completed_work = Completed_work

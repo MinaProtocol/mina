@@ -251,6 +251,8 @@ module type Proposer_intf = sig
 
   type keypair
 
+  type transition_frontier
+
   module Tip : sig
     type t =
       { protocol_state: protocol_state * protocol_state_proof
@@ -268,6 +270,7 @@ module type Proposer_intf = sig
     -> time_controller:time_controller
     -> keypair:keypair
     -> consensus_local_state:consensus_local_state
+    -> transition_frontier:transition_frontier
     -> (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
 end
 
@@ -388,6 +391,8 @@ module type Inputs_intf = sig
      and type public_key_compressed := Public_key.Compressed.t
      and type maskable_ledger := Ledger.maskable_ledger
 
+  module Transition_frontier : sig type t end
+
   module Proposer :
     Proposer_intf
     with type ledger_hash := Ledger_hash.t
@@ -401,6 +406,7 @@ module type Inputs_intf = sig
      and type external_transition := External_transition.t
      and type time_controller := Time.Controller.t
      and type keypair := Keypair.t
+     and type transition_frontier := Transition_frontier.t
 
   module Genesis : sig
     val state : Consensus_mechanism.Protocol_state.value
@@ -624,6 +630,7 @@ module Make (Inputs : Inputs_intf) = struct
                 ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
                 ~time_controller:config.time_controller ~keypair
                 ~consensus_local_state
+                ~transition_frontier:(failwith "TODO")
             in
             don't_wait_for
               (Linear_pipe.transfer_id transitions external_transitions_writer)
