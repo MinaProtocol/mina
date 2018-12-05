@@ -48,7 +48,9 @@ end = struct
     module Step = struct
       let apply' t diff logger =
         let open Deferred.Or_error.Let_syntax in
-        let%map _, `Ledger_proof proof = Ledger_builder.apply t diff ~logger in
+        let%map _, `Ledger_proof proof =
+          Deferred.return @@ Ledger_builder.apply t diff ~logger
+        in
         Option.map proof ~f:(fun proof ->
             ( Ledger_proof.statement proof |> Ledger_proof_statement.target
             , proof ) )
@@ -433,13 +435,13 @@ let%test_module "test" =
             create ~ledger
 
           let of_aux_and_ledger ~snarked_ledger_hash:_ ~ledger ~aux:_ =
-            Deferred.return (Ok (create ~ledger))
+            Ok (create ~ledger)
 
           let aux t = !t
 
           let apply (t : t) (x : Ledger_builder_diff.t) ~logger:_ =
             t := x ;
-            return (Ok (`Hash_after_applying (hash t), `Ledger_proof (Some x)))
+            Ok (`Hash_after_applying (hash t), `Ledger_proof (Some x))
 
           let apply_diff_unchecked (_t : t) (_x : 'a) =
             failwith "Unimplemented"

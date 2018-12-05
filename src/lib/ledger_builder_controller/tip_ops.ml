@@ -29,13 +29,13 @@ module Make (Inputs : Inputs.Base.S) = struct
       transition_with_hash ) logger =
     let%map () =
       let open Deferred.Let_syntax in
-      match%map
+      match
         Ledger_builder.apply t.Tip.ledger_builder
           (External_transition.ledger_builder_diff transition)
           ~logger
       with
-      | Ok (_, `Ledger_proof None) -> ()
-      | Ok (_, `Ledger_proof (Some _)) -> ()
+      | Ok (_, `Ledger_proof None) -> return ()
+      | Ok (_, `Ledger_proof (Some _)) -> return ()
       (* We've already verified that all the patches can be
         applied successfully before we added to the ktree, so we
         can force-unwrap here *)
