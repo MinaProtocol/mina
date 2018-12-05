@@ -574,7 +574,7 @@ module type Ledger_builder_base_intf = sig
        snarked_ledger_hash:frozen_ledger_hash
     -> ledger:ledger
     -> aux:Aux.t
-    -> t Or_error.t Deferred.t
+    -> t Or_error.t
 
   val of_serialized_and_unserialized :
     serialized:serializable -> unserialized:ledger -> t
@@ -593,14 +593,13 @@ module type Ledger_builder_base_intf = sig
     -> logger:Logger.t
     -> ( [`Hash_after_applying of ledger_builder_hash]
        * [`Ledger_proof of ledger_proof option] )
-       Deferred.Or_error.t
+       Or_error.t
 
   val apply_diff_unchecked :
        t
     -> valid_diff
-    -> ( [`Hash_after_applying of ledger_builder_hash]
-       * [`Ledger_proof of ledger_proof option] )
-       Deferred.t
+    -> [`Hash_after_applying of ledger_builder_hash]
+       * [`Ledger_proof of ledger_proof option]
 
   val snarked_ledger :
     t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t

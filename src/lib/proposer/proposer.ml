@@ -150,11 +150,11 @@ module Make (Inputs : Inputs_intf) :
             ~logger ~transactions_by_fee:transactions ~get_completed_work
         in
         let lb2 = Ledger_builder.copy ledger_builder in
-        let%map ( `Hash_after_applying next_ledger_builder_hash
-                , `Ledger_proof ledger_proof_opt ) =
+        let ( `Hash_after_applying next_ledger_builder_hash
+            , `Ledger_proof ledger_proof_opt ) =
           Ledger_builder.apply_diff_unchecked lb2 diff
         in
-        (diff, next_ledger_builder_hash, ledger_proof_opt))
+        return (diff, next_ledger_builder_hash, ledger_proof_opt))
     in
     let%bind protocol_state, consensus_transition_data =
       lift_sync (fun () ->
