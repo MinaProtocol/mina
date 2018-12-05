@@ -49,7 +49,8 @@ module type Transition_frontier_intf = sig
     val staged_ledger : t -> staged_ledger
   end
 
-  val hack_temporary_ledger_builder_of_staged_ledger : staged_ledger -> ledger_builder
+  val hack_temporary_ledger_builder_of_staged_ledger :
+    staged_ledger -> ledger_builder
 
   val root : t -> Breadcrumb.t
 

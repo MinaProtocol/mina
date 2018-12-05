@@ -6,20 +6,25 @@ open O1trace
 module type Inputs_intf = sig
   include Protocols.Coda_pow.Inputs_intf
 
-  module State_hash : sig type t end
+  module State_hash : sig
+    type t
+  end
 
-  module Ledger_db : sig type t end
+  module Ledger_db : sig
+    type t
+  end
 
   module Transition_frontier :
     Protocols.Coda_transition_frontier.Transition_frontier_intf
-      with type state_hash := State_hash.t
-       and type external_transition := External_transition.t
-       and type ledger_database := Ledger_db.t
-       and type ledger_builder := Ledger_builder.t
+    with type state_hash := State_hash.t
+     and type external_transition := External_transition.t
+     and type ledger_database := Ledger_db.t
+     and type ledger_builder := Ledger_builder.t
 
   module Transaction_pool :
     Coda_lib.Transaction_pool_read_intf
-      with type transaction_with_valid_signature := User_command.With_valid_signature.t
+    with type transaction_with_valid_signature :=
+                User_command.With_valid_signature.t
 
   module Prover : sig
     val prove :
@@ -237,8 +242,8 @@ module Make (Inputs : Inputs_intf) :
 
   let transition_capacity = 64
 
-  let create ~parent_log ~get_completed_work ~transaction_pool
-      ~time_controller ~keypair ~consensus_local_state ~transition_frontier =
+  let create ~parent_log ~get_completed_work ~transaction_pool ~time_controller
+      ~keypair ~consensus_local_state ~transition_frontier =
     trace_task "proposer" (fun () ->
         let logger = Logger.child parent_log "proposer" in
         let transition_reader, transition_writer = Linear_pipe.create () in
@@ -253,8 +258,8 @@ module Make (Inputs : Inputs_intf) :
             let transition : External_transition.t =
               (Crumb.transition_with_hash crumb).data
             in
-            (External_transition.protocol_state transition,
-              External_transition.protocol_state_proof transition)
+            ( External_transition.protocol_state transition
+            , External_transition.protocol_state_proof transition )
           in
           let%bind () =
             Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
@@ -262,11 +267,12 @@ module Make (Inputs : Inputs_intf) :
           let%bind next_state_opt =
             generate_next_state ~proposal_data ~previous_protocol_state
               ~time_controller
-              ~ledger_builder:(Transition_frontier.hack_temporary_ledger_builder_of_staged_ledger (Crumb.staged_ledger crumb))
+              ~ledger_builder:
+                (Transition_frontier
+                 .hack_temporary_ledger_builder_of_staged_ledger
+                   (Crumb.staged_ledger crumb))
               ~transactions:(Transaction_pool.transactions transaction_pool)
-              ~get_completed_work
-              ~logger
-              ~keypair
+              ~get_completed_work ~logger ~keypair
           in
           trace_event "next state generated" ;
           match next_state_opt with
@@ -322,8 +328,7 @@ module Make (Inputs : Inputs_intf) :
                 ~f:(fun () ->
                   ignore
                     (Interruptible.finally
-                       (Singleton_supervisor.dispatch proposal_supervisor
-                          data)
+                       (Singleton_supervisor.dispatch proposal_supervisor data)
                        ~f:check_for_proposal) )
         in
         check_for_proposal () ; transition_reader )

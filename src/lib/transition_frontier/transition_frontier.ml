@@ -8,39 +8,40 @@ module Max_length = struct
   let length = 2160
 end
 
-module Make
-    (Completed_work : sig
-      type t
-      module Checked : sig type t end
-    end)
-    (Ledger_builder_diff : Ledger_builder_diff_intf
-                           with type user_command := User_command.t
-                            and type user_command_with_valid_signature :=
-                                       User_command.With_valid_signature.t
-                            and type ledger_builder_hash :=
-                                       Ledger_builder_hash.t
-                            and type public_key := Public_key.Compressed.t
-                            and type completed_work := Completed_work.t
-                            and type completed_work_checked := Completed_work.Checked.t)
-    (External_transition : External_transition.S
-                           with module Protocol_state = Consensus.Mechanism
-                                                        .Protocol_state
-                            and module Ledger_builder_diff := Ledger_builder_diff)
-    (Ledger_builder : Ledger_builder_intf
-                      with type diff := Ledger_builder_diff.t
-                       and type valid_diff :=
-                                  Ledger_builder_diff
-                                  .With_valid_signatures_and_proofs
-                                  .t
-                       and type ledger_builder_hash := Ledger_builder_hash.t
-                       and type ledger_hash := Ledger_hash.t
-                       and type frozen_ledger_hash := Frozen_ledger_hash.t
-                       and type public_key := Public_key.Compressed.t
-                       and type ledger := Ledger.t
-                       and type user_command_with_valid_signature :=
-                                  User_command.With_valid_signature.t
-                       and type completed_work := Completed_work.Checked.t
-    ) :
+module Make (Completed_work : sig
+  type t
+
+  module Checked : sig
+    type t
+  end
+end)
+(Ledger_builder_diff : Ledger_builder_diff_intf
+                       with type user_command := User_command.t
+                        and type user_command_with_valid_signature :=
+                                   User_command.With_valid_signature.t
+                        and type ledger_builder_hash := Ledger_builder_hash.t
+                        and type public_key := Public_key.Compressed.t
+                        and type completed_work := Completed_work.t
+                        and type completed_work_checked :=
+                                   Completed_work.Checked.t)
+(External_transition : External_transition.S
+                       with module Protocol_state = Consensus.Mechanism
+                                                    .Protocol_state
+                        and module Ledger_builder_diff := Ledger_builder_diff)
+(Ledger_builder : Ledger_builder_intf
+                  with type diff := Ledger_builder_diff.t
+                   and type valid_diff :=
+                              Ledger_builder_diff
+                              .With_valid_signatures_and_proofs
+                              .t
+                   and type ledger_builder_hash := Ledger_builder_hash.t
+                   and type ledger_hash := Ledger_hash.t
+                   and type frozen_ledger_hash := Frozen_ledger_hash.t
+                   and type public_key := Public_key.Compressed.t
+                   and type ledger := Ledger.t
+                   and type user_command_with_valid_signature :=
+                              User_command.With_valid_signature.t
+                   and type completed_work := Completed_work.Checked.t) :
   Transition_frontier_intf
   with type state_hash := State_hash.t
    and type external_transition := External_transition.t
