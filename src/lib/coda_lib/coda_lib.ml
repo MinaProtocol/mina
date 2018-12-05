@@ -97,16 +97,20 @@ module type Network_intf = sig
     -> t Deferred.t
 end
 
-module type Transaction_pool_intf = sig
+module type Transaction_pool_read_intf = sig
   type t
-
-  type pool_diff
 
   type transaction_with_valid_signature
 
-  type transaction
-
   val transactions : t -> transaction_with_valid_signature Sequence.t
+end
+
+module type Transaction_pool_intf = sig
+  include Transaction_pool_read_intf
+
+  type pool_diff
+
+  type transaction
 
   val broadcasts : t -> pool_diff Linear_pipe.Reader.t
 
@@ -253,20 +257,13 @@ module type Proposer_intf = sig
 
   type transition_frontier
 
-  module Tip : sig
-    type t =
-      { protocol_state: protocol_state * protocol_state_proof
-      ; ledger_builder: ledger_builder
-      ; transactions: transaction Sequence.t }
-  end
-
-  type change = Tip_change of Tip.t
+  type transaction_pool
 
   val create :
        parent_log:Logger.t
     -> get_completed_work:(   completed_work_statement
                            -> completed_work_checked option)
-    -> change_feeder:change Linear_pipe.Reader.t
+    -> transaction_pool:transaction_pool
     -> time_controller:time_controller
     -> keypair:keypair
     -> consensus_local_state:consensus_local_state
@@ -407,6 +404,7 @@ module type Inputs_intf = sig
      and type time_controller := Time.Controller.t
      and type keypair := Keypair.t
      and type transition_frontier := Transition_frontier.t
+     and type transaction_pool := Transaction_pool.t
 
   module Genesis : sig
     val state : Consensus_mechanism.Protocol_state.value
@@ -578,17 +576,7 @@ module Make (Inputs : Inputs_intf) = struct
         |> don't_wait_for ;
         ( match config.propose_keypair with
         | Some keypair ->
-            let tips_r, tips_w = Linear_pipe.create () in
-            (let tip =
-               Ledger_builder_controller.strongest_tip ledger_builder
-             in
-             Linear_pipe.write_without_pushback tips_w
-               (Proposer.Tip_change
-                  { protocol_state= (tip.state, tip.proof)
-                  ; transactions=
-                      Transaction_pool.transactions transaction_pool
-                  ; ledger_builder= tip.ledger_builder })) ;
-            Linear_pipe.transfer strongest_ledgers_for_miner tips_w
+            Linear_pipe.iter strongest_ledgers_for_miner
               ~f:(fun (ledger_builder, transition) ->
                 let protocol_state =
                   External_transition.protocol_state transition
@@ -616,17 +604,12 @@ module Make (Inputs : Inputs_intf) = struct
                           ( Ledger_builder.ledger ledger_builder
                           |> Ledger.merkle_root
                           |> Frozen_ledger_hash.of_ledger_hash )
-                          target ) ;
-                Proposer.Tip_change
-                  { protocol_state=
-                      ( protocol_state
-                      , External_transition.protocol_state_proof transition )
-                  ; ledger_builder
-                  ; transactions=
-                      Transaction_pool.transactions transaction_pool } )
+                  target );
+                  return ()
+                 )
             |> don't_wait_for ;
             let transitions =
-              Proposer.create ~parent_log:config.log ~change_feeder:tips_r
+              Proposer.create ~parent_log:config.log ~transaction_pool
                 ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
                 ~time_controller:config.time_controller ~keypair
                 ~consensus_local_state
