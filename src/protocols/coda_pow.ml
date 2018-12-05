@@ -169,10 +169,16 @@ module type Mask_serializable_intf = sig
   val serializable_of_t : t -> serializable
 end
 
-module type Ledger_intf = sig
-  module Mask : Mask_intf
-
+module type Ledger_creatable_intf = sig
   type t
+
+  val create : ?directory_name:string -> unit -> t
+end
+
+module type Ledger_intf = sig
+  include Ledger_creatable_intf
+
+  module Mask : Mask_intf
 
   type attached_mask = t
 
@@ -199,8 +205,6 @@ module type Ledger_intf = sig
 
     val transaction : t -> transaction Or_error.t
   end
-
-  val create : ?directory_name:string -> unit -> t
 
   val copy : t -> t
 
