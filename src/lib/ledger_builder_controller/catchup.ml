@@ -23,9 +23,9 @@ struct
     External_transition.protocol_state t
     |> Protocol_state.blockchain_state |> Blockchain_state.ledger_hash
 
-  let ledger_builder_hash_of_transition t =
+  let staged_ledger_hash_of_transition t =
     External_transition.protocol_state t
-    |> Protocol_state.blockchain_state |> Blockchain_state.ledger_builder_hash
+    |> Protocol_state.blockchain_state |> Blockchain_state.staged_ledger_hash
 
   type t = {net: Net.t; log: Logger.t; sl_ref: Sync_ledger.t option ref}
 
@@ -87,7 +87,7 @@ struct
         in
         let h =
           Staged_ledger_hash.ledger_hash
-            (ledger_builder_hash_of_transition transition)
+            (staged_ledger_hash_of_transition transition)
         in
         (* Lazily recreate the sync_ledger if necessary *)
         let sl : Sync_ledger.t =
@@ -95,7 +95,7 @@ struct
           | None ->
               trace_recurring_task "sync ledger" (fun () ->
                   let ledger =
-                    Staged_ledger.ledger locked_tip.ledger_builder
+                    Staged_ledger.ledger locked_tip.staged_ledger
                     |> Ledger.copy
                   in
                   let sl = Sync_ledger.create ledger ~parent_log:log in
@@ -126,8 +126,8 @@ struct
               trace_task "net aux" (fun () ->
                   match%bind
                     Interruptible.uninterruptible
-                      (Net.get_ledger_builder_aux_at_hash net
-                         (ledger_builder_hash_of_transition transition))
+                      (Net.get_staged_ledger_aux_at_hash net
+                         (staged_ledger_hash_of_transition transition))
                   with
                   | Ok aux -> build_lb ~aux ~ledger
                   | Error e ->

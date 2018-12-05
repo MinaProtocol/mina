@@ -13,7 +13,7 @@ module Make (Inputs : sig
 
   module Staged_ledger_hash :
     Staged_ledger_hash_intf
-    with type ledger_builder_aux_hash := Staged_ledger_aux_hash.t
+    with type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
      and type ledger_hash := Ledger_hash.t
 
   module Compressed_public_key : Compressed_public_key_intf
@@ -31,7 +31,7 @@ end) :
   with type user_command := Inputs.User_command.t
    and type user_command_with_valid_signature :=
               Inputs.User_command.With_valid_signature.t
-   and type ledger_builder_hash := Inputs.Staged_ledger_hash.t
+   and type staged_ledger_hash := Inputs.Staged_ledger_hash.t
    and type public_key := Inputs.Compressed_public_key.t
    and type completed_work := Inputs.Transaction_snark_work.t
    and type completed_work_checked := Inputs.Transaction_snark_work.Checked.t = struct

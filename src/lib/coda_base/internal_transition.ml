@@ -16,14 +16,14 @@ module type S = sig
   val create :
        snark_transition:Snark_transition.value
     -> prover_state:Prover_state.t
-    -> ledger_builder_diff:Staged_ledger_diff.t
+    -> staged_ledger_diff:Staged_ledger_diff.t
     -> t
 
   val snark_transition : t -> Snark_transition.value
 
   val prover_state : t -> Prover_state.t
 
-  val ledger_builder_diff : t -> Staged_ledger_diff.t
+  val staged_ledger_diff : t -> Staged_ledger_diff.t
 end
 
 module Make (Staged_ledger_diff : sig
@@ -43,9 +43,9 @@ end) :
   type t =
     { snark_transition: Snark_transition.value
     ; prover_state: Prover_state.t
-    ; ledger_builder_diff: Staged_ledger_diff.t }
+    ; staged_ledger_diff: Staged_ledger_diff.t }
   [@@deriving sexp, fields, bin_io]
 
-  let create ~snark_transition ~prover_state ~ledger_builder_diff =
-    {snark_transition; ledger_builder_diff; prover_state}
+  let create ~snark_transition ~prover_state ~staged_ledger_diff =
+    {snark_transition; staged_ledger_diff; prover_state}
 end

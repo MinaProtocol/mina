@@ -2,7 +2,7 @@ open Core_kernel
 
 module Make (Inputs : Inputs.Inputs_intf) :
   Test.Work_selector_with_tests_intf
-  with type ledger_builder := Inputs.Staged_ledger.t
+  with type staged_ledger := Inputs.Staged_ledger.t
    and type work :=
               ( Inputs.Ledger_proof_statement.t
               , Inputs.Transaction.t
@@ -18,9 +18,9 @@ module Make (Inputs : Inputs.Inputs_intf) :
     let does_not_have_better_fee = Helper.For_tests.does_not_have_better_fee
   end
 
-  let work ~snark_pool ~fee (ledger_builder : Inputs.Staged_ledger.t)
+  let work ~snark_pool ~fee (staged_ledger : Inputs.Staged_ledger.t)
       (state : State.t) =
-    let unseen_jobs = Helper.all_works ledger_builder state in
+    let unseen_jobs = Helper.all_works staged_ledger state in
     match Helper.get_expensive_work ~snark_pool ~fee unseen_jobs with
     | [] -> ([], state)
     | _ ->

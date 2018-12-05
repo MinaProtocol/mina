@@ -18,13 +18,13 @@ module type Inputs_intf = sig
   module Staged_ledger_hash :
     Staged_ledger_hash_intf
     with type ledger_hash := Ledger_hash.t
-     and type ledger_builder_aux_hash := Staged_ledger_aux_hash.t
+     and type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
 
   module Staged_ledger_diff : Staged_ledger_diff_intf
 
   module Blockchain_state :
     Blockchain_state_intf
-    with type ledger_builder_hash := Staged_ledger_hash.t
+    with type staged_ledger_hash := Staged_ledger_hash.t
      and type frozen_ledger_hash := Frozen_ledger_hash.t
      and type time := Time.t
 
@@ -40,7 +40,7 @@ module type Inputs_intf = sig
     External_transition_intf
     with type protocol_state := Protocol_state.value
      and type protocol_state_proof := Proof.t
-     and type ledger_builder_diff := Staged_ledger_diff.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
 
   module Key : Merkle_ledger.Intf.Key
 
@@ -100,7 +100,7 @@ module type Inputs_intf = sig
       type t
 
       (* hack until Parallel_scan_state().Diff.t fully diverges from Staged_ledger_diff.t and is included in External_transition *)
-      val of_ledger_builder_diff : Staged_ledger_diff.t -> t
+      val of_staged_ledger_diff : Staged_ledger_diff.t -> t
     end
   end
 
@@ -187,7 +187,7 @@ module Make (Inputs : Inputs_intf) :
       Ledger_hash.equal
         (Ledger_mask.merkle_root root_staged_ledger_mask)
         (Staged_ledger_hash.ledger_hash
-           (Blockchain_state.ledger_builder_hash root_blockchain_state)) ) ;
+           (Blockchain_state.staged_ledger_hash root_blockchain_state)) ) ;
     let root_staged_ledger =
       Staged_ledger.create
         ~transaction_snark_scan_state:root_transaction_snark_scan_state
@@ -279,8 +279,8 @@ module Make (Inputs : Inputs_intf) :
     let staged_ledger =
       Staged_ledger.apply
         (Breadcrumb.staged_ledger parent_node.breadcrumb)
-        (Transaction_snark_scan_state.Diff.of_ledger_builder_diff
-           (External_transition.ledger_builder_diff transition))
+        (Transaction_snark_scan_state.Diff.of_staged_ledger_diff
+           (External_transition.staged_ledger_diff transition))
       |> Or_error.ok_exn
     in
     (* 1.c *)

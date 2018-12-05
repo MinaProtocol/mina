@@ -107,7 +107,7 @@ let genesis ~loc =
   in
   let ledger =
     Sparse_ledger_lib.Sparse_ledger.of_hash ~depth:0
-      protocol_state.blockchain_state.ledger_builder_hash.ledger_hash
+      protocol_state.blockchain_state.staged_ledger_hash.ledger_hash
   in
   let proof = Lite_compat.proof Precomputed_values.base_proof in
   let chain = {Lite_base.Lite_chain.protocol_state; ledger; proof} in

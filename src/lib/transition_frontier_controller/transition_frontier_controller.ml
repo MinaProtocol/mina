@@ -10,7 +10,7 @@ module type Inputs_intf = sig
   module External_transition :
     External_transition_intf
     with type protocol_state := Consensus_mechanism.Protocol_state.value
-     and type ledger_builder_diff := Consensus_mechanism.ledger_builder_diff
+     and type staged_ledger_diff := Consensus_mechanism.staged_ledger_diff
      and type protocol_state_proof := Consensus_mechanism.protocol_state_proof
 
   module Merkle_address : Merkle_address.S
@@ -87,7 +87,7 @@ module type Inputs_intf = sig
       type t
 
       (* hack until Parallel_scan_state().Diff.t fully diverges from Staged_ledger_diff.t and is included in External_transition *)
-      val of_ledger_builder_diff : Staged_ledger_diff.t -> t
+      val of_staged_ledger_diff : Staged_ledger_diff.t -> t
     end
   end
 

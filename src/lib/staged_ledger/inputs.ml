@@ -87,7 +87,7 @@ module type S = sig
   module Staged_ledger_hash :
     Coda_pow.Staged_ledger_hash_intf
     with type ledger_hash := Ledger_hash.t
-     and type ledger_builder_aux_hash := Staged_ledger_aux_hash.t
+     and type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
 
   module Transaction_snark_work :
     Coda_pow.Transaction_snark_work_intf
@@ -103,7 +103,7 @@ module type S = sig
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
      and type public_key := Compressed_public_key.t
-     and type ledger_builder_hash := Staged_ledger_hash.t
+     and type staged_ledger_hash := Staged_ledger_hash.t
 
   module Config : sig
     val transaction_capacity_log_2 : int
@@ -180,7 +180,7 @@ module type S' = sig
   module Staged_ledger_hash :
     Coda_pow.Staged_ledger_hash_intf
     with type ledger_hash := Ledger_hash.t
-     and type ledger_builder_aux_hash := Staged_ledger_aux_hash.t
+     and type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
 
   module Transaction_snark_work :
     Coda_pow.Transaction_snark_work_intf
@@ -196,7 +196,7 @@ module type S' = sig
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
      and type public_key := Compressed_public_key.t
-     and type ledger_builder_hash := Staged_ledger_hash.t
+     and type staged_ledger_hash := Staged_ledger_hash.t
 
   (*module Merkle_address : Merkle_address.S
 
@@ -260,29 +260,6 @@ module type S' = sig
     val apply_transaction_exn : t -> Transaction.t -> t
   end
 
-  (*module Transaction_snark_scan_state : sig
-    type t
-
-    val empty : t
-
-    module Diff : sig
-      type t
-
-      (* hack until Parallel_scan_state().Diff.t fully diverges from Staged_ledger_diff.t and is included in External_transition *)
-      val of_ledger_builder_diff : Staged_ledger_diff.t -> t
-    end
-  end
-
-  module Staged_ledger : sig
-    type t
-
-    val create :
-         transaction_snark_scan_state:Transaction_snark_scan_state.t
-      -> ledger_mask:Ledger.Mask.t
-      -> t
-
-    val apply : t -> Transaction_snark_scan_state.Diff.t -> t Or_error.t
-  end*)
   module Config : sig
     val transaction_capacity_log_2 : int
   end

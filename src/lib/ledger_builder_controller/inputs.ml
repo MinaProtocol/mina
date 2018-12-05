@@ -75,7 +75,7 @@ module Base = struct
 
         val ledger_hash : value -> Frozen_ledger_hash.t
 
-        val ledger_builder_hash : value -> Staged_ledger_hash.t
+        val staged_ledger_hash : value -> Staged_ledger_hash.t
       end
 
       module Protocol_state : sig
@@ -125,7 +125,7 @@ module Base = struct
 
       val protocol_state_proof : t -> Protocol_state_proof.t
 
-      val ledger_builder_diff : t -> Staged_ledger_diff.t
+      val staged_ledger_diff : t -> Staged_ledger_diff.t
     end
 
     module Ledger_proof_statement : sig
@@ -142,18 +142,18 @@ module Base = struct
 
     module Staged_ledger :
       Protocols.Coda_pow.Staged_ledger_base_intf
-      with type ledger_builder_hash := Staged_ledger_hash.t
+      with type staged_ledger_hash := Staged_ledger_hash.t
        and type frozen_ledger_hash := Frozen_ledger_hash.t
        and type valid_diff :=
                   Staged_ledger_diff.With_valid_signatures_and_proofs.t
        and type diff := Staged_ledger_diff.t
        and type ledger_proof := Ledger_proof.t
        and type ledger := Ledger.t
-       and type ledger_builder_aux_hash := Staged_ledger_aux_hash.t
+       and type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
 
     module Tip :
       Protocols.Coda_pow.Tip_intf
-      with type ledger_builder := Staged_ledger.t
+      with type staged_ledger := Staged_ledger.t
        and type protocol_state := Consensus_mechanism.Protocol_state.value
        and type protocol_state_proof := Protocol_state_proof.t
        and type serializable :=
@@ -209,8 +209,8 @@ module Synchronizing = struct
         Coda_lib.Staged_ledger_io_intf
         with type sync_ledger_query := Sync_ledger.query
          and type sync_ledger_answer := Sync_ledger.answer
-         and type ledger_builder_hash := Staged_ledger_hash.t
-         and type ledger_builder_aux := Staged_ledger.Aux.t
+         and type staged_ledger_hash := Staged_ledger_hash.t
+         and type staged_ledger_aux := Staged_ledger.Aux.t
          and type ledger_hash := Ledger_hash.t
          and type protocol_state := Consensus_mechanism.Protocol_state.value
     end

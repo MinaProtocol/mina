@@ -714,7 +714,7 @@ let state_html state =
           ; proof } } =
     state
   in
-  let {Blockchain_state.ledger_builder_hash; ledger_hash; timestamp} =
+  let {Blockchain_state.staged_ledger_hash; ledger_hash; timestamp} =
     blockchain_state
   in
   let {Consensus_state.length; _} = consensus_state in
@@ -752,7 +752,7 @@ let state_html state =
       ; [create_entry "timestamp" timestamp]
       ; [create_entry "locked_ledger_hash" (field_to_base64 ledger_hash)]
       ; [ create_entry "staged_ledger_hash"
-            (field_to_base64 ledger_builder_hash.ledger_hash) ] ]
+            (field_to_base64 staged_ledger_hash.ledger_hash) ] ]
   in
   let hoverable = hoverable state in
   let _ = ledger in

@@ -15,14 +15,14 @@ module Make (Inputs : Inputs.Base.S) = struct
       ~message:
         (Printf.sprintf
            !"Staged_ledger_hash inside protocol state inconsistent with \
-             materialized ledger_builder's hash for transition: %{sexp: \
+             materialized staged_ledger's hash for transition: %{sexp: \
              External_transition.t}"
            transition)
       ~expect:
         ( External_transition.protocol_state transition
         |> Protocol_state.blockchain_state
-        |> Blockchain_state.ledger_builder_hash )
-      (Staged_ledger.hash t.Tip.ledger_builder)
+        |> Blockchain_state.staged_ledger_hash )
+      (Staged_ledger.hash t.Tip.staged_ledger)
 
   let transition_unchecked t
       ( {With_hash.data= transition; hash= transition_state_hash} as
@@ -30,8 +30,8 @@ module Make (Inputs : Inputs.Base.S) = struct
     let%map () =
       let open Deferred.Let_syntax in
       match%map
-        Staged_ledger.apply t.Tip.ledger_builder
-          (External_transition.ledger_builder_diff transition)
+        Staged_ledger.apply t.Tip.staged_ledger
+          (External_transition.staged_ledger_diff transition)
           ~logger
       with
       | Ok (_, `Ledger_proof None) -> ()

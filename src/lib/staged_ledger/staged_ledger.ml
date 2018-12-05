@@ -24,7 +24,7 @@ module Make (Inputs : Inputs.S') : sig
                 Inputs.Staged_ledger_diff.With_valid_signatures_and_proofs.t
      and type ledger_hash := Inputs.Ledger_hash.t
      and type frozen_ledger_hash := Inputs.Frozen_ledger_hash.t
-     and type ledger_builder_hash := Inputs.Staged_ledger_hash.t
+     and type staged_ledger_hash := Inputs.Staged_ledger_hash.t
      and type public_key := Inputs.Compressed_public_key.t
      and type ledger := Inputs.Ledger.t
      and type user_command_with_valid_signature :=
@@ -32,7 +32,7 @@ module Make (Inputs : Inputs.S') : sig
      and type statement := Inputs.Transaction_snark_work.Statement.t
      and type completed_work := Inputs.Transaction_snark_work.Checked.t
      and type ledger_proof := Inputs.Ledger_proof.t
-     and type ledger_builder_aux_hash := Inputs.Staged_ledger_aux_hash.t
+     and type staged_ledger_aux_hash := Inputs.Staged_ledger_aux_hash.t
      and type sparse_ledger := Inputs.Sparse_ledger.t
      and type ledger_proof_statement := Inputs.Ledger_proof_statement.t
      and type ledger_proof_statement_set := Inputs.Ledger_proof_statement.Set.t
@@ -1520,14 +1520,14 @@ let%test_module "test" =
 
         type ledger_hash = Ledger_hash.t
 
-        type ledger_builder_aux_hash = Staged_ledger_aux_hash.t
+        type staged_ledger_aux_hash = Staged_ledger_aux_hash.t
 
         let ledger_hash _ = failwith "stub"
 
         let aux_hash _ = failwith "stub"
 
         let of_aux_and_ledger_hash :
-            ledger_builder_aux_hash -> ledger_hash -> t =
+            staged_ledger_aux_hash -> ledger_hash -> t =
          fun ah h -> ah ^ h
       end
 
@@ -1593,7 +1593,7 @@ let%test_module "test" =
         type public_key = Compressed_public_key.t
         [@@deriving sexp, bin_io, compare]
 
-        type ledger_builder_hash = Staged_ledger_hash.t
+        type staged_ledger_hash = Staged_ledger_hash.t
         [@@deriving sexp, bin_io, compare]
 
         module At_most_two = struct
@@ -1644,7 +1644,7 @@ let%test_module "test" =
 
         type t =
           { pre_diffs: pre_diffs
-          ; prev_hash: ledger_builder_hash
+          ; prev_hash: staged_ledger_hash
           ; creator: public_key }
         [@@deriving sexp, bin_io]
 
@@ -1671,7 +1671,7 @@ let%test_module "test" =
 
           type t =
             { pre_diffs: pre_diffs
-            ; prev_hash: ledger_builder_hash
+            ; prev_hash: staged_ledger_hash
             ; creator: public_key }
           [@@deriving sexp]
 

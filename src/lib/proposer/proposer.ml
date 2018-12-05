@@ -86,7 +86,7 @@ module Make (Inputs : Inputs_intf) :
   Coda_lib.Proposer_intf
   with type external_transition := Inputs.External_transition.t
    and type ledger_hash := Inputs.Ledger_hash.t
-   and type ledger_builder := Inputs.Staged_ledger.t
+   and type staged_ledger := Inputs.Staged_ledger.t
    and type transaction := Inputs.User_command.With_valid_signature.t
    and type protocol_state := Inputs.Consensus_mechanism.Protocol_state.value
    and type protocol_state_proof := Inputs.Protocol_state_proof.t
@@ -138,23 +138,23 @@ module Make (Inputs : Inputs_intf) :
   end
 
   let generate_next_state ~previous_protocol_state ~time_controller
-      ~ledger_builder ~transactions ~get_completed_work ~logger
+      ~staged_ledger ~transactions ~get_completed_work ~logger
       ~(keypair : Keypair.t) ~proposal_data =
     let open Interruptible.Let_syntax in
-    let%bind diff, next_ledger_builder_hash, ledger_proof_opt =
+    let%bind diff, next_staged_ledger_hash, ledger_proof_opt =
       Interruptible.uninterruptible
         (let open Deferred.Let_syntax in
         let diff =
-          Staged_ledger.create_diff ledger_builder
+          Staged_ledger.create_diff staged_ledger
             ~self:(Public_key.compress keypair.public_key)
             ~logger ~transactions_by_fee:transactions ~get_completed_work
         in
-        let lb2 = Staged_ledger.copy ledger_builder in
-        let%map ( `Hash_after_applying next_ledger_builder_hash
+        let lb2 = Staged_ledger.copy staged_ledger in
+        let%map ( `Hash_after_applying next_staged_ledger_hash
                 , `Ledger_proof ledger_proof_opt ) =
           Staged_ledger.apply_diff_unchecked lb2 diff
         in
-        (diff, next_ledger_builder_hash, ledger_proof_opt))
+        (diff, next_staged_ledger_hash, ledger_proof_opt))
     in
     let%bind protocol_state, consensus_transition_data =
       lift_sync (fun () ->
@@ -177,7 +177,7 @@ module Make (Inputs : Inputs_intf) :
           let blockchain_state =
             Blockchain_state.create_value ~timestamp:(Time.now time_controller)
               ~ledger_hash:next_ledger_hash
-              ~ledger_builder_hash:next_ledger_builder_hash
+              ~staged_ledger_hash:next_staged_ledger_hash
           in
           let time =
             Time.now time_controller |> Time.to_span_since_epoch
@@ -214,7 +214,7 @@ module Make (Inputs : Inputs_intf) :
         let internal_transition =
           Internal_transition.create ~snark_transition
             ~prover_state:(Proposal_data.prover_state proposal_data)
-            ~ledger_builder_diff:(Staged_ledger_diff.forget diff)
+            ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
         in
         Some (protocol_state, internal_transition) )
 
@@ -222,7 +222,7 @@ module Make (Inputs : Inputs_intf) :
     type t =
       { protocol_state:
           Protocol_state.value * Protocol_state_proof.t sexp_opaque
-      ; ledger_builder: Staged_ledger.t sexp_opaque
+      ; staged_ledger: Staged_ledger.t sexp_opaque
       ; transactions:
           User_command.With_valid_signature.t Sequence.t sexp_opaque }
     [@@deriving sexp_of]
@@ -257,7 +257,7 @@ module Make (Inputs : Inputs_intf) :
               in
               let%bind next_state_opt =
                 generate_next_state ~proposal_data ~previous_protocol_state
-                  ~time_controller ~ledger_builder:tip.ledger_builder
+                  ~time_controller ~staged_ledger:tip.staged_ledger
                   ~transactions:tip.transactions ~get_completed_work ~logger
                   ~keypair
               in
@@ -283,8 +283,8 @@ module Make (Inputs : Inputs_intf) :
                          let external_transition =
                            External_transition.create ~protocol_state
                              ~protocol_state_proof
-                             ~ledger_builder_diff:
-                               (Internal_transition.ledger_builder_diff
+                             ~staged_ledger_diff:
+                               (Internal_transition.staged_ledger_diff
                                   internal_transition)
                          in
                          let time =

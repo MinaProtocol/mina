@@ -88,7 +88,7 @@ module Make (Inputs : Inputs.Base.S) :
           (consensus_state_of_tip new_tip)
           ~snarked_ledger:(fun () ->
             Staged_ledger.snarked_ledger
-              (Tip.ledger_builder new_tip)
+              (Tip.staged_ledger new_tip)
               ~snarked_ledger_hash )
           ~local_state:t.consensus_local_state ;
         {t with locked_tip}

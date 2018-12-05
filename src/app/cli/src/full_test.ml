@@ -40,7 +40,7 @@ let run_test () : unit Deferred.t =
     let genesis_proof = Precomputed_values.base_proof
 
     let transaction_capacity_log_2 =
-      if with_snark then 1
+      if with_snark then 2
         (*this works because we don't have prover fees. Once we have that, the transaction_capacity_log_2 has to be at least 2 for transactions to be included*)
       else 3
 
@@ -80,7 +80,7 @@ let run_test () : unit Deferred.t =
     Main.create
       (Main.Config.make ~log ~net_config ~propose_keypair:keypair
          ~run_snark_worker:true
-         ~ledger_builder_persistant_location:(temp_conf_dir ^/ "ledger_builder")
+         ~staged_ledger_persistant_location:(temp_conf_dir ^/ "staged_ledger")
          ~transaction_pool_disk_location:(temp_conf_dir ^/ "transaction_pool")
          ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
          ~time_controller:(Inputs.Time.Controller.create ())

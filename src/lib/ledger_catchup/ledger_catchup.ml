@@ -11,7 +11,7 @@ module type Inputs_intf = sig
   module External_transition :
     External_transition_intf
     with type protocol_state := Consensus_mechanism.Protocol_state.value
-     and type ledger_builder_diff := Consensus_mechanism.ledger_builder_diff
+     and type staged_ledger_diff := Consensus_mechanism.staged_ledger_diff
      and type protocol_state_proof := Consensus_mechanism.protocol_state_proof
 end
 

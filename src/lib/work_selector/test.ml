@@ -26,7 +26,7 @@ end
 
 module type Work_selector_F = functor (Inputs : Inputs.Inputs_intf) -> Work_selector_with_tests_intf
                                                                        with type 
-                                                                       ledger_builder :=
+                                                                       staged_ledger :=
                                                                          Inputs
                                                                          .Staged_ledger
                                                                          .t

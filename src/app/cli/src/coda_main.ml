@@ -74,7 +74,7 @@ end
 module type Work_selector_F = functor
   (Inputs : Work_selector.Inputs.Inputs_intf)
   -> Protocols.Coda_pow.Work_selector_intf
-     with type ledger_builder := Inputs.Staged_ledger.t
+     with type staged_ledger := Inputs.Staged_ledger.t
       and type work :=
                  ( Inputs.Ledger_proof_statement.t
                  , Inputs.Transaction.t
@@ -117,7 +117,7 @@ module type Init_intf = sig
     with type completed_work_checked := Transaction_snark_work.Checked.t
      and type completed_work := Transaction_snark_work.t
      and type public_key := Public_key.Compressed.t
-     and type ledger_builder_hash := Staged_ledger_hash.t
+     and type staged_ledger_hash := Staged_ledger_hash.t
      and type user_command := User_command.t
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
@@ -255,10 +255,10 @@ module type Main_intf = sig
       ; propose_keypair: Keypair.t option
       ; run_snark_worker: bool
       ; net_config: Inputs.Net.Config.t
-      ; ledger_builder_persistant_location: string
+      ; staged_ledger_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
-      ; ledger_builder_transition_backup_capacity: int [@default 10]
+      ; staged_ledger_transition_backup_capacity: int [@default 10]
       ; time_controller: Inputs.Time.Controller.t
       ; banlist: Banlist.t
       ; receipt_chain_database: Receipt_chain_database.t
@@ -274,7 +274,7 @@ module type Main_intf = sig
 
   val request_work : t -> Inputs.Snark_worker.Work.Spec.t option
 
-  val best_ledger_builder : t -> Inputs.Staged_ledger.t
+  val best_staged_ledger : t -> Inputs.Staged_ledger.t
 
   val best_ledger : t -> Inputs.Ledger.t
 
@@ -300,7 +300,7 @@ module type Main_intf = sig
 
   val create : Config.t -> t Deferred.t
 
-  val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
+  val staged_ledger_ledger_proof : t -> Inputs.Ledger_proof.t option
 
   val get_ledger :
     t -> Staged_ledger_hash.t -> Account.t list Deferred.Or_error.t
@@ -551,15 +551,15 @@ struct
     type t =
       { state: Protocol_state.value
       ; proof: Protocol_state_proof.t
-      ; ledger_builder: Staged_ledger.t sexp_opaque }
+      ; staged_ledger: Staged_ledger.t sexp_opaque }
     [@@deriving sexp, fields]
 
     type scan_state = Staged_ledger.Aux.t
 
-    let of_transition_and_lb transition ledger_builder =
+    let of_transition_and_lb transition staged_ledger =
       { state= External_transition.protocol_state transition
       ; proof= External_transition.protocol_state_proof transition
-      ; ledger_builder }
+      ; staged_ledger }
 
     let bin_tip =
       [%bin_type_class:
@@ -567,7 +567,7 @@ struct
         * Protocol_state_proof.t
         * Staged_ledger.serializable]
 
-    let copy t = {t with ledger_builder= Staged_ledger.copy t.ledger_builder}
+    let copy t = {t with staged_ledger= Staged_ledger.copy t.staged_ledger}
   end
 end
 
@@ -603,27 +603,27 @@ struct
 
   module State_with_witness = struct
     type t =
-      { ledger_builder_transition:
+      { staged_ledger_transition:
           Staged_ledger_transition.With_valid_signatures_and_proofs.t
       ; state: Proof_carrying_state.t }
     [@@deriving sexp]
 
     module Stripped = struct
       type t =
-        { ledger_builder_transition: Staged_ledger_transition.t
+        { staged_ledger_transition: Staged_ledger_transition.t
         ; state: Proof_carrying_state.t }
     end
 
-    let strip {ledger_builder_transition; state} =
-      { Stripped.ledger_builder_transition=
-          Staged_ledger_transition.forget ledger_builder_transition
+    let strip {staged_ledger_transition; state} =
+      { Stripped.staged_ledger_transition=
+          Staged_ledger_transition.forget staged_ledger_transition
       ; state }
 
-    let forget_witness {ledger_builder_transition; state} = state
+    let forget_witness {staged_ledger_transition; state} = state
 
     (* TODO: How do we check this *)
-    let add_witness ledger_builder_transition state =
-      Or_error.return {ledger_builder_transition; state}
+    let add_witness staged_ledger_transition state =
+      Or_error.return {staged_ledger_transition; state}
 
     let add_witness_exn l s = add_witness l s |> Or_error.ok_exn
   end
@@ -839,11 +839,11 @@ struct
 
   module Work_selector = Make_work_selector (Work_selector_inputs)
 
-  let request_work ~best_ledger_builder
+  let request_work ~best_staged_ledger
       ~(seen_jobs : 'a -> Work_selector.State.t)
       ~(set_seen_jobs : 'a -> Work_selector.State.t -> unit)
       ~(snark_pool : 'a -> Snark_pool.t) (t : 'a) (fee : Fee.Unsigned.t) =
-    let lb = best_ledger_builder t in
+    let lb = best_staged_ledger t in
     let instances, seen_jobs =
       Work_selector.work ~fee ~snark_pool:(snark_pool t) lb (seen_jobs t)
     in
@@ -887,7 +887,7 @@ module Make_coda (Init : Init_intf) = struct
   include Coda_lib.Make (Inputs)
 
   let request_work t =
-    Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
+    Inputs.request_work ~best_staged_ledger ~seen_jobs ~set_seen_jobs
       ~snark_pool t (snark_work_fee t)
 end
 
@@ -908,7 +908,7 @@ module Make_coda (Init : Init_intf) = struct
   include Coda_lib.Make (Inputs)
 
   let request_work t =
-    Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
+    Inputs.request_work ~best_staged_ledger ~seen_jobs ~set_seen_jobs
       ~snark_pool t t.snark_work_fee
 end
 
@@ -919,7 +919,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   open Inputs
 
   module For_tests = struct
-    let ledger_proof t = ledger_builder_ledger_proof t
+    let ledger_proof t = staged_ledger_ledger_proof t
   end
 
   module Lite_compat = Lite_compat.Make (Consensus.Mechanism.Blockchain_state)
@@ -1078,8 +1078,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; block_count= Int.of_string (Length.to_string block_count)
     ; uptime_secs
     ; ledger_merkle_root
-    ; ledger_builder_hash=
-        best_ledger_builder t |> Staged_ledger.hash
+    ; staged_ledger_hash=
+        best_staged_ledger t |> Staged_ledger.hash
         |> Staged_ledger_hash.sexp_of_t |> Sexp.to_string
     ; state_hash
     ; external_transition_latency=

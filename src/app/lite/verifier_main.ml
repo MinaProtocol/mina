@@ -32,7 +32,7 @@ let verify_chain pvk state_and_instance_hash
   let check b lab = if b then Ok () else Or_error.error_string lab in
   let open Or_error.Let_syntax in
   let lb_ledger_hash =
-    protocol_state.blockchain_state.ledger_builder_hash.ledger_hash
+    protocol_state.blockchain_state.staged_ledger_hash.ledger_hash
   in
   let%bind () =
     check
