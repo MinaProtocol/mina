@@ -1,0 +1,5 @@
+(library
+  (name transition_handler)
+  (public_name transition_handler)
+  (libraries core_kernel protocols coda_base)
+  (preprocess (pps ppx_jane)))

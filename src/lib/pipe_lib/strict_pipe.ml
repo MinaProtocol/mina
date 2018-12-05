@@ -1,4 +1,5 @@
 open Async_kernel
+open Core_kernel
 
 exception Overflow
 
@@ -31,12 +32,11 @@ module Reader = struct
   let wrap_reader reader = {reader; has_reader= false}
 
   let enforce_single_reader reader deferred =
-    if reader.has_reader then raise Multiple_reads_attempted
-    else (
-      reader.has_reader <- true ;
-      let%map result = deferred in
-      reader.has_reader <- false ;
-      result )
+    assert_not_read reader ;
+    reader.has_reader <- true ;
+    let%map result = deferred in
+    reader.has_reader <- false ;
+    result
 
   let fold ?consumer reader ~init ~f =
     enforce_single_reader reader (Pipe.fold reader.reader ?consumer ~init ~f)
@@ -54,6 +54,36 @@ module Reader = struct
     assert_not_read reader ;
     reader.has_reader <- true ;
     wrap_reader (Pipe.filter_map reader.reader ~f)
+
+  let iter_sync ?consumer ?continue_on_error reader ~f =
+    iter ?consumer ?continue_on_error reader ~f:(fun x -> f x ; Deferred.unit)
+
+  module Merge = struct
+    let iter readers ~f =
+      let not_empty r = Pipe.is_empty r.reader in
+      let rec read_deferred () =
+        let%bind ready_reader =
+          match List.find readers ~f:not_empty with
+          | Some reader -> Deferred.return reader
+          | None ->
+              let%map () =
+                Deferred.choose
+                  (List.map readers ~f:(fun r ->
+                       Deferred.choice (Pipe.values_available r.reader)
+                         (fun _ -> () ) ))
+              in
+              List.find_exn readers ~f:not_empty
+        in
+        match Pipe.read_now ready_reader.reader with
+        | `Nothing_available -> failwith "impossible"
+        | `Eof -> Deferred.return ()
+        | `Ok value -> Deferred.bind (f value) ~f:read_deferred
+      in
+      List.iter readers ~f:assert_not_read ;
+      read_deferred ()
+
+    let iter_sync readers ~f = iter readers ~f:(fun x -> f x ; Deferred.unit)
+  end
 end
 
 module Writer = struct

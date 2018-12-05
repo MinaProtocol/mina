@@ -25,6 +25,10 @@ type (_, _) type_ =
 module Reader : sig
   type 't t
 
+  val map : 'a t -> f:('a -> 'b) -> 'b t
+
+  val filter_map : 'a t -> f:('a -> 'b option) -> 'b t
+
   val fold :
        ?consumer:Pipe.Consumer.t
     -> 'a t
@@ -39,9 +43,18 @@ module Reader : sig
     -> f:('a -> unit Deferred.t)
     -> unit Deferred.t
 
-  val map : 'a t -> f:('a -> 'b) -> 'b t
+  val iter_sync :
+       ?consumer:Pipe.Consumer.t
+    -> ?continue_on_error:bool
+    -> 'a t
+    -> f:('a -> unit)
+    -> unit Deferred.t
 
-  val filter_map : 'a t -> f:('a -> 'b option) -> 'b t
+  module Merge : sig
+    val iter : 'a t list -> f:('a -> unit Deferred.t) -> unit Deferred.t
+
+    val iter_sync : 'a t list -> f:('a -> unit) -> unit Deferred.t
+  end
 end
 
 module Writer : sig

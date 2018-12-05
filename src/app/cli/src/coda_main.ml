@@ -250,6 +250,7 @@ module type Main_intf = sig
   end
 
   module Config : sig
+    (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
     type t =
       { log: Logger.t
       ; propose_keypair: Keypair.t option
@@ -258,6 +259,7 @@ module type Main_intf = sig
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
+      ; ledger_db_location: string option
       ; ledger_builder_transition_backup_capacity: int [@default 10]
       ; time_controller: Inputs.Time.Controller.t
       ; banlist: Banlist.t
@@ -450,6 +452,7 @@ struct
   end
 
   module Ledger = Ledger
+  module Ledger_db = Ledger.Db
 
   module Transaction_snark = struct
     include Ledger_proof
@@ -527,6 +530,29 @@ struct
       (Consensus.Mechanism.Prover_state)
   module External_transition =
     Coda_base.External_transition.Make (Ledger_builder_diff) (Protocol_state)
+
+  module Transition_frontier =
+    Transition_frontier.Make (Completed_work) (Ledger_builder_diff)
+      (External_transition)
+      (struct
+        (* This monkey patching is justified because we're about to rip out
+         * ledger builder *)
+        include Ledger_builder
+
+        type sparse_ledger = Sparse_ledger.t
+
+        type ledger_proof_statement_set = Ledger_proof_statement.Set.t
+
+        type ledger_proof_statement = Ledger_proof_statement.t
+
+        type statement = Completed_work.Statement.t
+
+        type transaction = Transaction.t
+
+        type ledger_proof = Ledger_proof.t
+
+        type ledger_builder_aux_hash = Ledger_builder_aux_hash.t
+      end)
 
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (User_command)
@@ -787,6 +813,7 @@ struct
 
   module Proposer = Proposer.Make (struct
     include Inputs0
+    module State_hash = State_hash
     module Ledger_builder_diff = Ledger_builder_diff
     module Ledger_proof_verifier = Ledger_proof_verifier
     module Completed_work = Completed_work
@@ -1121,12 +1148,14 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
               Lite_compat.digest
                 ( Consensus.Mechanism.Protocol_state.previous_state_hash state
                   :> Snark_params.Tick.Pedersen.Digest.t )
-          ; blockchain_state=
-              Lite_compat.blockchain_state
-                (Consensus.Mechanism.Protocol_state.blockchain_state state)
-          ; consensus_state=
-              consensus_state_to_lite
-                (Consensus.Mechanism.Protocol_state.consensus_state state) }
+          ; body=
+              { blockchain_state=
+                  Lite_compat.blockchain_state
+                    (Consensus.Mechanism.Protocol_state.blockchain_state state)
+              ; consensus_state=
+                  consensus_state_to_lite
+                    (Consensus.Mechanism.Protocol_state.consensus_state state)
+              } }
         in
         let proof = Lite_compat.proof proof in
         {Lite_base.Lite_chain.proof; ledger; protocol_state} )
