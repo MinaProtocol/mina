@@ -55,13 +55,16 @@ struct
       Printf.sprintf "Transaction diff of length %d" (List.length t)
 
     (* TODO: Check signatures *)
-    let apply t txns =
+    let apply t env =
+      let txns = Envelope.Incoming.data env in
       let pool0 = t.pool in
       let pool', res =
         List.fold txns ~init:(pool0, []) ~f:(fun (pool, acc) txn ->
             match Payment.check txn with
             | None ->
-                Logger.faulty_peer t.log "Transaction doesn't check" ;
+                Logger.faulty_peer t.log
+                  !"Transaction doesn't check %{sexp: Host_and_port.t}"
+                  (Envelope.Incoming.sender env) ;
                 (pool, acc)
             | Some txn ->
                 if Set.mem pool.set txn then (

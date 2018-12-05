@@ -597,7 +597,10 @@ struct
 
     (* TODO: This causes the signature to get checked twice as it is checked
    below before feeding it to add *)
-    let add t txn = apply_and_broadcast t [txn]
+    let add t txn =
+      apply_and_broadcast t
+        (Envelope.Incoming.wrap ~data:[txn]
+           ~sender:(Host_and_port.of_string "127.0.0.1:0"))
   end
 
   module Transaction_pool_diff = Transaction_pool.Pool.Diff
@@ -744,15 +747,19 @@ struct
       | Error _e -> create ~parent_log ~incoming_diffs
 
     open Snark_work_lib.Work
+    open Network_pool.Snark_pool_diff
 
     let add_completed_work t
         (res :
           (('a, 'b, 'c, 'd) Single.Spec.t Spec.t, Ledger_proof.t) Result.t) =
       apply_and_broadcast t
-        (Add_solved_work
-           ( List.map res.spec.instances ~f:Single.Spec.statement
-           , {proof= res.proofs; fee= {fee= res.spec.fee; prover= res.prover}}
-           ))
+        (Envelope.Incoming.wrap
+           ~data:
+             (Add_solved_work
+                ( List.map res.spec.instances ~f:Single.Spec.statement
+                , { Diff.proof= res.proofs
+                  ; fee= {fee= res.spec.fee; prover= res.prover} } ))
+           ~sender:(Host_and_port.of_string "127.0.0.1:0"))
   end
 
   module Sync_ledger =
@@ -1154,7 +1161,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let prove_receipt t ~proving_receipt ~resulting_receipt :
       Payment_proof.t Deferred.Or_error.t =
     let receipt_chain_database = receipt_chain_database t in
-    (* TODO: since we are making so many reads to `receipt_chain_database`, 
+    (* TODO: since we are making so many reads to `receipt_chain_database`,
     reads should be async to not get IO-blocked. See #1125 *)
     let result =
       Receipt_chain_database.prove receipt_chain_database ~proving_receipt
