@@ -4,7 +4,7 @@ open Protocols
 open Pipe_lib
 open O1trace
 
-module type Ledger_builder_io_intf = sig
+module type Staged_ledger_io_intf = sig
   type t
 
   type net
@@ -71,8 +71,8 @@ module type Network_intf = sig
 
   val broadcast_transaction_pool_diff : t -> transaction_pool_diff -> unit
 
-  module Ledger_builder_io :
-    Ledger_builder_io_intf
+  module Staged_ledger_io :
+    Staged_ledger_io_intf
     with type net := t
      and type ledger_builder_aux := parallel_scan_state
      and type ledger_builder_hash := ledger_builder_hash
@@ -325,9 +325,9 @@ module type Inputs_intf = sig
     State_with_witness_intf
     with type state := Proof_carrying_state.t
      and type ledger_hash := Ledger_hash.t
-     and type ledger_builder_transition := Ledger_builder_transition.t
+     and type ledger_builder_transition := Staged_ledger_transition.t
      and type ledger_builder_transition_with_valid_signatures_and_proofs :=
-                Ledger_builder_transition.With_valid_signatures_and_proofs.t
+                Staged_ledger_transition.With_valid_signatures_and_proofs.t
 
   module Snark_pool :
     Snark_pool_intf

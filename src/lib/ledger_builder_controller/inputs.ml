@@ -206,7 +206,7 @@ module Synchronizing = struct
 
     module Net : sig
       include
-        Coda_lib.Ledger_builder_io_intf
+        Coda_lib.Staged_ledger_io_intf
         with type sync_ledger_query := Sync_ledger.query
          and type sync_ledger_answer := Sync_ledger.answer
          and type ledger_builder_hash := Staged_ledger_hash.t

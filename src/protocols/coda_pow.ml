@@ -520,7 +520,7 @@ module type Staged_ledger_diff_intf = sig
   val user_commands : t -> user_command list
 end
 
-module type Ledger_builder_transition_intf = sig
+module type Staged_ledger_transition_intf = sig
   type ledger_builder
 
   type diff
@@ -1260,8 +1260,8 @@ Merge Snark:
      and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
      and type transaction := Transaction.t
 
-  module Ledger_builder_transition :
-    Ledger_builder_transition_intf
+  module Staged_ledger_transition :
+    Staged_ledger_transition_intf
     with type diff := Staged_ledger_diff.t
      and type ledger_builder := Staged_ledger.t
      and type diff_with_valid_signatures_and_proofs :=
@@ -1333,7 +1333,7 @@ struct
   module Event = struct
     type t =
       | Found of Internal_transition.t
-      | New_state of Proof_carrying_state.t * Ledger_builder_transition.t
+      | New_state of Proof_carrying_state.t * Staged_ledger_transition.t
   end
 
   type t = {state: Proof_carrying_state.t} [@@deriving fields]

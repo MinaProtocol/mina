@@ -285,7 +285,7 @@ let run_test () : unit Deferred.t =
   if with_snark then
     let accounts = List.take other_accounts 2 in
     let%bind block_count' =
-      test_multiple_payments accounts (pks accounts) 15.
+      test_multiple_payments accounts (pks accounts) 30.
     in
     (*wait for a block after the ledger_proof is emitted*)
     let%map () =

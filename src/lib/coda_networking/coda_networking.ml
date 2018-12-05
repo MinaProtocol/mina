@@ -301,7 +301,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let peers t = Gossip_net.peers t.gossip_net
 
-  module Ledger_builder_io = struct
+  module Staged_ledger_io = struct
     type nonrec t = t
 
     let create = Fn.id

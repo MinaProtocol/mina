@@ -505,7 +505,7 @@ struct
 
   module Staged_ledger_aux = Staged_ledger.Aux
 
-  module Ledger_builder_transition = struct
+  module Staged_ledger_transition = struct
     type t = {old: Staged_ledger.t sexp_opaque; diff: Staged_ledger_diff.t}
     [@@deriving sexp]
 
@@ -604,19 +604,19 @@ struct
   module State_with_witness = struct
     type t =
       { ledger_builder_transition:
-          Ledger_builder_transition.With_valid_signatures_and_proofs.t
+          Staged_ledger_transition.With_valid_signatures_and_proofs.t
       ; state: Proof_carrying_state.t }
     [@@deriving sexp]
 
     module Stripped = struct
       type t =
-        { ledger_builder_transition: Ledger_builder_transition.t
+        { ledger_builder_transition: Staged_ledger_transition.t
         ; state: Proof_carrying_state.t }
     end
 
     let strip {ledger_builder_transition; state} =
       { Stripped.ledger_builder_transition=
-          Ledger_builder_transition.forget ledger_builder_transition
+          Staged_ledger_transition.forget ledger_builder_transition
       ; state }
 
     let forget_witness {ledger_builder_transition; state} = state
@@ -772,7 +772,7 @@ struct
       module Net = struct
         type net = Net.t
 
-        include Net.Ledger_builder_io
+        include Net.Staged_ledger_io
       end
 
       module Store = Store

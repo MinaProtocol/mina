@@ -248,7 +248,7 @@ end
 
 module Make (Inputs : Inputs.S) : sig
   include
-    Coda_pow.Ledger_builder_intf
+    Coda_pow.Staged_ledger_intf
     with type diff := Inputs.Staged_ledger_diff.t
      and type valid_diff :=
                 Inputs.Staged_ledger_diff.With_valid_signatures_and_proofs.t
