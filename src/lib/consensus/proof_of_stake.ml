@@ -1425,7 +1425,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     is_valid Consensus_state.genesis
       ~time_received:(to_unix_timestamp time_received)
 
-  let%test "Receive an unvalid consensus_state" =
+  let%test "Receive an invalid consensus_state" =
     let epoch = Epoch.of_int 5 in
     let start_time = Epoch.start_time epoch in
     let curr_epoch, curr_slot = Epoch.epoch_and_slot_of_time_exn start_time in
