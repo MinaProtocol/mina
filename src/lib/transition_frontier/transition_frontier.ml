@@ -8,35 +8,45 @@ module Max_length = struct
   let length = 2160
 end
 
-module Make
-    (Ledger_builder_diff : Ledger_builder_diff_intf
-                           with type user_command := User_command.t
-                            and type user_command_with_valid_signature :=
-                                       User_command.With_valid_signature.t
-                            and type ledger_builder_hash :=
-                                       Ledger_builder_hash.t
-                            and type public_key := Public_key.Compressed.t)
-    (External_transition : External_transition.S
-                           with module Protocol_state = Consensus.Mechanism
-                                                        .Protocol_state
-                            and module Ledger_builder_diff := Ledger_builder_diff)
-    (Ledger_builder : Ledger_builder_intf
-                      with type diff := Ledger_builder_diff.t
-                       and type valid_diff :=
-                                  Ledger_builder_diff
-                                  .With_valid_signatures_and_proofs
-                                  .t
-                       and type ledger_builder_hash := Ledger_builder_hash.t
-                       and type ledger_hash := Ledger_hash.t
-                       and type frozen_ledger_hash := Frozen_ledger_hash.t
-                       and type public_key := Public_key.Compressed.t
-                       and type ledger := Ledger.t
-                       and type user_command_with_valid_signature :=
-                                  User_command.With_valid_signature.t) :
+module Make (Completed_work : sig
+  type t
+
+  module Checked : sig
+    type t
+  end
+end)
+(Ledger_builder_diff : Ledger_builder_diff_intf
+                       with type user_command := User_command.t
+                        and type user_command_with_valid_signature :=
+                                   User_command.With_valid_signature.t
+                        and type ledger_builder_hash := Ledger_builder_hash.t
+                        and type public_key := Public_key.Compressed.t
+                        and type completed_work := Completed_work.t
+                        and type completed_work_checked :=
+                                   Completed_work.Checked.t)
+(External_transition : External_transition.S
+                       with module Protocol_state = Consensus.Mechanism
+                                                    .Protocol_state
+                        and module Ledger_builder_diff := Ledger_builder_diff)
+(Ledger_builder : Ledger_builder_intf
+                  with type diff := Ledger_builder_diff.t
+                   and type valid_diff :=
+                              Ledger_builder_diff
+                              .With_valid_signatures_and_proofs
+                              .t
+                   and type ledger_builder_hash := Ledger_builder_hash.t
+                   and type ledger_hash := Ledger_hash.t
+                   and type frozen_ledger_hash := Frozen_ledger_hash.t
+                   and type public_key := Public_key.Compressed.t
+                   and type ledger := Ledger.t
+                   and type user_command_with_valid_signature :=
+                              User_command.With_valid_signature.t
+                   and type completed_work := Completed_work.Checked.t) :
   Transition_frontier_intf
   with type state_hash := State_hash.t
    and type external_transition := External_transition.t
-   and type ledger_database := Ledger.Db.t = struct
+   and type ledger_database := Ledger.Db.t
+   and type ledger_builder := Ledger_builder.t = struct
   type ledger_diff = Ledger_builder_diff.t
 
   (* Transaction_snark_scan_state and Staged_ledger long-term will not live in
@@ -148,8 +158,8 @@ module Make
   module Breadcrumb = struct
     type t =
       { transition_with_hash: (External_transition.t, State_hash.t) With_hash.t
-      ; staged_ledger: Staged_ledger.t }
-    [@@deriving fields]
+      ; staged_ledger: Staged_ledger.t sexp_opaque }
+    [@@deriving sexp, fields]
 
     let hash {transition_with_hash; _} = With_hash.hash transition_with_hash
 
@@ -172,6 +182,7 @@ module Make
   (* TODO: load from and write to disk *)
   let create ~logger ~root_transition ~root_snarked_ledger
       ~root_transaction_snark_scan_state ~root_staged_ledger_diff =
+    let logger = Logger.child logger __MODULE__ in
     let root_hash = With_hash.hash root_transition in
     let root_protocol_state =
       External_transition.protocol_state (With_hash.data root_transition)
@@ -220,6 +231,8 @@ module Make
         ; root= root_hash
         ; best_tip= root_hash
         ; table }
+
+  let hack_temporary_ledger_builder_of_staged_ledger = Fn.id
 
   let find t hash =
     let open Option.Let_syntax in
