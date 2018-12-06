@@ -33,7 +33,7 @@ module Reader : sig
        ?consumer:Pipe.Consumer.t
     -> 'a t
     -> init:'b
-    -> f:('b -> 'a -> 'b Deferred.t)
+    -> f:('b -> 'a -> 'b)
     -> 'b Deferred.t
   (** This also uses `fold_without_pushback`, see [iter] *)
 
