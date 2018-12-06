@@ -519,16 +519,17 @@ module Make (Inputs : Inputs_intf) = struct
             ~protocol_state:Consensus_mechanism.genesis_protocol_state
             ~protocol_state_proof:Protocol_state_proof.dummy
             ~ledger_builder_diff:
-              { Ledger_builder_diff.pre_diffs =
+              { Ledger_builder_diff.pre_diffs=
                   Either.First
-                    { diff=
-                        {completed_works= []; user_commands= []}
+                    { diff= {completed_works= []; user_commands= []}
                     ; coinbase_added= Ledger_builder_diff.At_most_one.Zero }
               ; prev_hash=
                   Ledger_builder_hash.of_aux_and_ledger_hash
                     (Ledger_builder_aux_hash.of_bytes "")
                     (Ledger.merkle_root Genesis_ledger.t)
-              ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts)) }
+              ; creator=
+                  Account.public_key
+                    (snd (List.hd_exn Genesis_ledger.accounts)) }
         in
         let transition_frontier =
           Transition_frontier.create ~logger:config.log
