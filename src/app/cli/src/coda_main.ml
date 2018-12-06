@@ -221,6 +221,8 @@ module type Main_intf = sig
 
     module Protocol_state_proof : sig
       type t
+
+      val dummy : t
     end
 
     module Ledger_builder_hash : sig
@@ -414,6 +416,8 @@ struct
     include Proof.Stable.V1
 
     type input = Protocol_state.value
+
+    let dummy = Coda_base.Proof.dummy
 
     let verify state_proof state =
       match%map
@@ -813,6 +817,7 @@ struct
 
   module Proposer = Proposer.Make (struct
     include Inputs0
+    module Genesis_ledger = Genesis_ledger
     module State_hash = State_hash
     module Ledger_builder_diff = Ledger_builder_diff
     module Ledger_proof_verifier = Ledger_proof_verifier
@@ -927,6 +932,7 @@ module Make_coda (Init : Init_intf) = struct
 
   module Inputs = struct
     include Make_inputs (Init) (Ledger_proof_verifier) (Storage.Disk)
+    module Genesis_ledger = Genesis_ledger
     module Ledger_proof_statement = Ledger_proof_statement
     module Snark_worker = Snark_worker_lib.Debug.Worker
     module Consensus_mechanism = Consensus.Mechanism
