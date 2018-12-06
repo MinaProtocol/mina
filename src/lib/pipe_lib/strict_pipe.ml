@@ -23,7 +23,7 @@ type (_, _) type_ =
       [`Capacity of int] * [`Overflow of 'b overflow_behavior]
       -> ('b buffered, unit) type_
 
-module Reader0 = struct
+module Reader = struct
   type 't t = {reader: 't Pipe.Reader.t; mutable has_reader: bool}
 
   let assert_not_read reader =
@@ -84,6 +84,27 @@ module Reader0 = struct
 
     let iter_sync readers ~f = iter readers ~f:(fun x -> f x ; Deferred.unit)
   end
+
+  module Fork = struct
+    let n reader count =
+      let pipes = List.init count ~f:(fun _ -> Pipe.create ()) in
+      let writers = List.map pipes ~f:(fun (_, w) -> w) in
+      let readers = List.map pipes ~f:(fun (r, _) -> r) in
+      don't_wait_for
+        (iter reader ~f:(fun x ->
+             Deferred.List.iter writers ~f:(fun writer ->
+                 if not (Pipe.is_closed writer) then Pipe.write writer x
+                 else return () ) )) ;
+      don't_wait_for
+        (let%map () = Deferred.List.iter readers ~f:(Fn.compose Deferred.return Pipe.close_read) in
+         Pipe.close_read reader.reader) ;
+      List.map readers ~f:wrap_reader
+
+    let two reader =
+      match n reader 2 with
+      | [a; b] -> (a, b)
+      | _ -> failwith "unexpected"
+  end
 end
 
 module Writer = struct
@@ -114,33 +135,10 @@ end
 let create type_ =
   let reader, writer = Pipe.create () in
   let reader, writer =
-    (Reader0.{reader; has_reader= false}, Writer.{type_; reader; writer})
+    (Reader.{reader; has_reader= false}, Writer.{type_; reader; writer})
   in
   (reader, writer)
 
 let transfer reader {Writer.writer; _} ~f =
-  Reader0.enforce_single_reader reader (Pipe.transfer reader.reader writer ~f)
+  Reader.enforce_single_reader reader (Pipe.transfer reader.reader writer ~f)
 
-module Reader = struct
-  include Reader0
-  module Fork = struct
-    let n reader count =
-      let pipes = List.init count ~f:(fun _ -> Pipe.create ()) in
-      let writers = List.map pipes ~f:(fun (_, w) -> w) in
-      let readers = List.map pipes ~f:(fun (r, _) -> r) in
-      don't_wait_for
-        (iter reader ~f:(fun x ->
-             Deferred.List.iter writers ~f:(fun writer ->
-                 if not (Pipe.is_closed writer) then Pipe.write writer x
-                 else return () ) )) ;
-      don't_wait_for
-        (let%map () = Deferred.List.iter readers ~f:(Fn.compose Deferred.return Pipe.close_read) in
-         Pipe.close_read reader.reader) ;
-      List.map readers ~f:wrap_reader
-
-    let two reader =
-      match n reader 2 with
-      | [a; b] -> (a, b)
-      | _ -> failwith "unexpected"
-  end
-end
