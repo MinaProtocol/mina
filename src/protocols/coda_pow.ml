@@ -119,6 +119,8 @@ end
 
 module type Protocol_state_proof_intf = sig
   type t
+
+  val dummy : t
 end
 
 module type Ledger_builder_aux_hash_intf = sig
@@ -1067,6 +1069,8 @@ module type Inputs_intf = sig
 
   module Account : sig
     type t
+
+    val public_key : t -> Public_key.Compressed.t
   end
 
   module Ledger :
@@ -1075,6 +1079,12 @@ module type Inputs_intf = sig
      and type transaction := Transaction.t
      and type ledger_hash := Ledger_hash.t
      and type account := Account.t
+
+  module Genesis_ledger : sig
+    val t : Ledger.t
+
+    val accounts : (Private_key.t option * Account.t) list
+  end
 
   module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
 
