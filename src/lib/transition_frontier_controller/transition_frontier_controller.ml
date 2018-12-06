@@ -1,62 +1,20 @@
 open Protocols.Coda_pow
+open Protocols.Coda_transition_frontier
 open Coda_base
 open Pipe_lib
-open Signature_lib
 
 module type Inputs_intf = sig
+  include Sync_handler.Inputs_intf
+
   module Time : Time_intf
 
-  module Consensus_mechanism :
-    Consensus_mechanism_intf with type protocol_state_hash := State_hash.t
-
-  module External_transition :
-    External_transition_intf
-    with type protocol_state := Consensus_mechanism.Protocol_state.value
-     and type ledger_builder_diff := Consensus_mechanism.ledger_builder_diff
-     and type protocol_state_proof := Consensus_mechanism.protocol_state_proof
-
-  module Ledger_builder_diff : Ledger_builder_diff_intf
-
-  module Merkle_address : Merkle_address.S
-
-  module Syncable_ledger :
-    Syncable_ledger.S
-    with type addr := Merkle_address.t
-     and type hash := Ledger_hash.t
-
-  module Ledger_builder :
-    Ledger_builder_intf
-    with type diff := Ledger_builder_diff.t
-     and type valid_diff :=
-                Ledger_builder_diff.With_valid_signatures_and_proofs.t
-     and type ledger_builder_hash := Ledger_builder_hash.t
-     and type ledger_hash := Ledger_hash.t
-     and type frozen_ledger_hash := Frozen_ledger_hash.t
-     and type public_key := Public_key.Compressed.t
-     and type ledger := Ledger.t
-     and type user_command_with_valid_signature :=
-                User_command.With_valid_signature.t
-
-  module Ledger_diff : sig
-    type t
-
-    val empty : t
-  end
-
-  module Transition_frontier :
-    Transition_frontier_intf
-    with type external_transition := External_transition.t
-     and type state_hash := State_hash.t
-     and type ledger_database := Ledger.Db.t
-     and type ledger_diff := Ledger_diff.t
-
-  type ledger_database
-
-  type transaction_snark_scan_state
-
-  type ledger_diff
-
-  type staged_ledger
+  module Sync_handler : Sync_handler_intf
+  with type addr := Ledger.Addr.t
+   and type hash := State_hash.t
+   and type syncable_ledger := Syncable_ledger.t
+   and type syncable_ledger_query := Syncable_ledger.query
+   and type syncable_ledger_answer := Syncable_ledger.answer
+   and type transition_frontier := Transition_frontier.t
 
   module Transition_handler :
     Transition_handler_intf
@@ -74,15 +32,6 @@ module type Inputs_intf = sig
      and type transition_frontier := Transition_frontier.t
      and type transition_frontier_breadcrumb :=
                 Transition_frontier.Breadcrumb.t
-
-  module Sync_handler :
-    Sync_handler_intf
-    with type addr := Merkle_address.t
-     and type hash := State_hash.t
-     and type syncable_ledger := Ledger.t
-     and type transition_frontier := Transition_frontier.t
-     and type syncable_ledger_query := Syncable_ledger.query
-     and type syncable_ledger_answer := Syncable_ledger.answer
 end
 
 module Make (Inputs : Inputs_intf) :
