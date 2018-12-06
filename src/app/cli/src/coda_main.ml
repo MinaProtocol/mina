@@ -801,12 +801,18 @@ struct
     module Syncable_ledger = Sync_ledger
   end)
 
-  module Transition_handler = struct
-    type t = TODO
-  end
+  module Ledger_catchup = Ledger_catchup.Make (struct
+    include (
+      Inputs0 :
+        module type of Inputs0
+        with module Ledger_builder := Patched_ledger_builder )
+  end)
 
-  module Catchup = struct
-    type t = TODO
+  module Transition_handler = struct
+    include (
+      Inputs0 :
+        module type of Inputs0
+        with module Ledger_builder := Patched_ledger_builder )
   end
 
   module Transition_frontier_controller =
@@ -815,7 +821,7 @@ struct
     module Syncable_ledger = Sync_ledger
     module Sync_handler = Sync_handler
     module Merkle_address = Ledger.Addr
-    module Catchup = Catchup
+    module Catchup = Ledger_catchup
     module Transition_handler = Transition_handler
     module Ledger_builder_diff = Ledger_builder_diff
     module Ledger_diff = Ledger_builder_diff

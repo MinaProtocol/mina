@@ -5,7 +5,6 @@ open Pipe_lib
 
 module type Inputs_intf = sig
   include Sync_handler.Inputs_intf
-  include Transition_handler.Inputs.S
 
   module Time : Time_intf
 
