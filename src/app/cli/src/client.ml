@@ -105,14 +105,12 @@ let prove_payment =
   in
   let address_flag =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
-      (required public_key)
+      (required public_key_compressed)
   in
   Command.async ~summary:"Generate a proof of a sent payment"
     (Cli_lib.Background_daemon.init (Args.zip2 receipt_hash_flag address_flag)
        ~f:(fun port (receipt_chain_hash, pk) ->
-         dispatch_with_message Prove_receipt.rpc
-           (receipt_chain_hash, Public_key.compress pk)
-           port
+         dispatch_with_message Prove_receipt.rpc (receipt_chain_hash, pk) port
            ~success:(function
              | Ok result -> Cli_lib.Render.Prove_receipt.to_text result
              | Error e -> Error.to_string_hum e)
@@ -139,7 +137,7 @@ let verify_payment =
   in
   let address_flag =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
-      (required public_key)
+      (required public_key_compressed)
   in
   Command.async ~summary:"Verify a proof of a sent payment"
     (Cli_lib.Background_daemon.init
@@ -157,9 +155,7 @@ let verify_payment =
            and proof =
              Payment_proof.of_yojson proof_json |> to_deferred_or_error
            in
-           dispatch Verify_proof.rpc
-             (Public_key.compress pk, payment, proof)
-             port
+           dispatch Verify_proof.rpc (pk, payment, proof) port
          in
          match%map dispatch_result with
          | Ok (Ok ()) -> printf "Payment is valid on the existing blockchain!"
