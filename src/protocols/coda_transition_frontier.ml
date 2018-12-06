@@ -119,6 +119,8 @@ module type Sync_handler_intf = sig
 
   type transition_frontier
 
+  type proof
+
   val run :
        frontier:transition_frontier
     -> sync_query_reader:(hash * syncable_ledger_query) Reader.t
@@ -127,6 +129,9 @@ module type Sync_handler_intf = sig
                           , unit Async.Deferred.t )
                           Writer.t
     -> unit
+
+  val prove :
+    frontier:transition_frontier -> int -> hash -> (hash * proof) option
 end
 
 module type Transition_frontier_controller_intf = sig
