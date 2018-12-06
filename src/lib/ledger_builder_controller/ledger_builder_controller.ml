@@ -561,16 +561,13 @@ let%test_module "test" =
 
           let get_ledger_builder_aux_at_hash _t hash =
             return
-              (Ok
-                 (Envelope.Incoming.wrap ~data:hash
-                    ~sender:(Host_and_port.of_string "127.0.0.1:0")))
+              (Ok (Envelope.Incoming.local hash))
 
           let glue_sync_ledger _t q a =
             don't_wait_for
               (Linear_pipe.iter q ~f:(fun (h, _) ->
                    Linear_pipe.write a
-                     (Envelope.Incoming.wrap ~data:(h, h)
-                        ~sender:(Host_and_port.of_string "127.0.0.1:0")) ))
+                     (Envelope.Incoming.local (h, h))))
         end
 
         module Sync_ledger = struct
