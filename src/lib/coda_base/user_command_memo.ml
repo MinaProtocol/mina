@@ -7,7 +7,7 @@ let max_size_in_bytes = 1000
 
 let create_exn s =
   let max_size = 1000 in
-  if String.length s > max_size_in_bytes then
+  if Int.(String.length s > max_size_in_bytes) then
     failwithf !"Memo data too long. Max size = %d" max_size ()
   else Sha256.digest_string s
 

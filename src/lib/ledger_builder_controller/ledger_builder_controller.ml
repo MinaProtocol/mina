@@ -48,7 +48,9 @@ end = struct
     module Step = struct
       let apply' t diff logger =
         let open Deferred.Or_error.Let_syntax in
-        let%map _, `Ledger_proof proof = Staged_ledger.apply t diff ~logger in
+        let%map _, `Ledger_proof proof =
+          Deferred.return @@ Staged_ledger.apply t diff ~logger
+        in
         Option.map proof ~f:(fun proof ->
             ( Ledger_proof.statement proof |> Ledger_proof_statement.target
             , proof ) )
@@ -414,6 +416,8 @@ let%test_module "test" =
             let hash t = t
 
             let is_valid _ = true
+
+            let empty ~parallelism_log_2:_ = 0
           end
 
           let serializable_of_t t = !t
@@ -431,13 +435,13 @@ let%test_module "test" =
             create ~ledger
 
           let of_aux_and_ledger ~snarked_ledger_hash:_ ~ledger ~aux:_ =
-            Deferred.return (Ok (create ~ledger))
+            Ok (create ~ledger)
 
           let aux t = !t
 
           let apply (t : t) (x : Staged_ledger_diff.t) ~logger:_ =
             t := x ;
-            return (Ok (`Hash_after_applying (hash t), `Ledger_proof (Some x)))
+            Ok (`Hash_after_applying (hash t), `Ledger_proof (Some x))
 
           let apply_diff_unchecked (_t : t) (_x : 'a) =
             failwith "Unimplemented"

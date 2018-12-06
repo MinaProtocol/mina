@@ -50,7 +50,7 @@ struct
         let build_lb ~aux ~ledger =
           let open Interruptible.Let_syntax in
           match%bind
-            Interruptible.uninterruptible
+            Interruptible.return
               (Staged_ledger.of_aux_and_ledger ~snarked_ledger_hash ~ledger
                  ~aux)
           with

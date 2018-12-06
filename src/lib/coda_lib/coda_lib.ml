@@ -97,16 +97,20 @@ module type Network_intf = sig
     -> t Deferred.t
 end
 
-module type Transaction_pool_intf = sig
+module type Transaction_pool_read_intf = sig
   type t
-
-  type pool_diff
 
   type transaction_with_valid_signature
 
-  type transaction
-
   val transactions : t -> transaction_with_valid_signature Sequence.t
+end
+
+module type Transaction_pool_intf = sig
+  include Transaction_pool_read_intf
+
+  type pool_diff
+
+  type transaction
 
   val broadcasts : t -> pool_diff Linear_pipe.Reader.t
 
@@ -251,23 +255,19 @@ module type Proposer_intf = sig
 
   type keypair
 
-  module Tip : sig
-    type t =
-      { protocol_state: protocol_state * protocol_state_proof
-      ; staged_ledger: staged_ledger
-      ; transactions: transaction Sequence.t }
-  end
+  type transition_frontier
 
-  type change = Tip_change of Tip.t
+  type transaction_pool
 
   val create :
        parent_log:Logger.t
     -> get_completed_work:(   completed_work_statement
                            -> completed_work_checked option)
-    -> change_feeder:change Linear_pipe.Reader.t
+    -> transaction_pool:transaction_pool
     -> time_controller:time_controller
     -> keypair:keypair
     -> consensus_local_state:consensus_local_state
+    -> transition_frontier:transition_frontier
     -> (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
 end
 
@@ -387,6 +387,14 @@ module type Inputs_intf = sig
      and type public_key_compressed := Public_key.Compressed.t
      and type maskable_ledger := Ledger.maskable_ledger
 
+  module Ledger_db : Coda_pow.Ledger_creatable_intf
+
+  module Transition_frontier :
+    Protocols.Coda_transition_frontier.Transition_frontier_base_intf
+    with type state_hash := Protocol_state_hash.t
+     and type external_transition := External_transition.t
+     and type ledger_database := Ledger_db.t
+
   module Proposer :
     Proposer_intf
     with type ledger_hash := Ledger_hash.t
@@ -400,6 +408,8 @@ module type Inputs_intf = sig
      and type external_transition := External_transition.t
      and type time_controller := Time.Controller.t
      and type keypair := Keypair.t
+     and type transition_frontier := Transition_frontier.t
+     and type transaction_pool := Transaction_pool.t
 
   module Genesis : sig
     val state : Consensus_mechanism.Protocol_state.value
@@ -422,7 +432,7 @@ module Make (Inputs : Inputs_intf) = struct
         (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
-    ; staged_ledger: Ledger_builder_controller.t
+    ; ledger_builder_controller: Ledger_builder_controller.t
     ; strongest_ledgers:
         (Staged_ledger.t * External_transition.t) Linear_pipe.Reader.t
     ; log: Logger.t
@@ -436,17 +446,17 @@ module Make (Inputs : Inputs_intf) = struct
   let propose_keypair t = t.propose_keypair
 
   let best_staged_ledger t =
-    (Ledger_builder_controller.strongest_tip t.staged_ledger).staged_ledger
+    (Ledger_builder_controller.strongest_tip t.ledger_builder_controller).staged_ledger
 
   let best_protocol_state t =
-    (Ledger_builder_controller.strongest_tip t.staged_ledger).state
+    (Ledger_builder_controller.strongest_tip t.ledger_builder_controller).state
 
   let best_tip t =
-    let tip = Ledger_builder_controller.strongest_tip t.staged_ledger in
+    let tip = Ledger_builder_controller.strongest_tip t.ledger_builder_controller in
     (Staged_ledger.ledger tip.staged_ledger, tip.state, tip.proof)
 
   let get_ledger t lh =
-    Ledger_builder_controller.local_get_ledger t.staged_ledger lh
+    Ledger_builder_controller.local_get_ledger t.ledger_builder_controller lh
     |> Deferred.Or_error.map ~f:(fun (lb, _) ->
            Staged_ledger.ledger lb |> Ledger.to_list )
 
@@ -474,6 +484,7 @@ module Make (Inputs : Inputs_intf) = struct
     Linear_pipe.map t.strongest_ledgers ~f:(fun (_, x) -> x)
 
   module Config = struct
+    (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
     type t =
       { log: Logger.t
       ; propose_keypair: Keypair.t option
@@ -482,6 +493,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; staged_ledger_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
+      ; ledger_db_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
       ; time_controller: Time.Controller.t
       ; banlist: Coda_base.Banlist.t
@@ -500,6 +512,22 @@ module Make (Inputs : Inputs_intf) = struct
         let net_ivar = Ivar.create () in
         let consensus_local_state =
           Consensus_mechanism.Local_state.create config.propose_keypair
+        in
+        let first_transition =
+          failwith "TODO: Bootstrap should emit this transition"
+        in
+        let transition_frontier =
+          Transition_frontier.create ~logger:config.log
+            ~root_transition:
+              (With_hash.of_data first_transition
+                 ~hash_data:
+                   (Fn.compose Consensus_mechanism.Protocol_state.hash
+                      External_transition.protocol_state))
+            ~root_transaction_snark_scan_state:
+              Transition_frontier.Transaction_snark_scan_state.empty
+            ~root_staged_ledger_diff:None
+            ~root_snarked_ledger:
+              (Ledger_db.create ?directory_name:config.ledger_db_location ())
         in
         let lbc_deferred =
           Ledger_builder_controller.create
@@ -571,15 +599,7 @@ module Make (Inputs : Inputs_intf) = struct
         |> don't_wait_for ;
         ( match config.propose_keypair with
         | Some keypair ->
-            let tips_r, tips_w = Linear_pipe.create () in
-            (let tip = Ledger_builder_controller.strongest_tip staged_ledger in
-             Linear_pipe.write_without_pushback tips_w
-               (Proposer.Tip_change
-                  { protocol_state= (tip.state, tip.proof)
-                  ; transactions=
-                      Transaction_pool.transactions transaction_pool
-                  ; staged_ledger= tip.staged_ledger })) ;
-            Linear_pipe.transfer strongest_ledgers_for_miner tips_w
+            Linear_pipe.iter strongest_ledgers_for_miner
               ~f:(fun (staged_ledger, transition) ->
                 let protocol_state =
                   External_transition.protocol_state transition
@@ -608,19 +628,13 @@ module Make (Inputs : Inputs_intf) = struct
                           |> Ledger.merkle_root
                           |> Frozen_ledger_hash.of_ledger_hash )
                           target ) ;
-                Proposer.Tip_change
-                  { protocol_state=
-                      ( protocol_state
-                      , External_transition.protocol_state_proof transition )
-                  ; staged_ledger
-                  ; transactions=
-                      Transaction_pool.transactions transaction_pool } )
+                return () )
             |> don't_wait_for ;
             let transitions =
-              Proposer.create ~parent_log:config.log ~change_feeder:tips_r
+              Proposer.create ~parent_log:config.log ~transaction_pool
                 ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
                 ~time_controller:config.time_controller ~keypair
-                ~consensus_local_state
+                ~consensus_local_state ~transition_frontier
             in
             don't_wait_for
               (Linear_pipe.transfer_id transitions external_transitions_writer)
