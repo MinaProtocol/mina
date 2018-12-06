@@ -24,12 +24,15 @@ module type Ledger_builder_io_intf = sig
   val create : net -> t
 
   val get_ledger_builder_aux_at_hash :
-    t -> ledger_builder_hash -> ledger_builder_aux Deferred.Or_error.t
+       t
+    -> ledger_builder_hash
+    -> ledger_builder_aux Envelope.Incoming.t Deferred.Or_error.t
 
   val glue_sync_ledger :
        t
     -> (ledger_hash * sync_ledger_query) Linear_pipe.Reader.t
-    -> (ledger_hash * sync_ledger_answer) Linear_pipe.Writer.t
+    -> (ledger_hash * sync_ledger_answer) Envelope.Incoming.t
+       Linear_pipe.Writer.t
     -> unit
 end
 
@@ -57,13 +60,17 @@ module type Network_intf = sig
   type transaction_pool_diff
 
   val states :
-    t -> (state_with_witness * Unix_timestamp.t) Linear_pipe.Reader.t
+       t
+    -> (state_with_witness Envelope.Incoming.t * Unix_timestamp.t)
+       Linear_pipe.Reader.t
 
   val peers : t -> Kademlia.Peer.t list
 
-  val snark_pool_diffs : t -> snark_pool_diff Linear_pipe.Reader.t
+  val snark_pool_diffs :
+    t -> snark_pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
 
-  val transaction_pool_diffs : t -> transaction_pool_diff Linear_pipe.Reader.t
+  val transaction_pool_diffs :
+    t -> transaction_pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
 
   val broadcast_state : t -> state_with_witness -> unit
 
@@ -88,10 +95,12 @@ module type Network_intf = sig
   val create :
        Config.t
     -> get_ledger_builder_aux_at_hash:(   ledger_builder_hash
+                                          Envelope.Incoming.t
                                        -> (parallel_scan_state * ledger_hash)
                                           option
                                           Deferred.t)
-    -> answer_sync_ledger_query:(   ledger_hash * sync_ledger_query
+    -> answer_sync_ledger_query:(   (ledger_hash * sync_ledger_query)
+                                    Envelope.Incoming.t
                                  -> (ledger_hash * sync_ledger_answer)
                                     Deferred.Or_error.t)
     -> t Deferred.t
@@ -117,7 +126,7 @@ module type Transaction_pool_intf = sig
   val load :
        parent_log:Logger.t
     -> disk_location:string
-    -> incoming_diffs:pool_diff Linear_pipe.Reader.t
+    -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
     -> t Deferred.t
 
   val add : t -> transaction -> unit Deferred.t
@@ -137,7 +146,7 @@ module type Snark_pool_intf = sig
   val load :
        parent_log:Logger.t
     -> disk_location:string
-    -> incoming_diffs:pool_diff Linear_pipe.Reader.t
+    -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
     -> t Deferred.t
 
   val get_completed_work :
@@ -600,7 +609,9 @@ module Make (Inputs : Inputs_intf) = struct
                Deferred.unit )) ;
         Ivar.fill net_ivar net ;
         don't_wait_for
-          (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;
+          (Linear_pipe.transfer
+             ~f:(fun (tn, tm) -> (Envelope.Incoming.data tn, tm))
+             (Net.states net) external_transitions_writer) ;
         let%bind snark_pool =
           Snark_pool.load ~parent_log:config.log
             ~disk_location:config.snark_pool_disk_location

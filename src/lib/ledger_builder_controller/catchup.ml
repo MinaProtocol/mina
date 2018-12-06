@@ -47,8 +47,10 @@ struct
           transition_with_hash
         in
         let snarked_ledger_hash = ledger_hash_of_transition transition in
-        let build_lb ~aux ~ledger =
+        let build_lb ~(aux_env : Ledger_builder.Aux.t Envelope.Incoming.t)
+            ~ledger =
           let open Interruptible.Let_syntax in
+          let aux = Envelope.Incoming.data aux_env in
           match%bind
             Interruptible.return
               (Ledger_builder.of_aux_and_ledger ~snarked_ledger_hash ~ledger
@@ -81,8 +83,11 @@ struct
                    ; Longest_branch_tip new_tip ]
                    (With_hash.data transition_with_hash))
           | Error e ->
-              Logger.faulty_peer log "Malicious aux data received from net %s"
-                (Error.to_string_hum e) ;
+              Logger.faulty_peer log
+                !"Malicious aux data received from net %s %{sexp: \
+                  Host_and_port.t}"
+                (Error.to_string_hum e)
+                (Envelope.Incoming.sender aux_env) ;
               Interruptible.return ()
         in
         let h =
@@ -129,7 +134,7 @@ struct
                       (Net.get_ledger_builder_aux_at_hash net
                          (ledger_builder_hash_of_transition transition))
                   with
-                  | Ok aux -> build_lb ~aux ~ledger
+                  | Ok aux_env -> build_lb ~aux_env ~ledger
                   | Error e ->
                       Logger.faulty_peer log "Network failed to send aux %s"
                         (Error.to_string_hum e) ;

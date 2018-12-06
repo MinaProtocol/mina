@@ -806,7 +806,7 @@ module type External_transition_intf = sig
 
   type ledger_builder_diff
 
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, bin_io]
 
   val create :
        protocol_state:protocol_state
