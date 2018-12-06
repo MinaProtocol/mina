@@ -1,11 +1,11 @@
 open Core_kernel
 open Pipe_lib.Strict_pipe
 open With_hash
-module State_hash = Coda_base.State_hash
+open Coda_base
 
 module Make (Inputs : Inputs.S) = struct
   open Inputs
-  open Consensus_mechanism
+  open Consensus.Mechanism
 
   type t =
     { catchup_job_writer:

@@ -1,18 +1,19 @@
 open Core_kernel
 open Protocols.Coda_pow
 open Pipe_lib.Strict_pipe
+open Coda_base
 open O1trace
 
 module Make (Inputs : Inputs.S) :
   Transition_handler_processor_intf
-  with type state_hash := Coda_base.State_hash.t
+  with type state_hash := State_hash.t
    and type time_controller := Inputs.Time.Controller.t
    and type external_transition := Inputs.External_transition.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
               Inputs.Transition_frontier.Breadcrumb.t = struct
   open Inputs
-  open Consensus_mechanism
+  open Consensus.Mechanism
   module Catchup_monitor = Catchup_monitor.Make (Inputs)
 
   (* TODO: calculate a sensible value from postake consensus arguments *)
