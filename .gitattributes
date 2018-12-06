@@ -2,15 +2,4 @@
 # libsnark is lots of c++
 src/lib/snarky/src/camlsnark_c/libsnark-caml/* linguist-vendored
 *.png filter=lfs diff=lfs merge=lfs -text
-docs/res/transition_frontier_diagram.png filter=lfs diff=lfs merge=lfs -text
-src/app/website/static/blog/scans/merge-tree3.png filter=lfs diff=lfs merge=lfs -text
-src/app/website/static/blog/scans/better-aprime.png filter=lfs diff=lfs merge=lfs -text
-src/app/website/static/blog/scans/better-c.png filter=lfs diff=lfs merge=lfs -text
-src/app/website/static/blog/scans/better-b.png filter=lfs diff=lfs merge=lfs -text
-src/app/website/static/blog/scans/better-d.png filter=lfs diff=lfs merge=lfs -text
-src/app/website/static/blog/scans/compress.png filter=lfs diff=lfs merge=lfs -text
-src/app/website/static/blog/scans/reorganize.png filter=lfs diff=lfs merge=lfs -text
-src/app/website/static/blog/scans/space-waste.png filter=lfs diff=lfs merge=lfs -text
-src/app/website/static/blog/scans/succinct.png filter=lfs diff=lfs merge=lfs -text
-src/app/website/static/blog/scans/better-a.png filter=lfs diff=lfs merge=lfs -text
-src/app/website/static/blog/scans/better-a5.png filter=lfs diff=lfs merge=lfs -text
+
