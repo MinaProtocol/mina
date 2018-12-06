@@ -118,7 +118,8 @@ module type Transition_handler_validator_intf = sig
   val run :
        logger:Logger.t
     -> frontier:transition_frontier
-    -> transition_reader:( [`Transition of external_transition]
+    -> transition_reader:( [ `Transition of external_transition
+                                            Envelope.Incoming.t ]
                          * [`Time_received of time] )
                          Reader.t
     -> valid_transition_writer:( (external_transition, state_hash) With_hash.t
@@ -224,7 +225,8 @@ module type Transition_frontier_controller_intf = sig
        logger:Logger.t
     -> time_controller:time_controller
     -> frontier:transition_frontier
-    -> transition_reader:( [`Transition of external_transition]
+    -> transition_reader:( [ `Transition of external_transition
+                                            Envelope.Incoming.t ]
                          * [`Time_received of time] )
                          Reader.t
     -> sync_query_reader:(state_hash * syncable_ledger_query) Reader.t
