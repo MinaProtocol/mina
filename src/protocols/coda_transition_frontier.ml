@@ -131,7 +131,10 @@ module type Sync_handler_intf = sig
     -> unit
 
   val prove_ancestory :
-    frontier:transition_frontier -> int -> hash -> (hash * ancestor_proof) option
+       frontier:transition_frontier
+    -> int
+    -> hash
+    -> (hash * ancestor_proof) option
 end
 
 module type Transition_frontier_controller_intf = sig
