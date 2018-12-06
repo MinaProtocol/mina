@@ -88,18 +88,14 @@ module Reader = struct
   module Fork = struct
     let n reader count =
       let pipes = List.init count ~f:(fun _ -> Pipe.create ()) in
-      let writers = List.map pipes ~f:(fun (_, w) -> w) in
-      let readers = List.map pipes ~f:(fun (r, _) -> r) in
+      let readers, writers = List.unzip pipes in
       don't_wait_for
         (iter reader ~f:(fun x ->
              Deferred.List.iter writers ~f:(fun writer ->
                  if not (Pipe.is_closed writer) then Pipe.write writer x
                  else return () ) )) ;
       don't_wait_for
-        (let%map () =
-           Deferred.List.iter readers
-             ~f:(Fn.compose Deferred.return Pipe.close_read)
-         in
+        (let%map () = Deferred.List.iter readers ~f:Pipe.closed in
          Pipe.close_read reader.reader) ;
       List.map readers ~f:wrap_reader
 

@@ -55,6 +55,12 @@ module Reader : sig
 
     val iter_sync : 'a t list -> f:('a -> unit) -> unit Deferred.t
   end
+
+  module Fork : sig
+    val n : 'a t -> int -> 'a t list
+
+    val two : 'a t -> 'a t * 'a t
+  end
 end
 
 module Writer : sig
