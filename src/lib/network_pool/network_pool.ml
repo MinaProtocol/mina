@@ -123,7 +123,7 @@ let%test_module "network pool test" =
                | None -> failwith "There should have been a proof here" ) ;
                Deferred.unit ) ;
         Mock_network_pool.apply_and_broadcast network_pool
-          (Envelope.Incoming.local command))
+          (Envelope.Incoming.local command) )
       |> Async.Thread_safe.block_on_async_exn
 
     let%test_unit "when creating a network, the incoming diffs in reader pipe \
@@ -133,8 +133,8 @@ let%test_module "network pool test" =
         let work_diffs =
           List.map works ~f:(fun work ->
               Envelope.Incoming.local
-                  (Snark_pool_diff.Add_solved_work
-                     (work, {Mock_snark_pool_diff.proof= 0; fee= 0})))
+                (Snark_pool_diff.Add_solved_work
+                   (work, {Mock_snark_pool_diff.proof= 0; fee= 0})) )
           |> Linear_pipe.of_list
         in
         let network_pool =

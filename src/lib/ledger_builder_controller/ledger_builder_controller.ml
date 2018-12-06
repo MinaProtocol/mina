@@ -560,14 +560,12 @@ let%test_module "test" =
             tbl
 
           let get_ledger_builder_aux_at_hash _t hash =
-            return
-              (Ok (Envelope.Incoming.local hash))
+            return (Ok (Envelope.Incoming.local hash))
 
           let glue_sync_ledger _t q a =
             don't_wait_for
               (Linear_pipe.iter q ~f:(fun (h, _) ->
-                   Linear_pipe.write a
-                     (Envelope.Incoming.local (h, h))))
+                   Linear_pipe.write a (Envelope.Incoming.local (h, h)) ))
         end
 
         module Sync_ledger = struct

@@ -597,9 +597,7 @@ struct
 
     (* TODO: This causes the signature to get checked twice as it is checked
    below before feeding it to add *)
-    let add t txn =
-      apply_and_broadcast t
-        (Envelope.Incoming.local [txn])
+    let add t txn = apply_and_broadcast t (Envelope.Incoming.local [txn])
   end
 
   module Transaction_pool_diff = Transaction_pool.Pool.Diff
