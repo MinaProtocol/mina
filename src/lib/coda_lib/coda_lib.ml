@@ -390,11 +390,26 @@ module type Inputs_intf = sig
 
   module Ledger_db : Coda_pow.Ledger_creatable_intf
 
+  module Masked_ledger : sig
+    type t
+  end
+
   module Transition_frontier :
     Protocols.Coda_transition_frontier.Transition_frontier_base_intf
     with type state_hash := Protocol_state_hash.t
      and type external_transition := External_transition.t
      and type ledger_database := Ledger_db.t
+     and type masked_ledger := Masked_ledger.t
+
+  module Transition_frontier_controller :
+    Protocols.Coda_transition_frontier.Transition_frontier_controller_intf
+    with type time_controller := Time.Controller.t
+     and type external_transition := External_transition.t
+     and type syncable_ledger_query := Sync_ledger.query
+     and type syncable_ledger_answer := Sync_ledger.answer
+     and type transition_frontier := Transition_frontier.t
+     and type state_hash := Protocol_state_hash.t
+     and type time := Time.t
 
   module Proposer :
     Proposer_intf
@@ -411,6 +426,11 @@ module type Inputs_intf = sig
      and type keypair := Keypair.t
      and type transition_frontier := Transition_frontier.t
      and type transaction_pool := Transaction_pool.t
+
+  module Ledger_transfer :
+    Coda_pow.Ledger_transfer_intf
+    with type src := Ledger.t
+     and type dest := Ledger_db.t
 
   module Genesis : sig
     val state : Consensus_mechanism.Protocol_state.value
@@ -433,7 +453,7 @@ module Make (Inputs : Inputs_intf) = struct
         (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
-    ; ledger_builder: Ledger_builder_controller.t
+    ; transition_frontier: Transition_frontier.t
     ; strongest_ledgers:
         (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t
     ; log: Logger.t
@@ -447,19 +467,24 @@ module Make (Inputs : Inputs_intf) = struct
   let propose_keypair t = t.propose_keypair
 
   let best_ledger_builder t =
-    (Ledger_builder_controller.strongest_tip t.ledger_builder).ledger_builder
+    failwith
+      "TODO: Use transition frontier to get best lb out; you'll need to \
+       update the signature"
 
   let best_protocol_state t =
-    (Ledger_builder_controller.strongest_tip t.ledger_builder).state
+    failwith
+      "TODO: Use transition frontier to get best lb out; you'll need to \
+       update the signature"
 
   let best_tip t =
-    let tip = Ledger_builder_controller.strongest_tip t.ledger_builder in
-    (Ledger_builder.ledger tip.ledger_builder, tip.state, tip.proof)
+    failwith
+      "TODO: Use transition frontier to get best lb out; you'll need to \
+       update the signature"
 
   let get_ledger t lh =
-    Ledger_builder_controller.local_get_ledger t.ledger_builder lh
-    |> Deferred.Or_error.map ~f:(fun (lb, _) ->
-           Ledger_builder.ledger lb |> Ledger.to_list )
+    failwith
+      "TODO: Use transition frontier to find an arbitrary ledger based on a \
+       hash"
 
   let best_ledger t = Ledger_builder.ledger (best_ledger_builder t)
 
@@ -507,7 +532,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let create (config : Config.t) =
     trace_task "coda" (fun () ->
-        let external_transitions_reader, external_transitions_writer =
+        let _external_transitions_reader, external_transitions_writer =
           Linear_pipe.create ()
         in
         let net_ivar = Ivar.create () in
@@ -542,43 +567,26 @@ module Make (Inputs : Inputs_intf) = struct
               Transition_frontier.Transaction_snark_scan_state.empty
             ~root_staged_ledger_diff:None
             ~root_snarked_ledger:
-              (Ledger_db.create ?directory_name:config.ledger_db_location ())
+              (Ledger_transfer.transfer_accounts ~src:Genesis.ledger
+                 ~dest:
+                   (Ledger_db.create ?directory_name:config.ledger_db_location
+                      ()))
         in
-        let lbc_deferred =
-          Ledger_builder_controller.create
-            (Ledger_builder_controller.Config.make
-               ?proposer_public_key:
-                 (Option.map config.propose_keypair ~f:(fun k ->
-                      k.public_key |> Public_key.compress ))
-               ~parent_log:config.log ~net_deferred:(Ivar.read net_ivar)
-               ~genesis_tip:
-                 { ledger_builder=
-                     Ledger_builder.create
-                       ~ledger:
-                         (Ledger.register_mask Genesis.ledger
-                            (Ledger.Mask.create ()))
-                 ; state= Genesis.state
-                 ; proof= Genesis.proof }
-               ~consensus_local_state ~ledger:Genesis.ledger
-               ~longest_tip_location:config.ledger_builder_persistant_location
-               ~external_transitions:external_transitions_reader ())
+        let () =
+          Transition_frontier_controller.run ~logger:config.log
+            ~time_controller:config.time_controller
+            ~frontier:transition_frontier
+            ~transition_reader:
+              (failwith "Turn external_transitions_reader into a strict pipe")
+            ~sync_query_reader:(failwith "TODO")
+            ~sync_answer_writer:(failwith "TODO")
         in
         let%bind net =
           Net.create config.net_config
-            ~get_ledger_builder_aux_at_hash:(fun hash ->
-              let%bind lbc = lbc_deferred in
-              (* TODO: Just make lbc do this *)
-              match%map
-                Ledger_builder_controller.local_get_ledger lbc hash
-              with
-              | Ok (lb, _state) ->
-                  Some
-                    ( Ledger_builder.aux lb
-                    , Ledger.merkle_root (Ledger_builder.ledger lb) )
-              | _ -> None )
-            ~answer_sync_ledger_query:(fun query ->
-              let%bind lbc = lbc_deferred in
-              Ledger_builder_controller.handle_sync_ledger_queries lbc query )
+            ~get_ledger_builder_aux_at_hash:(fun _hash ->
+              failwith "TODO: replace with new net" )
+            ~answer_sync_ledger_query:(fun _query ->
+              failwith "TODO: replace with new net" )
         in
         let%bind transaction_pool =
           Transaction_pool.load ~parent_log:config.log
@@ -591,7 +599,6 @@ module Make (Inputs : Inputs_intf) = struct
                Net.broadcast_transaction_pool_diff net x ;
                Deferred.unit )) ;
         Ivar.fill net_ivar net ;
-        let%bind ledger_builder = lbc_deferred in
         don't_wait_for
           (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;
         let%bind snark_pool =
@@ -607,7 +614,7 @@ module Make (Inputs : Inputs_intf) = struct
             , strongest_ledgers_for_network
             , strongest_ledgers_for_api ) =
           Linear_pipe.fork3
-            (Ledger_builder_controller.strongest_ledgers ledger_builder)
+            (failwith "TODO: Broadcast \"best tips\" from transition frontier")
         in
         Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (_, t) ->
             Net.broadcast_state net t ; Deferred.unit )
@@ -662,7 +669,7 @@ module Make (Inputs : Inputs_intf) = struct
           ; external_transitions= external_transitions_writer
           ; transaction_pool
           ; snark_pool
-          ; ledger_builder
+          ; transition_frontier
           ; strongest_ledgers= strongest_ledgers_for_api
           ; log= config.log
           ; seen_jobs= Work_selector.State.init
