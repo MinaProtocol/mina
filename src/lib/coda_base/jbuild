@@ -9,6 +9,7 @@
   (libraries
     ( lite_base
       hash_prefixes
+      syncable_ledger
       base64
       signature_lib
       test_util

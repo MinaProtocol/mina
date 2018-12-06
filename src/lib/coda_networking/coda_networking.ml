@@ -237,24 +237,29 @@ module Make (Inputs : Inputs_intf) = struct
   type t =
     { gossip_net: Gossip_net.t
     ; log: Logger.t
-    ; states: (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
-    ; transaction_pool_diffs: Transaction_pool_diff.t Linear_pipe.Reader.t
-    ; snark_pool_diffs: Snark_pool_diff.t Linear_pipe.Reader.t }
+    ; states:
+        (External_transition.t Envelope.Incoming.t * Unix_timestamp.t)
+        Linear_pipe.Reader.t
+    ; transaction_pool_diffs:
+        Transaction_pool_diff.t Envelope.Incoming.t Linear_pipe.Reader.t
+    ; snark_pool_diffs:
+        Snark_pool_diff.t Envelope.Incoming.t Linear_pipe.Reader.t }
   [@@deriving fields]
 
   let create (config : Config.t)
       ~(get_ledger_builder_aux_at_hash :
-            Ledger_builder_hash.t
+            Ledger_builder_hash.t Envelope.Incoming.t
          -> (Ledger_builder_aux.t * Ledger_hash.t) option Deferred.t)
       ~(answer_sync_ledger_query :
-            Ledger_hash.t * Sync_ledger.query
+            (Ledger_hash.t * Sync_ledger.query) Envelope.Incoming.t
          -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t) =
     let log = Logger.child config.parent_log "coda networking" in
-    let get_ledger_builder_aux_at_hash_rpc () ~version:_ hash =
-      get_ledger_builder_aux_at_hash hash
+    let get_ledger_builder_aux_at_hash_rpc sender ~version:_ hash =
+      get_ledger_builder_aux_at_hash
+        (Envelope.Incoming.wrap ~data:hash ~sender)
     in
-    let answer_sync_ledger_query_rpc () ~version:_ query =
-      answer_sync_ledger_query query
+    let answer_sync_ledger_query_rpc sender ~version:_ query =
+      answer_sync_ledger_query (Envelope.Incoming.wrap ~data:query ~sender)
     in
     let implementations =
       List.append
@@ -273,17 +278,18 @@ module Make (Inputs : Inputs_intf) = struct
     *)
     let states, snark_pool_diffs, transaction_pool_diffs =
       Linear_pipe.partition_map3 (Gossip_net.received gossip_net) ~f:(fun x ->
-          match x with
+          match Envelope.Incoming.data x with
           | New_state s ->
               Perf_histograms.add_span ~name:"external_transition_latency"
                 (Time.abs_diff (Time.now ())
                    (External_transition.timestamp s |> Block_time.to_time)) ;
               `Fst
-                ( s
+                ( Envelope.Incoming.map x ~f:(fun _ -> s)
                 , Time.now () |> Time.to_span_since_epoch |> Time.Span.to_ms
                   |> Unix_timestamp.of_float )
-          | Snark_pool_diff d -> `Snd d
-          | Transaction_pool_diff d -> `Trd d )
+          | Snark_pool_diff d -> `Snd (Envelope.Incoming.map x ~f:(fun _ -> d))
+          | Transaction_pool_diff d ->
+              `Trd (Envelope.Incoming.map x ~f:(fun _ -> d)) )
     in
     {gossip_net; log; states; snark_pool_diffs; transaction_pool_diffs}
 
@@ -366,7 +372,9 @@ module Make (Inputs : Inputs_intf) = struct
                   !"%{sexp: Peer.t} sent contents resulting in a good \
                     Ledger_builder_hash %{sexp: Ledger_builder_hash.t}"
                   peer ledger_builder_hash ;
-                Ok ledger_builder_aux )
+                Ok
+                  (Envelope.Incoming.wrap ~data:ledger_builder_aux
+                     ~sender:(fst peer)) )
               else (
                 Logger.faulty_peer t.log
                   !"%{sexp: Peer.t} sent contents resulting in a bad \
@@ -416,7 +424,7 @@ module Make (Inputs : Inputs_intf) = struct
                     !"Received answer from peer %{sexp: Peer.t} on \
                       ledger_hash %{sexp: Ledger_hash.t}"
                     peer (fst answer) ;
-                  Some answer
+                  Some (Envelope.Incoming.wrap ~data:answer ~sender:(fst peer))
               | Ok (Error e) ->
                   Logger.info t.log "Rpc error: %s" (Error.to_string_mach e) ;
                   Hash_set.add peers_tried peer ;
@@ -429,7 +437,7 @@ module Make (Inputs : Inputs_intf) = struct
         | Some answer ->
             Logger.trace t.log
               !"Succeeding with answer on ledger_hash %{sexp: Ledger_hash.t}"
-              (fst answer) ;
+              (fst answer.data) ;
             (* TODO *)
             Linear_pipe.write_if_open response_writer answer
         | None ->

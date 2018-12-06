@@ -559,11 +559,13 @@ let%test_module "test" =
                   ~data:s ) ;
             tbl
 
-          let get_ledger_builder_aux_at_hash _t hash = return (Ok hash)
+          let get_ledger_builder_aux_at_hash _t hash =
+            return (Ok (Envelope.Incoming.local hash))
 
           let glue_sync_ledger _t q a =
             don't_wait_for
-              (Linear_pipe.iter q ~f:(fun (h, _) -> Linear_pipe.write a (h, h)))
+              (Linear_pipe.iter q ~f:(fun (h, _) ->
+                   Linear_pipe.write a (Envelope.Incoming.local (h, h)) ))
         end
 
         module Sync_ledger = struct
@@ -582,8 +584,10 @@ let%test_module "test" =
           type t =
             { mutable ledger: Ledger.t
             ; answer_pipe:
-                (Ledger_hash.t * answer) Linear_pipe.Reader.t
-                * (Ledger_hash.t * answer) Linear_pipe.Writer.t
+                (Ledger_hash.t * answer) Envelope.Incoming.t
+                Linear_pipe.Reader.t
+                * (Ledger_hash.t * answer) Envelope.Incoming.t
+                  Linear_pipe.Writer.t
             ; query_pipe:
                 (Ledger_hash.t * query) Linear_pipe.Reader.t
                 * (Ledger_hash.t * query) Linear_pipe.Writer.t }
@@ -595,7 +599,8 @@ let%test_module "test" =
               ; query_pipe= Linear_pipe.create () }
             in
             don't_wait_for
-              (Linear_pipe.iter (fst t.answer_pipe) ~f:(fun (h, _l) ->
+              (Linear_pipe.iter (fst t.answer_pipe) ~f:(fun env ->
+                   let h, _ = Envelope.Incoming.data env in
                    t.ledger <- h ;
                    Deferred.return () )) ;
             t
