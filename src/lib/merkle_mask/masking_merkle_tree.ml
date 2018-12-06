@@ -191,25 +191,8 @@ struct
         ~init:[(starting_address, starting_hash)]
         ~f:get_addresses_hashes
 
-    (* WARNING: This is n*log(n) and shouldn't be. See issue #1219 *)
-    let recompute_tree t =
-      let locations_and_accounts = Location.Table.to_alist t.account_tbl in
-      List.iter locations_and_accounts ~f:(fun (location, account) ->
-          let starting_address = Location.to_path_exn location in
-          let merkle_path = merkle_path t location in
-          let account_hash =
-            find_hash t starting_address |> Option.value_exn
-          in
-          let addresses_and_hashes =
-            addresses_and_hashes_from_merkle_path_exn merkle_path
-              starting_address account_hash
-          in
-          List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
-              set_inner_hash_at_addr_exn t addr hash ) )
-
     (* use mask Merkle root, if it exists, else get from parent *)
     let merkle_root t =
-      recompute_tree t ;
       match find_hash t (Addr.root ()) with
       | Some hash -> hash
       | None -> Base.merkle_root (get_parent t)
