@@ -166,6 +166,19 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     module Prover_state = Prover_state
   end)
 
+  module For_tests = struct
+    let gen_consensus_state
+        ~gen_slot_advancement:_
+        ~previous_protocol_state
+        ~snarked_ledger_hash:_
+      : Consensus_state.value Quickcheck.Generator.t =
+      let open Consensus_state in
+      let prev = Protocol_state.consensus_state (With_hash.data previous_protocol_state) in
+      Quickcheck.Let_syntax.return
+        { length= Length.succ prev.length
+        ; signer_public_key= prev.signer_public_key }
+  end
+
   let block_interval_ms = Time.Span.to_ms proposal_interval
 
   let generate_transition ~previous_protocol_state ~blockchain_state ~time:_
@@ -221,10 +234,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         signer_public_key
     and success = is_transition_valid_checked block in
     (`Success success, {length; signer_public_key})
-
-  let update_local_state _ ~previous_consensus_state:_ ~next_consensus_state:_
-      ~ledger:_ =
-    ()
 
   let select ~existing:Consensus_state.({length= l1; _})
       ~candidate:Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =

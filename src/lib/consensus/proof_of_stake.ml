@@ -457,6 +457,11 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
             (pedersen_digest :> Snark_params.Tick.Boolean.var list)
       end
 
+      let gen =
+        let open Quickcheck.Let_syntax in
+        let%map input = String.gen in
+        Sha256.digest_string input
+
       let%test_unit "hash unchecked vs. checked equality" =
         let gen_inner_curve_point =
           let open Quickcheck.Generator.Let_syntax in
@@ -1141,6 +1146,47 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     module Blockchain_state = Blockchain_state
     module Consensus_data = Consensus_transition_data
   end)
+
+  module For_tests = struct
+    let gen_consensus_state
+        ~(gen_slot_advancement : int Quickcheck.Generator.t)
+        ~(previous_protocol_state : (Protocol_state.value, Coda_base.State_hash.t) With_hash.t)
+        ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t)
+      : Consensus_state.value Quickcheck.Generator.t =
+      let open Consensus_state in
+      let open Quickcheck.Let_syntax in
+      let open UInt32.Infix in
+      let prev = Protocol_state.consensus_state (With_hash.data previous_protocol_state) in
+      let length = Length.succ prev.length in
+      let%bind slot_advancement = gen_slot_advancement in
+      let curr_epoch, curr_slot =
+        let slot = prev.curr_slot + (UInt32.of_int slot_advancement) in
+        let epoch_advancement = slot / Epoch.size in
+        (prev.curr_epoch + epoch_advancement, slot mod Epoch.size)
+      in
+      let%map proposer_vrf_result = Vrf.Output.gen in
+      let total_currency = Option.value_exn (Amount.add prev.total_currency Constants.coinbase) in
+      let last_epoch_data, curr_epoch_data, epoch_length =
+        Epoch_data.update_pair
+          (prev.last_epoch_data, prev.curr_epoch_data)
+          prev.epoch_length
+          ~prev_epoch:prev.curr_epoch
+          ~next_epoch:curr_epoch
+          ~curr_slot
+          ~prev_protocol_state_hash:(With_hash.hash previous_protocol_state)
+          ~proposer_vrf_result
+          ~snarked_ledger_hash
+          ~total_currency
+      in
+      { length
+      ; epoch_length
+      ; last_vrf_output= proposer_vrf_result
+      ; total_currency
+      ; curr_epoch
+      ; curr_slot
+      ; last_epoch_data
+      ; curr_epoch_data }
+  end
 
   (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
   let generate_transition ~(previous_protocol_state : Protocol_state.value)

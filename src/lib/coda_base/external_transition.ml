@@ -1,3 +1,5 @@
+open Core_kernel
+
 module type S = sig
   module Protocol_state : Protocol_state.S
 

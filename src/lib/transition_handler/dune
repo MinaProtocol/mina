@@ -2,5 +2,6 @@
   (name transition_handler)
   (public_name transition_handler)
   (inline_tests)
+  (flags (:standard -short-paths -warn-error -32-27))
   (libraries core_kernel protocols coda_base genesis_ledger consensus transition_frontier)
   (preprocess (pps ppx_jane ppx_deriving.eq)))
