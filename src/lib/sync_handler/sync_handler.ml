@@ -37,7 +37,7 @@ module Make (Inputs : Inputs_intf) :
    and type syncable_ledger_query := Inputs.Syncable_ledger.query
    and type syncable_ledger_answer := Inputs.Syncable_ledger.answer
    and type transition_frontier := Inputs.Transition_frontier.t
-   and type proof := State_body_hash.t list = struct
+   and type ancestor_proof := State_body_hash.t list = struct
   open Inputs
 
   let answer_query ~frontier (hash, query) =
@@ -48,7 +48,7 @@ module Make (Inputs : Inputs_intf) :
     let answer = Syncable_ledger.Responder.answer_query responder query in
     (hash, answer)
 
-  let prove ~frontier generations descendants =
+  let prove_ancestory ~frontier generations descendants =
     let open Option.Let_syntax in
     let rec go acc iter_traversal state_hash =
       if iter_traversal = 0 then Some (state_hash, acc)

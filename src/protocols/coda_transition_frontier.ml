@@ -119,7 +119,7 @@ module type Sync_handler_intf = sig
 
   type transition_frontier
 
-  type proof
+  type ancestor_proof
 
   val run :
        frontier:transition_frontier
@@ -130,8 +130,8 @@ module type Sync_handler_intf = sig
                           Writer.t
     -> unit
 
-  val prove :
-    frontier:transition_frontier -> int -> hash -> (hash * proof) option
+  val prove_ancestory :
+    frontier:transition_frontier -> int -> hash -> (hash * ancestor_proof) option
 end
 
 module type Transition_frontier_controller_intf = sig
