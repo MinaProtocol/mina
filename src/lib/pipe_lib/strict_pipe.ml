@@ -39,7 +39,8 @@ module Reader = struct
     result
 
   let fold ?consumer reader ~init ~f =
-    enforce_single_reader reader (Pipe.fold reader.reader ?consumer ~init ~f)
+    enforce_single_reader reader
+      (Pipe.fold_without_pushback reader.reader ?consumer ~init ~f)
 
   let iter ?consumer ?continue_on_error reader ~f =
     enforce_single_reader reader

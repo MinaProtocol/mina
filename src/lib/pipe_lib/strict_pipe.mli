@@ -35,6 +35,7 @@ module Reader : sig
     -> init:'b
     -> f:('b -> 'a -> 'b Deferred.t)
     -> 'b Deferred.t
+  (** This also uses `fold_without_pushback`, see [iter] *)
 
   val iter :
        ?consumer:Pipe.Consumer.t
