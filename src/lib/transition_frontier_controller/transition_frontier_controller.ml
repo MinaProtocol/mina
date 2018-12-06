@@ -8,13 +8,14 @@ module type Inputs_intf = sig
 
   module Time : Time_intf
 
-  module Sync_handler : Sync_handler_intf
-  with type addr := Ledger.Addr.t
-   and type hash := State_hash.t
-   and type syncable_ledger := Syncable_ledger.t
-   and type syncable_ledger_query := Syncable_ledger.query
-   and type syncable_ledger_answer := Syncable_ledger.answer
-   and type transition_frontier := Transition_frontier.t
+  module Sync_handler :
+    Sync_handler_intf
+    with type addr := Ledger.Addr.t
+     and type hash := State_hash.t
+     and type syncable_ledger := Syncable_ledger.t
+     and type syncable_ledger_query := Syncable_ledger.query
+     and type syncable_ledger_answer := Syncable_ledger.answer
+     and type transition_frontier := Transition_frontier.t
 
   module Transition_handler :
     Transition_handler_intf

@@ -9,52 +9,53 @@ module Max_length = struct
 end
 
 module type Inputs_intf = sig
-module Completed_work : sig
-  type t
-
-  module Checked : sig
+  module Completed_work : sig
     type t
+
+    module Checked : sig
+      type t
+    end
   end
+
+  module Ledger_builder_diff :
+    Ledger_builder_diff_intf
+    with type user_command := User_command.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
+     and type ledger_builder_hash := Ledger_builder_hash.t
+     and type public_key := Public_key.Compressed.t
+     and type completed_work := Completed_work.t
+     and type completed_work_checked := Completed_work.Checked.t
+
+  module External_transition :
+    External_transition.S
+    with module Protocol_state = Consensus.Mechanism.Protocol_state
+     and module Ledger_builder_diff := Ledger_builder_diff
+
+  module Ledger_builder :
+    Ledger_builder_intf
+    with type diff := Ledger_builder_diff.t
+     and type valid_diff :=
+                Ledger_builder_diff.With_valid_signatures_and_proofs.t
+     and type ledger_builder_hash := Ledger_builder_hash.t
+     and type ledger_hash := Ledger_hash.t
+     and type frozen_ledger_hash := Frozen_ledger_hash.t
+     and type public_key := Public_key.Compressed.t
+     and type ledger := Ledger.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
+     and type completed_work := Completed_work.Checked.t
 end
-module Ledger_builder_diff : Ledger_builder_diff_intf
-                       with type user_command := User_command.t
-                        and type user_command_with_valid_signature :=
-                                   User_command.With_valid_signature.t
-                        and type ledger_builder_hash := Ledger_builder_hash.t
-                        and type public_key := Public_key.Compressed.t
-                        and type completed_work := Completed_work.t
-                        and type completed_work_checked :=
-                                   Completed_work.Checked.t
 
-module External_transition : External_transition.S
-                       with module Protocol_state = Consensus.Mechanism
-                                                    .Protocol_state
-                        and module Ledger_builder_diff := Ledger_builder_diff
-
-module Ledger_builder : Ledger_builder_intf
-                  with type diff := Ledger_builder_diff.t
-                   and type valid_diff :=
-                              Ledger_builder_diff
-                              .With_valid_signatures_and_proofs
-                              .t
-                   and type ledger_builder_hash := Ledger_builder_hash.t
-                   and type ledger_hash := Ledger_hash.t
-                   and type frozen_ledger_hash := Frozen_ledger_hash.t
-                   and type public_key := Public_key.Compressed.t
-                   and type ledger := Ledger.t
-                   and type user_command_with_valid_signature :=
-                              User_command.With_valid_signature.t
-                   and type completed_work := Completed_work.Checked.t
-end
-
-module Make (Inputs: Inputs_intf) :
+module Make (Inputs : Inputs_intf) :
   Transition_frontier_intf
   with type state_hash := State_hash.t
    and type external_transition := Inputs.External_transition.t
    and type ledger_database := Ledger.Db.t
    and type masked_ledger := Ledger.Mask.Attached.t
    and type ledger_builder := Inputs.Ledger_builder.t = struct
-     open Inputs
+  open Inputs
+
   type ledger_diff = Ledger_builder_diff.t
 
   (* Transaction_snark_scan_state and Staged_ledger long-term will not live in

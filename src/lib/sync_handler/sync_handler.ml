@@ -16,13 +16,13 @@ module type Inputs_intf = sig
      and type masked_ledger := Ledger.Mask.Attached.t
 
   module Syncable_ledger :
-      Syncable_ledger.S
-      with type addr := Ledger.Addr.t
-       and type hash := Ledger_hash.t
-       and type merkle_tree := Ledger.Mask.Attached.t
-       and type merkle_path := Ledger.path
-       and type root_hash := Ledger_hash.t
-       and type account := Account.t
+    Syncable_ledger.S
+    with type addr := Ledger.Addr.t
+     and type hash := Ledger_hash.t
+     and type merkle_tree := Ledger.Mask.Attached.t
+     and type merkle_path := Ledger.path
+     and type root_hash := Ledger_hash.t
+     and type account := Account.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -38,7 +38,9 @@ module Make (Inputs : Inputs_intf) :
   let answer_query ~frontier (hash, query) =
     let open Option.Let_syntax in
     let%map breadcrumb = Transition_frontier.find frontier hash in
-    let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger breadcrumb in
+    let staged_ledger =
+      Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+    in
     let ledger = Transition_frontier.Staged_ledger.ledger staged_ledger in
     let responder = Syncable_ledger.Responder.create ledger ignore in
     let answer = Syncable_ledger.Responder.answer_query responder query in

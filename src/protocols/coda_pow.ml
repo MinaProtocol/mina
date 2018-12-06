@@ -179,6 +179,7 @@ end
 
 module type Ledger_transfer_intf = sig
   type src
+
   type dest
 
   val transfer_accounts : src:src -> dest:dest -> dest

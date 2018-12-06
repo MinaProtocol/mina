@@ -457,8 +457,7 @@ struct
 
   module Ledger = Ledger
   module Ledger_db = Ledger.Db
-  module Ledger_transfer =
-    Ledger_transfer.Make(Ledger)(Ledger_db)
+  module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger_db)
 
   module Transaction_snark = struct
     include Ledger_proof
@@ -492,8 +491,7 @@ struct
      and type sparse_ledger := Sparse_ledger.t
      and type ledger_proof_statement := Ledger_proof_statement.t
      and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
-     and type transaction := Transaction.t
-  = struct
+     and type transaction := Transaction.t = struct
     module Inputs = struct
       module Sok_message = Sok_message
       module Account = Account
@@ -577,13 +575,12 @@ struct
     type ledger_builder_aux_hash = Ledger_builder_aux_hash.t
   end
 
-  module Transition_frontier =
-    Transition_frontier.Make (struct
-      module Completed_work = Completed_work
-      module Ledger_builder_diff = Ledger_builder_diff
-      module External_transition = External_transition
-      module Ledger_builder = Patched_ledger_builder
-    end)
+  module Transition_frontier = Transition_frontier.Make (struct
+    module Completed_work = Completed_work
+    module Ledger_builder_diff = Ledger_builder_diff
+    module External_transition = External_transition
+    module Ledger_builder = Patched_ledger_builder
+  end)
 
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (User_command)
@@ -792,38 +789,38 @@ struct
     module Blockchain_state = Consensus.Mechanism.Blockchain_state
   end)
 
-  module Sync_handler =
-    Sync_handler.Make(struct
-      include (
-        Inputs0 :
-          module type of Inputs0
-          with module Ledger_builder := Patched_ledger_builder )
+  module Sync_handler = Sync_handler.Make (struct
+    include (
+      Inputs0 :
+        module type of Inputs0
+        with module Ledger_builder := Patched_ledger_builder )
 
-      module Ledger_builder = Patched_ledger_builder
-      module Ledger_builder_diff = Ledger_builder_diff
-      module Completed_work = Completed_work
-      module Syncable_ledger = Sync_ledger
-    end)
+    module Ledger_builder = Patched_ledger_builder
+    module Ledger_builder_diff = Ledger_builder_diff
+    module Completed_work = Completed_work
+    module Syncable_ledger = Sync_ledger
+  end)
 
   module Transition_handler = struct
     type t = TODO
   end
+
   module Catchup = struct
     type t = TODO
   end
 
   module Transition_frontier_controller =
-    Transition_frontier_controller.Make (struct
-      include Inputs0
-      module Syncable_ledger = Sync_ledger
-      module Sync_handler = Sync_handler
-      module Merkle_address = Ledger.Addr
-      module Catchup = Catchup
-      module Transition_handler = Transition_handler
-      module Ledger_builder_diff = Ledger_builder_diff
-      module Ledger_diff = Ledger_builder_diff
-      module Consensus_mechanism = Consensus.Mechanism
-    end)
+  Transition_frontier_controller.Make (struct
+    include Inputs0
+    module Syncable_ledger = Sync_ledger
+    module Sync_handler = Sync_handler
+    module Merkle_address = Ledger.Addr
+    module Catchup = Catchup
+    module Transition_handler = Transition_handler
+    module Ledger_builder_diff = Ledger_builder_diff
+    module Ledger_diff = Ledger_builder_diff
+    module Consensus_mechanism = Consensus.Mechanism
+  end)
 
   module Ledger_builder_controller = struct
     module Inputs = struct
