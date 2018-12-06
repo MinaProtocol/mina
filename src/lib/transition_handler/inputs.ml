@@ -1,27 +1,23 @@
 open Protocols.Coda_pow
+open Coda_base
 
 module type S = sig
   module Time : Time_intf
 
-  module Consensus_mechanism :
-    Consensus_mechanism_intf
-    with type protocol_state_hash := Coda_base.State_hash.t
-     and type protocol_state_proof := Coda_base.Proof.t
-
-  module External_transition :
-    External_transition_intf
-    with type protocol_state := Consensus_mechanism.Protocol_state.value
-     and type protocol_state_proof := Coda_base.Proof.t
+  include Transition_frontier.Inputs_intf
 
   module Proof :
     Proof_intf
-    with type input := Consensus_mechanism.Protocol_state.value
-     and type t := Coda_base.Proof.t
+    with type input := Consensus.Mechanism.Protocol_state.value
+     and type t := Proof.t
 
   module Transition_frontier :
     Transition_frontier_intf
-    with type state_hash := Coda_base.State_hash.t
+    with type state_hash := State_hash.t
      and type external_transition := External_transition.t
+     and type ledger_database := Ledger.Db.t
+     and type ledger_builder := Ledger_builder.t
+     and type masked_ledger := Ledger.Mask.Attached.t
 end
 
 (*
