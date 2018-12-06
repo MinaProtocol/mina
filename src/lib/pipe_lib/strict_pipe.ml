@@ -43,7 +43,7 @@ module Reader = struct
 
   let iter ?consumer ?continue_on_error reader ~f =
     enforce_single_reader reader
-      (Pipe.iter reader.reader ?consumer ?continue_on_error ~f)
+      (Pipe.iter_without_pushback reader.reader ?consumer ?continue_on_error ~f)
 
   let map reader ~f =
     assert_not_read reader ;
@@ -54,9 +54,6 @@ module Reader = struct
     assert_not_read reader ;
     reader.has_reader <- true ;
     wrap_reader (Pipe.filter_map reader.reader ~f)
-
-  let iter_sync ?consumer ?continue_on_error reader ~f =
-    iter ?consumer ?continue_on_error reader ~f:(fun x -> f x ; Deferred.unit)
 
   module Merge = struct
     let iter readers ~f =
@@ -89,8 +86,13 @@ module Reader = struct
     let n reader count =
       let pipes = List.init count ~f:(fun _ -> Pipe.create ()) in
       let readers, writers = List.unzip pipes in
+      (* This one place we _do_ want iter with pushback which we want to trigger
+       * when all reads have pushed back downstream
+       *
+       * Since future reads will resolve via the iter_without_pushback, we
+       * should still get the behavior we want. *)
       don't_wait_for
-        (iter reader ~f:(fun x ->
+        (Pipe.iter reader.reader ~f:(fun x ->
              Deferred.List.iter writers ~f:(fun writer ->
                  if not (Pipe.is_closed writer) then Pipe.write writer x
                  else return () ) )) ;

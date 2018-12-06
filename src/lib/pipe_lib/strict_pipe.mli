@@ -40,15 +40,12 @@ module Reader : sig
        ?consumer:Pipe.Consumer.t
     -> ?continue_on_error:bool
     -> 'a t
-    -> f:('a -> unit Deferred.t)
-    -> unit Deferred.t
-
-  val iter_sync :
-       ?consumer:Pipe.Consumer.t
-    -> ?continue_on_error:bool
-    -> 'a t
     -> f:('a -> unit)
     -> unit Deferred.t
+  (** This is equivalent to `iter_without_pushback` on a normal pipe,
+   * iter_without_pushback lets you model CSP style communication patterns. If
+   * we allow `iter` with a pushback, we can emulate "single-threadedness", a
+   * behavior we don't need yet for strict pipes *)
 
   module Merge : sig
     val iter : 'a t list -> f:('a -> unit Deferred.t) -> unit Deferred.t
@@ -56,6 +53,9 @@ module Reader : sig
     val iter_sync : 'a t list -> f:('a -> unit) -> unit Deferred.t
   end
 
+  (** A synchronous write on a pipe that is later forked resolves its deferred
+   * when all readers take the message (assuming the readers obey the CSP-style
+   * iter *)
   module Fork : sig
     val n : 'a t -> int -> 'a t list
 
