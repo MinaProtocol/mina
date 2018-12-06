@@ -4,7 +4,7 @@ open Pipe_lib.Strict_pipe
 
 module Make (Inputs : Inputs.S) = struct
   open Inputs
-  open Consensus_mechanism
+  open Consensus.Mechanism
   open Deferred.Let_syntax
 
   let validate_transition ~logger ~frontier ~time_received t =
@@ -30,10 +30,10 @@ module Make (Inputs : Inputs.S) = struct
     in
     if
       log_assert
-        (Consensus_mechanism.is_valid (consensus_state t) ~time_received)
+        (Consensus.Mechanism.is_valid (consensus_state t) ~time_received)
         "failed consensus validation"
       && log_assert
-           ( Consensus_mechanism.select ~logger
+           ( Consensus.Mechanism.select ~logger
                ~existing:(consensus_state root) ~candidate:(consensus_state t)
                ~time_received
            = `Take )
@@ -65,7 +65,12 @@ module Make (Inputs : Inputs.S) = struct
          ~f:(fun (`Transition transition, `Time_received time_received) ->
            if%map
              validate_transition ~logger ~frontier ~time_received transition
-           then Writer.write valid_transition_writer transition
+           then
+             Writer.write valid_transition_writer
+               (With_hash.of_data transition
+                  ~hash_data:
+                    (Fn.compose Protocol_state.hash
+                       External_transition.protocol_state))
            else
              (* TODO: punish *)
              Logger.warn logger "failed to verify transition from the network!"

@@ -177,6 +177,14 @@ module type Ledger_creatable_intf = sig
   val create : ?directory_name:string -> unit -> t
 end
 
+module type Ledger_transfer_intf = sig
+  type src
+
+  type dest
+
+  val transfer_accounts : src:src -> dest:dest -> dest
+end
+
 module type Ledger_intf = sig
   include Ledger_creatable_intf
 
