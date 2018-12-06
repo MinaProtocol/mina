@@ -4,7 +4,7 @@ open Pipe_lib.Strict_pipe
 
 module Make (Inputs : Inputs.S) = struct
   open Inputs
-  open Consensus_mechanism
+  open Consensus.Mechanism
   open Deferred.Let_syntax
 
   let validate_transition ~logger ~frontier ~time_received t =
@@ -30,10 +30,10 @@ module Make (Inputs : Inputs.S) = struct
     in
     if
       log_assert
-        (Consensus_mechanism.is_valid (consensus_state t) ~time_received)
+        (Consensus.Mechanism.is_valid (consensus_state t) ~time_received)
         "failed consensus validation"
       && log_assert
-           ( Consensus_mechanism.select ~logger
+           ( Consensus.Mechanism.select ~logger
                ~existing:(consensus_state root) ~candidate:(consensus_state t)
                ~time_received
            = `Take )
