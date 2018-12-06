@@ -123,8 +123,14 @@ module Make (Inputs : Inputs_intf) :
     type t = staged_ledger
 
     let create ~transaction_snark_scan_state ~ledger =
-      Ledger_builder.of_aux_and_ledger ~snarked_ledger_hash:(failwith "TODO")
-        ~ledger
+      (* Assuming we always create at the root, the parent will be the DB aka the snarked_ledger *)
+      let parent = Ledger.Mask.Attached.get_parent ledger in
+      let empty_mask = Ledger.Mask.create () in
+      let snarked_ledger = Ledger.Maskable.register_mask parent empty_mask in
+      let snarked_ledger_hash =
+        Frozen_ledger_hash.of_ledger_hash @@ Ledger.merkle_root snarked_ledger
+      in
+      Ledger_builder.of_aux_and_ledger ~snarked_ledger_hash ~ledger
         ~aux:
           (Transaction_snark_scan_state.to_ledger_aux
              transaction_snark_scan_state)
