@@ -60,7 +60,7 @@ module Make (Inputs : Inputs_intf) :
 
   (* Transaction_snark_scan_state and Staged_ledger long-term will not live in
   * this module *)
-
+  
   (* Right now Transaction_snark_scan_state is not different from a
      * ledger-builder diff *)
   module Transaction_snark_scan_state : sig
@@ -126,14 +126,11 @@ module Make (Inputs : Inputs_intf) :
       (* Assuming we always create at the root, the parent will be the DB aka the snarked_ledger *)
       let parent = Ledger.Mask.Attached.get_parent ledger in
       let empty_mask = Ledger.Mask.create () in
-      let snarked_ledger =
-        Ledger.Maskable.register_mask parent empty_mask in
+      let snarked_ledger = Ledger.Maskable.register_mask parent empty_mask in
       let snarked_ledger_hash =
-        Frozen_ledger_hash.of_ledger_hash @@
-          Ledger.merkle_root snarked_ledger
+        Frozen_ledger_hash.of_ledger_hash @@ Ledger.merkle_root snarked_ledger
       in
-      Ledger_builder.of_aux_and_ledger ~snarked_ledger_hash
-        ~ledger
+      Ledger_builder.of_aux_and_ledger ~snarked_ledger_hash ~ledger
         ~aux:
           (Transaction_snark_scan_state.to_ledger_aux
              transaction_snark_scan_state)
