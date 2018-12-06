@@ -96,14 +96,15 @@ module Reader = struct
                  if not (Pipe.is_closed writer) then Pipe.write writer x
                  else return () ) )) ;
       don't_wait_for
-        (let%map () = Deferred.List.iter readers ~f:(Fn.compose Deferred.return Pipe.close_read) in
+        (let%map () =
+           Deferred.List.iter readers
+             ~f:(Fn.compose Deferred.return Pipe.close_read)
+         in
          Pipe.close_read reader.reader) ;
       List.map readers ~f:wrap_reader
 
     let two reader =
-      match n reader 2 with
-      | [a; b] -> (a, b)
-      | _ -> failwith "unexpected"
+      match n reader 2 with [a; b] -> (a, b) | _ -> failwith "unexpected"
   end
 end
 
@@ -141,4 +142,3 @@ let create type_ =
 
 let transfer reader {Writer.writer; _} ~f =
   Reader.enforce_single_reader reader (Pipe.transfer reader.reader writer ~f)
-
