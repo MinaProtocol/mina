@@ -5,7 +5,8 @@ module Inputs = Inputs
 
 module Make (Inputs : Inputs.S) :
   Transition_handler_intf
-  with type time_controller := Inputs.Time.Controller.t
+  with type time := Inputs.Time.t
+   and type time_controller := Inputs.Time.Controller.t
    and type external_transition := Inputs.External_transition.t
    and type state_hash := State_hash.t
    and type transition_frontier := Inputs.Transition_frontier.t

@@ -107,6 +107,8 @@ module type Catchup_intf = sig
 end
 
 module type Transition_handler_validator_intf = sig
+  type time
+
   type state_hash
 
   type external_transition
@@ -114,11 +116,12 @@ module type Transition_handler_validator_intf = sig
   type transition_frontier
 
   val run :
-       frontier:transition_frontier
-    -> transition_reader:external_transition Reader.t
+       logger:Logger.t
+    -> frontier:transition_frontier
+    -> transition_reader:([`Transition of external_transition] * [`Time_received of time]) Reader.t
     -> valid_transition_writer:( (external_transition, state_hash) With_hash.t
                                , drop_head buffered
-                               , _ )
+                               , unit )
                                Writer.t
     -> unit
 end
@@ -151,6 +154,8 @@ end
 module type Transition_handler_intf = sig
   type time_controller
 
+  type time
+
   type state_hash
 
   type external_transition
@@ -161,7 +166,8 @@ module type Transition_handler_intf = sig
 
   module Validator :
     Transition_handler_validator_intf
-    with type state_hash := state_hash
+    with type time := time
+     and type state_hash := state_hash
      and type external_transition := external_transition
      and type transition_frontier := transition_frontier
 
