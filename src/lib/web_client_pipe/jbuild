@@ -7,6 +7,6 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core async pipe_lib logger web_request))
-  (preprocess (pps (ppx_jane ppx_deriving.std)))
+  (preprocess (pps (ppx_jane ppx_deriving.std bisect_ppx -conditional)))
   (synopsis "Transforming Coda data such that it can be easy for the Web Client to process")))
 

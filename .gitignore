@@ -1,6 +1,6 @@
 _build*
 *.install
-.merlin
+.merlin*
 result
 test.log
 build.log

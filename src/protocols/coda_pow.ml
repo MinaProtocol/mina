@@ -845,6 +845,9 @@ module type Consensus_mechanism_intf = sig
     -> logger:Logger.t
     -> Protocol_state.value * Consensus_transition_data.value
 
+  val is_valid :
+    Consensus_state.value -> time_received:Unix_timestamp.t -> bool
+
   val next_proposal :
        Int64.t
     -> Consensus_state.value
@@ -852,6 +855,13 @@ module type Consensus_mechanism_intf = sig
     -> keypair:keypair
     -> logger:Logger.t
     -> [`Check_again of Int64.t | `Propose of Int64.t * Proposal_data.t]
+
+  val select :
+       existing:Consensus_state.value
+    -> candidate:Consensus_state.value
+    -> logger:Logger.t
+    -> time_received:Unix_timestamp.t
+    -> [`Keep | `Take]
 
   val genesis_protocol_state : Protocol_state.value
 end

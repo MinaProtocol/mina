@@ -36,23 +36,20 @@ module type Inputs_intf = sig
     val add : t -> Span.t -> t
   end
 
-  module Genesis_ledger : sig
-    val t : Coda_base.Ledger.t
+  module Constants : sig
+    val genesis_state_timestamp : Time.t
+
+    val coinbase : Amount.t
+
+    val network_delay : int
+
+    val slot_length : Time.Span.t
+
+    val unforkable_transition_count : int
+    (** also known as [K] *)
+
+    val probable_slots_per_transition_count : int
   end
-
-  val genesis_state_timestamp : Time.t
-
-  val coinbase : Amount.t
-
-  val slot_interval : Time.Span.t
-
-  val unforkable_transition_count : int
-
-  val probable_slots_per_transition_count : int
-
-  val expected_network_delay : Time.Span.t
-
-  val approximate_network_diameter : int
 end
 
 module Segment_id = Nat.Make32 ()
@@ -92,6 +89,18 @@ let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64
 module Make (Inputs : Inputs_intf) : Intf.S = struct
   module Time = Inputs.Time
 
+  module Constants = struct
+    include Inputs.Constants
+
+    let slot_length_ms = Time.Span.to_ms slot_length
+
+    let network_window_length =
+      Time.Span.of_ms
+        (Int64.of_int (Int64.to_int slot_length_ms * network_delay))
+  end
+
+  let block_interval_ms = Constants.slot_length_ms
+
   module Proposal_data = struct
     type t = {stake_proof: Coda_base.Stake_proof.t; vrf_result: Sha256.Digest.t}
     [@@deriving bin_io]
@@ -99,10 +108,8 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     let prover_state {stake_proof; _} = stake_proof
   end
 
-  let block_interval_ms = Time.Span.to_ms Inputs.slot_interval
-
   let genesis_ledger_total_currency =
-    Coda_base.Ledger.to_list Inputs.Genesis_ledger.t
+    Coda_base.Ledger.to_list Genesis_ledger.t
     |> List.fold_left ~init:Balance.zero ~f:(fun sum account ->
            Balance.add_amount sum
              (Balance.to_amount @@ Coda_base.Account.balance account)
@@ -112,7 +119,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     |> Balance.to_amount
 
   let genesis_ledger_hash =
-    Coda_base.Ledger.merkle_root Inputs.Genesis_ledger.t
+    Coda_base.Ledger.merkle_root Genesis_ledger.t
     |> Coda_base.Frozen_ledger_hash.of_ledger_hash
 
   let compute_delegators self_pk ledger =
@@ -155,44 +162,43 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
 
     let size =
       UInt32.of_int
-        ( 3 * Inputs.probable_slots_per_transition_count
-        * Inputs.unforkable_transition_count )
+        ( 3 * Constants.probable_slots_per_transition_count
+        * Constants.unforkable_transition_count )
 
-    let interval =
+    let length =
       Time.Span.of_ms
-        Int64.Infix.(
-          Time.Span.to_ms Inputs.slot_interval * int64_of_uint32 size)
+        Int64.Infix.(Constants.slot_length_ms * int64_of_uint32 size)
 
     let of_time_exn t : t =
-      if Time.(t < Inputs.genesis_state_timestamp) then
+      if Time.(t < Constants.genesis_state_timestamp) then
         raise
           (Invalid_argument
              "Epoch.of_time: time is less than genesis block timestamp") ;
-      let time_since_genesis = Time.diff t Inputs.genesis_state_timestamp in
+      let time_since_genesis = Time.diff t Constants.genesis_state_timestamp in
       uint32_of_int64
         Int64.Infix.(
-          Time.Span.to_ms time_since_genesis / Time.Span.to_ms interval)
+          Time.Span.to_ms time_since_genesis / Time.Span.to_ms length)
 
     let start_time (epoch : t) =
       let ms =
         let open Int64.Infix in
         Time.Span.to_ms
-          (Time.to_span_since_epoch Inputs.genesis_state_timestamp)
-        + (int64_of_uint32 epoch * Time.Span.to_ms interval)
+          (Time.to_span_since_epoch Constants.genesis_state_timestamp)
+        + (int64_of_uint32 epoch * Time.Span.to_ms length)
       in
       Time.of_span_since_epoch (Time.Span.of_ms ms)
 
-    let end_time (epoch : t) = Time.add (start_time epoch) interval
+    let end_time (epoch : t) = Time.add (start_time epoch) length
 
     module Slot = struct
       include Segment_id
 
-      let interval = Inputs.slot_interval
+      let length = Constants.slot_length
 
       let unforkable_count =
         UInt32.of_int
-          ( Inputs.probable_slots_per_transition_count
-          * Inputs.unforkable_transition_count )
+          ( Constants.probable_slots_per_transition_count
+          * Constants.unforkable_transition_count )
 
       let after_lock_checkpoint (slot : t) =
         let open UInt32.Infix in
@@ -241,10 +247,10 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     let slot_start_time (epoch : t) (slot : Slot.t) =
       Time.add (start_time epoch)
         (Time.Span.of_ms
-           Int64.Infix.(int64_of_uint32 slot * Time.Span.to_ms Slot.interval))
+           Int64.Infix.(int64_of_uint32 slot * Time.Span.to_ms Slot.length))
 
     let slot_end_time (epoch : t) (slot : Slot.t) =
-      Time.add (slot_start_time epoch slot) Slot.interval
+      Time.add (slot_start_time epoch slot) Slot.length
 
     let epoch_and_slot_of_time_exn t : t * Slot.t =
       let epoch = of_time_exn t in
@@ -252,7 +258,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       let slot =
         uint32_of_int64
         @@ Int64.Infix.(
-             Time.Span.to_ms time_since_epoch / Time.Span.to_ms Slot.interval)
+             Time.Span.to_ms time_since_epoch / Time.Span.to_ms Slot.length)
       in
       (epoch, slot)
   end
@@ -1113,8 +1119,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         (Amount.to_string t.total_currency)
   end
 
-  module Blockchain_state =
-    Coda_base.Blockchain_state.Make (Inputs.Genesis_ledger)
+  module Blockchain_state = Coda_base.Blockchain_state.Make (Genesis_ledger)
   module Protocol_state =
     Coda_base.Protocol_state.Make (Blockchain_state) (Consensus_state)
 
@@ -1132,7 +1137,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
   end
 
   module Snark_transition = Coda_base.Snark_transition.Make (struct
-    module Genesis_ledger = Inputs.Genesis_ledger
+    module Genesis_ledger = Genesis_ledger
     module Blockchain_state = Blockchain_state
     module Consensus_data = Consensus_transition_data
   end)
@@ -1164,6 +1169,21 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         ~blockchain_state ~consensus_state
     in
     (protocol_state, consensus_transition_data)
+
+  let received_within_window (epoch, slot) ~time_received =
+    let open Time in
+    let time_received =
+      of_span_since_epoch (Span.of_ms (Unix_timestamp.to_int64 time_received))
+    in
+    let window_start = Epoch.slot_start_time epoch slot in
+    let window_end = add window_start Constants.network_window_length in
+    window_start < time_received && time_received < window_end
+
+  let is_valid consensus_state ~time_received =
+    let open Consensus_state in
+    received_within_window
+      (consensus_state.curr_epoch, consensus_state.curr_slot)
+      ~time_received
 
   let next_state_checked ~(prev_state : Protocol_state.var)
       ~(prev_state_hash : Coda_base.State_hash.var) transition supply_increase
@@ -1200,89 +1220,93 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     Logger.info logger
       !"candidate consensus state: %{sexp:Consensus_state.value}"
       candidate ;
-    (* TODO: update time_received check and `Keep when it is not met *)
     if
       not
-        (time_in_epoch_slot candidate
-           Time.(of_span_since_epoch (Span.of_ms time_received)))
-    then Logger.error logger "received a transition outside of it's slot time" ;
-    (* TODO: add fork_before_checkpoint check *)
-    (* Each branch contains a precondition predicate and a choice predicate,
-     * which takes the new state when true. Each predicate is also decorated
-     * with a string description, used for debugging messages *)
-    let candidate_vrf_is_bigger =
-      let d = Fn.compose Sha256.digest_string Vrf.Output.to_string in
-      Sha256.Digest.( > )
-        (d candidate.last_vrf_output)
-        (d existing.last_vrf_output)
-    in
-    let ( << ) a b =
-      let c = Length.compare a b in
-      c < 0 || (c = 0 && candidate_vrf_is_bigger)
-    in
-    let ( = ) = Coda_base.State_hash.equal in
-    let branches =
-      [ ( ( lazy
-              ( existing.last_epoch_data.lock_checkpoint
-              = candidate.last_epoch_data.lock_checkpoint )
-          , "last epoch lock checkpoints are equal" )
-        , ( lazy (existing.length << candidate.length)
-          , "candidate is longer than existing" ) )
-      ; ( ( lazy
-              ( existing.last_epoch_data.start_checkpoint
-              = candidate.last_epoch_data.start_checkpoint )
-          , "last epoch start checkpoints are equal" )
-        , ( lazy
-              ( existing.last_epoch_data.length
-              << candidate.last_epoch_data.length )
-          , "candidate last epoch is longer than existing last epoch" ) )
-        (* these two could be condensed into one entry *)
-      ; ( ( lazy
-              ( existing.curr_epoch_data.lock_checkpoint
-              = candidate.last_epoch_data.lock_checkpoint )
-          , "candidate last epoch lock checkpoint is equal to existing \
-             current epoch lock checkpoint" )
-        , ( lazy (existing.length << candidate.length)
-          , "candidate is longer than existing" ) )
-      ; ( ( lazy
-              ( existing.last_epoch_data.lock_checkpoint
-              = candidate.curr_epoch_data.lock_checkpoint )
-          , "candidate current epoch lock checkpoint is equal to existing \
-             last epoch lock checkpoint" )
-        , ( lazy (existing.length << candidate.length)
-          , "candidate is longer than existing" ) )
-      ; ( ( lazy
-              ( existing.curr_epoch_data.start_checkpoint
-              = candidate.last_epoch_data.start_checkpoint )
-          , "candidate last epoch start checkpoint is equal to existing \
-             current epoch start checkpoint" )
-        , ( lazy
-              ( existing.curr_epoch_data.length
-              << candidate.last_epoch_data.length )
-          , "candidate last epoch is longer than existing current epoch" ) )
-      ; ( ( lazy
-              ( existing.last_epoch_data.start_checkpoint
-              = candidate.curr_epoch_data.start_checkpoint )
-          , "candidate current epoch start checkpoint is equal to existing \
-             last epoch start checkpoint" )
-        , ( lazy
-              ( existing.last_epoch_data.length
-              << candidate.curr_epoch_data.length )
-          , "candidate current epoch is longer than existing last epoch" ) ) ]
-    in
-    match
-      List.find_map branches
-        ~f:(fun ((precondition, precondition_msg), (choice, choice_msg)) ->
-          if Lazy.force precondition then (
-            let choice = if Lazy.force choice then `Take else `Keep in
-            log_choice ~precondition_msg ~choice_msg choice ;
-            Some choice )
-          else None )
-    with
-    | Some choice -> choice
-    | None ->
-        log_result `Keep "no predicates were matched" ;
-        `Keep
+        (received_within_window
+           (candidate.curr_epoch, candidate.curr_slot)
+           ~time_received)
+    then (
+      Logger.error logger "received a transition outside of its slot time" ;
+      `Keep )
+    else
+      (* TODO: add fork_before_checkpoint check *)
+      (* Each branch contains a precondition predicate and a choice predicate,
+       * which takes the new state when true. Each predicate is also decorated
+       * with a string description, used for debugging messages *)
+      let candidate_vrf_is_bigger =
+        let d = Fn.compose Sha256.digest_string Vrf.Output.to_string in
+        Sha256.Digest.( > )
+          (d candidate.last_vrf_output)
+          (d existing.last_vrf_output)
+      in
+      let ( << ) a b =
+        let c = Length.compare a b in
+        c < 0 || (c = 0 && candidate_vrf_is_bigger)
+      in
+      let ( = ) = Coda_base.State_hash.equal in
+      let branches =
+        [ ( ( lazy
+                ( existing.last_epoch_data.lock_checkpoint
+                = candidate.last_epoch_data.lock_checkpoint )
+            , "last epoch lock checkpoints are equal" )
+          , ( lazy (existing.length << candidate.length)
+            , "candidate is longer than existing" ) )
+        ; ( ( lazy
+                ( existing.last_epoch_data.start_checkpoint
+                = candidate.last_epoch_data.start_checkpoint )
+            , "last epoch start checkpoints are equal" )
+          , ( lazy
+                ( existing.last_epoch_data.length
+                << candidate.last_epoch_data.length )
+            , "candidate last epoch is longer than existing last epoch" ) )
+          (* these two could be condensed into one entry *)
+        ; ( ( lazy
+                ( existing.curr_epoch_data.lock_checkpoint
+                = candidate.last_epoch_data.lock_checkpoint )
+            , "candidate last epoch lock checkpoint is equal to existing \
+               current epoch lock checkpoint" )
+          , ( lazy (existing.length << candidate.length)
+            , "candidate is longer than existing" ) )
+        ; ( ( lazy
+                ( existing.last_epoch_data.lock_checkpoint
+                = candidate.curr_epoch_data.lock_checkpoint )
+            , "candidate current epoch lock checkpoint is equal to existing \
+               last epoch lock checkpoint" )
+          , ( lazy (existing.length << candidate.length)
+            , "candidate is longer than existing" ) )
+        ; ( ( lazy
+                ( existing.curr_epoch_data.start_checkpoint
+                = candidate.last_epoch_data.start_checkpoint )
+            , "candidate last epoch start checkpoint is equal to existing \
+               current epoch start checkpoint" )
+          , ( lazy
+                ( existing.curr_epoch_data.length
+                << candidate.last_epoch_data.length )
+            , "candidate last epoch is longer than existing current epoch" ) )
+        ; ( ( lazy
+                ( existing.last_epoch_data.start_checkpoint
+                = candidate.curr_epoch_data.start_checkpoint )
+            , "candidate current epoch start checkpoint is equal to existing \
+               last epoch start checkpoint" )
+          , ( lazy
+                ( existing.last_epoch_data.length
+                << candidate.curr_epoch_data.length )
+            , "candidate current epoch is longer than existing last epoch" ) )
+        ]
+      in
+      match
+        List.find_map branches
+          ~f:(fun ((precondition, precondition_msg), (choice, choice_msg)) ->
+            if Lazy.force precondition then (
+              let choice = if Lazy.force choice then `Take else `Keep in
+              log_choice ~precondition_msg ~choice_msg choice ;
+              Some choice )
+            else None )
+      with
+      | Some choice -> choice
+      | None ->
+          log_result `Keep "no predicates were matched" ;
+          `Keep
 
   let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
       ~logger =
@@ -1388,27 +1412,55 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       ~previous_state_hash:Protocol_state.(hash negative_one)
       ~blockchain_state:Snark_transition.(blockchain_state genesis)
       ~consensus_state
+
+  let to_unix_timestamp recieved_time =
+    recieved_time |> Time.to_span_since_epoch |> Time.Span.to_ms
+    |> Unix_timestamp.of_int64
+
+  let%test "Receive a valid consensus_state with a bit of delay" =
+    let {Consensus_state.curr_epoch; curr_slot; _} = Consensus_state.genesis in
+    let delay = Constants.network_delay / 2 |> UInt32.of_int in
+    let new_slot = UInt32.Infix.(curr_slot + delay) in
+    let time_received = Epoch.slot_start_time curr_epoch new_slot in
+    is_valid Consensus_state.genesis
+      ~time_received:(to_unix_timestamp time_received)
+
+  let%test "Receive an invalid consensus_state" =
+    let epoch = Epoch.of_int 5 in
+    let start_time = Epoch.start_time epoch in
+    let curr_epoch, curr_slot = Epoch.epoch_and_slot_of_time_exn start_time in
+    let consensus_state =
+      {Consensus_state.genesis with curr_epoch; curr_slot}
+    in
+    let too_early = Epoch.start_time Consensus_state.genesis.curr_slot in
+    let too_late =
+      let delay = Constants.network_delay * 2 |> UInt32.of_int in
+      let delayed_slot = UInt32.Infix.(curr_slot + delay) in
+      Epoch.slot_start_time curr_epoch delayed_slot
+    in
+    let times = [too_late; too_early] in
+    List.for_all times ~f:(fun time ->
+        not (is_valid consensus_state ~time_received:(to_unix_timestamp time))
+    )
 end
 
 let%test_module "Proof_of_stake tests" =
   ( module struct
     module Proof_of_stake = Make (struct
       module Time = Coda_base.Block_time
-      module Genesis_ledger = Genesis_ledger
 
-      let genesis_state_timestamp = Coda_base.Block_time.now ()
+      module Constants = struct
+        let genesis_state_timestamp = Coda_base.Block_time.now ()
 
-      let coinbase = Amount.of_int 20
+        let coinbase = Amount.of_int 20
 
-      let slot_interval = Coda_base.Block_time.Span.of_ms (Int64.of_int 200)
+        let slot_length = Coda_base.Block_time.Span.of_ms (Int64.of_int 200)
 
-      let unforkable_transition_count = 24
+        let unforkable_transition_count = 24
 
-      let probable_slots_per_transition_count = 8
+        let probable_slots_per_transition_count = 8
 
-      let expected_network_delay =
-        Coda_base.Block_time.Span.of_ms (Int64.of_int 1000)
-
-      let approximate_network_diameter = 3
+        let network_delay = 4
+      end
     end)
   end )

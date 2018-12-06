@@ -40,7 +40,7 @@ Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debi
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-9aea9e820e487fabb79e3c8c27372a50fbf77289`
+`docker pull codaprotocol/coda:toolchain-6862c63e4f3f4989db7a27c1fe79420ae0ba7397`
 
 * Create local builder image
 
@@ -55,6 +55,11 @@ Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debi
 `make USEDOCKER=TRUE build`
 
 #### Customizing your dev environment for autocomplete/merlin
+
+* If you build in Docker, the files created for merlin will have invalid paths. You can fix those paths after a
+  build
+
+`make USEDOCKER=TRUE merlin-fixup`
 
 * If you use vim, add this snippet in your vimrc to use merlin. (REMEMBER to change the HOME directory to match yours)
 
@@ -88,7 +93,7 @@ let g:syntastic_ocaml_checkers=['merlin']
 ```
 
 Emacs has a built-in autocomplete, via `M-x completion-at-point`, or simply `M-tab`. There are other
-Emacs autocompletion packages; see [Emacs from scratch] (https://github.com/ocaml/merlin/wiki/emacs-from-scratch).
+Emacs autocompletion packages; see [Emacs from scratch](https://github.com/ocaml/merlin/wiki/emacs-from-scratch).
 
 ## Using the makefile
 
@@ -125,9 +130,12 @@ with `dune`, so you need to add them manually:
 
 * `opam pin add src/external/ocaml-sodium`
 * `opam pin add src/external/ocaml-rocksdb`
+* `opam pin add src/external/ocaml-dune`
 
 There are a variety of C libraries we expect to be available in the system.
-These are also listed in the dockerfiles.
+These are also listed in the dockerfiles. Unlike most of the C libraries,
+which are installed using `apt` in the dockerfiles, the libraries for RocksDB are
+installed via the script `src/external/ocaml-rocksdb/install_rocksdb.sh`.
 
 ## Common dune tasks
 

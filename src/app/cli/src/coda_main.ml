@@ -992,7 +992,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let open Or_error.Let_syntax in
     let%bind () = Payment_verifier.verify ~resulting_receipt proof in
     if
-      List.exists proof ~f:(fun (_, txn) ->
+      List.exists (Payment_proof.payments proof) ~f:(fun txn ->
           User_command.equal verifying_txn txn )
     then Ok ()
     else

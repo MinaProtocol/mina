@@ -18,5 +18,5 @@
       global_signer_private_key
       non_zero_curve_point ))
   (preprocessor_deps ("../../config.mlh"))
-  (preprocess (pps (ppx_jane ppx_deriving.eq)))
+  (preprocess (pps (ppx_jane ppx_deriving.eq bisect_ppx -conditional)))
   (synopsis "Consensus mechanisms")))

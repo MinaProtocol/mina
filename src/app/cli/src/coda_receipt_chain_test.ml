@@ -40,12 +40,12 @@ let main () =
       Coda_worker_testnet.Api.send_payment_with_receipt testnet 0 sender_sk
         receiver_pk send_amount fee
     in
-    let%map merkle_list =
+    let%map proof =
       Coda_worker_testnet.Api.prove_receipt testnet 0 receipt_chain_hash
         receipt_chain_hash
     in
     Receipt.Chain_hash.equal
-      (merkle_list |> List.hd_exn |> fst)
+      (Payment_proof.initial_receipt proof)
       receipt_chain_hash
   in
   assert (Option.value ~default:false result)

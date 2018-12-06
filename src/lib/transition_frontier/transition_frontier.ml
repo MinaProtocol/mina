@@ -242,14 +242,44 @@ module Make (Inputs : Inputs_intf) :
     List.bind (successors t breadcrumb) ~f:(fun succ ->
         succ :: successors_rec t succ )
 
+  let attach_node_to t ~parent_node ~node =
+    let hash = Breadcrumb.hash node.breadcrumb in
+    if
+      not
+        (State_hash.equal
+           (Breadcrumb.hash parent_node.breadcrumb)
+           (Breadcrumb.parent_hash node.breadcrumb))
+    then
+      failwith
+        "invalid call to attach_to: hash parent_node <> parent_hash node" ;
+    if
+      Hashtbl.add t.table ~key:(Breadcrumb.hash node.breadcrumb) ~data:node
+      <> `Ok
+    then Error.raise (Error.of_exn (Already_exists hash)) ;
+    Hashtbl.set t.table
+      ~key:(Breadcrumb.hash parent_node.breadcrumb)
+      ~data:
+        { parent_node with
+          successor_hashes= hash :: parent_node.successor_hashes }
+
+  let attach_breadcrumb_exn t breadcrumb =
+    let hash = Breadcrumb.hash breadcrumb in
+    let parent_hash = Breadcrumb.parent_hash breadcrumb in
+    let parent_node =
+      Option.value_exn
+        (Hashtbl.find t.table parent_hash)
+        ~error:
+          (Error.of_exn (Parent_not_found (`Parent parent_hash, `Target hash)))
+    in
+    let node =
+      {breadcrumb; successor_hashes= []; length= parent_node.length + 1}
+    in
+    attach_node_to t ~parent_node ~node
+
   (* Adding a transition to the transition frontier is broken into the following steps:
-   *   1) create a new node for a transition
-   *     a) derive a new mask from the parent mask
-   *     b) apply the ledger builder diff to the new mask
-   *     c) form the breadcrumb and node records
-   *   2) add the node to the table
-   *   3) add the successor_hashes entry to the parent node
-   *   4) move the root if the path to the new node is longer than the max length
+   *   1) create a new breadcrumb for a transition
+   *   2) attach the breadcrumb to the transition frontier
+   *   3) move the root if the path to the new node is longer than the max length
    *     a) calculate the distance from the new node to the parent
    *     b) if the distance is greater than the max length:
    *       I  ) find the immediate successor of the old root in the path to the
@@ -257,10 +287,10 @@ module Make (Inputs : Inputs_intf) :
    *       II ) find all successors of the other immediate successors of the old root
    *       III) remove the old root and all of the nodes found in (II) from the table
    *       IV ) merge the old root's merkle mask into the root ledger
-   *   5) set the new node as the best tip if the new node has a greater length than
+   *   4) set the new node as the best tip if the new node has a greater length than
    *      the current best tip
    *)
-  let add_exn t transition_with_hash =
+  let add_transition_exn t transition_with_hash =
     let root_node = Hashtbl.find_exn t.table t.root in
     let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
     let transition = With_hash.data transition_with_hash in
@@ -269,57 +299,46 @@ module Make (Inputs : Inputs_intf) :
       Protocol_state.previous_state_hash
         (External_transition.protocol_state transition)
     in
-    let parent_node =
-      Option.value_exn
-        (Hashtbl.find t.table parent_hash)
+    let parent =
+      Option.value_exn (find t parent_hash)
         ~error:
           (Error.of_exn (Parent_not_found (`Parent parent_hash, `Target hash)))
     in
-    (* 1.a ; b *)
+    (* 1 *)
     let staged_ledger =
       Staged_ledger.apply
-        (Breadcrumb.staged_ledger parent_node.breadcrumb)
+        (Breadcrumb.staged_ledger parent)
         (Transaction_snark_scan_state.Diff.of_ledger_builder_diff
            (External_transition.ledger_builder_diff transition))
       |> Or_error.ok_exn
     in
-    (* 1.c *)
-    let node =
-      { breadcrumb= {Breadcrumb.transition_with_hash; staged_ledger}
-      ; successor_hashes= []
-      ; length= parent_node.length + 1 }
-    in
+    let breadcrumb = {Breadcrumb.transition_with_hash; staged_ledger} in
     (* 2 *)
-    if Hashtbl.add t.table ~key:hash ~data:node <> `Ok then
-      Error.raise (Error.of_exn (Already_exists hash)) ;
-    (* 3 *)
-    Hashtbl.set t.table ~key:parent_hash
-      ~data:
-        { parent_node with
-          successor_hashes= hash :: parent_node.successor_hashes } ;
-    (* 4.a *)
+    attach_breadcrumb_exn t breadcrumb ;
+    let node = Hashtbl.find_exn t.table hash in
+    (* 3.a *)
     let distance_to_parent = root_node.length - node.length in
-    (* 4.b *)
+    (* 3.b *)
     if distance_to_parent > max_length then (
-      (* 4.b.I *)
+      (* 3.b.I *)
       let new_root_hash = List.hd_exn (path t node.breadcrumb) in
-      (* 4.b.II *)
+      (* 3.b.II *)
       let garbage_immediate_successors =
         List.filter root_node.successor_hashes ~f:(fun succ_hash ->
             not (State_hash.equal succ_hash new_root_hash) )
       in
-      (* 4.b.III *)
+      (* 3.b.III *)
       let garbage =
         t.root
         :: List.bind garbage_immediate_successors ~f:(successor_hashes_rec t)
       in
       t.root <- new_root_hash ;
       List.iter garbage ~f:(Hashtbl.remove t.table) ;
-      (* 4.b.IV *)
+      (* 3.b.IV *)
       Ledger_mask.commit
         (Staged_ledger.ledger_mask
            (Breadcrumb.staged_ledger root_node.breadcrumb)) ) ;
-    (* 5 *)
+    (* 4 *)
     if node.length > best_tip_node.length then t.best_tip <- hash ;
     node.breadcrumb
 end

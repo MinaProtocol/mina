@@ -13,6 +13,6 @@
       snark_keys
       blockchain_snark
       transaction_snark ))
-  (preprocess (pps (ppx_jane)))
+  (preprocess (pps (ppx_jane bisect_ppx -conditional)))
   (synopsis "SNARK keys")))
 

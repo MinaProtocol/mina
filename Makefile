@@ -1,12 +1,12 @@
 ########################################
-## Docker Wrapper 
+## Docker Wrapper
 ## Hint: export USEDOCKER=TRUE
 
 GITHASH = $(shell git rev-parse --short=8 HEAD)
 GITLONGHASH = $(shell git rev-parse HEAD)
 
 MYUID = $(shell id -u)
-DOCKERNAME = codabuilder-$(MYUID) 
+DOCKERNAME = codabuilder-$(MYUID)
 
 # Unique signature of kademlia code tree
 KADEMLIA_SIG = $(shell cd src/app/kademlia-haskell ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
@@ -25,6 +25,11 @@ else
 endif
 
 ########################################
+# Coverage directory
+
+COVERAGE_DIR=_coverage
+
+########################################
 ## Code
 
 all: clean codabuilder containerstart build
@@ -32,6 +37,7 @@ all: clean codabuilder containerstart build
 clean:
 	$(info Removing previous build artifacts)
 	@rm -rf src/_build
+	@rm -rf src/$(COVERAGE_DIR)
 
 kademlia:
 	@# FIXME: Bash wrap here is awkward but required to get nix-env
@@ -58,13 +64,24 @@ check-format:
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
 
 ########################################
+## Merlin fixup for docker builds
+
+merlin-fixup:
+ifeq ($(USEDOCKER),TRUE)
+	@echo "Fixing up .merlin files for Docker build"
+	@./scripts/merlin-fixup.sh
+else
+	@echo "Not building in Docker, .merlin files unchanged"
+endif
+
+########################################
 ## Containers and container management
 
 
 # push steps require auth on docker hub
 docker-toolchain:
 	@if git diff-index --quiet HEAD ; then \
-		docker build --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/coda:toolchain-$(GITLONGHASH) . && \
+		docker build --no-cache --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/coda:toolchain-$(GITLONGHASH) . && \
 		docker tag  codaprotocol/coda:toolchain-$(GITLONGHASH) codaprotocol/coda:toolchain-latest && \
 		docker push codaprotocol/coda:toolchain-$(GITLONGHASH) && \
 		docker push codaprotocol/coda:toolchain-latest ;\
@@ -185,10 +202,47 @@ test-withsnark:
 web:
 	./scripts/web.sh
 
+########################################
+# Coverage testing and output
+
+test-coverage: SHELL := /bin/bash
+test-coverage:
+	source scripts/test_all.sh ; cd src ; run_unit_tests_with_coverage
+
+# we don't depend on test-coverage, which forces a run of all unit tests
+coverage-html:
+ifeq ($(shell find src/_build/default -name bisect\*.out),"")
+	echo "No coverage output; run make test-coverage"
+else
+	cd src && bisect-ppx-report -I _build/default/ -html $(COVERAGE_DIR) `find . -name bisect\*.out`
+endif
+
+coverage-text:
+ifeq ($(shell find src/_build/default -name bisect\*.out),"")
+	echo "No coverage output; run make test-coverage"
+else
+	cd src && bisect-ppx-report -I _build/default/ -text $(COVERAGE_DIR)/coverage.txt `find . -name bisect\*.out`
+endif
+
+coverage-coveralls:
+ifeq ($(shell find src/_build/default -name bisect\*.out),"")
+	echo "No coverage output; run make test-coverage"
+else
+	cd src && bisect-ppx-report -I _build/default/ -coveralls $(COVERAGE_DIR)/coveralls.json `find . -name bisect\*.out`
+endif
+
+########################################
+# Diagrams for documentation
+
+transition_frontier_diagram: SHELL := /bin/bash
+transition_frontier_diagram:
+	cd docs/res; pdflatex transition_frontier_diagram.tex && convert -density 600x600 transition_frontier_diagram.pdf -quality 90 -resize 1080x800 transition_frontier_diagram.png
+
+diagrams: transition_frontier_diagram
 
 ########################################
 # To avoid unintended conflicts with file names, always add to .PHONY
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains transition_frontier_diagram diagrams

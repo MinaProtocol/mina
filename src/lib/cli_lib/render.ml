@@ -31,10 +31,10 @@ end
 module Prove_receipt = struct
   type t = Coda_base.Payment_proof.t [@@deriving yojson]
 
-  let to_text merkle_list =
+  let to_text proof =
     sprintf
       !"Merkle List of transactions:\n%s"
-      (to_yojson merkle_list |> Yojson.Safe.pretty_to_string)
+      (to_yojson proof |> Yojson.Safe.pretty_to_string)
 end
 
 module Public_key_with_balances = struct
