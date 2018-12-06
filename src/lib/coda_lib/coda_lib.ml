@@ -390,22 +390,26 @@ module type Inputs_intf = sig
 
   module Ledger_db : Coda_pow.Ledger_creatable_intf
 
+  module Masked_ledger : sig
+    type t
+  end
+
   module Transition_frontier :
     Protocols.Coda_transition_frontier.Transition_frontier_base_intf
     with type state_hash := Protocol_state_hash.t
      and type external_transition := External_transition.t
      and type ledger_database := Ledger_db.t
-
-  module Syncable_ledger : sig type query type answer end
+     and type masked_ledger := Masked_ledger.t
 
   module Transition_frontier_controller :
     Protocols.Coda_transition_frontier.Transition_frontier_controller_intf
     with type time_controller := Time.Controller.t
      and type external_transition := External_transition.t
-     and type syncable_ledger_query := Syncable_ledger.query
-     and type syncable_ledger_answer := Syncable_ledger.answer
+     and type syncable_ledger_query := Sync_ledger.query
+     and type syncable_ledger_answer := Sync_ledger.answer
      and type transition_frontier := Transition_frontier.t
      and type state_hash := Protocol_state_hash.t
+     and type time := Time.t
 
   module Proposer :
     Proposer_intf
@@ -463,16 +467,24 @@ module Make (Inputs : Inputs_intf) = struct
   let propose_keypair t = t.propose_keypair
 
   let best_ledger_builder t =
-    (failwith "TODO: Use transition frontier to get best lb out; you'll need to update the signature")
+    failwith
+      "TODO: Use transition frontier to get best lb out; you'll need to \
+       update the signature"
 
   let best_protocol_state t =
-    (failwith "TODO: Use transition frontier to get best lb out; you'll need to update the signature")
+    failwith
+      "TODO: Use transition frontier to get best lb out; you'll need to \
+       update the signature"
 
   let best_tip t =
-    (failwith "TODO: Use transition frontier to get best lb out; you'll need to update the signature")
+    failwith
+      "TODO: Use transition frontier to get best lb out; you'll need to \
+       update the signature"
 
   let get_ledger t lh =
-    (failwith "TODO: Use transition frontier to find an arbitrary ledger based on a hash")
+    failwith
+      "TODO: Use transition frontier to find an arbitrary ledger based on a \
+       hash"
 
   let best_ledger t = Ledger_builder.ledger (best_ledger_builder t)
 
@@ -561,11 +573,11 @@ module Make (Inputs : Inputs_intf) = struct
                       ()))
         in
         let () =
-          Transition_frontier_controller.run
-            ~logger:config.log
+          Transition_frontier_controller.run ~logger:config.log
             ~time_controller:config.time_controller
             ~frontier:transition_frontier
-            ~transition_reader:(failwith "Turn external_transitions_reader into a strict pipe")
+            ~transition_reader:
+              (failwith "Turn external_transitions_reader into a strict pipe")
             ~sync_query_reader:(failwith "TODO")
             ~sync_answer_writer:(failwith "TODO")
         in

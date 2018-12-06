@@ -398,6 +398,7 @@ struct
       Block_time.Span.( < ) (Block_time.diff t now) limit
   end
 
+  module Masked_ledger = Ledger.Mask.Attached
   module Sok_message = Sok_message
 
   module Amount = struct
@@ -806,18 +807,36 @@ struct
       Inputs0 :
         module type of Inputs0
         with module Ledger_builder := Patched_ledger_builder )
+
+    module Ledger_builder_diff = Ledger_builder_diff
+    module Completed_work = Completed_work
+    module Ledger_builder = Patched_ledger_builder
   end)
 
-  module Transition_handler = struct
+  module Transition_handler = Transition_handler.Make (struct
+    module Hack_proof = Inputs0.Proof
+
+    include (
+      Inputs0 :
+        module type of Inputs0
+        with module Ledger_builder := Patched_ledger_builder
+         and module Proof := Hack_proof )
+
+    module Proof = Protocol_state_proof
+    module Completed_work = Completed_work
+    module Ledger_builder_diff = Ledger_builder_diff
+    module Ledger_builder = Patched_ledger_builder
+  end)
+
+  module Transition_frontier_controller =
+  Transition_frontier_controller.Make (struct
     include (
       Inputs0 :
         module type of Inputs0
         with module Ledger_builder := Patched_ledger_builder )
-  end
 
-  module Transition_frontier_controller =
-  Transition_frontier_controller.Make (struct
-    include Inputs0
+    module Ledger_builder = Patched_ledger_builder
+    module Completed_work = Completed_work
     module Syncable_ledger = Sync_ledger
     module Sync_handler = Sync_handler
     module Merkle_address = Ledger.Addr
@@ -850,6 +869,7 @@ struct
       module Ledger_proof_statement = Ledger_proof_statement
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger = Ledger
+      module Ledger_builder = Ledger_builder
       module Ledger_builder_diff = Ledger_builder_diff
       module Ledger_builder_aux_hash = Ledger_builder_aux_hash
       module Blockchain_state = Blockchain_state

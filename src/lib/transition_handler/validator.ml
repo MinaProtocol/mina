@@ -65,7 +65,12 @@ module Make (Inputs : Inputs.S) = struct
          ~f:(fun (`Transition transition, `Time_received time_received) ->
            if%map
              validate_transition ~logger ~frontier ~time_received transition
-           then Writer.write valid_transition_writer (With_hash.of_data transition ~hash_data:(Fn.compose Protocol_state.hash External_transition.protocol_state))
+           then
+             Writer.write valid_transition_writer
+               (With_hash.of_data transition
+                  ~hash_data:
+                    (Fn.compose Protocol_state.hash
+                       External_transition.protocol_state))
            else
              (* TODO: punish *)
              Logger.warn logger "failed to verify transition from the network!"

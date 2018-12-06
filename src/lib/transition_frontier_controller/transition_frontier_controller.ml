@@ -23,6 +23,7 @@ module type Inputs_intf = sig
      and type external_transition := External_transition.t
      and type state_hash := State_hash.t
      and type transition_frontier := Transition_frontier.t
+     and type time := Time.t
      and type transition_frontier_breadcrumb :=
                 Transition_frontier.Breadcrumb.t
 
@@ -42,6 +43,7 @@ module Make (Inputs : Inputs_intf) :
    and type syncable_ledger_query := Inputs.Syncable_ledger.query
    and type syncable_ledger_answer := Inputs.Syncable_ledger.answer
    and type transition_frontier := Inputs.Transition_frontier.t
+   and type time := Inputs.Time.t
    and type state_hash := State_hash.t = struct
   open Inputs
 
@@ -58,7 +60,7 @@ module Make (Inputs : Inputs_intf) :
       Strict_pipe.create (Buffered (`Capacity 3, `Overflow Crash))
     in
     Transition_handler.Validator.run ~frontier ~transition_reader
-      ~valid_transition_writer ;
+      ~valid_transition_writer ~logger ;
     Transition_handler.Processor.run ~logger ~time_controller ~frontier
       ~valid_transition_reader ~catchup_job_writer ~catchup_breadcrumbs_reader ;
     Catchup.run ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer ;
