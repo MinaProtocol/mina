@@ -614,7 +614,11 @@ module Make (Inputs : Inputs_intf) = struct
             , strongest_ledgers_for_network
             , strongest_ledgers_for_api ) =
           Linear_pipe.fork3
-            (failwith "TODO: Broadcast \"best tips\" from transition frontier")
+            (let _pipe =
+               Transition_frontier.best_tip_reader transition_frontier
+             in
+             failwith
+               "Handle impedence mismatch between linear_pipe and strict pipe")
         in
         Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (_, t) ->
             Net.broadcast_state net t ; Deferred.unit )

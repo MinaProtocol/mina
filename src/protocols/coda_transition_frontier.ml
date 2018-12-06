@@ -21,6 +21,15 @@ module type Transition_frontier_base_intf = sig
     val ledger : t -> masked_ledger
   end
 
+  module Breadcrumb : sig
+    type t [@@deriving sexp]
+
+    val transition_with_hash :
+      t -> (external_transition, state_hash) With_hash.t
+
+    val staged_ledger : t -> staged_ledger
+  end
+
   type ledger_database
 
   type ledger_diff
@@ -34,6 +43,8 @@ module type Transition_frontier_base_intf = sig
     -> root_transaction_snark_scan_state:Transaction_snark_scan_state.t
     -> root_staged_ledger_diff:ledger_diff option
     -> t
+
+  val best_tip_reader : t -> Breadcrumb.t Reader.t
 end
 
 module type Transition_frontier_intf = sig
@@ -47,15 +58,6 @@ module type Transition_frontier_intf = sig
   exception Already_exists of state_hash
 
   val max_length : int
-
-  module Breadcrumb : sig
-    type t [@@deriving sexp]
-
-    val transition_with_hash :
-      t -> (external_transition, state_hash) With_hash.t
-
-    val staged_ledger : t -> staged_ledger
-  end
 
   val hack_temporary_ledger_builder_of_staged_ledger :
     staged_ledger -> ledger_builder

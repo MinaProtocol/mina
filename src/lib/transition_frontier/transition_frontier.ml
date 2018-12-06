@@ -3,6 +3,7 @@ open Protocols.Coda_pow
 open Protocols.Coda_transition_frontier
 open Coda_base
 open Signature_lib
+open Pipe_lib
 
 module Max_length = struct
   let length = 2160
@@ -186,12 +187,21 @@ module Make (Inputs : Inputs_intf) :
     ; mutable root: State_hash.t
     ; mutable best_tip: State_hash.t
     ; logger: Logger.t
+    ; best_tip_reader: Breadcrumb.t Strict_pipe.Reader.t
+    ; best_tip_writer:
+        ( Breadcrumb.t
+        , Strict_pipe.crash Strict_pipe.buffered
+        , unit )
+        Strict_pipe.Writer.t
     ; table: node State_hash.Table.t }
 
   (* TODO: load from and write to disk *)
   let create ~logger ~root_transition ~root_snarked_ledger
       ~root_transaction_snark_scan_state ~root_staged_ledger_diff =
     let logger = Logger.child logger __MODULE__ in
+    let best_tip_reader, best_tip_writer =
+      Strict_pipe.(create (Buffered (`Capacity 3, `Overflow Crash)))
+    in
     let root_hash = With_hash.hash root_transition in
     let root_protocol_state =
       External_transition.protocol_state (With_hash.data root_transition)
@@ -239,6 +249,8 @@ module Make (Inputs : Inputs_intf) :
         ; root_snarked_ledger
         ; root= root_hash
         ; best_tip= root_hash
+        ; best_tip_reader
+        ; best_tip_writer
         ; table }
 
   let hack_temporary_ledger_builder_of_staged_ledger = Fn.id
@@ -266,6 +278,8 @@ module Make (Inputs : Inputs_intf) :
   let root t = find_exn t t.root
 
   let best_tip t = find_exn t t.best_tip
+
+  let best_tip_reader t = t.best_tip_reader
 
   let successor_hashes t hash =
     let node = Hashtbl.find_exn t.table hash in
@@ -388,7 +402,9 @@ module Make (Inputs : Inputs_intf) :
       Ledger.Mask.Attached.commit
         (Staged_ledger.ledger (Breadcrumb.staged_ledger root_node.breadcrumb)) ) ;
     (* 4 *)
-    if node.length > best_tip_node.length then t.best_tip <- hash ;
+    if node.length > best_tip_node.length then
+      Strict_pipe.Writer.write t.best_tip_writer breadcrumb ;
+    t.best_tip <- hash ;
     node.breadcrumb
 end
 
