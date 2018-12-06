@@ -911,6 +911,7 @@ module Make_coda (Init : Init_intf) = struct
 
   module Inputs = struct
     include Make_inputs (Init) (Ledger_proof_verifier) (Storage.Disk)
+    module Genesis_ledger = Genesis_ledger
     module Ledger_proof_statement = Ledger_proof_statement
     module Snark_worker = Snark_worker_lib.Prod.Worker
     module Consensus_mechanism = Consensus.Mechanism
