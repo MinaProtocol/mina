@@ -398,6 +398,7 @@ struct
       Block_time.Span.( < ) (Block_time.diff t now) limit
   end
 
+  module Masked_ledger = Ledger.Mask.Attached
   module Sok_message = Sok_message
 
   module Amount = struct
@@ -457,6 +458,7 @@ struct
 
   module Ledger = Ledger
   module Ledger_db = Ledger.Db
+  module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger_db)
 
   module Transaction_snark = struct
     include Ledger_proof
@@ -471,7 +473,26 @@ struct
     type t = Ledger_proof.t list [@@deriving sexp, bin_io]
   end
 
-  module Ledger_builder = struct
+  module Ledger_builder :
+    Protocols.Coda_pow.Ledger_builder_intf
+    with type diff := Ledger_builder_diff.t
+     and type valid_diff :=
+                Ledger_builder_diff.With_valid_signatures_and_proofs.t
+     and type ledger_hash := Ledger_hash.t
+     and type frozen_ledger_hash := Frozen_ledger_hash.t
+     and type ledger_builder_hash := Ledger_builder_hash.t
+     and type public_key := Public_key.Compressed.t
+     and type ledger := Ledger.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
+     and type statement := Completed_work.Statement.t
+     and type completed_work := Completed_work.Checked.t
+     and type ledger_proof := Ledger_proof.t
+     and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+     and type sparse_ledger := Sparse_ledger.t
+     and type ledger_proof_statement := Ledger_proof_statement.t
+     and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
+     and type transaction := Transaction.t = struct
     module Inputs = struct
       module Sok_message = Sok_message
       module Account = Account
@@ -535,28 +556,32 @@ struct
   module External_transition =
     Coda_base.External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
-  module Transition_frontier =
-    Transition_frontier.Make (Completed_work) (Ledger_builder_diff)
-      (External_transition)
-      (struct
-        (* This monkey patching is justified because we're about to rip out
-         * ledger builder *)
-        include Ledger_builder
+  module Patched_ledger_builder = struct
+    (* This monkey patching is justified because we're about to rip out
+     * ledger builder *)
+    include Ledger_builder
 
-        type sparse_ledger = Sparse_ledger.t
+    type sparse_ledger = Sparse_ledger.t
 
-        type ledger_proof_statement_set = Ledger_proof_statement.Set.t
+    type ledger_proof_statement_set = Ledger_proof_statement.Set.t
 
-        type ledger_proof_statement = Ledger_proof_statement.t
+    type ledger_proof_statement = Ledger_proof_statement.t
 
-        type statement = Completed_work.Statement.t
+    type statement = Completed_work.Statement.t
 
-        type transaction = Transaction.t
+    type transaction = Transaction.t
 
-        type ledger_proof = Ledger_proof.t
+    type ledger_proof = Ledger_proof.t
 
-        type ledger_builder_aux_hash = Ledger_builder_aux_hash.t
-      end)
+    type ledger_builder_aux_hash = Ledger_builder_aux_hash.t
+  end
+
+  module Transition_frontier = Transition_frontier.Make (struct
+    module Completed_work = Completed_work
+    module Ledger_builder_diff = Ledger_builder_diff
+    module External_transition = External_transition
+    module Ledger_builder = Patched_ledger_builder
+  end)
 
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (User_command)
@@ -765,6 +790,63 @@ struct
     module Blockchain_state = Consensus.Mechanism.Blockchain_state
   end)
 
+  module Sync_handler = Sync_handler.Make (struct
+    include (
+      Inputs0 :
+        module type of Inputs0
+        with module Ledger_builder := Patched_ledger_builder )
+
+    module Ledger_builder = Patched_ledger_builder
+    module Ledger_builder_diff = Ledger_builder_diff
+    module Completed_work = Completed_work
+    module Syncable_ledger = Sync_ledger
+  end)
+
+  module Ledger_catchup = Ledger_catchup.Make (struct
+    include (
+      Inputs0 :
+        module type of Inputs0
+        with module Ledger_builder := Patched_ledger_builder )
+
+    module Ledger_builder_diff = Ledger_builder_diff
+    module Completed_work = Completed_work
+    module Ledger_builder = Patched_ledger_builder
+  end)
+
+  module Transition_handler = Transition_handler.Make (struct
+    module Hack_proof = Inputs0.Proof
+
+    include (
+      Inputs0 :
+        module type of Inputs0
+        with module Ledger_builder := Patched_ledger_builder
+         and module Proof := Hack_proof )
+
+    module Proof = Protocol_state_proof
+    module Completed_work = Completed_work
+    module Ledger_builder_diff = Ledger_builder_diff
+    module Ledger_builder = Patched_ledger_builder
+  end)
+
+  module Transition_frontier_controller =
+  Transition_frontier_controller.Make (struct
+    include (
+      Inputs0 :
+        module type of Inputs0
+        with module Ledger_builder := Patched_ledger_builder )
+
+    module Ledger_builder = Patched_ledger_builder
+    module Completed_work = Completed_work
+    module Syncable_ledger = Sync_ledger
+    module Sync_handler = Sync_handler
+    module Merkle_address = Ledger.Addr
+    module Catchup = Ledger_catchup
+    module Transition_handler = Transition_handler
+    module Ledger_builder_diff = Ledger_builder_diff
+    module Ledger_diff = Ledger_builder_diff
+    module Consensus_mechanism = Consensus.Mechanism
+  end)
+
   module Ledger_builder_controller = struct
     module Inputs = struct
       module Security = struct
@@ -787,9 +869,9 @@ struct
       module Ledger_proof_statement = Ledger_proof_statement
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger = Ledger
+      module Ledger_builder = Ledger_builder
       module Ledger_builder_diff = Ledger_builder_diff
       module Ledger_builder_aux_hash = Ledger_builder_aux_hash
-      module Ledger_builder = Ledger_builder
       module Blockchain_state = Blockchain_state
       module Consensus_mechanism = Consensus.Mechanism
       module Protocol_state = Protocol_state

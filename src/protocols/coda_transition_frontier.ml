@@ -5,10 +5,20 @@ module type Transition_frontier_base_intf = sig
 
   type external_transition
 
+  type masked_ledger
+
+  type staged_ledger
+
   module Transaction_snark_scan_state : sig
     type t
 
     val empty : t
+  end
+
+  module Staged_ledger : sig
+    type t = staged_ledger
+
+    val ledger : t -> masked_ledger
   end
 
   type ledger_database
@@ -28,8 +38,6 @@ end
 
 module type Transition_frontier_intf = sig
   include Transition_frontier_base_intf
-
-  type staged_ledger
 
   type ledger_builder
 
@@ -99,6 +107,8 @@ module type Catchup_intf = sig
 end
 
 module type Transition_handler_validator_intf = sig
+  type time
+
   type state_hash
 
   type external_transition
@@ -106,11 +116,14 @@ module type Transition_handler_validator_intf = sig
   type transition_frontier
 
   val run :
-       frontier:transition_frontier
-    -> transition_reader:external_transition Reader.t
+       logger:Logger.t
+    -> frontier:transition_frontier
+    -> transition_reader:( [`Transition of external_transition]
+                         * [`Time_received of time] )
+                         Reader.t
     -> valid_transition_writer:( (external_transition, state_hash) With_hash.t
                                , drop_head buffered
-                               , _ )
+                               , unit )
                                Writer.t
     -> unit
 end
@@ -143,6 +156,8 @@ end
 module type Transition_handler_intf = sig
   type time_controller
 
+  type time
+
   type state_hash
 
   type external_transition
@@ -153,7 +168,8 @@ module type Transition_handler_intf = sig
 
   module Validator :
     Transition_handler_validator_intf
-    with type state_hash := state_hash
+    with type time := time
+     and type state_hash := state_hash
      and type external_transition := external_transition
      and type transition_frontier := transition_frontier
 
@@ -198,15 +214,19 @@ module type Transition_frontier_controller_intf = sig
 
   type syncable_ledger_answer
 
+  type state_hash
+
   type transition_frontier
 
-  type state_hash
+  type time
 
   val run :
        logger:Logger.t
     -> time_controller:time_controller
-    -> genesis_transition:external_transition
-    -> transition_reader:external_transition Reader.t
+    -> frontier:transition_frontier
+    -> transition_reader:( [`Transition of external_transition]
+                         * [`Time_received of time] )
+                         Reader.t
     -> sync_query_reader:(state_hash * syncable_ledger_query) Reader.t
     -> sync_answer_writer:( state_hash * syncable_ledger_answer
                           , synchronous
