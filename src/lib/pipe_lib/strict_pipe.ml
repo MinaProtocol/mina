@@ -38,12 +38,25 @@ module Reader = struct
     reader.has_reader <- false ;
     result
 
-  let fold ?consumer reader ~init ~f =
-    enforce_single_reader reader (Pipe.fold reader.reader ?consumer ~init ~f)
-
-  let iter ?consumer ?continue_on_error reader ~f =
+  let fold reader ~init ~f =
     enforce_single_reader reader
-      (Pipe.iter reader.reader ?consumer ?continue_on_error ~f)
+      (let rec go b =
+         match%bind Pipe.read reader.reader with
+         | `Eof -> return b
+         | `Ok a ->
+             (* The async scheduler could yield here *)
+             let%bind b' = f b a in
+             go b'
+       in
+       go init)
+
+  let fold_without_pushback ?consumer reader ~init ~f =
+    Pipe.fold_without_pushback ?consumer reader.reader ~init ~f
+
+  let iter reader ~f = fold reader ~init:() ~f:(fun () -> f)
+
+  let iter_without_pushback ?consumer ?continue_on_error reader ~f =
+    Pipe.iter_without_pushback reader.reader ?consumer ?continue_on_error ~f
 
   let map reader ~f =
     assert_not_read reader ;
@@ -54,9 +67,6 @@ module Reader = struct
     assert_not_read reader ;
     reader.has_reader <- true ;
     wrap_reader (Pipe.filter_map reader.reader ~f)
-
-  let iter_sync ?consumer ?continue_on_error reader ~f =
-    iter ?consumer ?continue_on_error reader ~f:(fun x -> f x ; Deferred.unit)
 
   module Merge = struct
     let iter readers ~f =
@@ -83,6 +93,29 @@ module Reader = struct
       read_deferred ()
 
     let iter_sync readers ~f = iter readers ~f:(fun x -> f x ; Deferred.unit)
+  end
+
+  module Fork = struct
+    let n reader count =
+      let pipes = List.init count ~f:(fun _ -> Pipe.create ()) in
+      let readers, writers = List.unzip pipes in
+      (* This one place we _do_ want iter with pushback which we want to trigger
+       * when all reads have pushed back downstream
+       *
+       * Since future reads will resolve via the iter_without_pushback, we
+       * should still get the behavior we want. *)
+      don't_wait_for
+        (Pipe.iter reader.reader ~f:(fun x ->
+             Deferred.List.iter writers ~f:(fun writer ->
+                 if not (Pipe.is_closed writer) then Pipe.write writer x
+                 else return () ) )) ;
+      don't_wait_for
+        (let%map () = Deferred.List.iter readers ~f:Pipe.closed in
+         Pipe.close_read reader.reader) ;
+      List.map readers ~f:wrap_reader
+
+    let two reader =
+      match n reader 2 with [a; b] -> (a, b) | _ -> failwith "unexpected"
   end
 end
 
