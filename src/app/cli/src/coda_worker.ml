@@ -212,8 +212,10 @@ module T = struct
           ~directory:receipt_chain_dir_name
       in
       let banlist = Coda_base.Banlist.create ~suspicious_dir ~punished_dir in
+      let time_controller = Main.Inputs.Time.Controller.create () in
       let net_config =
         { Main.Inputs.Net.Config.parent_log= log
+        ; time_controller
         ; gossip_net_params=
             { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
             ; target_peer_count= 8
@@ -234,8 +236,8 @@ module T = struct
              ~transaction_pool_disk_location:
                (conf_temp_dir ^/ "transaction_pool")
              ~snark_pool_disk_location:(conf_temp_dir ^/ "snark_pool")
-             ~time_controller:(Main.Inputs.Time.Controller.create ())
-             ~receipt_chain_database ~snark_work_fee:(Currency.Fee.of_int 0)
+             ~time_controller ~receipt_chain_database
+             ~snark_work_fee:(Currency.Fee.of_int 0)
              ?propose_keypair:Config.propose_keypair () ~banlist)
       in
       Option.iter snark_worker_config ~f:(fun config ->
