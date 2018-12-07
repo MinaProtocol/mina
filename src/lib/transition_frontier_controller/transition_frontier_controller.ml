@@ -92,8 +92,6 @@ module type Inputs_intf = sig
 
   type ledger_database
 
-  (* type transaction_snark_scan_state *)
-
   type ledger_diff
 
   type staged_ledger

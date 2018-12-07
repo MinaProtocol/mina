@@ -1,5 +1,5 @@
-(*[%%import
-"../../../config.mlh"]*)
+[%%import
+"../../../config.mlh"]
 
 open Core
 open Async
@@ -11,19 +11,19 @@ open Pipe_lib
 open O1trace
 module Fee = Protocols.Coda_pow.Fee
 
-(*[%%if
-with_snark]*)
+[%%if
+with_snark]
 
 module Ledger_proof = Ledger_proof.Prod
 
-(*[%%else]
+[%%else]
 
 module Ledger_proof = struct
   module Statement = Transaction_snark.Statement
   include Ledger_proof.Debug
 end
 
-[%%endif]*)
+[%%endif]
 
 module Staged_ledger_aux_hash = struct
   include Staged_ledger_hash.Aux_hash.Stable.V1
@@ -540,26 +540,6 @@ struct
       (External_transition)
       (Staged_ledger)
 
-  (*struct
-        (* This monkey patching is justified because we're about to rip out
-         * ledger builder *)
-        include Staged_ledger
-
-        type sparse_ledger = Sparse_ledger.t
-
-        type ledger_proof_statement_set = Ledger_proof_statement.Set.t
-
-        type ledger_proof_statement = Ledger_proof_statement.t
-
-        type statement = Transaction_snark_work.Statement.t
-
-        type transaction = Transaction.t
-
-        type ledger_proof = Ledger_proof.t
-
-        type staged_ledger_aux_hash = Staged_ledger_aux_hash.t
-      end*)
-
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (User_command)
     include Network_pool.Make (Pool) (Pool.Diff)
@@ -585,8 +565,6 @@ struct
       ; proof: Protocol_state_proof.t
       ; staged_ledger: Staged_ledger.t sexp_opaque }
     [@@deriving sexp, fields]
-
-    (*type scan_state = Staged_ledger.scan_state*)
 
     let of_transition_and_lb transition staged_ledger =
       { state= External_transition.protocol_state transition
@@ -887,8 +865,8 @@ struct
     else Some {Snark_work_lib.Work.Spec.instances; fee}
 end
 
-(*[%%if
-with_snark]*)
+[%%if
+with_snark]
 
 module Make_coda (Init : Init_intf) = struct
   module Ledger_proof_verifier = struct
@@ -926,7 +904,7 @@ module Make_coda (Init : Init_intf) = struct
       ~snark_pool t (snark_work_fee t)
 end
 
-(*[%%else]
+[%%else]
 
 module Make_coda (Init : Init_intf) = struct
   module Ledger_proof_verifier = struct
@@ -947,7 +925,7 @@ module Make_coda (Init : Init_intf) = struct
       ~snark_pool t t.snark_work_fee
 end
 
-[%%endif]*)
+[%%endif]
 
 module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   include Program

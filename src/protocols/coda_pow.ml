@@ -1243,18 +1243,6 @@ Merge Snark:
     type t
   end
 
-  (* module Transaction_snark_scan_state :
-    Transaction_snark_scan_state_intf
-    with type ledger := Ledger.t
-     and type transaction_snark_work := Transaction_snark_work.t
-     and type ledger_proof := Ledger_proof.t
-     and type sparse_ledger := Sparse_ledger.t
-     and type ledger_proof_statement := Ledger_proof_statement.t
-     and type transaction := Transaction.t
-     and type transaction_with_info := Ledger.Undo.t
-     and type frozen_ledger_hash := Frozen_ledger_hash.t
-     and type sok_message := Sok_message.t
-     and type staged_ledger_aux_hash := Staged_ledger_aux_hash.t*)
   module Staged_ledger :
     Staged_ledger_intf
     with type diff := Staged_ledger_diff.t
