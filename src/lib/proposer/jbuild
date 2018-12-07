@@ -11,6 +11,7 @@
       async
       coda_lib
       coda_base
+      envelope
       protocols
       async_extra
       unix_timestamp
