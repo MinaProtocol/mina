@@ -778,12 +778,6 @@ struct
   end)
 
   module Transition_handler = Transition_handler.Make (struct
-    (*module Hack_proof = Inputs0.Proof
-
-    include (
-      Inputs0 :
-        module type of Inputs0
-        with module Proof := Hack_proof )*)
     include Inputs0
     module State_proof = Protocol_state_proof
     module Transaction_snark_work = Transaction_snark_work
