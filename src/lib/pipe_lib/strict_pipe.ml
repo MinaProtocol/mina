@@ -26,6 +26,13 @@ type (_, _) type_ =
 module Reader = struct
   type 't t = {reader: 't Pipe.Reader.t; mutable has_reader: bool}
 
+  (* TODO: See #1281 *)
+  let to_linear_pipe {reader= pipe; has_reader} =
+    {Linear_pipe.Reader.pipe; has_reader}
+
+  let of_linear_pipe {Linear_pipe.Reader.pipe= reader; has_reader} =
+    {reader; has_reader}
+
   let assert_not_read reader =
     if reader.has_reader then raise Multiple_reads_attempted
 
@@ -124,6 +131,9 @@ module Writer = struct
     { type_: ('type_, 'write_return) type_
     ; reader: 't Pipe.Reader.t
     ; writer: 't Pipe.Writer.t }
+
+  (* TODO: See #1281 *)
+  let to_linear_pipe {writer= pipe; reader= _; type_= _} = pipe
 
   let handle_overflow : type b.
       ('t, b buffered, unit) t -> 't -> b overflow_behavior -> unit =
