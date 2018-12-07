@@ -208,6 +208,8 @@ module type Ledger_intf = sig
 
   val copy : t -> t
 
+  val commit : attached_mask -> unit
+
   val num_accounts : t -> int
 
   val merkle_root : t -> ledger_hash

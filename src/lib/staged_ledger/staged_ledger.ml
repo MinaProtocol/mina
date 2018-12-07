@@ -571,13 +571,14 @@ end = struct
       verify_scan_state_after_apply new_ledger t.scan_state
       |> Result_with_rollback.of_or_error
     in
+    let () = Inputs.Ledger.commit new_ledger in
     Logger.info logger
       "Block info: No of transactions included:%d Coinbase parts:%d Work \
        count:%d"
       user_commands_count cb_parts_count (List.length works) ;
     ( `Hash_after_applying (hash t)
     , `Ledger_proof res_opt
-    , `Updated_staged_ledger {t with ledger= new_ledger} )
+    , `Updated_staged_ledger t )
 
   let apply t witness ~logger =
     Result_with_rollback.run (apply_diff t witness ~logger)
@@ -1461,6 +1462,8 @@ let%test_module "test" =
         let serializable_of_t _ = failwith "unimplemented"
 
         (* END BOILERPLATE UNUSED *)
+
+        let commit _t = ()
 
         let apply_transaction : t -> Undo.t -> Undo.t Or_error.t =
          fun t s ->
