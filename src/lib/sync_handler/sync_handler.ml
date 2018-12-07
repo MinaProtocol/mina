@@ -23,7 +23,6 @@ module type Inputs_intf = sig
      and type merkle_path := Ledger.path
      and type root_hash := Ledger_hash.t
      and type account := Account.t
-  
   (* module Merkle_address : Merkle_address.S
 
   module Staged_ledger : sig
@@ -83,9 +82,10 @@ module Make (Inputs : Inputs_intf) :
         let protocol_state =
           External_transition.protocol_state external_transition
         in
-        
         let body = External_transition.Protocol_state.body protocol_state in
-        let state_body_hash = External_transition.Protocol_state.Body.hash body in
+        let state_body_hash =
+          External_transition.Protocol_state.Body.hash body
+        in
         let previous_state_hash =
           External_transition.Protocol_state.previous_state_hash protocol_state
         in
