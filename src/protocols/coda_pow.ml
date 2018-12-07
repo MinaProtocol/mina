@@ -551,7 +551,7 @@ module type Monad_with_Or_error_intf = sig
 end
 
 module type Transaction_snark_scan_state_intf = sig
-  type ledger_mask
+  type ledger
 
   type ledger_proof_statement
 
@@ -565,13 +565,13 @@ module type Transaction_snark_scan_state_intf = sig
 
   type ledger_proof
 
-  type hash
-
   type transaction_snark_work
 
   type transaction_with_info
 
   type frozen_ledger_hash
+
+  type staged_ledger_aux_hash
 
   module Transaction_with_witness : sig
     (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
@@ -603,12 +603,12 @@ module type Transaction_snark_scan_state_intf = sig
     val check_invariants :
          t
       -> error_prefix:string
-      -> ledger_mask
+      -> ledger
       -> frozen_ledger_hash sexp_option
       -> (unit, Error.t) result M.t
   end
 
-  val create : transaction_capacity_log_2:int -> t
+  val empty : t
 
   val enqueue_transactions :
     t -> Transaction_with_witness.t list -> unit Or_error.t
@@ -628,7 +628,7 @@ module type Transaction_snark_scan_state_intf = sig
 
   val is_valid : t -> bool
 
-  val hash : t -> hash
+  val hash : t -> staged_ledger_aux_hash
 
   val staged_transactions : t -> transaction_with_info list
 
@@ -666,28 +666,25 @@ module type Staged_ledger_base_intf = sig
 
   type serializable [@@deriving bin_io]
 
-  module Aux : sig
+  module Scan_state : sig
     type t [@@deriving bin_io]
 
     val hash : t -> staged_ledger_aux_hash
 
     val is_valid : t -> bool
 
-    val empty : parallelism_log_2:int -> t
+    val empty : t
   end
 
   val ledger : t -> ledger
 
   val create : ledger:ledger -> t
 
-  val of_aux_and_ledger :
+  val of_scan_state_and_ledger :
        snarked_ledger_hash:frozen_ledger_hash
     -> ledger:ledger
-    -> aux:Aux.t
+    -> scan_state:Scan_state.t
     -> t Or_error.t
-
-  val of_serialized_and_unserialized :
-    serialized:serializable -> unserialized:ledger -> t
 
   val of_serialized_and_unserialized :
     serialized:serializable -> unserialized:ledger -> t
@@ -696,7 +693,7 @@ module type Staged_ledger_base_intf = sig
 
   val hash : t -> staged_ledger_hash
 
-  val aux : t -> Aux.t
+  val scan_state : t -> Scan_state.t
 
   val serializable_of_t : t -> serializable
 
@@ -705,7 +702,8 @@ module type Staged_ledger_base_intf = sig
     -> diff
     -> logger:Logger.t
     -> ( [`Hash_after_applying of staged_ledger_hash]
-       * [`Ledger_proof of ledger_proof option] )
+       * [`Ledger_proof of ledger_proof option]
+       * [`Updated_staged_ledger of t] )
        Or_error.t
 
   val apply_diff_unchecked :
@@ -713,6 +711,7 @@ module type Staged_ledger_base_intf = sig
     -> valid_diff
     -> [`Hash_after_applying of staged_ledger_hash]
        * [`Ledger_proof of ledger_proof option]
+       * [`Updated_staged_ledger of t]
 
   val snarked_ledger :
     t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t
@@ -1242,6 +1241,18 @@ Merge Snark:
     type t
   end
 
+  (* module Transaction_snark_scan_state :
+    Transaction_snark_scan_state_intf
+    with type ledger := Ledger.t
+     and type transaction_snark_work := Transaction_snark_work.t
+     and type ledger_proof := Ledger_proof.t
+     and type sparse_ledger := Sparse_ledger.t
+     and type ledger_proof_statement := Ledger_proof_statement.t
+     and type transaction := Transaction.t
+     and type transaction_with_info := Ledger.Undo.t
+     and type frozen_ledger_hash := Frozen_ledger_hash.t
+     and type sok_message := Sok_message.t
+     and type staged_ledger_aux_hash := Staged_ledger_aux_hash.t*)
   module Staged_ledger :
     Staged_ledger_intf
     with type diff := Staged_ledger_diff.t

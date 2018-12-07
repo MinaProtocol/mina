@@ -5,11 +5,7 @@ module type Transition_frontier_base_intf = sig
 
   type external_transition
 
-  module Transaction_snark_scan_state : sig
-    type t
-
-    val empty : t
-  end
+  type transaction_snark_scan_state
 
   type ledger_database
 
@@ -21,7 +17,7 @@ module type Transition_frontier_base_intf = sig
        logger:Logger.t
     -> root_transition:(external_transition, state_hash) With_hash.t
     -> root_snarked_ledger:ledger_database
-    -> root_transaction_snark_scan_state:Transaction_snark_scan_state.t
+    -> root_transaction_snark_scan_state:transaction_snark_scan_state
     -> root_staged_ledger_diff:ledger_diff option
     -> t
 end
@@ -30,8 +26,6 @@ module type Transition_frontier_intf = sig
   include Transition_frontier_base_intf
 
   type staged_ledger
-
-  type ledger_builder
 
   exception
     Parent_not_found of ([`Parent of state_hash] * [`Target of state_hash])
@@ -48,9 +42,6 @@ module type Transition_frontier_intf = sig
 
     val staged_ledger : t -> staged_ledger
   end
-
-  val hack_temporary_ledger_builder_of_staged_ledger :
-    staged_ledger -> ledger_builder
 
   val root : t -> Breadcrumb.t
 

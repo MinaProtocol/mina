@@ -43,32 +43,39 @@ end = struct
 
   type job = TSS.Available_job.t
 
-  module Aux = struct
-    type t = TSS.t [@@deriving sexp, bin_io]
+  let verify_threadsafe proof statement ~message =
+    (* TODO: This is synchronous for now -- we'll need to figure out how to make it async again long term *)
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        Inputs.Ledger_proof_verifier.verify proof statement ~message )
 
-    let is_valid = TSS.is_valid
+  let verify ~message job proof =
+    match TSS.statement_of_job job with
+    | None -> false
+    | Some statement -> verify_threadsafe proof statement ~message
 
-    let hash t = Staged_ledger_aux_hash.of_bytes (TSS.hash t :> string)
+  module Scan_state = TSS
 
-    module Statement_scanner = struct
-      module T = struct
-        include Monad.Ident
-        module Or_error = Or_error
-      end
-
-      include TSS.Make_statement_scanner
-                (T)
-                (struct
-                  let verify (_ : Ledger_proof.t)
-                      (_ : Ledger_proof_statement.t)
-                      ~message:(_ : Sok_message.t) =
-                    true
-                end)
-    end
-
-    module Statement_scanner_with_proofs =
-      TSS.Make_statement_scanner (Deferred) (Inputs.Ledger_proof_verifier)
+  module M = struct
+    include Monad.Ident
+    module Or_error = Or_error
   end
+
+  module Statement_scanner = struct
+    include TSS.Make_statement_scanner
+              (M)
+              (struct
+                let verify (_ : Ledger_proof.t) (_ : Ledger_proof_statement.t)
+                    ~message:(_ : Sok_message.t) =
+                  true
+              end)
+  end
+
+  module Statement_scanner_with_proofs =
+    TSS.Make_statement_scanner
+      (M)
+      (struct
+        let verify proof stmt ~message = verify_threadsafe proof stmt ~message
+      end)
 
   type scan_state = TSS.t [@@deriving sexp, bin_io]
 
@@ -80,7 +87,7 @@ end = struct
     ; ledger: Ledger.attached_mask sexp_opaque }
   [@@deriving sexp]
 
-  type serializable = Aux.t * Ledger.serializable [@@deriving bin_io]
+  type serializable = scan_state * Ledger.serializable [@@deriving bin_io]
 
   let serializable_of_t t = (t.scan_state, Ledger.serializable_of_t t.ledger)
 
@@ -143,21 +150,21 @@ end = struct
     in
     List.map all_jobs_paired ~f:job_pair_to_work_spec_pair
 
-  let aux {scan_state; _} = scan_state
+  let scan_state {scan_state; _} = scan_state
 
   let get_target (proof, _) =
     let {Ledger_proof_statement.target; _} = Ledger_proof.statement proof in
     target
 
-  let verify_scan_state_after_apply ledger (aux : Aux.t) =
+  let verify_scan_state_after_apply ledger (scan_state : scan_state) =
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
-    match TSS.latest_ledger_proof aux with
+    match TSS.latest_ledger_proof scan_state with
     | None ->
-        Aux.Statement_scanner.check_invariants aux ~error_prefix ledger None
+        Statement_scanner.check_invariants scan_state ~error_prefix ledger None
     | Some proof ->
-        Aux.Statement_scanner.check_invariants aux ~error_prefix ledger
+        Statement_scanner.check_invariants scan_state ~error_prefix ledger
           (Some (get_target proof))
 
   let snarked_ledger :
@@ -202,12 +209,12 @@ end = struct
               target expected_target
 
   let statement_exn t =
-    match Aux.Statement_scanner.scan_statement t.scan_state with
+    match Statement_scanner.scan_statement t.scan_state with
     | Ok s -> `Non_empty s
     | Error `Empty -> `Empty
     | Error (`Error e) -> failwithf !"statement_exn: %{sexp:Error.t}" e ()
 
-  let of_aux_and_ledger ~snarked_ledger_hash ~ledger ~aux =
+  let of_scan_state_and_ledger ~snarked_ledger_hash ~ledger ~scan_state =
     let open Or_error.Let_syntax in
     let verify_snarked_ledger t snarked_ledger_hash =
       match snarked_ledger t ~snarked_ledger_hash with
@@ -217,10 +224,10 @@ end = struct
             ( "Error verifying snarked ledger hash from the ledger.\n"
             ^ Error.to_string_hum e )
     in
-    let t = {ledger; scan_state= aux} in
+    let t = {ledger; scan_state} in
     let%bind () =
-      Aux.Statement_scanner_with_proofs.check_invariants aux
-        ~error_prefix:"Ledger_hash.of_aux_and_ledger" ledger
+      Statement_scanner_with_proofs.check_invariants scan_state
+        ~error_prefix:"Ledger_hash.of_scan_state_and_ledger" ledger
         (Some snarked_ledger_hash)
     in
     let%map () = verify_snarked_ledger t snarked_ledger_hash in
@@ -230,7 +237,7 @@ end = struct
     {scan_state= TSS.copy scan_state; ledger= Ledger.copy ledger}
 
   let hash {scan_state; ledger} : Staged_ledger_hash.t =
-    Staged_ledger_hash.of_aux_and_ledger_hash (Aux.hash scan_state)
+    Staged_ledger_hash.of_aux_and_ledger_hash (TSS.hash scan_state)
       (Ledger.merkle_root ledger)
 
   [%%if
@@ -244,21 +251,10 @@ end = struct
 
   let ledger {ledger; _} = ledger
 
-  let create ~ledger : t =
-    let open Config in
-    (* Transaction capacity log_2 is half the capacity for work parallelism *)
-    {scan_state= TSS.create ~transaction_capacity_log_2; ledger}
+  let create ~ledger : t = {scan_state= TSS.empty; ledger}
 
   let current_ledger_proof t =
     Option.map (TSS.latest_ledger_proof t.scan_state) ~f:fst
-
-  let verify ~message job proof =
-    match TSS.statement_of_job job with
-    | None -> false
-    | Some statement ->
-        (* TODO: This is synchronous for now -- we'll need to figure out how to make it async again long term *)
-        Async.Thread_safe.block_on_async_exn (fun () ->
-            Inputs.Ledger_proof_verifier.verify proof statement ~message )
 
   let total_proofs (works : Transaction_snark_work.t list) =
     List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
@@ -338,8 +334,7 @@ end = struct
       let%bind jobses =
         let open Or_error.Let_syntax in
         let%map jobs =
-          TSS.next_k_jobs t.scan_state
-            ~k:(total_proofs completed_works)
+          TSS.next_k_jobs t.scan_state ~k:(total_proofs completed_works)
         in
         chunks_of jobs ~n:Transaction_snark_work.proofs_length
       in
@@ -455,8 +450,8 @@ end = struct
       ; coinbase_parts_count: int }
   end
 
-  let apply_pre_diff t coinbase_parts proposer (diff : Staged_ledger_diff.diff)
-      =
+  let apply_pre_diff ledger coinbase_parts proposer
+      (diff : Staged_ledger_diff.diff) =
     let open Result_with_rollback.Let_syntax in
     let%bind user_commands =
       let%map user_commands' =
@@ -496,9 +491,7 @@ end = struct
       @ List.map coinbase ~f:(fun t -> Transaction.Coinbase t)
       @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
     in
-    let%map new_data =
-      update_ledger_and_get_statements t.ledger transactions
-    in
+    let%map new_data = update_ledger_and_get_statements ledger transactions in
     { Prediff_info.data= new_data
     ; work= diff.completed_works
     ; coinbase_work
@@ -509,21 +502,23 @@ end = struct
   let apply_diff t (diff : Staged_ledger_diff.t) ~logger =
     let open Result_with_rollback.Let_syntax in
     let apply_pre_diff_with_at_most_two
-        (pre_diff1 : Staged_ledger_diff.diff_with_at_most_two_coinbase) =
+        (pre_diff1 : Staged_ledger_diff.diff_with_at_most_two_coinbase) ledger
+        =
       let coinbase_parts =
         match pre_diff1.coinbase_parts with
         | Zero -> `Zero
         | One x -> `One x
         | Two x -> `Two x
       in
-      apply_pre_diff t coinbase_parts diff.creator pre_diff1.diff
+      apply_pre_diff ledger coinbase_parts diff.creator pre_diff1.diff
     in
     let apply_pre_diff_with_at_most_one
-        (pre_diff2 : Staged_ledger_diff.diff_with_at_most_one_coinbase) =
+        (pre_diff2 : Staged_ledger_diff.diff_with_at_most_one_coinbase) ledger
+        =
       let coinbase_added =
         match pre_diff2.coinbase_added with Zero -> `Zero | One x -> `One x
       in
-      apply_pre_diff t coinbase_added diff.creator pre_diff2.diff
+      apply_pre_diff ledger coinbase_added diff.creator pre_diff2.diff
     in
     let%bind () =
       let curr_hash = hash t in
@@ -535,6 +530,8 @@ end = struct
         (Staged_ledger_hash.equal diff.prev_hash (hash t))
       |> Result_with_rollback.of_or_error
     in
+    let new_mask = Inputs.Ledger.Mask.create () in
+    let new_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
     let%bind data, works, user_commands_count, cb_parts_count =
       Either.value_map diff.pre_diffs
         ~first:(fun d ->
@@ -543,15 +540,15 @@ end = struct
                   ; coinbase_work
                   ; user_commands_count
                   ; coinbase_parts_count } =
-            apply_pre_diff_with_at_most_one d
+            apply_pre_diff_with_at_most_one d new_ledger
           in
           ( data
           , coinbase_work @ work
           , user_commands_count
           , coinbase_parts_count ) )
         ~second:(fun d ->
-          let%bind p1 = apply_pre_diff_with_at_most_two (fst d) in
-          let%map p2 = apply_pre_diff_with_at_most_one (snd d) in
+          let%bind p1 = apply_pre_diff_with_at_most_two (fst d) new_ledger in
+          let%map p2 = apply_pre_diff_with_at_most_one (snd d) new_ledger in
           ( p1.data @ p2.data
           , p1.work @ p1.coinbase_work @ p2.coinbase_work @ p2.work
           , p1.user_commands_count + p2.user_commands_count
@@ -571,21 +568,23 @@ end = struct
       @@ TSS.enqueue_transactions t.scan_state data
     in
     let%map () =
-      verify_scan_state_after_apply t.ledger t.scan_state
+      verify_scan_state_after_apply new_ledger t.scan_state
       |> Result_with_rollback.of_or_error
     in
     Logger.info logger
       "Block info: No of transactions included:%d Coinbase parts:%d Work \
        count:%d"
       user_commands_count cb_parts_count (List.length works) ;
-    (`Hash_after_applying (hash t), `Ledger_proof res_opt)
+    ( `Hash_after_applying (hash t)
+    , `Ledger_proof res_opt
+    , `Updated_staged_ledger {t with ledger= new_ledger} )
 
   let apply t witness ~logger =
     Result_with_rollback.run (apply_diff t witness ~logger)
 
   let forget_work_opt = Option.map ~f:Transaction_snark_work.forget
 
-  let apply_pre_diff_unchecked t coinbase_parts proposer
+  let apply_pre_diff_unchecked ledger coinbase_parts proposer
       (diff : Staged_ledger_diff.With_valid_signatures_and_proofs.diff) =
     let user_commands = diff.user_commands in
     let txn_works =
@@ -613,7 +612,7 @@ end = struct
     in
     let new_data =
       List.map transactions ~f:(fun s ->
-          let r = apply_transaction_and_get_witness t.ledger s in
+          let r = apply_transaction_and_get_witness ledger s in
           let _undo, t = Or_error.ok_exn r in
           t )
     in
@@ -624,7 +623,7 @@ end = struct
     let apply_pre_diff_with_at_most_two
         (pre_diff1 :
           Staged_ledger_diff.With_valid_signatures_and_proofs
-          .diff_with_at_most_two_coinbase) =
+          .diff_with_at_most_two_coinbase) ledger =
       let coinbase_parts =
         match pre_diff1.coinbase_parts with
         | Zero -> `Zero
@@ -634,30 +633,36 @@ end = struct
               (Option.map x ~f:(fun (w, w_opt) ->
                    (Transaction_snark_work.forget w, forget_work_opt w_opt) ))
       in
-      apply_pre_diff_unchecked t coinbase_parts diff.creator pre_diff1.diff
+      apply_pre_diff_unchecked ledger coinbase_parts diff.creator
+        pre_diff1.diff
     in
     let apply_pre_diff_with_at_most_one
         (pre_diff2 :
           Staged_ledger_diff.With_valid_signatures_and_proofs
-          .diff_with_at_most_one_coinbase) =
+          .diff_with_at_most_one_coinbase) ledger =
       let coinbase_added =
         match pre_diff2.coinbase_added with
         | Zero -> `Zero
         | One x -> `One (forget_work_opt x)
       in
-      apply_pre_diff_unchecked t coinbase_added diff.creator pre_diff2.diff
+      apply_pre_diff_unchecked ledger coinbase_added diff.creator
+        pre_diff2.diff
     in
+    let new_mask = Inputs.Ledger.Mask.create () in
+    let new_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
     let data, works =
       Either.value_map diff.pre_diffs
         ~first:(fun d ->
-          let data, works, cb_works = apply_pre_diff_with_at_most_one d in
+          let data, works, cb_works =
+            apply_pre_diff_with_at_most_one d new_ledger
+          in
           (data, cb_works @ works) )
         ~second:(fun d ->
           let data1, works1, cb_works1 =
-            apply_pre_diff_with_at_most_two (fst d)
+            apply_pre_diff_with_at_most_two (fst d) new_ledger
           in
           let data2, works2, cb_works2 =
-            apply_pre_diff_with_at_most_one (snd d)
+            apply_pre_diff_with_at_most_one (snd d) new_ledger
           in
           (data1 @ data2, works1 @ cb_works1 @ cb_works2 @ works2) )
     in
@@ -666,7 +671,9 @@ end = struct
     in
     Or_error.ok_exn (TSS.enqueue_transactions t.scan_state data) ;
     Or_error.ok_exn (verify_scan_state_after_apply t.ledger t.scan_state) ;
-    (`Hash_after_applying (hash t), `Ledger_proof res_opt)
+    ( `Hash_after_applying (hash t)
+    , `Ledger_proof res_opt
+    , `Updated_staged_ledger {t with ledger= new_ledger} )
 
   let work_to_do scan_state : Transaction_snark_work.Statement.t Sequence.t =
     let work_seq = TSS.next_jobs_sequence scan_state in
@@ -1153,9 +1160,8 @@ end = struct
             Transaction_snark_work.Statement.t
          -> Transaction_snark_work.Checked.t option) =
     let curr_hash = hash t in
-    let cur_ledger = ledger t in
     let new_mask = Inputs.Ledger.Mask.create () in
-    let tmp_ledger = Inputs.Ledger.register_mask cur_ledger new_mask in
+    let tmp_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
     let partitions =
       TSS.partition_if_overflowing ~max_slots:max_throughput t.scan_state
@@ -1752,7 +1758,7 @@ let%test_module "test" =
         Sl.create_diff sl ~self:self_pk ~logger ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work
       in
-      let%map _, `Ledger_proof ledger_proof =
+      let%map _, `Ledger_proof ledger_proof, _ =
         Sl.apply sl (Test_input1.Staged_ledger_diff.forget diff) ~logger
       in
       (ledger_proof, Test_input1.Staged_ledger_diff.forget diff)
@@ -1794,7 +1800,7 @@ let%test_module "test" =
       let initial_ledger = ref 0 in
       let sl = Sl.create ~ledger:initial_ledger in
       Quickcheck.test g ~trials:1000 ~f:(fun _ ->
-          let old_ledger = !(Sl.ledger lb) in
+          let old_ledger = !(Sl.ledger sl) in
           let all_ts = txns (p / 2) (fun x -> (x + 1) * 100) (fun _ -> 4) in
           let proof, diff =
             create_and_apply sl logger (Sequence.of_list all_ts) stmt_to_work
@@ -1816,7 +1822,7 @@ let%test_module "test" =
           in
           assert_at_least_coinbase_added x cb ;
           let expected_value = expected_ledger x all_ts old_ledger in
-          assert (!(Sl.ledger lb) = expected_value) )
+          assert (!(Sl.ledger sl) = expected_value) )
 
     let%test_unit "Be able to include random number of user_commands" =
       (*Always at worst case number of provers*)
@@ -1827,7 +1833,7 @@ let%test_module "test" =
       let initial_ledger = ref 0 in
       let sl = Sl.create ~ledger:initial_ledger in
       Quickcheck.test g ~trials:1000 ~f:(fun i ->
-          let old_ledger = !(Sl.ledger lb) in
+          let old_ledger = !(Sl.ledger sl) in
           let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
           let ts = List.take all_ts i in
           let proof, diff =
@@ -1850,7 +1856,7 @@ let%test_module "test" =
           in
           assert_at_least_coinbase_added x cb ;
           let expected_value = expected_ledger x all_ts old_ledger in
-          assert (!(Sl.ledger lb) = expected_value) )
+          assert (!(Sl.ledger sl) = expected_value) )
 
     let%test_unit "Be able to include random number of user_commands (One \
                    prover)" =
@@ -1869,7 +1875,7 @@ let%test_module "test" =
       let initial_ledger = ref 0 in
       let sl = Sl.create ~ledger:initial_ledger in
       Quickcheck.test g ~trials:1000 ~f:(fun i ->
-          let old_ledger = !(Sl.ledger lb) in
+          let old_ledger = !(Sl.ledger sl) in
           let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
           let ts = List.take all_ts i in
           let proof, diff =
@@ -1892,7 +1898,7 @@ let%test_module "test" =
           in
           assert_at_least_coinbase_added x cb ;
           let expected_value = expected_ledger x all_ts old_ledger in
-          assert (!(Sl.ledger lb) = expected_value) )
+          assert (!(Sl.ledger sl) = expected_value) )
 
     let%test_unit "Reproduce invalid statement error" =
       (*Always at worst case number of provers*)
@@ -1927,7 +1933,7 @@ let%test_module "test" =
       let sl = Sl.create ~ledger:initial_ledger in
       let expected_snarked_ledger = ref 0 in
       Quickcheck.test g ~trials:50 ~f:(fun i ->
-          let _old_ledger = !(Sl.ledger lb) in
+          let _old_ledger = !(Sl.ledger sl) in
           let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
           let ts = List.take all_ts i in
           let proof, _ =

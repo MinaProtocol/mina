@@ -365,7 +365,7 @@ module type Inputs_intf = sig
      and type protocol_state := Consensus_mechanism.Protocol_state.value
      and type snark_pool_diff := Snark_pool.pool_diff
      and type transaction_pool_diff := Transaction_pool.pool_diff
-     and type parallel_scan_state := Staged_ledger.Aux.t
+     and type parallel_scan_state := Staged_ledger.Scan_state.t
      and type ledger_hash := Ledger_hash.t
      and type sync_ledger_query := Sync_ledger.query
      and type sync_ledger_answer := Sync_ledger.answer
@@ -394,6 +394,7 @@ module type Inputs_intf = sig
     with type state_hash := Protocol_state_hash.t
      and type external_transition := External_transition.t
      and type ledger_database := Ledger_db.t
+     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
 
   module Proposer :
     Proposer_intf
@@ -446,13 +447,16 @@ module Make (Inputs : Inputs_intf) = struct
   let propose_keypair t = t.propose_keypair
 
   let best_staged_ledger t =
-    (Ledger_builder_controller.strongest_tip t.ledger_builder_controller).staged_ledger
+    (Ledger_builder_controller.strongest_tip t.ledger_builder_controller)
+      .staged_ledger
 
   let best_protocol_state t =
     (Ledger_builder_controller.strongest_tip t.ledger_builder_controller).state
 
   let best_tip t =
-    let tip = Ledger_builder_controller.strongest_tip t.ledger_builder_controller in
+    let tip =
+      Ledger_builder_controller.strongest_tip t.ledger_builder_controller
+    in
     (Staged_ledger.ledger tip.staged_ledger, tip.state, tip.proof)
 
   let get_ledger t lh =
@@ -523,8 +527,7 @@ module Make (Inputs : Inputs_intf) = struct
                  ~hash_data:
                    (Fn.compose Consensus_mechanism.Protocol_state.hash
                       External_transition.protocol_state))
-            ~root_transaction_snark_scan_state:
-              Transition_frontier.Transaction_snark_scan_state.empty
+            ~root_transaction_snark_scan_state:Staged_ledger.Scan_state.empty
             ~root_staged_ledger_diff:None
             ~root_snarked_ledger:
               (Ledger_db.create ?directory_name:config.ledger_db_location ())
@@ -558,7 +561,7 @@ module Make (Inputs : Inputs_intf) = struct
               with
               | Ok (lb, _state) ->
                   Some
-                    ( Staged_ledger.aux lb
+                    ( Staged_ledger.scan_state lb
                     , Ledger.merkle_root (Staged_ledger.ledger lb) )
               | _ -> None )
             ~answer_sync_ledger_query:(fun query ->
@@ -576,7 +579,7 @@ module Make (Inputs : Inputs_intf) = struct
                Net.broadcast_transaction_pool_diff net x ;
                Deferred.unit )) ;
         Ivar.fill net_ivar net ;
-        let%bind staged_ledger = lbc_deferred in
+        let%bind ledger_builder_controller = lbc_deferred in
         don't_wait_for
           (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;
         let%bind snark_pool =
@@ -592,7 +595,8 @@ module Make (Inputs : Inputs_intf) = struct
             , strongest_ledgers_for_network
             , strongest_ledgers_for_api ) =
           Linear_pipe.fork3
-            (Ledger_builder_controller.strongest_ledgers staged_ledger)
+            (Ledger_builder_controller.strongest_ledgers
+               ledger_builder_controller)
         in
         Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (_, t) ->
             Net.broadcast_state net t ; Deferred.unit )
@@ -647,7 +651,7 @@ module Make (Inputs : Inputs_intf) = struct
           ; external_transitions= external_transitions_writer
           ; transaction_pool
           ; snark_pool
-          ; staged_ledger
+          ; ledger_builder_controller
           ; strongest_ledgers= strongest_ledgers_for_api
           ; log= config.log
           ; seen_jobs= Work_selector.State.init

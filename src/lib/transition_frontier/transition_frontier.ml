@@ -8,49 +8,200 @@ module Max_length = struct
   let length = 2160
 end
 
-module Make (Completed_work : sig
-  type t
+(*module type Inputs_intf = sig
 
-  module Checked : sig
+  module Compressed_public_key : Compressed_public_key_intf
+
+  module User_command :
+    User_command_intf with type public_key := Compressed_public_key.t
+
+  module Fee_transfer :
+    Fee_transfer_intf with type public_key := Compressed_public_key.t
+
+  module Coinbase :
+    Coinbase_intf
+    with type public_key := Compressed_public_key.t
+     and type fee_transfer := Fee_transfer.single
+
+  module Transaction :
+    Transaction_intf
+    with type valid_user_command := User_command.With_valid_signature.t
+     and type fee_transfer := Fee_transfer.t
+     and type coinbase := Coinbase.t
+
+  module Ledger_hash : Ledger_hash_intf
+
+  module Frozen_ledger_hash : sig
+    include Ledger_hash_intf
+
+    val of_ledger_hash : Ledger_hash.t -> t
+  end
+
+  module Ledger_proof_statement :
+    Ledger_proof_statement_intf
+    with type ledger_hash := Frozen_ledger_hash.t
+
+  module Proof : sig
     type t
   end
-end)
-(Staged_ledger_diff : Staged_ledger_diff_intf
-                       with type user_command := User_command.t
-                        and type user_command_with_valid_signature :=
-                                   User_command.With_valid_signature.t
-                        and type staged_ledger_hash := Staged_ledger_hash.t
-                        and type public_key := Public_key.Compressed.t
-                        and type completed_work := Completed_work.t
-                        and type completed_work_checked :=
-                                   Completed_work.Checked.t)
-(External_transition : External_transition.S
-                       with module Protocol_state = Consensus.Mechanism
-                                                    .Protocol_state
-                        and module Staged_ledger_diff := Staged_ledger_diff)
-(Staged_ledger : Staged_ledger_intf
-                  with type diff := Staged_ledger_diff.t
-                   and type valid_diff :=
-                              Staged_ledger_diff
-                              .With_valid_signatures_and_proofs
-                              .t
-                   and type staged_ledger_hash := Staged_ledger_hash.t
-                   and type ledger_hash := Ledger_hash.t
-                   and type frozen_ledger_hash := Frozen_ledger_hash.t
-                   and type public_key := Public_key.Compressed.t
-                   and type ledger := Ledger.t
-                   and type user_command_with_valid_signature :=
-                              User_command.With_valid_signature.t
-                   and type completed_work := Completed_work.Checked.t) :
+
+  module Sok_message :
+    Sok_message_intf with type public_key_compressed := Compressed_public_key.t
+
+  module Ledger_proof : sig
+    include
+      Ledger_proof_intf
+      with type statement := Ledger_proof_statement.t
+       and type ledger_hash := Frozen_ledger_hash.t
+       and type proof := Proof.t
+       and type sok_digest := Sok_message.Digest.t
+
+    include Binable.S with type t := t
+
+    include Sexpable.S with type t := t
+  end
+
+  module Ledger_proof_verifier :
+    Ledger_proof_verifier_intf
+    with type statement := Ledger_proof_statement.t
+     and type message := Sok_message.t
+     and type ledger_proof := Ledger_proof.t
+
+  module Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf
+
+  module Staged_ledger_hash :
+    Staged_ledger_hash_intf
+    with type ledger_hash := Ledger_hash.t
+     and type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
+
+  module Transaction_snark_work :
+    Transaction_snark_work_intf
+    with type proof := Ledger_proof.t
+     and type statement := Ledger_proof_statement.t
+     and type public_key := Compressed_public_key.t
+
+  module Staged_ledger_diff :
+    Staged_ledger_diff_intf
+    with type completed_work := Transaction_snark_work.t
+     and type completed_work_checked := Transaction_snark_work.Checked.t
+     and type user_command := User_command.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
+     and type public_key := Compressed_public_key.t
+     and type staged_ledger_hash := Staged_ledger_hash.t
+
+  module Account : sig
+    type t
+  end
+
+  module Ledger :
+    Ledger_intf
+    with type ledger_hash := Ledger_hash.t
+     and type transaction := Transaction.t
+     and type valid_user_command := User_command.With_valid_signature.t
+     and type account := Account.t
+
+  module Sparse_ledger : sig
+    type t [@@deriving sexp, bin_io]
+
+    val of_ledger_subset_exn : Ledger.t -> Compressed_public_key.t list -> t
+
+    val merkle_root : t -> Ledger_hash.t
+
+    val apply_transaction_exn : t -> Transaction.t -> t
+  end
+
+  module Config : sig
+    val transaction_capacity_log_2 : int
+  end
+
+end*)
+
+module Make
+    (Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf)
+    (Ledger_proof_statement : Ledger_proof_statement_intf
+                              with type ledger_hash := Frozen_ledger_hash.t)
+                                                                           (Ledger_proof : sig
+        include
+          Ledger_proof_intf
+          with type statement := Ledger_proof_statement.t
+           and type ledger_hash := Frozen_ledger_hash.t
+           and type proof := Proof.t
+           and type sok_digest := Sok_message.Digest.t
+
+        include Binable.S with type t := t
+
+        include Sexpable.S with type t := t
+    end)
+    (Transaction_snark_work : Transaction_snark_work_intf
+                              with type proof := Ledger_proof.t
+                               and type statement := Ledger_proof_statement.t
+                               and type public_key := Public_key.Compressed.t)
+    (Staged_ledger_diff : Staged_ledger_diff_intf
+                          with type user_command := User_command.t
+                           and type user_command_with_valid_signature :=
+                                      User_command.With_valid_signature.t
+                           and type staged_ledger_hash := Staged_ledger_hash.t
+                           and type public_key := Public_key.Compressed.t
+                           and type completed_work := Transaction_snark_work.t
+                           and type completed_work_checked :=
+                                      Transaction_snark_work.Checked.t)
+    (External_transition : External_transition.S
+                           with module Protocol_state = Consensus.Mechanism
+                                                        .Protocol_state
+                            and module Staged_ledger_diff := Staged_ledger_diff)
+    (Staged_ledger : Staged_ledger_intf
+                     with type diff := Staged_ledger_diff.t
+                      and type valid_diff :=
+                                 Staged_ledger_diff
+                                 .With_valid_signatures_and_proofs
+                                 .t
+                      and type staged_ledger_hash := Staged_ledger_hash.t
+                      and type staged_ledger_aux_hash :=
+                                 Staged_ledger_aux_hash.t
+                      and type ledger_hash := Ledger_hash.t
+                      and type frozen_ledger_hash := Frozen_ledger_hash.t
+                      and type public_key := Public_key.Compressed.t
+                      and type ledger := Ledger.t
+                      and type ledger_proof := Ledger_proof.t
+                      and type user_command_with_valid_signature :=
+                                 User_command.With_valid_signature.t
+                      and type statement := Transaction_snark_work.Statement.t
+                      and type completed_work :=
+                                 Transaction_snark_work.Checked.t
+                      and type sparse_ledger := Sparse_ledger.t
+                      and type ledger_proof_statement :=
+                                 Ledger_proof_statement.t
+                      and type ledger_proof_statement_set :=
+                                 Ledger_proof_statement.Set.t
+                      and type transaction := Transaction.t) :
   Transition_frontier_intf
   with type state_hash := State_hash.t
    and type external_transition := External_transition.t
    and type ledger_database := Ledger.Db.t
-   and type staged_ledger := Staged_ledger.t = struct
+   and type staged_ledger := Staged_ledger.t
+   and type transaction_snark_scan_state := Staged_ledger.Scan_state.t =
+(*Transaction_snark_scan_state : Transaction_snark_scan_state_intf
+                                with type ledger := Ledger.t
+                                 and type transaction_snark_work :=
+                                            Transaction_snark_work.t
+                                 and type ledger_proof := Ledger_proof.t
+                                 and type sparse_ledger := Sparse_ledger.t
+                                 and type ledger_proof_statement :=
+                                            Ledger_proof_statement.t
+                                 and type transaction := Transaction.t
+                                 and type transaction_with_info :=
+                                            Ledger.Undo.t
+                                 and type frozen_ledger_hash :=
+                                            Frozen_ledger_hash.t
+                                 and type sok_message := Sok_message.t
+                                 and type staged_ledger_aux_hash :=
+                                            Staged_ledger_aux_hash.t*)
+struct
   type ledger_diff = Staged_ledger_diff.t
 
   (*******hooking in staged ledger*************)
-
+  
   (* Transaction_snark_scan_state and Staged_ledger long-term will not live in
   * this module *)
   
@@ -58,7 +209,7 @@ end)
      * ledger-builder diff *)
   
   (* Right now, Staged_ledger is a thin wrapper over Ledger_builder *)
-
+  
   (*module Transaction_snark_scan_state : sig
     type t
 
@@ -149,7 +300,7 @@ end)
       in
       fresh_ledger_builder
   end *)
-
+  
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
 
   exception
@@ -207,36 +358,41 @@ end)
         (Staged_ledger_hash.ledger_hash
            (Consensus.Mechanism.Protocol_state.Blockchain_state
             .staged_ledger_hash root_blockchain_state)) ) ;
-    match
-      Staged_ledger.create
-        ~transaction_snark_scan_state:root_transaction_snark_scan_state
-        ~ledger:root_masked_ledger
-    with
-    | Error e -> failwith (Error.to_string_hum e)
-    | Ok pre_root_staged_ledger ->
-        let root_staged_ledger =
-          match root_staged_ledger_diff with
-          | None -> pre_root_staged_ledger
-          | Some diff -> (
-            match Staged_ledger.apply pre_root_staged_ledger diff ~logger with
-            | Error e -> failwith (Error.to_string_hum e)
-            | Ok root_staged_ledger -> root_staged_ledger )
-        in
-        let root_breadcrumb =
-          { Breadcrumb.transition_with_hash= root_transition
-          ; staged_ledger= root_staged_ledger }
-        in
-        let root_node =
-          {breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
-        in
-        let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
-        { logger
-        ; root_snarked_ledger
-        ; root= root_hash
-        ; best_tip= root_hash
-        ; table }
-
-  let hack_temporary_ledger_builder_of_staged_ledger = Fn.id
+    (*let empty_mask = Ledger.Mask.create () in
+    let snarked_ledger = Ledger.Maskable.register_mask (Ledger.of_database root_snarked_ledger) empty_mask
+    in*)
+    let root_snarked_ledger_hash =
+      Frozen_ledger_hash.of_ledger_hash
+      @@ Ledger.merkle_root (Ledger.of_database root_snarked_ledger)
+    in
+    let pre_root_staged_ledger =
+      match
+        Staged_ledger.of_scan_state_and_ledger
+          ~scan_state:root_transaction_snark_scan_state
+          ~ledger:root_masked_ledger
+          ~snarked_ledger_hash:root_snarked_ledger_hash
+      with
+      | Error e -> failwith (Error.to_string_hum e)
+      | Ok sl -> sl
+    in
+    let root_staged_ledger =
+      match root_staged_ledger_diff with
+      | None -> pre_root_staged_ledger
+      | Some diff -> (
+        match Staged_ledger.apply pre_root_staged_ledger diff ~logger with
+        | Error e -> failwith (Error.to_string_hum e)
+        | Ok (_, _, `Updated_staged_ledger root_staged_ledger) ->
+            root_staged_ledger )
+    in
+    let root_breadcrumb =
+      { Breadcrumb.transition_with_hash= root_transition
+      ; staged_ledger= root_staged_ledger }
+    in
+    let root_node =
+      {breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
+    in
+    let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
+    {logger; root_snarked_ledger; root= root_hash; best_tip= root_hash; table}
 
   let find t hash =
     let open Option.Let_syntax in
@@ -350,11 +506,12 @@ end)
           (Error.of_exn (Parent_not_found (`Parent parent_hash, `Target hash)))
     in
     (* 1.a ; b *)
-    let staged_ledger =
+    let ( `Hash_after_applying _hash
+        , `Ledger_proof _proof
+        , `Updated_staged_ledger staged_ledger ) =
       Staged_ledger.apply ~logger:t.logger
         (Breadcrumb.staged_ledger parent_node.breadcrumb)
-        (Transaction_snark_scan_state.Diff.of_staged_ledger_diff
-           (External_transition.staged_ledger_diff transition))
+        (External_transition.staged_ledger_diff transition)
       |> Or_error.ok_exn
     in
     let breadcrumb = {Breadcrumb.transition_with_hash; staged_ledger} in

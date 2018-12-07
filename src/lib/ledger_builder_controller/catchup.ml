@@ -47,12 +47,12 @@ struct
           transition_with_hash
         in
         let snarked_ledger_hash = ledger_hash_of_transition transition in
-        let build_lb ~aux ~ledger =
+        let build_lb ~scan_state ~ledger =
           let open Interruptible.Let_syntax in
           match%bind
             Interruptible.return
-              (Staged_ledger.of_aux_and_ledger ~snarked_ledger_hash ~ledger
-                 ~aux)
+              (Staged_ledger.of_scan_state_and_ledger ~snarked_ledger_hash
+                 ~ledger ~scan_state)
           with
           (* TODO: We'll need the full history in order to trust that
                the ledger builder we get is actually valid. See #285 *)
@@ -129,7 +129,7 @@ struct
                       (Net.get_staged_ledger_aux_at_hash net
                          (staged_ledger_hash_of_transition transition))
                   with
-                  | Ok aux -> build_lb ~aux ~ledger
+                  | Ok scan_state -> build_lb ~scan_state ~ledger
                   | Error e ->
                       Logger.faulty_peer log "Network failed to send aux %s"
                         (Error.to_string_hum e) ;

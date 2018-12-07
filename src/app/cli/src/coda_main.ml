@@ -1,5 +1,5 @@
-[%%import
-"../../../config.mlh"]
+(*[%%import
+"../../../config.mlh"]*)
 
 open Core
 open Async
@@ -11,19 +11,19 @@ open Pipe_lib
 open O1trace
 module Fee = Protocols.Coda_pow.Fee
 
-[%%if
-with_snark]
+(*[%%if
+with_snark]*)
 
 module Ledger_proof = Ledger_proof.Prod
 
-[%%else]
+(*[%%else]
 
 module Ledger_proof = struct
   module Statement = Transaction_snark.Statement
   include Ledger_proof.Debug
 end
 
-[%%endif]
+[%%endif]*)
 
 module Staged_ledger_aux_hash = struct
   include Staged_ledger_hash.Aux_hash.Stable.V1
@@ -108,9 +108,9 @@ module type Init_intf = sig
 
   module Transaction_snark_work :
     Protocols.Coda_pow.Transaction_snark_work_intf
-    with type public_key := Public_key.Compressed.t
+    with type proof := Ledger_proof.t
      and type statement := Transaction_snark.Statement.t
-     and type proof := Ledger_proof.t
+     and type public_key := Public_key.Compressed.t
 
   module Staged_ledger_diff :
     Protocols.Coda_pow.Staged_ledger_diff_intf
@@ -365,6 +365,7 @@ let make_init ~should_propose (module Config : Config_intf) :
     | Random -> (module Work_selector.Random.Make : Work_selector_F)
   in
   let module Init = struct
+    module Ledger_proof_statement = Ledger_proof_statement
     module Transaction_snark_work = Transaction_snark_work
     module Staged_ledger_diff = Staged_ledger_diff
     module Make_work_selector = Make_work_selector
@@ -507,7 +508,7 @@ struct
     include Staged_ledger.Make (Inputs)
   end
 
-  module Staged_ledger_aux = Staged_ledger.Aux
+  module Staged_ledger_aux = Staged_ledger.Scan_state
 
   module Staged_ledger_transition = struct
     type t = {old: Staged_ledger.t sexp_opaque; diff: Staged_ledger_diff.t}
@@ -531,11 +532,15 @@ struct
       (Consensus.Mechanism.Prover_state)
   module External_transition =
     Coda_base.External_transition.Make (Staged_ledger_diff) (Protocol_state)
-
   module Transition_frontier =
-    Transition_frontier.Make (Completed_work) (Staged_ledger_diff)
+    Transition_frontier.Make (Staged_ledger_aux_hash) (Ledger_proof_statement)
+      (Ledger_proof)
+      (Transaction_snark_work)
+      (Staged_ledger_diff)
       (External_transition)
-      (struct
+      (Staged_ledger)
+
+  (*struct
         (* This monkey patching is justified because we're about to rip out
          * ledger builder *)
         include Staged_ledger
@@ -546,14 +551,14 @@ struct
 
         type ledger_proof_statement = Ledger_proof_statement.t
 
-        type statement = Completed_work.Statement.t
+        type statement = Transaction_snark_work.Statement.t
 
         type transaction = Transaction.t
 
         type ledger_proof = Ledger_proof.t
 
         type staged_ledger_aux_hash = Staged_ledger_aux_hash.t
-      end)
+      end*)
 
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (User_command)
@@ -581,7 +586,7 @@ struct
       ; staged_ledger: Staged_ledger.t sexp_opaque }
     [@@deriving sexp, fields]
 
-    type scan_state = Staged_ledger.Aux.t
+    (*type scan_state = Staged_ledger.scan_state*)
 
     let of_transition_and_lb transition staged_ledger =
       { state= External_transition.protocol_state transition
@@ -882,8 +887,8 @@ struct
     else Some {Snark_work_lib.Work.Spec.instances; fee}
 end
 
-[%%if
-with_snark]
+(*[%%if
+with_snark]*)
 
 module Make_coda (Init : Init_intf) = struct
   module Ledger_proof_verifier = struct
@@ -921,7 +926,7 @@ module Make_coda (Init : Init_intf) = struct
       ~snark_pool t (snark_work_fee t)
 end
 
-[%%else]
+(*[%%else]
 
 module Make_coda (Init : Init_intf) = struct
   module Ledger_proof_verifier = struct
@@ -942,7 +947,7 @@ module Make_coda (Init : Init_intf) = struct
       ~snark_pool t t.snark_work_fee
 end
 
-[%%endif]
+[%%endif]*)
 
 module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   include Program

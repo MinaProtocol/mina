@@ -29,16 +29,16 @@ end
 module Make (Inputs : Inputs.S) : sig
   include
     Coda_pow.Transaction_snark_scan_state_intf
-    with type ledger_mask := Inputs.Ledger.attached_mask
+    with type ledger := Inputs.Ledger.t
      and type transaction_snark_work := Inputs.Transaction_snark_work.t
      and type ledger_proof := Inputs.Ledger_proof.t
      and type sparse_ledger := Inputs.Sparse_ledger.t
      and type ledger_proof_statement := Inputs.Ledger_proof_statement.t
      and type transaction := Inputs.Transaction.t
-     and type hash := Digestif.SHA256.t
      and type transaction_with_info := Inputs.Ledger.Undo.t
      and type frozen_ledger_hash := Inputs.Frozen_ledger_hash.t
      and type sok_message := Inputs.Sok_message.t
+     and type staged_ledger_aux_hash := Inputs.Staged_ledger_aux_hash.t
 end = struct
   open Inputs
 
@@ -79,9 +79,12 @@ end = struct
   include T
 
   let hash t =
-    Parallel_scan.State.hash t
-      (Binable.to_string (module Ledger_proof_with_sok_message))
-      (Binable.to_string (module Transaction_with_witness))
+    let state_hash =
+      Parallel_scan.State.hash t
+        (Binable.to_string (module Ledger_proof_with_sok_message))
+        (Binable.to_string (module Transaction_with_witness))
+    in
+    Staged_ledger_aux_hash.of_bytes (state_hash :> string)
 
   let is_valid t =
     Parallel_scan.parallelism ~state:t
@@ -332,6 +335,10 @@ end = struct
 
   let create ~transaction_capacity_log_2 =
     Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 1)
+
+  let empty =
+    let open Config in
+    create ~transaction_capacity_log_2
 
   let enqueue_transactions t transactions =
     Parallel_scan.enqueue_data ~state:t ~data:transactions

@@ -25,6 +25,44 @@ module type Inputs_intf = sig
     with type addr := Merkle_address.t
      and type hash := Ledger_hash.t
 
+  module Proof : sig
+    type t
+  end
+
+  module Sok_message :
+    Sok_message_intf with type public_key_compressed := Public_key.Compressed.t
+
+  module Ledger_proof_statement :
+    Ledger_proof_statement_intf with type ledger_hash := Frozen_ledger_hash.t
+
+  module Ledger_proof :
+    Ledger_proof_intf
+    with type ledger_hash := Frozen_ledger_hash.t
+     and type statement := Ledger_proof_statement.t
+     and type proof := Proof.t
+     and type sok_digest := Sok_message.Digest.t
+
+  module Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf
+
+  module Transaction_snark_work :
+    Transaction_snark_work_intf
+    with type proof := Ledger_proof.t
+     and type statement := Ledger_proof_statement.t
+     and type public_key := Public_key.Compressed.t
+
+  module Transaction_snark_scan_state :
+    Transaction_snark_scan_state_intf
+    with type ledger := Ledger.t
+     and type transaction_snark_work := Transaction_snark_work.t
+     and type ledger_proof := Ledger_proof.t
+     and type sparse_ledger := Sparse_ledger.t
+     and type ledger_proof_statement := Ledger_proof_statement.t
+     and type transaction := Transaction.t
+     and type transaction_with_info := Ledger.Undo.t
+     and type frozen_ledger_hash := Frozen_ledger_hash.t
+     and type sok_message := Sok_message.t
+     and type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
+
   module Staged_ledger :
     Staged_ledger_intf
     with type diff := Staged_ledger_diff.t
@@ -50,10 +88,11 @@ module type Inputs_intf = sig
      and type state_hash := State_hash.t
      and type ledger_database := Ledger.Db.t
      and type ledger_diff := Ledger_diff.t
+     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
 
   type ledger_database
 
-  type transaction_snark_scan_state
+  (* type transaction_snark_scan_state *)
 
   type ledger_diff
 
@@ -123,8 +162,7 @@ module Make (Inputs : Inputs_intf) :
                let key = Account.public_key account in
                ignore (Ledger.Db.get_or_create_account_exn db key account) ;
                db ))
-        ~root_transaction_snark_scan_state:
-          Transition_frontier.Transaction_snark_scan_state.empty
+        ~root_transaction_snark_scan_state:Staged_ledger.Scan_state.empty
         ~root_staged_ledger_diff:None ~logger
     in
     Transition_handler.Validator.run ~frontier ~transition_reader

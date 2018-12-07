@@ -210,7 +210,7 @@ module Synchronizing = struct
         with type sync_ledger_query := Sync_ledger.query
          and type sync_ledger_answer := Sync_ledger.answer
          and type staged_ledger_hash := Staged_ledger_hash.t
-         and type staged_ledger_aux := Staged_ledger.Aux.t
+         and type staged_ledger_aux := Staged_ledger.Scan_state.t
          and type ledger_hash := Ledger_hash.t
          and type protocol_state := Consensus_mechanism.Protocol_state.value
     end

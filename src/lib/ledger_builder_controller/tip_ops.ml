@@ -34,8 +34,8 @@ module Make (Inputs : Inputs.Base.S) = struct
           (External_transition.staged_ledger_diff transition)
           ~logger
       with
-      | Ok (_, `Ledger_proof None) -> return ()
-      | Ok (_, `Ledger_proof (Some _)) -> return ()
+      | Ok (_, `Ledger_proof None, _) -> return ()
+      | Ok (_, `Ledger_proof (Some _), _) -> return ()
       (* We've already verified that all the patches can be
         applied successfully before we added to the ktree, so we
         can force-unwrap here *)

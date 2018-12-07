@@ -20,6 +20,7 @@ module type Inputs_intf = sig
      and type external_transition := External_transition.t
      and type ledger_database := Ledger_db.t
      and type staged_ledger := Staged_ledger.t
+     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
 
   module Transaction_pool :
     Coda_lib.Transaction_pool_read_intf
@@ -174,9 +175,11 @@ module Make (Inputs : Inputs_intf) :
         in
         let lb2 = Staged_ledger.copy staged_ledger in
         let ( `Hash_after_applying next_staged_ledger_hash
-            , `Ledger_proof ledger_proof_opt ) =
-            Staged_ledger.apply_diff_unchecked lb2 diff
+            , `Ledger_proof ledger_proof_opt
+            , `Updated_staged_ledger _updated_staged_ledger ) =
+          Staged_ledger.apply_diff_unchecked lb2 diff
         in
+        (*TODO use updated_staged_ledger*)
         return (diff, next_staged_ledger_hash, ledger_proof_opt))
     in
     let%bind protocol_state, consensus_transition_data =
@@ -268,10 +271,7 @@ module Make (Inputs : Inputs_intf) :
           let%bind next_state_opt =
             generate_next_state ~proposal_data ~previous_protocol_state
               ~time_controller
-              ~staged_ledger:
-                (Transition_frontier
-                 .hack_temporary_ledger_builder_of_staged_ledger
-                   (Crumb.staged_ledger crumb))
+              ~staged_ledger:(Crumb.staged_ledger crumb)
               ~transactions:(Transaction_pool.transactions transaction_pool)
               ~get_completed_work ~logger ~keypair
           in
