@@ -925,8 +925,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
       in
       fst (go 0 t)
 
-    let auxiliary_input (type s) ~num_inputs (t0 : (unit, s) t) (s0 : s)
-        (input : Field.Vector.t) : Field.Vector.t =
+    let auxiliary_input (type s) ?system ~num_inputs (t0 : (unit, s) t)
+        (s0 : s) (input : Field.Vector.t) : Field.Vector.t =
       let next_auxiliary = ref (1 + num_inputs) in
       let aux = Field.Vector.create () in
       let get_value : Cvar.t -> Field.t =
@@ -943,38 +943,48 @@ module Make_basic (Backend : Backend_intf.S) = struct
         Field.Vector.emplace_back aux x ;
         v
       in
-      let rec go : type a s. (a, s) t -> Request.Handler.t -> s -> s * a =
-       fun t handler s ->
+      Option.iter system ~f:(fun sys ->
+          R1CS_constraint_system.set_primary_input_size sys num_inputs ) ;
+      let rec go : type a s.
+          string list -> (a, s) t -> Request.Handler.t -> s -> s * a =
+       fun stack t handler s ->
         match t with
         | Pure x -> (s, x)
-        | With_constraint_system (_, k) -> go k handler s
-        | With_label (_lab, t, k) ->
-            let s', y = go t handler s in
-            go (k y) handler s'
+        | With_constraint_system (f, k) ->
+            Option.iter system ~f ; go stack k handler s
+        | With_label (lab, t, k) ->
+            let s', y = go (lab :: stack) t handler s in
+            go stack (k y) handler s'
         | As_prover (x, k) ->
             let s', () = As_prover.run x get_value s in
-            go k handler s'
-        | Add_constraint (c, t) -> go t handler s
+            go stack k handler s'
+        | Add_constraint (c, t) ->
+            Option.iter system ~f:(Constraint.add ~stack c) ;
+            go stack t handler s
         | With_state (p, and_then, t_sub, k) ->
             let s, s_sub = As_prover.run p get_value s in
-            let s_sub, y = go t_sub handler s_sub in
+            let s_sub, y = go stack t_sub handler s_sub in
             let s, () = As_prover.run (and_then s_sub) get_value s in
-            go (k y) handler s
+            go stack (k y) handler s
         | With_handler (h, t, k) ->
-            let s', y = go t (Request.Handler.push handler h) s in
-            go (k y) handler s'
+            let s', y = go stack t (Request.Handler.push handler h) s in
+            go stack (k y) handler s'
         | Clear_handler (t, k) ->
-            let s', y = go t Request.Handler.fail s in
-            go (k y) handler s'
+            let s', y = go stack t Request.Handler.fail s in
+            go stack (k y) handler s'
         | Exists ({store; check; _}, c, k) ->
             let s', value = Provider.run c get_value s handler in
             let var = Typ.Store.run (store value) store_field_elt in
-            let (), () = go (check var) handler () in
-            go (k {Handle.var; value= Some value}) handler s'
-        | Next_auxiliary k -> go (k !next_auxiliary) handler s
+            let (), () = go stack (check var) handler () in
+            go stack (k {Handle.var; value= Some value}) handler s'
+        | Next_auxiliary k -> go stack (k !next_auxiliary) handler s
       in
       O1trace.measure "auxiliary_input" (fun () ->
-          ignore (go t0 Request.Handler.fail s0) ) ;
+          ignore (go [] t0 Request.Handler.fail s0) ) ;
+      let auxiliary_input_size = !next_auxiliary - (1 + num_inputs) in
+      Option.iter system ~f:(fun sys ->
+          R1CS_constraint_system.set_auxiliary_input_size sys
+            auxiliary_input_size ) ;
       aux
 
     let run_unchecked (type a s) (t0 : (a, s) t) (s0 : s) =
@@ -1489,8 +1499,13 @@ module Make_basic (Backend : Backend_intf.S) = struct
      fun key t s k ->
       conv
         (fun c primary ->
+          let system =
+            let s = Proving_key.r1cs_constraint_system key in
+            if R1CS_constraint_system.get_primary_input_size s = 0 then Some s
+            else None
+          in
           let auxiliary =
-            Checked.auxiliary_input
+            Checked.auxiliary_input ?system
               ~num_inputs:(Field.Vector.length primary)
               c s primary
           in

@@ -38,39 +38,6 @@ module type S = sig
     val set_is_square : t -> bool -> unit
   end
 
-  module Proving_key : sig
-    type t [@@deriving bin_io]
-
-    val to_string : t -> string
-
-    val of_string : string -> t
-
-    val to_bigstring : t -> Bigstring.t
-
-    val of_bigstring : Bigstring.t -> t
-  end
-
-  module Verification_key : sig
-    type t
-
-    include Stringable.S with type t := t
-
-    val to_bigstring : t -> Bigstring.t
-
-    val of_bigstring : Bigstring.t -> t
-  end
-
-  module Proof : sig
-    type t
-
-    include Stringable.S with type t := t
-
-    val create :
-      Proving_key.t -> primary:Field.Vector.t -> auxiliary:Field.Vector.t -> t
-
-    val verify : t -> Verification_key.t -> Field.Vector.t -> bool
-  end
-
   module R1CS_constraint_system : sig
     type t
 
@@ -100,6 +67,41 @@ module type S = sig
       -> bool
 
     val digest : t -> Md5.t
+  end
+
+  module Proving_key : sig
+    type t [@@deriving bin_io]
+
+    val r1cs_constraint_system : t -> R1CS_constraint_system.t
+
+    val to_string : t -> string
+
+    val of_string : string -> t
+
+    val to_bigstring : t -> Bigstring.t
+
+    val of_bigstring : Bigstring.t -> t
+  end
+
+  module Verification_key : sig
+    type t
+
+    include Stringable.S with type t := t
+
+    val to_bigstring : t -> Bigstring.t
+
+    val of_bigstring : Bigstring.t -> t
+  end
+
+  module Proof : sig
+    type t
+
+    include Stringable.S with type t := t
+
+    val create :
+      Proving_key.t -> primary:Field.Vector.t -> auxiliary:Field.Vector.t -> t
+
+    val verify : t -> Verification_key.t -> Field.Vector.t -> bool
   end
 
   module Keypair : sig

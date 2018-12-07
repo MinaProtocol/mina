@@ -541,6 +541,8 @@ struct
 
     val create : unit -> t
 
+    val clear : t -> unit
+
     val delete : t -> unit
 
     val report_statistics : t -> unit
@@ -577,6 +579,8 @@ struct
     let func_name s = with_prefix prefix s
 
     let delete = foreign (func_name "delete") (typ @-> returning void)
+
+    let clear = foreign (func_name "clear") (typ @-> returning void)
 
     let report_statistics =
       foreign (func_name "report_statistics") (typ @-> returning void)
@@ -1016,6 +1020,8 @@ module Make_proof_system (M : sig
     type t
 
     val typ : t Ctypes.typ
+
+    val clear : t -> unit
   end
 
   module Field : sig
@@ -1033,6 +1039,8 @@ struct
     val typ : t Ctypes.typ
 
     val delete : t -> unit
+
+    val r1cs_constraint_system : t -> M.R1CS_constraint_system.t
 
     val to_string : t -> string
 
@@ -1052,8 +1060,18 @@ struct
 
     let delete = foreign (with_prefix prefix "delete") (typ @-> returning void)
 
+    let r1cs_constraint_system =
+      foreign
+        (with_prefix prefix "r1cs_constraint_system")
+        (typ @-> returning M.R1CS_constraint_system.typ)
+
     let to_cpp_string_stub : t -> Cpp_string.t =
-      foreign (func_name "to_string") (typ @-> returning Cpp_string.typ)
+     fun t ->
+      let stub =
+        foreign (func_name "to_string") (typ @-> returning Cpp_string.typ)
+      in
+      M.R1CS_constraint_system.clear (r1cs_constraint_system t) ;
+      stub t
 
     let to_string : t -> string =
      fun t ->
