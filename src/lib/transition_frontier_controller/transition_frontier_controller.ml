@@ -16,6 +16,7 @@ module type Inputs_intf = sig
      and type syncable_ledger_query := Syncable_ledger.query
      and type syncable_ledger_answer := Syncable_ledger.answer
      and type transition_frontier := Transition_frontier.t
+     and type ancestor_proof := State_body_hash.t list
 
   module Transition_handler :
     Transition_handler_intf
