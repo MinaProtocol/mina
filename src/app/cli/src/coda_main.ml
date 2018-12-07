@@ -183,6 +183,7 @@ module type Main_intf = sig
       module Config :
         Coda_networking.Config_intf
         with type gossip_config := Gossip_net.Config.t
+         and type time_controller := Time.Controller.t
     end
 
     module Sparse_ledger : sig
