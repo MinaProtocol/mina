@@ -1,11 +1,30 @@
 open Core_kernel
 open Async_kernel
-open Protocols.Coda_pow
-open Coda_base
 open Pipe_lib
+open Protocols.Coda_transition_frontier
+open Coda_base
 
 module type Inputs_intf = sig
-  module Merkle_address : Merkle_address.S
+  include Transition_frontier.Inputs_intf
+
+  module Transition_frontier :
+    Transition_frontier_intf
+    with type state_hash := State_hash.t
+     and type external_transition := External_transition.t
+     and type ledger_database := Ledger.Db.t
+     and type ledger_builder := Ledger_builder.t
+     and type masked_ledger := Ledger.Mask.Attached.t
+
+  module Syncable_ledger :
+    Syncable_ledger.S
+    with type addr := Ledger.Addr.t
+     and type hash := Ledger_hash.t
+     and type merkle_tree := Ledger.Mask.Attached.t
+     and type merkle_path := Ledger.path
+     and type root_hash := Ledger_hash.t
+     and type account := Account.t
+  
+  (* module Merkle_address : Merkle_address.S
 
   module Staged_ledger : sig
     type t
@@ -20,18 +39,18 @@ module type Inputs_intf = sig
   module Protocol_state : Protocol_state.S
 
   module External_transition :
-    External_transition_intf with type protocol_state := Protocol_state.value
+    External_transition.S with type protocol_state := Protocol_state.value
 
   module Transition_frontier :
     Transition_frontier_intf
     with type staged_ledger := Staged_ledger.t
      and type external_transition := External_transition.t
-     and type state_hash := State_hash.t
+     and type state_hash := State_hash.t *)
 end
 
 module Make (Inputs : Inputs_intf) :
   Sync_handler_intf
-  with type addr := Inputs.Merkle_address.t
+  with type addr := Ledger.Addr.t
    and type hash := State_hash.t
    and type syncable_ledger := Inputs.Syncable_ledger.t
    and type syncable_ledger_query := Inputs.Syncable_ledger.query
@@ -43,7 +62,10 @@ module Make (Inputs : Inputs_intf) :
   let answer_query ~frontier (hash, query) =
     let open Option.Let_syntax in
     let%map breadcrumb = Transition_frontier.find frontier hash in
-    let ledger = Transition_frontier.Breadcrumb.staged_ledger breadcrumb in
+    let staged_ledger =
+      Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+    in
+    let ledger = Transition_frontier.Staged_ledger.ledger staged_ledger in
     let responder = Syncable_ledger.Responder.create ledger ignore in
     let answer = Syncable_ledger.Responder.answer_query responder query in
     (hash, answer)
@@ -61,10 +83,11 @@ module Make (Inputs : Inputs_intf) :
         let protocol_state =
           External_transition.protocol_state external_transition
         in
-        let body = Protocol_state.body protocol_state in
-        let state_body_hash = Protocol_state.Body.hash body in
+        
+        let body = External_transition.Protocol_state.body protocol_state in
+        let state_body_hash = External_transition.Protocol_state.Body.hash body in
         let previous_state_hash =
-          Protocol_state.previous_state_hash protocol_state
+          External_transition.Protocol_state.previous_state_hash protocol_state
         in
         go (state_body_hash :: acc) (iter_traversal - 1) previous_state_hash
     in

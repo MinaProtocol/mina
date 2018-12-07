@@ -221,6 +221,8 @@ module type Main_intf = sig
 
     module Protocol_state_proof : sig
       type t
+
+      val dummy : t
     end
 
     module Ledger_builder_hash : sig
@@ -250,6 +252,7 @@ module type Main_intf = sig
   end
 
   module Config : sig
+    (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
     type t =
       { log: Logger.t
       ; propose_keypair: Keypair.t option
@@ -258,6 +261,7 @@ module type Main_intf = sig
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
+      ; ledger_db_location: string option
       ; ledger_builder_transition_backup_capacity: int [@default 10]
       ; time_controller: Inputs.Time.Controller.t
       ; banlist: Banlist.t
@@ -394,6 +398,7 @@ struct
       Block_time.Span.( < ) (Block_time.diff t now) limit
   end
 
+  module Masked_ledger = Ledger.Mask.Attached
   module Sok_message = Sok_message
 
   module Amount = struct
@@ -412,6 +417,8 @@ struct
     include Proof.Stable.V1
 
     type input = Protocol_state.value
+
+    let dummy = Coda_base.Proof.dummy
 
     let verify state_proof state =
       match%map
@@ -450,6 +457,8 @@ struct
   end
 
   module Ledger = Ledger
+  module Ledger_db = Ledger.Db
+  module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger_db)
 
   module Transaction_snark = struct
     include Ledger_proof
@@ -464,7 +473,26 @@ struct
     type t = Ledger_proof.t list [@@deriving sexp, bin_io]
   end
 
-  module Ledger_builder = struct
+  module Ledger_builder :
+    Protocols.Coda_pow.Ledger_builder_intf
+    with type diff := Ledger_builder_diff.t
+     and type valid_diff :=
+                Ledger_builder_diff.With_valid_signatures_and_proofs.t
+     and type ledger_hash := Ledger_hash.t
+     and type frozen_ledger_hash := Frozen_ledger_hash.t
+     and type ledger_builder_hash := Ledger_builder_hash.t
+     and type public_key := Public_key.Compressed.t
+     and type ledger := Ledger.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
+     and type statement := Completed_work.Statement.t
+     and type completed_work := Completed_work.Checked.t
+     and type ledger_proof := Ledger_proof.t
+     and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+     and type sparse_ledger := Sparse_ledger.t
+     and type ledger_proof_statement := Ledger_proof_statement.t
+     and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
+     and type transaction := Transaction.t = struct
     module Inputs = struct
       module Sok_message = Sok_message
       module Account = Account
@@ -528,6 +556,33 @@ struct
   module External_transition =
     Coda_base.External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
+  module Patched_ledger_builder = struct
+    (* This monkey patching is justified because we're about to rip out
+     * ledger builder *)
+    include Ledger_builder
+
+    type sparse_ledger = Sparse_ledger.t
+
+    type ledger_proof_statement_set = Ledger_proof_statement.Set.t
+
+    type ledger_proof_statement = Ledger_proof_statement.t
+
+    type statement = Completed_work.Statement.t
+
+    type transaction = Transaction.t
+
+    type ledger_proof = Ledger_proof.t
+
+    type ledger_builder_aux_hash = Ledger_builder_aux_hash.t
+  end
+
+  module Transition_frontier = Transition_frontier.Make (struct
+    module Completed_work = Completed_work
+    module Ledger_builder_diff = Ledger_builder_diff
+    module External_transition = External_transition
+    module Ledger_builder = Patched_ledger_builder
+  end)
+
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (User_command)
     include Network_pool.Make (Pool) (Pool.Diff)
@@ -542,7 +597,7 @@ struct
 
     (* TODO: This causes the signature to get checked twice as it is checked
    below before feeding it to add *)
-    let add t txn = apply_and_broadcast t [txn]
+    let add t txn = apply_and_broadcast t (Envelope.Incoming.local [txn])
   end
 
   module Transaction_pool_diff = Transaction_pool.Pool.Diff
@@ -689,15 +744,19 @@ struct
       | Error _e -> create ~parent_log ~incoming_diffs
 
     open Snark_work_lib.Work
+    open Network_pool.Snark_pool_diff
 
     let add_completed_work t
         (res :
           (('a, 'b, 'c, 'd) Single.Spec.t Spec.t, Ledger_proof.t) Result.t) =
       apply_and_broadcast t
-        (Add_solved_work
-           ( List.map res.spec.instances ~f:Single.Spec.statement
-           , {proof= res.proofs; fee= {fee= res.spec.fee; prover= res.prover}}
-           ))
+        (Envelope.Incoming.wrap
+           ~data:
+             (Add_solved_work
+                ( List.map res.spec.instances ~f:Single.Spec.statement
+                , { Diff.proof= res.proofs
+                  ; fee= {fee= res.spec.fee; prover= res.prover} } ))
+           ~sender:(Host_and_port.of_string "127.0.0.1:0"))
   end
 
   module Sync_ledger =
@@ -735,6 +794,63 @@ struct
     module Blockchain_state = Consensus.Mechanism.Blockchain_state
   end)
 
+  module Sync_handler = Sync_handler.Make (struct
+    include (
+      Inputs0 :
+        module type of Inputs0
+        with module Ledger_builder := Patched_ledger_builder )
+
+    module Ledger_builder = Patched_ledger_builder
+    module Ledger_builder_diff = Ledger_builder_diff
+    module Completed_work = Completed_work
+    module Syncable_ledger = Sync_ledger
+  end)
+
+  module Ledger_catchup = Ledger_catchup.Make (struct
+    include (
+      Inputs0 :
+        module type of Inputs0
+        with module Ledger_builder := Patched_ledger_builder )
+
+    module Ledger_builder_diff = Ledger_builder_diff
+    module Completed_work = Completed_work
+    module Ledger_builder = Patched_ledger_builder
+  end)
+
+  module Transition_handler = Transition_handler.Make (struct
+    module Hack_proof = Inputs0.Proof
+
+    include (
+      Inputs0 :
+        module type of Inputs0
+        with module Ledger_builder := Patched_ledger_builder
+         and module Proof := Hack_proof )
+
+    module Proof = Protocol_state_proof
+    module Completed_work = Completed_work
+    module Ledger_builder_diff = Ledger_builder_diff
+    module Ledger_builder = Patched_ledger_builder
+  end)
+
+  module Transition_frontier_controller =
+  Transition_frontier_controller.Make (struct
+    include (
+      Inputs0 :
+        module type of Inputs0
+        with module Ledger_builder := Patched_ledger_builder )
+
+    module Ledger_builder = Patched_ledger_builder
+    module Completed_work = Completed_work
+    module Syncable_ledger = Sync_ledger
+    module Sync_handler = Sync_handler
+    module Merkle_address = Ledger.Addr
+    module Catchup = Ledger_catchup
+    module Transition_handler = Transition_handler
+    module Ledger_builder_diff = Ledger_builder_diff
+    module Ledger_diff = Ledger_builder_diff
+    module Consensus_mechanism = Consensus.Mechanism
+  end)
+
   module Ledger_builder_controller = struct
     module Inputs = struct
       module Security = struct
@@ -757,9 +873,9 @@ struct
       module Ledger_proof_statement = Ledger_proof_statement
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger = Ledger
+      module Ledger_builder = Ledger_builder
       module Ledger_builder_diff = Ledger_builder_diff
       module Ledger_builder_aux_hash = Ledger_builder_aux_hash
-      module Ledger_builder = Ledger_builder
       module Blockchain_state = Blockchain_state
       module Consensus_mechanism = Consensus.Mechanism
       module Protocol_state = Protocol_state
@@ -787,6 +903,8 @@ struct
 
   module Proposer = Proposer.Make (struct
     include Inputs0
+    module Genesis_ledger = Genesis_ledger
+    module State_hash = State_hash
     module Ledger_builder_diff = Ledger_builder_diff
     module Ledger_proof_verifier = Ledger_proof_verifier
     module Completed_work = Completed_work
@@ -879,6 +997,7 @@ module Make_coda (Init : Init_intf) = struct
 
   module Inputs = struct
     include Make_inputs (Init) (Ledger_proof_verifier) (Storage.Disk)
+    module Genesis_ledger = Genesis_ledger
     module Ledger_proof_statement = Ledger_proof_statement
     module Snark_worker = Snark_worker_lib.Prod.Worker
     module Consensus_mechanism = Consensus.Mechanism
@@ -900,6 +1019,7 @@ module Make_coda (Init : Init_intf) = struct
 
   module Inputs = struct
     include Make_inputs (Init) (Ledger_proof_verifier) (Storage.Disk)
+    module Genesis_ledger = Genesis_ledger
     module Ledger_proof_statement = Ledger_proof_statement
     module Snark_worker = Snark_worker_lib.Debug.Worker
     module Consensus_mechanism = Consensus.Mechanism
@@ -1038,7 +1158,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let prove_receipt t ~proving_receipt ~resulting_receipt :
       Payment_proof.t Deferred.Or_error.t =
     let receipt_chain_database = receipt_chain_database t in
-    (* TODO: since we are making so many reads to `receipt_chain_database`, 
+    (* TODO: since we are making so many reads to `receipt_chain_database`,
     reads should be async to not get IO-blocked. See #1125 *)
     let result =
       Receipt_chain_database.prove receipt_chain_database ~proving_receipt

@@ -119,6 +119,8 @@ end
 
 module type Protocol_state_proof_intf = sig
   type t
+
+  val dummy : t
 end
 
 module type Ledger_builder_aux_hash_intf = sig
@@ -169,10 +171,24 @@ module type Mask_serializable_intf = sig
   val serializable_of_t : t -> serializable
 end
 
-module type Ledger_intf = sig
-  module Mask : Mask_intf
-
+module type Ledger_creatable_intf = sig
   type t
+
+  val create : ?directory_name:string -> unit -> t
+end
+
+module type Ledger_transfer_intf = sig
+  type src
+
+  type dest
+
+  val transfer_accounts : src:src -> dest:dest -> dest
+end
+
+module type Ledger_intf = sig
+  include Ledger_creatable_intf
+
+  module Mask : Mask_intf
 
   type attached_mask = t
 
@@ -248,12 +264,12 @@ module type Snark_pool_proof_intf = sig
 end
 
 module type User_command_intf = sig
-  type t [@@deriving sexp, compare, eq, bin_io]
+  type t [@@deriving sexp, eq, bin_io]
 
   type public_key
 
   module With_valid_signature : sig
-    type nonrec t = private t [@@deriving sexp, compare, eq]
+    type nonrec t = private t [@@deriving sexp, eq]
   end
 
   val check : t -> With_valid_signature.t option
@@ -562,6 +578,8 @@ module type Ledger_builder_base_intf = sig
     val hash : t -> ledger_builder_aux_hash
 
     val is_valid : t -> bool
+
+    val empty : parallelism_log_2:int -> t
   end
 
   val ledger : t -> ledger
@@ -572,7 +590,7 @@ module type Ledger_builder_base_intf = sig
        snarked_ledger_hash:frozen_ledger_hash
     -> ledger:ledger
     -> aux:Aux.t
-    -> t Or_error.t Deferred.t
+    -> t Or_error.t
 
   val of_serialized_and_unserialized :
     serialized:serializable -> unserialized:ledger -> t
@@ -591,14 +609,13 @@ module type Ledger_builder_base_intf = sig
     -> logger:Logger.t
     -> ( [`Hash_after_applying of ledger_builder_hash]
        * [`Ledger_proof of ledger_proof option] )
-       Deferred.Or_error.t
+       Or_error.t
 
   val apply_diff_unchecked :
        t
     -> valid_diff
-    -> ( [`Hash_after_applying of ledger_builder_hash]
-       * [`Ledger_proof of ledger_proof option] )
-       Deferred.t
+    -> [`Hash_after_applying of ledger_builder_hash]
+       * [`Ledger_proof of ledger_proof option]
 
   val snarked_ledger :
     t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t
@@ -791,7 +808,7 @@ module type External_transition_intf = sig
 
   type ledger_builder_diff
 
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, bin_io]
 
   val create :
        protocol_state:protocol_state
@@ -895,6 +912,9 @@ module type Consensus_mechanism_intf = sig
     -> logger:Logger.t
     -> Protocol_state.value * Consensus_transition_data.value
 
+  val is_valid :
+    Consensus_state.value -> time_received:Unix_timestamp.t -> bool
+
   val next_proposal :
        Int64.t
     -> Consensus_state.value
@@ -902,6 +922,13 @@ module type Consensus_mechanism_intf = sig
     -> keypair:keypair
     -> logger:Logger.t
     -> [`Check_again of Int64.t | `Propose of Int64.t * Proposal_data.t]
+
+  val select :
+       existing:Consensus_state.value
+    -> candidate:Consensus_state.value
+    -> logger:Logger.t
+    -> time_received:Unix_timestamp.t
+    -> [`Keep | `Take]
 
   val genesis_protocol_state : Protocol_state.value
 end
@@ -1052,6 +1079,8 @@ module type Inputs_intf = sig
 
   module Account : sig
     type t
+
+    val public_key : t -> Public_key.Compressed.t
   end
 
   module Ledger :
@@ -1060,6 +1089,12 @@ module type Inputs_intf = sig
      and type transaction := Transaction.t
      and type ledger_hash := Ledger_hash.t
      and type account := Account.t
+
+  module Genesis_ledger : sig
+    val t : Ledger.t
+
+    val accounts : (Private_key.t option * Account.t) list
+  end
 
   module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
 

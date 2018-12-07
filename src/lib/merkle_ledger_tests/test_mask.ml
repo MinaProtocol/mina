@@ -21,8 +21,6 @@ let%test_module "Test mask connected to underlying Merkle tree" =
          and type hash := Hash.t
          and type key := Key.t
 
-      type base = Base.t
-
       module Mask :
         Merkle_mask.Masking_merkle_tree_intf.S
         with module Addr = Location.Addr
@@ -44,11 +42,12 @@ let%test_module "Test mask connected to underlying Merkle tree" =
          and type hash := Hash.t
          and type unattached_mask := Mask.t
          and type attached_mask := Mask.Attached.t
-         and type t := base
+         and type t := Base.t
 
-      val with_instances : (base -> Mask.t -> 'a) -> 'a
+      val with_instances : (Base.t -> Mask.t -> 'a) -> 'a
 
-      val with_chain : (base -> Mask.Attached.t -> Mask.Attached.t -> 'a) -> 'a
+      val with_chain :
+        (Base.t -> Mask.Attached.t -> Mask.Attached.t -> 'a) -> 'a
       (** Here we provide a base ledger and two layers of attached masks
        * one ontop another *)
     end

@@ -191,6 +191,8 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     in
     (protocol_state, consensus_transition_data)
 
+  let is_valid _ ~time_received:_ = true
+
   let is_transition_valid_checked (transition : Snark_transition.var) =
     let Consensus_transition_data.({signature}) =
       Snark_transition.consensus_data transition

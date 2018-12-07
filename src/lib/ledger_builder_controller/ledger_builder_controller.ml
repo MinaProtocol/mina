@@ -48,7 +48,9 @@ end = struct
     module Step = struct
       let apply' t diff logger =
         let open Deferred.Or_error.Let_syntax in
-        let%map _, `Ledger_proof proof = Ledger_builder.apply t diff ~logger in
+        let%map _, `Ledger_proof proof =
+          Deferred.return @@ Ledger_builder.apply t diff ~logger
+        in
         Option.map proof ~f:(fun proof ->
             ( Ledger_proof.statement proof |> Ledger_proof_statement.target
             , proof ) )
@@ -414,6 +416,8 @@ let%test_module "test" =
             let hash t = t
 
             let is_valid _ = true
+
+            let empty ~parallelism_log_2:_ = 0
           end
 
           let serializable_of_t t = !t
@@ -431,13 +435,13 @@ let%test_module "test" =
             create ~ledger
 
           let of_aux_and_ledger ~snarked_ledger_hash:_ ~ledger ~aux:_ =
-            Deferred.return (Ok (create ~ledger))
+            Ok (create ~ledger)
 
           let aux t = !t
 
           let apply (t : t) (x : Ledger_builder_diff.t) ~logger:_ =
             t := x ;
-            return (Ok (`Hash_after_applying (hash t), `Ledger_proof (Some x)))
+            Ok (`Hash_after_applying (hash t), `Ledger_proof (Some x))
 
           let apply_diff_unchecked (_t : t) (_x : 'a) =
             failwith "Unimplemented"
@@ -555,11 +559,13 @@ let%test_module "test" =
                   ~data:s ) ;
             tbl
 
-          let get_ledger_builder_aux_at_hash _t hash = return (Ok hash)
+          let get_ledger_builder_aux_at_hash _t hash =
+            return (Ok (Envelope.Incoming.local hash))
 
           let glue_sync_ledger _t q a =
             don't_wait_for
-              (Linear_pipe.iter q ~f:(fun (h, _) -> Linear_pipe.write a (h, h)))
+              (Linear_pipe.iter q ~f:(fun (h, _) ->
+                   Linear_pipe.write a (Envelope.Incoming.local (h, h)) ))
         end
 
         module Sync_ledger = struct
@@ -578,8 +584,10 @@ let%test_module "test" =
           type t =
             { mutable ledger: Ledger.t
             ; answer_pipe:
-                (Ledger_hash.t * answer) Linear_pipe.Reader.t
-                * (Ledger_hash.t * answer) Linear_pipe.Writer.t
+                (Ledger_hash.t * answer) Envelope.Incoming.t
+                Linear_pipe.Reader.t
+                * (Ledger_hash.t * answer) Envelope.Incoming.t
+                  Linear_pipe.Writer.t
             ; query_pipe:
                 (Ledger_hash.t * query) Linear_pipe.Reader.t
                 * (Ledger_hash.t * query) Linear_pipe.Writer.t }
@@ -591,7 +599,8 @@ let%test_module "test" =
               ; query_pipe= Linear_pipe.create () }
             in
             don't_wait_for
-              (Linear_pipe.iter (fst t.answer_pipe) ~f:(fun (h, _l) ->
+              (Linear_pipe.iter (fst t.answer_pipe) ~f:(fun env ->
+                   let h, _ = Envelope.Incoming.data env in
                    t.ledger <- h ;
                    Deferred.return () )) ;
             t
