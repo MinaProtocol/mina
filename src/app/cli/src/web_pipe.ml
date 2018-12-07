@@ -33,7 +33,9 @@ module type Coda_intf = sig
   val best_ledger : t -> Inputs.Ledger.t
 
   val strongest_ledgers :
-    t -> Inputs.External_transition.t Linear_pipe.Reader.t
+       t
+    -> (Inputs.External_transition.t, State_hash.t) With_hash.t
+       Strict_pipe.Reader.t
 end
 
 let to_base64 m x = B64.encode (Binable.to_string m x)
@@ -64,7 +66,7 @@ struct
 
   let run ~filename ~log coda =
     let%bind web_client_pipe = Web_pipe.create ~filename ~log in
-    Linear_pipe.iter (Program.strongest_ledgers coda) ~f:(fun _ ->
+    Strict_pipe.Reader.iter (Program.strongest_ledgers coda) ~f:(fun _ ->
         let chain = get_proposer_chain coda in
         Web_pipe.store web_client_pipe chain )
 end
@@ -124,7 +126,10 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
   O1trace.trace_task "web pipe" (fun () -> function
     | `None ->
         Logger.info log "Not running a web client pipe" ;
-        don't_wait_for (Linear_pipe.drain (Program.strongest_ledgers coda))
+        don't_wait_for
+          (Strict_pipe.Reader.iter_without_pushback
+             (Program.strongest_ledgers coda)
+             ~f:ignore)
     | `Local path ->
         let open Keypair in
         Logger.trace log "Saving chain locally at path %s" path ;
@@ -134,7 +139,7 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
         |> don't_wait_for ;
         let get_lite_chain = Option.value_exn Program.get_lite_chain in
         let keypair = Genesis_ledger.largest_account_keypair_exn () in
-        Linear_pipe.iter (Program.strongest_ledgers coda) ~f:(fun _ ->
+        Strict_pipe.Reader.iter (Program.strongest_ledgers coda) ~f:(fun _ ->
             Writer.save (path ^/ "chain")
               ~contents:
                 (B64.encode
