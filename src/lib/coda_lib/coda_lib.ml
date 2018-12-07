@@ -487,25 +487,30 @@ module Make (Inputs : Inputs_intf) = struct
 
   let best_protocol_state t =
     Transition_frontier.Breadcrumb.transition_with_hash (best_tip t)
-    |> With_hash.data
-    |> External_transition.protocol_state
+    |> With_hash.data |> External_transition.protocol_state
 
   let best_ledger t = Ledger_builder.ledger (best_ledger_builder t)
 
   let get_ledger t ledger_builder_hash =
     match
-      List.find_map (Transition_frontier.all_breadcrumbs t.transition_frontier) ~f:(fun b ->
+      List.find_map (Transition_frontier.all_breadcrumbs t.transition_frontier)
+        ~f:(fun b ->
           let ledger_builder =
             Transition_frontier.Breadcrumb.staged_ledger b
-            |> Transition_frontier.hack_temporary_ledger_builder_of_staged_ledger
+            |> Transition_frontier
+               .hack_temporary_ledger_builder_of_staged_ledger
           in
-          if Ledger_builder_hash.equal (Ledger_builder.hash ledger_builder) ledger_builder_hash then
-            Some (Ledger.to_list (Ledger_builder.ledger ledger_builder))
-          else
-            None)
+          if
+            Ledger_builder_hash.equal
+              (Ledger_builder.hash ledger_builder)
+              ledger_builder_hash
+          then Some (Ledger.to_list (Ledger_builder.ledger ledger_builder))
+          else None )
     with
     | Some x -> Deferred.return (Ok x)
-    | None   -> Deferred.Or_error.error_string "ledger builder hash not found in transition frontier"
+    | None ->
+        Deferred.Or_error.error_string
+          "ledger builder hash not found in transition frontier"
 
   let seen_jobs t = t.seen_jobs
 

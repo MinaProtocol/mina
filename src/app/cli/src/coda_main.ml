@@ -1225,7 +1225,10 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     Option.map Consensus.Mechanism.Consensus_state.to_lite
       ~f:(fun consensus_state_to_lite t pks ->
         let ledger = best_ledger t in
-        let transition = With_hash.data (Transition_frontier.Breadcrumb.transition_with_hash (best_tip t)) in
+        let transition =
+          With_hash.data
+            (Transition_frontier.Breadcrumb.transition_with_hash (best_tip t))
+        in
         let state = External_transition.protocol_state transition in
         let proof = External_transition.protocol_state_proof transition in
         let ledger =
