@@ -1004,9 +1004,11 @@ end = struct
   (* TODO: when we move to a disk-backed db, this should call "Ledger.commit_changes" at the end. *)
   let apply_diff t (diff : Ledger_builder_diff.t) ~logger =
     let open Result_with_rollback.Let_syntax in
+    let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
     let spots_available, proofs_waiting =
       let jobs = Parallel_scan.next_jobs ~state:t.scan_state in
-      (Parallel_scan.free_space ~state:t.scan_state, List.length jobs)
+      ( Int.min (Parallel_scan.free_space ~state:t.scan_state) max_throughput
+      , List.length jobs )
     in
     let apply_pre_diff_with_at_most_two
         (pre_diff1 : Ledger_builder_diff.diff_with_at_most_two_coinbase) =
@@ -1670,7 +1672,8 @@ end = struct
       Sequence.filter_map (work_to_do t'.scan_state) ~f:get_completed_work
       |> Sequence.to_list |> List.length
     in
-    Logger.info logger "Block stats: Proofs ready for purchase: %d" proofs_available ;
+    Logger.info logger "Block stats: Proofs ready for purchase: %d"
+      proofs_available ;
     trace_event "prediffs done" ;
     { Ledger_builder_diff.With_valid_signatures_and_proofs.pre_diffs
     ; creator= self
