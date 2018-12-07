@@ -2,4 +2,4 @@
   (name sync_handler)
   (public_name sync_handler)
   (preprocess (pps ppx_jane))
-  (libraries async_kernel core_kernel protocols coda_base transition_frontier syncable_ledger merkle_address))
+  (libraries async_kernel core_kernel protocols coda_base transition_frontier syncable_ledger merkle_address consensus))

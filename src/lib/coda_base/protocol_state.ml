@@ -91,18 +91,30 @@ module type S = sig
   val hash : value -> State_hash.Stable.V1.t
 
   val to_string_record : value -> string
+end
 
-  module Ancestor_proof : sig
-    module Stable : sig
-      module V1 : sig
-        type t = State_body_hash.Stable.V1.t list [@@deriving bin_io]
-      end
-    end
+module T = struct
+  type ('state_hash, 'body) t = {previous_state_hash: 'state_hash; body: 'body}
+  [@@deriving eq, ord, bin_io, hash, sexp]
+end
 
-    type t = Stable.V1.t
+include T
 
-    val verify : t -> ancestor:value -> target_hash:State_hash.t -> bool
-  end
+let fold ~fold_body {previous_state_hash; body} =
+  let open Fold in
+  State_hash.fold previous_state_hash +> fold_body body
+
+let hash ~hash_body t =
+  Snark_params.Tick.Pedersen.digest_fold Hash_prefix.protocol_state
+    (fold ~fold_body:(Fn.compose State_body_hash.fold hash_body) t)
+  |> State_hash.of_hash
+
+let crypto_hash = hash
+
+module Body = struct
+  type ('blockchain_state, 'consensus_state) t =
+    {blockchain_state: 'blockchain_state; consensus_state: 'consensus_state}
+  [@@deriving eq, ord, bin_io, hash, sexp]
 end
 
 module Make
@@ -110,14 +122,14 @@ module Make
     (Consensus_state : Consensus_state_intf) :
   S
   with module Blockchain_state = Blockchain_state
-   and module Consensus_state = Consensus_state = struct
+   and module Consensus_state = Consensus_state
+   and type ('a, 'b) t = ('a, 'b) t
+   and type ('a, 'b) Body.t = ('a, 'b) Body.t = struct
   module Blockchain_state = Blockchain_state
   module Consensus_state = Consensus_state
 
   module Body = struct
-    type ('blockchain_state, 'consensus_state) t =
-      {blockchain_state: 'blockchain_state; consensus_state: 'consensus_state}
-    [@@deriving eq, ord, bin_io, hash, sexp]
+    include Body
 
     type value = (Blockchain_state.value, Consensus_state.value) t
     [@@deriving eq, ord, bin_io, hash, sexp]
@@ -162,8 +174,7 @@ module Make
       >>| State_body_hash.var_of_hash_packed
   end
 
-  type ('state_hash, 'body) t = {previous_state_hash: 'state_hash; body: 'body}
-  [@@deriving eq, ord, bin_io, hash, sexp]
+  include T
 
   module Value = struct
     type value = (State_hash.Stable.V1.t, Body.value) t
@@ -217,39 +228,9 @@ module Make
     in
     previous_state_hash @ body_hash
 
-  let fold' ~fold_body {previous_state_hash; body} =
-    let open Fold in
-    State_hash.fold previous_state_hash +> fold_body body
+  let fold t = fold ~fold_body:(Fn.compose State_body_hash.fold Body.hash) t
 
-  let fold t = fold' ~fold_body:(Fn.compose State_body_hash.fold Body.hash) t
-
-  let hash s =
-    Snark_params.Tick.Pedersen.digest_fold Hash_prefix.protocol_state (fold s)
-    |> State_hash.of_hash
-
-  module Ancestor_proof = struct
-    module Stable = struct
-      module V1 = struct
-        type t = State_body_hash.Stable.V1.t list [@@deriving bin_io]
-      end
-    end
-
-    include Stable.V1
-
-    let verify t ~ancestor ~target_hash =
-      let rec go acc = function
-        | [] -> acc
-        | h :: hs ->
-            let acc =
-              Snark_params.Tick.Pedersen.digest_fold Hash_prefix.protocol_state
-                (fold' ~fold_body:State_body_hash.fold
-                   {previous_state_hash= acc; body= h})
-              |> State_hash.of_hash
-            in
-            go acc hs
-      in
-      State_hash.equal target_hash (go (hash ancestor) t)
-  end
+  let hash = crypto_hash ~hash_body:Body.hash
 
   [%%if
   call_logger]

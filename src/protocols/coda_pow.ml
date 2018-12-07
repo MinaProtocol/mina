@@ -216,6 +216,8 @@ module type Ledger_intf = sig
     val transaction : t -> transaction Or_error.t
   end
 
+  val create : ?directory_name:string -> unit -> t
+
   val copy : t -> t
 
   val num_accounts : t -> int
