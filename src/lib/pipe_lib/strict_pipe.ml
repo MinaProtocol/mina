@@ -38,13 +38,25 @@ module Reader = struct
     reader.has_reader <- false ;
     result
 
-  let fold ?consumer reader ~init ~f =
+  let fold reader ~init ~f =
     enforce_single_reader reader
-      (Pipe.fold_without_pushback reader.reader ?consumer ~init ~f)
+      (let rec go b =
+         match%bind Pipe.read reader.reader with
+         | `Eof -> return b
+         | `Ok a ->
+             (* The async scheduler could yield here *)
+             let%bind b' = f b a in
+             go b'
+       in
+       go init)
 
-  let iter ?consumer ?continue_on_error reader ~f =
-    enforce_single_reader reader
-      (Pipe.iter_without_pushback reader.reader ?consumer ?continue_on_error ~f)
+  let fold_without_pushback ?consumer reader ~init ~f =
+    Pipe.fold_without_pushback ?consumer reader.reader ~init ~f
+
+  let iter reader ~f = fold reader ~init:() ~f:(fun () -> f)
+
+  let iter_without_pushback ?consumer ?continue_on_error reader ~f =
+    Pipe.iter_without_pushback reader.reader ?consumer ?continue_on_error ~f
 
   let map reader ~f =
     assert_not_read reader ;

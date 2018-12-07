@@ -29,24 +29,32 @@ module Reader : sig
 
   val filter_map : 'a t -> f:('a -> 'b option) -> 'b t
 
-  val fold :
+  val fold : 'a t -> init:'b -> f:('b -> 'a -> 'b Deferred.t) -> 'b Deferred.t
+  (** This is equivalent to CSP style communication pattern. This does not
+   * delegate to [Pipe.iter] under the hood because that emulates a
+   * "single-threadedness" with its pushback mechanism. We want more of a CSP
+   * model. *)
+
+  val fold_without_pushback :
        ?consumer:Pipe.Consumer.t
     -> 'a t
     -> init:'b
     -> f:('b -> 'a -> 'b)
     -> 'b Deferred.t
-  (** This also uses `fold_without_pushback`, see [iter] *)
+  (** This has similar semantics to [fold reader ~init ~f], but f isn't
+   * deferred. This function delegates to [Pipe.fold_without_pushback] *)
 
-  val iter :
+  val iter : 'a t -> f:('a -> unit Deferred.t) -> unit Deferred.t
+  (** This is a specialization of a fold for the common case of accumulating
+   * unit. See [fold reader ~init ~f] *)
+
+  val iter_without_pushback :
        ?consumer:Pipe.Consumer.t
     -> ?continue_on_error:bool
     -> 'a t
     -> f:('a -> unit)
     -> unit Deferred.t
-  (** This is equivalent to `iter_without_pushback` on a normal pipe,
-   * iter_without_pushback lets you model CSP style communication patterns. If
-   * we allow `iter` with a pushback, we can emulate "single-threadedness", a
-   * behavior we don't need yet for strict pipes *)
+  (** See [fold_without_pushback reader ~init ~f] *)
 
   module Merge : sig
     val iter : 'a t list -> f:('a -> unit Deferred.t) -> unit Deferred.t
