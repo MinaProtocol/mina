@@ -247,6 +247,9 @@ module Make (Inputs : Inputs_intf) :
         ; best_tip= root_hash
         ; table }
 
+  let all_breadcrumbs t =
+    List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb;_} -> breadcrumb)
+
   let hack_temporary_ledger_builder_of_staged_ledger = Fn.id
 
   let find t hash =
