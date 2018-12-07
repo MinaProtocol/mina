@@ -407,7 +407,7 @@ module type Inputs_intf = sig
   end
 
   module Transition_frontier :
-    Protocols.Coda_transition_frontier.Transition_frontier_base_intf
+    Protocols.Coda_transition_frontier.Transition_frontier_intf
     with type state_hash := Protocol_state_hash.t
      and type external_transition := External_transition.t
      and type ledger_database := Ledger_db.t
@@ -479,27 +479,38 @@ module Make (Inputs : Inputs_intf) = struct
 
   let propose_keypair t = t.propose_keypair
 
+  let best_tip t = Transition_frontier.best_tip t.transition_frontier
+
   let best_ledger_builder t =
-    failwith
-      "TODO: Use transition frontier to get best lb out; you'll need to \
-       update the signature"
+    Transition_frontier.Breadcrumb.staged_ledger (best_tip t)
+    |> Transition_frontier.hack_temporary_ledger_builder_of_staged_ledger
 
   let best_protocol_state t =
-    failwith
-      "TODO: Use transition frontier to get best lb out; you'll need to \
-       update the signature"
-
-  let best_tip t =
-    failwith
-      "TODO: Use transition frontier to get best lb out; you'll need to \
-       update the signature"
-
-  let get_ledger t lh =
-    failwith
-      "TODO: Use transition frontier to find an arbitrary ledger based on a \
-       hash"
+    Transition_frontier.Breadcrumb.transition_with_hash (best_tip t)
+    |> With_hash.data |> External_transition.protocol_state
 
   let best_ledger t = Ledger_builder.ledger (best_ledger_builder t)
+
+  let get_ledger t ledger_builder_hash =
+    match
+      List.find_map (Transition_frontier.all_breadcrumbs t.transition_frontier)
+        ~f:(fun b ->
+          let ledger_builder =
+            Transition_frontier.Breadcrumb.staged_ledger b
+            |> Transition_frontier
+               .hack_temporary_ledger_builder_of_staged_ledger
+          in
+          if
+            Ledger_builder_hash.equal
+              (Ledger_builder.hash ledger_builder)
+              ledger_builder_hash
+          then Some (Ledger.to_list (Ledger_builder.ledger ledger_builder))
+          else None )
+    with
+    | Some x -> Deferred.return (Ok x)
+    | None ->
+        Deferred.Or_error.error_string
+          "ledger builder hash not found in transition frontier"
 
   let seen_jobs t = t.seen_jobs
 
