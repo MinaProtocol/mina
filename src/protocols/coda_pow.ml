@@ -119,6 +119,8 @@ end
 
 module type Protocol_state_proof_intf = sig
   type t
+
+  val dummy : t
 end
 
 module type Staged_ledger_aux_hash_intf = sig
@@ -175,6 +177,14 @@ module type Ledger_creatable_intf = sig
   val create : ?directory_name:string -> unit -> t
 end
 
+module type Ledger_transfer_intf = sig
+  type src
+
+  type dest
+
+  val transfer_accounts : src:src -> dest:dest -> dest
+end
+
 module type Ledger_intf = sig
   include Ledger_creatable_intf
 
@@ -205,6 +215,8 @@ module type Ledger_intf = sig
 
     val transaction : t -> transaction Or_error.t
   end
+
+  val create : ?directory_name:string -> unit -> t
 
   val copy : t -> t
 
@@ -695,8 +707,6 @@ module type Staged_ledger_base_intf = sig
 
   val hash : t -> staged_ledger_hash
 
-  val scan_state : t -> Scan_state.t
-
   val serializable_of_t : t -> serializable
 
   val apply :
@@ -906,7 +916,7 @@ module type External_transition_intf = sig
 
   type staged_ledger_diff
 
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, bin_io]
 
   val create :
        protocol_state:protocol_state
@@ -1177,6 +1187,8 @@ module type Inputs_intf = sig
 
   module Account : sig
     type t
+
+    val public_key : t -> Public_key.Compressed.t
   end
 
   module Ledger :
@@ -1185,6 +1197,12 @@ module type Inputs_intf = sig
      and type transaction := Transaction.t
      and type ledger_hash := Ledger_hash.t
      and type account := Account.t
+
+  module Genesis_ledger : sig
+    val t : Ledger.t
+
+    val accounts : (Private_key.t option * Account.t) list
+  end
 
   module Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf
 

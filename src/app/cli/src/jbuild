@@ -37,6 +37,10 @@
       storage
       logger
       transition_frontier
+      transition_frontier_controller
+      sync_handler
+      ledger_catchup
+      transition_handler
       async
       async_extra
       rpc_parallel

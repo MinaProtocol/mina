@@ -7,6 +7,16 @@ module type Transition_frontier_base_intf = sig
 
   type transaction_snark_scan_state
 
+  type masked_ledger
+
+  type staged_ledger
+
+  (*module Staged_ledger : sig
+    type t = staged_ledger
+
+    val ledger : t -> masked_ledger
+  end*)
+
   type ledger_database
 
   type ledger_diff
@@ -24,8 +34,6 @@ end
 
 module type Transition_frontier_intf = sig
   include Transition_frontier_base_intf
-
-  type staged_ledger
 
   exception
     Parent_not_found of ([`Parent of state_hash] * [`Target of state_hash])
@@ -90,6 +98,8 @@ module type Catchup_intf = sig
 end
 
 module type Transition_handler_validator_intf = sig
+  type time
+
   type state_hash
 
   type external_transition
@@ -97,11 +107,15 @@ module type Transition_handler_validator_intf = sig
   type transition_frontier
 
   val run :
-       frontier:transition_frontier
-    -> transition_reader:external_transition Reader.t
+       logger:Logger.t
+    -> frontier:transition_frontier
+    -> transition_reader:( [ `Transition of external_transition
+                                            Envelope.Incoming.t ]
+                         * [`Time_received of time] )
+                         Reader.t
     -> valid_transition_writer:( (external_transition, state_hash) With_hash.t
                                , drop_head buffered
-                               , _ )
+                               , unit )
                                Writer.t
     -> unit
 end
@@ -134,6 +148,8 @@ end
 module type Transition_handler_intf = sig
   type time_controller
 
+  type time
+
   type state_hash
 
   type external_transition
@@ -144,7 +160,8 @@ module type Transition_handler_intf = sig
 
   module Validator :
     Transition_handler_validator_intf
-    with type state_hash := state_hash
+    with type time := time
+     and type state_hash := state_hash
      and type external_transition := external_transition
      and type transition_frontier := transition_frontier
 
@@ -170,6 +187,8 @@ module type Sync_handler_intf = sig
 
   type transition_frontier
 
+  type ancestor_proof
+
   val run :
        frontier:transition_frontier
     -> sync_query_reader:(hash * syncable_ledger_query) Reader.t
@@ -178,6 +197,12 @@ module type Sync_handler_intf = sig
                           , unit Async.Deferred.t )
                           Writer.t
     -> unit
+
+  val prove_ancestory :
+       frontier:transition_frontier
+    -> int
+    -> hash
+    -> (hash * ancestor_proof) option
 end
 
 module type Transition_frontier_controller_intf = sig
@@ -189,15 +214,20 @@ module type Transition_frontier_controller_intf = sig
 
   type syncable_ledger_answer
 
+  type state_hash
+
   type transition_frontier
 
-  type state_hash
+  type time
 
   val run :
        logger:Logger.t
     -> time_controller:time_controller
-    -> genesis_transition:external_transition
-    -> transition_reader:external_transition Reader.t
+    -> frontier:transition_frontier
+    -> transition_reader:( [ `Transition of external_transition
+                                            Envelope.Incoming.t ]
+                         * [`Time_received of time] )
+                         Reader.t
     -> sync_query_reader:(state_hash * syncable_ledger_query) Reader.t
     -> sync_answer_writer:( state_hash * syncable_ledger_answer
                           , synchronous

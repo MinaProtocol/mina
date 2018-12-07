@@ -4,10 +4,11 @@ open Pipe_lib.Strict_pipe
 
 module Make (Inputs : Inputs.S) = struct
   open Inputs
-  open Consensus_mechanism
+  open Consensus.Mechanism
   open Deferred.Let_syntax
 
-  let validate_transition ~logger ~frontier ~time_received t =
+  let validate_transition ~logger ~frontier ~time_received t_env =
+    let t = Envelope.Incoming.data t_env in
     let time_received =
       Time.to_span_since_epoch time_received
       |> Time.Span.to_ms |> Unix_timestamp.of_int64
@@ -30,15 +31,16 @@ module Make (Inputs : Inputs.S) = struct
     in
     if
       log_assert
-        (Consensus_mechanism.is_valid (consensus_state t) ~time_received)
+        (Consensus.Mechanism.is_valid (consensus_state t) ~time_received)
         "failed consensus validation"
       && log_assert
-           ( Consensus_mechanism.select ~logger
+           ( Consensus.Mechanism.select ~logger
                ~existing:(consensus_state root) ~candidate:(consensus_state t)
                ~time_received
            = `Take )
            "was not better than transition frontier root"
     then
+      (* TODO: what conditions should we punish? *)
       (* TODO:
       let length = External_transition.protocol_state t |> Protocol_state.blockchain_state |> Blockchain_state.length in
       log_assert
@@ -51,7 +53,7 @@ module Make (Inputs : Inputs.S) = struct
         "transition frontier root hash was invalid"
       *)
       let%map proof_is_valid =
-        Proof.verify
+        State_proof.verify
           (External_transition.protocol_state_proof t)
           (External_transition.protocol_state t)
       in
@@ -62,14 +64,22 @@ module Make (Inputs : Inputs.S) = struct
     let logger = Logger.child logger "transition_handler_validator" in
     don't_wait_for
       (Reader.iter transition_reader
-         ~f:(fun (`Transition transition, `Time_received time_received) ->
+         ~f:(fun (`Transition transition_env, `Time_received time_received) ->
+           let transition = Envelope.Incoming.data transition_env in
            if%map
-             validate_transition ~logger ~frontier ~time_received transition
-           then Writer.write valid_transition_writer transition
+             validate_transition ~logger ~frontier ~time_received
+               transition_env
+           then
+             Writer.write valid_transition_writer
+               (With_hash.of_data transition
+                  ~hash_data:
+                    (Fn.compose Protocol_state.hash
+                       External_transition.protocol_state))
            else
-             (* TODO: punish *)
-             Logger.warn logger "failed to verify transition from the network!"
-       ))
+             Logger.warn logger
+               !"failed to verify transition from the network! sent by \
+                 %{sexp: Host_and_port.t}"
+               (Envelope.Incoming.sender transition_env) ))
 end
 
 (*

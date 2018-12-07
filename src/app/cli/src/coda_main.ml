@@ -221,6 +221,8 @@ module type Main_intf = sig
 
     module Protocol_state_proof : sig
       type t
+
+      val dummy : t
     end
 
     module Staged_ledger_hash : sig
@@ -397,6 +399,7 @@ struct
       Block_time.Span.( < ) (Block_time.diff t now) limit
   end
 
+  module Masked_ledger = Ledger.Mask.Attached
   module Sok_message = Sok_message
 
   module Amount = struct
@@ -415,6 +418,8 @@ struct
     include Proof.Stable.V1
 
     type input = Protocol_state.value
+
+    let dummy = Coda_base.Proof.dummy
 
     let verify state_proof state =
       match%map
@@ -454,6 +459,7 @@ struct
 
   module Ledger = Ledger
   module Ledger_db = Ledger.Db
+  module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger_db)
 
   module Transaction_snark = struct
     include Ledger_proof
@@ -532,13 +538,18 @@ struct
       (Consensus.Mechanism.Prover_state)
   module External_transition =
     Coda_base.External_transition.Make (Staged_ledger_diff) (Protocol_state)
-  module Transition_frontier =
-    Transition_frontier.Make (Staged_ledger_aux_hash) (Ledger_proof_statement)
-      (Ledger_proof)
-      (Transaction_snark_work)
-      (Staged_ledger_diff)
-      (External_transition)
-      (Staged_ledger)
+
+  module Tf_inputs = struct
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Ledger_proof = Ledger_proof
+    module Transaction_snark_work = Transaction_snark_work
+    module Staged_ledger_diff = Staged_ledger_diff
+    module External_transition = External_transition
+    module Staged_ledger = Staged_ledger
+  end
+
+  module Transition_frontier = Transition_frontier.Make (Tf_inputs)
 
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (User_command)
@@ -554,7 +565,7 @@ struct
 
     (* TODO: This causes the signature to get checked twice as it is checked
    below before feeding it to add *)
-    let add t txn = apply_and_broadcast t [txn]
+    let add t txn = apply_and_broadcast t (Envelope.Incoming.local [txn])
   end
 
   module Transaction_pool_diff = Transaction_pool.Pool.Diff
@@ -699,15 +710,19 @@ struct
       | Error _e -> create ~parent_log ~incoming_diffs
 
     open Snark_work_lib.Work
+    open Network_pool.Snark_pool_diff
 
     let add_completed_work t
         (res :
           (('a, 'b, 'c, 'd) Single.Spec.t Spec.t, Ledger_proof.t) Result.t) =
       apply_and_broadcast t
-        (Add_solved_work
-           ( List.map res.spec.instances ~f:Single.Spec.statement
-           , {proof= res.proofs; fee= {fee= res.spec.fee; prover= res.prover}}
-           ))
+        (Envelope.Incoming.wrap
+           ~data:
+             (Add_solved_work
+                ( List.map res.spec.instances ~f:Single.Spec.statement
+                , { Diff.proof= res.proofs
+                  ; fee= {fee= res.spec.fee; prover= res.prover} } ))
+           ~sender:(Host_and_port.of_string "127.0.0.1:0"))
   end
 
   module Sync_ledger =
@@ -743,6 +758,54 @@ struct
     module Ledger_hash = Ledger_hash
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Blockchain_state = Consensus.Mechanism.Blockchain_state
+  end)
+
+  module Sync_handler = Sync_handler.Make (struct
+    include Inputs0
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Transaction_snark_work = Transaction_snark_work
+    module Syncable_ledger = Sync_ledger
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+  end)
+
+  module Ledger_catchup = Ledger_catchup.Make (struct
+    include Inputs0
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Transaction_snark_work = Transaction_snark_work
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+  end)
+
+  module Transition_handler = Transition_handler.Make (struct
+    (*module Hack_proof = Inputs0.Proof
+
+    include (
+      Inputs0 :
+        module type of Inputs0
+        with module Proof := Hack_proof )*)
+    include Inputs0
+    module State_proof = Protocol_state_proof
+    module Transaction_snark_work = Transaction_snark_work
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+  end)
+
+  module Transition_frontier_controller =
+  Transition_frontier_controller.Make (struct
+    include Inputs0
+    module Transaction_snark_work = Transaction_snark_work
+    module Syncable_ledger = Sync_ledger
+    module Sync_handler = Sync_handler
+    module Merkle_address = Ledger.Addr
+    module Catchup = Ledger_catchup
+    module Transition_handler = Transition_handler
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Ledger_diff = Staged_ledger_diff
+    module Consensus_mechanism = Consensus.Mechanism
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
   end)
 
   module Ledger_builder_controller = struct
@@ -797,6 +860,7 @@ struct
 
   module Proposer = Proposer.Make (struct
     include Inputs0
+    module Genesis_ledger = Genesis_ledger
     module State_hash = State_hash
     module Staged_ledger_diff = Staged_ledger_diff
     module Ledger_proof_verifier = Ledger_proof_verifier
@@ -892,6 +956,7 @@ module Make_coda (Init : Init_intf) = struct
 
   module Inputs = struct
     include Make_inputs (Init) (Ledger_proof_verifier) (Storage.Disk)
+    module Genesis_ledger = Genesis_ledger
     module Ledger_proof_statement = Ledger_proof_statement
     module Snark_worker = Snark_worker_lib.Prod.Worker
     module Consensus_mechanism = Consensus.Mechanism
@@ -913,6 +978,7 @@ module Make_coda (Init : Init_intf) = struct
 
   module Inputs = struct
     include Make_inputs (Init) (Ledger_proof_verifier) (Storage.Disk)
+    module Genesis_ledger = Genesis_ledger
     module Ledger_proof_statement = Ledger_proof_statement
     module Snark_worker = Snark_worker_lib.Debug.Worker
     module Consensus_mechanism = Consensus.Mechanism
@@ -1051,7 +1117,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let prove_receipt t ~proving_receipt ~resulting_receipt :
       Payment_proof.t Deferred.Or_error.t =
     let receipt_chain_database = receipt_chain_database t in
-    (* TODO: since we are making so many reads to `receipt_chain_database`, 
+    (* TODO: since we are making so many reads to `receipt_chain_database`,
     reads should be async to not get IO-blocked. See #1125 *)
     let result =
       Receipt_chain_database.prove receipt_chain_database ~proving_receipt

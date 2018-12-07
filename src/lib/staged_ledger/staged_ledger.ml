@@ -150,7 +150,7 @@ end = struct
     in
     List.map all_jobs_paired ~f:job_pair_to_work_spec_pair
 
-  let scan_state {scan_state; _} = scan_state
+  (*let scan_state {scan_state; _} = scan_state*)
 
   let get_target (proof, _) =
     let {Ledger_proof_statement.target; _} = Ledger_proof.statement proof in

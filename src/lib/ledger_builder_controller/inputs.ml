@@ -190,7 +190,8 @@ module Synchronizing = struct
 
       val create : Ledger.t -> parent_log:Logger.t -> t
 
-      val answer_writer : t -> (Ledger_hash.t * answer) Linear_pipe.Writer.t
+      val answer_writer :
+        t -> (Ledger_hash.t * answer) Envelope.Incoming.t Linear_pipe.Writer.t
 
       val query_reader : t -> (Ledger_hash.t * query) Linear_pipe.Reader.t
 

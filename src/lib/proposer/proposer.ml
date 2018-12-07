@@ -14,6 +14,10 @@ module type Inputs_intf = sig
     type t
   end
 
+  module Masked_ledger : sig
+    type t
+  end
+
   module Transition_frontier :
     Protocols.Coda_transition_frontier.Transition_frontier_intf
     with type state_hash := State_hash.t
@@ -21,6 +25,7 @@ module type Inputs_intf = sig
      and type ledger_database := Ledger_db.t
      and type staged_ledger := Staged_ledger.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+     and type masked_ledger := Masked_ledger.t
 
   module Transaction_pool :
     Coda_lib.Transaction_pool_read_intf

@@ -24,12 +24,15 @@ module type Staged_ledger_io_intf = sig
   val create : net -> t
 
   val get_staged_ledger_aux_at_hash :
-    t -> staged_ledger_hash -> staged_ledger_aux Deferred.Or_error.t
+       t
+    -> staged_ledger_hash
+    -> staged_ledger_aux Envelope.Incoming.t Deferred.Or_error.t
 
   val glue_sync_ledger :
        t
     -> (ledger_hash * sync_ledger_query) Linear_pipe.Reader.t
-    -> (ledger_hash * sync_ledger_answer) Linear_pipe.Writer.t
+    -> (ledger_hash * sync_ledger_answer) Envelope.Incoming.t
+       Linear_pipe.Writer.t
     -> unit
 end
 
@@ -57,13 +60,17 @@ module type Network_intf = sig
   type transaction_pool_diff
 
   val states :
-    t -> (state_with_witness * Unix_timestamp.t) Linear_pipe.Reader.t
+       t
+    -> (state_with_witness Envelope.Incoming.t * Unix_timestamp.t)
+       Linear_pipe.Reader.t
 
   val peers : t -> Kademlia.Peer.t list
 
-  val snark_pool_diffs : t -> snark_pool_diff Linear_pipe.Reader.t
+  val snark_pool_diffs :
+    t -> snark_pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
 
-  val transaction_pool_diffs : t -> transaction_pool_diff Linear_pipe.Reader.t
+  val transaction_pool_diffs :
+    t -> transaction_pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
 
   val broadcast_state : t -> state_with_witness -> unit
 
@@ -87,11 +94,12 @@ module type Network_intf = sig
 
   val create :
        Config.t
-    -> get_staged_ledger_aux_at_hash:(   staged_ledger_hash
+    -> get_staged_ledger_aux_at_hash:(   staged_ledger_hash Envelope.Incoming.t
                                       -> (parallel_scan_state * ledger_hash)
                                          option
                                          Deferred.t)
-    -> answer_sync_ledger_query:(   ledger_hash * sync_ledger_query
+    -> answer_sync_ledger_query:(   (ledger_hash * sync_ledger_query)
+                                    Envelope.Incoming.t
                                  -> (ledger_hash * sync_ledger_answer)
                                     Deferred.Or_error.t)
     -> t Deferred.t
@@ -117,7 +125,7 @@ module type Transaction_pool_intf = sig
   val load :
        parent_log:Logger.t
     -> disk_location:string
-    -> incoming_diffs:pool_diff Linear_pipe.Reader.t
+    -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
     -> t Deferred.t
 
   val add : t -> transaction -> unit Deferred.t
@@ -137,7 +145,7 @@ module type Snark_pool_intf = sig
   val load :
        parent_log:Logger.t
     -> disk_location:string
-    -> incoming_diffs:pool_diff Linear_pipe.Reader.t
+    -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
     -> t Deferred.t
 
   val get_completed_work :
@@ -389,12 +397,28 @@ module type Inputs_intf = sig
 
   module Ledger_db : Coda_pow.Ledger_creatable_intf
 
+  module Masked_ledger : sig
+    type t
+  end
+
   module Transition_frontier :
     Protocols.Coda_transition_frontier.Transition_frontier_base_intf
     with type state_hash := Protocol_state_hash.t
      and type external_transition := External_transition.t
      and type ledger_database := Ledger_db.t
+     and type masked_ledger := Masked_ledger.t
+     and type staged_ledger := Staged_ledger.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+
+  module Transition_frontier_controller :
+    Protocols.Coda_transition_frontier.Transition_frontier_controller_intf
+    with type time_controller := Time.Controller.t
+     and type external_transition := External_transition.t
+     and type syncable_ledger_query := Sync_ledger.query
+     and type syncable_ledger_answer := Sync_ledger.answer
+     and type transition_frontier := Transition_frontier.t
+     and type state_hash := Protocol_state_hash.t
+     and type time := Time.t
 
   module Proposer :
     Proposer_intf
@@ -411,6 +435,11 @@ module type Inputs_intf = sig
      and type keypair := Keypair.t
      and type transition_frontier := Transition_frontier.t
      and type transaction_pool := Transaction_pool.t
+
+  module Ledger_transfer :
+    Coda_pow.Ledger_transfer_intf
+    with type src := Ledger.t
+     and type dest := Ledger_db.t
 
   module Genesis : sig
     val state : Consensus_mechanism.Protocol_state.value
@@ -433,7 +462,7 @@ module Make (Inputs : Inputs_intf) = struct
         (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
-    ; ledger_builder_controller: Ledger_builder_controller.t
+    ; transition_frontier: Transition_frontier.t
     ; strongest_ledgers:
         (Staged_ledger.t * External_transition.t) Linear_pipe.Reader.t
     ; log: Logger.t
@@ -447,22 +476,24 @@ module Make (Inputs : Inputs_intf) = struct
   let propose_keypair t = t.propose_keypair
 
   let best_staged_ledger t =
-    (Ledger_builder_controller.strongest_tip t.ledger_builder_controller)
-      .staged_ledger
+    failwith
+      "TODO: Use transition frontier to get best lb out; you'll need to \
+       update the signature"
 
   let best_protocol_state t =
-    (Ledger_builder_controller.strongest_tip t.ledger_builder_controller).state
+    failwith
+      "TODO: Use transition frontier to get best lb out; you'll need to \
+       update the signature"
 
   let best_tip t =
-    let tip =
-      Ledger_builder_controller.strongest_tip t.ledger_builder_controller
-    in
-    (Staged_ledger.ledger tip.staged_ledger, tip.state, tip.proof)
+    failwith
+      "TODO: Use transition frontier to get best lb out; you'll need to \
+       update the signature"
 
   let get_ledger t lh =
-    Ledger_builder_controller.local_get_ledger t.ledger_builder_controller lh
-    |> Deferred.Or_error.map ~f:(fun (lb, _) ->
-           Staged_ledger.ledger lb |> Ledger.to_list )
+    failwith
+      "TODO: Use transition frontier to find an arbitrary ledger based on a \
+       hash"
 
   let best_ledger t = Staged_ledger.ledger (best_staged_ledger t)
 
@@ -510,7 +541,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let create (config : Config.t) =
     trace_task "coda" (fun () ->
-        let external_transitions_reader, external_transitions_writer =
+        let _external_transitions_reader, external_transitions_writer =
           Linear_pipe.create ()
         in
         let net_ivar = Ivar.create () in
@@ -518,7 +549,21 @@ module Make (Inputs : Inputs_intf) = struct
           Consensus_mechanism.Local_state.create config.propose_keypair
         in
         let first_transition =
-          failwith "TODO: Bootstrap should emit this transition"
+          External_transition.create
+            ~protocol_state:Consensus_mechanism.genesis_protocol_state
+            ~protocol_state_proof:Protocol_state_proof.dummy
+            ~staged_ledger_diff:
+              { Staged_ledger_diff.pre_diffs=
+                  Either.First
+                    { diff= {completed_works= []; user_commands= []}
+                    ; coinbase_added= Staged_ledger_diff.At_most_one.Zero }
+              ; prev_hash=
+                  Staged_ledger_hash.of_aux_and_ledger_hash
+                    (Staged_ledger_aux_hash.of_bytes "")
+                    (Ledger.merkle_root Genesis_ledger.t)
+              ; creator=
+                  Account.public_key
+                    (snd (List.hd_exn Genesis_ledger.accounts)) }
         in
         let transition_frontier =
           Transition_frontier.create ~logger:config.log
@@ -530,43 +575,26 @@ module Make (Inputs : Inputs_intf) = struct
             ~root_transaction_snark_scan_state:Staged_ledger.Scan_state.empty
             ~root_staged_ledger_diff:None
             ~root_snarked_ledger:
-              (Ledger_db.create ?directory_name:config.ledger_db_location ())
+              (Ledger_transfer.transfer_accounts ~src:Genesis.ledger
+                 ~dest:
+                   (Ledger_db.create ?directory_name:config.ledger_db_location
+                      ()))
         in
-        let lbc_deferred =
-          Ledger_builder_controller.create
-            (Ledger_builder_controller.Config.make
-               ?proposer_public_key:
-                 (Option.map config.propose_keypair ~f:(fun k ->
-                      k.public_key |> Public_key.compress ))
-               ~parent_log:config.log ~net_deferred:(Ivar.read net_ivar)
-               ~genesis_tip:
-                 { staged_ledger=
-                     Staged_ledger.create
-                       ~ledger:
-                         (Ledger.register_mask Genesis.ledger
-                            (Ledger.Mask.create ()))
-                 ; state= Genesis.state
-                 ; proof= Genesis.proof }
-               ~consensus_local_state ~ledger:Genesis.ledger
-               ~longest_tip_location:config.staged_ledger_persistant_location
-               ~external_transitions:external_transitions_reader ())
+        let () =
+          Transition_frontier_controller.run ~logger:config.log
+            ~time_controller:config.time_controller
+            ~frontier:transition_frontier
+            ~transition_reader:
+              (failwith "Turn external_transitions_reader into a strict pipe")
+            ~sync_query_reader:(failwith "TODO")
+            ~sync_answer_writer:(failwith "TODO")
         in
         let%bind net =
           Net.create config.net_config
-            ~get_staged_ledger_aux_at_hash:(fun hash ->
-              let%bind lbc = lbc_deferred in
-              (* TODO: Just make lbc do this *)
-              match%map
-                Ledger_builder_controller.local_get_ledger lbc hash
-              with
-              | Ok (lb, _state) ->
-                  Some
-                    ( Staged_ledger.scan_state lb
-                    , Ledger.merkle_root (Staged_ledger.ledger lb) )
-              | _ -> None )
-            ~answer_sync_ledger_query:(fun query ->
-              let%bind lbc = lbc_deferred in
-              Ledger_builder_controller.handle_sync_ledger_queries lbc query )
+            ~get_staged_ledger_aux_at_hash:(fun _hash ->
+              failwith "TODO: replace with new net" )
+            ~answer_sync_ledger_query:(fun _query ->
+              failwith "TODO: replace with new net" )
         in
         let%bind transaction_pool =
           Transaction_pool.load ~parent_log:config.log
@@ -579,9 +607,10 @@ module Make (Inputs : Inputs_intf) = struct
                Net.broadcast_transaction_pool_diff net x ;
                Deferred.unit )) ;
         Ivar.fill net_ivar net ;
-        let%bind ledger_builder_controller = lbc_deferred in
         don't_wait_for
-          (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;
+          (Linear_pipe.transfer
+             ~f:(fun (tn, tm) -> (Envelope.Incoming.data tn, tm))
+             (Net.states net) external_transitions_writer) ;
         let%bind snark_pool =
           Snark_pool.load ~parent_log:config.log
             ~disk_location:config.snark_pool_disk_location
@@ -595,8 +624,7 @@ module Make (Inputs : Inputs_intf) = struct
             , strongest_ledgers_for_network
             , strongest_ledgers_for_api ) =
           Linear_pipe.fork3
-            (Ledger_builder_controller.strongest_ledgers
-               ledger_builder_controller)
+            (failwith "TODO: Broadcast \"best tips\" from transition frontier")
         in
         Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (_, t) ->
             Net.broadcast_state net t ; Deferred.unit )
@@ -651,7 +679,7 @@ module Make (Inputs : Inputs_intf) = struct
           ; external_transitions= external_transitions_writer
           ; transaction_pool
           ; snark_pool
-          ; ledger_builder_controller
+          ; transition_frontier
           ; strongest_ledgers= strongest_ledgers_for_api
           ; log= config.log
           ; seen_jobs= Work_selector.State.init
