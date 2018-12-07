@@ -62,6 +62,8 @@ module type Transition_frontier_intf = sig
 
   val max_length : int
 
+  val all_breadcrumbs : t -> Breadcrumb.t list
+
   val root : t -> Breadcrumb.t
 
   val best_tip : t -> Breadcrumb.t
