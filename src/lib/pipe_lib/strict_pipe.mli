@@ -25,6 +25,10 @@ type (_, _) type_ =
 module Reader : sig
   type 't t
 
+  val to_linear_pipe : 't t -> 't Linear_pipe.Reader.t
+
+  val of_linear_pipe : 't Linear_pipe.Reader.t -> 't t
+
   val map : 'a t -> f:('a -> 'b) -> 'b t
 
   val filter_map : 'a t -> f:('a -> 'b option) -> 'b t
@@ -74,6 +78,8 @@ end
 
 module Writer : sig
   type ('t, 'behavior, 'return) t
+
+  val to_linear_pipe : ('t, 'behavior, 'return) t -> 't Linear_pipe.Writer.t
 
   val write : ('t, _, 'return) t -> 't -> 'return
 end

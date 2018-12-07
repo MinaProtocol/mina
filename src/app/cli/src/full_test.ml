@@ -65,8 +65,10 @@ let run_test () : unit Deferred.t =
   let receipt_chain_database =
     Coda_base.Receipt_chain_database.create ~directory:receipt_chain_dir_name
   in
+  let time_controller = Inputs.Time.Controller.create () in
   let net_config =
     { Inputs.Net.Config.parent_log= log
+    ; time_controller
     ; gossip_net_params=
         { Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
         ; parent_log= log
@@ -83,8 +85,7 @@ let run_test () : unit Deferred.t =
          ~ledger_builder_persistant_location:(temp_conf_dir ^/ "ledger_builder")
          ~transaction_pool_disk_location:(temp_conf_dir ^/ "transaction_pool")
          ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
-         ~time_controller:(Inputs.Time.Controller.create ())
-         ~receipt_chain_database () ~banlist
+         ~time_controller ~receipt_chain_database () ~banlist
          ~snark_work_fee:(Currency.Fee.of_int 0))
   in
   don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers coda)) ;
