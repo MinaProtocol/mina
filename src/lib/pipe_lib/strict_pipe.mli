@@ -29,31 +29,46 @@ module Reader : sig
 
   val filter_map : 'a t -> f:('a -> 'b option) -> 'b t
 
-  val fold :
+  val fold : 'a t -> init:'b -> f:('b -> 'a -> 'b Deferred.t) -> 'b Deferred.t
+  (** This is equivalent to CSP style communication pattern. This does not
+   * delegate to [Pipe.iter] under the hood because that emulates a
+   * "single-threadedness" with its pushback mechanism. We want more of a CSP
+   * model. *)
+
+  val fold_without_pushback :
        ?consumer:Pipe.Consumer.t
     -> 'a t
     -> init:'b
-    -> f:('b -> 'a -> 'b Deferred.t)
+    -> f:('b -> 'a -> 'b)
     -> 'b Deferred.t
+  (** This has similar semantics to [fold reader ~init ~f], but f isn't
+   * deferred. This function delegates to [Pipe.fold_without_pushback] *)
 
-  val iter :
-       ?consumer:Pipe.Consumer.t
-    -> ?continue_on_error:bool
-    -> 'a t
-    -> f:('a -> unit Deferred.t)
-    -> unit Deferred.t
+  val iter : 'a t -> f:('a -> unit Deferred.t) -> unit Deferred.t
+  (** This is a specialization of a fold for the common case of accumulating
+   * unit. See [fold reader ~init ~f] *)
 
-  val iter_sync :
+  val iter_without_pushback :
        ?consumer:Pipe.Consumer.t
     -> ?continue_on_error:bool
     -> 'a t
     -> f:('a -> unit)
     -> unit Deferred.t
+  (** See [fold_without_pushback reader ~init ~f] *)
 
   module Merge : sig
     val iter : 'a t list -> f:('a -> unit Deferred.t) -> unit Deferred.t
 
     val iter_sync : 'a t list -> f:('a -> unit) -> unit Deferred.t
+  end
+
+  (** A synchronous write on a pipe that is later forked resolves its deferred
+   * when all readers take the message (assuming the readers obey the CSP-style
+   * iter *)
+  module Fork : sig
+    val n : 'a t -> int -> 'a t list
+
+    val two : 'a t -> 'a t * 'a t
   end
 end
 
