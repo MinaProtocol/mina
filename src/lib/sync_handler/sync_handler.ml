@@ -23,28 +23,6 @@ module type Inputs_intf = sig
      and type merkle_path := Ledger.path
      and type root_hash := Ledger_hash.t
      and type account := Account.t
-  (* module Merkle_address : Merkle_address.S
-
-  module Staged_ledger : sig
-    type t
-  end
-
-  module Syncable_ledger :
-    Syncable_ledger.S
-    with type addr := Merkle_address.t
-     and type hash := Ledger_hash.t
-     and type merkle_tree := Staged_ledger.t
-
-  module Protocol_state : Protocol_state.S
-
-  module External_transition :
-    External_transition.S with type protocol_state := Protocol_state.value
-
-  module Transition_frontier :
-    Transition_frontier_intf
-    with type staged_ledger := Staged_ledger.t
-     and type external_transition := External_transition.t
-     and type state_hash := State_hash.t *)
 end
 
 module Make (Inputs : Inputs_intf) :
