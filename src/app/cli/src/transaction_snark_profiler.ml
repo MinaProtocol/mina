@@ -10,9 +10,8 @@ module Sparse_ledger = struct
   let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
 end
 
-let create_ledger_and_transactions num_transitions =
+let create_ledger num_accounts =
   let open Tick in
-  let num_accounts = 4 in
   let ledger = Ledger.create () in
   let keys =
     Array.init num_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
@@ -21,6 +20,12 @@ let create_ledger_and_transactions num_transitions =
       let public_key = Public_key.compress k.public_key in
       Ledger.create_new_account_exn ledger public_key
         (Account.create public_key (Currency.Balance.of_int 10_000)) ) ;
+  (ledger, keys)
+
+let create_ledger_and_transactions num_transitions =
+  let open Tick in
+  let num_accounts = 4 in
+  let ledger, keys = create_ledger num_accounts in
   let txn from_kp (to_kp : Signature_lib.Keypair.t) amount fee nonce =
     let payload : User_command.Payload.t =
       User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
@@ -188,7 +193,34 @@ let dry num_transactions () =
   Test_util.with_randomness 123456789 (fun () ->
       run check_base_snarks num_transactions )
 
-let command =
+let main_simple () =
+  let ledger, keys = create_ledger 4 in
+  let pk = Public_key.compress keys.(0).public_key in
+  let noop = Fee_transfer.One (pk, Currency.Fee.zero) in
+  let open Async in
+  let%map _, keys, _ = Transaction_snark.Keys.cached_full () in
+  let module T = Transaction_snark.Make (struct
+    let keys = keys
+  end) in
+  let source = Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger) in
+  let sparse_ledger =
+    Coda_base.Sparse_ledger.of_ledger_subset_exn ledger [pk]
+  in
+  let time_base, proof =
+    time (fun () ->
+        T.of_transaction (Fee_transfer noop)
+          ~sok_digest:Sok_message.Digest.default ~source ~target:source
+          (unstage (Sparse_ledger.handler sparse_ledger)) )
+  in
+  Core.printf !"Base SNARK time: %{sexp:Time.Span.t}\n%!" time_base ;
+  let time_merge, _ =
+    time (fun () ->
+        T.merge proof proof ~sok_digest:Sok_message.Digest.default
+        |> Or_error.ok_exn )
+  in
+  Core.printf !"Merge SNARK time: %{sexp:Time.Span.t}\n%!" time_merge
+
+let tree_command =
   let open Command.Let_syntax in
   Command.basic ~summary:"transaction snark profiler"
     (let%map_open n =
@@ -205,3 +237,7 @@ let command =
        |> Option.value ~default:`Two_from_same
      in
      if check_only then dry num_transactions else main num_transactions)
+
+let command =
+  Async.Command.async ~summary:"transaction snark profiler"
+    (Command.Param.return main_simple)

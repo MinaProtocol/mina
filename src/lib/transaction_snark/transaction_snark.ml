@@ -384,7 +384,7 @@ module Base = struct
       and proving =
         Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
       in
-      (verification, {proving with value= ()})
+      (verification, proving)
     in
     Cached.Spec.create ~load ~name:"transaction-snark base keys"
       ~autogen_path:Cache_dir.autogen_path
@@ -628,7 +628,7 @@ module Merge = struct
       and proving =
         Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
       in
-      (verification, {proving with value= ()})
+      (verification, proving)
     in
     Cached.Spec.create ~load ~name:"transaction-snark merge keys"
       ~autogen_path:Cache_dir.autogen_path
@@ -873,7 +873,7 @@ struct
       and proving =
         Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
       in
-      (verification, {proving with value= ()})
+      (verification, proving)
     in
     Cached.Spec.create ~load ~name:"transaction-snark wrap keys"
       ~autogen_path:Cache_dir.autogen_path
@@ -1202,7 +1202,7 @@ module Keys = struct
         ; merge= Tick.Keypair.vk merge
         ; wrap= Tock.Keypair.vk wrap } }
 
-  let cached () =
+  let cached_full () =
     let paths path = Cache_dir.possible_paths (Filename.basename path) in
     let open Async in
     let%bind base_vk, base_pk = Cached.run Base.cached in
@@ -1214,9 +1214,6 @@ module Keys = struct
         let merge = merge_vk.value
       end) in
       Cached.run Wrap.cached
-    in
-    let t : Verification.t =
-      {base= base_vk.value; merge= merge_vk.value; wrap= wrap_vk.value}
     in
     let location : Location.t =
       { proving=
@@ -1235,6 +1232,55 @@ module Keys = struct
       ; verification=
           Verification.checksum ~base:base_vk.checksum ~merge:merge_vk.checksum
             ~wrap:wrap_vk.checksum }
+    in
+    let t : t =
+      { verification=
+          {base= base_vk.value; merge= merge_vk.value; wrap= wrap_vk.value}
+      ; proving=
+          {base= base_pk.value; merge= merge_pk.value; wrap= wrap_pk.value} }
+    in
+    (location, t, checksum)
+
+  let discard_proving_key t =
+    let open Async in
+    let%map vk, pk = t in
+    (vk, {pk with Cached.value= ()})
+
+  let cached () =
+    let paths path = Cache_dir.possible_paths (Filename.basename path) in
+    let open Async in
+    let%bind base_vk, base_pk = discard_proving_key (Cached.run Base.cached) in
+    let%bind merge_vk, merge_pk =
+      discard_proving_key (Cached.run Merge.cached)
+    in
+    let%map wrap_vk, wrap_pk =
+      let module Wrap = Wrap (struct
+        let base = base_vk.value
+
+        let merge = merge_vk.value
+      end) in
+      discard_proving_key (Cached.run Wrap.cached)
+    in
+    let location : Location.t =
+      { proving=
+          { base= paths base_pk.path
+          ; merge= paths merge_pk.path
+          ; wrap= paths wrap_pk.path }
+      ; verification=
+          { base= paths base_vk.path
+          ; merge= paths merge_vk.path
+          ; wrap= paths wrap_vk.path } }
+    in
+    let checksum =
+      { Checksum.proving=
+          Proving.checksum ~base:base_pk.checksum ~merge:merge_pk.checksum
+            ~wrap:wrap_pk.checksum
+      ; verification=
+          Verification.checksum ~base:base_vk.checksum ~merge:merge_vk.checksum
+            ~wrap:wrap_vk.checksum }
+    in
+    let t : Verification.t =
+      {base= base_vk.value; merge= merge_vk.value; wrap= wrap_vk.value}
     in
     (location, t, checksum)
 end
