@@ -32,7 +32,8 @@ module Make (Inputs : Inputs_intf) :
    and type syncable_ledger := Inputs.Syncable_ledger.t
    and type syncable_ledger_query := Inputs.Syncable_ledger.query
    and type syncable_ledger_answer := Inputs.Syncable_ledger.answer
-   and type transition_frontier := Inputs.Transition_frontier.t = struct
+   and type transition_frontier := Inputs.Transition_frontier.t
+   and type ancestor_proof := State_body_hash.t list = struct
   open Inputs
 
   let answer_query ~frontier (hash, query) =
@@ -45,6 +46,30 @@ module Make (Inputs : Inputs_intf) :
     let responder = Syncable_ledger.Responder.create ledger ignore in
     let answer = Syncable_ledger.Responder.answer_query responder query in
     (hash, answer)
+
+  let prove_ancestory ~frontier generations descendants =
+    let open Option.Let_syntax in
+    let rec go acc iter_traversal state_hash =
+      if iter_traversal = 0 then Some (state_hash, acc)
+      else
+        let%bind breadcrumb = Transition_frontier.find frontier state_hash in
+        let transition_with_hash =
+          Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
+        in
+        let external_transition = With_hash.data transition_with_hash in
+        let protocol_state =
+          External_transition.protocol_state external_transition
+        in
+        let body = External_transition.Protocol_state.body protocol_state in
+        let state_body_hash =
+          External_transition.Protocol_state.Body.hash body
+        in
+        let previous_state_hash =
+          External_transition.Protocol_state.previous_state_hash protocol_state
+        in
+        go (state_body_hash :: acc) (iter_traversal - 1) previous_state_hash
+    in
+    go [] generations descendants
 
   let run ~frontier ~sync_query_reader ~sync_answer_writer =
     let answer_broadcaster =
