@@ -467,7 +467,8 @@ module Make (Inputs : Inputs_intf) = struct
     ; snark_pool: Snark_pool.t
     ; transition_frontier: Transition_frontier.t
     ; strongest_ledgers:
-        (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t
+        (External_transition.t, Protocol_state_hash.t) With_hash.t
+        Strict_pipe.Reader.t
     ; log: Logger.t
     ; mutable seen_jobs: Work_selector.State.t
     ; receipt_chain_database: Coda_base.Receipt_chain_database.t
@@ -518,8 +519,7 @@ module Make (Inputs : Inputs_intf) = struct
     let lb = best_ledger_builder t in
     Ledger_builder.current_ledger_proof lb
 
-  let strongest_ledgers t =
-    Linear_pipe.map t.strongest_ledgers ~f:(fun (_, x) -> x)
+  let strongest_ledgers t = t.strongest_ledgers
 
   module Config = struct
     (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
@@ -680,11 +680,7 @@ module Make (Inputs : Inputs_intf) = struct
           ; transaction_pool
           ; snark_pool
           ; transition_frontier
-          ; strongest_ledgers=
-              (let _ =
-                 Strict_pipe.Reader.to_linear_pipe valid_transitions_for_api
-               in
-               failwith "fixup integration tests")
+          ; strongest_ledgers= valid_transitions_for_api
           ; log= config.log
           ; seen_jobs= Work_selector.State.init
           ; ledger_builder_transition_backup_capacity=
