@@ -212,12 +212,19 @@ module type Inputs_intf = sig
   module Transaction_pool_diff : sig
     type t [@@deriving sexp, bin_io]
   end
+
+  module Time : Protocols.Coda_pow.Time_intf
 end
 
 module type Config_intf = sig
   type gossip_config
 
-  type t = {parent_log: Logger.t; gossip_net_params: gossip_config}
+  type time_controller
+
+  type t =
+    { parent_log: Logger.t
+    ; gossip_net_params: gossip_config
+    ; time_controller: time_controller }
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -226,9 +233,14 @@ module Make (Inputs : Inputs_intf) = struct
   module Gossip_net = Gossip_net.Make (Message)
   module Peer = Peer
 
-  module Config : Config_intf with type gossip_config := Gossip_net.Config.t =
-  struct
-    type t = {parent_log: Logger.t; gossip_net_params: Gossip_net.Config.t}
+  module Config :
+    Config_intf
+    with type gossip_config := Gossip_net.Config.t
+     and type time_controller := Time.Controller.t = struct
+    type t =
+      { parent_log: Logger.t
+      ; gossip_net_params: Gossip_net.Config.t
+      ; time_controller: Time.Controller.t }
   end
 
   module Rpcs = Rpcs (Inputs)
@@ -238,7 +250,7 @@ module Make (Inputs : Inputs_intf) = struct
     { gossip_net: Gossip_net.t
     ; log: Logger.t
     ; states:
-        (External_transition.t Envelope.Incoming.t * Unix_timestamp.t)
+        (External_transition.t Envelope.Incoming.t * Time.t)
         Linear_pipe.Reader.t
     ; transaction_pool_diffs:
         Transaction_pool_diff.t Envelope.Incoming.t Linear_pipe.Reader.t
@@ -281,12 +293,11 @@ module Make (Inputs : Inputs_intf) = struct
           match Envelope.Incoming.data x with
           | New_state s ->
               Perf_histograms.add_span ~name:"external_transition_latency"
-                (Time.abs_diff (Time.now ())
+                (Core.Time.abs_diff (Core.Time.now ())
                    (External_transition.timestamp s |> Block_time.to_time)) ;
               `Fst
                 ( Envelope.Incoming.map x ~f:(fun _ -> s)
-                , Time.now () |> Time.to_span_since_epoch |> Time.Span.to_ms
-                  |> Unix_timestamp.of_float )
+                , Time.now config.time_controller )
           | Snark_pool_diff d -> `Snd (Envelope.Incoming.map x ~f:(fun _ -> d))
           | Transaction_pool_diff d ->
               `Trd (Envelope.Incoming.map x ~f:(fun _ -> d)) )
@@ -400,7 +411,7 @@ module Make (Inputs : Inputs_intf) = struct
       of the peers that couldn't answer a particular query and won't try them
       again. *)
       let retry_max = 6 in
-      let retry_interval = Time.Span.of_ms 200. in
+      let retry_interval = Core.Time.Span.of_ms 200. in
       let rec answer_query ctr peers_tried query =
         O1trace.trace_event "ask sync ledger query" ;
         let peers =

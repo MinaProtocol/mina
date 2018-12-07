@@ -301,8 +301,10 @@ let daemon log =
          let banlist =
            Coda_base.Banlist.create ~suspicious_dir ~punished_dir
          in
+         let time_controller = Inputs.Time.Controller.create () in
          let net_config =
            { Inputs.Net.Config.parent_log= log
+           ; time_controller
            ; gossip_net_params=
                { timeout= Time.Span.of_sec 1.
                ; parent_log= log
@@ -328,8 +330,8 @@ let daemon log =
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~ledger_db_location:(conf_dir ^/ "ledger_db")
                 ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
-                ~time_controller:(Inputs.Time.Controller.create ())
-                ?propose_keypair:Config0.propose_keypair () ~banlist)
+                ~time_controller ?propose_keypair:Config0.propose_keypair ()
+                ~banlist)
          in
          let web_service = Web_pipe.get_service () in
          Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;
