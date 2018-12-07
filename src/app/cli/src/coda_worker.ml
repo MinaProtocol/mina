@@ -281,15 +281,14 @@ module T = struct
       let coda_strongest_ledgers () =
         let r, w = Linear_pipe.create () in
         don't_wait_for
-          (Linear_pipe.iter (Main.strongest_ledgers coda) ~f:(fun t ->
-               let p = Main.Inputs.External_transition.protocol_state t in
+          (Strict_pipe.Reader.iter (Main.strongest_ledgers coda) ~f:(fun t ->
+               let open Main.Inputs in
+               let p = External_transition.protocol_state (With_hash.data t) in
                let prev_state_hash =
                  Main.Inputs.Consensus_mechanism.Protocol_state
                  .previous_state_hash p
                in
-               let state_hash =
-                 Main.Inputs.Consensus_mechanism.Protocol_state.hash p
-               in
+               let state_hash = With_hash.hash t in
                let prev_state_hash = State_hash.to_bits prev_state_hash in
                let state_hash = State_hash.to_bits state_hash in
                Linear_pipe.write w (prev_state_hash, state_hash) )) ;

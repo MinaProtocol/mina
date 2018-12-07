@@ -297,7 +297,9 @@ module type Main_intf = sig
   val peers : t -> Kademlia.Peer.t list
 
   val strongest_ledgers :
-    t -> Inputs.External_transition.t Linear_pipe.Reader.t
+       t
+    -> (Inputs.External_transition.t, State_hash.t) With_hash.t
+       Strict_pipe.Reader.t
 
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
