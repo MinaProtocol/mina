@@ -29,5 +29,4 @@ let gen_test =
 let%test_unit "json" =
   Quickcheck.test ~seed:(`Deterministic "seed") ~trials:20 gen_test
     ~sexp_of:sexp_of_t ~f:(fun t ->
-      assert (Codable.For_tests.check_encoding (module T) ~equal t)
-  )
+      assert (Codable.For_tests.check_encoding (module T) ~equal t) )

@@ -62,10 +62,10 @@ end = struct
     module Or_error = Or_error
   end
 
-    let is_valid t =
-      Parallel_scan.parallelism ~state:t
-      = Int.pow 2 (Config.transaction_capacity_log_2 + 2)
-      && Parallel_scan.is_valid t
+  let is_valid t =
+    Parallel_scan.parallelism ~state:t
+    = Int.pow 2 (Config.transaction_capacity_log_2 + 2)
+    && Parallel_scan.is_valid t
 
   module Statement_scanner = struct
     include Scan_state.Make_statement_scanner
@@ -262,16 +262,11 @@ end = struct
   let ledger {ledger; _} = ledger
 
   let create ~ledger : t =
-<<<<<<< HEAD:src/lib/ledger_builder/ledger_builder.ml
     let open Config in
     (* Transaction capacity log_2 is one-fourth the capacity for work parallelism *)
     { scan_state=
         Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 2)
     ; ledger }
-=======
-    let s = Scan_state.empty () in
-    {scan_state= s; ledger}
->>>>>>> Ledger_builder -> Staged_ledger (#1279):src/lib/staged_ledger/staged_ledger.ml
 
   let current_ledger_proof t =
     Option.map (Scan_state.latest_ledger_proof t.scan_state) ~f:fst
@@ -603,7 +598,8 @@ end = struct
     Logger.info logger
       "Block info: No of transactions included:%d Coinbase parts:%d Work \
        count:%d Spots available:%d Proofs waiting to be solved:%d"
-      user_commands_count cb_parts_count (List.length works) spots_available proofs_waiting ;
+      user_commands_count cb_parts_count (List.length works) spots_available
+      proofs_waiting ;
     ( `Hash_after_applying (hash t)
     , `Ledger_proof res_opt
     , `Updated_staged_ledger {t with ledger= new_ledger} )
@@ -705,18 +701,9 @@ end = struct
     , `Ledger_proof res_opt
     , `Updated_staged_ledger {t with ledger= new_ledger} )
 
-<<<<<<< HEAD:src/lib/ledger_builder/ledger_builder.ml
-  let work_to_do_exn scan_state : Completed_work.Statement.t Sequence.t =
-    let work_seq =
-      val_or_exn "Work to do"
-        (Parallel_scan.next_jobs_sequence ~state:scan_state)
-    in
-    sequence_chunks_of ~n:Completed_work.proofs_length
-=======
   let work_to_do scan_state : Transaction_snark_work.Statement.t Sequence.t =
     let work_seq = Scan_state.next_jobs_sequence scan_state in
     sequence_chunks_of ~n:Transaction_snark_work.proofs_length
->>>>>>> Ledger_builder -> Staged_ledger (#1279):src/lib/staged_ledger/staged_ledger.ml
     @@ Sequence.map work_seq ~f:(fun maybe_work ->
            match Scan_state.statement_of_job maybe_work with
            | None -> assert false
@@ -1208,13 +1195,8 @@ end = struct
     (*TODO: return an or_error here *)
     let work_to_do = work_to_do_exn t'.scan_state in
     let pre_diffs =
-<<<<<<< HEAD:src/lib/ledger_builder/ledger_builder.ml
-      generate_prediff logger work_to_do transactions_by_fee get_completed_work
-        ledger self partitions
-=======
       generate_prediff logger (work_to_do t.scan_state) transactions_by_fee
         get_completed_work tmp_ledger self partitions
->>>>>>> Ledger_builder -> Staged_ledger (#1279):src/lib/staged_ledger/staged_ledger.ml
     in
     let proofs_available =
       Sequence.filter_map work_to_do ~f:get_completed_work
