@@ -177,7 +177,7 @@ end = struct
           Int.pow 2 (Inputs.Config.transaction_capacity_log_2 + 1)
         in
         [%test_pred: int]
-          (( >= ) ((Inputs.Config.transaction_capacity_log_2 + 1) * parallelism))
+          (( >= ) (Inputs.Config.transaction_capacity_log_2 * parallelism))
           (List.length txns_still_being_worked_on) ) ;
     let snarked_ledger = Ledger.register_mask ledger (Ledger.Mask.create ()) in
     let%bind () =
