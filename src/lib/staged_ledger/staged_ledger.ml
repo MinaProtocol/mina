@@ -508,8 +508,8 @@ end = struct
     let open Result_with_rollback.Let_syntax in
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
     let spots_available, proofs_waiting =
-      let jobs = Parallel_scan.next_jobs ~state:t.scan_state in
-      ( Int.min (Parallel_scan.free_space ~state:t.scan_state) max_throughput
+      let jobs = Scan_state.next_jobs t.scan_state in
+      ( Int.min (Scan_state.free_space t.scan_state) max_throughput
       , List.length jobs )
     in
     let apply_pre_diff_with_at_most_two
@@ -1184,7 +1184,7 @@ end = struct
         get_completed_work tmp_ledger self partitions
     in
     let proofs_available =
-      Sequence.filter_map (work_to_do t'.scan_state) ~f:get_completed_work
+      Sequence.filter_map (work_to_do t.scan_state) ~f:get_completed_work
       |> Sequence.to_list |> List.length
     in
     Logger.info logger "Block stats: Proofs ready for purchase: %d"

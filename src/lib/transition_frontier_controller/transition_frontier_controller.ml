@@ -10,11 +10,7 @@ module type Inputs_intf = sig
 
   module Sync_handler :
     Sync_handler_intf
-    with type addr := Ledger.Addr.t
-     and type hash := State_hash.t
-     and type syncable_ledger := Syncable_ledger.t
-     and type syncable_ledger_query := Syncable_ledger.query
-     and type syncable_ledger_answer := Syncable_ledger.answer
+    with type hash := State_hash.t
      and type transition_frontier := Transition_frontier.t
      and type ancestor_proof := State_body_hash.t list
 
@@ -48,8 +44,7 @@ module Make (Inputs : Inputs_intf) :
    and type state_hash := State_hash.t = struct
   open Inputs
 
-  let run ~logger ~time_controller ~frontier ~transition_reader
-      ~sync_query_reader ~sync_answer_writer =
+  let run ~logger ~time_controller ~frontier ~transition_reader =
     let logger = Logger.child logger "transition_frontier_controller" in
     let valid_transition_reader_raw, valid_transition_writer =
       Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
@@ -69,6 +64,5 @@ module Make (Inputs : Inputs_intf) :
       ~valid_transition_reader:valid_transition_reader_processor
       ~catchup_job_writer ~catchup_breadcrumbs_reader ;
     Catchup.run ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer ;
-    Sync_handler.run ~sync_query_reader ~sync_answer_writer ~frontier ;
     valid_transition_reader_network
 end
