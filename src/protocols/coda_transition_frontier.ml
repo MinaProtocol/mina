@@ -11,19 +11,6 @@ module type Transition_frontier_base_intf = sig
 
   type staged_ledger
 
-  (*module Transaction_snark_scan_state : sig
-    type t
-
-    val empty : t
-  end
-
-  module Staged_ledger : sig
-    type t = staged_ledger
-
-    val ledger : t -> masked_ledger
-  end
-
-  type ledger_builder*)
   module Breadcrumb : sig
     type t [@@deriving sexp]
 
