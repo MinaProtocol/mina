@@ -22,7 +22,7 @@ module Proof_of_signature = Consensus.Proof_of_signature.Make (struct
 
   let proposal_interval = Time.Span.of_ms Int64.zero
 
-  module Ledger_builder_diff = Unit
+  module Staged_ledger_diff = Unit
   module Genesis_ledger = Genesis_ledger
 end)
 
@@ -108,7 +108,7 @@ let genesis ~loc =
   in
   let ledger =
     Sparse_ledger_lib.Sparse_ledger.of_hash ~depth:0
-      protocol_state.body.blockchain_state.ledger_builder_hash.ledger_hash
+      protocol_state.body.blockchain_state.staged_ledger_hash.ledger_hash
   in
   let proof = Lite_compat.proof Precomputed_values.base_proof in
   let chain = {Lite_base.Lite_chain.protocol_state; ledger; proof} in

@@ -329,8 +329,7 @@ let daemon log =
            Run.create
              (Run.Config.make ~log ~net_config
                 ~run_snark_worker:(Option.is_some run_snark_worker_flag)
-                ~ledger_builder_persistant_location:
-                  (conf_dir ^/ "ledger_builder")
+                ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~ledger_db_location:(conf_dir ^/ "ledger_db")

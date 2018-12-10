@@ -55,11 +55,13 @@ module type S = sig
     include Sexpable.S with type t := t
   end
 
-  module Ledger_proof_verifier :
-    Ledger_proof_verifier_intf
-    with type statement := Ledger_proof_statement.t
-     and type message := Sok_message.t
-     and type ledger_proof := Ledger_proof.t
+  module Staged_ledger_aux_hash : Coda_pow.Staged_ledger_aux_hash_intf
+
+  module Transaction_snark_work :
+    Coda_pow.Transaction_snark_work_intf
+    with type proof := Ledger_proof.t
+     and type statement := Ledger_proof_statement.t
+     and type public_key := Compressed_public_key.t
 
   module Account : sig
     type t
@@ -82,35 +84,7 @@ module type S = sig
     val apply_transaction_exn : t -> Transaction.t -> t
   end
 
-  module Ledger_builder_aux_hash : Coda_pow.Ledger_builder_aux_hash_intf
-
-  module Ledger_builder_hash :
-    Coda_pow.Ledger_builder_hash_intf
-    with type ledger_hash := Ledger_hash.t
-     and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
-
-  module Completed_work :
-    Coda_pow.Completed_work_intf
-    with type proof := Ledger_proof.t
-     and type statement := Ledger_proof_statement.t
-     and type public_key := Compressed_public_key.t
-
-  module Ledger_builder_diff :
-    Coda_pow.Ledger_builder_diff_intf
-    with type completed_work := Completed_work.t
-     and type completed_work_checked := Completed_work.Checked.t
-     and type user_command := User_command.t
-     and type user_command_with_valid_signature :=
-                User_command.With_valid_signature.t
-     and type public_key := Compressed_public_key.t
-     and type ledger_builder_hash := Ledger_builder_hash.t
-
   module Config : sig
     val transaction_capacity_log_2 : int
   end
-
-  val check :
-       Completed_work.t
-    -> Ledger_proof_statement.t list
-    -> Completed_work.Checked.t option Async_kernel.Deferred.t
 end
