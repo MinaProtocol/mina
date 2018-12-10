@@ -585,7 +585,8 @@ end = struct
     Logger.info logger
       "Block info: No of transactions included:%d Coinbase parts:%d Work \
        count:%d Spots available:%d Proofs waiting to be solved:%d"
-      user_commands_count cb_parts_count (List.length works) spots_available proofs_waiting ;
+      user_commands_count cb_parts_count (List.length works) spots_available
+      proofs_waiting ;
     ( `Hash_after_applying (hash t)
     , `Ledger_proof res_opt
     , `Updated_staged_ledger {t with ledger= new_ledger} )
