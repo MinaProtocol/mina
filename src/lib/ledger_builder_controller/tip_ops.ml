@@ -11,18 +11,18 @@ module Make (Inputs : Inputs.Base.S) = struct
       ~message:
         "Protocol state in tip should be the target state of the transition"
       ~expect:transition_state_hash tip_state_hash ;
-    [%test_result: Ledger_builder_hash.t]
+    [%test_result: Staged_ledger_hash.t]
       ~message:
         (Printf.sprintf
-           !"Ledger_builder_hash inside protocol state inconsistent with \
-             materialized ledger_builder's hash for transition: %{sexp: \
+           !"Staged_ledger_hash inside protocol state inconsistent with \
+             materialized staged_ledger's hash for transition: %{sexp: \
              External_transition.t}"
            transition)
       ~expect:
         ( External_transition.protocol_state transition
         |> Protocol_state.blockchain_state
-        |> Blockchain_state.ledger_builder_hash )
-      (Ledger_builder.hash t.Tip.ledger_builder)
+        |> Blockchain_state.staged_ledger_hash )
+      (Staged_ledger.hash t.Tip.staged_ledger)
 
   let transition_unchecked t
       ( {With_hash.data= transition; hash= transition_state_hash} as
@@ -30,12 +30,12 @@ module Make (Inputs : Inputs.Base.S) = struct
     let%map () =
       let open Deferred.Let_syntax in
       match
-        Ledger_builder.apply t.Tip.ledger_builder
-          (External_transition.ledger_builder_diff transition)
+        Staged_ledger.apply t.Tip.staged_ledger
+          (External_transition.staged_ledger_diff transition)
           ~logger
       with
-      | Ok (_, `Ledger_proof None) -> return ()
-      | Ok (_, `Ledger_proof (Some _)) -> return ()
+      | Ok (_, `Ledger_proof None, _) -> return ()
+      | Ok (_, `Ledger_proof (Some _), _) -> return ()
       (* We've already verified that all the patches can be
         applied successfully before we added to the ktree, so we
         can force-unwrap here *)

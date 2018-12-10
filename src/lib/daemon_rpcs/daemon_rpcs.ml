@@ -17,7 +17,7 @@ module Types = struct
       ; block_count: int
       ; uptime_secs: int
       ; ledger_merkle_root: string
-      ; ledger_builder_hash: string
+      ; staged_ledger_hash: string
       ; state_hash: string
       ; commit_id: Git_sha.t option
       ; conf_dir: string
@@ -66,8 +66,7 @@ module Types = struct
             ("Block Count", Int.to_string (f x)) :: acc )
           ~uptime_secs:(fun acc x -> ("Uptime", sprintf "%ds" (f x)) :: acc)
           ~ledger_merkle_root:(fun acc x -> ("Ledger Merkle Root", f x) :: acc)
-          ~ledger_builder_hash:(fun acc x ->
-            ("Ledger-builder hash", f x) :: acc )
+          ~staged_ledger_hash:(fun acc x -> ("Ledger-builder hash", f x) :: acc)
           ~state_hash:(fun acc x -> ("State Hash", f x) :: acc)
           ~commit_id:(fun acc x ->
             match f x with
@@ -154,7 +153,7 @@ module Send_user_commands = struct
 end
 
 module Get_ledger = struct
-  type query = Ledger_builder_hash.Stable.V1.t [@@deriving bin_io]
+  type query = Staged_ledger_hash.Stable.V1.t [@@deriving bin_io]
 
   type response = Account.t list Or_error.t [@@deriving bin_io]
 

@@ -75,6 +75,8 @@ val copy : t -> t
 
 val register_mask : t -> Mask.t -> Mask.Attached.t
 
+val commit : Mask.Attached.t -> unit
+
 module Undo : sig
   module User_command : sig
     module Common : sig
