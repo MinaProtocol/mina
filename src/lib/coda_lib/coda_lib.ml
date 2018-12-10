@@ -413,6 +413,7 @@ module type Inputs_intf = sig
      and type ledger_database := Ledger_db.t
      and type masked_ledger := Masked_ledger.t
      and type ledger_builder := Ledger_builder.t
+     and type ledger_diff := Ledger_builder_diff.t
 
   module Transition_frontier_controller :
     Protocols.Coda_transition_frontier.Transition_frontier_controller_intf
@@ -423,6 +424,7 @@ module type Inputs_intf = sig
      and type transition_frontier := Transition_frontier.t
      and type state_hash := Protocol_state_hash.t
      and type time := Time.t
+     and type network := Net.t
 
   module Proposer :
     Proposer_intf
@@ -607,6 +609,13 @@ module Make (Inputs : Inputs_intf) = struct
                   Account.public_key
                     (snd (List.hd_exn Genesis_ledger.accounts)) }
         in
+        let%bind net =
+          Net.create config.net_config
+            ~get_ledger_builder_aux_at_hash:(fun _hash ->
+              failwith "TODO: replace with new net" )
+            ~answer_sync_ledger_query:(fun _query ->
+              failwith "TODO: replace with new net" )
+        in
         let transition_frontier =
           Transition_frontier.create ~logger:config.log
             ~root_transition:
@@ -624,7 +633,7 @@ module Make (Inputs : Inputs_intf) = struct
                       ()))
         in
         let valid_transitions =
-          Transition_frontier_controller.run ~logger:config.log
+          Transition_frontier_controller.run ~logger:config.log ~network:net
             ~time_controller:config.time_controller
             ~frontier:transition_frontier
             ~transition_reader:
@@ -636,13 +645,6 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let valid_transitions_for_network, valid_transitions_for_api =
           Strict_pipe.Reader.Fork.two valid_transitions
-        in
-        let%bind net =
-          Net.create config.net_config
-            ~get_ledger_builder_aux_at_hash:(fun _hash ->
-              failwith "TODO: replace with new net" )
-            ~answer_sync_ledger_query:(fun _query ->
-              failwith "TODO: replace with new net" )
         in
         let%bind transaction_pool =
           Transaction_pool.load ~parent_log:config.log

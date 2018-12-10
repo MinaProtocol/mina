@@ -18,6 +18,7 @@ module type S = sig
      and type ledger_database := Ledger.Db.t
      and type ledger_builder := Ledger_builder.t
      and type masked_ledger := Ledger.Mask.Attached.t
+     and type ledger_diff := Ledger_builder_diff.t
 end
 
 (*

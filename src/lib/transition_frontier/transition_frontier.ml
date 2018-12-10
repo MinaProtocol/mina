@@ -53,10 +53,9 @@ module Make (Inputs : Inputs_intf) :
    and type external_transition := Inputs.External_transition.t
    and type ledger_database := Ledger.Db.t
    and type masked_ledger := Ledger.Mask.Attached.t
-   and type ledger_builder := Inputs.Ledger_builder.t = struct
+   and type ledger_builder := Inputs.Ledger_builder.t
+   and type ledger_diff := Inputs.Ledger_builder_diff.t = struct
   open Inputs
-
-  type ledger_diff = Ledger_builder_diff.t
 
   (* Transaction_snark_scan_state and Staged_ledger long-term will not live in
   * this module *)
@@ -73,7 +72,7 @@ module Make (Inputs : Inputs_intf) :
     val empty : t
 
     module Diff : sig
-      type t = ledger_diff
+      type t = Ledger_builder_diff.t
 
       (* hack until Parallel_scan_state().Diff.t fully diverges from Ledger_builder_diff.t and is included in External_transition *)
       val of_ledger_builder_diff : Ledger_builder_diff.t -> t
@@ -91,7 +90,7 @@ module Make (Inputs : Inputs_intf) :
     let empty = Ledger_builder.Aux.empty ~parallelism_log_2:4
 
     module Diff = struct
-      type nonrec t = ledger_diff
+      type nonrec t = Ledger_builder_diff.t
 
       let of_ledger_builder_diff = Fn.id
 
@@ -175,6 +174,9 @@ module Make (Inputs : Inputs_intf) :
       { transition_with_hash: (External_transition.t, State_hash.t) With_hash.t
       ; staged_ledger: Staged_ledger.t sexp_opaque }
     [@@deriving sexp, fields]
+
+    let create transition_with_hash staged_ledger =
+      {transition_with_hash; staged_ledger}
 
     let hash {transition_with_hash; _} = With_hash.hash transition_with_hash
 
@@ -261,14 +263,16 @@ module Make (Inputs : Inputs_intf) :
     let node = Hashtbl.find_exn t.table hash in
     node.breadcrumb
 
-  let path t breadcrumb =
+  let path_map t breadcrumb ~f =
     let rec find_path b =
-      let hash = Breadcrumb.hash b in
+      let elem = f b in
       let parent_hash = Breadcrumb.parent_hash b in
-      if State_hash.equal parent_hash t.root then [hash]
-      else hash :: find_path (find_exn t parent_hash)
+      if State_hash.equal parent_hash t.root then [elem]
+      else elem :: find_path (find_exn t parent_hash)
     in
     List.rev (find_path breadcrumb)
+
+  let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.hash
 
   let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
 
@@ -331,7 +335,7 @@ module Make (Inputs : Inputs_intf) :
     let root_hash = With_hash.hash root_node.breadcrumb.transition_with_hash in
     let distance_to_root = new_length - root_node.length in
     if distance_to_root > max_length then
-      `Changed_root (List.hd_exn (path t parent_node.breadcrumb))
+      `Changed_root (List.hd_exn (hash_path t parent_node.breadcrumb))
     else `Same_root root_hash
 
   (* Adding a transition to the transition frontier is broken into the following steps:
@@ -380,7 +384,7 @@ module Make (Inputs : Inputs_intf) :
     (* 3.b *)
     if distance_to_parent > max_length then (
       (* 3.b.I *)
-      let new_root_hash = List.hd_exn (path t node.breadcrumb) in
+      let new_root_hash = List.hd_exn (hash_path t node.breadcrumb) in
       (* 3.b.II *)
       let garbage_immediate_successors =
         List.filter root_node.successor_hashes ~f:(fun succ_hash ->

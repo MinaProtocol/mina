@@ -258,6 +258,7 @@ module type Main_intf = sig
        and type ledger_database := Coda_base.Ledger.Db.t
        and type masked_ledger := Coda_base.Ledger.t
        and type ledger_builder := Ledger_builder.t
+       and type ledger_diff := Ledger_builder_diff.t
   end
 
   module Config : sig
@@ -819,6 +820,7 @@ struct
     module Ledger_builder_diff = Ledger_builder_diff
     module Completed_work = Completed_work
     module Ledger_builder = Patched_ledger_builder
+    module Network = Net
   end)
 
   module Transition_handler = Transition_handler.Make (struct
@@ -853,6 +855,7 @@ struct
     module Ledger_builder_diff = Ledger_builder_diff
     module Ledger_diff = Ledger_builder_diff
     module Consensus_mechanism = Consensus.Mechanism
+    module Network = Net
   end)
 
   module Ledger_builder_controller = struct
