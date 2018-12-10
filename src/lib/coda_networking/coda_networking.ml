@@ -11,16 +11,16 @@ module type Sync_ledger_intf = sig
 end
 
 module Rpcs (Inputs : sig
-  module Ledger_builder_aux_hash :
-    Protocols.Coda_pow.Ledger_builder_aux_hash_intf
+  module Staged_ledger_aux_hash :
+    Protocols.Coda_pow.Staged_ledger_aux_hash_intf
 
-  module Ledger_builder_aux : Binable.S
+  module Staged_ledger_aux : Binable.S
 
   module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
 
-  module Ledger_builder_hash :
-    Protocols.Coda_pow.Ledger_builder_hash_intf
-    with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+  module Staged_ledger_hash :
+    Protocols.Coda_pow.Staged_ledger_hash_intf
+    with type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
      and type ledger_hash := Ledger_hash.t
 
   module Blockchain_state : Blockchain_state.S
@@ -40,14 +40,14 @@ end) =
 struct
   open Inputs
 
-  module Get_ledger_builder_aux_at_hash = struct
+  module Get_staged_ledger_aux_at_hash = struct
     module T = struct
-      let name = "get_ledger_builder_aux_at_hash"
+      let name = "get_staged_ledger_aux_at_hash"
 
       module T = struct
-        type query = Ledger_builder_hash.t
+        type query = Staged_ledger_hash.t
 
-        type response = (Ledger_builder_aux.t * Ledger_hash.t) option
+        type response = (Staged_ledger_aux.t * Ledger_hash.t) option
       end
 
       module Caller = T
@@ -59,9 +59,9 @@ struct
 
     module V1 = struct
       module T = struct
-        type query = Ledger_builder_hash.t [@@deriving bin_io]
+        type query = Staged_ledger_hash.t [@@deriving bin_io]
 
-        type response = (Ledger_builder_aux.t * Ledger_hash.t) option
+        type response = (Staged_ledger_aux.t * Ledger_hash.t) option
         [@@deriving bin_io]
 
         let version = 1
@@ -175,14 +175,14 @@ module type Inputs_intf = sig
     val timestamp : t -> Block_time.t
   end
 
-  module Ledger_builder_aux_hash :
-    Protocols.Coda_pow.Ledger_builder_aux_hash_intf
+  module Staged_ledger_aux_hash :
+    Protocols.Coda_pow.Staged_ledger_aux_hash_intf
 
   module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
 
-  module Ledger_builder_hash :
-    Protocols.Coda_pow.Ledger_builder_hash_intf
-    with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+  module Staged_ledger_hash :
+    Protocols.Coda_pow.Staged_ledger_hash_intf
+    with type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
      and type ledger_hash := Ledger_hash.t
 
   module Blockchain_state : Coda_base.Blockchain_state.S
@@ -199,10 +199,10 @@ module type Inputs_intf = sig
 
   module Sync_ledger : Sync_ledger_intf
 
-  module Ledger_builder_aux : sig
+  module Staged_ledger_aux : sig
     type t [@@deriving bin_io]
 
-    val hash : t -> Ledger_builder_aux_hash.t
+    val hash : t -> Staged_ledger_aux_hash.t
   end
 
   module Snark_pool_diff : sig
@@ -259,24 +259,23 @@ module Make (Inputs : Inputs_intf) = struct
   [@@deriving fields]
 
   let create (config : Config.t)
-      ~(get_ledger_builder_aux_at_hash :
-            Ledger_builder_hash.t Envelope.Incoming.t
-         -> (Ledger_builder_aux.t * Ledger_hash.t) option Deferred.t)
+      ~(get_staged_ledger_aux_at_hash :
+            Staged_ledger_hash.t Envelope.Incoming.t
+         -> (Staged_ledger_aux.t * Ledger_hash.t) option Deferred.t)
       ~(answer_sync_ledger_query :
             (Ledger_hash.t * Sync_ledger.query) Envelope.Incoming.t
          -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t) =
     let log = Logger.child config.parent_log "coda networking" in
-    let get_ledger_builder_aux_at_hash_rpc sender ~version:_ hash =
-      get_ledger_builder_aux_at_hash
-        (Envelope.Incoming.wrap ~data:hash ~sender)
+    let get_staged_ledger_aux_at_hash_rpc sender ~version:_ hash =
+      get_staged_ledger_aux_at_hash (Envelope.Incoming.wrap ~data:hash ~sender)
     in
     let answer_sync_ledger_query_rpc sender ~version:_ query =
       answer_sync_ledger_query (Envelope.Incoming.wrap ~data:query ~sender)
     in
     let implementations =
       List.append
-        (Rpcs.Get_ledger_builder_aux_at_hash.implement_multi
-           get_ledger_builder_aux_at_hash_rpc)
+        (Rpcs.Get_staged_ledger_aux_at_hash.implement_multi
+           get_staged_ledger_aux_at_hash_rpc)
         (Rpcs.Answer_sync_ledger_query.implement_multi
            answer_sync_ledger_query_rpc)
     in
@@ -318,7 +317,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let peers t = Gossip_net.peers t.gossip_net
 
-  module Ledger_builder_io = struct
+  module Staged_ledger_io = struct
     type nonrec t = t
 
     let create = Fn.id
@@ -353,55 +352,54 @@ module Make (Inputs : Inputs_intf) = struct
       in
       Deferred.any (none_worked :: List.map ~f:(filter ~f:Or_error.is_ok) ds)
 
-    let get_ledger_builder_aux_at_hash t ledger_builder_hash =
+    let get_staged_ledger_aux_at_hash t staged_ledger_hash =
       let peers = Gossip_net.random_peers t.gossip_net 8 in
       Logger.trace t.log
         !"Get_aux querying the following peers %{sexp: Peer.t list}"
         peers ;
       find_map' peers ~f:(fun peer ->
           Logger.trace t.log
-            !"Asking %{sexp: Peer.t} query regarding ledger_builder_hash \
-              %{sexp: Ledger_builder_hash.t}"
-            peer ledger_builder_hash ;
+            !"Asking %{sexp: Peer.t} query regarding staged_ledger_hash \
+              %{sexp: Staged_ledger_hash.t}"
+            peer staged_ledger_hash ;
           match%map
             Gossip_net.query_peer t.gossip_net peer
-              Rpcs.Get_ledger_builder_aux_at_hash.dispatch_multi
-              ledger_builder_hash
+              Rpcs.Get_staged_ledger_aux_at_hash.dispatch_multi
+              staged_ledger_hash
           with
-          | Ok (Some (ledger_builder_aux, ledger_builder_aux_merkle_sibling))
-            ->
-              let implied_ledger_builder_hash =
-                Ledger_builder_hash.of_aux_and_ledger_hash
-                  (Ledger_builder_aux.hash ledger_builder_aux)
-                  ledger_builder_aux_merkle_sibling
+          | Ok (Some (staged_ledger_aux, staged_ledger_aux_merkle_sibling)) ->
+              let implied_staged_ledger_hash =
+                Staged_ledger_hash.of_aux_and_ledger_hash
+                  (Staged_ledger_aux.hash staged_ledger_aux)
+                  staged_ledger_aux_merkle_sibling
               in
               if
-                Ledger_builder_hash.equal implied_ledger_builder_hash
-                  ledger_builder_hash
+                Staged_ledger_hash.equal implied_staged_ledger_hash
+                  staged_ledger_hash
               then (
                 Logger.trace t.log
                   !"%{sexp: Peer.t} sent contents resulting in a good \
-                    Ledger_builder_hash %{sexp: Ledger_builder_hash.t}"
-                  peer ledger_builder_hash ;
+                    Staged_ledger_hash %{sexp: Staged_ledger_hash.t}"
+                  peer staged_ledger_hash ;
                 Ok
-                  (Envelope.Incoming.wrap ~data:ledger_builder_aux
+                  (Envelope.Incoming.wrap ~data:staged_ledger_aux
                      ~sender:(fst peer)) )
               else (
                 Logger.faulty_peer t.log
                   !"%{sexp: Peer.t} sent contents resulting in a bad \
-                    Ledger_builder_hash %{sexp: Ledger_builder_hash.t}, we \
-                    wanted %{sexp: Ledger_builder_hash.t}"
-                  peer implied_ledger_builder_hash ledger_builder_hash ;
+                    Staged_ledger_hash %{sexp: Staged_ledger_hash.t}, we \
+                    wanted %{sexp: Staged_ledger_hash.t}"
+                  peer implied_staged_ledger_hash staged_ledger_hash ;
                 Or_error.error_string "Evil! TODO: Punish" )
           | Ok None ->
               Logger.trace t.log
-                !"%{sexp: Peer.t} didn't find a ledger_builder_aux at \
-                  ledger_builder_hash %{sexp: Ledger_builder_hash.t}"
-                peer ledger_builder_hash ;
+                !"%{sexp: Peer.t} didn't find a staged_ledger_aux at \
+                  staged_ledger_hash %{sexp: Staged_ledger_hash.t}"
+                peer staged_ledger_hash ;
               Or_error.error_string "no ledger builder aux found"
           | Error err ->
               Logger.warn t.log
-                !"Ledger_builder_aux acquisition hit network error %s"
+                !"Staged_ledger_aux acquisition hit network error %s"
                 (Error.to_string_mach err) ;
               Error err )
 

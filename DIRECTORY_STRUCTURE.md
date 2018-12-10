@@ -22,7 +22,7 @@ files play.
     Libraries powering coda. 
     The libraries here basically fall into two categories.
     1. General purpose data-types and functionality. This includes `snarky`, `fold_lib`, `vrf_lib`, `sgn`, and others.
-    2. Application specific functionality, structured as a library. This includes `syncable_ledger`, `ledger_builder`, `transaction_snark`, and others.
+    2. Application specific functionality, structured as a library. This includes `syncable_ledger`, `staged_ledger`, `transaction_snark`, and others.
   - `app/`
     Applications live here.
     - `cli/`

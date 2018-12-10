@@ -82,7 +82,7 @@ let run_test () : unit Deferred.t =
     Main.create
       (Main.Config.make ~log ~net_config ~propose_keypair:keypair
          ~run_snark_worker:true
-         ~ledger_builder_persistant_location:(temp_conf_dir ^/ "ledger_builder")
+         ~staged_ledger_persistant_location:(temp_conf_dir ^/ "staged_ledger")
          ~transaction_pool_disk_location:(temp_conf_dir ^/ "transaction_pool")
          ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
          ~time_controller ~receipt_chain_database () ~banlist

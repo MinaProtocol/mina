@@ -23,7 +23,8 @@ module type Inputs_intf = sig
     with type state_hash := State_hash.t
      and type external_transition := External_transition.t
      and type ledger_database := Ledger_db.t
-     and type ledger_builder := Ledger_builder.t
+     and type staged_ledger := Staged_ledger.t
+     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type masked_ledger := Masked_ledger.t
 
   module Transaction_pool :
@@ -111,13 +112,14 @@ module Make (Inputs : Inputs_intf) :
   Coda_lib.Proposer_intf
   with type external_transition := Inputs.External_transition.t
    and type ledger_hash := Inputs.Ledger_hash.t
-   and type ledger_builder := Inputs.Ledger_builder.t
+   and type staged_ledger := Inputs.Staged_ledger.t
    and type transaction := Inputs.User_command.With_valid_signature.t
    and type protocol_state := Inputs.Consensus_mechanism.Protocol_state.value
    and type protocol_state_proof := Inputs.Protocol_state_proof.t
    and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
-   and type completed_work_statement := Inputs.Completed_work.Statement.t
-   and type completed_work_checked := Inputs.Completed_work.Checked.t
+   and type completed_work_statement :=
+              Inputs.Transaction_snark_work.Statement.t
+   and type completed_work_checked := Inputs.Transaction_snark_work.Checked.t
    and type time_controller := Inputs.Time.Controller.t
    and type keypair := Inputs.Keypair.t
    and type transition_frontier := Inputs.Transition_frontier.t
@@ -166,23 +168,25 @@ module Make (Inputs : Inputs_intf) :
   end
 
   let generate_next_state ~previous_protocol_state ~time_controller
-      ~ledger_builder ~transactions ~get_completed_work ~logger
+      ~staged_ledger ~transactions ~get_completed_work ~logger
       ~(keypair : Keypair.t) ~proposal_data =
     let open Interruptible.Let_syntax in
-    let%bind diff, next_ledger_builder_hash, ledger_proof_opt =
+    let%bind diff, next_staged_ledger_hash, ledger_proof_opt =
       Interruptible.uninterruptible
         (let open Deferred.Let_syntax in
         let diff =
-          Ledger_builder.create_diff ledger_builder
+          Staged_ledger.create_diff staged_ledger
             ~self:(Public_key.compress keypair.public_key)
             ~logger ~transactions_by_fee:transactions ~get_completed_work
         in
-        let lb2 = Ledger_builder.copy ledger_builder in
-        let ( `Hash_after_applying next_ledger_builder_hash
-            , `Ledger_proof ledger_proof_opt ) =
-          Ledger_builder.apply_diff_unchecked lb2 diff
+        let lb2 = Staged_ledger.copy staged_ledger in
+        let ( `Hash_after_applying next_staged_ledger_hash
+            , `Ledger_proof ledger_proof_opt
+            , `Updated_staged_ledger _updated_staged_ledger ) =
+          Staged_ledger.apply_diff_unchecked lb2 diff
         in
-        return (diff, next_ledger_builder_hash, ledger_proof_opt))
+        (*TODO use updated_staged_ledger*)
+        return (diff, next_staged_ledger_hash, ledger_proof_opt))
     in
     let%bind protocol_state, consensus_transition_data =
       lift_sync (fun () ->
@@ -205,7 +209,7 @@ module Make (Inputs : Inputs_intf) :
           let blockchain_state =
             Blockchain_state.create_value ~timestamp:(Time.now time_controller)
               ~ledger_hash:next_ledger_hash
-              ~ledger_builder_hash:next_ledger_builder_hash
+              ~staged_ledger_hash:next_staged_ledger_hash
           in
           let time =
             Time.now time_controller |> Time.to_span_since_epoch
@@ -214,7 +218,7 @@ module Make (Inputs : Inputs_intf) :
           Consensus_mechanism.generate_transition ~previous_protocol_state
             ~blockchain_state ~time ~proposal_data
             ~transactions:
-              ( Ledger_builder_diff.With_valid_signatures_and_proofs
+              ( Staged_ledger_diff.With_valid_signatures_and_proofs
                 .user_commands diff
                 :> User_command.t list )
             ~snarked_ledger_hash:
@@ -242,7 +246,7 @@ module Make (Inputs : Inputs_intf) :
         let internal_transition =
           Internal_transition.create ~snark_transition
             ~prover_state:(Proposal_data.prover_state proposal_data)
-            ~ledger_builder_diff:(Ledger_builder_diff.forget diff)
+            ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
         in
         Some (protocol_state, internal_transition) )
 
@@ -273,10 +277,7 @@ module Make (Inputs : Inputs_intf) :
           let%bind next_state_opt =
             generate_next_state ~proposal_data ~previous_protocol_state
               ~time_controller
-              ~ledger_builder:
-                (Transition_frontier
-                 .hack_temporary_ledger_builder_of_staged_ledger
-                   (Crumb.staged_ledger crumb))
+              ~staged_ledger:(Crumb.staged_ledger crumb)
               ~transactions:(Transaction_pool.transactions transaction_pool)
               ~get_completed_work ~logger ~keypair
           in
@@ -302,8 +303,8 @@ module Make (Inputs : Inputs_intf) :
                      let external_transition =
                        External_transition.create ~protocol_state
                          ~protocol_state_proof
-                         ~ledger_builder_diff:
-                           (Internal_transition.ledger_builder_diff
+                         ~staged_ledger_diff:
+                           (Internal_transition.staged_ledger_diff
                               internal_transition)
                      in
                      let time = Time.now time_controller in

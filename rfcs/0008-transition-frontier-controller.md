@@ -83,7 +83,7 @@ so we must get enough info to go back to the locked state (where we know we've
 achieved consensus).
 
 2. There is now a notion of a `Breadcrumb.t` which contains an
-`External_transition.t` and a now light-weight `Ledger_builder.t` it also has a
+`External_transition.t` and a now light-weight `Staged_ledger.t` it also has a
 notion of the prior breadcrumb. We take advantage of the merkle-mask to put
 these breadcrumbs in each node of the transition-tree. See
 [RFC-0007](0007-persistent-ledger-builder-controller) for more info on merkle
@@ -148,7 +148,7 @@ table and not applying an ledger-builder-diffs.
 The add process runs in two phases:
 
 1. Perform a `lookup` on the `Transition_frontier` for the previous `State_hash.t` of this transition. If it is absent, send to [catchup monitor](#catchup-monitor). If present, continue.
-2. Derive a mask from the parent retrieved in (1) and apply the `Ledger_builder_diff.t` of the breadcrumb to that new mask. See [Transition Frontier](#transition-frontier) for more.
+2. Derive a mask from the parent retrieved in (1) and apply the `Staged_ledger_diff.t` of the breadcrumb to that new mask. See [Transition Frontier](#transition-frontier) for more.
 3. Construct the new `Breadcrumb.t` from the new mask and transition, and attempt a true mutate-add to the underlying [Transition Frontier](#transition-frontier) data.
 
 <a href="catchup-monitor"></a>

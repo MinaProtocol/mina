@@ -368,7 +368,7 @@ let apply_coinbase t
     match fee_transfer with
     | None -> return (coinbase_amount, [], None)
     | Some (receiver, fee) ->
-        (* This assertion will pass because of how coinbase is produced by Ledger_builder.apply_diff *)
+        (* This assertion will pass because of how coinbase is produced by Staged_ledger.apply_diff *)
         assert (not @@ Public_key.Compressed.equal receiver proposer) ;
         let fee = Amount.of_fee fee in
         let%bind proposer_reward =

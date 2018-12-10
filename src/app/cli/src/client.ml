@@ -399,7 +399,7 @@ let dump_ledger =
     let open Command.Param in
     let h =
       Arg_type.create (fun s ->
-          Sexp.of_string_conv_exn s Ledger_builder_hash.Stable.V1.t_of_sexp )
+          Sexp.of_string_conv_exn s Staged_ledger_hash.Stable.V1.t_of_sexp )
     in
     anon ("ledger-builder-hash" %: h)
   in
