@@ -390,7 +390,7 @@ let generate_keypair =
     exit 0)
 
 let dump_ledger =
-  let lb_hash =
+  let sl_hash =
     let open Command.Param in
     let h =
       Arg_type.create (fun s ->
@@ -399,8 +399,8 @@ let dump_ledger =
     anon ("ledger-builder-hash" %: h)
   in
   Command.async ~summary:"Print the ledger with given merkle root as a sexp"
-    (Cli_lib.Background_daemon.init lb_hash ~f:(fun port lb_hash ->
-         dispatch Daemon_rpcs.Get_ledger.rpc lb_hash port
+    (Cli_lib.Background_daemon.init sl_hash ~f:(fun port sl_hash ->
+         dispatch Daemon_rpcs.Get_ledger.rpc sl_hash port
          >>| function
          | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e
          | Ok (Error e) -> printf !"Ledger not found: %{sexp:Error.t}\n" e
