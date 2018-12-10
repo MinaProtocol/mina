@@ -1,6 +1,8 @@
 open Core
 open Import
 open Snark_params.Tick
+module Payment_payload = Payment_payload
+module Stake_delegation = Stake_delegation
 module Payload = User_command_payload
 
 type ('payload, 'pk, 'signature) t_ =

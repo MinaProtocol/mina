@@ -395,11 +395,12 @@ module type Inputs_intf = sig
   end
 
   module Transition_frontier :
-    Protocols.Coda_transition_frontier.Transition_frontier_base_intf
+    Protocols.Coda_transition_frontier.Transition_frontier_intf
     with type state_hash := Protocol_state_hash.t
      and type external_transition := External_transition.t
      and type ledger_database := Ledger_db.t
      and type masked_ledger := Masked_ledger.t
+     and type ledger_builder := Ledger_builder.t
 
   module Transition_frontier_controller :
     Protocols.Coda_transition_frontier.Transition_frontier_controller_intf
@@ -441,7 +442,58 @@ module type Inputs_intf = sig
   end
 end
 
-module Make (Inputs : Inputs_intf) = struct
+module type S = sig
+  module Inputs : Inputs_intf
+
+  module Config : sig
+    (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
+    type t =
+      { log: Logger.t
+      ; propose_keypair: Inputs.Keypair.t option
+      ; run_snark_worker: bool
+      ; net_config: Inputs.Net.Config.t
+      ; ledger_builder_persistant_location: string
+      ; transaction_pool_disk_location: string
+      ; snark_pool_disk_location: string
+      ; ledger_db_location: string option
+      ; ledger_builder_transition_backup_capacity: int [@default 10]
+      ; time_controller: Inputs.Time.Controller.t
+      ; banlist: Coda_base.Banlist.t
+      ; receipt_chain_database: Coda_base.Receipt_chain_database.t
+      ; snark_work_fee: Currency.Fee.t }
+    [@@deriving make]
+  end
+
+  type t
+
+  val propose_keypair : t -> Inputs.Keypair.t option
+
+  val run_snark_worker : t -> bool
+
+  val all_tips : t -> Inputs.Transition_frontier.Breadcrumb.t list
+
+  val best_tip : t -> Inputs.Transition_frontier.Breadcrumb.t
+
+  val best_tip_ledger_builder : t -> Inputs.Ledger_builder.t
+
+  val peers : t -> Kademlia.Peer.t list
+
+  val transaction_pool : t -> Inputs.Transaction_pool.t
+
+  val snark_pool : t -> Inputs.Snark_pool.t
+
+  val create : Config.t -> t Deferred.t
+
+  val receipt_chain_database : t -> Coda_base.Receipt_chain_database.t
+
+  val seen_jobs : t -> Inputs.Work_selector.State.t
+
+  val set_seen_jobs : t -> Inputs.Work_selector.State.t -> unit
+
+  val snark_work_fee : t -> Currency.Fee.t
+end
+
+module Make (Inputs : Inputs_intf) : S with module Inputs := Inputs = struct
   open Inputs
 
   type t =
@@ -454,8 +506,6 @@ module Make (Inputs : Inputs_intf) = struct
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
     ; transition_frontier: Transition_frontier.t
-    ; strongest_ledgers:
-        (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t
     ; log: Logger.t
     ; mutable seen_jobs: Work_selector.State.t
     ; receipt_chain_database: Coda_base.Receipt_chain_database.t
@@ -466,27 +516,14 @@ module Make (Inputs : Inputs_intf) = struct
 
   let propose_keypair t = t.propose_keypair
 
-  let best_ledger_builder t =
-    failwith
-      "TODO: Use transition frontier to get best lb out; you'll need to \
-       update the signature"
+  let all_tips t = Transition_frontier.all_tips t.transition_frontier
 
-  let best_protocol_state t =
-    failwith
-      "TODO: Use transition frontier to get best lb out; you'll need to \
-       update the signature"
+  let best_tip t = Transition_frontier.best_tip t.transition_frontier
 
-  let best_tip t =
-    failwith
-      "TODO: Use transition frontier to get best lb out; you'll need to \
-       update the signature"
-
-  let get_ledger t lh =
-    failwith
-      "TODO: Use transition frontier to find an arbitrary ledger based on a \
-       hash"
-
-  let best_ledger t = Ledger_builder.ledger (best_ledger_builder t)
+  let best_tip_ledger_builder t =
+    best_tip t
+    |> Inputs.Transition_frontier.Breadcrumb.staged_ledger
+    |> Inputs.Transition_frontier.hack_temporary_ledger_builder_of_staged_ledger
 
   let seen_jobs t = t.seen_jobs
 
@@ -496,18 +533,11 @@ module Make (Inputs : Inputs_intf) = struct
 
   let snark_pool t = t.snark_pool
 
-  let peers t = Net.peers t.net
-
   let snark_work_fee t = t.snark_work_fee
 
+  let peers t = Net.peers t.net
+
   let receipt_chain_database t = t.receipt_chain_database
-
-  let ledger_builder_ledger_proof t =
-    let lb = best_ledger_builder t in
-    Ledger_builder.current_ledger_proof lb
-
-  let strongest_ledgers t =
-    Linear_pipe.map t.strongest_ledgers ~f:(fun (_, x) -> x)
 
   module Config = struct
     (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
@@ -670,7 +700,6 @@ module Make (Inputs : Inputs_intf) = struct
           ; transaction_pool
           ; snark_pool
           ; transition_frontier
-          ; strongest_ledgers= strongest_ledgers_for_api
           ; log= config.log
           ; seen_jobs= Work_selector.State.init
           ; ledger_builder_transition_backup_capacity=

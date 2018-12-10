@@ -62,6 +62,8 @@ module type Transition_frontier_intf = sig
 
   val root : t -> Breadcrumb.t
 
+  val all_tips : t -> Breadcrumb.t list
+
   val best_tip : t -> Breadcrumb.t
 
   val path : t -> Breadcrumb.t -> state_hash list

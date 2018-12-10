@@ -316,14 +316,15 @@ module Make (Inputs : Inputs_intf) :
     in
     attach_node_to t ~parent_node ~node
 
-  let _root_successor t parent_node =
-    let new_length = parent_node.length + 1 in
-    let root_node = Hashtbl.find_exn t.table t.root in
-    let root_hash = With_hash.hash root_node.breadcrumb.transition_with_hash in
-    let distance_to_root = new_length - root_node.length in
-    if distance_to_root > max_length then
-      `Changed_root (List.hd_exn (path t parent_node.breadcrumb))
-    else `Same_root root_hash
+  let all_tips t =
+    let rec tips hash =
+      let node = Hashtbl.find_exn t.table hash in
+      if node.successor_hashes = [] then
+        [node.breadcrumb]
+      else
+        List.bind node.successor_hashes ~f:tips
+    in
+    tips t.root
 
   (* Adding a transition to the transition frontier is broken into the following steps:
    *   1) create a new breadcrumb for a transition

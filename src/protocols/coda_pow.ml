@@ -3,6 +3,40 @@ open Async_kernel
 open Pipe_lib
 include Coda_transition_frontier
 
+module type Receipt_chain_hash_intf = sig
+  type t
+end
+
+module type Receipt_chain_database_intf = sig
+  type t
+
+  type receipt_chain_hash
+
+  type user_command
+
+  val add :
+       t
+    -> previous:receipt_chain_hash
+    -> user_command
+    -> [ `Duplicate of receipt_chain_hash
+       | `Error_multiple_previous_receipts of receipt_chain_hash
+       | `Ok of receipt_chain_hash ]
+end
+
+module type Account_intf = sig
+  type public_key
+
+  type receipt_chain_hash
+
+  type t
+
+  val public_key : t -> public_key
+
+  val balance : t -> Currency.Balance.t
+
+  val receipt_chain_hash : t -> receipt_chain_hash
+end
+
 module type Security_intf = sig
   val max_depth : [`Infinity | `Finite of int]
   (** In production we set this to (hopefully a prefix of) k for our consensus
@@ -185,8 +219,14 @@ module type Ledger_transfer_intf = sig
   val transfer_accounts : src:src -> dest:dest -> dest
 end
 
+module type Location_intf = sig
+  type t
+end
+
 module type Ledger_intf = sig
   include Ledger_creatable_intf
+
+  module Location : Location_intf
 
   module Mask : Mask_intf
 
@@ -204,6 +244,8 @@ module type Ledger_intf = sig
 
   type account
 
+  type key
+
   (* for masks, serializable is same as t *)
   include
     Mask_serializable_intf
@@ -215,6 +257,10 @@ module type Ledger_intf = sig
 
     val transaction : t -> transaction Or_error.t
   end
+
+  val location_of_key : t -> key -> Location.t option
+
+  val get : t -> Location.t -> account option
 
   val copy : t -> t
 
@@ -262,9 +308,35 @@ module type Snark_pool_proof_intf = sig
 end
 
 module type User_command_intf = sig
-  type t [@@deriving sexp, eq, bin_io]
-
   type public_key
+
+  module Payment_payload : sig
+    type t
+
+    val receiver : t -> public_key
+
+    val amount : t -> Currency.Amount.t
+  end
+
+  module Stake_delegation : sig
+    type t = Set_delegate of {new_delegate: public_key}
+  end
+
+  module Payload : sig
+    module Body : sig
+      type t =
+        | Payment of Payment_payload.t
+        | Stake_delegation of Stake_delegation.t
+    end
+
+    type t [@@deriving sexp, eq, bin_io]
+
+    val fee : t -> Fee.Unsigned.t
+
+    val body : t -> Body.t
+  end
+
+  type t [@@deriving sexp, eq, bin_io]
 
   module With_valid_signature : sig
     type nonrec t = private t [@@deriving sexp, eq]
@@ -272,7 +344,7 @@ module type User_command_intf = sig
 
   val check : t -> With_valid_signature.t option
 
-  val fee : t -> Fee.Unsigned.t
+  val payload : t -> Payload.t 
 
   val sender : t -> public_key
 
@@ -287,6 +359,8 @@ module type Compressed_public_key_intf = sig
   type t [@@deriving sexp, bin_io, compare]
 
   include Comparable.S with type t := t
+
+  val to_base64 : t -> string
 end
 
 module type Public_key_intf = sig
@@ -1075,11 +1149,15 @@ module type Inputs_intf = sig
      and type ledger_proof := Ledger_proof.t
      and type statement := Ledger_proof_statement.t
 
-  module Account : sig
-    type t
+  module Receipt_chain_hash : Receipt_chain_hash_intf
 
-    val public_key : t -> Public_key.Compressed.t
-  end
+  module Receipt_chain_database : Receipt_chain_database_intf
+    with type receipt_chain_hash := Receipt_chain_hash.t
+     and type user_command := User_command.t
+
+  module Account : Account_intf
+    with type public_key := Public_key.Compressed.t
+     and type receipt_chain_hash := Receipt_chain_hash.t
 
   module Ledger :
     Ledger_intf
@@ -1087,6 +1165,7 @@ module type Inputs_intf = sig
      and type transaction := Transaction.t
      and type ledger_hash := Ledger_hash.t
      and type account := Account.t
+     and type key := Public_key.Compressed.t
 
   module Genesis_ledger : sig
     val t : Ledger.t

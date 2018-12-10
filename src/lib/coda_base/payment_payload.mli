@@ -12,6 +12,10 @@ type ('pk, 'amount) t_ = {receiver: 'pk; amount: 'amount}
 type t = (Public_key.Compressed.t, Currency.Amount.t) t_
 [@@deriving bin_io, eq, sexp, hash, yojson]
 
+val receiver : t -> Public_key.Compressed.t
+
+val amount : t -> Currency.Amount.t
+
 val dummy : t
 
 val gen : max_amount:Currency.Amount.t -> t Quickcheck.Generator.t

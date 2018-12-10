@@ -954,8 +954,7 @@ end = struct
       completed_works =
     let open Or_error.Let_syntax in
     let%bind budget =
-      sum_fees user_commands ~f:(fun t -> User_command.fee (t :> User_command.t)
-      )
+      sum_fees user_commands ~f:(fun t -> User_command.Payload.fee (User_command.payload (t :> User_command.t)))
     in
     let%bind work_fee =
       sum_fees completed_works ~f:(fun {Completed_work.fee; _} -> fee)
@@ -1247,13 +1246,14 @@ end = struct
         =
       let tx = (txv :> User_command.t) in
       let open Or_error.Let_syntax in
+      let fee = User_command.Payload.fee (User_command.payload tx) in
       let%bind budget =
         option "overflow"
           (Fee.Signed.add t.budget
-             (Fee.Signed.of_unsigned @@ User_command.fee tx))
+             (Fee.Signed.of_unsigned fee))
       in
       let q =
-        if Currency.Fee.equal (User_command.fee tx) Currency.Fee.zero then
+        if Currency.Fee.equal fee Currency.Fee.zero then
           t.queue_consumption
         else Queue_consumption.add_fee_transfer t.queue_consumption t.self_pk
       in
@@ -1296,7 +1296,7 @@ end = struct
         (txv : User_command.With_valid_signature.t) =
       let tx = (txv :> User_command.t) in
       let q =
-        if Currency.Fee.equal (User_command.fee tx) Currency.Fee.zero then
+        if Currency.Fee.equal (User_command.Payload.fee (User_command.payload tx)) Currency.Fee.zero then
           t.queue_consumption
         else Queue_consumption.add_fee_transfer t.queue_consumption t.self_pk
       in
@@ -1691,7 +1691,10 @@ let%test_module "test" =
   ( module struct
     module Test_input1 = struct
       open Coda_pow
-      module Compressed_public_key = String
+      module Compressed_public_key = struct
+        include String
+        let to_base64 _ = failwith "stub"
+      end
 
       module Sok_message = struct
         module Digest = Unit
@@ -1711,8 +1714,34 @@ let%test_module "test" =
 
         type txn_fee = int [@@deriving sexp, bin_io, compare, eq]
 
-        module T = struct
+        module Payment_payload = struct
+          type t = unit
+
+          let receiver _ = failwith "stub"
+
+          let amount _ = failwith "stub"
+        end
+
+        module Stake_delegation = struct
+          type t = Set_delegate of {new_delegate: string}
+        end
+
+        module Payload = struct
+          module Body = struct
+            type t =
+              | Payment of Payment_payload.t
+              | Stake_delegation of Stake_delegation.t
+          end
+
           type t = txn_amt * txn_fee [@@deriving sexp, bin_io, compare, eq]
+
+          let fee (_, fee) = Fee.Unsigned.of_int fee
+
+          let body _ = failwith "stub"
+        end
+
+        module T = struct
+          type t = Payload.t [@@deriving sexp, bin_io, compare, eq]
         end
 
         include T
@@ -1721,9 +1750,9 @@ let%test_module "test" =
           type t = T.t [@@deriving sexp, bin_io, compare, eq]
         end
 
-        let check : t -> With_valid_signature.t option = fun i -> Some i
+        let payload = Fn.id
 
-        let fee : t -> Fee.Unsigned.t = fun t -> Fee.Unsigned.of_int (snd t)
+        let check : t -> With_valid_signature.t option = fun i -> Some i
 
         (*Fee excess*)
         let sender _ = "S"
@@ -1826,7 +1855,7 @@ let%test_module "test" =
           let open Or_error.Let_syntax in
           match t with
           | User_command t' ->
-              Ok (Currency.Fee.Signed.of_unsigned (User_command.fee t'))
+              Ok (Currency.Fee.Signed.of_unsigned (User_command.Payload.fee (User_command.payload t')))
           | Fee_transfer f ->
               let%map fee = Fee_transfer.fee_excess f in
               Currency.Fee.Signed.negate (Currency.Fee.Signed.of_unsigned fee)
@@ -1932,11 +1961,19 @@ let%test_module "test" =
 
         type transaction = Transaction.t [@@deriving sexp, bin_io]
 
+        module Location = struct
+          type t = unit
+        end
+
         module Undo = struct
           type t = transaction [@@deriving sexp, bin_io]
 
           let transaction t = Ok t
         end
+
+        let location_of_key _ _ = failwith "stub"
+
+        let get _ _ = failwith "stub"
 
         let create ?directory_name:_ () = ref 0
 

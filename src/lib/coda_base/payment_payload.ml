@@ -20,6 +20,10 @@ end
 
 include Stable.V1
 
+let receiver {receiver;_} = receiver
+
+let amount {amount;_} = amount
+
 let dummy = {receiver= Public_key.Compressed.empty; amount= Amount.zero}
 
 type var = (Public_key.Compressed.var, Amount.var) t_

@@ -7,7 +7,8 @@ module type S = sig
   module Compressed_public_key : Compressed_public_key_intf
 
   module User_command :
-    Coda_pow.User_command_intf with type public_key := Compressed_public_key.t
+    Coda_pow.User_command_intf
+    with type public_key := Compressed_public_key.t
 
   module Fee_transfer :
     Coda_pow.Fee_transfer_intf with type public_key := Compressed_public_key.t
@@ -71,6 +72,7 @@ module type S = sig
      and type transaction := Transaction.t
      and type valid_user_command := User_command.With_valid_signature.t
      and type account := Account.t
+     and type key := Compressed_public_key.t
 
   module Sparse_ledger : sig
     type t [@@deriving sexp, bin_io]

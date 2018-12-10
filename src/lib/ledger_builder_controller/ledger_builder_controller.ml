@@ -361,6 +361,8 @@ let%test_module "test" =
           module Compressed = struct
             module T = struct
               type t = unit [@@deriving compare, sexp, bin_io]
+
+              let to_base64 _ = failwith "stub"
             end
 
             include T
