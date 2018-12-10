@@ -11,12 +11,6 @@ module type Transition_frontier_base_intf = sig
 
   type staged_ledger
 
-  (*module Staged_ledger : sig
-    type t = staged_ledger
-
-    val ledger : t -> masked_ledger
-  end*)
-
   type ledger_database
 
   type ledger_diff

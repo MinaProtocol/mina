@@ -826,7 +826,8 @@ module type Tip_intf = sig
   (* serializer for tip components other than the persistent database in the ledger builder *)
   val bin_tip : serializable Bin_prot.Type_class.t
 
-  val of_transition_and_lb : external_transition -> staged_ledger -> t
+  val of_transition_and_staged_ledger :
+    external_transition -> staged_ledger -> t
 
   val copy : t -> t
 end

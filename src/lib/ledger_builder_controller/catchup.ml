@@ -68,7 +68,8 @@ struct
                   transition_with_hash
               in
               let new_tip =
-                { With_hash.data= Tip.of_transition_and_lb transition lb
+                { With_hash.data=
+                    Tip.of_transition_and_staged_ledger transition lb
                 ; hash= transition_state_hash }
               in
               assert_materialization_of new_tip transition_with_hash ;

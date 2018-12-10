@@ -40,7 +40,7 @@ let run_test () : unit Deferred.t =
     let genesis_proof = Precomputed_values.base_proof
 
     let transaction_capacity_log_2 =
-      if with_snark then 2
+      if with_snark then 1
         (*this works because we don't have prover fees. Once we have that, the transaction_capacity_log_2 has to be at least 2 for transactions to be included*)
       else 3
 
@@ -285,7 +285,7 @@ let run_test () : unit Deferred.t =
   if with_snark then
     let accounts = List.take other_accounts 2 in
     let%bind block_count' =
-      test_multiple_payments accounts (pks accounts) 30.
+      test_multiple_payments accounts (pks accounts) 15.
     in
     (*wait for a block after the ledger_proof is emitted*)
     let%map () =

@@ -540,7 +540,7 @@ let%test_module "test" =
           let copy t =
             {t with staged_ledger= Staged_ledger.copy t.staged_ledger}
 
-          let of_transition_and_lb transition staged_ledger =
+          let of_transition_and_staged_ledger transition staged_ledger =
             { state= External_transition.protocol_state transition
             ; proof= External_transition.protocol_state_proof transition
             ; staged_ledger }

@@ -539,7 +539,7 @@ struct
   module External_transition =
     Coda_base.External_transition.Make (Staged_ledger_diff) (Protocol_state)
 
-  module Tf_inputs = struct
+  module Transition_frontier = Transition_frontier.Make (struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Ledger_proof_statement = Ledger_proof_statement
     module Ledger_proof = Ledger_proof
@@ -547,9 +547,7 @@ struct
     module Staged_ledger_diff = Staged_ledger_diff
     module External_transition = External_transition
     module Staged_ledger = Staged_ledger
-  end
-
-  module Transition_frontier = Transition_frontier.Make (Tf_inputs)
+  end)
 
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (User_command)
@@ -577,7 +575,7 @@ struct
       ; staged_ledger: Staged_ledger.t sexp_opaque }
     [@@deriving sexp, fields]
 
-    let of_transition_and_lb transition staged_ledger =
+    let of_transition_and_staged_ledger transition staged_ledger =
       { state= External_transition.protocol_state transition
       ; proof= External_transition.protocol_state_proof transition
       ; staged_ledger }

@@ -39,9 +39,9 @@ module Make (Inputs : Inputs.S) : sig
      and type transaction := Inputs.Transaction.t
 end = struct
   open Inputs
-  module TSS = Transaction_snark_scan_state.Make (Inputs)
+  module Scan_state = Transaction_snark_scan_state.Make (Inputs)
 
-  type job = TSS.Available_job.t
+  type job = Scan_state.Available_job.t
 
   let verify_threadsafe proof statement ~message =
     (* TODO: This is synchronous for now -- we'll need to figure out how to make it async again long term *)
@@ -49,11 +49,9 @@ end = struct
         Inputs.Ledger_proof_verifier.verify proof statement ~message )
 
   let verify ~message job proof =
-    match TSS.statement_of_job job with
+    match Scan_state.statement_of_job job with
     | None -> false
     | Some statement -> verify_threadsafe proof statement ~message
-
-  module Scan_state = TSS
 
   module M = struct
     include Monad.Ident
@@ -61,7 +59,7 @@ end = struct
   end
 
   module Statement_scanner = struct
-    include TSS.Make_statement_scanner
+    include Scan_state.Make_statement_scanner
               (M)
               (struct
                 let verify (_ : Ledger_proof.t) (_ : Ledger_proof_statement.t)
@@ -71,13 +69,13 @@ end = struct
   end
 
   module Statement_scanner_with_proofs =
-    TSS.Make_statement_scanner
+    Scan_state.Make_statement_scanner
       (M)
       (struct
         let verify proof stmt ~message = verify_threadsafe proof stmt ~message
       end)
 
-  type scan_state = TSS.t [@@deriving sexp, bin_io]
+  type scan_state = Scan_state.t [@@deriving sexp, bin_io]
 
   type t =
     { scan_state:
@@ -116,11 +114,11 @@ end = struct
             | _ -> Skip (x :: acc, i + 1, seq) ) )
 
   let all_work_pairs t =
-    let all_jobs = TSS.next_jobs t.scan_state in
-    let module A = TSS.Available_job in
+    let all_jobs = Scan_state.next_jobs t.scan_state in
+    let module A = Scan_state.Available_job in
     let module L = Ledger_proof_statement in
     let single_spec (job : job) =
-      match TSS.extract_from_job job with
+      match Scan_state.extract_from_job job with
       | First (transaction_with_info, statement, witness) ->
           let transaction =
             Or_error.ok_exn @@ Ledger.Undo.transaction transaction_with_info
@@ -160,7 +158,7 @@ end = struct
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
-    match TSS.latest_ledger_proof scan_state with
+    match Scan_state.latest_ledger_proof scan_state with
     | None ->
         Statement_scanner.check_invariants scan_state ~error_prefix ledger None
     | Some proof ->
@@ -171,7 +169,9 @@ end = struct
       t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t =
    fun {ledger; scan_state; _} ~snarked_ledger_hash:expected_target ->
     let open Or_error.Let_syntax in
-    let txns_still_being_worked_on = TSS.staged_transactions scan_state in
+    let txns_still_being_worked_on =
+      Scan_state.staged_transactions scan_state
+    in
     Debug_assert.debug_assert (fun () ->
         let parallelism =
           Int.pow 2 (Inputs.Config.transaction_capacity_log_2 + 1)
@@ -195,7 +195,7 @@ end = struct
           %{sexp:Frozen_ledger_hash.t}: "
         expected_target
     else
-      match TSS.latest_ledger_proof scan_state with
+      match Scan_state.latest_ledger_proof scan_state with
       | None -> return snarked_ledger
       | Some proof ->
           let target = get_target proof in
@@ -235,11 +235,12 @@ end = struct
 
   let copy {scan_state; ledger} =
     let new_mask = Ledger.Mask.create () in
-    { scan_state= TSS.copy scan_state
+    { scan_state= Scan_state.copy scan_state
     ; ledger= Ledger.register_mask ledger new_mask }
 
   let hash {scan_state; ledger} : Staged_ledger_hash.t =
-    Staged_ledger_hash.of_aux_and_ledger_hash (TSS.hash scan_state)
+    Staged_ledger_hash.of_aux_and_ledger_hash
+      (Scan_state.hash scan_state)
       (Ledger.merkle_root ledger)
 
   [%%if
@@ -254,11 +255,11 @@ end = struct
   let ledger {ledger; _} = ledger
 
   let create ~ledger : t =
-    let s = TSS.empty () in
+    let s = Scan_state.empty () in
     {scan_state= s; ledger}
 
   let current_ledger_proof t =
-    Option.map (TSS.latest_ledger_proof t.scan_state) ~f:fst
+    Option.map (Scan_state.latest_ledger_proof t.scan_state) ~f:fst
 
   let total_proofs (works : Transaction_snark_work.t list) =
     List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
@@ -310,7 +311,7 @@ end = struct
     let open Or_error.Let_syntax in
     let%map undo, statement = r in
     ( undo
-    , { TSS.Transaction_with_witness.transaction_with_info= undo
+    , { Scan_state.Transaction_with_witness.transaction_with_info= undo
       ; witness
       ; statement } )
 
@@ -338,7 +339,7 @@ end = struct
       let%bind jobses =
         let open Or_error.Let_syntax in
         let%map jobs =
-          TSS.next_k_jobs t.scan_state ~k:(total_proofs completed_works)
+          Scan_state.next_k_jobs t.scan_state ~k:(total_proofs completed_works)
         in
         chunks_of jobs ~n:Transaction_snark_work.proofs_length
       in
@@ -561,7 +562,7 @@ end = struct
     let%bind () = check_completed_works t works in
     let%bind res_opt =
       (* TODO: Add rollback *)
-      let r = TSS.fill_in_transaction_snark_work t.scan_state works in
+      let r = Scan_state.fill_in_transaction_snark_work t.scan_state works in
       Or_error.iter_error r ~f:(fun e ->
           (* TODO: Pass a logger here *)
           eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e ) ;
@@ -569,7 +570,7 @@ end = struct
     in
     let%bind () =
       Result_with_rollback.of_or_error
-      @@ TSS.enqueue_transactions t.scan_state data
+      @@ Scan_state.enqueue_transactions t.scan_state data
     in
     let%map () =
       verify_scan_state_after_apply new_ledger t.scan_state
@@ -671,19 +672,20 @@ end = struct
           (data1 @ data2, works1 @ cb_works1 @ cb_works2 @ works2) )
     in
     let res_opt =
-      Or_error.ok_exn (TSS.fill_in_transaction_snark_work t.scan_state works)
+      Or_error.ok_exn
+        (Scan_state.fill_in_transaction_snark_work t.scan_state works)
     in
-    Or_error.ok_exn (TSS.enqueue_transactions t.scan_state data) ;
+    Or_error.ok_exn (Scan_state.enqueue_transactions t.scan_state data) ;
     Or_error.ok_exn (verify_scan_state_after_apply t.ledger t.scan_state) ;
     ( `Hash_after_applying (hash t)
     , `Ledger_proof res_opt
     , `Updated_staged_ledger {t with ledger= new_ledger} )
 
   let work_to_do scan_state : Transaction_snark_work.Statement.t Sequence.t =
-    let work_seq = TSS.next_jobs_sequence scan_state in
+    let work_seq = Scan_state.next_jobs_sequence scan_state in
     sequence_chunks_of ~n:Transaction_snark_work.proofs_length
     @@ Sequence.map work_seq ~f:(fun maybe_work ->
-           match TSS.statement_of_job maybe_work with
+           match Scan_state.statement_of_job maybe_work with
            | None -> assert false
            | Some work -> work )
 
@@ -1167,7 +1169,8 @@ end = struct
     let tmp_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
     let partitions =
-      TSS.partition_if_overflowing ~max_slots:max_throughput t.scan_state
+      Scan_state.partition_if_overflowing ~max_slots:max_throughput
+        t.scan_state
     in
     let pre_diffs =
       generate_prediff logger (work_to_do t.scan_state) transactions_by_fee
