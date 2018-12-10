@@ -622,7 +622,7 @@ module type Transaction_snark_scan_state_intf = sig
       -> (unit, Error.t) result M.t
   end
 
-  val empty : t
+  val empty : unit -> t
 
   val enqueue_transactions :
     t -> Transaction_with_witness.t list -> unit Or_error.t
@@ -687,10 +687,12 @@ module type Staged_ledger_base_intf = sig
 
     val is_valid : t -> bool
 
-    val empty : t
+    val empty : unit -> t
   end
 
   val ledger : t -> ledger
+
+  val scan_state : t -> Scan_state.t
 
   val create : ledger:ledger -> t
 
@@ -749,8 +751,6 @@ module type Staged_ledger_intf = sig
   type completed_work
 
   type public_key
-
-  val ledger : t -> ledger
 
   val current_ledger_proof : t -> ledger_proof option
 

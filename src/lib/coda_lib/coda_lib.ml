@@ -572,7 +572,8 @@ module Make (Inputs : Inputs_intf) = struct
                  ~hash_data:
                    (Fn.compose Consensus_mechanism.Protocol_state.hash
                       External_transition.protocol_state))
-            ~root_transaction_snark_scan_state:Staged_ledger.Scan_state.empty
+            ~root_transaction_snark_scan_state:
+              (Staged_ledger.Scan_state.empty ())
             ~root_staged_ledger_diff:None
             ~root_snarked_ledger:
               (Ledger_transfer.transfer_accounts ~src:Genesis.ledger

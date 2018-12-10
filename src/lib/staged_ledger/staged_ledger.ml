@@ -150,7 +150,7 @@ end = struct
     in
     List.map all_jobs_paired ~f:job_pair_to_work_spec_pair
 
-  (*let scan_state {scan_state; _} = scan_state*)
+  let scan_state {scan_state; _} = scan_state
 
   let get_target (proof, _) =
     let {Ledger_proof_statement.target; _} = Ledger_proof.statement proof in
@@ -177,9 +177,9 @@ end = struct
           Int.pow 2 (Inputs.Config.transaction_capacity_log_2 + 1)
         in
         [%test_pred: int]
-          (( >= ) (Inputs.Config.transaction_capacity_log_2 * parallelism))
+          (( >= ) ((Inputs.Config.transaction_capacity_log_2 + 1) * parallelism))
           (List.length txns_still_being_worked_on) ) ;
-    let snarked_ledger = Ledger.copy ledger in
+    let snarked_ledger = Ledger.register_mask ledger (Ledger.Mask.create ()) in
     let%bind () =
       List.fold_left txns_still_being_worked_on ~init:(Ok ()) ~f:(fun acc t ->
           Or_error.bind
@@ -234,7 +234,9 @@ end = struct
     t
 
   let copy {scan_state; ledger} =
-    {scan_state= TSS.copy scan_state; ledger= Ledger.copy ledger}
+    let new_mask = Ledger.Mask.create () in
+    { scan_state= TSS.copy scan_state
+    ; ledger= Ledger.register_mask ledger new_mask }
 
   let hash {scan_state; ledger} : Staged_ledger_hash.t =
     Staged_ledger_hash.of_aux_and_ledger_hash (TSS.hash scan_state)
@@ -251,7 +253,9 @@ end = struct
 
   let ledger {ledger; _} = ledger
 
-  let create ~ledger : t = {scan_state= TSS.empty; ledger}
+  let create ~ledger : t =
+    let s = TSS.empty () in
+    {scan_state= s; ledger}
 
   let current_ledger_proof t =
     Option.map (TSS.latest_ledger_proof t.scan_state) ~f:fst
@@ -1042,8 +1046,7 @@ end = struct
     res_util_with_txns.resources
 
   let two_prediffs logger ws_seq ts_seq get_completed_work ledger self
-      partitions
-      (*: (Resources_util.t, Resources.t * Resources.t option) Either.t*) =
+      partitions =
     let init_resources =
       Resources.init ~available_queue_space:(fst partitions) ~self
         (First Staged_ledger_diff.At_most_two.Zero)
@@ -1442,7 +1445,7 @@ let%test_module "test" =
 
         type maskable_ledger = t
 
-        type attached_mask = t
+        type attached_mask = t [@@deriving sexp]
 
         module Mask = struct
           type t = int [@@deriving bin_io]
@@ -1454,7 +1457,7 @@ let%test_module "test" =
 
         let unregister_mask_exn _ = failwith "unimplemented"
 
-        let register_mask l m = ref (!l + m)
+        let register_mask l _m = copy l
 
         let unattached_mask_of_serializable _ = failwith "unimplemented"
 
@@ -1754,16 +1757,33 @@ let%test_module "test" =
         ; proofs= stmts
         ; prover }
 
-    let create_and_apply sl logger txns stmt_to_work =
+    let create_and_apply sl logger txns stmt_to_work proof =
       let open Or_error.Let_syntax in
       let diff =
         Sl.create_diff sl ~self:self_pk ~logger ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work
       in
-      let%map _, `Ledger_proof ledger_proof, _ =
+      let%map _, `Ledger_proof ledger_proof, `Updated_staged_ledger sl' =
         Sl.apply sl (Test_input1.Staged_ledger_diff.forget diff) ~logger
       in
-      (ledger_proof, Test_input1.Staged_ledger_diff.forget diff)
+      let ledger = Sl.ledger sl in
+      let snarked_ledger_hash =
+        match ledger_proof with
+        | None -> !proof
+        | Some p ->
+            let new_proof =
+              Test_input1.Ledger_proof.statement_target
+                (Test_input1.Ledger_proof.statement p)
+            in
+            proof := new_proof ;
+            new_proof
+      in
+      ledger := !(Sl.ledger sl') ;
+      ( ledger_proof
+      , Test_input1.Staged_ledger_diff.forget diff
+      , Or_error.ok_exn
+        @@ Sl.of_scan_state_and_ledger ~scan_state:(Sl.scan_state sl') ~ledger
+             ~snarked_ledger_hash )
 
     let txns n f g = List.zip_exn (List.init n ~f) (List.init n ~f:g)
 
@@ -1801,11 +1821,13 @@ let%test_module "test" =
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let sl = Sl.create ~ledger:initial_ledger in
+      let proof = ref "0" in
       Quickcheck.test g ~trials:1000 ~f:(fun _ ->
           let old_ledger = !(Sl.ledger sl) in
           let all_ts = txns (p / 2) (fun x -> (x + 1) * 100) (fun _ -> 4) in
-          let proof, diff =
+          let proof, diff, sl =
             create_and_apply sl logger (Sequence.of_list all_ts) stmt_to_work
+              proof
             |> Or_error.ok_exn
           in
           let fee_excess =
@@ -1834,12 +1856,13 @@ let%test_module "test" =
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let sl = Sl.create ~ledger:initial_ledger in
+      let proof = ref "0" in
       Quickcheck.test g ~trials:1000 ~f:(fun i ->
           let old_ledger = !(Sl.ledger sl) in
           let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
           let ts = List.take all_ts i in
-          let proof, diff =
-            create_and_apply sl logger (Sequence.of_list ts) stmt_to_work
+          let proof, diff, sl =
+            create_and_apply sl logger (Sequence.of_list ts) stmt_to_work proof
             |> Or_error.ok_exn
           in
           let fee_excess =
@@ -1876,12 +1899,13 @@ let%test_module "test" =
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let sl = Sl.create ~ledger:initial_ledger in
+      let proof = ref "0" in
       Quickcheck.test g ~trials:1000 ~f:(fun i ->
           let old_ledger = !(Sl.ledger sl) in
           let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
           let ts = List.take all_ts i in
-          let proof, diff =
-            create_and_apply sl logger (Sequence.of_list ts) get_work
+          let proof, diff, sl =
+            create_and_apply sl logger (Sequence.of_list ts) get_work proof
             |> Or_error.ok_exn
           in
           let fee_excess =
@@ -1919,12 +1943,16 @@ let%test_module "test" =
       in
       let ledger = ref 0 in
       let sl = Sl.create ~ledger in
-      List.fold ~init:() txns ~f:(fun _ ts ->
-          let _ =
-            create_and_apply sl logger (Sequence.of_list ts) get_work
-            |> Or_error.ok_exn
-          in
-          () )
+      let proof = ref "0" in
+      let _ =
+        List.fold ~init:sl txns ~f:(fun _ ts ->
+            let _, _, sl =
+              create_and_apply sl logger (Sequence.of_list ts) get_work proof
+              |> Or_error.ok_exn
+            in
+            sl )
+      in
+      ()
 
     let%test_unit "Snarked ledger" =
       Backtrace.elide := false ;
@@ -1933,13 +1961,14 @@ let%test_module "test" =
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let sl = Sl.create ~ledger:initial_ledger in
+      let proof = ref "0" in
       let expected_snarked_ledger = ref 0 in
       Quickcheck.test g ~trials:50 ~f:(fun i ->
           let _old_ledger = !(Sl.ledger sl) in
           let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
           let ts = List.take all_ts i in
-          let proof, _ =
-            create_and_apply sl logger (Sequence.of_list ts) stmt_to_work
+          let proof, _, sl =
+            create_and_apply sl logger (Sequence.of_list ts) stmt_to_work proof
             |> Or_error.ok_exn
           in
           let last_snarked_ledger, snarked_ledger_hash =

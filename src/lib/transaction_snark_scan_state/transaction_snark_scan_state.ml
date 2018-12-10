@@ -175,7 +175,7 @@ end = struct
     let scan_statement t :
         (Ledger_proof_statement.t, [`Error of Error.t | `Empty]) Result.t M.t =
       let write_error description =
-        sprintf !"Staged_ledger.scan_statement: %s" description
+        sprintf !"Staged_ledger.scan_statement: %s\n" description
       in
       let open M.Let_syntax in
       let with_error ~f message =
@@ -336,7 +336,7 @@ end = struct
   let create ~transaction_capacity_log_2 =
     Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 1)
 
-  let empty =
+  let empty () =
     let open Config in
     create ~transaction_capacity_log_2
 

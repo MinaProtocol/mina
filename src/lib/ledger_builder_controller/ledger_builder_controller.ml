@@ -417,7 +417,7 @@ let%test_module "test" =
 
             let is_valid _ = true
 
-            let empty = 0
+            let empty () = 0
           end
 
           let serializable_of_t t = !t
