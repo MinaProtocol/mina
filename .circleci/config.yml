@@ -3,7 +3,7 @@ version: 2
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-7ebc54574da84dfc6c7ee2a28ea3e8dca093dbf5
+            - image: codaprotocol/coda:toolchain-rust-a91280c1eede8b4b5d442c693d85d65f7bf93201
         steps:
             - checkout
             - run:
