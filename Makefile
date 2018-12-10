@@ -133,17 +133,25 @@ deb:
 DEBS3 = deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=120
 
 publish_kademlia_deb:
-	@if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
-		$(DEBS3) --codename stable   --component main src/_build/coda-kademlia.deb ; \
+	@if [ $(AWS_ACCESS_KEY_ID) ] ; then \
+		if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
+			$(DEBS3) --codename stable   --component main src/_build/coda-kademlia.deb ; \
+		else \
+			$(DEBS3) --codename unstable --component main src/_build/coda-kademlia.deb ; \
+		fi ; \
 	else \
-		$(DEBS3) --codename unstable --component main src/_build/coda-kademlia.deb ; \
+		echo "WARNING: AWS_ACCESS_KEY_ID not set, deb-s3 not run" ; \
 	fi
 
 publish_deb:
-	@if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
-		$(DEBS3) --codename stable   --component main src/_build/coda.deb ; \
-	else \
-		$(DEBS3) --codename unstable --component main src/_build/coda.deb ; \
+	@if [ $(AWS_ACCESS_KEY_ID) ] ; then \
+		if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
+			$(DEBS3) --codename stable   --component main src/_build/coda.deb ; \
+		else \
+			$(DEBS3) --codename unstable --component main src/_build/coda.deb ; \
+		fi ; \
+	else  \
+		echo "WARNING: AWS_ACCESS_KEY_ID not set, deb-s3 commands not run" ; \
 	fi
 
 publish_debs: publish_deb publish_kademlia_deb
