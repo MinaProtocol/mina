@@ -921,9 +921,9 @@ struct
       ~(seen_jobs : 'a -> Work_selector.State.t)
       ~(set_seen_jobs : 'a -> Work_selector.State.t -> unit)
       ~(snark_pool : 'a -> Snark_pool.t) (t : 'a) (fee : Fee.Unsigned.t) =
-    let lb = best_staged_ledger t in
+    let sl = best_staged_ledger t in
     let instances, seen_jobs =
-      Work_selector.work ~fee ~snark_pool:(snark_pool t) lb (seen_jobs t)
+      Work_selector.work ~fee ~snark_pool:(snark_pool t) sl (seen_jobs t)
     in
     set_seen_jobs t seen_jobs ;
     if List.is_empty instances then None
