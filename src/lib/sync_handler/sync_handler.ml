@@ -1,6 +1,4 @@
 open Core_kernel
-open Async_kernel
-open Pipe_lib
 open Protocols.Coda_transition_frontier
 open Coda_base
 
@@ -28,27 +26,12 @@ end
 
 module Make (Inputs : Inputs_intf) :
   Sync_handler_intf
-  with type addr := Ledger.Addr.t
-   and type hash := State_hash.t
-   and type syncable_ledger := Inputs.Syncable_ledger.t
-   and type syncable_ledger_query := Inputs.Syncable_ledger.query
-   and type syncable_ledger_answer := Inputs.Syncable_ledger.answer
+  with type hash := State_hash.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type ancestor_proof := State_body_hash.t list = struct
   open Inputs
 
-  let answer_query ~frontier (hash, query) =
-    let open Option.Let_syntax in
-    let%map breadcrumb = Transition_frontier.find frontier hash in
-    let staged_ledger =
-      Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-    in
-    let ledger = Staged_ledger.ledger staged_ledger in
-    let responder = Syncable_ledger.Responder.create ledger ignore in
-    let answer = Syncable_ledger.Responder.answer_query responder query in
-    (hash, answer)
-
-  let prove_ancestory ~frontier generations descendants =
+  let prove_ancestry ~frontier generations descendants =
     let open Option.Let_syntax in
     let rec go acc iter_traversal state_hash =
       if iter_traversal = 0 then Some (state_hash, acc)
@@ -71,12 +54,4 @@ module Make (Inputs : Inputs_intf) :
         go (state_body_hash :: acc) (iter_traversal - 1) previous_state_hash
     in
     go [] generations descendants
-
-  let run ~frontier ~sync_query_reader ~sync_answer_writer =
-    let answer_broadcaster =
-      Strict_pipe.Reader.filter_map sync_query_reader
-        ~f:(answer_query ~frontier)
-    in
-    Strict_pipe.transfer answer_broadcaster sync_answer_writer ~f:Fn.id
-    |> don't_wait_for
 end
