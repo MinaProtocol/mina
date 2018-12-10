@@ -23,9 +23,9 @@ struct
     External_transition.protocol_state t
     |> Protocol_state.blockchain_state |> Blockchain_state.ledger_hash
 
-  let ledger_builder_hash_of_transition t =
+  let staged_ledger_hash_of_transition t =
     External_transition.protocol_state t
-    |> Protocol_state.blockchain_state |> Blockchain_state.ledger_builder_hash
+    |> Protocol_state.blockchain_state |> Blockchain_state.staged_ledger_hash
 
   type t = {net: Net.t; log: Logger.t; sl_ref: Sync_ledger.t option ref}
 
@@ -47,14 +47,15 @@ struct
           transition_with_hash
         in
         let snarked_ledger_hash = ledger_hash_of_transition transition in
-        let build_lb ~(aux_env : Ledger_builder.Aux.t Envelope.Incoming.t)
+        let build_lb
+            ~(scan_state_env : Staged_ledger.Scan_state.t Envelope.Incoming.t)
             ~ledger =
           let open Interruptible.Let_syntax in
-          let aux = Envelope.Incoming.data aux_env in
+          let scan_state = Envelope.Incoming.data scan_state_env in
           match%bind
             Interruptible.return
-              (Ledger_builder.of_aux_and_ledger ~snarked_ledger_hash ~ledger
-                 ~aux)
+              (Staged_ledger.of_scan_state_and_ledger ~snarked_ledger_hash
+                 ~ledger ~scan_state)
           with
           (* TODO: We'll need the full history in order to trust that
                the ledger builder we get is actually valid. See #285 *)
@@ -67,14 +68,15 @@ struct
                   transition_with_hash
               in
               let new_tip =
-                { With_hash.data= Tip.of_transition_and_lb transition lb
+                { With_hash.data=
+                    Tip.of_transition_and_staged_ledger transition lb
                 ; hash= transition_state_hash }
               in
               assert_materialization_of new_tip transition_with_hash ;
               Logger.debug log
                 !"Successfully caught up to full ledger-builder %{sexp: \
-                  Ledger_builder_hash.t}"
-                (Ledger_builder.hash lb) ;
+                  Staged_ledger_hash.t}"
+                (Staged_ledger.hash lb) ;
               let open Transition_logic_state.Change in
               Interruptible.uninterruptible
                 (state_mutator old_state
@@ -87,12 +89,12 @@ struct
                 !"Malicious aux data received from net %s %{sexp: \
                   Host_and_port.t}"
                 (Error.to_string_hum e)
-                (Envelope.Incoming.sender aux_env) ;
+                (Envelope.Incoming.sender scan_state_env) ;
               Interruptible.return ()
         in
         let h =
-          Ledger_builder_hash.ledger_hash
-            (ledger_builder_hash_of_transition transition)
+          Staged_ledger_hash.ledger_hash
+            (staged_ledger_hash_of_transition transition)
         in
         (* Lazily recreate the sync_ledger if necessary *)
         let sl : Sync_ledger.t =
@@ -100,7 +102,7 @@ struct
           | None ->
               trace_recurring_task "sync ledger" (fun () ->
                   let ledger =
-                    Ledger_builder.ledger locked_tip.ledger_builder
+                    Staged_ledger.ledger locked_tip.staged_ledger
                     |> Ledger.copy
                   in
                   let sl = Sync_ledger.create ledger ~parent_log:log in
@@ -131,10 +133,10 @@ struct
               trace_task "net aux" (fun () ->
                   match%bind
                     Interruptible.uninterruptible
-                      (Net.get_ledger_builder_aux_at_hash net
-                         (ledger_builder_hash_of_transition transition))
+                      (Net.get_staged_ledger_aux_at_hash net
+                         (staged_ledger_hash_of_transition transition))
                   with
-                  | Ok aux_env -> build_lb ~aux_env ~ledger
+                  | Ok scan_state_env -> build_lb ~scan_state_env ~ledger
                   | Error e ->
                       Logger.faulty_peer log "Network failed to send aux %s"
                         (Error.to_string_hum e) ;

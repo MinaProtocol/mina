@@ -6,7 +6,7 @@ module type S = sig
 
   include Transition_frontier.Inputs_intf
 
-  module Proof :
+  module State_proof :
     Proof_intf
     with type input := Consensus.Mechanism.Protocol_state.value
      and type t := Proof.t
@@ -16,8 +16,9 @@ module type S = sig
     with type state_hash := State_hash.t
      and type external_transition := External_transition.t
      and type ledger_database := Ledger.Db.t
-     and type ledger_builder := Ledger_builder.t
+     and type staged_ledger := Staged_ledger.t
      and type masked_ledger := Ledger.Mask.Attached.t
+     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
 end
 
 (*

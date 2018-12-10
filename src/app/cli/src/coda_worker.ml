@@ -231,8 +231,8 @@ module T = struct
         Main.create
           (Main.Config.make ~log ~net_config
              ~run_snark_worker:(Option.is_some snark_worker_config)
-             ~ledger_builder_persistant_location:
-               (conf_temp_dir ^/ "ledger_builder")
+             ~staged_ledger_persistant_location:
+               (conf_temp_dir ^/ "staged_ledger")
              ~transaction_pool_disk_location:
                (conf_temp_dir ^/ "transaction_pool")
              ~snark_pool_disk_location:(conf_temp_dir ^/ "snark_pool")
