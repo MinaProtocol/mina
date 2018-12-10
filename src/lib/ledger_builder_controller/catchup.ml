@@ -59,7 +59,7 @@ struct
           with
           (* TODO: We'll need the full history in order to trust that
                the ledger builder we get is actually valid. See #285 *)
-          | Ok lb ->
+          | Ok sl ->
               Option.iter !sl_ref ~f:Sync_ledger.destroy ;
               Sync_ledger.destroy (!sl_ref |> Option.value_exn) ;
               sl_ref := None ;
@@ -69,14 +69,14 @@ struct
               in
               let new_tip =
                 { With_hash.data=
-                    Tip.of_transition_and_staged_ledger transition lb
+                    Tip.of_transition_and_staged_ledger transition sl
                 ; hash= transition_state_hash }
               in
               assert_materialization_of new_tip transition_with_hash ;
               Logger.debug log
                 !"Successfully caught up to full ledger-builder %{sexp: \
                   Staged_ledger_hash.t}"
-                (Staged_ledger.hash lb) ;
+                (Staged_ledger.hash sl) ;
               let open Transition_logic_state.Change in
               Interruptible.uninterruptible
                 (state_mutator old_state
