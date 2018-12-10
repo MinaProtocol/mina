@@ -183,6 +183,7 @@ module type Main_intf = sig
       module Config :
         Coda_networking.Config_intf
         with type gossip_config := Gossip_net.Config.t
+         and type time_controller := Time.Controller.t
     end
 
     module Sparse_ledger : sig
@@ -233,6 +234,10 @@ module type Main_intf = sig
       type t
 
       val hash : t -> Staged_ledger_hash.t
+
+      module Scan_state : sig
+        type t
+      end
     end
 
     module Staged_ledger_diff : sig
@@ -249,6 +254,15 @@ module type Main_intf = sig
       Coda_base.External_transition.S
       with module Protocol_state = Consensus.Mechanism.Protocol_state
        and module Staged_ledger_diff := Staged_ledger_diff
+
+    module Transition_frontier :
+      Protocols.Coda_pow.Transition_frontier_intf
+      with type state_hash := State_hash.t
+       and type external_transition := External_transition.t
+       and type ledger_database := Coda_base.Ledger.Db.t
+       and type masked_ledger := Coda_base.Ledger.t
+       and type staged_ledger := Staged_ledger.t
+       and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
   end
 
   module Config : sig
@@ -282,21 +296,16 @@ module type Main_intf = sig
 
   val best_ledger : t -> Inputs.Ledger.t
 
-  val best_tip :
-       t
-    -> Inputs.Ledger.t
-       * Consensus.Mechanism.Protocol_state.value
-       * Inputs.Protocol_state_proof.t
-
   val best_protocol_state : t -> Consensus.Mechanism.Protocol_state.value
 
-  val best_tip :
-    t -> Inputs.Ledger.t * Consensus.Mechanism.Protocol_state.value * Proof.t
+  val best_tip : t -> Inputs.Transition_frontier.Breadcrumb.t
 
   val peers : t -> Kademlia.Peer.t list
 
   val strongest_ledgers :
-    t -> Inputs.External_transition.t Linear_pipe.Reader.t
+       t
+    -> (Inputs.External_transition.t, State_hash.t) With_hash.t
+       Strict_pipe.Reader.t
 
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
@@ -1171,7 +1180,13 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =
     Option.map Consensus.Mechanism.Consensus_state.to_lite
       ~f:(fun consensus_state_to_lite t pks ->
-        let ledger, state, proof = best_tip t in
+        let ledger = best_ledger t in
+        let transition =
+          With_hash.data
+            (Transition_frontier.Breadcrumb.transition_with_hash (best_tip t))
+        in
+        let state = External_transition.protocol_state transition in
+        let proof = External_transition.protocol_state_proof transition in
         let ledger =
           List.fold pks
             ~f:(fun acc key ->

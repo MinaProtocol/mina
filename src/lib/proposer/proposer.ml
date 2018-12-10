@@ -123,7 +123,8 @@ module Make (Inputs : Inputs_intf) :
    and type time_controller := Inputs.Time.Controller.t
    and type keypair := Inputs.Keypair.t
    and type transition_frontier := Inputs.Transition_frontier.t
-   and type transaction_pool := Inputs.Transaction_pool.t = struct
+   and type transaction_pool := Inputs.Transaction_pool.t
+   and type time := Inputs.Time.t = struct
   open Inputs
   open Consensus_mechanism
 
@@ -306,13 +307,10 @@ module Make (Inputs : Inputs_intf) :
                            (Internal_transition.staged_ledger_diff
                               internal_transition)
                      in
-                     let time =
-                       Time.now time_controller |> Time.to_span_since_epoch
-                       |> Time.Span.to_ms
-                     in
+                     let time = Time.now time_controller in
                      Linear_pipe.write_or_exn ~capacity:transition_capacity
                        transition_writer transition_reader
-                       (external_transition, time)) )
+                       (Envelope.Incoming.local external_transition, time)) )
         in
         let proposal_supervisor = Singleton_supervisor.create ~task:propose in
         let scheduler = Singleton_scheduler.create time_controller in

@@ -212,8 +212,10 @@ module T = struct
           ~directory:receipt_chain_dir_name
       in
       let banlist = Coda_base.Banlist.create ~suspicious_dir ~punished_dir in
+      let time_controller = Main.Inputs.Time.Controller.create () in
       let net_config =
         { Main.Inputs.Net.Config.parent_log= log
+        ; time_controller
         ; gossip_net_params=
             { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
             ; target_peer_count= 8
@@ -234,8 +236,8 @@ module T = struct
              ~transaction_pool_disk_location:
                (conf_temp_dir ^/ "transaction_pool")
              ~snark_pool_disk_location:(conf_temp_dir ^/ "snark_pool")
-             ~time_controller:(Main.Inputs.Time.Controller.create ())
-             ~receipt_chain_database ~snark_work_fee:(Currency.Fee.of_int 0)
+             ~time_controller ~receipt_chain_database
+             ~snark_work_fee:(Currency.Fee.of_int 0)
              ?propose_keypair:Config.propose_keypair () ~banlist)
       in
       Option.iter snark_worker_config ~f:(fun config ->
@@ -279,15 +281,14 @@ module T = struct
       let coda_strongest_ledgers () =
         let r, w = Linear_pipe.create () in
         don't_wait_for
-          (Linear_pipe.iter (Main.strongest_ledgers coda) ~f:(fun t ->
-               let p = Main.Inputs.External_transition.protocol_state t in
+          (Strict_pipe.Reader.iter (Main.strongest_ledgers coda) ~f:(fun t ->
+               let open Main.Inputs in
+               let p = External_transition.protocol_state (With_hash.data t) in
                let prev_state_hash =
                  Main.Inputs.Consensus_mechanism.Protocol_state
                  .previous_state_hash p
                in
-               let state_hash =
-                 Main.Inputs.Consensus_mechanism.Protocol_state.hash p
-               in
+               let state_hash = With_hash.hash t in
                let prev_state_hash = State_hash.to_bits prev_state_hash in
                let state_hash = State_hash.to_bits state_hash in
                Linear_pipe.write w (prev_state_hash, state_hash) )) ;

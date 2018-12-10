@@ -51,8 +51,11 @@ module Make (Inputs : Inputs_intf) :
   let run ~logger ~time_controller ~frontier ~transition_reader
       ~sync_query_reader ~sync_answer_writer =
     let logger = Logger.child logger "transition_frontier_controller" in
-    let valid_transition_reader, valid_transition_writer =
+    let valid_transition_reader_raw, valid_transition_writer =
       Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
+    in
+    let valid_transition_reader_network, valid_transition_reader_processor =
+      Strict_pipe.Reader.Fork.two valid_transition_reader_raw
     in
     let catchup_job_reader, catchup_job_writer =
       Strict_pipe.create (Buffered (`Capacity 5, `Overflow Drop_head))
@@ -63,7 +66,9 @@ module Make (Inputs : Inputs_intf) :
     Transition_handler.Validator.run ~frontier ~transition_reader
       ~valid_transition_writer ~logger ;
     Transition_handler.Processor.run ~logger ~time_controller ~frontier
-      ~valid_transition_reader ~catchup_job_writer ~catchup_breadcrumbs_reader ;
+      ~valid_transition_reader:valid_transition_reader_processor
+      ~catchup_job_writer ~catchup_breadcrumbs_reader ;
     Catchup.run ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer ;
-    Sync_handler.run ~sync_query_reader ~sync_answer_writer ~frontier
+    Sync_handler.run ~sync_query_reader ~sync_answer_writer ~frontier ;
+    valid_transition_reader_network
 end

@@ -59,10 +59,10 @@ module type Network_intf = sig
 
   type transaction_pool_diff
 
+  type time
+
   val states :
-       t
-    -> (state_with_witness Envelope.Incoming.t * Unix_timestamp.t)
-       Linear_pipe.Reader.t
+    t -> (state_with_witness Envelope.Incoming.t * time) Linear_pipe.Reader.t
 
   val peers : t -> Kademlia.Peer.t list
 
@@ -267,6 +267,8 @@ module type Proposer_intf = sig
 
   type transaction_pool
 
+  type time
+
   val create :
        parent_log:Logger.t
     -> get_completed_work:(   completed_work_statement
@@ -276,7 +278,7 @@ module type Proposer_intf = sig
     -> keypair:keypair
     -> consensus_local_state:consensus_local_state
     -> transition_frontier:transition_frontier
-    -> (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
+    -> (external_transition Envelope.Incoming.t * time) Linear_pipe.Reader.t
 end
 
 module type Witness_change_intf = sig
@@ -377,6 +379,7 @@ module type Inputs_intf = sig
      and type ledger_hash := Ledger_hash.t
      and type sync_ledger_query := Sync_ledger.query
      and type sync_ledger_answer := Sync_ledger.answer
+     and type time := Time.t
 
   module Ledger_builder_controller :
     Ledger_builder_controller_intf
@@ -402,7 +405,7 @@ module type Inputs_intf = sig
   end
 
   module Transition_frontier :
-    Protocols.Coda_transition_frontier.Transition_frontier_base_intf
+    Protocols.Coda_transition_frontier.Transition_frontier_intf
     with type state_hash := Protocol_state_hash.t
      and type external_transition := External_transition.t
      and type ledger_database := Ledger_db.t
@@ -435,6 +438,7 @@ module type Inputs_intf = sig
      and type keypair := Keypair.t
      and type transition_frontier := Transition_frontier.t
      and type transaction_pool := Transaction_pool.t
+     and type time := Time.t
 
   module Ledger_transfer :
     Coda_pow.Ledger_transfer_intf
@@ -456,15 +460,14 @@ module Make (Inputs : Inputs_intf) = struct
   type t =
     { propose_keypair: Keypair.t option
     ; run_snark_worker: bool
-    ; net: Net.t
-    ; external_transitions:
-        (External_transition.t * Unix_timestamp.t) Linear_pipe.Writer.t
-        (* TODO: Is this the best spot for the transaction_pool ref? *)
+    ; net:
+        Net.t (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
     ; transition_frontier: Transition_frontier.t
     ; strongest_ledgers:
-        (Staged_ledger.t * External_transition.t) Linear_pipe.Reader.t
+        (External_transition.t, Protocol_state_hash.t) With_hash.t
+        Strict_pipe.Reader.t
     ; log: Logger.t
     ; mutable seen_jobs: Work_selector.State.t
     ; receipt_chain_database: Coda_base.Receipt_chain_database.t
@@ -475,27 +478,33 @@ module Make (Inputs : Inputs_intf) = struct
 
   let propose_keypair t = t.propose_keypair
 
+  let best_tip t = Transition_frontier.best_tip t.transition_frontier
+
   let best_staged_ledger t =
-    failwith
-      "TODO: Use transition frontier to get best lb out; you'll need to \
-       update the signature"
+    Transition_frontier.Breadcrumb.staged_ledger (best_tip t)
 
   let best_protocol_state t =
-    failwith
-      "TODO: Use transition frontier to get best lb out; you'll need to \
-       update the signature"
-
-  let best_tip t =
-    failwith
-      "TODO: Use transition frontier to get best lb out; you'll need to \
-       update the signature"
-
-  let get_ledger t lh =
-    failwith
-      "TODO: Use transition frontier to find an arbitrary ledger based on a \
-       hash"
+    Transition_frontier.Breadcrumb.transition_with_hash (best_tip t)
+    |> With_hash.data |> External_transition.protocol_state
 
   let best_ledger t = Staged_ledger.ledger (best_staged_ledger t)
+
+  let get_ledger t staged_ledger_hash =
+    match
+      List.find_map (Transition_frontier.all_breadcrumbs t.transition_frontier)
+        ~f:(fun b ->
+          let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger b in
+          if
+            Staged_ledger_hash.equal
+              (Staged_ledger.hash staged_ledger)
+              staged_ledger_hash
+          then Some (Ledger.to_list (Staged_ledger.ledger staged_ledger))
+          else None )
+    with
+    | Some x -> Deferred.return (Ok x)
+    | None ->
+        Deferred.Or_error.error_string
+          "ledger builder hash not found in transition frontier"
 
   let seen_jobs t = t.seen_jobs
 
@@ -515,8 +524,7 @@ module Make (Inputs : Inputs_intf) = struct
     let lb = best_staged_ledger t in
     Staged_ledger.current_ledger_proof lb
 
-  let strongest_ledgers t =
-    Linear_pipe.map t.strongest_ledgers ~f:(fun (_, x) -> x)
+  let strongest_ledgers t = t.strongest_ledgers
 
   module Config = struct
     (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
@@ -539,9 +547,33 @@ module Make (Inputs : Inputs_intf) = struct
     [@@deriving make]
   end
 
+  let verify_staged_ledger transition_frontier transition_with_hash =
+    let external_transition = With_hash.data transition_with_hash in
+    let external_transition_hash = With_hash.hash transition_with_hash in
+    let crumb =
+      Transition_frontier.find_exn transition_frontier external_transition_hash
+    in
+    let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger crumb in
+    match Staged_ledger.statement_exn staged_ledger with
+    | `Empty -> ()
+    | `Non_empty {source; target; fee_excess; proof_type= _; supply_increase= _}
+      ->
+        let bc_state =
+          Consensus_mechanism.Protocol_state.blockchain_state
+            (External_transition.protocol_state external_transition)
+        in
+        [%test_eq: Currency.Fee.Signed.t] Currency.Fee.Signed.zero fee_excess ;
+        [%test_eq: Frozen_ledger_hash.t]
+          (Consensus_mechanism.Blockchain_state.ledger_hash bc_state)
+          source ;
+        [%test_eq: Frozen_ledger_hash.t]
+          ( Staged_ledger.ledger staged_ledger
+          |> Ledger.merkle_root |> Frozen_ledger_hash.of_ledger_hash )
+          target
+
   let create (config : Config.t) =
     trace_task "coda" (fun () ->
-        let _external_transitions_reader, external_transitions_writer =
+        let external_transitions_reader, external_transitions_writer =
           Linear_pipe.create ()
         in
         let net_ivar = Ivar.create () in
@@ -581,14 +613,19 @@ module Make (Inputs : Inputs_intf) = struct
                    (Ledger_db.create ?directory_name:config.ledger_db_location
                       ()))
         in
-        let () =
+        let valid_transitions =
           Transition_frontier_controller.run ~logger:config.log
             ~time_controller:config.time_controller
             ~frontier:transition_frontier
             ~transition_reader:
-              (failwith "Turn external_transitions_reader into a strict pipe")
+              (Strict_pipe.Reader.of_linear_pipe
+                 (Linear_pipe.map external_transitions_reader
+                    ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm) )))
             ~sync_query_reader:(failwith "TODO")
             ~sync_answer_writer:(failwith "TODO")
+        in
+        let valid_transitions_for_network, valid_transitions_for_api =
+          Strict_pipe.Reader.Fork.two valid_transitions
         in
         let%bind net =
           Net.create config.net_config
@@ -609,9 +646,14 @@ module Make (Inputs : Inputs_intf) = struct
                Deferred.unit )) ;
         Ivar.fill net_ivar net ;
         don't_wait_for
-          (Linear_pipe.transfer
-             ~f:(fun (tn, tm) -> (Envelope.Incoming.data tn, tm))
-             (Net.states net) external_transitions_writer) ;
+          (Strict_pipe.Reader.iter_without_pushback
+             valid_transitions_for_network ~f:(fun transition_with_hash ->
+               Debug_assert.debug_assert (fun () ->
+                   verify_staged_ledger transition_frontier
+                     transition_with_hash ) ;
+               Net.broadcast_state net (With_hash.data transition_with_hash) )) ;
+        don't_wait_for
+          (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;
         let%bind snark_pool =
           Snark_pool.load ~parent_log:config.log
             ~disk_location:config.snark_pool_disk_location
@@ -621,48 +663,8 @@ module Make (Inputs : Inputs_intf) = struct
           (Linear_pipe.iter (Snark_pool.broadcasts snark_pool) ~f:(fun x ->
                Net.broadcast_snark_pool_diff net x ;
                Deferred.unit )) ;
-        let ( strongest_ledgers_for_miner
-            , strongest_ledgers_for_network
-            , strongest_ledgers_for_api ) =
-          Linear_pipe.fork3
-            (failwith "TODO: Broadcast \"best tips\" from transition frontier")
-        in
-        Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (_, t) ->
-            Net.broadcast_state net t ; Deferred.unit )
-        |> don't_wait_for ;
         ( match config.propose_keypair with
         | Some keypair ->
-            Linear_pipe.iter strongest_ledgers_for_miner
-              ~f:(fun (staged_ledger, transition) ->
-                let protocol_state =
-                  External_transition.protocol_state transition
-                in
-                Debug_assert.debug_assert (fun () ->
-                    match Staged_ledger.statement_exn staged_ledger with
-                    | `Empty -> ()
-                    | `Non_empty
-                        { source
-                        ; target
-                        ; fee_excess
-                        ; proof_type= _
-                        ; supply_increase= _ } ->
-                        let bc_state =
-                          Consensus_mechanism.Protocol_state.blockchain_state
-                            protocol_state
-                        in
-                        [%test_eq: Currency.Fee.Signed.t]
-                          Currency.Fee.Signed.zero fee_excess ;
-                        [%test_eq: Frozen_ledger_hash.t]
-                          (Consensus_mechanism.Blockchain_state.ledger_hash
-                             bc_state)
-                          source ;
-                        [%test_eq: Frozen_ledger_hash.t]
-                          ( Staged_ledger.ledger staged_ledger
-                          |> Ledger.merkle_root
-                          |> Frozen_ledger_hash.of_ledger_hash )
-                          target ) ;
-                return () )
-            |> don't_wait_for ;
             let transitions =
               Proposer.create ~parent_log:config.log ~transaction_pool
                 ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
@@ -671,17 +673,15 @@ module Make (Inputs : Inputs_intf) = struct
             in
             don't_wait_for
               (Linear_pipe.transfer_id transitions external_transitions_writer)
-        | None ->
-            don't_wait_for (Linear_pipe.drain strongest_ledgers_for_miner) ) ;
+        | None -> () ) ;
         return
           { propose_keypair= config.propose_keypair
           ; run_snark_worker= config.run_snark_worker
           ; net
-          ; external_transitions= external_transitions_writer
           ; transaction_pool
           ; snark_pool
           ; transition_frontier
-          ; strongest_ledgers= strongest_ledgers_for_api
+          ; strongest_ledgers= valid_transitions_for_api
           ; log= config.log
           ; seen_jobs= Work_selector.State.init
           ; staged_ledger_transition_backup_capacity=

@@ -134,46 +134,53 @@ struct
            (Consensus.Mechanism.Protocol_state.Blockchain_state.ledger_hash
               root_blockchain_state)) ) ;
     let root_masked_ledger = Ledger.of_database root_snarked_ledger in
+    let root_snarked_ledger_hash =
+      Frozen_ledger_hash.of_ledger_hash
+      @@ Ledger.merkle_root (Ledger.of_database root_snarked_ledger)
+    in
     assert (
       Ledger_hash.equal
         (Ledger.Mask.Attached.merkle_root root_masked_ledger)
         (Staged_ledger_hash.ledger_hash
            (Consensus.Mechanism.Protocol_state.Blockchain_state
             .staged_ledger_hash root_blockchain_state)) ) ;
-    let root_snarked_ledger_hash =
-      Frozen_ledger_hash.of_ledger_hash
-      @@ Ledger.merkle_root (Ledger.of_database root_snarked_ledger)
-    in
-    let pre_root_staged_ledger =
-      match
-        Inputs.Staged_ledger.of_scan_state_and_ledger
-          ~scan_state:root_transaction_snark_scan_state
-          ~ledger:root_masked_ledger
-          ~snarked_ledger_hash:root_snarked_ledger_hash
-      with
-      | Error e -> failwith (Error.to_string_hum e)
-      | Ok sl -> sl
-    in
-    let root_staged_ledger =
-      match root_staged_ledger_diff with
-      | None -> pre_root_staged_ledger
-      | Some diff -> (
-        match
-          Inputs.Staged_ledger.apply pre_root_staged_ledger diff ~logger
-        with
-        | Error e -> failwith (Error.to_string_hum e)
-        | Ok (_, _, `Updated_staged_ledger root_staged_ledger) ->
-            root_staged_ledger )
-    in
-    let root_breadcrumb =
-      { Breadcrumb.transition_with_hash= root_transition
-      ; staged_ledger= root_staged_ledger }
-    in
-    let root_node =
-      {breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
-    in
-    let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
-    {logger; root_snarked_ledger; root= root_hash; best_tip= root_hash; table}
+    match
+      Inputs.Staged_ledger.of_scan_state_and_ledger
+        ~scan_state:root_transaction_snark_scan_state
+        ~ledger:root_masked_ledger
+        ~snarked_ledger_hash:root_snarked_ledger_hash
+    with
+    | Error e -> failwith (Error.to_string_hum e)
+    | Ok pre_root_staged_ledger ->
+        let root_staged_ledger =
+          match root_staged_ledger_diff with
+          | None -> pre_root_staged_ledger
+          | Some diff -> (
+            match
+              Inputs.Staged_ledger.apply pre_root_staged_ledger diff ~logger
+            with
+            | Error e -> failwith (Error.to_string_hum e)
+            | Ok (_, _, `Updated_staged_ledger _root_staged_ledger) ->
+                failwith
+                  "Use staged_ledger_hash and ledger proof emitted after apply"
+            )
+        in
+        let root_breadcrumb =
+          { Breadcrumb.transition_with_hash= root_transition
+          ; staged_ledger= root_staged_ledger }
+        in
+        let root_node =
+          {breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
+        in
+        let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
+        { logger
+        ; root_snarked_ledger
+        ; root= root_hash
+        ; best_tip= root_hash
+        ; table }
+
+  let all_breadcrumbs t =
+    List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb; _} -> breadcrumb)
 
   let find t hash =
     let open Option.Let_syntax in
