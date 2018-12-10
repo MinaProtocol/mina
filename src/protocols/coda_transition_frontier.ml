@@ -5,23 +5,11 @@ module type Transition_frontier_base_intf = sig
 
   type external_transition
 
+  type transaction_snark_scan_state
+
   type masked_ledger
 
   type staged_ledger
-
-  module Transaction_snark_scan_state : sig
-    type t
-
-    val empty : t
-  end
-
-  module Staged_ledger : sig
-    type t = staged_ledger
-
-    val ledger : t -> masked_ledger
-  end
-
-  type ledger_builder
 
   module Breadcrumb : sig
     type t [@@deriving sexp]
@@ -42,12 +30,9 @@ module type Transition_frontier_base_intf = sig
        logger:Logger.t
     -> root_transition:(external_transition, state_hash) With_hash.t
     -> root_snarked_ledger:ledger_database
-    -> root_transaction_snark_scan_state:Transaction_snark_scan_state.t
+    -> root_transaction_snark_scan_state:transaction_snark_scan_state
     -> root_staged_ledger_diff:ledger_diff option
     -> t
-
-  val hack_temporary_ledger_builder_of_staged_ledger :
-    staged_ledger -> ledger_builder
 
   val find_exn : t -> state_hash -> Breadcrumb.t
 end

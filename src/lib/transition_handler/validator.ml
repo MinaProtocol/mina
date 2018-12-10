@@ -53,7 +53,7 @@ module Make (Inputs : Inputs.S) = struct
         "transition frontier root hash was invalid"
       *)
       let%map proof_is_valid =
-        Proof.verify
+        State_proof.verify
           (External_transition.protocol_state_proof t)
           (External_transition.protocol_state t)
       in

@@ -27,13 +27,13 @@ module Base = struct
       type t [@@deriving eq, bin_io, sexp, eq]
     end
 
-    module Ledger_builder_hash : sig
+    module Staged_ledger_hash : sig
       type t [@@deriving eq, sexp, compare]
 
       val ledger_hash : t -> Ledger_hash.t
     end
 
-    module Ledger_builder_diff : sig
+    module Staged_ledger_diff : sig
       type t [@@deriving sexp, bin_io]
 
       module With_valid_signatures_and_proofs : sig
@@ -53,7 +53,7 @@ module Base = struct
       val merkle_root : t -> Ledger_hash.t
     end
 
-    module Ledger_builder_aux_hash : sig
+    module Staged_ledger_aux_hash : sig
       type t [@@deriving sexp]
     end
 
@@ -75,7 +75,7 @@ module Base = struct
 
         val ledger_hash : value -> Frozen_ledger_hash.t
 
-        val ledger_builder_hash : value -> Ledger_builder_hash.t
+        val staged_ledger_hash : value -> Staged_ledger_hash.t
       end
 
       module Protocol_state : sig
@@ -125,7 +125,7 @@ module Base = struct
 
       val protocol_state_proof : t -> Protocol_state_proof.t
 
-      val ledger_builder_diff : t -> Ledger_builder_diff.t
+      val staged_ledger_diff : t -> Staged_ledger_diff.t
     end
 
     module Ledger_proof_statement : sig
@@ -140,26 +140,26 @@ module Base = struct
       val statement : t -> Ledger_proof_statement.t
     end
 
-    module Ledger_builder :
-      Protocols.Coda_pow.Ledger_builder_base_intf
-      with type ledger_builder_hash := Ledger_builder_hash.t
+    module Staged_ledger :
+      Protocols.Coda_pow.Staged_ledger_base_intf
+      with type staged_ledger_hash := Staged_ledger_hash.t
        and type frozen_ledger_hash := Frozen_ledger_hash.t
        and type valid_diff :=
-                  Ledger_builder_diff.With_valid_signatures_and_proofs.t
-       and type diff := Ledger_builder_diff.t
+                  Staged_ledger_diff.With_valid_signatures_and_proofs.t
+       and type diff := Staged_ledger_diff.t
        and type ledger_proof := Ledger_proof.t
        and type ledger := Ledger.t
-       and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+       and type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
 
     module Tip :
       Protocols.Coda_pow.Tip_intf
-      with type ledger_builder := Ledger_builder.t
+      with type staged_ledger := Staged_ledger.t
        and type protocol_state := Consensus_mechanism.Protocol_state.value
        and type protocol_state_proof := Protocol_state_proof.t
        and type serializable :=
                   Consensus_mechanism.Protocol_state.value
                   * Protocol_state_proof.t
-                  * Ledger_builder.serializable
+                  * Staged_ledger.serializable
        and type external_transition := External_transition.t
 
     val verify_blockchain :
@@ -207,11 +207,11 @@ module Synchronizing = struct
 
     module Net : sig
       include
-        Coda_lib.Ledger_builder_io_intf
+        Coda_lib.Staged_ledger_io_intf
         with type sync_ledger_query := Sync_ledger.query
          and type sync_ledger_answer := Sync_ledger.answer
-         and type ledger_builder_hash := Ledger_builder_hash.t
-         and type ledger_builder_aux := Ledger_builder.Aux.t
+         and type staged_ledger_hash := Staged_ledger_hash.t
+         and type staged_ledger_aux := Staged_ledger.Scan_state.t
          and type ledger_hash := Ledger_hash.t
          and type protocol_state := Consensus_mechanism.Protocol_state.value
     end

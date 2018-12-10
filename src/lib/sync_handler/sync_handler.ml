@@ -12,8 +12,9 @@ module type Inputs_intf = sig
     with type state_hash := State_hash.t
      and type external_transition := External_transition.t
      and type ledger_database := Ledger.Db.t
-     and type ledger_builder := Ledger_builder.t
+     and type staged_ledger := Staged_ledger.t
      and type masked_ledger := Ledger.Mask.Attached.t
+     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
 
   module Syncable_ledger :
     Syncable_ledger.S
@@ -42,7 +43,7 @@ module Make (Inputs : Inputs_intf) :
     let staged_ledger =
       Transition_frontier.Breadcrumb.staged_ledger breadcrumb
     in
-    let ledger = Transition_frontier.Staged_ledger.ledger staged_ledger in
+    let ledger = Staged_ledger.ledger staged_ledger in
     let responder = Syncable_ledger.Responder.create ledger ignore in
     let answer = Syncable_ledger.Responder.answer_query responder query in
     (hash, answer)

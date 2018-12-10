@@ -74,4 +74,4 @@ let typ : (var, t) Typ.t =
   Typ.transport
     (Typ.list ~length:length_in_triples (triple Boolean.typ))
     ~there:(Fn.compose Fold.to_list fold)
-    ~back:(fun _ -> failwith "Cannot read a ledger_builder_hash from a var")
+    ~back:(fun _ -> failwith "Cannot read a staged_ledger_hash from a var")
