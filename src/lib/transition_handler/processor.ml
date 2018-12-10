@@ -51,7 +51,7 @@ module Make (Inputs : Inputs.S) :
                          ~timeout_duration:catchup_timeout_duration ~transition
                    | Some _ ->
                        ignore
-                         (Transition_frontier.add_transition_exn ~logger frontier
+                         (Transition_frontier.add_transition_exn frontier
                             transition) ;
                        Catchup_monitor.notify catchup_monitor ~time_controller
                          ~transition ) ) ))
@@ -65,7 +65,7 @@ let%test_module "Transition_handler.Processor tests" =
 
     module Time = Coda_base.Block_time
 
-    module Proof = struct
+    module State_proof = struct
       include Coda_base.Proof
 
       let verify _ = failwith "stub"
@@ -77,8 +77,6 @@ let%test_module "Transition_handler.Processor tests" =
         * Coda_base.Sok_message.Digest.Stable.V1.t
       [@@deriving sexp, bin_io]
 
-      type statement = Transaction_snark.Statement.t
-
       let underlying_proof (_ : t) = Proof.dummy
 
       let statement ((t, _) : t) : Transaction_snark.Statement.t = t
@@ -87,7 +85,7 @@ let%test_module "Transition_handler.Processor tests" =
 
       let sok_digest (_, d) = d
 
-      let create ~statement ~sok_digest ~proof = (statement, sok_digest)
+      let create ~statement ~sok_digest ~proof:_ = (statement, sok_digest)
     end
 
     module Ledger_proof_statement = Transaction_snark.Statement
@@ -96,12 +94,13 @@ let%test_module "Transition_handler.Processor tests" =
       let verify _ = failwith "stub"
     end
 
-    module Ledger_builder_aux_hash = struct
-      include Coda_base.Ledger_builder_hash.Aux_hash.Stable.V1
+    module Staged_ledger_aux_hash = struct
+      include Coda_base.Staged_ledger_hash.Aux_hash.Stable.V1
 
-      let of_bytes = Coda_base.Ledger_builder_hash.Aux_hash.of_bytes
+      let of_bytes = Coda_base.Staged_ledger_hash.Aux_hash.of_bytes
     end
 
+    (*
     module User_command = struct
       include (
         Coda_base.User_command :
@@ -150,7 +149,6 @@ let%test_module "Transition_handler.Processor tests" =
           module type of Coda_base.Transaction with type t := t )
     end
 
-    (*
     module Completed_work =
       Ledger_builder.Make_completed_work
         (Signature_lib.Public_key.Compressed)
@@ -168,7 +166,7 @@ let%test_module "Transition_handler.Processor tests" =
     end)
     *)
 
-    module Completed_work = struct
+    module Transaction_snark_work = struct
       let proofs_length = 2
 
       module Statement = struct
@@ -200,7 +198,7 @@ let%test_module "Transition_handler.Processor tests" =
       let forget = Fn.id
     end
 
-    module Ledger_builder_diff = struct
+    module Staged_ledger_diff = struct
       module At_most_two = struct
         type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
         [@@deriving sexp, bin_io]
@@ -215,15 +213,15 @@ let%test_module "Transition_handler.Processor tests" =
       end
 
       type diff =
-        {completed_works: Completed_work.t list; user_commands: Coda_base.User_command.t list}
+        {completed_works: Transaction_snark_work.t list; user_commands: Coda_base.User_command.t list}
       [@@deriving sexp, bin_io]
 
       type diff_with_at_most_two_coinbase =
-        {diff: diff; coinbase_parts: Completed_work.t At_most_two.t}
+        {diff: diff; coinbase_parts: Transaction_snark_work.t At_most_two.t}
       [@@deriving sexp, bin_io]
 
       type diff_with_at_most_one_coinbase =
-        {diff: diff; coinbase_added: Completed_work.t At_most_one.t}
+        {diff: diff; coinbase_added: Transaction_snark_work.t At_most_one.t}
       [@@deriving sexp, bin_io]
 
       type pre_diffs =
@@ -233,21 +231,21 @@ let%test_module "Transition_handler.Processor tests" =
       [@@deriving sexp, bin_io]
 
       type t =
-        {pre_diffs: pre_diffs; prev_hash: Coda_base.Ledger_builder_hash.t; creator: Signature_lib.Public_key.Compressed.t}
+        {pre_diffs: pre_diffs; prev_hash: Coda_base.Staged_ledger_hash.t; creator: Signature_lib.Public_key.Compressed.t}
       [@@deriving sexp, bin_io]
 
       module With_valid_signatures_and_proofs = struct
         type diff =
-          { completed_works: Completed_work.Checked.t list
+          { completed_works: Transaction_snark_work.Checked.t list
           ; user_commands: Coda_base.User_command.With_valid_signature.t list }
         [@@deriving sexp]
 
         type diff_with_at_most_two_coinbase =
-          {diff: diff; coinbase_parts: Completed_work.Checked.t At_most_two.t}
+          {diff: diff; coinbase_parts: Transaction_snark_work.Checked.t At_most_two.t}
         [@@deriving sexp]
 
         type diff_with_at_most_one_coinbase =
-          {diff: diff; coinbase_added: Completed_work.Checked.t At_most_one.t}
+          {diff: diff; coinbase_added: Transaction_snark_work.Checked.t At_most_one.t}
         [@@deriving sexp]
 
         type pre_diffs =
@@ -258,7 +256,7 @@ let%test_module "Transition_handler.Processor tests" =
 
         type t =
           { pre_diffs: pre_diffs
-          ; prev_hash: Coda_base.Ledger_builder_hash.t
+          ; prev_hash: Coda_base.Staged_ledger_hash.t
           ; creator: Signature_lib.Public_key.Compressed.t }
         [@@deriving sexp]
 
@@ -272,30 +270,30 @@ let%test_module "Transition_handler.Processor tests" =
 
     module External_transition =
       Coda_base.External_transition.Make
-        (Ledger_builder_diff)
+        (Staged_ledger_diff)
         (Consensus.Mechanism.Protocol_state)
 
-    module Ledger_builder = struct
+    module Staged_ledger = struct
       type t = unit [@@deriving sexp]
 
       type serializable = unit [@@deriving bin_io, sexp]
 
-      module Aux = struct
+      module Scan_state = struct
         type t = unit [@@deriving bin_io]
 
         let hash _ = failwith "stub"
 
         let is_valid _ = failwith "stub"
 
-        let empty ~parallelism_log_2:_ = ()
+        let empty () = ()
       end
 
       let ledger _ = failwith "stub"
 
       let create ~ledger:_ = ()
 
-      let of_aux_and_ledger ~snarked_ledger_hash:_ ~ledger:_ ~aux:_ =
-        Deferred.Or_error.return ()
+      let of_scan_state_and_ledger ~snarked_ledger_hash:_ ~ledger:_ ~scan_state:_ =
+        Or_error.return ()
 
       let of_serialized_and_unserialized ~serialized:_ ~unserialized:_ = ()
 
@@ -303,7 +301,7 @@ let%test_module "Transition_handler.Processor tests" =
 
       let hash () = failwith "stub"
 
-      let aux () = failwith "stub"
+      let scan_state () = failwith "stub"
 
       let serializable_of_t _ = failwith "stub"
 
@@ -355,33 +353,34 @@ let%test_module "Transition_handler.Processor tests" =
     end)
     *)
 
-    module Transition_frontier = Transition_frontier.Make (struct
+    module Base_inputs = struct
+      module Ledger_proof_statement = Ledger_proof_statement
       module Ledger_proof = Ledger_proof
-      module Completed_work = Completed_work
-      module Ledger_builder_diff = Ledger_builder_diff
+      module Transaction_snark_work = Transaction_snark_work
       module External_transition = External_transition
-      module Ledger_builder = Ledger_builder
-    end)
+      module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+      module Staged_ledger_diff = Staged_ledger_diff
+      module Staged_ledger = Staged_ledger
+    end
+
+    module Transition_frontier = Transition_frontier.Make (Base_inputs)
 
     module Processor = Make (struct
+      include Base_inputs
       module Time = Time
-      module Ledger_proof = Ledger_proof
-      module Completed_work = Completed_work
-      module Ledger_builder_diff = Ledger_builder_diff
-      module External_transition = External_transition
-      module Proof = Proof
+      module State_proof = State_proof
       module Transition_frontier = Transition_frontier
     end)
 
-    let dummy_ledger_bulder_diff =
+    let dummy_staged_ledger_diff =
       let creator = Quickcheck.random_value Signature_lib.Public_key.Compressed.gen in
-      { Ledger_builder_diff.pre_diffs=
+      { Staged_ledger_diff.pre_diffs=
           Either.First
             { diff=
                 { completed_works= []
                 ; user_commands= [] }
-            ; coinbase_added= Ledger_builder_diff.At_most_one.Zero }
-      ; prev_hash= Coda_base.Ledger_builder_hash.dummy
+            ; coinbase_added= Staged_ledger_diff.At_most_one.Zero }
+      ; prev_hash= Coda_base.Staged_ledger_hash.dummy
       ; creator }
 
     let gen_external_transition previous_protocol_state =
@@ -393,13 +392,13 @@ let%test_module "Transition_handler.Processor tests" =
         ~snarked_ledger_hash:Coda_base.Frozen_ledger_hash.empty_hash
       in
       let protocol_state = Consensus.Mechanism.Protocol_state.create_value ~blockchain_state ~consensus_state ~previous_state_hash:(With_hash.hash previous_protocol_state) in
-      let transition = External_transition.create ~protocol_state ~protocol_state_proof:Proof.dummy ~ledger_builder_diff:dummy_ledger_bulder_diff in
+      let transition = External_transition.create ~protocol_state ~protocol_state_proof:Proof.dummy ~staged_ledger_diff:dummy_staged_ledger_diff in
       {With_hash.data= transition; hash= Consensus.Mechanism.Protocol_state.hash protocol_state}
 
     let dummy_protocol_state =
       let blockchain_state =
         Consensus.Mechanism.Blockchain_state.create_value
-          ~ledger_builder_hash:Coda_base.Ledger_builder_hash.dummy
+          ~staged_ledger_hash:Coda_base.Staged_ledger_hash.dummy
           ~ledger_hash:Coda_base.Frozen_ledger_hash.empty_hash
           ~timestamp:(Time.now ())
       in
@@ -443,12 +442,12 @@ let%test_module "Transition_handler.Processor tests" =
                      ~blockchain_state:(
                        Consensus.Mechanism.Blockchain_state.create_value
                          ~ledger_hash:(Coda_base.Frozen_ledger_hash.of_ledger_hash (Coda_base.Ledger.Db.merkle_root root_snarked_ledger))
-                         ~ledger_builder_hash:Coda_base.Ledger_builder_hash.dummy
+                         ~staged_ledger_hash:Coda_base.Staged_ledger_hash.dummy
                          ~timestamp:(Time.now ()))
                      ~consensus_state:(
                        Consensus.Mechanism.Protocol_state.consensus_state Consensus.Mechanism.genesis_protocol_state))
                  ~protocol_state_proof:Proof.dummy
-                 ~ledger_builder_diff:dummy_ledger_bulder_diff
+                 ~staged_ledger_diff:dummy_staged_ledger_diff
            ; hash= Consensus.Mechanism.Protocol_state.hash Consensus.Mechanism.genesis_protocol_state }
          in
          let frontier =
@@ -487,7 +486,7 @@ let%test_module "Transition_handler.Processor tests" =
            ~valid_transition_reader ~catchup_job_writer
            ~catchup_breadcrumbs_reader ;
          don't_wait_for
-           (Reader.iter_sync catchup_job_reader ~f:check_catchup_job) ;
+           (Reader.iter_without_pushback catchup_job_reader ~f:check_catchup_job) ;
          for _ = 1 to test_size do
            let status, transition =
              gen_transition ~seed
