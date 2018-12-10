@@ -1,5 +1,13 @@
 open Pipe_lib.Strict_pipe
 
+module type Network_intf = sig
+  type t
+
+  type peer
+
+  val peers : t -> peer list
+end
+
 module type Transition_frontier_base_intf = sig
   type state_hash
 
@@ -11,8 +19,13 @@ module type Transition_frontier_base_intf = sig
 
   type staged_ledger
 
+  type ledger_diff
+
   module Breadcrumb : sig
     type t [@@deriving sexp]
+
+    val create :
+      (external_transition, state_hash) With_hash.t -> staged_ledger -> t
 
     val transition_with_hash :
       t -> (external_transition, state_hash) With_hash.t
@@ -21,8 +34,6 @@ module type Transition_frontier_base_intf = sig
   end
 
   type ledger_database
-
-  type ledger_diff
 
   type t
 
@@ -53,7 +64,9 @@ module type Transition_frontier_intf = sig
 
   val best_tip : t -> Breadcrumb.t
 
-  val path : t -> Breadcrumb.t -> state_hash list
+  val path_map : t -> Breadcrumb.t -> f:(Breadcrumb.t -> 'a) -> 'a list
+
+  val hash_path : t -> Breadcrumb.t -> state_hash list
 
   val find : t -> state_hash -> Breadcrumb.t option
 
@@ -82,13 +95,17 @@ module type Catchup_intf = sig
 
   type transition_frontier_breadcrumb
 
+  type network
+
   val run :
-       frontier:transition_frontier
+       logger:Logger.t
+    -> network:network
+    -> frontier:transition_frontier
     -> catchup_job_reader:(external_transition, state_hash) With_hash.t
                           Reader.t
     -> catchup_breadcrumbs_writer:( transition_frontier_breadcrumb list
                                   , crash buffered
-                                  , _ )
+                                  , unit )
                                   Writer.t
     -> unit
 end
@@ -197,10 +214,13 @@ module type Transition_frontier_controller_intf = sig
 
   type transition_frontier
 
+  type network
+
   type time
 
   val run :
        logger:Logger.t
+    -> network:network
     -> time_controller:time_controller
     -> frontier:transition_frontier
     -> transition_reader:( [ `Transition of external_transition

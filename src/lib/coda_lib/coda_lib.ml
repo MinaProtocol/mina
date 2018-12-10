@@ -420,6 +420,7 @@ module type Inputs_intf = sig
      and type masked_ledger := Masked_ledger.t
      and type staged_ledger := Staged_ledger.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+     and type ledger_diff := Staged_ledger_diff.t
 
   module Transition_frontier_controller :
     Protocols.Coda_transition_frontier.Transition_frontier_controller_intf
@@ -430,6 +431,7 @@ module type Inputs_intf = sig
      and type transition_frontier := Transition_frontier.t
      and type state_hash := Protocol_state_hash.t
      and type time := Time.t
+     and type network := Net.t
 
   module Proposer :
     Proposer_intf
@@ -654,7 +656,7 @@ module Make (Inputs : Inputs_intf) = struct
               (ledger_hash, answer) )
         in
         let valid_transitions =
-          Transition_frontier_controller.run ~logger:config.log
+          Transition_frontier_controller.run ~logger:config.log ~network:net
             ~time_controller:config.time_controller
             ~frontier:transition_frontier
             ~transition_reader:
