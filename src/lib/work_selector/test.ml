@@ -74,12 +74,12 @@ module Make_test (Make_selector : Work_selector_F) = struct
     Quickcheck.test g ~trials:100 ~f:(fun i ->
         Async.Thread_safe.block_on_async_exn (fun () ->
             let open Deferred.Let_syntax in
-            let lb : T.Staged_ledger.t = List.init i ~f:Fn.id in
+            let sl : T.Staged_ledger.t = List.init i ~f:Fn.id in
             let rec go i seen =
               [%test_result: Bool.t]
                 ~message:"Exceeded time expected to exhaust work" ~expect:true
                 (i <= p) ;
-              let stuff, seen = Selector.work ~snark_pool ~fee lb seen in
+              let stuff, seen = Selector.work ~snark_pool ~fee sl seen in
               match stuff with [] -> return () | _ -> go (i + 1) seen
             in
             go 0 Selector.State.init ) )
@@ -109,15 +109,15 @@ module Make_test (Make_selector : Work_selector_F) = struct
     Quickcheck.test g ~trials:100 ~f:(fun i ->
         Async.Thread_safe.block_on_async_exn (fun () ->
             let open Deferred.Let_syntax in
-            let lb : T.Staged_ledger.t = List.init i ~f:Fn.id in
-            let works = T.Staged_ledger.chunks_of lb ~n:2 in
+            let sl : T.Staged_ledger.t = List.init i ~f:Fn.id in
+            let works = T.Staged_ledger.chunks_of sl ~n:2 in
             let my_fee = 2 in
             let snark_pool = gen_snark_pool works my_fee in
             let rec go i seen =
               [%test_result: Bool.t]
                 ~message:"Exceeded time expected to exhaust work" ~expect:true
                 (i <= p) ;
-              let work, seen = Selector.work ~snark_pool ~fee:my_fee lb seen in
+              let work, seen = Selector.work ~snark_pool ~fee:my_fee sl seen in
               match work with
               | [] -> return ()
               | job ->
