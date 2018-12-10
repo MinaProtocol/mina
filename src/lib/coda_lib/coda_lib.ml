@@ -365,6 +365,14 @@ module type Inputs_intf = sig
     type query [@@deriving bin_io]
 
     type answer [@@deriving bin_io]
+
+    module Responder : sig
+      type t
+
+      val create : Ledger.t -> (query -> unit) -> t
+
+      val answer_query : t -> query -> answer
+    end
   end
 
   module Net :
@@ -506,6 +514,22 @@ module Make (Inputs : Inputs_intf) = struct
         Deferred.Or_error.error_string
           "ledger builder hash not found in transition frontier"
 
+  let get_ledger_by_hash tf ledger_hash =
+    match
+      List.find_map (Transition_frontier.all_breadcrumbs tf) ~f:(fun b ->
+          let ledger =
+            Transition_frontier.Breadcrumb.staged_ledger b
+            |> Staged_ledger.ledger
+          in
+          if Ledger_hash.equal (Ledger.merkle_root ledger) ledger_hash then
+            Some ledger
+          else None )
+    with
+    | Some x -> Deferred.return (Ok x)
+    | None ->
+        Deferred.Or_error.error_string
+          "ledger hash not found in transition frontier"
+
   let seen_jobs t = t.seen_jobs
 
   let set_seen_jobs t seen_jobs = t.seen_jobs <- seen_jobs
@@ -613,6 +637,22 @@ module Make (Inputs : Inputs_intf) = struct
                    (Ledger_db.create ?directory_name:config.ledger_db_location
                       ()))
         in
+        let%bind net =
+          Net.create config.net_config
+            ~get_staged_ledger_aux_at_hash:(fun hash ->
+              failwith "shouldn't be necessary right now?" )
+            ~answer_sync_ledger_query:(fun query_env ->
+              let open Deferred.Or_error.Let_syntax in
+              let ledger_hash, query = Envelope.Incoming.data query_env in
+              let%map ledger =
+                get_ledger_by_hash transition_frontier ledger_hash
+              in
+              let responder = Sync_ledger.Responder.create ledger ignore in
+              let answer =
+                Sync_ledger.Responder.answer_query responder query
+              in
+              (ledger_hash, answer) )
+        in
         let valid_transitions =
           Transition_frontier_controller.run ~logger:config.log
             ~time_controller:config.time_controller
@@ -621,18 +661,9 @@ module Make (Inputs : Inputs_intf) = struct
               (Strict_pipe.Reader.of_linear_pipe
                  (Linear_pipe.map external_transitions_reader
                     ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm) )))
-            ~sync_query_reader:(failwith "TODO")
-            ~sync_answer_writer:(failwith "TODO")
         in
         let valid_transitions_for_network, valid_transitions_for_api =
           Strict_pipe.Reader.Fork.two valid_transitions
-        in
-        let%bind net =
-          Net.create config.net_config
-            ~get_staged_ledger_aux_at_hash:(fun _hash ->
-              failwith "TODO: replace with new net" )
-            ~answer_sync_ledger_query:(fun _query ->
-              failwith "TODO: replace with new net" )
         in
         let%bind transaction_pool =
           Transaction_pool.load ~parent_log:config.log
