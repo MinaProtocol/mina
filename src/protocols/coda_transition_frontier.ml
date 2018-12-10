@@ -171,30 +171,13 @@ module type Transition_handler_intf = sig
 end
 
 module type Sync_handler_intf = sig
-  type addr
-
   type hash
-
-  type syncable_ledger
-
-  type syncable_ledger_query
-
-  type syncable_ledger_answer
 
   type transition_frontier
 
   type ancestor_proof
 
-  val run :
-       frontier:transition_frontier
-    -> sync_query_reader:(hash * syncable_ledger_query) Reader.t
-    -> sync_answer_writer:( hash * syncable_ledger_answer
-                          , synchronous
-                          , unit Async.Deferred.t )
-                          Writer.t
-    -> unit
-
-  val prove_ancestory :
+  val prove_ancestry :
        frontier:transition_frontier
     -> int
     -> hash
@@ -224,10 +207,5 @@ module type Transition_frontier_controller_intf = sig
                                             Envelope.Incoming.t ]
                          * [`Time_received of time] )
                          Reader.t
-    -> sync_query_reader:(state_hash * syncable_ledger_query) Reader.t
-    -> sync_answer_writer:( state_hash * syncable_ledger_answer
-                          , synchronous
-                          , unit Async.Deferred.t )
-                          Writer.t
     -> (external_transition, state_hash) With_hash.t Reader.t
 end
