@@ -2,6 +2,7 @@ open Core_kernel
 open Protocols.Coda_pow
 open Protocols.Coda_transition_frontier
 open Coda_base
+open Coda_numbers
 open Signature_lib
 
 module Max_length = struct
@@ -118,6 +119,7 @@ struct
   (* TODO: load from and write to disk *)
   let create ~logger ~root_transition ~root_snarked_ledger
       ~root_transaction_snark_scan_state ~root_staged_ledger_diff =
+    let open Consensus.Mechanism in
     let logger = Logger.child logger __MODULE__ in
     let root_hash = With_hash.hash root_transition in
     let root_protocol_state =
@@ -125,19 +127,36 @@ struct
         (With_hash.data root_transition)
     in
     let root_blockchain_state =
-      Consensus.Mechanism.Protocol_state.blockchain_state root_protocol_state
+      Protocol_state.blockchain_state root_protocol_state
     in
     assert (
       Ledger_hash.equal
         (Ledger.Db.merkle_root root_snarked_ledger)
         (Frozen_ledger_hash.to_ledger_hash
-           (Consensus.Mechanism.Protocol_state.Blockchain_state.ledger_hash
-              root_blockchain_state)) ) ;
+           (Protocol_state.Blockchain_state.ledger_hash root_blockchain_state))
+    ) ;
     let root_masked_ledger = Ledger.of_database root_snarked_ledger in
     let root_snarked_ledger_hash =
       Frozen_ledger_hash.of_ledger_hash
       @@ Ledger.merkle_root (Ledger.of_database root_snarked_ledger)
     in
+    (* Only check this case after the genesis block *)
+    if
+      not
+      @@ Length.equal
+           (Protocol_state.Consensus_state.length
+              (Protocol_state.consensus_state root_protocol_state))
+           (Length.of_int 1)
+    then
+      [%test_result: Ledger_hash.t]
+        ~message:
+          "Staged-ledger's ledger hash different from implied merkle root of \
+           this masked ledger"
+        ~expect:
+          (Staged_ledger_hash.ledger_hash
+             (Consensus.Mechanism.Protocol_state.Blockchain_state
+              .staged_ledger_hash root_blockchain_state))
+        (Ledger.Mask.Attached.merkle_root root_masked_ledger) ;
     match
       Inputs.Staged_ledger.of_scan_state_and_ledger
         ~scan_state:root_transaction_snark_scan_state
