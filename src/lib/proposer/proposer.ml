@@ -179,11 +179,11 @@ module Make (Inputs : Inputs_intf) :
             ~self:(Public_key.compress keypair.public_key)
             ~logger ~transactions_by_fee:transactions ~get_completed_work
         in
-        let lb2 = Staged_ledger.copy staged_ledger in
+        let sl2 = Staged_ledger.copy staged_ledger in
         let ( `Hash_after_applying next_staged_ledger_hash
             , `Ledger_proof ledger_proof_opt
             , `Updated_staged_ledger _updated_staged_ledger ) =
-          Staged_ledger.apply_diff_unchecked lb2 diff
+          Staged_ledger.apply_diff_unchecked sl2 diff
         in
         (*TODO use updated_staged_ledger*)
         return (diff, next_staged_ledger_hash, ledger_proof_opt))

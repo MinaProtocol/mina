@@ -545,8 +545,8 @@ module Make (Inputs : Inputs_intf) = struct
   let receipt_chain_database t = t.receipt_chain_database
 
   let staged_ledger_ledger_proof t =
-    let lb = best_staged_ledger t in
-    Staged_ledger.current_ledger_proof lb
+    let sl = best_staged_ledger t in
+    Staged_ledger.current_ledger_proof sl
 
   let strongest_ledgers t = t.strongest_ledgers
 

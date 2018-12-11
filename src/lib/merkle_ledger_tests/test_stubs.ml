@@ -121,7 +121,7 @@ module In_memory_kvdb : Intf.Key_value_database = struct
   let create ~directory:_ =
     {uuid= Uuid.create (); table= Bigstring_frozen.Table.create ()}
 
-  let destroy _ = ()
+  let close _ = ()
 
   let get t ~key = Bigstring_frozen.Table.find t.table key
 
@@ -130,10 +130,7 @@ module In_memory_kvdb : Intf.Key_value_database = struct
   let set_batch tbl ~key_data_pairs =
     List.iter key_data_pairs ~f:(fun (key, data) -> set tbl ~key ~data)
 
-  let delete t ~key = Bigstring_frozen.Table.remove t.table key
-
-  let copy (t : t) =
-    {uuid= Uuid.create (); table= Bigstring_frozen.Table.copy t.table}
+  let remove t ~key = Bigstring_frozen.Table.remove t.table key
 end
 
 module Storage_locations : Intf.Storage_locations = struct
