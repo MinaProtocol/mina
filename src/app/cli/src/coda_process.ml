@@ -45,7 +45,7 @@ let local_config ?proposal_interval ~peers ~discovery_port ~external_port
   config
 
 let disconnect (conn, proc, _) =
-  let%bind () = Coda_worker.Connection.close conn in
+  let%bind () = Coda_worker.Connection.close_finished conn in
   let%bind _ : Unix.Exit_or_signal.t = Process.wait proc in
   return ()
 

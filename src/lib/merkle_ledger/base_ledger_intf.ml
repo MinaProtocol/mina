@@ -63,7 +63,7 @@ module type S = sig
   val get_or_create_account_exn :
     t -> key -> account -> [`Added | `Existed] * Location.t
 
-  val destroy : t -> unit
+  val close : t -> unit
 
   val get_uuid : t -> Uuid.t
 
