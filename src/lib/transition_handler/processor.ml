@@ -100,72 +100,6 @@ let%test_module "Transition_handler.Processor tests" =
       let of_bytes = Coda_base.Staged_ledger_hash.Aux_hash.of_bytes
     end
 
-    (*
-    module User_command = struct
-      include (
-        Coda_base.User_command :
-          module type of Coda_base.User_command
-          with module With_valid_signature := Coda_base.User_command
-                                              .With_valid_signature )
-
-      let fee (t : t) = Payload.fee t.payload
-
-      let sender (t : t) = Signature_lib.Public_key.compress t.sender
-
-      let seed = Coda_base.Secure_random.string ()
-
-      let compare t1 t2 = Coda_base.User_command.Stable.V1.compare ~seed t1 t2
-
-      module With_valid_signature = struct
-        module T = struct
-          include Coda_base.User_command.With_valid_signature
-
-          let compare t1 t2 =
-            Coda_base.User_command.With_valid_signature.compare ~seed t1 t2
-        end
-
-        include T
-        include Comparable.Make (T)
-      end
-    end
-
-    module Transaction = struct
-      module T = struct
-        type t = Coda_base.Transaction.t =
-          | User_command of User_command.With_valid_signature.t
-          | Fee_transfer of Coda_base.Fee_transfer.t
-          | Coinbase of Coda_base.Coinbase.t
-        [@@deriving compare, eq]
-      end
-
-      let fee_excess = Coda_base.Transaction.fee_excess
-
-      let supply_increase = Coda_base.Transaction.supply_increase
-
-      include T
-
-      include (
-        Coda_base.Transaction :
-          module type of Coda_base.Transaction with type t := t )
-    end
-
-    module Completed_work =
-      Ledger_builder.Make_completed_work
-        (Signature_lib.Public_key.Compressed)
-        (Ledger_proof)
-        (Ledger_proof_statement)
-
-    module Ledger_builder_diff = Ledger_builder.Make_diff (struct
-      module Ledger_hash = Coda_base.Ledger_hash
-      module Ledger_proof = Ledger_proof
-      module Ledger_builder_aux_hash = Ledger_builder_aux_hash
-      module Ledger_builder_hash = Coda_base.Ledger_builder_hash
-      module Compressed_public_key = Signature_lib.Public_key.Compressed
-      module User_command = User_command
-      module Completed_work = Completed_work
-    end)
-    *)
-
     module Transaction_snark_work = struct
       let proofs_length = 2
 
@@ -323,36 +257,6 @@ let%test_module "Transition_handler.Processor tests" =
       let statement_exn () = failwith "stub"
     end
 
-    (*
-    module Ledger_builder = Ledger_builder.Make (struct
-      module Compressed_public_key = Signature_lib.Public_key.Compressed
-      module User_command = User_command
-      module Fee_transfer = Coda_base.Fee_transfer
-      module Coinbase = Coda_base.Coinbase
-      module Transaction = Transaction
-      module Ledger_hash = Coda_base.Ledger_hash
-      module Frozen_ledger_hash = Coda_base.Frozen_ledger_hash
-      module Ledger_proof_statement = Ledger_proof_statement
-      module Proof = Proof
-      module Sok_message = Coda_base.Sok_message
-      module Ledger_proof = Ledger_proof
-      module Ledger_proof_verifier = Ledger_proof_verifier
-      module Account = Coda_base.Account
-      module Ledger = Coda_base.Ledger
-      module Sparse_ledger = Coda_base.Sparse_ledger
-      module Ledger_builder_aux_hash = Ledger_builder_aux_hash
-      module Ledger_builder_hash = Coda_base.Ledger_builder_hash
-      module Completed_work = Completed_work
-      module Ledger_builder_diff = Ledger_builder_diff
-
-      module Config = struct
-        let transaction_capacity_log_2 = 8
-      end
-
-      let check = failwith "stub"
-    end)
-    *)
-
     module Base_inputs = struct
       module Ledger_proof_statement = Ledger_proof_statement
       module Ledger_proof = Ledger_proof
@@ -433,6 +337,7 @@ let%test_module "Transition_handler.Processor tests" =
          let time_controller = Time.Controller.create () in
          let root_snarked_ledger = Coda_base.Ledger.Db.create () in
          let root_transaction_snark_scan_state = () in
+         let root_ledger_hash = Coda_base.Ledger.Db.merkle_root root_snarked_ledger in
          let root_transition =
            { With_hash.data=
                External_transition.create
@@ -441,8 +346,8 @@ let%test_module "Transition_handler.Processor tests" =
                      ~previous_state_hash:(Coda_base.State_hash.(of_hash zero))
                      ~blockchain_state:(
                        Consensus.Mechanism.Blockchain_state.create_value
-                         ~ledger_hash:(Coda_base.Frozen_ledger_hash.of_ledger_hash (Coda_base.Ledger.Db.merkle_root root_snarked_ledger))
-                         ~staged_ledger_hash:Coda_base.Staged_ledger_hash.dummy
+                         ~ledger_hash:(Coda_base.Frozen_ledger_hash.of_ledger_hash root_ledger_hash)
+                         ~staged_ledger_hash:(Coda_base.Staged_ledger_hash.of_aux_and_ledger_hash Staged_ledger_hash.Aux_hash.dummy root_ledger_hash)
                          ~timestamp:(Time.now ()))
                      ~consensus_state:(
                        Consensus.Mechanism.Protocol_state.consensus_state Consensus.Mechanism.genesis_protocol_state))
