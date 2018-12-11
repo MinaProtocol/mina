@@ -104,7 +104,7 @@ let genesis ~loc =
   end) in
   let open E in
   let protocol_state =
-    protocol_state Proof_of_signature.genesis_protocol_state
+    protocol_state Proof_of_signature.genesis_protocol_state.data
   in
   let ledger =
     Sparse_ledger_lib.Sparse_ledger.of_hash ~depth:0

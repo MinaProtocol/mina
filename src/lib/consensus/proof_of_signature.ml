@@ -245,11 +245,14 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     ()
 
   let genesis_protocol_state =
-    Protocol_state.create_value
-      ~previous_state_hash:(Protocol_state.hash Protocol_state.negative_one)
-      ~blockchain_state:
-        (Snark_transition.genesis |> Snark_transition.blockchain_state)
-      ~consensus_state:
-        (Consensus_state.update
-           (Protocol_state.consensus_state Protocol_state.negative_one))
+    let state =
+      Protocol_state.create_value
+        ~previous_state_hash:(Protocol_state.hash Protocol_state.negative_one)
+        ~blockchain_state:
+          (Snark_transition.genesis |> Snark_transition.blockchain_state)
+        ~consensus_state:
+          (Consensus_state.update
+             (Protocol_state.consensus_state Protocol_state.negative_one))
+    in
+    With_hash.of_data ~hash_data:Protocol_state.hash state
 end

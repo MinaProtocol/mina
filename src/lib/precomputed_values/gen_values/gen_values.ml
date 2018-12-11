@@ -37,7 +37,8 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
   let loc = Ppxlib.Location.none
 
   let base_hash =
-    Keys.Step.instance_hash Keys.Consensus_mechanism.genesis_protocol_state
+    Keys.Step.instance_hash
+      Keys.Consensus_mechanism.genesis_protocol_state.data
 
   let base_hash_expr =
     [%expr
