@@ -70,7 +70,8 @@ module type S = sig
 
   val block_interval_ms : Int64.t
 
-  val genesis_protocol_state : Protocol_state.value
+  val genesis_protocol_state :
+    (Protocol_state.value, Coda_base.State_hash.t) With_hash.t
 
   val generate_transition :
        previous_protocol_state:Protocol_state.value

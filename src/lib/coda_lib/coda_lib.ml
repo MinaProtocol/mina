@@ -454,7 +454,10 @@ module type Inputs_intf = sig
      and type dest := Ledger_db.t
 
   module Genesis : sig
-    val state : Consensus_mechanism.Protocol_state.value
+    val state :
+      ( Consensus_mechanism.Protocol_state.value
+      , Protocol_state_hash.t )
+      With_hash.t
 
     val ledger : Ledger.maskable_ledger
 
@@ -606,7 +609,7 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let first_transition =
           External_transition.create
-            ~protocol_state:Consensus_mechanism.genesis_protocol_state
+            ~protocol_state:Consensus_mechanism.genesis_protocol_state.data
             ~protocol_state_proof:Protocol_state_proof.dummy
             ~staged_ledger_diff:
               { Staged_ledger_diff.pre_diffs=
@@ -637,7 +640,7 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let%bind net =
           Net.create config.net_config
-            ~get_staged_ledger_aux_at_hash:(fun hash ->
+            ~get_staged_ledger_aux_at_hash:(fun _hash ->
               failwith "shouldn't be necessary right now?" )
             ~answer_sync_ledger_query:(fun query_env ->
               let open Deferred.Or_error.Let_syntax in
