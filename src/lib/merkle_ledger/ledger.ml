@@ -125,7 +125,7 @@ end = struct
     let t = create () in
     f t
 
-  let destroy _t = failwith "destroy: not implemented"
+  let close _t = failwith "close: not implemented"
 
   let get_uuid t = t.uuid
 

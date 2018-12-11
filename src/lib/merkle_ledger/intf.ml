@@ -45,21 +45,15 @@ end
 module type Key_value_database = sig
   type t [@@deriving sexp]
 
-  val copy : t -> t
-
-  val create : directory:string -> t
+  include
+    Key_value_database.S
+    with type t := t
+     and type key := Bigstring.t
+     and type value := Bigstring.t
 
   val get_uuid : t -> Uuid.t
 
-  val destroy : t -> unit
-
-  val get : t -> key:Bigstring.t -> Bigstring.t option
-
-  val set : t -> key:Bigstring.t -> data:Bigstring.t -> unit
-
   val set_batch : t -> key_data_pairs:(Bigstring.t * Bigstring.t) list -> unit
-
-  val delete : t -> key:Bigstring.t -> unit
 
   val to_alist : t -> (Bigstring.t * Bigstring.t) list
   (* an association list, sorted by key *)
