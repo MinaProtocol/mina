@@ -24,7 +24,11 @@ module type Inputs_intf = sig
      and type transition_frontier_breadcrumb :=
                 Transition_frontier.Breadcrumb.t
 
-  module Network : Network_intf with type peer := Kademlia.Peer.t
+  module Network :
+    Network_intf
+    with type peer := Kademlia.Peer.t
+     and type state_hash := State_hash.t
+     and type transition := External_transition.t
 
   module Catchup :
     Catchup_intf

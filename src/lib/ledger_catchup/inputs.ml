@@ -14,5 +14,9 @@ module type S = sig
      and type ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
 
-  module Network : Network_intf with type peer := Kademlia.Peer.t
+  module Network :
+    Network_intf
+    with type peer := Kademlia.Peer.t
+     and type state_hash := State_hash.t
+     and type transition := External_transition.t
 end

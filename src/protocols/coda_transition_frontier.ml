@@ -1,3 +1,5 @@
+open Core_kernel
+open Async_kernel
 open Pipe_lib.Strict_pipe
 
 module type Network_intf = sig
@@ -5,7 +7,14 @@ module type Network_intf = sig
 
   type peer
 
-  val peers : t -> peer list
+  type state_hash
+
+  type transition
+
+  val random_peers : t -> int -> peer list
+
+  val catchup_transition :
+    t -> peer -> state_hash -> transition list option Or_error.t Deferred.t
 end
 
 module type Transition_frontier_base_intf = sig

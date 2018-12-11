@@ -61,10 +61,20 @@ module type Network_intf = sig
 
   type time
 
+  type state_hash
+
   val states :
     t -> (state_with_witness Envelope.Incoming.t * time) Linear_pipe.Reader.t
 
   val peers : t -> Kademlia.Peer.t list
+
+  val random_peers : t -> int -> Kademlia.Peer.t list
+
+  val catchup_transition :
+       t
+    -> Kademlia.Peer.t
+    -> state_hash
+    -> state_with_witness list option Or_error.t Deferred.t
 
   val snark_pool_diffs :
     t -> snark_pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
@@ -102,6 +112,8 @@ module type Network_intf = sig
                                     Envelope.Incoming.t
                                  -> (ledger_hash * sync_ledger_answer)
                                     Deferred.Or_error.t)
+    -> transition_catchup:(   state_hash Envelope.Incoming.t
+                           -> state_with_witness list option Deferred.t)
     -> t Deferred.t
 end
 
@@ -388,6 +400,7 @@ module type Inputs_intf = sig
      and type sync_ledger_query := Sync_ledger.query
      and type sync_ledger_answer := Sync_ledger.answer
      and type time := Time.t
+     and type state_hash := Protocol_state_hash.t
 
   module Ledger_builder_controller :
     Ledger_builder_controller_intf
@@ -641,7 +654,7 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let%bind net =
           Net.create config.net_config
-            ~get_staged_ledger_aux_at_hash:(fun hash ->
+            ~get_staged_ledger_aux_at_hash:(fun _hash ->
               failwith "shouldn't be necessary right now?" )
             ~answer_sync_ledger_query:(fun query_env ->
               let open Deferred.Or_error.Let_syntax in
@@ -654,6 +667,18 @@ module Make (Inputs : Inputs_intf) = struct
                 Sync_ledger.Responder.answer_query responder query
               in
               (ledger_hash, answer) )
+            ~transition_catchup:(fun enveloped_hash ->
+              let open Deferred.Option.Let_syntax in
+              let hash = Envelope.Incoming.data enveloped_hash in
+              let%map breadcrumb =
+                Deferred.return
+                @@ Transition_frontier.find transition_frontier hash
+              in
+              Transition_frontier.path_map
+                ~f:(fun b ->
+                  Transition_frontier.Breadcrumb.transition_with_hash b
+                  |> With_hash.data )
+                transition_frontier breadcrumb )
         in
         let valid_transitions =
           Transition_frontier_controller.run ~logger:config.log ~network:net

@@ -13,20 +13,33 @@ module Make (Inputs : Inputs.S) :
    and type state_hash := State_hash.t
    and type network := Inputs.Network.t = struct
   open Inputs
-  module Worker = Catchup_worker.Make (Inputs)
 
+  let fold_result_seq list ~init ~f =
+    Deferred.List.fold list ~init:(Ok init) ~f:(fun acc elem ->
+        match acc with
+        | Error e -> Deferred.return (Error e)
+        | Ok acc -> f acc elem )
+
+  (* We would like the async scheduler to context switch between each iteration 
+  of external transitions when trying to build breadcrumb_path. Therefore, this 
+  function needs to return a Deferred *)
   let construct_breadcrumb_path ~logger initial_staged_ledger
       external_transitions =
-    let open Or_error.Let_syntax in
+    let open Deferred.Or_error.Let_syntax in
     let%map _, breadcrumbs =
-      List.fold_result external_transitions ~init:(initial_staged_ledger, [])
-        ~f:(fun (staged_ledger, acc) transition_with_hash ->
-          let external_transition = With_hash.data transition_with_hash in
+      fold_result_seq external_transitions ~init:(initial_staged_ledger, [])
+        ~f:(fun (staged_ledger, acc) external_transition ->
           let diff =
             External_transition.staged_ledger_diff external_transition
           in
           let%map _, _, `Updated_staged_ledger staged_ledger =
-            Staged_ledger.apply ~logger staged_ledger diff
+            Deferred.return @@ Staged_ledger.apply ~logger staged_ledger diff
+          in
+          let transition_with_hash =
+            With_hash.of_data external_transition
+              ~hash_data:
+                (Fn.compose Consensus.Mechanism.Protocol_state.hash
+                   External_transition.protocol_state)
           in
           let new_breadcrumb =
             Transition_frontier.Breadcrumb.create transition_with_hash
@@ -36,89 +49,66 @@ module Make (Inputs : Inputs.S) :
     in
     List.rev breadcrumbs
 
-  let materilize_breadcrumbs ~frontier ~logger = function
-    | [] -> `Success []
-    | root_transition :: _ as external_transitions -> (
-        let initial_state_hash =
-          With_hash.data root_transition
-          |> External_transition.protocol_state
-          |> External_transition.Protocol_state.previous_state_hash
+  let materialize_breadcrumbs ~frontier ~logger ~peer external_transitions =
+    let root_transition = List.hd_exn external_transitions in
+    let initial_state_hash =
+      root_transition |> External_transition.protocol_state
+      |> External_transition.Protocol_state.previous_state_hash
+    in
+    match Transition_frontier.find frontier initial_state_hash with
+    | None ->
+        let message =
+          sprintf
+            !"Could not find root hash, %{sexp:State_hash.t}.Peer \
+              %{sexp:Kademlia.Peer.t} is seen as malicious"
+            initial_state_hash peer
         in
-        match Transition_frontier.find frontier initial_state_hash with
-        | None -> `No_matching_root_hash initial_state_hash
-        | Some initial_breadcrumb -> (
-            let initial_staged_ledger =
-              Transition_frontier.Breadcrumb.staged_ledger initial_breadcrumb
+        Logger.faulty_peer logger !"%s" message ;
+        Deferred.return @@ Or_error.error_string message
+    | Some initial_breadcrumb ->
+        let initial_staged_ledger =
+          Transition_frontier.Breadcrumb.staged_ledger initial_breadcrumb
+        in
+        construct_breadcrumb_path ~logger initial_staged_ledger
+          external_transitions
+
+  let get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
+      ~num_peers hash =
+    let peers = Network.random_peers network num_peers in
+    let open Deferred.Or_error.Let_syntax in
+    Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
+        match%bind Network.catchup_transition network peer hash with
+        | None ->
+            Deferred.return
+            @@ Or_error.errorf
+                 !"Peer %{sexp:Kademlia.Peer.t} did not have transition"
+                 peer
+        | Some [] ->
+            let message =
+              sprintf
+                !"Peer %{sexp:Kademlia.Peer.t} gave an empty list of \
+                  transitions. They should respond with none"
+                peer
             in
-            match
-              construct_breadcrumb_path ~logger initial_staged_ledger
-                external_transitions
-            with
-            | Ok result -> `Success result
-            | Error e -> `Error e ) )
-
-  let choose_first_success (list : 'a option Deferred.t list) :
-      'a option Deferred.t =
-    let first_success = Ivar.create () in
-    List.iter list ~f:(fun x ->
-        Deferred.upon x (Option.iter ~f:(Ivar.fill first_success)) ) ;
-    Deferred.any
-      [ Ivar.read first_success >>| Option.some
-      ; Deferred.all list >>| Fn.const None ]
-
-  let get_transitions_from_peers ~logger ~peers hash =
-    List.map peers ~f:(fun peer ->
-        match%map Catchup_worker.dispatch Worker.Worker_rpc.rpc hash peer with
-        | Ok result -> result
-        | Error e ->
-            Logger.info logger
-              !"Connection error with peer %{sexp: Host_and_port.t}: %s"
-              peer (Error.to_string_hum e) ;
-            None )
+            Logger.faulty_peer logger !"%s" message ;
+            Deferred.return @@ Or_error.error_string message
+        | Some queried_transitions ->
+            materialize_breadcrumbs ~frontier ~logger ~peer queried_transitions
+    )
 
   let run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer =
     Strict_pipe.Reader.iter catchup_job_reader ~f:(fun transition_with_hash ->
         let hash = With_hash.hash transition_with_hash in
-        (* TODO: pass in peers as paramet
-        er *)
-        let peers =
-          Network.peers network |> List.map ~f:Kademlia.Peer.external_rpc
-        in
-        let breadcrumbs =
-          List.map
-            (List.zip_exn peers
-               (get_transitions_from_peers ~logger ~peers hash))
-            ~f:(fun (peer, transitions_deferred) ->
-              let open Deferred.Option.Let_syntax in
-              let%bind transitions = transitions_deferred in
-              Deferred.return
-              @@
-              match materilize_breadcrumbs ~frontier ~logger transitions with
-              | `No_matching_root_hash initial_state_hash ->
-                  Logger.info logger
-                    !"Could not find initial hash: %{sexp:State_hash.t}."
-                    initial_state_hash ;
-                  None
-              | `Error e ->
-                  Logger.faulty_peer logger
-                    !"Recieved invalid transitions from bad peer \
-                      %{sexp:Host_and_port.t}: %{sexp:Error.t}"
-                    peer e ;
-                  None
-              | `Success result -> Some result )
-        in
-        match%map choose_first_success breadcrumbs with
-        | Some response ->
-            Strict_pipe.Writer.write catchup_breadcrumbs_writer response
-        | None ->
+        match%map
+          get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
+            ~num_peers:8 hash
+        with
+        | Ok breadcrumbs ->
+            Strict_pipe.Writer.write catchup_breadcrumbs_writer breadcrumbs
+        | Error e ->
             Logger.info logger
-              !"None of the peers have a transition with state hash \
-                %{sexp:State_hash.t}"
-              hash )
-    |> don't_wait_for ;
-    (* TODO: server_port should be passdown as a parameter  *)
-    let server_port = 9999 in
-    Worker.setup_server ~frontier ~logger server_port
-    |> Deferred.ignore |> don't_wait_for
+              !"None of the peers have a transition with state hash:\n%s"
+              (Error.to_string_hum e) )
+    |> don't_wait_for
 end
