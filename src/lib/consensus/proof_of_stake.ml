@@ -1408,10 +1408,13 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
            ~supply_increase:Currency.Amount.zero
            ~snarked_ledger_hash:genesis_ledger_hash)
     in
-    Protocol_state.create_value
-      ~previous_state_hash:Protocol_state.(hash negative_one)
-      ~blockchain_state:Snark_transition.(blockchain_state genesis)
-      ~consensus_state
+    let state =
+      Protocol_state.create_value
+        ~previous_state_hash:Protocol_state.(hash negative_one)
+        ~blockchain_state:Snark_transition.(blockchain_state genesis)
+        ~consensus_state
+    in
+    With_hash.of_data ~hash_data:Protocol_state.hash state
 
   let to_unix_timestamp recieved_time =
     recieved_time |> Time.to_span_since_epoch |> Time.Span.to_ms
