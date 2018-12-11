@@ -1,3 +1,5 @@
+open Core
+
 module type S = sig
   module Protocol_state : Protocol_state.S
 
@@ -35,7 +37,7 @@ end)
 
   type t =
     { protocol_state: Protocol_state.value
-    ; protocol_state_proof: Proof.Stable.V1.t
+    ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
     ; staged_ledger_diff: Staged_ledger_diff.t }
   [@@deriving sexp, fields, bin_io]
 
