@@ -1039,7 +1039,8 @@ module type Consensus_mechanism_intf = sig
     -> time_received:Unix_timestamp.t
     -> [`Keep | `Take]
 
-  val genesis_protocol_state : Protocol_state.value
+  val genesis_protocol_state :
+    (Protocol_state.value, protocol_state_hash) With_hash.t
 end
 
 module type Time_close_validator_intf = sig

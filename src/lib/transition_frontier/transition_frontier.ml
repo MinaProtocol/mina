@@ -2,7 +2,6 @@ open Core_kernel
 open Protocols.Coda_pow
 open Protocols.Coda_transition_frontier
 open Coda_base
-open Coda_numbers
 open Signature_lib
 
 module Max_length = struct
@@ -143,10 +142,8 @@ struct
     (* Only check this case after the genesis block *)
     if
       not
-      @@ Length.equal
-           (Protocol_state.Consensus_state.length
-              (Protocol_state.consensus_state root_protocol_state))
-           (Length.of_int 1)
+      @@ State_hash.equal Consensus.Mechanism.genesis_protocol_state.hash
+           root_hash
     then
       [%test_result: Ledger_hash.t]
         ~message:
