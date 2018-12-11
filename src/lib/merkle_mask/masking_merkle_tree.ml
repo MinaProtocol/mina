@@ -397,7 +397,7 @@ struct
 
     (* Destroy intentionally does not commit before destroying
      * as sometimes this is desired behavior *)
-    let destroy t =
+    let close t =
       Location.Table.clear t.account_tbl ;
       Addr.Table.clear t.hash_tbl ;
       Key.Table.clear t.location_tbl
