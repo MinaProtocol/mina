@@ -82,17 +82,17 @@ module Make (Inputs : Intf.Inputs_intf) :
         let%bind () = wait () in
         go ()
       in
-      Logger.info log "Asking for work again..." ;
       match%bind
         dispatch Rpcs.Get_work.rpc shutdown_on_disconnect () daemon_address
       with
       | Error e -> log_and_retry "getting work" e
       | Ok None ->
-          Logger.info log "No work; waiting a few seconds before retrying" ;
+          Logger.info log "No work; waiting %.2fs"
+            Worker_state.worker_wait_time ;
           let%bind () = wait ~sec:Worker_state.worker_wait_time () in
           go ()
       | Ok (Some work) -> (
-          Logger.info log "Got some work\n" ;
+          Logger.info log !"Received work." ;
           match perform state public_key work with
           | Error e -> log_and_retry "performing work" e
           | Ok result -> (
