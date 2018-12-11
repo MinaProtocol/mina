@@ -77,7 +77,7 @@ module Reader = struct
 
   module Merge = struct
     let iter readers ~f =
-      let not_empty r = Pipe.is_empty r.reader in
+      let not_empty r = not @@ Pipe.is_empty r.reader in
       let rec read_deferred () =
         let%bind ready_reader =
           match List.find readers ~f:not_empty with

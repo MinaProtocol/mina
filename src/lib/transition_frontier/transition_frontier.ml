@@ -138,12 +138,6 @@ struct
       Frozen_ledger_hash.of_ledger_hash
       @@ Ledger.merkle_root (Ledger.of_database root_snarked_ledger)
     in
-    assert (
-      Ledger_hash.equal
-        (Ledger.Mask.Attached.merkle_root root_masked_ledger)
-        (Staged_ledger_hash.ledger_hash
-           (Consensus.Mechanism.Protocol_state.Blockchain_state
-            .staged_ledger_hash root_blockchain_state)) ) ;
     match
       Inputs.Staged_ledger.of_scan_state_and_ledger
         ~scan_state:root_transaction_snark_scan_state
