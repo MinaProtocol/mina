@@ -7,6 +7,14 @@ open Signature_lib
 
 let name = "coda-receipt-chain-test"
 
+let lift = Deferred.map ~f:Option.some
+
+(* TODO: This should completely kill the coda daemon for a worker *)
+let restart_node testnet i =
+  let%bind () = Coda_worker_testnet.Api.stop testnet i in
+  let%bind () = after (Time.Span.of_sec 15.) in
+  Coda_worker_testnet.Api.start testnet i
+
 let main () =
   let open Keypair in
   let log = Logger.create () in
@@ -42,6 +50,7 @@ let main () =
     with
     | Error err -> assert false
     | Ok receipt_chain_hash ->
+        let%bind () = restart_node testnet 0 |> lift in
         let%map proof =
           Coda_worker_testnet.Api.prove_receipt testnet 0 receipt_chain_hash
             receipt_chain_hash

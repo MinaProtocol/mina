@@ -116,7 +116,7 @@ module Make_base
 
     let get_uuid (T ((module Base), t)) = Base.get_uuid t
 
-    let destroy (T ((module Base), t)) = Base.destroy t
+    let close (T ((module Base), t)) = Base.close t
 
     let get_or_create_account_exn (T ((module Base), t)) =
       Base.get_or_create_account_exn t

@@ -1,4 +1,4 @@
-(* rocksdb_database.ml -- expose RocksDB operations for Coda *)
+(* rocksdb.ml -- expose RocksDB operations for Coda *)
 
 open Core
 
@@ -12,7 +12,7 @@ let create ~directory =
 
 let get_uuid t = t.uuid
 
-let destroy t = Rocks.close t.db
+let close t = Rocks.close t.db
 
 let get t ~(key : Bigstring.t) : Bigstring.t option =
   Rocks.get ?pos:None ?len:None ?opts:None t.db key
@@ -31,7 +31,7 @@ let set_batch t ~(key_data_pairs : (Bigstring.t * Bigstring.t) list) : unit =
 
 let copy _t = failwith "copy: not implemented"
 
-let delete t ~(key : Bigstring.t) : unit =
+let remove t ~(key : Bigstring.t) : unit =
   Rocks.delete ?pos:None ?len:None ?opts:None t.db key
 
 let to_alist t : (Bigstring.t * Bigstring.t) list =

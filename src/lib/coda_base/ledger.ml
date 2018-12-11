@@ -26,7 +26,7 @@ module Key = struct
   include Hashable.Make_binable (T)
 end
 
-module Kvdb : Intf.Key_value_database = Rocksdb_database
+module Kvdb : Intf.Key_value_database = Rocksdb.Database
 
 module Storage_locations : Intf.Storage_locations = struct
   let stack_db_file = "coda_stack_db"
@@ -121,8 +121,8 @@ let with_ledger ~f =
   let ledger = create () in
   try
     let result = f ledger in
-    destroy ledger ; result
-  with exn -> destroy ledger ; raise exn
+    close ledger ; result
+  with exn -> close ledger ; raise exn
 
 let packed t = Any_ledger.cast (module Mask.Attached) t
 
