@@ -42,9 +42,7 @@ module Compressed = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = (Field.t, bool) t_
-        [@@deriving bin_io, eq, compare, hash]
-
+        type t = (Field.t, bool) t_ [@@deriving bin_io, eq, compare, hash]
       end
 
       include T
