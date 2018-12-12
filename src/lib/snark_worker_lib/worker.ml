@@ -87,9 +87,12 @@ module Make (Inputs : Intf.Inputs_intf) :
       with
       | Error e -> log_and_retry "getting work" e
       | Ok None ->
-          Logger.info log "No work; waiting %.2fs"
-            Worker_state.worker_wait_time ;
-          let%bind () = wait ~sec:Worker_state.worker_wait_time () in
+          let random_delay =
+            Worker_state.worker_wait_time
+            +. (0.2 *. Random.float Worker_state.worker_wait_time)
+          in
+          Logger.info log "No work; waiting %.3fs" random_delay ;
+          let%bind () = wait ~sec:random_delay () in
           go ()
       | Ok (Some work) -> (
           Logger.info log !"Received work." ;
