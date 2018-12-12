@@ -39,7 +39,7 @@ git_hooks: $(wildcard scripts/git_hooks/*)
 	    break;; \
 	' directory') \
 	    for f in $^; do \
-	      cp $$f .git/hooks/; \
+	      [ ! -f ".git/hooks/$$(basename $$f)" ] && ln -s ../../$$f .git/hooks/; \
 	    done; \
 	    break;; \
 	*) \
