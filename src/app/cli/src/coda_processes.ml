@@ -44,12 +44,38 @@ let local_configs ?proposal_interval ?(should_propose = Fn.const true) n
   in
   configs
 
-let spawn_local_processes_exn ?(first_delay = 3.0) configs =
-  let first = List.hd_exn configs in
-  let rest = List.drop configs 1 in
-  let%bind first = Coda_process.spawn_exn first in
-  let%bind () = after (Time.Span.of_sec first_delay) in
-  let%map rest =
-    Deferred.List.all (List.map rest ~f:(fun c -> Coda_process.spawn_exn c))
+let stabalize_and_start_or_timeout ?(timeout_ms = 2000.) nodes =
+  let ready () =
+    let check_ready node =
+      let%map peers = Coda_process.peers_exn node in
+      List.length peers = List.length nodes - 1
+    in
+    let rec go () =
+      if%bind Deferred.List.for_all nodes ~f:check_ready then return ()
+      else go ()
+    in
+    go ()
   in
-  first :: rest
+  match%bind
+    Deferred.any
+      [ (after (Time.Span.of_ms timeout_ms) >>= fun () -> return `Timeout)
+      ; (ready () >>= fun () -> return `Ready) ]
+  with
+  | `Timeout ->
+      failwith @@ sprintf "Nodes couldn't initialize within %f ms" timeout_ms
+  | `Ready ->
+      Deferred.List.iter nodes ~f:(fun node -> Coda_process.start_exn node)
+
+let spawn_local_processes_exn ?(first_delay = 0.0) configs =
+  match configs with
+  | [] -> failwith "Configs should be non-empty"
+  | first :: rest ->
+      let%bind first_created = Coda_process.spawn_exn first in
+      let%bind () = after (Time.Span.of_sec first_delay) in
+      let%bind rest_created =
+        Deferred.List.all
+          (List.map rest ~f:(fun c -> Coda_process.spawn_exn c))
+      in
+      let all_created = first_created :: rest_created in
+      let%map () = stabalize_and_start_or_timeout all_created in
+      all_created
