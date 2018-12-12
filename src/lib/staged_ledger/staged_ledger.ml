@@ -49,6 +49,7 @@ end = struct
         Inputs.Ledger_proof_verifier.verify proof statement ~message )
 
   let verify ~message _job _proof = ignore message ; true
+
   (* FIXME: psteckler
     match Scan_state.statement_of_job job with
     | None -> false

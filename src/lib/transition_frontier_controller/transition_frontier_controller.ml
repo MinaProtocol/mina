@@ -61,9 +61,8 @@ module Make (Inputs : Inputs_intf) :
     Transition_handler.Validator.run ~frontier ~transition_reader
       ~valid_transition_writer ~logger ;
     Transition_handler.Processor.run ~logger ~time_controller ~frontier
-      ~valid_transition_reader:valid_transition_reader
-      ~processed_transition_writer
-      ~catchup_job_writer ~catchup_breadcrumbs_reader ;
+      ~valid_transition_reader ~processed_transition_writer ~catchup_job_writer
+      ~catchup_breadcrumbs_reader ;
     Catchup.run ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer ;
     processed_transition_reader
 end
