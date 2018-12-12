@@ -837,6 +837,155 @@ libff::G1<ppT>* camlsnark_mnt4_gm_proof_c(r1cs_se_ppzksnark_proof<ppT>* proof) {
 
 // End Groth-Maller specific code
 
+// Begin BG specific code
+r1cs_constraint_system<FieldT>* camlsnark_mnt4_bg_proving_key_r1cs_constraint_system(
+    r1cs_bg_ppzksnark_proving_key<ppT>* pk) {
+  return &pk->constraint_system;
+}
+
+std::string* camlsnark_mnt4_bg_proving_key_to_string(r1cs_bg_ppzksnark_proving_key<ppT>* pk) {
+  std::stringstream stream;
+  stream << *pk;
+  return new std::string(stream.str());
+}
+
+r1cs_bg_ppzksnark_proving_key<ppT>* camlsnark_mnt4_bg_proving_key_of_string(std::string* s) {
+  r1cs_bg_ppzksnark_proving_key<ppT>*  pk = new r1cs_bg_ppzksnark_proving_key<ppT>();
+  std::stringstream stream(*s);
+  stream >> *pk;
+  return pk;
+}
+
+void camlsnark_mnt4_bg_proving_key_delete(r1cs_bg_ppzksnark_proving_key<ppT>* pk) {
+  delete pk;
+}
+
+void camlsnark_mnt4_bg_verification_key_delete(r1cs_bg_ppzksnark_verification_key<ppT>* vk) {
+  delete vk;
+}
+
+int camlsnark_mnt4_bg_verification_key_size_in_bits(
+    r1cs_bg_ppzksnark_verification_key<ppT>* vk
+) {
+  return vk->size_in_bits();
+}
+
+libff::GT<ppT>* 
+camlsnark_mnt4_bg_verification_key_alpha_beta(
+    r1cs_bg_ppzksnark_verification_key<ppT>* vk
+) {
+  return new libff::GT<ppT>(vk->alpha_g1_beta_g2);
+}
+
+libff::G2<ppT>* 
+camlsnark_mnt4_bg_verification_key_delta (
+    r1cs_bg_ppzksnark_verification_key<ppT>* vk
+) {
+  return new libff::G2<ppT>(vk->delta_g2);
+}
+
+libff::G2<ppT>* 
+camlsnark_mnt4_bg_verification_key_gamma (
+    r1cs_bg_ppzksnark_verification_key<ppT>* vk
+) {
+  return new libff::G2<ppT>(vk->gamma_g2);
+}
+
+std::vector< libff::G1<ppT> >*
+camlsnark_mnt4_bg_verification_key_query(
+    r1cs_bg_ppzksnark_verification_key<ppT> *vk)
+{
+    std::vector<libff::G1<ppT>>* res = new std::vector<libff::G1<ppT>>();
+    res->emplace_back(vk->gamma_ABC_g1.first);
+    for (size_t i = 0; i < vk->gamma_ABC_g1.rest.values.size(); ++i) {
+      res->emplace_back(vk->gamma_ABC_g1.rest.values[i]);
+    }
+    return res;
+}
+
+std::string* camlsnark_mnt4_bg_verification_key_to_string(r1cs_bg_ppzksnark_verification_key<ppT>* vk) {
+  std::stringstream stream;
+  stream << *vk;
+  return new std::string(stream.str());
+}
+
+r1cs_bg_ppzksnark_verification_key<ppT>* camlsnark_mnt4_bg_verification_key_of_string(std::string* s) {
+  r1cs_bg_ppzksnark_verification_key<ppT>*  vk = new r1cs_bg_ppzksnark_verification_key<ppT>();
+  std::stringstream stream(*s);
+  stream >> *vk;
+  return vk;
+}
+
+r1cs_bg_ppzksnark_proving_key<ppT>* camlsnark_mnt4_bg_keypair_pk(r1cs_bg_ppzksnark_keypair<ppT>* keypair) {
+  return new r1cs_bg_ppzksnark_proving_key<ppT>(keypair->pk);
+}
+
+r1cs_bg_ppzksnark_verification_key<ppT>* camlsnark_mnt4_bg_keypair_vk(r1cs_bg_ppzksnark_keypair<ppT>* keypair) {
+  return new r1cs_bg_ppzksnark_verification_key<ppT>(keypair->vk);
+}
+
+void camlsnark_mnt4_bg_keypair_delete(r1cs_bg_ppzksnark_keypair<ppT>* keypair) {
+  delete keypair;
+}
+
+r1cs_bg_ppzksnark_keypair<ppT>* camlsnark_mnt4_bg_keypair_create(
+    r1cs_constraint_system<FieldT>* sys) {
+  r1cs_bg_ppzksnark_keypair<ppT> res = r1cs_bg_ppzksnark_generator<ppT>(*sys);
+  return new r1cs_bg_ppzksnark_keypair<ppT>(res);
+}
+
+std::string* camlsnark_mnt4_bg_proof_to_string(
+    r1cs_bg_ppzksnark_proof<ppT>* p) {
+  std::stringstream stream;
+  stream << *p;
+  return new std::string(stream.str());
+}
+
+r1cs_bg_ppzksnark_proof<ppT>* camlsnark_mnt4_bg_proof_of_string(std::string* s) {
+  r1cs_bg_ppzksnark_proof<ppT>*  p = new r1cs_bg_ppzksnark_proof<ppT>();
+  std::stringstream stream(*s);
+  stream >> *p;
+  return p;
+}
+
+r1cs_bg_ppzksnark_proof<ppT>* camlsnark_mnt4_bg_proof_create(
+    r1cs_bg_ppzksnark_proving_key<ppT>* key,
+    FieldT* d,
+    std::vector<FieldT>* primary_input,
+    std::vector<FieldT>* auxiliary_input) {
+  auto res = r1cs_bg_ppzksnark_prover(*key, *d, *primary_input, *auxiliary_input);
+  return new r1cs_bg_ppzksnark_proof<ppT>(res);
+}
+
+void camlsnark_mnt4_bg_proof_delete(r1cs_bg_ppzksnark_proof<ppT>* proof) {
+  delete proof;
+}
+
+bool camlsnark_mnt4_bg_proof_verify(
+    r1cs_bg_ppzksnark_proof<ppT>* proof,
+    r1cs_bg_ppzksnark_verification_key<ppT>* key,
+    std::vector<FieldT>* primary_input) {
+  return r1cs_bg_ppzksnark_verifier_weak_IC(*key, *primary_input, *proof);
+}
+
+libff::G1<ppT>* camlsnark_mnt4_bg_proof_a(r1cs_bg_ppzksnark_proof<ppT>* proof) {
+  return new libff::G1<ppT>(proof->g_A);
+}
+
+libff::G2<ppT>* camlsnark_mnt4_bg_proof_b(r1cs_bg_ppzksnark_proof<ppT>* proof) {
+  return new libff::G2<ppT>(proof->g_B);
+}
+
+libff::G1<ppT>* camlsnark_mnt4_bg_proof_c(r1cs_bg_ppzksnark_proof<ppT>* proof) {
+  return new libff::G1<ppT>(proof->g_C);
+}
+
+libff::G2<ppT>* camlsnark_mnt4_bg_proof_delta_prime(r1cs_bg_ppzksnark_proof<ppT>* proof) {
+  return new libff::G2<ppT>(proof->delta_prime);
+}
+
+// End BG specific code
+
 // begin SHA gadget code
 void camlsnark_mnt4_digest_variable_delete(
     digest_variable<FieldT>* digest) {
