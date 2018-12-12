@@ -328,6 +328,7 @@ let daemon log =
                 ~time_controller ?propose_keypair:Config0.propose_keypair ()
                 ~banlist)
          in
+         M.start coda ;
          let web_service = Web_pipe.get_service () in
          Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;
          Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
