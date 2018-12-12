@@ -48,10 +48,12 @@ end = struct
     Async.Thread_safe.block_on_async_exn (fun () ->
         Inputs.Ledger_proof_verifier.verify proof statement ~message )
 
-  let verify ~message job proof =
+  let verify ~message _job _proof = ignore message ; true
+
+  (* FIXME: psteckler
     match Scan_state.statement_of_job job with
     | None -> false
-    | Some statement -> verify_threadsafe proof statement ~message
+    | Some statement -> verify_threadsafe proof statement ~message *)
 
   module M = struct
     include Monad.Ident
@@ -683,7 +685,7 @@ end = struct
         (Scan_state.fill_in_transaction_snark_work t.scan_state works)
     in
     Or_error.ok_exn (Scan_state.enqueue_transactions t.scan_state data) ;
-    Or_error.ok_exn (verify_scan_state_after_apply t.ledger t.scan_state) ;
+    Or_error.ok_exn (verify_scan_state_after_apply new_ledger t.scan_state) ;
     ( `Hash_after_applying (hash t)
     , `Ledger_proof res_opt
     , `Updated_staged_ledger {t with ledger= new_ledger} )
