@@ -23,7 +23,7 @@ module Make (Inputs : Inputs.S) :
     External_transition.protocol_state t |> Protocol_state.previous_state_hash
 
   let run ~logger ~time_controller ~frontier ~valid_transition_reader
-      ~catchup_job_writer ~catchup_breadcrumbs_reader =
+      ~catchup_job_writer ~catchup_breadcrumbs_reader ~processed_transition_writer =
     let logger = Logger.child logger "Transition_handler.Catchup" in
     let catchup_monitor = Catchup_monitor.create ~catchup_job_writer in
     ignore
@@ -53,6 +53,7 @@ module Make (Inputs : Inputs.S) :
                      ignore
                        (Transition_frontier.add_transition_exn frontier
                           transition) ;
+                     Writer.write processed_transition_writer transition ;
                      Catchup_monitor.notify catchup_monitor ~time_controller
                        ~transition ) ) ))
 end
