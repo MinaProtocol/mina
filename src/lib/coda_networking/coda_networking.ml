@@ -146,6 +146,44 @@ struct
       include Register (T)
     end
   end
+
+  module Prove_ancestry = struct
+    module T = struct
+      let name = "prove_ancestry"
+
+      module T = struct
+        type query = State_hash.t * int [@@deriving bin_io]
+
+        type response = (State_hash.t * State_body_hash.t list) Or_error.t
+        [@@deriving bin_io]
+      end
+
+      module Caller = T
+      module Callee = T
+    end
+
+    include T.T
+    include Versioned_rpc.Both_convert.Plain.Make (T)
+
+    module V1 = struct
+      module T = struct
+        include T.T
+
+        let version = 1
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = Fn.id
+
+        let caller_model_of_response = Fn.id
+      end
+
+      include T
+      include Register (T)
+    end
+  end
 end
 
 module Message (Inputs : sig
@@ -282,7 +320,10 @@ module Make (Inputs : Inputs_intf) = struct
          -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t)
       ~(transition_catchup :
             State_hash.t Envelope.Incoming.t
-         -> External_transition.t list option Deferred.t) =
+         -> External_transition.t list option Deferred.t)
+      ~(prove_ancestry :
+            (State_hash.t * int) Envelope.Incoming.t
+         -> (State_hash.t * State_body_hash.t list) Deferred.Or_error.t) =
     let log = Logger.child config.parent_log "coda networking" in
     let get_staged_ledger_aux_at_hash_rpc sender ~version:_ hash =
       get_staged_ledger_aux_at_hash (Envelope.Incoming.wrap ~data:hash ~sender)
@@ -293,13 +334,17 @@ module Make (Inputs : Inputs_intf) = struct
     let transition_catchup_rpc sender ~version:_ hash =
       transition_catchup (Envelope.Incoming.wrap ~data:hash ~sender)
     in
+    let prove_ancestry_rpc sender ~version:_ query =
+      prove_ancestry (Envelope.Incoming.wrap ~data:query ~sender)
+    in
     let implementations =
       List.concat
         [ Rpcs.Get_staged_ledger_aux_at_hash.implement_multi
             get_staged_ledger_aux_at_hash_rpc
         ; Rpcs.Answer_sync_ledger_query.implement_multi
             answer_sync_ledger_query_rpc
-        ; Rpcs.Transition_catchup.implement_multi transition_catchup_rpc ]
+        ; Rpcs.Transition_catchup.implement_multi transition_catchup_rpc
+        ; Rpcs.Prove_ancestry.implement_multi prove_ancestry_rpc ]
     in
     let%map gossip_net =
       Gossip_net.create config.gossip_net_params implementations

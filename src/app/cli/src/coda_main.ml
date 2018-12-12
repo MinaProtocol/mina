@@ -611,6 +611,7 @@ struct
   module Blockchain_state = Coda_base.Blockchain_state
   module Staged_ledger_diff = Staged_ledger_diff
   module Transaction_snark_work = Transaction_snark_work
+  module State_body_hash = State_body_hash
   module Staged_ledger_hash = Staged_ledger_hash
   module Staged_ledger_aux_hash = Staged_ledger_aux_hash
   module Ledger_proof_verifier = Ledger_proof_verifier

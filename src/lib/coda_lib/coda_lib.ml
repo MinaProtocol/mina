@@ -63,6 +63,8 @@ module type Network_intf = sig
 
   type state_hash
 
+  type state_body_hash
+
   val states :
     t -> (state_with_witness Envelope.Incoming.t * time) Linear_pipe.Reader.t
 
@@ -114,6 +116,9 @@ module type Network_intf = sig
                                     Deferred.Or_error.t)
     -> transition_catchup:(   state_hash Envelope.Incoming.t
                            -> state_with_witness list option Deferred.t)
+    -> prove_ancestry:(   (state_hash * int) Envelope.Incoming.t
+                       -> (state_hash * state_body_hash list)
+                          Deferred.Or_error.t)
     -> t Deferred.t
 end
 
@@ -387,6 +392,10 @@ module type Inputs_intf = sig
     end
   end
 
+  module State_body_hash : sig
+    type t
+  end
+
   module Net :
     Network_intf
     with type state_with_witness := External_transition.t
@@ -401,6 +410,7 @@ module type Inputs_intf = sig
      and type sync_ledger_answer := Sync_ledger.answer
      and type time := Time.t
      and type state_hash := Protocol_state_hash.t
+     and type state_body_hash := State_body_hash.t
 
   module Ledger_builder_controller :
     Ledger_builder_controller_intf
@@ -477,6 +487,14 @@ module type Inputs_intf = sig
     val ledger : Ledger.maskable_ledger
 
     val proof : Protocol_state_proof.t
+  end
+
+  module Sync_handler : sig
+    val prove_ancestry :
+         frontier:Transition_frontier.t
+      -> int
+      -> Protocol_state_hash.t
+      -> (Protocol_state_hash.t * State_body_hash.t list) option
   end
 end
 
@@ -674,6 +692,14 @@ module Make (Inputs : Inputs_intf) = struct
                   Transition_frontier.Breadcrumb.transition_with_hash b
                   |> With_hash.data )
                 transition_frontier breadcrumb )
+            ~prove_ancestry:(fun query_env ->
+              let descendent, count = Envelope.Incoming.data query_env in
+              match
+                Sync_handler.prove_ancestry ~frontier:transition_frontier count
+                  descendent
+              with
+              | Some pf -> return (Ok pf)
+              | None -> Deferred.Or_error.error_string "not found" )
         in
         let valid_transitions =
           Transition_frontier_controller.run ~logger:config.log ~network:net

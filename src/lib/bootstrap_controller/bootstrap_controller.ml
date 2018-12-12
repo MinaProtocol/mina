@@ -2,7 +2,6 @@ open Core
 open Async
 open Protocols.Coda_pow
 open Coda_base
-open Pipe_lib
 
 module type Inputs_intf = sig
   module Consensus_mechanism : Consensus.Mechanism.S
@@ -126,7 +125,7 @@ module Make (Inputs : Inputs_intf) = struct
       get_root ()
 
   let create ~parent_log ~(get_ancestor : get_ancestor) ~root_length
-      ~ancestor_prover ~state ~root ~get_ancestor ledger transitions =
+      ~ancestor_prover ~state ~root ledger transitions =
     let logger = Logger.child parent_log "Bootstrap_controller" in
     let t =
       { root_length
