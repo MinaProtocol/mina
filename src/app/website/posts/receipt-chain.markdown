@@ -1,7 +1,7 @@
 ---
 title: How to make a scalable blockchain (1), techniques of SNARK 
 How do you prove you sent someone a transaction when there's no blockchain?
-date: 2018-03-11
+date: 2018-12-12
 ---
 
 As we wrap up 2018 at O(1) Labs, we thought it would be fun to look back on
@@ -19,7 +19,7 @@ Alice needs to get to basketball practice and Bob is meeting his friend Carol to
 eat the bread, so each is anxious to get out of there. So, each wants to convince
 the grocer that their transaction was the one that went through.
 
-If Alice and Bob were using a heavy blockchain the answer would be clear: just have the grocer look
+If Alice and Bob were using a heavy blockchain (TODO) the answer would be clear: just have the grocer look
 through the transaction history on the blockchain to see which was sent. But Alice
 and Bob are using Coda, where there is no history stored on the blockchain. How can
 they convince the grocer that their transaction was sent?
@@ -68,4 +68,4 @@ a Merkle tree instead of a Merkle list (or possibly a tree combined with a list)
 
 # Wrapping up
 
-I hope you enjoyed this post and stay tuned for more secrets of Coda.
+I hope you enjoyed this post and stay tuned for more secrets of Coda. TODO improve
