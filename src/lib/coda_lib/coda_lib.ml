@@ -498,6 +498,10 @@ module Make (Inputs : Inputs_intf) = struct
     ; mutable seen_jobs: Work_selector.State.t
     ; receipt_chain_database: Coda_base.Receipt_chain_database.t
     ; staged_ledger_transition_backup_capacity: int
+    ; external_transitions_writer:
+        (External_transition.t Envelope.Incoming.t * Inputs.Time.t)
+        Pipe.Writer.t
+    ; time_controller: Time.Controller.t
     ; snark_work_fee: Currency.Fee.t }
 
   let run_snark_worker t = t.run_snark_worker
@@ -589,15 +593,29 @@ module Make (Inputs : Inputs_intf) = struct
     [@@deriving make]
   end
 
+  let start t =
+    let consensus_local_state =
+      Consensus_mechanism.Local_state.create t.propose_keypair
+    in
+    match t.propose_keypair with
+    | Some keypair ->
+        let transitions =
+          Proposer.create ~parent_log:t.log
+            ~transaction_pool:t.transaction_pool
+            ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
+            ~time_controller:t.time_controller ~keypair ~consensus_local_state
+            ~transition_frontier:t.transition_frontier
+        in
+        don't_wait_for
+          (Linear_pipe.transfer_id transitions t.external_transitions_writer)
+    | None -> ()
+
   let create (config : Config.t) =
     trace_task "coda" (fun () ->
         let external_transitions_reader, external_transitions_writer =
           Linear_pipe.create ()
         in
         let net_ivar = Ivar.create () in
-        let consensus_local_state =
-          Consensus_mechanism.Local_state.create config.propose_keypair
-        in
         let first_transition =
           External_transition.create
             ~protocol_state:Consensus_mechanism.genesis_protocol_state.data
@@ -695,17 +713,6 @@ module Make (Inputs : Inputs_intf) = struct
           (Linear_pipe.iter (Snark_pool.broadcasts snark_pool) ~f:(fun x ->
                Net.broadcast_snark_pool_diff net x ;
                Deferred.unit )) ;
-        ( match config.propose_keypair with
-        | Some keypair ->
-            let transitions =
-              Proposer.create ~parent_log:config.log ~transaction_pool
-                ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
-                ~time_controller:config.time_controller ~keypair
-                ~consensus_local_state ~transition_frontier
-            in
-            don't_wait_for
-              (Linear_pipe.transfer_id transitions external_transitions_writer)
-        | None -> () ) ;
         return
           { propose_keypair= config.propose_keypair
           ; run_snark_worker= config.run_snark_worker
@@ -713,6 +720,8 @@ module Make (Inputs : Inputs_intf) = struct
           ; transaction_pool
           ; snark_pool
           ; transition_frontier
+          ; time_controller= config.time_controller
+          ; external_transitions_writer
           ; strongest_ledgers= valid_transitions_for_api
           ; log= config.log
           ; seen_jobs= Work_selector.State.init
