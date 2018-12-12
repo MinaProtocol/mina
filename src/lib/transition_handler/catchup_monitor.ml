@@ -19,9 +19,6 @@ module Make (Inputs : Inputs.S) = struct
   let create ~catchup_job_writer =
     {catchup_job_writer; timeouts= State_hash.Table.create ()}
 
-  let parent_state_hash t =
-    External_transition.protocol_state t |> Protocol_state.previous_state_hash
-
   let watch t ~logger ~time_controller ~timeout_duration ~transition =
     let logger = Logger.child logger "catchup_monitor" in
     let hash = With_hash.hash transition in

@@ -26,6 +26,7 @@ module type Inputs_intf = sig
      and type staged_ledger := Staged_ledger.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type masked_ledger := Masked_ledger.t
+     and type ledger_diff := Staged_ledger_diff.t
 
   module Transaction_pool :
     Coda_lib.Transaction_pool_read_intf

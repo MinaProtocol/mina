@@ -24,6 +24,12 @@ module type Inputs_intf = sig
      and type transition_frontier_breadcrumb :=
                 Transition_frontier.Breadcrumb.t
 
+  module Network :
+    Network_intf
+    with type peer := Kademlia.Peer.t
+     and type state_hash := State_hash.t
+     and type transition := External_transition.t
+
   module Catchup :
     Catchup_intf
     with type external_transition := External_transition.t
@@ -31,6 +37,7 @@ module type Inputs_intf = sig
      and type transition_frontier := Transition_frontier.t
      and type transition_frontier_breadcrumb :=
                 Transition_frontier.Breadcrumb.t
+     and type network := Network.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -41,10 +48,11 @@ module Make (Inputs : Inputs_intf) :
    and type syncable_ledger_answer := Inputs.Syncable_ledger.answer
    and type transition_frontier := Inputs.Transition_frontier.t
    and type time := Inputs.Time.t
-   and type state_hash := State_hash.t = struct
+   and type state_hash := State_hash.t
+   and type network := Inputs.Network.t = struct
   open Inputs
 
-  let run ~logger ~time_controller ~frontier ~transition_reader =
+  let run ~logger ~network ~time_controller ~frontier ~transition_reader =
     let logger = Logger.child logger "transition_frontier_controller" in
     let valid_transition_reader, valid_transition_writer =
       Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
@@ -63,6 +71,7 @@ module Make (Inputs : Inputs_intf) :
     Transition_handler.Processor.run ~logger ~time_controller ~frontier
       ~valid_transition_reader ~processed_transition_writer ~catchup_job_writer
       ~catchup_breadcrumbs_reader ;
-    Catchup.run ~frontier ~catchup_job_reader ~catchup_breadcrumbs_writer ;
+    Catchup.run ~logger ~network ~frontier ~catchup_job_reader
+      ~catchup_breadcrumbs_writer ;
     processed_transition_reader
 end

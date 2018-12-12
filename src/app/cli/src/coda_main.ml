@@ -263,6 +263,7 @@ module type Main_intf = sig
        and type masked_ledger := Coda_base.Ledger.t
        and type staged_ledger := Staged_ledger.t
        and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+       and type ledger_diff := Staged_ledger_diff.t
   end
 
   module Config : sig
@@ -782,6 +783,7 @@ struct
     module Transaction_snark_work = Transaction_snark_work
     module Ledger_proof_statement = Ledger_proof_statement
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Network = Net
   end)
 
   module Transition_handler = Transition_handler.Make (struct
@@ -807,6 +809,7 @@ struct
     module Consensus_mechanism = Consensus.Mechanism
     module Ledger_proof_statement = Ledger_proof_statement
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Network = Net
   end)
 
   module Ledger_builder_controller = struct
