@@ -77,12 +77,10 @@ module Make (Inputs : Inputs_intf) :
    and type ledger_database := Ledger.Db.t
    and type staged_ledger := Inputs.Staged_ledger.t
    and type masked_ledger := Ledger.Mask.Attached.t
+   and type ledger_diff := Inputs.Staged_ledger_diff.t
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t =
 struct
-  type ledger_diff = Inputs.Staged_ledger_diff.t
-
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
-
   exception
     Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
 
@@ -96,6 +94,9 @@ struct
           (Inputs.External_transition.t, State_hash.t) With_hash.t
       ; staged_ledger: Inputs.Staged_ledger.t sexp_opaque }
     [@@deriving sexp, fields]
+
+    let create transition_with_hash staged_ledger =
+      {transition_with_hash; staged_ledger}
 
     let hash {transition_with_hash; _} = With_hash.hash transition_with_hash
 
@@ -201,14 +202,16 @@ struct
     let node = Hashtbl.find_exn t.table hash in
     node.breadcrumb
 
-  let path t breadcrumb =
+  let path_map t breadcrumb ~f =
     let rec find_path b =
-      let hash = Breadcrumb.hash b in
+      let elem = f b in
       let parent_hash = Breadcrumb.parent_hash b in
-      if State_hash.equal parent_hash t.root then [hash]
-      else hash :: find_path (find_exn t parent_hash)
+      if State_hash.equal parent_hash t.root then [elem]
+      else elem :: find_path (find_exn t parent_hash)
     in
     List.rev (find_path breadcrumb)
+
+  let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.hash
 
   let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
 
@@ -271,7 +274,7 @@ struct
     let root_hash = With_hash.hash root_node.breadcrumb.transition_with_hash in
     let distance_to_root = new_length - root_node.length in
     if distance_to_root > max_length then
-      `Changed_root (List.hd_exn (path t parent_node.breadcrumb))
+      `Changed_root (List.hd_exn (hash_path t parent_node.breadcrumb))
     else `Same_root root_hash
 
   (* Adding a transition to the transition frontier is broken into the following steps:
@@ -321,7 +324,7 @@ struct
     (* 3.b *)
     if distance_to_parent > max_length then (
       (* 3.b.I *)
-      let new_root_hash = List.hd_exn (path t node.breadcrumb) in
+      let new_root_hash = List.hd_exn (hash_path t node.breadcrumb) in
       (* 3.b.II *)
       let garbage_immediate_successors =
         List.filter root_node.successor_hashes ~f:(fun succ_hash ->
