@@ -25,17 +25,9 @@ module Rpcs (Inputs : sig
 
   module Blockchain_state : Blockchain_state.S
 
-  module Protocol_state : sig
-    type value [@@deriving bin_io]
-
-    val equal_value : value -> value -> bool
-
-    val hash : value -> State_hash.t
-
-    val blockchain_state : value -> Blockchain_state.value
-  end
-
   module Sync_ledger : Sync_ledger_intf
+
+  module External_transition : External_transition.S
 end) =
 struct
   open Inputs
@@ -117,6 +109,43 @@ struct
       include Register (T)
     end
   end
+
+  module Transition_catchup = struct
+    module T = struct
+      let name = "transition_catchup"
+
+      module T = struct
+        type query = State_hash.t [@@deriving bin_io]
+
+        type response = External_transition.t list option [@@deriving bin_io]
+      end
+
+      module Caller = T
+      module Callee = T
+    end
+
+    include T.T
+    include Versioned_rpc.Both_convert.Plain.Make (T)
+
+    module V1 = struct
+      module T = struct
+        include T.T
+
+        let version = 1
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = Fn.id
+
+        let caller_model_of_response = Fn.id
+      end
+
+      include T
+      include Register (T)
+    end
+  end
 end
 
 module Message (Inputs : sig
@@ -169,11 +198,7 @@ struct
 end
 
 module type Inputs_intf = sig
-  module External_transition : sig
-    type t [@@deriving sexp, bin_io]
-
-    val timestamp : t -> Block_time.t
-  end
+  module External_transition : External_transition.S
 
   module Staged_ledger_aux_hash :
     Protocols.Coda_pow.Staged_ledger_aux_hash_intf
@@ -186,16 +211,6 @@ module type Inputs_intf = sig
      and type ledger_hash := Ledger_hash.t
 
   module Blockchain_state : Coda_base.Blockchain_state.S
-
-  module Protocol_state : sig
-    type value [@@deriving bin_io]
-
-    val equal_value : value -> value -> bool
-
-    val hash : value -> State_hash.t
-
-    val blockchain_state : value -> Blockchain_state.value
-  end
 
   module Sync_ledger : Sync_ledger_intf
 
@@ -264,7 +279,10 @@ module Make (Inputs : Inputs_intf) = struct
          -> (Staged_ledger_aux.t * Ledger_hash.t) option Deferred.t)
       ~(answer_sync_ledger_query :
             (Ledger_hash.t * Sync_ledger.query) Envelope.Incoming.t
-         -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t) =
+         -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t)
+      ~(transition_catchup :
+            State_hash.t Envelope.Incoming.t
+         -> External_transition.t list option Deferred.t) =
     let log = Logger.child config.parent_log "coda networking" in
     let get_staged_ledger_aux_at_hash_rpc sender ~version:_ hash =
       get_staged_ledger_aux_at_hash (Envelope.Incoming.wrap ~data:hash ~sender)
@@ -272,12 +290,16 @@ module Make (Inputs : Inputs_intf) = struct
     let answer_sync_ledger_query_rpc sender ~version:_ query =
       answer_sync_ledger_query (Envelope.Incoming.wrap ~data:query ~sender)
     in
+    let transition_catchup_rpc sender ~version:_ hash =
+      transition_catchup (Envelope.Incoming.wrap ~data:hash ~sender)
+    in
     let implementations =
-      List.append
-        (Rpcs.Get_staged_ledger_aux_at_hash.implement_multi
-           get_staged_ledger_aux_at_hash_rpc)
-        (Rpcs.Answer_sync_ledger_query.implement_multi
-           answer_sync_ledger_query_rpc)
+      List.concat
+        [ Rpcs.Get_staged_ledger_aux_at_hash.implement_multi
+            get_staged_ledger_aux_at_hash_rpc
+        ; Rpcs.Answer_sync_ledger_query.implement_multi
+            answer_sync_ledger_query_rpc
+        ; Rpcs.Transition_catchup.implement_multi transition_catchup_rpc ]
     in
     let%map gossip_net =
       Gossip_net.create config.gossip_net_params implementations
@@ -316,6 +338,12 @@ module Make (Inputs : Inputs_intf) = struct
   let broadcast_snark_pool_diff t x = broadcast t (Snark_pool_diff x)
 
   let peers t = Gossip_net.peers t.gossip_net
+
+  let random_peers {gossip_net; _} = Gossip_net.random_peers gossip_net
+
+  let catchup_transition t peer state_hash =
+    Gossip_net.query_peer t.gossip_net peer
+      Rpcs.Transition_catchup.dispatch_multi state_hash
 
   module Staged_ledger_io = struct
     type nonrec t = t
