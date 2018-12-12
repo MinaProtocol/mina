@@ -684,7 +684,7 @@ end = struct
         (Scan_state.fill_in_transaction_snark_work t.scan_state works)
     in
     Or_error.ok_exn (Scan_state.enqueue_transactions t.scan_state data) ;
-    Or_error.ok_exn (verify_scan_state_after_apply t.ledger t.scan_state) ;
+    Or_error.ok_exn (verify_scan_state_after_apply new_ledger t.scan_state) ;
     ( `Hash_after_applying (hash t)
     , `Ledger_proof res_opt
     , `Updated_staged_ledger {t with ledger= new_ledger} )
