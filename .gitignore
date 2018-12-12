@@ -1,4 +1,5 @@
 _build*
+*.pdf
 *.install
 .merlin*
 result
