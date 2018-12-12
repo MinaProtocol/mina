@@ -174,11 +174,11 @@ module T = struct
       let log =
         Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string external_port)
       in
-      let%bind conf_temp_dir = Unix.mkdtemp conf_dir in
+      let%bind () = File_system.create_dir conf_dir in
       let module Config = struct
         let logger = log
 
-        let conf_dir = conf_temp_dir
+        let conf_dir = conf_dir
 
         let lbc_tree_max_depth = `Finite 50
 
@@ -198,15 +198,14 @@ module T = struct
       let%bind (module Init) = make_init ~should_propose (module Config) in
       let module Main = Coda_main.Make_coda (Init) in
       let module Run = Run (Config) (Main) in
-      let banlist_dir_name = conf_temp_dir ^/ "banlist" in
-      let%bind () = Async.Unix.mkdir banlist_dir_name in
+      let banlist_dir_name = conf_dir ^/ "banlist" in
+      let%bind () = File_system.create_dir banlist_dir_name in
       let%bind suspicious_dir =
         Unix.mkdtemp (banlist_dir_name ^/ "suspicious")
       in
       let%bind punished_dir = Unix.mkdtemp (banlist_dir_name ^/ "banned") in
-      let%bind receipt_chain_dir_name =
-        Unix.mkdtemp (conf_temp_dir ^/ "receipt_chain")
-      in
+      let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
+      let%bind () = File_system.create_dir receipt_chain_dir_name in
       let receipt_chain_database =
         Coda_base.Receipt_chain_database.create
           ~directory:receipt_chain_dir_name
@@ -219,7 +218,7 @@ module T = struct
         ; gossip_net_params=
             { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
             ; target_peer_count= 8
-            ; conf_dir= conf_temp_dir
+            ; conf_dir
             ; initial_peers= peers
             ; me=
                 (Host_and_port.create ~host ~port:discovery_port, external_port)
@@ -231,11 +230,9 @@ module T = struct
         Main.create
           (Main.Config.make ~log ~net_config
              ~run_snark_worker:(Option.is_some snark_worker_config)
-             ~staged_ledger_persistant_location:
-               (conf_temp_dir ^/ "staged_ledger")
-             ~transaction_pool_disk_location:
-               (conf_temp_dir ^/ "transaction_pool")
-             ~snark_pool_disk_location:(conf_temp_dir ^/ "snark_pool")
+             ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
+             ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
+             ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
              ~time_controller ~receipt_chain_database
              ~snark_work_fee:(Currency.Fee.of_int 0)
              ?propose_keypair:Config.propose_keypair () ~banlist)
