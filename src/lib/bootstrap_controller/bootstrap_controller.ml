@@ -125,7 +125,7 @@ module Make (Inputs : Inputs_intf) = struct
       get_root ()
 
   let create ~parent_log ~(get_ancestor : get_ancestor) ~root_length
-      ~ancestor_prover ~state ~root ledger transitions =
+      ~ancestor_prover ~state ~root ledger transition_reader =
     let logger = Logger.child parent_log "Bootstrap_controller" in
     let t =
       { root_length
@@ -139,10 +139,11 @@ module Make (Inputs : Inputs_intf) = struct
       match Syncable_ledger.valid_tree t.syncable_ledger with
       | Some tree -> return (Ok tree)
       | None -> (
-          match%bind Pipe.read transitions with
+          match%bind Pipe.read transition_reader with
           | `Eof -> return (Or_error.error_string "No more transitions")
-          | `Ok transition ->
-              don't_wait_for (on_transition t transition) ;
+          | `Ok (`Transition incoming_transition, `Time_received tm) ->
+              let transition = Envelope.Incoming.data incoming_transition in
+              don't_wait_for (on_transition t (transition, tm)) ;
               go () )
     in
     go ()
