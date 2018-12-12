@@ -543,6 +543,7 @@ end = struct
     in
     let new_mask = Inputs.Ledger.Mask.create () in
     let new_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
+    let new_scan_state = Scan_state.copy t.scan_state in
     let%bind data, works, user_commands_count, cb_parts_count =
       Either.value_map diff.pre_diffs
         ~first:(fun d ->
@@ -568,7 +569,7 @@ end = struct
     let%bind () = check_completed_works t works in
     let%bind res_opt =
       (* TODO: Add rollback *)
-      let r = Scan_state.fill_in_transaction_snark_work t.scan_state works in
+      let r = Scan_state.fill_in_transaction_snark_work new_scan_state works in
       Or_error.iter_error r ~f:(fun e ->
           (* TODO: Pass a logger here *)
           eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e ) ;
@@ -576,10 +577,10 @@ end = struct
     in
     let%bind () =
       Result_with_rollback.of_or_error
-      @@ Scan_state.enqueue_transactions t.scan_state data
+      @@ Scan_state.enqueue_transactions new_scan_state data
     in
     let%map () =
-      verify_scan_state_after_apply new_ledger t.scan_state
+      verify_scan_state_after_apply new_ledger new_scan_state
       |> Result_with_rollback.of_or_error
     in
     Logger.info logger
@@ -589,7 +590,7 @@ end = struct
       proofs_waiting ;
     ( `Hash_after_applying (hash t)
     , `Ledger_proof res_opt
-    , `Updated_staged_ledger {t with ledger= new_ledger} )
+    , `Staged_ledger {scan_state= new_scan_state; ledger= new_ledger} )
 
   let apply t witness ~logger =
     Result_with_rollback.run (apply_diff t witness ~logger)
@@ -662,6 +663,7 @@ end = struct
     in
     let new_mask = Inputs.Ledger.Mask.create () in
     let new_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
+    let new_scan_state = Scan_state.copy t.scan_state in
     let data, works =
       Either.value_map diff.pre_diffs
         ~first:(fun d ->
@@ -680,13 +682,13 @@ end = struct
     in
     let res_opt =
       Or_error.ok_exn
-        (Scan_state.fill_in_transaction_snark_work t.scan_state works)
+        (Scan_state.fill_in_transaction_snark_work new_scan_state works)
     in
-    Or_error.ok_exn (Scan_state.enqueue_transactions t.scan_state data) ;
-    Or_error.ok_exn (verify_scan_state_after_apply t.ledger t.scan_state) ;
+    Or_error.ok_exn (Scan_state.enqueue_transactions new_scan_state data) ;
+    Or_error.ok_exn (verify_scan_state_after_apply t.ledger new_scan_state) ;
     ( `Hash_after_applying (hash t)
     , `Ledger_proof res_opt
-    , `Updated_staged_ledger {t with ledger= new_ledger} )
+    , `Staged_ledger {scan_state= new_scan_state; ledger= new_ledger} )
 
   let work_to_do scan_state : Transaction_snark_work.Statement.t Sequence.t =
     let work_seq = Scan_state.next_jobs_sequence scan_state in
@@ -1779,7 +1781,7 @@ let%test_module "test" =
         Sl.create_diff sl ~self:self_pk ~logger ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work
       in
-      let%map _, `Ledger_proof ledger_proof, `Updated_staged_ledger sl' =
+      let%map _, `Ledger_proof ledger_proof, `Staged_ledger sl' =
         Sl.apply sl (Test_input1.Staged_ledger_diff.forget diff) ~logger
       in
       let ledger = Sl.ledger sl in
