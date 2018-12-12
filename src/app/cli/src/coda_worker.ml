@@ -233,8 +233,8 @@ module T = struct
              ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
              ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
              ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
-             ~time_controller
-             ~receipt_chain_database ~snark_work_fee:(Currency.Fee.of_int 0)
+             ~time_controller ~receipt_chain_database
+             ~snark_work_fee:(Currency.Fee.of_int 0)
              ?propose_keypair:Config.propose_keypair () ~banlist)
       in
       Option.iter snark_worker_config ~f:(fun config ->
