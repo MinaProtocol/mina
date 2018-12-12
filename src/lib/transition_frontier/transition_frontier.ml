@@ -141,7 +141,8 @@ struct
       Inputs.Staged_ledger.of_scan_state_and_ledger
         ~scan_state:root_transaction_snark_scan_state
         ~ledger:root_masked_ledger
-        ~snarked_ledger_hash:(Frozen_ledger_hash.of_ledger_hash root_snarked_ledger_hash)
+        ~snarked_ledger_hash:
+          (Frozen_ledger_hash.of_ledger_hash root_snarked_ledger_hash)
     with
     | Error e -> failwith (Error.to_string_hum e)
     | Ok pre_root_staged_ledger ->

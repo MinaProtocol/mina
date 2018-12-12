@@ -5,7 +5,6 @@ module T = struct
 end
 
 include T
-
 include Comparable.Make (T)
 
 let zero = Snark_params.Tick.Pedersen.zero_hash

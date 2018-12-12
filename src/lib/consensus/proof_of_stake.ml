@@ -1148,6 +1148,9 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
   end)
 
   module For_tests = struct
+    open Quickcheck_lib
+    open Quickcheck.Let_syntax
+
     let gen_consensus_state
         ~(gen_slot_advancement : int Quickcheck.Generator.t)
         ~(previous_protocol_state : (Protocol_state.value, Coda_base.State_hash.t) With_hash.t)
@@ -1186,6 +1189,61 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       ; curr_slot
       ; last_epoch_data
       ; curr_epoch_data }
+
+    let gen_external_transition_ktree ?p ~gen_slot_advancement ~dummy_proof ~root =
+      let gen_consensus_state
+        let%bind slot_advancement gen_slot_advancement in
+        let%map proposer_vrf_result = Vrf.Output.gen in
+        (fun prev_external_transition ->
+          let open Consensus_state in
+          let prev_hash = With_hash.hash prev_external_transition in
+          let prev_protocol_state = External_transition.protocol_state (With_hash.data prev_external_transition) in
+          let consensus_state =
+            let prev = Protocol_state.consensus_state (With_hash.data previous_protocol_state) in
+            let length = Length.succ prev.length in
+            let curr_epoch, curr_slot =
+              let open UInt32.Infix in
+              let slot = prev.curr_slot + (UInt32.of_int slot_advancement) in
+              let epoch_advancement = slot / Epoch.size in
+              (prev.curr_epoch + epoch_advancement, slot mod Epoch.size)
+            in
+            let total_currency = Option.value_exn (Amount.add prev.total_currency Constants.coinbase) in
+            let last_epoch_data, curr_epoch_data, epoch_length =
+              Epoch_data.update_pair
+                (prev.last_epoch_data, prev.curr_epoch_data)
+                prev.epoch_length
+                ~prev_epoch:prev.curr_epoch
+                ~next_epoch:curr_epoch
+                ~curr_slot
+                ~prev_protocol_state_hash:(With_hash.hash previous_protocol_state)
+                ~proposer_vrf_result
+                ~snarked_ledger_hash
+                ~total_currency
+            in
+            { length
+            ; epoch_length
+            ; last_vrf_output= proposer_vrf_result
+            ; total_currency
+            ; curr_epoch
+            ; curr_slot
+            ; last_epoch_data
+            ; curr_epoch_data }
+          in
+          let protocol_state =
+            Protocol_state.create_value
+              ~previous_protocol_state_hash:dummy_proof
+              ~blockchain_state
+              ~consensus_state
+          in
+          let external_transition =
+            External_transition.create
+              ~protocol_state_proof:proof
+              ~previous_protocol_state
+              ~staged_ledger_diff
+          in
+          {With_hash.data= external_transition; hash= Protocol_state.hash protocol_state}
+      in
+      gen_imperative_ktree ?p (return root) node_gen
   end
 
   (* TODO: only track total currency from accounts > 1% of the currency using transactions *)

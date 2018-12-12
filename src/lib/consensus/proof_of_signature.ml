@@ -167,13 +167,12 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
   end)
 
   module For_tests = struct
-    let gen_consensus_state
-        ~gen_slot_advancement:_
-        ~previous_protocol_state
-        ~snarked_ledger_hash:_
-      : Consensus_state.value Quickcheck.Generator.t =
+    let gen_consensus_state ~gen_slot_advancement:_ ~previous_protocol_state
+        ~snarked_ledger_hash:_ : Consensus_state.value Quickcheck.Generator.t =
       let open Consensus_state in
-      let prev = Protocol_state.consensus_state (With_hash.data previous_protocol_state) in
+      let prev =
+        Protocol_state.consensus_state (With_hash.data previous_protocol_state)
+      in
       Quickcheck.Let_syntax.return
         { length= Length.succ prev.length
         ; signer_public_key= prev.signer_public_key }
