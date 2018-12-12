@@ -25,9 +25,28 @@ else
 endif
 
 ########################################
-# Coverage directory
+## Coverage directory
 
 COVERAGE_DIR=_coverage
+
+########################################
+## Git hooks
+
+git_hooks: $(wildcard scripts/git_hooks/*)
+	@case "$$(file .git | cut -d: -f2)" in \
+	' ASCII text') \
+	    echo 'refusing to install git hooks in worktree' \
+	    break;; \
+	' directory') \
+	    for f in $^; do \
+	      cp $$f .git/hooks/; \
+	    done; \
+	    break;; \
+	*) \
+	    echo 'unhandled case when installing git hooks' \
+	    exit 1 \
+	    break;; \
+	esac
 
 ########################################
 ## Code
@@ -46,7 +65,7 @@ kademlia:
 # Alias
 dht: kademlia
 
-build:
+build: git_hooks
 	$(info Starting Build)
 	ulimit -s 65536
 	cd src ; $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
@@ -57,7 +76,7 @@ dev: docker container build
 ########################################
 ## Lint
 
-reformat:
+reformat: git_hooks
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
 
 check-format:
@@ -114,11 +133,11 @@ update-deps:
 	cd .circleci; python2 render.py > config.yml
 
 # Local 'codabuilder' docker image (based off docker-toolchain)
-codabuilder:
+codabuilder: git_hooks
 	docker build --file dockerfiles/Dockerfile --tag codabuilder .
 
 # Restarts codabuilder
-containerstart:
+containerstart: git_hooks
 	@./scripts/container.sh restart
 
 ########################################
