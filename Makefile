@@ -261,15 +261,21 @@ endif
 ########################################
 # Diagrams for documentation
 
-transition_frontier_diagram: SHELL := /bin/bash
-transition_frontier_diagram:
-	cd docs/res; pdflatex transition_frontier_diagram.tex && convert -density 600x600 transition_frontier_diagram.pdf -quality 90 -resize 1080x800 transition_frontier_diagram.png
+docs/res/%.dot.png: docs/res/%.dot
+	dot -Tpng $< > $@
 
-diagrams: transition_frontier_diagram
+docs/res/%.tex.pdf: docs/res/%.tex
+	cd docs/res && pdflatex $(notdir $<)
+	cp $(@:.tex.pdf=.pdf) $@
+
+docs/res/%.tex.png: docs/res/%.tex.pdf
+	convert -density 600x600 $< -quality 90 -resize 1080x1080 $@
+
+doc_diagrams: $(addsuffix .png,$(wildcard docs/res/*.tex) $(wildcard docs/res/*.dot))
 
 ########################################
 # To avoid unintended conflicts with file names, always add to .PHONY
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains transition_frontier_diagram diagrams
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams
