@@ -138,6 +138,12 @@ module type Transition_handler_processor_intf = sig
                           , unit )
                           Writer.t
     -> catchup_breadcrumbs_reader:transition_frontier_breadcrumb list Reader.t
+    -> processed_transition_writer:( ( external_transition
+                                     , state_hash )
+                                     With_hash.t
+                                   , drop_head buffered
+                                   , unit )
+                                   Writer.t
     -> unit
 end
 
