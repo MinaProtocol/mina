@@ -7,9 +7,6 @@ date: 2018-03-11
 As we wrap up 2018 at O(1) Labs, we thought it would be fun to look back on
 the year's developments, highlighting some interesting aspects TODO
 
-Let's imagine Alice and Bob have gone for pizza and the bill has just arrived.
-Alice begins to put down some 
-
 Let's imagine Alice and Bob have gone to the grocery store. Alice gets a jar
 of peanut butter and a bunch of bananas, the total ringing up as 8 Coda.
 Bob gets some cheddar cheese and a loaf of bread, which also ends up costing
