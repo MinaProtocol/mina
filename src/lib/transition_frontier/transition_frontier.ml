@@ -118,6 +118,7 @@ struct
   (* TODO: load from and write to disk *)
   let create ~logger ~root_transition ~root_snarked_ledger
       ~root_transaction_snark_scan_state ~root_staged_ledger_diff =
+    let open Consensus.Mechanism in
     let logger = Logger.child logger __MODULE__ in
     let root_hash = With_hash.hash root_transition in
     let root_protocol_state =
@@ -125,12 +126,11 @@ struct
         (With_hash.data root_transition)
     in
     let root_blockchain_state =
-      Consensus.Mechanism.Protocol_state.blockchain_state root_protocol_state
+      Protocol_state.blockchain_state root_protocol_state
     in
     let root_blockchain_state_ledger_hash, root_blockchain_staged_ledger_hash =
-      ( Consensus.Mechanism.Protocol_state.Blockchain_state.ledger_hash
-          root_blockchain_state
-      , Consensus.Mechanism.Protocol_state.Blockchain_state.staged_ledger_hash
+      ( Protocol_state.Blockchain_state.ledger_hash root_blockchain_state
+      , Protocol_state.Blockchain_state.staged_ledger_hash
           root_blockchain_state )
     in
     assert (
@@ -143,12 +143,17 @@ struct
       Frozen_ledger_hash.of_ledger_hash
       @@ Ledger.merkle_root (Ledger.of_database root_snarked_ledger)
     in
-    assert (
-      Ledger_hash.equal
-        (Ledger.Mask.Attached.merkle_root root_masked_ledger)
-        (Staged_ledger_hash.ledger_hash
-           (Consensus.Mechanism.Protocol_state.Blockchain_state
-            .staged_ledger_hash root_blockchain_state)) ) ;
+    (* Only check this case after the genesis block *)
+    if not @@ State_hash.equal genesis_protocol_state.hash root_hash then
+      [%test_result: Ledger_hash.t]
+        ~message:
+          "Staged-ledger's ledger hash different from implied merkle root of \
+           this masked ledger"
+        ~expect:
+          (Staged_ledger_hash.ledger_hash
+             (Protocol_state.Blockchain_state.staged_ledger_hash
+                root_blockchain_state))
+        (Ledger.Mask.Attached.merkle_root root_masked_ledger) ;
     match
       Inputs.Staged_ledger.of_scan_state_and_ledger
         ~scan_state:root_transaction_snark_scan_state
@@ -294,6 +299,7 @@ struct
    *      the current best tip
    *)
   let add_transition_exn t transition_with_hash =
+    let open Consensus.Mechanism in
     let root_node = Hashtbl.find_exn t.table t.root in
     let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
     let transition = With_hash.data transition_with_hash in
@@ -302,8 +308,7 @@ struct
       Inputs.External_transition.protocol_state transition
     in
     let parent_hash =
-      Consensus.Mechanism.Protocol_state.previous_state_hash
-        transition_protocol_state
+      Protocol_state.previous_state_hash transition_protocol_state
     in
     let parent_node =
       Option.value_exn
@@ -318,13 +323,10 @@ struct
     in
     let blockchain_state_ledger_hash, blockchain_staged_ledger_hash =
       let blockchain_state =
-        Consensus.Mechanism.Protocol_state.blockchain_state
-          transition_protocol_state
+        Protocol_state.blockchain_state transition_protocol_state
       in
-      ( Consensus.Mechanism.Protocol_state.Blockchain_state.ledger_hash
-          blockchain_state
-      , Consensus.Mechanism.Protocol_state.Blockchain_state.staged_ledger_hash
-          blockchain_state )
+      ( Protocol_state.Blockchain_state.ledger_hash blockchain_state
+      , Protocol_state.Blockchain_state.staged_ledger_hash blockchain_state )
     in
     let transitioned_staged_ledger =
       match
