@@ -79,6 +79,7 @@ module T = struct
 
   type 'worker functions =
     { peers: ('worker, unit, Peers.t) Rpc_parallel.Function.t
+    ; start: ('worker, unit, unit) Rpc_parallel.Function.t
     ; get_balance:
         ( 'worker
         , Public_key.Compressed.t
@@ -99,6 +100,7 @@ module T = struct
 
   type coda_functions =
     { coda_peers: unit -> Peers.t Deferred.t
+    ; coda_start: unit -> unit Deferred.t
     ; coda_get_balance: Public_key.Compressed.t -> Maybe_currency.t Deferred.t
     ; coda_send_payment:
         Send_payment_input.t -> Receipt.Chain_hash.t Or_error.t Deferred.t
@@ -137,8 +139,14 @@ module T = struct
     let prove_receipt_impl ~worker_state ~conn_state:() input =
       worker_state.coda_prove_receipt input
 
+    let start_impl ~worker_state ~conn_state:() () = worker_state.coda_start ()
+
     let peers =
       C.create_rpc ~f:peers_impl ~bin_input:Unit.bin_t ~bin_output:Peers.bin_t
+        ()
+
+    let start =
+      C.create_rpc ~f:start_impl ~bin_input:Unit.bin_t ~bin_output:Unit.bin_t
         ()
 
     let get_balance =
@@ -158,7 +166,12 @@ module T = struct
         ~bin_output:State_hashes.bin_t ()
 
     let functions =
-      {peers; strongest_ledgers; get_balance; send_payment; prove_receipt}
+      { peers
+      ; start
+      ; strongest_ledgers
+      ; get_balance
+      ; send_payment
+      ; prove_receipt }
 
     let init_worker_state
         { host
@@ -243,6 +256,7 @@ module T = struct
           Run.run_snark_worker ~log ~client_port:config.port run_snark_worker
       ) ;
       let coda_peers () = return (Main.peers coda) in
+      let coda_start () = return (Main.start coda) in
       let coda_get_balance pk = return (Run.get_balance coda pk) in
       let coda_send_payment (sk, pk, amount, fee, memo) =
         let pk_of_sk sk =
@@ -296,7 +310,8 @@ module T = struct
         ; coda_strongest_ledgers
         ; coda_get_balance
         ; coda_send_payment
-        ; coda_prove_receipt }
+        ; coda_prove_receipt
+        ; coda_start }
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end

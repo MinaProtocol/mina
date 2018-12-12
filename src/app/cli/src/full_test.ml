@@ -88,6 +88,7 @@ let run_test () : unit Deferred.t =
          ~time_controller ~receipt_chain_database () ~banlist
          ~snark_work_fee:(Currency.Fee.of_int 0))
   in
+  Main.start coda ;
   don't_wait_for
     (Strict_pipe.Reader.iter_without_pushback
        (Main.strongest_ledgers coda)
