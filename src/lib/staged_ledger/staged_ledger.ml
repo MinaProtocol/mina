@@ -53,7 +53,7 @@ end = struct
   (* FIXME: psteckler
     match Scan_state.statement_of_job job with
     | None -> false
-    | Some statement -> true verify_threadsafe proof statement ~message *)
+    | Some statement -> verify_threadsafe proof statement ~message *)
 
   module M = struct
     include Monad.Ident
