@@ -43,7 +43,7 @@ module Compressed = struct
     module V1 = struct
       module T = struct
         type t = (Field.t, bool) t_
-        [@@deriving bin_io, sexp, eq, compare, hash]
+        [@@deriving sexp, bin_io, eq, compare, hash]
       end
 
       include T
@@ -67,10 +67,6 @@ module Compressed = struct
   include Hashable.Make_binable (Stable.V1)
 
   let compress (x, y) : t = {x; is_odd= parity y}
-
-  let to_base64 t = Binable.to_string (module Stable.V1) t |> B64.encode
-
-  let of_base64_exn s = B64.decode s |> Binable.of_string (module Stable.V1)
 
   let empty = {x= Field.zero; is_odd= false}
 

@@ -35,12 +35,12 @@
       coda_numbers
       debug_assert
       merkle_mask
-      rocksdb_database
       banlist_lib
       receipt_chain_database_lib
       storage
       yojson
-      codable))
+      codable
+      rocksdb))
   (preprocessor_deps ("../../config.mlh"))
   (preprocess (pps (ppx_jane ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord ppx_deriving_yojson bisect_ppx -conditional)))
   (synopsis "Snarks and friends necessary for keypair generation")))

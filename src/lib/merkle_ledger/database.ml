@@ -51,14 +51,14 @@ module Make
     let kvdb = Kvdb.create ~directory in
     {uuid; kvdb}
 
-  let destroy {uuid= _; kvdb} = Kvdb.destroy kvdb
+  let close {uuid= _; kvdb} = Kvdb.close kvdb
 
   let with_ledger ~f =
     let t = create () in
     try
       let result = f t in
-      destroy t ; result
-    with exn -> destroy t ; raise exn
+      close t ; result
+    with exn -> close t ; raise exn
 
   let empty_hashes =
     let empty_hashes =
@@ -80,7 +80,7 @@ module Make
     get_raw mdb location |> Option.map ~f:(fun v -> bin_read v ~pos_ref:(ref 0))
 
   let delete_raw {kvdb; _} location =
-    Kvdb.delete kvdb ~key:(Location.serialize location)
+    Kvdb.remove kvdb ~key:(Location.serialize location)
 
   let get mdb location =
     assert (Location.is_account location) ;

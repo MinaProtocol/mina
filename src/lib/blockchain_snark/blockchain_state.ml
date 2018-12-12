@@ -112,8 +112,7 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) :
       with_label __LOC__
         (Field.Checked.equal
            (Field.Checked.constant
-              ( Protocol_state.hash Consensus_mechanism.genesis_protocol_state
-                :> Field.t ))
+              (Consensus_mechanism.genesis_protocol_state.hash :> Field.t))
            (State_hash.var_to_hash_packed h))
 
     let hash (t : Protocol_state.var) =

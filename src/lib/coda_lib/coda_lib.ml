@@ -469,7 +469,10 @@ module type Inputs_intf = sig
      and type dest := Ledger_db.t
 
   module Genesis : sig
-    val state : Consensus_mechanism.Protocol_state.value
+    val state :
+      ( Consensus_mechanism.Protocol_state.value
+      , Protocol_state_hash.t )
+      With_hash.t
 
     val ledger : Ledger.maskable_ledger
 
@@ -586,30 +589,6 @@ module Make (Inputs : Inputs_intf) = struct
     [@@deriving make]
   end
 
-  let verify_staged_ledger transition_frontier transition_with_hash =
-    let external_transition = With_hash.data transition_with_hash in
-    let external_transition_hash = With_hash.hash transition_with_hash in
-    let crumb =
-      Transition_frontier.find_exn transition_frontier external_transition_hash
-    in
-    let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger crumb in
-    match Staged_ledger.statement_exn staged_ledger with
-    | `Empty -> ()
-    | `Non_empty {source; target; fee_excess; proof_type= _; supply_increase= _}
-      ->
-        let bc_state =
-          Consensus_mechanism.Protocol_state.blockchain_state
-            (External_transition.protocol_state external_transition)
-        in
-        [%test_eq: Currency.Fee.Signed.t] Currency.Fee.Signed.zero fee_excess ;
-        [%test_eq: Frozen_ledger_hash.t]
-          (Consensus_mechanism.Blockchain_state.ledger_hash bc_state)
-          source ;
-        [%test_eq: Frozen_ledger_hash.t]
-          ( Staged_ledger.ledger staged_ledger
-          |> Ledger.merkle_root |> Frozen_ledger_hash.of_ledger_hash )
-          target
-
   let create (config : Config.t) =
     trace_task "coda" (fun () ->
         let external_transitions_reader, external_transitions_writer =
@@ -621,7 +600,7 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let first_transition =
           External_transition.create
-            ~protocol_state:Consensus_mechanism.genesis_protocol_state
+            ~protocol_state:Consensus_mechanism.genesis_protocol_state.data
             ~protocol_state_proof:Protocol_state_proof.dummy
             ~staged_ledger_diff:
               { Staged_ledger_diff.pre_diffs=
@@ -648,9 +627,7 @@ module Make (Inputs : Inputs_intf) = struct
             ~root_staged_ledger_diff:None
             ~root_snarked_ledger:
               (Ledger_transfer.transfer_accounts ~src:Genesis.ledger
-                 ~dest:
-                   (Ledger_db.create ?directory_name:config.ledger_db_location
-                      ()))
+                 ~dest:(Ledger_db.create ()))
         in
         let%bind net =
           Net.create config.net_config
@@ -706,9 +683,6 @@ module Make (Inputs : Inputs_intf) = struct
         don't_wait_for
           (Strict_pipe.Reader.iter_without_pushback
              valid_transitions_for_network ~f:(fun transition_with_hash ->
-               Debug_assert.debug_assert (fun () ->
-                   verify_staged_ledger transition_frontier
-                     transition_with_hash ) ;
                Net.broadcast_state net (With_hash.data transition_with_hash) )) ;
         don't_wait_for
           (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;

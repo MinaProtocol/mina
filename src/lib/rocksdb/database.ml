@@ -1,4 +1,4 @@
-(* rocksdb_database.ml -- expose RocksDB operations for Coda *)
+(* rocksdb.ml -- expose RocksDB operations for Coda *)
 
 open Core
 
@@ -12,7 +12,7 @@ let create ~directory =
 
 let get_uuid t = t.uuid
 
-let destroy t = Rocks.close t.db
+let close t = Rocks.close t.db
 
 let get t ~(key : Bigstring.t) : Bigstring.t option =
   Rocks.get ?pos:None ?len:None ?opts:None t.db key
@@ -31,19 +31,45 @@ let set_batch t ~(key_data_pairs : (Bigstring.t * Bigstring.t) list) : unit =
 
 let copy _t = failwith "copy: not implemented"
 
-let delete t ~(key : Bigstring.t) : unit =
+let remove t ~(key : Bigstring.t) : unit =
   Rocks.delete ?pos:None ?len:None ?opts:None t.db key
 
 let to_alist t : (Bigstring.t * Bigstring.t) list =
   let iterator = Rocks.Iterator.create t.db in
   Rocks.Iterator.seek_to_last iterator ;
   (* iterate backwards and cons, to build list sorted by key *)
+  let copy t =
+    let tlen = Bigstring.length t in
+    let new_t = Bigstring.create tlen in
+    Bigstring.blit ~src:t ~dst:new_t ~src_pos:0 ~dst_pos:0 ~len:tlen ;
+    new_t
+  in
   let rec loop accum =
     if Rocks.Iterator.is_valid iterator then (
-      let key = Rocks.Iterator.get_key iterator in
-      let value = Rocks.Iterator.get_value iterator in
+      let key = copy (Rocks.Iterator.get_key iterator) in
+      let value = copy (Rocks.Iterator.get_value iterator) in
       Rocks.Iterator.prev iterator ;
       loop ((key, value) :: accum) )
     else accum
   in
   loop []
+
+let%test_unit "to_alist (of_alist l) = l" =
+  Quickcheck.test
+    Quickcheck.Generator.(tuple2 String.gen String.gen |> list)
+    ~f:(fun kvs ->
+      File_system.with_temp_dir "/tmp/coda-test" ~f:(fun directory ->
+          let s = Bigstring.of_string in
+          let sorted =
+            List.sort kvs ~compare:[%compare: string * string]
+            |> List.map ~f:(fun (k, v) -> (s k, s v))
+          in
+          let db = create ~directory in
+          List.iter sorted ~f:(fun (key, data) -> set db ~key ~data) ;
+          let alist =
+            List.sort (to_alist db)
+              ~compare:[%compare: Bigstring.t * Bigstring.t]
+          in
+          [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted alist ;
+          Async.Deferred.unit )
+      |> Async.don't_wait_for )
