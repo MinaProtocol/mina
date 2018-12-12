@@ -48,10 +48,11 @@ end = struct
     Async.Thread_safe.block_on_async_exn (fun () ->
         Inputs.Ledger_proof_verifier.verify proof statement ~message )
 
-  let verify ~message job proof =
+  let verify ~message _job _proof = ignore message ; true
+  (* FIXME: psteckler
     match Scan_state.statement_of_job job with
     | None -> false
-    | Some statement -> verify_threadsafe proof statement ~message
+    | Some statement -> true verify_threadsafe proof statement ~message *)
 
   module M = struct
     include Monad.Ident
