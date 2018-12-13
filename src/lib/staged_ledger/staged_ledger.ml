@@ -20,6 +20,7 @@ module Make (Inputs : Inputs.S) : sig
   include
     Coda_pow.Staged_ledger_intf
     with type diff := Inputs.Staged_ledger_diff.t
+     and type verified_diff := Inputs.Staged_ledger_diff.Verified.t
      and type valid_diff :=
                 Inputs.Staged_ledger_diff.With_valid_signatures_and_proofs.t
      and type ledger_hash := Inputs.Ledger_hash.t
@@ -30,7 +31,7 @@ module Make (Inputs : Inputs.S) : sig
      and type user_command_with_valid_signature :=
                 Inputs.User_command.With_valid_signature.t
      and type statement := Inputs.Transaction_snark_work.Statement.t
-     and type completed_work := Inputs.Transaction_snark_work.Checked.t
+     and type completed_work_checked := Inputs.Transaction_snark_work.Checked.t
      and type ledger_proof := Inputs.Ledger_proof.t
      and type staged_ledger_aux_hash := Inputs.Staged_ledger_aux_hash.t
      and type sparse_ledger := Inputs.Sparse_ledger.t
@@ -337,26 +338,30 @@ end = struct
 
   let check_completed_works scan_state
       (completed_works : Transaction_snark_work.t list) =
-    Result_with_rollback.with_no_rollback
-      (let open Or_error.Let_syntax in
-      let%bind jobses =
-        let open Or_error.Let_syntax in
-        let%map jobs =
-          Scan_state.next_k_jobs scan_state ~k:(total_proofs completed_works)
-        in
-        chunks_of jobs ~n:Transaction_snark_work.proofs_length
+    let open Or_error.Let_syntax in
+    let%bind jobses =
+      let open Or_error.Let_syntax in
+      let%map jobs =
+        Scan_state.next_k_jobs scan_state ~k:(total_proofs completed_works)
       in
-      List.for_all (List.zip_exn jobses completed_works)
-        ~f:(fun (jobs, work) ->
-          let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
-          List.for_all (List.zip_exn jobs work.proofs) ~f:(fun (job, proof) ->
-              verify ~message job proof ) )
-      |> check_or_error "proofs did not verify")
+      chunks_of jobs ~n:Transaction_snark_work.proofs_length
+    in
+    List.for_all (List.zip_exn jobses completed_works) ~f:(fun (jobs, work) ->
+        let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
+        List.for_all (List.zip_exn jobs work.proofs) ~f:(fun (job, proof) ->
+            verify ~message job proof ) )
+    |> fun verified ->
+    if verified then
+      (* "verified" guard justifies use of "create_unsafe" here *)
+      Ok
+        (List.map completed_works
+           ~f:Transaction_snark_work.Checked.create_unsafe)
+    else Or_error.error_string "proofs did not verify"
 
-  let create_fee_transfers completed_works delta public_key =
+  let create_fee_transfers completed_works_verified delta public_key =
     let singles =
       (if Fee.Unsigned.(equal zero delta) then [] else [(public_key, delta)])
-      @ List.filter_map completed_works
+      @ List.filter_map completed_works_verified
           ~f:(fun {Transaction_snark_work.fee; prover; _} ->
             if Fee.Unsigned.equal fee Fee.Unsigned.zero then None
             else Some (prover, fee) )
@@ -438,14 +443,15 @@ end = struct
         two_parts amt (Some w1) w2
 
   let fee_remainder (user_commands : User_command.With_valid_signature.t list)
-      completed_works =
+      (completed_works_verified : Transaction_snark_work.t list) =
     let open Or_error.Let_syntax in
     let%bind budget =
       sum_fees user_commands ~f:(fun t -> User_command.fee (t :> User_command.t)
       )
     in
     let%bind work_fee =
-      sum_fees completed_works ~f:(fun {Transaction_snark_work.fee; _} -> fee)
+      sum_fees completed_works_verified
+        ~f:(fun {Transaction_snark_work.fee; _} -> fee )
     in
     option "budget did not suffice" (Fee.Unsigned.sub budget work_fee)
 
@@ -457,6 +463,91 @@ end = struct
       ; user_commands_count: int
       ; coinbase_parts_count: int }
   end
+
+  (* turn a diff into a diff_checked by verifying completed works *)
+  let verified_diff_of_diff t (diff : Staged_ledger_diff.t) =
+    let open Or_error.Monad_infix in
+    let open Staged_ledger_diff in
+    let scan_state = t.scan_state in
+    let singleton_msg n =
+      Format.sprintf "verified_diff_of_diff: expected singleton list (%d)" n
+    in
+    let diff_verified_of_verified_work completed_works user_commands =
+      {Staged_ledger_diff.Verified.completed_works; user_commands}
+    in
+    let check_at_most_one (at_most_one : diff_with_at_most_one_coinbase) =
+      check_completed_works scan_state at_most_one.diff.completed_works
+      >>= fun checked_work ->
+      let diff =
+        diff_verified_of_verified_work checked_work
+          at_most_one.diff.user_commands
+      in
+      match at_most_one.coinbase_added with
+      | Zero -> Ok Staged_ledger_diff.Verified.{diff; coinbase_added= Zero}
+      | One maybe_work -> (
+        match maybe_work with
+        | None -> Ok {diff; coinbase_added= One None}
+        | Some work -> (
+          match check_completed_works scan_state [work] with
+          | Ok [checked_work] ->
+              Ok {diff; coinbase_added= One (Some checked_work)}
+          | Error msg -> Error msg
+          | Ok _ -> failwith (singleton_msg 1) ) )
+    in
+    let check_at_most_two (at_most_two : diff_with_at_most_two_coinbase) =
+      check_completed_works scan_state at_most_two.diff.completed_works
+      >>= fun checked_work ->
+      let diff =
+        diff_verified_of_verified_work checked_work
+          at_most_two.diff.user_commands
+      in
+      match at_most_two.coinbase_parts with
+      | Zero -> Ok {Staged_ledger_diff.Verified.diff; coinbase_parts= Zero}
+      | One maybe_work -> (
+        match maybe_work with
+        | None -> Ok {diff; coinbase_parts= One None}
+        | Some work -> (
+          match check_completed_works scan_state [work] with
+          | Ok [checked_work] ->
+              Ok {diff; coinbase_parts= One (Some checked_work)}
+          | Error msg -> Error msg
+          | Ok _ -> failwith (singleton_msg 2) ) )
+      | Two maybe_works -> (
+        match maybe_works with
+        | None -> Ok {diff; coinbase_parts= Two None}
+        | Some (work, maybe_work) -> (
+          match check_completed_works scan_state [work] with
+          | Ok [checked_work_1] -> (
+            match maybe_work with
+            | None ->
+                Ok {diff; coinbase_parts= Two (Some (checked_work_1, None))}
+            | Some work -> (
+              match check_completed_works scan_state [work] with
+              | Ok [checked_work_2] ->
+                  Ok
+                    { diff
+                    ; coinbase_parts=
+                        Two (Some (checked_work_1, Some checked_work_2)) }
+              | Error msg -> Error msg
+              | Ok _ -> failwith (singleton_msg 3) ) )
+          | Error msg -> Error msg
+          | Ok _ -> failwith (singleton_msg 4) ) )
+    in
+    ( match diff.pre_diffs with
+    | First at_most_one ->
+        check_at_most_one (at_most_one : diff_with_at_most_one_coinbase)
+        >>= fun at_most_one_verified -> Ok (First at_most_one_verified)
+    | Second (at_most_two, at_most_one) ->
+        check_at_most_two at_most_two
+        >>= fun at_most_two_verified ->
+        check_at_most_one at_most_one
+        >>= fun at_most_one_verified ->
+        Ok (Second (at_most_two_verified, at_most_one_verified)) )
+    >>= fun pre_diffs ->
+    Ok
+      { Staged_ledger_diff.Verified.pre_diffs
+      ; prev_hash= diff.prev_hash
+      ; creator= diff.creator }
 
   let apply_pre_diff ledger coinbase_parts proposer
       (diff : Staged_ledger_diff.diff) =
@@ -475,7 +566,7 @@ end = struct
       in
       List.rev user_commands'
     in
-    let coinbase_work =
+    let (coinbase_work : Transaction_snark_work.t list) =
       match coinbase_parts with
       | `One (Some w) -> [w]
       | `Two (Some (w, None)) -> [w]
@@ -506,8 +597,7 @@ end = struct
     ; user_commands_count= List.length user_commands
     ; coinbase_parts_count= List.length coinbase }
 
-  (* TODO: when we move to a disk-backed db, this should call "Ledger.commit_changes" at the end. *)
-  let apply_diff t (diff : Staged_ledger_diff.t) ~logger =
+  let apply_unverified_diff t (diff : Staged_ledger_diff.t) ~logger =
     let open Result_with_rollback.Let_syntax in
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
     let spots_available, proofs_waiting =
@@ -569,7 +659,6 @@ end = struct
           , p1.user_commands_count + p2.user_commands_count
           , p1.coinbase_parts_count + p2.coinbase_parts_count ) )
     in
-    let%bind () = check_completed_works scan_state' works in
     let%bind res_opt =
       (* TODO: Add rollback *)
       let r = Scan_state.fill_in_transaction_snark_work scan_state' works in
@@ -595,8 +684,20 @@ end = struct
     , `Ledger_proof res_opt
     , `Staged_ledger {scan_state= scan_state'; ledger= new_ledger} )
 
+  (* TODO: when we move to a disk-backed db, this should call "Ledger.commit_changes" at the end. *)
+  let apply_verified_diff t (diff_verified : Staged_ledger_diff.Verified.t)
+      ~logger =
+    (* forget the verification when applying *)
+    let (diff : Staged_ledger_diff.t) =
+      Staged_ledger_diff.forget_verified diff_verified
+    in
+    apply_unverified_diff t diff ~logger
+
   let apply t witness ~logger =
-    Result_with_rollback.run (apply_diff t witness ~logger)
+    Result_with_rollback.run (apply_verified_diff t witness ~logger)
+
+  let apply_unverified t witness ~logger =
+    Result_with_rollback.run (apply_unverified_diff t witness ~logger)
 
   let forget_work_opt = Option.map ~f:Transaction_snark_work.forget
 
@@ -1670,6 +1771,38 @@ let%test_module "test" =
           ; creator: public_key }
         [@@deriving sexp, bin_io]
 
+        module Verified = struct
+          type diff =
+            { completed_works: completed_work_checked list
+            ; user_commands: user_command list }
+          [@@deriving sexp, bin_io]
+
+          type diff_with_at_most_two_coinbase =
+            {diff: diff; coinbase_parts: completed_work_checked At_most_two.t}
+          [@@deriving sexp, bin_io]
+
+          type diff_with_at_most_one_coinbase =
+            {diff: diff; coinbase_added: completed_work_checked At_most_one.t}
+          [@@deriving sexp, bin_io]
+
+          type pre_diffs =
+            ( diff_with_at_most_one_coinbase
+            , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase
+            )
+            Either.t
+          [@@deriving sexp, bin_io]
+
+          type t =
+            { pre_diffs: pre_diffs
+            ; prev_hash: staged_ledger_hash
+            ; creator: public_key }
+          [@@deriving sexp, bin_io]
+        end
+
+        type verified = Verified.t [@@deriving sexp, bin_io]
+
+        let forget_verified _vf = failwith "forget_verified: not implemented"
+
         module With_valid_signatures_and_proofs = struct
           type diff =
             { completed_works: completed_work_checked list
@@ -1735,7 +1868,7 @@ let%test_module "test" =
           in
           {diff= forget_diff diff; coinbase_added= forget_cw}
 
-        let forget (t : With_valid_signatures_and_proofs.t) =
+        let forget_validated (t : With_valid_signatures_and_proofs.t) =
           { pre_diffs=
               Either.map t.pre_diffs ~first:forget_pre_diff_with_at_most_one
                 ~second:(fun d ->
@@ -1785,10 +1918,12 @@ let%test_module "test" =
           ~get_completed_work:stmt_to_work
       in
       let%map _, `Ledger_proof ledger_proof, `Staged_ledger sl' =
-        Sl.apply !sl (Test_input1.Staged_ledger_diff.forget diff) ~logger
+        Sl.apply_unverified !sl
+          (Test_input1.Staged_ledger_diff.forget_validated diff)
+          ~logger
       in
       sl := sl' ;
-      (ledger_proof, Test_input1.Staged_ledger_diff.forget diff)
+      (ledger_proof, Test_input1.Staged_ledger_diff.forget_validated diff)
 
     let txns n f g = List.zip_exn (List.init n ~f) (List.init n ~f:g)
 

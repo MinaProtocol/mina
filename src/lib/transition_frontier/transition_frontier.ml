@@ -51,6 +51,7 @@ module type Inputs_intf = sig
   module Staged_ledger :
     Staged_ledger_intf
     with type diff := Staged_ledger_diff.t
+     and type verified_diff := Staged_ledger_diff.Verified.t
      and type valid_diff :=
                 Staged_ledger_diff.With_valid_signatures_and_proofs.t
      and type staged_ledger_hash := Staged_ledger_hash.t
@@ -63,7 +64,7 @@ module type Inputs_intf = sig
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
      and type statement := Transaction_snark_work.Statement.t
-     and type completed_work := Transaction_snark_work.Checked.t
+     and type completed_work_checked := Transaction_snark_work.Checked.t
      and type sparse_ledger := Sparse_ledger.t
      and type ledger_proof_statement := Ledger_proof_statement.t
      and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
@@ -73,11 +74,12 @@ end
 module Make (Inputs : Inputs_intf) :
   Transition_frontier_intf
   with type state_hash := State_hash.t
-   and type external_transition := Inputs.External_transition.t
+   and type external_transition_verified :=
+              Inputs.External_transition.Verified.t
    and type ledger_database := Ledger.Db.t
    and type staged_ledger := Inputs.Staged_ledger.t
+   and type ledger_diff_verified := Inputs.Staged_ledger_diff.Verified.t
    and type masked_ledger := Ledger.Mask.Attached.t
-   and type ledger_diff := Inputs.Staged_ledger_diff.t
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t =
 struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
@@ -91,7 +93,7 @@ struct
   module Breadcrumb = struct
     type t =
       { transition_with_hash:
-          (Inputs.External_transition.t, State_hash.t) With_hash.t
+          (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
       ; staged_ledger: Inputs.Staged_ledger.t sexp_opaque }
     [@@deriving sexp, fields]
 
@@ -102,7 +104,7 @@ struct
 
     let parent_hash {transition_with_hash; _} =
       Consensus.Mechanism.Protocol_state.previous_state_hash
-        (Inputs.External_transition.protocol_state
+        (Inputs.External_transition.Verified.protocol_state
            (With_hash.data transition_with_hash))
   end
 
@@ -117,13 +119,16 @@ struct
     ; table: node State_hash.Table.t }
 
   (* TODO: load from and write to disk *)
-  let create ~logger ~root_transition ~root_snarked_ledger
-      ~root_transaction_snark_scan_state ~root_staged_ledger_diff =
+  let create ~logger
+      ~(root_transition :
+         (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t)
+      ~root_snarked_ledger ~root_transaction_snark_scan_state
+      ~root_staged_ledger_diff =
     let open Consensus.Mechanism in
     let logger = Logger.child logger __MODULE__ in
     let root_hash = With_hash.hash root_transition in
     let root_protocol_state =
-      Inputs.External_transition.protocol_state
+      Inputs.External_transition.Verified.protocol_state
         (With_hash.data root_transition)
     in
     let root_blockchain_state =
@@ -305,10 +310,12 @@ struct
     let open Consensus.Mechanism in
     let root_node = Hashtbl.find_exn t.table t.root in
     let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
-    let transition = With_hash.data transition_with_hash in
+    let (transition : Inputs.External_transition.Verified.t) =
+      With_hash.data transition_with_hash
+    in
     let hash = With_hash.hash transition_with_hash in
     let transition_protocol_state =
-      Inputs.External_transition.protocol_state transition
+      Inputs.External_transition.Verified.protocol_state transition
     in
     let parent_hash =
       Protocol_state.previous_state_hash transition_protocol_state
@@ -334,7 +341,7 @@ struct
     let transitioned_staged_ledger =
       match
           Inputs.Staged_ledger.apply ~logger:t.logger staged_ledger
-            (Inputs.External_transition.staged_ledger_diff transition)
+            (Inputs.External_transition.Verified.staged_ledger_diff transition)
           |> Or_error.ok_exn
       
       with

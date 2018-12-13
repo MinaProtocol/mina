@@ -18,7 +18,7 @@ module Make (Inputs : Inputs.S) : sig
      and type ledger_hash := Ledger_hash.t
      and type sync_query := Sync_ledger.query
      and type sync_answer := Sync_ledger.answer
-     and type external_transition := External_transition.t
+     and type external_transition_verified := External_transition.Verified.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type tip := Tip.t
      and type public_key_compressed := Public_key.Compressed.t
@@ -33,7 +33,8 @@ end = struct
       { parent_log: Logger.t
       ; net_deferred: Net.net Deferred.t
       ; external_transitions:
-          (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
+          (External_transition.Verified.t * Unix_timestamp.t)
+          Linear_pipe.Reader.t
       ; genesis_tip: Tip.t
       ; ledger: Ledger.maskable_ledger
       ; consensus_local_state: Consensus_mechanism.Local_state.t
@@ -59,16 +60,18 @@ end = struct
           {With_hash.data= transition; hash= transition_target_hash} =
         let open Deferred.Or_error.Let_syntax in
         let old_state = tip.Tip.state in
-        let new_state = External_transition.protocol_state transition in
+        let new_state =
+          External_transition.Verified.protocol_state transition
+        in
         let%bind verified =
           verify_blockchain
-            (External_transition.protocol_state_proof transition)
+            (External_transition.Verified.protocol_state_proof transition)
             new_state
         in
         let%bind ledger_hash =
           match%map
             apply' tip.staged_ledger
-              (External_transition.staged_ledger_diff transition)
+              (External_transition.Verified.staged_ledger_diff transition)
               logger
           with
           | Some (h, _) -> h
@@ -94,7 +97,8 @@ end = struct
         { With_hash.data=
             { tip with
               state= new_state
-            ; proof= External_transition.protocol_state_proof transition }
+            ; proof=
+                External_transition.Verified.protocol_state_proof transition }
         ; hash= transition_target_hash }
     end
 
@@ -117,11 +121,12 @@ end = struct
     ; log: Logger.t
     ; handler: Transition_logic.t
     ; strongest_ledgers_reader:
-        (Staged_ledger.t * External_transition.t) Linear_pipe.Reader.t }
+        (Staged_ledger.t * External_transition.Verified.t) Linear_pipe.Reader.t
+    }
 
   let strongest_tip t =
     let state = Transition_logic.state t.handler in
-    Transition_logic_state.assert_state_valid state ;
+    (*    Transition_logic_state.assert_state_valid state ; *)
     Transition_logic_state.longest_branch_tip state |> With_hash.data
 
   let staged_ledger_io {staged_ledger_io; _} = staged_ledger_io
@@ -184,7 +189,7 @@ end = struct
             config.external_transitions ~f:(fun (transition, time_received) ->
               let transition_with_hash =
                 With_hash.of_data transition ~hash_data:(fun t ->
-                    t |> External_transition.protocol_state
+                    t |> External_transition.Verified.protocol_state
                     |> Protocol_state.hash )
               in
               let%map job =
@@ -204,10 +209,11 @@ end = struct
             Consensus_mechanism.select
               ~existing:
                 (Protocol_state.consensus_state
-                   (External_transition.protocol_state last_transition))
+                   (External_transition.Verified.protocol_state last_transition))
               ~candidate:
                 (Protocol_state.consensus_state
-                   (External_transition.protocol_state current_transition))
+                   (External_transition.Verified.protocol_state
+                      current_transition))
               ~logger:log ~time_received
           with
           | `Keep -> `Skip
@@ -271,7 +277,7 @@ end = struct
           hash )
       ~p_trans:(fun hash {With_hash.data= trans; hash= _} ->
         Staged_ledger_hash.equal
-          ( trans |> External_transition.protocol_state
+          ( trans |> External_transition.Verified.protocol_state
           |> Protocol_state.blockchain_state
           |> Blockchain_state.staged_ledger_hash )
           hash )
@@ -305,7 +311,7 @@ end = struct
                     hash )
                 ~p_trans:(fun hash {With_hash.data= trans; hash= _} ->
                   Ledger_hash.equal
-                    ( trans |> External_transition.protocol_state
+                    ( trans |> External_transition.Verified.protocol_state
                     |> Protocol_state.blockchain_state
                     |> Blockchain_state.staged_ledger_hash
                     |> Staged_ledger_hash.ledger_hash )
@@ -384,6 +390,10 @@ let%test_module "test" =
         module Staged_ledger_diff = struct
           type t = int [@@deriving bin_io, sexp]
 
+          module Verified = struct
+            type t = int
+          end
+
           module With_valid_signatures_and_proofs = struct
             type t = int
           end
@@ -440,12 +450,15 @@ let%test_module "test" =
 
           let scan_state t = !t
 
-          let apply (t : t) (x : Staged_ledger_diff.t) ~logger:_ =
+          let apply (t : t) (x : Staged_ledger_diff.Verified.t) ~logger:_ =
             t := x ;
             Ok
               ( `Hash_after_applying (hash t)
               , `Ledger_proof (Some x)
               , `Staged_ledger t )
+
+          let apply_unverified (_t : t) (_x : Staged_ledger_diff.t) ~logger:_ =
+            failwith "Unimplemented"
 
           let apply_diff_unchecked (_t : t) (_x : 'a) =
             failwith "Unimplemented"
@@ -455,8 +468,6 @@ let%test_module "test" =
               -> snarked_ledger_hash:Frozen_ledger_hash.t
               -> Ledger.t Or_error.t =
            fun t ~snarked_ledger_hash:_ -> Ok !t
-
-          let transaction_snark_scan_state t = !t
         end
 
         module State_hash = struct
@@ -528,6 +539,18 @@ let%test_module "test" =
           let staged_ledger_diff = Consensus_mechanism.Protocol_state.hash
 
           let protocol_state_proof _ = ()
+
+          module Verified = struct
+            include Consensus_mechanism.Protocol_state
+
+            let staged_ledger_diff = staged_ledger_diff
+
+            let protocol_state = protocol_state
+
+            let protocol_state_proof = protocol_state_proof
+
+            let of_state = of_state
+          end
         end
 
         module Tip = struct
@@ -540,9 +563,11 @@ let%test_module "test" =
           let copy t =
             {t with staged_ledger= Staged_ledger.copy t.staged_ledger}
 
-          let of_transition_and_staged_ledger transition staged_ledger =
-            { state= External_transition.protocol_state transition
-            ; proof= External_transition.protocol_state_proof transition
+          let of_verified_transition_and_staged_ledger transition staged_ledger
+              =
+            { state= External_transition.Verified.protocol_state transition
+            ; proof=
+                External_transition.Verified.protocol_state_proof transition
             ; staged_ledger }
 
           let bin_tip =
@@ -650,7 +675,7 @@ let%test_module "test" =
           ~net_deferred:(return net_input)
           ~external_transitions:
             (Linear_pipe.map staged_ledger_transitions
-               ~f:External_transition.of_state)
+               ~f:External_transition.Verified.of_state)
           ~genesis_tip:
             { state= Inputs.Consensus_mechanism.Protocol_state.genesis
             ; proof= ()

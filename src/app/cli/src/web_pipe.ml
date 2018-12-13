@@ -23,6 +23,10 @@ module type Coda_intf = sig
 
     module External_transition : sig
       type t
+
+      module Verified : sig
+        type t
+      end
     end
   end
 
@@ -34,7 +38,7 @@ module type Coda_intf = sig
 
   val strongest_ledgers :
        t
-    -> (Inputs.External_transition.t, State_hash.t) With_hash.t
+    -> (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
        Strict_pipe.Reader.t
 end
 

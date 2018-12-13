@@ -9,7 +9,7 @@ module Make (Inputs : sig
     Transition_logic_state_intf.S
     with type tip := Tip.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
-     and type external_transition := External_transition.t
+     and type external_transition_verified := External_transition.Verified.t
      and type state_hash := State_hash.t
      and type public_key_compressed := Public_key.Compressed.t
 end) =
@@ -20,11 +20,11 @@ struct
   open Ops
 
   let ledger_hash_of_transition t =
-    External_transition.protocol_state t
+    External_transition.Verified.protocol_state t
     |> Protocol_state.blockchain_state |> Blockchain_state.ledger_hash
 
   let staged_ledger_hash_of_transition t =
-    External_transition.protocol_state t
+    External_transition.Verified.protocol_state t
     |> Protocol_state.blockchain_state |> Blockchain_state.staged_ledger_hash
 
   type t = {net: Net.t; log: Logger.t; sl_ref: Sync_ledger.t option ref}
@@ -37,8 +37,10 @@ struct
       ~(state_mutator :
             Transition_logic_state.t
          -> Transition_logic_state.Change.t list
-         -> External_transition.t
-         -> unit Deferred.t) transition_with_hash =
+         -> External_transition.Verified.t
+         -> unit Deferred.t)
+      (transition_with_hash :
+        (External_transition.Verified.t, State_hash.t) With_hash.t) =
     trace_recurring_task "catchup" (fun () ->
         let {With_hash.data= locked_tip; hash= _} =
           Transition_logic_state.locked_tip old_state
@@ -69,7 +71,7 @@ struct
               in
               let new_tip =
                 { With_hash.data=
-                    Tip.of_transition_and_staged_ledger transition sl
+                    Tip.of_verified_transition_and_staged_ledger transition sl
                 ; hash= transition_state_hash }
               in
               assert_materialization_of new_tip transition_with_hash ;
@@ -113,7 +115,8 @@ struct
                   sl )
           | Some sl -> sl
         in
-        let ivar : (External_transition.t, State_hash.t) With_hash.t Ivar.t =
+        let ivar :
+            (External_transition.Verified.t, State_hash.t) With_hash.t Ivar.t =
           Ivar.create ()
         in
         Logger.debug log
