@@ -268,7 +268,14 @@ end = struct
       let open M.Let_syntax in
       match%map scan_statement t with
       | Error (`Error e) -> Error e
-      | Error `Empty -> Ok ()
+      | Error `Empty ->
+          let current_ledger_hash =
+            Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
+          in
+          Option.value_map ~default:(Ok ()) snarked_ledger_hash ~f:(fun hash ->
+              clarify_error
+                (Frozen_ledger_hash.equal hash current_ledger_hash)
+                "did not connect with snarked ledger hash" )
       | Ok {fee_excess; source; target; supply_increase= _; proof_type= _} ->
           let open Or_error.Let_syntax in
           let%map () =
