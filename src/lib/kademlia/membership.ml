@@ -207,9 +207,8 @@ module Haskell_process = struct
           | "DBUG" ->
               Logger.debug log "%s" line_no_prefix ;
               None
-          | "TRAC" ->
-              Logger.trace log "%s" line_no_prefix ;
-              None
+          | "TRAC" -> (* trace is 99% ping/pong checks, omit *)
+                      None
           | "EROR" ->
               Logger.error log "%s" line_no_prefix ;
               None
