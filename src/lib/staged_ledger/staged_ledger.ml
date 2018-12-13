@@ -1799,8 +1799,6 @@ let%test_module "test" =
           [@@deriving sexp, bin_io]
         end
 
-        type verified = Verified.t [@@deriving sexp, bin_io]
-
         let forget_verified _vf = failwith "forget_verified: not implemented"
 
         module With_valid_signatures_and_proofs = struct

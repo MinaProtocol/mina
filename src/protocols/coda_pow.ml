@@ -530,9 +530,7 @@ module type Staged_ledger_diff_intf = sig
     [@@deriving sexp, bin_io]
   end
 
-  type verified = Verified.t [@@deriving sexp, bin_io]
-
-  val forget_verified : verified -> t
+  val forget_verified : Verified.t -> t
 
   module With_valid_signatures_and_proofs : sig
     type diff =

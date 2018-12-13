@@ -116,8 +116,6 @@ struct
     [@@deriving sexp, bin_io]
   end
 
-  type verified = Verified.t [@@deriving sexp, bin_io]
-
   (* forget the verification of completed works in a verified diff
      unlike Staged_ledger.checked_diff_of_diff, there's no possibility of failure *)
 
