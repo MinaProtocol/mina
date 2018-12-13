@@ -445,6 +445,19 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             in
             assert (Int.equal retrieved_total total) )
 
+      let%test_unit "create_empty doesn't modify the hash" =
+        Test.with_instances (fun maskable mask ->
+            let open Mask.Attached in
+            let ledger = Maskable.register_mask maskable mask in
+            let key = List.nth_exn (Key.gen_keys 1) 0 in
+            let start_hash = merkle_root ledger in
+            match get_or_create_account_exn ledger key Account.empty with
+            | `Existed, _ ->
+                failwith
+                  "create_empty with empty ledger somehow already has that key?"
+            | `Added, new_loc ->
+                [%test_eq: Hash.t] start_hash (merkle_root ledger) )
+
       let%test_unit "reuse of locations for removed accounts" =
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
