@@ -17,7 +17,6 @@ module type S = sig
      and type external_transition := External_transition.t
      and type ledger_database := Ledger.Db.t
      and type staged_ledger := Staged_ledger.t
-     and type masked_ledger := Ledger.Mask.Attached.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type ledger_diff := Staged_ledger_diff.t
 end

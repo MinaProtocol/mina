@@ -440,7 +440,6 @@ module type Inputs_intf = sig
     with type state_hash := Protocol_state_hash.t
      and type external_transition := External_transition.t
      and type ledger_database := Ledger_db.t
-     and type masked_ledger := Masked_ledger.t
      and type staged_ledger := Staged_ledger.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type ledger_diff := Staged_ledger_diff.t
@@ -449,8 +448,6 @@ module type Inputs_intf = sig
     Protocols.Coda_transition_frontier.Transition_frontier_controller_intf
     with type time_controller := Time.Controller.t
      and type external_transition := External_transition.t
-     and type syncable_ledger_query := Sync_ledger.query
-     and type syncable_ledger_answer := Sync_ledger.answer
      and type transition_frontier := Transition_frontier.t
      and type state_hash := Protocol_state_hash.t
      and type time := Time.t

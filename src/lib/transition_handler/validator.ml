@@ -89,7 +89,7 @@ module Make (Inputs : Inputs.S) = struct
                transition_env
            with
            | `Valid ->
-               Writer.write valid_transition_writer
+               Closed_writer.write valid_transition_writer
                  (With_hash.of_data transition
                     ~hash_data:
                       (Fn.compose Protocol_state.hash

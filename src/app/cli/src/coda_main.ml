@@ -260,7 +260,6 @@ module type Main_intf = sig
       with type state_hash := State_hash.t
        and type external_transition := External_transition.t
        and type ledger_database := Coda_base.Ledger.Db.t
-       and type masked_ledger := Coda_base.Ledger.t
        and type staged_ledger := Staged_ledger.t
        and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
        and type ledger_diff := Staged_ledger_diff.t

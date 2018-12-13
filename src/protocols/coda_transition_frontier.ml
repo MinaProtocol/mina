@@ -24,8 +24,6 @@ module type Transition_frontier_base_intf = sig
 
   type transaction_snark_scan_state
 
-  type masked_ledger
-
   type staged_ledger
 
   type ledger_diff
@@ -93,6 +91,8 @@ module type Transition_frontier_intf = sig
 
   val add_transition_exn :
     t -> (external_transition, state_hash) With_hash.t -> Breadcrumb.t
+
+  val clear_paths : t -> unit
 end
 
 module type Catchup_intf = sig
@@ -115,7 +115,7 @@ module type Catchup_intf = sig
     -> catchup_breadcrumbs_writer:( transition_frontier_breadcrumb list
                                   , crash buffered
                                   , unit )
-                                  Writer.t
+                                  Closed_writer.t
     -> unit
 end
 
@@ -138,7 +138,7 @@ module type Transition_handler_validator_intf = sig
     -> valid_transition_writer:( (external_transition, state_hash) With_hash.t
                                , drop_head buffered
                                , unit )
-                               Writer.t
+                               Closed_writer.t
     -> unit
 end
 
@@ -162,14 +162,14 @@ module type Transition_handler_processor_intf = sig
     -> catchup_job_writer:( (external_transition, state_hash) With_hash.t
                           , drop_head buffered
                           , unit )
-                          Writer.t
+                          Closed_writer.t
     -> catchup_breadcrumbs_reader:transition_frontier_breadcrumb list Reader.t
     -> processed_transition_writer:( ( external_transition
                                      , state_hash )
                                      With_hash.t
                                    , drop_head buffered
                                    , unit )
-                                   Writer.t
+                                   Closed_writer.t
     -> unit
 end
 
@@ -220,10 +220,6 @@ module type Transition_frontier_controller_intf = sig
   type time_controller
 
   type external_transition
-
-  type syncable_ledger_query
-
-  type syncable_ledger_answer
 
   type state_hash
 
