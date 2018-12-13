@@ -497,6 +497,12 @@ module type Basic = sig
     -> 'k_var
     -> Keypair.t
 
+  val prepare_proving_key :
+       Proving_key.t
+    -> ((unit, 's) Checked.t, _, 'k_var, _) Data_spec.t
+    -> 'k_var
+    -> unit
+
   val prove :
        Proving_key.t
     -> ((unit, 's) Checked.t, Proof.t, 'k_var, 'k_value) Data_spec.t

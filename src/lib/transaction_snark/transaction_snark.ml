@@ -963,6 +963,11 @@ struct
     let base = keys.verification.base
   end)
 
+  let () =
+    Tock.prepare_proving_key keys.proving.wrap wrap_input Wrap.main ;
+    Tick.prepare_proving_key keys.proving.base (tick_input ()) Base.main ;
+    Tick.prepare_proving_key keys.proving.merge (tick_input ()) Merge.main
+
   let wrap proof_type proof input =
     let prover_state = {Wrap.Prover_state.proof; proof_type} in
     Tock.prove keys.proving.wrap wrap_input prover_state Wrap.main

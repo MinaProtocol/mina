@@ -55,6 +55,13 @@ module Worker_state = struct
     Deferred.return
       (let module Keys = Keys_lib.Keys.Make (Consensus_mechanism) in
       let%map (module Keys) = Keys.create () in
+      (let open Snark_params in
+      Tock.prepare_proving_key
+        (Tock.Keypair.pk Keys.Wrap.keys)
+        Keys.Wrap.input Keys.Wrap.main ;
+      Tick.prepare_proving_key
+        (Tick.Keypair.pk Keys.Step.keys)
+        (Keys.Step.input ()) Keys.Step.main) ;
       let module Transaction_snark =
       Transaction_snark.Verification.Make (struct
         let keys = Keys.transaction_snark_keys

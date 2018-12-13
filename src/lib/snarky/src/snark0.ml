@@ -852,9 +852,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
     let assert_equal ?label x y = assert_ (Constraint.equal ?label x y)
 
     (* TODO-someday: Add pass to unify variables which have an Equal constraint *)
-    let constraint_system ~num_inputs (t : (unit, 's) t) :
-        R1CS_constraint_system.t =
-      let system = R1CS_constraint_system.create () in
+    let set_constraints system ~num_inputs (t : (unit, 's) t) =
       let next_auxiliary = ref (1 + num_inputs) in
       let alloc_var () =
         let v = Backend.Var.create !next_auxiliary in
@@ -888,7 +886,11 @@ module Make_basic (Backend : Backend_intf.S) = struct
       O1trace.measure "constraint_system" (fun () -> go [] t) ;
       let auxiliary_input_size = !next_auxiliary - (1 + num_inputs) in
       R1CS_constraint_system.set_auxiliary_input_size system
-        auxiliary_input_size ;
+        auxiliary_input_size
+
+    let constraint_system ~num_inputs t =
+      let system = R1CS_constraint_system.create () in
+      set_constraints system ~num_inputs t ;
       system
 
     let constraint_count (t : (_, _) t) : int =
@@ -1490,6 +1492,16 @@ module Make_basic (Backend : Backend_intf.S) = struct
       in
       go t0 k0
 
+    let constraint_system_is_unset s =
+      R1CS_constraint_system.get_primary_input_size s = 0
+
+    let prepare_proving_key key t k =
+      let s = Proving_key.r1cs_constraint_system key in
+      if constraint_system_is_unset s then
+        let next_input = ref 1 in
+        let r = collect_input_constraints next_input t k in
+        Checked.set_constraints s ~num_inputs:(!next_input - 1) r
+
     let prove :
            Proving_key.t
         -> ((unit, 's) Checked.t, Proof.t, 'k_var, 'k_value) t
@@ -1501,8 +1513,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
         (fun c primary ->
           let system =
             let s = Proving_key.r1cs_constraint_system key in
-            if R1CS_constraint_system.get_primary_input_size s = 0 then Some s
-            else None
+            Option.some_if (constraint_system_is_unset s) s
           in
           let auxiliary =
             Checked.auxiliary_input ?system
@@ -1732,6 +1743,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
   let generate_keypair = Run.generate_keypair
 
   let prove = Run.prove
+
+  let prepare_proving_key = Run.prepare_proving_key
 
   let verify = Run.verify
 
