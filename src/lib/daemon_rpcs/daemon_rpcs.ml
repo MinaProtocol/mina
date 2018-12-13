@@ -132,7 +132,7 @@ end
 module Send_user_command = struct
   type query = User_command.Stable.V1.t [@@deriving bin_io]
 
-  type response = Receipt.Chain_hash.t [@@deriving bin_io]
+  type response = Receipt.Chain_hash.t Or_error.t [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
