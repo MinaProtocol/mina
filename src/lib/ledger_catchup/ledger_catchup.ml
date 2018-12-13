@@ -107,7 +107,8 @@ module Make (Inputs : Inputs.S) :
             ~num_peers:8 hash
         with
         | Ok breadcrumbs ->
-            Strict_pipe.Writer.write catchup_breadcrumbs_writer breadcrumbs
+            Strict_pipe.Closed_writer.write catchup_breadcrumbs_writer
+              breadcrumbs
         | Error e ->
             Logger.info logger
               !"None of the peers have a transition with state hash:\n%s"

@@ -76,7 +76,6 @@ module Make (Inputs : Inputs_intf) :
    and type external_transition := Inputs.External_transition.t
    and type ledger_database := Ledger.Db.t
    and type staged_ledger := Inputs.Staged_ledger.t
-   and type masked_ledger := Ledger.Mask.Attached.t
    and type ledger_diff := Inputs.Staged_ledger_diff.t
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t =
 struct
@@ -344,6 +343,8 @@ struct
     (* 4 *)
     if node.length > best_tip_node.length then t.best_tip <- hash ;
     node.breadcrumb
+
+  let clear_paths t = Hashtbl.clear t.table
 end
 
 let%test_module "Transition_frontier tests" =

@@ -70,7 +70,7 @@ module Make (Inputs : Inputs.S) = struct
              validate_transition ~logger ~frontier ~time_received
                transition_env
            then
-             Writer.write valid_transition_writer
+             Closed_writer.write valid_transition_writer
                (With_hash.of_data transition
                   ~hash_data:
                     (Fn.compose Protocol_state.hash
