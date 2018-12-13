@@ -30,6 +30,10 @@ let env name ~f ~default =
 [%%if
 defined consensus_mechanism]
 
+let network_delay =
+  env "NETWORK_DELAY" ~default:4 ~f:(fun str ->
+      try Some (Int.of_string str) with _ -> None )
+
 [%%if
 consensus_mechanism = "proof_of_signature"]
 
@@ -80,9 +84,7 @@ include Proof_of_stake.Make (struct
       env "PROBABLE_SLOTS_PER_TRANSITION_COUNT" ~default:8 ~f:(fun str ->
           try Some (Int.of_string str) with _ -> None )
 
-    let network_delay =
-      env "NETWORK_DELAY" ~default:4 ~f:(fun str ->
-          try Some (Int.of_string str) with _ -> None )
+    let network_delay = network_delay
   end
 end)
 

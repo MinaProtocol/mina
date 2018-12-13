@@ -49,9 +49,11 @@ module type S = sig
 
   val destroy : t -> unit
 
-  val new_goal : t -> root_hash -> unit
+  val new_goal : t -> root_hash -> [`Ignore | `Continue]
 
-  val valid_tree : t -> merkle_tree option
+  val peek_valid_tree : t -> merkle_tree option
+
+  val valid_tree : t -> merkle_tree Deferred.t
 
   val wait_until_valid :
        t
@@ -511,10 +513,18 @@ module Make
       t.desired_root <- Some h ;
       Valid.set t.validity (Addr.root ()) (Stale, Root_hash.to_hash h)
       |> ignore ;
-      Linear_pipe.write_without_pushback t.queries (h, Num_accounts) )
-    else Logger.info t.log "new_goal to same hash, not doing anything"
+      Linear_pipe.write_without_pushback t.queries (h, Num_accounts) ;
+      `Continue )
+    else (
+      Logger.info t.log "new_goal to same hash, not doing anything" ;
+      `Ignore )
 
-  let valid_tree t =
+  let rec valid_tree t =
+    match%bind Ivar.read t.validity_listener with
+    | `Ok -> return t.tree
+    | `Target_changed _ -> valid_tree t
+
+  let peek_valid_tree t =
     Option.bind (Ivar.peek t.validity_listener) ~f:(function
       | `Ok -> Some t.tree
       | `Target_changed _ -> None )
@@ -527,7 +537,9 @@ module Make
         | `Target_changed payload -> `Target_changed payload
         | `Ok -> `Ok t.tree )
 
-  let fetch t rh = new_goal t rh ; wait_until_valid t rh
+  let fetch t rh =
+    new_goal t rh |> ignore ;
+    wait_until_valid t rh
 
   let create mt ~parent_log =
     let qr, qw = Linear_pipe.create () in

@@ -58,6 +58,8 @@ end
 module type Transition_frontier_intf = sig
   include Transition_frontier_base_intf
 
+  type ledger
+
   exception
     Parent_not_found of ([`Parent of state_hash] * [`Target of state_hash])
 
@@ -93,6 +95,8 @@ module type Transition_frontier_intf = sig
     t -> (external_transition, state_hash) With_hash.t -> Breadcrumb.t
 
   val clear_paths : t -> unit
+
+  val rebuild : t -> ledger -> state_hash -> unit
 end
 
 module type Catchup_intf = sig
