@@ -263,6 +263,7 @@ module type Main_intf = sig
        and type staged_ledger := Staged_ledger.t
        and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
        and type ledger_diff := Staged_ledger_diff.t
+       and type ledger := Ledger.t
   end
 
   module Config : sig
