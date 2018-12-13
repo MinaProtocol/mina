@@ -684,7 +684,6 @@ end = struct
     , `Ledger_proof res_opt
     , `Staged_ledger {scan_state= scan_state'; ledger= new_ledger} )
 
-  (* TODO: when we move to a disk-backed db, this should call "Ledger.commit_changes" at the end. *)
   let apply_verified_diff t (diff_verified : Staged_ledger_diff.Verified.t)
       ~logger =
     (* forget the verification when applying *)
