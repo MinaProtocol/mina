@@ -93,3 +93,15 @@ val transfer :
   -> ('b, synchronous, unit Deferred.t) Writer.t
   -> f:('a -> 'b)
   -> unit Deferred.t
+
+module Closed_writer : sig
+  type ('t, 'behavior, 'return) t
+
+  val wrap : ('t, 'type_, 'return) Writer.t -> ('t, 'type_, 'return) t
+
+  val is_closed : ('t, 'type_, 'return) t -> bool
+
+  val toggle : ('t, 'type_, 'return) t -> unit
+
+  val write : ('t, 'type_, 'return) t -> 't -> 'return
+end
