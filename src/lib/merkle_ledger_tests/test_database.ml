@@ -189,6 +189,18 @@ let%test_module "test functor on in memory databases" =
                 let result = MT.get_all_accounts_rooted_at_exn mdb address in
                 assert (List.equal ~equal:Account.equal accounts result) ) )
 
+      let%test_unit "create_empty doesn't modify the hash" =
+        Test.with_instance (fun ledger ->
+            let open MT in
+            let key = List.nth_exn (Key.gen_keys 1) 0 in
+            let start_hash = merkle_root ledger in
+            match get_or_create_account_exn ledger key Account.empty with
+            | `Existed, _ ->
+                failwith
+                  "create_empty with empty ledger somehow already has that key?"
+            | `Added, new_loc ->
+                [%test_eq: Hash.t] start_hash (merkle_root ledger) )
+
       let%test "get_at_index_exn t (index_of_key_exn t public_key) = account" =
         Test.with_instance (fun mdb ->
             let max_height = Int.min MT.depth 5 in
