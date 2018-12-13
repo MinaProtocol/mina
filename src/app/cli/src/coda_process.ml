@@ -45,7 +45,7 @@ let local_config ?proposal_interval ~peers ~discovery_port ~external_port
   config
 
 let disconnect (conn, proc, _) =
-  let%bind () = Coda_worker.Connection.close_finished conn in
+  let%bind () = Coda_worker.Connection.close conn in
   let%bind _ : Unix.Exit_or_signal.t = Process.wait proc in
   return ()
 
@@ -70,3 +70,6 @@ let strongest_ledgers_exn (conn, proc, _) =
       ~f:Coda_worker.functions.strongest_ledgers ~arg:()
   in
   Linear_pipe.wrap_reader r
+
+let start_exn (conn, proc, _) =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.start ~arg:()

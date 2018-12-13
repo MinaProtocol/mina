@@ -61,10 +61,20 @@ module type Network_intf = sig
 
   type time
 
+  type state_hash
+
   val states :
     t -> (state_with_witness Envelope.Incoming.t * time) Linear_pipe.Reader.t
 
   val peers : t -> Kademlia.Peer.t list
+
+  val random_peers : t -> int -> Kademlia.Peer.t list
+
+  val catchup_transition :
+       t
+    -> Kademlia.Peer.t
+    -> state_hash
+    -> state_with_witness list option Or_error.t Deferred.t
 
   val snark_pool_diffs :
     t -> snark_pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
@@ -102,6 +112,8 @@ module type Network_intf = sig
                                     Envelope.Incoming.t
                                  -> (ledger_hash * sync_ledger_answer)
                                     Deferred.Or_error.t)
+    -> transition_catchup:(   state_hash Envelope.Incoming.t
+                           -> state_with_witness list option Deferred.t)
     -> t Deferred.t
 end
 
@@ -388,6 +400,7 @@ module type Inputs_intf = sig
      and type sync_ledger_query := Sync_ledger.query
      and type sync_ledger_answer := Sync_ledger.answer
      and type time := Time.t
+     and type state_hash := Protocol_state_hash.t
 
   module Ledger_builder_controller :
     Ledger_builder_controller_intf
@@ -420,6 +433,7 @@ module type Inputs_intf = sig
      and type masked_ledger := Masked_ledger.t
      and type staged_ledger := Staged_ledger.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+     and type ledger_diff := Staged_ledger_diff.t
 
   module Transition_frontier_controller :
     Protocols.Coda_transition_frontier.Transition_frontier_controller_intf
@@ -430,6 +444,7 @@ module type Inputs_intf = sig
      and type transition_frontier := Transition_frontier.t
      and type state_hash := Protocol_state_hash.t
      and type time := Time.t
+     and type network := Net.t
 
   module Proposer :
     Proposer_intf
@@ -483,6 +498,10 @@ module Make (Inputs : Inputs_intf) = struct
     ; mutable seen_jobs: Work_selector.State.t
     ; receipt_chain_database: Coda_base.Receipt_chain_database.t
     ; staged_ledger_transition_backup_capacity: int
+    ; external_transitions_writer:
+        (External_transition.t Envelope.Incoming.t * Inputs.Time.t)
+        Pipe.Writer.t
+    ; time_controller: Time.Controller.t
     ; snark_work_fee: Currency.Fee.t }
 
   let run_snark_worker t = t.run_snark_worker
@@ -574,15 +593,29 @@ module Make (Inputs : Inputs_intf) = struct
     [@@deriving make]
   end
 
+  let start t =
+    let consensus_local_state =
+      Consensus_mechanism.Local_state.create t.propose_keypair
+    in
+    match t.propose_keypair with
+    | Some keypair ->
+        let transitions =
+          Proposer.create ~parent_log:t.log
+            ~transaction_pool:t.transaction_pool
+            ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
+            ~time_controller:t.time_controller ~keypair ~consensus_local_state
+            ~transition_frontier:t.transition_frontier
+        in
+        don't_wait_for
+          (Linear_pipe.transfer_id transitions t.external_transitions_writer)
+    | None -> ()
+
   let create (config : Config.t) =
     trace_task "coda" (fun () ->
         let external_transitions_reader, external_transitions_writer =
           Linear_pipe.create ()
         in
         let net_ivar = Ivar.create () in
-        let consensus_local_state =
-          Consensus_mechanism.Local_state.create config.propose_keypair
-        in
         let first_transition =
           External_transition.create
             ~protocol_state:Consensus_mechanism.genesis_protocol_state.data
@@ -629,9 +662,21 @@ module Make (Inputs : Inputs_intf) = struct
                 Sync_ledger.Responder.answer_query responder query
               in
               (ledger_hash, answer) )
+            ~transition_catchup:(fun enveloped_hash ->
+              let open Deferred.Option.Let_syntax in
+              let hash = Envelope.Incoming.data enveloped_hash in
+              let%map breadcrumb =
+                Deferred.return
+                @@ Transition_frontier.find transition_frontier hash
+              in
+              Transition_frontier.path_map
+                ~f:(fun b ->
+                  Transition_frontier.Breadcrumb.transition_with_hash b
+                  |> With_hash.data )
+                transition_frontier breadcrumb )
         in
         let valid_transitions =
-          Transition_frontier_controller.run ~logger:config.log
+          Transition_frontier_controller.run ~logger:config.log ~network:net
             ~time_controller:config.time_controller
             ~frontier:transition_frontier
             ~transition_reader:
@@ -668,17 +713,6 @@ module Make (Inputs : Inputs_intf) = struct
           (Linear_pipe.iter (Snark_pool.broadcasts snark_pool) ~f:(fun x ->
                Net.broadcast_snark_pool_diff net x ;
                Deferred.unit )) ;
-        ( match config.propose_keypair with
-        | Some keypair ->
-            let transitions =
-              Proposer.create ~parent_log:config.log ~transaction_pool
-                ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
-                ~time_controller:config.time_controller ~keypair
-                ~consensus_local_state ~transition_frontier
-            in
-            don't_wait_for
-              (Linear_pipe.transfer_id transitions external_transitions_writer)
-        | None -> () ) ;
         return
           { propose_keypair= config.propose_keypair
           ; run_snark_worker= config.run_snark_worker
@@ -686,6 +720,8 @@ module Make (Inputs : Inputs_intf) = struct
           ; transaction_pool
           ; snark_pool
           ; transition_frontier
+          ; time_controller= config.time_controller
+          ; external_transitions_writer
           ; strongest_ledgers= valid_transitions_for_api
           ; log= config.log
           ; seen_jobs= Work_selector.State.init
