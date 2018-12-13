@@ -144,6 +144,8 @@ module Writer = struct
         ignore (Pipe.read_now writer.reader) ;
         Pipe.write_without_pushback writer.writer data
 
+  let clear {reader; _} = Pipe.clear reader
+
   let write : type type_ return. ('t, type_, return) t -> 't -> return =
    fun writer data ->
     match writer.type_ with
@@ -163,3 +165,25 @@ let create type_ =
 
 let transfer reader {Writer.writer; _} ~f =
   Reader.enforce_single_reader reader (Pipe.transfer reader.reader writer ~f)
+
+module Closed_writer = struct
+  type ('t, 'type_, 'write_return) t =
+    {writer: ('t, 'type_, 'write_return) Writer.t; mutable is_closed: bool}
+
+  let wrap writer = {writer; is_closed= false}
+
+  let is_closed {is_closed; _} = is_closed
+
+  let toggle t =
+    if t.is_closed then t.is_closed <- false
+    else (
+      Writer.clear t.writer ;
+      t.is_closed <- true )
+
+  let write : type type_ return. ('t, type_, return) t -> 't -> return =
+   fun {writer; is_closed} _x ->
+    match (is_closed, writer.type_) with
+    | false, _ -> Writer.write writer _x
+    | true, Synchronous -> Deferred.unit
+    | true, Buffered (`Capacity _, `Overflow _) -> ()
+end
