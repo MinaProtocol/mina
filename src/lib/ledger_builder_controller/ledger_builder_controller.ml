@@ -445,7 +445,7 @@ let%test_module "test" =
             Ok
               ( `Hash_after_applying (hash t)
               , `Ledger_proof (Some x)
-              , `Updated_staged_ledger t )
+              , `Staged_ledger t )
 
           let apply_diff_unchecked (_t : t) (_x : 'a) =
             failwith "Unimplemented"
