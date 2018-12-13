@@ -597,8 +597,10 @@ struct
     end)
 
     module Term = struct
+      let prefix = with_prefix prefix "term"
+
       include Make_foreign (struct
-        let prefix = with_prefix prefix "term"
+        let prefix = prefix
       end)
 
       let create =
