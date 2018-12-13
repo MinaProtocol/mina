@@ -32,7 +32,7 @@ module Make (Inputs : Inputs.S) :
           let diff =
             External_transition.staged_ledger_diff external_transition
           in
-          let%map _, _, `Updated_staged_ledger staged_ledger =
+          let%map _, _, `Staged_ledger staged_ledger =
             Deferred.create (fun ivar ->
                 Ivar.fill ivar
                 @@ Staged_ledger.apply ~logger staged_ledger diff )
