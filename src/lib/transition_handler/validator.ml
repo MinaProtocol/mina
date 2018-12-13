@@ -1,6 +1,7 @@
 open Async_kernel
 open Core_kernel
 open Pipe_lib.Strict_pipe
+open Coda_base
 
 module Make (Inputs : Inputs.S) = struct
   open Inputs
@@ -8,6 +9,24 @@ module Make (Inputs : Inputs.S) = struct
   open Deferred.Let_syntax
 
   let validate_transition ~logger ~frontier ~time_received t_env =
+    (* it's like bool option but with names (`Duplicate is None). *)
+    let ( && ) a b =
+      match (a, b) with
+      | _, `Duplicate -> `Duplicate
+      | `Duplicate, _ -> `Duplicate
+      | _, `Reject -> `Reject
+      | `Reject, _ -> `Reject
+      | `Valid, `Valid -> `Valid
+    in
+    let ( || ) a b =
+      match (a, b) with
+      | _, `Duplicate -> `Duplicate
+      | `Duplicate, _ -> `Duplicate
+      | `Valid, _ -> `Valid
+      | _, `Valid -> `Valid
+      | `Reject, `Reject -> `Reject
+    in
+    let of_bool = function true -> `Valid | false -> `Reject in
     let t = Envelope.Incoming.data t_env in
     let time_received =
       Time.to_span_since_epoch time_received
@@ -16,9 +35,9 @@ module Make (Inputs : Inputs.S) = struct
     let log_assert condition error_msg =
       let log () =
         Logger.info logger "transition rejected: %s" error_msg ;
-        false
+        `Reject
       in
-      condition || log ()
+      of_bool condition || log ()
     in
     let consensus_state =
       Fn.compose Protocol_state.consensus_state
@@ -29,19 +48,27 @@ module Make (Inputs : Inputs.S) = struct
         (Transition_frontier.Breadcrumb.transition_with_hash
            (Transition_frontier.root frontier))
     in
-    if
-      log_assert
-        (Consensus.Mechanism.is_valid (consensus_state t) ~time_received)
-        "failed consensus validation"
-      && log_assert
-           ( Consensus.Mechanism.select ~logger
-               ~existing:(consensus_state root) ~candidate:(consensus_state t)
-               ~time_received
-           = `Take )
-           "was not better than transition frontier root"
-    then
-      (* TODO: what conditions should we punish? *)
-      (* TODO:
+    let psh = Protocol_state.hash (External_transition.protocol_state t) in
+    if Transition_frontier.find frontier psh |> Option.is_some then (
+      Logger.info logger
+        !"we've already seen protocol state %{sexp:State_hash.t}"
+        psh ;
+      Deferred.return `Duplicate )
+    else
+      match
+        log_assert
+          (Consensus.Mechanism.is_valid (consensus_state t) ~time_received)
+          "failed consensus validation"
+        && log_assert
+             ( Consensus.Mechanism.select ~logger
+                 ~existing:(consensus_state root)
+                 ~candidate:(consensus_state t) ~time_received
+             = `Take )
+             "was not better than transition frontier root"
+      with
+      | `Valid ->
+          (* TODO: what conditions should we punish? *)
+          (* TODO:
       let length = External_transition.protocol_state t |> Protocol_state.blockchain_state |> Blockchain_state.length in
       log_assert
         (match Root_history.find (Transition_frontier.root_history frontier) (length - k) with
@@ -52,13 +79,13 @@ module Make (Inputs : Inputs.S) = struct
           false)
         "transition frontier root hash was invalid"
       *)
-      let%map proof_is_valid =
-        State_proof.verify
-          (External_transition.protocol_state_proof t)
-          (External_transition.protocol_state t)
-      in
-      log_assert proof_is_valid "proof was invalid"
-    else Deferred.return false
+          let%map proof_is_valid =
+            State_proof.verify
+              (External_transition.protocol_state_proof t)
+              (External_transition.protocol_state t)
+          in
+          log_assert proof_is_valid "proof was invalid"
+      | x -> return x
 
   let run ~logger ~frontier ~transition_reader ~valid_transition_writer =
     let logger = Logger.child logger "transition_handler_validator" in
@@ -66,20 +93,22 @@ module Make (Inputs : Inputs.S) = struct
       (Reader.iter transition_reader
          ~f:(fun (`Transition transition_env, `Time_received time_received) ->
            let transition = Envelope.Incoming.data transition_env in
-           if%map
+           match%map
              validate_transition ~logger ~frontier ~time_received
                transition_env
-           then
-             Writer.write valid_transition_writer
-               (With_hash.of_data transition
-                  ~hash_data:
-                    (Fn.compose Protocol_state.hash
-                       External_transition.protocol_state))
-           else
-             Logger.warn logger
-               !"failed to verify transition from the network! sent by \
-                 %{sexp: Host_and_port.t}"
-               (Envelope.Incoming.sender transition_env) ))
+           with
+           | `Valid ->
+               Writer.write valid_transition_writer
+                 (With_hash.of_data transition
+                    ~hash_data:
+                      (Fn.compose Protocol_state.hash
+                         External_transition.protocol_state))
+           | `Duplicate -> ()
+           | `Reject ->
+               Logger.warn logger
+                 !"failed to verify transition from the network! sent by \
+                   %{sexp: Host_and_port.t}"
+                 (Envelope.Incoming.sender transition_env) ))
 end
 
 (*
