@@ -672,7 +672,7 @@ module Make_weierstrass_checked
     let div_unsafe x y =
       let%bind z =
         provide_witness Field.typ
-          As_prover.(map2 (read_var x) (read_var x) ~f:Field.Infix.( / ))
+          As_prover.(map2 (read_var x) (read_var y) ~f:Field.Infix.( / ))
       in
       (* Constraint: y * z = x
 
