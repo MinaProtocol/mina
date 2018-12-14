@@ -55,7 +55,7 @@ struct
           let open Interruptible.Let_syntax in
           let scan_state = Envelope.Incoming.data scan_state_env in
           match%bind
-            Interruptible.return
+            Interruptible.uninterruptible
               (Staged_ledger.of_scan_state_and_ledger ~snarked_ledger_hash
                  ~ledger ~scan_state)
           with

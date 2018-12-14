@@ -730,7 +730,7 @@ module type Staged_ledger_base_intf = sig
        snarked_ledger_hash:frozen_ledger_hash
     -> ledger:ledger
     -> scan_state:Scan_state.t
-    -> t Or_error.t
+    -> t Or_error.t Deferred.t
 
   val of_serialized_and_unserialized :
     serialized:serializable -> unserialized:ledger -> t
@@ -820,7 +820,7 @@ module type Staged_ledger_intf = sig
 
   val statement_exn : t -> [`Non_empty of ledger_proof_statement | `Empty]
 
-  val verified_diff_of_diff : t -> diff -> verified_diff Or_error.t
+  val verified_diff_of_diff : t -> diff -> verified_diff Or_error.t Deferred.t
 end
 
 module type Work_selector_intf = sig
