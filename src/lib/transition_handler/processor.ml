@@ -79,8 +79,14 @@ module Make (Inputs : Inputs.S) :
                              Deferred.Or_error.error_string "parent not found"
                        in
                        let%map breadcrumb =
-                         Transition_frontier.Breadcrumb.build ~logger ~parent
-                           ~transition_with_hash:transition
+                         match
+                           Transition_frontier.Breadcrumb.build ~logger ~parent
+                             ~transition_with_hash:transition
+                         with
+                         | Error (`Validation_error e) ->
+                             (*TODO: Punish*) Error e
+                         | Error (`Fatal_error e) -> raise e
+                         | Ok b -> Ok b
                        in
                        Transition_frontier.add_breadcrumb_exn frontier
                          breadcrumb ;
