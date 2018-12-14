@@ -105,8 +105,7 @@ module Make (Inputs : Inputs.S) :
               Deferred.Or_error.List.map queried_transitions
                 ~f:(fun transition ->
                   Transition_handler_validator.verify_transition ~staged_ledger
-                    ~transition
-                  |> Deferred.return )
+                    ~transition )
             in
             materialize_breadcrumbs ~frontier ~logger ~peer
               queried_transitions_verified )

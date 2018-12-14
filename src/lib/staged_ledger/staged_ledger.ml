@@ -47,7 +47,7 @@ end = struct
   let verify_proof proof statement ~message =
     Inputs.Ledger_proof_verifier.verify proof statement ~message
 
-  let verify ~message job proof = 
+  let verify ~message job proof =
     match Scan_state.statement_of_job job with
     | None -> return false
     | Some statement -> verify_proof proof statement ~message
@@ -332,25 +332,32 @@ end = struct
     in
     go [] [] ts
 
-  let check_completed_works scan_state (completed_works : Transaction_snark_work.t list) =
+  let check_completed_works scan_state
+      (completed_works : Transaction_snark_work.t list) =
     let open Deferred.Or_error.Let_syntax in
     let%bind jobses =
       let%map jobs =
-        Scan_state.next_k_jobs scan_state ~k:(total_proofs completed_works) |> Deferred.return
+        Scan_state.next_k_jobs scan_state ~k:(total_proofs completed_works)
+        |> Deferred.return
       in
       chunks_of jobs ~n:Transaction_snark_work.proofs_length
     in
     let%bind verified =
-      Deferred.Or_error.List.fold (List.zip_exn jobses completed_works) ~init:true ~f:(fun accum (jobs, work) ->
-          if accum then (
-            let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
-            Deferred.Or_error.List.fold (List.zip_exn jobs work.proofs) ~init:true ~f:(fun accum (job, proof) ->
+      Deferred.Or_error.List.fold (List.zip_exn jobses completed_works)
+        ~init:true ~f:(fun accum (jobs, work) ->
+          if accum then
+            let message =
+              Sok_message.create ~fee:work.fee ~prover:work.prover
+            in
+            Deferred.Or_error.List.fold (List.zip_exn jobs work.proofs)
+              ~init:true ~f:(fun accum (job, proof) ->
                 if accum then
-                  let x = Deferred.map (verify ~message job proof) ~f:Or_error.return in
+                  let x =
+                    Deferred.map (verify ~message job proof) ~f:Or_error.return
+                  in
                   x
-                else return false ) )
-          else
-            return false)
+                else return false )
+          else return false )
     in
     if verified then
       (* "verified" guard justifies use of "create_unsafe" here *)
@@ -477,24 +484,31 @@ end = struct
       {Staged_ledger_diff.Verified.completed_works; user_commands}
     in
     let check_at_most_one (at_most_one : diff_with_at_most_one_coinbase) =
-      let%bind checked_works = check_completed_works scan_state at_most_one.diff.completed_works in
+      let%bind checked_works =
+        check_completed_works scan_state at_most_one.diff.completed_works
+      in
       let diff =
         diff_verified_of_verified_work checked_works
           at_most_one.diff.user_commands
       in
       match at_most_one.coinbase_added with
-      | Zero -> return (Staged_ledger_diff.Verified.{diff; coinbase_added= Zero})
+      | Zero -> return Staged_ledger_diff.Verified.{diff; coinbase_added= Zero}
       | One maybe_work -> (
         match maybe_work with
-        | None -> return (Staged_ledger_diff.Verified.{diff; coinbase_added= One None})
+        | None ->
+            return Staged_ledger_diff.Verified.{diff; coinbase_added= One None}
         | Some work -> (
-          match%bind check_completed_works scan_state [work] with
-          | [checked_work] ->
-              return Staged_ledger_diff.Verified.{diff; coinbase_added= One (Some checked_work)}
-          |  _ -> failwith (singleton_msg 1) ) )
+            match%bind check_completed_works scan_state [work] with
+            | [checked_work] ->
+                return
+                  Staged_ledger_diff.Verified.
+                    {diff; coinbase_added= One (Some checked_work)}
+            | _ -> failwith (singleton_msg 1) ) )
     in
     let check_at_most_two (at_most_two : diff_with_at_most_two_coinbase) =
-      let%bind checked_works = check_completed_works scan_state at_most_two.diff.completed_works in
+      let%bind checked_works =
+        check_completed_works scan_state at_most_two.diff.completed_works
+      in
       let diff =
         diff_verified_of_verified_work checked_works
           at_most_two.diff.user_commands
@@ -503,43 +517,55 @@ end = struct
       | Zero -> return Staged_ledger_diff.Verified.{diff; coinbase_parts= Zero}
       | One maybe_work -> (
         match maybe_work with
-        | None -> return Staged_ledger_diff.Verified.{diff; coinbase_parts= One None}
+        | None ->
+            return Staged_ledger_diff.Verified.{diff; coinbase_parts= One None}
         | Some work -> (
-          match%bind check_completed_works scan_state [work] with
-          | [checked_work] ->
-              return Staged_ledger_diff.Verified.{diff; coinbase_parts= One (Some checked_work)}
-          | _ -> failwith (singleton_msg 2) ) )
+            match%bind check_completed_works scan_state [work] with
+            | [checked_work] ->
+                return
+                  Staged_ledger_diff.Verified.
+                    {diff; coinbase_parts= One (Some checked_work)}
+            | _ -> failwith (singleton_msg 2) ) )
       | Two maybe_works -> (
         match maybe_works with
-        | None -> return Staged_ledger_diff.Verified.{diff; coinbase_parts= Two None}
+        | None ->
+            return Staged_ledger_diff.Verified.{diff; coinbase_parts= Two None}
         | Some (work, maybe_work) -> (
-          match%bind check_completed_works scan_state [work] with
-          | [checked_work_1] -> (
-            match maybe_work with
-            | None ->
-                return Staged_ledger_diff.Verified.{diff; coinbase_parts= Two (Some (checked_work_1, None))}
-            | Some work -> (
-              match%bind check_completed_works scan_state [work] with
-              | [checked_work_2] ->
-                  return Staged_ledger_diff.Verified.{ diff
-                                                     ; coinbase_parts=
-                                                         Two (Some (checked_work_1, Some checked_work_2)) }
-              | _ -> failwith (singleton_msg 3) ) )
-          | _ -> failwith (singleton_msg 4) ) )
+            match%bind check_completed_works scan_state [work] with
+            | [checked_work_1] -> (
+              match maybe_work with
+              | None ->
+                  return
+                    Staged_ledger_diff.Verified.
+                      {diff; coinbase_parts= Two (Some (checked_work_1, None))}
+              | Some work -> (
+                  match%bind check_completed_works scan_state [work] with
+                  | [checked_work_2] ->
+                      return
+                        Staged_ledger_diff.Verified.
+                          { diff
+                          ; coinbase_parts=
+                              Two (Some (checked_work_1, Some checked_work_2))
+                          }
+                  | _ -> failwith (singleton_msg 3) ) )
+            | _ -> failwith (singleton_msg 4) ) )
     in
-    let%bind pre_diffs = 
+    let%bind pre_diffs =
       match diff.pre_diffs with
       | First at_most_one ->
-         let%bind at_most_one_verified = check_at_most_one (at_most_one : diff_with_at_most_one_coinbase) in
-         return (First at_most_one_verified)
+          let%bind at_most_one_verified =
+            check_at_most_one (at_most_one : diff_with_at_most_one_coinbase)
+          in
+          return (First at_most_one_verified)
       | Second (at_most_two, at_most_one) ->
-         let%bind at_most_two_verified = check_at_most_two at_most_two in
-         let%bind at_most_one_verified = check_at_most_one at_most_one in
-         return (Second (at_most_two_verified, at_most_one_verified))
+          let%bind at_most_two_verified = check_at_most_two at_most_two in
+          let%bind at_most_one_verified = check_at_most_one at_most_one in
+          return (Second (at_most_two_verified, at_most_one_verified))
     in
-    return { Staged_ledger_diff.Verified.pre_diffs
-           ; prev_hash= diff.prev_hash
-           ; creator= diff.creator }
+    return
+      { Staged_ledger_diff.Verified.pre_diffs
+      ; prev_hash= diff.prev_hash
+      ; creator= diff.creator }
 
   let apply_pre_diff ledger coinbase_parts proposer
       (diff : Staged_ledger_diff.diff) =
@@ -589,6 +615,7 @@ end = struct
     ; user_commands_count= List.length user_commands
     ; coinbase_parts_count= List.length coinbase }
 
+  (* N.B.: we don't expose apply_diff_unverified in the signature for Staged_ledger *)
   let apply_unverified_diff t (diff : Staged_ledger_diff.t) ~logger =
     let open Result_with_rollback.Let_syntax in
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
@@ -678,17 +705,16 @@ end = struct
 
   let apply_verified_diff t (diff_verified : Staged_ledger_diff.Verified.t)
       ~logger =
-    (* forget the verification when applying *)
+    (* forget the verification when applying
+       that allows apply_diff_unverified to share code with apply_diff_unchecked
+    *)
     let (diff : Staged_ledger_diff.t) =
       Staged_ledger_diff.forget_verified diff_verified
     in
-    apply_unverified_diff t diff ~logger
+    apply_diff_unverified t diff ~logger
 
   let apply t witness ~logger =
-    Result_with_rollback.run (apply_verified_diff t witness ~logger)
-
-  let apply_unverified t witness ~logger =
-    Result_with_rollback.run (apply_unverified_diff t witness ~logger)
+    Result_with_rollback.run (apply_diff_verified t witness ~logger)
 
   let forget_work_opt = Option.map ~f:Transaction_snark_work.forget
 
@@ -1906,13 +1932,19 @@ let%test_module "test" =
         Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work
       in
+      let unverified_diff =
+        Test_input1.Staged_ledger_diff.forget_validated diff
+      in
+      (* pull verified diff out of Deferred for test purposes *)
+      let verified_diff_or_error =
+        Deferred.value_exn (Sl.verified_diff_of_diff !sl unverified_diff)
+      in
+      let%bind verified_diff = verified_diff_or_error in
       let%map _, `Ledger_proof ledger_proof, `Staged_ledger sl' =
-        Sl.apply_unverified !sl
-          (Test_input1.Staged_ledger_diff.forget_validated diff)
-          ~logger
+        Sl.apply !sl verified_diff ~logger
       in
       sl := sl' ;
-      (ledger_proof, Test_input1.Staged_ledger_diff.forget_validated diff)
+      (ledger_proof, unverified_diff)
 
     let txns n f g = List.zip_exn (List.init n ~f) (List.init n ~f:g)
 

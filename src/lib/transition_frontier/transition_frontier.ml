@@ -1,4 +1,5 @@
 open Core_kernel
+open Async_kernel
 open Protocols.Coda_pow
 open Protocols.Coda_transition_frontier
 open Coda_base
@@ -125,6 +126,7 @@ struct
       ~root_snarked_ledger ~root_transaction_snark_scan_state
       ~root_staged_ledger_diff =
     let open Consensus.Mechanism in
+    let open Deferred.Let_syntax in
     let logger = Logger.child logger __MODULE__ in
     let root_hash = With_hash.hash root_transition in
     let root_protocol_state =
@@ -160,7 +162,7 @@ struct
              (Protocol_state.Blockchain_state.staged_ledger_hash
                 root_blockchain_state))
         (Ledger.Mask.Attached.merkle_root root_masked_ledger) ;
-    match
+    match%map
       Inputs.Staged_ledger.of_scan_state_and_ledger
         ~scan_state:root_transaction_snark_scan_state
         ~ledger:root_masked_ledger

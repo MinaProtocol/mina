@@ -639,7 +639,7 @@ module Make (Inputs : Inputs_intf) = struct
             ~protocol_state_proof:Protocol_state_proof.dummy
             ~staged_ledger_diff:empty_diff_verified
         in
-        let transition_frontier =
+        let%bind transition_frontier =
           Transition_frontier.create ~logger:config.log
             ~root_transition:
               (With_hash.of_data first_transition

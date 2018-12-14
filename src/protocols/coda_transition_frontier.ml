@@ -57,7 +57,7 @@ module type Transition_frontier_base_intf = sig
     -> root_snarked_ledger:ledger_database
     -> root_transaction_snark_scan_state:transaction_snark_scan_state
     -> root_staged_ledger_diff:ledger_diff_verified option
-    -> t
+    -> t Deferred.t
 
   val find_exn : t -> state_hash -> Breadcrumb.t
 end
@@ -159,7 +159,7 @@ module type Transition_handler_validator_intf = sig
   val verify_transition :
        staged_ledger:staged_ledger
     -> transition:external_transition
-    -> external_transition_verified Or_error.t
+    -> external_transition_verified Or_error.t Deferred.t
 end
 
 module type Transition_handler_processor_intf = sig

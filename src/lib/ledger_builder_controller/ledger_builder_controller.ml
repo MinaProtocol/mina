@@ -446,7 +446,7 @@ let%test_module "test" =
 
           let of_scan_state_and_ledger ~snarked_ledger_hash:_ ~ledger
               ~scan_state:_ =
-            Ok (create ~ledger)
+            Deferred.Or_error.return (create ~ledger)
 
           let scan_state t = !t
 

@@ -97,17 +97,18 @@ module Make (Inputs : Inputs.S) = struct
       | x -> return x
 
   let verify_transition ~staged_ledger ~transition :
-      External_transition.Verified.t Or_error.t =
+      External_transition.Verified.t Or_error.t Deferred.t =
+    let open Deferred.Or_error.Let_syntax in
     let diff = External_transition.staged_ledger_diff transition in
-    match Staged_ledger.verified_diff_of_diff staged_ledger diff with
-    | Ok verified_diff ->
-        Ok
-          (External_transition.Verified.create
-             ~protocol_state:(External_transition.protocol_state transition)
-             ~protocol_state_proof:
-               (External_transition.protocol_state_proof transition)
-             ~staged_ledger_diff:verified_diff)
-    | Error _ -> Error (Error.of_string "Could not verify transition")
+    let%bind verified_diff =
+      Staged_ledger.verified_diff_of_diff staged_ledger diff
+    in
+    return
+      (External_transition.Verified.create
+         ~protocol_state:(External_transition.protocol_state transition)
+         ~protocol_state_proof:
+           (External_transition.protocol_state_proof transition)
+         ~staged_ledger_diff:verified_diff)
 
   let run ~logger ~frontier ~transition_reader ~valid_transition_writer =
     let logger =
@@ -119,19 +120,23 @@ module Make (Inputs : Inputs.S) = struct
            let (transition : External_transition.t) =
              Envelope.Incoming.data transition_env
            in
-           match%map
+           match%bind
              validate_transition ~logger ~frontier ~time_received
                transition_env
            with
            | `Valid -> (
+               (* validated, now verify *)
                let tip = Transition_frontier.best_tip frontier in
                let staged_ledger =
                  Transition_frontier.Breadcrumb.staged_ledger tip
                in
-               match verify_transition ~staged_ledger ~transition with
-               | Ok checked_transition ->
+               let%map maybe_verified_transaction =
+                 verify_transition ~staged_ledger ~transition
+               in
+               match maybe_verified_transaction with
+               | Ok verified_transition ->
                    Writer.write valid_transition_writer
-                     (With_hash.of_data checked_transition
+                     (With_hash.of_data verified_transition
                         ~hash_data:
                           (Fn.compose Protocol_state.hash
                              External_transition.Verified.protocol_state))
@@ -140,12 +145,13 @@ module Make (Inputs : Inputs.S) = struct
                      !"failed to verify transition from the network! sent by \
                        %{sexp: Host_and_port.t}"
                      (Envelope.Incoming.sender transition_env) )
-           | `Duplicate -> ()
+           | `Duplicate -> return ()
            | `Reject ->
-               Logger.warn logger
-                 !"failed to verify transition from the network! sent by \
-                   %{sexp: Host_and_port.t}"
-                 (Envelope.Incoming.sender transition_env) ))
+               return
+                 (Logger.warn logger
+                    !"failed to verify transition from the network! sent by \
+                      %{sexp: Host_and_port.t}"
+                    (Envelope.Incoming.sender transition_env)) ))
 end
 
 (*

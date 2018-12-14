@@ -750,14 +750,7 @@ module type Staged_ledger_base_intf = sig
        * [`Staged_ledger of t] )
        Or_error.t
 
-  val apply_unverified :
-       t
-    -> diff
-    -> logger:Logger.t
-    -> ( [`Hash_after_applying of staged_ledger_hash]
-       * [`Ledger_proof of ledger_proof option]
-       * [`Staged_ledger of t] )
-       Or_error.t
+  (* N.B.: apply_diff_unverified is not exposed here *)
 
   val apply_diff_unchecked :
        t
