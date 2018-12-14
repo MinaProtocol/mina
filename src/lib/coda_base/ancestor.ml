@@ -107,7 +107,7 @@ let%test_unit "completeness" =
   let open Generator in
   let ancestor = State_hash.gen in
   let bodies = list State_body_hash.gen in
-  test (tuple2 ancestor bodies) ~f:(fun (ancestor, bs) ->
+  test (tuple2 ancestor bodies) ~trials:300 ~f:(fun (ancestor, bs) ->
       let n = List.length bs in
       let prover = Prover.create ~max_size:(2 * n) in
       let hashes =
