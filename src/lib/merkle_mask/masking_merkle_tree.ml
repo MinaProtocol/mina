@@ -188,25 +188,8 @@ struct
         ~init:[(starting_address, starting_hash)]
         ~f:get_addresses_hashes
 
-    (* WARNING: This is n*log(n) and shouldn't be. See issue #1219 *)
-    let recompute_tree t =
-      let locations_and_accounts = Location.Table.to_alist t.account_tbl in
-      List.iter locations_and_accounts ~f:(fun (location, account) ->
-          let starting_address = Location.to_path_exn location in
-          let merkle_path = merkle_path t location in
-          let account_hash =
-            find_hash t starting_address |> Option.value_exn
-          in
-          let addresses_and_hashes =
-            addresses_and_hashes_from_merkle_path_exn merkle_path
-              starting_address account_hash
-          in
-          List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
-              set_inner_hash_at_addr_exn t addr hash ) )
-
     (* use mask Merkle root, if it exists, else get from parent *)
     let merkle_root t =
-      recompute_tree t ;
       match find_hash t (Addr.root ()) with
       | Some hash -> hash
       | None -> Base.merkle_root (get_parent t)
@@ -390,7 +373,9 @@ struct
       *)
       let rev_sorted_mask_locations =
         List.sort mask_locations ~compare:(fun loc1 loc2 ->
-            Location.compare loc2 loc1 )
+            let loc1 = Location.to_path_exn loc1 in
+            let loc2 = Location.to_path_exn loc2 in
+            Location.Addr.compare loc2 loc1 )
       in
       List.iter rev_sorted_mask_locations
         ~f:(remove_account_and_update_hashes t)
@@ -445,6 +430,20 @@ struct
         ( Addr.of_directions
         @@ List.init Base.depth ~f:(fun _ -> Direction.Left) )
 
+    let loc_max a b =
+      let a' = Location.to_path_exn a in
+      let b' = Location.to_path_exn b in
+      if Location.Addr.compare a' b' > 0 then a else b
+
+    let last_filled t =
+      Option.value_map
+        (Base.last_filled (get_parent t))
+        ~default:t.current_location
+        ~f:(fun parent_loc ->
+          match t.current_location with
+          | None -> Some parent_loc
+          | Some our_loc -> Some (max parent_loc our_loc) )
+
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t key account =
       match find_location t key with
@@ -455,7 +454,7 @@ struct
         | None -> (
             (* not in parent, create new location *)
             let maybe_location =
-              match t.current_location with
+              match last_filled t with
               | None -> Some first_location
               | Some loc -> Location.next loc
             in
