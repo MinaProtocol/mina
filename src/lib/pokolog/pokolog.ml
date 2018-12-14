@@ -72,7 +72,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
   module Fixed_base = struct
     module Instance = struct
-      type t = Group.Checked.t
+      type t = Group.Unchecked.t [@@deriving bin_io]
     end
   end
 end
