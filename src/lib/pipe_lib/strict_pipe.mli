@@ -1,3 +1,4 @@
+open Core_kernel
 open Async_kernel
 
 exception Overflow
@@ -82,6 +83,12 @@ module Writer : sig
   val to_linear_pipe : ('t, 'behavior, 'return) t -> 't Linear_pipe.Writer.t
 
   val write : ('t, _, 'return) t -> 't -> 'return
+
+  val is_stopped : (_, _, _) t -> bool
+
+  val stop : (_, _, _) t -> unit Or_error.t
+
+  val continue : (_, _, _) t -> unit Or_error.t
 end
 
 val create :
@@ -93,15 +100,3 @@ val transfer :
   -> ('b, synchronous, unit Deferred.t) Writer.t
   -> f:('a -> 'b)
   -> unit Deferred.t
-
-module Closed_writer : sig
-  type ('t, 'behavior, 'return) t
-
-  val wrap : ('t, 'type_, 'return) Writer.t -> ('t, 'type_, 'return) t
-
-  val is_closed : ('t, 'type_, 'return) t -> bool
-
-  val toggle : ('t, 'type_, 'return) t -> unit
-
-  val write : ('t, 'type_, 'return) t -> 't -> 'return
-end

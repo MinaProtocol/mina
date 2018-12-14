@@ -130,10 +130,11 @@ module Writer = struct
   type ('t, 'type_, 'write_return) t =
     { type_: ('type_, 'write_return) type_
     ; reader: 't Pipe.Reader.t
-    ; writer: 't Pipe.Writer.t }
+    ; writer: 't Pipe.Writer.t
+    ; mutable is_stopped: bool }
 
   (* TODO: See #1281 *)
-  let to_linear_pipe {writer= pipe; reader= _; type_= _} = pipe
+  let to_linear_pipe {writer= pipe; reader= _; type_= _; is_stopped= _} = pipe
 
   let handle_overflow : type b.
       ('t, b buffered, unit) t -> 't -> b overflow_behavior -> unit =
@@ -144,13 +145,30 @@ module Writer = struct
         ignore (Pipe.read_now writer.reader) ;
         Pipe.write_without_pushback writer.writer data
 
-  let clear {reader; _} = Pipe.clear reader
+  let stop t =
+    let open Or_error in
+    if t.is_stopped then error_string "Pipe is already stopped"
+    else (
+      Pipe.clear t.reader ;
+      t.is_stopped <- true ;
+      return () )
+
+  let continue t =
+    let open Or_error in
+    if not t.is_stopped then error_string "Data is already flowing the pipe"
+    else (
+      t.is_stopped <- false ;
+      return () )
+
+  let is_stopped {is_stopped; _} = is_stopped
 
   let write : type type_ return. ('t, type_, return) t -> 't -> return =
    fun writer data ->
-    match writer.type_ with
-    | Synchronous -> Pipe.write writer.writer data
-    | Buffered (`Capacity capacity, `Overflow overflow) ->
+    match (writer.is_stopped, writer.type_) with
+    | true, Synchronous -> Deferred.unit
+    | true, Buffered (`Capacity _, `Overflow _) -> ()
+    | false, Synchronous -> Pipe.write writer.writer data
+    | false, Buffered (`Capacity capacity, `Overflow overflow) ->
         if Pipe.length writer.reader > capacity then
           handle_overflow writer data overflow
         else Pipe.write_without_pushback writer.writer data
@@ -159,31 +177,10 @@ end
 let create type_ =
   let reader, writer = Pipe.create () in
   let reader, writer =
-    (Reader.{reader; has_reader= false}, Writer.{type_; reader; writer})
+    ( Reader.{reader; has_reader= false}
+    , Writer.{type_; reader; writer; is_stopped= false} )
   in
   (reader, writer)
 
 let transfer reader {Writer.writer; _} ~f =
   Reader.enforce_single_reader reader (Pipe.transfer reader.reader writer ~f)
-
-module Closed_writer = struct
-  type ('t, 'type_, 'write_return) t =
-    {writer: ('t, 'type_, 'write_return) Writer.t; mutable is_closed: bool}
-
-  let wrap writer = {writer; is_closed= false}
-
-  let is_closed {is_closed; _} = is_closed
-
-  let toggle t =
-    if t.is_closed then t.is_closed <- false
-    else (
-      Writer.clear t.writer ;
-      t.is_closed <- true )
-
-  let write : type type_ return. ('t, type_, return) t -> 't -> return =
-   fun {writer; is_closed} _x ->
-    match (is_closed, writer.type_) with
-    | false, _ -> Writer.write writer _x
-    | true, Synchronous -> Deferred.unit
-    | true, Buffered (`Capacity _, `Overflow _) -> ()
-end

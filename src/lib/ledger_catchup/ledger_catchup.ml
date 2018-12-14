@@ -1,7 +1,6 @@
 open Core
 open Async
 open Protocols.Coda_transition_frontier
-open Pipe_lib
 open Coda_base
 
 module Make (Inputs : Inputs.S) :
@@ -100,15 +99,14 @@ module Make (Inputs : Inputs.S) :
 
   let run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer =
-    Strict_pipe.Reader.iter catchup_job_reader ~f:(fun transition_with_hash ->
+    let open Pipe_lib.Strict_pipe in
+    Reader.iter catchup_job_reader ~f:(fun transition_with_hash ->
         let hash = With_hash.hash transition_with_hash in
         match%map
           get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
             ~num_peers:8 hash
         with
-        | Ok breadcrumbs ->
-            Strict_pipe.Closed_writer.write catchup_breadcrumbs_writer
-              breadcrumbs
+        | Ok breadcrumbs -> Writer.write catchup_breadcrumbs_writer breadcrumbs
         | Error e ->
             Logger.info logger
               !"None of the peers have a transition with state hash:\n%s"

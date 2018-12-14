@@ -12,7 +12,7 @@ module Make (Inputs : Inputs.S) = struct
         ( (External_transition.t, State_hash.t) With_hash.t
         , drop_head buffered
         , unit )
-        Closed_writer.t
+        Writer.t
     ; timeouts:
         (State_hash.t, unit Time.Timeout.t) List.Assoc.t State_hash.Table.t }
 
@@ -28,7 +28,7 @@ module Make (Inputs : Inputs.S) = struct
     in
     let make_timeout () =
       Time.Timeout.create time_controller timeout_duration ~f:(fun _ ->
-          Closed_writer.write t.catchup_job_writer transition )
+          Writer.write t.catchup_job_writer transition )
     in
     Hashtbl.update t.timeouts parent_hash ~f:(function
       | None -> [(hash, make_timeout ())]

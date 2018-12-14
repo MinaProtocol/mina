@@ -54,7 +54,7 @@ module Make (Inputs : Inputs.S) :
                      ignore
                        (Transition_frontier.add_transition_exn frontier
                           transition) ;
-                     Closed_writer.write processed_transition_writer transition ;
+                     Writer.write processed_transition_writer transition ;
                      Catchup_monitor.notify catchup_monitor ~time_controller
                        ~transition ) ) ))
 end

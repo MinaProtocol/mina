@@ -70,26 +70,14 @@ module Make (Inputs : Inputs_intf) :
     let valid_transition_reader, valid_transition_writer =
       Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
     in
-    let valid_transition_writer =
-      Strict_pipe.Closed_writer.wrap valid_transition_writer
-    in
     let processed_transition_reader, processed_transition_writer =
       Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
-    in
-    let processed_transition_writer =
-      Strict_pipe.Closed_writer.wrap processed_transition_writer
     in
     let catchup_job_reader, catchup_job_writer =
       Strict_pipe.create (Buffered (`Capacity 5, `Overflow Drop_head))
     in
-    let catchup_job_writer =
-      Strict_pipe.Closed_writer.wrap catchup_job_writer
-    in
     let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
       Strict_pipe.create (Buffered (`Capacity 3, `Overflow Crash))
-    in
-    let catchup_breadcrumbs_writer =
-      Strict_pipe.Closed_writer.wrap catchup_breadcrumbs_writer
     in
     let ancestor_prover =
       Ancestor.Prover.create ~max_size:(2 * Transition_frontier.max_length)

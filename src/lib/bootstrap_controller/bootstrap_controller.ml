@@ -145,9 +145,9 @@ module Make (Inputs : Inputs_intf) :
       in
       get_root ()
 
-  let setup_bootstrap ~ledger_hash_table ~toggle_pipes ~frontier t
-      (transition, tm) =
-    toggle_pipes () ;
+  let setup_bootstrap ~ledger_hash_table ~stop_pipes ~continue_pipes ~frontier
+      t (transition, tm) =
+    stop_pipes () |> Or_error.ok_exn ;
     Transition_frontier.clear_paths frontier ;
     don't_wait_for (on_transition t ~ledger_hash_table (transition, tm)) ;
     let%map tree = Syncable_ledger.valid_tree t.syncable_ledger in
@@ -155,7 +155,7 @@ module Make (Inputs : Inputs_intf) :
     let state_hash = Hashtbl.find_exn ledger_hash_table root_hash in
     Transition_frontier.rebuild frontier tree state_hash ;
     Hashtbl.clear ledger_hash_table ;
-    toggle_pipes ()
+    continue_pipes () |> Or_error.ok_exn
 
   let create ~parent_log ~frontier ~network ~ancestor_prover =
     let logger = Logger.child parent_log __MODULE__ in
@@ -177,31 +177,39 @@ module Make (Inputs : Inputs_intf) :
   let run ~valid_transition_writer ~processed_transition_writer
       ~catchup_job_writer ~catchup_breadcrumbs_writer ~parent_log ~network
       ~ancestor_prover ~frontier ~transition_reader =
-    let toggle_pipes () =
-      Closed_writer.(
-        toggle valid_transition_writer ;
-        toggle processed_transition_writer ;
-        toggle catchup_job_writer ;
-        toggle catchup_breadcrumbs_writer)
-    in
-    let is_bootstrapping () =
-      let are_pipes_closed =
-        Closed_writer.(
-          is_closed valid_transition_writer
-          && is_closed processed_transition_writer
-          && is_closed catchup_job_writer
-          && is_closed catchup_breadcrumbs_writer)
+    let stop_pipes, continue_pipes, is_bootstrapping =
+      let open Writer in
+      let open Or_error.Let_syntax in
+      let stop_pipes () =
+        let%bind () = stop valid_transition_writer in
+        let%bind () = stop processed_transition_writer in
+        let%bind () = stop catchup_job_writer in
+        stop catchup_breadcrumbs_writer
       in
-      Debug_assert.debug_assert (fun () ->
-          assert (
-            Closed_writer.(
+      let continue_pipes () =
+        let%bind () = continue valid_transition_writer in
+        let%bind () = continue processed_transition_writer in
+        let%bind () = continue catchup_job_writer in
+        continue catchup_breadcrumbs_writer
+      in
+      let is_bootstrapping () =
+        let are_pipes_closed =
+          is_stopped valid_transition_writer
+          && is_stopped processed_transition_writer
+          && is_stopped catchup_job_writer
+          && is_stopped catchup_breadcrumbs_writer
+        in
+        Debug_assert.debug_assert (fun () ->
+            assert (
               are_pipes_closed
               || not
-                   ( is_closed valid_transition_writer
-                   || is_closed processed_transition_writer
-                   || is_closed catchup_job_writer
-                   || is_closed catchup_breadcrumbs_writer )) ) ) ;
-      are_pipes_closed
+                   ( is_stopped valid_transition_writer
+                   || is_stopped processed_transition_writer
+                   || is_stopped catchup_job_writer
+                   || is_stopped catchup_breadcrumbs_writer ) ) ) ;
+        are_pipes_closed
+      in
+      (stop_pipes, continue_pipes, is_bootstrapping)
     in
     let t = create ~parent_log ~frontier ~network ~ancestor_prover in
     let ledger_hash_table = Ledger_hash.Table.create () in
@@ -226,8 +234,8 @@ module Make (Inputs : Inputs_intf) :
             ( if is_bootstrapping () then
               on_transition t ~ledger_hash_table (new_transition, tm)
             else
-              setup_bootstrap t ~ledger_hash_table ~toggle_pipes ~frontier
-                (new_transition, tm) ) ;
+              setup_bootstrap t ~ledger_hash_table ~stop_pipes ~continue_pipes
+                ~frontier (new_transition, tm) ) ;
         Deferred.unit )
     |> don't_wait_for
 end

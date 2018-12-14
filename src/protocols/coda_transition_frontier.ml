@@ -129,7 +129,7 @@ module type Catchup_intf = sig
     -> catchup_breadcrumbs_writer:( transition_frontier_breadcrumb list
                                   , crash buffered
                                   , unit )
-                                  Closed_writer.t
+                                  Writer.t
     -> unit
 end
 
@@ -152,7 +152,7 @@ module type Transition_handler_validator_intf = sig
     -> valid_transition_writer:( (external_transition, state_hash) With_hash.t
                                , drop_head buffered
                                , unit )
-                               Closed_writer.t
+                               Writer.t
     -> unit
 end
 
@@ -176,14 +176,14 @@ module type Transition_handler_processor_intf = sig
     -> catchup_job_writer:( (external_transition, state_hash) With_hash.t
                           , drop_head buffered
                           , unit )
-                          Closed_writer.t
+                          Writer.t
     -> catchup_breadcrumbs_reader:transition_frontier_breadcrumb list Reader.t
     -> processed_transition_writer:( ( external_transition
                                      , state_hash )
                                      With_hash.t
                                    , drop_head buffered
                                    , unit )
-                                   Closed_writer.t
+                                   Writer.t
     -> unit
 end
 
@@ -240,10 +240,10 @@ module type Bootstrap_controller_intf = sig
   type ancestor_prover
 
   val run :
-       valid_transition_writer:('a, 'b, 'c) Closed_writer.t
-    -> processed_transition_writer:('d, 'e, 'f) Closed_writer.t
-    -> catchup_job_writer:('g, 'h, 'i) Closed_writer.t
-    -> catchup_breadcrumbs_writer:('j, 'k, 'l) Closed_writer.t
+       valid_transition_writer:('a, 'b, 'c) Writer.t
+    -> processed_transition_writer:('d, 'e, 'f) Writer.t
+    -> catchup_job_writer:('g, 'h, 'i) Writer.t
+    -> catchup_breadcrumbs_writer:('j, 'k, 'l) Writer.t
     -> parent_log:Logger.t
     -> network:network
     -> ancestor_prover:ancestor_prover
