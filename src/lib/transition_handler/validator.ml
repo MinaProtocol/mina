@@ -18,15 +18,6 @@ module Make (Inputs : Inputs.S) = struct
       | `Reject, _ -> `Reject
       | `Valid, `Valid -> `Valid
     in
-    let ( || ) a b =
-      match (a, b) with
-      | _, `Duplicate -> `Duplicate
-      | `Duplicate, _ -> `Duplicate
-      | `Valid, _ -> `Valid
-      | _, `Valid -> `Valid
-      | `Reject, `Reject -> `Reject
-    in
-    let of_bool = function true -> `Valid | false -> `Reject in
     let t = Envelope.Incoming.data t_env in
     let time_received =
       Time.to_span_since_epoch time_received
@@ -37,7 +28,7 @@ module Make (Inputs : Inputs.S) = struct
         Logger.info logger "transition rejected: %s" error_msg ;
         `Reject
       in
-      of_bool condition || log ()
+      if condition then `Valid else log ()
     in
     let consensus_state =
       Fn.compose Protocol_state.consensus_state
