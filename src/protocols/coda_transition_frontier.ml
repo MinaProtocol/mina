@@ -1,4 +1,3 @@
-open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
 
@@ -9,12 +8,24 @@ module type Network_intf = sig
 
   type state_hash
 
+  type protocol_state
+
   type transition
+
+  type ancestor_proof_input
+
+  type ancestor_proof
 
   val random_peers : t -> int -> peer list
 
   val catchup_transition :
-    t -> peer -> state_hash -> transition list option Or_error.t Deferred.t
+    t -> peer -> state_hash -> transition list option Deferred.Or_error.t
+
+  val prove_ancestry :
+       t
+    -> peer
+    -> ancestor_proof_input
+    -> (protocol_state * ancestor_proof) option Deferred.Or_error.t
 end
 
 module type Transition_frontier_base_intf = sig
@@ -218,6 +229,31 @@ module type Sync_handler_intf = sig
     -> int
     -> hash
     -> (hash * ancestor_proof) option
+end
+
+module type Bootstrap_controller_intf = sig
+  type network
+
+  type transition_frontier
+
+  type external_transition
+
+  type ancestor_prover
+
+  val run :
+       valid_transition_writer:('a, 'b, 'c) Closed_writer.t
+    -> processed_transition_writer:('d, 'e, 'f) Closed_writer.t
+    -> catchup_job_writer:('g, 'h, 'i) Closed_writer.t
+    -> catchup_breadcrumbs_writer:('j, 'k, 'l) Closed_writer.t
+    -> parent_log:Logger.t
+    -> network:network
+    -> ancestor_prover:ancestor_prover
+    -> frontier:transition_frontier
+    -> transition_reader:( [< `Transition of external_transition
+                                             Envelope.Incoming.t ]
+                         * [< `Time_received of int64] )
+                         Reader.t
+    -> unit
 end
 
 module type Transition_frontier_controller_intf = sig

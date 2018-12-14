@@ -5,11 +5,17 @@ open Coda_base
 open Pipe_lib.Strict_pipe
 
 module type Inputs_intf = sig
-  module Consensus_mechanism : Consensus.Mechanism.S
+  include Transition_frontier.Inputs_intf
 
-  module External_transition :
-    External_transition_intf
-    with type protocol_state := Consensus_mechanism.Protocol_state.value
+  module Transition_frontier :
+    Transition_frontier_intf
+    with type state_hash := State_hash.t
+     and type external_transition := External_transition.t
+     and type ledger_database := Ledger.Db.t
+     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+     and type ledger_diff := Staged_ledger_diff.t
+     and type staged_ledger := Staged_ledger.t
+     and type ledger := Ledger.t
 
   module Merkle_address : Merkle_address.S
 
@@ -17,59 +23,48 @@ module type Inputs_intf = sig
     Syncable_ledger.S
     with type addr := Merkle_address.t
      and type hash := Ledger_hash.t
-     and type root_hash := Frozen_ledger_hash.t
+     and type root_hash := Ledger_hash.t
      and type merkle_tree := Ledger.t
+     and type account := Account.t
+     and type merkle_path := Ledger.path
 
-  module Staged_ledger : Staged_ledger_intf with type ledger := Ledger.t
-
-  module Transition_frontier :
-    Transition_frontier_intf
-    with type state_hash := State_hash.t
-     and type external_transition := External_transition.t
-     and type ledger_database := Ledger.Db.t
-     and type ledger := Ledger.t
-     and type staged_ledger := Staged_ledger.t
+  module Network :
+    Network_intf
+    with type peer := Kademlia.Peer.t
+     and type state_hash := State_hash.t
+     and type transition := External_transition.t
+     and type ancestor_proof_input := State_hash.t * int
+     and type ancestor_proof := Ancestor.Proof.t
+     and type protocol_state := Consensus.Mechanism.Protocol_state.value
 end
 
-module type S = sig
-  module Inputs : Inputs_intf
-
+module Make (Inputs : Inputs_intf) :
+  Bootstrap_controller_intf
+  with type network := Inputs.Network.t
+   and type transition_frontier := Inputs.Transition_frontier.t
+   and type external_transition := Inputs.External_transition.t
+   and type ancestor_prover := Ancestor.Prover.t = struct
   open Inputs
-
-  type t
-
-  val create : unit -> t
-
-  val result : t -> (Ledger.t * External_transition.t) Deferred.t
-end
-
-module Make (Inputs : Inputs_intf) = struct
-  open Inputs
-
-  type get_ancestor =
-       Ancestor.Input.t
-    -> (Consensus_mechanism.Protocol_state.value * Ancestor.Proof.t) option
-       Deferred.Or_error.t
 
   type state_with_root =
-    { state: Consensus_mechanism.Protocol_state.value
-    ; root: Consensus_mechanism.Protocol_state.value }
+    { state: Consensus.Mechanism.Protocol_state.value
+    ; root: Consensus.Mechanism.Protocol_state.value }
 
   type t =
     { syncable_ledger: Syncable_ledger.t
     ; logger: Logger.t
     ; ancestor_prover: Ancestor.Prover.t
     ; mutable best_with_root: state_with_root
-    ; get_ancestor: get_ancestor }
+    ; network: Network.t }
 
   let isn't_worth_getting_root t candidate time_received =
     match
-      Consensus_mechanism.select ~logger:t.logger
+      Consensus.Mechanism.select ~logger:t.logger
         ~existing:
-          (Consensus_mechanism.Protocol_state.consensus_state
+          (Consensus.Mechanism.Protocol_state.consensus_state
              t.best_with_root.state)
         ~candidate:
-          (Consensus_mechanism.Protocol_state.consensus_state candidate)
+          (Consensus.Mechanism.Protocol_state.consensus_state candidate)
         ~time_received
     with
     | `Keep -> true
@@ -83,11 +78,26 @@ module Make (Inputs : Inputs_intf) = struct
     Option.is_some (Syncable_ledger.peek_valid_tree t.syncable_ledger)
 
   let length protocol_state =
-    Consensus_mechanism.Protocol_state.consensus_state protocol_state
-    |> Consensus_mechanism.Consensus_state.length |> Coda_numbers.Length.to_int
+    Consensus.Mechanism.Protocol_state.consensus_state protocol_state
+    |> Consensus.Mechanism.Consensus_state.length |> Coda_numbers.Length.to_int
+
+  let get_ancestor ~network ({Ancestor.Input.descendant; generations} as input)
+      =
+    let peers = Network.random_peers network 8 in
+    let open Deferred.Or_error.Let_syntax in
+    Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
+        match%bind
+          Network.prove_ancestry network peer (descendant, generations)
+        with
+        | Some proof -> Deferred.Or_error.return proof
+        | None ->
+            Deferred.Or_error.errorf
+              !"Peer %{sexp:Kademlia.Peer.t} does not have proof for \
+                %{sexp:Ancestor.Input.t}"
+              peer input )
 
   let on_transition t ~ledger_hash_table (transition, time_received) =
-    let module Ps = Consensus_mechanism.Protocol_state in
+    let module Ps = Consensus.Mechanism.Protocol_state in
     let candidate = External_transition.protocol_state transition in
     if isn't_worth_getting_root t candidate time_received then Deferred.unit
     else
@@ -98,7 +108,7 @@ module Make (Inputs : Inputs_intf) = struct
         ; generations= length t.best_with_root.root }
       in
       let rec get_root () =
-        let%bind res = t.get_ancestor input in
+        let%bind res = get_ancestor ~network:t.network input in
         if
           done_syncing_root t
           || isn't_worth_getting_root t candidate time_received
@@ -108,10 +118,7 @@ module Make (Inputs : Inputs_intf) = struct
           | Error e ->
               Logger.error t.logger !"%{sexp:Error.t}" e ;
               get_root ()
-          | Ok None ->
-              Logger.info t.logger "Peer did not have root. Re-requesting." ;
-              get_root ()
-          | Ok (Some (ancestor, proof)) -> (
+          | Ok (ancestor, proof) -> (
               let ancestor_length =
                 Ps.(Consensus_state.length (consensus_state ancestor))
               in
@@ -131,20 +138,18 @@ module Make (Inputs : Inputs_intf) = struct
                     ~length:
                       Ps.(Consensus_state.length (consensus_state candidate))
                     ~body_hash:candidate_body_hash ;
-                  let frozen_ledger_hash =
-                    Consensus_mechanism.(
+                  let ledger_hash =
+                    Consensus.Mechanism.(
                       Protocol_state.blockchain_state ancestor
-                      |> Blockchain_state.ledger_hash)
+                      |> Blockchain_state.ledger_hash
+                      |> Frozen_ledger_hash.to_ledger_hash)
                   in
                   ( match
-                      Syncable_ledger.new_goal t.syncable_ledger
-                        frozen_ledger_hash
+                      Syncable_ledger.new_goal t.syncable_ledger ledger_hash
                     with
                   | `Ignore -> ()
                   | `Continue ->
-                      Ledger_hash.Table.set ledger_hash_table
-                        ~key:
-                          (Frozen_ledger_hash.to_ledger_hash frozen_ledger_hash)
+                      Ledger_hash.Table.set ledger_hash_table ~key:ledger_hash
                         ~data:candidate_hash ) ;
                   Deferred.unit
               | Error e -> received_bad_proof t e ; get_root () )
@@ -157,23 +162,19 @@ module Make (Inputs : Inputs_intf) = struct
     new_length - root_length
     > (2 * Transition_frontier.max_length) + Consensus.Mechanism.network_delay
 
-  let is_bootstrapping pipes =
-    Debug_assert.debug_assert (fun () ->
-        if List.exists pipes ~f:Closed_writer.is_closed then
-          assert (List.for_all pipes ~f:Closed_writer.is_closed) ) ;
-    Closed_writer.is_closed (List.hd_exn pipes)
-
-  let setup_bootstrap ~ledger_hash_table ~pipes ~frontier t (transition, tm) =
-    List.iter pipes ~f:Closed_writer.toggle ;
+  let setup_bootstrap ~ledger_hash_table ~toggle_pipes ~frontier t
+      (transition, tm) =
+    toggle_pipes () ;
     Transition_frontier.clear_paths frontier ;
     don't_wait_for (on_transition t ~ledger_hash_table (transition, tm)) ;
     let%map tree = Syncable_ledger.valid_tree t.syncable_ledger in
     let root_hash = Ledger.merkle_root tree in
     let state_hash = Hashtbl.find_exn ledger_hash_table root_hash in
     Transition_frontier.rebuild frontier tree state_hash ;
-    Hashtbl.clear ledger_hash_table
+    Hashtbl.clear ledger_hash_table ;
+    toggle_pipes ()
 
-  let create ~parent_log ~frontier ~get_ancestor ~ancestor_prover =
+  let create ~parent_log ~frontier ~network ~ancestor_prover =
     let logger = Logger.child parent_log __MODULE__ in
     let initial_breadcrumb = Transition_frontier.root frontier in
     let initial_root_state =
@@ -184,15 +185,42 @@ module Make (Inputs : Inputs_intf) = struct
       Transition_frontier.Breadcrumb.staged_ledger initial_breadcrumb
       |> Staged_ledger.ledger
     in
-    { get_ancestor
+    { network
     ; logger
     ; ancestor_prover
     ; best_with_root= {state= initial_root_state; root= initial_root_state}
     ; syncable_ledger= Syncable_ledger.create ledger ~parent_log:logger }
 
-  let run pipes ~parent_log ~get_ancestor ~ancestor_prover ~frontier
-      ~transition_reader =
-    let t = create ~parent_log ~frontier ~get_ancestor ~ancestor_prover in
+  let run ~valid_transition_writer ~processed_transition_writer
+      ~catchup_job_writer ~catchup_breadcrumbs_writer ~parent_log ~network
+      ~ancestor_prover ~frontier ~transition_reader =
+    let toggle_pipes () =
+      Closed_writer.(
+        toggle valid_transition_writer ;
+        toggle processed_transition_writer ;
+        toggle catchup_job_writer ;
+        toggle catchup_breadcrumbs_writer)
+    in
+    let is_bootstrapping () =
+      let are_pipes_closed =
+        Closed_writer.(
+          is_closed valid_transition_writer
+          && is_closed processed_transition_writer
+          && is_closed catchup_job_writer
+          && is_closed catchup_breadcrumbs_writer)
+      in
+      Debug_assert.debug_assert (fun () ->
+          assert (
+            Closed_writer.(
+              are_pipes_closed
+              || not
+                   ( is_closed valid_transition_writer
+                   || is_closed processed_transition_writer
+                   || is_closed catchup_job_writer
+                   || is_closed catchup_breadcrumbs_writer )) ) ) ;
+      are_pipes_closed
+    in
+    let t = create ~parent_log ~frontier ~network ~ancestor_prover in
     let ledger_hash_table = Ledger_hash.Table.create () in
     Reader.iter transition_reader
       ~f:(fun (`Transition incoming_transition, `Time_received tm) ->
@@ -206,10 +234,10 @@ module Make (Inputs : Inputs_intf) = struct
         let new_state = External_transition.protocol_state new_transition in
         if should_bootstrap root_state new_state then
           don't_wait_for
-            ( if is_bootstrapping pipes then
+            ( if is_bootstrapping () then
               on_transition t ~ledger_hash_table (new_transition, tm)
             else
-              setup_bootstrap t ~ledger_hash_table ~pipes ~frontier
+              setup_bootstrap t ~ledger_hash_table ~toggle_pipes ~frontier
                 (new_transition, tm) ) ;
         Deferred.unit )
     |> don't_wait_for

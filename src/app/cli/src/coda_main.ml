@@ -796,6 +796,18 @@ struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
   end)
 
+  module Bootstrap_controller = Bootstrap_controller.Make (struct
+    include Inputs0
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Transaction_snark_work = Transaction_snark_work
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Syncable_ledger = Sync_ledger
+    module Merkle_address = Ledger.Addr
+    module Consensus_mechanism = Consensus.Mechanism
+    module Network = Net
+  end)
+
   module Transition_frontier_controller =
   Transition_frontier_controller.Make (struct
     include Inputs0
@@ -810,6 +822,7 @@ struct
     module Consensus_mechanism = Consensus.Mechanism
     module Ledger_proof_statement = Ledger_proof_statement
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Bootstrap_controller = Bootstrap_controller
     module Network = Net
   end)
 

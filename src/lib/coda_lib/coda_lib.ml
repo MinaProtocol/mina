@@ -115,10 +115,10 @@ module type Network_intf = sig
                                  -> (ledger_hash * sync_ledger_answer)
                                     Deferred.Or_error.t)
     -> transition_catchup:(   state_hash Envelope.Incoming.t
-                           -> state_with_witness list option Deferred.t)
+                           -> state_with_witness list Deferred.Option.t)
     -> prove_ancestry:(   (state_hash * int) Envelope.Incoming.t
-                       -> (state_hash * state_body_hash list)
-                          Deferred.Or_error.t)
+                       -> (protocol_state * state_body_hash list)
+                          Deferred.Option.t)
     -> t Deferred.t
 end
 
@@ -692,12 +692,23 @@ module Make (Inputs : Inputs_intf) = struct
                 transition_frontier breadcrumb )
             ~prove_ancestry:(fun query_env ->
               let descendent, count = Envelope.Incoming.data query_env in
-              match
-                Sync_handler.prove_ancestry ~frontier:transition_frontier count
-                  descendent
-              with
-              | Some pf -> return (Ok pf)
-              | None -> Deferred.Or_error.error_string "not found" )
+              let result =
+                let open Option.Let_syntax in
+                let%bind state_hash, proof =
+                  Sync_handler.prove_ancestry ~frontier:transition_frontier
+                    count descendent
+                in
+                let%map transition_with_hash =
+                  Transition_frontier.find transition_frontier state_hash
+                in
+                let protocol_state =
+                  transition_with_hash
+                  |> Transition_frontier.Breadcrumb.transition_with_hash
+                  |> With_hash.data |> External_transition.protocol_state
+                in
+                (protocol_state, proof)
+              in
+              Deferred.return result )
         in
         let valid_transitions =
           Transition_frontier_controller.run ~logger:config.log ~network:net

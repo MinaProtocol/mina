@@ -154,7 +154,9 @@ struct
       module T = struct
         type query = State_hash.t * int [@@deriving bin_io]
 
-        type response = (State_hash.t * State_body_hash.t list) Or_error.t
+        type response =
+          (External_transition.Protocol_state.value * State_body_hash.t list)
+          option
         [@@deriving bin_io]
       end
 
@@ -323,7 +325,8 @@ module Make (Inputs : Inputs_intf) = struct
          -> External_transition.t list option Deferred.t)
       ~(prove_ancestry :
             (State_hash.t * int) Envelope.Incoming.t
-         -> (State_hash.t * State_body_hash.t list) Deferred.Or_error.t) =
+         -> (External_transition.Protocol_state.value * State_body_hash.t list)
+            Deferred.Option.t) =
     let log = Logger.child config.parent_log "coda networking" in
     let get_staged_ledger_aux_at_hash_rpc sender ~version:_ hash =
       get_staged_ledger_aux_at_hash (Envelope.Incoming.wrap ~data:hash ~sender)
@@ -389,6 +392,10 @@ module Make (Inputs : Inputs_intf) = struct
   let catchup_transition t peer state_hash =
     Gossip_net.query_peer t.gossip_net peer
       Rpcs.Transition_catchup.dispatch_multi state_hash
+
+  let prove_ancestry t peer input =
+    Gossip_net.query_peer t.gossip_net peer Rpcs.Prove_ancestry.dispatch_multi
+      input
 
   module Staged_ledger_io = struct
     type nonrec t = t
