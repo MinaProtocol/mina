@@ -66,7 +66,7 @@ module Make (Inputs : Inputs_intf) :
     |> Unix_timestamp.of_int64
 
   let run ~logger ~network ~time_controller ~frontier ~transition_reader =
-    let logger = Logger.child logger "transition_frontier_cont\roller" in
+    let logger = Logger.child logger __MODULE__ in
     let valid_transition_reader, valid_transition_writer =
       Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
     in

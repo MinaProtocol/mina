@@ -21,11 +21,10 @@ module type Network_intf = sig
   val catchup_transition :
     t -> peer -> state_hash -> transition list option Deferred.Or_error.t
 
-  val prove_ancestry :
+  val get_ancestry :
        t
-    -> peer
     -> ancestor_proof_input
-    -> (protocol_state * ancestor_proof) option Deferred.Or_error.t
+    -> (protocol_state * ancestor_proof) Deferred.Or_error.t
 end
 
 module type Transition_frontier_base_intf = sig

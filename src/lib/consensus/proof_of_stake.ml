@@ -1416,6 +1416,11 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     in
     With_hash.of_data ~hash_data:Protocol_state.hash state
 
+  let should_bootstrap ~max_length ~existing ~candidate =
+    let length = Fn.compose Length.to_int Consensus_state.length in
+    length existing - length candidate
+    > (2 * max_length) + Constants.network_delay
+
   let to_unix_timestamp recieved_time =
     recieved_time |> Time.to_span_since_epoch |> Time.Span.to_ms
     |> Unix_timestamp.of_int64

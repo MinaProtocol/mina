@@ -116,9 +116,9 @@ module type Network_intf = sig
                                     Deferred.Or_error.t)
     -> transition_catchup:(   state_hash Envelope.Incoming.t
                            -> state_with_witness list Deferred.Option.t)
-    -> prove_ancestry:(   (state_hash * int) Envelope.Incoming.t
-                       -> (protocol_state * state_body_hash list)
-                          Deferred.Option.t)
+    -> get_ancestry:(   (state_hash * int) Envelope.Incoming.t
+                     -> (protocol_state * state_body_hash list)
+                        Deferred.Option.t)
     -> t Deferred.t
 end
 
@@ -690,7 +690,7 @@ module Make (Inputs : Inputs_intf) = struct
                   Transition_frontier.Breadcrumb.transition_with_hash b
                   |> With_hash.data )
                 transition_frontier breadcrumb )
-            ~prove_ancestry:(fun query_env ->
+            ~get_ancestry:(fun query_env ->
               let descendent, count = Envelope.Incoming.data query_env in
               let result =
                 let open Option.Let_syntax in

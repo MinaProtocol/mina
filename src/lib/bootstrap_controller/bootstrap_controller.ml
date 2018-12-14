@@ -58,17 +58,14 @@ module Make (Inputs : Inputs_intf) :
     ; network: Network.t }
 
   let isn't_worth_getting_root t candidate time_received =
-    match
-      Consensus.Mechanism.select ~logger:t.logger
+    `Keep
+    = Consensus.Mechanism.select ~logger:t.logger
         ~existing:
           (Consensus.Mechanism.Protocol_state.consensus_state
              t.best_with_root.state)
         ~candidate:
           (Consensus.Mechanism.Protocol_state.consensus_state candidate)
         ~time_received
-    with
-    | `Keep -> true
-    | `Take -> false
 
   let received_bad_proof t e =
     (* TODO: Punish *)
@@ -81,34 +78,21 @@ module Make (Inputs : Inputs_intf) :
     Consensus.Mechanism.Protocol_state.consensus_state protocol_state
     |> Consensus.Mechanism.Consensus_state.length |> Coda_numbers.Length.to_int
 
-  let get_ancestor ~network ({Ancestor.Input.descendant; generations} as input)
-      =
-    let peers = Network.random_peers network 8 in
-    let open Deferred.Or_error.Let_syntax in
-    Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
-        match%bind
-          Network.prove_ancestry network peer (descendant, generations)
-        with
-        | Some proof -> Deferred.Or_error.return proof
-        | None ->
-            Deferred.Or_error.errorf
-              !"Peer %{sexp:Kademlia.Peer.t} does not have proof for \
-                %{sexp:Ancestor.Input.t}"
-              peer input )
-
   let on_transition t ~ledger_hash_table (transition, time_received) =
-    let module Ps = Consensus.Mechanism.Protocol_state in
+    let module Protocol_state = Consensus.Mechanism.Protocol_state in
     let candidate = External_transition.protocol_state transition in
     if isn't_worth_getting_root t candidate time_received then Deferred.unit
     else
-      let previous_state_hash = Ps.previous_state_hash candidate in
+      let previous_state_hash = Protocol_state.previous_state_hash candidate in
       (* TODO: This may be an off by one *)
       let input : Ancestor.Input.t =
         { descendant= previous_state_hash
         ; generations= length t.best_with_root.root }
       in
       let rec get_root () =
-        let%bind res = get_ancestor ~network:t.network input in
+        let%bind res =
+          Network.get_ancestry t.network (input.descendant, input.generations)
+        in
         if
           done_syncing_root t
           || isn't_worth_getting_root t candidate time_received
@@ -116,27 +100,32 @@ module Make (Inputs : Inputs_intf) :
         else
           match res with
           | Error e ->
-              Logger.error t.logger !"%{sexp:Error.t}" e ;
+              Logger.error t.logger
+                !"Could not get the proof of ancestors from the \
+                  network:%{sexp:Error.t}"
+                e ;
               get_root ()
           | Ok (ancestor, proof) -> (
               let ancestor_length =
-                Ps.(Consensus_state.length (consensus_state ancestor))
+                Protocol_state.(
+                  Consensus_state.length (consensus_state ancestor))
               in
               match
                 Ancestor.Prover.verify_and_add t.ancestor_prover input
-                  (Ps.hash ancestor) proof ~ancestor_length
+                  (Protocol_state.hash ancestor)
+                  proof ~ancestor_length
               with
               | Ok () ->
                   t.best_with_root <- {state= candidate; root= ancestor} ;
-                  let candidate_body_hash = Ps.Body.hash (Ps.body candidate) in
-                  let candidate_hash =
-                    Protocol_state.hash ~hash_body:Fn.id
-                      {body= candidate_body_hash; previous_state_hash}
+                  let candidate_body_hash =
+                    Protocol_state.Body.hash (Protocol_state.body candidate)
                   in
+                  let candidate_hash = Protocol_state.hash candidate in
                   Ancestor.Prover.add t.ancestor_prover ~hash:candidate_hash
                     ~prev_hash:previous_state_hash
                     ~length:
-                      Ps.(Consensus_state.length (consensus_state candidate))
+                      Protocol_state.(
+                        Consensus_state.length (consensus_state candidate))
                     ~body_hash:candidate_body_hash ;
                   let ledger_hash =
                     Consensus.Mechanism.(
@@ -155,12 +144,6 @@ module Make (Inputs : Inputs_intf) :
               | Error e -> received_bad_proof t e ; get_root () )
       in
       get_root ()
-
-  let should_bootstrap root_state new_state =
-    let new_length = length new_state in
-    let root_length = length root_state in
-    new_length - root_length
-    > (2 * Transition_frontier.max_length) + Consensus.Mechanism.network_delay
 
   let setup_bootstrap ~ledger_hash_table ~toggle_pipes ~frontier t
       (transition, tm) =
@@ -230,9 +213,15 @@ module Make (Inputs : Inputs_intf) :
           |> Transition_frontier.Breadcrumb.transition_with_hash
           |> With_hash.data
         in
-        let root_state = External_transition.protocol_state root_transition in
-        let new_state = External_transition.protocol_state new_transition in
-        if should_bootstrap root_state new_state then
+        let open External_transition in
+        let root_state = protocol_state root_transition in
+        let new_state = protocol_state new_transition in
+        if
+          Consensus.Mechanism.should_bootstrap
+            ~max_length:Transition_frontier.max_length
+            ~existing:(Protocol_state.consensus_state root_state)
+            ~candidate:(Protocol_state.consensus_state new_state)
+        then
           don't_wait_for
             ( if is_bootstrapping () then
               on_transition t ~ledger_hash_table (new_transition, tm)
