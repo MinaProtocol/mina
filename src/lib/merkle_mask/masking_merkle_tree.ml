@@ -489,10 +489,13 @@ struct
   end
 
   let set_parent t parent =
-    { uuid= t.uuid
-    ; Attached.parent
-    ; account_tbl= t.account_tbl
-    ; hash_tbl= t.hash_tbl
-    ; location_tbl= t.location_tbl
-    ; current_location= t.current_location }
+    let t =
+      { uuid= t.uuid
+      ; Attached.parent
+      ; account_tbl= t.account_tbl
+      ; hash_tbl= t.hash_tbl
+      ; location_tbl= t.location_tbl
+      ; current_location= t.current_location }
+    in
+    {t with current_location= Attached.last_filled t}
 end
