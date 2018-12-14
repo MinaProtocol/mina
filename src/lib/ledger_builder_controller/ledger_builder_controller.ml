@@ -457,9 +457,6 @@ let%test_module "test" =
               , `Ledger_proof (Some x)
               , `Staged_ledger t )
 
-          let apply_unverified (_t : t) (_x : Staged_ledger_diff.t) ~logger:_ =
-            failwith "Unimplemented"
-
           let apply_diff_unchecked (_t : t) (_x : 'a) =
             failwith "Unimplemented"
 

@@ -616,7 +616,7 @@ end = struct
     ; coinbase_parts_count= List.length coinbase }
 
   (* N.B.: we don't expose apply_diff_unverified in the signature for Staged_ledger *)
-  let apply_unverified_diff t (diff : Staged_ledger_diff.t) ~logger =
+  let apply_diff_unverified t (diff : Staged_ledger_diff.t) ~logger =
     let open Result_with_rollback.Let_syntax in
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
     let spots_available, proofs_waiting =
@@ -703,7 +703,7 @@ end = struct
     , `Ledger_proof res_opt
     , `Staged_ledger {scan_state= scan_state'; ledger= new_ledger} )
 
-  let apply_verified_diff t (diff_verified : Staged_ledger_diff.Verified.t)
+  let apply_diff_verified t (diff_verified : Staged_ledger_diff.Verified.t)
       ~logger =
     (* forget the verification when applying
        that allows apply_diff_unverified to share code with apply_diff_unchecked
