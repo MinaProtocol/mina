@@ -21,7 +21,6 @@
       coda_base
       test_util
       staged_ledger
-      ledger_builder_controller
       sparse_ledger_lib
       syncable_ledger
       blockchain_snark

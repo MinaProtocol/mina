@@ -821,56 +821,6 @@ struct
     module Network = Net
   end)
 
-  module Ledger_builder_controller = struct
-    module Inputs = struct
-      module Security = struct
-        let max_depth = Init.lbc_tree_max_depth
-      end
-
-      module Tip = Tip
-      module Snark_pool = Snark_pool
-      module Ledger_hash = Ledger_hash
-      module Frozen_ledger_hash = Frozen_ledger_hash
-      module Ledger_proof = Transaction_snark
-      module Private_key = Private_key
-
-      module Public_key = struct
-        module Private_key = Private_key
-        include Public_key
-      end
-
-      module Keypair = Keypair
-      module Ledger_proof_statement = Ledger_proof_statement
-      module Staged_ledger_hash = Staged_ledger_hash
-      module Ledger = Ledger
-      module Staged_ledger_diff = Staged_ledger_diff
-      module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-      module Staged_ledger = Staged_ledger
-      module Blockchain_state = Blockchain_state
-      module Consensus_mechanism = Consensus.Mechanism
-      module Protocol_state = Protocol_state
-      module Protocol_state_proof = Protocol_state_proof
-      module State_hash = State_hash
-      module Valid_user_command = User_command.With_valid_signature
-      module Internal_transition = Internal_transition
-      module External_transition = External_transition
-
-      module Net = struct
-        type net = Net.t
-
-        include Net.Staged_ledger_io
-      end
-
-      module Store = Store
-      module Sync_ledger = Sync_ledger
-
-      let verify_blockchain proof state =
-        Verifier.verify_blockchain Init.verifier {proof; state}
-    end
-
-    include Ledger_builder_controller.Make (Inputs)
-  end
-
   module Proposer = Proposer.Make (struct
     include Inputs0
     module Genesis_ledger = Genesis_ledger
