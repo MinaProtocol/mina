@@ -403,23 +403,6 @@ module type Inputs_intf = sig
      and type time := Time.t
      and type state_hash := Protocol_state_hash.t
 
-  module Ledger_builder_controller :
-    Ledger_builder_controller_intf
-    with type net := Net.t
-     and type ledger := Ledger.t
-     and type staged_ledger := Staged_ledger.t
-     and type staged_ledger_hash := Staged_ledger_hash.t
-     and type external_transition_verified := External_transition.Verified.t
-     and type protocol_state := Consensus_mechanism.Protocol_state.value
-     and type consensus_local_state := Consensus_mechanism.Local_state.t
-     and type sync_query := Sync_ledger.query
-     and type sync_answer := Sync_ledger.answer
-     and type ledger_hash := Ledger_hash.t
-     and type ledger_proof := Ledger_proof.t
-     and type tip := Tip.t
-     and type public_key_compressed := Public_key.Compressed.t
-     and type maskable_ledger := Ledger.maskable_ledger
-
   module Ledger_db : Coda_pow.Ledger_creatable_intf
 
   module Masked_ledger : sig
