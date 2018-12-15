@@ -18,7 +18,7 @@ module Make (Inputs : Inputs.S) = struct
       | `Reject, _ -> `Reject
       | `Valid, `Valid -> `Valid
     in
-    let t = Envelope.Incoming.data t_env in
+    let (transition : External_transition.t) = Envelope.Incoming.data t_env in
     let time_received =
       Time.to_span_since_epoch time_received
       |> Time.Span.to_ms |> Unix_timestamp.of_int64
@@ -34,12 +34,18 @@ module Make (Inputs : Inputs.S) = struct
       Fn.compose Protocol_state.consensus_state
         External_transition.protocol_state
     in
+    let consensus_state_verified =
+      Fn.compose Protocol_state.consensus_state
+        External_transition.Verified.protocol_state
+    in
     let root =
       With_hash.data
         (Transition_frontier.Breadcrumb.transition_with_hash
            (Transition_frontier.root frontier))
     in
-    let psh = Protocol_state.hash (External_transition.protocol_state t) in
+    let psh =
+      Protocol_state.hash (External_transition.protocol_state transition)
+    in
     if Transition_frontier.find frontier psh |> Option.is_some then (
       Logger.info logger
         !"we've already seen protocol state %{sexp:State_hash.t}"
@@ -48,12 +54,15 @@ module Make (Inputs : Inputs.S) = struct
     else
       match
         log_assert
-          (Consensus.Mechanism.is_valid (consensus_state t) ~time_received)
+          (Consensus.Mechanism.is_valid
+             (consensus_state transition)
+             ~time_received)
           "failed consensus validation"
         && log_assert
              ( Consensus.Mechanism.select ~logger
-                 ~existing:(consensus_state root)
-                 ~candidate:(consensus_state t) ~time_received
+                 ~existing:(consensus_state_verified root)
+                 ~candidate:(consensus_state transition)
+                 ~time_received
              = `Take )
              "was not better than transition frontier root"
       with
@@ -72,34 +81,69 @@ module Make (Inputs : Inputs.S) = struct
       *)
           let%map proof_is_valid =
             State_proof.verify
-              (External_transition.protocol_state_proof t)
-              (External_transition.protocol_state t)
+              (External_transition.protocol_state_proof transition)
+              (External_transition.protocol_state transition)
           in
           log_assert proof_is_valid "proof was invalid"
       | x -> return x
 
+  let verify_transition ~staged_ledger ~transition :
+      External_transition.Verified.t Or_error.t Deferred.t =
+    let open Deferred.Or_error.Let_syntax in
+    let diff = External_transition.staged_ledger_diff transition in
+    let%bind verified_diff =
+      Staged_ledger.verified_diff_of_diff staged_ledger diff
+    in
+    return
+      (External_transition.Verified.create
+         ~protocol_state:(External_transition.protocol_state transition)
+         ~protocol_state_proof:
+           (External_transition.protocol_state_proof transition)
+         ~staged_ledger_diff:verified_diff)
+
   let run ~logger ~frontier ~transition_reader ~valid_transition_writer =
-    let logger = Logger.child logger "transition_handler_validator" in
+    let logger =
+      Logger.child logger "transition_handler_validator_and_verifier"
+    in
     don't_wait_for
       (Reader.iter transition_reader
          ~f:(fun (`Transition transition_env, `Time_received time_received) ->
-           let transition = Envelope.Incoming.data transition_env in
-           match%map
+           let (transition : External_transition.t) =
+             Envelope.Incoming.data transition_env
+           in
+           match%bind
              validate_transition ~logger ~frontier ~time_received
                transition_env
            with
-           | `Valid ->
-               Writer.write valid_transition_writer
-                 (With_hash.of_data transition
-                    ~hash_data:
-                      (Fn.compose Protocol_state.hash
-                         External_transition.protocol_state))
-           | `Duplicate -> ()
+           | `Valid -> (
+               (* validated, now verify *)
+               let tip = Transition_frontier.best_tip frontier in
+               let staged_ledger =
+                 Transition_frontier.Breadcrumb.staged_ledger tip
+               in
+               let%map maybe_verified_transaction =
+                 verify_transition ~staged_ledger ~transition
+               in
+               match maybe_verified_transaction with
+               | Ok verified_transition ->
+                   Writer.write valid_transition_writer
+                     (With_hash.of_data verified_transition
+                        ~hash_data:
+                          (Fn.compose Protocol_state.hash
+                             External_transition.Verified.protocol_state))
+               | Error _ ->
+                   (* TODO: Punish *)
+                   Logger.warn logger
+                     !"failed to verify transition from the network! sent by \
+                       %{sexp: Host_and_port.t}"
+                     (Envelope.Incoming.sender transition_env) )
+           | `Duplicate -> return ()
            | `Reject ->
-               Logger.warn logger
-                 !"failed to verify transition from the network! sent by \
-                   %{sexp: Host_and_port.t}"
-                 (Envelope.Incoming.sender transition_env) ))
+               return
+                 (Logger.warn logger
+                    !"failed to verify transition from the network! sent by \
+                      %{sexp: Host_and_port.t}"
+                    (Envelope.Incoming.sender transition_env)) ))
 end
 
 (*

@@ -10,7 +10,7 @@ module type Inputs_intf = sig
     Transition_logic_state_intf.S
     with type tip := Tip.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
-     and type external_transition := External_transition.t
+     and type external_transition_verified := External_transition.Verified.t
      and type state_hash := State_hash.t
      and type public_key_compressed := Public_key.Compressed.t
 
@@ -20,7 +20,7 @@ module type Inputs_intf = sig
     val step :
          Logger.t
       -> (Tip.t, State_hash.t) With_hash.t
-      -> (External_transition.t, State_hash.t) With_hash.t
+      -> (External_transition.Verified.t, State_hash.t) With_hash.t
       -> (Tip.t, State_hash.t) With_hash.t Deferred.Or_error.t
   end
 
@@ -32,10 +32,12 @@ module type Inputs_intf = sig
       -> old_state:Transition_logic_state.t
       -> state_mutator:(   Transition_logic_state.t
                         -> Transition_logic_state.Change.t list
-                        -> External_transition.t
+                        -> External_transition.Verified.t
                         -> unit Deferred.t)
-      -> (External_transition.t, State_hash.t) With_hash.t
-      -> ((External_transition.t, State_hash.t) With_hash.t, unit) Job.t
+      -> (External_transition.Verified.t, State_hash.t) With_hash.t
+      -> ( (External_transition.Verified.t, State_hash.t) With_hash.t
+         , unit )
+         Job.t
   end
 end
 
@@ -79,7 +81,7 @@ end
 module Make (Inputs : Inputs_intf) :
   S
   with type catchup := Inputs.Catchup.t
-   and type transition := Inputs.External_transition.t
+   and type transition := Inputs.External_transition.Verified.t
    and type transition_logic_state := Inputs.Transition_logic_state.t
    and type handler_state_change := Inputs.Transition_logic_state.Change.t
    and type tip := Inputs.Tip.t
@@ -94,7 +96,7 @@ module Make (Inputs : Inputs_intf) :
   let transition_is_parent_of ~child:{With_hash.data= child; hash= _}
       ~parent:{With_hash.hash= parent_state_hash; data= _} =
     State_hash.equal parent_state_hash
-      ( External_transition.protocol_state child
+      ( External_transition.Verified.protocol_state child
       |> Protocol_state.previous_state_hash )
 
   (* HACK: To prevent a DoS from healthy nodes trying to gossip the same
@@ -108,11 +110,11 @@ module Make (Inputs : Inputs_intf) :
 
     val attempt_replace :
          t
-      -> (External_transition.t, State_hash.t) With_hash.t
+      -> (External_transition.Verified.t, State_hash.t) With_hash.t
       -> [`Continue | `Stop]
 
     val finish_target :
-      t -> (External_transition.t, State_hash.t) With_hash.t -> unit
+      t -> (External_transition.Verified.t, State_hash.t) With_hash.t -> unit
   end = struct
     type t = {mutable data: State_hash.t option; log: Logger.t sexp_opaque}
     [@@deriving sexp]
@@ -162,9 +164,9 @@ module Make (Inputs : Inputs_intf) :
     ; log: Logger.t
     ; pending_target: Pending_target.t
     ; strongest_tip_writer:
-        (Tip.t * External_transition.t) Linear_pipe.Writer.t
+        (Tip.t * External_transition.Verified.t) Linear_pipe.Writer.t
     ; strongest_tip_reader:
-        (Tip.t * External_transition.t) Linear_pipe.Reader.t }
+        (Tip.t * External_transition.Verified.t) Linear_pipe.Reader.t }
 
   let state {state; _} = state
 
@@ -205,10 +207,11 @@ module Make (Inputs : Inputs_intf) :
         [@@deriving sexp]
       end)
       (struct
-        type t = (External_transition.t, State_hash.t) With_hash.t
+        type t = (External_transition.Verified.t, State_hash.t) With_hash.t
         [@@deriving sexp]
 
-        let target = With_hash.map ~f:External_transition.protocol_state
+        let target =
+          With_hash.map ~f:External_transition.Verified.protocol_state
       end)
 
   let create state parent_log : t =
@@ -225,7 +228,8 @@ module Make (Inputs : Inputs_intf) :
     (List.hd_exn path, List.last_exn path)
 
   module Path_traversal = struct
-    type 'a t = ((External_transition.t, State_hash.t) With_hash.t, 'a) Job.t
+    type 'a t =
+      ((External_transition.Verified.t, State_hash.t) With_hash.t, 'a) Job.t
 
     let transition_unchecked h t logger =
       Interruptible.uninterruptible (transition_unchecked h t logger)
@@ -240,7 +244,9 @@ module Make (Inputs : Inputs_intf) :
           let new_head, _new_tip = locked_and_best new_tree in
           let old_head, _old_tip = locked_and_best old_tree in
           let open Interruptible.Let_syntax in
-          let ivar : (External_transition.t, State_hash.t) With_hash.t Ivar.t =
+          let ivar :
+              (External_transition.Verified.t, State_hash.t) With_hash.t Ivar.t
+              =
             Ivar.create ()
           in
           let step tip_with_hash transition_with_hash =
@@ -294,7 +300,7 @@ module Make (Inputs : Inputs_intf) :
             trace_event "step over path end" ;
             match result with
             | Some tip ->
-                assert_materialization_of tip last_transition ;
+                (* assert_materialization_of tip last_transition; *)
                 let locked_tip =
                   if locked_tip_changed then Some locked_tip else None
                 in
@@ -311,7 +317,7 @@ module Make (Inputs : Inputs_intf) :
     let create ~on_success old_state new_tree old_tree new_best_path
         (logger : Logger.t)
         (transition_with_hash :
-          (External_transition.t, State_hash.t) With_hash.t) : 'a t =
+          (External_transition.Verified.t, State_hash.t) With_hash.t) : 'a t =
       Job.create transition_with_hash
         ~f:(run old_state new_tree old_tree new_best_path logger ~on_success)
   end
@@ -334,7 +340,7 @@ module Make (Inputs : Inputs_intf) :
             Transition_tree.find_map ktree
               ~f:(fun ({With_hash.data= trans; hash= _} as trans_with_hash) ->
                 if p_trans trans_with_hash then
-                  Some (External_transition.protocol_state trans)
+                  Some (External_transition.Verified.protocol_state trans)
                 else None )
           in
           match maybe_state with
@@ -360,7 +366,8 @@ module Make (Inputs : Inputs_intf) :
               let last_transition = List.last_exn path.Path.path in
               Logger.trace t.log
                 !"Attempting a local path traversal to last_transition \
-                  %{sexp: (External_transition.t, State_hash.t) With_hash.t}"
+                  %{sexp: (External_transition.Verified.t, State_hash.t) \
+                  With_hash.t}"
                 last_transition ;
               let job =
                 Path_traversal.create old_state ktree ktree path t.log
@@ -380,11 +387,12 @@ module Make (Inputs : Inputs_intf) :
                   assert (p_tip longest_branch_tip) ;
                   Logger.trace t.log
                     !"Successfully path traversed to last_transition %{sexp: \
-                      (External_transition.t, State_hash.t) With_hash.t}"
+                      (External_transition.Verified.t, State_hash.t) \
+                      With_hash.t}"
                     last_transition ;
                   Ok
                     ( longest_branch_tip
-                    , External_transition.protocol_state
+                    , External_transition.Verified.protocol_state
                         (With_hash.data last_transition) ) )
           | None ->
               return
@@ -392,8 +400,10 @@ module Make (Inputs : Inputs_intf) :
 
   let verify_blockchain ~log ~on_success transition_with_hash =
     let transition = With_hash.data transition_with_hash in
-    let proof = External_transition.protocol_state_proof transition in
-    let protocol_state = External_transition.protocol_state transition in
+    let proof = External_transition.Verified.protocol_state_proof transition in
+    let protocol_state =
+      External_transition.Verified.protocol_state transition
+    in
     match%bind verify_blockchain proof protocol_state with
     | Error e ->
         Logger.error log !"Could not connect to verifier: %{sexp:Error.t}" e ;
@@ -401,14 +411,15 @@ module Make (Inputs : Inputs_intf) :
     | Ok false ->
         Logger.faulty_peer log
           !"Received malicious transition. Will not add external transition \
-            %{sexp:External_transition.t}"
+            %{sexp:External_transition.Verified.t}"
           transition ;
         Deferred.return None
     | Ok true -> on_success ()
 
   let unguarded_on_new_transition catchup t transition_with_hash ~time_received
       :
-      ((External_transition.t, State_hash.t) With_hash.t, unit) Job.t option
+      ((External_transition.Verified.t, State_hash.t) With_hash.t, unit) Job.t
+      option
       Deferred.t =
     let old_state = t.state in
     let longest_branch_tip =
@@ -418,7 +429,7 @@ module Make (Inputs : Inputs_intf) :
     | None -> (
         let source_state = (With_hash.data longest_branch_tip).state in
         let target_state =
-          External_transition.protocol_state
+          External_transition.Verified.protocol_state
             (With_hash.data transition_with_hash)
         in
         if is_parent_of ~child:transition_with_hash ~parent:longest_branch_tip
@@ -455,7 +466,7 @@ module Make (Inputs : Inputs_intf) :
           | `Take ->
               let lh =
                 With_hash.data transition_with_hash
-                |> External_transition.protocol_state
+                |> External_transition.Verified.protocol_state
                 |> Protocol_state.blockchain_state
                 |> Blockchain_state.ledger_hash
               in
@@ -480,11 +491,11 @@ module Make (Inputs : Inputs_intf) :
                 Consensus_mechanism.select
                   ~existing:
                     ( transition_with_hash |> With_hash.data
-                    |> External_transition.protocol_state
+                    |> External_transition.Verified.protocol_state
                     |> Protocol_state.consensus_state )
                   ~candidate:
                     ( best_tip |> With_hash.data
-                    |> External_transition.protocol_state
+                    |> External_transition.Verified.protocol_state
                     |> Protocol_state.consensus_state )
                   ~logger:t.log ~time_received
               with
@@ -502,10 +513,10 @@ module Make (Inputs : Inputs_intf) :
               let old_locked_head, old_best_tip = locked_and_best old_tree in
               let new_head, new_tip = locked_and_best new_tree in
               if
-                With_hash.compare External_transition.compare
+                With_hash.compare External_transition.Verified.compare
                   State_hash.compare old_locked_head new_head
                 = 0
-                && With_hash.compare External_transition.compare
+                && With_hash.compare External_transition.Verified.compare
                      State_hash.compare old_best_tip new_tip
                    = 0
               then
@@ -545,7 +556,8 @@ module Make (Inputs : Inputs_intf) :
 
   let on_new_transition catchup ({pending_target; _} as t) transition_with_hash
       ~(time_received : Unix_timestamp.t) :
-      ((External_transition.t, State_hash.t) With_hash.t, unit) Job.t option
+      ((External_transition.Verified.t, State_hash.t) With_hash.t, unit) Job.t
+      option
       Deferred.t =
     match
       Pending_target.attempt_replace pending_target transition_with_hash
