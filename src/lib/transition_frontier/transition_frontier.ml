@@ -262,12 +262,17 @@ struct
     if
       Hashtbl.add t.table ~key:(Breadcrumb.hash node.breadcrumb) ~data:node
       <> `Ok
-    then Error.raise (Error.of_exn (Already_exists hash)) ;
-    Hashtbl.set t.table
-      ~key:(Breadcrumb.hash parent_node.breadcrumb)
-      ~data:
-        { parent_node with
-          successor_hashes= hash :: parent_node.successor_hashes }
+    then
+      Logger.warn t.logger
+        !"attach_node_to with breadcrumb for state %{sexp:State_hash.t} \
+          already present; catchup monitor bug?"
+        hash
+    else
+      Hashtbl.set t.table
+        ~key:(Breadcrumb.hash parent_node.breadcrumb)
+        ~data:
+          { parent_node with
+            successor_hashes= hash :: parent_node.successor_hashes }
 
   let attach_breadcrumb_exn t breadcrumb =
     let hash = Breadcrumb.hash breadcrumb in
@@ -295,7 +300,7 @@ struct
   (* Adding a transition to the transition frontier is broken into the following steps:
    *   1) create a new breadcrumb for a transition
           a) apply the staged_ledger_diff on to the parent breadcrumb of the transition
-          b) validate the snarked ledger hash from the transition 
+          b) validate the snarked ledger hash from the transition
    *   2) attach the breadcrumb to the transition frontier
    *   3) move the root if the path to the new node is longer than the max length
    *     a) calculate the distance from the new node to the parent
