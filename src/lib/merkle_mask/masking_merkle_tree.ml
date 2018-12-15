@@ -489,7 +489,7 @@ struct
   end
 
   let set_parent t parent =
-    let t =
+    let attached =
       { uuid= t.uuid
       ; Attached.parent
       ; account_tbl= t.account_tbl
@@ -497,5 +497,5 @@ struct
       ; location_tbl= t.location_tbl
       ; current_location= t.current_location }
     in
-    {t with current_location= Attached.last_filled t}
+    {attached with current_location= Attached.last_filled attached}
 end
