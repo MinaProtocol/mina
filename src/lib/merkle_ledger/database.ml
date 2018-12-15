@@ -163,8 +163,8 @@ module Make
       assert (Location.is_generic location) ;
       get_raw mdb location
 
-    (* encodes a key as a location used as a database key, so we can find the account 
-       location associated with that key 
+    (* encodes a key as a location used as a database key, so we can find the account
+       location associated with that key
      *)
     let build_location key =
       Location.build_generic
@@ -219,12 +219,22 @@ module Make
       with
       | Error () -> None
       | Ok parsed_location -> Some (Location.to_path_exn parsed_location)
+
+    let last_location mdb =
+      match
+        last_location () |> get_raw mdb |> Result.of_option ~error:()
+        |> Result.bind ~f:Location.parse
+      with
+      | Error () -> None
+      | Ok parsed_location -> Some parsed_location
   end
 
   let location_of_key t key =
     match Account_location.get t key with
     | Error _ -> None
     | Ok location -> Some location
+
+  let last_filled t = Account_location.last_location t
 
   module For_tests = struct
     let gen_account_location =
