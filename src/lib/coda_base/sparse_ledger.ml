@@ -16,7 +16,8 @@ let of_root (h : Ledger_hash.t) =
 
 let of_ledger_root ledger = of_root (Ledger.merkle_root ledger)
 
-let of_ledger_subset_exn (ledger : Ledger.t) keys =
+let of_ledger_subset_exn (oledger : Ledger.t) keys =
+  let ledger = Ledger.copy oledger in
   let new_keys, sparse =
     List.fold keys
       ~f:(fun (new_keys, sl) key ->
@@ -32,8 +33,6 @@ let of_ledger_subset_exn (ledger : Ledger.t) keys =
             (key :: new_keys, add_path sl path key acct) )
       ~init:([], of_ledger_root ledger)
   in
-  O1trace.measure "remove accounts exn" (fun () ->
-      Ledger.remove_accounts_exn ledger new_keys ) ;
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
         (Ledger.merkle_root ledger)
