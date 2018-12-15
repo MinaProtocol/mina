@@ -132,6 +132,7 @@ module Make (Inputs : Inputs.S) = struct
                           (Fn.compose Protocol_state.hash
                              External_transition.Verified.protocol_state))
                | Error _ ->
+                   (* TODO: Punish *)
                    Logger.warn logger
                      !"failed to verify transition from the network! sent by \
                        %{sexp: Host_and_port.t}"

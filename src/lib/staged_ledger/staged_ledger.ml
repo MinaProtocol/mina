@@ -38,6 +38,17 @@ module Make (Inputs : Inputs.S) : sig
      and type ledger_proof_statement := Inputs.Ledger_proof_statement.t
      and type ledger_proof_statement_set := Inputs.Ledger_proof_statement.Set.t
      and type transaction := Inputs.Transaction.t
+
+  module For_tests : sig
+    val apply_unverified :
+         t
+      -> Inputs.Staged_ledger_diff.t
+      -> logger:Logger.t
+      -> ( [`Hash_after_applying of Inputs.Staged_ledger_hash.t]
+         * [`Ledger_proof of Inputs.Ledger_proof.t option]
+         * [`Staged_ledger of t] )
+         Or_error.t
+  end
 end = struct
   open Inputs
   module Scan_state = Transaction_snark_scan_state.Make (Inputs)
@@ -230,7 +241,9 @@ end = struct
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger" ledger
         (Some snarked_ledger_hash)
     in
-    let _ = verify_snarked_ledger t snarked_ledger_hash in
+    let%bind () =
+      Deferred.return (verify_snarked_ledger t snarked_ledger_hash)
+    in
     return t
 
   let copy {scan_state; ledger} =
@@ -352,10 +365,7 @@ end = struct
             Deferred.Or_error.List.fold (List.zip_exn jobs work.proofs)
               ~init:true ~f:(fun accum (job, proof) ->
                 if accum then
-                  let x =
-                    Deferred.map (verify ~message job proof) ~f:Or_error.return
-                  in
-                  x
+                  Deferred.map (verify ~message job proof) ~f:Or_error.return
                 else return false )
           else return false )
     in
@@ -615,7 +625,8 @@ end = struct
     ; user_commands_count= List.length user_commands
     ; coinbase_parts_count= List.length coinbase }
 
-  (* N.B.: we don't expose apply_diff_unverified in the signature for Staged_ledger *)
+  (* N.B.: we don't expose apply_diff_unverified
+     in For_tests only, we expose apply apply_unverified, which calls apply_diff_unverified *)
   let apply_diff_unverified t (diff : Staged_ledger_diff.t) ~logger =
     let open Result_with_rollback.Let_syntax in
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
@@ -1316,6 +1327,11 @@ end = struct
     { Staged_ledger_diff.With_valid_signatures_and_proofs.pre_diffs
     ; creator= self
     ; prev_hash= curr_hash }
+
+  module For_tests = struct
+    let apply_unverified t witness ~logger =
+      Result_with_rollback.run (apply_diff_unverified t witness ~logger)
+  end
 end
 
 let%test_module "test" =
@@ -1935,13 +1951,8 @@ let%test_module "test" =
       let unverified_diff =
         Test_input1.Staged_ledger_diff.forget_validated diff
       in
-      (* pull verified diff out of Deferred for test purposes *)
-      let verified_diff_or_error =
-        Deferred.value_exn (Sl.verified_diff_of_diff !sl unverified_diff)
-      in
-      let%bind verified_diff = verified_diff_or_error in
       let%map _, `Ledger_proof ledger_proof, `Staged_ledger sl' =
-        Sl.apply !sl verified_diff ~logger
+        Sl.For_tests.apply_unverified !sl unverified_diff ~logger
       in
       sl := sl' ;
       (ledger_proof, unverified_diff)
