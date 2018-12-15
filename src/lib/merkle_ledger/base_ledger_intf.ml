@@ -65,6 +65,8 @@ module type S = sig
 
   val close : t -> unit
 
+  val last_filled : t -> Location.t option
+
   val get_uuid : t -> Uuid.t
 
   val get : t -> Location.t -> account option

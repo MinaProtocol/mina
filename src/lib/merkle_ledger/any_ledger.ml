@@ -116,6 +116,8 @@ module Make_base
 
     let get_uuid (T ((module Base), t)) = Base.get_uuid t
 
+    let last_filled (T ((module Base), t)) = Base.last_filled t
+
     let close (T ((module Base), t)) = Base.close t
 
     let get_or_create_account_exn (T ((module Base), t)) =
