@@ -163,6 +163,10 @@ end = struct
     (t.tree).dirty_indices <- merkle_index :: t.tree.dirty_indices ;
     merkle_index
 
+  let last_filled t =
+    let merkle_index = Dyn_array.length t.accounts in
+    if merkle_index = 0 then None else Some merkle_index
+
   let get_or_create_account t key account =
     match location_of_key t key with
     | None ->
