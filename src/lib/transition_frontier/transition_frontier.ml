@@ -265,7 +265,7 @@ struct
     then
       Logger.warn t.logger
         !"attach_node_to with breadcrumb for state %{sexp:State_hash.t} \
-         already present; catchup monitor bug?"
+          already present; catchup monitor bug?"
         hash
     else
       Hashtbl.set t.table
@@ -350,7 +350,7 @@ struct
           Inputs.Staged_ledger.apply ~logger:t.logger staged_ledger
             (Inputs.External_transition.Verified.staged_ledger_diff transition)
           |> Or_error.ok_exn
-
+      
       with
       | ( `Hash_after_applying staged_ledger_hash
         , `Ledger_proof proof_opt
@@ -455,5 +455,5 @@ let%test_module "Transition_frontier tests" =
       interface_works ()
     done
      *)
-
+  
   end )
