@@ -1215,6 +1215,19 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       Time_ns.diff (Time_ns.now ()) start_time
       |> Time_ns.Span.to_sec |> Int.of_float
     in
+    let r = Perf_histograms.report in
+    let rpc_timings =
+      let open Daemon_rpcs.Types.Status.Rpc_timings in
+      { get_staged_ledger_aux=
+          { Rpc_pair.dispatch= r ~name:"rpc_dispatch_get_staged_ledger_aux"
+          ; impl= r ~name:"rpc_impl_get_staged_ledger_aux" }
+      ; answer_sync_ledger_query=
+          { Rpc_pair.dispatch= r ~name:"rpc_dispatch_answer_sync_ledger_query"
+          ; impl= r ~name:"rpc_impl_answer_sync_ledger_query" }
+      ; transition_catchup=
+          { Rpc_pair.dispatch= r ~name:"rpc_dispatch_transition_catchup"
+          ; impl= r ~name:"rpc_impl_transition_catchup" } }
+    in
     let%map staged_ledger = best_staged_ledger t in
     { Daemon_rpcs.Types.Status.num_accounts
     ; block_count= Int.of_string (Length.to_string block_count)
@@ -1224,18 +1237,16 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         staged_ledger |> Staged_ledger.hash |> Staged_ledger_hash.sexp_of_t
         |> Sexp.to_string
     ; state_hash
-    ; external_transition_latency=
-        Perf_histograms.report ~name:"external_transition_latency"
-    ; snark_worker_transition_time=
-        Perf_histograms.report ~name:"snark_worker_transition_time"
-    ; snark_worker_merge_time=
-        Perf_histograms.report ~name:"snark_worker_merge_time"
+    ; external_transition_latency= r ~name:"external_transition_latency"
+    ; snark_worker_transition_time= r ~name:"snark_worker_transition_time"
+    ; snark_worker_merge_time= r ~name:"snark_worker_merge_time"
     ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
     ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
     ; user_commands_sent= !txn_count
     ; run_snark_worker= run_snark_worker t
     ; proposal_interval= Int64.to_int_exn Consensus.Mechanism.block_interval_ms
+    ; rpc_timings
     ; propose_pubkey=
         Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t) }
 

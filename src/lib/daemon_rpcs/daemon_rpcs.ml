@@ -5,12 +5,91 @@ open Signature_lib
 
 module Types = struct
   module Git_sha = struct
-    type t = string [@@deriving sexp, yojson, bin_io, eq]
+    type t = string [@@deriving sexp, to_yojson, bin_io, eq]
 
     let of_string s = s
   end
 
   module Status = struct
+    let digest_entries ~title entries =
+      let max_key_length =
+        List.map ~f:(fun (s, _) -> String.length s) entries
+        |> List.max_elt ~compare:Int.compare
+        |> Option.value_exn
+      in
+      let output =
+        List.map entries ~f:(fun (s, x) ->
+            let padding =
+              String.init (max_key_length - String.length s) ~f:(fun _ -> ' ')
+            in
+            sprintf "%s: %s %s" s padding x )
+        |> String.concat ~sep:"\n"
+      in
+      title ^ output ^ "\n"
+
+    let summarize_report
+        {Perf_histograms.Report.values; intervals; overflow; underflow} =
+      (* Show the largest 3 buckets *)
+      let zipped = List.zip_exn values intervals in
+      let best =
+        List.sort zipped ~compare:(fun (a, _) (a', _) -> -1 * Int.compare a a')
+        |> Fn.flip List.take 4
+      in
+      let msgs =
+        List.map best ~f:(fun (v, (lo, hi)) ->
+            Printf.sprintf
+              !"(%{sexp: Time.Span.t}, %{sexp: Time.Span.t}): %d"
+              lo hi v )
+      in
+      let total = List.sum (module Int) values ~f:Fn.id in
+      List.fold msgs
+        ~init:
+          (Printf.sprintf "Total: %d (overflow:%d) (underflow:%d)\n\t" total
+             overflow underflow) ~f:(fun acc x -> acc ^ "\n\t" ^ x )
+      ^ "\n\t..."
+
+    module Rpc_timings = struct
+      module Rpc_pair = struct
+        type 'a t = {dispatch: 'a; impl: 'a}
+        [@@deriving to_yojson, bin_io, fields]
+      end
+
+      type t =
+        { get_staged_ledger_aux: Perf_histograms.Report.t option Rpc_pair.t
+        ; answer_sync_ledger_query: Perf_histograms.Report.t option Rpc_pair.t
+        ; transition_catchup: Perf_histograms.Report.t option Rpc_pair.t }
+      [@@deriving to_yojson, bin_io, fields]
+
+      let to_text s =
+        let entries =
+          let add_rpcs ~name {Rpc_pair.dispatch; impl} acc =
+            let name k =
+              let go s = sprintf "%s (%s)" name s in
+              match k with `Dispatch -> go "dispatch" | `Impl -> go "impl"
+            in
+            let maybe_cons ~f x xs =
+              match x with Some x -> f x :: xs | None -> xs
+            in
+            maybe_cons
+              ~f:(fun dispatch -> (name `Dispatch, summarize_report dispatch))
+              dispatch acc
+            |> maybe_cons
+                 ~f:(fun impl -> (name `Impl, summarize_report impl))
+                 impl
+          in
+          let f x = Field.get x s in
+          Fields.fold ~init:[]
+            ~get_staged_ledger_aux:(fun acc x ->
+              add_rpcs ~name:"Get Staged Ledger Aux" (f x) acc )
+            ~answer_sync_ledger_query:(fun acc x ->
+              add_rpcs ~name:"Answer Sync Ledger Query" (f x) acc )
+            ~transition_catchup:(fun acc x ->
+              add_rpcs ~name:"Transition Catchup" (f x) acc )
+          |> List.rev
+        in
+        digest_entries ~title:"RPC Histograms" entries
+    end
+
     (* NOTE: yojson deriving generates code that violates warning 39 *)
     type t =
       { num_accounts: int
@@ -28,6 +107,7 @@ module Types = struct
       ; external_transition_latency: Perf_histograms.Report.t option
       ; snark_worker_transition_time: Perf_histograms.Report.t option
       ; snark_worker_merge_time: Perf_histograms.Report.t option
+      ; rpc_timings: Rpc_timings.t
       ; propose_pubkey: Public_key.t option }
     [@@deriving to_yojson, bin_io, fields]
 
@@ -38,28 +118,6 @@ module Types = struct
       in
       let entries =
         let f x = Field.get x s in
-        let summarize_report
-            {Perf_histograms.Report.values; intervals; overflow; underflow} =
-          (* Show the largest 3 buckets *)
-          let zipped = List.zip_exn values intervals in
-          let best =
-            List.sort zipped ~compare:(fun (a, _) (a', _) ->
-                -1 * Int.compare a a' )
-            |> Fn.flip List.take 4
-          in
-          let msgs =
-            List.map best ~f:(fun (v, (lo, hi)) ->
-                Printf.sprintf
-                  !"(%{sexp: Time.Span.t}, %{sexp: Time.Span.t}): %d"
-                  lo hi v )
-          in
-          let total = List.sum (module Int) values ~f:Fn.id in
-          List.fold msgs
-            ~init:
-              (Printf.sprintf "Total: %d (overflow:%d) (underflow:%d)\n\t"
-                 total overflow underflow) ~f:(fun acc x -> acc ^ "\n\t" ^ x )
-          ^ "\n\t..."
-        in
         Fields.fold ~init:[]
           ~num_accounts:(fun acc x ->
             ("Number of Accounts", Int.to_string (f x)) :: acc )
@@ -112,22 +170,11 @@ module Types = struct
                 ( "Proposer Running"
                 , Printf.sprintf !"%{sexp: Public_key.t}" pubkey )
                 :: acc )
+          ~rpc_timings:(fun acc x ->
+            ("RPC Timings", Rpc_timings.to_text (f x)) :: acc )
         |> List.rev
       in
-      let max_key_length =
-        List.map ~f:(fun (s, _) -> String.length s) entries
-        |> List.max_elt ~compare:Int.compare
-        |> Option.value_exn
-      in
-      let output =
-        List.map entries ~f:(fun (s, x) ->
-            let padding =
-              String.init (max_key_length - String.length s) ~f:(fun _ -> ' ')
-            in
-            sprintf "%s: %s %s" s padding x )
-        |> String.concat ~sep:"\n"
-      in
-      title ^ output ^ "\n"
+      digest_entries ~title entries
   end
 end
 
