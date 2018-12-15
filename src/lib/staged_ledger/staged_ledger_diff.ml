@@ -87,6 +87,94 @@ struct
     ; creator: Compressed_public_key.t }
   [@@deriving sexp, bin_io]
 
+  module Verified = struct
+    type diff =
+      { completed_works: Transaction_snark_work.Checked.t list
+      ; user_commands: User_command.t list }
+    [@@deriving sexp, bin_io]
+
+    type diff_with_at_most_two_coinbase =
+      { diff: diff
+      ; coinbase_parts: Transaction_snark_work.Checked.t At_most_two.t }
+    [@@deriving sexp, bin_io]
+
+    type diff_with_at_most_one_coinbase =
+      { diff: diff
+      ; coinbase_added: Transaction_snark_work.Checked.t At_most_one.t }
+    [@@deriving sexp, bin_io]
+
+    type pre_diffs =
+      ( diff_with_at_most_one_coinbase
+      , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase )
+      Either.t
+    [@@deriving sexp, bin_io]
+
+    type t =
+      { pre_diffs: pre_diffs
+      ; prev_hash: Staged_ledger_hash.t
+      ; creator: Compressed_public_key.t }
+    [@@deriving sexp, bin_io]
+  end
+
+  (* forget the verification of completed works in a verified diff
+     unlike Staged_ledger.checked_diff_of_diff, there's no possibility of failure *)
+
+  let forget_verified (verified : Verified.t) : t =
+    let diff_of_work completed_works user_commands =
+      {completed_works; user_commands}
+    in
+    let uncheck_at_most_one
+        (at_most_one : Verified.diff_with_at_most_one_coinbase) =
+      let checked_diff = at_most_one.diff in
+      let (completed_works : Transaction_snark_work.t list) =
+        List.map checked_diff.completed_works ~f:Transaction_snark_work.forget
+      in
+      let diff = diff_of_work completed_works checked_diff.user_commands in
+      match at_most_one.coinbase_added with
+      | Zero -> {diff; coinbase_added= Zero}
+      | One maybe_work -> (
+        match maybe_work with
+        | None -> {diff; coinbase_added= One None}
+        | Some work ->
+            let completed_work = Transaction_snark_work.forget work in
+            {diff; coinbase_added= One (Some completed_work)} )
+    in
+    let uncheck_at_most_two
+        (at_most_two : Verified.diff_with_at_most_two_coinbase) =
+      let checked_diff = at_most_two.diff in
+      let completed_works =
+        List.map checked_diff.completed_works ~f:Transaction_snark_work.forget
+      in
+      let diff = diff_of_work completed_works checked_diff.user_commands in
+      match at_most_two.coinbase_parts with
+      | Zero -> {diff; coinbase_parts= Zero}
+      | One maybe_work -> (
+        match maybe_work with
+        | None -> {diff; coinbase_parts= One None}
+        | Some work ->
+            let completed_work = Transaction_snark_work.forget work in
+            {diff; coinbase_parts= One (Some completed_work)} )
+      | Two maybe_works -> (
+        match maybe_works with
+        | None -> {diff; coinbase_parts= Two None}
+        | Some (work_1, maybe_work) -> (
+            let completed_work_1 = Transaction_snark_work.forget work_1 in
+            match maybe_work with
+            | None ->
+                {diff; coinbase_parts= Two (Some (completed_work_1, None))}
+            | Some work_2 ->
+                let completed_work_2 = Transaction_snark_work.forget work_2 in
+                { diff
+                ; coinbase_parts=
+                    Two (Some (completed_work_1, Some completed_work_2)) } ) )
+    in
+    let pre_diffs =
+      Either.map verified.pre_diffs ~first:uncheck_at_most_one
+        ~second:(fun (at_most_two, at_most_one) ->
+          (uncheck_at_most_two at_most_two, uncheck_at_most_one at_most_one) )
+    in
+    {pre_diffs; prev_hash= verified.prev_hash; creator= verified.creator}
+
   module With_valid_signatures_and_proofs = struct
     type diff =
       { completed_works: Transaction_snark_work.Checked.t list
@@ -153,7 +241,7 @@ struct
     in
     {diff= forget_diff diff; coinbase_added= forget_cw}
 
-  let forget (t : With_valid_signatures_and_proofs.t) =
+  let forget_validated (t : With_valid_signatures_and_proofs.t) =
     { pre_diffs=
         Either.map t.pre_diffs ~first:forget_pre_diff_with_at_most_one
           ~second:(fun d ->

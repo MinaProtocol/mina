@@ -4,7 +4,8 @@ module Make (Inputs : Inputs.Base.S) :
   Transition_logic_state_intf.S
   with type tip := Inputs.Tip.t
    and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
-   and type external_transition := Inputs.External_transition.t
+   and type external_transition_verified :=
+              Inputs.External_transition.Verified.t
    and type public_key_compressed := Inputs.Public_key.Compressed.t
    and type state_hash := Inputs.State_hash.t = struct
   open Inputs
@@ -13,7 +14,7 @@ module Make (Inputs : Inputs.Base.S) :
   include Ops
 
   module Transition = struct
-    type t = (External_transition.t, State_hash.t) With_hash.t
+    type t = (External_transition.Verified.t, State_hash.t) With_hash.t
     [@@deriving compare, bin_io, sexp]
 
     open With_hash
@@ -32,7 +33,7 @@ module Make (Inputs : Inputs.Base.S) :
       Printf.sprintf "{%s|%s}"
         (Base64.encode_string (State_hash.to_bytes t.hash))
         (Protocol_state.to_string_record
-           (External_transition.protocol_state t.data))
+           (External_transition.Verified.protocol_state t.data))
   end
 
   module Transition_tree = Ktree.Make (Transition) (Security)
@@ -96,7 +97,8 @@ module Make (Inputs : Inputs.Base.S) :
     | Ktree k -> {t with ktree= Some k}
 
   (* Invariant: state is consistent after change applications *)
-  let assert_state_valid t =
+  (* @bkase claims this is dead code, leaving in for later removal 
+     let assert_state_valid t =
     Debug_assert.debug_assert (fun () ->
         match t.ktree with
         | None -> ()
@@ -109,12 +111,14 @@ module Make (Inputs : Inputs.Base.S) :
           | x :: y :: rest ->
               let last = List.last_exn (y :: rest) in
               assert_materialization_of t.locked_tip x ;
-              assert_materialization_of t.longest_branch_tip last ) )
+              assert_materialization_of t.longest_branch_tip last ) ) *)
 
-  let apply_all t changes ~logger =
-    assert_state_valid t ;
+  let apply_all t changes ~logger:_ =
+    (*    assert_state_valid t ; *)
     let t' = List.fold changes ~init:t ~f:apply in
-    try assert_state_valid t' ; t' with exn ->
+    t'
+
+  (* try assert_state_valid t' ; t' with exn ->
       Logger.error logger
         "fatal exception while applying changes to transition logic -- locked \
          tip state hash: %s"
@@ -125,7 +129,7 @@ module Make (Inputs : Inputs.Base.S) :
               Transition_tree.Graph.output_graph channel
                 (Transition_tree.to_graph ktree) ) ;
           Logger.info logger "dot graph dumped to %s" filename ) ;
-      raise exn
+      raise exn *)
 
   let create ?proposer_public_key ~consensus_local_state genesis_heavy =
     { locked_tip= genesis_heavy

@@ -7,6 +7,8 @@ open Coda_base
 module Make (Inputs : Inputs.S) :
   Catchup_intf
   with type external_transition := Inputs.External_transition.t
+  with type external_transition_verified :=
+              Inputs.External_transition.Verified.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
               Inputs.Transition_frontier.Breadcrumb.t
@@ -20,8 +22,8 @@ module Make (Inputs : Inputs.S) :
         | Error e -> Deferred.return (Error e)
         | Ok acc -> f acc elem )
 
-  (* We would like the async scheduler to context switch between each iteration 
-  of external transitions when trying to build breadcrumb_path. Therefore, this 
+  (* We would like the async scheduler to context switch between each iteration
+  of external transitions when trying to build breadcrumb_path. Therefore, this
   function needs to return a Deferred *)
   let construct_breadcrumb_path ~logger initial_staged_ledger
       external_transitions =
@@ -30,7 +32,7 @@ module Make (Inputs : Inputs.S) :
       fold_result_seq external_transitions ~init:(initial_staged_ledger, [])
         ~f:(fun (staged_ledger, acc) external_transition ->
           let diff =
-            External_transition.staged_ledger_diff external_transition
+            External_transition.Verified.staged_ledger_diff external_transition
           in
           let%map _, _, `Staged_ledger staged_ledger =
             Deferred.create (fun ivar ->
@@ -41,7 +43,7 @@ module Make (Inputs : Inputs.S) :
             With_hash.of_data external_transition
               ~hash_data:
                 (Fn.compose Consensus.Mechanism.Protocol_state.hash
-                   External_transition.protocol_state)
+                   External_transition.Verified.protocol_state)
           in
           let new_breadcrumb =
             Transition_frontier.Breadcrumb.create transition_with_hash
@@ -54,7 +56,7 @@ module Make (Inputs : Inputs.S) :
   let materialize_breadcrumbs ~frontier ~logger ~peer external_transitions =
     let root_transition = List.hd_exn external_transitions in
     let initial_state_hash =
-      root_transition |> External_transition.protocol_state
+      root_transition |> External_transition.Verified.protocol_state
       |> External_transition.Protocol_state.previous_state_hash
     in
     match Transition_frontier.find frontier initial_state_hash with
@@ -95,8 +97,18 @@ module Make (Inputs : Inputs.S) :
             Logger.faulty_peer logger !"%s" message ;
             Deferred.return @@ Or_error.error_string message
         | Some queried_transitions ->
-            materialize_breadcrumbs ~frontier ~logger ~peer queried_transitions
-    )
+            let%bind queried_transitions_verified =
+              let staged_ledger =
+                Transition_frontier.best_tip frontier
+                |> Transition_frontier.Breadcrumb.staged_ledger
+              in
+              Deferred.Or_error.List.map queried_transitions
+                ~f:(fun transition ->
+                  Transition_handler_validator.verify_transition ~staged_ledger
+                    ~transition )
+            in
+            materialize_breadcrumbs ~frontier ~logger ~peer
+              queried_transitions_verified )
 
   let run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer =

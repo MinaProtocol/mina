@@ -294,7 +294,9 @@ module T = struct
         don't_wait_for
           (Strict_pipe.Reader.iter (Main.strongest_ledgers coda) ~f:(fun t ->
                let open Main.Inputs in
-               let p = External_transition.protocol_state (With_hash.data t) in
+               let p =
+                 External_transition.Verified.protocol_state (With_hash.data t)
+               in
                let prev_state_hash =
                  Main.Inputs.Consensus_mechanism.Protocol_state
                  .previous_state_hash p
