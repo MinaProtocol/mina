@@ -1,7 +1,7 @@
 module type S = sig
   type consensus_local_state
 
-  type external_transition
+  type external_transition_verified
 
   type tip
 
@@ -11,7 +11,7 @@ module type S = sig
 
   module Transition_tree :
     Coda_lib.Ktree_intf
-    with type elem := (external_transition, state_hash) With_hash.t
+    with type elem := (external_transition_verified, state_hash) With_hash.t
 
   type t
 
@@ -21,8 +21,10 @@ module type S = sig
 
   val ktree : t -> Transition_tree.t option
 
-  val assert_state_valid : t -> unit
+  (*  
+      TODO : remove as dead code
 
+val assert_state_valid : t -> unit *)
   module Change : sig
     type t =
       | Locked_tip of (tip, state_hash) With_hash.t

@@ -36,6 +36,10 @@ module Base = struct
     module Staged_ledger_diff : sig
       type t [@@deriving sexp, bin_io]
 
+      module Verified : sig
+        type t
+      end
+
       module With_valid_signatures_and_proofs : sig
         type t
       end
@@ -126,6 +130,16 @@ module Base = struct
       val protocol_state_proof : t -> Protocol_state_proof.t
 
       val staged_ledger_diff : t -> Staged_ledger_diff.t
+
+      module Verified : sig
+        type t [@@deriving bin_io, eq, compare, sexp]
+
+        val protocol_state : t -> Consensus_mechanism.Protocol_state.value
+
+        val protocol_state_proof : t -> Protocol_state_proof.t
+
+        val staged_ledger_diff : t -> Staged_ledger_diff.Verified.t
+      end
     end
 
     module Ledger_proof_statement : sig
@@ -147,6 +161,7 @@ module Base = struct
        and type valid_diff :=
                   Staged_ledger_diff.With_valid_signatures_and_proofs.t
        and type diff := Staged_ledger_diff.t
+       and type verified_diff := Staged_ledger_diff.Verified.t
        and type ledger_proof := Ledger_proof.t
        and type ledger := Ledger.t
        and type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
@@ -161,6 +176,7 @@ module Base = struct
                   * Protocol_state_proof.t
                   * Staged_ledger.serializable
        and type external_transition := External_transition.t
+       and type external_transition_verified := External_transition.Verified.t
 
     val verify_blockchain :
          Protocol_state_proof.t

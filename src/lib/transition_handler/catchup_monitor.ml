@@ -9,7 +9,7 @@ module Make (Inputs : Inputs.S) = struct
 
   type t =
     { catchup_job_writer:
-        ( (External_transition.t, State_hash.t) With_hash.t
+        ( (External_transition.Verified.t, State_hash.t) With_hash.t
         , drop_head buffered
         , unit )
         Writer.t
@@ -23,7 +23,7 @@ module Make (Inputs : Inputs.S) = struct
     let logger = Logger.child logger "catchup_monitor" in
     let hash = With_hash.hash transition in
     let parent_hash =
-      With_hash.data transition |> External_transition.protocol_state
+      With_hash.data transition |> External_transition.Verified.protocol_state
       |> Protocol_state.previous_state_hash
     in
     let make_timeout () =
