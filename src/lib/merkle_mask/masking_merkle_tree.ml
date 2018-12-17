@@ -355,7 +355,16 @@ struct
     let to_list t =
       let mask_accounts = Location.Table.data t.account_tbl in
       let parent_accounts = Base.to_list (get_parent t) in
-      mask_accounts @ parent_accounts
+      (* if an account is in mask and parent, favor the mask version *)
+      let in_mask parent_account =
+        (* N.B.: List.find is slow, but so is converting to, say, a Set representation *)
+        let parent_key = Account.public_key parent_account in
+        Option.is_none
+          (List.find mask_accounts ~f:(fun mask_account ->
+               Key.equal (Account.public_key mask_account) parent_key ))
+      in
+      let masked_parent_accounts = List.filter parent_accounts ~f:in_mask in
+      mask_accounts @ masked_parent_accounts
 
     let foldi t ~init ~f =
       let parent_result = Base.foldi (get_parent t) ~init ~f in
