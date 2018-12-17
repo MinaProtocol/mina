@@ -58,23 +58,22 @@ module Make (Inputs : Inputs_intf) :
     ; mutable best_with_root: state_with_root
     ; network: Network.t }
 
-  
   (* Cache represents a graph. The key is a State_hash, which is the node in 
   the graph, and the value is the children transitions of the node *)
   module Transition_cache = struct
     type t = External_transition.t list State_hash.Table.t
+
     let create () = State_hash.Table.create ()
 
-    let add (t:t) ~parent new_child = 
-    State_hash.Table.update t parent
-          ~f:(function
-          | None -> [new_child]
-          | Some children ->
-              if List.mem children new_child ~equal:External_transition.equal
-              then children
-              else new_child :: children )
+    let add (t : t) ~parent new_child =
+      State_hash.Table.update t parent ~f:(function
+        | None -> [new_child]
+        | Some children ->
+            if List.mem children new_child ~equal:External_transition.equal
+            then children
+            else new_child :: children )
   end
-  
+
   let worth_getting_root t candidate time_received =
     `Keep
     = Consensus.Mechanism.select ~logger:t.logger
@@ -104,67 +103,60 @@ module Make (Inputs : Inputs_intf) :
       { descendant= previous_state_hash
       ; generations= length candidate - length t.best_with_root.root }
     in
-    let rec get_root () =
-      let%bind res =
+    if
+      done_syncing_root t
+      || (not @@ worth_getting_root t candidate time_received)
+    then Deferred.unit
+    else
+      match%map
         Network.get_ancestry t.network (input.descendant, input.generations)
-      in
-      if
-        done_syncing_root t
-        || (not @@ worth_getting_root t candidate time_received)
-      then Deferred.unit
-      else
-        match res with
-        | Error e ->
-            Logger.error t.logger
-              !"Could not get the proof of ancestors from the \
-                network:%{sexp:Error.t}"
-              e ;
-            get_root ()
-        | Ok (ancestor, proof) -> (
-            let ancestor_length =
-              Protocol_state.(
-                Consensus_state.length (consensus_state ancestor))
-            in
-            match
-              Ancestor.Prover.verify_and_add t.ancestor_prover input
-                (Protocol_state.hash ancestor)
-                proof ~ancestor_length
-            with
-            | Ok () ->
-                t.best_with_root <- {state= candidate; root= ancestor} ;
-                let candidate_body_hash =
-                  Protocol_state.Body.hash (Protocol_state.body candidate)
-                in
-                let candidate_hash = Protocol_state.hash candidate in
-                Ancestor.Prover.add t.ancestor_prover ~hash:candidate_hash
-                  ~prev_hash:previous_state_hash
-                  ~length:
-                    Protocol_state.(
-                      Consensus_state.length (consensus_state candidate))
-                  ~body_hash:candidate_body_hash ;
-                let ledger_hash =
-                  Consensus.Mechanism.(
-                    Protocol_state.blockchain_state ancestor
-                    |> Blockchain_state.ledger_hash
-                    |> Frozen_ledger_hash.to_ledger_hash)
-                in
-                Syncable_ledger.new_goal t.syncable_ledger ledger_hash
-                |> ignore ;
-                Deferred.unit
-            | Error e -> received_bad_proof t e ; get_root () )
-    in
-    get_root ()
+      with
+      | Error e ->
+          Logger.error t.logger
+            !"Could not get the proof of ancestors from the \
+              network:%{sexp:Error.t}"
+            e
+      | Ok (ancestor, proof) -> (
+          let ancestor_length =
+            Protocol_state.(Consensus_state.length (consensus_state ancestor))
+          in
+          match
+            Ancestor.Prover.verify_and_add t.ancestor_prover input
+              (Protocol_state.hash ancestor)
+              proof ~ancestor_length
+          with
+          | Ok () ->
+              t.best_with_root <- {state= candidate; root= ancestor} ;
+              let candidate_body_hash =
+                Protocol_state.Body.hash (Protocol_state.body candidate)
+              in
+              let candidate_hash = Protocol_state.hash candidate in
+              Ancestor.Prover.add t.ancestor_prover ~hash:candidate_hash
+                ~prev_hash:previous_state_hash
+                ~length:
+                  Protocol_state.(
+                    Consensus_state.length (consensus_state candidate))
+                ~body_hash:candidate_body_hash ;
+              let ledger_hash =
+                Consensus.Mechanism.(
+                  Protocol_state.blockchain_state ancestor
+                  |> Blockchain_state.ledger_hash
+                  |> Frozen_ledger_hash.to_ledger_hash)
+              in
+              Syncable_ledger.new_goal t.syncable_ledger ledger_hash |> ignore
+          | Error e -> received_bad_proof t e )
 
-  (* TODO: We need to do catchup jobs for all remaining transitions in the cache *)
+  (* TODO: We need to do catchup jobs for all remaining transitions in the cache. 
+           This will be hooked into `run` when we do this *)
   let _expand_root ~frontier root_hash cache =
     let rec dfs state_hash =
-      Option.iter (Hashtbl.find_and_remove cache state_hash) 
-      ~f:(fun children -> 
-        List.iter children ~f:(fun transition ->
-          Transition_frontier.add_transition_exn frontier transition |> ignore;
-          dfs (With_hash.hash transition)
-        )
-      ) in
+      Option.iter (Hashtbl.find_and_remove cache state_hash)
+        ~f:(fun children ->
+          List.iter children ~f:(fun transition ->
+              Transition_frontier.add_transition_exn frontier transition
+              |> ignore ;
+              dfs (With_hash.hash transition) ) )
+    in
     dfs root_hash
 
   let sync_ledger t ~transition_graph ~transition_reader =
@@ -176,7 +168,8 @@ module Make (Inputs : Inputs_intf) :
         let previous_state_hash =
           External_transition.Protocol_state.previous_state_hash protocol_state
         in
-        Transition_cache.add transition_graph ~parent:previous_state_hash transition;
+        Transition_cache.add transition_graph ~parent:previous_state_hash
+          transition ;
         if worth_getting_root t protocol_state time_received then
           on_transition t (transition, time_received) |> don't_wait_for ;
         Deferred.unit )
@@ -188,10 +181,10 @@ module Make (Inputs : Inputs_intf) :
       ~transition_reader =
     let logger = Logger.child parent_log __MODULE__ in
     let initial_breadcrumb = Transition_frontier.root frontier in
-    
     let initial_root_state =
       initial_breadcrumb |> Transition_frontier.Breadcrumb.transition_with_hash
-      |> With_hash.data |> External_transition.forget |> External_transition.protocol_state
+      |> With_hash.data |> External_transition.forget
+      |> External_transition.protocol_state
     in
     let t =
       { network

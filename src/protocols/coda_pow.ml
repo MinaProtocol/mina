@@ -1254,9 +1254,6 @@ module type Inputs_intf = sig
      and type ledger_hash := Ledger_hash.t
      and type account := Account.t
 
-
-     
-
   module Genesis_ledger : sig
     val t : Ledger.t
 

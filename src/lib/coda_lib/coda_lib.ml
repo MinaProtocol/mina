@@ -695,8 +695,8 @@ module Make (Inputs : Inputs_intf) = struct
                 let protocol_state =
                   transition_with_hash
                   |> Transition_frontier.Breadcrumb.transition_with_hash
-                  |> With_hash.data |> External_transition.forget |> 
-                  External_transition.protocol_state
+                  |> With_hash.data |> External_transition.forget
+                  |> External_transition.protocol_state
                 in
                 (protocol_state, proof)
               in

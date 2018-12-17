@@ -766,7 +766,7 @@ struct
         let subtree_height = 3
       end)
 
-    module Sync_root_ledger =
+  module Sync_root_ledger =
     Syncable_ledger.Make (Ledger.Db.Addr) (Account)
       (struct
         include Ledger_hash
@@ -858,9 +858,8 @@ struct
     module Network = Net
   end)
 
-  module Transition_router = 
-    Transition_router.Make(struct
-        include Inputs0
+  module Transition_router = Transition_router.Make (struct
+    include Inputs0
     module Transaction_snark_work = Transaction_snark_work
     module Syncable_ledger = Sync_root_ledger
     module Sync_handler = Sync_handler
@@ -875,7 +874,7 @@ struct
     module Network = Net
     module Bootstrap_controller = Bootstrap_controller
     module Transition_frontier_controller = Transition_frontier_controller
-    end)
+  end)
 
   module Proposer = Proposer.Make (struct
     include Inputs0

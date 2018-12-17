@@ -20,7 +20,10 @@ module type Network_intf = sig
   val random_peers : t -> int -> peer list
 
   val catchup_transition :
-    t -> peer -> state_hash -> external_transition list option Deferred.Or_error.t
+       t
+    -> peer
+    -> state_hash
+    -> external_transition list option Deferred.Or_error.t
 
   val get_ancestry :
        t
@@ -32,7 +35,7 @@ module type Transition_frontier_base_intf = sig
   type state_hash
 
   type external_transition_verified
-  
+
   type transaction_snark_scan_state
 
   type masked_ledger

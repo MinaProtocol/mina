@@ -36,7 +36,7 @@ module type Inputs_intf = sig
      and type ancestor_proof_input := State_hash.t * int
      and type ancestor_proof := Ancestor.Proof.t
      and type protocol_state := External_transition.Protocol_state.value
-  
+
   module Catchup :
     Catchup_intf
     with type external_transition := External_transition.t

@@ -423,6 +423,7 @@ module Make (Inputs : Inputs_intf) = struct
     Gossip_net.query_peer t.gossip_net peer
       Rpcs.Transition_catchup.dispatch_multi state_hash
 
+  (* TODO: Make this rpc `Get_ancestry` more intelligent #1324 *)
   let get_ancestry t input =
     let peers = random_peers t 8 in
     find_map' peers ~f:(fun peer ->
