@@ -443,16 +443,16 @@ module type Inputs_intf = sig
      and type staged_ledger := Staged_ledger.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type ledger_diff := Staged_ledger_diff.t
-     and type ledger := Ledger.t
 
-  module Transition_frontier_controller :
-    Protocols.Coda_transition_frontier.Transition_frontier_controller_intf
+  module Transition_router :
+    Protocols.Coda_transition_frontier.Transition_router_intf
     with type time_controller := Time.Controller.t
      and type external_transition := External_transition.t
      and type transition_frontier := Transition_frontier.t
      and type state_hash := Protocol_state_hash.t
      and type time := Time.t
      and type network := Net.t
+     and type ledger_db := Ledger_db.t
 
   module Proposer :
     Proposer_intf
@@ -649,6 +649,7 @@ module Make (Inputs : Inputs_intf) = struct
                   Account.public_key
                     (snd (List.hd_exn Genesis_ledger.accounts)) }
         in
+        let ledger_db = Ledger_db.create () in
         let transition_frontier =
           Transition_frontier.create ~logger:config.log
             ~root_transition:
@@ -661,7 +662,7 @@ module Make (Inputs : Inputs_intf) = struct
             ~root_staged_ledger_diff:None
             ~root_snarked_ledger:
               (Ledger_transfer.transfer_accounts ~src:Genesis.ledger
-                 ~dest:(Ledger_db.create ()))
+                 ~dest:ledger_db)
         in
         let%bind net =
           Net.create config.net_config
@@ -711,9 +712,9 @@ module Make (Inputs : Inputs_intf) = struct
               Deferred.return result )
         in
         let valid_transitions =
-          Transition_frontier_controller.run ~logger:config.log ~network:net
+          Transition_router.run ~logger:config.log ~network:net
             ~time_controller:config.time_controller
-            ~frontier:transition_frontier
+            ~frontier:transition_frontier ~ledger_db
             ~transition_reader:
               (Strict_pipe.Reader.of_linear_pipe
                  (Linear_pipe.map external_transitions_reader

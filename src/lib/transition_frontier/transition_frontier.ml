@@ -77,8 +77,8 @@ module Make (Inputs : Inputs_intf) :
    and type ledger_database := Ledger.Db.t
    and type staged_ledger := Inputs.Staged_ledger.t
    and type ledger_diff := Inputs.Staged_ledger_diff.t
-   and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
-   and type ledger := Ledger.t = struct
+   and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t =
+struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
   exception
     Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
@@ -400,13 +400,9 @@ module Make (Inputs : Inputs_intf) :
 
   let clear_paths t = Hashtbl.clear t.table
 
-  module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
-
-  let rebuild t ledger state_hash =
-    Ledger_transfer.transfer_accounts ~src:ledger ~dest:t.root_snarked_ledger
-    |> ignore ;
-    t.root <- state_hash ;
-    t.best_tip <- state_hash
+  let rebuild t new_root_hash =
+    t.root <- new_root_hash ;
+    t.best_tip <- new_root_hash
 end
 
 let%test_module "Transition_frontier tests" =

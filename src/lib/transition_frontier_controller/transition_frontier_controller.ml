@@ -1,4 +1,5 @@
 open Core_kernel
+open Async_kernel
 open Protocols.Coda_pow
 open Protocols.Coda_transition_frontier
 open Coda_base
@@ -42,13 +43,6 @@ module type Inputs_intf = sig
      and type transition_frontier_breadcrumb :=
                 Transition_frontier.Breadcrumb.t
      and type network := Network.t
-
-  module Bootstrap_controller :
-    Bootstrap_controller_intf
-    with type network := Network.t
-     and type transition_frontier := Transition_frontier.t
-     and type external_transition := External_transition.t
-     and type ancestor_prover := Ancestor.Prover.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -61,11 +55,8 @@ module Make (Inputs : Inputs_intf) :
    and type network := Inputs.Network.t = struct
   open Inputs
 
-  let to_unix_timestamp recieved_time =
-    recieved_time |> Time.to_span_since_epoch |> Time.Span.to_ms
-    |> Unix_timestamp.of_int64
-
-  let run ~logger ~network ~time_controller ~frontier ~transition_reader =
+  let run ~logger ~network ~time_controller ~frontier ~transition_reader
+      ~clear_reader =
     let logger = Logger.child logger __MODULE__ in
     let valid_transition_reader, valid_transition_writer =
       Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
@@ -79,9 +70,6 @@ module Make (Inputs : Inputs_intf) :
     let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
       Strict_pipe.create (Buffered (`Capacity 3, `Overflow Crash))
     in
-    let ancestor_prover =
-      Ancestor.Prover.create ~max_size:(2 * Transition_frontier.max_length)
-    in
     Transition_handler.Validator.run ~frontier ~transition_reader
       ~valid_transition_writer ~logger ;
     Transition_handler.Processor.run ~logger ~time_controller ~frontier
@@ -89,14 +77,12 @@ module Make (Inputs : Inputs_intf) :
       ~catchup_breadcrumbs_reader ;
     Catchup.run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer ;
-    (* HACK: Bootstrap accepts unix_timestamp rather than Time.t *)
-    Bootstrap_controller.run ~valid_transition_writer
-      ~processed_transition_writer ~catchup_job_writer
-      ~catchup_breadcrumbs_writer ~parent_log:logger ~network ~ancestor_prover
-      ~frontier
-      ~transition_reader:
-        (Strict_pipe.Reader.map transition_reader
-           ~f:(fun (transition, `Time_received tm) ->
-             (transition, `Time_received (to_unix_timestamp tm)) )) ;
+    Strict_pipe.Reader.iter clear_reader ~f:(fun _ ->
+        Strict_pipe.Reader.clear valid_transition_reader ;
+        Strict_pipe.Reader.clear processed_transition_reader ;
+        Strict_pipe.Reader.clear catchup_job_reader ;
+        Strict_pipe.Reader.clear catchup_breadcrumbs_reader ;
+        Deferred.unit )
+    |> don't_wait_for ;
     processed_transition_reader
 end

@@ -49,7 +49,7 @@ module type S = sig
 
   val destroy : t -> unit
 
-  val new_goal : t -> root_hash -> [`Ignore | `Continue]
+  val new_goal : t -> root_hash -> [`Repeat | `New]
 
   val peek_valid_tree : t -> merkle_tree option
 
@@ -514,10 +514,10 @@ module Make
       Valid.set t.validity (Addr.root ()) (Stale, Root_hash.to_hash h)
       |> ignore ;
       Linear_pipe.write_without_pushback t.queries (h, Num_accounts) ;
-      `Continue )
+      `New )
     else (
       Logger.info t.log "new_goal to same hash, not doing anything" ;
-      `Ignore )
+      `Repeat )
 
   let rec valid_tree t =
     match%bind Ivar.read t.validity_listener with

@@ -68,8 +68,6 @@ end
 module type Transition_frontier_intf = sig
   include Transition_frontier_base_intf
 
-  type ledger
-
   exception
     Parent_not_found of ([`Parent of state_hash] * [`Target of state_hash])
 
@@ -106,7 +104,11 @@ module type Transition_frontier_intf = sig
 
   val clear_paths : t -> unit
 
-  val rebuild : t -> ledger -> state_hash -> unit
+  (* TODO: Rather than rebuilding the same transition_frontier, it would be better to 
+  change the reference of the frontier that every component that the transition_frontier 
+  contains #1323 *)
+  (* TODO: after caching external transitions, we should recreate transition_frontier #1326*)
+  val rebuild : t -> state_hash -> unit
 end
 
 module type Catchup_intf = sig
@@ -239,20 +241,19 @@ module type Bootstrap_controller_intf = sig
 
   type ancestor_prover
 
+  type ledger_db
+
   val run :
-       valid_transition_writer:('a, 'b, 'c) Writer.t
-    -> processed_transition_writer:('d, 'e, 'f) Writer.t
-    -> catchup_job_writer:('g, 'h, 'i) Writer.t
-    -> catchup_breadcrumbs_writer:('j, 'k, 'l) Writer.t
-    -> parent_log:Logger.t
+       parent_log:Logger.t
     -> network:network
     -> ancestor_prover:ancestor_prover
     -> frontier:transition_frontier
+    -> ledger_db:ledger_db
     -> transition_reader:( [< `Transition of external_transition
                                              Envelope.Incoming.t ]
                          * [< `Time_received of int64] )
                          Reader.t
-    -> unit
+    -> unit Deferred.t
 end
 
 module type Transition_frontier_controller_intf = sig
@@ -273,6 +274,35 @@ module type Transition_frontier_controller_intf = sig
     -> network:network
     -> time_controller:time_controller
     -> frontier:transition_frontier
+    -> transition_reader:( [ `Transition of external_transition
+                                            Envelope.Incoming.t ]
+                         * [`Time_received of time] )
+                         Reader.t
+    -> clear_reader:[`Clear] Reader.t
+    -> (external_transition, state_hash) With_hash.t Reader.t
+end
+
+module type Transition_router_intf = sig
+  type time_controller
+
+  type external_transition
+
+  type state_hash
+
+  type transition_frontier
+
+  type network
+
+  type time
+
+  type ledger_db
+
+  val run :
+       logger:Logger.t
+    -> network:network
+    -> time_controller:time_controller
+    -> frontier:transition_frontier
+    -> ledger_db:ledger_db
     -> transition_reader:( [ `Transition of external_transition
                                             Envelope.Incoming.t ]
                          * [`Time_received of time] )

@@ -263,7 +263,6 @@ module type Main_intf = sig
        and type staged_ledger := Staged_ledger.t
        and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
        and type ledger_diff := Staged_ledger_diff.t
-       and type ledger := Ledger.t
   end
 
   module Config : sig
@@ -468,8 +467,7 @@ struct
   end
 
   module Ledger = Ledger
-  module Ledger_db = Ledger.Db
-  module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger_db)
+  module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 
   module Transaction_snark = struct
     include Ledger_proof
@@ -735,7 +733,7 @@ struct
   end
 
   module Sync_ledger =
-    Syncable_ledger.Make (Ledger.Addr) (Account)
+    Syncable_ledger.Make (Ledger.Db.Addr) (Account)
       (struct
         include Ledger_hash
 
@@ -750,7 +748,7 @@ struct
           Ledger_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
       end)
       (struct
-        include Ledger
+        include Ledger.Db
 
         let f = Account.hash
       end)
@@ -803,7 +801,7 @@ struct
     module Ledger_proof_statement = Ledger_proof_statement
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Syncable_ledger = Sync_ledger
-    module Merkle_address = Ledger.Addr
+    module Merkle_address = Ledger.Db.Addr
     module Consensus_mechanism = Consensus.Mechanism
     module Network = Net
   end)
