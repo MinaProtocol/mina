@@ -71,7 +71,7 @@ build: git_hooks
 	cd src ; $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
-dev: docker container build
+dev: codabuilder containerstart build
 
 ########################################
 ## Lint
