@@ -448,36 +448,6 @@ module Make (Inputs : Inputs_intf) = struct
 
     let create = Fn.id
 
-    (* TODO: This is kinda inefficient *)
-    let find_map xs ~f =
-      let open Async in
-      let ds = List.map xs ~f in
-      let filter ~f =
-        Deferred.bind ~f:(fun x -> if f x then return x else Deferred.never ())
-      in
-      let none_worked =
-        Deferred.bind (Deferred.all ds) ~f:(fun ds ->
-            if List.for_all ds ~f:Option.is_none then return None
-            else Deferred.never () )
-      in
-      Deferred.any (none_worked :: List.map ~f:(filter ~f:Option.is_some) ds)
-
-    (* TODO: Don't copy and paste *)
-    let find_map' xs ~f =
-      let open Async in
-      let ds = List.map xs ~f in
-      let filter ~f =
-        Deferred.bind ~f:(fun x -> if f x then return x else Deferred.never ())
-      in
-      let none_worked =
-        Deferred.bind (Deferred.all ds) ~f:(fun ds ->
-            (* TODO: Validation applicative here *)
-            if List.for_all ds ~f:Or_error.is_error then
-              return (Or_error.error_string "all none")
-            else Deferred.never () )
-      in
-      Deferred.any (none_worked :: List.map ~f:(filter ~f:Or_error.is_ok) ds)
-
     let get_staged_ledger_aux_at_hash t staged_ledger_hash =
       let peers = Gossip_net.random_peers t.gossip_net 8 in
       Logger.trace t.log

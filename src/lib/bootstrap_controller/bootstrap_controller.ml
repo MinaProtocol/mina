@@ -147,7 +147,7 @@ module Make (Inputs : Inputs_intf) :
           | Error e -> received_bad_proof t e )
 
   (* TODO: We need to do catchup jobs for all remaining transitions in the cache. 
-           This will be hooked into `run` when we do this *)
+           This will be hooked into `run` when we do this. #1326 *)
   let _expand_root ~frontier root_hash cache =
     let rec dfs state_hash =
       Option.iter (Hashtbl.find_and_remove cache state_hash)
@@ -176,7 +176,7 @@ module Make (Inputs : Inputs_intf) :
     |> don't_wait_for ;
     Syncable_ledger.valid_tree t.syncable_ledger
 
-  (* Assume that the transitions we are getting are verified from the network *)
+  (* TODO: Assume that the transitions we are getting are verified from the network #1334 *)
   let run ~parent_log ~network ~ancestor_prover ~frontier ~ledger_db
       ~transition_reader =
     let logger = Logger.child parent_log __MODULE__ in

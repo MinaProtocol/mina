@@ -676,6 +676,7 @@ module Make (Inputs : Inputs_intf) = struct
                 Deferred.return
                 @@ Transition_frontier.find transition_frontier hash
               in
+              (* forget verified status of external transition in breadcrumb for broadcast *)
               Transition_frontier.path_map
                 ~f:(fun b ->
                   Transition_frontier.Breadcrumb.transition_with_hash b
