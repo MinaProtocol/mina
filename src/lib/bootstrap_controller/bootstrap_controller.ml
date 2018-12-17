@@ -57,6 +57,23 @@ module Make (Inputs : Inputs_intf) :
     ; mutable best_with_root: state_with_root
     ; network: Network.t }
 
+  
+  (* Cache represents a graph. The key is a State_hash, which is the node in 
+  the graph, and the value is the children transitions of the node *)
+  module Transition_cache = struct
+    type t = External_transition.t list State_hash.Table.t
+    let create () = State_hash.Table.create ()
+
+    let add (t:t) ~parent new_child = 
+    State_hash.Table.update t parent
+          ~f:(function
+          | None -> [new_child]
+          | Some children ->
+              if List.mem children new_child ~equal:External_transition.equal
+              then children
+              else new_child :: children )
+  end
+  
   let worth_getting_root t candidate time_received =
     `Keep
     = Consensus.Mechanism.select ~logger:t.logger
@@ -137,19 +154,35 @@ module Make (Inputs : Inputs_intf) :
     in
     get_root ()
 
-  let sync_ledger t ~transition_reader =
+  (* TODO: We need to do catchup jobs for all remaining transitions in the cache *)
+  let _expand_root ~frontier root_hash cache =
+    let rec dfs state_hash =
+      Option.iter (Hashtbl.find_and_remove cache state_hash) 
+      ~f:(fun children -> 
+        List.iter children ~f:(fun transition ->
+          Transition_frontier.add_transition_exn frontier transition |> ignore;
+          dfs (With_hash.hash transition)
+        )
+      ) in
+    dfs root_hash
+
+  let sync_ledger t ~transition_graph ~transition_reader =
     Reader.iter transition_reader
       ~f:(fun (`Transition incoming_transition, `Time_received time_received)
          ->
         let transition = Envelope.Incoming.data incoming_transition in
         let protocol_state = External_transition.protocol_state transition in
+        let previous_state_hash =
+          External_transition.Protocol_state.previous_state_hash protocol_state
+        in
+        Transition_cache.add transition_graph ~parent:previous_state_hash transition;
         if worth_getting_root t protocol_state time_received then
           on_transition t (transition, time_received) |> don't_wait_for ;
         Deferred.unit )
     |> don't_wait_for ;
     Syncable_ledger.valid_tree t.syncable_ledger
 
-  (* Assume that the transitions we are getting are verified from the network*)
+  (* Assume that the transitions we are getting are verified from the network *)
   let run ~parent_log ~network ~ancestor_prover ~frontier ~ledger_db
       ~transition_reader =
     let logger = Logger.child parent_log __MODULE__ in
@@ -165,8 +198,9 @@ module Make (Inputs : Inputs_intf) :
       ; best_with_root= {state= initial_root_state; root= initial_root_state}
       ; syncable_ledger= Syncable_ledger.create ledger_db ~parent_log:logger }
     in
+    let transition_graph = Transition_cache.create () in
     Transition_frontier.clear_paths frontier ;
-    let%map _ledger_db = sync_ledger t ~transition_reader in
+    let%map _ledger_db = sync_ledger t ~transition_graph ~transition_reader in
     let protocol_state = t.best_with_root.root in
     let root_hash = External_transition.Protocol_state.hash protocol_state in
     Transition_frontier.rebuild frontier root_hash
