@@ -1,5 +1,5 @@
-[%%import
-"../../config.mlh"]
+(*[%%import
+"../../config.mlh"]*)
 
 open Core_kernel
 open Async_kernel
@@ -37,9 +37,24 @@ module Make (Inputs : Inputs.S) : sig
      and type ledger_proof_statement := Inputs.Ledger_proof_statement.t
      and type ledger_proof_statement_set := Inputs.Ledger_proof_statement.Set.t
      and type transaction := Inputs.Transaction.t
+     and type coinbase := Inputs.Coinbase.t
+     and type user_command := Inputs.User_command.t
 end = struct
   open Inputs
   module Scan_state = Transaction_snark_scan_state.Make (Inputs)
+
+  module Staged_ledger_error = struct
+    type t =
+      | Bad_signature of User_command.t
+      | Coinbase_too_large of Coinbase.t
+      | Bad_prev_hash of Staged_ledger_hash.t * Staged_ledger_hash.t
+      | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
+      | Unexpected_error of Error.t
+
+    let unexpected = function
+      | Ok a -> Ok a
+      | Error e -> Unexpected_error e
+  end
 
   type job = Scan_state.Available_job.t
 
@@ -244,7 +259,7 @@ end = struct
       (Scan_state.hash scan_state)
       (Ledger.merkle_root ledger)
 
-  [%%if
+  (*[%%if
   call_logger]
 
   let hash t =
@@ -252,7 +267,7 @@ end = struct
     hash t
 
   [%%endif]
-
+*)
   let ledger {ledger; _} = ledger
 
   let create ~ledger : t =
@@ -431,7 +446,7 @@ end = struct
 
   let fee_remainder (user_commands : User_command.With_valid_signature.t list)
       (completed_works_verified : Transaction_snark_work.t list) =
-    let open Or_error.Let_syntax in
+    let open Result.Let_syntax in
     let%bind budget =
       sum_fees user_commands ~f:(fun t -> User_command.fee (t :> User_command.t)
       )
@@ -440,7 +455,7 @@ end = struct
       sum_fees completed_works_verified
         ~f:(fun {Transaction_snark_work.fee; _} -> fee )
     in
-    option "budget did not suffice" (Fee.Unsigned.sub budget work_fee)
+    Option.value_map ~default:(Error (Staged_ledger_error.Insufficient_fee budget work_fee)) ~f:(fun x -> Ok x) (Fee.Unsigned.sub budget work_fee)
 
   module Prediff_info = struct
     type ('data, 'work) t =
@@ -453,17 +468,17 @@ end = struct
 
   let apply_pre_diff ledger coinbase_parts proposer
       (diff : Staged_ledger_diff.diff) =
-    let open Deferred.Or_error.Let_syntax in
+    let open Deferred.Result.Let_syntax in
     let%bind user_commands, coinbase, transactions, coinbase_work =
       Deferred.return
-        (let open Or_error.Let_syntax in
+        (let open Result.Let_syntax in
         let%bind user_commands =
           let%map user_commands' =
             List.fold_until diff.user_commands ~init:[]
               ~f:(fun acc t ->
                 match User_command.check t with
                 | Some t -> Continue (t :: acc)
-                | None -> Stop (Or_error.error_string "Bad signature") )
+                | None -> Stop (Error (Staged_ledger_error.Bad_signature t)) )
               ~finish:Or_error.return
           in
           List.rev user_commands'
@@ -497,7 +512,7 @@ end = struct
   (* N.B.: we don't expose apply_diff_unverified
      in For_tests only, we expose apply apply_unverified, which calls apply_diff_unverified *)
   let apply_diff t (diff : Staged_ledger_diff.t) ~logger =
-    let open Deferred.Or_error.Let_syntax in
+    let open Deferred.Result.Let_syntax in
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
     let spots_available, proofs_waiting =
       let jobs = Scan_state.next_jobs t.scan_state in
@@ -525,13 +540,10 @@ end = struct
     in
     let%bind () =
       let curr_hash = hash t in
-      check_or_error
-        (sprintf
-           !"bad prev_hash: Expected %{sexp:Staged_ledger_hash.t}, got \
-             %{sexp:Staged_ledger_hash.t}"
-           curr_hash diff.prev_hash)
-        (Staged_ledger_hash.equal diff.prev_hash (hash t))
-      |> Deferred.return
+      if Staged_ledger_hash.equal diff.prev_hash (hash t) 
+      then return ()
+      else 
+        Deferred.return (Error (Bad_prev_hash curr_hash diff.prev_hash))
     in
     let new_mask = Inputs.Ledger.Mask.create () in
     let new_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
@@ -564,14 +576,16 @@ end = struct
       let r = Scan_state.fill_in_transaction_snark_work scan_state' works in
       Or_error.iter_error r ~f:(fun e ->
           (* TODO: Pass a logger here *)
-          eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e ) ;
-      Deferred.return r
+          eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e );
+      Staged_ledger_error.unexpected r
     in
     let%bind () =
-      Deferred.return (Scan_state.enqueue_transactions scan_state' data)
+    Deferred.return (Staged_ledger_error.unexpected
+      @@ Scan_state.enqueue_transactions scan_state' data)
     in
     let%map () =
-      Deferred.return (verify_scan_state_after_apply new_ledger scan_state')
+      Deferred.return (verify_scan_state_after_apply new_ledger scan_state'
+      |> Staged_ledger_error.unexpected)
     in
     Logger.info logger
       "Block info: No of transactions included:%d Coinbase parts:%d Work \
@@ -588,7 +602,7 @@ end = struct
 
   let apply_pre_diff_unchecked ledger coinbase_parts proposer
       (diff : Staged_ledger_diff.With_valid_signatures_and_proofs.diff) =
-    let open Deferred.Or_error.Let_syntax in
+    let open Deferred.Result.Let_syntax in
     let user_commands = diff.user_commands in
     let txn_works =
       List.map ~f:Transaction_snark_work.forget diff.completed_works

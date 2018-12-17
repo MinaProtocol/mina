@@ -676,10 +676,16 @@ module type Staged_ledger_base_intf = sig
 
   type ledger_proof
 
+  type coinbase
+
   (** The ledger in a ledger builder is always a mask *)
   type ledger
 
   type serializable [@@deriving bin_io]
+
+  type user_command
+
+  type transaction
 
   module Scan_state : sig
     type t [@@deriving bin_io]
@@ -689,6 +695,15 @@ module type Staged_ledger_base_intf = sig
     val is_valid : t -> bool
 
     val empty : unit -> t
+  end
+
+  module Staged_ledger_error : sig
+    type t =
+      | Bad_signature of user_command
+      | Coinbase_error of coinbase * string
+      | Bad_prev_hash of staged_ledger_hash * staged_ledger_hash
+      | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
+      | Unexpected_error of Error.t
   end
 
   val ledger : t -> ledger
@@ -716,12 +731,10 @@ module type Staged_ledger_base_intf = sig
        t
     -> diff
     -> logger:Logger.t
-    -> ( [`Hash_after_applying of staged_ledger_hash]
+    -> (( [`Hash_after_applying of staged_ledger_hash]
        * [`Ledger_proof of ledger_proof option]
-       * [`Staged_ledger of t] )
-       Deferred.Or_error.t
-
-  (* N.B.: apply_diff_unverified is not exposed here *)
+       * [`Staged_ledger of t]), Staged_ledger_error.t )
+       Deferred.Result.t
 
   val apply_diff_unchecked :
        t
@@ -739,8 +752,6 @@ module type Staged_ledger_intf = sig
   include Staged_ledger_base_intf
 
   type ledger_hash
-
-  type transaction
 
   type user_command_with_valid_signature
 
