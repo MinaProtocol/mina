@@ -1,4 +1,5 @@
 open Core_kernel
+open Async_kernel
 open Protocols.Coda_pow
 open Protocols.Coda_transition_frontier
 open Coda_base
@@ -51,6 +52,7 @@ module type Inputs_intf = sig
   module Staged_ledger :
     Staged_ledger_intf
     with type diff := Staged_ledger_diff.t
+     and type verified_diff := Staged_ledger_diff.Verified.t
      and type valid_diff :=
                 Staged_ledger_diff.With_valid_signatures_and_proofs.t
      and type staged_ledger_hash := Staged_ledger_hash.t
@@ -63,7 +65,7 @@ module type Inputs_intf = sig
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
      and type statement := Transaction_snark_work.Statement.t
-     and type completed_work := Transaction_snark_work.Checked.t
+     and type completed_work_checked := Transaction_snark_work.Checked.t
      and type sparse_ledger := Sparse_ledger.t
      and type ledger_proof_statement := Ledger_proof_statement.t
      and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
@@ -73,10 +75,12 @@ end
 module Make (Inputs : Inputs_intf) :
   Transition_frontier_intf
   with type state_hash := State_hash.t
-   and type external_transition := Inputs.External_transition.t
+   and type external_transition_verified :=
+              Inputs.External_transition.Verified.t
    and type ledger_database := Ledger.Db.t
    and type staged_ledger := Inputs.Staged_ledger.t
-   and type ledger_diff := Inputs.Staged_ledger_diff.t
+   and type ledger_diff_verified := Inputs.Staged_ledger_diff.Verified.t
+   and type masked_ledger := Ledger.Mask.Attached.t
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t =
 struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
@@ -90,7 +94,7 @@ struct
   module Breadcrumb = struct
     type t =
       { transition_with_hash:
-          (Inputs.External_transition.t, State_hash.t) With_hash.t
+          (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
       ; staged_ledger: Inputs.Staged_ledger.t sexp_opaque }
     [@@deriving sexp, fields]
 
@@ -101,7 +105,7 @@ struct
 
     let parent_hash {transition_with_hash; _} =
       Consensus.Mechanism.Protocol_state.previous_state_hash
-        (Inputs.External_transition.protocol_state
+        (Inputs.External_transition.Verified.protocol_state
            (With_hash.data transition_with_hash))
   end
 
@@ -116,13 +120,17 @@ struct
     ; table: node State_hash.Table.t }
 
   (* TODO: load from and write to disk *)
-  let create ~logger ~root_transition ~root_snarked_ledger
-      ~root_transaction_snark_scan_state ~root_staged_ledger_diff =
+  let create ~logger
+      ~(root_transition :
+         (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t)
+      ~root_snarked_ledger ~root_transaction_snark_scan_state
+      ~root_staged_ledger_diff =
     let open Consensus.Mechanism in
+    let open Deferred.Let_syntax in
     let logger = Logger.child logger __MODULE__ in
     let root_hash = With_hash.hash root_transition in
     let root_protocol_state =
-      Inputs.External_transition.protocol_state
+      Inputs.External_transition.Verified.protocol_state
         (With_hash.data root_transition)
     in
     let root_blockchain_state =
@@ -154,7 +162,7 @@ struct
              (Protocol_state.Blockchain_state.staged_ledger_hash
                 root_blockchain_state))
         (Ledger.Mask.Attached.merkle_root root_masked_ledger) ;
-    match
+    match%map
       Inputs.Staged_ledger.of_scan_state_and_ledger
         ~scan_state:root_transaction_snark_scan_state
         ~ledger:root_masked_ledger
@@ -254,12 +262,17 @@ struct
     if
       Hashtbl.add t.table ~key:(Breadcrumb.hash node.breadcrumb) ~data:node
       <> `Ok
-    then Error.raise (Error.of_exn (Already_exists hash)) ;
-    Hashtbl.set t.table
-      ~key:(Breadcrumb.hash parent_node.breadcrumb)
-      ~data:
-        { parent_node with
-          successor_hashes= hash :: parent_node.successor_hashes }
+    then
+      Logger.warn t.logger
+        !"attach_node_to with breadcrumb for state %{sexp:State_hash.t} \
+          already present; catchup monitor bug?"
+        hash
+    else
+      Hashtbl.set t.table
+        ~key:(Breadcrumb.hash parent_node.breadcrumb)
+        ~data:
+          { parent_node with
+            successor_hashes= hash :: parent_node.successor_hashes }
 
   let attach_breadcrumb_exn t breadcrumb =
     let hash = Breadcrumb.hash breadcrumb in
@@ -287,7 +300,7 @@ struct
   (* Adding a transition to the transition frontier is broken into the following steps:
    *   1) create a new breadcrumb for a transition
           a) apply the staged_ledger_diff on to the parent breadcrumb of the transition
-          b) validate the snarked ledger hash from the transition 
+          b) validate the snarked ledger hash from the transition
    *   2) attach the breadcrumb to the transition frontier
    *   3) move the root if the path to the new node is longer than the max length
    *     a) calculate the distance from the new node to the parent
@@ -304,10 +317,12 @@ struct
     let open Consensus.Mechanism in
     let root_node = Hashtbl.find_exn t.table t.root in
     let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
-    let transition = With_hash.data transition_with_hash in
+    let (transition : Inputs.External_transition.Verified.t) =
+      With_hash.data transition_with_hash
+    in
     let hash = With_hash.hash transition_with_hash in
     let transition_protocol_state =
-      Inputs.External_transition.protocol_state transition
+      Inputs.External_transition.Verified.protocol_state transition
     in
     let parent_hash =
       Protocol_state.previous_state_hash transition_protocol_state
@@ -333,7 +348,7 @@ struct
     let transitioned_staged_ledger =
       match
           Inputs.Staged_ledger.apply ~logger:t.logger staged_ledger
-            (Inputs.External_transition.staged_ledger_diff transition)
+            (Inputs.External_transition.Verified.staged_ledger_diff transition)
           |> Or_error.ok_exn
       
       with

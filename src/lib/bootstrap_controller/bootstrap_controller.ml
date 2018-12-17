@@ -10,10 +10,11 @@ module type Inputs_intf = sig
   module Transition_frontier :
     Transition_frontier_intf
     with type state_hash := State_hash.t
-     and type external_transition := External_transition.t
+     and type external_transition_verified := External_transition.Verified.t
      and type ledger_database := Ledger.Db.t
+     and type masked_ledger := Ledger.Mask.Attached.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type ledger_diff := Staged_ledger_diff.t
+     and type ledger_diff_verified := Staged_ledger_diff.Verified.t
      and type staged_ledger := Staged_ledger.t
 
   module Merkle_address : Merkle_address.S
@@ -31,7 +32,7 @@ module type Inputs_intf = sig
     Network_intf
     with type peer := Kademlia.Peer.t
      and type state_hash := State_hash.t
-     and type transition := External_transition.t
+     and type external_transition := External_transition.t
      and type ancestor_proof_input := State_hash.t * int
      and type ancestor_proof := Ancestor.Proof.t
      and type protocol_state := Consensus.Mechanism.Protocol_state.value
@@ -187,9 +188,10 @@ module Make (Inputs : Inputs_intf) :
       ~transition_reader =
     let logger = Logger.child parent_log __MODULE__ in
     let initial_breadcrumb = Transition_frontier.root frontier in
+    
     let initial_root_state =
       initial_breadcrumb |> Transition_frontier.Breadcrumb.transition_with_hash
-      |> With_hash.data |> External_transition.protocol_state
+      |> With_hash.data |> External_transition.forget |> External_transition.protocol_state
     in
     let t =
       { network

@@ -134,16 +134,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
     let of_string = Fn.compose of_bignum_bigint Bignum_bigint.of_string
 
-    include Binable.Of_binable
-              (Bigint)
-              (struct
-                type t = Field.t
-
-                let to_binable = Bigint.of_field
-
-                let of_binable = Bigint.to_field
-              end)
-
     module Infix = struct
       let ( + ) = add
 

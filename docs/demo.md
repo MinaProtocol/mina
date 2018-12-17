@@ -115,7 +115,7 @@ For ease of setup and experimentation, we've already given you a well-funded acc
 $ coda client send-txn -amount <AMOUNT> -privkey-path ./funded-wallet/key -receiver <RECEIVER_ADDRESS>
 ```
 
-Replacing the `<AMOUNT>` argument with an integer value and the `<RECEIVER_ADDRESS>` with the public key of the account you're sending money to.
+Replacing the `<AMOUNT>` argument with an integer value and the `<RECEIVER_ADDRESS>` with the public key of the account you're sending money to. It will prompt you for the private key password but it is blank.
 
 #### Check account balances
 

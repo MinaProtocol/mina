@@ -88,7 +88,7 @@ module T = struct
     ; send_payment:
         ( 'worker
         , Send_payment_input.t
-        , Receipt.Chain_hash.t )
+        , Receipt.Chain_hash.t Or_error.t )
         Rpc_parallel.Function.t
     ; strongest_ledgers:
         ('worker, unit, State_hashes.t Pipe.Reader.t) Rpc_parallel.Function.t
@@ -103,7 +103,7 @@ module T = struct
     ; coda_start: unit -> unit Deferred.t
     ; coda_get_balance: Public_key.Compressed.t -> Maybe_currency.t Deferred.t
     ; coda_send_payment:
-        Send_payment_input.t -> Receipt.Chain_hash.t Deferred.t
+        Send_payment_input.t -> Receipt.Chain_hash.t Or_error.t Deferred.t
     ; coda_strongest_ledgers: unit -> State_hashes.t Pipe.Reader.t Deferred.t
     ; coda_prove_receipt:
         Prove_receipt.Input.t -> Prove_receipt.Output.t Deferred.t }
@@ -159,7 +159,7 @@ module T = struct
 
     let send_payment =
       C.create_rpc ~f:send_payment_impl ~bin_input:Send_payment_input.bin_t
-        ~bin_output:Receipt.Chain_hash.bin_t ()
+        ~bin_output:[%bin_type_class: Receipt.Chain_hash.t Or_error.t] ()
 
     let strongest_ledgers =
       C.create_pipe ~f:strongest_ledgers_impl ~bin_input:Unit.bin_t
@@ -294,7 +294,9 @@ module T = struct
         don't_wait_for
           (Strict_pipe.Reader.iter (Main.strongest_ledgers coda) ~f:(fun t ->
                let open Main.Inputs in
-               let p = External_transition.protocol_state (With_hash.data t) in
+               let p =
+                 External_transition.Verified.protocol_state (With_hash.data t)
+               in
                let prev_state_hash =
                  Main.Inputs.Consensus_mechanism.Protocol_state
                  .previous_state_hash p

@@ -1,3 +1,4 @@
+open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
 
@@ -10,7 +11,7 @@ module type Network_intf = sig
 
   type protocol_state
 
-  type transition
+  type external_transition
 
   type ancestor_proof_input
 
@@ -19,7 +20,7 @@ module type Network_intf = sig
   val random_peers : t -> int -> peer list
 
   val catchup_transition :
-    t -> peer -> state_hash -> transition list option Deferred.Or_error.t
+    t -> peer -> state_hash -> external_transition list option Deferred.Or_error.t
 
   val get_ancestry :
        t
@@ -30,37 +31,41 @@ end
 module type Transition_frontier_base_intf = sig
   type state_hash
 
-  type external_transition
-
+  type external_transition_verified
+  
   type transaction_snark_scan_state
 
-  type staged_ledger
+  type masked_ledger
 
-  type ledger_diff
+  type staged_ledger
 
   module Breadcrumb : sig
     type t [@@deriving sexp]
 
     val create :
-      (external_transition, state_hash) With_hash.t -> staged_ledger -> t
+         (external_transition_verified, state_hash) With_hash.t
+      -> staged_ledger
+      -> t
 
     val transition_with_hash :
-      t -> (external_transition, state_hash) With_hash.t
+      t -> (external_transition_verified, state_hash) With_hash.t
 
     val staged_ledger : t -> staged_ledger
   end
 
   type ledger_database
 
+  type ledger_diff_verified
+
   type t
 
   val create :
        logger:Logger.t
-    -> root_transition:(external_transition, state_hash) With_hash.t
+    -> root_transition:(external_transition_verified, state_hash) With_hash.t
     -> root_snarked_ledger:ledger_database
     -> root_transaction_snark_scan_state:transaction_snark_scan_state
-    -> root_staged_ledger_diff:ledger_diff option
-    -> t
+    -> root_staged_ledger_diff:ledger_diff_verified option
+    -> t Deferred.t
 
   val find_exn : t -> state_hash -> Breadcrumb.t
 end
@@ -100,7 +105,7 @@ module type Transition_frontier_intf = sig
   val attach_breadcrumb_exn : t -> Breadcrumb.t -> unit
 
   val add_transition_exn :
-    t -> (external_transition, state_hash) With_hash.t -> Breadcrumb.t
+    t -> (external_transition_verified, state_hash) With_hash.t -> Breadcrumb.t
 
   val clear_paths : t -> unit
 
@@ -116,6 +121,8 @@ module type Catchup_intf = sig
 
   type external_transition
 
+  type external_transition_verified
+
   type transition_frontier
 
   type transition_frontier_breadcrumb
@@ -126,7 +133,9 @@ module type Catchup_intf = sig
        logger:Logger.t
     -> network:network
     -> frontier:transition_frontier
-    -> catchup_job_reader:(external_transition, state_hash) With_hash.t
+    -> catchup_job_reader:( external_transition_verified
+                          , state_hash )
+                          With_hash.t
                           Reader.t
     -> catchup_breadcrumbs_writer:( transition_frontier_breadcrumb list
                                   , crash buffered
@@ -142,7 +151,11 @@ module type Transition_handler_validator_intf = sig
 
   type external_transition
 
+  type external_transition_verified
+
   type transition_frontier
+
+  type staged_ledger
 
   val run :
        logger:Logger.t
@@ -151,11 +164,18 @@ module type Transition_handler_validator_intf = sig
                                             Envelope.Incoming.t ]
                          * [`Time_received of time] )
                          Reader.t
-    -> valid_transition_writer:( (external_transition, state_hash) With_hash.t
+    -> valid_transition_writer:( ( external_transition_verified
+                                 , state_hash )
+                                 With_hash.t
                                , drop_head buffered
                                , unit )
                                Writer.t
     -> unit
+
+  val verify_transition :
+       staged_ledger:staged_ledger
+    -> transition:external_transition
+    -> external_transition_verified Or_error.t Deferred.t
 end
 
 module type Transition_handler_processor_intf = sig
@@ -165,6 +185,8 @@ module type Transition_handler_processor_intf = sig
 
   type external_transition
 
+  type external_transition_verified
+
   type transition_frontier
 
   type transition_frontier_breadcrumb
@@ -173,14 +195,18 @@ module type Transition_handler_processor_intf = sig
        logger:Logger.t
     -> time_controller:time_controller
     -> frontier:transition_frontier
-    -> valid_transition_reader:(external_transition, state_hash) With_hash.t
+    -> valid_transition_reader:( external_transition_verified
+                               , state_hash )
+                               With_hash.t
                                Reader.t
-    -> catchup_job_writer:( (external_transition, state_hash) With_hash.t
+    -> catchup_job_writer:( ( external_transition_verified
+                            , state_hash )
+                            With_hash.t
                           , drop_head buffered
                           , unit )
                           Writer.t
     -> catchup_breadcrumbs_reader:transition_frontier_breadcrumb list Reader.t
-    -> processed_transition_writer:( ( external_transition
+    -> processed_transition_writer:( ( external_transition_verified
                                      , state_hash )
                                      With_hash.t
                                    , drop_head buffered
@@ -198,7 +224,11 @@ module type Transition_handler_intf = sig
 
   type external_transition
 
+  type external_transition_verified
+
   type transition_frontier
+
+  type staged_ledger
 
   type transition_frontier_breadcrumb
 
@@ -207,12 +237,15 @@ module type Transition_handler_intf = sig
     with type time := time
      and type state_hash := state_hash
      and type external_transition := external_transition
+     and type external_transition_verified := external_transition_verified
      and type transition_frontier := transition_frontier
+     and type staged_ledger := staged_ledger
 
   module Processor :
     Transition_handler_processor_intf
     with type time_controller := time_controller
      and type external_transition := external_transition
+     and type external_transition_verified := external_transition_verified
      and type state_hash := state_hash
      and type transition_frontier := transition_frontier
      and type transition_frontier_breadcrumb := transition_frontier_breadcrumb
@@ -261,6 +294,8 @@ module type Transition_frontier_controller_intf = sig
 
   type external_transition
 
+  type external_transition_verified
+
   type state_hash
 
   type transition_frontier
@@ -279,13 +314,15 @@ module type Transition_frontier_controller_intf = sig
                          * [`Time_received of time] )
                          Reader.t
     -> clear_reader:[`Clear] Reader.t
-    -> (external_transition, state_hash) With_hash.t Reader.t
+    -> (external_transition_verified, state_hash) With_hash.t Reader.t
 end
 
 module type Transition_router_intf = sig
   type time_controller
 
   type external_transition
+
+  type external_transition_verified
 
   type state_hash
 
@@ -307,5 +344,5 @@ module type Transition_router_intf = sig
                                             Envelope.Incoming.t ]
                          * [`Time_received of time] )
                          Reader.t
-    -> (external_transition, state_hash) With_hash.t Reader.t
+    -> (external_transition_verified, state_hash) With_hash.t Reader.t
 end

@@ -197,7 +197,7 @@ module type Ledger_builder_controller_intf = sig
 
   type staged_ledger_hash
 
-  type external_transition
+  type external_transition_verified
 
   type ledger
 
@@ -226,7 +226,8 @@ module type Ledger_builder_controller_intf = sig
       { parent_log: Logger.t
       ; net_deferred: net Deferred.t
       ; external_transitions:
-          (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
+          (external_transition_verified * Unix_timestamp.t)
+          Linear_pipe.Reader.t
       ; genesis_tip: tip
       ; ledger: maskable_ledger
       ; consensus_local_state: consensus_local_state
@@ -249,7 +250,7 @@ module type Ledger_builder_controller_intf = sig
     -> (staged_ledger * protocol_state) Deferred.Or_error.t
 
   val strongest_ledgers :
-    t -> (staged_ledger * external_transition) Linear_pipe.Reader.t
+    t -> (staged_ledger * external_transition_verified) Linear_pipe.Reader.t
 
   val handle_sync_ledger_queries :
        t
@@ -412,23 +413,6 @@ module type Inputs_intf = sig
      and type state_hash := Protocol_state_hash.t
      and type state_body_hash := State_body_hash.t
 
-  module Ledger_builder_controller :
-    Ledger_builder_controller_intf
-    with type net := Net.t
-     and type ledger := Ledger.t
-     and type staged_ledger := Staged_ledger.t
-     and type staged_ledger_hash := Staged_ledger_hash.t
-     and type external_transition := External_transition.t
-     and type protocol_state := Consensus_mechanism.Protocol_state.value
-     and type consensus_local_state := Consensus_mechanism.Local_state.t
-     and type sync_query := Sync_ledger.query
-     and type sync_answer := Sync_ledger.answer
-     and type ledger_hash := Ledger_hash.t
-     and type ledger_proof := Ledger_proof.t
-     and type tip := Tip.t
-     and type public_key_compressed := Public_key.Compressed.t
-     and type maskable_ledger := Ledger.maskable_ledger
-
   module Ledger_db : Coda_pow.Ledger_creatable_intf
 
   module Masked_ledger : sig
@@ -438,16 +422,18 @@ module type Inputs_intf = sig
   module Transition_frontier :
     Protocols.Coda_transition_frontier.Transition_frontier_intf
     with type state_hash := Protocol_state_hash.t
-     and type external_transition := External_transition.t
+     and type external_transition_verified := External_transition.Verified.t
      and type ledger_database := Ledger_db.t
+     and type masked_ledger := Masked_ledger.t
      and type staged_ledger := Staged_ledger.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type ledger_diff := Staged_ledger_diff.t
+     and type ledger_diff_verified := Staged_ledger_diff.Verified.t
 
   module Transition_router :
     Protocols.Coda_transition_frontier.Transition_router_intf
     with type time_controller := Time.Controller.t
      and type external_transition := External_transition.t
+     and type external_transition_verified := External_transition.Verified.t
      and type transition_frontier := Transition_frontier.t
      and type state_hash := Protocol_state_hash.t
      and type time := Time.t
@@ -508,7 +494,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; snark_pool: Snark_pool.t
     ; transition_frontier: Transition_frontier.t
     ; strongest_ledgers:
-        (External_transition.t, Protocol_state_hash.t) With_hash.t
+        (External_transition.Verified.t, Protocol_state_hash.t) With_hash.t
         Strict_pipe.Reader.t
     ; log: Logger.t
     ; mutable seen_jobs: Work_selector.State.t
@@ -531,7 +517,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let best_protocol_state t =
     Transition_frontier.Breadcrumb.transition_with_hash (best_tip t)
-    |> With_hash.data |> External_transition.protocol_state
+    |> With_hash.data |> External_transition.Verified.protocol_state
 
   let best_ledger t = Staged_ledger.ledger (best_staged_ledger t)
 
@@ -632,31 +618,35 @@ module Make (Inputs : Inputs_intf) = struct
           Linear_pipe.create ()
         in
         let net_ivar = Ivar.create () in
+        let empty_diff_verified =
+          { Staged_ledger_diff.Verified.pre_diffs=
+              Either.First
+                { diff= {completed_works= []; user_commands= []}
+                ; coinbase_added= Staged_ledger_diff.At_most_one.Zero }
+          ; prev_hash=
+              Staged_ledger_hash.of_aux_and_ledger_hash
+                (Staged_ledger_aux_hash.of_bytes "")
+                (Ledger.merkle_root Genesis_ledger.t)
+          ; creator=
+              Account.public_key (snd (List.hd_exn Genesis_ledger.accounts)) }
+        in
+        let genesis_protocol_state =
+          With_hash.data Consensus_mechanism.genesis_protocol_state
+        in
         let first_transition =
-          External_transition.create
-            ~protocol_state:Consensus_mechanism.genesis_protocol_state.data
+          External_transition.Verified.create
+            ~protocol_state:genesis_protocol_state
             ~protocol_state_proof:Protocol_state_proof.dummy
-            ~staged_ledger_diff:
-              { Staged_ledger_diff.pre_diffs=
-                  Either.First
-                    { diff= {completed_works= []; user_commands= []}
-                    ; coinbase_added= Staged_ledger_diff.At_most_one.Zero }
-              ; prev_hash=
-                  Staged_ledger_hash.of_aux_and_ledger_hash
-                    (Staged_ledger_aux_hash.of_bytes "")
-                    (Ledger.merkle_root Genesis_ledger.t)
-              ; creator=
-                  Account.public_key
-                    (snd (List.hd_exn Genesis_ledger.accounts)) }
+            ~staged_ledger_diff:empty_diff_verified
         in
         let ledger_db = Ledger_db.create () in
-        let transition_frontier =
+        let%bind transition_frontier =
           Transition_frontier.create ~logger:config.log
             ~root_transition:
               (With_hash.of_data first_transition
                  ~hash_data:
                    (Fn.compose Consensus_mechanism.Protocol_state.hash
-                      External_transition.protocol_state))
+                      External_transition.Verified.protocol_state))
             ~root_transaction_snark_scan_state:
               (Staged_ledger.Scan_state.empty ())
             ~root_staged_ledger_diff:None
@@ -689,7 +679,7 @@ module Make (Inputs : Inputs_intf) = struct
               Transition_frontier.path_map
                 ~f:(fun b ->
                   Transition_frontier.Breadcrumb.transition_with_hash b
-                  |> With_hash.data )
+                  |> With_hash.data |> External_transition.forget )
                 transition_frontier breadcrumb )
             ~get_ancestry:(fun query_env ->
               let descendent, count = Envelope.Incoming.data query_env in
@@ -705,7 +695,8 @@ module Make (Inputs : Inputs_intf) = struct
                 let protocol_state =
                   transition_with_hash
                   |> Transition_frontier.Breadcrumb.transition_with_hash
-                  |> With_hash.data |> External_transition.protocol_state
+                  |> With_hash.data |> External_transition.forget |> 
+                  External_transition.protocol_state
                 in
                 (protocol_state, proof)
               in
@@ -737,7 +728,10 @@ module Make (Inputs : Inputs_intf) = struct
         don't_wait_for
           (Strict_pipe.Reader.iter_without_pushback
              valid_transitions_for_network ~f:(fun transition_with_hash ->
-               Net.broadcast_state net (With_hash.data transition_with_hash) )) ;
+               (* remove verified status for network broadcast *)
+               Net.broadcast_state net
+                 (External_transition.forget
+                    (With_hash.data transition_with_hash)) )) ;
         don't_wait_for
           (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;
         let%bind snark_pool =

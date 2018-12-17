@@ -1,11 +1,14 @@
 open Core
 open Async
 open Protocols.Coda_transition_frontier
+open Pipe_lib
 open Coda_base
 
 module Make (Inputs : Inputs.S) :
   Catchup_intf
   with type external_transition := Inputs.External_transition.t
+  with type external_transition_verified :=
+              Inputs.External_transition.Verified.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
               Inputs.Transition_frontier.Breadcrumb.t
@@ -29,7 +32,7 @@ module Make (Inputs : Inputs.S) :
       fold_result_seq external_transitions ~init:(initial_staged_ledger, [])
         ~f:(fun (staged_ledger, acc) external_transition ->
           let diff =
-            External_transition.staged_ledger_diff external_transition
+            External_transition.Verified.staged_ledger_diff external_transition
           in
           let%map _, _, `Staged_ledger staged_ledger =
             Deferred.create (fun ivar ->
@@ -40,7 +43,7 @@ module Make (Inputs : Inputs.S) :
             With_hash.of_data external_transition
               ~hash_data:
                 (Fn.compose Consensus.Mechanism.Protocol_state.hash
-                   External_transition.protocol_state)
+                   External_transition.Verified.protocol_state)
           in
           let new_breadcrumb =
             Transition_frontier.Breadcrumb.create transition_with_hash
@@ -53,7 +56,7 @@ module Make (Inputs : Inputs.S) :
   let materialize_breadcrumbs ~frontier ~logger ~peer external_transitions =
     let root_transition = List.hd_exn external_transitions in
     let initial_state_hash =
-      root_transition |> External_transition.protocol_state
+      root_transition |> External_transition.Verified.protocol_state
       |> External_transition.Protocol_state.previous_state_hash
     in
     match Transition_frontier.find frontier initial_state_hash with
@@ -94,19 +97,29 @@ module Make (Inputs : Inputs.S) :
             Logger.faulty_peer logger !"%s" message ;
             Deferred.return @@ Or_error.error_string message
         | Some queried_transitions ->
-            materialize_breadcrumbs ~frontier ~logger ~peer queried_transitions
-    )
+            let%bind queried_transitions_verified =
+              let staged_ledger =
+                Transition_frontier.best_tip frontier
+                |> Transition_frontier.Breadcrumb.staged_ledger
+              in
+              Deferred.Or_error.List.map queried_transitions
+                ~f:(fun transition ->
+                  Transition_handler_validator.verify_transition ~staged_ledger
+                    ~transition )
+            in
+            materialize_breadcrumbs ~frontier ~logger ~peer
+              queried_transitions_verified )
 
   let run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer =
-    let open Pipe_lib.Strict_pipe in
-    Reader.iter catchup_job_reader ~f:(fun transition_with_hash ->
+    Strict_pipe.Reader.iter catchup_job_reader ~f:(fun transition_with_hash ->
         let hash = With_hash.hash transition_with_hash in
         match%map
           get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
             ~num_peers:8 hash
         with
-        | Ok breadcrumbs -> Writer.write catchup_breadcrumbs_writer breadcrumbs
+        | Ok breadcrumbs ->
+            Strict_pipe.Writer.write catchup_breadcrumbs_writer breadcrumbs
         | Error e ->
             Logger.info logger
               !"None of the peers have a transition with state hash:\n%s"

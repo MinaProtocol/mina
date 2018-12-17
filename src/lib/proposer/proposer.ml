@@ -21,11 +21,12 @@ module type Inputs_intf = sig
   module Transition_frontier :
     Protocols.Coda_transition_frontier.Transition_frontier_intf
     with type state_hash := State_hash.t
-     and type external_transition := External_transition.t
+     and type external_transition_verified := External_transition.Verified.t
      and type ledger_database := Ledger_db.t
      and type staged_ledger := Staged_ledger.t
+     and type ledger_diff_verified := Staged_ledger_diff.Verified.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type ledger_diff := Staged_ledger_diff.t
+     and type masked_ledger := Masked_ledger.t
 
   module Transaction_pool :
     Coda_lib.Transaction_pool_read_intf
@@ -245,7 +246,7 @@ module Make (Inputs : Inputs_intf) :
         let internal_transition =
           Internal_transition.create ~snark_transition
             ~prover_state:(Proposal_data.prover_state proposal_data)
-            ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
+            ~staged_ledger_diff:(Staged_ledger_diff.forget_validated diff)
         in
         Some (protocol_state, internal_transition) )
 
@@ -264,11 +265,11 @@ module Make (Inputs : Inputs_intf) :
             !"Begining to propose off of crumb %{sexp: Crumb.t}"
             crumb ;
           let previous_protocol_state, previous_protocol_state_proof =
-            let transition : External_transition.t =
+            let transition : External_transition.Verified.t =
               (Crumb.transition_with_hash crumb).data
             in
-            ( External_transition.protocol_state transition
-            , External_transition.protocol_state_proof transition )
+            ( External_transition.Verified.protocol_state transition
+            , External_transition.Verified.protocol_state_proof transition )
           in
           let%bind () =
             Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
@@ -316,7 +317,9 @@ module Make (Inputs : Inputs_intf) :
         let rec check_for_proposal () =
           let crumb = Transition_frontier.best_tip transition_frontier in
           let transition = (Crumb.transition_with_hash crumb).data in
-          let protocol_state = External_transition.protocol_state transition in
+          let protocol_state =
+            External_transition.Verified.protocol_state transition
+          in
           match
             Consensus_mechanism.next_proposal
               (time_to_ms (Time.now time_controller))

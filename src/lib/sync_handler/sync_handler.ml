@@ -8,11 +8,12 @@ module type Inputs_intf = sig
   module Transition_frontier :
     Transition_frontier_intf
     with type state_hash := State_hash.t
-     and type external_transition := External_transition.t
+     and type external_transition_verified := External_transition.Verified.t
      and type ledger_database := Ledger.Db.t
      and type staged_ledger := Staged_ledger.t
+     and type masked_ledger := Ledger.Mask.Attached.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type ledger_diff := Staged_ledger_diff.t
+     and type ledger_diff_verified := Staged_ledger_diff.Verified.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -33,7 +34,7 @@ module Make (Inputs : Inputs_intf) :
         in
         let external_transition = With_hash.data transition_with_hash in
         let protocol_state =
-          External_transition.protocol_state external_transition
+          External_transition.Verified.protocol_state external_transition
         in
         let body = External_transition.Protocol_state.body protocol_state in
         let state_body_hash =

@@ -390,7 +390,9 @@ struct
       *)
       let rev_sorted_mask_locations =
         List.sort mask_locations ~compare:(fun loc1 loc2 ->
-            Location.compare loc2 loc1 )
+            let loc1 = Location.to_path_exn loc1 in
+            let loc2 = Location.to_path_exn loc2 in
+            Location.Addr.compare loc2 loc1 )
       in
       List.iter rev_sorted_mask_locations
         ~f:(remove_account_and_update_hashes t)
@@ -445,6 +447,20 @@ struct
         ( Addr.of_directions
         @@ List.init Base.depth ~f:(fun _ -> Direction.Left) )
 
+    let loc_max a b =
+      let a' = Location.to_path_exn a in
+      let b' = Location.to_path_exn b in
+      if Location.Addr.compare a' b' > 0 then a else b
+
+    let last_filled t =
+      Option.value_map
+        (Base.last_filled (get_parent t))
+        ~default:t.current_location
+        ~f:(fun parent_loc ->
+          match t.current_location with
+          | None -> Some parent_loc
+          | Some our_loc -> Some (max parent_loc our_loc) )
+
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t key account =
       match find_location t key with
@@ -455,7 +471,7 @@ struct
         | None -> (
             (* not in parent, create new location *)
             let maybe_location =
-              match t.current_location with
+              match last_filled t with
               | None -> Some first_location
               | Some loc -> Location.next loc
             in
@@ -490,10 +506,13 @@ struct
   end
 
   let set_parent t parent =
-    { uuid= t.uuid
-    ; Attached.parent
-    ; account_tbl= t.account_tbl
-    ; hash_tbl= t.hash_tbl
-    ; location_tbl= t.location_tbl
-    ; current_location= t.current_location }
+    let attached =
+      { uuid= t.uuid
+      ; Attached.parent
+      ; account_tbl= t.account_tbl
+      ; hash_tbl= t.hash_tbl
+      ; location_tbl= t.location_tbl
+      ; current_location= t.current_location }
+    in
+    {attached with current_location= Attached.last_filled attached}
 end

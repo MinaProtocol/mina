@@ -195,7 +195,7 @@ let start_payment_check log events payments workers proposal_interval testnet =
   don't_wait_for
     (Linear_pipe.iter payments ~f:(fun (i, sk, pk, amount, fee) ->
          let%bind () = add_to_active_accounts pk in
-         let%map _ : Receipt.Chain_hash.t =
+         let%map _ : Receipt.Chain_hash.t Or_error.t =
            Coda_process.send_payment_exn (List.nth_exn workers i) sk pk amount
              fee User_command_memo.dummy
          in

@@ -2,8 +2,8 @@ open Core_kernel
 open Async_kernel
 open Coda_base
 open Protocols.Coda_pow
-open Protocols.Coda_transition_frontier
 open Pipe_lib
+open Protocols.Coda_transition_frontier
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
@@ -13,17 +13,18 @@ module type Inputs_intf = sig
   module Transition_frontier :
     Transition_frontier_intf
     with type state_hash := State_hash.t
-     and type external_transition := External_transition.t
+     and type external_transition_verified := External_transition.Verified.t
      and type ledger_database := Ledger.Db.t
      and type staged_ledger := Staged_ledger.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type ledger_diff := Staged_ledger_diff.t
+     and type ledger_diff_verified := Staged_ledger_diff.Verified.t
+     and type masked_ledger := Coda_base.Ledger.t
 
   module Network :
     Network_intf
     with type peer := Kademlia.Peer.t
      and type state_hash := State_hash.t
-     and type transition := External_transition.t
+     and type external_transition := External_transition.t
      and type ancestor_proof_input := State_hash.t * int
      and type ancestor_proof := Ancestor.Proof.t
      and type protocol_state := External_transition.Protocol_state.value
@@ -32,6 +33,7 @@ module type Inputs_intf = sig
     Transition_frontier_controller_intf
     with type time_controller := Time.Controller.t
      and type external_transition := External_transition.t
+     and type external_transition_verified := External_transition.Verified.t
      and type transition_frontier := Transition_frontier.t
      and type time := Time.t
      and type state_hash := State_hash.t
@@ -50,6 +52,7 @@ module Make (Inputs : Inputs_intf) :
   Transition_router_intf
   with type time_controller := Inputs.Time.Controller.t
    and type external_transition := Inputs.External_transition.t
+   and type external_transition_verified := Inputs.External_transition.Verified.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type time := Inputs.Time.t
    and type state_hash := State_hash.t
@@ -98,7 +101,7 @@ module Make (Inputs : Inputs_intf) :
           |> With_hash.data
         in
         let open External_transition in
-        let root_state = protocol_state root_transition in
+        let root_state = protocol_state (root_transition |> forget) in
         let new_state = protocol_state new_transition in
         if
           Consensus.Mechanism.should_bootstrap

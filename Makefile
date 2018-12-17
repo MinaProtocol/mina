@@ -25,9 +25,28 @@ else
 endif
 
 ########################################
-# Coverage directory
+## Coverage directory
 
 COVERAGE_DIR=_coverage
+
+########################################
+## Git hooks
+
+git_hooks: $(wildcard scripts/git_hooks/*)
+	@case "$$(file .git | cut -d: -f2)" in \
+	' ASCII text') \
+	    echo 'refusing to install git hooks in worktree' \
+	    break;; \
+	' directory') \
+	    for f in $^; do \
+	      [ ! -f ".git/hooks/$$(basename $$f)" ] && ln -s ../../$$f .git/hooks/; \
+	    done; \
+	    break;; \
+	*) \
+	    echo 'unhandled case when installing git hooks' \
+	    exit 1 \
+	    break;; \
+	esac
 
 ########################################
 ## Code
@@ -46,7 +65,7 @@ kademlia:
 # Alias
 dht: kademlia
 
-build:
+build: git_hooks
 	$(info Starting Build)
 	ulimit -s 65536
 	cd src ; $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
@@ -57,7 +76,7 @@ dev: docker container build
 ########################################
 ## Lint
 
-reformat:
+reformat: git_hooks
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
 
 check-format:
@@ -114,11 +133,11 @@ update-deps:
 	cd .circleci; python2 render.py > config.yml
 
 # Local 'codabuilder' docker image (based off docker-toolchain)
-codabuilder:
+codabuilder: git_hooks
 	docker build --file dockerfiles/Dockerfile --tag codabuilder .
 
 # Restarts codabuilder
-containerstart:
+containerstart: git_hooks
 	@./scripts/container.sh restart
 
 ########################################
@@ -133,17 +152,25 @@ deb:
 DEBS3 = deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=120
 
 publish_kademlia_deb:
-	@if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
-		$(DEBS3) --codename stable   --component main src/_build/coda-kademlia.deb ; \
+	@if [ $(AWS_ACCESS_KEY_ID) ] ; then \
+		if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
+			$(DEBS3) --codename stable   --component main src/_build/coda-kademlia.deb ; \
+		else \
+			$(DEBS3) --codename unstable --component main src/_build/coda-kademlia.deb ; \
+		fi ; \
 	else \
-		$(DEBS3) --codename unstable --component main src/_build/coda-kademlia.deb ; \
+		echo "WARNING: AWS_ACCESS_KEY_ID not set, deb-s3 not run" ; \
 	fi
 
 publish_deb:
-	@if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
-		$(DEBS3) --codename stable   --component main src/_build/coda.deb ; \
-	else \
-		$(DEBS3) --codename unstable --component main src/_build/coda.deb ; \
+	@if [ $(AWS_ACCESS_KEY_ID) ] ; then \
+		if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
+			$(DEBS3) --codename stable   --component main src/_build/coda.deb ; \
+		else \
+			$(DEBS3) --codename unstable --component main src/_build/coda.deb ; \
+		fi ; \
+	else  \
+		echo "WARNING: AWS_ACCESS_KEY_ID not set, deb-s3 commands not run" ; \
 	fi
 
 publish_debs: publish_deb publish_kademlia_deb
@@ -234,15 +261,21 @@ endif
 ########################################
 # Diagrams for documentation
 
-transition_frontier_diagram: SHELL := /bin/bash
-transition_frontier_diagram:
-	cd docs/res; pdflatex transition_frontier_diagram.tex && convert -density 600x600 transition_frontier_diagram.pdf -quality 90 -resize 1080x800 transition_frontier_diagram.png
+docs/res/%.dot.png: docs/res/%.dot
+	dot -Tpng $< > $@
 
-diagrams: transition_frontier_diagram
+docs/res/%.tex.pdf: docs/res/%.tex
+	cd docs/res && pdflatex $(notdir $<)
+	cp $(@:.tex.pdf=.pdf) $@
+
+docs/res/%.tex.png: docs/res/%.tex.pdf
+	convert -density 600x600 $< -quality 90 -resize 1080x1080 $@
+
+doc_diagrams: $(addsuffix .png,$(wildcard docs/res/*.tex) $(wildcard docs/res/*.dot))
 
 ########################################
 # To avoid unintended conflicts with file names, always add to .PHONY
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains transition_frontier_diagram diagrams
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams

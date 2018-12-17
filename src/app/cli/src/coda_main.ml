@@ -242,6 +242,10 @@ module type Main_intf = sig
 
     module Staged_ledger_diff : sig
       type t [@@deriving sexp, bin_io]
+
+      module Verified : sig
+        type t [@@deriving sexp, bin_io]
+      end
     end
 
     module Internal_transition :
@@ -258,11 +262,12 @@ module type Main_intf = sig
     module Transition_frontier :
       Protocols.Coda_pow.Transition_frontier_intf
       with type state_hash := State_hash.t
-       and type external_transition := External_transition.t
+       and type external_transition_verified := External_transition.Verified.t
        and type ledger_database := Coda_base.Ledger.Db.t
+       and type ledger_diff_verified := Staged_ledger_diff.Verified.t
+       and type masked_ledger := Coda_base.Ledger.t
        and type staged_ledger := Staged_ledger.t
        and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-       and type ledger_diff := Staged_ledger_diff.t
   end
 
   module Config : sig
@@ -304,7 +309,7 @@ module type Main_intf = sig
 
   val strongest_ledgers :
        t
-    -> (Inputs.External_transition.t, State_hash.t) With_hash.t
+    -> (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
        Strict_pipe.Reader.t
 
   val transaction_pool : t -> Inputs.Transaction_pool.t
@@ -467,7 +472,8 @@ struct
   end
 
   module Ledger = Ledger
-  module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
+  module Ledger_db = Ledger.Db
+  module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger_db)
 
   module Transaction_snark = struct
     include Ledger_proof
@@ -520,6 +526,8 @@ struct
     end
 
     include Staged_ledger.Make (Inputs)
+
+    type verified_diff = Staged_ledger_diff.Verified.t
   end
 
   module Staged_ledger_aux = Staged_ledger.Scan_state
@@ -536,7 +544,7 @@ struct
     end
 
     let forget {With_valid_signatures_and_proofs.old; diff} =
-      {old; diff= Staged_ledger_diff.forget diff}
+      {old; diff= Staged_ledger_diff.forget_validated diff}
   end
 
   module Internal_transition =
@@ -583,9 +591,11 @@ struct
       ; staged_ledger: Staged_ledger.t sexp_opaque }
     [@@deriving sexp, fields]
 
-    let of_transition_and_staged_ledger transition staged_ledger =
-      { state= External_transition.protocol_state transition
-      ; proof= External_transition.protocol_state_proof transition
+    type external_transition_verified = External_transition.Verified.t
+
+    let of_verified_transition_and_staged_ledger transition staged_ledger =
+      { state= External_transition.Verified.protocol_state transition
+      ; proof= External_transition.Verified.protocol_state_proof transition
       ; staged_ledger }
 
     let bin_tip =
@@ -733,6 +743,30 @@ struct
   end
 
   module Sync_ledger =
+    Syncable_ledger.Make (Ledger.Addr) (Account)
+      (struct
+        include Ledger_hash
+
+        let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
+
+        let empty_account = hash_account Account.empty
+      end)
+      (struct
+        include Ledger_hash
+
+        let to_hash (h : t) =
+          Ledger_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
+      end)
+      (struct
+        include Ledger
+
+        let f = Account.hash
+      end)
+      (struct
+        let subtree_height = 3
+      end)
+
+    module Sync_root_ledger =
     Syncable_ledger.Make (Ledger.Db.Addr) (Account)
       (struct
         include Ledger_hash
@@ -776,15 +810,6 @@ struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
   end)
 
-  module Ledger_catchup = Ledger_catchup.Make (struct
-    include Inputs0
-    module Staged_ledger_diff = Staged_ledger_diff
-    module Transaction_snark_work = Transaction_snark_work
-    module Ledger_proof_statement = Ledger_proof_statement
-    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Network = Net
-  end)
-
   module Transition_handler = Transition_handler.Make (struct
     include Inputs0
     module State_proof = Protocol_state_proof
@@ -794,13 +819,23 @@ struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
   end)
 
+  module Ledger_catchup = Ledger_catchup.Make (struct
+    include Inputs0
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Transaction_snark_work = Transaction_snark_work
+    module Transition_handler_validator = Transition_handler.Validator
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Network = Net
+  end)
+
   module Bootstrap_controller = Bootstrap_controller.Make (struct
     include Inputs0
     module Staged_ledger_diff = Staged_ledger_diff
     module Transaction_snark_work = Transaction_snark_work
     module Ledger_proof_statement = Ledger_proof_statement
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Syncable_ledger = Sync_ledger
+    module Syncable_ledger = Sync_root_ledger
     module Merkle_address = Ledger.Db.Addr
     module Consensus_mechanism = Consensus.Mechanism
     module Network = Net
@@ -820,59 +855,27 @@ struct
     module Consensus_mechanism = Consensus.Mechanism
     module Ledger_proof_statement = Ledger_proof_statement
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Bootstrap_controller = Bootstrap_controller
     module Network = Net
   end)
 
-  module Ledger_builder_controller = struct
-    module Inputs = struct
-      module Security = struct
-        let max_depth = Init.lbc_tree_max_depth
-      end
-
-      module Tip = Tip
-      module Snark_pool = Snark_pool
-      module Ledger_hash = Ledger_hash
-      module Frozen_ledger_hash = Frozen_ledger_hash
-      module Ledger_proof = Transaction_snark
-      module Private_key = Private_key
-
-      module Public_key = struct
-        module Private_key = Private_key
-        include Public_key
-      end
-
-      module Keypair = Keypair
-      module Ledger_proof_statement = Ledger_proof_statement
-      module Staged_ledger_hash = Staged_ledger_hash
-      module Ledger = Ledger
-      module Staged_ledger_diff = Staged_ledger_diff
-      module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-      module Staged_ledger = Staged_ledger
-      module Blockchain_state = Blockchain_state
-      module Consensus_mechanism = Consensus.Mechanism
-      module Protocol_state = Protocol_state
-      module Protocol_state_proof = Protocol_state_proof
-      module State_hash = State_hash
-      module Valid_user_command = User_command.With_valid_signature
-      module Internal_transition = Internal_transition
-      module External_transition = External_transition
-
-      module Net = struct
-        type net = Net.t
-
-        include Net.Staged_ledger_io
-      end
-
-      module Store = Store
-      module Sync_ledger = Sync_ledger
-
-      let verify_blockchain proof state =
-        Verifier.verify_blockchain Init.verifier {proof; state}
-    end
-
-    include Ledger_builder_controller.Make (Inputs)
-  end
+  module Transition_router = 
+    Transition_router.Make(struct
+        include Inputs0
+    module Transaction_snark_work = Transaction_snark_work
+    module Syncable_ledger = Sync_root_ledger
+    module Sync_handler = Sync_handler
+    module Merkle_address = Ledger.Addr
+    module Catchup = Ledger_catchup
+    module Transition_handler = Transition_handler
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Ledger_diff = Staged_ledger_diff
+    module Consensus_mechanism = Consensus.Mechanism
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Network = Net
+    module Bootstrap_controller = Bootstrap_controller
+    module Transition_frontier_controller = Transition_frontier_controller
+    end)
 
   module Proposer = Proposer.Make (struct
     include Inputs0
@@ -1108,28 +1111,38 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         verifying_txn
 
   let schedule_payment log t (txn : User_command.t) account_opt =
-    if not (is_valid_payment t txn account_opt) then (
-      Core.Printf.eprintf "Invalid payment: account balance is too low" ;
-      Core.exit 1 ) ;
-    let txn_pool = transaction_pool t in
-    don't_wait_for (Transaction_pool.add txn_pool txn) ;
-    Logger.info log
-      !"Added payment %{sexp: User_command.t} to pool successfully"
-      txn ;
-    txn_count := !txn_count + 1
+    if not (is_valid_payment t txn account_opt) then
+      Or_error.error_string "Invalid payment: account balance is too low"
+    else
+      let txn_pool = transaction_pool t in
+      don't_wait_for (Transaction_pool.add txn_pool txn) ;
+      Logger.info log
+        !"Added payment %{sexp: User_command.t} to pool successfully"
+        txn ;
+      txn_count := !txn_count + 1 ;
+      Or_error.return ()
 
   let send_payment log t (txn : User_command.t) =
+    Deferred.return
+    @@
+    let open Or_error.Let_syntax in
     let public_key = Public_key.compress txn.sender in
     let account_opt = get_account t public_key in
-    schedule_payment log t txn account_opt ;
-    Deferred.return @@ record_payment ~log t txn (Option.value_exn account_opt)
+    let%map () = schedule_payment log t txn account_opt in
+    record_payment ~log t txn (Option.value_exn account_opt)
 
   (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
   let schedule_payments log t txns =
     List.iter txns ~f:(fun (txn : User_command.t) ->
         let public_key = Public_key.compress txn.sender in
         let account_opt = get_account t public_key in
-        schedule_payment log t txn account_opt )
+        match schedule_payment log t txn account_opt with
+        | Ok () -> ()
+        | Error err ->
+            Logger.warn log
+              !"Failure in schedule_payments: %{sexp:Error.t}. This is not \
+                yet reported to the client, see #1143"
+              err )
 
   let prove_receipt t ~proving_receipt ~resulting_receipt :
       Payment_proof.t Deferred.Or_error.t =
@@ -1201,8 +1214,10 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
           With_hash.data
             (Transition_frontier.Breadcrumb.transition_with_hash (best_tip t))
         in
-        let state = External_transition.protocol_state transition in
-        let proof = External_transition.protocol_state_proof transition in
+        let state = External_transition.Verified.protocol_state transition in
+        let proof =
+          External_transition.Verified.protocol_state_proof transition
+        in
         let ledger =
           List.fold pks
             ~f:(fun acc key ->
