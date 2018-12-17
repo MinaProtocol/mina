@@ -18,7 +18,7 @@ endif
 ifeq ($(USEDOCKER),TRUE)
  $(info INFO Using Docker Named $(DOCKERNAME))
  WRAP = docker exec -it $(DOCKERNAME)
- WRAPSRC = docker exec --workdir /home/opam/app/src -it $(DOCKERNAME)
+ WRAPSRC = docker exec --workdir /home/opam/app/src -t $(DOCKERNAME)
 else
  $(info INFO Not using Docker)
  WRAP =
