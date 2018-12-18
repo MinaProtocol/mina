@@ -1,0 +1,4 @@
+(library
+  (name rose_tree)
+  (public_name rose_tree)
+  (libraries core_kernel))
