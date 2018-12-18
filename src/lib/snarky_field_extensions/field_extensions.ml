@@ -50,8 +50,8 @@ module Make (F : Intf.Basic) = struct
           let%map () = assert_square x res in
           res
 
-  let inv =
-    match inv with
+  let inv_exn =
+    match inv_exn with
     | `Custom f -> f
     | `Define ->
         fun t ->
@@ -65,9 +65,13 @@ end
 module Make_applicative (F : Intf.S) (A : Intf.Applicative) = struct
   type t = F.t A.t
 
+  type 'a t_ = 'a F.t_ A.t
+
   let constant = A.map ~f:F.constant
 
   let scale t x = A.map t ~f:(fun a -> F.scale a x)
+
+  let scale' t x = A.map t ~f:(fun a -> F.scale x a)
 
   let negate t = A.map t ~f:F.negate
 
@@ -85,20 +89,21 @@ module E2
   open Params
 
   module T = struct
+    module Base = F
     module Impl = F.Impl
     open Impl
     open Let_syntax
     module Unchecked = Snarkette.Fields.Make_fp2 (F.Unchecked) (Params)
 
-    include Make_applicative
-              (F)
-              (struct
-                type 'a t = 'a * 'a
+    module A = struct
+      type 'a t = 'a * 'a
 
-                let map (x, y) ~f = (f x, f y)
+      let map (x, y) ~f = (f x, f y)
 
-                let map2 (x1, y1) (x2, y2) ~f = (f x1 x2, f y1 y2)
-              end)
+      let map2 (x1, y1) (x2, y2) ~f = (f x1 x2, f y1 y2)
+    end
+
+    include Make_applicative (Base) (A)
 
     let typ = Typ.tuple2 F.typ F.typ
 
@@ -135,9 +140,9 @@ module E2
 
     let ( * ) = `Custom ( * )
 
-    let inv = `Define
+    let inv_exn = `Define
 
-    let assert_square = `Define
+    let assert_square = `Custom assert_square
   end
 
   include T
@@ -155,21 +160,21 @@ module E3
         val mul_by_non_residue : F.t -> F.t
     end) : Intf.S with module Impl = F.Impl = struct
   module T = struct
+    module Base = F
     module Unchecked = Snarkette.Fields.Make_fp3 (F.Unchecked) (Params)
     module Impl = F.Impl
     open Impl
     open Let_syntax
 
-    include Make_applicative
-              (F)
-              (struct
-                type 'a t = 'a * 'a * 'a
+    module A = struct
+      type 'a t = 'a * 'a * 'a
 
-                let map (x, y, z) ~f = (f x, f y, f z)
+      let map (x, y, z) ~f = (f x, f y, f z)
 
-                let map2 (x1, y1, z1) (x2, y2, z2) ~f =
-                  (f x1 x2, f y1 y2, f z1 z2)
-              end)
+      let map2 (x1, y1, z1) (x2, y2, z2) ~f = (f x1 x2, f y1 y2, f z1 z2)
+    end
+
+    include Make_applicative (Base) (A)
 
     let typ = Typ.tuple3 F.typ F.typ F.typ
 
@@ -213,7 +218,7 @@ module E3
 
     let ( * ) = `Custom ( * )
 
-    let inv = `Define
+    let inv_exn = `Define
 
     let assert_square = `Define
   end
