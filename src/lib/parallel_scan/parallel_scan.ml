@@ -42,7 +42,8 @@ module State = struct
     ; current_data_length= 0
     ; base_none_pos= Some (parallelism - 1)
     ; recent_tree_data= []
-    ; other_trees_data= [] }
+    ; other_trees_data= []
+    ; stateful_work_order= Queue.create () }
 
   let next_leaf_pos p cur_pos =
     if cur_pos = (2 * p) - 2 then p - 1 else cur_pos + 1
@@ -163,9 +164,6 @@ module State = struct
   *    B()   B() B()   B() B()  B() B()  B()
   *
   *)
-  module Work = struct
-    type t = Work_done | Not_done
-  end
 
   let dir c = if c mod 2 = 1 then `Left else `Right
 
@@ -205,7 +203,7 @@ module State = struct
     | `Same_level pos -> pos
     | `Next_level pos -> pos
 
-  let set_next_position t level_pointer =
+  let _set_next_position t level_pointer =
     (t.jobs).position
     <- next_position (parallelism t) level_pointer t.jobs.position
 
@@ -223,7 +221,7 @@ module State = struct
       else t.level_pointer.(cur_level) <- first_node
     else ()
 
-  let make_jobs_ordered f empty t =
+  (*let make_jobs_ordered f empty t =
     let rec go count t =
       if count = (parallelism t * 2) - 1 then empty
       else
@@ -238,21 +236,20 @@ module State = struct
     (t.jobs).position <- 0 ;
     js
 
-  let jobs_list t =
-    let cons elt elts = elt :: elts in
-    make_jobs_ordered cons [] t
-
   let jobs_sequence t =
     let open Sequence in
     let seq_cons elt elts = append (return elt) elts in
     make_jobs_ordered seq_cons empty t
 
-  let read_jobs t =
-    List.filter (jobs_list t) ~f:(fun (_, pos) -> parent_empty t.jobs pos)
+  let _jobs_list t =
+    Sequence.to_list (jobs_sequence t)
 
   let read_jobs_sequence t =
     Sequence.filter (jobs_sequence t) ~f:(fun (_, pos) ->
         parent_empty t.jobs pos )
+
+  let _read_jobs t =
+    Sequence.to_list (read_jobs_sequence t)*)
 
   let job_ready job =
     let module J = Job in
@@ -262,12 +259,24 @@ module State = struct
     | J.Merge (Some a, Some b) -> Some (A.Merge (a, b))
     | _ -> None
 
-  let jobs_ready state =
-    List.filter_map (read_jobs state) ~f:(fun (job, _) -> job_ready job)
-
   let jobs_ready_sequence state =
-    Sequence.filter_map (read_jobs_sequence state) ~f:(fun (job, _) ->
-        job_ready job )
+    let open Sequence in
+    let app elt elts = append elts (return elt) in
+    Queue.fold state.stateful_work_order ~init:empty ~f:(fun seq index ->
+        let elt =
+          Option.value_exn (job_ready (Ring_buffer.read_i state.jobs index))
+          (*These should be Available_job.t by structure *)
+        in
+        if parent_empty state.jobs index then app elt seq else seq )
+
+  let jobs_ready state =
+    Queue.fold state.stateful_work_order ~init:[] ~f:(fun lst index ->
+        let elt =
+          Option.value_exn (job_ready (Ring_buffer.read_i state.jobs index))
+          (*These should be Available_job.t by structure *)
+        in
+        if parent_empty state.jobs index then elt :: lst else lst )
+    |> List.rev
 
   let update_new_job t z dir pos =
     let new_job (cur_job : ('a, 'd) Job.t) : ('a, 'd) Job.t Or_error.t =
@@ -289,11 +298,11 @@ module State = struct
          ('a, 'd) t
       -> 'a Completed_job.t
       -> ('a, 'b) Job.t Ring_buffer.t
-      -> Work.t Or_error.t =
-   fun t completed_job old_jobs ->
+      -> int
+      -> unit Or_error.t =
+   fun t completed_job old_jobs cur_pos ->
     let open Or_error.Let_syntax in
-    let cur_job = Ring_buffer.read t.jobs in
-    let cur_pos = t.jobs.position in
+    let cur_job = Ring_buffer.read_i t.jobs cur_pos in
     match (parent_empty old_jobs cur_pos, cur_job, completed_job) with
     | true, Merge (Some _, Some _), Merged z ->
         let%bind () =
@@ -302,19 +311,35 @@ module State = struct
             t.other_trees_data
             <- List.take t.other_trees_data (List.length t.other_trees_data - 1) ;
             Ok () )
-          else update_new_job t z (dir cur_pos) ((cur_pos - 1) / 2)
+          else
+            let parent_pos = (cur_pos - 1) / 2 in
+            let%map () = update_new_job t z (dir cur_pos) parent_pos in
+            match Ring_buffer.read_i t.jobs parent_pos with
+            | Merge (Some _, Some _) ->
+                Queue.enqueue t.stateful_work_order parent_pos
+            | _ -> ()
         in
         let () = incr_level_pointer t cur_pos in
         let%map () = update_cur_job t (Merge (None, None)) cur_pos in
-        Work.Work_done
+        ()
     | true, Base (Some _), Lifted z ->
-        let%bind () = update_new_job t z (dir cur_pos) ((cur_pos - 1) / 2) in
+        let parent_pos = (cur_pos - 1) / 2 in
+        let%bind () = update_new_job t z (dir cur_pos) parent_pos in
         let%bind () = update_cur_job t (Base None) cur_pos in
         let () = incr_level_pointer t cur_pos in
         t.base_none_pos <- Some (Option.value t.base_none_pos ~default:cur_pos) ;
         t.current_data_length <- t.current_data_length - 1 ;
-        Ok Work.Work_done
-    | _ -> Ok Not_done
+        let () =
+          match Ring_buffer.read_i t.jobs parent_pos with
+          | Merge (Some _, Some _) ->
+              Queue.enqueue t.stateful_work_order parent_pos
+          | _ -> ()
+        in
+        Ok ()
+    | false, _, _ -> Or_error.errorf "Parent of Job at %d not empty" cur_pos
+    | _ ->
+        Or_error.errorf "Job-to-do and Job-done doesn't match (at pos %d)"
+          cur_pos
 
   let rec consume : type a d.
          (a, d) t
@@ -323,17 +348,14 @@ module State = struct
       -> unit Or_error.t =
    fun t completed_jobs jobs_copy ->
     let open Or_error.Let_syntax in
-    let level_pointer_before_update = Array.copy t.State.level_pointer in
     match completed_jobs with
     | [] -> Ok ()
-    | j :: js ->
-        let%bind next =
-          match%map work t j jobs_copy with
-          | Work.Not_done -> j :: js
-          | Work.Work_done -> js
-        in
-        set_next_position t level_pointer_before_update ;
-        consume t next jobs_copy
+    | j :: js -> (
+      match Queue.dequeue t.stateful_work_order with
+      | None -> Or_error.error_string "Work order state out of sync"
+      | Some pos ->
+          let%bind () = work t j jobs_copy pos in
+          consume t js jobs_copy )
 
   let include_one_datum state value base_pos : unit Or_error.t =
     let open Or_error.Let_syntax in
@@ -359,6 +381,7 @@ module State = struct
         | None -> Or_error.error_string "No empty leaves"
         | Some pos ->
             let%map () = include_one_datum state a pos in
+            let () = Queue.enqueue state.stateful_work_order pos in
             state.base_none_pos <- next_base_pos state pos )
 
   module Make_foldable (M : Monad.S) = struct
@@ -592,6 +615,8 @@ let gen :
 
 let%test_module "scans" =
   ( module struct
+    module Queue = Queue
+
     let enqueue state ds =
       let free_space = free_space ~state in
       match free_space >= List.length ds with
@@ -737,7 +762,6 @@ let%test_module "scans" =
                       ~f:Int64.to_int_exn
                   in
                   let expected = !cur_value - Int64.to_int_exn acc_data in
-                  (*Core.printf !"state: %{sexp: (Int64.t, Int64.t) State.t} \n %!" state;*)
                   assert (acc = expected) ;
                   assert (
                     List.length state.other_trees_data < parallelism_log_2 ) ;

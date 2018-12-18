@@ -588,7 +588,7 @@ end = struct
     let txns_still_being_worked_on = Parallel_scan.current_data scan_state in
     Debug_assert.debug_assert (fun () ->
         let parallelism =
-          Int.pow 2 (Inputs.Config.transaction_capacity_log_2 + 1)
+          Int.pow 2 (Inputs.Config.transaction_capacity_log_2 + 2)
         in
         [%test_pred: int]
           (( >= ) (Inputs.Config.transaction_capacity_log_2 * parallelism))
@@ -2270,7 +2270,7 @@ let%test_module "test" =
     let%test_unit "Max throughput" =
       (*Always at worst case number of provers*)
       let logger = Logger.create () in
-      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
+      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger in
@@ -2311,7 +2311,7 @@ let%test_module "test" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
+      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger in
@@ -2357,7 +2357,7 @@ let%test_module "test" =
       in
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
+      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger in
@@ -2420,7 +2420,7 @@ let%test_module "test" =
     let%test_unit "Snarked ledger" =
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
+      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger in
