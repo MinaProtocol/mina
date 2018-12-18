@@ -110,8 +110,8 @@ let daemon log =
            Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
              conf_dir ;
            Daemon.daemonize
-             ~redirect_stdout:(`File_append (conf_dir ^/ "coda.stdout"))
-             ~redirect_stderr:(`File_append (conf_dir ^/ "coda.stderr"))
+             ~redirect_stdout:(`File_append (conf_dir ^/ "coda.log"))
+             ~redirect_stderr:(`File_append (conf_dir ^/ "coda.log"))
              () ;
            Deferred.return conf_dir )
          else Sys.home_directory () >>| compute_conf_dir
