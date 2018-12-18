@@ -915,62 +915,15 @@ module Make_basic (Backend : Backend_intf.S) = struct
       in
       fst (go 0 t)
 
-    let auxiliary_input (type s) ~num_inputs (t0 : (unit, s) t) (s0 : s)
-        (input : Field.Vector.t) : Field.Vector.t =
-      let next_auxiliary = ref (1 + num_inputs) in
-      let aux = Field.Vector.create () in
+    let run (type a s) ~num_inputs ~input ~next_auxiliary ~aux ?system
+        (t0 : (a, s) t) (s0 : s) =
+      next_auxiliary := 1 + num_inputs ;
       let get_value : Cvar.t -> Field.t =
         let get_one v =
           let i = Backend.Var.index v in
           if i <= num_inputs then Field.Vector.get input (i - 1)
           else Field.Vector.get aux (i - num_inputs - 1)
         in
-        Cvar.eval get_one
-      in
-      let store_field_elt x =
-        let v = Backend.Var.create !next_auxiliary in
-        incr next_auxiliary ;
-        Field.Vector.emplace_back aux x ;
-        v
-      in
-      let rec go : type a s. (a, s) t -> Request.Handler.t -> s -> s * a =
-       fun t handler s ->
-        match t with
-        | Pure x -> (s, x)
-        | With_constraint_system (_, k) -> go k handler s
-        | With_label (_lab, t, k) ->
-            let s', y = go t handler s in
-            go (k y) handler s'
-        | As_prover (x, k) ->
-            let s', () = As_prover.run x get_value s in
-            go k handler s'
-        | Add_constraint (c, t) -> go t handler s
-        | With_state (p, and_then, t_sub, k) ->
-            let s, s_sub = As_prover.run p get_value s in
-            let s_sub, y = go t_sub handler s_sub in
-            let s, () = As_prover.run (and_then s_sub) get_value s in
-            go (k y) handler s
-        | With_handler (h, t, k) ->
-            let s', y = go t (Request.Handler.push handler h) s in
-            go (k y) handler s'
-        | Clear_handler (t, k) ->
-            let s', y = go t Request.Handler.fail s in
-            go (k y) handler s'
-        | Exists ({store; check; _}, c, k) ->
-            let s', value = Provider.run c get_value s handler in
-            let var = Typ.Store.run (store value) store_field_elt in
-            let (), () = go (check var) handler () in
-            go (k {Handle.var; value= Some value}) handler s'
-        | Next_auxiliary k -> go (k !next_auxiliary) handler s
-      in
-      O1trace.measure "auxiliary_input" (fun () ->
-          ignore (go t0 Request.Handler.fail s0) ) ;
-      aux
-
-    let run (type a s) ~next_auxiliary ~aux ?system (t0 : (a, s) t) (s0 : s) =
-      next_auxiliary := 1 ;
-      let get_value : Cvar.t -> Field.t =
-        let get_one v = Field.Vector.get aux (Backend.Var.index v - 1) in
         Cvar.eval get_one
       in
       let store_field_elt x =
@@ -1026,7 +979,17 @@ module Make_basic (Backend : Backend_intf.S) = struct
       in
       go [] t0 Request.Handler.fail s0
 
+    let auxiliary_input (type s) ~num_inputs (t0 : (unit, s) t) (s0 : s)
+        (input : Field.Vector.t) : Field.Vector.t =
+      let next_auxiliary = ref (1 + num_inputs) in
+      let aux = Field.Vector.create () in
+      O1trace.measure "auxiliary_input" (fun () ->
+          ignore (run ~num_inputs ~input ~next_auxiliary ~aux t0 s0) ) ;
+      aux
+
     let run_and_check' (type a s) (t0 : (a, s) t) (s0 : s) =
+      let num_inputs = 0 in
+      let input = Field.Vector.create () in
       let next_auxiliary = ref 1 in
       let aux = Field.Vector.create () in
       let system = R1CS_constraint_system.create () in
@@ -1034,7 +997,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
         let get_one v = Field.Vector.get aux (Backend.Var.index v - 1) in
         Cvar.eval get_one
       in
-      match run ~next_auxiliary ~aux ~system t0 s0 with
+      match run ~num_inputs ~input ~next_auxiliary ~aux ~system t0 s0 with
       | exception e -> Or_error.of_exn e
       | s, x ->
           let primary_input = Field.Vector.create () in
@@ -1048,9 +1011,11 @@ module Make_basic (Backend : Backend_intf.S) = struct
           else Ok (s, x, get_value)
 
     let run_unchecked (type a s) (t0 : (a, s) t) (s0 : s) =
+      let num_inputs = 0 in
+      let input = Field.Vector.create () in
       let next_auxiliary = ref 1 in
       let aux = Field.Vector.create () in
-      run ~next_auxiliary ~aux t0 s0
+      run ~num_inputs ~input ~next_auxiliary ~aux t0 s0
 
     let run_and_check t s =
       Or_error.map (run_and_check' t s) ~f:(fun (s, x, get_value) ->
