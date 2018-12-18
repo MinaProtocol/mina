@@ -3,9 +3,9 @@ open Async_kernel
 open Pipe_lib
 open Strict_pipe
 
-type 'job t =
-  { job_writer: ('job, drop_head buffered, unit) Writer.t
-  ; f: 'job -> unit Deferred.t }
+type 'data t =
+  { job_writer: ('data, drop_head buffered, unit) Writer.t
+  ; f: 'data -> unit Deferred.t }
 
 let create ?(buffer_capacity = 10) ~job_capacity f =
   let job_reader, job_writer =

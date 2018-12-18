@@ -103,7 +103,7 @@ struct
 
     let build ~logger ~parent ~transition_with_hash =
       let open Or_error.Let_syntax in
-      let logger = Logger.child logger "transition_frontier_breadcrumb" in
+      let logger = Logger.child logger __MODULE__ in
       let staged_ledger = parent.staged_ledger in
       let transition = With_hash.data transition_with_hash in
       let transition_protocol_state =

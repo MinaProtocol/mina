@@ -82,6 +82,7 @@ module Make (Inputs : Inputs.S) = struct
     in
     let make_timeout () =
       Time.Timeout.create t.time_controller timeout_duration ~f:(fun _ ->
+          (* it's ok to create a new thread here because the thread essentially does no work *)
           don't_wait_for (Writer.write t.catchup_job_writer transition) )
     in
     Hashtbl.update t.timeouts parent_hash ~f:(function
