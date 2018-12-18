@@ -70,11 +70,12 @@ let json =
      ))
 
 let main () =
-  let fmt =
-    Format.formatter_of_out_channel (Out_channel.create "sample_keypairs.ml")
-  in
-  Yojson.pretty_to_channel (Out_channel.create "sample_keypairs.json") json ;
-  Pprintast.top_phrase fmt (Ptop_def (structure ~loc:Ppxlib.Location.none)) ;
+  Out_channel.with_file "sample_keypairs.ml" ~f:(fun ml_file ->
+      let fmt = Format.formatter_of_out_channel ml_file in
+      Pprintast.top_phrase fmt (Ptop_def (structure ~loc:Ppxlib.Location.none))
+  ) ;
+  Out_channel.with_file "sample_keypairs.json" ~f:(fun json_file ->
+      Yojson.pretty_to_channel json_file json ) ;
   exit 0
 
 let () = main ()

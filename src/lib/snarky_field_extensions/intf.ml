@@ -41,19 +41,20 @@ module type Basic = sig
 
   val assert_r1cs : t -> t -> t -> (unit, _) Checked.t
 
-  val assert_square : [`Define | `Custom of t -> t -> (unit, _) Checked.t]
-
   val ( + ) : t -> t -> t
 
   val ( - ) : t -> t -> t
 
   val negate : t -> t
 
+  (* These definitions are shadowed in the below interface *)
+  val assert_square : [`Define | `Custom of t -> t -> (unit, _) Checked.t]
+
   val ( * ) : [`Define | `Custom of t -> t -> (t, _) Checked.t]
 
   val square : [`Define | `Custom of t -> (t, _) Checked.t]
 
-  val inv : [`Define | `Custom of t -> (t, _) Checked.t]
+  val inv_exn : [`Define | `Custom of t -> (t, _) Checked.t]
 end
 
 module type S = sig
@@ -67,11 +68,11 @@ module type S = sig
 
   val square : t -> (t, _) Checked.t
 
-  val inv : t -> (t, _) Checked.t
-
   (* This function MUST NOT be called on two arguments which are both potentially
    zero *)
   val div_unsafe : t -> t -> (t, _) Checked.t
+
+  val inv_exn : t -> (t, _) Checked.t
 
   val zero : t
 
