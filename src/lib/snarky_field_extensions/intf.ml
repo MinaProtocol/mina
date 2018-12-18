@@ -37,13 +37,14 @@ module type Basic = sig
 
   val assert_r1cs : t -> t -> t -> (unit, _) Checked.t
 
-  val assert_square : [`Define | `Custom of t -> t -> (unit, _) Checked.t]
-
   val ( + ) : t -> t -> t
 
   val ( - ) : t -> t -> t
 
   val negate : t -> t
+
+  (* These definitions are shadowed in the below interface *)
+  val assert_square : [`Define | `Custom of t -> t -> (unit, _) Checked.t]
 
   val ( * ) : [`Define | `Custom of t -> t -> (t, _) Checked.t]
 
