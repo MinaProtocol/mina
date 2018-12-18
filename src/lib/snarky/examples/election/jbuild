@@ -3,6 +3,6 @@
 (executables
  ((names (election_main))
   (modes (native))
-  (preprocess (pps (ppx_jane ppx_deriving.enum)))
+  (preprocess (pps (ppx_jane ppx_deriving.enum ppx_snarky)))
   (libraries (snarky core))))
 

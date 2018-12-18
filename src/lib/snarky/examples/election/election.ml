@@ -22,12 +22,12 @@ module Ballot = struct
     (* An opened ballot is a nonce along with a vote. *)
     type t = Nonce.t * Vote.t
 
-    type var = Nonce.var * Vote.var
+    type var = Nonce.var * Vote.var [@@deriving snarky]
 
     (* A [typ] is a kind of specification of a type of data which makes it possible
        to use values of that type inside checked computations. In a future version of
        the library, [typ]s will be derived automatically with a ppx extension. *)
-    let typ = Typ.(Nonce.typ * Vote.typ)
+    (*let typ = Typ.(Nonce.typ * Vote.typ)*)
 
     let to_bits (nonce, vote) = Nonce.to_bits nonce @ Vote.to_bits vote
 
