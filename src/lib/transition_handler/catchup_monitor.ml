@@ -46,28 +46,25 @@ module Make (Inputs : Inputs.S) = struct
     let timeouts = State_hash.Table.create () in
     let breadcrumb_builder_supervisor =
       Capped_supervisor.create ~job_capacity:5 (fun transition_branches ->
-          let%bind breadcrumbs =
-            Deferred.create (fun ivar ->
-                Ivar.fill ivar
-                  (List.map transition_branches ~f:(fun branch ->
-                       let (Rose_tree.T (branch_base, _)) = branch in
-                       let branch_parent_hash =
-                         With_hash.data branch_base
-                         |> External_transition.Verified.protocol_state
-                         |> Protocol_state.previous_state_hash
-                       in
-                       let branch_parent =
-                         Transition_frontier.find_exn frontier
-                           branch_parent_hash
-                       in
-                       Rose_tree.fold_map branch ~init:branch_parent
-                         ~f:(fun parent transition_with_hash ->
-                           let breadcrumb =
-                             Transition_frontier.Breadcrumb.build ~logger
-                               ~parent ~transition_with_hash
-                             |> Or_error.ok_exn
-                           in
-                           breadcrumb ) )) )
+          let%bind _, breadcrumbs =
+            Deferred.List.map transition_branches ~f:(fun branch ->
+                let (Rose_tree.T (branch_base, _)) = branch in
+                let branch_parent_hash =
+                  With_hash.data branch_base
+                  |> External_transition.Verified.protocol_state
+                  |> Protocol_state.previous_state_hash
+                in
+                let branch_parent =
+                  Transition_frontier.find_exn frontier branch_parent_hash
+                in
+                Rose_tree.Deferred.fold_map branch ~init:branch_parent
+                  ~f:(fun parent transition_with_hash ->
+                    let breadcrumb =
+                      Transition_frontier.Breadcrumb.build ~logger ~parent
+                        ~transition_with_hash
+                      |> Or_error.ok_exn
+                    in
+                    breadcrumb ) )
           in
           Writer.write catchup_breadcrumbs_writer breadcrumbs )
     in
