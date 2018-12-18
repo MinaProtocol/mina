@@ -184,7 +184,7 @@ end = struct
     in
     Debug_assert.debug_assert (fun () ->
         let total_capacity_log_2 =
-          Inputs.Config.transaction_capacity_log_2 + 1
+          Inputs.Config.transaction_capacity_log_2 + 2
         in
         let parallelism = Int.pow 2 total_capacity_log_2 in
         [%test_pred: int]
@@ -1989,11 +1989,11 @@ let%test_module "test" =
     let%test_unit "Max throughput" =
       (*Always at worst case number of provers*)
       let logger = Logger.create () in
-      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
+      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
-      Quickcheck.test g ~trials:1000 ~f:(fun _ ->
+      Quickcheck.test g ~trials:100 ~f:(fun _ ->
           let old_ledger = !(Sl.ledger !sl) in
           let all_ts = txns (p / 2) (fun x -> (x + 1) * 100) (fun _ -> 4) in
           let ledger_proof, diff =
@@ -2022,7 +2022,7 @@ let%test_module "test" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
+      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
@@ -2064,7 +2064,7 @@ let%test_module "test" =
       in
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
+      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
@@ -2124,7 +2124,7 @@ let%test_module "test" =
     let%test_unit "Snarked ledger" =
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
+      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
