@@ -14,12 +14,13 @@ let create ?(buffer_capacity = 10) ~job_capacity f =
   in
   let active_jobs = ref 0 in
   let pending_jobs = ref [] in
-  let bvar = Bvar.create () in
+  let job_finished_bvar = Bvar.create () in
   let run_job job =
     incr active_jobs ;
     don't_wait_for
       (let%map () = f job in
-       decr active_jobs ; Bvar.broadcast bvar ())
+       decr active_jobs ;
+       Bvar.broadcast job_finished_bvar ())
   in
   let rec start_jobs n =
     if n <= 0 then ()
@@ -32,7 +33,7 @@ let create ?(buffer_capacity = 10) ~job_capacity f =
           start_jobs (n - 1)
   in
   let rec process_pending_jobs () =
-    let%bind () = Bvar.wait bvar in
+    let%bind () = Bvar.wait job_finished_bvar in
     start_jobs (job_capacity - !active_jobs) ;
     process_pending_jobs ()
   in
