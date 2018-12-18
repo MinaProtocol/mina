@@ -66,16 +66,16 @@ module Make (Inputs : Inputs_intf) :
       Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
     in
     let catchup_job_reader, catchup_job_writer =
-      Strict_pipe.create (Buffered (`Capacity 5, `Overflow Drop_head))
+      Strict_pipe.create Synchronous
     in
     let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-      Strict_pipe.create (Buffered (`Capacity 3, `Overflow Crash))
+      Strict_pipe.create Synchronous
     in
     Transition_handler.Validator.run ~frontier ~transition_reader
       ~valid_transition_writer ~logger ;
     Transition_handler.Processor.run ~logger ~time_controller ~frontier
-      ~valid_transition_reader ~processed_transition_writer ~catchup_job_writer
-      ~catchup_breadcrumbs_reader ;
+      ~valid_transition_reader ~catchup_job_writer ~catchup_breadcrumbs_reader
+      ~catchup_breadcrumbs_writer ~processed_transition_writer ;
     Catchup.run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer ;
     processed_transition_reader
