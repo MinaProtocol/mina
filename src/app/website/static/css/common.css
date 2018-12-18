@@ -83,6 +83,8 @@
   .hauto-ns { height:auto; }
 }
 
+.blueblack { color: #3d5978; }
+
 .blacklike { color: #1F2D3D; }
 .silver { color: #8492A6; }
 .lightsilver { color: #8192a8; }
@@ -133,6 +135,12 @@
   .mw55-ns { max-width: 20rem; }
 }
 .mw57 { max-width: 27rem; }
+
+.mw65 { max-width: 40rem; }
+@media screen and (min-wdith:30em) {
+  .mw65-ns { max-width: 40rem; }
+}
+
 .mw85 {max-width:80rem}
 
 .min-h7 { min-height: 48rem; }

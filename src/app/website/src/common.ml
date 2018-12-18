@@ -119,10 +119,7 @@ module Links = struct
 
   let reddit = ("Reddit", "https://reddit.com/r/coda", "reddit")
 
-  let blog =
-    ( "Blog"
-    , "https://medium.com/codaprotocol/coda-keeping-cryptocurrency-decentralized-e4b180721f42"
-    , "blog" )
+  let blog = ("Blog", "/scanning_scans.html", "blog")
 
   let telegram = ("Telegram", "https://t.me/codaprotocol", "telegram")
 

@@ -3,7 +3,12 @@ open Async
 open Stationary
 open Util
 
-type t = {date: Date.t; title: string; content: Html.t; basename: string}
+type t =
+  { date: Date.t
+  ; title: string
+  ; author: string
+  ; content: Html.t
+  ; basename: string }
 
 let load path =
   let%map markdown = Reader.file_contents path and html = Markdown.load path in
@@ -26,7 +31,9 @@ let load path =
         Date.of_string (List.Assoc.find_exn ~equal:String.equal kvs "date")
       in
       let title = List.Assoc.find_exn ~equal:String.equal kvs "title" in
+      let author = List.Assoc.find_exn ~equal:String.equal kvs "author" in
       { date
       ; title
+      ; author
       ; content= html
       ; basename= Filename.chop_extension (Filename.basename path) }

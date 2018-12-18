@@ -562,6 +562,7 @@ let load_job_posts jobs =
 let site () : Site.t Deferred.t =
   let open File_system in
   let%bind position_files = load_job_posts positions in
+  let%bind post = Blog_post.content "scaning_scans" in
   let%map home = home () in
   Site.create
     ( List.map position_files ~f:file
@@ -571,6 +572,8 @@ let site () : Site.t Deferred.t =
       ; file (File.of_html ~name:"testnet.html" (testnet ()))
       ; file (File.of_html ~name:"privacy.html" Privacy_policy.content)
       ; file (File.of_html ~name:"tos.html" Tos.content)
+        (* TODO: Make some more generalized thing for the blog posts *)
+      ; file (File.of_html ~name:"scanning_scans.html" post)
       ; file (File.of_path "static/favicon.ico")
       ; copy_directory "static" ] )
 
