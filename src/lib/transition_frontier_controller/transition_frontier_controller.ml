@@ -60,6 +60,10 @@ module Make (Inputs : Inputs_intf) :
    and type network := Inputs.Network.t = struct
   open Inputs
 
+  let kill reader writer =
+    Strict_pipe.Reader.clear reader ;
+    Strict_pipe.Writer.close writer
+
   let run ~logger ~network ~time_controller ~frontier ~transition_reader
       ~clear_reader =
     let logger = Logger.child logger __MODULE__ in
@@ -83,10 +87,10 @@ module Make (Inputs : Inputs_intf) :
     Catchup.run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer ;
     Strict_pipe.Reader.iter clear_reader ~f:(fun _ ->
-        Strict_pipe.Reader.clear valid_transition_reader ;
-        Strict_pipe.Reader.clear processed_transition_reader ;
-        Strict_pipe.Reader.clear catchup_job_reader ;
-        Strict_pipe.Reader.clear catchup_breadcrumbs_reader ;
+        kill valid_transition_reader valid_transition_writer ;
+        kill processed_transition_reader processed_transition_writer ;
+        kill catchup_job_reader catchup_job_writer ;
+        kill catchup_breadcrumbs_reader catchup_breadcrumbs_writer ;
         Deferred.unit )
     |> don't_wait_for ;
     processed_transition_reader

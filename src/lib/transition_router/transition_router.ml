@@ -66,22 +66,45 @@ module Make (Inputs : Inputs_intf) :
     recieved_time |> Time.to_span_since_epoch |> Time.Span.to_ms
     |> Unix_timestamp.of_int64
 
+  let create_bufferred_pipe () =
+    Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
+
+  type tfc_transition =
+    [`Transition of Inputs.External_transition.t Envelope.Incoming.t]
+    * [`Time_received of Inputs.Time.t]
+
+  type bootstrap_transition =
+    [`Transition of Inputs.External_transition.t Envelope.Incoming.t]
+    * [`Time_received of int64]
+
+  type acc_pipe =
+    { tfc_reader: tfc_transition Strict_pipe.Reader.t
+    ; tfc_writer:
+        ( tfc_transition
+        , Strict_pipe.drop_head Strict_pipe.buffered
+        , unit )
+        Strict_pipe.Writer.t
+    ; bootstrap_controller_reader: bootstrap_transition Strict_pipe.Reader.t
+    ; bootstrap_controller_writer:
+        ( bootstrap_transition
+        , Strict_pipe.drop_head Strict_pipe.buffered
+        , unit )
+        Strict_pipe.Writer.t }
+
+  let kill reader writer =
+    Strict_pipe.Reader.clear reader ;
+    Strict_pipe.Writer.close writer
+
+  (* TODO: Wrap frontier with a Mvar #1323 *)
   let run ~logger ~network ~time_controller ~frontier ~ledger_db
       ~transition_reader =
-    let clear_reader, clear_writer = Strict_pipe.create Synchronous in
-    let tfc_reader, tfc_writer =
-      Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
-    in
-    let bootstrap_controller_reader, bootstrap_controller_writer =
-      Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
-    in
-    let is_bootstrapping = ref false in
-    let ancestor_prover =
-      Ancestor.Prover.create ~max_size:(2 * Transition_frontier.max_length)
-    in
     let start_bootstrap (`Transition incoming_transition, `Time_received tm) =
-      Strict_pipe.Writer.write clear_writer `Clear |> don't_wait_for ;
-      is_bootstrapping := true ;
+      let ancestor_prover =
+        Ancestor.Prover.create ~max_size:(2 * Transition_frontier.max_length)
+      in
+      let bootstrap_controller_reader, bootstrap_controller_writer =
+        create_bufferred_pipe ()
+      in
       Strict_pipe.Writer.write bootstrap_controller_writer
         (`Transition incoming_transition, `Time_received (to_unix_timestamp tm)) ;
       let%map () =
@@ -89,9 +112,42 @@ module Make (Inputs : Inputs_intf) :
           ~ancestor_prover ~frontier
           ~transition_reader:bootstrap_controller_reader
       in
-      is_bootstrapping := false
+      (bootstrap_controller_reader, bootstrap_controller_writer)
     in
-    Strict_pipe.Reader.iter transition_reader ~f:(fun network_transition ->
+    let start_tfc ~verified_transition_writer ~clear_reader =
+      let transition_reader, transition_writer = create_bufferred_pipe () in
+      let new_verified_transition_reader =
+        Transition_frontier_controller.run ~logger ~network ~time_controller
+          ~frontier ~transition_reader ~clear_reader
+      in
+      Strict_pipe.Reader.iter new_verified_transition_reader
+        ~f:
+          (Fn.compose Deferred.return
+             (Strict_pipe.Writer.write verified_transition_writer))
+      |> don't_wait_for ;
+      (transition_reader, transition_writer)
+    in
+    let clear_reader, clear_writer = Strict_pipe.create Synchronous in
+    let verified_transition_reader, verified_transition_writer =
+      create_bufferred_pipe ()
+    in
+    let tfc_reader, tfc_writer =
+      start_tfc ~verified_transition_writer ~clear_reader
+    in
+    let bootstrap_controller_reader, bootstrap_controller_writer =
+      create_bufferred_pipe ()
+    in
+    let init =
+      { tfc_reader
+      ; tfc_writer
+      ; bootstrap_controller_reader
+      ; bootstrap_controller_writer }
+    in
+    Strict_pipe.Reader.fold transition_reader ~init
+      ~f:(fun pipe_acc network_transition ->
+        let is_bootstrapping () =
+          Strict_pipe.Writer.is_closed pipe_acc.bootstrap_controller_writer
+        in
         let `Transition incoming_transition, `Time_received tm =
           network_transition
         in
@@ -110,17 +166,30 @@ module Make (Inputs : Inputs_intf) :
             ~existing:(Protocol_state.consensus_state root_state)
             ~candidate:(Protocol_state.consensus_state new_state)
         then
-          if not !is_bootstrapping then start_bootstrap network_transition
-          else Deferred.unit
-        else
-          Deferred.return
-            ( if not !is_bootstrapping then
-              Strict_pipe.Writer.write tfc_writer network_transition
-            else
-              Strict_pipe.Writer.write bootstrap_controller_writer
-                ( `Transition incoming_transition
-                , `Time_received (to_unix_timestamp tm) ) ) )
-    |> don't_wait_for ;
-    Transition_frontier_controller.run ~logger ~network ~time_controller
-      ~frontier ~transition_reader:tfc_reader ~clear_reader
+          if not @@ is_bootstrapping () then (
+            kill pipe_acc.tfc_reader pipe_acc.tfc_writer ;
+            Strict_pipe.Writer.write clear_writer `Clear |> don't_wait_for ;
+            let%map bootstrap_controller_reader, bootstrap_controller_writer =
+              start_bootstrap network_transition
+            in
+            kill pipe_acc.bootstrap_controller_reader
+              pipe_acc.bootstrap_controller_writer ;
+            let tfc_reader, tfc_writer =
+              start_tfc ~verified_transition_writer ~clear_reader
+            in
+            { tfc_reader
+            ; tfc_writer
+            ; bootstrap_controller_reader
+            ; bootstrap_controller_writer } )
+          else (
+            Strict_pipe.Writer.write bootstrap_controller_writer
+              ( `Transition incoming_transition
+              , `Time_received (to_unix_timestamp tm) ) ;
+            Deferred.return pipe_acc )
+        else (
+          if not @@ is_bootstrapping () then
+            Strict_pipe.Writer.write tfc_writer network_transition ;
+          Deferred.return pipe_acc ) )
+    |> Deferred.ignore |> don't_wait_for ;
+    verified_transition_reader
 end

@@ -84,6 +84,10 @@ module Writer : sig
   val to_linear_pipe : ('t, 'behavior, 'return) t -> 't Linear_pipe.Writer.t
 
   val write : ('t, _, 'return) t -> 't -> 'return
+
+  val close : (_, _, _) t -> unit
+
+  val is_closed : (_, _, _) t -> bool
 end
 
 val create :

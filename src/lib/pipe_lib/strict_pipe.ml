@@ -154,6 +154,10 @@ module Writer = struct
         if Pipe.length writer.reader > capacity then
           handle_overflow writer data overflow
         else Pipe.write_without_pushback writer.writer data
+
+  let close {writer; _} = Pipe.close writer
+
+  let is_closed {writer; _} = Pipe.is_closed writer
 end
 
 let create type_ =
