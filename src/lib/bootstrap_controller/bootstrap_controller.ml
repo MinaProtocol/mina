@@ -170,6 +170,7 @@ module Make (Inputs : Inputs_intf) :
         in
         Transition_cache.add transition_graph ~parent:previous_state_hash
           transition ;
+        (* TODO: Efficiently limiting the number of green threads in #1337 *)
         if worth_getting_root t protocol_state time_received then
           on_transition t (transition, time_received) |> don't_wait_for ;
         Deferred.unit )
@@ -195,6 +196,7 @@ module Make (Inputs : Inputs_intf) :
     in
     let transition_graph = Transition_cache.create () in
     Transition_frontier.clear_paths frontier ;
+    (* TODO: We will use this variable for building a new reference for transition_frontier #1323 *)
     let%map _ledger_db = sync_ledger t ~transition_graph ~transition_reader in
     let protocol_state = t.best_with_root.root in
     let root_hash = External_transition.Protocol_state.hash protocol_state in

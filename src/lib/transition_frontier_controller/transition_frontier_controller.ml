@@ -86,12 +86,11 @@ module Make (Inputs : Inputs_intf) :
       ~catchup_breadcrumbs_reader ;
     Catchup.run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer ;
-    Strict_pipe.Reader.iter clear_reader ~f:(fun _ ->
+    Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
         kill valid_transition_reader valid_transition_writer ;
         kill processed_transition_reader processed_transition_writer ;
         kill catchup_job_reader catchup_job_writer ;
-        kill catchup_breadcrumbs_reader catchup_breadcrumbs_writer ;
-        Deferred.unit )
+        kill catchup_breadcrumbs_reader catchup_breadcrumbs_writer )
     |> don't_wait_for ;
     processed_transition_reader
 end
