@@ -46,7 +46,7 @@ module Make (Inputs : Inputs.S) = struct
     let timeouts = State_hash.Table.create () in
     let breadcrumb_builder_supervisor =
       Capped_supervisor.create ~job_capacity:5 (fun transition_branches ->
-          let%bind _, breadcrumbs =
+          let%bind breadcrumbs =
             Deferred.List.map transition_branches ~f:(fun branch ->
                 let (Rose_tree.T (branch_base, _)) = branch in
                 let branch_parent_hash =
@@ -59,12 +59,10 @@ module Make (Inputs : Inputs.S) = struct
                 in
                 Rose_tree.Deferred.fold_map branch ~init:branch_parent
                   ~f:(fun parent transition_with_hash ->
-                    let breadcrumb =
-                      Transition_frontier.Breadcrumb.build ~logger ~parent
-                        ~transition_with_hash
-                      |> Or_error.ok_exn
-                    in
-                    breadcrumb ) )
+                    Deferred.create (fun ivar ->
+                        Transition_frontier.Breadcrumb.build ~logger ~parent
+                          ~transition_with_hash
+                        |> Or_error.ok_exn |> Ivar.fill ivar ) ) )
           in
           Writer.write catchup_breadcrumbs_writer breadcrumbs )
     in

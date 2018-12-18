@@ -50,15 +50,13 @@ end)
 module Deferred = Make_ops (struct
   open Async_kernel
 
-  include (Deferred : module type of Deferred with module List := Deferred.List)
+  include (Deferred : Monad.S with type +'a t = 'a Deferred.t)
 
   module List = struct
     open Deferred.List
 
-    let iter : 'a list -> f:('a -> unit Deferred.t) -> unit Deferred.t =
-      iter ~how:`Sequential
+    let iter ls ~f = iter ~how:`Sequential ls ~f
 
-    let map : 'a list -> f:('a -> 'b Deferred.t) -> 'b list Deferred.t =
-      map ~how:`Sequential
+    let map ls ~f = map ~how:`Sequential ls ~f
   end
 end)
