@@ -967,9 +967,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
           ignore (go t0 Request.Handler.fail s0) ) ;
       aux
 
-    let run_unchecked (type a s) (t0 : (a, s) t) (s0 : s) =
-      let next_auxiliary = ref 1 in
-      let aux = Field.Vector.create () in
+    let run (type a s) ~next_auxiliary ~aux ?system (t0 : (a, s) t) (s0 : s) =
+      next_auxiliary := 1 ;
       let get_value : Cvar.t -> Field.t =
         let get_one v = Field.Vector.get aux (Backend.Var.index v - 1) in
         Cvar.eval get_one
@@ -980,59 +979,17 @@ module Make_basic (Backend : Backend_intf.S) = struct
         Field.Vector.emplace_back aux x ;
         v
       in
-      let rec go : type a s. (a, s) t -> Request.Handler.t -> s -> s * a =
-       fun t handler s ->
-        match t with
-        | Pure x -> (s, x)
-        | With_constraint_system (_, k) -> go k handler s
-        | With_label (_, t, k) ->
-            let s', y = go t handler s in
-            go (k y) handler s'
-        | As_prover (x, k) ->
-            let s', () = As_prover.run x get_value s in
-            go k handler s'
-        | Add_constraint (_c, t) -> go t handler s
-        | With_state (p, and_then, t_sub, k) ->
-            let s, s_sub = As_prover.run p get_value s in
-            let s_sub, y = go t_sub handler s_sub in
-            let s, () = As_prover.run (and_then s_sub) get_value s in
-            go (k y) handler s
-        | With_handler (h, t, k) ->
-            let s', y = go t (Request.Handler.push handler h) s in
-            go (k y) handler s'
-        | Clear_handler (t, k) ->
-            let s', y = go t Request.Handler.fail s in
-            go (k y) handler s'
-        | Exists ({store; check; _}, p, k) ->
-            let s', value = Provider.run p get_value s handler in
-            let var = Typ.Store.run (store value) store_field_elt in
-            let (), () = go (check var) handler () in
-            go (k {Handle.var; value= Some value}) handler s'
-        | Next_auxiliary k -> go (k !next_auxiliary) handler s
-      in
-      go t0 Request.Handler.fail s0
-
-    let run_and_check' (type a s) (t0 : (a, s) t) (s0 : s) =
-      let next_auxiliary = ref 1 in
-      let aux = Field.Vector.create () in
-      let get_value : Cvar.t -> Field.t =
-        let get_one v = Field.Vector.get aux (Backend.Var.index v - 1) in
-        Cvar.eval get_one
-      in
-      let store_field_elt x =
-        let v = Backend.Var.create !next_auxiliary in
-        incr next_auxiliary ;
-        Field.Vector.emplace_back aux x ;
-        v
-      in
-      let system = R1CS_constraint_system.create () in
-      R1CS_constraint_system.set_primary_input_size system 0 ;
+      ignore
+        (Option.map system ~f:(fun system ->
+             R1CS_constraint_system.set_primary_input_size system 0 )) ;
       let rec go : type a s.
           string list -> (a, s) t -> Request.Handler.t -> s -> s * a =
        fun stack t handler s ->
         match t with
         | Pure x -> (s, x)
-        | With_constraint_system (f, k) -> f system ; go stack k handler s
+        | With_constraint_system (f, k) ->
+            ignore (Option.map ~f system) ;
+            go stack k handler s
         | With_label (lab, t, k) ->
             let s', y = go (lab :: stack) t handler s in
             go stack (k y) handler s'
@@ -1040,12 +997,14 @@ module Make_basic (Backend : Backend_intf.S) = struct
             let s', () = As_prover.run x get_value s in
             go stack k handler s'
         | Add_constraint (c, t) ->
-            if not (Constraint.eval c get_value) then
-              failwithf "Constraint unsatisfied:\n%s\n%s\n"
-                (Constraint.annotation c)
-                (Constraint.stack_to_string stack)
-                () ;
-            Constraint.add ~stack c system ;
+            ignore
+              (Option.map system ~f:(fun system ->
+                   if not (Constraint.eval c get_value) then
+                     failwithf "Constraint unsatisfied:\n%s\n%s\n"
+                       (Constraint.annotation c)
+                       (Constraint.stack_to_string stack)
+                       () ;
+                   Constraint.add ~stack c system )) ;
             go stack t handler s
         | With_state (p, and_then, t_sub, k) ->
             let s, s_sub = As_prover.run p get_value s in
@@ -1065,7 +1024,17 @@ module Make_basic (Backend : Backend_intf.S) = struct
             go stack (k {Handle.var; value= Some value}) handler s'
         | Next_auxiliary k -> go stack (k !next_auxiliary) handler s
       in
-      match go [] t0 Request.Handler.fail s0 with
+      go [] t0 Request.Handler.fail s0
+
+    let run_and_check' (type a s) (t0 : (a, s) t) (s0 : s) =
+      let next_auxiliary = ref 1 in
+      let aux = Field.Vector.create () in
+      let system = R1CS_constraint_system.create () in
+      let get_value : Cvar.t -> Field.t =
+        let get_one v = Field.Vector.get aux (Backend.Var.index v - 1) in
+        Cvar.eval get_one
+      in
+      match run ~next_auxiliary ~aux ~system t0 s0 with
       | exception e -> Or_error.of_exn e
       | s, x ->
           let primary_input = Field.Vector.create () in
@@ -1077,6 +1046,11 @@ module Make_basic (Backend : Backend_intf.S) = struct
                  ~auxiliary_input:aux)
           then Or_error.error_string "Unknown constraint unsatisfied"
           else Ok (s, x, get_value)
+
+    let run_unchecked (type a s) (t0 : (a, s) t) (s0 : s) =
+      let next_auxiliary = ref 1 in
+      let aux = Field.Vector.create () in
+      run ~next_auxiliary ~aux t0 s0
 
     let run_and_check t s =
       Or_error.map (run_and_check' t s) ~f:(fun (s, x, get_value) ->
