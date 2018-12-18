@@ -960,7 +960,13 @@ module Make_basic (Backend : Backend_intf.S) = struct
               go stack (k {Handle.var; value= None}) handler None )
         | Next_auxiliary k -> go stack (k !next_auxiliary) handler s
       in
-      go [] t0 Request.Handler.fail s0
+      let retval = go [] t0 Request.Handler.fail s0 in
+      ignore
+        (Option.map system ~f:(fun system ->
+             let auxiliary_input_size = !next_auxiliary - (1 + num_inputs) in
+             R1CS_constraint_system.set_auxiliary_input_size system
+               auxiliary_input_size )) ;
+      retval
 
     (* TODO-someday: Add pass to unify variables which have an Equal constraint *)
     let constraint_system ~num_inputs (t : (unit, 's) t) :
@@ -972,9 +978,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
       O1trace.measure "constraint_system" (fun () ->
           ignore (run ~num_inputs ~input ~next_auxiliary ~aux ~system t None)
       ) ;
-      let auxiliary_input_size = !next_auxiliary - (1 + num_inputs) in
-      R1CS_constraint_system.set_auxiliary_input_size system
-        auxiliary_input_size ;
       system
 
     let auxiliary_input (type s) ~num_inputs (t0 : (unit, s) t) (s0 : s)
