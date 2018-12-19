@@ -16,19 +16,22 @@ end
 module Time = struct
   include Time
 
-  let to_yojson t = Time.to_string t |> Yojson.Safe.from_string
+  let to_yojson t = `String (Time.to_string_abs t ~zone:Zone.utc)
 
   let of_yojson json =
-    json |> Yojson.Safe.to_string |> fun s -> Ok (Time.of_string s)
+    json |> Yojson.Safe.Util.to_string |> fun s -> Ok (Time.of_string s)
 end
 
 module Pid = struct
   include Pid
 
-  let to_yojson t = Pid.to_string t |> Yojson.Safe.from_string
+  let to_yojson t =
+    let pid_string = Pid.to_string t in
+    `Int (int_of_string pid_string)
 
   let of_yojson json =
-    json |> Yojson.Safe.to_string |> fun s -> Ok (Pid.of_string s)
+    json |> Yojson.Safe.Util.to_int
+    |> fun n -> Ok (Pid.of_string (string_of_int n))
 end
 
 module Message = struct
@@ -38,7 +41,7 @@ module Message = struct
     ; level: Level.t
     ; pid: Pid.t
     ; host: string
-    ; time: Time.t
+    ; timestamp: Time.t
     ; location: string option
     ; message: string }
   [@@deriving sexp, bin_io, yojson]
@@ -78,7 +81,7 @@ let log ~level ?loc ?(attrs = []) t fmt =
         ; path= t.path
         ; pid= t.pid
         ; host= t.host
-        ; time= Time.now ()
+        ; timestamp= Time.now ()
         ; level
         ; message
         ; location= loc }

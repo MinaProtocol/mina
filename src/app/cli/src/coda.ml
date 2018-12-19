@@ -120,6 +120,7 @@ let daemon log =
          else Sys.home_directory () >>| compute_conf_dir
        in
        Parallel.init_master () ;
+       ignore (Logger.set_sexp_logging sexp_logging) ;
        let%bind config =
          match%map
            Monitor.try_with_or_error ~extract_exn:true (fun () ->
@@ -173,10 +174,6 @@ let daemon log =
            (or_from_config YJ.Util.to_int_option "snark-worker-fee" ~default:0
               snark_work_fee)
        in
-       let sexp_logging_flag =
-         or_from_config YJ.Util.to_bool_option "sexp-logging"
-           (Some sexp_logging) ~default:false
-       in
        let rest_server_port =
          maybe_from_config YJ.Util.to_int_option "rest-port" rest_server_port
        in
@@ -197,7 +194,6 @@ let daemon log =
                   "peers" None ~default:[] ]
        in
        let discovery_port = external_port + 1 in
-       ignore (Logger.set_sexp_logging sexp_logging_flag) ;
        let%bind () = Unix.mkdir ~p:() conf_dir in
        let%bind initial_peers_raw =
          match peers with

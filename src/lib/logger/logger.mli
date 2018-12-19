@@ -20,7 +20,7 @@ module Message : sig
     ; level: Level.t
     ; pid: Pid.t
     ; host: string
-    ; time: Time.t
+    ; timestamp: Time.t
     ; location: string option
     ; message: string }
   [@@deriving bin_io, sexp, yojson]
