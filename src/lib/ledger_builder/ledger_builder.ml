@@ -673,7 +673,7 @@ end = struct
 
   let create ~ledger : t =
     let open Config in
-    (* Transaction capacity log_2 is one-forth the capacity for work parallelism *)
+    (* Transaction capacity log_2 is one-fourth the capacity for work parallelism *)
     { scan_state=
         Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 2)
     ; ledger }
