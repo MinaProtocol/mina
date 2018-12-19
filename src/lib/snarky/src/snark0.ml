@@ -876,8 +876,10 @@ module Make_basic (Backend : Backend_intf.S) = struct
       fst (go 0 t)
 
     let run (type a s) ~num_inputs ~input ~next_auxiliary ~aux ?system
-        (t0 : (a, s) t) (s0 : s option) =
+        ?(eval_constraints = false) (t0 : (a, s) t) (s0 : s option) =
       next_auxiliary := 1 + num_inputs ;
+      (* We can't evaluate the constraints if we are not computing over a value. *)
+      let eval_constraints = eval_constraints && Option.is_some s0 in
       let get_value : Cvar.t -> Field.t =
         let get_one v =
           let i = Backend.Var.index v in
@@ -903,6 +905,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
       in
       Option.iter system ~f:(fun system ->
           R1CS_constraint_system.set_primary_input_size system num_inputs ) ;
+      (* INVARIANT: go _ _ _ s = (s', _) gives (s' = Some _) iff (s = Some _) *)
       let rec go : type a s.
              string list
           -> (a, s) t
@@ -922,8 +925,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
             go stack k handler s'
         | Add_constraint (c, t) ->
             Option.iter system ~f:(fun system ->
-                (* NOTE: If s is None, we aren't evaluating and shouldn't consider constraints here. *)
-                if Option.is_some s && not (Constraint.eval c get_value) then
+                if eval_constraints && not (Constraint.eval c get_value) then
                   failwithf "Constraint unsatisfied:\n%s\n%s\n"
                     (Constraint.annotation c)
                     (Constraint.stack_to_string stack)
@@ -998,7 +1000,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
         Cvar.eval get_one
       in
       match
-        run ~num_inputs ~input ~next_auxiliary ~aux ~system t0 (Some s0)
+        run ~num_inputs ~input ~next_auxiliary ~aux ~system
+          ~eval_constraints:true t0 (Some s0)
       with
       | exception e -> Or_error.of_exn e
       | Some s, x ->
