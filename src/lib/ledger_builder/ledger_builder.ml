@@ -1011,7 +1011,7 @@ end = struct
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
     let%bind spots_available, proofs_waiting =
       let%map jobs =
-        Parallel_scan.next_jobs t.scan_state
+        Parallel_scan.next_jobs ~state:t.scan_state
         |> Result_with_rollback.of_or_error
       in
       ( Int.min (Parallel_scan.free_space ~state:t.scan_state) max_throughput
