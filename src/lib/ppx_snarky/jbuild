@@ -4,5 +4,5 @@
   ((name ppx_snarky)
    (public_name ppx_snarky)
    (kind ppx_rewriter)
-   (libraries (ppxlib ppx_tools ppx_deriving.make))
+   (libraries (ppxlib ppx_tools))
    (preprocess (pps (ppxlib.metaquot)))))
