@@ -82,7 +82,6 @@ module Make (Inputs : Inputs_intf) :
     let root_state = protocol_state (root_transition |> forget) in
     let new_state = protocol_state new_transition in
     Consensus.Mechanism.should_bootstrap
-      ~max_length:Transition_frontier.max_length
       ~existing:(Protocol_state.consensus_state root_state)
       ~candidate:(Protocol_state.consensus_state new_state)
 

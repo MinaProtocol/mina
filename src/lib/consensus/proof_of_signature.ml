@@ -256,7 +256,5 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     in
     With_hash.of_data ~hash_data:Protocol_state.hash state
 
-  let should_bootstrap ~max_length ~existing ~candidate =
-    let length = Fn.compose Length.to_int Consensus_state.length in
-    length existing - length candidate > 2 * max_length
+  let should_bootstrap ~existing:_ ~candidate:_ = false
 end

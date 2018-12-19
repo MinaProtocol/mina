@@ -6,7 +6,7 @@ open Coda_base
 open Signature_lib
 
 module Max_length = struct
-  let length = 2160
+  let length = Consensus.Mechanism.blocks_till_finality
 end
 
 module type Inputs_intf = sig

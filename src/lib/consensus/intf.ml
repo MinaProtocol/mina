@@ -147,10 +147,7 @@ module type S = sig
    *)
 
   val should_bootstrap :
-       max_length:int
-    -> existing:Consensus_state.value
-    -> candidate:Consensus_state.value
-    -> bool
+    existing:Consensus_state.value -> candidate:Consensus_state.value -> bool
   (**
    * Indicator of when we should bootstrap  
    *)
