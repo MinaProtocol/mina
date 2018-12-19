@@ -2004,7 +2004,7 @@ let%test_module "test" =
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
-      Quickcheck.test g ~trials:100 ~f:(fun _ ->
+      Quickcheck.test g ~trials:1000 ~f:(fun _ ->
           let old_ledger = !(Sl.ledger !sl) in
           let all_ts = txns (p / 2) (fun x -> (x + 1) * 100) (fun _ -> 4) in
           let ledger_proof, diff =
