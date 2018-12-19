@@ -562,7 +562,7 @@ let load_job_posts jobs =
 let site () : Site.t Deferred.t =
   let open File_system in
   let%bind position_files = load_job_posts positions in
-  let%bind post = Blog_post.content "scaning_scans" in
+  let%bind post = Blog_post.content "scans.markdown" in
   let%map home = home () in
   Site.create
     ( List.map position_files ~f:file
