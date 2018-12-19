@@ -14,15 +14,6 @@ module type Inputs_intf = sig
      and type masked_ledger := Ledger.Mask.Attached.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type ledger_diff_verified := Staged_ledger_diff.Verified.t
-
-  module Syncable_ledger :
-    Syncable_ledger.S
-    with type addr := Ledger.Addr.t
-     and type hash := Ledger_hash.t
-     and type merkle_tree := Ledger.Mask.Attached.t
-     and type merkle_path := Ledger.path
-     and type root_hash := Ledger_hash.t
-     and type account := Account.t
 end
 
 module Make (Inputs : Inputs_intf) :

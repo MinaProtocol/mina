@@ -22,8 +22,8 @@ module Make (Inputs : Inputs.S) :
         | Error e -> Deferred.return (Error e)
         | Ok acc -> f acc elem )
 
-  (* We would like the async scheduler to context switch between each iteration
-  of external transitions when trying to build breadcrumb_path. Therefore, this
+  (* We would like the async scheduler to context switch between each iteration 
+  of external transitions when trying to build breadcrumb_path. Therefore, this 
   function needs to return a Deferred *)
   let construct_breadcrumb_path ~logger initial_staged_ledger
       external_transitions =
