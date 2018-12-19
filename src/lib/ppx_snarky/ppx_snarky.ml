@@ -1,3 +1,4 @@
+open Core_kernel
 open Location
 open Ppxlib
 open Asttypes
@@ -25,32 +26,28 @@ let parse_to_name expr =
 let type_var field_info =
   match field_info with
   | _ :: field_mod :: _ ->
-      field_mod |> parse_to_name |> Longident.last_exn
-      |> String.uncapitalize_ascii
+      field_mod |> parse_to_name |> Longident.last_exn |> String.uncapitalize
   | _ -> failwith "Not enough info to construct type var."
 
 let polymorphic_type_stri fields_info =
-  let typ_vars = List.map type_var fields_info in
+  let typ_vars = List.map ~f:type_var fields_info in
   let fields =
-    fields_info
-    |> List.map2
-         (fun typ_var field_info ->
-           match field_info with
-           | field_name :: _ ->
-               let field_name = mknoloc (string_of_string_expr field_name) in
-               Type.field field_name (Typ.var typ_var)
-           | _ -> failwith "Not enough info to construct polymorphic type." )
-         typ_vars
+    List.map2_exn typ_vars fields_info ~f:(fun typ_var field_info ->
+        match field_info with
+        | field_name :: _ ->
+            let field_name = mknoloc (string_of_string_expr field_name) in
+            Type.field field_name (Typ.var typ_var)
+        | _ -> failwith "Not enough info to construct polymorphic type." )
   in
   let params =
-    typ_vars |> List.map (fun typ_var -> (Typ.var typ_var, Invariant))
+    List.map typ_vars ~f:(fun typ_var -> (Typ.var typ_var, Invariant))
   in
   Str.type_ Nonrecursive
     [Type.mk ~params ~kind:(Ptype_record fields) (mknoloc "polymorphic")]
 
 let accessors_stri fields_info =
   let accessor_bindings =
-    List.map (fun field_info ->
+    List.map ~f:(fun field_info ->
         match field_info with
         | field_name :: _ ->
             let field_name = string_of_string_expr field_name in
@@ -68,12 +65,30 @@ let accessors_stri fields_info =
 let include_ ?(loc = none) ?(attr = []) mod_ =
   Str.include_ ~loc {pincl_loc= loc; pincl_attributes= attr; pincl_mod= mod_}
 
-let t_mod_instance name _fields_info =
-  [ Str.module_ @@ Mb.mk (mknoloc name) @@ Mod.structure []
+let localize_mod base_mod mod_name name = Ldot (Ldot (base_mod, mod_name), name)
+
+let polymorphic_type_instance_stri mod_name fields_info =
+  let typs =
+    List.map fields_info ~f:(fun field_info ->
+        match field_info with
+        | _ :: field_mod :: _ ->
+            let path = localize_mod (parse_to_name field_mod) mod_name "t" in
+            Typ.constr (mknoloc path) []
+        | _ -> failwith "Not enough info to construct polytype instance." )
+  in
+  let bound_poly = Typ.constr (mknoloc (Longident.parse "polymorphic")) typs in
+  Str.type_ Nonrecursive [Type.mk ~manifest:bound_poly (mknoloc "polymorphic")]
+
+let t_mod_instance name fields_info =
+  [ Str.module_
+    @@ Mb.mk (mknoloc name)
+    @@ Mod.structure [polymorphic_type_instance_stri name fields_info]
   ; include_ (Mod.ident (mknoloc (Longident.parse name))) ]
 
-let snark_mod_instance name _fields_info =
-  [Str.module_ @@ Mb.mk (mknoloc name) @@ Mod.structure []]
+let snark_mod_instance name fields_info =
+  [ Str.module_
+    @@ Mb.mk (mknoloc name)
+    @@ Mod.structure [polymorphic_type_instance_stri name fields_info] ]
 
 let instances_str instances_info fields_info =
   match instances_info with
@@ -90,10 +105,10 @@ let str_poly_record ~loc ~path:_ expr =
           [ {pexp_desc= Pexp_variant ("Instances", Some instances_info); _}
           ; {pexp_desc= Pexp_variant ("Fields", Some fields_info); _} ]; _ } ->
       let instances_info =
-        instances_info |> parse_listlike |> List.map parse_to_name
+        instances_info |> parse_listlike |> List.map ~f:parse_to_name
       in
       let fields_info =
-        fields_info |> parse_listlike |> List.map parse_listlike
+        fields_info |> parse_listlike |> List.map ~f:parse_listlike
       in
       let polytype = polymorphic_type_stri fields_info in
       let accessors = accessors_stri fields_info in
