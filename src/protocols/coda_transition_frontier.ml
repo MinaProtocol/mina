@@ -50,6 +50,14 @@ module type Transition_frontier_base_intf = sig
       -> staged_ledger
       -> t
 
+    val build :
+         logger:Logger.t
+      -> parent:t
+      -> transition_with_hash:( external_transition_verified
+                              , state_hash )
+                              With_hash.t
+      -> t Or_error.t
+
     val transition_with_hash :
       t -> (external_transition_verified, state_hash) With_hash.t
 
@@ -140,9 +148,10 @@ module type Catchup_intf = sig
                           , state_hash )
                           With_hash.t
                           Reader.t
-    -> catchup_breadcrumbs_writer:( transition_frontier_breadcrumb list
-                                  , crash buffered
-                                  , unit )
+    -> catchup_breadcrumbs_writer:( transition_frontier_breadcrumb Rose_tree.t
+                                    list
+                                  , synchronous
+                                  , unit Deferred.t )
                                   Writer.t
     -> unit
 end
@@ -205,10 +214,17 @@ module type Transition_handler_processor_intf = sig
     -> catchup_job_writer:( ( external_transition_verified
                             , state_hash )
                             With_hash.t
-                          , drop_head buffered
-                          , unit )
+                          , synchronous
+                          , unit Deferred.t )
                           Writer.t
-    -> catchup_breadcrumbs_reader:transition_frontier_breadcrumb list Reader.t
+    -> catchup_breadcrumbs_reader:transition_frontier_breadcrumb Rose_tree.t
+                                  list
+                                  Reader.t
+    -> catchup_breadcrumbs_writer:( transition_frontier_breadcrumb Rose_tree.t
+                                    list
+                                  , synchronous
+                                  , unit Deferred.t )
+                                  Writer.t
     -> processed_transition_writer:( ( external_transition_verified
                                      , state_hash )
                                      With_hash.t
