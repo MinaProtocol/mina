@@ -7,6 +7,10 @@ open Protocols
 open Coda_pow
 open O1trace
 
+let val_or_exn label = function
+  | Error e -> failwithf "%s: %s" label (Error.to_string_hum e) ()
+  | Ok x -> x
+
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
 
@@ -529,8 +533,10 @@ end = struct
             | None -> Yield (List.rev (x :: acc), ([], 0, seq))
             | _ -> Skip (x :: acc, i + 1, seq) ) )
 
-  let all_work_pairs t =
-    let all_jobs = Parallel_scan.next_jobs ~state:t.scan_state in
+  let all_work_pairs_exn t =
+    let all_jobs =
+      val_or_exn "Next jobs" (Parallel_scan.next_jobs ~state:t.scan_state)
+    in
     let module A = Parallel_scan.Available_job in
     let module L = Ledger_proof_statement in
     let single_spec (job : job) =
@@ -1003,8 +1009,11 @@ end = struct
   let apply_diff t (diff : Ledger_builder_diff.t) ~logger =
     let open Result_with_rollback.Let_syntax in
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
-    let spots_available, proofs_waiting =
-      let jobs = Parallel_scan.next_jobs ~state:t.scan_state in
+    let%bind spots_available, proofs_waiting =
+      let%map jobs =
+        Parallel_scan.next_jobs t.scan_state
+        |> Result_with_rollback.of_or_error
+      in
       ( Int.min (Parallel_scan.free_space ~state:t.scan_state) max_throughput
       , List.length jobs )
     in
@@ -1167,8 +1176,11 @@ end = struct
     Or_error.ok_exn (verify_scan_state_after_apply t.ledger t.scan_state) ;
     (`Hash_after_applying (hash t), `Ledger_proof res_opt)
 
-  let work_to_do scan_state : Completed_work.Statement.t Sequence.t =
-    let work_seq = Parallel_scan.next_jobs_sequence ~state:scan_state in
+  let work_to_do_exn scan_state : Completed_work.Statement.t Sequence.t =
+    let work_seq =
+      val_or_exn "Work to do"
+        (Parallel_scan.next_jobs_sequence ~state:scan_state)
+    in
     sequence_chunks_of ~n:Completed_work.proofs_length
     @@ Sequence.map work_seq ~f:(fun maybe_work ->
            match statement_of_job maybe_work with
@@ -1662,12 +1674,14 @@ end = struct
       Parallel_scan.partition_if_overflowing ~max_slots:max_throughput
         t'.scan_state
     in
+    (*TODO: return an or_error here *)
+    let work_to_do = work_to_do_exn t'.scan_state in
     let pre_diffs =
-      generate_prediff logger (work_to_do t'.scan_state) transactions_by_fee
-        get_completed_work ledger self partitions
+      generate_prediff logger work_to_do transactions_by_fee get_completed_work
+        ledger self partitions
     in
     let proofs_available =
-      Sequence.filter_map (work_to_do t'.scan_state) ~f:get_completed_work
+      Sequence.filter_map work_to_do ~f:get_completed_work
       |> Sequence.to_list |> List.length
     in
     Logger.info logger "Block stats: Proofs ready for purchase: %d"

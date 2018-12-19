@@ -118,11 +118,12 @@ val next_k_jobs :
   state:('a, 'd) State.t -> k:int -> ('a, 'd) Available_job.t list Or_error.t
 (** Get the next k available jobs *)
 
-val next_jobs : state:('a, 'd) State.t -> ('a, 'd) Available_job.t list
+val next_jobs :
+  state:('a, 'd) State.t -> ('a, 'd) Available_job.t list Or_error.t
 (** Get all the available jobs *)
 
 val next_jobs_sequence :
-  state:('a, 'd) State.t -> ('a, 'd) Available_job.t Sequence.t
+  state:('a, 'd) State.t -> ('a, 'd) Available_job.t Sequence.t Or_error.t
 (** Get all the available jobs as a sequence *)
 
 val enqueue_data : state:('a, 'd) State.t -> data:'d list -> unit Or_error.t

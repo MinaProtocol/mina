@@ -203,10 +203,6 @@ module State = struct
     | `Same_level pos -> pos
     | `Next_level pos -> pos
 
-  let _set_next_position t level_pointer =
-    (t.jobs).position
-    <- next_position (parallelism t) level_pointer t.jobs.position
-
   (*On each level, the jobs are completed starting from a specific index that 
   is stored in levels_pointer. When a job at that index is completed, it points 
   to the next job on the same level. After the last node of the level, the 
@@ -221,36 +217,6 @@ module State = struct
       else t.level_pointer.(cur_level) <- first_node
     else ()
 
-  (*let make_jobs_ordered f empty t =
-    let rec go count t =
-      if count = (parallelism t * 2) - 1 then empty
-      else
-        let j = Ring_buffer.read t.jobs in
-        let pos = t.jobs.position in
-        set_next_position t t.level_pointer ;
-        (* build list or sequence *)
-        f (j, pos) (go (count + 1) t)
-    in
-    (t.jobs).position <- 0 ;
-    let js = go 0 t in
-    (t.jobs).position <- 0 ;
-    js
-
-  let jobs_sequence t =
-    let open Sequence in
-    let seq_cons elt elts = append (return elt) elts in
-    make_jobs_ordered seq_cons empty t
-
-  let _jobs_list t =
-    Sequence.to_list (jobs_sequence t)
-
-  let read_jobs_sequence t =
-    Sequence.filter (jobs_sequence t) ~f:(fun (_, pos) ->
-        parent_empty t.jobs pos )
-
-  let _read_jobs t =
-    Sequence.to_list (read_jobs_sequence t)*)
-
   let job_ready job =
     let module J = Job in
     let module A = Available_job in
@@ -259,24 +225,31 @@ module State = struct
     | J.Merge (Some a, Some b) -> Some (A.Merge (a, b))
     | _ -> None
 
+  let job state index =
+    match job_ready (Ring_buffer.read_i state.jobs index) with
+    | None ->
+        Or_error.errorf
+          "Invalid state of the scan: Found an un-Available_job.t at %d " index
+    | Some e -> Ok e
+
   let jobs_ready_sequence state =
     let open Sequence in
     let app elt elts = append elts (return elt) in
-    Queue.fold state.stateful_work_order ~init:empty ~f:(fun seq index ->
-        let elt =
-          Option.value_exn (job_ready (Ring_buffer.read_i state.jobs index))
-          (*These should be Available_job.t by structure *)
-        in
+    let open Or_error.Let_syntax in
+    Queue.fold state.stateful_work_order ~init:(Ok empty) ~f:(fun seq index ->
+        let%bind seq = seq in
+        let%map elt = job state index in
         if parent_empty state.jobs index then app elt seq else seq )
 
   let jobs_ready state =
-    Queue.fold state.stateful_work_order ~init:[] ~f:(fun lst index ->
-        let elt =
-          Option.value_exn (job_ready (Ring_buffer.read_i state.jobs index))
-          (*These should be Available_job.t by structure *)
-        in
-        if parent_empty state.jobs index then elt :: lst else lst )
-    |> List.rev
+    let open Or_error.Let_syntax in
+    let%map lst =
+      Queue.fold state.stateful_work_order ~init:(Ok []) ~f:(fun lst index ->
+          let%bind lst = lst in
+          let%map elt = job state index in
+          if parent_empty state.jobs index then elt :: lst else lst )
+    in
+    List.rev lst
 
   let update_new_job t z dir pos =
     let new_job (cur_job : ('a, 'd) Job.t) : ('a, 'd) Job.t Or_error.t =
@@ -414,22 +387,25 @@ end
 
 let start : type a d. parallelism_log_2:int -> (a, d) State.t = State.create
 
-let next_jobs : state:('a, 'd) State.t -> ('a, 'd) Available_job.t list =
+let next_jobs :
+    state:('a, 'd) State.t -> ('a, 'd) Available_job.t list Or_error.t =
  fun ~state -> State.jobs_ready state
 
 let next_jobs_sequence :
-    state:('a, 'd) State.t -> ('a, 'd) Available_job.t Sequence.t =
+    state:('a, 'd) State.t -> ('a, 'd) Available_job.t Sequence.t Or_error.t =
  fun ~state -> State.jobs_ready_sequence state
 
 let next_k_jobs :
     state:('a, 'd) State.t -> k:int -> ('a, 'd) Available_job.t list Or_error.t
     =
  fun ~state ~k ->
+  let open Or_error.Let_syntax in
   if k > State.parallelism state then
     Or_error.errorf "You asked for %d jobs, but it's only safe to ask for %d" k
       (State.parallelism state)
   else
-    let possible_jobs = List.take (next_jobs ~state) k in
+    let%bind jobs = next_jobs ~state in
+    let possible_jobs = List.take jobs k in
     let len = List.length possible_jobs in
     if Int.equal len k then Or_error.return possible_jobs
     else
@@ -598,7 +574,7 @@ let gen :
     go datas []
   in
   List.fold data_chunks ~init:s ~f:(fun s chunk ->
-      let jobs = next_jobs ~state:s in
+      let jobs = Or_error.ok_exn (next_jobs ~state:s) in
       let jobs_done = List.map jobs ~f:f_job_done in
       let old_tuple = s.acc in
       Option.iter
@@ -635,7 +611,7 @@ let%test_module "scans" =
           rem_ds
         else []
       in
-      let jobs = next_jobs ~state in
+      let jobs = Or_error.ok_exn (next_jobs ~state) in
       let jobs_done = List.map jobs ~f in
       let old_tuple = state.acc in
       let x' =
@@ -701,7 +677,7 @@ let%test_module "scans" =
               let data = List.init i ~f:Int64.of_int in
               let partition = partition_if_overflowing ~max_slots:i state in
               let curr_head = Option.value_exn state.base_none_pos in
-              let jobs = next_jobs ~state in
+              let jobs = Or_error.ok_exn (next_jobs ~state) in
               let jobs_done = List.map jobs ~f:job_done in
               let _ =
                 Or_error.ok_exn
@@ -735,7 +711,7 @@ let%test_module "scans" =
               Async.Thread_safe.block_on_async_exn (fun () ->
                   (*let i = free_space ~state - 1 in*)
                   let data = List.init i ~f:(fun _ -> one) in
-                  let jobs = next_jobs ~state in
+                  let jobs = Or_error.ok_exn (next_jobs ~state) in
                   let jobs_done = List.map jobs ~f:job_done in
                   let old_tuple = state.acc in
                   let _ =
