@@ -146,6 +146,46 @@ struct
       include Register (T)
     end
   end
+
+  module Get_ancestry = struct
+    module T = struct
+      let name = "get_ancestry"
+
+      module T = struct
+        type query = State_hash.t * int [@@deriving bin_io, sexp]
+
+        type response =
+          (External_transition.Protocol_state.value * State_body_hash.t list)
+          option
+        [@@deriving bin_io]
+      end
+
+      module Caller = T
+      module Callee = T
+    end
+
+    include T.T
+    include Versioned_rpc.Both_convert.Plain.Make (T)
+
+    module V1 = struct
+      module T = struct
+        include T.T
+
+        let version = 1
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = Fn.id
+
+        let caller_model_of_response = Fn.id
+      end
+
+      include T
+      include Register (T)
+    end
+  end
 end
 
 module Message (Inputs : sig
@@ -282,7 +322,11 @@ module Make (Inputs : Inputs_intf) = struct
          -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t)
       ~(transition_catchup :
             State_hash.t Envelope.Incoming.t
-         -> External_transition.t list option Deferred.t) =
+         -> External_transition.t list option Deferred.t)
+      ~(get_ancestry :
+            (State_hash.t * int) Envelope.Incoming.t
+         -> (External_transition.Protocol_state.value * State_body_hash.t list)
+            Deferred.Option.t) =
     let log = Logger.child config.parent_log "coda networking" in
     let get_staged_ledger_aux_at_hash_rpc sender ~version:_ hash =
       get_staged_ledger_aux_at_hash (Envelope.Incoming.wrap ~data:hash ~sender)
@@ -293,13 +337,17 @@ module Make (Inputs : Inputs_intf) = struct
     let transition_catchup_rpc sender ~version:_ hash =
       transition_catchup (Envelope.Incoming.wrap ~data:hash ~sender)
     in
+    let get_ancestry_rpc sender ~version:_ query =
+      get_ancestry (Envelope.Incoming.wrap ~data:query ~sender)
+    in
     let implementations =
       List.concat
         [ Rpcs.Get_staged_ledger_aux_at_hash.implement_multi
             get_staged_ledger_aux_at_hash_rpc
         ; Rpcs.Answer_sync_ledger_query.implement_multi
             answer_sync_ledger_query_rpc
-        ; Rpcs.Transition_catchup.implement_multi transition_catchup_rpc ]
+        ; Rpcs.Transition_catchup.implement_multi transition_catchup_rpc
+        ; Rpcs.Get_ancestry.implement_multi get_ancestry_rpc ]
     in
     let%map gossip_net =
       Gossip_net.create config.gossip_net_params implementations
@@ -337,6 +385,36 @@ module Make (Inputs : Inputs_intf) = struct
 
   let broadcast_snark_pool_diff t x = broadcast t (Snark_pool_diff x)
 
+  (* TODO: This is kinda inefficient *)
+  let find_map xs ~f =
+    let open Async in
+    let ds = List.map xs ~f in
+    let filter ~f =
+      Deferred.bind ~f:(fun x -> if f x then return x else Deferred.never ())
+    in
+    let none_worked =
+      Deferred.bind (Deferred.all ds) ~f:(fun ds ->
+          if List.for_all ds ~f:Option.is_none then return None
+          else Deferred.never () )
+    in
+    Deferred.any (none_worked :: List.map ~f:(filter ~f:Option.is_some) ds)
+
+  (* TODO: Don't copy and paste *)
+  let find_map' xs ~f =
+    let open Async in
+    let ds = List.map xs ~f in
+    let filter ~f =
+      Deferred.bind ~f:(fun x -> if f x then return x else Deferred.never ())
+    in
+    let none_worked =
+      Deferred.bind (Deferred.all ds) ~f:(fun ds ->
+          (* TODO: Validation applicative here *)
+          if List.for_all ds ~f:Or_error.is_error then
+            return (Or_error.error_string "all none")
+          else Deferred.never () )
+    in
+    Deferred.any (none_worked :: List.map ~f:(filter ~f:Or_error.is_ok) ds)
+
   let peers t = Gossip_net.peers t.gossip_net
 
   let random_peers {gossip_net; _} = Gossip_net.random_peers gossip_net
@@ -345,40 +423,30 @@ module Make (Inputs : Inputs_intf) = struct
     Gossip_net.query_peer t.gossip_net peer
       Rpcs.Transition_catchup.dispatch_multi state_hash
 
+  (* TODO: Make this rpc `Get_ancestry` more intelligent #1324 *)
+  let get_ancestry t input =
+    let peers = random_peers t 8 in
+    find_map' peers ~f:(fun peer ->
+        match%map
+          Gossip_net.query_peer t.gossip_net peer
+            Rpcs.Get_ancestry.dispatch_multi input
+        with
+        | Ok (Some ancestors) -> Ok ancestors
+        | Ok None ->
+            Or_error.errorf
+              !"Peer %{sexp:Peer.t} does not have proof for \
+                %{sexp:Rpcs.Get_ancestry.query}"
+              peer input
+        | Error e ->
+            Or_error.errorf
+              !"Encountered a network connection querying an ancestry from \
+                peer %{sexp:Peer.t}: %{sexp:Error.t}"
+              peer e )
+
   module Staged_ledger_io = struct
     type nonrec t = t
 
     let create = Fn.id
-
-    (* TODO: This is kinda inefficient *)
-    let find_map xs ~f =
-      let open Async in
-      let ds = List.map xs ~f in
-      let filter ~f =
-        Deferred.bind ~f:(fun x -> if f x then return x else Deferred.never ())
-      in
-      let none_worked =
-        Deferred.bind (Deferred.all ds) ~f:(fun ds ->
-            if List.for_all ds ~f:Option.is_none then return None
-            else Deferred.never () )
-      in
-      Deferred.any (none_worked :: List.map ~f:(filter ~f:Option.is_some) ds)
-
-    (* TODO: Don't copy and paste *)
-    let find_map' xs ~f =
-      let open Async in
-      let ds = List.map xs ~f in
-      let filter ~f =
-        Deferred.bind ~f:(fun x -> if f x then return x else Deferred.never ())
-      in
-      let none_worked =
-        Deferred.bind (Deferred.all ds) ~f:(fun ds ->
-            (* TODO: Validation applicative here *)
-            if List.for_all ds ~f:Or_error.is_error then
-              return (Or_error.error_string "all none")
-            else Deferred.never () )
-      in
-      Deferred.any (none_worked :: List.map ~f:(filter ~f:Or_error.is_ok) ds)
 
     let get_staged_ledger_aux_at_hash t staged_ledger_hash =
       let peers = Gossip_net.random_peers t.gossip_net 8 in

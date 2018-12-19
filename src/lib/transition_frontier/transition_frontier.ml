@@ -6,7 +6,7 @@ open Coda_base
 open Signature_lib
 
 module Max_length = struct
-  let length = 2160
+  let length = Consensus.Mechanism.blocks_till_finality
 end
 
 module type Inputs_intf = sig
@@ -100,6 +100,59 @@ struct
 
     let create transition_with_hash staged_ledger =
       {transition_with_hash; staged_ledger}
+
+    let build ~logger ~parent ~transition_with_hash =
+      let open Or_error.Let_syntax in
+      let logger = Logger.child logger __MODULE__ in
+      let staged_ledger = parent.staged_ledger in
+      let transition = With_hash.data transition_with_hash in
+      let transition_protocol_state =
+        Inputs.External_transition.Verified.protocol_state transition
+      in
+      let ledger_hash_from_proof p =
+        Inputs.Ledger_proof.statement_target (Inputs.Ledger_proof.statement p)
+      in
+      let blockchain_state_ledger_hash, blockchain_staged_ledger_hash =
+        let blockchain_state =
+          Consensus.Mechanism.Protocol_state.blockchain_state
+            transition_protocol_state
+        in
+        ( Consensus.Mechanism.Blockchain_state.ledger_hash blockchain_state
+        , Consensus.Mechanism.Blockchain_state.staged_ledger_hash
+            blockchain_state )
+      in
+      let%bind ( `Hash_after_applying staged_ledger_hash
+               , `Ledger_proof proof_opt
+               , `Staged_ledger transitioned_staged_ledger ) =
+        Inputs.Staged_ledger.apply ~logger staged_ledger
+          (Inputs.External_transition.Verified.staged_ledger_diff transition)
+      in
+      let target_ledger_hash =
+        match proof_opt with
+        | None ->
+            Option.value_map
+              (Inputs.Staged_ledger.current_ledger_proof
+                 transitioned_staged_ledger)
+              ~f:ledger_hash_from_proof
+              ~default:
+                (Frozen_ledger_hash.of_ledger_hash
+                   (Ledger.merkle_root Genesis_ledger.t))
+        | Some proof -> ledger_hash_from_proof proof
+      in
+      let%map transitioned_staged_ledger =
+        if
+          Frozen_ledger_hash.equal target_ledger_hash
+            blockchain_state_ledger_hash
+          && Staged_ledger_hash.equal staged_ledger_hash
+               blockchain_staged_ledger_hash
+        then return transitioned_staged_ledger
+        else
+          Or_error.error_string
+            "Snarked ledger hash and Staged ledger hash after applying the \
+             diff does not match blockchain state's ledger hash and staged \
+             ledger hash resp.\n"
+      in
+      {transition_with_hash; staged_ledger= transitioned_staged_ledger}
 
     let hash {transition_with_hash; _} = With_hash.hash transition_with_hash
 
@@ -288,19 +341,8 @@ struct
     in
     attach_node_to t ~parent_node ~node
 
-  let _root_successor t parent_node =
-    let new_length = parent_node.length + 1 in
-    let root_node = Hashtbl.find_exn t.table t.root in
-    let root_hash = With_hash.hash root_node.breadcrumb.transition_with_hash in
-    let distance_to_root = new_length - root_node.length in
-    if distance_to_root > max_length then
-      `Changed_root (List.hd_exn (hash_path t parent_node.breadcrumb))
-    else `Same_root root_hash
-
   (* Adding a transition to the transition frontier is broken into the following steps:
-   *   1) create a new breadcrumb for a transition
-          a) apply the staged_ledger_diff on to the parent breadcrumb of the transition
-          b) validate the snarked ledger hash from the transition
+   *   1) build a new breadcrumb for a transition
    *   2) attach the breadcrumb to the transition frontier
    *   3) move the root if the path to the new node is longer than the max length
    *     a) calculate the distance from the new node to the parent
@@ -333,56 +375,11 @@ struct
         ~error:
           (Error.of_exn (Parent_not_found (`Parent parent_hash, `Target hash)))
     in
-    (* 1.a ; b *)
-    let staged_ledger = Breadcrumb.staged_ledger parent_node.breadcrumb in
-    let ledger_hash_from_proof p =
-      Inputs.Ledger_proof.statement_target (Inputs.Ledger_proof.statement p)
-    in
-    let blockchain_state_ledger_hash, blockchain_staged_ledger_hash =
-      let blockchain_state =
-        Protocol_state.blockchain_state transition_protocol_state
-      in
-      ( Protocol_state.Blockchain_state.ledger_hash blockchain_state
-      , Protocol_state.Blockchain_state.staged_ledger_hash blockchain_state )
-    in
-    let transitioned_staged_ledger =
-      match
-          Inputs.Staged_ledger.apply ~logger:t.logger staged_ledger
-            (Inputs.External_transition.Verified.staged_ledger_diff transition)
-          |> Or_error.ok_exn
-      
-      with
-      | ( `Hash_after_applying staged_ledger_hash
-        , `Ledger_proof proof_opt
-        , `Staged_ledger transitioned_staged_ledger )
-      ->
-        let target_ledger_hash =
-          match proof_opt with
-          | None ->
-              Option.value_map
-                (Inputs.Staged_ledger.current_ledger_proof
-                   transitioned_staged_ledger)
-                ~f:ledger_hash_from_proof
-                ~default:
-                  (Frozen_ledger_hash.of_ledger_hash
-                     (Ledger.Db.merkle_root t.root_snarked_ledger))
-          | Some proof -> ledger_hash_from_proof proof
-        in
-        if
-          Frozen_ledger_hash.equal target_ledger_hash
-            blockchain_state_ledger_hash
-          && Staged_ledger_hash.equal staged_ledger_hash
-               blockchain_staged_ledger_hash
-        then transitioned_staged_ledger
-        else
-          failwith
-            "Snarked ledger hash and Staged ledger hash after applying the \
-             diff does not match blockchain state's ledger hash and staged \
-             ledger hash resp.\n"
-    in
+    (* 1 *)
     let breadcrumb =
-      { Breadcrumb.transition_with_hash
-      ; staged_ledger= transitioned_staged_ledger }
+      Breadcrumb.build ~logger:t.logger ~parent:parent_node.breadcrumb
+        ~transition_with_hash
+      |> Or_error.ok_exn
     in
     (* 2 *)
     attach_breadcrumb_exn t breadcrumb ;
@@ -412,6 +409,12 @@ struct
     (* 4 *)
     if node.length > best_tip_node.length then t.best_tip <- hash ;
     node.breadcrumb
+
+  let clear_paths t = Hashtbl.clear t.table
+
+  let rebuild t new_root_hash =
+    t.root <- new_root_hash ;
+    t.best_tip <- new_root_hash
 end
 
 let%test_module "Transition_frontier tests" =

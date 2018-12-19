@@ -22,8 +22,8 @@ module Make (Inputs : Inputs.S) :
         | Error e -> Deferred.return (Error e)
         | Ok acc -> f acc elem )
 
-  (* We would like the async scheduler to context switch between each iteration
-  of external transitions when trying to build breadcrumb_path. Therefore, this
+  (* We would like the async scheduler to context switch between each iteration 
+  of external transitions when trying to build breadcrumb_path. Therefore, this 
   function needs to return a Deferred *)
   let construct_breadcrumb_path ~logger initial_staged_ledger
       external_transitions =
@@ -114,15 +114,17 @@ module Make (Inputs : Inputs.S) :
       ~catchup_breadcrumbs_writer =
     Strict_pipe.Reader.iter catchup_job_reader ~f:(fun transition_with_hash ->
         let hash = With_hash.hash transition_with_hash in
-        match%map
+        match%bind
           get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
             ~num_peers:8 hash
         with
         | Ok breadcrumbs ->
-            Strict_pipe.Writer.write catchup_breadcrumbs_writer breadcrumbs
+            Strict_pipe.Writer.write catchup_breadcrumbs_writer
+              [Rose_tree.of_list_exn breadcrumbs]
         | Error e ->
             Logger.info logger
               !"None of the peers have a transition with state hash:\n%s"
-              (Error.to_string_hum e) )
+              (Error.to_string_hum e) ;
+            Deferred.unit )
     |> don't_wait_for
 end

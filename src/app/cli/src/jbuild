@@ -40,6 +40,8 @@
       sync_handler
       ledger_catchup
       transition_handler
+      bootstrap_controller
+      transition_router
       async
       async_extra
       rpc_parallel

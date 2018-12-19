@@ -41,6 +41,8 @@ module type Inputs_intf = sig
 
     val coinbase : Amount.t
 
+    val blocks_till_finality : int
+
     val network_delay : int
 
     val slot_length : Time.Span.t
@@ -1416,6 +1418,11 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     in
     With_hash.of_data ~hash_data:Protocol_state.hash state
 
+  let should_bootstrap ~existing ~candidate =
+    let length = Fn.compose Length.to_int Consensus_state.length in
+    length existing - length candidate
+    > (2 * Constants.blocks_till_finality) + Constants.network_delay
+
   let to_unix_timestamp recieved_time =
     recieved_time |> Time.to_span_since_epoch |> Time.Span.to_ms
     |> Unix_timestamp.of_int64
@@ -1456,6 +1463,8 @@ let%test_module "Proof_of_stake tests" =
         let genesis_state_timestamp = Coda_base.Block_time.now ()
 
         let coinbase = Amount.of_int 20
+
+        let blocks_till_finality = 1024
 
         let slot_length = Coda_base.Block_time.Span.of_ms (Int64.of_int 200)
 
