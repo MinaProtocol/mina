@@ -403,6 +403,38 @@ let%test_module "Test mask connected to underlying Merkle tree" =
                   Balance.to_int (Account.balance account) + total )
             in
             assert (Int.equal retrieved_total total) )
+
+      let%test_unit "masking in to_list" =
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            let num_accounts = 10 in
+            let keys = Key.gen_keys num_accounts in
+            (* parent balances all non-zero *)
+            let balances =
+              List.init num_accounts ~f:(fun n -> Balance.of_int (n + 1))
+            in
+            let parent_accounts =
+              List.map2_exn keys balances ~f:Account.create
+            in
+            (* add accounts to parent *)
+            List.iter parent_accounts ~f:(fun account ->
+                ignore @@ parent_create_new_account_exn maskable account ) ;
+            (* all accounts in parent to_list *)
+            let parent_list = Maskable.to_list maskable in
+            let zero_balance account =
+              {account with Account.balance= Balance.zero}
+            in
+            (* put same accounts in mask, but with zero balance *)
+            let mask_accounts = List.map parent_accounts ~f:zero_balance in
+            List.iter mask_accounts ~f:(fun account ->
+                ignore @@ create_new_account_exn attached_mask account ) ;
+            let mask_list = Mask.Attached.to_list attached_mask in
+            (* same number of accounts after adding them to mask *)
+            assert (Int.equal (List.length parent_list) (List.length mask_list)) ;
+            (* should only see the zero balances in mask list *)
+            assert (
+              List.for_all mask_list ~f:(fun account ->
+                  Balance.equal (Account.balance account) Balance.zero ) ) )
     end
 
     module type Depth_S = sig
