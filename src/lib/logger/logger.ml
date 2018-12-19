@@ -3,18 +3,37 @@ open Async
 
 module Level = struct
   type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
-  [@@deriving sexp, bin_io, compare]
+  [@@deriving bin_io, sexp, compare, yojson]
 end
 
 module Attribute = struct
-  type t = string * Sexp.t
+  type t = string * string
 
   let ( ^= ) k v = (k, v)
 end
 
+(* Core modules extended with to_yojson *)
+module Time = struct
+  include Time
+
+  let to_yojson t = Time.to_string t |> Yojson.Safe.from_string
+
+  let of_yojson json =
+    json |> Yojson.Safe.to_string |> fun s -> Ok (Time.of_string s)
+end
+
+module Pid = struct
+  include Pid
+
+  let to_yojson t = Pid.to_string t |> Yojson.Safe.from_string
+
+  let of_yojson json =
+    json |> Yojson.Safe.to_string |> fun s -> Ok (Pid.of_string s)
+end
+
 module Message = struct
   type t =
-    { attributes: Sexp.t String.Map.t
+    { attributes: (string * string) list
     ; path: string list
     ; level: Level.t
     ; pid: Pid.t
@@ -22,19 +41,26 @@ module Message = struct
     ; time: Time.t
     ; location: string option
     ; message: string }
-  [@@deriving sexp, bin_io]
+  [@@deriving sexp, bin_io, yojson]
 end
 
 type t =
   { null: bool
-  ; attributes: Sexp.t String.Map.t
+  ; attributes: (string * string) list
   ; pid: Pid.t
   ; host: string
   ; path: string list }
-[@@deriving sexp, bin_io]
+[@@deriving bin_io]
+
+(* flag is set on daemon startup *)
+let sexp_logging : bool Set_once.t = Set_once.create ()
+
+let set_sexp_logging b = Set_once.set_exn sexp_logging Lexing.dummy_pos b
+
+let get_sexp_logging () = Set_once.get_exn sexp_logging Lexing.dummy_pos
 
 let create () =
-  { attributes= String.Map.empty
+  { attributes= []
   ; null= false
   ; pid= Unix.getpid ()
   ; host= Unix.gethostname ()
@@ -48,9 +74,7 @@ let log ~level ?loc ?(attrs = []) t fmt =
   ksprintf
     (fun message ->
       let m : Message.t =
-        { attributes=
-            List.fold attrs ~init:t.attributes ~f:(fun acc (key, data) ->
-                Map.set acc ~key ~data )
+        { attributes= attrs
         ; path= t.path
         ; pid= t.pid
         ; host= t.host
@@ -60,22 +84,24 @@ let log ~level ?loc ?(attrs = []) t fmt =
         ; location= loc }
       in
       if t.null then ifprintf stdout ""
-      else printf !"%s\n" (Sexp.to_string_mach (Message.sexp_of_t m)) )
+      else
+        let output =
+          if get_sexp_logging () then
+            (* S-expression output *)
+            Sexp.to_string_mach (Message.sexp_of_t m)
+          else (* JSON output *)
+            Yojson.Safe.to_string (Message.to_yojson m)
+        in
+        printf "%s\n" output )
     fmt
 
-let extend t attrs =
-  { t with
-    attributes=
-      List.fold attrs ~init:t.attributes ~f:(fun acc (key, data) ->
-          Map.set acc ~key ~data ) }
+let extend t attrs = {t with attributes= t.attributes @ attrs}
 
 let child t s =
   { t with
     path= s :: t.path
-  ; attributes=
-      t.attributes
-      |> Map.set ~key:"module" ~data:([%sexp_of: string] s)
-      |> Map.set ~key:(sprintf "module-%s" s) ~data:([%sexp_of: bool] true) }
+  ; attributes= t.attributes @ [("module", s); (sprintf "module-%s" s, "true")]
+  }
 
 type 'a logger =
      ?loc:string

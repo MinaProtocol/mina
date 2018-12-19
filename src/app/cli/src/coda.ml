@@ -97,6 +97,9 @@ let daemon log =
            "FEE Amount a worker wants to get compensated for generating a \
             snark proof"
          (optional int)
+     and sexp_logging =
+       flag "sexp-logging" no_arg
+         ~doc:"Use S-expressions in log output, instead of JSON"
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -170,6 +173,10 @@ let daemon log =
            (or_from_config YJ.Util.to_int_option "snark-worker-fee" ~default:0
               snark_work_fee)
        in
+       let sexp_logging_flag =
+         or_from_config YJ.Util.to_bool_option "sexp-logging"
+           (Some sexp_logging) ~default:false
+       in
        let rest_server_port =
          maybe_from_config YJ.Util.to_int_option "rest-port" rest_server_port
        in
@@ -190,6 +197,7 @@ let daemon log =
                   "peers" None ~default:[] ]
        in
        let discovery_port = external_port + 1 in
+       ignore (Logger.set_sexp_logging sexp_logging_flag) ;
        let%bind () = Unix.mkdir ~p:() conf_dir in
        let%bind initial_peers_raw =
          match peers with

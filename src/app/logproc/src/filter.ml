@@ -22,7 +22,10 @@ type t =
 let eval_sexp_expr e (m : Logger.Message.t) =
   match e with
   | Null -> None
-  | Attribute s -> Map.find m.attributes s
+  | Attribute s -> (
+    match List.Assoc.find m.attributes s ~equal:String.equal with
+    | None -> None
+    | Some v -> Some ([%sexp_of: string] v) )
   | Int n -> Some ([%sexp_of: int] n)
   | String s -> Some ([%sexp_of: string] s)
   | Sexp s -> Some s
