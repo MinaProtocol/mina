@@ -55,12 +55,16 @@ type t =
   ; path: string list }
 [@@deriving bin_io]
 
-(* flag is set on daemon startup *)
-let sexp_logging : bool Set_once.t = Set_once.create ()
+(* flag is set on daemon startup
+ * running the daemon sets this option, but
+ * other code run during unit tests does logging without
+ * setting the option, precluding use of Set_once here *)
 
-let set_sexp_logging b = Set_once.set_exn sexp_logging Lexing.dummy_pos b
+let sexp_logging = ref false
 
-let get_sexp_logging () = Set_once.get_exn sexp_logging Lexing.dummy_pos
+let set_sexp_logging b = sexp_logging := b
+
+let get_sexp_logging () = !sexp_logging
 
 let create () =
   { attributes= []
