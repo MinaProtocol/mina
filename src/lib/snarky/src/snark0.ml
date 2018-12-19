@@ -918,7 +918,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
             let s', y = go (lab :: stack) t handler s in
             go stack (k y) handler s'
         | As_prover (x, k) ->
-            let s', _ = run_as_prover (Some x) s in
+            let s', (_ : unit option) = run_as_prover (Some x) s in
             go stack k handler s'
         | Add_constraint (c, t) ->
             Option.iter system ~f:(fun system ->
@@ -933,7 +933,9 @@ module Make_basic (Backend : Backend_intf.S) = struct
         | With_state (p, and_then, t_sub, k) ->
             let s, s_sub = run_as_prover (Some p) s in
             let s_sub, y = go stack t_sub handler s_sub in
-            let s, _ = run_as_prover (Option.map ~f:and_then s_sub) s in
+            let s, (_ : unit option) =
+              run_as_prover (Option.map ~f:and_then s_sub) s
+            in
             go stack (k y) handler s
         | With_handler (h, t, k) ->
             let s', y = go stack t (Request.Handler.push handler h) s in
@@ -947,12 +949,14 @@ module Make_basic (Backend : Backend_intf.S) = struct
               let s', value = Provider.run p get_value s handler in
               let var = Typ.Store.run (store value) store_field_elt in
               (* TODO: Push a label onto the stack here *)
-              let _, () = go stack (check var) handler (Some ()) in
+              let (_ : unit option), () =
+                go stack (check var) handler (Some ())
+              in
               go stack (k {Handle.var; value= Some value}) handler (Some s')
           | None ->
               let var = Typ.Alloc.run alloc alloc_var in
               (* TODO: Push a label onto the stack here *)
-              let _, () = go stack (check var) handler None in
+              let (_ : unit option), () = go stack (check var) handler None in
               go stack (k {Handle.var; value= None}) handler None )
         | Next_auxiliary k -> go stack (k !next_auxiliary) handler s
       in
