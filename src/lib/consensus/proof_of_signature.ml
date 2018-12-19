@@ -255,4 +255,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
              (Protocol_state.consensus_state Protocol_state.negative_one))
     in
     With_hash.of_data ~hash_data:Protocol_state.hash state
+
+  let should_bootstrap ~existing:_ ~candidate:_ = false
 end

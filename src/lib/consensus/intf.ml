@@ -145,4 +145,10 @@ module type S = sig
   (**
    * A hook for managing local state when the locked tip is updated.
    *)
+
+  val should_bootstrap :
+    existing:Consensus_state.value -> candidate:Consensus_state.value -> bool
+  (**
+   * Indicator of when we should bootstrap  
+   *)
 end

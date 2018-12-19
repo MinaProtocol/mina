@@ -75,6 +75,8 @@ module Reader = struct
     reader.has_reader <- true ;
     wrap_reader (Pipe.filter_map reader.reader ~f)
 
+  let clear t = Pipe.clear t.reader
+
   module Merge = struct
     let iter readers ~f =
       let not_empty r = not @@ Pipe.is_empty r.reader in
@@ -152,6 +154,10 @@ module Writer = struct
         if Pipe.length writer.reader > capacity then
           handle_overflow writer data overflow
         else Pipe.write_without_pushback writer.writer data
+
+  let close {writer; _} = Pipe.close writer
+
+  let is_closed {writer; _} = Pipe.is_closed writer
 end
 
 let create type_ =
