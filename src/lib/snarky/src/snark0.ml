@@ -901,9 +901,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
             (Some s', Some y)
         | _, _ -> (None, None)
       in
-      ignore
-        (Option.map system ~f:(fun system ->
-             R1CS_constraint_system.set_primary_input_size system num_inputs )) ;
+      Option.iter system ~f:(fun system ->
+          R1CS_constraint_system.set_primary_input_size system num_inputs ) ;
       let rec go : type a s.
              string list
           -> (a, s) t
@@ -914,8 +913,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
         match t with
         | Pure x -> (s, x)
         | With_constraint_system (f, k) ->
-            ignore (Option.map ~f system) ;
-            go stack k handler s
+            Option.iter ~f system ; go stack k handler s
         | With_label (lab, t, k) ->
             let s', y = go (lab :: stack) t handler s in
             go stack (k y) handler s'
@@ -923,16 +921,14 @@ module Make_basic (Backend : Backend_intf.S) = struct
             let s', _ = run_as_prover (Some x) s in
             go stack k handler s'
         | Add_constraint (c, t) ->
-            ignore
-              (Option.map system ~f:(fun system ->
-                   (* NOTE: If s is None, we aren't evaluating and shouldn't consider constraints here. *)
-                   if Option.is_some s && not (Constraint.eval c get_value)
-                   then
-                     failwithf "Constraint unsatisfied:\n%s\n%s\n"
-                       (Constraint.annotation c)
-                       (Constraint.stack_to_string stack)
-                       () ;
-                   Constraint.add ~stack c system )) ;
+            Option.iter system ~f:(fun system ->
+                (* NOTE: If s is None, we aren't evaluating and shouldn't consider constraints here. *)
+                if Option.is_some s && not (Constraint.eval c get_value) then
+                  failwithf "Constraint unsatisfied:\n%s\n%s\n"
+                    (Constraint.annotation c)
+                    (Constraint.stack_to_string stack)
+                    () ;
+                Constraint.add ~stack c system ) ;
             go stack t handler s
         | With_state (p, and_then, t_sub, k) ->
             let s, s_sub = run_as_prover (Some p) s in
@@ -961,11 +957,10 @@ module Make_basic (Backend : Backend_intf.S) = struct
         | Next_auxiliary k -> go stack (k !next_auxiliary) handler s
       in
       let retval = go [] t0 Request.Handler.fail s0 in
-      ignore
-        (Option.map system ~f:(fun system ->
-             let auxiliary_input_size = !next_auxiliary - (1 + num_inputs) in
-             R1CS_constraint_system.set_auxiliary_input_size system
-               auxiliary_input_size )) ;
+      Option.iter system ~f:(fun system ->
+          let auxiliary_input_size = !next_auxiliary - (1 + num_inputs) in
+          R1CS_constraint_system.set_auxiliary_input_size system
+            auxiliary_input_size ) ;
       retval
 
     (* TODO-someday: Add pass to unify variables which have an Equal constraint *)
