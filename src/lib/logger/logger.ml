@@ -12,7 +12,7 @@ module Attribute = struct
   let ( ^= ) k v = (k, v)
 end
 
-(* Core modules extended with to_yojson *)
+(* Core modules extended with Yojson converters *)
 module Time = struct
   include Time
 
