@@ -34,6 +34,8 @@ module type Inputs_intf = sig
 
     val coinbase : Amount.t
 
+    val blocks_till_finality : int
+
     val network_delay : int
 
     val slot_length : Time.Span.t
