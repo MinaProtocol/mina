@@ -24,7 +24,7 @@ module Types = struct
       ; peers: string list
       ; user_commands_sent: int
       ; run_snark_worker: bool
-      ; proposal_interval: string
+      ; proposal_interval: int
       ; external_transition_latency: Perf_histograms.Report.t option
       ; snark_worker_transition_time: Perf_histograms.Report.t option
       ; snark_worker_merge_time: Perf_histograms.Report.t option
@@ -87,7 +87,8 @@ module Types = struct
             ("User_commands Sent", Int.to_string (f x)) :: acc )
           ~run_snark_worker:(fun acc x ->
             ("Snark Worker Running", Bool.to_string (f x)) :: acc )
-          ~proposal_interval:(fun acc x -> ("Proposal Interval", f x) :: acc)
+          ~proposal_interval:(fun acc x ->
+            ("Proposal Interval", Int.to_string (f x)) :: acc )
           ~external_transition_latency:(fun acc x ->
             match f x with
             | None -> acc
