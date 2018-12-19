@@ -60,6 +60,8 @@ module Reader : sig
     -> unit Deferred.t
   (** See [fold_without_pushback reader ~init ~f] *)
 
+  val clear : _ t -> unit
+
   module Merge : sig
     val iter : 'a t list -> f:('a -> unit Deferred.t) -> unit Deferred.t
 
@@ -82,6 +84,10 @@ module Writer : sig
   val to_linear_pipe : ('t, 'behavior, 'return) t -> 't Linear_pipe.Writer.t
 
   val write : ('t, _, 'return) t -> 't -> 'return
+
+  val close : (_, _, _) t -> unit
+
+  val is_closed : (_, _, _) t -> bool
 end
 
 val create :

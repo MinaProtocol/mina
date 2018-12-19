@@ -619,6 +619,7 @@ struct
   module Blockchain_state = Coda_base.Blockchain_state
   module Staged_ledger_diff = Staged_ledger_diff
   module Transaction_snark_work = Transaction_snark_work
+  module State_body_hash = State_body_hash
   module Staged_ledger_hash = Staged_ledger_hash
   module Staged_ledger_aux_hash = Staged_ledger_aux_hash
   module Ledger_proof_verifier = Ledger_proof_verifier
@@ -765,6 +766,30 @@ struct
         let subtree_height = 3
       end)
 
+  module Sync_root_ledger =
+    Syncable_ledger.Make (Ledger.Db.Addr) (Account)
+      (struct
+        include Ledger_hash
+
+        let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
+
+        let empty_account = hash_account Account.empty
+      end)
+      (struct
+        include Ledger_hash
+
+        let to_hash (h : t) =
+          Ledger_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
+      end)
+      (struct
+        include Ledger.Db
+
+        let f = Account.hash
+      end)
+      (struct
+        let subtree_height = 3
+      end)
+
   module Net = Coda_networking.Make (struct
     include Inputs0
     module Snark_pool = Snark_pool
@@ -804,6 +829,18 @@ struct
     module Network = Net
   end)
 
+  module Bootstrap_controller = Bootstrap_controller.Make (struct
+    include Inputs0
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Transaction_snark_work = Transaction_snark_work
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Syncable_ledger = Sync_root_ledger
+    module Merkle_address = Ledger.Db.Addr
+    module Consensus_mechanism = Consensus.Mechanism
+    module Network = Net
+  end)
+
   module Transition_frontier_controller =
   Transition_frontier_controller.Make (struct
     include Inputs0
@@ -819,6 +856,24 @@ struct
     module Ledger_proof_statement = Ledger_proof_statement
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Network = Net
+  end)
+
+  module Transition_router = Transition_router.Make (struct
+    include Inputs0
+    module Transaction_snark_work = Transaction_snark_work
+    module Syncable_ledger = Sync_root_ledger
+    module Sync_handler = Sync_handler
+    module Merkle_address = Ledger.Addr
+    module Catchup = Ledger_catchup
+    module Transition_handler = Transition_handler
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Ledger_diff = Staged_ledger_diff
+    module Consensus_mechanism = Consensus.Mechanism
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Network = Net
+    module Bootstrap_controller = Bootstrap_controller
+    module Transition_frontier_controller = Transition_frontier_controller
   end)
 
   module Proposer = Proposer.Make (struct

@@ -63,6 +63,8 @@ module type Network_intf = sig
 
   type state_hash
 
+  type state_body_hash
+
   val states :
     t -> (state_with_witness Envelope.Incoming.t * time) Linear_pipe.Reader.t
 
@@ -113,7 +115,10 @@ module type Network_intf = sig
                                  -> (ledger_hash * sync_ledger_answer)
                                     Deferred.Or_error.t)
     -> transition_catchup:(   state_hash Envelope.Incoming.t
-                           -> state_with_witness list option Deferred.t)
+                           -> state_with_witness list Deferred.Option.t)
+    -> get_ancestry:(   (state_hash * int) Envelope.Incoming.t
+                     -> (protocol_state * state_body_hash list)
+                        Deferred.Option.t)
     -> t Deferred.t
 end
 
@@ -388,6 +393,10 @@ module type Inputs_intf = sig
     end
   end
 
+  module State_body_hash : sig
+    type t
+  end
+
   module Net :
     Network_intf
     with type state_with_witness := External_transition.t
@@ -402,6 +411,7 @@ module type Inputs_intf = sig
      and type sync_ledger_answer := Sync_ledger.answer
      and type time := Time.t
      and type state_hash := Protocol_state_hash.t
+     and type state_body_hash := State_body_hash.t
 
   module Ledger_db : Coda_pow.Ledger_creatable_intf
 
@@ -419,17 +429,16 @@ module type Inputs_intf = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type ledger_diff_verified := Staged_ledger_diff.Verified.t
 
-  module Transition_frontier_controller :
-    Protocols.Coda_transition_frontier.Transition_frontier_controller_intf
+  module Transition_router :
+    Protocols.Coda_transition_frontier.Transition_router_intf
     with type time_controller := Time.Controller.t
      and type external_transition := External_transition.t
      and type external_transition_verified := External_transition.Verified.t
-     and type syncable_ledger_query := Sync_ledger.query
-     and type syncable_ledger_answer := Sync_ledger.answer
      and type transition_frontier := Transition_frontier.t
      and type state_hash := Protocol_state_hash.t
      and type time := Time.t
      and type network := Net.t
+     and type ledger_db := Ledger_db.t
 
   module Proposer :
     Proposer_intf
@@ -462,6 +471,14 @@ module type Inputs_intf = sig
     val ledger : Ledger.maskable_ledger
 
     val proof : Protocol_state_proof.t
+  end
+
+  module Sync_handler : sig
+    val prove_ancestry :
+         frontier:Transition_frontier.t
+      -> int
+      -> Protocol_state_hash.t
+      -> (Protocol_state_hash.t * State_body_hash.t list) option
   end
 end
 
@@ -622,6 +639,7 @@ module Make (Inputs : Inputs_intf) = struct
             ~protocol_state_proof:Protocol_state_proof.dummy
             ~staged_ledger_diff:empty_diff_verified
         in
+        let ledger_db = Ledger_db.create () in
         let%bind transition_frontier =
           Transition_frontier.create ~logger:config.log
             ~root_transition:
@@ -634,7 +652,7 @@ module Make (Inputs : Inputs_intf) = struct
             ~root_staged_ledger_diff:None
             ~root_snarked_ledger:
               (Ledger_transfer.transfer_accounts ~src:Genesis.ledger
-                 ~dest:(Ledger_db.create ()))
+                 ~dest:ledger_db)
         in
         let%bind net =
           Net.create config.net_config
@@ -664,11 +682,31 @@ module Make (Inputs : Inputs_intf) = struct
                   Transition_frontier.Breadcrumb.transition_with_hash b
                   |> With_hash.data |> External_transition.forget )
                 transition_frontier breadcrumb )
+            ~get_ancestry:(fun query_env ->
+              let descendent, count = Envelope.Incoming.data query_env in
+              let result =
+                let open Option.Let_syntax in
+                let%bind state_hash, proof =
+                  Sync_handler.prove_ancestry ~frontier:transition_frontier
+                    count descendent
+                in
+                let%map transition_with_hash =
+                  Transition_frontier.find transition_frontier state_hash
+                in
+                let protocol_state =
+                  transition_with_hash
+                  |> Transition_frontier.Breadcrumb.transition_with_hash
+                  |> With_hash.data |> External_transition.forget
+                  |> External_transition.protocol_state
+                in
+                (protocol_state, proof)
+              in
+              Deferred.return result )
         in
         let valid_transitions =
-          Transition_frontier_controller.run ~logger:config.log ~network:net
+          Transition_router.run ~logger:config.log ~network:net
             ~time_controller:config.time_controller
-            ~frontier:transition_frontier
+            ~frontier:transition_frontier ~ledger_db
             ~transition_reader:
               (Strict_pipe.Reader.of_linear_pipe
                  (Linear_pipe.map external_transitions_reader
