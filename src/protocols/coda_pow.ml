@@ -664,9 +664,9 @@ module type Transaction_snark_scan_state_intf = sig
 
   val next_k_jobs : t -> k:int -> Available_job.t list Or_error.t
 
-  val next_jobs : t -> Available_job.t list
+  val next_jobs : t -> Available_job.t list Or_error.t
 
-  val next_jobs_sequence : t -> Available_job.t Sequence.t
+  val next_jobs_sequence : t -> Available_job.t Sequence.t Or_error.t
 
   val is_valid : t -> bool
 
@@ -796,7 +796,7 @@ module type Staged_ledger_intf = sig
     -> get_completed_work:(statement -> completed_work_checked option)
     -> valid_diff
 
-  val all_work_pairs :
+  val all_work_pairs_exn :
        t
     -> ( ( ledger_proof_statement
          , transaction

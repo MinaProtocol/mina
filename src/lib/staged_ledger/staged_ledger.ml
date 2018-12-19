@@ -7,6 +7,10 @@ open Protocols
 open Coda_pow
 open O1trace
 
+let val_or_exn label = function
+  | Error e -> failwithf "%s: %s" label (Error.to_string_hum e) ()
+  | Ok x -> x
+
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
 
@@ -123,8 +127,10 @@ end = struct
             | None -> Yield (List.rev (x :: acc), ([], 0, seq))
             | _ -> Skip (x :: acc, i + 1, seq) ) )
 
-  let all_work_pairs t =
-    let all_jobs = Scan_state.next_jobs t.scan_state in
+  let all_work_pairs_exn t =
+    let all_jobs =
+      val_or_exn "Next jobs" (Scan_state.next_jobs t.scan_state)
+    in
     let module A = Scan_state.Available_job in
     let module L = Ledger_proof_statement in
     let single_spec (job : job) =
@@ -630,8 +636,10 @@ end = struct
   let apply_diff_unverified t (diff : Staged_ledger_diff.t) ~logger =
     let open Result_with_rollback.Let_syntax in
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
-    let spots_available, proofs_waiting =
-      let jobs = Scan_state.next_jobs t.scan_state in
+    let%bind spots_available, proofs_waiting =
+      let%map jobs =
+        Scan_state.next_jobs t.scan_state |> Result_with_rollback.of_or_error
+      in
       ( Int.min (Scan_state.free_space t.scan_state) max_throughput
       , List.length jobs )
     in
@@ -822,8 +830,11 @@ end = struct
     , `Ledger_proof res_opt
     , `Staged_ledger {scan_state= scan_state'; ledger= new_ledger} )
 
-  let work_to_do scan_state : Transaction_snark_work.Statement.t Sequence.t =
-    let work_seq = Scan_state.next_jobs_sequence scan_state in
+  let work_to_do_exn scan_state : Transaction_snark_work.Statement.t Sequence.t
+      =
+    let work_seq =
+      val_or_exn "Work to do" (Scan_state.next_jobs_sequence scan_state)
+    in
     sequence_chunks_of ~n:Transaction_snark_work.proofs_length
     @@ Sequence.map work_seq ~f:(fun maybe_work ->
            match Scan_state.statement_of_job maybe_work with
@@ -1313,12 +1324,14 @@ end = struct
       Scan_state.partition_if_overflowing ~max_slots:max_throughput
         t.scan_state
     in
+    (*TODO: return an or_error here *)
+    let work_to_do = work_to_do_exn t.scan_state in
     let pre_diffs =
-      generate_prediff logger (work_to_do t.scan_state) transactions_by_fee
-        get_completed_work tmp_ledger self partitions
+      generate_prediff logger work_to_do transactions_by_fee get_completed_work
+        tmp_ledger self partitions
     in
     let proofs_available =
-      Sequence.filter_map (work_to_do t.scan_state) ~f:get_completed_work
+      Sequence.filter_map work_to_do ~f:get_completed_work
       |> Sequence.to_list |> List.length
     in
     Logger.info logger "Block stats: Proofs ready for purchase: %d"
