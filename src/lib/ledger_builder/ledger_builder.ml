@@ -489,7 +489,7 @@ end = struct
 
     let is_valid t =
       Parallel_scan.parallelism ~state:t
-      = Int.pow 2 (Config.transaction_capacity_log_2 + 1)
+      = Int.pow 2 (Config.transaction_capacity_log_2 + 2)
       && Parallel_scan.is_valid t
 
     include Binable.Of_binable
@@ -587,9 +587,7 @@ end = struct
     let open Or_error.Let_syntax in
     let txns_still_being_worked_on = Parallel_scan.current_data scan_state in
     Debug_assert.debug_assert (fun () ->
-        let parallelism =
-          Int.pow 2 (Inputs.Config.transaction_capacity_log_2 + 2)
-        in
+        let parallelism = Parallel_scan.parallelism ~state:scan_state in
         [%test_pred: int]
           (( >= ) (Inputs.Config.transaction_capacity_log_2 * parallelism))
           (List.length txns_still_being_worked_on) ) ;
@@ -669,9 +667,9 @@ end = struct
 
   let create ~ledger : t =
     let open Config in
-    (* Transaction capacity log_2 is half the capacity for work parallelism *)
+    (* Transaction capacity log_2 is one-forth the capacity for work parallelism *)
     { scan_state=
-        Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 1)
+        Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 2)
     ; ledger }
 
   let current_ledger_proof t =
@@ -2278,9 +2276,7 @@ let%test_module "test" =
           Async.Thread_safe.block_on_async_exn (fun () ->
               let open Deferred.Let_syntax in
               let old_ledger = !(Lb.ledger lb) in
-              let all_ts =
-                txns (p / 2) (fun x -> (x + 1) * 100) (fun _ -> 4)
-              in
+              let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let%map proof, diff =
                 create_and_apply lb logger (Sequence.of_list all_ts)
                   stmt_to_work
