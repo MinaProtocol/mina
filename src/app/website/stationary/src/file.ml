@@ -11,6 +11,9 @@ let of_html ~name html =
   validate_filename name;
   Html (name, html)
 
+let of_html_path ~name html =
+  Html (name, html)
+
 let of_path ?name path =
   let name =
     match name with
@@ -27,6 +30,14 @@ let build t ~in_directory =
   match t with
   | Html (name, html) ->
     let%bind contents = Html.to_string html in
+    let filename = (in_directory ^/ name) in
+    let drop_last xs = 
+      List.rev (List.drop (List.rev xs) 1)
+    in
+    let filedir = 
+      String.concat (drop_last (String.split filename ~on:'/')) ~sep:"/" 
+    in
+    Core.Unix.mkdir_p filedir;
     Writer.save (in_directory ^/ name) ~contents:("<!DOCTYPE html>" ^ contents)
   | Of_path {name; path} ->
     Process.run_expect_no_output_exn ~prog:"cp"
