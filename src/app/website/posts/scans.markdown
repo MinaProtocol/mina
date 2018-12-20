@@ -483,11 +483,11 @@ Do we really need to hold all $$log(R)$$ trees? We only ever care about the fron
 
 Notice that we only use some of each layer of trees even across the $$log(R)$$ trees. And so we can represent the frontier of the $$log(R)$$ trees with only a single tree representing the work pipeline moving from leaves to the root in the following manner:
 
+<div class="images-2">
 ![](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566333017_compress1.png)
 
-
-
 ![](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566368658_compress2.png)
+</div>
 
 
 

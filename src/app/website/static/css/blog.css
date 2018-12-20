@@ -307,3 +307,17 @@
   padding-bottom: 0; /* offset */
   border-bottom: 1px solid rgb(45,158,219); /* color & weight */
 }
+
+/* images */
+
+.images-2 {
+  display: flex;
+}
+
+.images-2 * {
+  width: 50%;
+}
+
+.images-2 img {
+  width: 100%;
+}
