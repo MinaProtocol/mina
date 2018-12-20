@@ -241,6 +241,10 @@
 }
 
 /* table */
+.blog-content .mobile-only .table {
+  overflow-x: scroll;
+}
+
 .blog-content table {
   border-collapse: collapse;
 }

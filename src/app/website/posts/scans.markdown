@@ -371,21 +371,51 @@ We now have to keep parts of a tree around at each step. Since our trees have $$
 
 For the purposes of visualization, unit time is being replaced with *60 seconds*. We assume the space of a single node in the tree is 2KB.
 
+<div class="not-mobile">
+<div class="table">
 |             | Throughput (in data per second) | Latency (in seconds) | Space (in bytes) |
 | ----------- | ------------------------------- | -------------------- | ---------------- |
 | $$R=4$$     | 0.0333                          | 180                  | ~22KB            |
 | $$R=16$$    | 0.0667                          | 300                  | ~94KB            |
 | $$R=1024$$  | 1.71                            | 660                  | ~6MB             |
 | $$R=16384$$ | 19.5                            | 900                  | ~98MB            |
+</div>
+</div>
+
+<div class="mobile-only">
+<div class="table">
+|             | Throughput (in data per second) | Latency (in seconds) | Space (in bytes) |
+| ----------- | ------------------------------- | -------------------- | ---------------- |
+| $$R=4$$     | 0.0333                          | 180                  | ~22KB            |
+| $$R=16$$    | 0.0667                          | 300                  | ~94KB            |
+| $$R=1024$$  | 1.71                            | 660                  | ~6MB             |
+| $$R=16384$$ | 19.5                            | 900                  | ~98MB            |
+</div>
+</div>
 
 ### Serial Scan
 
+<div class="mobile-only">
+<div class="table">
 |             | Throughput (in data per second) | Latency (in seconds) | Space (in bytes) |
 | ----------- | ------------------------------- | -------------------- | ---------------- |
 | $$R=4$$     | 0.05                            | 20                   | ~2KB             |
 | $$R=16$$    | 0.05                            | 20                   | ~2KB             |
 | $$R=1024$$  | 0.05                            | 20                   | ~2KB             |
 | $$R=16384$$ | 0.05                            | 20                   | ~2KB             |
+</div>
+</div>
+
+<div class="not-mobile">
+<div class="table">
+|             | Throughput (in data per second) | Latency (in seconds) | Space (in bytes) |
+| ----------- | ------------------------------- | -------------------- | ---------------- |
+| $$R=4$$     | 0.05                            | 20                   | ~2KB             |
+| $$R=16$$    | 0.05                            | 20                   | ~2KB             |
+| $$R=1024$$  | 0.05                            | 20                   | ~2KB             |
+| $$R=16384$$ | 0.05                            | 20                   | ~2KB             |
+</div>
+</div>
 
 
 We have increased throughput at the cost of some latency and space when compared with the serial approach, so this is a little bit better!
@@ -515,12 +545,26 @@ We have an implicit data structure representation for our complete binary tree w
 
 ### Fully Optimized Scan
 
+<div class="mobile-only">
+<div class="table">
 |               | Throughput (in data per second) | Latency (in seconds) | Space (in bytes) |
 | ------------- | ------------------------------- | -------------------- | ---------------- |
 | $$R=4$$       | 0.0667                          | 180                  | ~22KB            |
 | $$R=16$$      | 0.267                           | 300                  | ~94KB            |
 | $$R=1024$$    | 17.1                            | 660                  | ~6MB             |
 | $$R = 16384$$ | 273                             | 900                  | ~98MB            |
+</div>
+</div>
+<div class="not-mobile">
+<div class="table">
+|               | Throughput (in data per second) | Latency (in seconds) | Space (in bytes) |
+| ------------- | ------------------------------- | -------------------- | ---------------- |
+| $$R=4$$       | 0.0667                          | 180                  | ~22KB            |
+| $$R=16$$      | 0.267                           | 300                  | ~94KB            |
+| $$R=1024$$    | 17.1                            | 660                  | ~6MB             |
+| $$R = 16384$$ | 273                             | 900                  | ~98MB            |
+</div>
+</div>
 
 
 We went from a sequential solution that at a reasonable $$R$$ only handled a throughput of 0.05 data per second to an initial parallel solution that handled 19.5 data per second to a fully optimized solution that handles 273 data per second. Our final solution even has optimal latency and space characteristics.
