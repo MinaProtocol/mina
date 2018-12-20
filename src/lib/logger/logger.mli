@@ -4,26 +4,26 @@ type t
 
 module Level : sig
   type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
-  [@@deriving sexp, bin_io, compare]
+  [@@deriving bin_io, sexp, compare]
 end
 
 module Attribute : sig
-  type t = string * Sexp.t
+  type t = string * string
 
-  val ( ^= ) : string -> Sexp.t -> t
+  val ( ^= ) : string -> string -> t
 end
 
 module Message : sig
   type t =
-    { attributes: Sexp.t String.Map.t
+    { attributes: (string * string) list
     ; path: string list
     ; level: Level.t
     ; pid: Pid.t
     ; host: string
-    ; time: Time.t
+    ; timestamp: Time.t
     ; location: string option
     ; message: string }
-  [@@deriving sexp, bin_io]
+  [@@deriving bin_io, sexp, yojson]
 end
 
 type 'a logger =
@@ -32,6 +32,8 @@ type 'a logger =
   -> t
   -> ('a, unit, string, unit) format4
   -> 'a
+
+val set_sexp_logging : bool -> unit
 
 val create : unit -> t
 

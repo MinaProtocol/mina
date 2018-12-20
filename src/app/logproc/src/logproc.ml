@@ -30,16 +30,22 @@ let colored_level level =
   Color.color (color_of_level level) (sprintf !"%{sexp:Logger.Level.t}" level)
 
 let pretty_print_message
-    {Logger.Message.attributes; path; level; pid; host; time; location; message}
-    =
+    { Logger.Message.attributes
+    ; path
+    ; level
+    ; pid
+    ; host
+    ; timestamp
+    ; location
+    ; message } =
   printf
     !"[%{Time}] %s (%{Pid} on %s): %s\n"
-    time (colored_level level) pid host
+    timestamp (colored_level level) pid host
     (Color.color Green message) ;
-  if not (Map.is_empty attributes) then
+  if not (List.is_empty attributes) then
     printf "    %s\n"
       (Sexp.to_string_hum ~indent:4
-         ([%sexp_of: Sexp.t String.Map.t] attributes))
+         ([%sexp_of: (string * string) list] attributes))
 
 let pos_string lexbuf =
   let open Lexing in
