@@ -141,13 +141,13 @@ module Links = struct
 
   let privacy = ("Privacy Policy", "/privacy.html", "privacy")
 
-  let hiring = ("We're Hiring", "jobs.html", "hiring")
+  let hiring = ("We're Hiring", "/jobs.html", "hiring")
 
-  let jobs = ("Jobs", "jobs.html", "jobs")
+  let jobs = ("Jobs", "/jobs.html", "jobs")
 
-  let testnet = ("Testnet", "testnet.html", "testnet")
+  let testnet = ("Testnet", "/testnet.html", "testnet")
 
-  let code = ("Code", "code.html", "code")
+  let code = ("Code", "/code.html", "code")
 end
 
 module Input_button = struct
