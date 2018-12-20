@@ -42,7 +42,7 @@ let run_test () : unit Deferred.t =
     let transaction_capacity_log_2 =
       if with_snark then 1
         (*this works because we don't have prover fees. Once we have that, the transaction_capacity_log_2 has to be at least 2 for transactions to be included*)
-      else 3
+      else 2
 
     let commit_id = None
 
@@ -293,7 +293,7 @@ let run_test () : unit Deferred.t =
     assert (block_count coda > block_count')
   else
     let%bind _ =
-      test_multiple_payments other_accounts (pks other_accounts) 3.
+      test_multiple_payments other_accounts (pks other_accounts) 5.
     in
     test_duplicate_payments sender_keypair receiver_keypair
 
