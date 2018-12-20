@@ -573,7 +573,7 @@ let site () : Site.t Deferred.t =
       ; file (File.of_html ~name:"privacy.html" Privacy_policy.content)
       ; file (File.of_html ~name:"tos.html" Tos.content)
         (* TODO: Make some more generalized thing for the blog posts *)
-      ; file (File.of_html_path ~name:"blog/scanning_scans.html" post)
+      ; file (File.of_html_path ~name:"blog/scanning_for_scans.html" post)
       ; file (File.of_path "static/favicon.ico")
       ; copy_directory "static" ] )
 
