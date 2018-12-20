@@ -1107,47 +1107,55 @@ module Make_basic (Backend : Backend_intf.S) = struct
       in
       r
 
-    let mul ?(label = "Checked.mul") x y =
-      with_label label
-        (let open Let_syntax in
-        let%bind z =
-          provide_witness Typ.field
-            (let open As_prover.Let_syntax in
-            let%map x = As_prover.read_var x and y = As_prover.read_var y in
-            Field.mul x y)
-        in
-        let%map () = assert_r1cs x y z in
-        z)
+    let mul ?(label = "Checked.mul") (x : Cvar.t) (y : Cvar.t) =
+      match (x, y) with
+      | Constant x, Constant y -> return (Cvar.constant (Field.mul x y))
+      | Constant x, _ -> return (Cvar.scale y x)
+      | _, Constant y -> return (Cvar.scale x y)
+      | _, _ ->
+          with_label label
+            (let open Let_syntax in
+            let%bind z =
+              provide_witness Typ.field
+                As_prover.(map2 (read_var x) (read_var y) ~f:Field.mul)
+            in
+            let%map () = assert_r1cs x y z in
+            z)
 
-    let square ?(label = "Checked.square") x =
-      with_label label
-        (let open Let_syntax in
-        let%bind z =
-          provide_witness Typ.field
-            (let open As_prover.Let_syntax in
-            let%map x = As_prover.read_var x in
-            Field.square x)
-        in
-        let%map () = assert_square x z in
-        z)
+    let square ?(label = "Checked.square") (x : Cvar.t) =
+      match x with
+      | Constant x -> return (Cvar.constant (Field.square x))
+      | _ ->
+          with_label label
+            (let open Let_syntax in
+            let%bind z =
+              provide_witness Typ.field
+                As_prover.(map (read_var x) ~f:Field.square)
+            in
+            let%map () = assert_square x z in
+            z)
 
     (* We get a better stack trace by failing at the call to is_satisfied, so we
      put a bogus value for the inverse to make the constraint system unsat if
      x is zero. *)
-    let inv ?(label = "Checked.inv") x =
-      with_label label
-        (let open Let_syntax in
-        let%bind x_inv =
-          provide_witness Typ.field
-            As_prover.(
-              map (read_var x) ~f:(fun x ->
-                  if Field.(equal zero x) then Field.zero
-                  else Backend.Field.inv x ))
-        in
-        let%map () =
-          assert_r1cs ~label:"field_inverse" x x_inv (Cvar.constant Field.one)
-        in
-        x_inv)
+    let inv ?(label = "Checked.inv") (x : Cvar.t) =
+      match x with
+      | Constant x -> return (Cvar.constant (Field.inv x))
+      | _ ->
+          with_label label
+            (let open Let_syntax in
+            let%bind x_inv =
+              provide_witness Typ.field
+                As_prover.(
+                  map (read_var x) ~f:(fun x ->
+                      if Field.(equal zero x) then Field.zero
+                      else Backend.Field.inv x ))
+            in
+            let%map () =
+              assert_r1cs ~label:"field_inverse" x x_inv
+                (Cvar.constant Field.one)
+            in
+            x_inv)
 
     let div ?(label = "Checked.div") x y =
       with_label label
