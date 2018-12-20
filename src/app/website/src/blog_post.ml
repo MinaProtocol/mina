@@ -49,8 +49,21 @@ let date d =
 
 module Share = struct
   open Html_concise
-
-  let content = h4 [] [text "TODO: Share section"]
+  let content = 
+    let channels = [ 
+        ("Twitter", "https://twitter.com/codaprotocol?lang=en") 
+      ; ("Discord", "https://discord.gg/UyqY37F") 
+      ; ("Telegram", "https://t.me/codaprotocol") 
+      ] 
+    in
+    let channels = 
+      List.map channels ~f:(fun (name,link) -> a [href link] [text name]) 
+    in
+    let channels =
+      List.intersperse channels ~sep:(text "•")
+    in
+    h4 [Style.(render (of_class "share"))] 
+      ([text "SHARE:"] @ channels)
 end
 
 let post name =

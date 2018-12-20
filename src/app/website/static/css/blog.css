@@ -235,3 +235,21 @@
   font-weight: 1000;
 }
 
+.share {
+  color: black;
+}
+
+/* share */
+.share a {
+  margin-right: .5rem;
+  margin-left: .5rem;
+  position: relative;
+  text-decoration: none;
+  padding-bottom: 2px; /* offset */
+  border-bottom: 1px solid #000; /* color & weight */
+  color: black;
+}
+
+.share a:not(.footnoteRef):hover {
+  color: blue;
+}
