@@ -310,14 +310,16 @@
 
 /* images */
 
-.images-2 {
-  display: flex;
-}
+@media screen and (min-width:30em) {
+  .images-2 {
+    display: flex;
+  }
 
-.images-2 * {
-  width: 50%;
-}
+  .images-2 * {
+    width: 50%;
+  }
 
-.images-2 img {
-  width: 100%;
+  .images-2 img {
+    width: 100%;
+  }
 }
