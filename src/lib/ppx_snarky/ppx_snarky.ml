@@ -119,10 +119,17 @@ let fold_fun_stri ~loc ~modname ~fname ~foldf ?(varname = "t") fields_info =
         ~foldf:(Exp.ident ~loc (mkloc foldf loc))
         ~varname:(mkloc varname loc) fields_info ]
 
-let snark_mod_instance ~loc name fields_info =
-  [ Str.module_ @@ Mb.mk ~loc:name.loc name
-    @@ Mod.structure ~loc:name.loc
-         [polymorphic_type_instance_stri ~loc:name.loc name fields_info] ]
+let snark_mod_instance ~loc modname fields_info =
+  [ Str.module_
+    @@ Mb.mk ~loc:modname.loc modname
+    @@ Mod.structure ~loc:modname.loc
+         [ polymorphic_type_instance_stri ~loc:modname.loc modname fields_info
+         ; fold_fun_stri ~loc ~modname ~fname:"length_in_bits"
+             ~foldf:(Ldot (Lident "Pervasives", "+"))
+             fields_info
+         ; fold_fun_stri ~loc ~modname ~fname:"fold"
+             ~foldf:(Ldot (Lident "Fold_lib", "+>"))
+             fields_info ] ]
 
 let instances_str ~loc instances_info fields_info =
   match instances_info with
