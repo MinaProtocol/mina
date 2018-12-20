@@ -5,14 +5,30 @@ date: 2018-12-18
 author: Brandon Kase
 ---
 
+
+<div class="side-footnote-container">
+<div class="side-footnote">
+<sup>1</sup> If you’d rather consume this content in video form, watch [this talk](https://www.youtube.com/watch?v=YSnQ8N760mI)
+</div>
+</div>
 While developing [Coda](https://codaprotocol.com), we came across an interesting problem that uncovered a much more general and potentially widely applicable problem: Taking advantage of parallelism when combining a large amount of data streaming in over time. We were able to come up with a solution that scales up for any throughput optimally while simultaneously minimizing latency and space usage. We’re sharing our results with the hope that others dealing with manipulation of online data streams will find them interesting and applicable.^[If you’d rather consume this content in video form, watch [this talk](https://www.youtube.com/watch?v=YSnQ8N760mI)]
 
 ## Background
 
+<div class="side-footnote-container">
+<div class="side-footnote">
+<sup>2</sup> equivalent to security as a full node)
+</div>
+</div>
 The Coda cryptocurrency protocol is unique in that it uses a [succinct blockchain](https://www.youtube.com/watch?v=eWVGATxEB6M). In Coda the blockchain is replaced by a tiny constant-sized cryptographic proof. This means that in the Coda protocol a user can sync with full-security^[equivalent to security as a full node] instantly—users don’t have to wait to download thousands and thousands of blocks to verify the state of the network.
 
 What is this tiny cryptographic proof? It’s called a zk-SNARK, or zero knowledge Succinct Non-interactive ARgument of Knowledge. zk-SNARKs let a program create a proof of a computation, then share that proof with anyone. Anyone with the proof can verify the computation very quickly, in just milliseconds, independent of how long the computation itself takes. While validating proofs is fast, creating them is quite slow, so creating this SNARK proof would be much more computationally expensive. We use a few different SNARK proofs throughout Coda’s protocol, but the important one for this post is what we call the “Ledger Proof”.
 
+<div class="side-footnote-container">
+<div class="side-footnote">
+<sup>3</sup> note that we represent account states concretely as their hashes for performance reasons 
+</div>
+</div>
 A ledger proof tells us that given some starting account state $$\sigma_0$$ there was a series of $$k$$ transactions that eventually put us into account state $$\sigma_k$$. Let’s refer to such a proof as $$\sigma_0 \Longrightarrow \sigma_k$$.^[note that we represent account states concretely as their hashes for performance&nbsp;reasons] So what does it mean for a single transaction to be valid? A transaction, $$T_i^{i+1}$$, is valid  if it’s been signed by the sender, and the sender had sufficient balance in their account. As a result our account state $$\sigma_i$$ transitions to some new state $$\sigma_{i+1}$$. This state transition can be represented as $$\sigma_i T_{i}^{i+1} \sigma_{i+1}$$. We could recompute $$\sigma_0 \Longrightarrow \sigma_k$$ every time there is a new transaction, but that would be slow, with the cost of generating the proof growing with the number of transactions—instead we can reuse the previous proof recursively. These ledger proofs enable users of Coda to be sure that the ledger has been computed correctly and play a part in consensus state verification.
 
 More precisely, the recursive bit of our ledger proof, $$\sigma_0 \Longrightarrow \sigma_{i}$$, or the account state, has transitioned from the starting state $$\sigma_0$$ to the current state $$\sigma_i$$ after $$i$$ correct transactions are applied, could naively be defined in the following way:
@@ -27,6 +43,11 @@ Let’s examine what running this process over four steps would look like:
 
 The functional programming enthusiast will notice that this operation is like a scan:
 
+<div class="side-footnote-container">
+<div class="side-footnote">
+The `~init` in OCaml refers to a named argument, and `'a` and `'b` are a type unification variables that work similarly to generics in Java
+</div>
+</div>
 <div class="code">
 <div class="mobile-only">
 ```ocaml
@@ -52,6 +73,11 @@ val scan : 'a list -> ~init:'b
 
 A scan combines elements of a collection together incrementally and returns all intermediate values. For example if our elements are numbers and our operation is plus, `scan [1;2;3] ~init:0 ~f:(fun b a → b + a)` has following evaluation trace:
 
+<div class="side-footnote-container">
+<div class="side-footnote">
+`::` means “cons” or prepend to the front of a linked list
+</div>
+</div>
 <div class="code">
 ```ocaml
 scan [1;2;3] ~init:0 ~f:add
@@ -76,6 +102,11 @@ val scan : 'a Stream.t
   -> 'b Stream.t
 ```
 
+<div class="side-footnote-container">
+<div class="side-footnote">
+<sup>6</sup> we write streams as lists in the evaluation
+</div>
+</div>
 As new information flows into the stream we combine it with the last piece of computed information and emit that result onto a new stream. Here’s a trace with transactions and proofs^[we write streams as lists in the evaluation]:
 
 <div class="mobile-only">
@@ -201,6 +232,13 @@ Transaction throughput here refers to the rate at which transactions can be proc
 
 2. Minimize transaction latency
 
+
+<div class="side-footnote-container">
+<div class="side-footnote">
+<sup>7</sup> 
+The more we sacrifice latency the longer proposer nodes have to keep around full copies of the state before just relying on the small SNARK itself
+</div>
+</div>
 It’s important to minimize transaction latency to enter our SNARK to keep the low RAM requirements on proposer nodes, nodes that propose new transitions during Proof of Stake.^[The more we sacrifice latency the longer proposer nodes have to keep around full copies of the state before just relying on the small SNARK itself]. SNARKing a transaction is not the same as *knowing* a transaction has been processed, so this is certainly less important for us than&nbsp;throughput.
 
 
@@ -215,6 +253,14 @@ And moreover, this is the order of importance of these goals from most to least 
 
 We’ll start with some assumptions:
 
+
+<div class="side-footnote-container">
+<div class="side-footnote">
+<sup>8</sup> 
+This is possible because of a cryptographic notion known as “Signature of Knowledge” which lets us embed information about the creator and a fee into the proof in a way that is unforgeable. We will talk more about how we use this information in another blog&nbsp;post.
+</div>
+
+</div>
 - All SNARK proofs take one unit of time to complete
 - Transactions arrive into the system at a constant rate $$R$$ per unit time
 - We effectively have any number of cores we need to process transactions because we can economically incentivize actors to perform SNARK proofs and use transaction fees to pay those actors.^[This is possible because of a cryptographic notion known as “Signature of Knowledge” which lets us embed information about the creator and a fee into the proof in a way that is unforgeable. We will talk more about how we use this information in another blog&nbsp;post.]
@@ -474,6 +520,12 @@ We do as we did before, but this time we have $$R$$ jobs to complete and can dis
 
 ## Analysis
 
+<div class="side-footnote-container">
+<div class="side-footnote">
+<sup>9</sup> 
+Here’s a short informal proof: Note that any sort of reduction operation on $$N$$ pieces of data can’t be done faster than $$O(log(N))$$ span. If we assume we could handle our $$R$$ units that we enqueue at a time in fewer than $$O(log(N))$$ steps then since we’re doing a reduction operation we would be doing it faster than $$O(log(N))$$ which is a contradiction.
+</div>
+</div>
 
 - Throughput: $$R$$
 
@@ -483,6 +535,7 @@ Throughput of work completion matches our stream of data! It’s perfect, we’v
 - Latency: $$O(log(R))$$
 
  
+
 Latency is still logarithmic, though now it’s $$log(R)+1$$ steps as our trees have $$R$$ leaves and we an extra layer on the bottom for base jobs. In fact, this is actually the lower bound^[Here’s a short informal proof: Note that any sort of reduction operation on $$N$$ pieces of data can’t be done faster than $$O(log(N))$$ span. If we assume we could handle our $$R$$ units that we enqueue at a time in fewer than $$O(log(N))$$ steps then since we’re doing a reduction operation we would be doing it faster than $$O(log(N))$$ which is a&nbsp;contradiction.]
  
 
@@ -490,6 +543,13 @@ Latency is still logarithmic, though now it’s $$log(R)+1$$ steps as our trees 
 
  
 We have multiple trees now. Interestingly, we have exactly $$log(R)$$ trees pending at a time. Again our longer trees take up an extra layer than traditional binary trees, so in this case $$3R-1$$ nodes since we have $$R$$ leaves, and we have $$log(R)$$ of these trees.^[In order to prevent latency and space from growing over time, we need to make sure we complete work as fast as we add it]
+
+<div class="side-footnote-container">
+<div class="side-footnote">
+<sup>10</sup> 
+In order to prevent latency and space from growing over time, we need to make sure we complete work as fast as we add it
+</div>
+</div>
 
 Now that we have thoroughly optimized our throughput and latency, let’s optimize for&nbsp;space.
 
@@ -538,10 +598,24 @@ Do we really need that extra layer? If we change how we think about the problem,
 
 Now we’re down to $$2R-1$$ nodes—a standard binary tree with $$R$$ leaves.
 
+<div class="side-footnote-container">
+<div class="side-footnote">
+<sup>11</sup> 
+This is a very interesting area of computer science research, and I very much recommend the curious to read more: See [Zhou, et. al 2013](https://www.cs.cmu.edu/~dga/papers/zhou-sea2013.pdf) and [wavelet trees](https://en.wikipedia.org/wiki/Wavelet_Tree).
+</div>
+</div>
 How do we store the tree? Since we know the size a priori (a complete binary tree with $$R$$ leaves), we can use a *succinct* representation. 
+
 
 A *succinct* data structure requires only $$o(Z)$$ extra space to manage the relationship between the elements if $$Z$$ is the optimal number of bits that we need to express the information in an unstructured manner. Note that this is little-$$o$$ not big-$$O$$—a much tighter bound^[This is a very interesting area of computer science research, and I very much recommend the curious to read more: See [Zhou, et. al 2013](https://www.cs.cmu.edu/~dga/papers/zhou-sea2013.pdf) and [wavelet trees](https://en.wikipedia.org/wiki/Wavelet_Tree).]
 
+
+<div class="side-footnote-container">
+<div class="side-footnote">
+<sup>12</sup> 
+In our case, just the cursor.
+</div>
+</div>
 In fact our structure as described is actually an *implicit* one because of our scalar cursor. An *implicit* data structure is one that uses only $$O(1)$$ extra bits.^[In our case, just the cursor.] In later refinements (in part 2), we'll go back to a *succinct* representation because we need to relax one of the assumptions we made here. This is similar to the popular *implicit heap* that you may have learned about in a computer science class.
 
 
@@ -621,7 +695,11 @@ Additionally, we will want to explore a more efficient mechanism to share accoun
 
 We can reify this model with the [following signature in the Coda codebase](https://github.com/CodaProtocol/coda/blob/7bdfa3421e49b73ed812a6eeab3ca0b8ce1be479/src/lib/parallel_scan/parallel_scan.mli):
 
-
+<div class="side-footnote-container">
+<div class="side-footnote">
+`'a` is the type of the top value and there’s some notion of an associative merging operation on the `'a` values. `'d` is the type of the data at the leaves that comes in at rate $$R$$.
+</div>
+</div>
 <div class="code">
 <div class="not-large">
 ```ocaml

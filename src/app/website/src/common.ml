@@ -83,6 +83,10 @@ module Visibility = struct
   let only_large = Style.of_class "dn db-l"
 
   let only_mobile = Style.of_class "db dn-ns"
+
+  let regular = Style.of_class "db dn-l"
+
+  let huge = Style.of_class "db-l dn"
 end
 
 module Mobile_switch = struct
@@ -91,6 +95,14 @@ module Mobile_switch = struct
     div []
       [ div [Style.render Visibility.no_mobile] [not_small]
       ; div [Style.render Visibility.only_mobile] [small] ]
+end
+
+module Huge_switch = struct
+  let create ~huge ~regular =
+    let open Html_concise in
+    div []
+      [ div [Style.render Visibility.regular] [regular]
+      ; div [Style.render Visibility.huge] [huge] ]
 end
 
 let title_string s = sprintf "Coda - %s" s

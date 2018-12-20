@@ -24,27 +24,6 @@ s.setAttribute('data-timestamp', +new Date());
 </script>
                         <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>|html}
 
-let roman n =
-  let symbols =
-    [ (1000, "M")
-    ; (900, "CM")
-    ; (500, "D")
-    ; (400, "CD")
-    ; (100, "C")
-    ; (90, "XC")
-    ; (50, "L")
-    ; (40, "XL")
-    ; (10, "X")
-    ; (9, "IX")
-    ; (5, "V")
-    ; (4, "IV")
-    ; (1, "I") ]
-  in
-  List.fold symbols ~init:([], n) ~f:(fun (acc, n) (base, name) ->
-      let q, r = (n / base, n mod base) in
-      (List.init q ~f:(Fn.const name) @ acc, r) )
-  |> fst |> List.rev |> String.concat
-
 let title s =
   let open Html_concise in
   h1 [Style.just "f2 f1-ns ddinexp tracked-tightish mb1"] [text s]
@@ -62,7 +41,7 @@ let author s =
 let date d =
   let month_day = Date.format d "%B %d" in
   let year = Date.year d in
-  let s = month_day ^ " " ^ roman year in
+  let s = month_day ^ " " ^ (Int.to_string year) in
   let open Html_concise in
   h4
     [Style.just "f7 fw4 tracked-supermega ttu o-50 metropolis mt0 mb35"]
@@ -93,9 +72,7 @@ end
 let post name =
   let open Html_concise in
   let%map post = Post.load ("posts/" ^ name) in
-  div
-    [Style.just "ph3 ph4-m ph5-l"]
-    [ div
+  let regular = div
         [Style.just "mw65-ns ibmplex f5 center blueblack"]
         ( title post.title
           :: (match post.subtitle with None -> [] | Some s -> [subtitle s])
@@ -107,8 +84,31 @@ let post name =
               ; hr []
               (* HACK: to reuse styles from blog hr, we can just stick it in blog-content *)
                ]
-          ; Share.content
-          ; Html.literal disqus_html ] ) ]
+          ; Share.content] )
+  in
+  let big = div
+      [ Style.just "mw7 center ibmplex blueblack side-footnotes"] 
+        [ div 
+        [Style.just "mw65-ns f5 left blueblack"]
+        ( title post.title
+          :: (match post.subtitle with None -> [] | Some s -> [subtitle s])
+        @ [ author post.author
+          ; date post.date
+          ; div
+              [Stationary.Attribute.class_ "blog-content lh-copy"]
+              [ post.content
+              ; hr []
+              (* HACK: to reuse styles from blog hr, we can just stick it in blog-content *)
+               ]
+          ; Share.content ] ) ]
+  in
+  let disqus = div [Style.just "mw65-ns ibmplex f5 center blueblack"] [ Html.literal disqus_html]
+  in
+  div
+    [Style.just "ph3 ph4-m ph5-l"]
+    [ Huge_switch.create
+        ~regular:regular
+        ~huge:big; disqus ]
 
 let content name =
   let%map p = post name in
