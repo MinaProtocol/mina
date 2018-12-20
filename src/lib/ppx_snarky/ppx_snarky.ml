@@ -88,6 +88,37 @@ let t_mod_instance ~loc name fields_info =
          [polymorphic_type_instance_stri ~loc:name.loc name fields_info]
   ; include_ ~loc (Mod.ident ~loc (loc_map ~f:Longident.parse name)) ]
 
+let rec fold_fun_body ~modname ~loc ~fname ~foldf ~varname fields_info =
+  let field_call {field_name; field_module; _} =
+    Exp.apply ~loc
+      (Exp.ident ~loc (localize_mod field_module modname fname.txt))
+      [ ( Nolabel
+        , Exp.field ~loc
+            (Exp.ident ~loc:varname.loc (loc_map ~f:Longident.parse varname))
+            (loc_map ~f:Longident.parse field_name) ) ]
+  in
+  match fields_info with
+  | [] -> failwith "Cannot create folding function for empty field list."
+  | [field_info] -> field_call field_info
+  | field_info :: fields_info ->
+      Exp.apply foldf
+        [ (Nolabel, field_call field_info)
+        ; ( Nolabel
+          , fold_fun_body ~modname ~loc ~fname ~foldf ~varname fields_info ) ]
+
+let fold_fun_def ~loc ~modname ~fname ~foldf ~varname fields_info =
+  Vb.mk ~loc
+    (Pat.var ~loc:fname.loc fname)
+    (Exp.fun_ ~loc Nolabel None
+       (Pat.var ~loc:varname.loc varname)
+       (fold_fun_body ~loc ~modname ~fname ~foldf ~varname fields_info))
+
+let fold_fun_stri ~loc ~modname ~fname ~foldf ?(varname = "t") fields_info =
+  Str.value ~loc Nonrecursive
+    [ fold_fun_def ~loc ~modname ~fname:(mkloc fname loc)
+        ~foldf:(Exp.ident ~loc (mkloc foldf loc))
+        ~varname:(mkloc varname loc) fields_info ]
+
 let snark_mod_instance ~loc name fields_info =
   [ Str.module_ @@ Mb.mk ~loc:name.loc name
     @@ Mod.structure ~loc:name.loc
