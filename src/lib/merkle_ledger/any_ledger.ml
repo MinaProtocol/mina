@@ -1,4 +1,4 @@
-(** Any_ledger let's you use any arbitrary ledger whenever some ledger is
+(** Any_ledger lets you use any arbitrary ledger whenever some ledger is
  * required. This uses dynamic dispatch and is equivalent to the notion of
  * consuming a value conforming to an interface in Java.
  *
@@ -29,6 +29,7 @@ struct
     with module Addr = Location.Addr
     with module Location = Location
     with type key := Key.t
+     and type key_set := Key.Set.t
      and type hash := Hash.t
      and type root_hash := Hash.t
      and type account := Account.t
@@ -92,6 +93,12 @@ struct
     let location_of_key (T ((module Base), t)) = Base.location_of_key t
 
     let fold_until (T ((module Base), t)) = Base.fold_until t
+
+    (* ignored_keys must be Base.Keys.Set.t, but that isn't necessarily the same as Keys.Set.t for the
+       Keys passed to this functor; as long as we use the same Keys for all ledgers, this should work
+     *)
+    let foldi_with_ignored_keys (T ((module Base), t)) =
+      Base.foldi_with_ignored_keys t
 
     let foldi (T ((module Base), t)) = Base.foldi t
 
