@@ -139,6 +139,8 @@
   height: 0.125rem;
 
   border: 0;
+  margin-top: 2rem;
+  margin-bottom: 2rem;
 }
 
 /* lists */
@@ -271,7 +273,7 @@
 }
 
 .share {
-  color: black;
+  color: rgb(101,133,163);
 }
 
 /* share */
@@ -280,11 +282,12 @@
   margin-left: .5rem;
   position: relative;
   text-decoration: none;
-  padding-bottom: 2px; /* offset */
-  border-bottom: 1px solid #000; /* color & weight */
-  color: black;
+  padding-bottom: 0; /* offset */
+  border-bottom: 1px solid rgb(45,158,219); /* color & weight */
+  color: rgb(134,165,190);
+  font-family:'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
 }
 
 .share a:not(.footnoteRef):hover {
-  color: blue;
+  color: rgb(45,158,219);
 }

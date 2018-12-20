@@ -83,8 +83,11 @@ module Share = struct
     let channels =
       List.intersperse channels ~sep:(text "•")
     in
-    h4 [Style.(render (of_class "share"))] 
-      ([text "SHARE:"] @ channels)
+    let share =
+      span [Style.just "f7 ttu fw4 ddinexp tracked-mega blueshare"] [text "share:"]
+    in
+    div [Style.just "share flex justify-center items-center"]
+      (share :: channels)
 end
 
 let post name =
