@@ -135,6 +135,18 @@ let content name =
               }
             });
           </script>|html}
+      ; Html.literal
+          {html|<script>
+            document.addEventListener("DOMContentLoaded", function() {
+              var blocks = document.querySelectorAll("a");
+              for (var i = 0; i < blocks.length; i++) {
+                var b = blocks[i];
+                if (b.href.indexOf('#') === -1) {
+                  b.target = '_blank';
+                }
+              }
+            });
+          </script>|html}
       ]
     ~tight:true ~fixed_footer:false
     ~page_label:Links.(label blog)
