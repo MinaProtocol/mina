@@ -488,7 +488,7 @@ However, this solution leaves something to be desired—why must we halve our pa
 
 Let's take advantage of the fact that we get $$R$$ new data values each time we complete work—still preferring earlier queued data values to minimize latency once we've exhausted available parallelism.
 
-With this in mind, let's trace a run-through, this time always making sure we have $$R$$ pieces of work to do at every step—for illustration, let's pick $$R=4$$:
+With this in mind, let's trace a run-through, this time always making sure we have $$R$$ pieces of work to do at every step—for illustration, let's pick $$R=2$$:
 
 <div class="images-2">
 ![In the first two steps we just lay out data](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178455_better-data.png)
@@ -515,7 +515,7 @@ With this in mind, let's trace a run-through, this time always making sure we ha
 </div>
 
 
-We do as we did before, but this time we have $$R$$ jobs to complete and can dispatch to our $$R$$ cores every step. We have exactly $$log(R)$$ trees pending at a time. Within every two steps, tree $$i$$ is completed up to layer $$i$$, the trees.
+We do as we did before, but this time we have $$R$$ jobs to complete and can dispatch to our $$R$$ cores every step. We have exactly $$log(R)$$ trees pending at a time. At every step, we complete the first tree (tree zero) and at tree $$i$$, we complete layer $$i$$.
 
 
 ## Analysis
