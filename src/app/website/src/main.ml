@@ -531,7 +531,7 @@ let testnet () =
     ~extra_body:
       [ Html.literal
           {html|
-      <script defer src="https://s3-us-west-2.amazonaws.com/o1labs-snarkette-data/main.bc.js"></script>      
+      <script defer src="/static/main.bc.js"></script>
       |html}
       ]
     ~headers:[Html.link ~href:"https://csshake.surge.sh/csshake.min.css"]
