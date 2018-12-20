@@ -5,15 +5,15 @@ date: 2018-12-18
 author: Brandon Kase
 ---
 
-While developing [Coda](https://codaprotocol.com), we came across an interesting problem that uncovered a much more general and potentially widely applicable problem: Taking advantage of parallelism when combining a large amount of data streaming in over time. We were able to come up with a solution that scales up for any throughput optimally while simultaneously minimizing latency and space usage. We’re sharing our results with the hope that others dealing with manipulation of online data streams will find them interesting and applicable. ^[If you’d rather consume this content in video form, watch [this talk](https://www.youtube.com/watch?v=YSnQ8N760mI)]
+While developing [Coda](https://codaprotocol.com), we came across an interesting problem that uncovered a much more general and potentially widely applicable problem: Taking advantage of parallelism when combining a large amount of data streaming in over time. We were able to come up with a solution that scales up for any throughput optimally while simultaneously minimizing latency and space usage. We’re sharing our results with the hope that others dealing with manipulation of online data streams will find them interesting and applicable.^[If you’d rather consume this content in video form, watch [this talk](https://www.youtube.com/watch?v=YSnQ8N760mI)]
 
 ## Background
 
-The Coda cryptocurrency protocol is unique in that it uses a [succinct blockchain TODO WHERE LINK](#where). In Coda the blockchain is replaced by a tiny constant-sized cryptographic proof. This means that in the Coda protocol a user can sync with full-security ^[equivalent to security as a full node] instantly—users don’t have to wait to download thousands and thousands of blocks to verify the state of the network.
+The Coda cryptocurrency protocol is unique in that it uses a [succinct blockchain TODO WHERE LINK](#where). In Coda the blockchain is replaced by a tiny constant-sized cryptographic proof. This means that in the Coda protocol a user can sync with full-security^[equivalent to security as a full node] instantly—users don’t have to wait to download thousands and thousands of blocks to verify the state of the network.
 
 What is this tiny cryptographic proof? It’s called a zk-SNARK, or zero knowledge Succinct Non-interactive ARgument of Knowledge. zk-SNARKs let a program create a proof of a computation, then share that proof with anyone. Anyone with the proof can verify the computation very quickly, in just milliseconds, independent of how long the computation itself takes. While validating proofs is fast, creating them is quite slow, so creating this SNARK proof would be much more computationally expensive. We use a few different SNARK proofs throughout Coda’s protocol, but the important one for this post is what we call the “Ledger Proof”.
 
-A ledger proof tells us that given some starting account state $$\sigma_0$$ there was a series of $$k$$ transactions that eventually put us into account state $$\sigma_k$$. Let’s refer to such a proof as $$\sigma_0 \Longrightarrow \sigma_k$$. ^[note that we represent account states concretely as their hashes for performance reasons] So what does it mean for a single transaction to be valid? A transaction, $$T_i^{i+1}$$, is valid  if it’s been signed by the sender, and the sender had sufficient balance in their account. As a result our account state $$\sigma_i$$ transitions to some new state $$\sigma_{i+1}$$. This state transition can be represented as $$\sigma_i T_{i}^{i+1} \sigma_{i+1}$$. We could recompute $$\sigma_0 \Longrightarrow \sigma_k$$ every time there is a new transaction, but that would be slow, with the cost of generating the proof growing with the number of transactions—instead we can reuse the previous proof recursively. These ledger proofs enable users of Coda to be sure that the ledger has been computed correctly and play a part in consensus state verification.
+A ledger proof tells us that given some starting account state $$\sigma_0$$ there was a series of $$k$$ transactions that eventually put us into account state $$\sigma_k$$. Let’s refer to such a proof as $$\sigma_0 \Longrightarrow \sigma_k$$.^[note that we represent account states concretely as their hashes for performance reasons] So what does it mean for a single transaction to be valid? A transaction, $$T_i^{i+1}$$, is valid  if it’s been signed by the sender, and the sender had sufficient balance in their account. As a result our account state $$\sigma_i$$ transitions to some new state $$\sigma_{i+1}$$. This state transition can be represented as $$\sigma_i T_{i}^{i+1} \sigma_{i+1}$$. We could recompute $$\sigma_0 \Longrightarrow \sigma_k$$ every time there is a new transaction, but that would be slow, with the cost of generating the proof growing with the number of transactions—instead we can reuse the previous proof recursively. These ledger proofs enable users of Coda to be sure that the ledger has been computed correctly and play a part in consensus state verification.
 
 More precisely, the recursive bit of our ledger proof, $$\sigma_0 \Longrightarrow \sigma_{i}$$, or the account state, has transitioned from the starting state $$\sigma_0$$ to the current state $$\sigma_i$$ after $$i$$ correct transactions are applied, could naively be defined in the following way:
 
@@ -61,7 +61,7 @@ val scan : 'a Stream.t
   -> 'b Stream.t
 ```
 
-As new information flows into the stream we combine it with the last piece of computed information and emit that result onto a new stream. Here’s a trace with transactions and proofs ^[we write streams as lists in the evaluation]:
+As new information flows into the stream we combine it with the last piece of computed information and emit that result onto a new stream. Here’s a trace with transactions and proofs^[we write streams as lists in the evaluation]:
 
 <div class="katex-block">
 ```
@@ -120,7 +120,7 @@ Transaction throughput here refers to the rate at which transactions can be proc
 
 2. Minimize transaction latency
 
-It’s important to minimize transaction latency to enter our SNARK to keep the low RAM requirements on proposer nodes, nodes that propose new transitions during Proof of Stake. ^[The more we sacrifice latency the longer proposer nodes have to keep around full copies of the state before just relying on the small SNARK itself]. SNARKing a transaction is not the same as *knowing* a transaction has been processed, so this is certainly less important for us than throughput.
+It’s important to minimize transaction latency to enter our SNARK to keep the low RAM requirements on proposer nodes, nodes that propose new transitions during Proof of Stake.^[The more we sacrifice latency the longer proposer nodes have to keep around full copies of the state before just relying on the small SNARK itself]. SNARKing a transaction is not the same as *knowing* a transaction has been processed, so this is certainly less important for us than throughput.
 
 
 3. Minimize size of state
@@ -136,7 +136,7 @@ We’ll start with some assumptions:
 
 - All SNARK proofs take one unit of time to complete
 - Transactions arrive into the system at a constant rate $$R$$ per unit time
-- We effectively have any number of cores we need to process transactions because we can economically incentivize actors to perform SNARK proofs and use transaction fees to pay those actors. ^[This is possible because of a cryptographic notion known as “Signature of Knowledge” which lets us embed information about the creator and a fee into the proof in a way that is unforgeable. We will talk more about how we use this information in another blog post.]
+- We effectively have any number of cores we need to process transactions because we can economically incentivize actors to perform SNARK proofs and use transaction fees to pay those actors.^[This is possible because of a cryptographic notion known as “Signature of Knowledge” which lets us embed information about the creator and a fee into the proof in a way that is unforgeable. We will talk more about how we use this information in another blog post.]
 - Two proofs can be recursively merged:
 
 ![Merging two transaction proofs](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544574986580_merging-exists.png)
@@ -144,7 +144,7 @@ We’ll start with some assumptions:
 
 This merge operation is associative:
 
-![Here we see a visual proof of associativity](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544575152921_merging-associative.png)
+![Here we see a visual proof of&nbsp;associativity](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544575152921_merging-associative.png)
 
 
 So we can actually write transaction SNARKs that effectively prove the following statements:
@@ -183,6 +183,8 @@ Let’s say that data effectively enqueues a “Base job” that can be complete
 
 ## Initial Analysis
 
+### Upper Bound
+
 Let’s set an upper bound efficiency target for any sort of scan. No matter what we do we can’t do better than the following:
 
 
@@ -202,8 +204,7 @@ We don’t need to store any extra information besides the most recent result
 
 As a reminder, we decided that the naive approach is just a standard linear scan. This “dumb scan” can be a nice lower bound on throughput, we can also analyze the other attributes we care about here:
 
-For the linear scan:
-
+### Linear Scan
 
 - Throughput: $$1$$ per unit time
 
@@ -227,6 +228,7 @@ Recall that the merge operation is associative. This means that we can choose to
 
 This gives rise to the notion of a “periodic scan”:
 
+<div class="mobile-only">
 ```ocaml
 (* periodicScan 1->2->3->4->5->6->7->8
   ~init:0
@@ -241,6 +243,17 @@ val periodicScan :
   ~merge:('b -> 'b -> 'b) ->
   'b Stream.t
 ```
+</div>
+<div class="not-mobile">
+```ocaml
+(* periodicScan 1->2->3->4->5->6->7->8
+  ~init:0 ~lift:(fun a -> a)
+  ~merge:(fun a b -> a + b) => 10->36
+*)
+val periodicScan : 'a Stream.t -> ~init:'b ->
+  ~lift:('a -> 'b) -> ~merge:('b -> 'b -> 'b) -> 'b Stream.t
+```
+</div>
 
 A scan that periodically emits complete values, not every time an `'a` datum appears on a stream, but maybe every few times. This therefore has slightly different semantics than a traditional scan operation.
 
@@ -351,13 +364,13 @@ Throughput of work completion matches our stream of data! It’s perfect, we’v
 - Latency: $$O(log(R))$$
 
  
-Latency is still logarithmic, though now it’s $$log(R)+1$$ steps as our trees have $$R$$ leaves and we an extra layer on the bottom for base jobs. In fact, this is actually the lower bound ^[Here’s a short informal proof: Note that any sort of reduction operation on $$N$$ pieces of data can’t be done faster than $$O(log(N))$$ span. If we assume we could handle our $$R$$ units that we enqueue at a time in fewer than $$O(log(N))$$ steps then since we’re doing a reduction operation we would be doing it faster than $$O(log(N))$$ which is a contradiction.]
+Latency is still logarithmic, though now it’s $$log(R)+1$$ steps as our trees have $$R$$ leaves and we an extra layer on the bottom for base jobs. In fact, this is actually the lower bound^[Here’s a short informal proof: Note that any sort of reduction operation on $$N$$ pieces of data can’t be done faster than $$O(log(N))$$ span. If we assume we could handle our $$R$$ units that we enqueue at a time in fewer than $$O(log(N))$$ steps then since we’re doing a reduction operation we would be doing it faster than $$O(log(N))$$ which is a contradiction.]
  
 
 - Space: $$O(R*log(R))$$ 
 
  
-We have multiple trees now. Interestingly, we have exactly $$log(R)$$ trees pending at a time. Again our longer trees take up an extra layer than traditional binary trees, so in this case $$3R-1$$ nodes since we have $$R$$ leaves, and we have $$log(R)$$ of these trees. ^[In order to prevent latency and space from growing over time, we need to make sure we complete work as fast as we add it]
+We have multiple trees now. Interestingly, we have exactly $$log(R)$$ trees pending at a time. Again our longer trees take up an extra layer than traditional binary trees, so in this case $$3R-1$$ nodes since we have $$R$$ leaves, and we have $$log(R)$$ of these trees.^[In order to prevent latency and space from growing over time, we need to make sure we complete work as fast as we add it]
 
 Now that we have thoroughly optimized our throughput and latency, let’s optimize for space.
 
@@ -408,10 +421,9 @@ Now we’re down to $$2R-1$$ nodes—a standard binary tree with $$R$$ leaves.
 
 How do we store the tree? Since we know the size a priori (a complete binary tree with $$R$$ leaves), we can use a *succinct* representation. 
 
-A *succinct* data structure requires only $$o(Z)$$ extra space to manage the relationship between the elements if $$Z$$ is the optimal number of bits that we need to express the information in an unstructured manner. Note that this is little-$$o$$ not big-$$O$$—a much tighter bound
-^[This is a very interesting area of computer science research, and I very much recommend the curious to read more: See https://www.cs.cmu.edu/~dga/papers/zhou-sea2013.pdf and https://en.wikipedia.org/wiki/Wavelet_Tree.)]
+A *succinct* data structure requires only $$o(Z)$$ extra space to manage the relationship between the elements if $$Z$$ is the optimal number of bits that we need to express the information in an unstructured manner. Note that this is little-$$o$$ not big-$$O$$—a much tighter bound^[This is a very interesting area of computer science research, and I very much recommend the curious to read more: See https://www.cs.cmu.edu/~dga/papers/zhou-sea2013.pdf and https://en.wikipedia.org/wiki/Wavelet_Tree.)]
 
-In fact our structure as described is actually an *implicit* one because of our scalar cursor. An *implicit* data structure is one that uses only $$O(1)$$ extra bits. ^[In our case, just the cursor.] In later refinements (in part 2), we'll go back to a *succinct* representation because we need to relax one of the assumptions we made here. This is similar to the popular *implicit heap* that you may have learned about in a computer science class.
+In fact our structure as described is actually an *implicit* one because of our scalar cursor. An *implicit* data structure is one that uses only $$O(1)$$ extra bits.^[In our case, just the cursor.] In later refinements (in part 2), we'll go back to a *succinct* representation because we need to relax one of the assumptions we made here. This is similar to the popular *implicit heap* that you may have learned about in a computer science class.
 
 
 ![A node at position $$i$$ can find its parent at position $$\frac{i}{2}$$](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544577978603_succinct.png)
@@ -477,6 +489,7 @@ Additionally, we will want to explore a more efficient mechanism to share accoun
 We can reify this model with the [following signature in the Coda codebase](https://github.com/CodaProtocol/coda/blob/7bdfa3421e49b73ed812a6eeab3ca0b8ce1be479/src/lib/parallel_scan/parallel_scan.mli):
 
 
+<div class="not-large">
 ```ocaml
 val start : parallelism_log_2:int
   -> ('a, 'd) State.t
@@ -504,6 +517,29 @@ val fill_in_completed_jobs :
 optionally emits the ['a] at the top of the
 tree *)
 ```
+</div>
+<div class="large-only">
+```ocaml
+val start : parallelism_log_2:int -> ('a, 'd) State.t
+(** The initial state of the parallel scan at some parallelism *)
+
+val next_jobs : state:('a, 'd) State.t -> ('a, 'd) Available_job.t list
+(** Get all the available jobs *)
+
+val enqueue_data : state:('a, 'd) State.t -> data:'d list -> unit Or_error.t
+(** Add data to parallel scan state *)
+
+val free_space : state:('a, 'd) State.t -> int
+(** Compute how much data ['d] elements we are allowed to add to the state *)
+
+val fill_in_completed_jobs :
+     state:('a, 'd) State.t
+  -> completed_jobs:'a State.Completed_job.t list
+  -> 'a option Or_error.t
+(** Complete jobs needed at this state -- optionally emits the ['a] at the top
+of the tree *)
+```
+</div>
 ^[`'a` is the type of the top value and there’s some notion of an associative merging operation on the `'a` values. `'d` is the type of the data at the leaves that comes in at rate $$R$$.]
 
 ## Thanks

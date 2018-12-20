@@ -1,3 +1,36 @@
+/* visibility */
+
+.blog-content .not-large,
+.blog-content .mobile-only {
+  display: block;
+}
+.blog-content .not-mobile,
+.blog-content .large-only {
+  display: none;
+}
+
+@media screen and (min-width:30em) {
+  .blog-content .not-large,
+  .blog-content .not-mobile,
+  {
+    display: block;
+  }
+  .blog-content .mobile-only,
+  .blog-content .large-only {
+    display: none;
+  }
+}
+@media screen and (min-width:60em) {
+  .blog-content .not-mobile,
+  .blog-content .large-only {
+    display: block;
+  }
+  .blog-content .not-large,
+  .blog-content .mobile-only {
+    display: none;
+  }
+}
+
 /* KATEX */
 
 .blog-content .katex-display {
@@ -14,6 +47,12 @@
 
 .katex {
   color: rgb(61,100,134); /* blueblacklight */
+}
+
+.blog-content .katex-block code,
+.blog-content .katex-block pre {
+  font-size: 1em;
+  background-color: white;
 }
 
 /* Headings */
@@ -54,6 +93,12 @@
   padding-right: 0.25rem;
   padding-top: 0.25rem;
   padding-bottom: 0.25rem;
+}
+
+@media screen and (min-width:30em) {
+  .blog-content code {
+    font-size: 0.8625rem;
+  }
 }
 
 .blog-content pre {
@@ -147,11 +192,9 @@
   }
 }
 
-/* block latex */
+/* block quotes */
 
-.blog-content .katex-block code,
-.blog-content .katex-block pre {
-  font-size: 1em;
-  background-color: white;
+.blog-content blockquote {
+  margin-inline-start: 1rem;
+  margin-inline-end: 1rem;
 }
-
