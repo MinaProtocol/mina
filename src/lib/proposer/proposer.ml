@@ -24,7 +24,7 @@ module type Inputs_intf = sig
      and type external_transition_verified := External_transition.Verified.t
      and type ledger_database := Ledger_db.t
      and type staged_ledger := Staged_ledger.t
-     and type ledger_diff_verified := Staged_ledger_diff.Verified.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type masked_ledger := Masked_ledger.t
 

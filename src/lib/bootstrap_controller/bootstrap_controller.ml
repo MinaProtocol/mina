@@ -14,7 +14,7 @@ module type Inputs_intf = sig
      and type ledger_database := Ledger.Db.t
      and type masked_ledger := Ledger.Mask.Attached.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type ledger_diff_verified := Staged_ledger_diff.Verified.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
 
   module Merkle_address : Merkle_address.S
@@ -74,7 +74,7 @@ module Make (Inputs : Inputs_intf) :
             else new_child :: children )
   end
 
-  let worth_getting_root t candidate time_received =
+  let worth_getting_root t candidate =
     `Keep
     = Consensus.Mechanism.select ~logger:t.logger
         ~existing:
@@ -82,7 +82,6 @@ module Make (Inputs : Inputs_intf) :
              t.best_with_root.state)
         ~candidate:
           (Consensus.Mechanism.Protocol_state.consensus_state candidate)
-        ~time_received
 
   let received_bad_proof t e =
     (* TODO: Punish *)
@@ -104,9 +103,16 @@ module Make (Inputs : Inputs_intf) :
       ; generations= length candidate - length t.best_with_root.root }
     in
     if
-      done_syncing_root t
-      || (not @@ worth_getting_root t candidate time_received)
-    then Deferred.unit
+      not
+        (Consensus.Mechanism.received_at_valid_time
+           (Protocol_state.consensus_state candidate)
+           ~time_received)
+    then (
+      Logger.faulty_peer t.logger
+        "received protocol state at invalid time while bootstrapping" ;
+      Deferred.unit )
+    else if done_syncing_root t || (not @@ worth_getting_root t candidate) then
+      Deferred.unit
     else
       match%map
         Network.get_ancestry t.network (input.descendant, input.generations)
@@ -171,7 +177,7 @@ module Make (Inputs : Inputs_intf) :
         Transition_cache.add transition_graph ~parent:previous_state_hash
           transition ;
         (* TODO: Efficiently limiting the number of green threads in #1337 *)
-        if worth_getting_root t protocol_state time_received then
+        if worth_getting_root t protocol_state then
           on_transition t (transition, time_received) |> don't_wait_for ;
         Deferred.unit )
     |> don't_wait_for ;
@@ -184,7 +190,7 @@ module Make (Inputs : Inputs_intf) :
     let initial_breadcrumb = Transition_frontier.root frontier in
     let initial_root_state =
       initial_breadcrumb |> Transition_frontier.Breadcrumb.transition_with_hash
-      |> With_hash.data |> External_transition.forget
+      |> With_hash.data |> External_transition.of_verified
       |> External_transition.protocol_state
     in
     let t =

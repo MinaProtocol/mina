@@ -52,7 +52,6 @@ module type Inputs_intf = sig
   module Staged_ledger :
     Staged_ledger_intf
     with type diff := Staged_ledger_diff.t
-     and type verified_diff := Staged_ledger_diff.Verified.t
      and type valid_diff :=
                 Staged_ledger_diff.With_valid_signatures_and_proofs.t
      and type staged_ledger_hash := Staged_ledger_hash.t
@@ -78,8 +77,8 @@ module Make (Inputs : Inputs_intf) :
    and type external_transition_verified :=
               Inputs.External_transition.Verified.t
    and type ledger_database := Ledger.Db.t
+   and type staged_ledger_diff := Inputs.Staged_ledger_diff.t
    and type staged_ledger := Inputs.Staged_ledger.t
-   and type ledger_diff_verified := Inputs.Staged_ledger_diff.Verified.t
    and type masked_ledger := Ledger.Mask.Attached.t
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t =
 struct
