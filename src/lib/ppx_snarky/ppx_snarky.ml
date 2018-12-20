@@ -119,6 +119,51 @@ let fold_fun_stri ~loc ~modname ~fname ~foldf ?(varname = "t") fields_info =
         ~foldf:(Exp.ident ~loc (mkloc foldf loc))
         ~varname:(mkloc varname loc) fields_info ]
 
+let fields_pattern ~loc fields_info =
+  Pat.record ~loc
+    (List.map fields_info ~f:(fun {field_name; _} ->
+         ( loc_map ~f:Longident.parse field_name
+         , Pat.var ~loc:field_name.loc field_name ) ))
+    Closed
+
+let fields_expression ~loc fields_info =
+  Exp.record ~loc
+    (List.map fields_info ~f:(fun {field_name; _} ->
+         let field_name = loc_map ~f:Longident.parse field_name in
+         (field_name, Exp.ident ~loc:field_name.loc field_name) ))
+    None
+
+let typ_stri ~loc ~modname fields_info =
+  let mk_lid2 ~loc name1 name2 = mkloc (Ldot (Lident name1, name2)) loc in
+  let typ_fn mod_ name =
+    Exp.ident ~loc (mkloc (Ldot (Ldot (Lident "Typ", mod_), name)) loc)
+  in
+  [%stri
+    let store =
+      let store [%p fields_pattern ~loc fields_info] =
+        [%e
+          List.fold_left fields_info
+            ~init:
+              (Exp.apply (typ_fn "Store" "return")
+                 [(Nolabel, fields_expression ~loc fields_info)])
+            ~f:(fun expr {field_name; field_module; _} ->
+              Exp.apply (typ_fn "Store" "bind")
+                [ ( Nolabel
+                  , Exp.apply ~loc
+                      (Exp.ident ~loc (mk_lid2 ~loc "Typ" "store"))
+                      [ ( Nolabel
+                        , Exp.ident ~loc:field_module.loc
+                            (localize_mod field_module modname "typ") )
+                      ; ( Nolabel
+                        , Exp.ident ~loc:field_name.loc
+                            (loc_map ~f:Longident.parse field_name) ) ] )
+                ; ( Nolabel
+                  , Exp.fun_ ~loc Nolabel None
+                      (Pat.var ~loc:field_name.loc field_name)
+                      expr ) ] )]
+      in
+      store]
+
 let snark_mod_instance ~loc modname fields_info =
   [ Str.module_
     @@ Mb.mk ~loc:modname.loc modname
@@ -129,7 +174,8 @@ let snark_mod_instance ~loc modname fields_info =
              fields_info
          ; fold_fun_stri ~loc ~modname ~fname:"fold"
              ~foldf:(Ldot (Lident "Fold_lib", "+>"))
-             fields_info ] ]
+             fields_info
+         ; typ_stri ~loc ~modname fields_info ] ]
 
 let instances_str ~loc instances_info fields_info =
   match instances_info with
