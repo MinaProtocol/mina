@@ -17,12 +17,12 @@ While developing [Coda](https://codaprotocol.com), we came across an interesting
 
 <div class="side-footnote-container">
 <div class="side-footnote">
-<sup>2</sup> Equivalent to security as a full node.
+<sup>2</sup> Equivalent to security as a full&nbsp;node.
 </div>
 </div>
-The Coda cryptocurrency protocol is unique in that it uses a [succinct blockchain](https://www.youtube.com/watch?v=eWVGATxEB6M). In Coda the blockchain is replaced by a tiny constant-sized cryptographic proof. This means that in the Coda protocol a user can sync with full-security^[Equivalent to security as a full node.] instantly—users don’t have to wait to download thousands and thousands of blocks to verify the state of the network.
+The Coda cryptocurrency protocol is unique in that it uses a [succinct blockchain](https://www.youtube.com/watch?v=eWVGATxEB6M). In Coda the blockchain is replaced by a tiny constant-sized cryptographic proof. This means that in the Coda protocol a user can sync with full-security^[Equivalent to security as a full&nbsp;node.] instantly—users don’t have to wait to download thousands and thousands of blocks to verify the state of the network.
 
-What is this tiny cryptographic proof? It’s called a zk-SNARK, or zero knowledge Succinct Non-interactive ARgument of Knowledge. zk-SNARKs let a program create a proof of a computation, then share that proof with anyone. Anyone with the proof can verify the computation very quickly, in just milliseconds, independent of how long the computation itself takes. While validating proofs is fast, creating them is quite slow, so creating this SNARK proof would be much more computationally expensive. We use a few different SNARK proofs throughout Coda’s protocol, but the important one for this post is what we call the “Ledger Proof”.
+What is this tiny cryptographic proof? It’s called a zk-SNARK, or zero knowledge Succinct Non-interactive ARgument of Knowledge. zk-SNARKs let a program create a proof of a computation, then share that proof with anyone. Anyone with the proof can verify the computation very quickly, in just milliseconds, independent of how long the computation itself takes. While validating proofs is fast, creating them is quite slow, so creating this SNARK proof would be much more computationally expensive. We use a few different SNARK proofs throughout Coda’s protocol, but the important one for this post is what we call the “Ledger&nbsp;Proof”.
 
 <div class="side-footnote-container">
 <div class="side-footnote">
@@ -38,10 +38,10 @@ More precisely, the recursive bit of our ledger proof, $$\sigma_0 \Longrightarro
 
 Let’s examine what running this process over four steps would look like:
 
-![Each transaction emits a proof that we can use along with the next transaction to get our next proof](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544741790874_merge-tree3.png)
+![Each transaction emits a proof that we can use along with the next transaction to get our next&nbsp;proof](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544741790874_merge-tree3.png)
 
 
-The functional programming enthusiast will notice that this operation is like a scan:
+The functional programming enthusiast will notice that this operation is like a&nbsp;scan:
 
 <div class="side-footnote-container">
 <div class="side-footnote">
@@ -104,10 +104,10 @@ val scan : 'a Stream.t
 
 <div class="side-footnote-container">
 <div class="side-footnote">
-<sup>6</sup> We write streams as lists in the evaluation.
+<sup>6</sup> We write streams as lists in the&nbsp;evaluation.
 </div>
 </div>
-As new information flows into the stream we combine it with the last piece of computed information and emit that result onto a new stream. Here’s a trace with transactions and proofs^[We write streams as lists in the evaluation.]:
+As new information flows into the stream we combine it with the last piece of computed information and emit that result onto a new stream. Here’s a trace with transactions and&nbsp;proofs^[We write streams as lists in the&nbsp;evaluation.]:
 
 <div class="mobile-only">
 <div class="katex-block">
@@ -239,7 +239,7 @@ Transaction throughput here refers to the rate at which transactions can be proc
 The more we sacrifice latency the longer proposer nodes have to keep around full copies of the state before just relying on the small SNARK itself.
 </div>
 </div>
-It’s important to minimize transaction latency to enter our SNARK to keep the low RAM requirements on proposer nodes, nodes that propose new transitions during Proof of Stake.^[The more we sacrifice latency the longer proposer nodes have to keep around full copies of the state before just relying on the small SNARK itself.]. SNARKing a transaction is not the same as *knowing* a transaction has been processed, so this is certainly less important for us than&nbsp;throughput.
+It’s important to minimize transaction latency to enter our SNARK to keep the low RAM requirements on proposer nodes, nodes that propose new transitions during Proof of Stake.^[The more we sacrifice latency the longer proposer nodes have to keep around full copies of the state before just relying on the small SNARK itself.] SNARKing a transaction is not the same as *knowing* a transaction has been processed, so this is certainly less important for us than&nbsp;throughput.
 
 
 3. Minimize size of state
@@ -261,10 +261,10 @@ This is possible because of a cryptographic notion known as “Signature of Know
 </div>
 
 </div>
-- All SNARK proofs take one unit of time to complete
+- All SNARK proofs take one unit of time to&nbsp;complete
 - Transactions arrive into the system at a constant rate $$R$$ per unit time
-- We effectively have any number of cores we need to process transactions because we can economically incentivize actors to perform SNARK proofs and use transaction fees to pay those actors.^[This is possible because of a cryptographic notion known as “Signature of Knowledge” which lets us embed information about the creator and a fee into the proof in a way that is unforgeable. We will talk more about how we use this information in another blog&nbsp;post.]
-- Two proofs can be recursively merged:
+- We effectively have any number of cores we need to process transactions because we can economically incentivize actors to perform SNARK proofs and use transaction fees to pay those&nbsp;actors.^[This is possible because of a cryptographic notion known as “Signature of Knowledge” which lets us embed information about the creator and a fee into the proof in a way that is unforgeable. We will talk more about how we use this information in another blog&nbsp;post.]
+- Two proofs can be recursively&nbsp;merged:
 
 ![Merging two transaction proofs](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544574986580_merging-exists.png)
 
@@ -312,7 +312,7 @@ Let’s say that data effectively enqueues a “Base job” that can be complete
 
 ### Upper Bound
 
-Let’s set an upper bound efficiency target for any sort of scan. No matter what we do we can’t do better than the following:
+Let’s set an upper bound efficiency target for any sort of scan. No matter what we do we can’t do better than the&nbsp;following:
 
 
 - Throughput: $$R$$ per unit time
@@ -322,12 +322,12 @@ We said new data was entering the system at a rate of $$R$$ per unit time, so th
 
 - Latency: $$O(1)$$
 
-In the best case, we don’t have to wait to get the piece of data included as part of the scan result. Whatever time it takes to do one step is the time it takes before our data is included in the scan result.
+In the best case, we don’t have to wait to get the piece of data included as part of the scan result. Whatever time it takes to do one step is the time it takes before our data is included in the scan&nbsp;result.
 
 
 - Space: $$O(1)$$
 
-We don’t need to store any extra information besides the most recent result
+We don’t need to store any extra information besides the most recent&nbsp;result.
 
 As a reminder, we decided that the naive approach is just a standard linear scan. This “dumb scan” can be a nice lower bound on throughput, we can also analyze the other attributes we care about here:
 
@@ -335,7 +335,7 @@ As a reminder, we decided that the naive approach is just a standard linear scan
 
 - Throughput: $$1$$ per unit time
 
-Our linear scan operation emits a result at every step and so we need the prior result before we can perform the next step.
+Our linear scan operation emits a result at every step and so we need the prior result before we can perform the next&nbsp;step.
 
 
 - Latency: $$O(1)$$
@@ -409,7 +409,7 @@ Now we have $$\frac{R}{2}$$ pieces of merge work to complete and we use $$\frac{
 ![](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566092163_naive-all.png)
 
 
-We repeat until we reach the top of the tree. The completed Merge work at the top can be consumed by the rest of the system. 
+We repeat until we reach the top of the tree. The completed Merge work at the top can be consumed by the rest of the&nbsp;system. 
 
 ## Analysis
 
@@ -486,34 +486,23 @@ However, this solution leaves something to be desired—why must we halve our pa
 
 ## Better Solution
 
-Let's take advantage of the fact that we get $$R$$ new data values each time we complete work—still preferring earlier queued data values to minimize latency once we've exhausted available parallelism.
+Let's take advantage of the fact that we get $$R$$ new data values each time we complete work—still preferring earlier queued data values to minimize latency once we've exhausted available&nbsp;parallelism.
 
 With this in mind, let's trace a run-through, this time always making sure we have $$R$$ pieces of work to do at every step—for illustration, let's pick $$R=2$$:
 
 <div class="images-2">
-![In the first two steps we just lay out data](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178455_better-data.png)
+![In the first step we just lay out data](/static/blog/scans/better-aprime.png)
 
-![The next step we lay out data and do four jobs](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178447_better-base.png)
+![Now we lay out data and do two jobs](/static/blog/scans/better-a5.png)
 </div>
+
+![We do three jobs completing the first&nbsp;tree](/static/blog/scans/better-b.png)
 
 <div class="images-2">
-![Again we do four jobs and add two more&nbsp;data](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178462_better-merge1.png)
+![We again do three jobs and complete a&nbsp;tree](/static/blog/scans/better-c.png)
 
-![Now the first tree is done and we again do four jobs](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178487_better-merge2.png)
+![It repeats](/static/blog/scans/better-d.png)
 </div>
-
-<div class="images-2">
-![](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178495_better-merge3.png)
-
-![It repeats](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178516_better-merge4.png)
-</div>
-
-<div class="images-2">
-![](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178502_better-merge5.png)
-
-![Over and over again](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178529_better-merge6.png)
-</div>
-
 
 We do as we did before, but this time we have $$R$$ jobs to complete and can dispatch to our $$R$$ cores every step. We have exactly $$log(R)$$ trees pending at a time. At every step, we complete the first tree (tree zero) and at tree $$i$$, we complete layer $$i$$.
 
@@ -522,7 +511,7 @@ We do as we did before, but this time we have $$R$$ jobs to complete and can dis
 
 - Throughput: $$R$$
 
-Throughput of work completion matches our stream of data! It’s perfect, we’ve hit our upper-bound.
+Throughput of work completion matches our stream of data! It’s perfect, we’ve hit our <span class="no-break">upper-bound.</span>
 
 
 - Latency: $$O(log(R))$$
@@ -557,17 +546,12 @@ In order to prevent latency and space from growing over time, we need to make su
 
 Do we really need to hold all $$log(R)$$ trees? We only ever care about the frontier of work. All the information we need to perform the next layer of jobs. We clearly don’t need to store anything above that or below it in the trees.
 
-![](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566315340_better-waste.png)
+![](/static/blog/scans/space-waste.png)
 
 
 Notice that we only use some of each layer of trees even across the $$log(R)$$ trees. And so we can represent the frontier of the $$log(R)$$ trees with only a single tree representing the work pipeline moving from leaves to the root in the following manner:
 
-<div class="images-2">
-![](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566333017_compress1.png)
-
-![](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566368658_compress2.png)
-</div>
-
+![Before and after we take a step](/static/blog/scans/compress.png)
 
 
 ## Analysis
@@ -593,7 +577,7 @@ We’ve reduced our space back down to a single tree with leaves $$3R-1$$.
 
 Do we really need that extra layer? If we change how we think about the problem, we can use a perfect binary tree which we can manipulate to save even more space:
 
-![The leaves are base proof holes that can be filled with data. The inner nodes hold incomplete and available jobs for workers to complete.](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544578238964_job-view.png)
+![The leaves are base proof holes that can be filled with data. The inner nodes hold available jobs for workers to complete.](/static/blog/scans/reorganize.png)
 
 
 Now we’re down to $$2R-1$$ nodes—a standard binary tree with $$R$$ leaves.
@@ -608,15 +592,15 @@ This is a very interesting area of computer science research, and I very much re
 <br>
 <br>
 <sup>12</sup> 
-In our case, just the cursor.
+In our case, just the&nbsp;cursor.
 </div>
 </div>
-A *succinct* data structure requires only $$o(Z)$$ extra space to manage the relationship between the elements if $$Z$$ is the optimal number of bits that we need to express the information in an unstructured manner. Note that this is little-$$o$$ not big-$$O$$—a much tighter bound^[This is a very interesting area of computer science research, and I very much recommend the curious to read more: See [Zhou, et. al 2013](https://www.cs.cmu.edu/~dga/papers/zhou-sea2013.pdf) and [wavelet trees](https://en.wikipedia.org/wiki/Wavelet_Tree).]
+A *succinct* data structure requires only $$o(Z)$$ extra space to manage the relationship between the elements if $$Z$$ is the optimal number of bits that we need to express the information in an unstructured manner. Note that this is little-$$o$$ not big-$$O$$—a much tighter&nbsp;bound.^[This is a very interesting area of computer science research, and I very much recommend the curious to read more: See [Zhou, et. al 2013](https://www.cs.cmu.edu/~dga/papers/zhou-sea2013.pdf) and [wavelet trees](https://en.wikipedia.org/wiki/Wavelet_Tree).]
 
 In fact our structure as described is actually an *implicit* one because of our scalar cursor. An *implicit* data structure is one that uses only $$O(1)$$ extra bits.^[In our case, just the cursor.] In later refinements (in part 2), we'll go back to a *succinct* representation because we need to relax one of the assumptions we made here. This is similar to the popular *implicit heap* that you may have learned about in a computer science class.
 
 
-![A node at position $$i$$ can find its parent at position $$\frac{i}{2}$$](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544577978603_succinct.png)
+![A node at position $$i$$ can find its parent at position $$\frac{i}{2}$$](/static/blog/scans/succinct.png)
 
 ## Final Analysis
 
@@ -661,7 +645,7 @@ We have an implicit data structure representation for our complete binary tree w
 </div>
 
 
-We went from a sequential solution that at a reasonable $$R$$ only handled a throughput of 0.05 data per second to an initial parallel solution that handled 19.5 data per second to a fully optimized solution that handles 273 data per second. Our final solution even has optimal latency and space characteristics.
+We went from a sequential solution that at a reasonable $$R$$ only handled a throughput of 0.05 data per second to an initial parallel solution that handled 19.5 data per second to a fully optimized solution that handles 273 data per second. Our final solution even has optimal latency and space&nbsp;characteristics.
 
 We did it! Coda can now be limited in its throughput by the speed at which information can flow across the network, and no longer by the time it takes to construct a SNARK. Moreover, we solved a more general problem: Efficiently computing an online periodic parallel scan over an infinite stream for some associative operation.
 
@@ -676,7 +660,7 @@ You can also go through literature and try to find prior art. We didn’t find m
 
 ## Conclusion
 
-We were able to take advantage of parallelism and other properties of our system to materialize this general “periodic scan” problem of combining data streaming in online fashion which as we described doesn’t limit throughput at all, has optimal latency characteristics, and is succinct. With this data structure, Coda is free to take advantage of succinctness to offer a high-throughput with no risk of centralization!
+We were able to take advantage of parallelism and other properties of our system to materialize this general “periodic scan” problem of combining data streaming in online fashion which as we described doesn’t limit throughput at all, has optimal latency characteristics, and is succinct. With this data structure, Coda is free to take advantage of succinctness to offer a high-throughput with no risk of&nbsp;centralization!
 
 In a future blog post, we’ll talk about instantiating this parametric structure with concrete parameters and how we instantiate our infinite core machine model by farming work out to the network. We’ll also talk about the optimization problem we have for choosing how to fill out these trees with completed work.
 
@@ -690,7 +674,7 @@ Additionally, we will want to explore a more efficient mechanism to share accoun
 
 ## Appendix
 
-We can reify this model with the [following signature in the Coda codebase](https://github.com/CodaProtocol/coda/blob/7bdfa3421e49b73ed812a6eeab3ca0b8ce1be479/src/lib/parallel_scan/parallel_scan.mli):
+We can reify this model with the [following signature in the Coda&nbsp;codebase](https://github.com/CodaProtocol/coda/blob/7bdfa3421e49b73ed812a6eeab3ca0b8ce1be479/src/lib/parallel_scan/parallel_scan.mli):
 
 <div class="side-footnote-container">
 <div class="side-footnote">
@@ -754,9 +738,9 @@ of the tree *)
 ^[`'a` is the type of the top value and there’s some notion of an associative merging operation on the `'a` values. `'d` is the type of the data at the leaves that comes in at rate $$R$$.]
 </div>
 
-## Thanks
+## Acknowledgements
 
 <div class="thanks">
-Thanks for reviewing Omer Zach, Evan Shapiro, Deepthi S Kumar, and Corey Richardson.
+Thanks to Evan Shapiro for working through these data structures with me when we were first figuring this stuff out.&nbsp;Thanks to Deepthi Kumar for collaborating with me on several optimizations. Finally, thanks to Omer Zach and Corey Richardson (and Evan and Deepthi) for their help in reviewing this post!
 </div>
 

@@ -3,7 +3,8 @@ open Async
 open Stationary
 open Common
 
-let disqus_html = {html|<div id="disqus_thread"></div>
+let disqus_html =
+  {html|<div id="disqus_thread"></div>
 <script>
 
 /**
@@ -41,7 +42,7 @@ let author s =
 let date d =
   let month_day = Date.format d "%B %d" in
   let year = Date.year d in
-  let s = month_day ^ " " ^ (Int.to_string year) in
+  let s = month_day ^ " " ^ Int.to_string year in
   let open Html_concise in
   h4
     [Style.just "f7 fw4 tracked-supermega ttu o-50 metropolis mt0 mb35"]
@@ -49,66 +50,70 @@ let date d =
 
 module Share = struct
   open Html_concise
-  let content = 
-    let channels = [ 
-        ("Twitter", "https://twitter.com/codaprotocol?lang=en") 
-      ; ("Discord", "https://discord.gg/UyqY37F") 
-      ; ("Telegram", "https://t.me/codaprotocol") 
-      ] 
-    in
-    let channels = 
-      List.map channels ~f:(fun (name,link) -> a [href link] [text name]) 
+
+  let content =
+    let channels =
+      [ ("Twitter", "https://twitter.com/codaprotocol")
+      ; ("Discord", "https://discord.gg/UyqY37F")
+      ; ("Telegram", "https://t.me/codaprotocol") ]
     in
     let channels =
-      List.intersperse channels ~sep:(text "•")
+      List.map channels ~f:(fun (name, link) -> a [href link] [text name])
     in
+    let channels = List.intersperse channels ~sep:(text "•") in
     let share =
-      span [Style.just "f7 ttu fw4 ddinexp tracked-mega blueshare"] [text "share:"]
+      span
+        [Style.just "f7 ttu fw4 ddinexp tracked-mega blueshare"]
+        [text "share:"]
     in
-    div [Style.just "share flex justify-center items-center mb4"]
+    div
+      [Style.just "share flex justify-center items-center mb4"]
       (share :: channels)
 end
 
 let post name =
   let open Html_concise in
   let%map post = Post.load ("posts/" ^ name) in
-  let regular = div
-        [Style.just "mw65-ns ibmplex f5 center blueblack"]
-        ( title post.title
-          :: (match post.subtitle with None -> [] | Some s -> [subtitle s])
-        @ [ author post.author
-          ; date post.date
-          ; div
-              [Stationary.Attribute.class_ "blog-content lh-copy"]
-              [ post.content
-              ; hr []
-              (* HACK: to reuse styles from blog hr, we can just stick it in blog-content *)
-               ]
-          ; Share.content] )
+  let regular =
+    div
+      [Style.just "mw65-ns ibmplex f5 center blueblack"]
+      ( title post.title
+        :: (match post.subtitle with None -> [] | Some s -> [subtitle s])
+      @ [ author post.author
+        ; date post.date
+        ; div
+            [Stationary.Attribute.class_ "blog-content lh-copy"]
+            [ post.content
+            ; hr []
+            (* HACK: to reuse styles from blog hr, we can just stick it in blog-content *)
+             ]
+        ; Share.content ] )
   in
-  let big = div
-      [ Style.just "mw7 center ibmplex blueblack side-footnotes"] 
-        [ div 
-        [Style.just "mw65-ns f5 left blueblack"]
-        ( title post.title
-          :: (match post.subtitle with None -> [] | Some s -> [subtitle s])
-        @ [ author post.author
-          ; date post.date
-          ; div
-              [Stationary.Attribute.class_ "blog-content lh-copy"]
-              [ post.content
-              ; hr []
-              (* HACK: to reuse styles from blog hr, we can just stick it in blog-content *)
-               ]
-          ; Share.content ] ) ]
+  let big =
+    div
+      [Style.just "mw7 center ibmplex blueblack side-footnotes"]
+      [ div
+          [Style.just "mw65-ns f5 left blueblack"]
+          ( title post.title
+            :: (match post.subtitle with None -> [] | Some s -> [subtitle s])
+          @ [ author post.author
+            ; date post.date
+            ; div
+                [Stationary.Attribute.class_ "blog-content lh-copy"]
+                [ post.content
+                ; hr []
+                (* HACK: to reuse styles from blog hr, we can just stick it in blog-content *)
+                 ]
+            ; Share.content ] ) ]
   in
-  let disqus = div [Style.just "mw65-ns ibmplex f5 center blueblack"] [ Html.literal disqus_html]
+  let disqus =
+    div
+      [Style.just "mw65-ns ibmplex f5 center blueblack"]
+      [Html.literal disqus_html]
   in
   div
     [Style.just "ph3 ph4-m ph5-l"]
-    [ Huge_switch.create
-        ~regular:regular
-        ~huge:big; disqus ]
+    [Huge_switch.create ~regular ~huge:big; disqus]
 
 let content name =
   let%map p = post name in

@@ -352,3 +352,8 @@
 .sticky { position: sticky; position: -webkit-sticky; }
 
 .no-mobile-highlight-jank {-webkit-tap-highlight-color: transparent;}
+
+span.no-break {
+  white-space: nowrap;
+}
+
