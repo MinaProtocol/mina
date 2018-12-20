@@ -156,7 +156,7 @@ combine&(\sigma_0 \Longrightarrow \sigma_0,\sigma_0T_0^{1}\sigma_1):: \\
 ```
 \begin{aligned}
 scan &[\sigma_0T_0^{1}\sigma^{1}; \; \sigma_1T_1^{2}\sigma^{2}; \; \sigma_2T_2^{3}\sigma^{3}] \\
-  \sim &init:\sigma_0 \Longrightarrow \sigma_0 \sim f:combine \\
+  \sim &init:\sigma_0 \Longrightarrow \sigma_0 \quad\sim f:combine \\
   \\
 
 combine&(\sigma_0 \Longrightarrow \sigma_0,\sigma_0T_0^{1}\sigma_1):: \\
@@ -167,16 +167,16 @@ combine&(\sigma_0 \Longrightarrow \sigma_0,\sigma_0T_0^{1}\sigma_1):: \\
 
 \sigma_0 \Longrightarrow \sigma_1&:: \\
 (scan &[\sigma_1T_1^{2}\sigma^{2}; \; \sigma_2T_2^{3}\sigma^{3}] \\
-  \sim &init:\sigma_0 \Longrightarrow \sigma_1 \sim f:combine) \\
+  \sim &init:\sigma_0 \Longrightarrow \sigma_1 \quad\sim f:combine) \\
   \\
 
 \sigma_0 \Longrightarrow \sigma_2&::\sigma_0 \Longrightarrow \sigma_1:: \\
 (scan &[\sigma_2T_2^{3}\sigma_3] \\
-  \sim &init:\sigma_0 \Longrightarrow \sigma_2 \sim f:combine) \\
+  \sim &init:\sigma_0 \Longrightarrow \sigma_2 \quad\sim f:combine) \\
   \\
 
 \sigma_0 \Longrightarrow \sigma_3&::\sigma_0 \Longrightarrow \sigma_2::\sigma_0 \Longrightarrow \sigma_1:: \\
-(scan &[] \sim init:\sigma_0 \Longrightarrow \sigma_3 \sim f:combine) \\
+(scan &[] \quad\sim init:\sigma_0 \Longrightarrow \sigma_3 \quad\sim f:combine) \\
   \\
 
 \sigma_0 \Longrightarrow \sigma_3&::\sigma_0 \Longrightarrow \sigma_2::\sigma_0 \Longrightarrow \sigma_1::[] \\
@@ -191,26 +191,26 @@ combine&(\sigma_0 \Longrightarrow \sigma_0,\sigma_0T_0^{1}\sigma_1):: \\
 <div class="katex-block">
 ```
 \begin{aligned}
-scan &[\sigma_0T_0^{1}\sigma^{1}; \; \sigma_1T_1^{2}\sigma^{2}; \; \sigma_2T_2^{3}\sigma^{3}] \sim init:\sigma_0 \Longrightarrow \sigma_0 \sim f:combine \\
+&scan [\sigma_0T_0^{1}\sigma^{1}; \; \sigma_1T_1^{2}\sigma^{2}; \; \sigma_2T_2^{3}\sigma^{3}] \quad\sim init:\sigma_0 \Longrightarrow \sigma_0 \quad\sim f:combine \\
   \\
 
-combine&(\sigma_0 \Longrightarrow \sigma_0,\sigma_0T_0^{1}\sigma_1):: \\
-(scan &[\sigma_1T_1^{2}\sigma^{2}; \; \sigma_2T_2^{3}\sigma^{3}] \sim init:combine(\sigma_0 \Longrightarrow \sigma_0,\sigma_0T_0^{1}\sigma_1) \sim f:combine) \\
+&combine(\sigma_0 \Longrightarrow \sigma_0,\sigma_0T_0^{1}\sigma_1):: \\
+&\quad(scan [\sigma_1T_1^{2}\sigma^{2}; \; \sigma_2T_2^{3}\sigma^{3}] \quad\sim init:combine(\sigma_0 \Longrightarrow \sigma_0,\sigma_0T_0^{1}\sigma_1) \quad\sim f:combine) \\
   \\
 
-\sigma_0 \Longrightarrow \sigma_1&:: (scan [\sigma_1T_1^{2}\sigma^{2}; \; \sigma_2T_2^{3}\sigma^{3}] \sim init:\sigma_0 \Longrightarrow \sigma_1 \sim f:combine) \\
+&\sigma_0 \Longrightarrow \sigma_1:: (scan [\sigma_1T_1^{2}\sigma^{2}; \; \sigma_2T_2^{3}\sigma^{3}] \quad\sim init:\sigma_0 \Longrightarrow \sigma_1 \quad\sim f:combine) \\
   \\
 
-\sigma_0 \Longrightarrow \sigma_2&::\sigma_0 \Longrightarrow \sigma_1:: (scan [\sigma_2T_2^{3}\sigma_3] \sim init:\sigma_0 \Longrightarrow \sigma_2 \sim f:combine) \\
+&\sigma_0 \Longrightarrow \sigma_2::\sigma_0 \Longrightarrow \sigma_1:: (scan [\sigma_2T_2^{3}\sigma_3] \quad\sim init:\sigma_0 \Longrightarrow \sigma_2 \quad\sim f:combine) \\
   \\
 
-\sigma_0 \Longrightarrow \sigma_3&::\sigma_0 \Longrightarrow \sigma_2::\sigma_0 \Longrightarrow \sigma_1:: (scan [] \sim init:\sigma_0 \Longrightarrow \sigma_3 \sim f:combine) \\
+&\sigma_0 \Longrightarrow \sigma_3::\sigma_0 \Longrightarrow \sigma_2::\sigma_0 \Longrightarrow \sigma_1:: (scan [] \quad\sim init:\sigma_0 \Longrightarrow \sigma_3 \quad\sim f:combine) \\
   \\
 
-\sigma_0 \Longrightarrow \sigma_3&::\sigma_0 \Longrightarrow \sigma_2::\sigma_0 \Longrightarrow \sigma_1::[] \\
+&\sigma_0 \Longrightarrow \sigma_3::\sigma_0 \Longrightarrow \sigma_2::\sigma_0 \Longrightarrow \sigma_1::[] \\
 \\
 
-[\sigma_0 \Longrightarrow \sigma_3&; \; \sigma_0 \Longrightarrow \sigma_2; \; \sigma_0 \Longrightarrow \sigma_1]
+&[\sigma_0 \Longrightarrow \sigma_3; \; \sigma_0 \Longrightarrow \sigma_2; \; \sigma_0 \Longrightarrow \sigma_1]
 \end{aligned}
 ```
 </div>
