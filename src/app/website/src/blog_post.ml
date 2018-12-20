@@ -41,7 +41,10 @@ let author s website =
     | Some url ->
         [ a
             [Attribute.href url; Style.just "blueblack no-underline"]
-            [text ("by " ^ s)] ]
+            [ span [Style.just "mr2"] [text ("by " ^ s)]
+            ; literal
+                {literal|<i class="ml-1 ml-2-ns fab f7 fa-twitter mr3 mr2-m mr3-l"></i>|literal}
+            ] ]
     | None -> [text ("by " ^ s)] )
 
 let date d =
