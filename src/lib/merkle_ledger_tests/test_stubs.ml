@@ -135,9 +135,9 @@ end
 module Key = struct
   module T = struct
     type t = Account.key [@@deriving sexp, bin_io, eq, compare, hash]
-
-    let gen = Account.key_gen
   end
+
+  let gen = Account.key_gen
 
   let empty = Account.empty.public_key
 
@@ -151,7 +151,7 @@ module Key = struct
     let num_to_gen = num_keys + (num_keys / 5) in
     let more_than_enough_keys =
       Quickcheck.random_value
-        (Quickcheck.Generator.list_with_length num_to_gen T.gen)
+        (Quickcheck.Generator.list_with_length num_to_gen gen)
     in
     let unique_keys =
       List.dedup_and_sort ~compare:T.compare more_than_enough_keys

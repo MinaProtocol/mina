@@ -9,6 +9,8 @@ module type S = sig
 
   type key
 
+  type key_set
+
   type index = int
 
   (* no deriving, purposely; signatures that include this one may add deriving *)
@@ -32,6 +34,15 @@ module type S = sig
      and type t := t
 
   val to_list : t -> account list
+
+  val foldi_with_ignored_keys :
+       t
+    -> key_set
+    -> init:'accum
+    -> f:(Addr.t -> 'accum -> account -> 'accum)
+    -> 'accum
+
+  (* the set of keys are ledger elements to skip during the fold, because they're in a mask *)
 
   val foldi :
     t -> init:'accum -> f:(Addr.t -> 'accum -> account -> 'accum) -> 'accum

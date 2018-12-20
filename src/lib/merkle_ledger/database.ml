@@ -17,7 +17,8 @@ end)
    and type account := Account.t
    and type root_hash := Hash.t
    and type hash := Hash.t
-   and type key := Key.t = struct
+   and type key := Key.t
+   and type key_set := Key.Set.t = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   include Depth
 
@@ -33,6 +34,7 @@ end)
   module Path = Merkle_path.Make (Hash)
   module Addr = Location.Addr
   module Location = Location
+  module Key = Key
 
   type location = Location.t [@@deriving sexp]
 
@@ -280,15 +282,24 @@ end)
   (* TODO : if key-value store supports iteration mechanism, like RocksDB,
      maybe use that here, instead of loading all accounts into memory
   *)
-  let foldi t ~init ~f =
+  let foldi_with_ignored_keys t ignored_keys ~init ~f =
     let f' index accum account = f (Addr.of_int_exn index) accum account in
     match Account_location.last_location_address t with
     | None -> init
     | Some last_addr ->
+        let ignored_indices =
+          Int.Set.map ignored_keys ~f:(fun key ->
+              try index_of_key_exn t key with _ -> -1
+              (* dummy index for keys not in database *) )
+        in
         let last = Addr.to_int last_addr in
         Sequence.range ~stop:`inclusive 0 last
+        (* filter out indices corresponding to ignored keys *)
+        |> Sequence.filter ~f:(fun loc -> not (Int.Set.mem ignored_indices loc))
         |> Sequence.map ~f:(get_at_index_exn t)
         |> Sequence.foldi ~init ~f:f'
+
+  let foldi t ~init ~f = foldi_with_ignored_keys t Key.Set.empty ~init ~f
 
   module C : Container.S0 with type t := t and type elt := Account.t =
   Container.Make0 (struct
