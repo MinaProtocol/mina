@@ -368,3 +368,7 @@
   cursor: default;
   border-bottom: none;
 }
+
+.thanks {
+  font-style: italic;
+}

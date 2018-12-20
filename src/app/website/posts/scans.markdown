@@ -756,5 +756,7 @@ of the tree *)
 
 ## Thanks
 
+<div class="thanks">
 Thanks for reviewing Omer Zach, Evan Shapiro, Deepthi S Kumar, and Corey Richardson.
+</div>
 
