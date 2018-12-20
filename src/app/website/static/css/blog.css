@@ -264,8 +264,10 @@
 
 /* emphasis */
 .blog-content em {
+  font-family:'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
   font-style: normal;
-  font-weight: 1000;
+  font-weight: 500;
+  color: rgb(61, 100, 134); /* emph blueblack */
 }
 
 .share {
