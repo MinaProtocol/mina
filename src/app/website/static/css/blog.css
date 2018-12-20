@@ -354,6 +354,12 @@
   cursor: default;
 }
 
+.side-footnote sup {
+  position: relative;
+  top: -.125rem;
+}
+
+
 .side-footnotes a.footnoteRef:hover sup {
   cursor: default;
   border-bottom: none;
