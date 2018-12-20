@@ -143,6 +143,17 @@
   margin-bottom: 2rem;
 }
 
+.blog-content .code {
+  position: relative;
+
+}
+
+.blog-content .code .footnoteRef {
+  position: absolute;
+  left: 100%;
+  top: 0rem;
+}
+
 /* lists */
 
 .blog-content ol, .blog-content ul {

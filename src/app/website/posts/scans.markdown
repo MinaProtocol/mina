@@ -27,6 +27,7 @@ Let’s examine what running this process over four steps would look like:
 
 The functional programming enthusiast will notice that this operation is like a scan:
 
+<div class="code">
 ```ocaml
 (* scan [1;2;3] ~init:0 ~f:(fun b a -> b + a)
   => [1,3,6] *)
@@ -36,9 +37,11 @@ val scan : 'a list
   -> 'b list
 ```
 ^[The `~init` in OCaml refers to a named argument, and `'a` and `'b` are a type unification variables that work similarly to generics in Java]
+</div>
 
 A scan combines elements of a collection together incrementally and returns all intermediate values. For example if our elements are numbers and our operation is plus, `scan [1;2;3] ~init:0 ~f:(fun b a → b + a)` has following evaluation trace:
 
+<div class="code">
 ```ocaml
 scan [1;2;3] ~init:0 ~f:add
 (0+1)::(scan [2;3] ~init:(0+1) ~f:add)
@@ -51,6 +54,7 @@ scan [1;2;3] ~init:0 ~f:add
 [1;3;6]
 ```
 ^[`::` means “cons” or prepend to the front of a linked list]
+</div>
 
 However, what we really have is a scan operation over some sort of stream of incoming information, not a list. A signature in OCaml may look like this:
 
@@ -599,6 +603,7 @@ Additionally, we will want to explore a more efficient mechanism to share accoun
 We can reify this model with the [following signature in the Coda codebase](https://github.com/CodaProtocol/coda/blob/7bdfa3421e49b73ed812a6eeab3ca0b8ce1be479/src/lib/parallel_scan/parallel_scan.mli):
 
 
+<div class="code">
 <div class="not-large">
 ```ocaml
 val start : parallelism_log_2:int
@@ -651,6 +656,7 @@ of the tree *)
 ```
 </div>
 ^[`'a` is the type of the top value and there’s some notion of an associative merging operation on the `'a` values. `'d` is the type of the data at the leaves that comes in at rate $$R$$.]
+</div>
 
 ## Thanks
 
