@@ -198,3 +198,40 @@
   margin-inline-start: 1rem;
   margin-inline-end: 1rem;
 }
+
+/* links */
+.blog-content a:not(.footnoteRef) {
+  position: relative;
+  color: black;
+  text-decoration: none;
+  padding-bottom: 2px; /* offset */
+  border-bottom: 1px solid #000; /* color & weight */
+}
+
+.blog-content a:not(.footnoteRef):hover {
+  color: blue;
+}
+
+/* table */
+.blog-content table {
+  border-collapse: collapse;
+}
+
+.blog-content table, th, td {
+  border: 1px solid black;
+}
+
+.blog-content table th {
+  background: red;
+}
+
+.blog-content table th:first-child {
+  background: rgba(0,0,0,0);
+}
+
+/* emphasis */
+.blog-content em {
+  font-style: normal;
+  font-weight: 1000;
+}
+
