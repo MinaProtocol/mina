@@ -520,13 +520,6 @@ We do as we did before, but this time we have $$R$$ jobs to complete and can dis
 
 ## Analysis
 
-<div class="side-footnote-container">
-<div class="side-footnote">
-<sup>9</sup> 
-Here’s a short informal proof: Note that any sort of reduction operation on $$N$$ pieces of data can’t be done faster than $$O(log(N))$$ span. If we assume we could handle our $$R$$ units that we enqueue at a time in fewer than $$O(log(N))$$ steps then since we’re doing a reduction operation we would be doing it faster than $$O(log(N))$$ which is a contradiction.
-</div>
-</div>
-
 - Throughput: $$R$$
 
 Throughput of work completion matches our stream of data! It’s perfect, we’ve hit our upper-bound.
@@ -536,6 +529,13 @@ Throughput of work completion matches our stream of data! It’s perfect, we’v
 
  
 
+
+<div class="side-footnote-container">
+<div class="side-footnote">
+<sup>9</sup> 
+Here’s a short informal proof: Note that any sort of reduction operation on $$N$$ pieces of data can’t be done faster than $$O(log(N))$$ span. If we assume we could handle our $$R$$ units that we enqueue at a time in fewer than $$O(log(N))$$ steps then since we’re doing a reduction operation we would be doing it faster than $$O(log(N))$$ which is a contradiction.
+</div>
+</div>
 Latency is still logarithmic, though now it’s $$log(R)+1$$ steps as our trees have $$R$$ leaves and we an extra layer on the bottom for base jobs. In fact, this is actually the lower bound^[Here’s a short informal proof: Note that any sort of reduction operation on $$N$$ pieces of data can’t be done faster than $$O(log(N))$$ span. If we assume we could handle our $$R$$ units that we enqueue at a time in fewer than $$O(log(N))$$ steps then since we’re doing a reduction operation we would be doing it faster than $$O(log(N))$$ which is a&nbsp;contradiction.]
  
 
@@ -544,16 +544,16 @@ Latency is still logarithmic, though now it’s $$log(R)+1$$ steps as our trees 
  
 We have multiple trees now. Interestingly, we have exactly $$log(R)$$ trees pending at a time. Again our longer trees take up an extra layer than traditional binary trees, so in this case $$3R-1$$ nodes since we have $$R$$ leaves, and we have $$log(R)$$ of these trees.^[In order to prevent latency and space from growing over time, we need to make sure we complete work as fast as we add it]
 
+Now that we have thoroughly optimized our throughput and latency, let’s optimize for&nbsp;space.
+
+## Optimize size
+
 <div class="side-footnote-container">
 <div class="side-footnote">
 <sup>10</sup> 
 In order to prevent latency and space from growing over time, we need to make sure we complete work as fast as we add it
 </div>
 </div>
-
-Now that we have thoroughly optimized our throughput and latency, let’s optimize for&nbsp;space.
-
-## Optimize size
 
 Do we really need to hold all $$log(R)$$ trees? We only ever care about the frontier of work. All the information we need to perform the next layer of jobs. We clearly don’t need to store anything above that or below it in the trees.
 
@@ -598,24 +598,21 @@ Do we really need that extra layer? If we change how we think about the problem,
 
 Now we’re down to $$2R-1$$ nodes—a standard binary tree with $$R$$ leaves.
 
+How do we store the tree? Since we know the size a priori (a complete binary tree with $$R$$ leaves), we can use a *succinct* representation. 
+
+
 <div class="side-footnote-container">
 <div class="side-footnote">
 <sup>11</sup> 
 This is a very interesting area of computer science research, and I very much recommend the curious to read more: See [Zhou, et. al 2013](https://www.cs.cmu.edu/~dga/papers/zhou-sea2013.pdf) and [wavelet trees](https://en.wikipedia.org/wiki/Wavelet_Tree).
-</div>
-</div>
-How do we store the tree? Since we know the size a priori (a complete binary tree with $$R$$ leaves), we can use a *succinct* representation. 
-
-
-A *succinct* data structure requires only $$o(Z)$$ extra space to manage the relationship between the elements if $$Z$$ is the optimal number of bits that we need to express the information in an unstructured manner. Note that this is little-$$o$$ not big-$$O$$—a much tighter bound^[This is a very interesting area of computer science research, and I very much recommend the curious to read more: See [Zhou, et. al 2013](https://www.cs.cmu.edu/~dga/papers/zhou-sea2013.pdf) and [wavelet trees](https://en.wikipedia.org/wiki/Wavelet_Tree).]
-
-
-<div class="side-footnote-container">
-<div class="side-footnote">
+<br>
+<br>
 <sup>12</sup> 
 In our case, just the cursor.
 </div>
 </div>
+A *succinct* data structure requires only $$o(Z)$$ extra space to manage the relationship between the elements if $$Z$$ is the optimal number of bits that we need to express the information in an unstructured manner. Note that this is little-$$o$$ not big-$$O$$—a much tighter bound^[This is a very interesting area of computer science research, and I very much recommend the curious to read more: See [Zhou, et. al 2013](https://www.cs.cmu.edu/~dga/papers/zhou-sea2013.pdf) and [wavelet trees](https://en.wikipedia.org/wiki/Wavelet_Tree).]
+
 In fact our structure as described is actually an *implicit* one because of our scalar cursor. An *implicit* data structure is one that uses only $$O(1)$$ extra bits.^[In our case, just the cursor.] In later refinements (in part 2), we'll go back to a *succinct* representation because we need to relax one of the assumptions we made here. This is similar to the popular *implicit heap* that you may have learned about in a computer science class.
 
 
