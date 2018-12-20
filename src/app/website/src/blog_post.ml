@@ -40,7 +40,9 @@ let author s website =
     ( match website with
     | Some url ->
         [ a
-            [Attribute.href url; Style.just "blueblack no-underline"]
+            [ Attribute.href url
+            ; Style.just "blueblack no-underline"
+            ; Attribute.create "target" "_blank" ]
             [ span [Style.just "mr2"] [text ("by " ^ s)]
             ; literal
                 {literal|<i class="ml-1 ml-2-ns fab f7 fa-twitter mr3 mr2-m mr3-l"></i>|literal}
@@ -63,7 +65,8 @@ module Share = struct
     let channels =
       [ ("Twitter", "https://twitter.com/codaprotocol")
       ; ("Discord", "https://discord.gg/UyqY37F")
-      ; ("Telegram", "https://t.me/codaprotocol") ]
+      ; ("Telegram", "https://t.me/codaprotocol")
+      ; ("Hacker News", "https://news.ycombinator.com/item?id=18726110") ]
     in
     let channels =
       List.map channels ~f:(fun (name, link) -> a [href link] [text name])
