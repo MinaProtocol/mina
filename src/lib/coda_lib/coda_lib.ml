@@ -680,7 +680,7 @@ module Make (Inputs : Inputs_intf) = struct
               Transition_frontier.path_map
                 ~f:(fun b ->
                   Transition_frontier.Breadcrumb.transition_with_hash b
-                  |> With_hash.data |> External_transition.forget )
+                  |> With_hash.data |> External_transition.Verified.forget )
                 transition_frontier breadcrumb )
             ~get_ancestry:(fun query_env ->
               let descendent, count = Envelope.Incoming.data query_env in
@@ -696,7 +696,7 @@ module Make (Inputs : Inputs_intf) = struct
                 let protocol_state =
                   transition_with_hash
                   |> Transition_frontier.Breadcrumb.transition_with_hash
-                  |> With_hash.data |> External_transition.forget
+                  |> With_hash.data |> External_transition.Verified.forget
                   |> External_transition.protocol_state
                 in
                 (protocol_state, proof)
@@ -731,7 +731,7 @@ module Make (Inputs : Inputs_intf) = struct
              valid_transitions_for_network ~f:(fun transition_with_hash ->
                (* remove verified status for network broadcast *)
                Net.broadcast_state net
-                 (External_transition.forget
+                 (External_transition.Verified.forget
                     (With_hash.data transition_with_hash)) )) ;
         don't_wait_for
           (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;

@@ -955,7 +955,12 @@ module type External_transition_intf = sig
 
   type staged_ledger_diff_verified
 
-  type t [@@deriving sexp, bin_io]
+  module T : sig
+    type t [@@deriving sexp, bin_io]
+  end
+
+  (* HACK: This makes coda_lib compile *)
+  include T with type t = T.t
 
   val create :
        protocol_state:protocol_state
@@ -975,9 +980,9 @@ module type External_transition_intf = sig
     val protocol_state : t -> protocol_state
 
     val protocol_state_proof : t -> protocol_state_proof
-  end
 
-  val forget : Verified.t -> t
+    val forget : t -> T.t
+  end
 
   val protocol_state : t -> protocol_state
 

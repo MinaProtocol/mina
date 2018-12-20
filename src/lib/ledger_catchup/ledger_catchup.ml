@@ -6,7 +6,6 @@ open Coda_base
 
 module Make (Inputs : Inputs.S) :
   Catchup_intf
-  with type external_transition := Inputs.External_transition.t
   with type external_transition_verified :=
               Inputs.External_transition.Verified.t
    and type transition_frontier := Inputs.Transition_frontier.t
@@ -104,8 +103,11 @@ module Make (Inputs : Inputs.S) :
               in
               Deferred.Or_error.List.map queried_transitions
                 ~f:(fun transition ->
+                  let%bind valid_protocol_state_transition =
+                    Protocol_state_validator.validate_proof transition
+                  in
                   Transition_handler_validator.verify_transition ~staged_ledger
-                    ~transition )
+                    ~transition:valid_protocol_state_transition )
             in
             materialize_breadcrumbs ~frontier ~logger ~peer
               queried_transitions_verified )

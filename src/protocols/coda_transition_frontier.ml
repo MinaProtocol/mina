@@ -130,8 +130,6 @@ end
 module type Catchup_intf = sig
   type state_hash
 
-  type external_transition
-
   type external_transition_verified
 
   type transition_frontier
@@ -161,7 +159,7 @@ module type Transition_handler_validator_intf = sig
 
   type state_hash
 
-  type external_transition
+  type external_transition_with_valid_protocol_state
 
   type external_transition_verified
 
@@ -172,7 +170,7 @@ module type Transition_handler_validator_intf = sig
   val run :
        logger:Logger.t
     -> frontier:transition_frontier
-    -> transition_reader:( [ `Transition of external_transition
+    -> transition_reader:( [ `Transition of external_transition_with_valid_protocol_state
                                             Envelope.Incoming.t ]
                          * [`Time_received of time] )
                          Reader.t
@@ -186,7 +184,7 @@ module type Transition_handler_validator_intf = sig
 
   val verify_transition :
        staged_ledger:staged_ledger
-    -> transition:external_transition
+    -> transition:external_transition_with_valid_protocol_state
     -> external_transition_verified Or_error.t Deferred.t
 end
 
@@ -194,8 +192,6 @@ module type Transition_handler_processor_intf = sig
   type state_hash
 
   type time_controller
-
-  type external_transition
 
   type external_transition_verified
 
@@ -241,7 +237,7 @@ module type Transition_handler_intf = sig
 
   type state_hash
 
-  type external_transition
+  type external_transition_with_valid_protocol_state
 
   type external_transition_verified
 
@@ -255,7 +251,8 @@ module type Transition_handler_intf = sig
     Transition_handler_validator_intf
     with type time := time
      and type state_hash := state_hash
-     and type external_transition := external_transition
+     and type external_transition_with_valid_protocol_state :=
+                external_transition_with_valid_protocol_state
      and type external_transition_verified := external_transition_verified
      and type transition_frontier := transition_frontier
      and type staged_ledger := staged_ledger
@@ -263,7 +260,6 @@ module type Transition_handler_intf = sig
   module Processor :
     Transition_handler_processor_intf
     with type time_controller := time_controller
-     and type external_transition := external_transition
      and type external_transition_verified := external_transition_verified
      and type state_hash := state_hash
      and type transition_frontier := transition_frontier
@@ -289,7 +285,7 @@ module type Bootstrap_controller_intf = sig
 
   type transition_frontier
 
-  type external_transition
+  type external_transition_with_valid_protocol_state
 
   type ancestor_prover
 
@@ -301,7 +297,7 @@ module type Bootstrap_controller_intf = sig
     -> ancestor_prover:ancestor_prover
     -> frontier:transition_frontier
     -> ledger_db:ledger_db
-    -> transition_reader:( [< `Transition of external_transition
+    -> transition_reader:( [< `Transition of external_transition_with_valid_protocol_state
                                              Envelope.Incoming.t ]
                          * [< `Time_received of int64] )
                          Reader.t
@@ -311,7 +307,7 @@ end
 module type Transition_frontier_controller_intf = sig
   type time_controller
 
-  type external_transition
+  type external_transition_with_valid_protocol_state
 
   type external_transition_verified
 
@@ -328,12 +324,55 @@ module type Transition_frontier_controller_intf = sig
     -> network:network
     -> time_controller:time_controller
     -> frontier:transition_frontier
-    -> transition_reader:( [ `Transition of external_transition
+    -> transition_reader:( [ `Transition of external_transition_with_valid_protocol_state
                                             Envelope.Incoming.t ]
                          * [`Time_received of time] )
                          Reader.t
     -> clear_reader:[`Clear] Reader.t
     -> (external_transition_verified, state_hash) With_hash.t Reader.t
+end
+
+module type Protocol_state_validator_intf = sig
+  type time
+
+  type state_hash
+
+  type external_transition
+
+  type external_transition_with_valid_protocol_state
+
+  val validate_proof :
+       external_transition
+    -> external_transition_with_valid_protocol_state Or_error.t Deferred.t
+
+  val validate_consensus_state :
+       time_received:time
+    -> external_transition
+    -> external_transition_with_valid_protocol_state Or_error.t Deferred.t
+end
+
+module type Initial_validator_intf = sig
+  type time
+
+  type state_hash
+
+  type external_transition
+
+  type external_transition_with_valid_protocol_state
+
+  val run :
+       logger:Logger.t
+    -> transition_reader:( [ `Transition of external_transition
+                                            Envelope.Incoming.t ]
+                         * [`Time_received of time] )
+                         Reader.t
+    -> valid_transition_writer:( [ `Transition of external_transition_with_valid_protocol_state
+                                                  Envelope.Incoming.t ]
+                                 * [`Time_received of time]
+                               , drop_head buffered
+                               , unit )
+                               Writer.t
+    -> unit
 end
 
 module type Transition_router_intf = sig

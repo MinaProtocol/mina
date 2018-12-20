@@ -92,6 +92,7 @@ struct
   let max_length = Max_length.length
 
   module Breadcrumb = struct
+    (* TODO: external_transition should be type : External_transition.With_valid_protocol_state.t #1344 *)
     type t =
       { transition_with_hash:
           (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t

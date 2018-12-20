@@ -2,11 +2,34 @@ open Async_kernel
 open Core_kernel
 open Pipe_lib.Strict_pipe
 open Coda_base
+open Protocols.Coda_transition_frontier
 
-module Make (Inputs : Inputs.S) = struct
+module Make (Inputs : Inputs.S) :
+  Transition_handler_validator_intf
+  with type time := Inputs.Time.t
+   and type state_hash := State_hash.t
+   and type external_transition_with_valid_protocol_state :=
+              Inputs.External_transition.With_valid_protocol_state.t
+   and type external_transition_verified :=
+              Inputs.External_transition.Verified.t
+   and type transition_frontier := Inputs.Transition_frontier.t
+   and type staged_ledger := Inputs.Staged_ledger.t = struct
   open Inputs
   open Consensus.Mechanism
   open Deferred.Let_syntax
+
+  let is_in_frontier ~logger ~frontier transition =
+    let psh =
+      Protocol_state.hash
+        (External_transition.With_valid_protocol_state.protocol_state
+           transition)
+    in
+    if Transition_frontier.find frontier psh |> Option.is_some then (
+      Logger.info logger
+        !"we've already seen protocol state %{sexp:State_hash.t}"
+        psh ;
+      `Duplicate )
+    else `Valid
 
   let validate_transition ~logger ~frontier ~time_received t_env =
     (* it's like bool option but with names (`Duplicate is None). *)
@@ -18,7 +41,9 @@ module Make (Inputs : Inputs.S) = struct
       | `Reject, _ -> `Reject
       | `Valid, `Valid -> `Valid
     in
-    let (transition : External_transition.t) = Envelope.Incoming.data t_env in
+    let transition : External_transition.With_valid_protocol_state.t =
+      Envelope.Incoming.data t_env
+    in
     let time_received =
       Time.to_span_since_epoch time_received
       |> Time.Span.to_ms |> Unix_timestamp.of_int64
@@ -36,70 +61,50 @@ module Make (Inputs : Inputs.S) = struct
     in
     let consensus_state_verified =
       Fn.compose Protocol_state.consensus_state
-        External_transition.Verified.protocol_state
+        External_transition.protocol_state
     in
     let root =
       With_hash.data
         (Transition_frontier.Breadcrumb.transition_with_hash
            (Transition_frontier.root frontier))
+      |> External_transition.Verified.forget
     in
-    let psh =
-      Protocol_state.hash (External_transition.protocol_state transition)
-    in
-    if Transition_frontier.find frontier psh |> Option.is_some then (
-      Logger.info logger
-        !"we've already seen protocol state %{sexp:State_hash.t}"
-        psh ;
-      Deferred.return `Duplicate )
-    else
-      match
-        log_assert
-          (Consensus.Mechanism.is_valid
-             (consensus_state transition)
-             ~time_received)
-          "failed consensus validation"
-        && log_assert
-             ( Consensus.Mechanism.select ~logger
-                 ~existing:(consensus_state_verified root)
-                 ~candidate:(consensus_state transition)
-                 ~time_received
-             = `Take )
-             "was not better than transition frontier root"
-      with
-      | `Valid ->
-          (* TODO: what conditions should we punish? *)
-          (* TODO:
-      let length = External_transition.protocol_state t |> Protocol_state.blockchain_state |> Blockchain_state.length in
-      log_assert
-        (match Root_history.find (Transition_frontier.root_history frontier) (length - k) with
-        | `Known h -> State_hash.equal h (External_transition.frontier_root_hash t)
-        | `Unknown -> true
-        | `Out_of_bounds ->
-          Logger.info logger "expected root of transition was out of bounds";
-          false)
-        "transition frontier root hash was invalid"
-      *)
-          let%map proof_is_valid =
-            State_proof.verify
-              (External_transition.protocol_state_proof transition)
-              (External_transition.protocol_state transition)
-          in
-          log_assert proof_is_valid "proof was invalid"
-      | x -> return x
+    let valid_protocol_state_root = root in
+    is_in_frontier ~logger ~frontier transition
+    && log_assert
+         ( Consensus.Mechanism.select ~logger
+             ~existing:(consensus_state_verified valid_protocol_state_root)
+             ~candidate:(consensus_state valid_protocol_state_root)
+             ~time_received
+         = `Take )
+         "was not better than root"
 
-  let verify_transition ~staged_ledger ~transition :
+  let verify_transition ~staged_ledger
+      ~(transition : External_transition.With_valid_protocol_state.t) :
       External_transition.Verified.t Or_error.t Deferred.t =
     let open Deferred.Or_error.Let_syntax in
-    let diff = External_transition.staged_ledger_diff transition in
+    let diff =
+      External_transition.With_valid_protocol_state.staged_ledger_diff
+        transition
+    in
     let%bind verified_diff =
       Staged_ledger.verified_diff_of_diff staged_ledger diff
     in
     return
       (External_transition.Verified.create
-         ~protocol_state:(External_transition.protocol_state transition)
+         ~protocol_state:
+           (External_transition.With_valid_protocol_state.protocol_state
+              transition)
          ~protocol_state_proof:
-           (External_transition.protocol_state_proof transition)
+           (External_transition.With_valid_protocol_state.protocol_state_proof
+              transition)
          ~staged_ledger_diff:verified_diff)
+
+  let warn_invalid_transition ~logger transition_env =
+    Logger.warn logger
+      !"failed to verify transition from the network! sent by %{sexp: \
+        Host_and_port.t}"
+      (Envelope.Incoming.sender transition_env)
 
   let run ~logger ~frontier ~transition_reader ~valid_transition_writer =
     let logger =
@@ -108,15 +113,15 @@ module Make (Inputs : Inputs.S) = struct
     don't_wait_for
       (Reader.iter transition_reader
          ~f:(fun (`Transition transition_env, `Time_received time_received) ->
-           let (transition : External_transition.t) =
+           let (transition : External_transition.With_valid_protocol_state.t) =
              Envelope.Incoming.data transition_env
            in
-           match%bind
+           match
              validate_transition ~logger ~frontier ~time_received
                transition_env
            with
            | `Valid -> (
-               (* validated, now verify *)
+               (* TODO: staged_ledger_diff verification should be done in the processor #1344 *)
                let tip = Transition_frontier.best_tip frontier in
                let staged_ledger =
                  Transition_frontier.Breadcrumb.staged_ledger tip
@@ -133,17 +138,10 @@ module Make (Inputs : Inputs.S) = struct
                              External_transition.Verified.protocol_state))
                | Error _ ->
                    (* TODO: Punish *)
-                   Logger.warn logger
-                     !"failed to verify transition from the network! sent by \
-                       %{sexp: Host_and_port.t}"
-                     (Envelope.Incoming.sender transition_env) )
+                   warn_invalid_transition ~logger transition_env )
            | `Duplicate -> return ()
            | `Reject ->
-               return
-                 (Logger.warn logger
-                    !"failed to verify transition from the network! sent by \
-                      %{sexp: Host_and_port.t}"
-                    (Envelope.Incoming.sender transition_env)) ))
+               return @@ warn_invalid_transition ~logger transition_env ))
 end
 
 (*

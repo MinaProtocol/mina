@@ -6,7 +6,8 @@ module Make (Inputs : Inputs.S) :
   Transition_handler_intf
   with type time := Inputs.Time.t
    and type time_controller := Inputs.Time.Controller.t
-   and type external_transition := Inputs.External_transition.t
+   and type external_transition_with_valid_protocol_state :=
+              Inputs.External_transition.With_valid_protocol_state.t
    and type external_transition_verified :=
               Inputs.External_transition.Verified.t
    and type staged_ledger := Inputs.Staged_ledger.t

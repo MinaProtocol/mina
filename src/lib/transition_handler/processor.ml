@@ -8,7 +8,6 @@ module Make (Inputs : Inputs.S) :
   Transition_handler_processor_intf
   with type state_hash := State_hash.t
    and type time_controller := Inputs.Time.Controller.t
-   and type external_transition := Inputs.External_transition.t
    and type external_transition_verified :=
               Inputs.External_transition.Verified.t
    and type transition_frontier := Inputs.Transition_frontier.t

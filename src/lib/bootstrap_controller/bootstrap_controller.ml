@@ -42,7 +42,8 @@ module Make (Inputs : Inputs_intf) :
   Bootstrap_controller_intf
   with type network := Inputs.Network.t
    and type transition_frontier := Inputs.Transition_frontier.t
-   and type external_transition := Inputs.External_transition.t
+   and type external_transition_with_valid_protocol_state :=
+              Inputs.External_transition.With_valid_protocol_state.t
    and type ancestor_prover := Ancestor.Prover.t
    and type ledger_db := Ledger.Db.t = struct
   open Inputs
@@ -61,7 +62,8 @@ module Make (Inputs : Inputs_intf) :
   (* Cache represents a graph. The key is a State_hash, which is the node in 
   the graph, and the value is the children transitions of the node *)
   module Transition_cache = struct
-    type t = External_transition.t list State_hash.Table.t
+    type t =
+      External_transition.With_valid_protocol_state.t list State_hash.Table.t
 
     let create () = State_hash.Table.create ()
 
@@ -69,7 +71,9 @@ module Make (Inputs : Inputs_intf) :
       State_hash.Table.update t parent ~f:(function
         | None -> [new_child]
         | Some children ->
-            if List.mem children new_child ~equal:External_transition.equal
+            if
+              List.mem children new_child
+                ~equal:External_transition.With_valid_protocol_state.equal
             then children
             else new_child :: children )
   end
@@ -95,8 +99,13 @@ module Make (Inputs : Inputs_intf) :
     Consensus.Mechanism.Protocol_state.consensus_state protocol_state
     |> Consensus.Mechanism.Consensus_state.length |> Coda_numbers.Length.to_int
 
-  let on_transition t (transition, time_received) =
+  let on_transition t
+      ( (transition : External_transition.With_valid_protocol_state.t)
+      , time_received ) =
     let module Protocol_state = Consensus.Mechanism.Protocol_state in
+    let module External_transition =
+      External_transition.With_valid_protocol_state
+    in
     let candidate = External_transition.protocol_state transition in
     let previous_state_hash = Protocol_state.previous_state_hash candidate in
     let input : Ancestor.Input.t =
@@ -163,8 +172,13 @@ module Make (Inputs : Inputs_intf) :
     Reader.iter transition_reader
       ~f:(fun (`Transition incoming_transition, `Time_received time_received)
          ->
-        let transition = Envelope.Incoming.data incoming_transition in
-        let protocol_state = External_transition.protocol_state transition in
+        let (transition : External_transition.With_valid_protocol_state.t) =
+          Envelope.Incoming.data incoming_transition
+        in
+        let protocol_state =
+          External_transition.With_valid_protocol_state.protocol_state
+            transition
+        in
         let previous_state_hash =
           External_transition.Protocol_state.previous_state_hash protocol_state
         in
@@ -177,14 +191,13 @@ module Make (Inputs : Inputs_intf) :
     |> don't_wait_for ;
     Syncable_ledger.valid_tree t.syncable_ledger
 
-  (* TODO: Assume that the transitions we are getting are verified from the network #1334 *)
   let run ~parent_log ~network ~ancestor_prover ~frontier ~ledger_db
       ~transition_reader =
     let logger = Logger.child parent_log __MODULE__ in
     let initial_breadcrumb = Transition_frontier.root frontier in
     let initial_root_state =
       initial_breadcrumb |> Transition_frontier.Breadcrumb.transition_with_hash
-      |> With_hash.data |> External_transition.forget
+      |> With_hash.data |> External_transition.Verified.forget
       |> External_transition.protocol_state
     in
     let t =
