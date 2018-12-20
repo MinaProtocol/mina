@@ -218,11 +218,17 @@
 }
 
 .blog-content table, th, td {
-  border: 1px solid black;
+  border: 1px solid rgb(218,222,228);
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+
+  font-weight: 400;
 }
 
 .blog-content table th {
-  background: red;
+  background: rgb(248,250,251);
 }
 
 .blog-content table th:first-child {
