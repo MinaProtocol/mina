@@ -80,17 +80,17 @@ let polymorphic_type_instance_stri ~loc mod_name fields_info =
         Typ.constr path [] )
   in
   let bound_poly = Typ.constr (mkloc (Longident.parse type_name) loc) typs in
-  Str.type_ Nonrecursive [Type.mk ~manifest:bound_poly (mkloc type_name loc)]
+  Str.type_ Nonrecursive [Type.mk ~manifest:bound_poly (mkloc "t" loc)]
 
 let t_mod_instance ~loc name fields_info =
-  [ Str.module_ ?loc @@ Mb.mk ?loc:name.loc name
-    @@ Mod.structure ?loc:name.loc
+  [ Str.module_ ~loc @@ Mb.mk ~loc:name.loc name
+    @@ Mod.structure ~loc:name.loc
          [polymorphic_type_instance_stri ~loc:name.loc name fields_info]
   ; include_ ~loc (Mod.ident ~loc (loc_map ~f:Longident.parse name)) ]
 
 let snark_mod_instance ~loc name fields_info =
-  [ Str.module_ @@ Mb.mk ?loc:name.loc name
-    @@ Mod.structure ?loc:name.loc
+  [ Str.module_ @@ Mb.mk ~loc:name.loc name
+    @@ Mod.structure ~loc:name.loc
          [polymorphic_type_instance_stri ~loc:name.loc name fields_info] ]
 
 let instances_str ~loc instances_info fields_info =
