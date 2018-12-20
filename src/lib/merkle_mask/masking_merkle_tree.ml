@@ -355,7 +355,19 @@ struct
     let to_list t =
       let mask_accounts = Location.Table.data t.account_tbl in
       let parent_accounts = Base.to_list (get_parent t) in
-      mask_accounts @ parent_accounts
+      let mask_keys =
+        List.map mask_accounts ~f:(fun acct -> Account.public_key acct)
+      in
+      let mask_key_set = Key.Set.of_list mask_keys in
+      (* if an account is in mask and parent, favor the mask version *)
+      let not_in_mask parent_account =
+        let parent_key = Account.public_key parent_account in
+        not (Key.Set.mem mask_key_set parent_key)
+      in
+      let in_parent_not_in_mask_accounts =
+        List.filter parent_accounts ~f:not_in_mask
+      in
+      mask_accounts @ in_parent_not_in_mask_accounts
 
     let foldi t ~init ~f =
       let parent_result = Base.foldi (get_parent t) ~init ~f in
