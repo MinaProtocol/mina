@@ -8,6 +8,7 @@ type t =
   ; title: string
   ; subtitle: string option
   ; author: string
+  ; author_website: string option
   ; content: Html.t
   ; basename: string }
 
@@ -33,10 +34,14 @@ let load path =
       in
       let title = List.Assoc.find_exn ~equal:String.equal kvs "title" in
       let author = List.Assoc.find_exn ~equal:String.equal kvs "author" in
+      let author_website =
+        List.Assoc.find ~equal:String.equal kvs "author_website"
+      in
       let subtitle = List.Assoc.find ~equal:String.equal kvs "subtitle" in
       { date
       ; title
       ; subtitle
       ; author
+      ; author_website
       ; content= html
       ; basename= Filename.chop_extension (Filename.basename path) }

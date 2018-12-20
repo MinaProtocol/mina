@@ -33,11 +33,16 @@ let subtitle s =
   let open Html_concise in
   h2 [Style.just "f4 f3-ns ddinexp mt0 mb4 fw4"] [text s]
 
-let author s =
+let author s website =
   let open Html_concise in
   h4
     [Style.just "f7 fw4 tracked-supermega ttu metropolis mt0 mb1"]
-    [text ("by " ^ s)]
+    ( match website with
+    | Some url ->
+        [ a
+            [Attribute.href url; Style.just "blueblack no-underline"]
+            [text ("by " ^ s)] ]
+    | None -> [text ("by " ^ s)] )
 
 let date d =
   let month_day = Date.format d "%B %d" in
@@ -74,37 +79,26 @@ end
 let post name =
   let open Html_concise in
   let%map post = Post.load ("posts/" ^ name) in
+  let content_chunk =
+    title post.title
+    :: (match post.subtitle with None -> [] | Some s -> [subtitle s])
+    @ [ author post.author post.author_website
+      ; date post.date
+      ; div
+          [Stationary.Attribute.class_ "blog-content lh-copy"]
+          [ post.content
+          ; hr []
+          (* HACK: to reuse styles from blog hr, we can just stick it in blog-content *)
+           ]
+      ; Share.content ]
+  in
   let regular =
-    div
-      [Style.just "mw65-ns ibmplex f5 center blueblack"]
-      ( title post.title
-        :: (match post.subtitle with None -> [] | Some s -> [subtitle s])
-      @ [ author post.author
-        ; date post.date
-        ; div
-            [Stationary.Attribute.class_ "blog-content lh-copy"]
-            [ post.content
-            ; hr []
-            (* HACK: to reuse styles from blog hr, we can just stick it in blog-content *)
-             ]
-        ; Share.content ] )
+    div [Style.just "mw65-ns ibmplex f5 center blueblack"] content_chunk
   in
   let big =
     div
       [Style.just "mw7 center ibmplex blueblack side-footnotes"]
-      [ div
-          [Style.just "mw65-ns f5 left blueblack"]
-          ( title post.title
-            :: (match post.subtitle with None -> [] | Some s -> [subtitle s])
-          @ [ author post.author
-            ; date post.date
-            ; div
-                [Stationary.Attribute.class_ "blog-content lh-copy"]
-                [ post.content
-                ; hr []
-                (* HACK: to reuse styles from blog hr, we can just stick it in blog-content *)
-                 ]
-            ; Share.content ] ) ]
+      [div [Style.just "mw65-ns f5 left blueblack"] content_chunk]
   in
   let disqus =
     div

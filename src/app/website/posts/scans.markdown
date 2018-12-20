@@ -1,8 +1,9 @@
 ---
 title: Fast&nbsp;Accumulation on&nbsp;Streams
 subtitle: Succinctly&nbsp;Verifying Coda’s&nbsp;Ledger
-date: 2018-12-18
+date: 2018-12-20
 author: Brandon Kase
+author_website: https://twitter.com/bkase_
 ---
 
 
@@ -282,7 +283,7 @@ Base ($$\sigma_i \Longrightarrow \sigma_{i+1}$$)
 
 Merge ($$\sigma_i \Longrightarrow \sigma_k$$)
 
-> There exists $$\sigma_i \Longrightarrow \sigma_j$$ and $$\sigma_j \Longrightarrow \sigma_k$$ such that both proofs verify
+> There exists $$\sigma_i \Longrightarrow \sigma_j$$ and $$\sigma_j \Longrightarrow \sigma_k$$ such that both proofs&nbsp;verify
 
 Before we go any further, though, let's abstract away some details here.
 
@@ -741,6 +742,6 @@ of the tree *)
 ## Acknowledgements
 
 <div class="thanks">
-Thanks to Evan Shapiro for working through these data structures with me when we were first figuring this stuff out.&nbsp;Thanks to Deepthi Kumar for collaborating with me on several optimizations. Finally, thanks to Omer Zach and Corey Richardson (and Evan and Deepthi) for their help in reviewing this post!
+Thanks to Evan Shapiro for working through these data structures with me when we were first figuring this stuff out.&nbsp;Thanks to Deepthi Kumar for collaborating with me on several optimizations. Finally, thanks to Omer Zach and Corey Richardson (and Evan and Deepthi) for their very thorough feedback on drafts of this&nbsp;post!
 </div>
 
