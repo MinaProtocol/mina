@@ -367,7 +367,7 @@ let home () =
             ~not_small:(social_list `Horizontal)
             ~small:(social_list `Vertical)
         , Link_list.create ~named:"Articles" ~orientation:`Vertical
-            [ ( `Read "Keeping Cryptocurrency Decentralized"
+            [ ( `Read "Fast Accumulation on Streams"
               , `One
                   (let _, u, _ = Links.blog in
                    u)

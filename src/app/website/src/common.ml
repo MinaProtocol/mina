@@ -273,8 +273,7 @@ module Navbar = struct
             + (if tight then of_class "mb3" else of_class "mb4")
             + Spacing.side_padding ~tight
             + top_margins )) ]
-      [ div [class_ "w-50"]
-          [anchor [] "./" [coda Style.empty] "coda-home" false]
+      [ div [class_ "w-50"] [anchor [] "/" [coda Style.empty] "coda-home" false]
       ; div
           [class_ "flex justify-around w-75"]
           [ (let name, url, label = Links.blog in
