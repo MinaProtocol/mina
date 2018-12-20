@@ -8,28 +8,28 @@ author: Brandon Kase
 
 <div class="side-footnote-container">
 <div class="side-footnote">
-<sup>1</sup> If you’d rather consume this content in video form, watch [this talk](https://www.youtube.com/watch?v=YSnQ8N760mI)
+<sup>1</sup> If you’d rather consume this content in video form, watch [this talk](https://www.youtube.com/watch?v=YSnQ8N760mI).
 </div>
 </div>
-While developing [Coda](https://codaprotocol.com), we came across an interesting problem that uncovered a much more general and potentially widely applicable problem: Taking advantage of parallelism when combining a large amount of data streaming in over time. We were able to come up with a solution that scales up for any throughput optimally while simultaneously minimizing latency and space usage. We’re sharing our results with the hope that others dealing with manipulation of online data streams will find them interesting and applicable.^[If you’d rather consume this content in video form, watch [this talk](https://www.youtube.com/watch?v=YSnQ8N760mI)]
+While developing [Coda](https://codaprotocol.com), we came across an interesting problem that uncovered a much more general and potentially widely applicable problem: Taking advantage of parallelism when combining a large amount of data streaming in over time. We were able to come up with a solution that scales up for any throughput optimally while simultaneously minimizing latency and space usage. We’re sharing our results with the hope that others dealing with manipulation of online data streams will find them interesting and applicable.^[If you’d rather consume this content in video form, watch [this talk](https://www.youtube.com/watch?v=YSnQ8N760mI).]
 
 ## Background
 
 <div class="side-footnote-container">
 <div class="side-footnote">
-<sup>2</sup> equivalent to security as a full node)
+<sup>2</sup> Equivalent to security as a full node.
 </div>
 </div>
-The Coda cryptocurrency protocol is unique in that it uses a [succinct blockchain](https://www.youtube.com/watch?v=eWVGATxEB6M). In Coda the blockchain is replaced by a tiny constant-sized cryptographic proof. This means that in the Coda protocol a user can sync with full-security^[equivalent to security as a full node] instantly—users don’t have to wait to download thousands and thousands of blocks to verify the state of the network.
+The Coda cryptocurrency protocol is unique in that it uses a [succinct blockchain](https://www.youtube.com/watch?v=eWVGATxEB6M). In Coda the blockchain is replaced by a tiny constant-sized cryptographic proof. This means that in the Coda protocol a user can sync with full-security^[Equivalent to security as a full node.] instantly—users don’t have to wait to download thousands and thousands of blocks to verify the state of the network.
 
 What is this tiny cryptographic proof? It’s called a zk-SNARK, or zero knowledge Succinct Non-interactive ARgument of Knowledge. zk-SNARKs let a program create a proof of a computation, then share that proof with anyone. Anyone with the proof can verify the computation very quickly, in just milliseconds, independent of how long the computation itself takes. While validating proofs is fast, creating them is quite slow, so creating this SNARK proof would be much more computationally expensive. We use a few different SNARK proofs throughout Coda’s protocol, but the important one for this post is what we call the “Ledger Proof”.
 
 <div class="side-footnote-container">
 <div class="side-footnote">
-<sup>3</sup> note that we represent account states concretely as their hashes for performance reasons 
+<sup>3</sup> Note that we represent account states concretely as their hashes for performance reasons.
 </div>
 </div>
-A ledger proof tells us that given some starting account state $$\sigma_0$$ there was a series of $$k$$ transactions that eventually put us into account state $$\sigma_k$$. Let’s refer to such a proof as $$\sigma_0 \Longrightarrow \sigma_k$$.^[note that we represent account states concretely as their hashes for performance&nbsp;reasons] So what does it mean for a single transaction to be valid? A transaction, $$T_i^{i+1}$$, is valid  if it’s been signed by the sender, and the sender had sufficient balance in their account. As a result our account state $$\sigma_i$$ transitions to some new state $$\sigma_{i+1}$$. This state transition can be represented as $$\sigma_i T_{i}^{i+1} \sigma_{i+1}$$. We could recompute $$\sigma_0 \Longrightarrow \sigma_k$$ every time there is a new transaction, but that would be slow, with the cost of generating the proof growing with the number of transactions—instead we can reuse the previous proof recursively. These ledger proofs enable users of Coda to be sure that the ledger has been computed correctly and play a part in consensus state verification.
+A ledger proof tells us that given some starting account state $$\sigma_0$$ there was a series of $$k$$ transactions that eventually put us into account state $$\sigma_k$$. Let’s refer to such a proof as $$\sigma_0 \Longrightarrow \sigma_k$$.^[Note that we represent account states concretely as their hashes for performance&nbsp;reasons.] So what does it mean for a single transaction to be valid? A transaction, $$T_i^{i+1}$$, is valid  if it’s been signed by the sender, and the sender had sufficient balance in their account. As a result our account state $$\sigma_i$$ transitions to some new state $$\sigma_{i+1}$$. This state transition can be represented as $$\sigma_i T_{i}^{i+1} \sigma_{i+1}$$. We could recompute $$\sigma_0 \Longrightarrow \sigma_k$$ every time there is a new transaction, but that would be slow, with the cost of generating the proof growing with the number of transactions—instead we can reuse the previous proof recursively. These ledger proofs enable users of Coda to be sure that the ledger has been computed correctly and play a part in consensus state verification.
 
 More precisely, the recursive bit of our ledger proof, $$\sigma_0 \Longrightarrow \sigma_{i}$$, or the account state, has transitioned from the starting state $$\sigma_0$$ to the current state $$\sigma_i$$ after $$i$$ correct transactions are applied, could naively be defined in the following way:
 
@@ -45,7 +45,7 @@ The functional programming enthusiast will notice that this operation is like a 
 
 <div class="side-footnote-container">
 <div class="side-footnote">
-The `~init` in OCaml refers to a named argument, and `'a` and `'b` are a type unification variables that work similarly to generics in Java
+The `~init` in OCaml refers to a named argument, and `'a` and `'b` are a type unification variables that work similarly to generics in Java.
 </div>
 </div>
 <div class="code">
@@ -68,14 +68,14 @@ val scan : 'a list -> ~init:'b
   -> ~f:('b -> 'a -> 'b) -> 'b list
 ```
 </div>
-^[The `~init` in OCaml refers to a named argument, and `'a` and `'b` are a type unification variables that work similarly to generics in Java]
+^[The `~init` in OCaml refers to a named argument, and `'a` and `'b` are a type unification variables that work similarly to generics in Java.]
 </div>
 
 A scan combines elements of a collection together incrementally and returns all intermediate values. For example if our elements are numbers and our operation is plus, `scan [1;2;3] ~init:0 ~f:(fun b a → b + a)` has following evaluation trace:
 
 <div class="side-footnote-container">
 <div class="side-footnote">
-`::` means “cons” or prepend to the front of a linked list
+`::` means “cons” or prepend to the front of a linked list.
 </div>
 </div>
 <div class="code">
@@ -90,7 +90,7 @@ scan [1;2;3] ~init:0 ~f:add
 1::3::6::[]
 [1;3;6]
 ```
-^[`::` means “cons” or prepend to the front of a linked list]
+^[`::` means “cons” or prepend to the front of a linked list.]
 </div>
 
 However, what we really have is a scan operation over some sort of stream of incoming information, not a list. A signature in OCaml may look like this:
@@ -104,10 +104,10 @@ val scan : 'a Stream.t
 
 <div class="side-footnote-container">
 <div class="side-footnote">
-<sup>6</sup> we write streams as lists in the evaluation
+<sup>6</sup> We write streams as lists in the evaluation.
 </div>
 </div>
-As new information flows into the stream we combine it with the last piece of computed information and emit that result onto a new stream. Here’s a trace with transactions and proofs^[we write streams as lists in the evaluation]:
+As new information flows into the stream we combine it with the last piece of computed information and emit that result onto a new stream. Here’s a trace with transactions and proofs^[We write streams as lists in the evaluation.]:
 
 <div class="mobile-only">
 <div class="katex-block">
@@ -236,10 +236,10 @@ Transaction throughput here refers to the rate at which transactions can be proc
 <div class="side-footnote-container">
 <div class="side-footnote">
 <sup>7</sup> 
-The more we sacrifice latency the longer proposer nodes have to keep around full copies of the state before just relying on the small SNARK itself
+The more we sacrifice latency the longer proposer nodes have to keep around full copies of the state before just relying on the small SNARK itself.
 </div>
 </div>
-It’s important to minimize transaction latency to enter our SNARK to keep the low RAM requirements on proposer nodes, nodes that propose new transitions during Proof of Stake.^[The more we sacrifice latency the longer proposer nodes have to keep around full copies of the state before just relying on the small SNARK itself]. SNARKing a transaction is not the same as *knowing* a transaction has been processed, so this is certainly less important for us than&nbsp;throughput.
+It’s important to minimize transaction latency to enter our SNARK to keep the low RAM requirements on proposer nodes, nodes that propose new transitions during Proof of Stake.^[The more we sacrifice latency the longer proposer nodes have to keep around full copies of the state before just relying on the small SNARK itself.]. SNARKing a transaction is not the same as *knowing* a transaction has been processed, so this is certainly less important for us than&nbsp;throughput.
 
 
 3. Minimize size of state
@@ -542,7 +542,7 @@ Latency is still logarithmic, though now it’s $$log(R)+1$$ steps as our trees 
 - Space: $$O(R*log(R))$$ 
 
  
-We have multiple trees now. Interestingly, we have exactly $$log(R)$$ trees pending at a time. Again our longer trees take up an extra layer than traditional binary trees, so in this case $$3R-1$$ nodes since we have $$R$$ leaves, and we have $$log(R)$$ of these trees.^[In order to prevent latency and space from growing over time, we need to make sure we complete work as fast as we add it]
+We have multiple trees now. Interestingly, we have exactly $$log(R)$$ trees pending at a time. Again our longer trees take up an extra layer than traditional binary trees, so in this case $$3R-1$$ nodes since we have $$R$$ leaves, and we have $$log(R)$$ of these trees.^[In order to prevent latency and space from growing over time, we need to make sure we complete work as fast as we add it.]
 
 Now that we have thoroughly optimized our throughput and latency, let’s optimize for&nbsp;space.
 
@@ -551,7 +551,7 @@ Now that we have thoroughly optimized our throughput and latency, let’s optimi
 <div class="side-footnote-container">
 <div class="side-footnote">
 <sup>10</sup> 
-In order to prevent latency and space from growing over time, we need to make sure we complete work as fast as we add it
+In order to prevent latency and space from growing over time, we need to make sure we complete work as fast as we add it.
 </div>
 </div>
 
