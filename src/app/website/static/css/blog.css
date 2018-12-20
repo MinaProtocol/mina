@@ -204,7 +204,7 @@
   position: relative;
   color: rgb(70, 99, 131); /* blue black */
   text-decoration: none;
-  padding-bottom: 0.125rem; /* offset */
+  padding-bottom: 0rem; /* offset */
   border-bottom: 1px solid rgb(45,158,219); /* color & weight */
 }
 
@@ -221,7 +221,7 @@
 
 .blog-content a.footnoteRef:hover sup {
   color: rgb(45,158,219); /* blue */
-  padding-bottom: 0.125rem; /* offset */
+  padding-bottom: 0rem; /* offset */
   border-bottom: 1px solid rgb(45,158,219); /* color & weight */
 }
 
@@ -234,7 +234,7 @@
 
 .blog-content a[href^="#"]:not(.footnoteRef):hover {
   color: rgb(45,158,219); /* blue */
-  padding-bottom: 0.125rem; /* offset */
+  padding-bottom: 0rem; /* offset */
   border-bottom: 1px solid rgb(45,158,219); /* color & weight */
 }
 
