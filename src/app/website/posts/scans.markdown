@@ -631,7 +631,8 @@ We have an implicit data structure representation for our complete binary tree w
 | $$R=4$$       | 0.0667                          | 180                  | ~22KB            |
 | $$R=16$$      | 0.267                           | 300                  | ~94KB            |
 | $$R=1024$$    | 17.1                            | 660                  | ~6MB             |
-| $$R = 16384$$ | 273                             | 900                  | ~98MB            |
+| $$R=16384$$   | 273                             | 900                  | ~98MB            |
+| $$R=65536$$   | 1092                            | 1020                 | ~393MB           |
 </div>
 </div>
 <div class="not-mobile">
@@ -641,12 +642,13 @@ We have an implicit data structure representation for our complete binary tree w
 | $$R=4$$       | 0.0667                          | 180                  | ~22KB            |
 | $$R=16$$      | 0.267                           | 300                  | ~94KB            |
 | $$R=1024$$    | 17.1                            | 660                  | ~6MB             |
-| $$R = 16384$$ | 273                             | 900                  | ~98MB            |
+| $$R=16384$$   | 273                             | 900                  | ~98MB            |
+| $$R=65536$$   | 1092                            | 1020                 | ~393MB           |
 </div>
 </div>
 
 
-We went from a sequential solution that at a reasonable $$R$$ only handled a throughput of 0.05 data per second to an initial parallel solution that handled 19.5 data per second to a fully optimized solution that handles 273 data per second. Our final solution even has optimal latency and space&nbsp;characteristics.
+We went from a sequential solution that at $$R=16384$$ only handled a throughput of 0.05 data per second to an initial parallel solution that handled 19.5 data per second to a fully optimized solution that handles 273 data per second. Our final solution even has optimal latency and space&nbsp;characteristics.
 
 We did it! Coda can now be limited in its throughput by the speed at which information can flow across the network, and no longer by the time it takes to construct a SNARK. Moreover, we solved a more general problem: Efficiently computing an online periodic parallel scan over an infinite stream for some associative operation.
 
