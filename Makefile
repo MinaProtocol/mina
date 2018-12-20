@@ -18,7 +18,7 @@ endif
 ifeq ($(USEDOCKER),TRUE)
  $(info INFO Using Docker Named $(DOCKERNAME))
  WRAP = docker exec -it $(DOCKERNAME)
- WRAPSRC = docker exec --workdir /home/opam/app/src -it $(DOCKERNAME)
+ WRAPSRC = docker exec --workdir /home/opam/app/src -t $(DOCKERNAME)
 else
  $(info INFO Not using Docker)
  WRAP =
@@ -71,7 +71,7 @@ build: git_hooks
 	cd src ; $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
-dev: docker container build
+dev: codabuilder containerstart build
 
 ########################################
 ## Lint
