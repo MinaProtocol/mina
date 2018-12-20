@@ -11,7 +11,7 @@ let disqus_html = {html|<div id="disqus_thread"></div>
 *  LEARN WHY DEFINING THESE VARIABLES IS IMPORTANT: https://disqus.com/admin/universalcode/#configuration-variables*/
 /*
 var disqus_config = function () {
-this.page.url = "https://codaprotocol.com/scanning_scans.html";  // Replace PAGE_URL with your page's canonical URL variable
+this.page.url = "https://codaprotocol.com/blog/scanning_scans.html";  // Replace PAGE_URL with your page's canonical URL variable
 this.page.identifier = "codaprotocol/blog/scanning_scans/1"; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
 };
 */
