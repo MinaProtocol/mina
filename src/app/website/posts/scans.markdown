@@ -63,6 +63,7 @@ val scan : 'a Stream.t
 
 As new information flows into the stream we combine it with the last piece of computed information and emit that result onto a new stream. Here’s a trace with transactions and proofs^[we write streams as lists in the evaluation]:
 
+<div class="mobile-only">
 <div class="katex-block">
 ```
 \begin{aligned}
@@ -102,6 +103,71 @@ combine&(\sigma_0 \Longrightarrow \sigma_0,\sigma_0T_0^{1}\sigma_1):: \\
 [\sigma_0 \Longrightarrow \sigma_3&; \; \sigma_0 \Longrightarrow \sigma_2; \; \sigma_0 \Longrightarrow \sigma_1]
 \end{aligned}
 ```
+</div>
+</div>
+<div class="not-mobile not-large">
+<div class="katex-block">
+```
+\begin{aligned}
+scan &[\sigma_0T_0^{1}\sigma^{1}; \; \sigma_1T_1^{2}\sigma^{2}; \; \sigma_2T_2^{3}\sigma^{3}] \\
+  \sim &init:\sigma_0 \Longrightarrow \sigma_0 \sim f:combine \\
+  \\
+
+combine&(\sigma_0 \Longrightarrow \sigma_0,\sigma_0T_0^{1}\sigma_1):: \\
+(scan &[\sigma_1T_1^{2}\sigma^{2}; \; \sigma_2T_2^{3}\sigma^{3}] \\
+  \sim &init:combine(\sigma_0 \Longrightarrow \sigma_0,\sigma_0T_0^{1}\sigma_1)  \\
+  \sim &f:combine) \\
+  \\
+
+\sigma_0 \Longrightarrow \sigma_1&:: \\
+(scan &[\sigma_1T_1^{2}\sigma^{2}; \; \sigma_2T_2^{3}\sigma^{3}] \\
+  \sim &init:\sigma_0 \Longrightarrow \sigma_1 \sim f:combine) \\
+  \\
+
+\sigma_0 \Longrightarrow \sigma_2&::\sigma_0 \Longrightarrow \sigma_1:: \\
+(scan &[\sigma_2T_2^{3}\sigma_3] \\
+  \sim &init:\sigma_0 \Longrightarrow \sigma_2 \sim f:combine) \\
+  \\
+
+\sigma_0 \Longrightarrow \sigma_3&::\sigma_0 \Longrightarrow \sigma_2::\sigma_0 \Longrightarrow \sigma_1:: \\
+(scan &[] \sim init:\sigma_0 \Longrightarrow \sigma_3 \sim f:combine) \\
+  \\
+
+\sigma_0 \Longrightarrow \sigma_3&::\sigma_0 \Longrightarrow \sigma_2::\sigma_0 \Longrightarrow \sigma_1::[] \\
+\\
+
+[\sigma_0 \Longrightarrow \sigma_3&; \; \sigma_0 \Longrightarrow \sigma_2; \; \sigma_0 \Longrightarrow \sigma_1]
+\end{aligned}
+```
+</div>
+</div>
+<div class="large-only">
+<div class="katex-block">
+```
+\begin{aligned}
+scan &[\sigma_0T_0^{1}\sigma^{1}; \; \sigma_1T_1^{2}\sigma^{2}; \; \sigma_2T_2^{3}\sigma^{3}] \sim init:\sigma_0 \Longrightarrow \sigma_0 \sim f:combine \\
+  \\
+
+combine&(\sigma_0 \Longrightarrow \sigma_0,\sigma_0T_0^{1}\sigma_1):: \\
+(scan &[\sigma_1T_1^{2}\sigma^{2}; \; \sigma_2T_2^{3}\sigma^{3}] \sim init:combine(\sigma_0 \Longrightarrow \sigma_0,\sigma_0T_0^{1}\sigma_1) \sim f:combine) \\
+  \\
+
+\sigma_0 \Longrightarrow \sigma_1&:: (scan [\sigma_1T_1^{2}\sigma^{2}; \; \sigma_2T_2^{3}\sigma^{3}] \sim init:\sigma_0 \Longrightarrow \sigma_1 \sim f:combine) \\
+  \\
+
+\sigma_0 \Longrightarrow \sigma_2&::\sigma_0 \Longrightarrow \sigma_1:: (scan [\sigma_2T_2^{3}\sigma_3] \sim init:\sigma_0 \Longrightarrow \sigma_2 \sim f:combine) \\
+  \\
+
+\sigma_0 \Longrightarrow \sigma_3&::\sigma_0 \Longrightarrow \sigma_2::\sigma_0 \Longrightarrow \sigma_1:: (scan [] \sim init:\sigma_0 \Longrightarrow \sigma_3 \sim f:combine) \\
+  \\
+
+\sigma_0 \Longrightarrow \sigma_3&::\sigma_0 \Longrightarrow \sigma_2::\sigma_0 \Longrightarrow \sigma_1::[] \\
+\\
+
+[\sigma_0 \Longrightarrow \sigma_3&; \; \sigma_0 \Longrightarrow \sigma_2; \; \sigma_0 \Longrightarrow \sigma_1]
+\end{aligned}
+```
+</div>
 </div>
 
 Unfortunately, we have a serial dependency of proof construction here: you must have $$\sigma_0 \Longrightarrow \sigma_i$$ before getting $$\sigma_0 \Longrightarrow \sigma_{i+1}$$. This is *very slow*. When using Libsnark (link) it takes ~5 seconds to do one of these steps on an 8 core machine, and that’s just for a single transaction. This translates to merely 8 transactions per minute globally on the network!

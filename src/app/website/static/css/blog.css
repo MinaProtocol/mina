@@ -11,7 +11,7 @@
 
 @media screen and (min-width:30em) {
   .blog-content .not-large,
-  .blog-content .not-mobile,
+  .blog-content .not-mobile
   {
     display: block;
   }
