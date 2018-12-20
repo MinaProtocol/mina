@@ -9,7 +9,7 @@ While developing [Coda](https://codaprotocol.com), we came across an interesting
 
 ## Background
 
-The Coda cryptocurrency protocol is unique in that it uses a [succinct blockchain TODO WHERE LINK](#where). In Coda the blockchain is replaced by a tiny constant-sized cryptographic proof. This means that in the Coda protocol a user can sync with full-security^[equivalent to security as a full node] instantly—users don’t have to wait to download thousands and thousands of blocks to verify the state of the network.
+The Coda cryptocurrency protocol is unique in that it uses a [succinct blockchain](https://www.youtube.com/watch?v=eWVGATxEB6M). In Coda the blockchain is replaced by a tiny constant-sized cryptographic proof. This means that in the Coda protocol a user can sync with full-security^[equivalent to security as a full node] instantly—users don’t have to wait to download thousands and thousands of blocks to verify the state of the network.
 
 What is this tiny cryptographic proof? It’s called a zk-SNARK, or zero knowledge Succinct Non-interactive ARgument of Knowledge. zk-SNARKs let a program create a proof of a computation, then share that proof with anyone. Anyone with the proof can verify the computation very quickly, in just milliseconds, independent of how long the computation itself takes. While validating proofs is fast, creating them is quite slow, so creating this SNARK proof would be much more computationally expensive. We use a few different SNARK proofs throughout Coda’s protocol, but the important one for this post is what we call the “Ledger Proof”.
 
