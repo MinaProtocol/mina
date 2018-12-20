@@ -13,7 +13,7 @@ The Coda cryptocurrency protocol is unique in that it uses a [succinct blockchai
 
 What is this tiny cryptographic proof? It’s called a zk-SNARK, or zero knowledge Succinct Non-interactive ARgument of Knowledge. zk-SNARKs let a program create a proof of a computation, then share that proof with anyone. Anyone with the proof can verify the computation very quickly, in just milliseconds, independent of how long the computation itself takes. While validating proofs is fast, creating them is quite slow, so creating this SNARK proof would be much more computationally expensive. We use a few different SNARK proofs throughout Coda’s protocol, but the important one for this post is what we call the “Ledger Proof”.
 
-A ledger proof tells us that given some starting account state $$\sigma_0$$ there was a series of $$k$$ transactions that eventually put us into account state $$\sigma_k$$. Let’s refer to such a proof as $$\sigma_0 \Longrightarrow \sigma_k$$.^[note that we represent account states concretely as their hashes for performance reasons] So what does it mean for a single transaction to be valid? A transaction, $$T_i^{i+1}$$, is valid  if it’s been signed by the sender, and the sender had sufficient balance in their account. As a result our account state $$\sigma_i$$ transitions to some new state $$\sigma_{i+1}$$. This state transition can be represented as $$\sigma_i T_{i}^{i+1} \sigma_{i+1}$$. We could recompute $$\sigma_0 \Longrightarrow \sigma_k$$ every time there is a new transaction, but that would be slow, with the cost of generating the proof growing with the number of transactions—instead we can reuse the previous proof recursively. These ledger proofs enable users of Coda to be sure that the ledger has been computed correctly and play a part in consensus state verification.
+A ledger proof tells us that given some starting account state $$\sigma_0$$ there was a series of $$k$$ transactions that eventually put us into account state $$\sigma_k$$. Let’s refer to such a proof as $$\sigma_0 \Longrightarrow \sigma_k$$.^[note that we represent account states concretely as their hashes for performance&nbsp;reasons] So what does it mean for a single transaction to be valid? A transaction, $$T_i^{i+1}$$, is valid  if it’s been signed by the sender, and the sender had sufficient balance in their account. As a result our account state $$\sigma_i$$ transitions to some new state $$\sigma_{i+1}$$. This state transition can be represented as $$\sigma_i T_{i}^{i+1} \sigma_{i+1}$$. We could recompute $$\sigma_0 \Longrightarrow \sigma_k$$ every time there is a new transaction, but that would be slow, with the cost of generating the proof growing with the number of transactions—instead we can reuse the previous proof recursively. These ledger proofs enable users of Coda to be sure that the ledger has been computed correctly and play a part in consensus state verification.
 
 More precisely, the recursive bit of our ledger proof, $$\sigma_0 \Longrightarrow \sigma_{i}$$, or the account state, has transitioned from the starting state $$\sigma_0$$ to the current state $$\sigma_i$$ after $$i$$ correct transactions are applied, could naively be defined in the following way:
 
@@ -176,7 +176,7 @@ What we’ll do in this blog post is find a better scan. A scan that maximizes t
 
 ## Requirements
 
-Now that we understand the root problem, let’s talk about requirements to help guide us toward the best solution for this problem. We want to optimize our scan for the following features:
+Now that we understand the root problem, let’s talk about requirements to help guide us toward the best solution for this problem. We want to optimize our scan for the following&nbsp;features:
 
 
 1. Maximize transaction throughput
@@ -186,7 +186,7 @@ Transaction throughput here refers to the rate at which transactions can be proc
 
 2. Minimize transaction latency
 
-It’s important to minimize transaction latency to enter our SNARK to keep the low RAM requirements on proposer nodes, nodes that propose new transitions during Proof of Stake.^[The more we sacrifice latency the longer proposer nodes have to keep around full copies of the state before just relying on the small SNARK itself]. SNARKing a transaction is not the same as *knowing* a transaction has been processed, so this is certainly less important for us than throughput.
+It’s important to minimize transaction latency to enter our SNARK to keep the low RAM requirements on proposer nodes, nodes that propose new transitions during Proof of Stake.^[The more we sacrifice latency the longer proposer nodes have to keep around full copies of the state before just relying on the small SNARK itself]. SNARKing a transaction is not the same as *knowing* a transaction has been processed, so this is certainly less important for us than&nbsp;throughput.
 
 
 3. Minimize size of state
@@ -202,7 +202,7 @@ We’ll start with some assumptions:
 
 - All SNARK proofs take one unit of time to complete
 - Transactions arrive into the system at a constant rate $$R$$ per unit time
-- We effectively have any number of cores we need to process transactions because we can economically incentivize actors to perform SNARK proofs and use transaction fees to pay those actors.^[This is possible because of a cryptographic notion known as “Signature of Knowledge” which lets us embed information about the creator and a fee into the proof in a way that is unforgeable. We will talk more about how we use this information in another blog post.]
+- We effectively have any number of cores we need to process transactions because we can economically incentivize actors to perform SNARK proofs and use transaction fees to pay those actors.^[This is possible because of a cryptographic notion known as “Signature of Knowledge” which lets us embed information about the creator and a fee into the proof in a way that is unforgeable. We will talk more about how we use this information in another blog&nbsp;post.]
 - Two proofs can be recursively merged:
 
 ![Merging two transaction proofs](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544574986580_merging-exists.png)
@@ -279,20 +279,20 @@ Our linear scan operation emits a result at every step and so we need the prior 
 
 - Latency: $$O(1)$$
 
-Every step emits a single result based on the data
+Every step emits a single result based on the&nbsp;data
 
 
 - Space: $$O(1)$$
 
-We only have to hold on to the most recently accumulated result to combine with the next value.
+We only have to hold on to the most recently accumulated result to combine with the next&nbsp;value.
 
-Since our primary goal is to maximize throughput, it’s clear a linear isn’t appropriate.
+Since our primary goal is to maximize throughput, it’s clear a linear isn’t&nbsp;appropriate.
 
 ## Parallel Periodic Scan
 
-Recall that the merge operation is associative. This means that we can choose to evaluate more than one merge at the same time, thus giving us parallelism! Even though data are coming in only $$R$$ at a time, we can choose to hold more back to unlock parallel merge work later. Because we effectively have infinite cores we can get a massive speedup by doing work in parallel.
+Recall that the merge operation is associative. This means that we can choose to evaluate more than one merge at the same time, thus giving us parallelism! Even though data are coming in only $$R$$ at a time, we can choose to hold more back to unlock parallel merge work later. Because we effectively have infinite cores we can get a massive speedup by doing work in&nbsp;parallel.
 
-This gives rise to the notion of a “periodic scan”:
+This gives rise to the notion of a “periodic&nbsp;scan”:
 
 <div class="mobile-only">
 ```ocaml
@@ -323,7 +323,7 @@ val periodicScan : 'a Stream.t -> ~init:'b ->
 
 A scan that periodically emits complete values, not every time an `'a` datum appears on a stream, but maybe every few times. This therefore has slightly different semantics than a traditional scan operation.
 
-See the example in the comment: Rather than returning a stream emitting 1→3→6→10→15→21→28→36, we buffer data elements 1 through 4 and compute with those in parallel, and only emit the resulting sum, 10, when we’re done. Likewise we buffer 5 through 8, and combine that with 10 and emit that 36 when we’re done. We periodically emit intermediate results instead of doing so every time.
+See the example in the comment: Rather than returning a stream emitting 1→3→6→10→15→21→28→36, we buffer data elements 1 through 4 and compute with those in parallel, and only emit the resulting sum, 10, when we’re done. Likewise we buffer 5 through 8, and combine that with 10 and emit that 36 when we’re done. We periodically emit intermediate results instead of doing so every&nbsp;time.
 
 ## Naive Implementation of Periodic Scan
 
@@ -337,7 +337,7 @@ First we gather $$R$$ pieces of data and enqueue $$R$$ Base jobs for our network
 ![](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566047415_naive-base.png)
 
 
-As we add Base work, we give way for a series of Merge jobs that can be completed in the next step:
+As we add Base work, we give way for a series of Merge jobs that can be completed in the next&nbsp;step:
 
 ![](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566064396_naive-merge.png)
 
@@ -433,7 +433,7 @@ With this in mind, let's trace a run-through, this time always making sure we ha
 
 ![The next step we lay out data and do four jobs](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178447_better-base.png)
 
-![Again we do four jobs and add two more data](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178462_better-merge1.png)
+![Again we do four jobs and add two more&nbsp;data](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178462_better-merge1.png)
 
 ![Now the first tree is done and we again do four jobs](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178487_better-merge2.png)
 
@@ -460,7 +460,7 @@ Throughput of work completion matches our stream of data! It’s perfect, we’v
 - Latency: $$O(log(R))$$
 
  
-Latency is still logarithmic, though now it’s $$log(R)+1$$ steps as our trees have $$R$$ leaves and we an extra layer on the bottom for base jobs. In fact, this is actually the lower bound^[Here’s a short informal proof: Note that any sort of reduction operation on $$N$$ pieces of data can’t be done faster than $$O(log(N))$$ span. If we assume we could handle our $$R$$ units that we enqueue at a time in fewer than $$O(log(N))$$ steps then since we’re doing a reduction operation we would be doing it faster than $$O(log(N))$$ which is a contradiction.]
+Latency is still logarithmic, though now it’s $$log(R)+1$$ steps as our trees have $$R$$ leaves and we an extra layer on the bottom for base jobs. In fact, this is actually the lower bound^[Here’s a short informal proof: Note that any sort of reduction operation on $$N$$ pieces of data can’t be done faster than $$O(log(N))$$ span. If we assume we could handle our $$R$$ units that we enqueue at a time in fewer than $$O(log(N))$$ steps then since we’re doing a reduction operation we would be doing it faster than $$O(log(N))$$ which is a&nbsp;contradiction.]
  
 
 - Space: $$O(R*log(R))$$ 
@@ -468,7 +468,7 @@ Latency is still logarithmic, though now it’s $$log(R)+1$$ steps as our trees 
  
 We have multiple trees now. Interestingly, we have exactly $$log(R)$$ trees pending at a time. Again our longer trees take up an extra layer than traditional binary trees, so in this case $$3R-1$$ nodes since we have $$R$$ leaves, and we have $$log(R)$$ of these trees.^[In order to prevent latency and space from growing over time, we need to make sure we complete work as fast as we add it]
 
-Now that we have thoroughly optimized our throughput and latency, let’s optimize for space.
+Now that we have thoroughly optimized our throughput and latency, let’s optimize for&nbsp;space.
 
 ## Optimize size
 
@@ -517,7 +517,7 @@ Now we’re down to $$2R-1$$ nodes—a standard binary tree with $$R$$ leaves.
 
 How do we store the tree? Since we know the size a priori (a complete binary tree with $$R$$ leaves), we can use a *succinct* representation. 
 
-A *succinct* data structure requires only $$o(Z)$$ extra space to manage the relationship between the elements if $$Z$$ is the optimal number of bits that we need to express the information in an unstructured manner. Note that this is little-$$o$$ not big-$$O$$—a much tighter bound^[This is a very interesting area of computer science research, and I very much recommend the curious to read more: See https://www.cs.cmu.edu/~dga/papers/zhou-sea2013.pdf and https://en.wikipedia.org/wiki/Wavelet_Tree.)]
+A *succinct* data structure requires only $$o(Z)$$ extra space to manage the relationship between the elements if $$Z$$ is the optimal number of bits that we need to express the information in an unstructured manner. Note that this is little-$$o$$ not big-$$O$$—a much tighter bound^[This is a very interesting area of computer science research, and I very much recommend the curious to read more: See [Zhou, et. al 2013](https://www.cs.cmu.edu/~dga/papers/zhou-sea2013.pdf) and [wavelet trees](https://en.wikipedia.org/wiki/Wavelet_Tree).]
 
 In fact our structure as described is actually an *implicit* one because of our scalar cursor. An *implicit* data structure is one that uses only $$O(1)$$ extra bits.^[In our case, just the cursor.] In later refinements (in part 2), we'll go back to a *succinct* representation because we need to relax one of the assumptions we made here. This is similar to the popular *implicit heap* that you may have learned about in a computer science class.
 
@@ -535,7 +535,7 @@ Throughput keeps up with production rate $$R$$, so we couldn’t do better.
 - Latency: $$O(log(R))$$
 
  
-Latency is proportional to $$log(R)$$ steps, as we described earlier, so we don’t get hurt too badly there.
+Latency is proportional to $$log(R)$$ steps, as we described earlier, so we don’t get hurt too badly&nbsp;there.
  
 
 - Space: $$2R-1 + O(1)$$  
