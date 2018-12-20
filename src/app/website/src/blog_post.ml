@@ -3,6 +3,27 @@ open Async
 open Stationary
 open Common
 
+let disqus_html = {html|<div id="disqus_thread"></div>
+<script>
+
+/**
+*  RECOMMENDED CONFIGURATION VARIABLES: EDIT AND UNCOMMENT THE SECTION BELOW TO INSERT DYNAMIC VALUES FROM YOUR PLATFORM OR CMS.
+*  LEARN WHY DEFINING THESE VARIABLES IS IMPORTANT: https://disqus.com/admin/universalcode/#configuration-variables*/
+/*
+var disqus_config = function () {
+this.page.url = "https://codaprotocol.com/scanning_scans.html";  // Replace PAGE_URL with your page's canonical URL variable
+this.page.identifier = "codaprotocol/blog/scanning_scans/1"; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
+};
+*/
+(function() { // DON'T EDIT BELOW THIS LINE
+var d = document, s = d.createElement('script');
+s.src = 'https://codaprotocol-com.disqus.com/embed.js';
+s.setAttribute('data-timestamp', +new Date());
+(d.head || d.body).appendChild(s);
+})();
+</script>
+                        <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>|html}
+
 let roman n =
   let symbols =
     [ (1000, "M")
@@ -84,7 +105,7 @@ let post name =
               (* HACK: to reuse styles from blog hr, we can just stick it in blog-content *)
                ]
           ; Share.content
-          ; h4 [] [text "TODO: Disqus comments"] ] ) ]
+          ; Html.literal disqus_html ] ) ]
 
 let content name =
   let%map p = post name in
