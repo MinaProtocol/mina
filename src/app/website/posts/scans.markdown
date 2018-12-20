@@ -433,21 +433,29 @@ Let's take advantage of the fact that we get $$R$$ new data values each time we 
 
 With this in mind, let's trace a run-through, this time always making sure we have $$R$$ pieces of work to do at every step—for illustration, let's pick $$R=4$$:
 
+<div class="images-2">
 ![In the first two steps we just lay out data](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178455_better-data.png)
 
 ![The next step we lay out data and do four jobs](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178447_better-base.png)
+</div>
 
+<div class="images-2">
 ![Again we do four jobs and add two more&nbsp;data](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178462_better-merge1.png)
 
 ![Now the first tree is done and we again do four jobs](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178487_better-merge2.png)
+</div>
 
+<div class="images-2">
 ![](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178495_better-merge3.png)
 
 ![It repeats](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178516_better-merge4.png)
+</div>
 
+<div class="images-2">
 ![](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178502_better-merge5.png)
 
 ![Over and over again](https://d2mxuefqeaa7sj.cloudfront.net/s_1F9E16749B17DC54549D96B5A3247F680EDDCCCB3DD78CFE222A02DA9883D4EE_1544566178529_better-merge6.png)
+</div>
 
 
 We do as we did before, but this time we have $$R$$ jobs to complete and can dispatch to our $$R$$ cores every step. We have exactly $$log(R)$$ trees pending at a time. Within every two steps, tree $$i$$ is completed up to layer $$i$$, the trees.
