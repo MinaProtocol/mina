@@ -3,16 +3,6 @@ open Async
 open Stationary
 open Common
 
-let title s =
-  let open Html_concise in
-  h1 [Style.just "f1 ddinexp tracked-tightish mb2"] [text s]
-
-let author s =
-  let open Html_concise in
-  h4
-    [Style.just "f7 fw4 tracked-supermega ttu metropolis mt0 mb0"]
-    [text ("by " ^ s)]
-
 let roman n =
   let symbols =
     [ (1000, "M")
@@ -34,6 +24,20 @@ let roman n =
       (List.init q ~f:(Fn.const name) @ acc, r) )
   |> fst |> List.rev |> String.concat
 
+let title s =
+  let open Html_concise in
+  h1 [Style.just "f2 f1-ns ddinexp tracked-tightish mb1"] [text s]
+
+let subtitle s =
+  let open Html_concise in
+  h2 [Style.just "f4 f3-ns ddinexp mt0 mb4 fw4"] [text s]
+
+let author s =
+  let open Html_concise in
+  h4
+    [Style.just "f7 fw4 tracked-supermega ttu metropolis mt0 mb1"]
+    [text ("by " ^ s)]
+
 let date d =
   let month_day = Date.format d "%B %d" in
   let year = Date.year d in
@@ -43,15 +47,31 @@ let date d =
     [Style.just "f7 fw4 tracked-supermega ttu o-50 metropolis mt0 mb35"]
     [text s]
 
+module Share = struct
+  open Html_concise
+
+  let content = h4 [] [text "TODO: Share section"]
+end
+
 let post name =
   let open Html_concise in
   let%map post = Post.load ("posts/" ^ name) in
   div
-    [Style.just "mw65 ibmplex f5 center lh-copy blueblack"]
-    [ title post.title
-    ; author post.author
-    ; date post.date
-    ; div [Stationary.Attribute.class_ "blog-content"] [post.content] ]
+    [Style.just "ph3 ph4-m ph5-l"]
+    [ div
+        [Style.just "mw65-ns ibmplex f5 center blueblack"]
+        ( title post.title
+          :: (match post.subtitle with None -> [] | Some s -> [subtitle s])
+        @ [ author post.author
+          ; date post.date
+          ; div
+              [Stationary.Attribute.class_ "blog-content lh-copy"]
+              [ post.content
+              ; hr []
+              (* HACK: to reuse styles from blog hr, we can just stick it in blog-content *)
+               ]
+          ; Share.content
+          ; h4 [] [text "TODO: Disqus comments"] ] ) ]
 
 let content name =
   let%map p = post name in
@@ -66,7 +86,17 @@ let content name =
       ; Html.literal
           {html|<script defer src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/contrib/auto-render.min.js" integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe" crossorigin="anonymous"
     onload="renderMathInElement(document.body);"></script>|html}
+      ; Html.literal
+          {html|<script>
+            document.addEventListener("DOMContentLoaded", function() {
+              var blocks = document.querySelectorAll(".katex-block code");
+              for (var i = 0; i < blocks.length; i++) {
+                var b = blocks[i];
+                katex.render(b.innerText, b);
+              }
+            });
+          </script>|html}
       ]
-    ~fixed_footer:false
+    ~tight:true ~fixed_footer:false
     ~page_label:Links.(label blog)
     [(fun _ -> p)]

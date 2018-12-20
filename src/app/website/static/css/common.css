@@ -121,6 +121,12 @@
 
 .blueblack { color: #3d5978; }
 .blueblacklight { color: rgb(61,100,134); }
+.bluegrey {
+  color: rgb(112,144,173);
+}
+.deepblue {
+  color: rgb(27,104,191);
+}
 
 .blacklike { color: #1F2D3D; }
 .silver { color: #8492A6; }
@@ -173,9 +179,9 @@
 }
 .mw57 { max-width: 27rem; }
 
-.mw65 { max-width: 40rem; }
-@media screen and (min-wdith:30em) {
-  .mw65-ns { max-width: 40rem; }
+.mw65 { max-width: 43rem; }
+@media screen and (min-width:30em) {
+  .mw65-ns { max-width: 43rem; }
 }
 
 .mw85 {max-width:80rem}
@@ -318,16 +324,26 @@
 
 }
 
+.tracked-more {
+  letter-spacing: 0.166666em;
+}
 .tracked-supermega {
   letter-spacing: 0.3125em;
 }
 .tracked-tightish {
   letter-spacing: -0.01em;
 }
-.tracked-custom {
-  letter-spacing: 0.3em;
+
+.fin-dots {
+  background-image: linear-gradient(to right, rgb(27, 104, 191) 25%, rgba(255, 255, 255, 0) 0%);
+  background-position: top;
+  background-size: 0.25rem 0.125rem;
+  background-repeat: repeat-x;
 }
 
+.h8th {
+  height: 0.125rem;
+}
 
 .sticky { position: sticky; position: -webkit-sticky; }
 

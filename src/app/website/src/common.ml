@@ -72,7 +72,9 @@ module Icon = struct
 end
 
 module Spacing = struct
-  let side_padding = Style.of_class "ph6-l ph5-m ph4 mw9-l"
+  let side_padding ~tight =
+    if tight then Style.of_class "ph6-l ph4-m ph3 mw9-l"
+    else Style.of_class "ph6-l ph5-m ph4 mw9-l"
 end
 
 module Visibility = struct
@@ -239,7 +241,7 @@ module Navbar = struct
           ; hr [Style.(render (of_class "w-50-ns w-100" + Styles.clean_hr))] ]
       ]
 
-  let navbar current_page =
+  let navbar ?(tight = false) current_page =
     let open Html in
     let open Html_concise in
     let maybe_no_underline label =
@@ -255,8 +257,10 @@ module Navbar = struct
     div
       [ Style.(
           render
-            ( of_class "flex items-center mw9 mb4 mb5-m"
-            + Spacing.side_padding + top_margins )) ]
+            ( of_class "flex items-center mw9 mb5-m"
+            + (if tight then of_class "mb3" else of_class "mb4")
+            + Spacing.side_padding ~tight
+            + top_margins )) ]
       [ div [class_ "w-50"]
           [anchor [] "./" [coda Style.empty] "coda-home" false]
       ; div
@@ -359,7 +363,7 @@ module Section = struct
           ( [ Style.(
                 render
                   ( ["section-wrapper"; "pv4"; "mw9"; "center"; "bxs-bb"]
-                  + Spacing.side_padding )) ]
+                  + Spacing.side_padding ~tight:false )) ]
           @ maybe_id )
           ( match heading with
           | Some heading -> [heading; content]
@@ -652,8 +656,8 @@ let wrap_simple ~navbar ~body_style ?(extra_body = []) ?(headers = [])
   in
   node "html" [] [head; body]
 
-let wrap ?(extra_body = []) ?(headers = []) ?(fixed_footer = false) ?title
-    ~page_label sections =
+let wrap ?(tight = false) ?(extra_body = []) ?(headers = [])
+    ?(fixed_footer = false) ?title ~page_label sections =
   let reified_sections =
     List.mapi
       (sections @ [footer ~fixed:fixed_footer ~show_newsletter:true])
@@ -662,6 +666,6 @@ let wrap ?(extra_body = []) ?(headers = []) ?(fixed_footer = false) ?title
   let open Html_concise in
   wrap_simple
     ~body_style:(Style.of_class "bg-white")
-    ~navbar:(Navbar.navbar page_label) ~extra_body ~headers ~fixed_footer
-    ?title ~page_label ~append_footer:false ~show_newsletter:true
-    (div [] reified_sections)
+    ~navbar:(Navbar.navbar ~tight page_label)
+    ~extra_body ~headers ~fixed_footer ?title ~page_label ~append_footer:false
+    ~show_newsletter:true (div [] reified_sections)
