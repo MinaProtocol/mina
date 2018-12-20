@@ -12,18 +12,23 @@ let parse_listlike expr =
   match expr.pexp_desc with
   | Pexp_array exprs -> exprs
   | Pexp_tuple exprs -> exprs
-  | _ -> failwith "Could not convert expression into a list of expressions"
+  | _ ->
+      raise_errorf ~loc:expr.pexp_loc
+        "Could not convert expression into a list of expressions"
 
 let string_of_string_expr expr =
   match expr.pexp_desc with
   | Pexp_constant (Pconst_string (str, None)) -> mkloc str expr.pexp_loc
-  | _ -> failwith "Expression is not a string: cannot extract."
+  | _ ->
+      raise_errorf ~loc:expr.pexp_loc
+        "Expression is not a string: cannot extract."
 
 let parse_to_name expr =
   match expr.pexp_desc with
-  (*| Pexp_ident ident -> ident*)
   | Pexp_construct (ident, None) -> ident
-  | _ -> failwith "Cannot convert this type of expression to a name."
+  | _ ->
+      raise_errorf ~loc:expr.pexp_loc
+        "Cannot convert this type of expression to a name."
 
 type field_info = {field_name: str; field_module: lid; var_name: str}
 
@@ -31,7 +36,7 @@ let loc_map x ~f = mkloc (f x.txt) x.loc
 
 let lid_last x = loc_map x ~f:Longident.last_exn
 
-let parse_field field =
+let parse_field ~loc field =
   match parse_listlike field with
   | field_name :: field_module :: _ ->
       let field_name = string_of_string_expr field_name in
@@ -41,7 +46,7 @@ let parse_field field =
             String.uncapitalize (Longident.last_exn lid) )
       in
       {field_name; field_module; var_name}
-  | _ -> failwith "Not enough info to construct field"
+  | _ -> raise_errorf ~loc "Not enough info to construct field"
 
 let polymorphic_type_stri ~loc fields_info =
   let fields =
@@ -98,7 +103,8 @@ let rec fold_fun_body ~modname ~loc ~fname ~foldf ~varname fields_info =
             (loc_map ~f:Longident.parse field_name) ) ]
   in
   match fields_info with
-  | [] -> failwith "Cannot create folding function for empty field list."
+  | [] ->
+      raise_errorf ~loc "Cannot create folding function for empty field list."
   | [field_info] -> field_call field_info
   | field_info :: fields_info ->
       Exp.apply foldf
@@ -197,21 +203,37 @@ let instances_str ~loc instances_info fields_info =
       t_mod_instance ~loc (lid_last t_mod) fields_info
       @ snark_mod_instance ~loc (lid_last snark_mod) fields_info
 
+let parse_arguments expr =
+  List.map (parse_listlike expr) ~f:(fun expr ->
+      match expr.pexp_desc with
+      | Pexp_variant (variant_name, Some variant_info) ->
+          (variant_name, variant_info)
+      | _ ->
+          raise_errorf ~loc:expr.pexp_loc
+            "Expected a variant type. Try `Instances (T, Snarkable)`" )
+
 let str_poly_record ~loc ~path:_ expr =
-  match expr with
-  | { pexp_desc=
-        Pexp_tuple
-          [ {pexp_desc= Pexp_variant ("Instances", Some instances_info); _}
-          ; {pexp_desc= Pexp_variant ("Fields", Some fields_info); _} ]; _ } ->
-      let instances_info =
-        instances_info |> parse_listlike |> List.map ~f:parse_to_name
-      in
-      let fields_info = List.map ~f:parse_field (parse_listlike fields_info) in
-      let polytype = polymorphic_type_stri ~loc fields_info in
-      let accessors = accessors_stri ~loc fields_info in
-      let instances = instances_str ~loc instances_info fields_info in
-      include_ ~loc (Mod.structure ~loc (polytype :: accessors :: instances))
-  | _ -> failwith "no!"
+  let arguments = parse_arguments expr in
+  let instances_info =
+    match List.assoc_opt "Instances" with
+    | Some instances_info -> instances_info
+    | None -> raise_errorf ~loc:expr.pexp_loc "Expected an Instances argument."
+  in
+  let fields_info =
+    match List.assoc_opt "Fields" with
+    | Some fields_info -> fields_info
+    | None -> raise_errorf ~loc:expr.pexp_loc "Expected an Fields argument."
+  in
+  let instances_info =
+    instances_info |> parse_listlike |> List.map ~f:parse_to_name
+  in
+  let fields_info =
+    List.map ~f:(parse_field ~loc) (parse_listlike fields_info)
+  in
+  let polytype = polymorphic_type_stri ~loc fields_info in
+  let accessors = accessors_stri ~loc fields_info in
+  let instances = instances_str ~loc instances_info fields_info in
+  include_ ~loc (Mod.structure ~loc (polytype :: accessors :: instances))
 
 let ext =
   Extension.declare "polymorphic_record" Extension.Context.structure_item
