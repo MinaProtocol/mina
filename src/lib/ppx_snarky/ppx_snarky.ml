@@ -133,36 +133,48 @@ let fields_expression ~loc fields_info =
          (field_name, Exp.ident ~loc:field_name.loc field_name) ))
     None
 
-let typ_stri ~loc ~modname fields_info =
+let typ_fold ~loc ~modname ~fname ~fmod fields_info =
   let mk_lid2 ~loc name1 name2 = mkloc (Ldot (Lident name1, name2)) loc in
   let typ_fn mod_ name =
     Exp.ident ~loc (mkloc (Ldot (Ldot (Lident "Typ", mod_), name)) loc)
   in
+  List.fold_left fields_info
+    ~init:
+      (Exp.apply (typ_fn fmod "return")
+         [(Nolabel, fields_expression ~loc fields_info)])
+    ~f:(fun expr {field_name; field_module; _} ->
+      Exp.apply (typ_fn fmod "bind")
+        [ ( Nolabel
+          , Exp.apply ~loc
+              (Exp.ident ~loc (mk_lid2 ~loc "Typ" fname))
+              [ ( Nolabel
+                , Exp.ident ~loc:field_module.loc
+                    (localize_mod field_module modname "typ") )
+              ; ( Nolabel
+                , Exp.ident ~loc:field_name.loc
+                    (loc_map ~f:Longident.parse field_name) ) ] )
+        ; ( Nolabel
+          , Exp.fun_ ~loc Nolabel None
+              (Pat.var ~loc:field_name.loc field_name)
+              expr ) ] )
+
+let typ_stri ~loc ~modname fields_info =
+  let field_pattern = fields_pattern ~loc fields_info in
   [%stri
-    let store =
-      let store [%p fields_pattern ~loc fields_info] =
-        [%e
-          List.fold_left fields_info
-            ~init:
-              (Exp.apply (typ_fn "Store" "return")
-                 [(Nolabel, fields_expression ~loc fields_info)])
-            ~f:(fun expr {field_name; field_module; _} ->
-              Exp.apply (typ_fn "Store" "bind")
-                [ ( Nolabel
-                  , Exp.apply ~loc
-                      (Exp.ident ~loc (mk_lid2 ~loc "Typ" "store"))
-                      [ ( Nolabel
-                        , Exp.ident ~loc:field_module.loc
-                            (localize_mod field_module modname "typ") )
-                      ; ( Nolabel
-                        , Exp.ident ~loc:field_name.loc
-                            (loc_map ~f:Longident.parse field_name) ) ] )
-                ; ( Nolabel
-                  , Exp.fun_ ~loc Nolabel None
-                      (Pat.var ~loc:field_name.loc field_name)
-                      expr ) ] )]
+    let typ =
+      let store [%p field_pattern] =
+        [%e typ_fold ~loc ~modname ~fname:"store" ~fmod:"Store" fields_info]
       in
-      store]
+      let read [%p field_pattern] =
+        [%e typ_fold ~loc ~modname ~fname:"read" ~fmod:"Read" fields_info]
+      in
+      let alloc [%p field_pattern] =
+        [%e typ_fold ~loc ~modname ~fname:"alloc" ~fmod:"Alloc" fields_info]
+      in
+      let check [%p field_pattern] =
+        [%e typ_fold ~loc ~modname ~fname:"check" ~fmod:"Check" fields_info]
+      in
+      {store; read; alloc; check}]
 
 let snark_mod_instance ~loc modname fields_info =
   [ Str.module_
