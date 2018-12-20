@@ -1,6 +1,6 @@
 ---
-title: Fast Accumulation on Streams
-subtitle: Succinctly Verifying Coda’s Ledger
+title: Fast&nbsp;Accumulation on&nbsp;Streams
+subtitle: Succinctly&nbsp;Verifying Coda’s&nbsp;Ledger
 date: 2018-12-18
 author: Brandon Kase
 ---
@@ -28,14 +28,25 @@ Let’s examine what running this process over four steps would look like:
 The functional programming enthusiast will notice that this operation is like a scan:
 
 <div class="code">
+<div class="mobile-only">
 ```ocaml
-(* scan [1;2;3] ~init:0 ~f:(fun b a -> b + a)
+(* scan [1;2;3] ~init:0
+  ~f:(fun b a -> b + a)
   => [1,3,6] *)
 val scan : 'a list
   -> ~init:'b
   -> ~f:('b -> 'a -> 'b)
   -> 'b list
 ```
+</div>
+<div class="not-mobile">
+```ocaml
+(* scan [1;2;3] ~init:0 ~f:(fun b a -> b + a)
+  => [1,3,6] *)
+val scan : 'a list -> ~init:'b
+  -> ~f:('b -> 'a -> 'b) -> 'b list
+```
+</div>
 ^[The `~init` in OCaml refers to a named argument, and `'a` and `'b` are a type unification variables that work similarly to generics in Java]
 </div>
 
@@ -616,8 +627,8 @@ We can reify this model with the [following signature in the Coda codebase](http
 ```ocaml
 val start : parallelism_log_2:int
   -> ('a, 'd) State.t
-(** The initial state of the parallel scan at some
-parallelism *)
+(** The initial state of the parallel
+scan at some parallelism *)
 
 val next_jobs : state:('a, 'd) State.t
   -> ('a, 'd) Available_job.t list
@@ -628,17 +639,19 @@ val enqueue_data : state:('a, 'd) State.t
   -> unit Or_error.t
 (** Add data to parallel scan state *)
 
-val free_space : state:('a, 'd) State.t -> int
-(** Compute how much data ['d] elements we are
-allowed to add to the state *)
+val free_space : state:('a, 'd) State.t
+  -> int
+(** Compute how much data ['d] elements we
+are allowed to add to the state *)
 
 val fill_in_completed_jobs :
      state:('a, 'd) State.t
-  -> completed_jobs:'a State.Completed_job.t list
+  -> completed_jobs:
+        'a State.Completed_job.t list
   -> 'a option Or_error.t
 (** Complete jobs needed at this state --
-optionally emits the ['a] at the top of the
-tree *)
+optionally emits the ['a] at the top of
+the tree *)
 ```
 </div>
 <div class="large-only">
