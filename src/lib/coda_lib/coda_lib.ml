@@ -2,6 +2,7 @@ open Core_kernel
 open Async_kernel
 open Protocols
 open Pipe_lib
+open Strict_pipe
 open O1trace
 
 module type Staged_ledger_io_intf = sig
@@ -259,6 +260,8 @@ module type Ledger_builder_controller_intf = sig
 end
 
 module type Proposer_intf = sig
+  type state_hash
+
   type ledger_hash
 
   type staged_ledger
@@ -287,7 +290,7 @@ module type Proposer_intf = sig
 
   type time
 
-  val create :
+  val run :
        parent_log:Logger.t
     -> get_completed_work:(   completed_work_statement
                            -> completed_work_checked option)
@@ -296,7 +299,11 @@ module type Proposer_intf = sig
     -> keypair:keypair
     -> consensus_local_state:consensus_local_state
     -> transition_frontier:transition_frontier
-    -> (external_transition Envelope.Incoming.t * time) Linear_pipe.Reader.t
+    -> transition_writer:( (external_transition, state_hash) With_hash.t
+                         , synchronous
+                         , unit Deferred.t )
+                         Strict_pipe.Writer.t
+    -> unit
 end
 
 module type Witness_change_intf = sig
@@ -599,18 +606,12 @@ module Make (Inputs : Inputs_intf) = struct
     let consensus_local_state =
       Consensus_mechanism.Local_state.create t.propose_keypair
     in
-    match t.propose_keypair with
-    | Some keypair ->
-        let transitions =
-          Proposer.create ~parent_log:t.log
-            ~transaction_pool:t.transaction_pool
-            ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
-            ~time_controller:t.time_controller ~keypair ~consensus_local_state
-            ~transition_frontier:t.transition_frontier
-        in
-        don't_wait_for
-          (Linear_pipe.transfer_id transitions t.external_transitions_writer)
-    | None -> ()
+    Option.iter t.propose_keypair ~f:(fun keypair ->
+        Proposer.run ~parent_log:t.log ~transaction_pool:t.transaction_pool
+          ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
+          ~time_controller:t.time_controller ~keypair ~consensus_local_state
+          ~transition_frontier:t.transition_frontier
+          ~transition_writer:proposer_transition_writer )
 
   let create (config : Config.t) =
     trace_task "coda" (fun () ->
