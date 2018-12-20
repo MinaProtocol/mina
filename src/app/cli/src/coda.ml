@@ -97,6 +97,9 @@ let daemon log =
            "FEE Amount a worker wants to get compensated for generating a \
             snark proof"
          (optional int)
+     and sexp_logging =
+       flag "sexp-logging" no_arg
+         ~doc:"Use S-expressions in log output, instead of JSON"
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -117,6 +120,7 @@ let daemon log =
          else Sys.home_directory () >>| compute_conf_dir
        in
        Parallel.init_master () ;
+       ignore (Logger.set_sexp_logging sexp_logging) ;
        let%bind config =
          match%map
            Monitor.try_with_or_error ~extract_exn:true (fun () ->

@@ -6,7 +6,7 @@
   (flags (:standard -short-paths -warn-error -58))
   (library_flags (-linkall))
   (inline_tests)
-  (libraries (core async))
-  (preprocess (pps (ppx_jane bisect_ppx -conditional)))
+  (libraries (core async yojson ppx_deriving_yojson.runtime))
+  (preprocess (pps (ppx_jane ppx_deriving_yojson bisect_ppx -conditional)))
   (synopsis "Logging library")))
 
