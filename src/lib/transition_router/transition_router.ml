@@ -32,7 +32,6 @@ module type Inputs_intf = sig
   module Transition_frontier_controller :
     Transition_frontier_controller_intf
     with type time_controller := Time.Controller.t
-     and type external_transition := External_transition.t
      and type external_transition_verified := External_transition.Verified.t
      and type transition_frontier := Transition_frontier.t
      and type time := Time.t
@@ -43,9 +42,21 @@ module type Inputs_intf = sig
     Bootstrap_controller_intf
     with type network := Network.t
      and type transition_frontier := Transition_frontier.t
-     and type external_transition := External_transition.t
+     and type external_transition_verified := External_transition.Verified.t
      and type ancestor_prover := Ancestor.Prover.t
      and type ledger_db := Ledger.Db.t
+
+  module State_proof :
+    Proof_intf
+    with type input := Consensus.Mechanism.Protocol_state.value
+     and type t := Proof.t
+
+  module Protocol_state_validator :
+    Protocol_state_validator_intf
+    with type time := Time.t
+     and type state_hash := State_hash.t
+     and type external_transition := External_transition.t
+     and type external_transition_verified := External_transition.Verified.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -60,6 +71,7 @@ module Make (Inputs : Inputs_intf) :
    and type network := Inputs.Network.t
    and type ledger_db := Ledger.Db.t = struct
   open Inputs
+  module Initial_validator = Initial_validator.Make (Inputs)
 
   (* HACK: Bootstrap accepts unix_timestamp rather than Time.t *)
   let to_unix_timestamp recieved_time =
@@ -78,12 +90,12 @@ module Make (Inputs : Inputs_intf) :
       Transition_frontier.root frontier
       |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
     in
-    let open External_transition in
-    let root_state = protocol_state (root_transition |> of_verified) in
+    let open External_transition.Verified in
+    let root_state = protocol_state root_transition in
     let new_state = protocol_state new_transition in
     Consensus.Mechanism.should_bootstrap
-      ~existing:(Protocol_state.consensus_state root_state)
-      ~candidate:(Protocol_state.consensus_state new_state)
+      ~existing:(External_transition.Protocol_state.consensus_state root_state)
+      ~candidate:(External_transition.Protocol_state.consensus_state new_state)
 
   let is_bootstrapping mode =
     match mode with
@@ -141,7 +153,14 @@ module Make (Inputs : Inputs_intf) :
            (start_transition_frontier_controller ~verified_transition_writer
               ~clear_reader)
     in
-    Strict_pipe.Reader.iter transition_reader ~f:(fun network_transition ->
+    let ( valid_protocol_state_transition_reader
+        , valid_protocol_state_transition_writer ) =
+      create_bufferred_pipe ()
+    in
+    Initial_validator.run ~logger ~transition_reader
+      ~valid_transition_writer:valid_protocol_state_transition_writer ;
+    Strict_pipe.Reader.iter valid_protocol_state_transition_reader
+      ~f:(fun network_transition ->
         let `Transition incoming_transition, `Time_received tm =
           network_transition
         in

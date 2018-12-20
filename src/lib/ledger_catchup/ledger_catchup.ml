@@ -6,7 +6,6 @@ open Coda_base
 
 module Make (Inputs : Inputs.S) :
   Catchup_intf
-  with type external_transition := Inputs.External_transition.t
   with type external_transition_verified :=
               Inputs.External_transition.Verified.t
    and type transition_frontier := Inputs.Transition_frontier.t
@@ -94,17 +93,28 @@ module Make (Inputs : Inputs.S) :
             let%bind queried_transitions_verified =
               Deferred.Or_error.List.filter_map queried_transitions
                 ~f:(fun transition ->
-                  let open Deferred.Let_syntax in
-                  let transition_with_hash =
-                    With_hash.of_data transition
-                      ~hash_data:
-                        (Fn.compose Consensus.Mechanism.Protocol_state.hash
-                           External_transition.protocol_state)
+                  let verified_transition =
+                    let open Deferred.Result.Let_syntax in
+                    let%bind verified_transition =
+                      Protocol_state_validator.validate_proof transition
+                      |> Deferred.Result.map_error ~f:(fun error ->
+                             `Invalid (Error.to_string_hum error) )
+                    in
+                    let verified_transition_with_hash =
+                      With_hash.of_data verified_transition
+                        ~hash_data:
+                          (Fn.compose Consensus.Mechanism.Protocol_state.hash
+                             External_transition.Verified.protocol_state)
+                    in
+                    let%map () =
+                      Deferred.return
+                      @@ Transition_handler_validator.validate_transition
+                           ~logger ~frontier verified_transition_with_hash
+                    in
+                    verified_transition_with_hash
                   in
-                  match%map
-                    Transition_handler_validator.validate_transition ~logger
-                      ~frontier transition_with_hash
-                  with
+                  let open Deferred.Let_syntax in
+                  match%map verified_transition with
                   | Ok verified_transition -> Ok (Some verified_transition)
                   | Error `Duplicate ->
                       Logger.info logger

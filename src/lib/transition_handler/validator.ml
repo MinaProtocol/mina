@@ -1,126 +1,81 @@
 open Async_kernel
 open Core_kernel
 open Pipe_lib.Strict_pipe
-open Protocols.Coda_pow
 open Coda_base
-
-(* TODO: what conditions should we punish? *)
-(* TODO:
-  let length = External_transition.protocol_state t |> Protocol_state.blockchain_state |> Blockchain_state.length in
-  log_assert
-    (match Root_history.find (Transition_frontier.root_history frontier) (length - k) with
-    | `Known h -> State_hash.equal h (External_transition.frontier_root_hash t)
-    | `Unknown -> true
-    | `Out_of_bounds ->
-      Logger.info logger "expected root of transition was out of bounds";
-      false)
-    "transition frontier root hash was invalid"
-*)
+open Protocols.Coda_transition_frontier
 
 module Make (Inputs : Inputs.S) :
   Transition_handler_validator_intf
   with type time := Inputs.Time.t
    and type state_hash := State_hash.t
-   and type external_transition := Inputs.External_transition.t
    and type external_transition_verified :=
               Inputs.External_transition.Verified.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type staged_ledger := Inputs.Staged_ledger.t = struct
   open Inputs
   open Consensus.Mechanism
-  open Deferred.Let_syntax
 
-  let validate_transition ?time_received ~logger ~frontier transition_with_hash
-      =
+  let validate_transition ~logger ~frontier transition_with_hash =
     let open With_hash in
     let open Protocol_state in
     let {hash; data= transition} = transition_with_hash in
-    let protocol_state = External_transition.protocol_state transition in
+    let protocol_state =
+      External_transition.Verified.protocol_state transition
+    in
     let root_protocol_state =
       Transition_frontier.root frontier
       |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
       |> External_transition.Verified.protocol_state
     in
-    if Transition_frontier.find frontier hash |> Option.is_some then
-      Deferred.return (Error `Duplicate)
-    else
-      (* these are done separately in order to avoid encoding
-       * synchronicity into the deferred monad *)
-      let synchronous_result =
-        let open Result.Let_syntax in
-        let%bind () =
-          match time_received with
-          | None -> Ok ()
-          | Some t ->
-              Result.ok_if_true
-                (Consensus.Mechanism.received_at_valid_time
-                   (consensus_state protocol_state)
-                   ~time_received:t)
-                ~error:(`Invalid "transition was received at an invalid time")
-        in
-        Result.ok_if_true
-          ( `Take
-          = Consensus.Mechanism.select ~logger
-              ~existing:(consensus_state root_protocol_state)
-              ~candidate:(consensus_state protocol_state) )
-          ~error:
-            (`Invalid
-              "consensus state was not selected over transition frontier root \
-               consensus state")
-      in
-      match synchronous_result with
-      | Error err -> Deferred.return (Error err)
-      | Ok () ->
-          let open Deferred.Let_syntax in
-          let%map valid =
-            State_proof.verify
-              (External_transition.protocol_state_proof transition)
-              protocol_state
-          in
-          if valid then
-            (* validation has completed successfully, so we can cast the transition *)
-            let (`I_swear_this_is_safe_see_my_comment verified_transition) =
-              External_transition.to_verified transition
-            in
-            Ok {hash; data= verified_transition}
-          else Error (`Invalid "protocol state proof was not valid")
+    let open Result.Let_syntax in
+    let%bind () =
+      Result.ok_if_true
+        (Transition_frontier.find frontier hash |> Option.is_some)
+        ~error:`Duplicate
+    in
+    Result.ok_if_true
+      ( `Take
+      = Consensus.Mechanism.select ~logger
+          ~existing:(consensus_state root_protocol_state)
+          ~candidate:(consensus_state protocol_state) )
+      ~error:
+        (`Invalid
+          "consensus state was not selected over transition frontier root \
+           consensus state")
 
   let run ~logger ~frontier ~transition_reader ~valid_transition_writer =
     let logger = Logger.child logger __MODULE__ in
     don't_wait_for
       (Reader.iter transition_reader
-         ~f:(fun (`Transition transition_env, `Time_received time_received) ->
-           let time_received =
-             Time.to_span_since_epoch time_received
-             |> Time.Span.to_ms |> Unix_timestamp.of_int64
-           in
-           let (transition : External_transition.t) =
+         ~f:(fun (`Transition transition_env, `Time_received _) ->
+           let (transition : External_transition.Verified.t) =
              Envelope.Incoming.data transition_env
            in
            let hash =
              Protocol_state.hash
-               (External_transition.protocol_state transition)
+               (External_transition.Verified.protocol_state transition)
            in
            let transition_with_hash = {With_hash.hash; data= transition} in
-           match%map
-             validate_transition ~logger ~frontier ~time_received
-               transition_with_hash
-           with
-           | Ok valid_transition ->
-               Logger.info logger
-                 !"accepting transition %{sexp:State_hash.t}"
-                 hash ;
-               Writer.write valid_transition_writer valid_transition
-           | Error `Duplicate ->
-               Logger.info logger
-                 !"ignoring transition we've already seen %{sexp:State_hash.t}"
-                 hash
-           | Error (`Invalid reason) ->
-               Logger.warn logger
-                 !"rejecting transitions because \"%s\" -- sent by %{sexp: \
-                   Host_and_port.t}"
-                 reason
-                 (Envelope.Incoming.sender transition_env) ))
+           Deferred.return
+             ( match
+                 validate_transition ~logger ~frontier transition_with_hash
+               with
+             | Ok () ->
+                 Logger.info logger
+                   !"accepting transition %{sexp:State_hash.t}"
+                   hash ;
+                 Writer.write valid_transition_writer transition_with_hash
+             | Error `Duplicate ->
+                 Logger.info logger
+                   !"ignoring transition we've already seen \
+                     %{sexp:State_hash.t}"
+                   hash
+             | Error (`Invalid reason) ->
+                 Logger.warn logger
+                   !"rejecting transitions because \"%s\" -- sent by %{sexp: \
+                     Host_and_port.t}"
+                   reason
+                   (Envelope.Incoming.sender transition_env) ) ))
 end
 
 (*
