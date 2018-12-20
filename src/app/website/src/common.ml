@@ -277,8 +277,7 @@ module Navbar = struct
       ; div
           [class_ "flex justify-around w-75"]
           [ (let name, url, label = Links.blog in
-             a' ~style:Visibility.no_mobile ~open_new_tab:true url [text name]
-               label)
+             a' ~style:Visibility.no_mobile url [text name] label)
           ; (let name, url, label = Links.testnet in
              a' url [text name] label)
           ; (let name, url, label = Links.code in

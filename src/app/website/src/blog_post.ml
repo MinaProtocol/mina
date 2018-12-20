@@ -138,7 +138,7 @@ let content name =
       ; Html.literal
           {html|<script>
             document.addEventListener("DOMContentLoaded", function() {
-              var blocks = document.querySelectorAll("a");
+              var blocks = document.querySelectorAll(".blog-content a");
               for (var i = 0; i < blocks.length; i++) {
                 var b = blocks[i];
                 if (b.href.indexOf('#') === -1) {
