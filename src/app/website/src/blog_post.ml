@@ -86,7 +86,7 @@ module Share = struct
     let share =
       span [Style.just "f7 ttu fw4 ddinexp tracked-mega blueshare"] [text "share:"]
     in
-    div [Style.just "share flex justify-center items-center"]
+    div [Style.just "share flex justify-center items-center mb4"]
       (share :: channels)
 end
 
