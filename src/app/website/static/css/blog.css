@@ -225,6 +225,7 @@
   padding-right: 1rem;
 
   font-weight: 400;
+  white-space: nowrap;
 }
 
 .blog-content table th {
