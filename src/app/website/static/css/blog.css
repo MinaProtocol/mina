@@ -346,6 +346,10 @@
   font-size: .75rem;
 }
 
+.side-footnote code {
+  font-size: .75rem;
+}
+
 .side-footnotes .footnotes {
   display: none;
 }
