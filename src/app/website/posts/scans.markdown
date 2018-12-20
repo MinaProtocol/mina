@@ -12,7 +12,7 @@ author_website: https://twitter.com/bkase_
 <sup>1</sup> If you’d rather consume this content in video form, watch [this talk](https://www.youtube.com/watch?v=YSnQ8N760mI).
 </div>
 </div>
-While developing [Coda](https://codaprotocol.com), we came across an interesting problem that uncovered a much more general and potentially widely applicable problem: Taking advantage of parallelism when combining a large amount of data streaming in over time. We were able to come up with a solution that scales up for any throughput optimally while simultaneously minimizing latency and space usage. We’re sharing our results with the hope that others dealing with manipulation of online data streams will find them interesting and applicable.^[If you’d rather consume this content in video form, watch [this talk](https://www.youtube.com/watch?v=YSnQ8N760mI).]
+While developing [Coda](https://codaprotocol.com), we came across an interesting problem that uncovered a much more general and potentially widely applicable problem: Taking advantage of parallelism when combining a large amount of data streaming in over time. We were able to come up with a solution that scales up to any throughput optimally while simultaneously minimizing latency and space usage. We’re sharing our results with the hope that others dealing with manipulation of online data streams will find them interesting and applicable.^[If you’d rather consume this content in video form, watch [this talk](https://www.youtube.com/watch?v=YSnQ8N760mI).]
 
 ## Background
 
@@ -23,7 +23,7 @@ While developing [Coda](https://codaprotocol.com), we came across an interesting
 </div>
 The Coda cryptocurrency protocol is unique in that it uses a [succinct blockchain](https://www.youtube.com/watch?v=eWVGATxEB6M). In Coda the blockchain is replaced by a tiny constant-sized cryptographic proof. This means that in the Coda protocol a user can sync with full-security^[Equivalent to security as a full&nbsp;node.] instantly—users don’t have to wait to download thousands and thousands of blocks to verify the state of the network.
 
-What is this tiny cryptographic proof? It’s called a zk-SNARK, or zero knowledge Succinct Non-interactive ARgument of Knowledge. zk-SNARKs let a program create a proof of a computation, then share that proof with anyone. Anyone with the proof can verify the computation very quickly, in just milliseconds, independent of how long the computation itself takes. While validating proofs is fast, creating them is quite slow, so creating this SNARK proof would be much more computationally expensive. We use a few different SNARK proofs throughout Coda’s protocol, but the important one for this post is what we call the “Ledger&nbsp;Proof”.
+What is this tiny cryptographic proof? It’s called a zk-SNARK, or zero knowledge Succinct Non-interactive ARgument of Knowledge. zk-SNARKs let a program create a proof of a computation, then share that proof with anyone. Anyone with the proof can verify the computation very quickly, in just milliseconds, independent of how long the computation itself takes. While validating proofs is fast, creating them is quite slow, so creating this SNARK proof is much more computationally expensive. We use a few different SNARK proofs throughout Coda’s protocol, but the important one for this post is what we call the “Ledger&nbsp;Proof”.
 
 <div class="side-footnote-container">
 <div class="side-footnote">
@@ -217,7 +217,7 @@ combine&(\sigma_0 \Longrightarrow \sigma_0,\sigma_0T_0^{1}\sigma_1):: \\
 </div>
 </div>
 
-Unfortunately, we have a serial dependency of proof construction here: you must have $$\sigma_0 \Longrightarrow \sigma_i$$ before getting $$\sigma_0 \Longrightarrow \sigma_{i+1}$$. This is *very slow*. When using Libsnark (link) it takes ~5 seconds to do one of these steps on an 8 core machine, and that’s just for a single transaction. This translates to merely 8 transactions per minute globally on the network!
+Unfortunately, we have a serial dependency of proof construction here: you must have $$\sigma_0 \Longrightarrow \sigma_i$$ before getting $$\sigma_0 \Longrightarrow \sigma_{i+1}$$. This is *very slow*. When using Libsnark (link) it takes ~5 seconds to do one of these steps on an 8 core machine, and that’s just for a single transaction. This translates to merely 12 transactions per minute globally on the network!
 
 What we’ll do in this blog post is find a better scan. A scan that maximizes throughput, doesn’t incur too much latency, and doesn’t require too much intermediate state. A scan that takes advantage of properties of the zk-SNARK primitives we have. We’ll do this by iterating on our design until we get something that best meets our requirements. Finally, we’ll talk about a few other potential use cases for such a scan outside of cryptocurrency.
 
@@ -348,7 +348,7 @@ Every step emits a single result based on the&nbsp;data
 
 We only have to hold on to the most recently accumulated result to combine with the next&nbsp;value.
 
-Since our primary goal is to maximize throughput, it’s clear a linear isn’t&nbsp;appropriate.
+Since our primary goal is to maximize throughput, it’s clear a linear scan isn’t&nbsp;appropriate.
 
 ## Parallel Periodic Scan
 
@@ -385,7 +385,7 @@ val periodicScan : 'a Stream.t -> ~init:'b ->
 
 A scan that periodically emits complete values, not every time an `'a` datum appears on a stream, but maybe every few times. This therefore has slightly different semantics than a traditional scan operation.
 
-See the example in the comment: Rather than returning a stream emitting 1→3→6→10→15→21→28→36, we buffer data elements 1 through 4 and compute with those in parallel, and only emit the resulting sum, 10, when we’re done. Likewise we buffer 5 through 8, and combine that with 10 and emit that 36 when we’re done. We periodically emit intermediate results instead of doing so every&nbsp;time.
+Rather than returning a stream emitting 1→3→6→10→15→21→28→36, we buffer data elements 1 through 4 and compute with those in parallel, and only emit the resulting sum, 10, when we’re done. Likewise we buffer 5 through 8, and combine that with 10 and emit that 36 when we’re done. We periodically emit intermediate results instead of doing so every&nbsp;time.
 
 ## Naive Implementation of Periodic Scan
 
@@ -427,7 +427,7 @@ It takes $$log(R)$$ time steps before we emit our top-level merge work as we hal
 
 - Space: $$O(R)$$
 
-We now have to keep parts of a tree around at each step. Since our trees have $$R$$ leaves, typical binary trees have $$2R-1$$ nodes when completed, and we have an extra layer, we actually use $$3R-1$$ nodes in the worst case.
+We now have to keep parts of a tree around at each step. Since our trees have $$R$$ leaves, typical binary trees have $$2R-1$$ nodes when completed, and we have an extra layer, we actually use $$3R-1$$ nodes.
 
 ### Naive Periodic Scan
 
@@ -526,7 +526,7 @@ Throughput of work completion matches our stream of data! It’s perfect, we’v
 Here’s a short informal proof: Note that any sort of reduction operation on $$N$$ pieces of data can’t be done faster than $$O(log(N))$$ span. If we assume we could handle our $$R$$ units that we enqueue at a time in fewer than $$O(log(N))$$ steps then since we’re doing a reduction operation we would be doing it faster than $$O(log(N))$$ which is a contradiction.
 </div>
 </div>
-Latency is still logarithmic, though now it’s $$log(R)+1$$ steps as our trees have $$R$$ leaves and we an extra layer on the bottom for base jobs. In fact, this is actually the lower bound^[Here’s a short informal proof: Note that any sort of reduction operation on $$N$$ pieces of data can’t be done faster than $$O(log(N))$$ span. If we assume we could handle our $$R$$ units that we enqueue at a time in fewer than $$O(log(N))$$ steps then since we’re doing a reduction operation we would be doing it faster than $$O(log(N))$$ which is a&nbsp;contradiction.]
+Latency is still logarithmic, though now it’s $$log(R)+1$$ steps as our trees have $$R$$ leaves and we an extra layer on the bottom for base jobs. In fact, this is actually the lower bound.^[Here’s a short informal proof: Note that any sort of reduction operation on $$N$$ pieces of data can’t be done faster than $$O(log(N))$$ span. If we assume we could handle our $$R$$ units that we enqueue at a time in fewer than $$O(log(N))$$ steps then since we’re doing a reduction operation we would be doing it faster than $$O(log(N))$$ which is a&nbsp;contradiction.]
  
 
 - Space: $$O(R*log(R))$$ 
