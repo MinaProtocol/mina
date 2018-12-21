@@ -215,12 +215,12 @@ let parse_arguments expr =
 let str_poly_record ~loc ~path:_ expr =
   let arguments = parse_arguments expr in
   let instances_info =
-    match List.assoc_opt "Instances" with
+    match List.Assoc.find arguments "Instances" ~equal:String.equal with
     | Some instances_info -> instances_info
     | None -> raise_errorf ~loc:expr.pexp_loc "Expected an Instances argument."
   in
   let fields_info =
-    match List.assoc_opt "Fields" with
+    match List.Assoc.find arguments "Fields" ~equal:String.equal with
     | Some fields_info -> fields_info
     | None -> raise_errorf ~loc:expr.pexp_loc "Expected an Fields argument."
   in
