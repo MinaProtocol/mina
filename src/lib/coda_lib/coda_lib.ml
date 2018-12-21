@@ -426,8 +426,8 @@ module type Inputs_intf = sig
      and type ledger_database := Ledger_db.t
      and type masked_ledger := Masked_ledger.t
      and type staged_ledger := Staged_ledger.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type ledger_diff_verified := Staged_ledger_diff.Verified.t
 
   module Transition_router :
     Protocols.Coda_transition_frontier.Transition_router_intf
@@ -618,8 +618,8 @@ module Make (Inputs : Inputs_intf) = struct
           Linear_pipe.create ()
         in
         let net_ivar = Ivar.create () in
-        let empty_diff_verified =
-          { Staged_ledger_diff.Verified.pre_diffs=
+        let empty_diff =
+          { Staged_ledger_diff.pre_diffs=
               Either.First
                 { diff= {completed_works= []; user_commands= []}
                 ; coinbase_added= Staged_ledger_diff.At_most_one.Zero }
@@ -633,11 +633,12 @@ module Make (Inputs : Inputs_intf) = struct
         let genesis_protocol_state =
           With_hash.data Consensus_mechanism.genesis_protocol_state
         in
-        let first_transition =
-          External_transition.Verified.create
-            ~protocol_state:genesis_protocol_state
-            ~protocol_state_proof:Protocol_state_proof.dummy
-            ~staged_ledger_diff:empty_diff_verified
+        (* the genesis transition is assumed to be valid *)
+        let (`I_swear_this_is_safe_see_my_comment first_transition) =
+          External_transition.to_verified
+            (External_transition.create ~protocol_state:genesis_protocol_state
+               ~protocol_state_proof:Protocol_state_proof.dummy
+               ~staged_ledger_diff:empty_diff)
         in
         let ledger_db = Ledger_db.create () in
         let%bind transition_frontier =
@@ -676,11 +677,10 @@ module Make (Inputs : Inputs_intf) = struct
                 Deferred.return
                 @@ Transition_frontier.find transition_frontier hash
               in
-              (* forget verified status of external transition in breadcrumb for broadcast *)
               Transition_frontier.path_map
                 ~f:(fun b ->
                   Transition_frontier.Breadcrumb.transition_with_hash b
-                  |> With_hash.data |> External_transition.forget )
+                  |> With_hash.data |> External_transition.of_verified )
                 transition_frontier breadcrumb )
             ~get_ancestry:(fun query_env ->
               let descendent, count = Envelope.Incoming.data query_env in
@@ -696,7 +696,7 @@ module Make (Inputs : Inputs_intf) = struct
                 let protocol_state =
                   transition_with_hash
                   |> Transition_frontier.Breadcrumb.transition_with_hash
-                  |> With_hash.data |> External_transition.forget
+                  |> With_hash.data |> External_transition.of_verified
                   |> External_transition.protocol_state
                 in
                 (protocol_state, proof)
@@ -731,7 +731,7 @@ module Make (Inputs : Inputs_intf) = struct
              valid_transitions_for_network ~f:(fun transition_with_hash ->
                (* remove verified status for network broadcast *)
                Net.broadcast_state net
-                 (External_transition.forget
+                 (External_transition.of_verified
                     (With_hash.data transition_with_hash)) )) ;
         don't_wait_for
           (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;

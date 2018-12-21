@@ -505,33 +505,6 @@ module type Staged_ledger_diff_intf = sig
     {pre_diffs: pre_diffs; prev_hash: staged_ledger_hash; creator: public_key}
   [@@deriving sexp, bin_io]
 
-  module Verified : sig
-    type diff =
-      { completed_works: completed_work_checked list
-      ; user_commands: user_command list }
-    [@@deriving sexp, bin_io]
-
-    type diff_with_at_most_two_coinbase =
-      {diff: diff; coinbase_parts: completed_work_checked At_most_two.t}
-    [@@deriving sexp, bin_io]
-
-    type diff_with_at_most_one_coinbase =
-      {diff: diff; coinbase_added: completed_work_checked At_most_one.t}
-    [@@deriving sexp, bin_io]
-
-    type pre_diffs =
-      ( diff_with_at_most_one_coinbase
-      , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase )
-      Either.t
-    [@@deriving sexp, bin_io]
-
-    type t =
-      {pre_diffs: pre_diffs; prev_hash: staged_ledger_hash; creator: public_key}
-    [@@deriving sexp, bin_io]
-  end
-
-  val forget_verified : Verified.t -> t
-
   module With_valid_signatures_and_proofs : sig
     type diff =
       { completed_works: completed_work_checked list
@@ -693,8 +666,6 @@ module type Staged_ledger_base_intf = sig
 
   type diff
 
-  type verified_diff
-
   type valid_diff
 
   type staged_ledger_aux_hash
@@ -743,21 +714,22 @@ module type Staged_ledger_base_intf = sig
 
   val apply :
        t
-    -> verified_diff
+    -> diff
     -> logger:Logger.t
     -> ( [`Hash_after_applying of staged_ledger_hash]
        * [`Ledger_proof of ledger_proof option]
        * [`Staged_ledger of t] )
-       Or_error.t
+       Deferred.Or_error.t
 
   (* N.B.: apply_diff_unverified is not exposed here *)
 
   val apply_diff_unchecked :
        t
     -> valid_diff
-    -> [`Hash_after_applying of staged_ledger_hash]
+    -> ( [`Hash_after_applying of staged_ledger_hash]
        * [`Ledger_proof of ledger_proof option]
-       * [`Staged_ledger of t]
+       * [`Staged_ledger of t] )
+       Deferred.Or_error.t
 
   val snarked_ledger :
     t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t
@@ -812,8 +784,6 @@ module type Staged_ledger_intf = sig
        list
 
   val statement_exn : t -> [`Non_empty of ledger_proof_statement | `Empty]
-
-  val verified_diff_of_diff : t -> diff -> verified_diff Or_error.t Deferred.t
 end
 
 module type Work_selector_intf = sig
@@ -953,8 +923,6 @@ module type External_transition_intf = sig
 
   type staged_ledger_diff
 
-  type staged_ledger_diff_verified
-
   type t [@@deriving sexp, bin_io]
 
   val create :
@@ -966,18 +934,16 @@ module type External_transition_intf = sig
   module Verified : sig
     type t [@@deriving sexp, bin_io]
 
-    val create :
-         protocol_state:protocol_state
-      -> protocol_state_proof:protocol_state_proof
-      -> staged_ledger_diff:staged_ledger_diff_verified
-      -> t
-
     val protocol_state : t -> protocol_state
 
     val protocol_state_proof : t -> protocol_state_proof
+
+    val staged_ledger_diff : t -> staged_ledger_diff
   end
 
-  val forget : Verified.t -> t
+  val to_verified : t -> [`I_swear_this_is_safe_see_my_comment of Verified.t]
+
+  val of_verified : Verified.t -> t
 
   val protocol_state : t -> protocol_state
 
@@ -1075,7 +1041,7 @@ module type Consensus_mechanism_intf = sig
     -> logger:Logger.t
     -> Protocol_state.value * Consensus_transition_data.value
 
-  val is_valid :
+  val received_at_valid_time :
     Consensus_state.value -> time_received:Unix_timestamp.t -> bool
 
   val next_proposal :
@@ -1090,7 +1056,6 @@ module type Consensus_mechanism_intf = sig
        existing:Consensus_state.value
     -> candidate:Consensus_state.value
     -> logger:Logger.t
-    -> time_received:Unix_timestamp.t
     -> [`Keep | `Take]
 
   val genesis_protocol_state :
@@ -1373,7 +1338,6 @@ Merge Snark:
     External_transition_intf
     with type protocol_state := Consensus_mechanism.Protocol_state.value
      and type staged_ledger_diff := Staged_ledger_diff.t
-     and type staged_ledger_diff_verified := Staged_ledger_diff.Verified.t
      and type protocol_state_proof := Protocol_state_proof.t
 
   module Tip :
