@@ -676,16 +676,12 @@ module type Staged_ledger_base_intf = sig
 
   type ledger_proof
 
-  type coinbase
+  type user_command
 
   (** The ledger in a ledger builder is always a mask *)
   type ledger
 
   type serializable [@@deriving bin_io]
-
-  type user_command
-
-  type transaction
 
   module Scan_state : sig
     type t [@@deriving bin_io]
@@ -700,10 +696,15 @@ module type Staged_ledger_base_intf = sig
   module Staged_ledger_error : sig
     type t =
       | Bad_signature of user_command
-      | Coinbase_error of coinbase * string
+      | Coinbase_error of string
       | Bad_prev_hash of staged_ledger_hash * staged_ledger_hash
       | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
-      | Unexpected_error of Error.t
+      | Unexpected of Error.t
+    [@@deriving sexp]
+
+    val to_string : t -> string
+
+    val to_error : t -> Error.t
   end
 
   val ledger : t -> ledger
@@ -731,9 +732,10 @@ module type Staged_ledger_base_intf = sig
        t
     -> diff
     -> logger:Logger.t
-    -> (( [`Hash_after_applying of staged_ledger_hash]
-       * [`Ledger_proof of ledger_proof option]
-       * [`Staged_ledger of t]), Staged_ledger_error.t )
+    -> ( [`Hash_after_applying of staged_ledger_hash]
+         * [`Ledger_proof of ledger_proof option]
+         * [`Staged_ledger of t]
+       , Staged_ledger_error.t )
        Deferred.Result.t
 
   val apply_diff_unchecked :
@@ -766,6 +768,8 @@ module type Staged_ledger_intf = sig
   type completed_work_checked
 
   type public_key
+
+  type transaction
 
   val current_ledger_proof : t -> ledger_proof option
 
@@ -1313,6 +1317,7 @@ Merge Snark:
      and type ledger_proof_statement := Ledger_proof_statement.t
      and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
      and type transaction := Transaction.t
+     and type user_command := User_command.t
 
   module Staged_ledger_transition :
     Staged_ledger_transition_intf

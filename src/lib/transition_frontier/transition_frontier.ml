@@ -69,6 +69,7 @@ module type Inputs_intf = sig
      and type ledger_proof_statement := Ledger_proof_statement.t
      and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
      and type transaction := Transaction.t
+     and type user_command := User_command.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -232,7 +233,7 @@ struct
               match%map
                 Inputs.Staged_ledger.apply pre_root_staged_ledger diff ~logger
               with
-              | Error e -> failwith (Error.to_string_hum e)
+              | Error e -> Inputs.Staged_ledger.Staged_ledger_error.to_string e
               | Ok
                   ( `Hash_after_applying staged_ledger_hash
                   , `Ledger_proof None
@@ -466,7 +467,11 @@ struct
                    "Snarked ledger hash and Staged ledger hash after applying \
                     the diff does not match blockchain state's ledger hash \
                     and staged ledger hash resp.\n"))
-      | Error e -> Error (`Validation_error e)
+      | Error e ->
+          Error
+            (`Validation_error
+              (Error.of_string
+                 (Inputs.Staged_ledger.Staged_ledger_error.to_string e)))
     in
     let breadcrumb =
       { Breadcrumb.transition_with_hash

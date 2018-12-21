@@ -10,9 +10,6 @@ open O1trace
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
 
-let check_or_error label b =
-  if not b then Or_error.error_string label else Ok ()
-
 module Make_completed_work = Transaction_snark_work.Make
 module Make_diff = Staged_ledger_diff.Make
 
@@ -37,7 +34,6 @@ module Make (Inputs : Inputs.S) : sig
      and type ledger_proof_statement := Inputs.Ledger_proof_statement.t
      and type ledger_proof_statement_set := Inputs.Ledger_proof_statement.Set.t
      and type transaction := Inputs.Transaction.t
-     and type coinbase := Inputs.Coinbase.t
      and type user_command := Inputs.User_command.t
 end = struct
   open Inputs
@@ -46,14 +42,33 @@ end = struct
   module Staged_ledger_error = struct
     type t =
       | Bad_signature of User_command.t
-      | Coinbase_too_large of Coinbase.t
+      | Coinbase_error of string
       | Bad_prev_hash of Staged_ledger_hash.t * Staged_ledger_hash.t
       | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
-      | Unexpected_error of Error.t
+      | Unexpected of Error.t
+    [@@deriving sexp]
 
-    let unexpected = function
-      | Ok a -> Ok a
-      | Error e -> Unexpected_error e
+    let of_or_error = function Ok a -> Ok a | Error e -> Error (Unexpected e)
+
+    let to_string = function
+      | Bad_signature t ->
+          Format.asprintf
+            !"Bad signature of the user command: %{sexp: User_command.t} \n"
+            t
+      | Coinbase_error err -> Format.asprintf !"Coinbase error: %s \n" err
+      | Bad_prev_hash (h1, h2) ->
+          Format.asprintf
+            !"bad prev_hash: Expected %{sexp: Staged_ledger_hash.t}, got \
+              %{sexp: Staged_ledger_hash.t} \n"
+            h1 h2
+      | Insufficient_fee (f1, f2) ->
+          Format.asprintf
+            !"Transaction fee %{sexp: Currency.Fee.t} does not suffice proof \
+              fee %{sexp: Currency.Fee.t} \n"
+            f1 f2
+      | Unexpected e -> Error.to_string_hum e
+
+    let to_error = Fn.compose Error.of_string to_string
   end
 
   type job = Scan_state.Available_job.t
@@ -333,34 +348,41 @@ end = struct
     ; statement }
 
   let update_ledger_and_get_statements ledger ts =
-    let open Deferred.Or_error.Let_syntax in
+    let open Deferred.Result.Let_syntax in
     let rec go acc = function
       | [] -> Deferred.Or_error.return (List.rev acc)
-      | t :: ts ->
-          let%bind res = apply_transaction_and_get_witness ledger t in
-          go (res :: acc) ts
+      | t :: ts -> (
+        match apply_transaction_and_get_witness ledger t with
+        | Error e -> Staged_ledger_error.of_or_error (Error e)
+        | Ok (_undo, res) -> go (res :: acc) ts )
     in
     go [] ts
 
   let check_completed_works scan_state
       (completed_works : Transaction_snark_work.t list) =
-    let open Deferred.Or_error.Let_syntax in
+    let open Deferred.Result.Let_syntax in
+    let check_or_error label b =
+      if not b then
+        Error (Staged_ledger_error.Unexpected (Error.of_string label))
+      else Ok ()
+    in
     let%bind jobses =
       Deferred.return
         (let open Or_error.Let_syntax in
         let%map jobs =
-          Scan_state.next_k_jobs scan_state ~k:(total_proofs completed_works)
+          Staged_ledger_error.of_or_error
+            (Scan_state.next_k_jobs scan_state
+               ~k:(total_proofs completed_works))
         in
         chunks_of jobs ~n:Transaction_snark_work.proofs_length)
     in
-    Deferred.List.for_all (List.zip_exn jobses completed_works)
-      ~f:(fun (jobs, work) ->
+    List.for_all (List.zip_exn jobses completed_works) ~f:(fun (jobs, work) ->
         let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
-        Deferred.List.for_all (List.zip_exn jobs work.proofs)
-          ~f:(fun (job, proof) -> verify ~message job proof ) )
+        List.for_all (List.zip_exn jobs work.proofs) ~f:(fun (job, proof) ->
+            verify ~message job proof ) )
     |> Deferred.map ~f:(check_or_error "proofs did not verify")
 
-  let create_fee_transfers completed_works_verified delta public_key =
+  let create_fee_transfers completed_works delta public_key =
     let singles =
       (if Fee.Unsigned.(equal zero delta) then [] else [(public_key, delta)])
       @ List.filter_map completed_works_verified
@@ -368,12 +390,13 @@ end = struct
             if Fee.Unsigned.equal fee Fee.Unsigned.zero then None
             else Some (prover, fee) )
     in
-    Or_error.try_with (fun () ->
-        Compressed_public_key.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
-            Option.value_exn (Fee.Unsigned.add f1 f2) )
-        (* TODO: This creates a weird incentive to have a small public_key *)
-        |> Map.to_alist ~key_order:`Increasing
-        |> Fee_transfer.of_single_list )
+    Staged_ledger_error.of_or_error
+    @@ Or_error.try_with (fun () ->
+           Compressed_public_key.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
+               Option.value_exn (Fee.Unsigned.add f1 f2) )
+           (* TODO: This creates a weird incentive to have a small public_key *)
+           |> Map.to_alist ~key_order:`Increasing
+           |> Fee_transfer.of_single_list )
 
   (*A Coinbase is a single transaction that accommodates the coinbase amount
   and a fee transfer for the work required to add the coinbase. Unlike a
@@ -395,14 +418,28 @@ end = struct
   of the second prediff.
   *)
   let create_coinbase coinbase_parts proposer =
-    let open Or_error.Let_syntax in
+    let open Result.Let_syntax in
     let coinbase = Protocols.Coda_praos.coinbase_amount in
+    let coinbase_or_error = function
+      | Ok x -> Ok x
+      | Error e ->
+          Error (Staged_ledger_error.Coinbase_error (Error.to_string_hum e))
+    in
     let overflow_err a1 a2 =
-      option
-        ( "overflow when creating coinbase (fee:"
-        ^ Currency.Amount.to_string a2
-        ^ ") \n %!" )
+      Option.value_map
+        ~default:
+          (Error
+             (Staged_ledger_error.Coinbase_error
+                (sprintf
+                   !"overflow when splitting coinbase: Minuend: %{sexp: \
+                     Currency.Amount.t} Subtrahend: %{sexp: \
+                     Currency.Amount.t} \n"
+                   a1 a2)))
         (Currency.Amount.sub a1 a2)
+        ~f:(fun x -> Ok x)
+      (*~default:(Error (Staged_ledger_error.Coinbase_error 
+        ( !"overflow when creating coinbase (fee:%s) (Coinbase amount:%s) \n"
+         (Currency.Amount.to_string a2 ) (Currency.Amount.to_string a1))))*)
     in
     let single {Transaction_snark_work.fee; prover; _} =
       if
@@ -421,11 +458,14 @@ end = struct
                Currency.Amount.of_fee fee ))
       in
       let%bind cb1 =
-        Coinbase.create ~amount:amt ~proposer ~fee_transfer:(fee_transfer w1)
+        coinbase_or_error
+          (Coinbase.create ~amount:amt ~proposer
+             ~fee_transfer:(fee_transfer w1))
       in
       let%map cb2 =
-        Coinbase.create ~amount:rem_coinbase ~proposer
-          ~fee_transfer:(fee_transfer w2)
+        coinbase_or_error
+          (Coinbase.create ~amount:rem_coinbase ~proposer
+             ~fee_transfer:(fee_transfer w2))
       in
       [cb1; cb2]
     in
@@ -433,8 +473,9 @@ end = struct
     | `Zero -> return []
     | `One x ->
         let%map cb =
-          Coinbase.create ~amount:coinbase ~proposer
-            ~fee_transfer:(fee_transfer x)
+          coinbase_or_error
+            (Coinbase.create ~amount:coinbase ~proposer
+               ~fee_transfer:(fee_transfer x))
         in
         [cb]
     | `Two None ->
@@ -445,17 +486,22 @@ end = struct
         two_parts amt (Some w1) w2
 
   let fee_remainder (user_commands : User_command.With_valid_signature.t list)
-      (completed_works_verified : Transaction_snark_work.t list) =
+      (completed_works : Transaction_snark_work.t list) =
     let open Result.Let_syntax in
     let%bind budget =
       sum_fees user_commands ~f:(fun t -> User_command.fee (t :> User_command.t)
       )
+      |> Staged_ledger_error.of_or_error
     in
     let%bind work_fee =
-      sum_fees completed_works_verified
-        ~f:(fun {Transaction_snark_work.fee; _} -> fee )
+      sum_fees completed_works ~f:(fun {Transaction_snark_work.fee; _} -> fee)
+      |> Staged_ledger_error.of_or_error
     in
-    Option.value_map ~default:(Error (Staged_ledger_error.Insufficient_fee budget work_fee)) ~f:(fun x -> Ok x) (Fee.Unsigned.sub budget work_fee)
+    Option.value_map
+      ~default:
+        (Error (Staged_ledger_error.Insufficient_fee (budget, work_fee)))
+      ~f:(fun x -> Ok x)
+      (Fee.Unsigned.sub budget work_fee)
 
   module Prediff_info = struct
     type ('data, 'work) t =
@@ -540,10 +586,11 @@ end = struct
     in
     let%bind () =
       let curr_hash = hash t in
-      if Staged_ledger_hash.equal diff.prev_hash (hash t) 
-      then return ()
-      else 
-        Deferred.return (Error (Bad_prev_hash curr_hash diff.prev_hash))
+      if Staged_ledger_hash.equal diff.prev_hash (hash t) then return ()
+      else
+        Deferred.return
+          (Error
+             (Staged_ledger_error.Bad_prev_hash (curr_hash, diff.prev_hash)))
     in
     let new_mask = Inputs.Ledger.Mask.create () in
     let new_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
@@ -576,16 +623,18 @@ end = struct
       let r = Scan_state.fill_in_transaction_snark_work scan_state' works in
       Or_error.iter_error r ~f:(fun e ->
           (* TODO: Pass a logger here *)
-          eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e );
-      Staged_ledger_error.unexpected r
+          eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e ) ;
+      Staged_ledger_error.of_or_error r
     in
     let%bind () =
-    Deferred.return (Staged_ledger_error.unexpected
-      @@ Scan_state.enqueue_transactions scan_state' data)
+      Deferred.return
+        ( Staged_ledger_error.of_or_error
+        @@ Scan_state.enqueue_transactions scan_state' data )
     in
     let%map () =
-      Deferred.return (verify_scan_state_after_apply new_ledger scan_state'
-      |> Staged_ledger_error.unexpected)
+      Deferred.return
+        ( verify_scan_state_after_apply new_ledger scan_state'
+        |> Staged_ledger_error.of_or_error )
     in
     Logger.info logger
       "Block info: No of transactions included:%d Coinbase parts:%d Work \
@@ -599,6 +648,11 @@ end = struct
   let apply t witness ~logger = apply_diff t witness ~logger
 
   let forget_work_opt = Option.map ~f:Transaction_snark_work.forget
+
+  let ok_exn' (t : ('a, Staged_ledger_error.t) Result.t) =
+    match t with
+    | Ok x -> x
+    | Error e -> Error.raise (Staged_ledger_error.to_error e)
 
   let apply_pre_diff_unchecked ledger coinbase_parts proposer
       (diff : Staged_ledger_diff.With_valid_signatures_and_proofs.diff) =
@@ -616,11 +670,11 @@ end = struct
     in
     let coinbase_parts =
       measure "create_coinbase" (fun () ->
-          Or_error.ok_exn (create_coinbase coinbase_parts proposer) )
+          ok_exn' (create_coinbase coinbase_parts proposer) )
     in
-    let delta = Or_error.ok_exn (fee_remainder user_commands txn_works) in
+    let delta = ok_exn' (fee_remainder user_commands txn_works) in
     let fee_transfers =
-      Or_error.ok_exn (create_fee_transfers txn_works delta proposer)
+      ok_exn' (create_fee_transfers txn_works delta proposer)
     in
     let transactions =
       List.map user_commands ~f:(fun t -> Transaction.User_command t)
@@ -1780,19 +1834,20 @@ let%test_module "test" =
         ; prover }
 
     let create_and_apply sl logger txns stmt_to_work =
-      let open Deferred.Or_error.Let_syntax in
+      let open Deferred.Let_syntax in
       let diff =
         Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work
       in
-      let unverified_diff =
-        Test_input1.Staged_ledger_diff.forget_validated diff
-      in
-      let%map _, `Ledger_proof ledger_proof, `Staged_ledger sl' =
-        Sl.apply !sl unverified_diff ~logger
+      let _, `Ledger_proof ledger_proof, `Staged_ledger sl' =
+        match
+          Sl.apply !sl (Test_input1.Staged_ledger_diff.forget diff) ~logger
+        with
+        | Ok x -> x
+        | Error e -> Error.raise (Sl.Staged_ledger_error.to_error e)
       in
       sl := sl' ;
-      (ledger_proof, unverified_diff)
+      return (ledger_proof, unverified_diff)
 
     let txns n f g = List.zip_exn (List.init n ~f) (List.init n ~f:g)
 
@@ -1837,11 +1892,8 @@ let%test_module "test" =
                 txns (p / 2) (fun x -> (x + 1) * 100) (fun _ -> 4)
               in
               let%map ledger_proof, diff =
-                let%map or_error =
-                  create_and_apply sl logger (Sequence.of_list all_ts)
-                    stmt_to_work
-                in
-                Or_error.ok_exn or_error
+                create_and_apply sl logger (Sequence.of_list all_ts)
+                  stmt_to_work
               in
               let fee_excess =
                 Option.value_map ~default:Currency.Fee.Signed.zero ledger_proof
@@ -1877,10 +1929,7 @@ let%test_module "test" =
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let ts = List.take all_ts i in
               let%map proof, diff =
-                let%map or_error =
-                  create_and_apply sl logger (Sequence.of_list ts) stmt_to_work
-                in
-                Or_error.ok_exn or_error
+                create_and_apply sl logger (Sequence.of_list ts) stmt_to_work
               in
               let fee_excess =
                 Option.value_map ~default:Currency.Fee.Signed.zero proof
@@ -1924,10 +1973,7 @@ let%test_module "test" =
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let ts = List.take all_ts i in
               let%map proof, diff =
-                let%map or_error =
-                  create_and_apply sl logger (Sequence.of_list ts) get_work
-                in
-                Or_error.ok_exn or_error
+                create_and_apply sl logger (Sequence.of_list ts) get_work
               in
               let fee_excess =
                 Option.value_map ~default:Currency.Fee.Signed.zero proof
@@ -1972,10 +2018,7 @@ let%test_module "test" =
           let%map _ =
             Deferred.List.fold ~init:() txns ~f:(fun _ ts ->
                 let%map _, _ =
-                  let%map or_error =
-                    create_and_apply sl logger (Sequence.of_list ts) get_work
-                  in
-                  Or_error.ok_exn or_error
+                  create_and_apply sl logger (Sequence.of_list ts) get_work
                 in
                 () )
           in
@@ -1994,10 +2037,7 @@ let%test_module "test" =
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let ts = List.take all_ts i in
               let%map proof, _ =
-                let%map or_error =
-                  create_and_apply sl logger (Sequence.of_list ts) stmt_to_work
-                in
-                Or_error.ok_exn or_error
+                create_and_apply sl logger (Sequence.of_list ts) stmt_to_work
               in
               let last_snarked_ledger, snarked_ledger_hash =
                 Option.value_map

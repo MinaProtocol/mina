@@ -36,7 +36,11 @@ module Make (Inputs : Inputs.S) :
               (With_hash.data external_transition)
           in
           let%map _, _, `Staged_ledger staged_ledger =
-            Staged_ledger.apply ~logger staged_ledger diff
+            let open Deferred.Let_syntax in
+            match%map Staged_ledger.apply ~logger staged_ledger diff with
+            | Ok x -> return (Ok x)
+            | Error e ->
+                return (Error (Staged_ledger.Staged_ledger_error.to_error e))
           in
           let new_breadcrumb =
             Transition_frontier.Breadcrumb.create external_transition
