@@ -24,8 +24,14 @@ module Constraints (Snarky : Snark_intf.Basic) = struct
   (** Same as [log], but for functions which take [Var.t] arguments.
     Use [apply_args] to apply the corresponding OCaml-typed arguments.
     For example: {[
-log_func ~input:Field.typ Field.Checked.mul
-  ~apply_args:(fun mul -> mul Field.one Field.one)
+open Snarky
+module Snark = Snark.Make (Backends.Bn128.Default)
+open Snark
+module Constraints = Flamechart.Snarky_log.Constraints (Snark)
+
+let () = Flamechart.to_file "output.json" @@
+  Constraints.log_func ~input:Data_spec.[Field.typ; Field.typ] Field.Checked.mul
+    ~apply_args:(fun mul -> mul Field.one Field.one)
     }] *)
   let log_func ~(input : ('r_value, 'r_value, 'k_var, 'k_value) Data_spec.t)
       ~(apply_args : 'k_value -> (_, _) Checked.t) (f : 'k_var) : events =
