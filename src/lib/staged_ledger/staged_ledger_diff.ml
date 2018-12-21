@@ -85,7 +85,7 @@ struct
     { pre_diffs: pre_diffs
     ; prev_hash: Staged_ledger_hash.t
     ; creator: Compressed_public_key.t }
-  [@@deriving sexp, bin_io]
+  [@@deriving sexp, bin_io, fields]
 
   module Verified = struct
     type diff =

@@ -388,10 +388,6 @@ struct
     if node.length > best_tip_node.length then t.best_tip <- hash
 
   let clear_paths t = Hashtbl.clear t.table
-
-  let rebuild t new_root_hash =
-    t.root <- new_root_hash ;
-    t.best_tip <- new_root_hash
 end
 
 let%test_module "Transition_frontier tests" =

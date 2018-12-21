@@ -842,6 +842,7 @@ struct
     module Syncable_ledger = Sync_root_ledger
     module Merkle_address = Ledger.Db.Addr
     module Consensus_mechanism = Consensus.Mechanism
+    module Protocol_state_validator = Protocol_state_validator
     module Network = Net
   end)
 

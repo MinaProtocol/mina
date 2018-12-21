@@ -9,8 +9,6 @@ module type Network_intf = sig
 
   type state_hash
 
-  type protocol_state
-
   type external_transition
 
   type ancestor_proof_input
@@ -28,7 +26,7 @@ module type Network_intf = sig
   val get_ancestry :
        t
     -> ancestor_proof_input
-    -> (protocol_state * ancestor_proof) Deferred.Or_error.t
+    -> (external_transition * ancestor_proof) Deferred.Or_error.t
 end
 
 module type Transition_frontier_base_intf = sig
@@ -118,12 +116,6 @@ module type Transition_frontier_intf = sig
   val add_breadcrumb_exn : t -> Breadcrumb.t -> unit
 
   val clear_paths : t -> unit
-
-  (* TODO: Rather than rebuilding the same transition_frontier, it would be better to 
-  change the reference of the frontier that every component that the transition_frontier 
-  contains #1323 *)
-  (* TODO: after caching external transitions, we should recreate transition_frontier #1326*)
-  val rebuild : t -> state_hash -> unit
 end
 
 module type Catchup_intf = sig
@@ -295,7 +287,7 @@ module type Bootstrap_controller_intf = sig
                                              Envelope.Incoming.t ]
                          * [< `Time_received of int64] )
                          Reader.t
-    -> unit Deferred.t
+    -> transition_frontier Deferred.t
 end
 
 module type Transition_frontier_controller_intf = sig
