@@ -26,6 +26,9 @@ let rec snarkydef_inject ~loc ~name expr =
       { expr with
         pexp_desc=
           Pexp_fun (lbl, default, pat, snarkydef_inject ~loc ~name body) }
+  | Pexp_newtype (typname, body) ->
+      { expr with
+        pexp_desc= Pexp_newtype (typname, snarkydef_inject ~loc ~name body) }
   | Pexp_function _ ->
       Location.raise_errorf ~loc:expr.pexp_loc
         "%%snarkydef currently doesn't support 'function'"
