@@ -27,7 +27,7 @@ s.setAttribute('data-timestamp', +new Date());
 
 let title s =
   let open Html_concise in
-  h1 [Style.just "f2 f1-ns ddinexp tracked-tightish mb1"] [text s]
+  h1 [Style.just "f2 f1-ns ddinexp tracked-tightish pt2 pt3-ns mb1"] [text s]
 
 let subtitle s =
   let open Html_concise in
@@ -55,7 +55,7 @@ let date d =
   let s = month_day ^ " " ^ Int.to_string year in
   let open Html_concise in
   h4
-    [Style.just "f7 fw4 tracked-supermega ttu o-50 metropolis mt0 mb35"]
+    [Style.just "f7 fw4 tracked-supermega ttu o-50 metropolis mt0 mb45"]
     [text s]
 
 module Share = struct

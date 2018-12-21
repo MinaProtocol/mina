@@ -217,7 +217,7 @@ combine&(\sigma_0 \Longrightarrow \sigma_0,\sigma_0T_0^{1}\sigma_1):: \\
 </div>
 </div>
 
-Unfortunately, we have a serial dependency of proof construction here: you must have $$\sigma_0 \Longrightarrow \sigma_i$$ before getting $$\sigma_0 \Longrightarrow \sigma_{i+1}$$. This is *very slow*. When using [Libsnark](https://github.com/scipr-lab/libsnark) it takes ~30 seconds to do one of these steps on an 8 core cloud instance, and that’s just for a single transaction. This translates to merely 12 transactions per minute globally on the network!
+Unfortunately, we have a serial dependency of proof construction here: you must have $$\sigma_0 \Longrightarrow \sigma_i$$ before getting $$\sigma_0 \Longrightarrow \sigma_{i+1}$$. This is *very slow*. When using [Libsnark](https://github.com/scipr-lab/libsnark) it takes ~20 seconds to do one of these steps on an 8 core cloud instance, and that’s just for a single transaction. This translates to merely 3 transactions per minute globally on the network!
 
 What we’ll do in this blog post is find a better scan. A scan that maximizes throughput, doesn’t incur too much latency, and doesn’t require too much intermediate state. A scan that takes advantage of properties of the zk-SNARK primitives we have. We’ll do this by iterating on our design until we get something that best meets our requirements. Finally, we’ll talk about a few other potential use cases for such a scan outside of cryptocurrency.
 
