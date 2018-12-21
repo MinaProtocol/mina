@@ -24,7 +24,7 @@ module type Inputs_intf = sig
      and type external_transition_verified := External_transition.Verified.t
      and type ledger_database := Ledger_db.t
      and type staged_ledger := Staged_ledger.t
-     and type ledger_diff_verified := Staged_ledger_diff.Verified.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type masked_ledger := Masked_ledger.t
 
@@ -180,13 +180,16 @@ module Make (Inputs : Inputs_intf) :
             ~self:(Public_key.compress keypair.public_key)
             ~logger ~transactions_by_fee:transactions ~get_completed_work
         in
-        let ( `Hash_after_applying next_staged_ledger_hash
-            , `Ledger_proof ledger_proof_opt
-            , `Staged_ledger _transitioned_staged_ledger ) =
-          Staged_ledger.apply_diff_unchecked staged_ledger diff
+        let%map ( `Hash_after_applying next_staged_ledger_hash
+                , `Ledger_proof ledger_proof_opt
+                , `Staged_ledger _transitioned_staged_ledger ) =
+          let%map or_error =
+            Staged_ledger.apply_diff_unchecked staged_ledger diff
+          in
+          Or_error.ok_exn or_error
         in
         (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
-        return (diff, next_staged_ledger_hash, ledger_proof_opt))
+        (diff, next_staged_ledger_hash, ledger_proof_opt))
     in
     let%bind protocol_state, consensus_transition_data =
       lift_sync (fun () ->

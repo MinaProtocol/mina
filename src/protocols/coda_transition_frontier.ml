@@ -56,7 +56,7 @@ module type Transition_frontier_base_intf = sig
       -> transition_with_hash:( external_transition_verified
                               , state_hash )
                               With_hash.t
-      -> t Or_error.t
+      -> t Deferred.Or_error.t
 
     val transition_with_hash :
       t -> (external_transition_verified, state_hash) With_hash.t
@@ -66,7 +66,7 @@ module type Transition_frontier_base_intf = sig
 
   type ledger_database
 
-  type ledger_diff_verified
+  type staged_ledger_diff
 
   type t
 
@@ -75,7 +75,7 @@ module type Transition_frontier_base_intf = sig
     -> root_transition:(external_transition_verified, state_hash) With_hash.t
     -> root_snarked_ledger:ledger_database
     -> root_transaction_snark_scan_state:transaction_snark_scan_state
-    -> root_staged_ledger_diff:ledger_diff_verified option
+    -> root_staged_ledger_diff:staged_ledger_diff option
     -> t Deferred.t
 
   val find_exn : t -> state_hash -> Breadcrumb.t
@@ -115,8 +115,7 @@ module type Transition_frontier_intf = sig
 
   val attach_breadcrumb_exn : t -> Breadcrumb.t -> unit
 
-  val add_transition_exn :
-    t -> (external_transition_verified, state_hash) With_hash.t -> Breadcrumb.t
+  val add_breadcrumb_exn : t -> Breadcrumb.t -> unit
 
   val clear_paths : t -> unit
 
@@ -184,10 +183,15 @@ module type Transition_handler_validator_intf = sig
                                Writer.t
     -> unit
 
-  val verify_transition :
-       staged_ledger:staged_ledger
-    -> transition:external_transition
-    -> external_transition_verified Or_error.t Deferred.t
+  val validate_transition :
+       ?time_received:Unix_timestamp.t
+    -> logger:Logger.t
+    -> frontier:transition_frontier
+    -> (external_transition, state_hash) With_hash.t
+    -> ( (external_transition_verified, state_hash) With_hash.t
+       , [`Duplicate | `Invalid of string] )
+       Result.t
+       Deferred.t
 end
 
 module type Transition_handler_processor_intf = sig
