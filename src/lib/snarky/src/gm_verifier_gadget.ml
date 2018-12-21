@@ -237,14 +237,6 @@ struct
                 with_label __LOC__ (Field.Checked.Assert.equal x y) )
           in
           let open Checked.Let_syntax in
-          let%bind () =
-            as_prover
-              (let open As_prover in
-              let open Let_syntax in
-              let typ = typ ~g1_count:(base_g1_count + 2) in
-              let%map t1 = read typ t1 and t2 = read typ t2 in
-              Core.printf !"t1 = %{sexp:t}\nt2 = %{sexp:t}\n%!" t1 t2)
-          in
           let%map () =
             with_label __LOC__
               (check t1.characterizing_up_to_sign t2.characterizing_up_to_sign)
