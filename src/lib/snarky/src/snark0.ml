@@ -1491,21 +1491,22 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
       let if_ = Checked.Boolean.if_
 
-      let%snarkydef compare ~bit_length a b =
+      let compare ~bit_length a b =
         let open Checked in
         let open Let_syntax in
-        let alpha_packed =
-          Cvar.Infix.(Cvar.constant (two_to_the bit_length) + b - a)
-        in
-        let%bind alpha = unpack alpha_packed ~length:(bit_length + 1) in
-        let prefix, less_or_equal =
-          match Core_kernel.List.split_n alpha bit_length with
-          | p, [l] -> (p, l)
-          | _ -> failwith "compare: Invalid alpha"
-        in
-        let%bind not_all_zeros = Boolean.any prefix in
-        let%map less = Boolean.(less_or_equal && not_all_zeros) in
-        {less; less_or_equal}
+        [%with_label "compare"]
+          (let alpha_packed =
+             Cvar.Infix.(Cvar.constant (two_to_the bit_length) + b - a)
+           in
+           let%bind alpha = unpack alpha_packed ~length:(bit_length + 1) in
+           let prefix, less_or_equal =
+             match Core_kernel.List.split_n alpha bit_length with
+             | p, [l] -> (p, l)
+             | _ -> failwith "compare: Invalid alpha"
+           in
+           let%bind not_all_zeros = Boolean.any prefix in
+           let%map less = Boolean.(less_or_equal && not_all_zeros) in
+           {less; less_or_equal})
 
       module Assert = struct
         let lt ~bit_length x y =

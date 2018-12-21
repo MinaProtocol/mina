@@ -257,27 +257,28 @@ module Schnorr
 
     open Impl.Let_syntax
 
-    let%snarkydef verification_hash (type s)
+    let verification_hash (type s)
         ((module Shifted) as shifted :
           (module Curve.Checked.Shifted.S with type t = s))
         ((s, h) : Signature.var) (public_key : Public_key.var)
         (m : Message.var) =
-      let%bind pre_r =
-        (* s * g + h * public_key *)
-        let%bind s_g =
-          Curve.Checked.scale_known shifted Curve.one
-            (Curve.Scalar.Checked.to_bits s)
-            ~init:Shifted.zero
-        in
-        let%bind s_g_h_pk =
-          Curve.Checked.scale shifted public_key
-            (Curve.Scalar.Checked.to_bits h)
-            ~init:s_g
-        in
-        Shifted.unshift_nonzero s_g_h_pk
-      in
-      let%bind r = compress pre_r in
-      Message.hash_checked m ~nonce:r
+      with_label __LOC__
+        (let%bind pre_r =
+           (* s * g + h * public_key *)
+           let%bind s_g =
+             Curve.Checked.scale_known shifted Curve.one
+               (Curve.Scalar.Checked.to_bits s)
+               ~init:Shifted.zero
+           in
+           let%bind s_g_h_pk =
+             Curve.Checked.scale shifted public_key
+               (Curve.Scalar.Checked.to_bits h)
+               ~init:s_g
+           in
+           Shifted.unshift_nonzero s_g_h_pk
+         in
+         let%bind r = compress pre_r in
+         Message.hash_checked m ~nonce:r)
 
     let%snarkydef verifies shifted ((_, h) as signature) pk m =
       verification_hash shifted signature pk m >>= Curve.Scalar.Checked.equal h
