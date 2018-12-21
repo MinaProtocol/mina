@@ -443,7 +443,7 @@ module Make (Inputs : Inputs_intf) = struct
             match ancestors_or_error with
             | Ok (Some ancestors) -> return (Ok ancestors)
             | Ok None ->
-                Logger.warn t.log
+                Logger.info t.log
                   !"get_ancestry returned no ancestors for non-preferred peer \
                     %{sexp: Peer.t} on input %{sexp: Rpcs.Get_ancestry.query}"
                   peer input ;
