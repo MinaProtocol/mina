@@ -13,6 +13,8 @@ module type Network_intf = sig
 
   type external_transition
 
+  type host_and_port
+
   type ancestor_proof_input
 
   type ancestor_proof
@@ -27,6 +29,7 @@ module type Network_intf = sig
 
   val get_ancestry :
        t
+    -> host_and_port
     -> ancestor_proof_input
     -> (protocol_state * ancestor_proof) Deferred.Or_error.t
 end

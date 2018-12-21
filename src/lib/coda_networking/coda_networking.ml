@@ -423,25 +423,62 @@ module Make (Inputs : Inputs_intf) = struct
     Gossip_net.query_peer t.gossip_net peer
       Rpcs.Transition_catchup.dispatch_multi state_hash
 
-  (* TODO: Make this rpc `Get_ancestry` more intelligent #1324 *)
-  let get_ancestry t input =
-    let peers = random_peers t 8 in
-    find_map' peers ~f:(fun peer ->
-        match%map
-          Gossip_net.query_peer t.gossip_net peer
-            Rpcs.Get_ancestry.dispatch_multi input
-        with
-        | Ok (Some ancestors) -> Ok ancestors
-        | Ok None ->
-            Or_error.errorf
-              !"Peer %{sexp:Peer.t} does not have proof for \
-                %{sexp:Rpcs.Get_ancestry.query}"
-              peer input
-        | Error e ->
-            Or_error.errorf
-              !"Encountered a network connection querying an ancestry from \
-                peer %{sexp:Peer.t}: %{sexp:Error.t}"
-              peer e )
+  let get_ancestry_non_preferred_peers t input =
+    let max_peers = 8 in
+    let rec loop num_peers =
+      if num_peers > max_peers then
+        return
+          (Or_error.errorf
+             !"None of randomly-chosen peers has a proof for \
+               %{sexp:Rpcs.Get_ancestry.query}"
+             input)
+      else
+        let peers = random_peers t num_peers in
+        (* peers might actually include the preferred peer *)
+        find_map' peers ~f:(fun peer ->
+            let%bind ancestors_or_error =
+              Gossip_net.query_peer t.gossip_net peer
+                Rpcs.Get_ancestry.dispatch_multi input
+            in
+            match ancestors_or_error with
+            | Ok (Some ancestors) -> return (Ok ancestors)
+            | Ok None ->
+                Logger.warn t.log
+                  !"get_ancestry returned no ancestors for non-preferred peer \
+                    %{sexp: Peer.t} on input %{sexp: Rpcs.Get_ancestry.query}"
+                  peer input ;
+                loop (2 * num_peers)
+            | Error e ->
+                Logger.warn t.log
+                  !"get_ancestry generated error for non-preferred peer \
+                    %{sexp: Peer.t}: %{sexp: Error.t}"
+                  peer e ;
+                loop (2 * num_peers) )
+    in
+    loop 1
+
+  let get_ancestry t sender ((_state_hash, num_hashes) as input) =
+    (* try preferred_peer first *)
+    let preferred_peer = (sender, num_hashes) in
+    let%bind ancestors_or_error =
+      Gossip_net.query_peer t.gossip_net preferred_peer
+        Rpcs.Get_ancestry.dispatch_multi input
+    in
+    match ancestors_or_error with
+    | Ok (Some ancestors) -> return (Ok ancestors)
+    | Ok None ->
+        (* TODO: punish *)
+        Logger.warn t.log
+          !"get_ancestry returned no ancestors for the transition sender \
+            %{sexp: Host_and_port.t}, trying non-preferred peers"
+          sender ;
+        get_ancestry_non_preferred_peers t input
+    | Error e ->
+        Logger.warn t.log
+          !"get_ancestry generated error for the transition sender %{sexp: \
+            Host_and_port.t}: %{sexp: Error.t}; trying non-preferred peers"
+          sender e ;
+        get_ancestry_non_preferred_peers t input
 
   module Staged_ledger_io = struct
     type nonrec t = t
