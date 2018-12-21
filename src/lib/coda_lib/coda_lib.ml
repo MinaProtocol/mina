@@ -295,7 +295,7 @@ module type Proposer_intf = sig
     -> time_controller:time_controller
     -> keypair:keypair
     -> consensus_local_state:consensus_local_state
-    -> transition_frontier:transition_frontier
+    -> frontier_ref:transition_frontier Mvar.Read_only.t
     -> (external_transition Envelope.Incoming.t * time) Linear_pipe.Reader.t
 end
 
@@ -492,7 +492,7 @@ module Make (Inputs : Inputs_intf) = struct
         Net.t (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
-    ; transition_frontier: Transition_frontier.t
+    ; transition_frontier: Transition_frontier.t Mvar.Read_only.t
     ; strongest_ledgers:
         (External_transition.Verified.t, Protocol_state_hash.t) With_hash.t
         Strict_pipe.Reader.t
@@ -506,25 +506,58 @@ module Make (Inputs : Inputs_intf) = struct
     ; time_controller: Time.Controller.t
     ; snark_work_fee: Currency.Fee.t }
 
+  let peek_frontier frontier_ref =
+    Mvar.peek frontier_ref
+    |> Result.of_option
+         ~error:
+           (Error.of_string
+              "Cannot retrieve transition frontier now. Bootstrapping right \
+               now.")
+
   let run_snark_worker t = t.run_snark_worker
 
   let propose_keypair t = t.propose_keypair
 
-  let best_tip t = Transition_frontier.best_tip t.transition_frontier
+  let best_tip_opt t =
+    let open Option.Let_syntax in
+    let%map frontier = Mvar.peek t.transition_frontier in
+    Transition_frontier.best_tip frontier
 
-  let best_staged_ledger t =
-    Transition_frontier.Breadcrumb.staged_ledger (best_tip t)
+  let best_staged_ledger_opt t =
+    let open Option.Let_syntax in
+    let%map tip = best_tip_opt t in
+    Transition_frontier.Breadcrumb.staged_ledger tip
 
-  let best_protocol_state t =
-    Transition_frontier.Breadcrumb.transition_with_hash (best_tip t)
+  let best_protocol_state_opt t =
+    let open Option.Let_syntax in
+    let%map tip = best_tip_opt t in
+    Transition_frontier.Breadcrumb.transition_with_hash tip
     |> With_hash.data |> External_transition.Verified.protocol_state
 
-  let best_ledger t = Staged_ledger.ledger (best_staged_ledger t)
+  let best_ledger_opt t =
+    let open Option.Let_syntax in
+    let%map staged_ledger = best_staged_ledger_opt t in
+    Staged_ledger.ledger staged_ledger
+
+  let of_option value =
+    Option.value_map value ~default:`Bootstrapping ~f:(fun x ->
+        `Participating x )
+
+  let best_tip = Fn.compose of_option best_tip_opt
+
+  let best_staged_ledger = Fn.compose of_option best_staged_ledger_opt
+
+  let best_protocol_state = Fn.compose of_option best_protocol_state_opt
+
+  let best_ledger = Fn.compose of_option best_ledger_opt
 
   let get_ledger t staged_ledger_hash =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind frontier =
+      Deferred.return (t.transition_frontier |> peek_frontier)
+    in
     match
-      List.find_map (Transition_frontier.all_breadcrumbs t.transition_frontier)
-        ~f:(fun b ->
+      List.find_map (Transition_frontier.all_breadcrumbs frontier) ~f:(fun b ->
           let staged_ledger = Transition_frontier.Breadcrumb.staged_ledger b in
           if
             Staged_ledger_hash.equal
@@ -569,7 +602,8 @@ module Make (Inputs : Inputs_intf) = struct
   let receipt_chain_database t = t.receipt_chain_database
 
   let staged_ledger_ledger_proof t =
-    let sl = best_staged_ledger t in
+    let open Option.Let_syntax in
+    let%bind sl = best_staged_ledger_opt t in
     Staged_ledger.current_ledger_proof sl
 
   let strongest_ledgers t = t.strongest_ledgers
@@ -606,7 +640,7 @@ module Make (Inputs : Inputs_intf) = struct
             ~transaction_pool:t.transaction_pool
             ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
             ~time_controller:t.time_controller ~keypair ~consensus_local_state
-            ~transition_frontier:t.transition_frontier
+            ~frontier_ref:t.transition_frontier
         in
         don't_wait_for
           (Linear_pipe.transfer_id transitions t.external_transitions_writer)
@@ -640,7 +674,7 @@ module Make (Inputs : Inputs_intf) = struct
             ~staged_ledger_diff:empty_diff_verified
         in
         let ledger_db = Ledger_db.create () in
-        let%bind transition_frontier =
+        let%bind _transition_frontier =
           Transition_frontier.create ~logger:config.log
             ~root_transition:
               (With_hash.of_data first_transition
@@ -654,6 +688,9 @@ module Make (Inputs : Inputs_intf) = struct
               (Ledger_transfer.transfer_accounts ~src:Genesis.ledger
                  ~dest:ledger_db)
         in
+        let frontier_read_write_ref = Mvar.create () in
+        Mvar.set frontier_read_write_ref _transition_frontier ;
+        let frontier_read_ref = Mvar.read_only frontier_read_write_ref in
         let%bind net =
           Net.create config.net_config
             ~get_staged_ledger_aux_at_hash:(fun _hash ->
@@ -661,9 +698,10 @@ module Make (Inputs : Inputs_intf) = struct
             ~answer_sync_ledger_query:(fun query_env ->
               let open Deferred.Or_error.Let_syntax in
               let ledger_hash, query = Envelope.Incoming.data query_env in
-              let%map ledger =
-                get_ledger_by_hash transition_frontier ledger_hash
+              let%bind frontier =
+                Deferred.return @@ peek_frontier frontier_read_ref
               in
+              let%map ledger = get_ledger_by_hash frontier ledger_hash in
               let responder = Sync_ledger.Responder.create ledger ignore in
               let answer =
                 Sync_ledger.Responder.answer_query responder query
@@ -672,26 +710,28 @@ module Make (Inputs : Inputs_intf) = struct
             ~transition_catchup:(fun enveloped_hash ->
               let open Deferred.Option.Let_syntax in
               let hash = Envelope.Incoming.data enveloped_hash in
+              let%bind frontier =
+                Deferred.return @@ Mvar.peek frontier_read_ref
+              in
               let%map breadcrumb =
-                Deferred.return
-                @@ Transition_frontier.find transition_frontier hash
+                Deferred.return @@ Transition_frontier.find frontier hash
               in
               (* forget verified status of external transition in breadcrumb for broadcast *)
               Transition_frontier.path_map
                 ~f:(fun b ->
                   Transition_frontier.Breadcrumb.transition_with_hash b
                   |> With_hash.data |> External_transition.forget )
-                transition_frontier breadcrumb )
+                frontier breadcrumb )
             ~get_ancestry:(fun query_env ->
               let descendent, count = Envelope.Incoming.data query_env in
               let result =
                 let open Option.Let_syntax in
+                let%bind frontier = Mvar.peek frontier_read_ref in
                 let%bind state_hash, proof =
-                  Sync_handler.prove_ancestry ~frontier:transition_frontier
-                    count descendent
+                  Sync_handler.prove_ancestry ~frontier count descendent
                 in
                 let%map transition_with_hash =
-                  Transition_frontier.find transition_frontier state_hash
+                  Transition_frontier.find frontier state_hash
                 in
                 let protocol_state =
                   transition_with_hash
@@ -706,7 +746,7 @@ module Make (Inputs : Inputs_intf) = struct
         let valid_transitions =
           Transition_router.run ~logger:config.log ~network:net
             ~time_controller:config.time_controller
-            ~frontier:transition_frontier ~ledger_db
+            ~frontier_ref:frontier_read_write_ref ~ledger_db
             ~transition_reader:
               (Strict_pipe.Reader.of_linear_pipe
                  (Linear_pipe.map external_transitions_reader
@@ -750,7 +790,7 @@ module Make (Inputs : Inputs_intf) = struct
           ; net
           ; transaction_pool
           ; snark_pool
-          ; transition_frontier
+          ; transition_frontier= frontier_read_ref
           ; time_controller= config.time_controller
           ; external_transitions_writer
           ; strongest_ledgers= valid_transitions_for_api

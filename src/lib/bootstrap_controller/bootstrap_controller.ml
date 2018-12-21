@@ -177,6 +177,9 @@ module Make (Inputs : Inputs_intf) :
     |> don't_wait_for ;
     Syncable_ledger.valid_tree t.syncable_ledger
 
+  (* TODO:  This should return a brand new transition_frontier rather than mutating Mvar.Read_write.t
+    Can't do this without compiling errors because PRs #1353 and #1349 need to land.
+  *)
   (* TODO: Assume that the transitions we are getting are verified from the network #1334 *)
   let run ~parent_log ~network ~ancestor_prover ~frontier ~ledger_db
       ~transition_reader =
@@ -200,5 +203,6 @@ module Make (Inputs : Inputs_intf) :
     let%map _ledger_db = sync_ledger t ~transition_graph ~transition_reader in
     let protocol_state = t.best_with_root.root in
     let root_hash = External_transition.Protocol_state.hash protocol_state in
-    Transition_frontier.rebuild frontier root_hash
+    Transition_frontier.rebuild frontier root_hash ;
+    frontier
 end

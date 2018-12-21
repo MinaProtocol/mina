@@ -305,7 +305,7 @@ module type Bootstrap_controller_intf = sig
                                              Envelope.Incoming.t ]
                          * [< `Time_received of int64] )
                          Reader.t
-    -> unit Deferred.t
+    -> transition_frontier Deferred.t
 end
 
 module type Transition_frontier_controller_intf = sig
@@ -357,7 +357,7 @@ module type Transition_router_intf = sig
        logger:Logger.t
     -> network:network
     -> time_controller:time_controller
-    -> frontier:transition_frontier
+    -> frontier_ref:transition_frontier Mvar.Read_write.t
     -> ledger_db:ledger_db
     -> transition_reader:( [ `Transition of external_transition
                                             Envelope.Incoming.t ]
