@@ -33,7 +33,6 @@ module type Inputs_intf = sig
     with type peer := Kademlia.Peer.t
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
-     and type host_and_port := Host_and_port.t
      and type ancestor_proof_input := State_hash.t * int
      and type ancestor_proof := Ancestor.Proof.t
      and type protocol_state := Consensus.Mechanism.Protocol_state.value
@@ -96,7 +95,7 @@ module Make (Inputs : Inputs_intf) :
     Consensus.Mechanism.Protocol_state.consensus_state protocol_state
     |> Consensus.Mechanism.Consensus_state.length |> Coda_numbers.Length.to_int
 
-  let on_transition t (transition, sender, time_received) =
+  let on_transition t ~sender (transition, time_received) =
     let module Protocol_state = Consensus.Mechanism.Protocol_state in
     let candidate = External_transition.protocol_state transition in
     let previous_state_hash = Protocol_state.previous_state_hash candidate in
@@ -166,7 +165,7 @@ module Make (Inputs : Inputs_intf) :
       ~f:(fun (`Transition incoming_transition, `Time_received time_received)
          ->
         let transition = Envelope.Incoming.data incoming_transition in
-        let sender = Envelope.Incoming.sender incoming_transition in
+        let sender = (Envelope.Incoming.sender incoming_transition, 0) in
         let protocol_state = External_transition.protocol_state transition in
         let previous_state_hash =
           External_transition.Protocol_state.previous_state_hash protocol_state
@@ -175,7 +174,7 @@ module Make (Inputs : Inputs_intf) :
           transition ;
         (* TODO: Efficiently limiting the number of green threads in #1337 *)
         if worth_getting_root t protocol_state time_received then
-          on_transition t (transition, sender, time_received) |> don't_wait_for ;
+          on_transition t ~sender (transition, time_received) |> don't_wait_for ;
         Deferred.unit )
     |> don't_wait_for ;
     Syncable_ledger.valid_tree t.syncable_ledger
