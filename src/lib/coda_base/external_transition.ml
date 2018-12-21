@@ -56,7 +56,6 @@ end)
       ; staged_ledger_diff: Staged_ledger_diff.t }
     [@@deriving sexp, fields, bin_io]
 
-    (* TODO: Important for bkase to review *)
     let compare t1 t2 =
       Protocol_state.compare t1.protocol_state t2.protocol_state
 
