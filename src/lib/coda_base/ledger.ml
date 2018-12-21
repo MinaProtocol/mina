@@ -10,6 +10,7 @@ module Make (Ledger : sig
      and type hash := Ledger_hash.t
      and type account := Account.t
      and type key := Public_key.Compressed.t
+     and type key_set := Public_key.Compressed.Set.t
 
   val create : unit -> t
 end) =
@@ -17,6 +18,8 @@ struct
   include Ledger
 
   type account = Account.t
+
+  type key_set = Public_key.Compressed.Set.t
 
   let create_new_account_exn t pk account =
     let action, _ = get_or_create_account_exn t pk account in

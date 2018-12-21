@@ -15,6 +15,8 @@ module type S = sig
 
   type key
 
+  type key_set
+
   module Location : Merkle_ledger.Location_intf.S
 
   module Addr : Merkle_address.S
@@ -30,6 +32,7 @@ module type S = sig
        and type root_hash := hash
        and type hash := hash
        and type key := key
+       and type key_set := key_set
 
     val get_hash : t -> Addr.t -> hash option
     (** get hash from mask, if present, else from its parent *)

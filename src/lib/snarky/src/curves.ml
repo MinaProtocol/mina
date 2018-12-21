@@ -528,7 +528,8 @@ module type Weierstrass_checked_intf = sig
 
   val constant : t -> var
 
-  val add_unsafe : var -> var -> (var, _) Checked.t
+  val add_unsafe :
+    var -> var -> ([`I_thought_about_this_very_carefully of var], _) Checked.t
 
   val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
@@ -624,10 +625,12 @@ module Make_weierstrass_checked
     let equal = assert_equal
   end
 
-  let add_unsafe (ax, ay) (bx, by) =
+  let add' ~div (ax, ay) (bx, by) =
     with_label __LOC__
       (let open Let_syntax in
-      let%bind lambda = Field.Checked.(div (sub by ay) (sub bx ax)) in
+      let%bind lambda =
+        div (Field.Checked.sub by ay) (Field.Checked.sub bx ax)
+      in
       let%bind cx =
         provide_witness Typ.field
           (let open As_prover in
@@ -660,6 +663,36 @@ module Make_weierstrass_checked
           assert_r1cs ~label:"c2" lambda (ax - cx) (cy + ay))
       in
       (cx, cy))
+
+  (* This function MUST NOT be called UNLESS you are certain the two points
+   on which it is called are not equal. If it is called on equal points,
+   the prover can return almost any curve point they want to from this function. *)
+  let add_unsafe =
+    let open Let_syntax in
+    let div_unsafe x y =
+      let%bind z =
+        provide_witness Field.typ
+          As_prover.(map2 (read_var x) (read_var y) ~f:Field.Infix.( / ))
+      in
+      (* Constraint: y * z = x
+
+         Cases:
+         x = 0, y = 0 -> 0 * z = 0 (i.e., z is arbitrary)
+
+         x = 0, y <> 0 -> z = 0 / y = 0.
+
+         x <> 0, y = 0 -> 0 * z = x. (i.e., unsat)
+
+         x <> 0, y <> 0 -> z = x / y
+      *)
+      let%map () = assert_r1cs y z x in
+      z
+    in
+    fun p q ->
+      let%map r = add' ~div:div_unsafe p q in
+      `I_thought_about_this_very_carefully r
+
+  let add_exn p q = add' ~div:Field.Checked.div p q
 
   (* TODO-someday: Make it so this doesn't have to compute both branches *)
   let if_ =
@@ -714,9 +747,9 @@ module Make_weierstrass_checked
 
       let if_ = if_
 
-      let unshift_nonzero shifted = add_unsafe (negate shift) shifted
+      let unshift_nonzero shifted = add_exn (negate shift) shifted
 
-      let add shifted x = add_unsafe shifted x
+      let add shifted x = add_exn shifted x
 
       module Assert = struct
         let equal = assert_equal

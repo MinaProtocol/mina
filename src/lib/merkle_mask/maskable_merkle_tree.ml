@@ -13,13 +13,15 @@ module Make
              and type account := Account.t
              and type root_hash := Hash.t
              and type hash := Hash.t
-             and type key := Key.t)
+             and type key := Key.t
+             and type key_set := Key.Set.t)
     (Mask : Masking_merkle_tree_intf.S
             with module Location = Location
              and type account := Account.t
              and type location := Location.t
              and type hash := Hash.t
              and type key := Key.t
+             and type key_set := Key.Set.t
              and type parent := Base.t) =
 struct
   include Base
