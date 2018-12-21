@@ -154,9 +154,7 @@ struct
       module T = struct
         type query = State_hash.t * int [@@deriving bin_io, sexp]
 
-        type response =
-          (External_transition.Protocol_state.value * State_body_hash.t list)
-          option
+        type response = (External_transition.t * State_body_hash.t list) option
         [@@deriving bin_io]
       end
 
@@ -325,8 +323,8 @@ module Make (Inputs : Inputs_intf) = struct
          -> External_transition.t list option Deferred.t)
       ~(get_ancestry :
             (State_hash.t * int) Envelope.Incoming.t
-         -> (External_transition.Protocol_state.value * State_body_hash.t list)
-            Deferred.Option.t) =
+         -> (External_transition.t * State_body_hash.t list) Deferred.Option.t)
+      =
     let log = Logger.child config.parent_log "coda networking" in
     let get_staged_ledger_aux_at_hash_rpc sender ~version:_ hash =
       get_staged_ledger_aux_at_hash (Envelope.Incoming.wrap ~data:hash ~sender)

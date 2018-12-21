@@ -1655,7 +1655,7 @@ let%test_module "test" =
           { pre_diffs: pre_diffs
           ; prev_hash: staged_ledger_hash
           ; creator: public_key }
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp, bin_io, fields]
 
         module With_valid_signatures_and_proofs = struct
           type diff =

@@ -27,7 +27,6 @@ module type Inputs_intf = sig
      and type external_transition := External_transition.t
      and type ancestor_proof_input := State_hash.t * int
      and type ancestor_proof := Ancestor.Proof.t
-     and type protocol_state := External_transition.Protocol_state.value
 
   module Transition_frontier_controller :
     Transition_frontier_controller_intf
@@ -110,7 +109,9 @@ module Make (Inputs : Inputs_intf) :
       in
       Strict_pipe.Writer.write bootstrap_controller_writer
         (`Transition incoming_transition, `Time_received (to_unix_timestamp tm)) ;
-      let%map () =
+      (* This will be used when we are dealing with a mvar frontier rather
+      than a regular one *)
+      let%map _new_frontier =
         Bootstrap_controller.run ~parent_log:logger ~network ~ledger_db
           ~ancestor_prover ~frontier
           ~transition_reader:bootstrap_controller_reader
