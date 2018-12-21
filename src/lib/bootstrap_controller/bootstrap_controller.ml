@@ -94,7 +94,7 @@ module Make (Inputs : Inputs_intf) :
     Consensus.Mechanism.Protocol_state.consensus_state protocol_state
     |> Consensus.Mechanism.Consensus_state.length |> Coda_numbers.Length.to_int
 
-  let on_transition t (transition, time_received) =
+  let on_transition t ~sender (transition, time_received) =
     let module Protocol_state = Consensus.Mechanism.Protocol_state in
     let candidate = External_transition.protocol_state transition in
     let previous_state_hash = Protocol_state.previous_state_hash candidate in
@@ -115,7 +115,8 @@ module Make (Inputs : Inputs_intf) :
       Deferred.unit
     else
       match%map
-        Network.get_ancestry t.network (input.descendant, input.generations)
+        Network.get_ancestry t.network sender
+          (input.descendant, input.generations)
       with
       | Error e ->
           Logger.error t.logger
@@ -180,6 +181,8 @@ module Make (Inputs : Inputs_intf) :
       ~f:(fun (`Transition incoming_transition, `Time_received time_received)
          ->
         let transition = Envelope.Incoming.data incoming_transition in
+        (* #TODO : the 0 below is a dummy, should be a valid port *)
+        let sender = (Envelope.Incoming.sender incoming_transition, 0) in
         let protocol_state = External_transition.protocol_state transition in
         let previous_state_hash =
           External_transition.Protocol_state.previous_state_hash protocol_state
@@ -188,7 +191,7 @@ module Make (Inputs : Inputs_intf) :
           transition ;
         (* TODO: Efficiently limiting the number of green threads in #1337 *)
         if worth_getting_root t protocol_state then
-          on_transition t (transition, time_received) |> don't_wait_for ;
+          on_transition t ~sender (transition, time_received) |> don't_wait_for ;
         Deferred.unit )
     |> don't_wait_for ;
     Syncable_ledger.valid_tree t.syncable_ledger

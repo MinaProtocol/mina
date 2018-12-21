@@ -27,6 +27,7 @@ module type Network_intf = sig
 
   val get_ancestry :
        t
+    -> peer
     -> ancestor_proof_input
     -> (protocol_state * ancestor_proof) Deferred.Or_error.t
 end
