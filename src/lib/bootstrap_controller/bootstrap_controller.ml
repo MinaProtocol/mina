@@ -165,6 +165,7 @@ module Make (Inputs : Inputs_intf) :
       ~f:(fun (`Transition incoming_transition, `Time_received time_received)
          ->
         let transition = Envelope.Incoming.data incoming_transition in
+        (* #TODO : the 0 below is a dummy, should be a valid port *)
         let sender = (Envelope.Incoming.sender incoming_transition, 0) in
         let protocol_state = External_transition.protocol_state transition in
         let previous_state_hash =
