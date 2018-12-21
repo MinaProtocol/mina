@@ -191,7 +191,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     in
     (protocol_state, consensus_transition_data)
 
-  let is_valid _ ~time_received:_ = true
+  let received_at_valid_time _ ~time_received:_ = true
 
   let is_transition_valid_checked (transition : Snark_transition.var) =
     let Consensus_transition_data.({signature}) =
@@ -227,7 +227,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     ()
 
   let select ~existing:Consensus_state.({length= l1; _})
-      ~candidate:Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
+      ~candidate:Consensus_state.({length= l2; _}) ~logger:_ =
     if Length.compare l1 l2 >= 0 then `Keep else `Take
 
   let next_proposal now _state ~local_state:_ ~keypair ~logger:_ =

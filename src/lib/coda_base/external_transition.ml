@@ -5,10 +5,6 @@ module type S = sig
 
   module Staged_ledger_diff : sig
     type t [@@deriving bin_io, sexp]
-
-    module Verified : sig
-      type t [@@deriving sexp, bin_io]
-    end
   end
 
   type t [@@deriving sexp, bin_io, compare, eq]
@@ -16,20 +12,16 @@ module type S = sig
   module Verified : sig
     type t [@@deriving sexp, bin_io, compare, eq]
 
-    val create :
-         protocol_state:Protocol_state.value
-      -> protocol_state_proof:Proof.t
-      -> staged_ledger_diff:Staged_ledger_diff.Verified.t
-      -> t
-
     val protocol_state : t -> Protocol_state.value
 
     val protocol_state_proof : t -> Proof.t
 
-    val staged_ledger_diff : t -> Staged_ledger_diff.Verified.t
+    val staged_ledger_diff : t -> Staged_ledger_diff.t
   end
 
-  val forget : Verified.t -> t
+  val to_verified : t -> [`I_swear_this_is_safe_see_my_comment of Verified.t]
+
+  val of_verified : Verified.t -> t
 
   val create :
        protocol_state:Protocol_state.value
@@ -48,12 +40,6 @@ end
 
 module Make (Staged_ledger_diff : sig
   type t [@@deriving bin_io, sexp]
-
-  module Verified : sig
-    type t [@@deriving bin_io, sexp]
-  end
-
-  val forget_verified : Verified.t -> t
 end)
 (Protocol_state : Protocol_state.S) :
   S
@@ -63,17 +49,11 @@ end)
   module Protocol_state = Protocol_state
   module Blockchain_state = Protocol_state.Blockchain_state
 
-  type t =
-    { protocol_state: Protocol_state.value
-    ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
-    ; staged_ledger_diff: Staged_ledger_diff.t }
-  [@@deriving sexp, fields, bin_io]
-
-  module Verified = struct
+  module T = struct
     type t =
       { protocol_state: Protocol_state.value
-      ; protocol_state_proof: Proof.Stable.V1.t
-      ; staged_ledger_diff: Staged_ledger_diff.Verified.t }
+      ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
+      ; staged_ledger_diff: Staged_ledger_diff.t }
     [@@deriving sexp, fields, bin_io]
 
     let compare t1 t2 =
@@ -81,25 +61,14 @@ end)
 
     let equal t1 t2 =
       Protocol_state.equal_value t1.protocol_state t2.protocol_state
-
-    let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff =
-      {protocol_state; protocol_state_proof; staged_ledger_diff}
   end
 
-  let forget (verified : Verified.t) =
-    let staged_ledger_diff =
-      Staged_ledger_diff.forget_verified verified.staged_ledger_diff
-    in
-    { protocol_state= verified.protocol_state
-    ; protocol_state_proof= verified.protocol_state_proof
-    ; staged_ledger_diff }
+  include T
+  module Verified = T
 
-  (* TODO: Important for bkase to review *)
-  let compare t1 t2 =
-    Protocol_state.compare t1.protocol_state t2.protocol_state
+  let to_verified x = `I_swear_this_is_safe_see_my_comment x
 
-  let equal t1 t2 =
-    Protocol_state.equal_value t1.protocol_state t2.protocol_state
+  let of_verified = Fn.id
 
   let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff =
     {protocol_state; protocol_state_proof; staged_ledger_diff}
