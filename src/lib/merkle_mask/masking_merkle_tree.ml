@@ -10,8 +10,9 @@ module Make
     (Location : Merkle_ledger.Location_intf.S)
     (Base : Base_merkle_tree_intf.S
             with module Addr = Location.Addr
-            with module Location = Location
+             and module Location = Location
             with type key := Key.t
+             and type key_set := Key.Set.t
              and type hash := Hash.t
              and type root_hash := Hash.t
              and type account := Account.t) =
@@ -21,6 +22,8 @@ struct
   type hash = Hash.t
 
   type key = Key.t
+
+  type key_set = Key.Set.t
 
   type location = Location.t
 
@@ -369,14 +372,29 @@ struct
       in
       mask_accounts @ in_parent_not_in_mask_accounts
 
-    let foldi t ~init ~f =
-      let parent_result = Base.foldi (get_parent t) ~init ~f in
+    let foldi_with_ignored_keys t ignored_keys ~init ~f =
       let locations_and_accounts = Location.Table.to_alist t.account_tbl in
+      (* parent should ignore keys in this mask *)
+      let mask_keys =
+        List.map locations_and_accounts ~f:(fun (_loc, acct) ->
+            Account.public_key acct )
+      in
+      let mask_ignored_keys = Key.Set.of_list mask_keys in
+      let all_ignored_keys = Key.Set.union ignored_keys mask_ignored_keys in
+      (* in parent, ignore any passed-in ignored keys and keys in mask *)
+      let parent_result =
+        Base.foldi_with_ignored_keys (get_parent t) all_ignored_keys ~init ~f
+      in
       let f' accum (location, account) =
-        let address = Location.to_path_exn location in
-        f address accum account
+        (* for mask, ignore just passed-in ignored keys *)
+        if Key.Set.mem ignored_keys (Account.public_key account) then accum
+        else
+          let address = Location.to_path_exn location in
+          f address accum account
       in
       List.fold locations_and_accounts ~init:parent_result ~f:f'
+
+    let foldi t ~init ~f = foldi_with_ignored_keys t Key.Set.empty ~init ~f
 
     (* we would want fold_until to combine results from the parent and the mask
        way (1): use the parent result as the init of the mask fold (or vice-versa)
@@ -384,6 +402,8 @@ struct
          we get a less general type than the signature indicates, so compilation fails
        way (2): make the folds independent, but there's not a specified way to combine
          the results
+       way (3): load parent accounts into an in-memory list, merge with mask accounts, then fold;
+          this becomes intractable if the parent has a large number of entries
     *)
     let fold_until _t ~init:_ ~f:_ ~finish:_ =
       failwith "fold_until: not implemented"
