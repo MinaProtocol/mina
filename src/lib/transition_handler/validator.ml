@@ -43,41 +43,47 @@ module Make (Inputs : Inputs.S) :
       |> External_transition.Verified.protocol_state
     in
     if Transition_frontier.find frontier hash |> Option.is_some then
-      Deferred.return `Duplicate
+      Deferred.return (Error `Duplicate)
     else
-      let rec check_cases = function
-        | [] -> return `Valid
-        | (cond_lazy, failure_reason) :: tail ->
-            if%bind Lazy.force cond_lazy then check_cases tail
-            else return (`Invalid failure_reason)
+      (* these are done separately in order to avoid encoding
+       * synchronicity into the deferred monad *)
+      let synchronous_result =
+        let open Result.Let_syntax in
+        let%bind () =
+          match time_received with
+          | None -> Ok ()
+          | Some t ->
+              Result.ok_if_true
+                (Consensus.Mechanism.received_at_valid_time
+                   (consensus_state protocol_state)
+                   ~time_received:t)
+                ~error:(`Invalid "transition was received at an invalid time")
+        in
+        Result.ok_if_true
+          ( `Take
+          = Consensus.Mechanism.select ~logger
+              ~existing:(consensus_state root_protocol_state)
+              ~candidate:(consensus_state protocol_state) )
+          ~error:
+            (`Invalid
+              "consensus state was not selected over transition frontier root \
+               consensus state")
       in
-      let validation_cases =
-        [ ( lazy
-              (return
-                 ( `Take
-                 = Consensus.Mechanism.select ~logger
-                     ~existing:(consensus_state root_protocol_state)
-                     ~candidate:(consensus_state protocol_state) ))
-          , "consensus state was not selected over transition frontier root \
-             consensus state" )
-        ; ( lazy
-              (State_proof.verify
-                 (External_transition.protocol_state_proof transition)
-                 protocol_state)
-          , "protocol state proof was not valid" ) ]
-      in
-      let validation_cases =
-        Option.value ~default:validation_cases
-          (Option.map time_received ~f:(fun t ->
-               ( lazy
-                   (return
-                      (Consensus.Mechanism.received_at_valid_time
-                         (consensus_state protocol_state)
-                         ~time_received:t))
-               , "transition was received at an invalid time" )
-               :: validation_cases ))
-      in
-      check_cases validation_cases
+      match synchronous_result with
+      | Error err -> Deferred.return (Error err)
+      | Ok () ->
+          let open Deferred.Let_syntax in
+          let%map valid =
+            State_proof.verify
+              (External_transition.protocol_state_proof transition)
+              protocol_state
+          in
+          if valid then
+            let (`I_swear_this_is_safe_don't_kill_me verified_transition) =
+              External_transition.to_verified transition
+            in
+            Ok {hash; data= verified_transition}
+          else Error (`Invalid "protocol state proof was not valid")
 
   let run ~logger ~frontier ~transition_reader ~valid_transition_writer =
     let logger = Logger.child logger __MODULE__ in
@@ -100,18 +106,16 @@ module Make (Inputs : Inputs.S) :
              validate_transition ~logger ~frontier ~time_received
                transition_with_hash
            with
-           | `Valid ->
+           | Ok valid_transition ->
                Logger.info logger
                  !"accepting transition %{sexp:State_hash.t}"
                  hash ;
-               Writer.write valid_transition_writer
-                 (With_hash.map transition_with_hash
-                    ~f:External_transition.to_verified)
-           | `Duplicate ->
+               Writer.write valid_transition_writer valid_transition
+           | Error `Duplicate ->
                Logger.info logger
                  !"ignoring transition we've already seen %{sexp:State_hash.t}"
                  hash
-           | `Invalid reason ->
+           | Error (`Invalid reason) ->
                Logger.warn logger
                  !"rejecting transitions because \"%s\" -- sent by %{sexp: \
                    Host_and_port.t}"

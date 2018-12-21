@@ -941,7 +941,7 @@ module type External_transition_intf = sig
     val staged_ledger_diff : t -> staged_ledger_diff
   end
 
-  val to_verified : t -> Verified.t
+  val to_verified : t -> [`I_swear_this_is_safe_don't_kill_me of Verified.t]
 
   val of_verified : Verified.t -> t
 

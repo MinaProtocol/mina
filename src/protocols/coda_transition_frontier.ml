@@ -1,3 +1,4 @@
+open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
 
@@ -187,7 +188,10 @@ module type Transition_handler_validator_intf = sig
     -> logger:Logger.t
     -> frontier:transition_frontier
     -> (external_transition, state_hash) With_hash.t
-    -> [`Valid | `Invalid of string | `Duplicate] Deferred.t
+    -> ( (external_transition_verified, state_hash) With_hash.t
+       , [`Duplicate | `Invalid of string] )
+       Result.t
+       Deferred.t
 end
 
 module type Transition_handler_processor_intf = sig

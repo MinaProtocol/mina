@@ -105,22 +105,18 @@ module Make (Inputs : Inputs.S) :
                     Transition_handler_validator.validate_transition ~logger
                       ~frontier transition_with_hash
                   with
-                  | `Valid ->
-                      Ok
-                        (Some
-                           (With_hash.map transition_with_hash
-                              ~f:External_transition.to_verified))
-                  | `Invalid reason ->
+                  | Ok verified_transition -> Ok (Some verified_transition)
+                  | Error `Duplicate ->
+                      Logger.info logger
+                        !"transition queried during ledger catchup has \
+                          already been seen" ;
+                      Ok None
+                  | Error (`Invalid reason) ->
                       Logger.faulty_peer logger
                         !"transition queried during ledger catchup was not \
                           valid because %s"
                         reason ;
-                      Error (Error.of_string reason)
-                  | `Duplicate ->
-                      Logger.info logger
-                        !"transition queried during ledger catchup has \
-                          already been seen" ;
-                      Ok None )
+                      Error (Error.of_string reason) )
             in
             materialize_breadcrumbs ~frontier ~logger ~peer
               queried_transitions_verified )
