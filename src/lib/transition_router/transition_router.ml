@@ -16,8 +16,8 @@ module type Inputs_intf = sig
      and type external_transition_verified := External_transition.Verified.t
      and type ledger_database := Ledger.Db.t
      and type staged_ledger := Staged_ledger.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type ledger_diff_verified := Staged_ledger_diff.Verified.t
      and type masked_ledger := Coda_base.Ledger.t
 
   module Network :
@@ -79,7 +79,7 @@ module Make (Inputs : Inputs_intf) :
       |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
     in
     let open External_transition in
-    let root_state = protocol_state (root_transition |> forget) in
+    let root_state = protocol_state (root_transition |> of_verified) in
     let new_state = protocol_state new_transition in
     Consensus.Mechanism.should_bootstrap
       ~existing:(Protocol_state.consensus_state root_state)
