@@ -154,14 +154,20 @@ module Make (Inputs : Inputs_intf) :
 
   (* TODO: We need to do catchup jobs for all remaining transitions in the cache. 
            This will be hooked into `run` when we do this. #1326 *)
-  let _expand_root ~frontier root_hash cache =
+  let _expand_root ~logger ~frontier root_hash cache =
     let rec dfs state_hash =
-      Option.iter (Hashtbl.find_and_remove cache state_hash)
-        ~f:(fun children ->
-          List.iter children ~f:(fun transition ->
-              Transition_frontier.add_transition_exn frontier transition
-              |> ignore ;
-              dfs (With_hash.hash transition) ) )
+      match Hashtbl.find_and_remove cache state_hash with
+      | None -> Deferred.return ()
+      | Some children ->
+          Deferred.List.iter children ~f:(fun transition_with_hash ->
+              let%map breadcrumb =
+                Transition_frontier.Breadcrumb.build
+                  ~logger
+                  ~parent
+                  ~transition_with_hash
+              in
+              Transition_frontier.add_breadcrumb_exn frontier transition;
+              dfs (With_hash.hash transition) )
     in
     dfs root_hash
 

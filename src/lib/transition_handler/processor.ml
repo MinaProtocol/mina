@@ -34,32 +34,31 @@ module Make (Inputs : Inputs.S) :
         ~catchup_job_writer ~catchup_breadcrumbs_writer
     in
     ignore
-      (Reader.Merge.iter_sync
+      (Reader.Merge.iter
          [ Reader.map catchup_breadcrumbs_reader ~f:(fun cb ->
                `Catchup_breadcrumbs cb )
          ; Reader.map valid_transition_reader ~f:(fun vt ->
                `Valid_transition vt ) ]
          ~f:(fun msg ->
+           let open Deferred.Let_syntax in
            trace_task "transition_handler_processor" (fun () ->
                match msg with
                | `Catchup_breadcrumbs breadcrumbs ->
-                   List.iter breadcrumbs
-                     ~f:
-                       (Rose_tree.iter
-                          ~f:
-                            (Transition_frontier.attach_breadcrumb_exn frontier))
+                   return (
+                     List.iter breadcrumbs ~f:(
+                       Rose_tree.iter ~f:(Transition_frontier.attach_breadcrumb_exn frontier)))
                | `Valid_transition transition -> (
-                 match
-                   Transition_frontier.find frontier
-                     (transition_parent_hash (With_hash.data transition))
-                 with
-                 | None ->
-                     Catchup_monitor.watch catchup_monitor
-                       ~timeout_duration:catchup_timeout_duration ~transition
-                 | Some _ ->
-                     ignore
-                       (Transition_frontier.add_transition_exn frontier
-                          transition) ;
-                     Writer.write processed_transition_writer transition ;
-                     Catchup_monitor.notify catchup_monitor ~transition ) ) ))
+                   match
+                     Transition_frontier.find frontier
+                       (transition_parent_hash (With_hash.data transition))
+                   with
+                   | None ->
+                       return (
+                         Catchup_monitor.watch catchup_monitor
+                           ~timeout_duration:catchup_timeout_duration ~transition)
+                   | Some _ ->
+                       let%map breadcrumb = Transition_frontier.Breadcrumb.build in
+                       Transition_frontier.add_breadcrumb_exn frontier breadcrumb ;
+                       Writer.write processed_transition_writer transition ;
+                       Catchup_monitor.notify catchup_monitor ~transition ) ) ))
 end

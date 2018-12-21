@@ -101,7 +101,7 @@ struct
       {transition_with_hash; staged_ledger}
 
     let build ~logger ~parent ~transition_with_hash =
-      let open Or_error.Let_syntax in
+      let open Deferred.Or_error.Let_syntax in
       let logger = Logger.child logger __MODULE__ in
       let staged_ledger = parent.staged_ledger in
       let transition = With_hash.data transition_with_hash in
@@ -146,7 +146,7 @@ struct
                blockchain_staged_ledger_hash
         then return transitioned_staged_ledger
         else
-          Or_error.error_string
+          Deferred.Or_error.error_string
             "Snarked ledger hash and Staged ledger hash after applying the \
              diff does not match blockchain state's ledger hash and staged \
              ledger hash resp.\n"
@@ -214,7 +214,7 @@ struct
              (Protocol_state.Blockchain_state.staged_ledger_hash
                 root_blockchain_state))
         (Ledger.Mask.Attached.merkle_root root_masked_ledger) ;
-    match%map
+    match%bind
       Inputs.Staged_ledger.of_scan_state_and_ledger
         ~scan_state:root_transaction_snark_scan_state
         ~ledger:root_masked_ledger
@@ -222,11 +222,12 @@ struct
     with
     | Error e -> failwith (Error.to_string_hum e)
     | Ok pre_root_staged_ledger ->
-        let root_staged_ledger =
+        let open Deferred.Let_syntax in
+        let%map root_staged_ledger =
           match root_staged_ledger_diff with
-          | None -> pre_root_staged_ledger
+          | None -> return pre_root_staged_ledger
           | Some diff -> (
-            match
+            match%map
               Inputs.Staged_ledger.apply pre_root_staged_ledger diff ~logger
             with
             | Error e -> failwith (Error.to_string_hum e)
@@ -340,10 +341,9 @@ struct
     in
     attach_node_to t ~parent_node ~node
 
-  (* Adding a transition to the transition frontier is broken into the following steps:
-   *   1) build a new breadcrumb for a transition
-   *   2) attach the breadcrumb to the transition frontier
-   *   3) move the root if the path to the new node is longer than the max length
+  (* Adding a breadcrumb to the transition frontier is broken into the following steps:
+   *   1) attach the breadcrumb to the transition frontier
+   *   2) move the root if the path to the new node is longer than the max length
    *     a) calculate the distance from the new node to the parent
    *     b) if the distance is greater than the max length:
    *       I  ) find the immediate successor of the old root in the path to the
@@ -351,63 +351,40 @@ struct
    *       II ) find all successors of the other immediate successors of the old root
    *       III) remove the old root and all of the nodes found in (II) from the table
    *       IV ) merge the old root's merkle mask into the root ledger
-   *   4) set the new node as the best tip if the new node has a greater length than
+   *   3) set the new node as the best tip if the new node has a greater length than
    *      the current best tip
    *)
-  let add_transition_exn t transition_with_hash =
-    let open Consensus.Mechanism in
+  let add_breadcrumb_exn t breadcrumb =
+    let hash = With_hash.hash (Breadcrumb.transition_with_hash breadcrumb) in
     let root_node = Hashtbl.find_exn t.table t.root in
     let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
-    let (transition : Inputs.External_transition.Verified.t) =
-      With_hash.data transition_with_hash
-    in
-    let hash = With_hash.hash transition_with_hash in
-    let transition_protocol_state =
-      Inputs.External_transition.Verified.protocol_state transition
-    in
-    let parent_hash =
-      Protocol_state.previous_state_hash transition_protocol_state
-    in
-    let parent_node =
-      Option.value_exn
-        (Hashtbl.find t.table parent_hash)
-        ~error:
-          (Error.of_exn (Parent_not_found (`Parent parent_hash, `Target hash)))
-    in
     (* 1 *)
-    let breadcrumb =
-      Breadcrumb.build ~logger:t.logger ~parent:parent_node.breadcrumb
-        ~transition_with_hash
-      |> Or_error.ok_exn
-    in
-    (* 2 *)
     attach_breadcrumb_exn t breadcrumb ;
     let node = Hashtbl.find_exn t.table hash in
-    (* 3.a *)
+    (* 2.a *)
     let distance_to_parent = root_node.length - node.length in
-    (* 3.b *)
+    (* 2.b *)
     if distance_to_parent > max_length then (
-      (* 3.b.I *)
+      (* 2.b.I *)
       let new_root_hash = List.hd_exn (hash_path t node.breadcrumb) in
-      (* 3.b.II *)
+      (* 2.b.II *)
       let garbage_immediate_successors =
         List.filter root_node.successor_hashes ~f:(fun succ_hash ->
             not (State_hash.equal succ_hash new_root_hash) )
       in
-      (* 3.b.III *)
+      (* 2.b.III *)
       let garbage =
         t.root
         :: List.bind garbage_immediate_successors ~f:(successor_hashes_rec t)
       in
       t.root <- new_root_hash ;
       List.iter garbage ~f:(Hashtbl.remove t.table) ;
-      (* 3.b.IV *)
+      (* 2.b.IV *)
       Ledger.Mask.Attached.commit
         (Inputs.Staged_ledger.ledger
            (Breadcrumb.staged_ledger root_node.breadcrumb)) ) ;
-    (* 4 *)
-    if node.length > best_tip_node.length then t.best_tip <- hash ;
-    node.breadcrumb
+    (* 3 *)
+    if node.length > best_tip_node.length then t.best_tip <- hash
 
   let clear_paths t = Hashtbl.clear t.table
 
