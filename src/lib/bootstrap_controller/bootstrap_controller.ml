@@ -155,21 +155,25 @@ module Make (Inputs : Inputs_intf) :
   (* TODO: We need to do catchup jobs for all remaining transitions in the cache. 
            This will be hooked into `run` when we do this. #1326 *)
   let _expand_root ~logger ~frontier root_hash cache =
-    let rec dfs state_hash =
-      match Hashtbl.find_and_remove cache state_hash with
+    let rec dfs parent =
+      let parent_hash =
+        With_hash.hash
+          (Transition_frontier.Breadcrumb.transition_with_hash parent)
+      in
+      match Hashtbl.find_and_remove cache parent_hash with
       | None -> Deferred.return ()
       | Some children ->
           Deferred.List.iter children ~f:(fun transition_with_hash ->
-              let%map breadcrumb =
-                Transition_frontier.Breadcrumb.build
-                  ~logger
-                  ~parent
+              let%bind breadcrumb =
+                Transition_frontier.Breadcrumb.build ~logger
+                  ~parent:(Transition_frontier.find_exn frontier parent_hash)
                   ~transition_with_hash
+                >>| Or_error.ok_exn
               in
-              Transition_frontier.add_breadcrumb_exn frontier transition;
-              dfs (With_hash.hash transition) )
+              Transition_frontier.add_breadcrumb_exn frontier breadcrumb ;
+              dfs breadcrumb )
     in
-    dfs root_hash
+    dfs (Transition_frontier.find_exn frontier root_hash)
 
   let sync_ledger t ~transition_graph ~transition_reader =
     Reader.iter transition_reader

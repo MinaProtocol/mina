@@ -1,4 +1,3 @@
-open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
 
@@ -56,7 +55,7 @@ module type Transition_frontier_base_intf = sig
       -> transition_with_hash:( external_transition_verified
                               , state_hash )
                               With_hash.t
-      -> t Or_error.t
+      -> t Deferred.Or_error.t
 
     val transition_with_hash :
       t -> (external_transition_verified, state_hash) With_hash.t
@@ -115,8 +114,7 @@ module type Transition_frontier_intf = sig
 
   val attach_breadcrumb_exn : t -> Breadcrumb.t -> unit
 
-  val add_transition_exn :
-    t -> (external_transition_verified, state_hash) With_hash.t -> Breadcrumb.t
+  val add_breadcrumb_exn : t -> Breadcrumb.t -> unit
 
   val clear_paths : t -> unit
 

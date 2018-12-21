@@ -227,22 +227,22 @@ struct
           match root_staged_ledger_diff with
           | None -> return pre_root_staged_ledger
           | Some diff -> (
-            match%map
-              Inputs.Staged_ledger.apply pre_root_staged_ledger diff ~logger
-            with
-            | Error e -> failwith (Error.to_string_hum e)
-            | Ok
-                ( `Hash_after_applying staged_ledger_hash
-                , `Ledger_proof None
-                , `Staged_ledger transitioned_staged_ledger ) ->
-                assert (
-                  Staged_ledger_hash.equal root_blockchain_staged_ledger_hash
-                    staged_ledger_hash ) ;
-                transitioned_staged_ledger
-            | Ok (_, `Ledger_proof (Some _), _) ->
-                failwith
-                  "Did not expect a ledger proof after applying the first diff"
-            )
+              match%map
+                Inputs.Staged_ledger.apply pre_root_staged_ledger diff ~logger
+              with
+              | Error e -> failwith (Error.to_string_hum e)
+              | Ok
+                  ( `Hash_after_applying staged_ledger_hash
+                  , `Ledger_proof None
+                  , `Staged_ledger transitioned_staged_ledger ) ->
+                  assert (
+                    Staged_ledger_hash.equal root_blockchain_staged_ledger_hash
+                      staged_ledger_hash ) ;
+                  transitioned_staged_ledger
+              | Ok (_, `Ledger_proof (Some _), _) ->
+                  failwith
+                    "Did not expect a ledger proof after applying the first \
+                     diff" )
         in
         let root_breadcrumb =
           { Breadcrumb.transition_with_hash= root_transition

@@ -1,4 +1,5 @@
 open Core_kernel
+open Async_kernel
 open Protocols.Coda_pow
 open Pipe_lib.Strict_pipe
 open Coda_base
@@ -44,21 +45,51 @@ module Make (Inputs : Inputs.S) :
            trace_task "transition_handler_processor" (fun () ->
                match msg with
                | `Catchup_breadcrumbs breadcrumbs ->
-                   return (
-                     List.iter breadcrumbs ~f:(
-                       Rose_tree.iter ~f:(Transition_frontier.attach_breadcrumb_exn frontier)))
+                   return
+                     (List.iter breadcrumbs
+                        ~f:
+                          (Rose_tree.iter
+                             ~f:
+                               (Transition_frontier.attach_breadcrumb_exn
+                                  frontier)))
                | `Valid_transition transition -> (
-                   match
-                     Transition_frontier.find frontier
-                       (transition_parent_hash (With_hash.data transition))
-                   with
-                   | None ->
-                       return (
-                         Catchup_monitor.watch catchup_monitor
-                           ~timeout_duration:catchup_timeout_duration ~transition)
-                   | Some _ ->
-                       let%map breadcrumb = Transition_frontier.Breadcrumb.build in
-                       Transition_frontier.add_breadcrumb_exn frontier breadcrumb ;
+                 match
+                   Transition_frontier.find frontier
+                     (transition_parent_hash (With_hash.data transition))
+                 with
+                 | None ->
+                     return
+                       (Catchup_monitor.watch catchup_monitor
+                          ~timeout_duration:catchup_timeout_duration
+                          ~transition)
+                 | Some _ -> (
+                     match%map
+                       let open Deferred.Or_error.Let_syntax in
+                       let parent_hash =
+                         With_hash.data transition
+                         |> External_transition.Verified.protocol_state
+                         |> Protocol_state.previous_state_hash
+                       in
+                       let%bind parent =
+                         match
+                           Transition_frontier.find frontier parent_hash
+                         with
+                         | Some parent -> return parent
+                         | None ->
+                             Deferred.Or_error.error_string "parent not found"
+                       in
+                       let%map breadcrumb =
+                         Transition_frontier.Breadcrumb.build ~logger ~parent
+                           ~transition_with_hash:transition
+                       in
+                       Transition_frontier.add_breadcrumb_exn frontier
+                         breadcrumb ;
                        Writer.write processed_transition_writer transition ;
-                       Catchup_monitor.notify catchup_monitor ~transition ) ) ))
+                       Catchup_monitor.notify catchup_monitor ~transition
+                     with
+                     | Ok () -> ()
+                     | Error err ->
+                         Logger.error logger
+                           "error while adding transition: %s"
+                           (Error.to_string_hum err) ) ) ) ))
 end

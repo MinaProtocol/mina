@@ -719,16 +719,17 @@ module type Staged_ledger_base_intf = sig
     -> ( [`Hash_after_applying of staged_ledger_hash]
        * [`Ledger_proof of ledger_proof option]
        * [`Staged_ledger of t] )
-       Or_error.t
+       Deferred.Or_error.t
 
   (* N.B.: apply_diff_unverified is not exposed here *)
 
   val apply_diff_unchecked :
        t
     -> valid_diff
-    -> [`Hash_after_applying of staged_ledger_hash]
+    -> ( [`Hash_after_applying of staged_ledger_hash]
        * [`Ledger_proof of ledger_proof option]
-       * [`Staged_ledger of t]
+       * [`Staged_ledger of t] )
+       Deferred.Or_error.t
 
   val snarked_ledger :
     t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t

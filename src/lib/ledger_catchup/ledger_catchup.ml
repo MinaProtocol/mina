@@ -36,9 +36,7 @@ module Make (Inputs : Inputs.S) :
               (With_hash.data external_transition)
           in
           let%map _, _, `Staged_ledger staged_ledger =
-            Deferred.create (fun ivar ->
-                Ivar.fill ivar
-                @@ Staged_ledger.apply ~logger staged_ledger diff )
+            Staged_ledger.apply ~logger staged_ledger diff
           in
           let new_breadcrumb =
             Transition_frontier.Breadcrumb.create external_transition
