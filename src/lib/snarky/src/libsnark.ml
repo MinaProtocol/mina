@@ -44,9 +44,10 @@ module Make_foreign (M : Prefix_intf) = struct
   let delete = foreign (func_name "delete") (typ @-> returning void)
 end
 
-let set_profiling = foreign "camlsnark_set_profiling" (bool @-> returning void)
+let set_no_profiling =
+  foreign "camlsnark_set_profiling" (bool @-> returning void)
 
-let () = set_profiling false
+let () = set_no_profiling true
 
 module Make_G1 (M : sig
   val prefix : string
