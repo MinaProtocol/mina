@@ -1,14 +1,11 @@
 open Core
 open Async
 open Pipe_lib
+open Strict_pipe
 open O1trace
 
 module type Inputs_intf = sig
   include Protocols.Coda_pow.Inputs_intf
-
-  module State_hash : sig
-    type t
-  end
 
   module Ledger_db : sig
     type t
@@ -20,7 +17,7 @@ module type Inputs_intf = sig
 
   module Transition_frontier :
     Protocols.Coda_transition_frontier.Transition_frontier_intf
-    with type state_hash := State_hash.t
+    with type state_hash := Protocol_state_hash.t
      and type external_transition_verified := External_transition.Verified.t
      and type ledger_database := Ledger_db.t
      and type staged_ledger := Staged_ledger.t
@@ -112,7 +109,9 @@ end
 module Make (Inputs : Inputs_intf) :
   Coda_lib.Proposer_intf
   with type external_transition := Inputs.External_transition.t
-   and type state_hash := Inputs.State_hash.t
+   and type external_transition_verified :=
+              Inputs.External_transition.Verified.t
+   and type state_hash := Inputs.Protocol_state_hash.t
    and type ledger_hash := Inputs.Ledger_hash.t
    and type staged_ledger := Inputs.Staged_ledger.t
    and type transaction := Inputs.User_command.With_valid_signature.t
@@ -254,8 +253,6 @@ module Make (Inputs : Inputs_intf) :
         in
         Some (protocol_state, internal_transition) )
 
-  let transition_capacity = 64
-
   let run ~parent_log ~get_completed_work ~transaction_pool ~time_controller
       ~keypair ~consensus_local_state ~transition_frontier ~transition_writer =
     trace_task "proposer" (fun () ->
@@ -287,34 +284,43 @@ module Make (Inputs : Inputs_intf) :
           trace_event "next state generated" ;
           match next_state_opt with
           | None -> Interruptible.return ()
-          | Some (protocol_state, internal_transition) -> (
-              let open Interruptible.Let_syntax in
-              let t0 = Time.now time_controller in
-              match%bind
-                Prover.prove ~prev_state:previous_protocol_state
-                  ~prev_state_proof:previous_protocol_state_proof
-                  ~next_state:protocol_state internal_transition
-              with
-              | Error err ->
-                  Logger.error logger "failed to prove generated protocol state: %s" (Error.to_string err);
-                  return ()
-              | Ok protocol_state_proof ->
-                  let span = Time.diff (Time.now time_controller) t0 in
-                  Logger.info logger
-                    !"Protocol_state_proof proving time took: %{sexp: \
-                      int64}ms\n\
-                      %!"
-                    (Time.Span.to_ms span) ;
-                  let external_transition =
-                    External_transition.to_verified (
-                      External_transition.create ~protocol_state
-                        ~protocol_state_proof
-                        ~staged_ledger_diff:
-                          (Internal_transition.staged_ledger_diff
-                             internal_transition))
-                  in
-                  let external_transition_with_hash = {With_hash.hash = Protocol_state.hash protocol_state; data= external_transition} in
-                  Writer.write transition_writer external_transition_with_hash))
+          | Some (protocol_state, internal_transition) ->
+              Interruptible.uninterruptible
+                (let open Deferred.Let_syntax in
+                let t0 = Time.now time_controller in
+                match%bind
+                  Prover.prove ~prev_state:previous_protocol_state
+                    ~prev_state_proof:previous_protocol_state_proof
+                    ~next_state:protocol_state internal_transition
+                with
+                | Error err ->
+                    Logger.error logger
+                      "failed to prove generated protocol state: %s"
+                      (Error.to_string_hum err) ;
+                    return ()
+                | Ok protocol_state_proof ->
+                    let span = Time.diff (Time.now time_controller) t0 in
+                    Logger.info logger
+                      !"Protocol_state_proof proving time took: %{sexp: \
+                        int64}ms\n\
+                        %!"
+                      (Time.Span.to_ms span) ;
+                    (* since we generated this transition, we do not need to verify it *)
+                    let (`I_swear_this_is_safe_see_my_comment
+                          external_transition) =
+                      External_transition.to_verified
+                        (External_transition.create ~protocol_state
+                           ~protocol_state_proof
+                           ~staged_ledger_diff:
+                             (Internal_transition.staged_ledger_diff
+                                internal_transition))
+                    in
+                    let external_transition_with_hash =
+                      { With_hash.hash= Protocol_state.hash protocol_state
+                      ; data= external_transition }
+                    in
+                    Writer.write transition_writer
+                      external_transition_with_hash)
         in
         let proposal_supervisor = Singleton_supervisor.create ~task:propose in
         let scheduler = Singleton_scheduler.create time_controller in
