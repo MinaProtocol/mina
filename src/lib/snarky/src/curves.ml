@@ -799,25 +799,25 @@ module Make_weierstrass_checked
     in
     (choose x1 x2, choose y1 y2)
 
-  let scale (type shifted) (module Shifted : Shifted.S with type t = shifted) t
+  let%snarkydef scale (type shifted)
+      (module Shifted : Shifted.S with type t = shifted) t
       (c : Boolean.var Bitstring_lib.Bitstring.Lsb_first.t) ~(init : shifted) :
       (shifted, _) Checked.t =
     let c = Bitstring_lib.Bitstring.Lsb_first.to_list c in
-    with_label __LOC__
-      (let open Let_syntax in
-      let rec go i bs0 acc pt =
-        match bs0 with
-        | [] -> return acc
-        | b :: bs ->
-            let%bind acc' =
-              with_label (sprintf "acc_%d" i)
-                (let%bind add_pt = Shifted.add acc pt in
-                 let don't_add_pt = acc in
-                 Shifted.if_ b ~then_:add_pt ~else_:don't_add_pt)
-            and pt' = double pt in
-            go (i + 1) bs acc' pt'
-      in
-      go 0 c init t)
+    let open Let_syntax in
+    let rec go i bs0 acc pt =
+      match bs0 with
+      | [] -> return acc
+      | b :: bs ->
+          let%bind acc' =
+            with_label (sprintf "acc_%d" i)
+              (let%bind add_pt = Shifted.add acc pt in
+               let don't_add_pt = acc in
+               Shifted.if_ b ~then_:add_pt ~else_:don't_add_pt)
+          and pt' = double pt in
+          go (i + 1) bs acc' pt'
+    in
+    go 0 c init t
 
   (* This 'looks up' a field element from a lookup table of size 2^2 = 4 with
    a 2 bit index.  See https://github.com/zcash/zcash/issues/2234#issuecomment-383736266 for

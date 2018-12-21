@@ -199,92 +199,90 @@ module Base = struct
           - fee excess = -(amount + fee)
   *)
   (* Nonce should only be incremented if it is a "Normal" transaction. *)
-  let apply_tagged_transaction (type shifted)
+  let%snarkydef apply_tagged_transaction (type shifted)
       (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
       root ({sender; signature; payload} : Transaction_union.var) =
-    with_label __LOC__
-      (let nonce = payload.common.nonce in
-       let tag = payload.body.tag in
-       let%bind payload_section = Schnorr.Message.var_of_payload payload in
-       let%bind is_user_command =
-         Transaction_union.Tag.Checked.is_user_command tag
-       in
-       let%bind () =
-         check_signature shifted ~payload_section ~is_user_command ~sender
-           ~signature
-       in
-       let%bind {excess; sender_delta; supply_increase; receiver_increase} =
-         Transaction_union_payload.Changes.Checked.of_payload payload
-       in
-       let%bind is_stake_delegation =
-         Transaction_union.Tag.Checked.is_stake_delegation tag
-       in
-       let%bind sender_compressed = Public_key.compress_var sender in
-       let%bind root =
-         let%bind is_fee_transfer =
-           Transaction_union.Tag.Checked.is_fee_transfer tag
-         in
-         Frozen_ledger_hash.modify_account_send root ~is_fee_transfer
-           sender_compressed ~f:(fun ~is_empty_and_writeable account ->
-             with_label __LOC__
-               (let%bind next_nonce =
-                  Account.Nonce.increment_if_var account.nonce is_user_command
-                in
-                let%bind () =
-                  with_label __LOC__
-                    (let%bind nonce_matches =
-                       Account.Nonce.equal_var nonce account.nonce
-                     in
-                     Boolean.Assert.any
-                       [Boolean.not is_user_command; nonce_matches])
-                in
-                let%bind receipt_chain_hash =
-                  let current = account.receipt_chain_hash in
-                  let%bind r =
-                    Receipt.Chain_hash.Checked.cons ~payload:payload_section
-                      current
-                  in
-                  Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
-                    ~else_:current
-                in
-                let%bind delegate =
-                  let if_ = chain Public_key.Compressed.Checked.if_ in
-                  if_ is_empty_and_writeable ~then_:(return sender_compressed)
-                    ~else_:
-                      (if_ is_stake_delegation
-                         ~then_:(return payload.body.public_key)
-                         ~else_:(return account.delegate))
-                in
-                let%map balance =
-                  Balance.Checked.add_signed_amount account.balance
-                    sender_delta
-                in
-                { Account.balance
-                ; public_key= sender_compressed
-                ; nonce= next_nonce
-                ; receipt_chain_hash
-                ; delegate }) )
-       in
-       let%bind receiver =
-         (* A stake delegation only uses the sender *)
-         Public_key.Compressed.Checked.if_ is_stake_delegation
-           ~then_:sender_compressed ~else_:payload.body.public_key
-       in
-       (* we explicitly set the public_key because it could be zero if the account is new *)
-       let%map root =
-         (* This update should be a no-op in the stake delegation case *)
-         Frozen_ledger_hash.modify_account_recv root receiver
-           ~f:(fun ~is_empty_and_writeable account ->
-             let%map balance =
-               (* receiver_increase will be zero in the stake delegation case *)
-               Balance.Checked.(account.balance + receiver_increase)
-             and delegate =
-               Public_key.Compressed.Checked.if_ is_empty_and_writeable
-                 ~then_:receiver ~else_:account.delegate
+    let nonce = payload.common.nonce in
+    let tag = payload.body.tag in
+    let%bind payload_section = Schnorr.Message.var_of_payload payload in
+    let%bind is_user_command =
+      Transaction_union.Tag.Checked.is_user_command tag
+    in
+    let%bind () =
+      check_signature shifted ~payload_section ~is_user_command ~sender
+        ~signature
+    in
+    let%bind {excess; sender_delta; supply_increase; receiver_increase} =
+      Transaction_union_payload.Changes.Checked.of_payload payload
+    in
+    let%bind is_stake_delegation =
+      Transaction_union.Tag.Checked.is_stake_delegation tag
+    in
+    let%bind sender_compressed = Public_key.compress_var sender in
+    let%bind root =
+      let%bind is_fee_transfer =
+        Transaction_union.Tag.Checked.is_fee_transfer tag
+      in
+      Frozen_ledger_hash.modify_account_send root ~is_fee_transfer
+        sender_compressed ~f:(fun ~is_empty_and_writeable account ->
+          with_label __LOC__
+            (let%bind next_nonce =
+               Account.Nonce.increment_if_var account.nonce is_user_command
              in
-             {account with balance; delegate; public_key= receiver} )
-       in
-       (root, excess, supply_increase))
+             let%bind () =
+               with_label __LOC__
+                 (let%bind nonce_matches =
+                    Account.Nonce.equal_var nonce account.nonce
+                  in
+                  Boolean.Assert.any
+                    [Boolean.not is_user_command; nonce_matches])
+             in
+             let%bind receipt_chain_hash =
+               let current = account.receipt_chain_hash in
+               let%bind r =
+                 Receipt.Chain_hash.Checked.cons ~payload:payload_section
+                   current
+               in
+               Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
+                 ~else_:current
+             in
+             let%bind delegate =
+               let if_ = chain Public_key.Compressed.Checked.if_ in
+               if_ is_empty_and_writeable ~then_:(return sender_compressed)
+                 ~else_:
+                   (if_ is_stake_delegation
+                      ~then_:(return payload.body.public_key)
+                      ~else_:(return account.delegate))
+             in
+             let%map balance =
+               Balance.Checked.add_signed_amount account.balance sender_delta
+             in
+             { Account.balance
+             ; public_key= sender_compressed
+             ; nonce= next_nonce
+             ; receipt_chain_hash
+             ; delegate }) )
+    in
+    let%bind receiver =
+      (* A stake delegation only uses the sender *)
+      Public_key.Compressed.Checked.if_ is_stake_delegation
+        ~then_:sender_compressed ~else_:payload.body.public_key
+    in
+    (* we explicitly set the public_key because it could be zero if the account is new *)
+    let%map root =
+      (* This update should be a no-op in the stake delegation case *)
+      Frozen_ledger_hash.modify_account_recv root receiver
+        ~f:(fun ~is_empty_and_writeable account ->
+          let%map balance =
+            (* receiver_increase will be zero in the stake delegation case *)
+            Balance.Checked.(account.balance + receiver_increase)
+          and delegate =
+            Public_key.Compressed.Checked.if_ is_empty_and_writeable
+              ~then_:receiver ~else_:account.delegate
+          in
+          {account with balance; delegate; public_key= receiver} )
+    in
+    (root, excess, supply_increase)
 
   (* Someday:
    write the following soundness tests:
