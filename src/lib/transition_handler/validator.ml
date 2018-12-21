@@ -30,7 +30,6 @@ module Make (Inputs : Inputs.S) :
   open Consensus.Mechanism
   open Deferred.Let_syntax
 
-  (* NOTE FOR PR REVIEWER: are these lazys confusing? is there a neater way to do this? *)
   let validate_transition ?time_received ~logger ~frontier transition_with_hash
       =
     let open With_hash in
@@ -79,7 +78,8 @@ module Make (Inputs : Inputs.S) :
               protocol_state
           in
           if valid then
-            let (`I_swear_this_is_safe_don't_kill_me verified_transition) =
+            (* validation has completed successfully, so we can cast the transition *)
+            let (`I_swear_this_is_safe_see_my_comment verified_transition) =
               External_transition.to_verified transition
             in
             Ok {hash; data= verified_transition}

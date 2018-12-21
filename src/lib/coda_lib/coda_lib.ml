@@ -633,7 +633,8 @@ module Make (Inputs : Inputs_intf) = struct
         let genesis_protocol_state =
           With_hash.data Consensus_mechanism.genesis_protocol_state
         in
-        let (`I_swear_this_is_safe_don't_kill_me first_transition) =
+        (* the genesis transition is assumed to be valid *)
+        let (`I_swear_this_is_safe_see_my_comment first_transition) =
           External_transition.to_verified
             (External_transition.create ~protocol_state:genesis_protocol_state
                ~protocol_state_proof:Protocol_state_proof.dummy
