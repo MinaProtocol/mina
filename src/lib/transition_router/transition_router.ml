@@ -89,21 +89,21 @@ module Make (Inputs : Inputs_intf) :
     |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
     |> External_transition.forget |> External_transition.protocol_state
 
-  let set_bootstrap_mode ~frontier_ref ~mode root_state
+  let set_bootstrap_mode ~frontier_mvar ~mode root_state
       bootstrap_controller_writer =
     assert (not @@ is_bootstrapping !mode) ;
-    let _ : Transition_frontier.t = Mvar.take_now_exn frontier_ref in
+    let _ : Transition_frontier.t = Mvar.take_now_exn frontier_mvar in
     mode := `Bootstrap_controller (root_state, bootstrap_controller_writer)
 
-  let set_transition_frontier_controller_mode ~frontier_ref ~mode new_frontier
+  let set_transition_frontier_controller_mode ~frontier_mvar ~mode new_frontier
       reader writer =
     assert (not @@ is_bootstrapping !mode) ;
-    assert (not @@ Mvar.is_empty frontier_ref) ;
-    Mvar.set frontier_ref new_frontier ;
+    assert (not @@ Mvar.is_empty frontier_mvar) ;
+    Mvar.set frontier_mvar new_frontier ;
     mode := `Transition_frontier_controller (new_frontier, reader, writer)
 
   (* TODO: Wrap frontier with a Mvar #1323 *)
-  let run ~logger ~network ~time_controller ~frontier_ref ~ledger_db
+  let run ~logger ~network ~time_controller ~frontier_mvar ~ledger_db
       ~transition_reader =
     let clean_transition_frontier_controller_and_start_bootstrap ~mode
         ~clear_writer ~transition_frontier_controller_reader
@@ -116,7 +116,7 @@ module Make (Inputs : Inputs_intf) :
         create_bufferred_pipe ()
       in
       let root_state = get_root_state old_frontier in
-      set_bootstrap_mode ~frontier_ref ~mode root_state
+      set_bootstrap_mode ~frontier_mvar ~mode root_state
         bootstrap_controller_writer ;
       let ancestor_prover =
         Ancestor.Prover.create ~max_size:(2 * Transition_frontier.max_length)
@@ -149,7 +149,7 @@ module Make (Inputs : Inputs_intf) :
     let verified_transition_reader, verified_transition_writer =
       create_bufferred_pipe ()
     in
-    let frontier = Mvar.take_now_exn frontier_ref in
+    let frontier = Mvar.take_now_exn frontier_mvar in
     let ( transition_frontier_controller_reader
         , transition_frontier_controller_writer ) =
       start_transition_frontier_controller ~verified_transition_writer
@@ -162,7 +162,7 @@ module Make (Inputs : Inputs_intf) :
            , transition_frontier_controller_reader
            , transition_frontier_controller_writer )
     in
-    Mvar.set frontier_ref frontier ;
+    Mvar.set frontier_mvar frontier ;
     Strict_pipe.Reader.iter transition_reader ~f:(fun network_transition ->
         let `Transition incoming_transition, `Time_received tm =
           network_transition
@@ -185,7 +185,7 @@ module Make (Inputs : Inputs_intf) :
                 start_transition_frontier_controller
                   ~verified_transition_writer ~clear_reader new_frontier
               in
-              set_transition_frontier_controller_mode ~frontier_ref ~mode
+              set_transition_frontier_controller_mode ~frontier_mvar ~mode
                 new_frontier reader writer
             else (
               Strict_pipe.Writer.write transition_frontier_controller_writer

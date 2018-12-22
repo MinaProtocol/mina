@@ -258,8 +258,7 @@ module T = struct
       let coda_peers () = return (Main.peers coda) in
       let coda_start () = return (Main.start coda) in
       let coda_get_balance pk =
-        return
-          (Run.get_balance coda pk |> Participating_state.participating_exn)
+        return (Run.get_balance coda pk |> Participating_state.active_exn)
       in
       let coda_send_payment (sk, pk, amount, fee, memo) =
         let pk_of_sk sk =
@@ -268,7 +267,7 @@ module T = struct
         let build_txn amount sender_sk receiver_pk fee =
           let nonce =
             Run.get_nonce coda (pk_of_sk sender_sk)
-            |> Participating_state.participating_exn |> Option.value_exn
+            |> Participating_state.active_exn |> Option.value_exn
           in
           let payload : User_command.Payload.t =
             User_command.Payload.create ~fee ~nonce ~memo
@@ -280,7 +279,7 @@ module T = struct
         let%map receipt =
           Run.send_payment log coda (payment :> User_command.t)
         in
-        receipt |> Participating_state.participating_exn
+        receipt |> Participating_state.active_exn
       in
       let coda_prove_receipt (proving_receipt, resulting_receipt) =
         match%map

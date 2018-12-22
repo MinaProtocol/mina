@@ -253,7 +253,7 @@ module Make (Inputs : Inputs_intf) :
   let transition_capacity = 64
 
   let create ~parent_log ~get_completed_work ~transaction_pool ~time_controller
-      ~keypair ~consensus_local_state ~frontier_ref =
+      ~keypair ~consensus_local_state ~frontier_reader =
     trace_task "proposer" (fun () ->
         let logger = Logger.child parent_log __MODULE__ in
         let log_bootstrap_mode () =
@@ -265,7 +265,7 @@ module Make (Inputs : Inputs_intf) :
         let module Crumb = Transition_frontier.Breadcrumb in
         let propose ivar proposal_data =
           let open Interruptible.Let_syntax in
-          match Mvar.peek frontier_ref with
+          match Mvar.peek frontier_reader with
           | None -> Interruptible.return (log_bootstrap_mode ())
           | Some frontier -> (
               let crumb = Transition_frontier.best_tip frontier in
@@ -326,7 +326,7 @@ module Make (Inputs : Inputs_intf) :
         let proposal_supervisor = Singleton_supervisor.create ~task:propose in
         let scheduler = Singleton_scheduler.create time_controller in
         let rec check_for_proposal () =
-          match Mvar.peek frontier_ref with
+          match Mvar.peek frontier_reader with
           | None -> log_bootstrap_mode ()
           | Some frontier -> (
               let crumb = Transition_frontier.best_tip frontier in

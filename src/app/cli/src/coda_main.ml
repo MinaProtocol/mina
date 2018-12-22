@@ -942,7 +942,7 @@ struct
       ~(snark_pool : 'a -> Snark_pool.t) (t : 'a) (fee : Fee.Unsigned.t) =
     let best_staged_ledger t =
       match best_staged_ledger t with
-      | `Participating staged_ledger -> Some staged_ledger
+      | `Active staged_ledger -> Some staged_ledger
       | `Bootstrapping ->
           Logger.info log
             "Could not retrieve staged_ledger due to bootstrapping" ;
@@ -1232,11 +1232,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =
     Option.map Consensus.Mechanism.Consensus_state.to_lite
       ~f:(fun consensus_state_to_lite t pks ->
-        let ledger = best_ledger t |> Participating_state.participating_exn in
+        let ledger = best_ledger t |> Participating_state.active_exn in
         let transition =
           With_hash.data
             (Transition_frontier.Breadcrumb.transition_with_hash
-               (best_tip t |> Participating_state.participating_exn))
+               (best_tip t |> Participating_state.active_exn))
         in
         let state = External_transition.Verified.protocol_state transition in
         let proof =
@@ -1287,24 +1287,22 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let client_impls =
       [ Rpc.Rpc.implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
             let%map result = send_payment log coda tx in
-            result |> Participating_state.participating_exn )
+            result |> Participating_state.active_exn )
       ; Rpc.Rpc.implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
-            schedule_payments log coda ts
-            |> Participating_state.participating_exn ;
+            schedule_payments log coda ts |> Participating_state.active_exn ;
             Deferred.unit )
       ; Rpc.Rpc.implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
-            return
-              (get_balance coda pk |> Participating_state.participating_exn) )
+            return (get_balance coda pk |> Participating_state.active_exn) )
       ; Rpc.Rpc.implement Daemon_rpcs.Verify_proof.rpc
           (fun () (pk, tx, proof) ->
             return
               ( verify_payment coda log pk tx proof
-              |> Participating_state.participating_exn ) )
+              |> Participating_state.active_exn ) )
       ; Rpc.Rpc.implement Daemon_rpcs.Prove_receipt.rpc
           (fun () (proving_receipt, pk) ->
             let open Deferred.Or_error.Let_syntax in
             let%bind account =
-              get_account coda pk |> Participating_state.participating_exn
+              get_account coda pk |> Participating_state.active_exn
               |> Result.of_option
                    ~error:
                      (Error.of_string
@@ -1319,21 +1317,16 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       ; Rpc.Rpc.implement Daemon_rpcs.Get_public_keys_with_balances.rpc
           (fun () () ->
             return
-              ( get_keys_with_balances coda
-              |> Participating_state.participating_exn ) )
+              (get_keys_with_balances coda |> Participating_state.active_exn)
+        )
       ; Rpc.Rpc.implement Daemon_rpcs.Get_public_keys.rpc (fun () () ->
-            return
-              (get_public_keys coda |> Participating_state.participating_exn)
-        )
+            return (get_public_keys coda |> Participating_state.active_exn) )
       ; Rpc.Rpc.implement Daemon_rpcs.Get_nonce.rpc (fun () pk ->
-            return (get_nonce coda pk |> Participating_state.participating_exn)
-        )
+            return (get_nonce coda pk |> Participating_state.active_exn) )
       ; Rpc.Rpc.implement Daemon_rpcs.Get_status.rpc (fun () () ->
-            return (get_status coda |> Participating_state.participating_exn)
-        )
+            return (get_status coda |> Participating_state.active_exn) )
       ; Rpc.Rpc.implement Daemon_rpcs.Clear_hist_status.rpc (fun () () ->
-            return
-              (clear_hist_status coda |> Participating_state.participating_exn)
+            return (clear_hist_status coda |> Participating_state.active_exn)
         )
       ; Rpc.Rpc.implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
             get_ledger coda lh )
@@ -1381,8 +1374,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                   match Uri.path uri with
                   | "/status" ->
                       Server.respond_string
-                        ( get_status coda
-                        |> Participating_state.participating_exn
+                        ( get_status coda |> Participating_state.active_exn
                         |> Daemon_rpcs.Types.Status.to_yojson
                         |> Yojson.Safe.pretty_to_string )
                   | _ -> route_not_found () )) )

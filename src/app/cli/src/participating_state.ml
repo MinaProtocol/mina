@@ -1,14 +1,12 @@
 open Core_kernel
 
 module T = struct
-  type 'a t = [`Participating of 'a | `Bootstrapping]
+  type 'a t = [`Active of 'a | `Bootstrapping]
 
-  let return value = `Participating value
+  let return value = `Active value
 
   let bind x ~(f : 'a -> 'b t) =
-    match x with
-    | `Participating value -> f value
-    | `Bootstrapping -> `Bootstrapping
+    match x with `Active value -> f value | `Bootstrapping -> `Bootstrapping
 
   let map = `Define_using_bind
 end
@@ -20,12 +18,12 @@ module Option = struct
   module T = struct
     type 'a t = 'a option T.t
 
-    let return value = `Participating (Some value)
+    let return value = `Active (Some value)
 
     let bind value_option_status ~f =
       match value_option_status with
-      | `Participating (Some value_option) -> f value_option
-      | `Participating None -> `Participating None
+      | `Active (Some value_option) -> f value_option
+      | `Active None -> `Active None
       | `Bootstrapping -> `Bootstrapping
 
     let map = `Define_using_bind
@@ -34,8 +32,8 @@ module Option = struct
   include Monad.Make (T)
 end
 
-let participating_exn = function
-  | `Participating x -> x
+let active_exn = function
+  | `Active x -> x
   | `Bootstrapping -> failwith "Should be particpating node"
 
 let rec sequence (list : 'a T.t List.t) : 'a List.t T.t =

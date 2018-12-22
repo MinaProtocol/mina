@@ -357,7 +357,7 @@ module type Transition_router_intf = sig
        logger:Logger.t
     -> network:network
     -> time_controller:time_controller
-    -> frontier_ref:transition_frontier Mvar.Read_write.t
+    -> frontier_mvar:transition_frontier Mvar.Read_write.t
     -> ledger_db:ledger_db
     -> transition_reader:( [ `Transition of external_transition
                                             Envelope.Incoming.t ]

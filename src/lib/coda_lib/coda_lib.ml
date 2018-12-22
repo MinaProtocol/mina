@@ -295,7 +295,7 @@ module type Proposer_intf = sig
     -> time_controller:time_controller
     -> keypair:keypair
     -> consensus_local_state:consensus_local_state
-    -> frontier_ref:transition_frontier Mvar.Read_only.t
+    -> frontier_reader:transition_frontier Mvar.Read_only.t
     -> (external_transition Envelope.Incoming.t * time) Linear_pipe.Reader.t
 end
 
@@ -506,8 +506,8 @@ module Make (Inputs : Inputs_intf) = struct
     ; time_controller: Time.Controller.t
     ; snark_work_fee: Currency.Fee.t }
 
-  let peek_frontier frontier_ref =
-    Mvar.peek frontier_ref
+  let peek_frontier frontier_mvar =
+    Mvar.peek frontier_mvar
     |> Result.of_option
          ~error:
            (Error.of_string
@@ -539,17 +539,18 @@ module Make (Inputs : Inputs_intf) = struct
     let%map staged_ledger = best_staged_ledger_opt t in
     Staged_ledger.ledger staged_ledger
 
-  let of_option value =
-    Option.value_map value ~default:`Bootstrapping ~f:(fun x ->
-        `Participating x )
+  let compose_of_option f =
+    Fn.compose
+      (Option.value_map ~default:`Bootstrapping ~f:(fun x -> `Active x))
+      f
 
-  let best_tip = Fn.compose of_option best_tip_opt
+  let best_tip = compose_of_option best_tip_opt
 
-  let best_staged_ledger = Fn.compose of_option best_staged_ledger_opt
+  let best_staged_ledger = compose_of_option best_staged_ledger_opt
 
-  let best_protocol_state = Fn.compose of_option best_protocol_state_opt
+  let best_protocol_state = compose_of_option best_protocol_state_opt
 
-  let best_ledger = Fn.compose of_option best_ledger_opt
+  let best_ledger = compose_of_option best_ledger_opt
 
   let get_ledger t staged_ledger_hash =
     let open Deferred.Or_error.Let_syntax in
@@ -640,7 +641,7 @@ module Make (Inputs : Inputs_intf) = struct
             ~transaction_pool:t.transaction_pool
             ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
             ~time_controller:t.time_controller ~keypair ~consensus_local_state
-            ~frontier_ref:t.transition_frontier
+            ~frontier_reader:t.transition_frontier
         in
         don't_wait_for
           (Linear_pipe.transfer_id transitions t.external_transitions_writer)
@@ -674,7 +675,7 @@ module Make (Inputs : Inputs_intf) = struct
             ~staged_ledger_diff:empty_diff_verified
         in
         let ledger_db = Ledger_db.create () in
-        let%bind _transition_frontier =
+        let%bind transition_frontier =
           Transition_frontier.create ~logger:config.log
             ~root_transition:
               (With_hash.of_data first_transition
@@ -688,9 +689,9 @@ module Make (Inputs : Inputs_intf) = struct
               (Ledger_transfer.transfer_accounts ~src:Genesis.ledger
                  ~dest:ledger_db)
         in
-        let frontier_read_write_ref = Mvar.create () in
-        Mvar.set frontier_read_write_ref _transition_frontier ;
-        let frontier_read_ref = Mvar.read_only frontier_read_write_ref in
+        let frontier_mvar = Mvar.create () in
+        Mvar.set frontier_mvar transition_frontier ;
+        let frontier_read_ref = Mvar.read_only frontier_mvar in
         let%bind net =
           Net.create config.net_config
             ~get_staged_ledger_aux_at_hash:(fun _hash ->
@@ -745,8 +746,7 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let valid_transitions =
           Transition_router.run ~logger:config.log ~network:net
-            ~time_controller:config.time_controller
-            ~frontier_ref:frontier_read_write_ref ~ledger_db
+            ~time_controller:config.time_controller ~frontier_mvar ~ledger_db
             ~transition_reader:
               (Strict_pipe.Reader.of_linear_pipe
                  (Linear_pipe.map external_transitions_reader
