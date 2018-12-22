@@ -595,7 +595,7 @@ module type Ledger_builder_intf = sig
     -> get_completed_work:(statement -> completed_work option)
     -> valid_diff
 
-  val all_work_pairs :
+  val all_work_pairs_exn :
        t
     -> ( ( ledger_proof_statement
          , transaction

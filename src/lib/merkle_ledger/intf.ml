@@ -1,11 +1,13 @@
 open Core
 
 module type Key = sig
-  type t [@@deriving sexp, bin_io, eq]
+  type t [@@deriving sexp, bin_io]
 
   val empty : t
 
   include Hashable.S_binable with type t := t
+
+  include Comparable.S with type t := t
 end
 
 module type Balance = sig

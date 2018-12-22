@@ -21,6 +21,7 @@ module Make
      and type root_hash := Hash.t
      and type account := Account.t
      and type key := Key.t
+     and type key_set := Key.Set.t
 
   val create : unit -> t
 
@@ -67,11 +68,21 @@ end = struct
 
   let fold_until = C.fold_until
 
-  let foldi t ~init ~f =
+  let key_of_index t index =
+    if index >= Dyn_array.length t.accounts then None
+    else Some (Dyn_array.get t.accounts index |> Account.public_key)
+
+  let foldi_with_ignored_keys t ignored_keys ~init ~f =
     Dyn_array.fold_left
-      (fun (i, acc) x -> (i + 1, f (Addr.of_int_exn i) acc x))
+      (fun (i, acc) x ->
+        (* won't throw exn because folding over existing indices *)
+        let key = Option.value_exn (key_of_index t i) in
+        if Key.Set.mem ignored_keys key then (i + 1, acc)
+        else (i + 1, f (Addr.of_int_exn i) acc x) )
       (0, init) t.accounts
     |> snd
+
+  let foldi t ~init ~f = foldi_with_ignored_keys t Key.Set.empty ~init ~f
 
   module Location = struct
     type t = index [@@deriving sexp, compare, hash, eq]
@@ -129,10 +140,6 @@ end = struct
   let get_uuid t = t.uuid
 
   let num_accounts t = Key.Table.length t.tree.leafs
-
-  let key_of_index t index =
-    if index >= Dyn_array.length t.accounts then None
-    else Some (Dyn_array.get t.accounts index |> Account.public_key)
 
   let location_of_key t key = Hashtbl.find t.tree.leafs key
 

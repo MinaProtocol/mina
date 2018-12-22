@@ -42,7 +42,7 @@ let run_test () : unit Deferred.t =
     let transaction_capacity_log_2 =
       if with_snark then 1
         (*this works because we don't have prover fees. Once we have that, the transaction_capacity_log_2 has to be at least 2 for transactions to be included*)
-      else 3
+      else 2
 
     let commit_id = None
 
@@ -145,6 +145,7 @@ let run_test () : unit Deferred.t =
     in
     User_command.sign (Keypair.of_private_key_exn sender_sk) payload
   in
+  let assert_ok x = assert (Or_error.is_ok x) in
   let test_sending_payment sender_sk receiver_pk =
     let payment =
       build_payment send_amount sender_sk receiver_pk (Currency.Fee.of_int 0)
@@ -156,17 +157,17 @@ let run_test () : unit Deferred.t =
       Run.get_balance coda receiver_pk
       |> Option.value ~default:Currency.Balance.zero
     in
-    let%bind _ : Receipt.Chain_hash.t =
-      Run.send_payment log coda (payment :> User_command.t)
-    in
-    (* Send a similar the payment twice on purpose; this second one
-    * will be rejected because the nonce is wrong *)
+    let%bind p1_res = Run.send_payment log coda (payment :> User_command.t) in
+    assert_ok p1_res ;
+    (* Send a similar payment twice on purpose; this second one will be rejected
+       because the nonce is wrong *)
     let payment' =
       build_payment send_amount sender_sk receiver_pk (Currency.Fee.of_int 0)
     in
-    let%bind _ : Receipt.Chain_hash.t =
-      Run.send_payment log coda (payment' :> User_command.t)
-    in
+    let%bind p2_res = Run.send_payment log coda (payment' :> User_command.t) in
+    assert_ok p2_res ;
+    (* The payment fails, but the rpc command doesn't indicate that because that
+       failure comes from the network. *)
     (* Let the system settle, mine some blocks *)
     let%map () =
       balance_change_or_timeout ~initial_receiver_balance:prev_receiver_balance
@@ -193,10 +194,8 @@ let run_test () : unit Deferred.t =
           Option.value_exn
             (Currency.Balance.add_amount (Option.value_exn v) amount) )
     in
-    let%map _ : Receipt.Chain_hash.t =
-      Run.send_payment log coda (payment :> User_command.t)
-    in
-    new_balance_sheet'
+    let%map p_res = Run.send_payment log coda (payment :> User_command.t) in
+    assert_ok p_res ; new_balance_sheet'
   in
   let send_payments accounts pks balance_sheet f_amount =
     Deferred.List.foldi accounts ~init:balance_sheet
@@ -294,7 +293,7 @@ let run_test () : unit Deferred.t =
     assert (block_count coda > block_count')
   else
     let%bind _ =
-      test_multiple_payments other_accounts (pks other_accounts) 3.
+      test_multiple_payments other_accounts (pks other_accounts) 5.
     in
     test_duplicate_payments sender_keypair receiver_keypair
 

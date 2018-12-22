@@ -11,9 +11,9 @@ The ledger builder has been suffering from scope creep for some time now. As we 
 ## Detailed design
 [detailed-design]: #detailed-design
 
-[Full architecture](../docs/res/all_data_structures.png)
+[Full architecture](../docs/res/all_data_structures.dot.png)
 
-![](../docs/res/ledger_builder_data_structures.png)
+![](../docs/res/ledger_builder_data_structures.dot.png)
 
 ### `Merkle_ledger`
 
