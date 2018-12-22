@@ -744,6 +744,6 @@ of the tree *)
 ## Acknowledgements
 
 <div class="thanks">
-Thanks to Evan Shapiro for working through these data structures with me when we were first figuring this stuff out.&nbsp;Thanks to Deepthi Kumar for collaborating with me on several optimizations.&nbsp;Thanks to Laxman Dhulipala for taking a video call early on, and helping with an early core insight about the multiple trees.&nbsp;Finally, thanks to Omer Zach and Corey Richardson (and Evan and Deepthi) for their very thorough feedback on drafts of this&nbsp;post!
+Thanks to Evan Shapiro for working through these data structures with me when we were first figuring this stuff out.&nbsp;Thanks to Deepthi Kumar for collaborating with me on several optimizations.&nbsp;Thanks to Laxman Dhulipala for taking a video call early on and helping with an early core insight about the multiple trees.&nbsp;Finally, thanks to Omer Zach and Corey Richardson (and Evan and Deepthi) for their very thorough feedback on drafts of this&nbsp;post!
 </div>
 
