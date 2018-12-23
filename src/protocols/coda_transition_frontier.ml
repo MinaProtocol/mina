@@ -212,10 +212,14 @@ module type Transition_handler_processor_intf = sig
        logger:Logger.t
     -> time_controller:time_controller
     -> frontier:transition_frontier
-    -> valid_transition_reader:( external_transition_verified
-                               , state_hash )
-                               With_hash.t
-                               Reader.t
+    -> primary_transition_reader:( external_transition_verified
+                                 , state_hash )
+                                 With_hash.t
+                                 Reader.t
+    -> proposer_transition_reader:( external_transition_verified
+                                  , state_hash )
+                                  With_hash.t
+                                  Reader.t
     -> catchup_job_writer:( ( external_transition_verified
                             , state_hash )
                             With_hash.t
@@ -333,10 +337,14 @@ module type Transition_frontier_controller_intf = sig
     -> network:network
     -> time_controller:time_controller
     -> frontier:transition_frontier
-    -> transition_reader:( [ `Transition of external_transition
-                                            Envelope.Incoming.t ]
-                         * [`Time_received of time] )
-                         Reader.t
+    -> network_transition_reader:( [ `Transition of external_transition
+                                                    Envelope.Incoming.t ]
+                                 * [`Time_received of time] )
+                                 Reader.t
+    -> proposer_transition_reader:( external_transition_verified
+                                  , state_hash )
+                                  With_hash.t
+                                  Reader.t
     -> clear_reader:[`Clear] Reader.t
     -> (external_transition_verified, state_hash) With_hash.t Reader.t
 end
@@ -364,9 +372,13 @@ module type Transition_router_intf = sig
     -> time_controller:time_controller
     -> frontier:transition_frontier
     -> ledger_db:ledger_db
-    -> transition_reader:( [ `Transition of external_transition
-                                            Envelope.Incoming.t ]
-                         * [`Time_received of time] )
-                         Reader.t
+    -> network_transition_reader:( [ `Transition of external_transition
+                                                    Envelope.Incoming.t ]
+                                 * [`Time_received of time] )
+                                 Reader.t
+    -> proposer_transition_reader:( external_transition_verified
+                                  , state_hash )
+                                  With_hash.t
+                                  Reader.t
     -> (external_transition_verified, state_hash) With_hash.t Reader.t
 end

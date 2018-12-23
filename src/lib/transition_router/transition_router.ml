@@ -92,7 +92,7 @@ module Make (Inputs : Inputs_intf) :
 
   (* TODO: Wrap frontier with a Mvar #1323 *)
   let run ~logger ~network ~time_controller ~frontier ~ledger_db
-      ~transition_reader =
+      ~network_transition_reader ~proposer_transition_reader =
     let clean_transition_frontier_controller_and_start_bootstrap ~mode
         ~clear_writer ~transition_frontier_controller_reader
         ~transition_frontier_controller_writer
@@ -122,7 +122,8 @@ module Make (Inputs : Inputs_intf) :
       let transition_reader, transition_writer = create_bufferred_pipe () in
       let new_verified_transition_reader =
         Transition_frontier_controller.run ~logger ~network ~time_controller
-          ~frontier ~transition_reader ~clear_reader
+          ~frontier ~network_transition_reader:transition_reader
+          ~proposer_transition_reader ~clear_reader
       in
       Strict_pipe.Reader.iter new_verified_transition_reader
         ~f:
@@ -141,7 +142,8 @@ module Make (Inputs : Inputs_intf) :
            (start_transition_frontier_controller ~verified_transition_writer
               ~clear_reader)
     in
-    Strict_pipe.Reader.iter transition_reader ~f:(fun network_transition ->
+    Strict_pipe.Reader.iter network_transition_reader
+      ~f:(fun network_transition ->
         let `Transition incoming_transition, `Time_received tm =
           network_transition
         in
