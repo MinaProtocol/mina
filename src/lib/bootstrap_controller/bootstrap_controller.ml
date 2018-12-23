@@ -165,10 +165,13 @@ module Make (Inputs : Inputs_intf) :
       | Some children ->
           Deferred.List.iter children ~f:(fun transition_with_hash ->
               let%bind breadcrumb =
-                Transition_frontier.Breadcrumb.build ~logger
-                  ~parent:(Transition_frontier.find_exn frontier parent_hash)
-                  ~transition_with_hash
-                >>| Or_error.ok_exn
+                match%map
+                  Transition_frontier.Breadcrumb.build ~logger ~parent
+                    ~transition_with_hash
+                with
+                | Error (`Validation_error e) -> (*TODO: Punish*) Error.raise e
+                | Error (`Fatal_error e) -> raise e
+                | Ok breadcrumb -> breadcrumb
               in
               Transition_frontier.add_breadcrumb_exn frontier breadcrumb ;
               dfs breadcrumb )

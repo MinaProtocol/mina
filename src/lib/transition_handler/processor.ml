@@ -64,7 +64,7 @@ module Make (Inputs : Inputs.S) :
                           ~transition)
                  | Some _ -> (
                      match%map
-                       let open Deferred.Or_error.Let_syntax in
+                       let open Deferred.Result.Let_syntax in
                        let parent_hash =
                          With_hash.data transition
                          |> External_transition.Verified.protocol_state
@@ -79,7 +79,8 @@ module Make (Inputs : Inputs.S) :
                              Deferred.Or_error.error_string "parent not found"
                        in
                        let%map breadcrumb =
-                         match
+                         let open Deferred.Let_syntax in
+                         match%map
                            Transition_frontier.Breadcrumb.build ~logger ~parent
                              ~transition_with_hash:transition
                          with

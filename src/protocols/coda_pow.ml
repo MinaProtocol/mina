@@ -532,7 +532,7 @@ module type Staged_ledger_diff_intf = sig
     val user_commands : t -> user_command_with_valid_signature list
   end
 
-  val forget_validated : With_valid_signatures_and_proofs.t -> t
+  val forget : With_valid_signatures_and_proofs.t -> t
 
   val user_commands : t -> user_command list
 end

@@ -348,13 +348,13 @@ end = struct
     ; statement }
 
   let update_ledger_and_get_statements ledger ts =
-    let open Deferred.Result.Let_syntax in
+    let open Deferred.Let_syntax in
     let rec go acc = function
-      | [] -> Deferred.Or_error.return (List.rev acc)
+      | [] -> return (Ok (List.rev acc))
       | t :: ts -> (
-        match apply_transaction_and_get_witness ledger t with
-        | Error e -> Staged_ledger_error.of_or_error (Error e)
-        | Ok (_undo, res) -> go (res :: acc) ts )
+          match%bind apply_transaction_and_get_witness ledger t with
+          | Error e -> return (Staged_ledger_error.of_or_error (Error e))
+          | Ok res -> go (res :: acc) ts )
     in
     go [] ts
 
@@ -368,7 +368,7 @@ end = struct
     in
     let%bind jobses =
       Deferred.return
-        (let open Or_error.Let_syntax in
+        (let open Result.Let_syntax in
         let%map jobs =
           Staged_ledger_error.of_or_error
             (Scan_state.next_k_jobs scan_state
@@ -376,16 +376,17 @@ end = struct
         in
         chunks_of jobs ~n:Transaction_snark_work.proofs_length)
     in
-    List.for_all (List.zip_exn jobses completed_works) ~f:(fun (jobs, work) ->
+    Deferred.List.for_all (List.zip_exn jobses completed_works)
+      ~f:(fun (jobs, work) ->
         let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
-        List.for_all (List.zip_exn jobs work.proofs) ~f:(fun (job, proof) ->
-            verify ~message job proof ) )
+        Deferred.List.for_all (List.zip_exn jobs work.proofs)
+          ~f:(fun (job, proof) -> verify ~message job proof ) )
     |> Deferred.map ~f:(check_or_error "proofs did not verify")
 
   let create_fee_transfers completed_works delta public_key =
     let singles =
       (if Fee.Unsigned.(equal zero delta) then [] else [(public_key, delta)])
-      @ List.filter_map completed_works_verified
+      @ List.filter_map completed_works
           ~f:(fun {Transaction_snark_work.fee; prover; _} ->
             if Fee.Unsigned.equal fee Fee.Unsigned.zero then None
             else Some (prover, fee) )
@@ -525,7 +526,7 @@ end = struct
                 match User_command.check t with
                 | Some t -> Continue (t :: acc)
                 | None -> Stop (Error (Staged_ledger_error.Bad_signature t)) )
-              ~finish:Or_error.return
+              ~finish:(fun acc -> Ok acc)
           in
           List.rev user_commands'
         in
@@ -624,7 +625,7 @@ end = struct
       Or_error.iter_error r ~f:(fun e ->
           (* TODO: Pass a logger here *)
           eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e ) ;
-      Staged_ledger_error.of_or_error r
+      Deferred.return (Staged_ledger_error.of_or_error r)
     in
     let%bind () =
       Deferred.return
@@ -1790,7 +1791,7 @@ let%test_module "test" =
           in
           {diff= forget_diff diff; coinbase_added= forget_cw}
 
-        let forget_validated (t : With_valid_signatures_and_proofs.t) =
+        let forget (t : With_valid_signatures_and_proofs.t) =
           { pre_diffs=
               Either.map t.pre_diffs ~first:forget_pre_diff_with_at_most_one
                 ~second:(fun d ->
@@ -1839,15 +1840,14 @@ let%test_module "test" =
         Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work
       in
-      let _, `Ledger_proof ledger_proof, `Staged_ledger sl' =
-        match
-          Sl.apply !sl (Test_input1.Staged_ledger_diff.forget diff) ~logger
-        with
+      let diff' = Test_input1.Staged_ledger_diff.forget diff in
+      let%map _, `Ledger_proof ledger_proof, `Staged_ledger sl' =
+        match%map Sl.apply !sl diff' ~logger with
         | Ok x -> x
         | Error e -> Error.raise (Sl.Staged_ledger_error.to_error e)
       in
       sl := sl' ;
-      return (ledger_proof, unverified_diff)
+      (ledger_proof, diff')
 
     let txns n f g = List.zip_exn (List.init n ~f) (List.init n ~f:g)
 
