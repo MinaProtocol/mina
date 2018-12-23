@@ -2,6 +2,7 @@ open Core_kernel
 open Async_kernel
 open Protocols
 open Pipe_lib
+open Strict_pipe
 open O1trace
 
 module type Staged_ledger_io_intf = sig
@@ -259,6 +260,8 @@ module type Ledger_builder_controller_intf = sig
 end
 
 module type Proposer_intf = sig
+  type state_hash
+
   type ledger_hash
 
   type staged_ledger
@@ -266,6 +269,8 @@ module type Proposer_intf = sig
   type transaction
 
   type external_transition
+
+  type external_transition_verified
 
   type completed_work_statement
 
@@ -287,7 +292,7 @@ module type Proposer_intf = sig
 
   type time
 
-  val create :
+  val run :
        parent_log:Logger.t
     -> get_completed_work:(   completed_work_statement
                            -> completed_work_checked option)
@@ -296,7 +301,13 @@ module type Proposer_intf = sig
     -> keypair:keypair
     -> consensus_local_state:consensus_local_state
     -> transition_frontier:transition_frontier
-    -> (external_transition Envelope.Incoming.t * time) Linear_pipe.Reader.t
+    -> transition_writer:( ( external_transition_verified
+                           , state_hash )
+                           With_hash.t
+                         , synchronous
+                         , unit Deferred.t )
+                         Strict_pipe.Writer.t
+    -> unit
 end
 
 module type Witness_change_intf = sig
@@ -442,7 +453,8 @@ module type Inputs_intf = sig
 
   module Proposer :
     Proposer_intf
-    with type ledger_hash := Ledger_hash.t
+    with type state_hash := Protocol_state_hash.t
+     and type ledger_hash := Ledger_hash.t
      and type staged_ledger := Staged_ledger.t
      and type transaction := User_command.With_valid_signature.t
      and type protocol_state := Consensus_mechanism.Protocol_state.value
@@ -451,6 +463,7 @@ module type Inputs_intf = sig
      and type completed_work_statement := Transaction_snark_work.Statement.t
      and type completed_work_checked := Transaction_snark_work.Checked.t
      and type external_transition := External_transition.t
+     and type external_transition_verified := External_transition.Verified.t
      and type time_controller := Time.Controller.t
      and type keypair := Keypair.t
      and type transition_frontier := Transition_frontier.t
@@ -496,6 +509,11 @@ module Make (Inputs : Inputs_intf) = struct
     ; strongest_ledgers:
         (External_transition.Verified.t, Protocol_state_hash.t) With_hash.t
         Strict_pipe.Reader.t
+    ; proposer_transition_writer:
+        ( (External_transition.Verified.t, Protocol_state_hash.t) With_hash.t
+        , synchronous
+        , unit Deferred.t )
+        Writer.t
     ; log: Logger.t
     ; mutable seen_jobs: Work_selector.State.t
     ; receipt_chain_database: Coda_base.Receipt_chain_database.t
@@ -599,23 +617,20 @@ module Make (Inputs : Inputs_intf) = struct
     let consensus_local_state =
       Consensus_mechanism.Local_state.create t.propose_keypair
     in
-    match t.propose_keypair with
-    | Some keypair ->
-        let transitions =
-          Proposer.create ~parent_log:t.log
-            ~transaction_pool:t.transaction_pool
-            ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
-            ~time_controller:t.time_controller ~keypair ~consensus_local_state
-            ~transition_frontier:t.transition_frontier
-        in
-        don't_wait_for
-          (Linear_pipe.transfer_id transitions t.external_transitions_writer)
-    | None -> ()
+    Option.iter t.propose_keypair ~f:(fun keypair ->
+        Proposer.run ~parent_log:t.log ~transaction_pool:t.transaction_pool
+          ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
+          ~time_controller:t.time_controller ~keypair ~consensus_local_state
+          ~transition_frontier:t.transition_frontier
+          ~transition_writer:t.proposer_transition_writer )
 
   let create (config : Config.t) =
     trace_task "coda" (fun () ->
         let external_transitions_reader, external_transitions_writer =
           Linear_pipe.create ()
+        in
+        let proposer_transition_reader, proposer_transition_writer =
+          Strict_pipe.create Synchronous
         in
         let net_ivar = Ivar.create () in
         let empty_diff =
@@ -707,10 +722,11 @@ module Make (Inputs : Inputs_intf) = struct
           Transition_router.run ~logger:config.log ~network:net
             ~time_controller:config.time_controller
             ~frontier:transition_frontier ~ledger_db
-            ~transition_reader:
+            ~network_transition_reader:
               (Strict_pipe.Reader.of_linear_pipe
                  (Linear_pipe.map external_transitions_reader
                     ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm) )))
+            ~proposer_transition_reader
         in
         let valid_transitions_for_network, valid_transitions_for_api =
           Strict_pipe.Reader.Fork.two valid_transitions
@@ -759,5 +775,6 @@ module Make (Inputs : Inputs_intf) = struct
           ; staged_ledger_transition_backup_capacity=
               config.staged_ledger_transition_backup_capacity
           ; receipt_chain_database= config.receipt_chain_database
-          ; snark_work_fee= config.snark_work_fee } )
+          ; snark_work_fee= config.snark_work_fee
+          ; proposer_transition_writer } )
 end
