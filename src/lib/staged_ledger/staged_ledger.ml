@@ -1,5 +1,5 @@
-(*[%%import
-"../../config.mlh"]*)
+[%%import
+"../../config.mlh"]
 
 open Core_kernel
 open Async_kernel
@@ -48,8 +48,6 @@ end = struct
       | Unexpected of Error.t
     [@@deriving sexp]
 
-    let of_or_error = function Ok a -> Ok a | Error e -> Error (Unexpected e)
-
     let to_string = function
       | Bad_signature t ->
           Format.asprintf
@@ -70,6 +68,10 @@ end = struct
 
     let to_error = Fn.compose Error.of_string to_string
   end
+
+  let to_staged_ledger_or_error = function
+    | Ok a -> Ok a
+    | Error e -> Error (Staged_ledger_error.Unexpected e)
 
   type job = Scan_state.Available_job.t
 
@@ -274,7 +276,7 @@ end = struct
       (Scan_state.hash scan_state)
       (Ledger.merkle_root ledger)
 
-  (*[%%if
+  [%%if
   call_logger]
 
   let hash t =
@@ -282,7 +284,7 @@ end = struct
     hash t
 
   [%%endif]
-*)
+
   let ledger {ledger; _} = ledger
 
   let create ~ledger : t =
@@ -353,7 +355,7 @@ end = struct
       | [] -> return (Ok (List.rev acc))
       | t :: ts -> (
           match%bind apply_transaction_and_get_witness ledger t with
-          | Error e -> return (Staged_ledger_error.of_or_error (Error e))
+          | Error e -> return (to_staged_ledger_or_error (Error e))
           | Ok res -> go (res :: acc) ts )
     in
     go [] ts
@@ -370,7 +372,7 @@ end = struct
       Deferred.return
         (let open Result.Let_syntax in
         let%map jobs =
-          Staged_ledger_error.of_or_error
+          to_staged_ledger_or_error
             (Scan_state.next_k_jobs scan_state
                ~k:(total_proofs completed_works))
         in
@@ -391,7 +393,7 @@ end = struct
             if Fee.Unsigned.equal fee Fee.Unsigned.zero then None
             else Some (prover, fee) )
     in
-    Staged_ledger_error.of_or_error
+    to_staged_ledger_or_error
     @@ Or_error.try_with (fun () ->
            Compressed_public_key.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
                Option.value_exn (Fee.Unsigned.add f1 f2) )
@@ -438,9 +440,6 @@ end = struct
                    a1 a2)))
         (Currency.Amount.sub a1 a2)
         ~f:(fun x -> Ok x)
-      (*~default:(Error (Staged_ledger_error.Coinbase_error 
-        ( !"overflow when creating coinbase (fee:%s) (Coinbase amount:%s) \n"
-         (Currency.Amount.to_string a2 ) (Currency.Amount.to_string a1))))*)
     in
     let single {Transaction_snark_work.fee; prover; _} =
       if
@@ -492,11 +491,11 @@ end = struct
     let%bind budget =
       sum_fees user_commands ~f:(fun t -> User_command.fee (t :> User_command.t)
       )
-      |> Staged_ledger_error.of_or_error
+      |> to_staged_ledger_or_error
     in
     let%bind work_fee =
       sum_fees completed_works ~f:(fun {Transaction_snark_work.fee; _} -> fee)
-      |> Staged_ledger_error.of_or_error
+      |> to_staged_ledger_or_error
     in
     Option.value_map
       ~default:
@@ -625,17 +624,17 @@ end = struct
       Or_error.iter_error r ~f:(fun e ->
           (* TODO: Pass a logger here *)
           eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e ) ;
-      Deferred.return (Staged_ledger_error.of_or_error r)
+      Deferred.return (to_staged_ledger_or_error r)
     in
     let%bind () =
       Deferred.return
-        ( Staged_ledger_error.of_or_error
+        ( to_staged_ledger_or_error
         @@ Scan_state.enqueue_transactions scan_state' data )
     in
     let%map () =
       Deferred.return
         ( verify_scan_state_after_apply new_ledger scan_state'
-        |> Staged_ledger_error.of_or_error )
+        |> to_staged_ledger_or_error )
     in
     Logger.info logger
       "Block info: No of transactions included:%d Coinbase parts:%d Work \

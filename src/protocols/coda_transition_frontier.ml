@@ -59,10 +59,6 @@ module type Transition_frontier_base_intf = sig
       -> (t, [`Validation_error of Error.t | `Fatal_error of exn]) Result.t
          Deferred.t
 
-    (**TODO -> ( Breadcrumb.t
-       , [`Validation_error of Error.t | `Fatal_error of exn] )
-       Result.t *)
-
     val transition_with_hash :
       t -> (external_transition_verified, state_hash) With_hash.t
 
