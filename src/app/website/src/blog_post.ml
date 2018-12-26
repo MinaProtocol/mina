@@ -27,7 +27,9 @@ s.setAttribute('data-timestamp', +new Date());
 
 let title s =
   let open Html_concise in
-  h1 [Style.just "f2 f1-ns ddinexp tracked-tightish pt2 pt3-m pt4-l mb1"] [text s]
+  h1
+    [Style.just "f2 f1-ns ddinexp tracked-tightish pt2 pt3-m pt4-l mb1"]
+    [text s]
 
 let subtitle s =
   let open Html_concise in
