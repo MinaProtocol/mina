@@ -1,0 +1,8 @@
+(library
+  (name snarky_field_extensions)
+  (public_name snarky_field_extensions)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (libraries
+    snarky
+    snarkette
+    core_kernel ))

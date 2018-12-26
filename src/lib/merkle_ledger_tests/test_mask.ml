@@ -20,8 +20,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
          and type root_hash := Hash.t
          and type hash := Hash.t
          and type key := Key.t
-
-      type base = Base.t
+         and type key_set := Key.Set.t
 
       module Mask :
         Merkle_mask.Masking_merkle_tree_intf.S
@@ -31,6 +30,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         with type account := Account.t
          and type location := Location.t
          and type key := Key.t
+         and type key_set := Key.Set.t
          and type hash := Hash.t
          and type parent := Base.t
 
@@ -40,15 +40,17 @@ let%test_module "Test mask connected to underlying Merkle tree" =
          and module Addr = Location.Addr
         with type account := Account.t
          and type key := Key.t
+         and type key_set := Key.Set.t
          and type root_hash := Hash.t
          and type hash := Hash.t
          and type unattached_mask := Mask.t
          and type attached_mask := Mask.Attached.t
-         and type t := base
+         and type t := Base.t
 
-      val with_instances : (base -> Mask.t -> 'a) -> 'a
+      val with_instances : (Base.t -> Mask.t -> 'a) -> 'a
 
-      val with_chain : (base -> Mask.Attached.t -> Mask.Attached.t -> 'a) -> 'a
+      val with_chain :
+        (Base.t -> Mask.Attached.t -> Mask.Attached.t -> 'a) -> 'a
       (** Here we provide a base ledger and two layers of attached masks
        * one ontop another *)
     end
@@ -435,6 +437,42 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             assert (
               List.for_all mask_list ~f:(fun account ->
                   Balance.equal (Account.balance account) Balance.zero ) ) )
+
+      let%test_unit "masking in foldi" =
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            let num_accounts = 10 in
+            let keys = Key.gen_keys num_accounts in
+            (* parent balances all non-zero *)
+            let balances =
+              List.init num_accounts ~f:(fun n -> Balance.of_int (n + 1))
+            in
+            let parent_accounts =
+              List.map2_exn keys balances ~f:Account.create
+            in
+            (* add accounts to parent *)
+            List.iter parent_accounts ~f:(fun account ->
+                ignore @@ parent_create_new_account_exn maskable account ) ;
+            let balance_summer _addr accum acct =
+              accum + Balance.to_int (Account.balance acct)
+            in
+            let parent_sum =
+              Maskable.foldi maskable ~init:0 ~f:balance_summer
+            in
+            (* non-zero sum of parent account balances *)
+            assert (Int.equal parent_sum 55) (* HT Gauss *) ;
+            let zero_balance account =
+              {account with Account.balance= Balance.zero}
+            in
+            (* put same accounts in mask, but with zero balance *)
+            let mask_accounts = List.map parent_accounts ~f:zero_balance in
+            List.iter mask_accounts ~f:(fun account ->
+                ignore @@ create_new_account_exn attached_mask account ) ;
+            let mask_sum =
+              Mask.Attached.foldi attached_mask ~init:0 ~f:balance_summer
+            in
+            (* sum should not include any parent balances *)
+            assert (Int.equal mask_sum 0) )
     end
 
     module type Depth_S = sig
@@ -455,7 +493,8 @@ let%test_module "Test mask connected to underlying Merkle tree" =
          and type account := Account.t
          and type root_hash := Hash.t
          and type hash := Hash.t
-         and type key := Key.t =
+         and type key := Key.t
+         and type key_set := Key.Set.t =
         Database.Make (Key) (Account) (Hash) (Depth) (Location)
           (In_memory_kvdb)
           (Storage_locations)
@@ -464,8 +503,6 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         Merkle_ledger.Any_ledger.Make_base (Key) (Account) (Hash) (Location)
           (Depth)
       module Base = Any_base.M
-
-      type base = Base.t
 
       (* the mask tree *)
       module Mask :
@@ -476,6 +513,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         with type account := Account.t
          and type location := Location.t
          and type key := Key.t
+         and type key_set := Key.Set.t
          and type hash := Hash.t
          and type parent := Base.t =
         Merkle_mask.Masking_merkle_tree.Make (Key) (Account) (Hash) (Location)
@@ -488,11 +526,12 @@ let%test_module "Test mask connected to underlying Merkle tree" =
          and module Location = Location
         with type account := Account.t
          and type key := Key.t
+         and type key_set := Key.Set.t
          and type root_hash := Hash.t
          and type hash := Hash.t
          and type unattached_mask := Mask.t
          and type attached_mask := Mask.Attached.t
-         and type t := base =
+         and type t := Base.t =
         Merkle_mask.Maskable_merkle_tree.Make (Key) (Account) (Hash) (Location)
           (Base)
           (Mask)
