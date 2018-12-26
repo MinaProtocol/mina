@@ -43,11 +43,19 @@ end
 
 module State : sig
   module Job : sig
-    (** An incomplete job -- base may contain data ['d], merge contains zero or
-     * more ['a] work.
+    (** An incomplete job -- base may contain data ['d], A merge can have zero components, one component (either the left or the right), or two components in which case there is an integer representing a place in the order of creation.
      *)
-    type ('a, 'd) t = Merge of 'a option * 'a option | Base of 'd option
-    [@@deriving bin_io, sexp]
+    type created_time = int [@@deriving sexp, bin_io]
+
+    type 'a merge =
+      | Empty
+      | Lcomp of 'a
+      | Rcomp of 'a
+      | Bcomp of ('a * 'a * created_time)
+    [@@deriving sexp, bin_io]
+
+    type ('a, 'd) t = Merge of 'a merge | Base of ('d * created_time) option
+    [@@deriving sexp, bin_io]
   end
 
   module Completed_job : sig
