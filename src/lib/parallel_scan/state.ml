@@ -1,23 +1,41 @@
 open Core_kernel
 
 module Job = struct
-  type ('a, 'd) t = Merge of 'a option * 'a option | Base of 'd option
+  type created_time = int [@@deriving sexp, bin_io]
+
+  (*A merge node can have zero components, one component (either the left or the right), or two components in which case there is an integer representing a place in the order of creation*)
+  type 'a merge =
+    | Empty
+    | Lcomp of 'a
+    | Rcomp of 'a
+    | Bcomp of ('a * 'a * created_time)
+  [@@deriving sexp, bin_io]
+
+  type ('a, 'd) t = Merge of 'a merge | Base of ('d * created_time) option
   [@@deriving sexp, bin_io]
 
   let gen a_gen d_gen =
     let open Quickcheck.Generator in
     let open Quickcheck.Generator.Let_syntax in
-    let maybe_a = Option.gen a_gen in
-    match%map variant2 (tuple2 maybe_a maybe_a) (Option.gen d_gen) with
-    | `A (a1, a2) -> Merge (a1, a2)
+    (*let maybe_a = Option.gen a_gen in
+    let maybe_int = Option.gen Int.gen in*)
+    match%map
+      variant2
+        (variant4 Bool.gen a_gen a_gen (tuple3 a_gen a_gen Int.gen))
+        (Option.gen (tuple2 d_gen Int.gen))
+    with
+    | `A (`A _) -> Merge Empty
+    | `A (`B a) -> Merge (Lcomp a)
+    | `A (`C a) -> Merge (Rcomp a)
+    | `A (`D a) -> Merge (Bcomp a)
     | `B d -> Base d
 
   let gen_full a_gen d_gen =
     let open Quickcheck.Generator in
     let open Quickcheck.Generator.Let_syntax in
-    match%map variant2 (tuple2 a_gen a_gen) d_gen with
-    | `A (a1, a2) -> Merge (Some a1, Some a2)
-    | `B d -> Base (Some d)
+    match%map variant2 (tuple3 a_gen a_gen Int.gen) (tuple2 d_gen Int.gen) with
+    | `A (a1, a2, o) -> Merge (Bcomp (a1, a2, o))
+    | `B (d, o) -> Base (Some (d, o))
 end
 
 module Completed_job = struct
@@ -48,13 +66,12 @@ let hash
   let add_string s = h := Digestif.SHA256.feed_string !h s in
   Ring_buffer.iter jobs ~f:(function
     | Base None -> add_string "Base None"
-    | Base (Some x) -> add_string ("Base Some " ^ d_to_string x)
-    | Merge (None, None) -> add_string "Merge None None"
-    | Merge (None, Some a) -> add_string ("Merge None Some " ^ a_to_string a)
-    | Merge (Some a, None) ->
-        add_string ("Merge Some " ^ a_to_string a ^ " None")
-    | Merge (Some a1, Some a2) ->
-        add_string ("Merge Some " ^ a_to_string a1 ^ " Some " ^ a_to_string a2) ) ;
+    | Base (Some (x, _)) -> add_string ("Base Some " ^ d_to_string x)
+    | Merge Empty -> add_string "Merge Empty"
+    | Merge (Rcomp a) -> add_string ("Merge Rcomp " ^ a_to_string a)
+    | Merge (Lcomp a) -> add_string ("Merge Lcomp " ^ a_to_string a)
+    | Merge (Bcomp (a1, a2, _)) ->
+        add_string ("Merge Bcomp " ^ a_to_string a1 ^ " " ^ a_to_string a2) ) ;
   let i, a = acc in
   let x = base_none_pos in
   add_string (Int.to_string capacity) ;
