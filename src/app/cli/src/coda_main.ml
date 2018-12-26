@@ -538,7 +538,7 @@ struct
     end
 
     let forget {With_valid_signatures_and_proofs.old; diff} =
-      {old; diff= Staged_ledger_diff.forget_validated diff}
+      {old; diff= Staged_ledger_diff.forget diff}
   end
 
   module Internal_transition =

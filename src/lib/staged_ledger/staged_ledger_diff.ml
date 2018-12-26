@@ -182,7 +182,7 @@ struct
     in
     {diff= forget_diff diff; coinbase_added= forget_cw}
 
-  let forget_validated (t : With_valid_signatures_and_proofs.t) =
+  let forget (t : With_valid_signatures_and_proofs.t) =
     { pre_diffs=
         Either.map t.pre_diffs ~first:forget_pre_diff_with_at_most_one
           ~second:(fun d ->

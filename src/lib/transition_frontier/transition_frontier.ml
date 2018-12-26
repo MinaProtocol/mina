@@ -69,6 +69,7 @@ module type Inputs_intf = sig
      and type ledger_proof_statement := Ledger_proof_statement.t
      and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
      and type transaction := Transaction.t
+     and type user_command := User_command.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -101,7 +102,7 @@ struct
       {transition_with_hash; staged_ledger}
 
     let build ~logger ~parent ~transition_with_hash =
-      let open Deferred.Or_error.Let_syntax in
+      let open Deferred.Result.Let_syntax in
       let logger = Logger.child logger __MODULE__ in
       let staged_ledger = parent.staged_ledger in
       let transition = With_hash.data transition_with_hash in
@@ -123,8 +124,19 @@ struct
       let%bind ( `Hash_after_applying staged_ledger_hash
                , `Ledger_proof proof_opt
                , `Staged_ledger transitioned_staged_ledger ) =
-        Inputs.Staged_ledger.apply ~logger staged_ledger
-          (Inputs.External_transition.Verified.staged_ledger_diff transition)
+        let open Deferred.Let_syntax in
+        match%map
+          Inputs.Staged_ledger.apply ~logger staged_ledger
+            (Inputs.External_transition.Verified.staged_ledger_diff transition)
+        with
+        | Ok x -> Ok x
+        | Error (Inputs.Staged_ledger.Staged_ledger_error.Unexpected e) ->
+            Error (`Fatal_error (Error.to_exn e))
+        | Error e ->
+            Error
+              (`Validation_error
+                (Error.of_string
+                   (Inputs.Staged_ledger.Staged_ledger_error.to_string e)))
       in
       let target_ledger_hash =
         match proof_opt with
@@ -146,10 +158,13 @@ struct
                blockchain_staged_ledger_hash
         then return transitioned_staged_ledger
         else
-          Deferred.Or_error.error_string
-            "Snarked ledger hash and Staged ledger hash after applying the \
-             diff does not match blockchain state's ledger hash and staged \
-             ledger hash resp.\n"
+          Deferred.return
+            (Error
+               (`Validation_error
+                 (Error.of_string
+                    "Snarked ledger hash and Staged ledger hash after \
+                     applying the diff does not match blockchain state's \
+                     ledger hash and staged ledger hash resp.\n")))
       in
       {transition_with_hash; staged_ledger= transitioned_staged_ledger}
 
@@ -170,6 +185,8 @@ struct
     ; mutable best_tip: State_hash.t
     ; logger: Logger.t
     ; table: node State_hash.Table.t }
+
+  let logger t = t.logger
 
   (* TODO: load from and write to disk *)
   let create ~logger
@@ -230,7 +247,9 @@ struct
               match%map
                 Inputs.Staged_ledger.apply pre_root_staged_ledger diff ~logger
               with
-              | Error e -> failwith (Error.to_string_hum e)
+              | Error e ->
+                  failwith
+                    (Inputs.Staged_ledger.Staged_ledger_error.to_string e)
               | Ok
                   ( `Hash_after_applying staged_ledger_hash
                   , `Ledger_proof None
