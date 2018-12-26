@@ -177,6 +177,7 @@ let run profiler num_transactions =
   exit 0
 
 let main num_transactions () =
+  Snarky.Libsnark.set_no_profiling false ;
   Test_util.with_randomness 123456789 (fun () ->
       let keys = Transaction_snark.Keys.create () in
       let module T = Transaction_snark.Make (struct
