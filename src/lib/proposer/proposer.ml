@@ -249,7 +249,7 @@ module Make (Inputs : Inputs_intf) :
         let internal_transition =
           Internal_transition.create ~snark_transition
             ~prover_state:(Proposal_data.prover_state proposal_data)
-            ~staged_ledger_diff:(Staged_ledger_diff.forget_validated diff)
+            ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
         in
         Some (protocol_state, internal_transition) )
 

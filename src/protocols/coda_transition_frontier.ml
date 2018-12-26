@@ -57,7 +57,8 @@ module type Transition_frontier_base_intf = sig
       -> transition_with_hash:( external_transition_verified
                               , state_hash )
                               With_hash.t
-      -> t Deferred.Or_error.t
+      -> (t, [`Validation_error of Error.t | `Fatal_error of exn]) Result.t
+         Deferred.t
 
     val transition_with_hash :
       t -> (external_transition_verified, state_hash) With_hash.t
@@ -80,6 +81,8 @@ module type Transition_frontier_base_intf = sig
     -> t Deferred.t
 
   val find_exn : t -> state_hash -> Breadcrumb.t
+
+  val logger : t -> Logger.t
 end
 
 module type Transition_frontier_intf = sig
