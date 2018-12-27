@@ -495,8 +495,9 @@ end = struct
       Make_statement_scanner (Deferred) (Inputs.Ledger_proof_verifier)
 
     let is_valid t =
+      let k = max Config.work_availability_factor 2 in
       Parallel_scan.parallelism ~state:t
-      = Int.pow 2 (Config.transaction_capacity_log_2 + 2)
+      = Int.pow 2 (Config.transaction_capacity_log_2 + k)
       && Parallel_scan.is_valid t
 
     include Binable.Of_binable
@@ -544,13 +545,13 @@ end = struct
     let module L = Ledger_proof_statement in
     let single_spec (job : job) =
       match job with
-      | A.Base d ->
+      | A.Base (d, _) ->
           let transaction =
             Or_error.ok_exn @@ Ledger.Undo.transaction d.transaction_with_info
           in
           Snark_work_lib.Work.Single.Spec.Transition
             (d.statement, transaction, d.witness)
-      | A.Merge ((p1, _), (p2, _)) ->
+      | A.Merge ((p1, _), (p2, _), _) ->
           let merged =
             Ledger_proof_statement.merge
               (Ledger_proof.statement p1)
@@ -676,17 +677,18 @@ end = struct
 
   let create ~ledger : t =
     let open Config in
-    (* Transaction capacity log_2 is one-fourth the capacity for work parallelism *)
+    (* Transaction capacity log_2 is 1/2^work_availability_factor the capacity for work parallelism *)
+    let k = max Config.work_availability_factor 2 in
     { scan_state=
-        Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 2)
+        Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + k)
     ; ledger }
 
   let current_ledger_proof t =
     Option.map (Parallel_scan.last_emitted_value t.scan_state) ~f:fst
 
   let statement_of_job : job -> Ledger_proof_statement.t option = function
-    | Base {statement; _} -> Some statement
-    | Merge ((p1, _), (p2, _)) ->
+    | Base ({statement; _}, _) -> Some statement
+    | Merge ((p1, _), (p2, _), _) ->
         let stmt1 = Ledger_proof.statement p1
         and stmt2 = Ledger_proof.statement p2 in
         let open Option.Let_syntax in
@@ -710,10 +712,10 @@ end = struct
     let sok_digest = Ledger_proof.sok_digest current_proof
     and proof = Ledger_proof.underlying_proof current_proof in
     match job with
-    | Base {statement; _} ->
+    | Base ({statement; _}, _) ->
         let ledger_proof = Ledger_proof.create ~statement ~sok_digest ~proof in
         Ok (Lifted (ledger_proof, Sok_message.create ~fee ~prover))
-    | Merge ((p, _), (p', _)) ->
+    | Merge ((p, _), (p', _), _) ->
         let s = Ledger_proof.statement p and s' = Ledger_proof.statement p' in
         let open Or_error.Let_syntax in
         let%map fee_excess =
@@ -1086,11 +1088,13 @@ end = struct
       verify_scan_state_after_apply t.ledger t.scan_state
       |> Result_with_rollback.of_or_error
     in
-    Logger.info logger
-      "Block info: No of transactions included:%d Coinbase parts:%d Work \
-       count:%d Spots available:%d Proofs waiting to be solved:%d"
-      user_commands_count cb_parts_count (List.length works) spots_available
-      proofs_waiting ;
+    let _f () =
+      Logger.info logger
+        "Block info: No of transactions included:%d Coinbase parts:%d Work \
+         count:%d Spots available:%d Proofs waiting to be solved:%d"
+        user_commands_count cb_parts_count (List.length works) spots_available
+        proofs_waiting
+    in
     (`Hash_after_applying (hash t), `Ledger_proof res_opt)
 
   let apply t witness ~logger =
@@ -1413,7 +1417,8 @@ end = struct
     | Ok value -> value
 
   let rec check_resources_add_txns logger get_completed_work ledger
-      (valid : Resource_util.t) (current : Resource_util.t) =
+      (valid : Resource_util.t) (current : Resource_util.t)
+      current_job_sequence_no =
     let add_user_command t ts ws =
       let r_user_command =
         log_error_and_return_value logger
@@ -1427,10 +1432,10 @@ end = struct
       in
       if Resources.budget_non_neg r_user_command then
         check_resources_add_txns logger get_completed_work ledger new_res_util
-          new_res_util
+          new_res_util current_job_sequence_no
       else
         check_resources_add_txns logger get_completed_work ledger valid
-          new_res_util
+          new_res_util current_job_sequence_no
     in
     match
       ( Sequence.next current.work_to_do
@@ -1454,6 +1459,7 @@ end = struct
                 ; work_to_do= ws
                 ; user_commands_to_include=
                     Sequence.append (Sequence.singleton t) ts }
+                current_job_sequence_no
           | Error e ->
               Logger.error logger "%s" (Error.to_string_hum e) ;
               (valid, txns_not_included valid.resources current.resources) )
@@ -1464,7 +1470,7 @@ end = struct
         Or_error.ok_exn (Ledger.undo ledger u) )
 
   let update_coinbase_count n logger (res_util : Resource_util.t)
-      get_completed_work : Resource_util.t =
+      get_completed_work latest_job_seq_no : Resource_util.t =
     if Resources.coinbase_added res_util.resources then res_util
     else
       let rec go valid (current : Resource_util.t) count =
@@ -1490,16 +1496,25 @@ end = struct
             if Resources.enough_work_for_coinbase current.resources then
               add_coinbase (Sequence.append (Sequence.singleton w) ws) count
             else
-              match
-                add_work_for_coinbase w current.resources get_completed_work
-              with
-              | Ok r_work ->
-                  go valid
-                    {current with resources= r_work; work_to_do= ws}
-                    count
-              | Error e ->
-                  Logger.error logger "%s" (Error.to_string_hum e) ;
-                  valid )
+              match get_completed_work w with
+              | Some work -> (
+                match
+                  Resources.add_work_for_coinbase current.resources work
+                with
+                | Ok r_work ->
+                    go valid
+                      {current with resources= r_work; work_to_do= ws}
+                      count
+                | Error e ->
+                    Logger.error logger "%s" (Error.to_string_hum e) ;
+                    valid )
+              | None ->
+                  Logger.error logger "%s" "Work not found" ;
+                  let _max_incomplete_job_seq_no =
+                    latest_job_seq_no - Config.work_availability_factor
+                  in
+                  (*TODO*)
+                  if true then valid else valid )
       in
       if n > 2 then
         log_error_and_return_value logger
@@ -1509,10 +1524,10 @@ end = struct
       else go res_util res_util n
 
   let coinbase_after_txns coinbase_parts logger get_completed_work ledger
-      init_res_util : Resource_util.t =
+      init_res_util current_job_sequence_no : Resource_util.t =
     let res_util, txns_to_undo =
       check_resources_add_txns logger get_completed_work ledger init_res_util
-        init_res_util
+        init_res_util current_job_sequence_no
     in
     let _ = undo_txns ledger txns_to_undo in
     let cb = coinbase_parts res_util in
@@ -1522,10 +1537,10 @@ end = struct
     in
     update_coinbase_count cb logger
       {res_util with resources= res}
-      get_completed_work
+      get_completed_work current_job_sequence_no
 
   let one_prediff logger ws_seq ts_seq get_completed_work ledger self
-      available_queue_space ~add_coinbase =
+      available_queue_space ~add_coinbase current_job_sequence_no =
     let init_resources =
       Resources.init ~available_queue_space ~self
         (Second Ledger_builder_diff.At_most_one.Zero)
@@ -1538,17 +1553,19 @@ end = struct
     let res_util_with_coinbase =
       if add_coinbase then
         update_coinbase_count 1 logger init_res_util get_completed_work
+          current_job_sequence_no
       else init_res_util
     in
     let res_util_with_txns, txns_to_undo =
       check_resources_add_txns logger get_completed_work ledger
-        res_util_with_coinbase res_util_with_coinbase
+        res_util_with_coinbase res_util_with_coinbase current_job_sequence_no
     in
     let _ = undo_txns ledger txns_to_undo in
     res_util_with_txns.resources
 
   let two_prediffs logger ws_seq ts_seq get_completed_work ledger self
       partitions
+      current_job_sequence_no
       (*: (Resources_util.t, Resources.t * Resources.t option) Either.t*) =
     let init_resources =
       Resources.init ~available_queue_space:(fst partitions) ~self
@@ -1568,7 +1585,7 @@ end = struct
     in
     let res_util_coinbase =
       coinbase_after_txns remaining_slots logger get_completed_work ledger
-        init_res_util
+        init_res_util current_job_sequence_no
     in
     let unable_to_add_coinbase =
       Resources.is_space_available res_util_coinbase.resources
@@ -1580,7 +1597,7 @@ end = struct
       let _ = undo_txns ledger res_util_coinbase.resources.user_commands in
       let res =
         one_prediff logger ws_seq ts_seq get_completed_work ledger self
-          (fst partitions) ~add_coinbase:true
+          (fst partitions) ~add_coinbase:true current_job_sequence_no
       in
       First res
     else
@@ -1590,6 +1607,7 @@ end = struct
           self (snd partitions)
           ~add_coinbase:
             (not (Resources.coinbase_added res_util_coinbase.resources))
+          current_job_sequence_no
       in
       let coinbase_added =
         Resources.coinbase_added res_util_coinbase.resources
@@ -1613,12 +1631,12 @@ end = struct
         in
         let res =
           one_prediff logger ws_seq ts_seq get_completed_work ledger self
-            (fst partitions) ~add_coinbase:true
+            (fst partitions) ~add_coinbase:true current_job_sequence_no
         in
         First res
 
   let generate_prediff logger ws_seq ts_seq get_completed_work ledger self
-      partitions =
+      partitions current_job_sequence_no =
     let diff (res : Resources.t) :
         Ledger_builder_diff.With_valid_signatures_and_proofs.diff =
       (* We have to reverse here because we only know they work in THIS order *)
@@ -1649,13 +1667,14 @@ end = struct
     | `One x ->
         let res =
           one_prediff logger ws_seq ts_seq get_completed_work ledger self x
-            ~add_coinbase:true
+            ~add_coinbase:true current_job_sequence_no
         in
         let _ = undo_txns ledger res.user_commands in
         First (make_diff_with_one res)
     | `Two (x, y) -> (
       match
         two_prediffs logger ws_seq ts_seq get_completed_work ledger self (x, y)
+          current_job_sequence_no
       with
       | First res ->
           let _ = undo_txns ledger res.user_commands in
@@ -1678,17 +1697,21 @@ end = struct
         t'.scan_state
     in
     (*TODO: return an or_error here *)
+    (* get the k value and*)
     let work_to_do = work_to_do_exn t'.scan_state in
+    let current_job_sequence_no =
+      Parallel_scan.current_job_sequence_number t'.scan_state
+    in
     let pre_diffs =
       generate_prediff logger work_to_do transactions_by_fee get_completed_work
-        ledger self partitions
+        ledger self partitions current_job_sequence_no
     in
-    let proofs_available =
+    let _proofs_available =
       Sequence.filter_map work_to_do ~f:get_completed_work
       |> Sequence.to_list |> List.length
     in
-    Logger.info logger "Block stats: Proofs ready for purchase: %d"
-      proofs_available ;
+    (*Logger.info logger "Block stats: Proofs ready for purchase: %d"
+      proofs_available ;*)
     trace_event "prediffs done" ;
     { Ledger_builder_diff.With_valid_signatures_and_proofs.pre_diffs
     ; creator= self
@@ -2217,6 +2240,8 @@ let%test_module "test" =
 
       module Config = struct
         let transaction_capacity_log_2 = 7
+
+        let work_availability_factor = 4
       end
 
       let check :
