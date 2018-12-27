@@ -183,11 +183,6 @@ module Tick = struct
     module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
 
     let size_in_triples = (size_in_bits + 2) / 3
-
-    let gen =
-      Quickcheck.Generator.map
-        Bignum_bigint.(gen_incl zero (Tick0.Field.size - one))
-        ~f:(fun x -> Bigint.(to_field (of_bignum_bigint x)))
   end
 
   module Inner_curve = struct
