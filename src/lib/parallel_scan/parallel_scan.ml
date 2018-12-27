@@ -10,7 +10,10 @@ module Ring_buffer = Ring_buffer
 module Queue = Queue
 
 module Available_job = struct
-  type ('a, 'd) t = Base of 'd | Merge of 'a * 'a [@@deriving sexp]
+  type sequence_no = int [@@deriving sexp]
+
+  type ('a, 'd) t = Base of 'd * sequence_no | Merge of 'a * 'a * sequence_no
+  [@@deriving sexp]
 end
 
 let place = 0
@@ -45,7 +48,8 @@ module State = struct
     ; base_none_pos= Some (parallelism - 1)
     ; recent_tree_data= []
     ; other_trees_data= []
-    ; stateful_work_order= Queue.create () }
+    ; stateful_work_order= Queue.create ()
+    ; curr_job_seq_no= 1 }
 
   let next_leaf_pos p cur_pos =
     if cur_pos = (2 * p) - 2 then p - 1 else cur_pos + 1
@@ -228,8 +232,8 @@ module State = struct
     let module J = Job in
     let module A = Available_job in
     match job with
-    | J.Base (Some (d, _)) -> Some (A.Base d)
-    | J.Merge (Bcomp (a, b, o)) -> Some (A.Merge (a, b))
+    | J.Base (Some (d, o)) -> Some (A.Base (d, o))
+    | J.Merge (Bcomp (a, b, o)) -> Some (A.Merge (a, b, o))
     | _ -> None
 
   let job state index =
@@ -391,6 +395,39 @@ module State = struct
     Foldable_ident.fold_chronological_until t ~init
       ~f:(fun acc job -> Container.Continue_or_stop.Continue (f acc job))
       ~finish:Fn.id
+
+  let reset_seq_no t =
+    let open Or_error.Let_syntax in
+    let seq_no_at x =
+      match Ring_buffer.read_i t.jobs x with
+      | Job.Base (Some (_, o)) -> Ok o
+      | Merge (Bcomp (_, _, o)) -> Ok o
+      | _ ->
+          Or_error.error_string (sprintf "Expecting a completed job at %d" x)
+    in
+    let new_seq_job x s =
+      match Ring_buffer.read_i t.jobs x with
+      | Job.Base (Some (d, _)) -> Ok (Job.Base (Some (d, s)))
+      | Merge (Bcomp (a1, a2, _)) -> Ok (Merge (Bcomp (a1, a2, s)))
+      | _ ->
+          Or_error.error_string (sprintf "Expecting a completed job at %d" x)
+    in
+    let first_seq_no =
+      match Queue.peek t.stateful_work_order with
+      | None -> Ok 1
+      | Some x -> seq_no_at x
+    in
+    Queue.fold ~init:(Ok 0) t.stateful_work_order ~f:(fun latest_seq index ->
+        let%bind seq_no =
+          Or_error.bind latest_seq ~f:(fun _ -> seq_no_at index)
+        in
+        let%bind first_seq_no = first_seq_no in
+        let new_seq_no = seq_no - first_seq_no + 1 in
+        let%map () =
+          Or_error.bind (new_seq_job index new_seq_no) ~f:(fun updated_job ->
+              update_cur_job t updated_job index )
+        in
+        new_seq_no )
 end
 
 let start : type a d. parallelism_log_2:int -> (a, d) State.t = State.create
@@ -542,6 +579,17 @@ let current_data (state : ('a, 'd) State.t) =
 let parallelism : state:('a, 'd) State.t -> int =
  fun ~state -> State.parallelism state
 
+let update_curr_job_seq_no : ('a, 'd) State.t -> unit Or_error.t =
+ fun state ->
+  let open Or_error.Let_syntax in
+  if state.curr_job_seq_no + 1 = Int.max_value then
+    let%map latest_seq_no = State.reset_seq_no state in
+    state.curr_job_seq_no <- latest_seq_no
+  else Ok (state.curr_job_seq_no <- state.curr_job_seq_no + 1)
+
+let current_job_sequence_number : ('a, 'd) State.t -> int =
+ fun state -> state.curr_job_seq_no
+
 let partition_if_overflowing ~max_slots state =
   let n = min (free_space ~state) max_slots in
   let parallelism = State.parallelism state in
@@ -667,8 +715,8 @@ let%test_module "scans" =
         let job_done (job : (Int64.t, Int64.t) Available_job.t) :
             Int64.t State.Completed_job.t =
           match job with
-          | Base x -> Lifted x
-          | Merge (x, y) -> Merged (Int64.( + ) x y)
+          | Base (x, _) -> Lifted x
+          | Merge (x, y, _) -> Merged (Int64.( + ) x y)
 
         let%test_unit "Split only if enqueuing onto the next queue" =
           let p = 3 in
@@ -814,8 +862,8 @@ let%test_module "scans" =
         let job_done (job : (Int64.t, string) Available_job.t) :
             Int64.t State.Completed_job.t =
           match job with
-          | Base x -> Lifted (Int64.of_string x)
-          | Merge (x, y) -> Merged (Int64.( + ) x y)
+          | Base (x, _) -> Lifted (Int64.of_string x)
+          | Merge (x, y, _) -> Merged (Int64.( + ) x y)
 
         let%test_unit "scan behaves like a fold long-term" =
           let a_bunch_of_ones_then_zeros x =
@@ -861,8 +909,8 @@ let%test_module "scans" =
         let job_done (job : (string, string) Available_job.t) :
             string State.Completed_job.t =
           match job with
-          | Base x -> Lifted x
-          | Merge (x, y) -> Merged (String.( ^ ) x y)
+          | Base (x, _) -> Lifted x
+          | Merge (x, y, _) -> Merged (String.( ^ ) x y)
 
         let%test_unit "scan performs operation in correct order with \
                        non-commutative semigroup" =

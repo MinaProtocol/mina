@@ -87,8 +87,9 @@ end = struct
     Staged_ledger_aux_hash.of_bytes (state_hash :> string)
 
   let is_valid t =
+    let k = max Config.work_availability_factor 2 in
     Parallel_scan.parallelism ~state:t
-    = Int.pow 2 (Config.transaction_capacity_log_2 + 2)
+    = Int.pow 2 (Config.transaction_capacity_log_2 + k)
     && Parallel_scan.is_valid t
 
   include Binable.Of_binable
@@ -132,10 +133,10 @@ end = struct
     let sok_digest = Ledger_proof.sok_digest current_proof
     and proof = Ledger_proof.underlying_proof current_proof in
     match job with
-    | Base {statement; _} ->
+    | Base ({statement; _}, _) ->
         let ledger_proof = Ledger_proof.create ~statement ~sok_digest ~proof in
         Ok (Lifted (ledger_proof, Sok_message.create ~fee ~prover))
-    | Merge ((p, _), (p', _)) ->
+    | Merge ((p, _), (p', _), _) ->
         let s = Ledger_proof.statement p and s' = Ledger_proof.statement p' in
         let open Or_error.Let_syntax in
         let%map fee_excess =
@@ -204,14 +205,14 @@ end = struct
       in
       let fold_step acc_statement job =
         match job with
-        | Parallel_scan.State.Job.Merge (None, Some (p, message))
-         |Merge (Some (p, message), None) ->
+        | Parallel_scan.State.Job.Merge (Rcomp (p, message))
+         |Merge (Lcomp (p, message)) ->
             merge_acc
               ~verify_proof:(fun () ->
                 Verifier.verify ~message p (Ledger_proof.statement p) )
               acc_statement (Ledger_proof.statement p)
-        | Merge (None, None) -> M.Or_error.return acc_statement
-        | Merge (Some (proof_1, message_1), Some (proof_2, message_2)) ->
+        | Merge Empty -> M.Or_error.return acc_statement
+        | Merge (Bcomp ((proof_1, message_1), (proof_2, message_2), _place)) ->
             let open M.Or_error.Let_syntax in
             let%bind merged_statement =
               M.return
@@ -230,7 +231,7 @@ end = struct
                 in
                 List.for_all verified_list ~f:Fn.id )
         | Base None -> M.Or_error.return acc_statement
-        | Base (Some transaction) ->
+        | Base (Some (transaction, _place)) ->
             with_error "Bad base statement" ~f:(fun () ->
                 let open M.Or_error.Let_syntax in
                 let%bind expected_statement =
@@ -300,8 +301,8 @@ end = struct
   end
 
   let statement_of_job : job -> Ledger_proof_statement.t option = function
-    | Base {statement; _} -> Some statement
-    | Merge ((p1, _), (p2, _)) ->
+    | Base ({statement; _}, _) -> Some statement
+    | Merge ((p1, _), (p2, _), _) ->
         let stmt1 = Ledger_proof.statement p1
         and stmt2 = Ledger_proof.statement p2 in
         let open Option.Let_syntax in
@@ -343,7 +344,9 @@ end = struct
   let capacity t = Parallel_scan.parallelism ~state:t
 
   let create ~transaction_capacity_log_2 =
-    Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 2)
+    (* Transaction capacity log_2 is 1/2^work_availability_factor the capacity for work parallelism *)
+    let k = max Config.work_availability_factor 2 in
+    Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + k)
 
   let empty () =
     let open Config in
@@ -371,9 +374,11 @@ end = struct
   let partition_if_overflowing t ~max_slots =
     Parallel_scan.partition_if_overflowing t ~max_slots
 
+  let current_job_sequence_number = Parallel_scan.current_job_sequence_number
+
   let extract_from_job (job : job) =
     match job with
-    | Parallel_scan.Available_job.Base d ->
+    | Parallel_scan.Available_job.Base (d, _) ->
         First (d.transaction_with_info, d.statement, d.witness)
-    | Merge ((p1, _), (p2, _)) -> Second (p1, p2)
+    | Merge ((p1, _), (p2, _), _) -> Second (p1, p2)
 end

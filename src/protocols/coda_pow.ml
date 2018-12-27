@@ -658,6 +658,8 @@ module type Transaction_snark_scan_state_intf = sig
     t -> max_slots:int -> [`One of int | `Two of int * int]
 
   val statement_of_job : Available_job.t -> ledger_proof_statement option
+
+  val current_job_sequence_number : t -> int
 end
 
 module type Staged_ledger_base_intf = sig

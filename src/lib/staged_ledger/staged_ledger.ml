@@ -1197,6 +1197,9 @@ end = struct
     in
     (*TODO: return an or_error here *)
     let work_to_do = work_to_do_exn t.scan_state in
+    let _current_job_sequence_no =
+      Scan_state.current_job_sequence_number t.scan_state
+    in
     let completed_works_seq =
       Sequence.fold_until work_to_do ~init:Sequence.empty
         ~f:(fun seq w ->
@@ -1766,6 +1769,8 @@ let%test_module "test" =
 
       module Config = struct
         let transaction_capacity_log_2 = 7
+
+        let work_availability_factor = 2
       end
 
       let check :
