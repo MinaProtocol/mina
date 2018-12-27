@@ -132,17 +132,22 @@ module Make (Inputs : Inputs_intf) :
     in
     let start_transition_frontier_controller ~verified_transition_writer
         ~clear_reader =
-      let transition_reader, transition_writer = create_bufferred_pipe () in
+      let ( transition_frontier_controller_reader
+          , transition_frontier_controller_writer ) =
+        create_bufferred_pipe ()
+      in
       let new_verified_transition_reader =
         Transition_frontier_controller.run ~logger ~network ~time_controller
-          ~frontier ~transition_reader ~clear_reader
+          ~frontier ~transition_reader:transition_frontier_controller_reader
+          ~clear_reader
       in
       Strict_pipe.Reader.iter new_verified_transition_reader
         ~f:
           (Fn.compose Deferred.return
              (Strict_pipe.Writer.write verified_transition_writer))
       |> don't_wait_for ;
-      (transition_reader, transition_writer)
+      ( transition_frontier_controller_reader
+      , transition_frontier_controller_writer )
     in
     let clear_reader, clear_writer = Strict_pipe.create Synchronous in
     let verified_transition_reader, verified_transition_writer =

@@ -30,7 +30,7 @@ module Make (Inputs : Inputs.S) :
     let open Result.Let_syntax in
     let%bind () =
       Result.ok_if_true
-        (Transition_frontier.find frontier hash |> Option.is_some)
+        (Transition_frontier.find frontier hash |> Option.is_none)
         ~error:`Duplicate
     in
     Result.ok_if_true
