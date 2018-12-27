@@ -13,6 +13,12 @@ module type S = sig
   val fold :
     'a t -> init:'b -> f:('b -> 'a -> ('b, 's) monad) -> ('b, 's) monad
 
+  val fold_map :
+       'a t
+    -> init:'b
+    -> f:('b -> 'a -> ('b * 'c, 's) monad)
+    -> ('b * 'c list, 's) monad
+
   val exists : 'a t -> f:('a -> (boolean, 's) monad) -> (boolean, 's) monad
 
   val existsi :
@@ -64,6 +70,14 @@ module List
     go 0 init t
 
   let fold t ~init ~f = foldi t ~init ~f:(fun _ acc x -> f acc x)
+
+  let fold_map xs ~init ~f =
+    let%map res, ys =
+      fold xs ~init:(init, []) ~f:(fun (acc, ys) x ->
+          let%map acc, y = f acc x in
+          (acc, y :: ys) )
+    in
+    (res, List.rev ys)
 
   let all = M.all
 
