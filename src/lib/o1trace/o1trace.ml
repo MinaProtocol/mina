@@ -11,7 +11,7 @@ module Scheduler = Async_kernel_scheduler
 
 let buf = Bigstring.create 128
 
-let emit_event = emit_event ~buf
+let emit_event = Output.Binary.emit_event ~buf
 
 let timestamp () =
   Time_stamp_counter.now () |> Time_stamp_counter.to_time_ns
