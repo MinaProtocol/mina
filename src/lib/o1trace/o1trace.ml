@@ -17,6 +17,14 @@ type event_kind =
   | Start
   | End
 
+type event =
+  { name: string
+  ; categories: string list
+  ; phase: event_kind
+  ; timestamp: int
+  ; pid: int
+  ; tid: int }
+
 let buf = Bigstring.create 128
 
 let emitk (k : event_kind) pos =
@@ -49,30 +57,35 @@ let timestamp () =
   Time_stamp_counter.now () |> Time_stamp_counter.to_time_ns
   |> Core.Time_ns.to_int63_ns_since_epoch |> Int63.to_int_exn
 
-let emit_event wr ?(name = "") ?(tid = 0) (k : event_kind) =
-  match k with
+let new_event (k : event_kind) : event =
+  {name= ""; categories= []; phase= k; timestamp= timestamp (); pid= 0; tid= 0}
+
+let emit_event wr (event : event) =
+  match event.phase with
   | New_thread ->
-      emitk New_thread 0
-      |> emiti (timestamp ())
-      |> emiti tid |> emits name |> finish wr
+      emitk New_thread 0 |> emiti event.timestamp |> emiti event.tid
+      |> emits event.name |> finish wr
   | Thread_switch ->
-      emitk Thread_switch 0 |> emiti (timestamp ()) |> emiti tid |> finish wr
-  | Cycle_end -> emitk Cycle_end 0 |> emiti (timestamp ()) |> finish wr
-  | Pid_is ->
-      emitk Pid_is 0 |> emiti (Unix.getpid () |> Pid.to_int) |> finish wr
-  | Event -> emitk Event 0 |> emiti (timestamp ()) |> emits name |> finish wr
-  | Start -> emitk Start 0 |> emiti (timestamp ()) |> emits name |> finish wr
-  | End -> emitk End 0 |> emiti (timestamp ()) |> finish wr
+      emitk Thread_switch 0 |> emiti event.timestamp |> emiti event.tid
+      |> finish wr
+  | Cycle_end -> emitk Cycle_end 0 |> emiti event.timestamp |> finish wr
+  | Pid_is -> emitk Pid_is 0 |> emiti event.pid |> finish wr
+  | Event ->
+      emitk Event 0 |> emiti event.timestamp |> emits event.name |> finish wr
+  | Start ->
+      emitk Start 0 |> emiti event.timestamp |> emits event.name |> finish wr
+  | End -> emitk End 0 |> emiti event.timestamp |> finish wr
 
 let trace_new_thread' wr (name : string) (ctx : Execution_context.t) =
-  emit_event wr ~name ~tid:ctx.tid New_thread
+  emit_event wr {(new_event New_thread) with name; tid= ctx.tid}
 
 let trace_thread_switch' wr (new_ctx : Execution_context.t) =
-  emit_event wr ~tid:new_ctx.tid Thread_switch
+  emit_event wr {(new_event Thread_switch) with tid= new_ctx.tid}
 
 let tid = ref 1
 
-let trace_event' wr (name : string) = emit_event wr ~name Event
+let trace_event' wr (name : string) =
+  emit_event wr {(new_event Event) with name}
 
 let trace_event_impl = ref (fun _ -> ())
 
@@ -97,9 +110,10 @@ let trace_recurring_task (name : string) (f : unit -> 'a) =
       f () )
 
 let measure' wr (name : string) (f : unit -> 'a) : 'a =
-  emit_event wr ~name Start ;
+  emit_event wr {(new_event Start) with name} ;
   let res = f () in
-  emit_event wr End ; res
+  emit_event wr (new_event End) ;
+  res
 
 let measure_impl = ref (fun _ f -> f ())
 
@@ -109,7 +123,7 @@ let measure name (f : unit -> 'a) : 'a =
   (Obj.magic !measure_impl : string -> (unit -> 'a) -> 'a) name f
 
 let start_tracing wr =
-  emit_event wr Pid_is ;
+  emit_event wr {(new_event Pid_is) with pid= Unix.getpid () |> Pid.to_int} ;
   Async_kernel.Tracing.fns :=
     { trace_thread_switch= trace_thread_switch' wr
     ; trace_new_thread= trace_new_thread' wr } ;
@@ -118,7 +132,8 @@ let start_tracing wr =
   let sch = Scheduler.t () in
   Scheduler.set_on_end_of_cycle sch (fun () ->
       sch.cycle_started <- true ;
-      if sch.current_execution_context.tid <> 0 then emit_event wr Cycle_end )
+      if sch.current_execution_context.tid <> 0 then
+        emit_event wr (new_event Cycle_end) )
 
 [%%else]
 
