@@ -1471,6 +1471,11 @@ module Make_basic (Backend : Backend_intf.S) = struct
   module Field = struct
     include Field0
 
+    let gen =
+      Quickcheck.Generator.map
+        Bignum_bigint.(gen_incl zero (size - one))
+        ~f:(fun x -> Bigint.(to_field (of_bignum_bigint x)))
+
     type var = Cvar.t
 
     let typ = Typ.field
