@@ -21,6 +21,14 @@ module Make (F : Intf.Basic) = struct
 
   let one = constant Unchecked.one
 
+  let div_unsafe x y =
+    let%bind x_over_y =
+      provide_witness typ
+        As_prover.(map2 (read typ x) (read typ y) ~f:Unchecked.( / ))
+    in
+    let%map () = assert_r1cs y x_over_y x in
+    x_over_y
+
   let assert_square =
     match assert_square with
     | `Custom f -> f
@@ -78,6 +86,75 @@ module Make_applicative (F : Intf.S) (A : Intf.Applicative) = struct
   let ( + ) = A.map2 ~f:F.( + )
 
   let ( - ) = A.map2 ~f:F.( - )
+
+  let map_ t ~f = A.map t ~f:(F.map_ ~f)
+end
+
+module F (Impl : Snarky.Snark_intf.S) :
+  Intf.S with type 'a Base.t_ = 'a and type 'a A.t = 'a and module Impl = Impl =
+struct
+  module T = struct
+    module Impl = Impl
+    open Impl
+
+    let map_ t ~f = f t
+
+    module Base = struct
+      type 'a t_ = 'a
+
+      module Unchecked = struct
+        type t = Field.t t_
+      end
+
+      type t = Field.Checked.t t_
+
+      let map_ = map_
+    end
+
+    module A = struct
+      type 'a t = 'a
+
+      let map t ~f = f t
+
+      let map2 t1 t2 ~f = f t1 t2
+    end
+
+    type 'a t_ = 'a
+
+    module Unchecked = struct
+      include Field
+      include Field.Infix
+    end
+
+    type t = Field.Checked.t
+
+    let typ = Field.typ
+
+    let constant = Field.Checked.constant
+
+    let scale = Field.Checked.scale
+
+    let mul_field = Field.Checked.mul
+
+    let assert_r1cs a b c = assert_r1cs a b c
+
+    let ( + ) = Field.Checked.Infix.( + )
+
+    let ( - ) = Field.Checked.Infix.( - )
+
+    let negate t = Field.Checked.scale t Unchecked.(negate one)
+
+    let assert_square = `Custom (fun a c -> assert_square a c)
+
+    let ( * ) = `Custom Field.Checked.mul
+
+    let square = `Custom Field.Checked.square
+
+    let inv_exn = `Custom Field.Checked.inv
+  end
+
+  include T
+  include Make (T)
 end
 
 (* Given a field F and s : F (called [non_residue] below)
@@ -88,7 +165,11 @@ module E2
         val non_residue : F.Unchecked.t
 
         val mul_by_non_residue : F.t -> F.t
-    end) : Intf.S with module Impl = F.Impl = struct
+    end) :
+  Intf.S_with_primitive_element
+  with module Impl = F.Impl
+   and module Base = F
+   and type 'a A.t = 'a * 'a = struct
   open Params
 
   module T = struct
@@ -110,6 +191,10 @@ module E2
    a + b sqrt(s). Then all operations are just what follow algebraically. *)
 
     include Make_applicative (Base) (A)
+
+    let mul_field (a, b) x =
+      let%map a = Base.mul_field a x and b = Base.mul_field b x in
+      (a, b)
 
     let typ = Typ.tuple2 F.typ F.typ
 
@@ -162,6 +247,8 @@ module E2
       let%map a = a1 * a2 and b = b1 * b2 and t = (a1 + b1) * (a2 + b2) in
       (a + mul_by_non_residue b, t - a - b)
 
+    let mul_by_primitive_element (a, b) = (mul_by_non_residue b, a)
+
     let assert_r1cs (a1, b1) (a2, b2) (a3, b3) =
       let open F in
       let%bind b = b1 * b2 in
@@ -198,7 +285,11 @@ module E3
         val frobenius_coeffs_c2 : F.Unchecked.t array
 
         val mul_by_non_residue : F.t -> F.t
-    end) : Intf.S with module Impl = F.Impl = struct
+    end) :
+  Intf.S_with_primitive_element
+  with module Impl = F.Impl
+   and module Base = F
+   and type 'a A.t = 'a * 'a * 'a = struct
   module T = struct
     module Base = F
     module Unchecked = Snarkette.Fields.Make_fp3 (F.Unchecked) (Params)
@@ -217,6 +308,12 @@ module E3
     include Make_applicative (Base) (A)
 
     let typ = Typ.tuple3 F.typ F.typ F.typ
+
+    let mul_field (a, b, c) x =
+      let%map a = Base.mul_field a x
+      and b = Base.mul_field b x
+      and c = Base.mul_field c x in
+      (a, b, c)
 
     (*
        (a1 + S b1 + S^2 c1) (a2 + S b2 + S^2 c2)
@@ -305,6 +402,8 @@ module E3
       ( s0 + Params.mul_by_non_residue s3
       , s1 + Params.mul_by_non_residue s4
       , s1 + s2 + s3 - s0 - s4 )
+
+    let mul_by_primitive_element (a, b, c) = (Params.mul_by_non_residue c, a, b)
 
     let assert_r1cs (a1, b1, c1) (a2, b2, c2) (a3, b3, c3) =
       let open F in

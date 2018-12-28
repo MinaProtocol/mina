@@ -258,6 +258,8 @@ module type Basic = sig
   and Field : sig
     type t = field [@@deriving bin_io, sexp, hash, compare, eq]
 
+    val gen : t Core_kernel.Quickcheck.Generator.t
+
     include Field_intf.Extended with type t := t
 
     include Stringable.S with type t := t
