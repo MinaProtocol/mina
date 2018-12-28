@@ -5,6 +5,8 @@ open Tuple_lib
 module type Intf = sig
   type t [@@deriving eq, bin_io, sexp]
 
+  val gen : t Quickcheck.Generator.t
+
   val one : t
 
   val zero : t
@@ -75,6 +77,14 @@ module Make_fp
   let one = N.of_int 1
 
   let length_in_bits = N.num_bits N.(Info.order - one)
+
+  let gen =
+    let length_in_int32s = (length_in_bits + 31) / 32 in
+    Quickcheck.Generator.(
+      map (list_with_length length_in_int32s Int32.gen) ~f:(fun xs ->
+          List.foldi xs ~init:zero ~f:(fun i acc x ->
+              N.log_or acc
+                (N.shift_left (N.of_int (Int32.to_int_exn x)) (32 * i)) ) ))
 
   let fold_bits n : bool Fold_lib.Fold.t =
     { fold=
@@ -192,6 +202,8 @@ end = struct
 
   type t = Fp.t * Fp.t * Fp.t [@@deriving eq, bin_io, sexp]
 
+  let gen = Quickcheck.Generator.tuple3 Fp.gen Fp.gen Fp.gen
+
   let to_base_elements (x, y, z) = [x; y; z]
 
   let componentwise f (x1, x2, x3) (y1, y2, y3) = (f x1 y1, f x2 y2, f x3 y3)
@@ -265,6 +277,8 @@ end = struct
 
   type t = Fp.t * Fp.t [@@deriving eq, bin_io, sexp]
 
+  let gen = Quickcheck.Generator.tuple2 Fp.gen Fp.gen
+
   let of_base x = (x, Fp.zero)
 
   let to_base_elements (x, y) = [x; y]
@@ -336,6 +350,8 @@ end = struct
   type t = Fp3.t * Fp3.t [@@deriving eq, bin_io, sexp]
 
   type base = Fp3.t
+
+  let gen = Quickcheck.Generator.tuple2 Fp3.gen Fp3.gen
 
   let to_base_elements (x, y) = [x; y]
 
