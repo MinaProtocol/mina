@@ -1,0 +1,6 @@
+(jbuild_version 1)
+
+(library
+  ((name flamechart)
+   (public_name flamechart)
+   (libraries (yojson snarky))))
