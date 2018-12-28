@@ -1,3 +1,5 @@
+open Core_kernel
+
 module Make (F : Intf.Basic) = struct
   open F.Impl
   open Let_syntax
@@ -77,6 +79,17 @@ module Make_applicative (F : Intf.S) (A : Intf.Applicative) = struct
 
   let constant = A.map ~f:F.constant
 
+  let to_constant =
+    let exception None_exn in
+    fun t ->
+      try
+        Some
+          (A.map t ~f:(fun x ->
+               match F.to_constant x with
+               | Some x -> x
+               | None -> raise None_exn ))
+      with None_exn -> None
+
   let scale t x = A.map t ~f:(fun a -> F.scale a x)
 
   let scale' t x = A.map t ~f:(fun a -> F.scale x a)
@@ -131,6 +144,8 @@ struct
     let typ = Field.typ
 
     let constant = Field.Checked.constant
+
+    let to_constant = Field.Checked.to_constant
 
     let scale = Field.Checked.scale
 

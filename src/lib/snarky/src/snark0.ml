@@ -1483,6 +1483,10 @@ module Make_basic (Backend : Backend_intf.S) = struct
     module Checked = struct
       include Cvar1
 
+      let to_constant : var -> Field0.t option = function
+        | Constant x -> Some x
+        | _ -> None
+
       let equal = Checked.equal
 
       let mul x y = Checked.mul ~label:"Field.Checked.mul" x y
