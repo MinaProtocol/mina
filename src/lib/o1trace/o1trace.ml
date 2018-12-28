@@ -43,22 +43,26 @@ let emits (s : string) pos =
   Bigstring.From_string.blit ~src:s ~src_pos:0 ~len:sl ~dst:buf ~dst_pos:pos ;
   pos + sl
 
-let emitt pos =
-  let ts = Time_stamp_counter.to_time_ns (Time_stamp_counter.now ()) in
-  emiti (Core.Time_ns.to_int63_ns_since_epoch ts |> Int63.to_int_exn) pos
-
 let finish wr final_len = Writer.write_bigstring wr ~pos:0 ~len:final_len buf
 
+let timestamp () =
+  Time_stamp_counter.now () |> Time_stamp_counter.to_time_ns
+  |> Core.Time_ns.to_int63_ns_since_epoch |> Int63.to_int_exn
+
 let trace_new_thread' wr (name : string) (ctx : Execution_context.t) =
-  emitk New_thread 0 |> emitt |> emiti ctx.tid |> emits name |> finish wr
+  emitk New_thread 0
+  |> emiti (timestamp ())
+  |> emiti ctx.tid |> emits name |> finish wr
 
 let trace_thread_switch' wr (new_ctx : Execution_context.t) =
-  emitk Thread_switch 0 |> emitt |> emiti new_ctx.tid |> finish wr
+  emitk Thread_switch 0
+  |> emiti (timestamp ())
+  |> emiti new_ctx.tid |> finish wr
 
 let tid = ref 1
 
 let trace_event' wr (name : string) =
-  emitk Event 0 |> emitt |> emits name |> finish wr
+  emitk Event 0 |> emiti (timestamp ()) |> emits name |> finish wr
 
 let trace_event_impl = ref (fun _ -> ())
 
@@ -83,9 +87,9 @@ let trace_recurring_task (name : string) (f : unit -> 'a) =
       f () )
 
 let measure' wr (name : string) (f : unit -> 'a) : 'a =
-  emitk Start 0 |> emitt |> emits name |> finish wr ;
+  emitk Start 0 |> emiti (timestamp ()) |> emits name |> finish wr ;
   let res = f () in
-  emitk End 0 |> emitt |> finish wr ;
+  emitk End 0 |> emiti (timestamp ()) |> finish wr ;
   res
 
 let measure_impl = ref (fun _ f -> f ())
@@ -106,7 +110,7 @@ let start_tracing wr =
   Scheduler.set_on_end_of_cycle sch (fun () ->
       sch.cycle_started <- true ;
       if sch.current_execution_context.tid <> 0 then
-        emitk Cycle_end 0 |> emitt |> finish wr )
+        emitk Cycle_end 0 |> emiti (timestamp ()) |> finish wr )
 
 [%%else]
 
