@@ -185,21 +185,17 @@ end) : S = struct
 
     let () = assert Insecure.signature_hash_function
 
-    let hash_checked t ~nonce =
+    let%snarkydef hash_checked t ~nonce =
       let open Let_syntax in
-      with_label __LOC__
-        (let%bind trips = var_to_triples t in
-         let%bind hash =
-           Pedersen.Checked.digest_triples ~init:Hash_prefix.signature
-             ( trips
-             @ Fold.(to_list (group3 ~default:Boolean.false_ (of_list nonce)))
-             )
-         in
-         let%map bs = Pedersen.Checked.Digest.choose_preimage hash in
-         Bitstring.Lsb_first.of_list
-           (List.take
-              (bs :> Boolean.var list)
-              Inner_curve.Scalar.length_in_bits))
+      let%bind trips = var_to_triples t in
+      let%bind hash =
+        Pedersen.Checked.digest_triples ~init:Hash_prefix.signature
+          ( trips
+          @ Fold.(to_list (group3 ~default:Boolean.false_ (of_list nonce))) )
+      in
+      let%map bs = Pedersen.Checked.Digest.choose_preimage hash in
+      Bitstring.Lsb_first.of_list
+        (List.take (bs :> Boolean.var list) Inner_curve.Scalar.length_in_bits)
   end
 
   module Signature =
