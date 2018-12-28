@@ -23,9 +23,7 @@ type event =
   ; pid: int
   ; tid: int }
 
-let buf = Bigstring.create 128
-
-let emitk (k : event_kind) pos =
+let emitk ~buf (k : event_kind) pos =
   let num =
     match k with
     | New_thread -> 0
@@ -39,30 +37,34 @@ let emitk (k : event_kind) pos =
   Bigstring.set_uint8 buf ~pos num ;
   pos + 1
 
-let emiti (i : int) pos =
+let emiti ~buf (i : int) pos =
   Bigstring.set_uint64_le buf ~pos i ;
   pos + 8
 
-let emits (s : string) pos =
+let emits ~buf (s : string) (pos : int) =
   let sl = String.length s in
-  let pos = emiti sl pos in
+  let pos = emiti ~buf sl pos in
   Bigstring.From_string.blit ~src:s ~src_pos:0 ~len:sl ~dst:buf ~dst_pos:pos ;
   pos + sl
 
-let finish wr final_len = Writer.write_bigstring wr ~pos:0 ~len:final_len buf
+let finish wr ~buf final_len =
+  Writer.write_bigstring wr ~pos:0 ~len:final_len buf
 
-let emit_event wr (event : event) =
+let emit_event wr ~buf (event : event) =
   match event.phase with
   | New_thread ->
-      emitk New_thread 0 |> emiti event.timestamp |> emiti event.tid
-      |> emits event.name |> finish wr
+      emitk ~buf New_thread 0 |> emiti ~buf event.timestamp
+      |> emiti ~buf event.tid |> emits ~buf event.name |> finish ~buf wr
   | Thread_switch ->
-      emitk Thread_switch 0 |> emiti event.timestamp |> emiti event.tid
-      |> finish wr
-  | Cycle_end -> emitk Cycle_end 0 |> emiti event.timestamp |> finish wr
-  | Pid_is -> emitk Pid_is 0 |> emiti event.pid |> finish wr
+      emitk ~buf Thread_switch 0 |> emiti ~buf event.timestamp
+      |> emiti ~buf event.tid |> finish ~buf wr
+  | Cycle_end ->
+      emitk ~buf Cycle_end 0 |> emiti ~buf event.timestamp |> finish ~buf wr
+  | Pid_is -> emitk ~buf Pid_is 0 |> emiti ~buf event.pid |> finish ~buf wr
   | Event ->
-      emitk Event 0 |> emiti event.timestamp |> emits event.name |> finish wr
+      emitk ~buf Event 0 |> emiti ~buf event.timestamp |> emits ~buf event.name
+      |> finish ~buf wr
   | Start ->
-      emitk Start 0 |> emiti event.timestamp |> emits event.name |> finish wr
-  | End -> emitk End 0 |> emiti event.timestamp |> finish wr
+      emitk ~buf Start 0 |> emiti ~buf event.timestamp |> emits ~buf event.name
+      |> finish ~buf wr
+  | End -> emitk ~buf End 0 |> emiti ~buf event.timestamp |> finish ~buf wr

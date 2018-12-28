@@ -9,6 +9,10 @@ open Async
 open Webkit_trace_event
 module Scheduler = Async_kernel_scheduler
 
+let buf = Bigstring.create 128
+
+let emit_event = emit_event ~buf
+
 let timestamp () =
   Time_stamp_counter.now () |> Time_stamp_counter.to_time_ns
   |> Core.Time_ns.to_int63_ns_since_epoch |> Int63.to_int_exn
