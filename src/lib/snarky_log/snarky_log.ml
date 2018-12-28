@@ -1,5 +1,16 @@
 open Snarky
-open Flamechart_base
+open Webkit_trace_event
+open Webkit_trace_event.Output.JSON
+open Yojson
+
+let to_string ?buf ?len ?std events =
+  to_string ?buf ?len ?std @@ json_of_events events
+
+let to_channel ?buf ?len ?std out_channel events =
+  to_channel ?buf ?len ?std out_channel @@ json_of_events events
+
+let to_file ?buf ?len ?std filename events =
+  to_channel ?buf ?len ?std (open_out filename) events
 
 module Constraints (Snarky : Snark_intf.Basic) = struct
   (** Create flamechart events for Snarky constraints.
@@ -15,7 +26,7 @@ module Constraints (Snarky : Snark_intf.Basic) = struct
       constraint_count t ~log:(fun ?(start = false) label count ->
           rev_events :=
             create_event label
-              ~phase:(if start then Begin else End)
+              ~phase:(if start then Start else End)
               ~timestamp:count
             :: !rev_events )
     in
@@ -27,9 +38,9 @@ module Constraints (Snarky : Snark_intf.Basic) = struct
 open Snarky
 module Snark = Snark.Make (Backends.Bn128.Default)
 open Snark
-module Constraints = Flamechart.Snarky_log.Constraints (Snark)
+module Constraints = Snarky_log.Constraints (Snark)
 
-let () = Flamechart.to_file "output.json" @@
+let () = Snarky_log.to_file "output.json" @@
   Constraints.log_func ~input:Data_spec.[Field.typ; Field.typ] Field.Checked.mul
     ~apply_args:(fun mul -> mul Field.one Field.one)
     }] *)

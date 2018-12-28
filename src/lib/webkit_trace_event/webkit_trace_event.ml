@@ -24,6 +24,12 @@ type event =
   ; pid: int
   ; tid: int }
 
+type events = event list
+
+let create_event ?(categories = []) ?(pid = 0) ?(tid = 0) ~phase ~timestamp
+    name =
+  {name; categories; phase; timestamp; pid; tid}
+
 module Output = struct
   module Binary = struct
     (** This output is designed to be consumed by trace-tool in src/app/trace-tool.
@@ -138,6 +144,7 @@ module Output = struct
             ; ("pid", `Int pid)
             ; ("tid", `Int tid) ]
 
-    let json_of_events events = `List (List.map ~f:json_of_event events)
+    let json_of_events (events : events) =
+      `List (List.map ~f:json_of_event events)
   end
 end

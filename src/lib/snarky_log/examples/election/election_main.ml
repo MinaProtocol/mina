@@ -32,7 +32,7 @@ open Impl
    To see how this is actually implemented using Snarky, check out election.ml.
 *)
 
-module Constraints = Flamechart.Snarky_log.Constraints (Impl)
+module Constraints = Snarky_log.Constraints (Impl)
 
 let () =
   (* Mock data *)
@@ -46,5 +46,5 @@ let () =
     Constraints.log_func ~input:(exposed ()) (handled_check received_ballots)
       ~apply_args:(fun c -> c commitments winner )
   in
-  Flamechart.to_file "output.json" log_events ;
+  Snarky_log.to_file "output.json" log_events ;
   assert (verify proof (Keypair.vk keypair) (exposed ()) commitments winner)
