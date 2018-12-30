@@ -320,6 +320,31 @@ struct
     (* 4 *)
     if node.length > best_tip_node.length then t.best_tip <- hash ;
     node.breadcrumb
+
+  let gen ?p =
+    let open Quickcheck_lib in
+    let open Quickcheck.Let_syntax in
+    let%map (frontier, _) =
+      imperative_fixpoint (frontier, root_hash) (fun self ->
+          let%bind consensus_state_constr = Consensus.Mechanism.For_tests.gen_consensus_state_constr in
+          (fun (frontier, parent) ->
+             let protocol_state =
+               Protocol_state.create_value
+                 ~previous_protocol_state_hash:(With_hash.hash parent)
+                 ~blockchain_state:(blockchain_state parent)
+                 ~consensus_state:(consensus_state_constr parent)
+             in
+             let staged_ledger_diff = staged_ledger_diff_constr parent in
+             let transition =
+               External_transition.create
+                 ~protocol_state_proof:Proof.dummy
+                 ~protocol_state
+                 ~staged_ledger_diff
+             in
+             add_transition_exn frontier {With_hash.data= transition; hash};
+             List.iter forks ~f:(fun f -> f (frontier, hash))))
+    in
+    frontier
 end
 
 let%test_module "Transition_frontier tests" =
