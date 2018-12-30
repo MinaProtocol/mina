@@ -1,0 +1,9 @@
+(library
+  (name snarky_verifier)
+  (public_name snarky_verifier)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (libraries
+    sgn
+    snarky
+    snarkette
+    core_kernel ))
