@@ -1112,11 +1112,10 @@ module Make_basic (Backend : Backend_intf.S) = struct
         let%bind y_inv = inv y in
         mul x y_inv)
 
-    let assert_non_zero (v : Cvar.t) =
-      with_label __LOC__
-        (let open Let_syntax in
-        let%map _ = inv v in
-        ())
+    let%snarkydef assert_non_zero (v : Cvar.t) =
+      let open Let_syntax in
+      let%map _ = inv v in
+      ()
 
     module Boolean = struct
       type var = Cvar.t
@@ -1232,17 +1231,14 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
         let is_true (v : var) = assert_equal v true_
 
-        let any (bs : var list) =
-          with_label __LOC__ (assert_non_zero (Cvar.sum bs))
+        let%snarkydef any (bs : var list) = assert_non_zero (Cvar.sum bs)
 
-        let all (bs : var list) =
-          with_label __LOC__
-            (assert_equal (Cvar.sum bs)
-               (Cvar.constant (Field.of_int (List.length bs))))
+        let%snarkydef all (bs : var list) =
+          assert_equal (Cvar.sum bs)
+            (Cvar.constant (Field.of_int (List.length bs)))
 
-        let exactly_one (bs : var list) =
-          with_label __LOC__
-            (assert_equal (Cvar.sum bs) (Cvar.constant Field.one))
+        let%snarkydef exactly_one (bs : var list) =
+          assert_equal (Cvar.sum bs) (Cvar.constant Field.one)
       end
 
       module Expr = struct
@@ -1507,7 +1503,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
       let compare ~bit_length a b =
         let open Checked in
         let open Let_syntax in
-        with_label __LOC__
+        [%with_label "compare"]
           (let alpha_packed =
              Cvar.Infix.(Cvar.constant (two_to_the bit_length) + b - a)
            in
