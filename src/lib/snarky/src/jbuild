@@ -12,4 +12,4 @@
       (:standard "\\" -pedantic)
       (-I re2_c/libre2)
       ))
-  (preprocess (pps (ppx_jane ppx_deriving.enum ppx_deriving.eq bisect_ppx -conditional)))))
+  (preprocess (pps (ppx_snarky ppx_jane ppx_deriving.enum ppx_deriving.eq bisect_ppx -conditional)))))
