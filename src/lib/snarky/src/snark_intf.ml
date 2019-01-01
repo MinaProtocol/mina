@@ -282,6 +282,8 @@ module type Basic = sig
 
       val constant : field -> t
 
+      val to_constant : t -> field option
+
       val linear_combination : (field * t) list -> t
 
       val sum : t list -> t
