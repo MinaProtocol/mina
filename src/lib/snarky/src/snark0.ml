@@ -871,17 +871,14 @@ module Make_basic (Backend : Backend_intf.S) = struct
       let next_auxiliary = ref (1 + num_inputs) in
       let aux = Field.Vector.create () in
       let system = R1CS_constraint_system.create () in
-      O1trace.measure "constraint_system" (fun () ->
-          ignore (run ~num_inputs ~input ~next_auxiliary ~aux ~system t None)
-      ) ;
+      ignore (run ~num_inputs ~input ~next_auxiliary ~aux ~system t None) ;
       system
 
     let auxiliary_input (type s) ~num_inputs (t0 : (unit, s) t) (s0 : s)
         (input : Field.Vector.t) : Field.Vector.t =
       let next_auxiliary = ref (1 + num_inputs) in
       let aux = Field.Vector.create () in
-      O1trace.measure "auxiliary_input" (fun () ->
-          ignore (run ~num_inputs ~input ~next_auxiliary ~aux t0 (Some s0)) ) ;
+      ignore (run ~num_inputs ~input ~next_auxiliary ~aux t0 (Some s0)) ;
       aux
 
     let run_and_check' (type a s) (t0 : (a, s) t) (s0 : s) =
