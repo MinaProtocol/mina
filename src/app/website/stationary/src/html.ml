@@ -41,13 +41,13 @@ let rec to_lines =
     let (_, ext) = Filename.split_extension path in
     begin match ext with
     | Some "markdown" | Some "md" ->
-      Process.run_lines_exn ~prog:"pandoc" ~args:[path; "--mathjax"] ()
+      Process.run_lines_exn ~prog:"pandoc" ~args:[path; "--katex"] ()
     | Some _ | None ->
       Reader.file_lines path
     end
   | Markdown s ->
     let%bind proc =
-      Process.create_exn ~prog:"pandoc"  ~args:["--mathjax"] ()
+      Process.create_exn ~prog:"pandoc"  ~args:["--katex"] ()
     in
     let stdin = Process.stdin proc in
     Writer.write stdin s;
