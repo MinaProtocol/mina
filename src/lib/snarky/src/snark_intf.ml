@@ -1,5 +1,7 @@
 module Bignum_bigint = Bigint
 open Core_kernel
+module Constraint0 = Constraint
+module Boolean0 = Boolean
 
 module type Basic = sig
   module Proving_key : sig
@@ -61,7 +63,7 @@ module type Basic = sig
   end
 
   module rec Constraint : sig
-    type t
+    type t = Field.Checked.t Constraint0.t
 
     type 'k with_constraint_args = ?label:string -> 'k
 
@@ -182,7 +184,7 @@ module type Basic = sig
   end
   
   and Boolean : sig
-    type var = private Field.Checked.t
+    type var = Field.Checked.t Boolean0.t
 
     type value = bool
 

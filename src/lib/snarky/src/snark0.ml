@@ -53,8 +53,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
       let compare x y = Int.compare (index x) (index y)
 
-      let hash x = Int.hash (Var.index x)
-
       let t_of_sexp _ = failwith "Var.t_of_sexp"
 
       let sexp_of_t v =
@@ -127,10 +125,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
   end
 
   module Linear_combination = struct
-    open Backend.Linear_combination
-
-    type t = Backend.Linear_combination.t
-
     let of_constant = function
       | None -> Linear_combination.create ()
       | Some c -> Linear_combination.of_field c
@@ -141,12 +135,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
       List.iter terms ~f:(fun (c, v) -> Linear_combination.add_term t c v) ;
       t
 
-    (* TODO: Could be more efficient. *)
-    let of_terms terms = of_var (Cvar.linear_combination terms)
-
     let of_field = Backend.Linear_combination.of_field
-
-    let one = of_field Field.one
 
     let zero = of_field Field.zero
   end
@@ -940,7 +929,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
     let check t s = Or_error.is_ok (run_and_check' t s)
 
-    let equal (x : Cvar.t) (y : Cvar.t) : (Cvar.t, _) t =
+    let equal (x : Cvar.t) (y : Cvar.t) : (Cvar.t Boolean.t, _) t =
       let open Let_syntax in
       let%bind inv =
         provide_witness Typ.field
@@ -960,7 +949,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
           [ r1cs ~label:"equals_1" inv (x - y) (Cvar.constant Field.one - r)
           ; r1cs ~label:"equals_2" r (x - y) (Cvar.constant Field.zero) ]
       in
-      r
+      Boolean.Unsafe.create r
 
     let mul ?(label = "Checked.mul") (x : Cvar.t) (y : Cvar.t) =
       match (x, y) with
@@ -1018,23 +1007,50 @@ module Make_basic (Backend : Backend_intf.S) = struct
         let%bind y_inv = inv y in
         mul x y_inv)
 
+    let%snarkydef if_ (b : Cvar.t Boolean.t) ~then_ ~else_ =
+      let open Let_syntax in
+      (* r = e + b (t - e)
+      r - e = b (t - e)
+    *)
+      let%bind r =
+        provide_witness Typ.field
+          (let open As_prover in
+          let open Let_syntax in
+          let%bind b = read_var (b :> Cvar.t) in
+          read Typ.field (if Field.equal b Field.one then then_ else else_))
+      in
+      let%map () =
+        assert_r1cs
+          (b :> Cvar.t)
+          Cvar.Infix.(then_ - else_)
+          Cvar.Infix.(r - else_)
+      in
+      r
+
     let%snarkydef assert_non_zero (v : Cvar.t) =
       let open Let_syntax in
       let%map _ = inv v in
       ()
 
     module Boolean = struct
-      type var = Cvar.t
+      open Boolean.Unsafe
+
+      type var = Cvar.t Boolean.t
 
       type value = bool
 
-      let true_ : var = Cvar.constant Field.one
+      let true_ : var = create (Cvar.constant Field.one)
 
-      let false_ : var = Cvar.constant Field.zero
+      let false_ : var = create (Cvar.constant Field.zero)
 
-      let not (x : var) : var = Cvar.Infix.(true_ - x)
+      let not (x : var) : var =
+        create Cvar.Infix.((true_ :> Cvar.t) - (x :> Cvar.t))
 
-      let ( && ) x y =
+      let if_ b ~(then_ : var) ~(else_ : var) =
+        Checked1.map ~f:create
+          (if_ b ~then_:(then_ :> Cvar.t) ~else_:(else_ :> Cvar.t))
+
+      let ( && ) (x : var) (y : var) =
         (* (x + y)^2 = 2 z + x + y
 
            x^2 + 2 x*y + y^2 = 2 z + x + y
@@ -1042,6 +1058,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
            2 x*y = 2 z
            x * y = z
         *)
+        let x = (x :> Cvar.t) in
+        let y = (y :> Cvar.t) in
         let open Let_syntax in
         let%bind z =
           provide_witness Typ.field
@@ -1055,14 +1073,12 @@ module Make_basic (Backend : Backend_intf.S) = struct
           let x_plus_y = Cvar.add x y in
           assert_square x_plus_y Cvar.Infix.((Field.of_int 2 * z) + x_plus_y)
         in
-        z
+        create z
 
       let ( || ) x y =
         let open Let_syntax in
         let%map both_false = (not x) && not y in
         not both_false
-
-      let equal x y = equal x y
 
       let any = function
         | [] -> return false_
@@ -1080,71 +1096,59 @@ module Make_basic (Backend : Backend_intf.S) = struct
         | [b1] -> return b1
         | [b1; b2] -> b1 && b2
         | bs ->
-            equal (Cvar.constant (Field.of_int (List.length bs))) (Cvar.sum bs)
+            equal
+              (Cvar.constant (Field.of_int (List.length bs)))
+              (Cvar.sum (bs :> Cvar.t list))
+
+      let equal (x : var) (y : var) = equal (x :> Cvar.t) (y :> Cvar.t)
 
       let of_field x =
         let open Let_syntax in
         let%map () = assert_ (Constraint.boolean x) in
-        x
+        create x
 
       let var_of_value b = if b then true_ else false_
 
       module Unsafe = struct
-        let of_cvar (t : Cvar.t) : var = t
+        let of_cvar (t : Cvar.t) : var = create t
       end
 
       let typ : (var, value) Typ.t =
         let open Typ in
-        let store b = Store.store (if b then Field.one else Field.zero) in
-        let read v =
+        let store b =
+          Store.(map (store (if b then Field.one else Field.zero)) ~f:create)
+        in
+        let read (v : var) =
           let open Read.Let_syntax in
-          let%map x = Read.read v in
+          let%map x = Read.read (v :> Cvar.t) in
           if Field.equal x Field.one then true
           else if Field.equal x Field.zero then false
           else failwith "Boolean.typ: Got non boolean value for variable"
         in
-        let alloc = Alloc.alloc in
-        let check v = assert_ (Constraint.boolean ~label:"boolean-alloc" v) in
+        let alloc = Alloc.(map alloc ~f:create) in
+        let check (v : var) =
+          assert_ (Constraint.boolean ~label:"boolean-alloc" (v :> Cvar.t))
+        in
         {read; store; alloc; check}
-
-      let if_ (b : var) ~then_ ~else_ =
-        let open Checked1 in
-        with_label "if_"
-          (let open Let_syntax in
-          (* r = e + b (t - e)
-          r - e = b (t - e)
-        *)
-          let%bind r =
-            provide_witness Typ.field
-              (let open As_prover in
-              let open Let_syntax in
-              let%bind b = read typ b in
-              read Typ.field (if b then then_ else else_))
-          in
-          let%map () =
-            assert_r1cs
-              (b :> Cvar.t)
-              Cvar.Infix.(then_ - else_)
-              Cvar.Infix.(r - else_)
-          in
-          r)
 
       let typ_unchecked : (var, value) Typ.t =
         {typ with check= (fun _ -> return ())}
 
       module Assert = struct
-        let ( = ) x y = assert_equal x y
+        let ( = ) (x : var) (y : var) = assert_equal (x :> Cvar.t) (y :> Cvar.t)
 
-        let is_true (v : var) = assert_equal v true_
+        let is_true (v : var) = v = true_
 
-        let%snarkydef any (bs : var list) = assert_non_zero (Cvar.sum bs)
+        let%snarkydef any (bs : var list) =
+          assert_non_zero (Cvar.sum (bs :> Cvar.t list))
 
         let%snarkydef all (bs : var list) =
-          assert_equal (Cvar.sum bs)
+          assert_equal
+            (Cvar.sum (bs :> Cvar.t list))
             (Cvar.constant (Field.of_int (List.length bs)))
 
         let%snarkydef exactly_one (bs : var list) =
-          assert_equal (Cvar.sum bs) (Cvar.constant Field.one)
+          assert_equal (Cvar.sum (bs :> Cvar.t list)) (Cvar.constant Field.one)
       end
 
       module Expr = struct
@@ -1158,7 +1162,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
           | And ts -> Checked1.all (List.map ~f:eval ts) >>= all
           | Or ts -> Checked1.all (List.map ~f:eval ts) >>= any
 
-        let assert_ t = eval t >>= assert_equal true_
+        let assert_ t = eval t >>= Assert.is_true
 
         let ( ! ) v = Var v
 
@@ -1200,7 +1204,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
     let packing_sum (bits : Boolean.var list) =
       let ts, _ =
         List.fold_left bits ~init:([], Field.one) ~f:(fun (acc, c) v ->
-            ((c, v) :: acc, Field.add c c) )
+            ((c, (v :> Cvar.t)) :: acc, Field.add c c) )
       in
       Cvar.linear_combination ts
 
@@ -1255,7 +1259,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
           and () = r in
           ()
 
-    let rec r1cs_h : type s r2 k1 k2.
+    let r1cs_h : type s r2 k1 k2.
            int ref
         -> ((unit, s) Checked.t, r2, k1, k2) t
         -> k1
@@ -1355,7 +1359,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
         | [] -> List.rev acc
         | v :: vs -> go (Field.add c c) ((c, v) :: acc) vs
       in
-      Cvar.linear_combination (go Field.one [] vars)
+      Cvar.linear_combination (go Field.one [] (vars :> Cvar.t list))
 
     let pack vars =
       assert (List.length vars < Field.size_in_bits) ;
@@ -1404,7 +1408,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
       type comparison_result =
         {less: Checked.Boolean.var; less_or_equal: Checked.Boolean.var}
 
-      let if_ = Checked.Boolean.if_
+      let if_ = Checked.if_
 
       let compare ~bit_length a b =
         let open Checked in
