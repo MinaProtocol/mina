@@ -101,22 +101,22 @@ module Make (Inputs : Inputs_intf) :
     let get {var; _} = !var
   end
 
-  let set_bootstrap_mode ~mode root_state bootstrap_controller_writer =
-    assert (not @@ is_bootstrapping (Broadcaster.get mode)) ;
-    Broadcaster.broadcast mode
+  let set_bootstrap_phase ~controller_type root_state
+      bootstrap_controller_writer =
+    assert (not @@ is_bootstrapping (Broadcaster.get controller_type)) ;
+    Broadcaster.broadcast controller_type
       (`Bootstrap_controller (root_state, bootstrap_controller_writer))
 
-  let set_transition_frontier_controller_mode ~mode new_frontier reader writer
-      =
-    assert (not @@ is_bootstrapping (Broadcaster.get mode)) ;
-    Broadcaster.broadcast mode
+  let set_transition_frontier_controller_phase ~controller_type new_frontier
+      reader writer =
+    assert (not @@ is_bootstrapping (Broadcaster.get controller_type)) ;
+    Broadcaster.broadcast controller_type
       (`Transition_frontier_controller (new_frontier, reader, writer))
 
-  (* TODO: Wrap frontier with a Mvar #1323 *)
   let run ~logger ~network ~time_controller ~frontier_mvar ~ledger_db
       ~transition_reader =
-    let clean_transition_frontier_controller_and_start_bootstrap ~mode
-        ~clear_writer ~transition_frontier_controller_reader
+    let clean_transition_frontier_controller_and_start_bootstrap
+        ~controller_type ~clear_writer ~transition_frontier_controller_reader
         ~transition_frontier_controller_writer ~old_frontier
         (`Transition incoming_transition, `Time_received tm) =
       kill transition_frontier_controller_reader
@@ -126,7 +126,8 @@ module Make (Inputs : Inputs_intf) :
         create_bufferred_pipe ()
       in
       let root_state = get_root_state old_frontier in
-      set_bootstrap_mode ~mode root_state bootstrap_controller_writer ;
+      set_bootstrap_phase ~controller_type root_state
+        bootstrap_controller_writer ;
       let ancestor_prover =
         Ancestor.Prover.create ~max_size:(2 * Transition_frontier.max_length)
       in
@@ -164,7 +165,7 @@ module Make (Inputs : Inputs_intf) :
         ~clear_reader
         (Mvar.peek_exn frontier_mvar)
     in
-    let mode =
+    let controller_type =
       Broadcaster.create
         ~init:
           (`Transition_frontier_controller
@@ -186,7 +187,7 @@ module Make (Inputs : Inputs_intf) :
           network_transition
         in
         let new_transition = Envelope.Incoming.data incoming_transition in
-        match Broadcaster.get mode with
+        match Broadcaster.get controller_type with
         | `Transition_frontier_controller
             ( frontier
             , transition_frontier_controller_reader
@@ -194,8 +195,9 @@ module Make (Inputs : Inputs_intf) :
             let root_state = get_root_state frontier in
             if is_transition_for_bootstrap root_state new_transition then
               let%map new_frontier =
-                clean_transition_frontier_controller_and_start_bootstrap ~mode
-                  ~clear_writer ~transition_frontier_controller_reader
+                clean_transition_frontier_controller_and_start_bootstrap
+                  ~controller_type ~clear_writer
+                  ~transition_frontier_controller_reader
                   ~transition_frontier_controller_writer ~old_frontier:frontier
                   network_transition
               in
@@ -203,8 +205,8 @@ module Make (Inputs : Inputs_intf) :
                 start_transition_frontier_controller
                   ~verified_transition_writer ~clear_reader new_frontier
               in
-              set_transition_frontier_controller_mode ~mode new_frontier reader
-                writer
+              set_transition_frontier_controller_phase ~controller_type
+                new_frontier reader writer
             else (
               Strict_pipe.Writer.write transition_frontier_controller_writer
                 network_transition ;
