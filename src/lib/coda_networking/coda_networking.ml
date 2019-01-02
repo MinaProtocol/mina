@@ -165,43 +165,6 @@ struct
     end
   end
 
-  module Transition_catchup = struct
-    module T = struct
-      let name = "transition_catchup"
-
-      module T = struct
-        type query = State_hash.t [@@deriving bin_io]
-
-        type response = External_transition.t list option [@@deriving bin_io]
-      end
-
-      module Caller = T
-      module Callee = T
-    end
-
-    include T.T
-    include Versioned_rpc.Both_convert.Plain.Make (T)
-
-    module V1 = struct
-      module T = struct
-        include T.T
-
-        let version = 1
-
-        let query_of_caller_model = Fn.id
-
-        let callee_model_of_query = Fn.id
-
-        let response_of_callee_model = Fn.id
-
-        let caller_model_of_response = Fn.id
-      end
-
-      include T
-      include Register (T)
-    end
-  end
-
   module Get_ancestry = struct
     module T = struct
       let name = "get_ancestry"
@@ -218,7 +181,13 @@ struct
     end
 
     include T.T
-    include Versioned_rpc.Both_convert.Plain.Make (T)
+    module M = Versioned_rpc.Both_convert.Plain.Make (T)
+    include M
+
+    include Perf_histograms.Rpc.Plain.Extend (struct
+      include M
+      include T
+    end)
 
     module V1 = struct
       module T = struct

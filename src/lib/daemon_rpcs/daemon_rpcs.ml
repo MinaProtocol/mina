@@ -57,6 +57,7 @@ module Types = struct
       type t =
         { get_staged_ledger_aux: Perf_histograms.Report.t option Rpc_pair.t
         ; answer_sync_ledger_query: Perf_histograms.Report.t option Rpc_pair.t
+        ; get_ancestry: Perf_histograms.Report.t option Rpc_pair.t
         ; transition_catchup: Perf_histograms.Report.t option Rpc_pair.t }
       [@@deriving to_yojson, bin_io, fields]
 
@@ -83,11 +84,48 @@ module Types = struct
               add_rpcs ~name:"Get Staged Ledger Aux" (f x) acc )
             ~answer_sync_ledger_query:(fun acc x ->
               add_rpcs ~name:"Answer Sync Ledger Query" (f x) acc )
+            ~get_ancestry:(fun acc x -> add_rpcs ~name:"Get Ancestry" (f x) acc)
             ~transition_catchup:(fun acc x ->
               add_rpcs ~name:"Transition Catchup" (f x) acc )
           |> List.rev
         in
-        digest_entries ~title:"RPC Histograms" entries
+        digest_entries ~title:"RPCs" entries
+    end
+
+    module Histograms = struct
+      type t =
+        { rpc_timings: Rpc_timings.t
+        ; external_transition_latency: Perf_histograms.Report.t option
+        ; snark_worker_transition_time: Perf_histograms.Report.t option
+        ; snark_worker_merge_time: Perf_histograms.Report.t option }
+      [@@deriving to_yojson, bin_io, fields]
+
+      let to_text s =
+        let entries =
+          let f x = Field.get x s in
+          Fields.fold ~init:[]
+            ~rpc_timings:(fun acc x ->
+              ("RPC Timings", Rpc_timings.to_text (f x)) :: acc )
+            ~external_transition_latency:(fun acc x ->
+              match f x with
+              | None -> acc
+              | Some report ->
+                  ("Block Latencies (hist.)", summarize_report report) :: acc
+              )
+            ~snark_worker_transition_time:(fun acc x ->
+              match f x with
+              | None -> acc
+              | Some report ->
+                  ("Snark Worker a->b (hist.)", summarize_report report) :: acc
+              )
+            ~snark_worker_merge_time:(fun acc x ->
+              match f x with
+              | None -> acc
+              | Some report ->
+                  ("Snark Worker Merge (hist.)", summarize_report report)
+                  :: acc )
+        in
+        digest_entries ~title:"Performance Histograms" entries
     end
 
     (* NOTE: yojson deriving generates code that violates warning 39 *)
@@ -104,11 +142,8 @@ module Types = struct
       ; user_commands_sent: int
       ; run_snark_worker: bool
       ; proposal_interval: int
-      ; external_transition_latency: Perf_histograms.Report.t option
-      ; snark_worker_transition_time: Perf_histograms.Report.t option
-      ; snark_worker_merge_time: Perf_histograms.Report.t option
-      ; rpc_timings: Rpc_timings.t
-      ; propose_pubkey: Public_key.t option }
+      ; propose_pubkey: Public_key.t option
+      ; histograms: Histograms.t option }
     [@@deriving to_yojson, bin_io, fields]
 
     (* Text response *)
@@ -146,23 +181,6 @@ module Types = struct
             ("Snark Worker Running", Bool.to_string (f x)) :: acc )
           ~proposal_interval:(fun acc x ->
             ("Proposal Interval", Int.to_string (f x)) :: acc )
-          ~external_transition_latency:(fun acc x ->
-            match f x with
-            | None -> acc
-            | Some report ->
-                ("Block Latencies (hist.)", summarize_report report) :: acc )
-          ~snark_worker_transition_time:(fun acc x ->
-            match f x with
-            | None -> acc
-            | Some report ->
-                ("Snark Worker a->b (hist.)", summarize_report report) :: acc
-            )
-          ~snark_worker_merge_time:(fun acc x ->
-            match f x with
-            | None -> acc
-            | Some report ->
-                ("Snark Worker Merge (hist.)", summarize_report report) :: acc
-            )
           ~propose_pubkey:(fun acc x ->
             match f x with
             | None -> ("Proposer Running", "false") :: acc
@@ -170,8 +188,11 @@ module Types = struct
                 ( "Proposer Running"
                 , Printf.sprintf !"%{sexp: Public_key.t}" pubkey )
                 :: acc )
-          ~rpc_timings:(fun acc x ->
-            ("RPC Timings", Rpc_timings.to_text (f x)) :: acc )
+          ~histograms:(fun acc x ->
+            match f x with
+            | None -> acc
+            | Some histograms ->
+                ("Histograms", Histograms.to_text histograms) :: acc )
         |> List.rev
       in
       digest_entries ~title entries
@@ -261,7 +282,7 @@ module Get_nonce = struct
 end
 
 module Get_status = struct
-  type query = unit [@@deriving bin_io]
+  type query = [`Performance | `None] [@@deriving bin_io]
 
   type response = Types.Status.t [@@deriving bin_io]
 
@@ -272,7 +293,7 @@ module Get_status = struct
 end
 
 module Clear_hist_status = struct
-  type query = unit [@@deriving bin_io]
+  type query = [`Performance | `None] [@@deriving bin_io]
 
   type response = Types.Status.t [@@deriving bin_io]
 
