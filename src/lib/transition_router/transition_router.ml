@@ -90,15 +90,15 @@ module Make (Inputs : Inputs_intf) :
     |> External_transition.forget |> External_transition.protocol_state
 
   module Broadcaster = struct
-    type 'a t = {var: 'a ref; f: 'a -> unit}
+    type 'a t = {mutable var: 'a; f: 'a -> unit}
 
-    let create ~init ~f = {var= ref init; f}
+    let create ~init ~f = {var= init; f}
 
-    let broadcast {var; f} value =
-      var := value ;
-      f value
+    let broadcast t value =
+      t.var <- value ;
+      t.f value
 
-    let get {var; _} = !var
+    let get {var; _} = var
   end
 
   let set_bootstrap_phase ~controller_type root_state
