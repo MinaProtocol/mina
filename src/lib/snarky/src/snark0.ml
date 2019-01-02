@@ -3,33 +3,6 @@ open Core_kernel
 
 let () = Camlsnark_c.linkme
 
-module Restrict_monad2
-    (M : Monad.S2) (T : sig
-        type t
-    end) : Monad.S with type 'a t = ('a, T.t) M.t = struct
-  type 'a t = ('a, T.t) M.t
-
-  let map = M.map
-
-  let bind = M.bind
-
-  let return = M.return
-
-  let all = M.all
-
-  let all_ignore = M.all_unit
-
-  let all_unit = M.all_unit
-
-  let ignore_m = M.ignore_m
-
-  let join = M.join
-
-  module Let_syntax = M.Let_syntax
-  module Monad_infix = M.Monad_infix
-  include Monad_infix
-end
-
 module Make_basic (Backend : Backend_intf.S) = struct
   open Backend
 
@@ -179,19 +152,13 @@ module Make_basic (Backend : Backend_intf.S) = struct
   end
 
   module Constraint = struct
-    type basic =
-      | Boolean of Cvar.t
-      | Equal of Cvar.t * Cvar.t
-      | Square of Cvar.t * Cvar.t
-      | R1CS of Cvar.t * Cvar.t * Cvar.t
-    [@@deriving sexp]
+    open Constraint
+
+    type basic = Cvar.t Constraint.basic
 
     type 'k with_constraint_args = ?label:string -> 'k
 
-    type basic_with_annotation = {basic: basic; annotation: string option}
-    [@@deriving sexp]
-
-    type t = basic_with_annotation list [@@deriving sexp]
+    type t = Cvar.t Constraint.t [@@deriving sexp]
 
     let basic_to_r1cs_constraint : basic -> R1CS_constraint.t =
       let of_var = Linear_combination.of_var in
@@ -255,71 +222,59 @@ module Make_basic (Backend : Backend_intf.S) = struct
       | Square (a, c) -> Field.equal (Field.square (get_value a)) (get_value c)
 
     let eval t get_value =
-      List.for_all t ~f:(fun {basic} -> eval_basic basic get_value)
+      List.for_all t ~f:(fun {basic; _} -> eval_basic basic get_value)
 
     let annotation (t : t) =
       String.concat ~sep:"; "
-        (List.filter_map t ~f:(fun {annotation} -> annotation))
+        (List.filter_map t ~f:(fun {annotation; _} -> annotation))
   end
 
   module Typ_monads = struct
+    open Typ_monads
+
+    module A = struct
+      type t1 = Field.t
+
+      type t2 = Cvar.t
+    end
+
     module Store = struct
-      module T = struct
-        type 'k t = Store of Field.t * (Backend.Var.t -> 'k)
+      include Restrict_monad.Make3 (Store) (A)
 
-        let map t ~f =
-          match t with Store (x, k) -> Store (x, fun v -> f (k v))
-      end
+      let store = Store.store
 
-      include Free_monad.Make (T)
-
-      let store x = Free (T.Store (x, fun v -> Pure (Cvar.Unsafe.of_var v)))
-
-      let rec run t f =
-        match t with Pure x -> x | Free (T.Store (x, k)) -> run (k (f x)) f
+      let run = Store.run
     end
 
     module Read = struct
-      module T = struct
-        type 'k t = Read of Cvar.t * (Field.t -> 'k)
+      include Restrict_monad.Make3 (Read) (A)
 
-        let map t ~f = match t with Read (v, k) -> Read (v, fun x -> f (k x))
-      end
+      let read = Read.read
 
-      include Free_monad.Make (T)
-
-      let read v = Free (T.Read (v, return))
-
-      let rec run t f =
-        match t with Pure x -> x | Free (T.Read (x, k)) -> run (k (f x)) f
+      let run = Read.run
     end
 
     module Alloc = struct
-      module T = struct
-        type 'k t = Alloc of (Backend.Var.t -> 'k)
+      open Alloc
 
-        let map t ~f = match t with Alloc k -> Alloc (fun v -> f (k v))
-      end
+      include Restrict_monad.Make2
+                (Alloc)
+                (struct
+                  type t = Cvar.t
+                end)
 
-      include Free_monad.Make (T)
+      let alloc = alloc
 
-      let alloc = Free (T.Alloc (fun v -> Pure (Cvar.Unsafe.of_var v)))
-
-      let rec run t f =
-        match t with Pure x -> x | Free (T.Alloc k) -> run (k (f ())) f
+      let run = run
 
       let size t =
-        let dummy = Backend.Var.create 0 in
+        let dummy = Cvar.Unsafe.of_var (Backend.Var.create 0) in
         let rec go acc = function
           | Pure _ -> acc
           | Free (T.Alloc k) -> go (acc + 1) (k dummy)
         in
         go 0 t
     end
-  end
-
-  module Handle0 = struct
-    type ('var, 'value) t = {var: 'var; value: 'value option}
   end
 
   module As_prover0 = struct
@@ -334,69 +289,19 @@ module Make_basic (Backend : Backend_intf.S) = struct
     type t = Request.request -> Request.response
   end
 
-  module Provider = struct
-    type ('a, 's) t =
-      | Request of ('a Request.t, 's) As_prover0.t
-      | Compute of ('a, 's) As_prover0.t
-      | Both of ('a Request.t, 's) As_prover0.t * ('a, 's) As_prover0.t
-
-    let run t tbl s (handler : Request.Handler.t) =
-      match t with
-      | Request rc ->
-          let s', r = As_prover0.run rc tbl s in
-          (s', Request.Handler.run handler r)
-      | Compute c -> As_prover0.run c tbl s
-      | Both (rc, c) -> (
-          let s', r = As_prover0.run rc tbl s in
-          match Request.Handler.run handler r with
-          | exception _ -> As_prover0.run c tbl s
-          | x -> (s', x) )
+  module Typ0 = struct
+    type ('var, 'value) t =
+      ('var, 'value, Field.t, Cvar.t, R1CS_constraint_system.t) Types.Typ.t
   end
 
-  module rec Typ0 : sig
-    open Typ_monads
-
-    type ('var, 'value) t =
-      { store: 'value -> 'var Store.t
-      ; read: 'var -> 'value Read.t
-      ; alloc: 'var Alloc.t
-      ; check: 'var -> (unit, unit) Checked0.t }
-  end =
-    Typ0
-  
-  and Checked0 : sig
-    (* TODO-someday: Consider having an "Assembly" type with only a store constructor for straight up Var.t's
-    that this gets compiled into. *)
-
+  module Checked0 = struct
     type ('a, 's) t =
-      | Pure : 'a -> ('a, 's) t
-      | Add_constraint : Constraint.t * ('a, 's) t -> ('a, 's) t
-      | With_constraint_system :
-          (R1CS_constraint_system.t -> unit) * ('a, 's) t
-          -> ('a, 's) t
-      | As_prover : (unit, 's) As_prover0.t * ('a, 's) t -> ('a, 's) t
-      | With_label : string * ('a, 's) t * ('a -> ('b, 's) t) -> ('b, 's) t
-      | With_state :
-          ('s1, 's) As_prover0.t
-          * ('s1 -> (unit, 's) As_prover0.t)
-          * ('b, 's1) t
-          * ('b -> ('a, 's) t)
-          -> ('a, 's) t
-      | With_handler :
-          Request.Handler.single * ('a, 's) t * ('a -> ('b, 's) t)
-          -> ('b, 's) t
-      | Clear_handler : ('a, 's) t * ('a -> ('b, 's) t) -> ('b, 's) t
-      | Exists :
-          ('var, 'value) Typ0.t
-          * ('value, 's) Provider.t
-          * (('var, 'value) Handle0.t -> ('a, 's) t)
-          -> ('a, 's) t
-      | Next_auxiliary : (int -> ('a, 's) t) -> ('a, 's) t
-  end =
-    Checked0
+      ('a, 's, Field.t, Cvar.t, R1CS_constraint_system.t) Types.Checked.t
+  end
 
   module Checked1 = struct
     module T = struct
+      open Types.Checked
       include Checked0
 
       let return x = Pure x
@@ -442,6 +347,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
   end
 
   module Typ = struct
+    open Types.Typ
     include Typ_monads
     include Typ0
 
@@ -475,8 +381,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
     let check ({check; _} : ('var, 'value) t) (v : 'var) :
         (unit, 's) Checked1.t =
       let do_nothing : (unit, _) As_prover0.t = fun _ s -> (s, ()) in
-      Checked1.With_state
-        (do_nothing, (fun () -> do_nothing), check v, Checked1.return)
+      With_state (do_nothing, (fun () -> do_nothing), check v, Checked1.return)
 
     let unit : (unit, unit) t =
       let s = Store.return () in
@@ -576,8 +481,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
     let transport_var ({read; store; alloc; check} : ('var1, 'value) t)
         ~(there : 'var2 -> 'var1) ~(back : 'var1 -> 'var2) : ('var2, 'value) t
         =
-      { alloc= Alloc.map alloc back
-      ; store= (fun x -> Store.map (store x) back)
+      { alloc= Alloc.map alloc ~f:back
+      ; store= (fun x -> Store.map (store x) ~f:back)
       ; read= (fun x -> read (there x))
       ; check= (fun x -> check (there x)) }
 
@@ -603,7 +508,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
           failwithf "Typ.list: Expected length %d, got %d" length n () ;
         Store.all (List.map ~f:store ts)
       in
-      let alloc = Alloc.all (List.init length (fun _ -> alloc)) in
+      let alloc = Alloc.all (List.init length ~f:(fun _ -> alloc)) in
       let check ts = Checked1.all_unit (List.map ts ~f:check) in
       let read vs = Read.all (List.map vs ~f:read) in
       {read; store; alloc; check}
@@ -618,7 +523,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
       in
       let alloc =
         let open Alloc.Let_syntax in
-        let%map vs = Alloc.all (List.init length (fun _ -> alloc)) in
+        let%map vs = Alloc.all (List.init length ~f:(fun _ -> alloc)) in
         Array.of_list vs
       in
       let read vs =
@@ -659,7 +564,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
         let traverse_checked =
           let module M =
             T.Traverse
-              (Restrict_monad2
+              (Restrict_monad.Make2
                  (Checked1)
                  (struct
                    type t = unit
@@ -752,7 +657,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
   end
 
   module Handle = struct
-    include Handle0
+    include Handle
 
     let value (t : ('var, 'value) t) : ('value, 's) As_prover0.t =
      fun _ s -> (s, Option.value_exn t.value)
@@ -761,6 +666,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
   end
 
   module Checked = struct
+    open Types.Checked
     include Checked1
 
     let request_witness (typ : ('var, 'value) Typ.t)
@@ -845,7 +751,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
       let next_auxiliary = ref 1 in
       let alloc_var () =
         let v = Backend.Var.create !next_auxiliary in
-        incr next_auxiliary ; v
+        incr next_auxiliary ; Cvar.Unsafe.of_var v
       in
       let rec go : type a s. int -> (a, s) t -> int * a =
        fun count t0 ->
@@ -853,9 +759,9 @@ module Make_basic (Backend : Backend_intf.S) = struct
         | Pure x -> (count, x)
         | With_constraint_system (_f, k) -> go count k
         | As_prover (_x, k) -> go count k
-        | Add_constraint (c, t) -> go (count + 1) t
+        | Add_constraint (_c, t) -> go (count + 1) t
         | Next_auxiliary k -> go count (k !next_auxiliary)
-        | With_label (s, t, k) ->
+        | With_label (_s, t, k) ->
             let count', y = go count t in
             go count' (k y)
         | With_state (_p, _and_then, t_sub, k) ->
@@ -891,10 +797,10 @@ module Make_basic (Backend : Backend_intf.S) = struct
         let v = Backend.Var.create !next_auxiliary in
         incr next_auxiliary ;
         Field.Vector.emplace_back aux x ;
-        v
+        Cvar.Unsafe.of_var v
       and alloc_var () =
         let v = Backend.Var.create !next_auxiliary in
-        incr next_auxiliary ; v
+        incr next_auxiliary ; Cvar.Unsafe.of_var v
       in
       let run_as_prover x s =
         match (x, s) with
@@ -1331,7 +1237,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
     let alloc_var next_input () =
       let v = Backend.Var.create !next_input in
-      incr next_input ; v
+      incr next_input ; Cvar.Unsafe.of_var v
 
     let rec collect_input_constraints : type s r2 k1 k2.
            int ref
@@ -1382,7 +1288,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
           let v = Backend.Var.create !next_input in
           incr next_input ;
           Field.Vector.emplace_back primary_input x ;
-          v
+          Cvar.Unsafe.of_var v
       in
       let rec go : type r_var k_var k_value.
           (r_var, bool, k_var, k_value) t -> k_value =
@@ -1409,7 +1315,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
           let v = Backend.Var.create !next_input in
           incr next_input ;
           Field.Vector.emplace_back primary_input x ;
-          v
+          Cvar.Unsafe.of_var v
       in
       let rec go : type k_var k_value.
           (r_var, r_value, k_var, k_value) t -> k_var -> k_value =
@@ -1570,10 +1476,10 @@ module Make_basic (Backend : Backend_intf.S) = struct
         let rec lt_binary xs ys : Boolean.var Expr.Binary.t =
           match (xs, ys) with
           | [], [] -> Lit Boolean.false_
-          | [x], [false] -> Lit Boolean.false_
+          | [_x], [false] -> Lit Boolean.false_
           | [x], [true] -> Lit (Boolean.not x)
-          | [x1; x2], [true; false] -> Lit (Boolean.not x1)
-          | [x1; x2], [false; false] -> Lit Boolean.false_
+          | [x1; _x2], [true; false] -> Lit (Boolean.not x1)
+          | [_x1; _x2], [false; false] -> Lit Boolean.false_
           | x :: xs, false :: ys -> And (Boolean.not x, lt_binary xs ys)
           | x :: xs, true :: ys -> Or (Boolean.not x, lt_binary xs ys)
           | _ :: _, [] | [], _ :: _ ->
