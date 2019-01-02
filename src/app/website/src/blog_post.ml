@@ -3,19 +3,18 @@ open Async
 open Stationary
 open Common
 
-let disqus_html =
-  {html|<div id="disqus_thread"></div>
+let disqus_html name =
+  Printf.sprintf
+    {html|<div id="disqus_thread"></div>
 <script>
 
 /**
 *  RECOMMENDED CONFIGURATION VARIABLES: EDIT AND UNCOMMENT THE SECTION BELOW TO INSERT DYNAMIC VALUES FROM YOUR PLATFORM OR CMS.
 *  LEARN WHY DEFINING THESE VARIABLES IS IMPORTANT: https://disqus.com/admin/universalcode/#configuration-variables*/
-/*
 var disqus_config = function () {
-this.page.url = "https://codaprotocol.com/blog/scanning_for_scans.html";  // Replace PAGE_URL with your page's canonical URL variable
-this.page.identifier = "codaprotocol/blog/scanning_for_scans?1"; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
+this.page.url = "https://codaprotocol.com/blog/%s.html";  // Replace PAGE_URL with your page's canonical URL variable
+this.page.identifier = "codaprotocol/blog/%s?1"; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
 };
-*/
 (function() { // DON'T EDIT BELOW THIS LINE
 var d = document, s = d.createElement('script');
 s.src = 'https://codaprotocol-com.disqus.com/embed.js';
@@ -24,6 +23,7 @@ s.setAttribute('data-timestamp', +new Date());
 })();
 </script>
                         <noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>|html}
+    name name
 
 let title s =
   let open Html_concise in
@@ -86,7 +86,7 @@ end
 
 let post name =
   let open Html_concise in
-  let%map post = Post.load ("posts/" ^ name) in
+  let%map post = Post.load ("posts/" ^ name ^ ".markdown") in
   let content_chunk =
     title post.title
     :: (match post.subtitle with None -> [] | Some s -> [subtitle s])
@@ -111,7 +111,7 @@ let post name =
   let disqus =
     div
       [Style.just "mw65-ns ibmplex f5 center blueblack"]
-      [Html.literal disqus_html]
+      [Html.literal (disqus_html name)]
   in
   div
     [Style.just "ph3 ph4-m ph5-l"]
