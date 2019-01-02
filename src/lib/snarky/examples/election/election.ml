@@ -20,12 +20,12 @@ module Ballot = struct
     module Nonce = Field
 
     [%%polymorphic_record
-    `Instances [|T; Snarkable|]
+    `Instances [T; Snarkable]
     , `Fields
-        [| ("length", Nat)
-         ; ("timestamp", Time)
-         ; ("previous_hash", Hash)
-         ; ("next_hash", Hash) |]]
+        [ ("length", Nat)
+        ; ("timestamp", Time)
+        ; ("previous_hash", Hash)
+        ; ("next_hash", Hash) ]]
 
     (* An opened ballot is a nonce along with a vote. *)
     type t = Nonce.t * Vote.t

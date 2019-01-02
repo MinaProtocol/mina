@@ -8,10 +8,14 @@ let name = "snarky_polyrecord"
 
 let type_name = "polymorphic"
 
-let parse_listlike expr =
+let rec parse_listlike expr =
   match expr.pexp_desc with
   | Pexp_array exprs -> exprs
   | Pexp_tuple exprs -> exprs
+  | Pexp_construct
+      ({txt= Lident "::"; _}, Some {pexp_desc= Pexp_tuple [hd; tl]; _}) ->
+      hd :: parse_listlike tl
+  | Pexp_construct ({txt= Lident "[]"; _}, None) -> []
   | _ ->
       raise_errorf ~loc:expr.pexp_loc
         "Could not convert expression into a list of expressions"
