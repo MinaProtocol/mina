@@ -142,6 +142,15 @@ module Ballot = struct
                (Pervasives.( + )
                   (Hash.Snarkable.length_in_triples t.previous_hash)
                   (Hash.Snarkable.length_in_triples t.next_hash)))
+
+        let something_else t =
+          (fun x y -> x + y)
+            (Nat.Snarkable.something_else t.length)
+            ((fun x y -> x + y)
+               (Time.Snarkable.something_else t.timestamp)
+               ((fun x y -> x + y)
+                  (Hash.Snarkable.something_else t.previous_hash)
+                  (Hash.Snarkable.something_else t.next_hash)))
       end
     end
 
