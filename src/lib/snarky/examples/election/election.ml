@@ -25,7 +25,12 @@ module Ballot = struct
         [ ("length", Nat)
         ; ("timestamp", Time)
         ; ("previous_hash", Hash)
-        ; ("next_hash", Hash) ]]
+        ; ("next_hash", Hash) ]
+    , `Contents
+        [ `Fold ("length_in_bits", Pervasives.( + ))
+        ; `Fold ("fold", Fold_lib.( +> ))
+        ; `Fold ("var_to_triples", Pervasives.( @ ))
+        ; `Fold ("length_in_triples", Pervasives.( + )) ]]
 
     (* An opened ballot is a nonce along with a vote. *)
     type t = Nonce.t * Vote.t

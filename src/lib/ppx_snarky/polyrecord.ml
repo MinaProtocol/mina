@@ -52,6 +52,20 @@ let parse_field ~loc field =
       {field_name; field_module; var_name}
   | _ -> raise_errorf ~loc "Not enough info to construct field"
 
+let parse_content ~loc content =
+  match content.pexp_desc with
+  | Pexp_variant ("Fold", Some folding_func) -> (
+    match parse_listlike folding_func with
+    | [name; fold_fn] ->
+        let name = string_of_string_expr name in
+        (name, fold_fn)
+    | _ ->
+        raise_errorf ~loc
+          "Unexpected format of `Fold. Try `Fold (name, fold_fn)" )
+  | _ ->
+      raise_errorf ~loc
+        "Unexpected format of contents. Try `Fold (name, fold_fn)"
+
 let unique_field_types fields_info =
   List.dedup_and_sort fields_info ~compare:(fun field_info1 field_info2 ->
       String.compare field_info1.var_name.txt field_info2.var_name.txt )
@@ -129,8 +143,7 @@ let fold_fun_def ~loc ~modname ~fname ~foldf ~varname fields_info =
 
 let fold_fun_stri ~loc ~modname ~fname ~foldf ?(varname = "t") fields_info =
   Str.value ~loc Nonrecursive
-    [ fold_fun_def ~loc ~modname ~fname:(mkloc fname loc)
-        ~foldf:(Exp.ident ~loc (mkloc foldf loc))
+    [ fold_fun_def ~loc ~modname ~fname:(mkloc fname loc) ~foldf
         ~varname:(mkloc varname loc) fields_info ]
 
 let fields_pattern ~loc fields_info =
@@ -190,32 +203,26 @@ let typ_stri ~loc ~modname fields_info =
       in
       {store; read; alloc; check}]
 
-let snark_mod_instance ~loc modname fields_info =
+let snark_mod_instance ~loc modname fields_info contents_info =
+  let contents =
+    List.map contents_info ~f:(fun (fname, foldf) ->
+        fold_fun_stri ~loc:fname.loc ~modname ~fname:fname.txt ~foldf
+          fields_info )
+  in
   [ Str.module_
     @@ Mb.mk ~loc:modname.loc modname
     @@ Mod.structure ~loc:modname.loc
-         [ polymorphic_type_instance_stri ~loc:modname.loc modname fields_info
-         ; fold_fun_stri ~loc ~modname ~fname:"length_in_bits"
-             ~foldf:(Ldot (Lident "Pervasives", "+"))
-             fields_info
-         ; fold_fun_stri ~loc ~modname ~fname:"fold"
-             ~foldf:(Ldot (Lident "Fold_lib", "+>"))
-             fields_info
-         ; fold_fun_stri ~loc ~modname ~fname:"var_to_triples"
-             ~foldf:(Ldot (Lident "Pervasives", "@"))
-             fields_info
-         ; fold_fun_stri ~loc ~modname ~fname:"length_in_triples"
-             ~foldf:(Ldot (Lident "Pervasives", "+"))
-             fields_info
-         ; typ_stri ~loc ~modname fields_info ] ]
+         ( polymorphic_type_instance_stri ~loc:modname.loc modname fields_info
+         :: typ_stri ~loc ~modname fields_info
+         :: contents ) ]
 
-let instances_str ~loc instances_info fields_info =
+let instances_str ~loc instances_info fields_info contents_info =
   match instances_info with
   | [] -> []
   | [t_mod] -> t_mod_instance ~loc (lid_last t_mod) fields_info
   | t_mod :: snark_mod :: _ ->
       t_mod_instance ~loc (lid_last t_mod) fields_info
-      @ snark_mod_instance ~loc (lid_last snark_mod) fields_info
+      @ snark_mod_instance ~loc (lid_last snark_mod) fields_info contents_info
 
 let parse_arguments expr =
   List.map (parse_listlike expr) ~f:(fun expr ->
@@ -224,29 +231,34 @@ let parse_arguments expr =
           (variant_name, variant_info)
       | _ ->
           raise_errorf ~loc:expr.pexp_loc
-            "Expected a variant type. Try `Instances (T, Snarkable)`" )
+            "Expected a variant type. Try `Instances (T, Snarkable)" )
+
+let read_arg ~loc ~arguments name =
+  match List.Assoc.find arguments name ~equal:String.equal with
+  | Some instances_info -> instances_info
+  | None -> raise_errorf ~loc "Expected an %s argument." name
 
 let str_poly_record ~loc ~path:_ expr =
   let arguments = parse_arguments expr in
   let instances_info =
-    match List.Assoc.find arguments "Instances" ~equal:String.equal with
-    | Some instances_info -> instances_info
-    | None -> raise_errorf ~loc:expr.pexp_loc "Expected an Instances argument."
+    read_arg ~loc:expr.pexp_loc ~arguments "Instances"
+    |> parse_listlike |> List.map ~f:parse_to_name
   in
   let fields_info =
-    match List.Assoc.find arguments "Fields" ~equal:String.equal with
-    | Some fields_info -> fields_info
-    | None -> raise_errorf ~loc:expr.pexp_loc "Expected an Fields argument."
+    read_arg ~loc:expr.pexp_loc ~arguments "Fields"
+    |> parse_listlike
+    |> List.map ~f:(parse_field ~loc)
   in
-  let instances_info =
-    instances_info |> parse_listlike |> List.map ~f:parse_to_name
-  in
-  let fields_info =
-    List.map ~f:(parse_field ~loc) (parse_listlike fields_info)
+  let contents_info =
+    read_arg ~loc:expr.pexp_loc ~arguments "Contents"
+    |> parse_listlike
+    |> List.map ~f:(parse_content ~loc)
   in
   let polytype = polymorphic_type_stri ~loc fields_info in
   let accessors = accessors_stri ~loc fields_info in
-  let instances = instances_str ~loc instances_info fields_info in
+  let instances =
+    instances_str ~loc instances_info fields_info contents_info
+  in
   include_ ~loc (Mod.structure ~loc (polytype :: accessors :: instances))
 
 let ext =

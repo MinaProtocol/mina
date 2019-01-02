@@ -52,42 +52,6 @@ module Ballot = struct
         type nonrec t =
           (Hash.Snarkable.t, Nat.Snarkable.t, Time.Snarkable.t) polymorphic
 
-        let length_in_bits t =
-          Pervasives.( + )
-            (Nat.Snarkable.length_in_bits t.length)
-            (Pervasives.( + )
-               (Time.Snarkable.length_in_bits t.timestamp)
-               (Pervasives.( + )
-                  (Hash.Snarkable.length_in_bits t.previous_hash)
-                  (Hash.Snarkable.length_in_bits t.next_hash)))
-
-        let fold t =
-          Fold_lib.( +> )
-            (Nat.Snarkable.fold t.length)
-            (Fold_lib.( +> )
-               (Time.Snarkable.fold t.timestamp)
-               (Fold_lib.( +> )
-                  (Hash.Snarkable.fold t.previous_hash)
-                  (Hash.Snarkable.fold t.next_hash)))
-
-        let var_to_triples t =
-          Pervasives.( @ )
-            (Nat.Snarkable.var_to_triples t.length)
-            (Pervasives.( @ )
-               (Time.Snarkable.var_to_triples t.timestamp)
-               (Pervasives.( @ )
-                  (Hash.Snarkable.var_to_triples t.previous_hash)
-                  (Hash.Snarkable.var_to_triples t.next_hash)))
-
-        let length_in_triples t =
-          Pervasives.( + )
-            (Nat.Snarkable.length_in_triples t.length)
-            (Pervasives.( + )
-               (Time.Snarkable.length_in_triples t.timestamp)
-               (Pervasives.( + )
-                  (Hash.Snarkable.length_in_triples t.previous_hash)
-                  (Hash.Snarkable.length_in_triples t.next_hash)))
-
         let typ =
           let store {length; timestamp; previous_hash; next_hash} =
             Typ.Store.bind (Typ.store Hash.Snarkable.typ next_hash)
@@ -142,6 +106,42 @@ module Ballot = struct
                     ) ) )
           in
           {store; read; alloc; check}
+
+        let length_in_bits t =
+          Pervasives.( + )
+            (Nat.Snarkable.length_in_bits t.length)
+            (Pervasives.( + )
+               (Time.Snarkable.length_in_bits t.timestamp)
+               (Pervasives.( + )
+                  (Hash.Snarkable.length_in_bits t.previous_hash)
+                  (Hash.Snarkable.length_in_bits t.next_hash)))
+
+        let fold t =
+          Fold_lib.( +> )
+            (Nat.Snarkable.fold t.length)
+            (Fold_lib.( +> )
+               (Time.Snarkable.fold t.timestamp)
+               (Fold_lib.( +> )
+                  (Hash.Snarkable.fold t.previous_hash)
+                  (Hash.Snarkable.fold t.next_hash)))
+
+        let var_to_triples t =
+          Pervasives.( @ )
+            (Nat.Snarkable.var_to_triples t.length)
+            (Pervasives.( @ )
+               (Time.Snarkable.var_to_triples t.timestamp)
+               (Pervasives.( @ )
+                  (Hash.Snarkable.var_to_triples t.previous_hash)
+                  (Hash.Snarkable.var_to_triples t.next_hash)))
+
+        let length_in_triples t =
+          Pervasives.( + )
+            (Nat.Snarkable.length_in_triples t.length)
+            (Pervasives.( + )
+               (Time.Snarkable.length_in_triples t.timestamp)
+               (Pervasives.( + )
+                  (Hash.Snarkable.length_in_triples t.previous_hash)
+                  (Hash.Snarkable.length_in_triples t.next_hash)))
       end
     end
 
