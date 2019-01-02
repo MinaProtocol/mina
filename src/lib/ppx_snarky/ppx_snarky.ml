@@ -193,6 +193,12 @@ let snark_mod_instance ~loc modname fields_info =
          ; fold_fun_stri ~loc ~modname ~fname:"fold"
              ~foldf:(Ldot (Lident "Fold_lib", "+>"))
              fields_info
+         ; fold_fun_stri ~loc ~modname ~fname:"var_to_triples"
+             ~foldf:(Ldot (Lident "Pervasives", "@"))
+             fields_info
+         ; fold_fun_stri ~loc ~modname ~fname:"length_in_triples"
+             ~foldf:(Ldot (Lident "Pervasives", "+"))
+             fields_info
          ; typ_stri ~loc ~modname fields_info ] ]
 
 let instances_str ~loc instances_info fields_info =
