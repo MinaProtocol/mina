@@ -34,7 +34,7 @@ end
 
 let active_exn = function
   | `Active x -> x
-  | `Bootstrapping -> failwith "Should be particpating node"
+  | `Bootstrapping -> failwith "Should be participating node"
 
 let rec sequence (list : 'a T.t List.t) : 'a List.t T.t =
   match list with
