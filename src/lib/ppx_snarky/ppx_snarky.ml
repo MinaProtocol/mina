@@ -48,13 +48,17 @@ let parse_field ~loc field =
       {field_name; field_module; var_name}
   | _ -> raise_errorf ~loc "Not enough info to construct field"
 
+let unique_field_types fields_info =
+  List.dedup_and_sort fields_info ~compare:(fun field_info1 field_info2 ->
+      String.compare field_info1.var_name.txt field_info2.var_name.txt )
+
 let polymorphic_type_stri ~loc fields_info =
   let fields =
     List.map fields_info ~f:(fun {field_name; var_name; _} ->
         Type.field ~loc field_name (Typ.var ~loc:var_name.loc var_name.txt) )
   in
   let params =
-    List.map fields_info ~f:(fun {var_name; _} ->
+    List.map (unique_field_types fields_info) ~f:(fun {var_name; _} ->
         (Typ.var ~loc:var_name.loc var_name.txt, Invariant) )
   in
   Str.type_ Nonrecursive
@@ -80,7 +84,7 @@ let localize_mod base_mod mod_name name =
 
 let polymorphic_type_instance_stri ~loc mod_name fields_info =
   let typs =
-    List.map fields_info ~f:(fun {field_module; _} ->
+    List.map (unique_field_types fields_info) ~f:(fun {field_module; _} ->
         let path = localize_mod field_module mod_name "t" in
         Typ.constr path [] )
   in
