@@ -1,20 +1,6 @@
-[%%import
-"../../../config.mlh"]
-
 open Core
 open Ctypes
 open Foreign
-
-[%%if
-call_logger]
-
-let foreign name t =
-  let f = foreign name t in
-  fun x ->
-    Coda_debug.Call_logger.record_call name ;
-    f x
-
-[%%endif]
 
 let with_prefix prefix s = sprintf "%s_%s" prefix s
 
