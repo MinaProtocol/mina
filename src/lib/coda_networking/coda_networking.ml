@@ -419,6 +419,9 @@ module Make (Inputs : Inputs_intf) = struct
 
   let random_peers {gossip_net; _} = Gossip_net.random_peers gossip_net
 
+  let random_peers_except {gossip_net; _} n ~(except : Peer.Hash_set.t) =
+    Gossip_net.random_peers_except gossip_net n ~except
+
   let catchup_transition t peer state_hash =
     Gossip_net.query_peer t.gossip_net peer
       Rpcs.Transition_catchup.dispatch_multi state_hash
@@ -434,7 +437,6 @@ module Make (Inputs : Inputs_intf) = struct
              input)
       else
         let current_peers, remaining_peers = List.split_n peers num_peers in
-        (* peers might actually include the preferred peer *)
         find_map' current_peers ~f:(fun peer ->
             let%bind ancestors_or_error =
               Gossip_net.query_peer t.gossip_net peer
@@ -473,14 +475,16 @@ module Make (Inputs : Inputs_intf) = struct
           !"get_ancestry returned no ancestors for the transition sender \
             %{sexp: Peer.t}, trying non-preferred peers"
           preferred_peer ;
-        let peers = random_peers t max_peers in
+        let except = Peer.Hash_set.of_list [preferred_peer] in
+        let peers = random_peers_except t max_peers ~except in
         get_ancestry_non_preferred_peers t input peers
     | Error e ->
         Logger.warn t.log
           !"get_ancestry generated error for the transition sender %{sexp: \
             Peer.t}: %{sexp: Error.t}; trying non-preferred peers"
           preferred_peer e ;
-        let peers = random_peers t max_peers in
+        let except = Peer.Hash_set.of_list [preferred_peer] in
+        let peers = random_peers_except t max_peers ~except in
         get_ancestry_non_preferred_peers t input peers
 
   module Staged_ledger_io = struct
