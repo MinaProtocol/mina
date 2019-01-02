@@ -164,7 +164,7 @@ module Make (Inputs : Inputs_intf) :
       ; supply_increase
       ; ledger_proof= None }
     in
-    {store; read; check; alloc}
+    {Snarky.Types.Typ.store; read; check; alloc}
 
   let genesis =
     { blockchain_state= Blockchain_state.genesis
