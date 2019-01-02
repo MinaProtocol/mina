@@ -258,6 +258,8 @@ module type Basic = sig
   and Field : sig
     type t = field [@@deriving bin_io, sexp, hash, compare, eq]
 
+    val gen : t Core_kernel.Quickcheck.Generator.t
+
     include Field_intf.Extended with type t := t
 
     include Stringable.S with type t := t
@@ -279,6 +281,8 @@ module type Basic = sig
       val to_constant_and_terms : t -> field option * (field * Var.t) list
 
       val constant : field -> t
+
+      val to_constant : t -> field option
 
       val linear_combination : (field * t) list -> t
 

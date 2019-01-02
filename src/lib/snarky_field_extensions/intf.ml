@@ -14,6 +14,8 @@ module type Basic = sig
   module Base : sig
     type _ t_
 
+    val map_ : 'a t_ -> f:('a -> 'b) -> 'b t_
+
     module Unchecked : sig
       type t = Field.t t_
     end
@@ -25,6 +27,8 @@ module type Basic = sig
 
   type 'a t_ = 'a Base.t_ A.t
 
+  val map_ : 'a t_ -> f:('a -> 'b) -> 'b t_
+
   module Unchecked : Snarkette.Fields.Intf with type t = Base.Unchecked.t A.t
 
   type t = Base.t A.t
@@ -33,7 +37,11 @@ module type Basic = sig
 
   val constant : Unchecked.t -> t
 
+  val to_constant : t -> Unchecked.t option
+
   val scale : t -> Field.t -> t
+
+  val mul_field : t -> Field.Checked.t -> (t, _) Checked.t
 
   val assert_r1cs : t -> t -> t -> (unit, _) Checked.t
 
@@ -64,9 +72,19 @@ module type S = sig
 
   val square : t -> (t, _) Checked.t
 
+  (* This function MUST NOT be called on two arguments which are both potentially
+   zero *)
+  val div_unsafe : t -> t -> (t, _) Checked.t
+
   val inv_exn : t -> (t, _) Checked.t
 
   val zero : t
 
   val one : t
+end
+
+module type S_with_primitive_element = sig
+  include S
+
+  val mul_by_primitive_element : t -> t
 end
