@@ -1,0 +1,69 @@
+module type Inputs_intf = sig
+  module Impl : Snarky.Snark_intf.S
+
+  module Fqk : sig
+    include Snarky_field_extensions.Intf.S with module Impl = Impl
+
+    val cyclotomic_square : t -> (t, _) Impl.Checked.t
+
+    val frobenius : t -> int -> t
+  end
+
+  module N : Snarkette.Nat_intf.S
+
+  module Params : sig
+    val loop_count : N.t
+
+    val loop_count_is_neg : bool
+
+    val final_exponent_last_chunk_w1 : N.t
+
+    val final_exponent_last_chunk_is_w0_neg : bool
+
+    val final_exponent_last_chunk_abs_of_w0 : N.t
+  end
+end
+
+module Make (Inputs : Inputs_intf) = struct
+  open Inputs
+  open Impl
+  open Let_syntax
+
+  let exponentiate elt power =
+    let naf = Snarkette.Fields.find_wnaf (module N) 1 power in
+    let rec go i found_nonzero acc =
+      if i < 0 then return acc
+      else
+        let%bind acc =
+          if found_nonzero then Fqk.cyclotomic_square acc else return acc
+        in
+        let%bind acc =
+          if naf.(i) > 0 then Fqk.(acc * elt)
+          else if naf.(i) < 0 then Fqk.div_unsafe acc elt
+            (* TODO: Confirm that this is ok. Alternatively can just compute the inverse (or the unitary inverse) once at the top. *)
+          else return acc
+        in
+        go (i - 1) (found_nonzero || naf.(i) <> 0) acc
+    in
+    go (Array.length naf - 1) false Fqk.one
+
+  let final_exponentiation el =
+    let%bind el_q_3_minus_1 =
+      let%bind el_inv = Fqk.inv_exn el in
+      Fqk.(frobenius el 3 * el_inv)
+    in
+    let alpha = Fqk.frobenius el_q_3_minus_1 1 in
+    let%bind beta = Fqk.(alpha * el_q_3_minus_1) in
+    let%bind w0 =
+      (* TODO: Find out why libsnark computes inv_beta in a roundabout way *)
+      let%bind base =
+        if Params.final_exponent_last_chunk_is_w0_neg then Fqk.inv_exn beta
+        else return beta
+      in
+      exponentiate base Params.final_exponent_last_chunk_abs_of_w0
+    and w1 =
+      let beta_q = Fqk.frobenius beta 1 in
+      exponentiate beta_q Params.final_exponent_last_chunk_w1
+    in
+    Fqk.(w0 * w1)
+end
