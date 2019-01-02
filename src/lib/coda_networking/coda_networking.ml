@@ -465,8 +465,12 @@ module Make (Inputs : Inputs_intf) = struct
       Gossip_net.query_peer t.gossip_net preferred_peer
         Rpcs.Get_ancestry.dispatch_multi input
     in
-    let max_peers = 15 in
-    (* 1 + 2 + 4 + 8 *)
+    let get_random_peers () =
+      let max_peers = 15 in
+      (* 1 + 2 + 4 + 8 *)
+      let except = Peer.Hash_set.of_list [preferred_peer] in
+      random_peers_except t max_peers ~except
+    in
     match ancestors_or_error with
     | Ok (Some ancestors) -> return (Ok ancestors)
     | Ok None ->
@@ -475,16 +479,14 @@ module Make (Inputs : Inputs_intf) = struct
           !"get_ancestry returned no ancestors for the transition sender \
             %{sexp: Peer.t}, trying non-preferred peers"
           preferred_peer ;
-        let except = Peer.Hash_set.of_list [preferred_peer] in
-        let peers = random_peers_except t max_peers ~except in
+        let peers = get_random_peers () in
         get_ancestry_non_preferred_peers t input peers
     | Error e ->
         Logger.warn t.log
           !"get_ancestry generated error for the transition sender %{sexp: \
             Peer.t}: %{sexp: Error.t}; trying non-preferred peers"
           preferred_peer e ;
-        let except = Peer.Hash_set.of_list [preferred_peer] in
-        let peers = random_peers_except t max_peers ~except in
+        let peers = get_random_peers () in
         get_ancestry_non_preferred_peers t input peers
 
   module Staged_ledger_io = struct
