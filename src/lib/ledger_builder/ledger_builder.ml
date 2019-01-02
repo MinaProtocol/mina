@@ -1,5 +1,5 @@
-[%%import
-"../../config.mlh"]
+(*[%%import
+"../../config.mlh"]*)
 
 open Core_kernel
 open Async_kernel
@@ -664,14 +664,14 @@ end = struct
     Ledger_builder_hash.of_aux_and_ledger_hash (Aux.hash scan_state)
       (Ledger.merkle_root ledger)
 
-  [%%if
+  (* [%%if
   call_logger]
 
   let hash t =
     Coda_debug.Call_logger.record_call "Ledger_builder.hash" ;
     hash t
 
-  [%%endif]
+  [%%endif]*)
 
   let ledger {ledger; _} = ledger
 
@@ -1194,10 +1194,10 @@ end = struct
            | None -> assert false
            | Some work -> work )
 
-  module Resources = struct
+  (*module Resources = struct
     module Queue_consumption = struct
       type t =
-        { fee_transfers: Compressed_public_key.Set.t
+        { fee_transfers: Currency.Fee.t Compressed_public_key.Map.t
         ; user_commands: int
         ; coinbase_part_count: int }
       [@@deriving sexp]
@@ -1226,15 +1226,17 @@ end = struct
       { budget: Fee.Signed.t
       ; queue_consumption: Queue_consumption.t
       ; available_queue_space: int
+      ; max_jobs: int
       ; work_done: int
       ; user_commands:
           (User_command.With_valid_signature.t * Ledger.Undo.t) list
-      ; completed_works: Completed_work.Checked.t list
+      ; work_in_store : Completed_work.Checked.t list
+      ; work_purchased: Completed_work.Checked.t list
       ; coinbase_parts:
           ( Completed_work.Checked.t Ledger_builder_diff.At_most_two.t
           , Completed_work.Checked.t Ledger_builder_diff.At_most_one.t )
           Either.t
-      ; completed_works_for_coinbase: Completed_work.Checked.t list
+      ; work_purchased_for_coinbase: Completed_work.Checked.t list
       ; self_pk: Compressed_public_key.t }
     [@@deriving sexp]
 
@@ -1355,9 +1357,10 @@ end = struct
         ; work_done= t.work_done + List.length w.proofs
         ; completed_works= wc :: t.completed_works }
 
-    let init ~available_queue_space ~self prediff =
+    let init ~available_queue_space ~self prediff max_jobs =
       { available_queue_space
       ; work_done= 0
+      ; max_jobs
       ; queue_consumption= Queue_consumption.init
       ; budget= Fee.Signed.zero
       ; user_commands= []
@@ -1365,12 +1368,38 @@ end = struct
       ; coinbase_parts= prediff
       ; completed_works_for_coinbase= []
       ; self_pk= self }
+
+    let budget t = fee_remainder (Sequence.to_list t.user_commands) t.work_purchased
+    
+    let budget_constraint_satisfied t =
+      match budget t with
+      | Ok _ -> true
+      | Error _ -> false 
+
+    let space_constraint_satisfied t =
+      match budget t with
+        | Error e -> false
+        | Ok b -> 
+          let fee_for_self = if b > Currency.Fee.zero then 1 else 0
+          in
+          let total_fee_transfer_pks = (Compressed_public_key.Map.length t.queue_consumption.fee_transfers) + fee_for_self in
+          let max_txn_count = t.max_space - ((total_fee_transfer_pks + 1)/ 2)
+          in
+          (Sequence.length t.user_commands_rev) = max_txn_count
+
+    let work_constraint_satisfied t = 
+      let no_of_proofs = Sequence.length t.work_purchased in
+      let all_proofs = no_of_proofs = t.max_jobs
+      in
+      let twice_of_txns = no_of_proofs = (2 * (List.length t.user_commands))
+      in
+      all_proofs || twice_of_txns
   end
 
   module Resource_util = struct
     type t =
       { resources: Resources.t
-      ; work_to_do: Completed_work.Statement.t Sequence.t
+      ; work_in_store: Completed_work.Checked.t Sequence.t
       ; user_commands_to_include:
           User_command.With_valid_signature.t Sequence.t }
   end
@@ -1633,9 +1662,344 @@ end = struct
           one_prediff logger ws_seq ts_seq get_completed_work ledger self
             (fst partitions) ~add_coinbase:true current_job_sequence_no
         in
-        First res
+        First res*)
 
-  let generate_prediff logger ws_seq ts_seq get_completed_work ledger self
+  module Resources = struct
+    type t =
+      { max_space: int
+      ; max_jobs: int
+      ; user_commands_rev: User_command.With_valid_signature.t Sequence.t
+      ; completed_work_rev: Completed_work.Checked.t Sequence.t
+      ; fee_transfers: Currency.Fee.t Compressed_public_key.Map.t
+      ; coinbase_parts: int
+      ; work_for_coinbase:
+          ( Completed_work.Checked.t Ledger_builder_diff.At_most_two.t
+          , Completed_work.Checked.t Ledger_builder_diff.At_most_one.t )
+          Either.t
+      ; self_pk: Compressed_public_key.t
+      ; budget: Currency.Fee.t Or_error.t }
+    [@@deriving sexp_of]
+
+    let init uc_seq (cw_seq : Completed_work.Checked.t Sequence.t) job_count
+        max_space self_pk cb_config =
+      let cw_unchecked = Sequence.map cw_seq ~f:Completed_work.forget in
+      let singles =
+        Sequence.filter_map cw_unchecked
+          ~f:(fun {Completed_work.fee; prover; _} ->
+            if Fee.Unsigned.equal fee Fee.Unsigned.zero then None
+            else Some (prover, fee) )
+        |> Sequence.to_list
+      in
+      let fee_transfers =
+        Compressed_public_key.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
+            Option.value_exn (Fee.Unsigned.add f1 f2) )
+      in
+      let budget =
+        fee_remainder (Sequence.to_list uc_seq) (Sequence.to_list cw_unchecked)
+      in
+      { max_space
+      ; max_jobs= job_count
+      ; user_commands_rev= uc_seq
+      ; completed_work_rev= cw_seq
+      ; fee_transfers
+      ; self_pk
+      ; coinbase_parts= 1
+      ; work_for_coinbase= cb_config
+      ; budget }
+
+    let re_budget t =
+      let cw_unchecked =
+        Sequence.map t.completed_work_rev ~f:Completed_work.forget
+      in
+      fee_remainder
+        (Sequence.to_list t.user_commands_rev)
+        (Sequence.to_list cw_unchecked)
+
+    let budget_sufficient t =
+      match t.budget with Ok _ -> true | Error _ -> false
+
+    let slots_occupied t =
+      (*TODO include coinbase*)
+      let fee_for_self =
+        match t.budget with
+        | Error e -> 0
+        | Ok b -> if b > Currency.Fee.zero then 1 else 0
+      in
+      let total_fee_transfer_pks =
+        Compressed_public_key.Map.length t.fee_transfers + fee_for_self
+      in
+      Core.printf
+        !"fee transfers %d %d \n %!"
+        total_fee_transfer_pks fee_for_self ;
+      Sequence.length t.user_commands_rev
+      + ((total_fee_transfer_pks + 1) / 2)
+      + t.coinbase_parts
+
+    let space_constraint_satisfied t =
+      let occupied = slots_occupied t in
+      Core.printf !"occupied: %d\n %!" occupied ;
+      occupied <= t.max_space
+
+    let enough_proofs t =
+      let occupied = slots_occupied t in
+      let no_of_proofs = Sequence.length t.completed_work_rev in
+      let all_proofs = no_of_proofs = t.max_jobs in
+      no_of_proofs >= occupied || all_proofs
+
+    let work_constraint_satisfied t =
+      let no_of_proofs = Sequence.length t.completed_work_rev in
+      let all_proofs = no_of_proofs = t.max_jobs in
+      let max_bundles = t.max_space in
+      if all_proofs then
+        if no_of_proofs > max_bundles then `More else `Satisfied
+      else if no_of_proofs = max_bundles then `Satisfied
+      else if no_of_proofs < max_bundles then `Less
+      else `More
+
+    let discard_last_work t =
+      match Sequence.next t.completed_work_rev with
+      | None -> t
+      | Some (w, rem_seq) ->
+          let to_be_discarded = Completed_work.forget w in
+          let current_fee =
+            Option.value
+              (Compressed_public_key.Map.find t.fee_transfers
+                 to_be_discarded.prover)
+              ~default:Currency.Fee.zero
+          in
+          let updated_map =
+            match Currency.Fee.sub current_fee to_be_discarded.fee with
+            | None ->
+                Compressed_public_key.Map.remove t.fee_transfers
+                  to_be_discarded.prover
+            | Some fee ->
+                if fee > Currency.Fee.zero then (
+                  Core.printf !"Some non zero fee %!" ;
+                  Compressed_public_key.Map.update t.fee_transfers
+                    to_be_discarded.prover ~f:(fun _ -> fee ) )
+                else
+                  Compressed_public_key.Map.remove t.fee_transfers
+                    to_be_discarded.prover
+          in
+          let new_t =
+            {t with completed_work_rev= rem_seq; fee_transfers= updated_map}
+          in
+          let budget =
+            match t.budget with
+            | Ok b ->
+                option "Currency overflow"
+                  (Currency.Fee.add b to_be_discarded.fee)
+            | e -> re_budget new_t
+          in
+          {new_t with budget}
+
+    let discard_user_command t =
+      match Sequence.next t.user_commands_rev with
+      | None -> (
+          let coinbase_parts = max (t.coinbase_parts - 1) 0 in
+          match coinbase_parts with
+          | 0 ->
+              { t with
+                coinbase_parts
+              ; work_for_coinbase= Second Ledger_builder_diff.At_most_one.Zero
+              }
+          | 1 ->
+              { t with
+                coinbase_parts
+              ; work_for_coinbase=
+                  Second (Ledger_builder_diff.At_most_one.One None) }
+          | 2 ->
+              { t with
+                coinbase_parts
+              ; work_for_coinbase=
+                  First (Ledger_builder_diff.At_most_two.One None) }
+          | _ -> failwith "Invalid coinbase parts" )
+      | Some (uc, rem_seq) ->
+          let new_t = {t with user_commands_rev= rem_seq} in
+          let budget =
+            match t.budget with
+            | Ok b ->
+                option "Fee insufficient"
+                  (Currency.Fee.sub b (User_command.fee (uc :> User_command.t)))
+            | e -> re_budget new_t
+          in
+          {new_t with budget}
+  end
+
+  let rec discard_extra_work (resources : Resources.t) =
+    if Sequence.is_empty resources.completed_work_rev then resources
+    else
+      let r = Resources.discard_last_work resources in
+      if Resources.enough_proofs r then discard_extra_work r else resources
+
+  let worked_extra (resources : Resources.t) =
+    if Sequence.is_empty resources.completed_work_rev then false
+    else
+      let r = Resources.discard_last_work resources in
+      Resources.enough_proofs r
+
+  let rec check_constraints_and_update (resources : Resources.t) =
+    let rec perform_n_updates ~f r n =
+      if n = 0 then r else perform_n_updates ~f (f r) (n - 1)
+    in
+    let check_space_and_budget r =
+      if Resources.space_constraint_satisfied r then
+        if Resources.budget_sufficient r then true else false
+      else false
+    in
+    let work_length = Sequence.length resources.completed_work_rev in
+    let txn_length = Sequence.length resources.user_commands_rev in
+    if work_length = 0 && txn_length = 0 then resources
+    else
+      match Resources.work_constraint_satisfied resources with
+      | `Satisfied ->
+          Core.printf
+            !"Work Satisfied work:%d txn:%d max_space:%d \n%!"
+            work_length txn_length resources.max_space ;
+          if Resources.space_constraint_satisfied resources then (
+            Core.printf
+              !"Space Satisfied work:%d txn:%d max_space:%d \n%!"
+              work_length txn_length resources.max_space ;
+            if Resources.budget_sufficient resources then (
+              Core.printf
+                !"Budget Satisfied work:%d txn:%d max_space:%d \n%!"
+                work_length txn_length resources.max_space ;
+              resources )
+            else (
+              Core.printf
+                !"Budget Not Satisfied work:%d txn:%d max_space:%d \n%!"
+                work_length txn_length resources.max_space ;
+              check_constraints_and_update
+                (Resources.discard_last_work resources) ) )
+          else (
+            Core.printf
+              !"Space Not Satisfied work:%d txn:%d max_space:%d \n%!"
+              work_length txn_length resources.max_space ;
+            if worked_extra resources then
+              check_constraints_and_update
+                (Resources.discard_last_work resources)
+            else
+              check_constraints_and_update
+                (Resources.discard_user_command resources) )
+      | `Less ->
+          Core.printf
+            !"Less Work work:%d txn:%d max_space:%d \n%!"
+            work_length txn_length resources.max_space ;
+          if worked_extra resources then (
+            Core.printf !"Resources: %{sexp: Resources.t} \n %!" resources ;
+            check_constraints_and_update
+              (Resources.discard_last_work resources) )
+          else if not (Resources.enough_proofs resources) then (
+            Core.printf !"Resources: %{sexp: Resources.t} \n %!" resources ;
+            failwith "delete txn \n" ;
+            check_constraints_and_update
+              (Resources.discard_user_command resources) )
+          else resources
+      (* No of transactions should be equal to the proof bundles. Discard extra transactions *)
+      | `More ->
+          Core.printf
+            !"More Work work:%d txn:%d max_space:%d \n%!"
+            work_length txn_length resources.max_space ;
+          check_constraints_and_update (Resources.discard_last_work resources)
+
+  (*let n = (Sequence.length resources.user_commands_rev) - (Sequence.length resources.completed_work_rev)
+            in
+              if n < 0 then
+        check_constraints_and_update (Resources.discard_last_work resources)
+      else if n = 0 then
+        resources
+      else
+        check_constraints_and_update (perform_n_updates resources ~f:Resources.discard_user_command n)*)
+
+  let one_prediff logger cw_seq ts_seq ledger self ~add_coinbase:_
+      available_queue_space current_job_sequence_no max_job_count =
+    (* Deducting 1 for coinbase. TODO remove when adding coinbase *)
+    let init_resources =
+      Resources.init ts_seq cw_seq max_job_count available_queue_space self
+        (Second (Ledger_builder_diff.At_most_one.One None))
+    in
+    let r =
+      check_constraints_and_update init_resources
+      (*TODO: apply the transactions and test *)
+    in
+    discard_extra_work r
+
+  (*let init_res_util =
+      { Resource_util.resources= init_resources
+      ; work_to_do= ws_seq
+      ; user_commands_to_include= ts_seq }
+    in
+    let res_util_with_coinbase =
+      if add_coinbase then
+        update_coinbase_count 1 logger init_res_util get_completed_work
+          current_job_sequence_no
+      else init_res_util
+    in
+    let res_util_with_txns, txns_to_undo =
+      check_resources_add_txns logger get_completed_work ledger
+        res_util_with_coinbase res_util_with_coinbase current_job_sequence_no
+    in
+    let _ = undo_txns ledger txns_to_undo in
+    res_util_with_txns.resources*)
+
+  let generate logger cw_seq ts_seq ledger self partitions
+      current_job_sequence_no max_job_count =
+    let diff (res : Resources.t) :
+        Ledger_builder_diff.With_valid_signatures_and_proofs.diff =
+      (* We have to reverse here because we only know they work in THIS order *)
+      { user_commands= List.rev (Sequence.to_list res.user_commands_rev)
+      ; completed_works= List.rev (Sequence.to_list res.completed_work_rev) }
+    in
+    let make_diff_with_one (res : Resources.t) :
+        Ledger_builder_diff.With_valid_signatures_and_proofs
+        .diff_with_at_most_one_coinbase =
+      match res.work_for_coinbase with
+      | First _ ->
+          Logger.error logger
+            "Error while creating a diff: Invalid resource configuration" ;
+          {diff= diff res; coinbase_added= Ledger_builder_diff.At_most_one.Zero}
+      | Second w -> {diff= diff res; coinbase_added= w}
+    in
+    let _make_diff_with_two (res : Resources.t) :
+        Ledger_builder_diff.With_valid_signatures_and_proofs
+        .diff_with_at_most_two_coinbase =
+      match res.work_for_coinbase with
+      | First w -> {diff= diff res; coinbase_parts= w}
+      | Second _ ->
+          Logger.error logger
+            "Error while creating a diff: Invalid resource configuration" ;
+          {diff= diff res; coinbase_parts= Ledger_builder_diff.At_most_two.Zero}
+    in
+    match partitions with
+    | `One x ->
+        let res =
+          one_prediff logger cw_seq ts_seq ledger self x ~add_coinbase:true
+            current_job_sequence_no max_job_count
+        in
+        (*let _ = undo_txns ledger res.user_commands in*)
+        (*Instead apply those transactions*)
+        First (make_diff_with_one res)
+    | `Two (x, y) ->
+        let res =
+          one_prediff logger cw_seq ts_seq ledger self (x + y)
+            ~add_coinbase:true current_job_sequence_no max_job_count
+        in
+        (*let _ = undo_txns ledger res.user_commands in*)
+        (*Instead apply those transactions*)
+        First (make_diff_with_one res)
+
+  (*(match
+        two_prediffs logger cw_seq ts_seq get_completed_work ledger self (x, y)
+          current_job_sequence_no
+      with
+      | First res ->
+          let _ = undo_txns ledger res.user_commands in
+          First (make_diff_with_one res)
+      | Second (res1, res2) ->
+          let _ = undo_txns ledger (res2.user_commands @ res1.user_commands) in
+          Second (make_diff_with_two res1, make_diff_with_one res2) )*)
+  
+  (*let generate_prediff logger ws_seq ts_seq get_completed_work ledger self
       partitions current_job_sequence_no =
     let diff (res : Resources.t) :
         Ledger_builder_diff.With_valid_signatures_and_proofs.diff =
@@ -1681,7 +2045,7 @@ end = struct
           First (make_diff_with_one res)
       | Second (res1, res2) ->
           let _ = undo_txns ledger (res2.user_commands @ res1.user_commands) in
-          Second (make_diff_with_two res1, make_diff_with_one res2) )
+          Second (make_diff_with_two res1, make_diff_with_one res2) )*)
 
   let create_diff t ~self ~logger
       ~(transactions_by_fee : User_command.With_valid_signature.t Sequence.t)
@@ -1702,9 +2066,27 @@ end = struct
     let current_job_sequence_no =
       Parallel_scan.current_job_sequence_number t'.scan_state
     in
+    (*Completed work in reverse order for easy removal of proofs if budget doesn't suffice*)
+    let completed_works_rev =
+      Sequence.fold_until work_to_do ~init:Sequence.empty
+        ~f:(fun seq w ->
+          match get_completed_work w with
+          | Some cw_checked ->
+              Continue (Sequence.append (Sequence.singleton cw_checked) seq)
+          | None -> Stop seq )
+        ~finish:Fn.id
+    in
+    let transactions_max_rev =
+      Sequence.fold transactions_by_fee ~init:Sequence.empty ~f:(fun seq t ->
+          Sequence.append (Sequence.singleton t) seq )
+    in
     let pre_diffs =
+      generate logger completed_works_rev transactions_max_rev ledger self
+        partitions current_job_sequence_no
+        (Sequence.length work_to_do)
+      (*let pre_diffs =
       generate_prediff logger work_to_do transactions_by_fee get_completed_work
-        ledger self partitions current_job_sequence_no
+        ledger self partitions current_job_sequence_no*)
     in
     let _proofs_available =
       Sequence.filter_map work_to_do ~f:get_completed_work
@@ -1712,6 +2094,11 @@ end = struct
     in
     (*Logger.info logger "Block stats: Proofs ready for purchase: %d"
       proofs_available ;*)
+    Core.printf
+      !"Diff created: %{sexp: \
+        Ledger_builder_diff.With_valid_signatures_and_proofs.pre_diffs} \n\
+       \ %!"
+      pre_diffs ;
     trace_event "prediffs done" ;
     { Ledger_builder_diff.With_valid_signatures_and_proofs.pre_diffs
     ; creator= self
@@ -2241,7 +2628,7 @@ let%test_module "test" =
       module Config = struct
         let transaction_capacity_log_2 = 7
 
-        let work_availability_factor = 4
+        let work_availability_factor = 2
       end
 
       let check :
