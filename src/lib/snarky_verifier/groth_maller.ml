@@ -63,7 +63,6 @@ module Make (Inputs : Inputs.S) = struct
         G2.add_exn b vk.h_beta >>= G2_precomputation.create
       in
       group_miller_loop
-        (* This is where we use [one : G2.t] rather than gamma. *)
         [ (Pos, G1_precomputation.create a_g_alpha, b_h_beta)
         ; (Neg, G1_precomputation.create acc, vk_precomp.h_gamma)
         ; (Neg, G1_precomputation.create c, vk_precomp.h) ]
