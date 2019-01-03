@@ -287,29 +287,33 @@ let parse_arguments expr =
           raise_errorf ~loc:expr.pexp_loc
             "Expected a variant type. Try `Instances (T, Snarkable)" )
 
-let read_arg ~loc ~arguments name =
-  match List.Assoc.find arguments name ~equal:String.equal with
+let read_arg ~arguments name =
+  List.Assoc.find arguments name ~equal:String.equal
+
+let read_arg_exn ~loc ~arguments name =
+  match read_arg ~arguments name with
   | Some instances_info -> instances_info
   | None -> raise_errorf ~loc "Expected an %s argument." name
 
 let str_poly_record ~loc ~path:_ expr =
   let arguments = parse_arguments expr in
   let instances_info =
-    read_arg ~loc:expr.pexp_loc ~arguments "Instances"
+    read_arg_exn ~loc:expr.pexp_loc ~arguments "Instances"
     |> parse_listlike
     |> List.map ~f:parse_to_modname
   in
   let fields_info =
-    read_arg ~loc:expr.pexp_loc ~arguments "Fields"
+    read_arg_exn ~loc:expr.pexp_loc ~arguments "Fields"
     |> parse_listlike
     |> List.folding_map
          ~init:(Map.empty (module String))
          ~f:(parse_field ~instances:instances_info ~loc)
   in
   let contents_info =
-    read_arg ~loc:expr.pexp_loc ~arguments "Contents"
-    |> parse_listlike
-    |> List.map ~f:(parse_content ~loc)
+    match read_arg ~arguments "Contents" with
+    | Some contents_info ->
+        List.map ~f:(parse_content ~loc) (parse_listlike contents_info)
+    | None -> []
   in
   let polytype = polymorphic_type_stri ~loc fields_info in
   let accessors = accessors_stri ~loc fields_info in
