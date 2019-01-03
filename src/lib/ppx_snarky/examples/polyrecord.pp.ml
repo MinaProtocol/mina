@@ -1,10 +1,10 @@
 include struct
-  type nonrec ('Hash, 'Hash1, 'Nat, 'Time) polymorphic =
-    { length: 'Nat
-    ; timestamp: 'Time
-    ; previous_hash: 'Hash
-    ; next_hash: 'Hash
-    ; new_hash: 'Hash1 }
+  type nonrec ('hash, 'hash1, 'nat, 'time) polymorphic =
+    { length: 'nat
+    ; timestamp: 'time
+    ; previous_hash: 'hash
+    ; next_hash: 'hash
+    ; new_hash: 'hash1 }
 
   let length {length; _} = length
 

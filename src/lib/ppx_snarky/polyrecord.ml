@@ -79,7 +79,8 @@ let parse_field ~loc ~instances var_name_map field =
         | _, _ -> raise_errorf ~loc "Not enough instance modules specified"
       in
       let var_name =
-        last_common_name field_module.txt field_snark_module.txt
+        String.uncapitalize
+          (last_common_name field_module.txt field_snark_module.txt)
       in
       let rec unique_var_name var_name' i =
         let var_name =
