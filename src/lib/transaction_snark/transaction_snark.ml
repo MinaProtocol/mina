@@ -172,13 +172,12 @@ module Base = struct
   open Tick
   open Let_syntax
 
-  let check_signature shifted ~payload_section ~is_user_command ~sender
-      ~signature =
-    with_label __LOC__
-      (let%bind verifies =
-         Schnorr.Checked.verifies shifted signature sender payload_section
-       in
-       Boolean.Assert.any [Boolean.not is_user_command; verifies])
+  let%snarkydef check_signature shifted ~payload_section ~is_user_command
+      ~sender ~signature =
+    let%bind verifies =
+      Schnorr.Checked.verifies shifted signature sender payload_section
+    in
+    Boolean.Assert.any [Boolean.not is_user_command; verifies]
 
   let chain if_ b ~then_ ~else_ =
     let%bind then_ = then_ and else_ = else_ in
@@ -200,92 +199,90 @@ module Base = struct
           - fee excess = -(amount + fee)
   *)
   (* Nonce should only be incremented if it is a "Normal" transaction. *)
-  let apply_tagged_transaction (type shifted)
+  let%snarkydef apply_tagged_transaction (type shifted)
       (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
       root ({sender; signature; payload} : Transaction_union.var) =
-    with_label __LOC__
-      (let nonce = payload.common.nonce in
-       let tag = payload.body.tag in
-       let%bind payload_section = Schnorr.Message.var_of_payload payload in
-       let%bind is_user_command =
-         Transaction_union.Tag.Checked.is_user_command tag
-       in
-       let%bind () =
-         check_signature shifted ~payload_section ~is_user_command ~sender
-           ~signature
-       in
-       let%bind {excess; sender_delta; supply_increase; receiver_increase} =
-         Transaction_union_payload.Changes.Checked.of_payload payload
-       in
-       let%bind is_stake_delegation =
-         Transaction_union.Tag.Checked.is_stake_delegation tag
-       in
-       let%bind sender_compressed = Public_key.compress_var sender in
-       let%bind root =
-         let%bind is_fee_transfer =
-           Transaction_union.Tag.Checked.is_fee_transfer tag
-         in
-         Frozen_ledger_hash.modify_account_send root ~is_fee_transfer
-           sender_compressed ~f:(fun ~is_empty_and_writeable account ->
-             with_label __LOC__
-               (let%bind next_nonce =
-                  Account.Nonce.increment_if_var account.nonce is_user_command
-                in
-                let%bind () =
-                  with_label __LOC__
-                    (let%bind nonce_matches =
-                       Account.Nonce.equal_var nonce account.nonce
-                     in
-                     Boolean.Assert.any
-                       [Boolean.not is_user_command; nonce_matches])
-                in
-                let%bind receipt_chain_hash =
-                  let current = account.receipt_chain_hash in
-                  let%bind r =
-                    Receipt.Chain_hash.Checked.cons ~payload:payload_section
-                      current
-                  in
-                  Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
-                    ~else_:current
-                in
-                let%bind delegate =
-                  let if_ = chain Public_key.Compressed.Checked.if_ in
-                  if_ is_empty_and_writeable ~then_:(return sender_compressed)
-                    ~else_:
-                      (if_ is_stake_delegation
-                         ~then_:(return payload.body.public_key)
-                         ~else_:(return account.delegate))
-                in
-                let%map balance =
-                  Balance.Checked.add_signed_amount account.balance
-                    sender_delta
-                in
-                { Account.balance
-                ; public_key= sender_compressed
-                ; nonce= next_nonce
-                ; receipt_chain_hash
-                ; delegate }) )
-       in
-       let%bind receiver =
-         (* A stake delegation only uses the sender *)
-         Public_key.Compressed.Checked.if_ is_stake_delegation
-           ~then_:sender_compressed ~else_:payload.body.public_key
-       in
-       (* we explicitly set the public_key because it could be zero if the account is new *)
-       let%map root =
-         (* This update should be a no-op in the stake delegation case *)
-         Frozen_ledger_hash.modify_account_recv root receiver
-           ~f:(fun ~is_empty_and_writeable account ->
-             let%map balance =
-               (* receiver_increase will be zero in the stake delegation case *)
-               Balance.Checked.(account.balance + receiver_increase)
-             and delegate =
-               Public_key.Compressed.Checked.if_ is_empty_and_writeable
-                 ~then_:receiver ~else_:account.delegate
+    let nonce = payload.common.nonce in
+    let tag = payload.body.tag in
+    let%bind payload_section = Schnorr.Message.var_of_payload payload in
+    let%bind is_user_command =
+      Transaction_union.Tag.Checked.is_user_command tag
+    in
+    let%bind () =
+      check_signature shifted ~payload_section ~is_user_command ~sender
+        ~signature
+    in
+    let%bind {excess; sender_delta; supply_increase; receiver_increase} =
+      Transaction_union_payload.Changes.Checked.of_payload payload
+    in
+    let%bind is_stake_delegation =
+      Transaction_union.Tag.Checked.is_stake_delegation tag
+    in
+    let%bind sender_compressed = Public_key.compress_var sender in
+    let%bind root =
+      let%bind is_fee_transfer =
+        Transaction_union.Tag.Checked.is_fee_transfer tag
+      in
+      Frozen_ledger_hash.modify_account_send root ~is_fee_transfer
+        sender_compressed ~f:(fun ~is_empty_and_writeable account ->
+          with_label __LOC__
+            (let%bind next_nonce =
+               Account.Nonce.increment_if_var account.nonce is_user_command
              in
-             {account with balance; delegate; public_key= receiver} )
-       in
-       (root, excess, supply_increase))
+             let%bind () =
+               with_label __LOC__
+                 (let%bind nonce_matches =
+                    Account.Nonce.equal_var nonce account.nonce
+                  in
+                  Boolean.Assert.any
+                    [Boolean.not is_user_command; nonce_matches])
+             in
+             let%bind receipt_chain_hash =
+               let current = account.receipt_chain_hash in
+               let%bind r =
+                 Receipt.Chain_hash.Checked.cons ~payload:payload_section
+                   current
+               in
+               Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
+                 ~else_:current
+             in
+             let%bind delegate =
+               let if_ = chain Public_key.Compressed.Checked.if_ in
+               if_ is_empty_and_writeable ~then_:(return sender_compressed)
+                 ~else_:
+                   (if_ is_stake_delegation
+                      ~then_:(return payload.body.public_key)
+                      ~else_:(return account.delegate))
+             in
+             let%map balance =
+               Balance.Checked.add_signed_amount account.balance sender_delta
+             in
+             { Account.balance
+             ; public_key= sender_compressed
+             ; nonce= next_nonce
+             ; receipt_chain_hash
+             ; delegate }) )
+    in
+    let%bind receiver =
+      (* A stake delegation only uses the sender *)
+      Public_key.Compressed.Checked.if_ is_stake_delegation
+        ~then_:sender_compressed ~else_:payload.body.public_key
+    in
+    (* we explicitly set the public_key because it could be zero if the account is new *)
+    let%map root =
+      (* This update should be a no-op in the stake delegation case *)
+      Frozen_ledger_hash.modify_account_recv root receiver
+        ~f:(fun ~is_empty_and_writeable account ->
+          let%map balance =
+            (* receiver_increase will be zero in the stake delegation case *)
+            Balance.Checked.(account.balance + receiver_increase)
+          and delegate =
+            Public_key.Compressed.Checked.if_ is_empty_and_writeable
+              ~then_:receiver ~else_:account.delegate
+          in
+          {account with balance; delegate; public_key= receiver} )
+    in
+    (root, excess, supply_increase)
 
   (* Someday:
    write the following soundness tests:
@@ -314,40 +311,35 @@ module Base = struct
    such that
    H(l1, l2, fee_excess, supply_increase) = top_hash,
    applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2]. *)
-  let main top_hash =
-    with_label __LOC__
-      (let%bind (module Shifted) =
-         Tick.Inner_curve.Checked.Shifted.create ()
-       in
-       let%bind root_before =
-         provide_witness' Frozen_ledger_hash.typ ~f:Prover_state.state1
-       in
-       let%bind t =
-         with_label __LOC__
-           (provide_witness' Transaction_union.typ ~f:Prover_state.transaction)
-       in
-       let%bind root_after, fee_excess, supply_increase =
-         apply_tagged_transaction (module Shifted) root_before t
-       in
-       let%map () =
-         with_label __LOC__
-           (let%bind b1 = Frozen_ledger_hash.var_to_triples root_before
-            and b2 = Frozen_ledger_hash.var_to_triples root_after
-            and sok_digest =
-              provide_witness' Sok_message.Digest.typ
-                ~f:Prover_state.sok_digest
-            in
-            let fee_excess = Amount.Signed.Checked.to_triples fee_excess in
-            let supply_increase = Amount.var_to_triples supply_increase in
-            let triples =
-              Sok_message.Digest.Checked.to_triples sok_digest
-              @ b1 @ b2 @ supply_increase @ fee_excess
-            in
-            Pedersen.Checked.digest_triples ~init:Hash_prefix.base_snark
-              triples
-            >>= Field.Checked.Assert.equal top_hash)
-       in
-       ())
+  let%snarkydef main top_hash =
+    let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
+    let%bind root_before =
+      provide_witness' Frozen_ledger_hash.typ ~f:Prover_state.state1
+    in
+    let%bind t =
+      with_label __LOC__
+        (provide_witness' Transaction_union.typ ~f:Prover_state.transaction)
+    in
+    let%bind root_after, fee_excess, supply_increase =
+      apply_tagged_transaction (module Shifted) root_before t
+    in
+    let%map () =
+      with_label __LOC__
+        (let%bind b1 = Frozen_ledger_hash.var_to_triples root_before
+         and b2 = Frozen_ledger_hash.var_to_triples root_after
+         and sok_digest =
+           provide_witness' Sok_message.Digest.typ ~f:Prover_state.sok_digest
+         in
+         let fee_excess = Amount.Signed.Checked.to_triples fee_excess in
+         let supply_increase = Amount.var_to_triples supply_increase in
+         let triples =
+           Sok_message.Digest.Checked.to_triples sok_digest
+           @ b1 @ b2 @ supply_increase @ fee_excess
+         in
+         Pedersen.Checked.digest_triples ~init:Hash_prefix.base_snark triples
+         >>= Field.Checked.Assert.equal top_hash)
+    in
+    ()
 
   let create_keys () = generate_keypair main ~exposing:(tick_input ())
 
@@ -828,39 +820,38 @@ struct
    constraints pass iff
    (b1, b2, .., bn) = unpack input,
    there is a proof making one of [ base_vk; merge_vk ] accept (b1, b2, .., bn) *)
-  let main (input : Wrap_input.var) =
+  let%snarkydef main (input : Wrap_input.var) =
     let open Let_syntax in
-    with_label __LOC__
-      (let%bind input = Wrap_input.Checked.to_scalar input in
-       let%bind is_base =
-         provide_witness' Boolean.typ ~f:(fun {Prover_state.proof_type; _} ->
-             Proof_type.is_base proof_type )
-       in
-       let verification_key =
-         Verifier.Verification_key.Checked.if_value is_base ~then_:base_vk
-           ~else_:merge_vk
-       in
-       let%bind vk_data, result =
-         (* someday: Probably an opportunity for optimization here since
+    let%bind input = Wrap_input.Checked.to_scalar input in
+    let%bind is_base =
+      provide_witness' Boolean.typ ~f:(fun {Prover_state.proof_type; _} ->
+          Proof_type.is_base proof_type )
+    in
+    let verification_key =
+      Verifier.Verification_key.Checked.if_value is_base ~then_:base_vk
+        ~else_:merge_vk
+    in
+    let%bind vk_data, result =
+      (* someday: Probably an opportunity for optimization here since
             we are passing in one of two known verification keys. *)
-         with_label __LOC__
-           (Verifier.All_in_one.check_proof verification_key
-              ~get_vk:
-                As_prover.(
-                  map get_state ~f:(fun {Prover_state.proof_type; _} ->
-                      match proof_type with
-                      | `Base -> Vk.base
-                      | `Merge -> Vk.merge ))
-              ~get_proof:As_prover.(map get_state ~f:Prover_state.proof)
-              [input])
-       in
-       let%bind () =
-         with_label __LOC__
-           (Verifier.Verification_key_data.Checked.Assert.equal
-              (Verifier.Verification_key.Checked.to_full_data verification_key)
-              vk_data)
-       in
-       Boolean.Assert.is_true result)
+      with_label __LOC__
+        (Verifier.All_in_one.check_proof verification_key
+           ~get_vk:
+             As_prover.(
+               map get_state ~f:(fun {Prover_state.proof_type; _} ->
+                   match proof_type with
+                   | `Base -> Vk.base
+                   | `Merge -> Vk.merge ))
+           ~get_proof:As_prover.(map get_state ~f:Prover_state.proof)
+           [input])
+    in
+    let%bind () =
+      with_label __LOC__
+        (Verifier.Verification_key_data.Checked.Assert.equal
+           (Verifier.Verification_key.Checked.to_full_data verification_key)
+           vk_data)
+    in
+    Boolean.Assert.is_true result
 
   let create_keys () = generate_keypair ~exposing:wrap_input main
 

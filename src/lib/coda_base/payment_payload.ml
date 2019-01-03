@@ -44,11 +44,10 @@ let fold {receiver; amount} =
 (* TODO: This could be a bit more efficient by packing across triples,
    but I think the added confusion-possibility
    is not worth it. *)
-let var_to_triples {receiver; amount} =
-  with_label __LOC__
-    (let%map receiver = Public_key.Compressed.var_to_triples receiver in
-     let amount = Amount.var_to_triples amount in
-     receiver @ amount)
+let%snarkydef var_to_triples {receiver; amount} =
+  let%map receiver = Public_key.Compressed.var_to_triples receiver in
+  let amount = Amount.var_to_triples amount in
+  receiver @ amount
 
 let length_in_triples =
   Public_key.Compressed.length_in_triples + Amount.length_in_triples

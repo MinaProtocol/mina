@@ -63,12 +63,15 @@ module Make (F : Intf.Basic) = struct
   let one = constant Unchecked.one
 
   let div_unsafe x y =
-    let%bind x_over_y =
-      provide_witness typ
-        As_prover.(map2 (read typ x) (read typ y) ~f:Unchecked.( / ))
-    in
-    let%map () = assert_r1cs y x_over_y x in
-    x_over_y
+    match (to_constant x, to_constant y) with
+    | Some x, Some y -> return (constant Unchecked.(x / y))
+    | _, _ ->
+        let%bind x_over_y =
+          provide_witness typ
+            As_prover.(map2 (read typ x) (read typ y) ~f:Unchecked.( / ))
+        in
+        let%map () = assert_r1cs y x_over_y x in
+        x_over_y
 
   let assert_square =
     match assert_square with
@@ -78,14 +81,17 @@ module Make (F : Intf.Basic) = struct
   let ( * ) =
     match ( * ) with
     | `Custom f -> f
-    | `Define ->
+    | `Define -> (
         fun x y ->
-          let%bind res =
-            provide_witness typ
-              As_prover.(map2 (read typ x) (read typ y) ~f:Unchecked.( * ))
-          in
-          let%map () = assert_r1cs x y res in
-          res
+          match (to_constant x, to_constant y) with
+          | Some x, Some y -> return (constant Unchecked.(x * y))
+          | _, _ ->
+              let%bind res =
+                provide_witness typ
+                  As_prover.(map2 (read typ x) (read typ y) ~f:Unchecked.( * ))
+              in
+              let%map () = assert_r1cs x y res in
+              res )
 
   let%test_unit "mul" =
     let module M = Make_test (F) in
@@ -94,14 +100,17 @@ module Make (F : Intf.Basic) = struct
   let square =
     match square with
     | `Custom f -> f
-    | `Define ->
+    | `Define -> (
         fun x ->
-          let%bind res =
-            provide_witness typ
-              As_prover.(map (read typ x) ~f:Unchecked.square)
-          in
-          let%map () = assert_square x res in
-          res
+          match to_constant x with
+          | Some x -> return (constant (Unchecked.square x))
+          | None ->
+              let%bind res =
+                provide_witness typ
+                  As_prover.(map (read typ x) ~f:Unchecked.square)
+              in
+              let%map () = assert_square x res in
+              res )
 
   let%test_unit "square" =
     let module M = Make_test (F) in
@@ -110,13 +119,17 @@ module Make (F : Intf.Basic) = struct
   let inv_exn =
     match inv_exn with
     | `Custom f -> f
-    | `Define ->
+    | `Define -> (
         fun t ->
-          let%bind res =
-            provide_witness typ As_prover.(map (read typ t) ~f:Unchecked.inv)
-          in
-          let%map () = assert_r1cs t res one in
-          res
+          match to_constant t with
+          | Some x -> return (constant (Unchecked.inv x))
+          | None ->
+              let%bind res =
+                provide_witness typ
+                  As_prover.(map (read typ t) ~f:Unchecked.inv)
+              in
+              let%map () = assert_r1cs t res one in
+              res )
 end
 
 module Make_applicative (F : Intf.S) (A : Intf.Applicative) = struct
@@ -125,6 +138,17 @@ module Make_applicative (F : Intf.S) (A : Intf.Applicative) = struct
   type 'a t_ = 'a F.t_ A.t
 
   let constant = A.map ~f:F.constant
+
+  let to_constant =
+    let exception None_exn in
+    fun t ->
+      try
+        Some
+          (A.map t ~f:(fun x ->
+               match F.to_constant x with
+               | Some x -> x
+               | None -> raise None_exn ))
+      with None_exn -> None
 
   let scale t x = A.map t ~f:(fun a -> F.scale a x)
 
@@ -180,6 +204,8 @@ struct
     let typ = Field.typ
 
     let constant = Field.Checked.constant
+
+    let to_constant = Field.Checked.to_constant
 
     let scale = Field.Checked.scale
 

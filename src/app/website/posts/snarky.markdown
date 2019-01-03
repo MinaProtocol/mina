@@ -1,6 +1,7 @@
 ---
 title: Snarky: A high-level language for verifiable computation
 date: 2018-03-11
+author: Izaak Meckler
 ---
 
 Living in the world today requires giving up a lot of control.
