@@ -11,12 +11,14 @@ module Db :
    and type hash := Ledger_hash.t
    and type account := Account.t
    and type key := Public_key.Compressed.t
+   and type key_set := Public_key.Compressed.Set.t
 
 module Any_ledger :
   Merkle_ledger.Any_ledger.S
   with module Location = Location
   with type account := Account.t
    and type key := Public_key.Compressed.t
+   and type key_set := Public_key.Compressed.Set.t
    and type hash := Ledger_hash.t
 
 module Mask :
@@ -26,6 +28,7 @@ module Mask :
    and module Attached.Addr = Location.Addr
   with type account := Account.t
    and type key := Public_key.Compressed.t
+   and type key_set := Public_key.Compressed.Set.t
    and type hash := Ledger_hash.t
    and type location := Location.t
    and type parent := Any_ledger.M.t
@@ -36,6 +39,7 @@ module Maskable :
   with module Addr = Location.Addr
   with type account := Account.t
    and type key := Public_key.Compressed.t
+   and type key_set := Public_key.Compressed.Set.t
    and type hash := Ledger_hash.t
    and type root_hash := Ledger_hash.t
    and type unattached_mask := Mask.t
@@ -49,6 +53,7 @@ include
    and type hash := Ledger_hash.t
    and type account := Account.t
    and type key := Public_key.Compressed.t
+   and type key_set := Public_key.Compressed.Set.t
    and type t = Mask.Attached.t
    and type attached_mask = Mask.Attached.t
    and type unattached_mask = Mask.t

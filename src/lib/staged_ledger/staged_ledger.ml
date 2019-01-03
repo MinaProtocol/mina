@@ -92,11 +92,6 @@ end = struct
     module Or_error = Or_error
   end
 
-  let is_valid t =
-    Parallel_scan.parallelism ~state:t
-    = Int.pow 2 (Config.transaction_capacity_log_2 + 2)
-    && Parallel_scan.is_valid t
-
   module Statement_scanner = struct
     include Scan_state.Make_statement_scanner
               (M)
@@ -152,8 +147,8 @@ end = struct
             | None -> Yield (List.rev (x :: acc), ([], 0, seq))
             | _ -> Skip (x :: acc, i + 1, seq) ) )
 
-  let all_work_pairs t =
-    let all_jobs = Scan_state.next_jobs t.scan_state in
+  let all_work_pairs_exn t =
+    let all_jobs = Scan_state.next_jobs t.scan_state |> Or_error.ok_exn in
     let module A = Scan_state.Available_job in
     let module L = Ledger_proof_statement in
     let single_spec (job : job) =
@@ -212,9 +207,12 @@ end = struct
       Scan_state.staged_transactions scan_state
     in
     Debug_assert.debug_assert (fun () ->
-        let parallelism = Parallel_scan.parallelism ~state:scan_state in
+        let total_capacity_log_2 =
+          Inputs.Config.transaction_capacity_log_2 + 2
+        in
+        let parallelism = Int.pow 2 total_capacity_log_2 in
         [%test_pred: int]
-          (( >= ) (Inputs.Config.transaction_capacity_log_2 * parallelism))
+          (( >= ) (total_capacity_log_2 * parallelism))
           (List.length txns_still_being_worked_on) ) ;
     let snarked_ledger = Ledger.register_mask ledger (Ledger.Mask.create ()) in
     let%bind () =
@@ -293,12 +291,7 @@ end = struct
 
   let ledger {ledger; _} = ledger
 
-  let create ~ledger : t =
-    let open Config in
-    (* Transaction capacity log_2 is one-fourth the capacity for work parallelism *)
-    { scan_state=
-        Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 2)
-    ; ledger }
+  let create ~ledger : t = {scan_state= Scan_state.empty (); ledger}
 
   let current_ledger_proof t =
     Option.map (Scan_state.latest_ledger_proof t.scan_state) ~f:fst
@@ -571,10 +564,10 @@ end = struct
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
     let%bind spots_available, proofs_waiting =
       let%map jobs =
-        Parallel_scan.next_jobs ~state:t.scan_state
-        |> Result_with_rollback.of_or_error
+        Deferred.return
+        @@ (Scan_state.next_jobs t.scan_state |> to_staged_ledger_or_error)
       in
-      ( Int.min (Parallel_scan.free_space ~state:t.scan_state) max_throughput
+      ( Int.min (Scan_state.free_space t.scan_state) max_throughput
       , List.length jobs )
     in
     let apply_pre_diff_with_at_most_two
@@ -760,8 +753,11 @@ end = struct
     , `Ledger_proof res_opt
     , `Staged_ledger {scan_state= scan_state'; ledger= new_ledger} )
 
-  let work_to_do scan_state : Transaction_snark_work.Statement.t Sequence.t =
-    let work_seq = Scan_state.next_jobs_sequence scan_state in
+  let work_to_do_exn scan_state : Transaction_snark_work.Statement.t Sequence.t
+      =
+    let work_seq =
+      Scan_state.next_jobs_sequence scan_state |> Or_error.ok_exn
+    in
     sequence_chunks_of ~n:Transaction_snark_work.proofs_length
     @@ Sequence.map work_seq ~f:(fun maybe_work ->
            match Scan_state.statement_of_job maybe_work with
@@ -1252,10 +1248,10 @@ end = struct
         t.scan_state
     in
     (*TODO: return an or_error here *)
-    let work_to_do = work_to_do_exn t'.scan_state in
+    let work_to_do = work_to_do_exn t.scan_state in
     let pre_diffs =
-      generate_prediff logger (work_to_do t.scan_state) transactions_by_fee
-        get_completed_work tmp_ledger self partitions
+      generate_prediff logger work_to_do transactions_by_fee get_completed_work
+        tmp_ledger self partitions
     in
     let proofs_available =
       Sequence.filter_map work_to_do ~f:get_completed_work

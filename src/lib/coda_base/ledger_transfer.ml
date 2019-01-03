@@ -5,6 +5,7 @@ module type Base_ledger_intf =
   Merkle_ledger.Base_ledger_intf.S
   with type account := Account.t
    and type key := Public_key.Compressed.t
+   and type key_set := Public_key.Compressed.Set.t
    and type hash := Ledger_hash.t
    and type root_hash := Ledger_hash.t
 
