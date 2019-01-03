@@ -34,22 +34,45 @@ let parse_to_name expr =
       raise_errorf ~loc:expr.pexp_loc
         "Cannot convert this type of expression to a name."
 
-type field_info = {field_name: str; field_module: lid; var_name: str}
+let parse_to_modname expr =
+  let name = parse_to_name expr in
+  match name.txt with
+  | Lident base_name -> mkloc base_name name.loc
+  | _ -> raise_errorf ~loc:expr.pexp_loc "Expected a bare module name."
+
+type field_info =
+  {field_name: str; field_module: lid; field_snark_module: lid; var_name: str}
+
+let field_module {field_module; _} = field_module
+
+let field_snark_module {field_snark_module; _} = field_snark_module
 
 let loc_map x ~f = mkloc (f x.txt) x.loc
 
 let lid_last x = loc_map x ~f:Longident.last_exn
 
-let parse_field ~loc field =
+let ldot mod_name name = mkloc (Ldot (mod_name.txt, name.txt)) name.loc
+
+let ldot' mod_name name = mkloc (Ldot (mod_name.txt, name)) mod_name.loc
+
+let parse_field ~loc ~instances field =
   match parse_listlike field with
-  | field_name :: field_module :: _ ->
+  | field_name :: field_module :: rest ->
       let field_name = string_of_string_expr field_name in
       let field_module = parse_to_name field_module in
       let var_name =
         loc_map field_module ~f:(fun lid ->
             String.uncapitalize (Longident.last_exn lid) )
       in
-      {field_name; field_module; var_name}
+      let field_module, field_snark_module =
+        match (rest, instances) with
+        | field_snark_module :: _, _ ->
+            (field_module, parse_to_name field_snark_module)
+        | [], submodule :: snark_submodule :: _ ->
+            (ldot field_module submodule, ldot field_module snark_submodule)
+        | _, _ -> raise_errorf ~loc "Not enough instance modules specified"
+      in
+      {field_name; field_module; field_snark_module; var_name}
   | _ -> raise_errorf ~loc "Not enough info to construct field"
 
 let parse_content ~loc content =
@@ -82,11 +105,13 @@ let polymorphic_type_stri ~loc fields_info =
   Str.type_ Nonrecursive
     [Type.mk ~loc ~params ~kind:(Ptype_record fields) (mkloc type_name loc)]
 
+let pat_var name = Pat.var ~loc:name.loc name
+
 let accessors_stri ~loc fields_info =
   Str.value ~loc Nonrecursive
     (List.map fields_info ~f:(fun {field_name; _} ->
          let field_ident = loc_map ~f:Longident.parse field_name in
-         let name_pat = Pat.var field_name in
+         let name_pat = pat_var field_name in
          let destr_record = Pat.record [(field_ident, name_pat)] Open in
          let accessor_fn =
            Exp.fun_ ~loc:field_name.loc Nolabel None destr_record
@@ -97,14 +122,10 @@ let accessors_stri ~loc fields_info =
 let include_ ~loc ?(attr = []) mod_ =
   Str.include_ ~loc {pincl_loc= loc; pincl_attributes= attr; pincl_mod= mod_}
 
-let localize_mod base_mod mod_name name =
-  mkloc (Ldot (Ldot (base_mod.txt, mod_name.txt), name)) mod_name.loc
-
-let polymorphic_type_instance_stri ~loc mod_name fields_info =
+let polymorphic_type_instance_stri ~loc ~field_module fields_info =
   let typs =
-    List.map (unique_field_types fields_info) ~f:(fun {field_module; _} ->
-        let path = localize_mod field_module mod_name "t" in
-        Typ.constr path [] )
+    List.map (unique_field_types fields_info) ~f:(fun field_info ->
+        Typ.constr (ldot' (field_module field_info) "t") [] )
   in
   let bound_poly = Typ.constr (mkloc (Longident.parse type_name) loc) typs in
   Str.type_ Nonrecursive [Type.mk ~manifest:bound_poly (mkloc "t" loc)]
@@ -112,17 +133,18 @@ let polymorphic_type_instance_stri ~loc mod_name fields_info =
 let t_mod_instance ~loc name fields_info =
   [ Str.module_ ~loc @@ Mb.mk ~loc:name.loc name
     @@ Mod.structure ~loc:name.loc
-         [polymorphic_type_instance_stri ~loc:name.loc name fields_info]
+         [ polymorphic_type_instance_stri ~loc:name.loc ~field_module
+             fields_info ]
   ; include_ ~loc (Mod.ident ~loc (loc_map ~f:Longident.parse name)) ]
 
-let rec fold_fun_body ~modname ~loc ~fname ~foldf ~varname fields_info =
-  let field_call {field_name; field_module; _} =
+let rec fold_fun_body ~field_module ~loc ~fname ~foldf ~varname fields_info =
+  let field_call field_info =
     Exp.apply ~loc
-      (Exp.ident ~loc (localize_mod field_module modname fname.txt))
+      (Exp.ident ~loc (ldot' (field_module field_info) fname.txt))
       [ ( Nolabel
         , Exp.field ~loc
             (Exp.ident ~loc:varname.loc (loc_map ~f:Longident.parse varname))
-            (loc_map ~f:Longident.parse field_name) ) ]
+            (loc_map ~f:Longident.parse field_info.field_name) ) ]
   in
   match fields_info with
   | [] ->
@@ -132,25 +154,24 @@ let rec fold_fun_body ~modname ~loc ~fname ~foldf ~varname fields_info =
       Exp.apply foldf
         [ (Nolabel, field_call field_info)
         ; ( Nolabel
-          , fold_fun_body ~modname ~loc ~fname ~foldf ~varname fields_info ) ]
+          , fold_fun_body ~field_module ~loc ~fname ~foldf ~varname fields_info
+          ) ]
 
-let fold_fun_def ~loc ~modname ~fname ~foldf ~varname fields_info =
-  Vb.mk ~loc
-    (Pat.var ~loc:fname.loc fname)
-    (Exp.fun_ ~loc Nolabel None
-       (Pat.var ~loc:varname.loc varname)
-       (fold_fun_body ~loc ~modname ~fname ~foldf ~varname fields_info))
+let fold_fun_def ~loc ~field_module ~fname ~foldf ~varname fields_info =
+  Vb.mk ~loc (pat_var fname)
+    (Exp.fun_ ~loc Nolabel None (pat_var varname)
+       (fold_fun_body ~loc ~field_module ~fname ~foldf ~varname fields_info))
 
-let fold_fun_stri ~loc ~modname ~fname ~foldf ?(varname = "t") fields_info =
+let fold_fun_stri ~loc ~field_module ~fname ~foldf ?(varname = "t") fields_info
+    =
   Str.value ~loc Nonrecursive
-    [ fold_fun_def ~loc ~modname ~fname:(mkloc fname loc) ~foldf
+    [ fold_fun_def ~loc ~field_module ~fname:(mkloc fname loc) ~foldf
         ~varname:(mkloc varname loc) fields_info ]
 
 let fields_pattern ~loc fields_info =
   Pat.record ~loc
     (List.map fields_info ~f:(fun {field_name; _} ->
-         ( loc_map ~f:Longident.parse field_name
-         , Pat.var ~loc:field_name.loc field_name ) ))
+         (loc_map ~f:Longident.parse field_name, pat_var field_name) ))
     Closed
 
 let fields_expression ~loc fields_info =
@@ -160,7 +181,7 @@ let fields_expression ~loc fields_info =
          (field_name, Exp.ident ~loc:field_name.loc field_name) ))
     None
 
-let typ_fold ~loc ~modname ~fname ~fmod fields_info =
+let typ_fold ~loc ~field_module ~fname ~fmod fields_info =
   let mk_lid2 ~loc name1 name2 = mkloc (Ldot (Lident name1, name2)) loc in
   let typ_fn mod_ name =
     Exp.ident ~loc (mkloc (Ldot (Ldot (Lident "Typ", mod_), name)) loc)
@@ -169,60 +190,64 @@ let typ_fold ~loc ~modname ~fname ~fmod fields_info =
     ~init:
       (Exp.apply (typ_fn fmod "return")
          [(Nolabel, fields_expression ~loc fields_info)])
-    ~f:(fun expr {field_name; field_module; _} ->
+    ~f:(fun expr field_info ->
       Exp.apply (typ_fn fmod "bind")
         [ ( Nolabel
           , Exp.apply ~loc
               (Exp.ident ~loc (mk_lid2 ~loc "Typ" fname))
               [ ( Nolabel
-                , Exp.ident ~loc:field_module.loc
-                    (localize_mod field_module modname "typ") )
+                , Exp.ident ~loc:(field_module field_info).loc
+                    (ldot' (field_module field_info) "typ") )
               ; ( Nolabel
-                , Exp.ident ~loc:field_name.loc
-                    (loc_map ~f:Longident.parse field_name) ) ] )
+                , Exp.ident ~loc:field_info.field_name.loc
+                    (loc_map ~f:Longident.parse field_info.field_name) ) ] )
         ; ( Nolabel
-          , Exp.fun_ ~loc Nolabel None
-              (Pat.var ~loc:field_name.loc field_name)
-              expr ) ] )
+          , Exp.fun_ ~loc Nolabel None (pat_var field_info.field_name) expr )
+        ] )
 
-let typ_stri ~loc ~modname fields_info =
+let typ_stri ~loc fields_info =
   let field_pattern = fields_pattern ~loc fields_info in
+  let field_module = field_snark_module in
   [%stri
     let typ =
       let store [%p field_pattern] =
-        [%e typ_fold ~loc ~modname ~fname:"store" ~fmod:"Store" fields_info]
+        [%e
+          typ_fold ~loc ~field_module ~fname:"store" ~fmod:"Store" fields_info]
       in
       let read [%p field_pattern] =
-        [%e typ_fold ~loc ~modname ~fname:"read" ~fmod:"Read" fields_info]
+        [%e typ_fold ~loc ~field_module ~fname:"read" ~fmod:"Read" fields_info]
       in
       let alloc [%p field_pattern] =
-        [%e typ_fold ~loc ~modname ~fname:"alloc" ~fmod:"Alloc" fields_info]
+        [%e
+          typ_fold ~loc ~field_module ~fname:"alloc" ~fmod:"Alloc" fields_info]
       in
       let check [%p field_pattern] =
-        [%e typ_fold ~loc ~modname ~fname:"check" ~fmod:"Check" fields_info]
+        [%e
+          typ_fold ~loc ~field_module ~fname:"check" ~fmod:"Check" fields_info]
       in
       {store; read; alloc; check}]
 
 let snark_mod_instance ~loc modname fields_info contents_info =
+  let field_module = field_snark_module in
   let contents =
     List.map contents_info ~f:(fun (fname, foldf) ->
-        fold_fun_stri ~loc:fname.loc ~modname ~fname:fname.txt ~foldf
+        fold_fun_stri ~loc:fname.loc ~field_module ~fname:fname.txt ~foldf
           fields_info )
   in
   [ Str.module_
     @@ Mb.mk ~loc:modname.loc modname
     @@ Mod.structure ~loc:modname.loc
-         ( polymorphic_type_instance_stri ~loc:modname.loc modname fields_info
-         :: typ_stri ~loc ~modname fields_info
-         :: contents ) ]
+         ( polymorphic_type_instance_stri ~loc:modname.loc ~field_module
+             fields_info
+         :: typ_stri ~loc fields_info :: contents ) ]
 
 let instances_str ~loc instances_info fields_info contents_info =
   match instances_info with
   | [] -> []
-  | [t_mod] -> t_mod_instance ~loc (lid_last t_mod) fields_info
+  | [t_mod] -> t_mod_instance ~loc t_mod fields_info
   | t_mod :: snark_mod :: _ ->
-      t_mod_instance ~loc (lid_last t_mod) fields_info
-      @ snark_mod_instance ~loc (lid_last snark_mod) fields_info contents_info
+      t_mod_instance ~loc t_mod fields_info
+      @ snark_mod_instance ~loc snark_mod fields_info contents_info
 
 let parse_arguments expr =
   List.map (parse_listlike expr) ~f:(fun expr ->
@@ -242,12 +267,13 @@ let str_poly_record ~loc ~path:_ expr =
   let arguments = parse_arguments expr in
   let instances_info =
     read_arg ~loc:expr.pexp_loc ~arguments "Instances"
-    |> parse_listlike |> List.map ~f:parse_to_name
+    |> parse_listlike
+    |> List.map ~f:parse_to_modname
   in
   let fields_info =
     read_arg ~loc:expr.pexp_loc ~arguments "Fields"
     |> parse_listlike
-    |> List.map ~f:(parse_field ~loc)
+    |> List.map ~f:(parse_field ~instances:instances_info ~loc)
   in
   let contents_info =
     read_arg ~loc:expr.pexp_loc ~arguments "Contents"

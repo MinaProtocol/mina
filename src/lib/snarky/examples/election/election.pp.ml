@@ -43,14 +43,14 @@ module Ballot = struct
       and next_hash {next_hash; _} = next_hash
 
       module T = struct
-        type nonrec t = (Hash.T.t, Nat.T.t, Time.T.t) polymorphic
+        type nonrec t = (Hash.T.t, Nat.t, Time.t) polymorphic
       end
 
       include T
 
       module Snarkable = struct
         type nonrec t =
-          (Hash.Snarkable.t, Nat.Snarkable.t, Time.Snarkable.t) polymorphic
+          (Hash.Snarkable.t, Nat.Snark.t, Time.Checked.t) polymorphic
 
         let typ =
           let store {length; timestamp; previous_hash; next_hash} =
@@ -58,9 +58,9 @@ module Ballot = struct
               (fun next_hash ->
                 Typ.Store.bind (Typ.store Hash.Snarkable.typ previous_hash)
                   (fun previous_hash ->
-                    Typ.Store.bind (Typ.store Time.Snarkable.typ timestamp)
+                    Typ.Store.bind (Typ.store Time.Checked.typ timestamp)
                       (fun timestamp ->
-                        Typ.Store.bind (Typ.store Nat.Snarkable.typ length)
+                        Typ.Store.bind (Typ.store Nat.Snark.typ length)
                           (fun length ->
                             Typ.Store.return
                               {length; timestamp; previous_hash; next_hash} )
@@ -71,9 +71,9 @@ module Ballot = struct
               (fun next_hash ->
                 Typ.Read.bind (Typ.read Hash.Snarkable.typ previous_hash)
                   (fun previous_hash ->
-                    Typ.Read.bind (Typ.read Time.Snarkable.typ timestamp)
+                    Typ.Read.bind (Typ.read Time.Checked.typ timestamp)
                       (fun timestamp ->
-                        Typ.Read.bind (Typ.read Nat.Snarkable.typ length)
+                        Typ.Read.bind (Typ.read Nat.Snark.typ length)
                           (fun length ->
                             Typ.Read.return
                               {length; timestamp; previous_hash; next_hash} )
@@ -84,9 +84,9 @@ module Ballot = struct
               (fun next_hash ->
                 Typ.Alloc.bind (Typ.alloc Hash.Snarkable.typ previous_hash)
                   (fun previous_hash ->
-                    Typ.Alloc.bind (Typ.alloc Time.Snarkable.typ timestamp)
+                    Typ.Alloc.bind (Typ.alloc Time.Checked.typ timestamp)
                       (fun timestamp ->
-                        Typ.Alloc.bind (Typ.alloc Nat.Snarkable.typ length)
+                        Typ.Alloc.bind (Typ.alloc Nat.Snark.typ length)
                           (fun length ->
                             Typ.Alloc.return
                               {length; timestamp; previous_hash; next_hash} )
@@ -97,9 +97,9 @@ module Ballot = struct
               (fun next_hash ->
                 Typ.Check.bind (Typ.check Hash.Snarkable.typ previous_hash)
                   (fun previous_hash ->
-                    Typ.Check.bind (Typ.check Time.Snarkable.typ timestamp)
+                    Typ.Check.bind (Typ.check Time.Checked.typ timestamp)
                       (fun timestamp ->
-                        Typ.Check.bind (Typ.check Nat.Snarkable.typ length)
+                        Typ.Check.bind (Typ.check Nat.Snark.typ length)
                           (fun length ->
                             Typ.Check.return
                               {length; timestamp; previous_hash; next_hash} )
@@ -109,45 +109,44 @@ module Ballot = struct
 
         let length_in_bits t =
           Pervasives.( + )
-            (Nat.Snarkable.length_in_bits t.length)
+            (Nat.Snark.length_in_bits t.length)
             (Pervasives.( + )
-               (Time.Snarkable.length_in_bits t.timestamp)
+               (Time.Checked.length_in_bits t.timestamp)
                (Pervasives.( + )
                   (Hash.Snarkable.length_in_bits t.previous_hash)
                   (Hash.Snarkable.length_in_bits t.next_hash)))
 
         let fold t =
-          Fold_lib.( +> )
-            (Nat.Snarkable.fold t.length)
+          Fold_lib.( +> ) (Nat.Snark.fold t.length)
             (Fold_lib.( +> )
-               (Time.Snarkable.fold t.timestamp)
+               (Time.Checked.fold t.timestamp)
                (Fold_lib.( +> )
                   (Hash.Snarkable.fold t.previous_hash)
                   (Hash.Snarkable.fold t.next_hash)))
 
         let var_to_triples t =
           Pervasives.( @ )
-            (Nat.Snarkable.var_to_triples t.length)
+            (Nat.Snark.var_to_triples t.length)
             (Pervasives.( @ )
-               (Time.Snarkable.var_to_triples t.timestamp)
+               (Time.Checked.var_to_triples t.timestamp)
                (Pervasives.( @ )
                   (Hash.Snarkable.var_to_triples t.previous_hash)
                   (Hash.Snarkable.var_to_triples t.next_hash)))
 
         let length_in_triples t =
           Pervasives.( + )
-            (Nat.Snarkable.length_in_triples t.length)
+            (Nat.Snark.length_in_triples t.length)
             (Pervasives.( + )
-               (Time.Snarkable.length_in_triples t.timestamp)
+               (Time.Checked.length_in_triples t.timestamp)
                (Pervasives.( + )
                   (Hash.Snarkable.length_in_triples t.previous_hash)
                   (Hash.Snarkable.length_in_triples t.next_hash)))
 
         let something_else t =
           (fun x y -> x + y)
-            (Nat.Snarkable.something_else t.length)
+            (Nat.Snark.something_else t.length)
             ((fun x y -> x + y)
-               (Time.Snarkable.something_else t.timestamp)
+               (Time.Checked.something_else t.timestamp)
                ((fun x y -> x + y)
                   (Hash.Snarkable.something_else t.previous_hash)
                   (Hash.Snarkable.something_else t.next_hash)))

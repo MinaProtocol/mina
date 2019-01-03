@@ -22,8 +22,8 @@ module Ballot = struct
     [%%polymorphic_record
     `Instances [T; Snarkable]
     , `Fields
-        [ ("length", Nat)
-        ; ("timestamp", Time)
+        [ ("length", Nat, Nat.Snark)
+        ; ("timestamp", Time, Time.Checked)
         ; ("previous_hash", Hash)
         ; ("next_hash", Hash) ]
     , `Contents
