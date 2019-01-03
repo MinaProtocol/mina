@@ -30,6 +30,12 @@ module type S = sig
      and type protocol_state_proof := Proof.t
      and type staged_ledger_diff := Staged_ledger_diff.t
 
+  module Proof_verified :
+    Base_intf
+    with type protocol_state := Protocol_state.value
+     and type protocol_state_proof := Proof.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
+
   module Verified :
     Base_intf
     with type protocol_state := Protocol_state.value
@@ -44,9 +50,16 @@ module type S = sig
 
   val timestamp : t -> Block_time.t
 
+  val to_proof_verified :
+    t -> [`I_swear_this_is_safe_see_my_comment of Proof_verified.t]
+
   val to_verified : t -> [`I_swear_this_is_safe_see_my_comment of Verified.t]
 
   val of_verified : Verified.t -> t
+
+  val of_proof_verified : Proof_verified.t -> t
+
+  val forget_consensus_state_verification : Verified.t -> Proof_verified.t
 end
 
 module Make (Staged_ledger_diff : sig
@@ -76,11 +89,18 @@ end)
   end
 
   include T
+  module Proof_verified = T
   module Verified = T
+
+  let to_proof_verified x = `I_swear_this_is_safe_see_my_comment x
 
   let to_verified x = `I_swear_this_is_safe_see_my_comment x
 
   let of_verified = Fn.id
+
+  let of_proof_verified = Fn.id
+
+  let forget_consensus_state_verification = Fn.id
 
   let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff =
     {protocol_state; protocol_state_proof; staged_ledger_diff}

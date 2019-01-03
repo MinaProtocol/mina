@@ -43,6 +43,8 @@ module type Inputs_intf = sig
     with type time := Time.t
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
+     and type external_transition_proof_verified :=
+                External_transition.Proof_verified.t
      and type external_transition_verified := External_transition.Verified.t
 end
 
@@ -60,8 +62,8 @@ module Make (Inputs : Inputs_intf) :
     { syncable_ledger: Syncable_ledger.t
     ; logger: Logger.t
     ; ancestor_prover: Ancestor.Prover.t
-    ; mutable best_seen_transition: External_transition.Verified.t
-    ; mutable current_root: External_transition.Verified.t
+    ; mutable best_seen_transition: External_transition.Proof_verified.t
+    ; mutable current_root: External_transition.Proof_verified.t
     ; network: Network.t }
 
   (* Cache represents a graph. The key is a State_hash, which is the node in 
@@ -87,7 +89,7 @@ module Make (Inputs : Inputs_intf) :
     = Consensus.Mechanism.select ~logger:t.logger
         ~existing:
           ( t.best_seen_transition
-          |> External_transition.Verified.protocol_state
+          |> External_transition.Proof_verified.protocol_state
           |> Consensus.Mechanism.Protocol_state.consensus_state )
         ~candidate:
           (Consensus.Mechanism.Protocol_state.consensus_state candidate)
@@ -100,14 +102,15 @@ module Make (Inputs : Inputs_intf) :
     Option.is_some (Syncable_ledger.peek_valid_tree t.syncable_ledger)
 
   let length external_transition =
-    external_transition |> External_transition.Verified.protocol_state
+    external_transition |> External_transition.Proof_verified.protocol_state
     |> Consensus.Mechanism.Protocol_state.consensus_state
     |> Consensus.Mechanism.Consensus_state.length |> Coda_numbers.Length.to_int
 
-  let on_transition t (candidate_transition : External_transition.Verified.t) =
+  let on_transition t
+      (candidate_transition : External_transition.Proof_verified.t) =
     let module Protocol_state = Consensus.Mechanism.Protocol_state in
     let candidate_state =
-      External_transition.Verified.protocol_state candidate_transition
+      External_transition.Proof_verified.protocol_state candidate_transition
     in
     let previous_state_hash =
       Protocol_state.previous_state_hash candidate_state
@@ -135,7 +138,7 @@ module Make (Inputs : Inputs_intf) :
               Protocol_state_validator.validate_proof ancestor_transition
             in
             let ancestor_protocol_state =
-              External_transition.Verified.protocol_state
+              External_transition.Proof_verified.protocol_state
                 verified_ancestor_transition
             in
             let ancestor_length =
@@ -168,7 +171,7 @@ module Make (Inputs : Inputs_intf) :
               let ledger_hash =
                 Consensus.Mechanism.(
                   Protocol_state.blockchain_state
-                    (External_transition.Verified.protocol_state
+                    (External_transition.Proof_verified.protocol_state
                        verified_ancestor_transition)
                   |> Blockchain_state.ledger_hash
                   |> Frozen_ledger_hash.to_ledger_hash)
@@ -215,7 +218,9 @@ module Make (Inputs : Inputs_intf) :
           transition ;
         (* TODO: Efficiently limiting the number of green threads in #1337 *)
         if worth_getting_root t protocol_state then
-          on_transition t transition |> don't_wait_for ;
+          on_transition t
+            (External_transition.forget_consensus_state_verification transition)
+          |> don't_wait_for ;
         Deferred.unit )
     |> don't_wait_for ;
     Syncable_ledger.valid_tree t.syncable_ledger
@@ -227,6 +232,7 @@ module Make (Inputs : Inputs_intf) :
     let initial_root_transition =
       initial_breadcrumb |> Transition_frontier.Breadcrumb.transition_with_hash
       |> With_hash.data
+      |> External_transition.forget_consensus_state_verification
     in
     let t =
       { network
@@ -240,7 +246,11 @@ module Make (Inputs : Inputs_intf) :
     Transition_frontier.clear_paths frontier ;
     let%bind synced_db = sync_ledger t ~transition_graph ~transition_reader in
     assert (Ledger.Db.(merkle_root ledger_db = merkle_root synced_db)) ;
-    let new_root = t.current_root in
+    (* Need to coerce new_root from a proof_verified transition to a fully
+       verified transition because it will be added into transition frontier*)
+    let (`I_swear_this_is_safe_see_my_comment new_root) =
+      External_transition.(t.current_root |> of_proof_verified |> to_verified)
+    in
     Transition_frontier.create ~logger:parent_log
       ~root_snarked_ledger:ledger_db
       ~root_transaction_snark_scan_state:(Staged_ledger.Scan_state.empty ())

@@ -323,10 +323,13 @@ module type Protocol_state_validator_intf = sig
 
   type external_transition
 
+  type external_transition_proof_verified
+
   type external_transition_verified
 
   val validate_proof :
-    external_transition -> external_transition_verified Or_error.t Deferred.t
+       external_transition
+    -> external_transition_proof_verified Or_error.t Deferred.t
 
   val validate_consensus_state :
        time_received:time

@@ -38,5 +38,7 @@ module type S = sig
     with type time := Time.t
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
+     and type external_transition_proof_verified :=
+                External_transition.Proof_verified.t
      and type external_transition_verified := External_transition.Verified.t
 end

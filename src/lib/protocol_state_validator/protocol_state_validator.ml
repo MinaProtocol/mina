@@ -22,6 +22,8 @@ module Make (Inputs : Inputs_intf) :
   with type time := Inputs.Time.t
    and type state_hash := State_hash.t
    and type external_transition := Inputs.External_transition.t
+   and type external_transition_proof_verified :=
+              Inputs.External_transition.Proof_verified.t
    and type external_transition_verified :=
               Inputs.External_transition.Verified.t = struct
   include Inputs
@@ -30,19 +32,17 @@ module Make (Inputs : Inputs_intf) :
     recieved_time |> Time.to_span_since_epoch |> Time.Span.to_ms
     |> Unix_timestamp.of_int64
 
-  let to_valid_protocol_state_transition unverified_transition =
-    (* This creates a verified transition after some verification. *)
-    let (`I_swear_this_is_safe_see_my_comment verified_transition) =
-      External_transition.to_verified unverified_transition
-    in
-    verified_transition
-
   let validate_proof transition =
     if%map
       State_proof.verify
         (External_transition.protocol_state_proof transition)
         (External_transition.protocol_state transition)
-    then Ok (to_valid_protocol_state_transition transition)
+    then
+      (* Verified the protocol_state proof *)
+      let (`I_swear_this_is_safe_see_my_comment proof_verified_transition) =
+        External_transition.to_proof_verified transition
+      in
+      Ok proof_verified_transition
     else transition_error "proof was invalid"
 
   let validate_consensus_state ~time_received transition =
@@ -55,6 +55,15 @@ module Make (Inputs : Inputs_intf) :
       Consensus.Mechanism.received_at_valid_time
         (consensus_state transition)
         ~time_received
-    then validate_proof transition
+    then
+      let open Deferred.Or_error.Let_syntax in
+      let%map _ : External_transition.Proof_verified.t =
+        validate_proof transition
+      in
+      (* Verified both protocol_state proof and consensus_state *)
+      let (`I_swear_this_is_safe_see_my_comment verified_transition) =
+        External_transition.to_verified transition
+      in
+      verified_transition
     else Deferred.return @@ transition_error "failed consensus validation"
 end
