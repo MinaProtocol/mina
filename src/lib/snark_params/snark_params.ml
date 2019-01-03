@@ -4,44 +4,50 @@ open Snark_bits
 module Tick_backend = Crypto_params.Tick_backend
 module Tock_backend = Crypto_params.Tock_backend
 
-module Extend (Impl : Snarky.Snark_intf.S) = struct
-  include Impl
+module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
+  open Impl
 
-  module Snarkable = struct
-    module type S = sig
-      type var
+  module type S = sig
+    type var
 
-      type value
+    type value
 
-      val typ : (var, value) Typ.t
-    end
+    val typ : (var, value) Typ.t
+  end
 
-    module Bits = struct
-      module type Lossy =
-        Bits_intf.Snarkable.Lossy
-        with type ('a, 'b) typ := ('a, 'b) Typ.t
-         and type ('a, 'b) checked := ('a, 'b) Checked.t
-         and type boolean_var := Boolean.var
+  module Bits = struct
+    module type Lossy =
+      Bits_intf.Snarkable.Lossy
+      with type ('a, 'b) typ := ('a, 'b) Typ.t
+       and type ('a, 'b) checked := ('a, 'b) Checked.t
+       and type boolean_var := Boolean.var
 
-      module type Faithful =
-        Bits_intf.Snarkable.Faithful
-        with type ('a, 'b) typ := ('a, 'b) Typ.t
-         and type ('a, 'b) checked := ('a, 'b) Checked.t
-         and type boolean_var := Boolean.var
+    module type Faithful =
+      Bits_intf.Snarkable.Faithful
+      with type ('a, 'b) typ := ('a, 'b) Typ.t
+       and type ('a, 'b) checked := ('a, 'b) Checked.t
+       and type boolean_var := Boolean.var
 
-      module type Small =
-        Bits_intf.Snarkable.Small
-        with type ('a, 'b) typ := ('a, 'b) Typ.t
-         and type ('a, 'b) checked := ('a, 'b) Checked.t
-         and type boolean_var := Boolean.var
-         and type comparison_result := Field.Checked.comparison_result
-         and type field_var := Field.Checked.t
-    end
+    module type Small =
+      Bits_intf.Snarkable.Small
+      with type ('a, 'b) typ := ('a, 'b) Typ.t
+       and type ('a, 'b) checked := ('a, 'b) Checked.t
+       and type boolean_var := Boolean.var
+       and type comparison_result := Field.Checked.comparison_result
+       and type field_var := Field.Checked.t
   end
 end
 
-module Tock0 = Extend (Crypto_params.Tock0)
-module Tick0 = Extend (Crypto_params.Tick0)
+module Tock0 = struct
+  include Crypto_params.Tock0
+  module Snarkable = Make_snarkable (Crypto_params.Tock0)
+end
+
+module Tick0 = struct
+  include Crypto_params.Tick0
+  module Snarkable = Make_snarkable (Crypto_params.Tick0)
+end
+
 module Wrap_input = Crypto_params.Wrap_input
 
 module Make_inner_curve_scalar
@@ -183,11 +189,6 @@ module Tick = struct
     module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
 
     let size_in_triples = (size_in_bits + 2) / 3
-
-    let gen =
-      Quickcheck.Generator.map
-        Bignum_bigint.(gen_incl zero (Tick0.Field.size - one))
-        ~f:(fun x -> Bigint.(to_field (of_bignum_bigint x)))
   end
 
   module Inner_curve = struct
