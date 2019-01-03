@@ -55,15 +55,21 @@ let ldot mod_name name = mkloc (Ldot (mod_name.txt, name.txt)) name.loc
 
 let ldot' mod_name name = mkloc (Ldot (mod_name.txt, name)) mod_name.loc
 
-let parse_field ~loc ~instances field =
+let last_common_name lid1 lid2 =
+  let names1 = Longident.flatten_exn lid1 in
+  let names2 = Longident.flatten_exn lid2 in
+  let rec last_equal prev_name names1 names2 =
+    match (names1, names2) with
+    | a :: names1, b :: names2 when a = b -> last_equal a names1 names2
+    | _, _ -> prev_name
+  in
+  last_equal "unknown" names1 names2
+
+let parse_field ~loc ~instances var_name_map field =
   match parse_listlike field with
   | field_name :: field_module :: rest ->
       let field_name = string_of_string_expr field_name in
       let field_module = parse_to_name field_module in
-      let var_name =
-        loc_map field_module ~f:(fun lid ->
-            String.uncapitalize (Longident.last_exn lid) )
-      in
       let field_module, field_snark_module =
         match (rest, instances) with
         | field_snark_module :: _, _ ->
@@ -72,7 +78,30 @@ let parse_field ~loc ~instances field =
             (ldot field_module submodule, ldot field_module snark_submodule)
         | _, _ -> raise_errorf ~loc "Not enough instance modules specified"
       in
-      {field_name; field_module; field_snark_module; var_name}
+      let var_name =
+        last_common_name field_module.txt field_snark_module.txt
+      in
+      let rec unique_var_name var_name' i =
+        let var_name =
+          if i = 0 then var_name else var_name ^ string_of_int i
+        in
+        match Map.find var_name_map var_name with
+        | Some (fld_mod, fld_sn_mod) ->
+            if
+              Longident.compare field_module.txt fld_mod = 0
+              && Longident.compare field_snark_module.txt fld_sn_mod = 0
+            then (var_name_map, var_name)
+            else unique_var_name var_name' (i + 1)
+        | None ->
+            let var_name_map =
+              Map.add_exn var_name_map ~key:var_name
+                ~data:(field_module.txt, field_snark_module.txt)
+            in
+            (var_name_map, var_name)
+      in
+      let var_name_map, var_name = unique_var_name var_name 0 in
+      let var_name = mkloc var_name field_module.loc in
+      (var_name_map, {field_name; field_module; field_snark_module; var_name})
   | _ -> raise_errorf ~loc "Not enough info to construct field"
 
 let parse_content ~loc content =
@@ -273,7 +302,9 @@ let str_poly_record ~loc ~path:_ expr =
   let fields_info =
     read_arg ~loc:expr.pexp_loc ~arguments "Fields"
     |> parse_listlike
-    |> List.map ~f:(parse_field ~instances:instances_info ~loc)
+    |> List.folding_map
+         ~init:(Map.empty (module String))
+         ~f:(parse_field ~instances:instances_info ~loc)
   in
   let contents_info =
     read_arg ~loc:expr.pexp_loc ~arguments "Contents"

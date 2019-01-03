@@ -23,9 +23,10 @@ module Ballot = struct
     `Instances [T; Snarkable]
     , `Fields
         [ ("length", Nat, Nat.Snark)
-        ; ("timestamp", Time, Time.Checked)
-        ; ("previous_hash", Hash)
-        ; ("next_hash", Hash) ]
+        ; ("timestamp", Snarky.Time.T, Snarky.Time.Checked)
+        ; ("previous_hash", Hash.T, Hash.Snarkable)
+        ; ("next_hash", Hash)
+        ; ("new_hash", Hash.New.T, Hash.Snarkable) ]
     , `Contents
         [ `Fold ("length_in_bits", Pervasives.( + ))
         ; `Fold ("fold", Fold_lib.( +> ))
