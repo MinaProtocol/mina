@@ -257,14 +257,17 @@ module T = struct
       ) ;
       let coda_peers () = return (Main.peers coda) in
       let coda_start () = return (Main.start coda) in
-      let coda_get_balance pk = return (Run.get_balance coda pk) in
+      let coda_get_balance pk =
+        return (Run.get_balance coda pk |> Participating_state.active_exn)
+      in
       let coda_send_payment (sk, pk, amount, fee, memo) =
         let pk_of_sk sk =
           Public_key.of_private_key_exn sk |> Public_key.compress
         in
         let build_txn amount sender_sk receiver_pk fee =
           let nonce =
-            Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn
+            Run.get_nonce coda (pk_of_sk sender_sk)
+            |> Participating_state.active_exn |> Option.value_exn
           in
           let payload : User_command.Payload.t =
             User_command.Payload.create ~fee ~nonce ~memo
@@ -273,7 +276,10 @@ module T = struct
           User_command.sign (Keypair.of_private_key_exn sender_sk) payload
         in
         let payment = build_txn amount sk pk fee in
-        Run.send_payment log coda (payment :> User_command.t)
+        let%map receipt =
+          Run.send_payment log coda (payment :> User_command.t)
+        in
+        receipt |> Participating_state.active_exn
       in
       let coda_prove_receipt (proving_receipt, resulting_receipt) =
         match%map
