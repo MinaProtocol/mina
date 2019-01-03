@@ -106,7 +106,7 @@ module Make (Inputs : Inputs_intf) :
     |> Consensus.Mechanism.Protocol_state.consensus_state
     |> Consensus.Mechanism.Consensus_state.length |> Coda_numbers.Length.to_int
 
-  let on_transition t
+  let on_transition t ~sender
       (candidate_transition : External_transition.Proof_verified.t) =
     let module Protocol_state = Consensus.Mechanism.Protocol_state in
     let candidate_state =
@@ -123,7 +123,8 @@ module Make (Inputs : Inputs_intf) :
     then Deferred.unit
     else
       match%bind
-        Network.get_ancestry t.network (input.descendant, input.generations)
+        Network.get_ancestry t.network sender
+          (input.descendant, input.generations)
       with
       | Error e ->
           Deferred.return
@@ -192,10 +193,13 @@ module Make (Inputs : Inputs_intf) :
       | Some children ->
           Deferred.List.iter children ~f:(fun transition_with_hash ->
               let%bind breadcrumb =
-                Transition_frontier.Breadcrumb.build ~logger
-                  ~parent:(Transition_frontier.find_exn frontier parent_hash)
-                  ~transition_with_hash
-                >>| Or_error.ok_exn
+                match%map
+                  Transition_frontier.Breadcrumb.build ~logger ~parent
+                    ~transition_with_hash
+                with
+                | Error (`Validation_error e) -> (*TODO: Punish*) Error.raise e
+                | Error (`Fatal_error e) -> raise e
+                | Ok breadcrumb -> breadcrumb
               in
               Transition_frontier.add_breadcrumb_exn frontier breadcrumb ;
               dfs breadcrumb )
@@ -208,6 +212,8 @@ module Make (Inputs : Inputs_intf) :
         let (transition : External_transition.Verified.t) =
           Envelope.Incoming.data incoming_transition
         in
+        (* #TODO : the 0 below is a dummy, should be a valid port *)
+        let sender = (Envelope.Incoming.sender incoming_transition, 0) in
         let protocol_state =
           External_transition.Verified.protocol_state transition
         in
@@ -218,7 +224,7 @@ module Make (Inputs : Inputs_intf) :
           transition ;
         (* TODO: Efficiently limiting the number of green threads in #1337 *)
         if worth_getting_root t protocol_state then
-          on_transition t
+          on_transition t ~sender
             (External_transition.forget_consensus_state_verification transition)
           |> don't_wait_for ;
         Deferred.unit )

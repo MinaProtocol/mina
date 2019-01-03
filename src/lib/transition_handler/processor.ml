@@ -25,9 +25,10 @@ module Make (Inputs : Inputs.S) :
     External_transition.Verified.protocol_state t
     |> Protocol_state.previous_state_hash
 
-  let run ~logger ~time_controller ~frontier ~valid_transition_reader
-      ~catchup_job_writer ~catchup_breadcrumbs_reader
-      ~catchup_breadcrumbs_writer ~processed_transition_writer =
+  let run ~logger ~time_controller ~frontier ~primary_transition_reader
+      ~proposer_transition_reader ~catchup_job_writer
+      ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
+      ~processed_transition_writer =
     let logger = Logger.child logger "Transition_handler.Catchup" in
     let catchup_monitor =
       Catchup_monitor.create ~logger ~frontier ~time_controller
@@ -35,9 +36,11 @@ module Make (Inputs : Inputs.S) :
     in
     ignore
       (Reader.Merge.iter
-         [ Reader.map catchup_breadcrumbs_reader ~f:(fun cb ->
+         [ Reader.map proposer_transition_reader ~f:(fun vt ->
+               `Valid_transition vt )
+         ; Reader.map catchup_breadcrumbs_reader ~f:(fun cb ->
                `Catchup_breadcrumbs cb )
-         ; Reader.map valid_transition_reader ~f:(fun vt ->
+         ; Reader.map primary_transition_reader ~f:(fun vt ->
                `Valid_transition vt ) ]
          ~f:(fun msg ->
            let open Deferred.Let_syntax in
@@ -63,7 +66,7 @@ module Make (Inputs : Inputs.S) :
                           ~transition)
                  | Some _ -> (
                      match%map
-                       let open Deferred.Or_error.Let_syntax in
+                       let open Deferred.Result.Let_syntax in
                        let parent_hash =
                          With_hash.data transition
                          |> External_transition.Verified.protocol_state
@@ -78,8 +81,15 @@ module Make (Inputs : Inputs.S) :
                              Deferred.Or_error.error_string "parent not found"
                        in
                        let%map breadcrumb =
-                         Transition_frontier.Breadcrumb.build ~logger ~parent
-                           ~transition_with_hash:transition
+                         let open Deferred.Let_syntax in
+                         match%map
+                           Transition_frontier.Breadcrumb.build ~logger ~parent
+                             ~transition_with_hash:transition
+                         with
+                         | Error (`Validation_error e) ->
+                             (*TODO: Punish*) Error e
+                         | Error (`Fatal_error e) -> raise e
+                         | Ok b -> Ok b
                        in
                        Transition_frontier.add_breadcrumb_exn frontier
                          breadcrumb ;

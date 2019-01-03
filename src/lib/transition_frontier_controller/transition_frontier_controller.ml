@@ -60,8 +60,8 @@ module Make (Inputs : Inputs_intf) :
     Strict_pipe.Reader.clear reader ;
     Strict_pipe.Writer.close writer
 
-  let run ~logger ~network ~time_controller ~frontier ~transition_reader
-      ~clear_reader =
+  let run ~logger ~network ~time_controller ~frontier
+      ~network_transition_reader ~proposer_transition_reader ~clear_reader =
     let logger = Logger.child logger __MODULE__ in
     let valid_transition_reader, valid_transition_writer =
       Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
@@ -75,11 +75,14 @@ module Make (Inputs : Inputs_intf) :
     let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
       Strict_pipe.create Synchronous
     in
-    Transition_handler.Validator.run ~frontier ~transition_reader
-      ~valid_transition_writer ~logger ;
+    Transition_handler.Validator.run ~frontier
+      ~transition_reader:network_transition_reader ~valid_transition_writer
+      ~logger ;
     Transition_handler.Processor.run ~logger ~time_controller ~frontier
-      ~valid_transition_reader ~catchup_job_writer ~catchup_breadcrumbs_reader
-      ~catchup_breadcrumbs_writer ~processed_transition_writer ;
+      ~primary_transition_reader:valid_transition_reader
+      ~proposer_transition_reader ~catchup_job_writer
+      ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
+      ~processed_transition_writer ;
     Catchup.run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer ;
     Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->

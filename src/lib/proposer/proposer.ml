@@ -6,10 +6,6 @@ open O1trace
 module type Inputs_intf = sig
   include Protocols.Coda_pow.Inputs_intf
 
-  module State_hash : sig
-    type t
-  end
-
   module Ledger_db : sig
     type t
   end
@@ -20,7 +16,7 @@ module type Inputs_intf = sig
 
   module Transition_frontier :
     Protocols.Coda_transition_frontier.Transition_frontier_intf
-    with type state_hash := State_hash.t
+    with type state_hash := Protocol_state_hash.t
      and type external_transition_verified := External_transition.Verified.t
      and type ledger_database := Ledger_db.t
      and type staged_ledger := Staged_ledger.t
@@ -112,6 +108,9 @@ end
 module Make (Inputs : Inputs_intf) :
   Coda_lib.Proposer_intf
   with type external_transition := Inputs.External_transition.t
+   and type external_transition_verified :=
+              Inputs.External_transition.Verified.t
+   and type state_hash := Inputs.Protocol_state_hash.t
    and type ledger_hash := Inputs.Ledger_hash.t
    and type staged_ledger := Inputs.Staged_ledger.t
    and type transaction := Inputs.User_command.With_valid_signature.t
@@ -249,96 +248,121 @@ module Make (Inputs : Inputs_intf) :
         let internal_transition =
           Internal_transition.create ~snark_transition
             ~prover_state:(Proposal_data.prover_state proposal_data)
-            ~staged_ledger_diff:(Staged_ledger_diff.forget_validated diff)
+            ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
         in
         Some (protocol_state, internal_transition) )
 
-  let transition_capacity = 64
-
-  let create ~parent_log ~get_completed_work ~transaction_pool ~time_controller
-      ~keypair ~consensus_local_state ~transition_frontier =
+  let run ~parent_log ~get_completed_work ~transaction_pool ~time_controller
+      ~keypair ~consensus_local_state ~frontier_reader ~transition_writer =
     trace_task "proposer" (fun () ->
-        let logger = Logger.child parent_log "proposer" in
-        let transition_reader, transition_writer = Linear_pipe.create () in
-        let module Crumb = Transition_frontier.Breadcrumb in
+        let logger = Logger.child parent_log __MODULE__ in
+        let log_bootstrap_mode () =
+          Logger.info logger
+            "Bootstrapping right now. Cannot generate new blockchains or \
+             schedule event"
+        in
+        let module Breadcrumb = Transition_frontier.Breadcrumb in
         let propose ivar proposal_data =
           let open Interruptible.Let_syntax in
-          let crumb = Transition_frontier.best_tip transition_frontier in
-          Logger.info logger
-            !"Begining to propose off of crumb %{sexp: Crumb.t}"
-            crumb ;
-          let previous_protocol_state, previous_protocol_state_proof =
-            let transition : External_transition.Verified.t =
-              (Crumb.transition_with_hash crumb).data
-            in
-            ( External_transition.Verified.protocol_state transition
-            , External_transition.Verified.protocol_state_proof transition )
-          in
-          let%bind () =
-            Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
-          in
-          let%bind next_state_opt =
-            generate_next_state ~proposal_data ~previous_protocol_state
-              ~time_controller
-              ~staged_ledger:(Crumb.staged_ledger crumb)
-              ~transactions:(Transaction_pool.transactions transaction_pool)
-              ~get_completed_work ~logger ~keypair
-          in
-          trace_event "next state generated" ;
-          match next_state_opt with
-          | None -> Interruptible.return ()
-          | Some (protocol_state, internal_transition) ->
-              lift_sync (fun () ->
-                  let open Deferred.Or_error.Let_syntax in
-                  ignore
-                    (let t0 = Time.now time_controller in
-                     let%map protocol_state_proof =
-                       Prover.prove ~prev_state:previous_protocol_state
-                         ~prev_state_proof:previous_protocol_state_proof
-                         ~next_state:protocol_state internal_transition
-                     in
-                     let span = Time.diff (Time.now time_controller) t0 in
-                     Logger.info logger
-                       !"Protocol_state_proof proving time took: %{sexp: \
-                         int64}ms\n\
-                         %!"
-                       (Time.Span.to_ms span) ;
-                     let external_transition =
-                       External_transition.create ~protocol_state
-                         ~protocol_state_proof
-                         ~staged_ledger_diff:
-                           (Internal_transition.staged_ledger_diff
-                              internal_transition)
-                     in
-                     let time = Time.now time_controller in
-                     Linear_pipe.write_or_exn ~capacity:transition_capacity
-                       transition_writer transition_reader
-                       (Envelope.Incoming.local external_transition, time)) )
+          match Mvar.peek frontier_reader with
+          | None -> Interruptible.return (log_bootstrap_mode ())
+          | Some frontier -> (
+              let crumb = Transition_frontier.best_tip frontier in
+              Logger.info logger
+                !"Begining to propose off of crumb %{sexp: Breadcrumb.t}"
+                crumb ;
+              let previous_protocol_state, previous_protocol_state_proof =
+                let transition : External_transition.Verified.t =
+                  (Breadcrumb.transition_with_hash crumb).data
+                in
+                ( External_transition.Verified.protocol_state transition
+                , External_transition.Verified.protocol_state_proof transition
+                )
+              in
+              let%bind () =
+                Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
+              in
+              let%bind next_state_opt =
+                generate_next_state ~proposal_data ~previous_protocol_state
+                  ~time_controller
+                  ~staged_ledger:(Breadcrumb.staged_ledger crumb)
+                  ~transactions:
+                    (Transaction_pool.transactions transaction_pool)
+                  ~get_completed_work ~logger ~keypair
+              in
+              trace_event "next state generated" ;
+              match next_state_opt with
+              | None -> Interruptible.return ()
+              | Some (protocol_state, internal_transition) ->
+                  Interruptible.uninterruptible
+                    (let open Deferred.Let_syntax in
+                    let t0 = Time.now time_controller in
+                    match%bind
+                      Prover.prove ~prev_state:previous_protocol_state
+                        ~prev_state_proof:previous_protocol_state_proof
+                        ~next_state:protocol_state internal_transition
+                    with
+                    | Error err ->
+                        Logger.error logger
+                          "failed to prove generated protocol state: %s"
+                          (Error.to_string_hum err) ;
+                        return ()
+                    | Ok protocol_state_proof ->
+                        let span = Time.diff (Time.now time_controller) t0 in
+                        Logger.info logger
+                          !"Protocol_state_proof proving time took: %{sexp: \
+                            int64}ms\n\
+                            %!"
+                          (Time.Span.to_ms span) ;
+                        (* since we generated this transition, we do not need to verify it *)
+                        let (`I_swear_this_is_safe_see_my_comment
+                              external_transition) =
+                          External_transition.to_verified
+                            (External_transition.create ~protocol_state
+                               ~protocol_state_proof
+                               ~staged_ledger_diff:
+                                 (Internal_transition.staged_ledger_diff
+                                    internal_transition))
+                        in
+                        let external_transition_with_hash =
+                          { With_hash.hash= Protocol_state.hash protocol_state
+                          ; data= external_transition }
+                        in
+                        Strict_pipe.Writer.write transition_writer
+                          external_transition_with_hash) )
         in
         let proposal_supervisor = Singleton_supervisor.create ~task:propose in
         let scheduler = Singleton_scheduler.create time_controller in
         let rec check_for_proposal () =
-          let crumb = Transition_frontier.best_tip transition_frontier in
-          let transition = (Crumb.transition_with_hash crumb).data in
-          let protocol_state =
-            External_transition.Verified.protocol_state transition
-          in
-          match
-            Consensus_mechanism.next_proposal
-              (time_to_ms (Time.now time_controller))
-              (Protocol_state.consensus_state protocol_state)
-              ~local_state:consensus_local_state ~keypair ~logger
-          with
-          | `Check_again time ->
-              Singleton_scheduler.schedule scheduler (time_of_ms time)
-                ~f:check_for_proposal
-          | `Propose (time, data) ->
-              Singleton_scheduler.schedule scheduler (time_of_ms time)
-                ~f:(fun () ->
-                  ignore
-                    (Interruptible.finally
-                       (Singleton_supervisor.dispatch proposal_supervisor data)
-                       ~f:check_for_proposal) )
+          match Mvar.peek frontier_reader with
+          | None -> log_bootstrap_mode ()
+          | Some transition_frontier -> (
+              let breadcrumb =
+                Transition_frontier.best_tip transition_frontier
+              in
+              let transition =
+                (Breadcrumb.transition_with_hash breadcrumb).data
+              in
+              let protocol_state =
+                External_transition.Verified.protocol_state transition
+              in
+              match
+                Consensus_mechanism.next_proposal
+                  (time_to_ms (Time.now time_controller))
+                  (Protocol_state.consensus_state protocol_state)
+                  ~local_state:consensus_local_state ~keypair ~logger
+              with
+              | `Check_again time ->
+                  Singleton_scheduler.schedule scheduler (time_of_ms time)
+                    ~f:check_for_proposal
+              | `Propose (time, data) ->
+                  Singleton_scheduler.schedule scheduler (time_of_ms time)
+                    ~f:(fun () ->
+                      ignore
+                        (Interruptible.finally
+                           (Singleton_supervisor.dispatch proposal_supervisor
+                              data)
+                           ~f:check_for_proposal) ) )
         in
-        check_for_proposal () ; transition_reader )
+        check_for_proposal () )
 end

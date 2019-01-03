@@ -293,13 +293,15 @@ module type Main_intf = sig
 
   val request_work : t -> Inputs.Snark_worker.Work.Spec.t option
 
-  val best_staged_ledger : t -> Inputs.Staged_ledger.t
+  val best_staged_ledger : t -> Inputs.Staged_ledger.t Participating_state.t
 
-  val best_ledger : t -> Inputs.Ledger.t
+  val best_ledger : t -> Inputs.Ledger.t Participating_state.t
 
-  val best_protocol_state : t -> Consensus.Mechanism.Protocol_state.value
+  val best_protocol_state :
+    t -> Consensus.Mechanism.Protocol_state.value Participating_state.t
 
-  val best_tip : t -> Inputs.Transition_frontier.Breadcrumb.t
+  val best_tip :
+    t -> Inputs.Transition_frontier.Breadcrumb.t Participating_state.t
 
   val peers : t -> Kademlia.Peer.t list
 
@@ -538,7 +540,7 @@ struct
     end
 
     let forget {With_valid_signatures_and_proofs.old; diff} =
-      {old; diff= Staged_ledger_diff.forget_validated diff}
+      {old; diff= Staged_ledger_diff.forget diff}
   end
 
   module Internal_transition =
@@ -941,11 +943,20 @@ struct
 
   module Work_selector = Make_work_selector (Work_selector_inputs)
 
-  let request_work ~best_staged_ledger
+  let request_work ~log ~best_staged_ledger
       ~(seen_jobs : 'a -> Work_selector.State.t)
       ~(set_seen_jobs : 'a -> Work_selector.State.t -> unit)
       ~(snark_pool : 'a -> Snark_pool.t) (t : 'a) (fee : Fee.Unsigned.t) =
-    let sl = best_staged_ledger t in
+    let best_staged_ledger t =
+      match best_staged_ledger t with
+      | `Active staged_ledger -> Some staged_ledger
+      | `Bootstrapping ->
+          Logger.info log
+            "Could not retrieve staged_ledger due to bootstrapping" ;
+          None
+    in
+    let open Option.Let_syntax in
+    let%bind sl = best_staged_ledger t in
     let instances, seen_jobs =
       Work_selector.work ~fee ~snark_pool:(snark_pool t) sl (seen_jobs t)
     in
@@ -990,8 +1001,8 @@ module Make_coda (Init : Init_intf) = struct
   include Coda_lib.Make (Inputs)
 
   let request_work t =
-    Inputs.request_work ~best_staged_ledger ~seen_jobs ~set_seen_jobs
-      ~snark_pool t (snark_work_fee t)
+    Inputs.request_work ~log:t.log ~best_staged_ledger ~seen_jobs
+      ~set_seen_jobs ~snark_pool t (snark_work_fee t)
 end
 
 [%%else]
@@ -1012,8 +1023,8 @@ module Make_coda (Init : Init_intf) = struct
   include Coda_lib.Make (Inputs)
 
   let request_work t =
-    Inputs.request_work ~best_staged_ledger ~seen_jobs ~set_seen_jobs
-      ~snark_pool t t.snark_work_fee
+    Inputs.request_work ~log:t.log ~best_staged_ledger ~seen_jobs
+      ~set_seen_jobs ~snark_pool t (snark_work_fee t)
 end
 
 [%%endif]
@@ -1029,30 +1040,34 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   module Lite_compat = Lite_compat.Make (Consensus.Mechanism.Blockchain_state)
 
   let get_account t (addr : Public_key.Compressed.t) =
-    let open Option.Let_syntax in
-    let ledger = best_ledger t in
-    let%bind location = Ledger.location_of_key ledger addr in
-    Ledger.get ledger location
+    let open Participating_state.Let_syntax in
+    let%map ledger = best_ledger t in
+    Ledger.location_of_key ledger addr |> Option.bind ~f:(Ledger.get ledger)
 
   let get_balance t (addr : Public_key.Compressed.t) =
-    let open Option.Let_syntax in
+    let open Participating_state.Option.Let_syntax in
     let%map account = get_account t addr in
     account.Account.balance
 
   let get_accounts t =
-    let ledger = best_ledger t in
+    let open Participating_state.Let_syntax in
+    let%map ledger = best_ledger t in
     Ledger.to_list ledger
 
   let string_of_public_key =
     Fn.compose Public_key.Compressed.to_base64 Account.public_key
 
-  let get_public_keys t = get_accounts t |> List.map ~f:string_of_public_key
+  let get_public_keys t =
+    let open Participating_state.Let_syntax in
+    let%map account = get_accounts t in
+    List.map account ~f:string_of_public_key
 
   let get_keys_with_balances t =
-    get_accounts t
-    |> List.map ~f:(fun account ->
-           ( Account.balance account |> Currency.Balance.to_int
-           , string_of_public_key account ) )
+    let open Participating_state.Let_syntax in
+    let%map accounts = get_accounts t in
+    List.map accounts ~f:(fun account ->
+        ( Account.balance account |> Currency.Balance.to_int
+        , string_of_public_key account ) )
 
   let is_valid_payment t (txn : User_command.t) account_opt =
     let remainder =
@@ -1101,9 +1116,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       (User_command)
       (Receipt.Chain_hash)
 
-  let verify_payment t (addr : Public_key.Compressed.Stable.V1.t)
+  let verify_payment t log (addr : Public_key.Compressed.Stable.V1.t)
       (verifying_txn : User_command.t) proof =
-    let account = get_account t addr |> Option.value_exn in
+    let open Participating_state.Let_syntax in
+    let%map account = get_account t addr in
+    let account = account |> Option.value_exn in
     let resulting_receipt = Account.receipt_chain_hash account in
     let open Or_error.Let_syntax in
     let%bind () = Payment_verifier.verify ~resulting_receipt proof in
@@ -1131,17 +1148,19 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let send_payment log t (txn : User_command.t) =
     Deferred.return
     @@
-    let open Or_error.Let_syntax in
     let public_key = Public_key.compress txn.sender in
-    let account_opt = get_account t public_key in
+    let open Participating_state.Let_syntax in
+    let%map account_opt = get_account t public_key in
+    let open Or_error.Let_syntax in
     let%map () = schedule_payment log t txn account_opt in
     record_payment ~log t txn (Option.value_exn account_opt)
 
   (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
   let schedule_payments log t txns =
-    List.iter txns ~f:(fun (txn : User_command.t) ->
+    List.map txns ~f:(fun (txn : User_command.t) ->
         let public_key = Public_key.compress txn.sender in
-        let account_opt = get_account t public_key in
+        let open Participating_state.Let_syntax in
+        let%map account_opt = get_account t public_key in
         match schedule_payment log t txn account_opt with
         | Ok () -> ()
         | Error err ->
@@ -1149,6 +1168,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
               !"Failure in schedule_payments: %{sexp:Error.t}. This is not \
                 yet reported to the client, see #1143"
               err )
+    |> Participating_state.sequence
+    |> Participating_state.map ~f:ignore
 
   let prove_receipt t ~proving_receipt ~resulting_receipt :
       Payment_proof.t Deferred.Or_error.t =
@@ -1162,8 +1183,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     Deferred.return result
 
   let get_nonce t (addr : Public_key.Compressed.t) =
+    let open Participating_state.Let_syntax in
+    let%map ledger = best_ledger t in
     let open Option.Let_syntax in
-    let ledger = best_ledger t in
     let%bind location = Ledger.location_of_key ledger addr in
     let%map account = Ledger.get ledger location in
     account.Account.nonce
@@ -1171,12 +1193,13 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let start_time = Time_ns.now ()
 
   let get_status t =
-    let ledger = best_ledger t in
+    let open Participating_state.Let_syntax in
+    let%bind ledger = best_ledger t in
     let ledger_merkle_root =
       Ledger.merkle_root ledger |> [%sexp_of: Ledger_hash.t] |> Sexp.to_string
     in
     let num_accounts = Ledger.num_accounts ledger in
-    let state = best_protocol_state t in
+    let%bind state = best_protocol_state t in
     let state_hash =
       Consensus.Mechanism.Protocol_state.hash state
       |> [%sexp_of: State_hash.t] |> Sexp.to_string
@@ -1189,13 +1212,14 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       Time_ns.diff (Time_ns.now ()) start_time
       |> Time_ns.Span.to_sec |> Int.of_float
     in
+    let%map staged_ledger = best_staged_ledger t in
     { Daemon_rpcs.Types.Status.num_accounts
     ; block_count= Int.of_string (Length.to_string block_count)
     ; uptime_secs
     ; ledger_merkle_root
     ; staged_ledger_hash=
-        best_staged_ledger t |> Staged_ledger.hash
-        |> Staged_ledger_hash.sexp_of_t |> Sexp.to_string
+        staged_ledger |> Staged_ledger.hash |> Staged_ledger_hash.sexp_of_t
+        |> Sexp.to_string
     ; state_hash
     ; external_transition_latency=
         Perf_histograms.report ~name:"external_transition_latency"
@@ -1215,10 +1239,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =
     Option.map Consensus.Mechanism.Consensus_state.to_lite
       ~f:(fun consensus_state_to_lite t pks ->
-        let ledger = best_ledger t in
+        let ledger = best_ledger t |> Participating_state.active_exn in
         let transition =
           With_hash.data
-            (Transition_frontier.Breadcrumb.transition_with_hash (best_tip t))
+            (Transition_frontier.Breadcrumb.transition_with_hash
+               (best_tip t |> Participating_state.active_exn))
         in
         let state = External_transition.Verified.protocol_state transition in
         let proof =
@@ -1258,6 +1283,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   let clear_hist_status t = Perf_histograms.wipe () ; get_status t
 
+  (* TODO: handle participation_status more appropriately than doing participate_exn *)
   let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda ~log
       ~client_port () =
     let client_whitelist =
@@ -1267,20 +1293,23 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     (* Setup RPC server for client interactions *)
     let client_impls =
       [ Rpc.Rpc.implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
-            send_payment log coda tx )
+            let%map result = send_payment log coda tx in
+            result |> Participating_state.active_exn )
       ; Rpc.Rpc.implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
-            schedule_payments log coda ts ;
+            schedule_payments log coda ts |> Participating_state.active_exn ;
             Deferred.unit )
       ; Rpc.Rpc.implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
-            return (get_balance coda pk) )
+            return (get_balance coda pk |> Participating_state.active_exn) )
       ; Rpc.Rpc.implement Daemon_rpcs.Verify_proof.rpc
-          (fun () (pk, tx, proof) -> return (verify_payment coda pk tx proof)
-        )
+          (fun () (pk, tx, proof) ->
+            return
+              ( verify_payment coda log pk tx proof
+              |> Participating_state.active_exn ) )
       ; Rpc.Rpc.implement Daemon_rpcs.Prove_receipt.rpc
           (fun () (proving_receipt, pk) ->
             let open Deferred.Or_error.Let_syntax in
             let%bind account =
-              get_account coda pk
+              get_account coda pk |> Participating_state.active_exn
               |> Result.of_option
                    ~error:
                      (Error.of_string
@@ -1293,15 +1322,19 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             prove_receipt coda ~proving_receipt
               ~resulting_receipt:(Account.receipt_chain_hash account) )
       ; Rpc.Rpc.implement Daemon_rpcs.Get_public_keys_with_balances.rpc
-          (fun () () -> return (get_keys_with_balances coda) )
+          (fun () () ->
+            return
+              (get_keys_with_balances coda |> Participating_state.active_exn)
+        )
       ; Rpc.Rpc.implement Daemon_rpcs.Get_public_keys.rpc (fun () () ->
-            return (get_public_keys coda) )
+            return (get_public_keys coda |> Participating_state.active_exn) )
       ; Rpc.Rpc.implement Daemon_rpcs.Get_nonce.rpc (fun () pk ->
-            return (get_nonce coda pk) )
+            return (get_nonce coda pk |> Participating_state.active_exn) )
       ; Rpc.Rpc.implement Daemon_rpcs.Get_status.rpc (fun () () ->
-            return (get_status coda) )
+            return (get_status coda |> Participating_state.active_exn) )
       ; Rpc.Rpc.implement Daemon_rpcs.Clear_hist_status.rpc (fun () () ->
-            return (clear_hist_status coda) )
+            return (clear_hist_status coda |> Participating_state.active_exn)
+        )
       ; Rpc.Rpc.implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
             get_ledger coda lh )
       ; Rpc.Rpc.implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
@@ -1348,7 +1381,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                   match Uri.path uri with
                   | "/status" ->
                       Server.respond_string
-                        ( get_status coda |> Daemon_rpcs.Types.Status.to_yojson
+                        ( get_status coda |> Participating_state.active_exn
+                        |> Daemon_rpcs.Types.Status.to_yojson
                         |> Yojson.Safe.pretty_to_string )
                   | _ -> route_not_found () )) )
         |> ignore ) ;
