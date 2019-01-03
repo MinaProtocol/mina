@@ -170,10 +170,9 @@ let decompress_var ({x; is_odd} as c : Compressed.var) =
 
 let compress : t -> Compressed.t = Compressed.compress
 
-let compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
-  with_label __LOC__
-    (let%map is_odd = parity_var y in
-     {Compressed.x; is_odd})
+let%snarkydef compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
+  let%map is_odd = parity_var y in
+  {Compressed.x; is_odd}
 
 let of_bigstring bs =
   let open Or_error.Let_syntax in

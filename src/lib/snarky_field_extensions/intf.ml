@@ -37,6 +37,8 @@ module type Basic = sig
 
   val constant : Unchecked.t -> t
 
+  val to_constant : t -> Unchecked.t option
+
   val scale : t -> Field.t -> t
 
   val mul_field : t -> Field.Checked.t -> (t, _) Checked.t

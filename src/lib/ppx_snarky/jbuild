@@ -1,0 +1,8 @@
+(jbuild_version 1)
+
+(library
+  ((name ppx_snarky)
+   (public_name ppx_snarky)
+   (kind ppx_rewriter)
+   (libraries (ppxlib))
+   (preprocess (pps (ppxlib.metaquot)))))
