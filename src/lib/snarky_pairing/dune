@@ -1,0 +1,10 @@
+(library
+  (name snarky_pairing)
+  (public_name snarky_pairing)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (libraries
+    sgn
+    snarky_field_extensions
+    snarky
+    snarkette
+    core_kernel ))
