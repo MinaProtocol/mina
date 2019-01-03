@@ -9,6 +9,15 @@ module Make (Inputs : Inputs.S) = struct
     type ('g1, 'g2, 'fqk) t_ =
       {query_base: 'g1; query: 'g1 list; delta: 'g2; alpha_beta_inv: 'fqk}
 
+    open Let_syntax
+    include Summary.Make (Inputs)
+
+    let summary {query_base; query; delta; alpha_beta_inv} =
+      let g1s = query_base :: query in
+      let g2s = [delta] in
+      let gts = [alpha_beta_inv] in
+      summary ~g1s ~g2s ~gts
+
     type ('a, 'b, 'c) vk = ('a, 'b, 'c) t_
 
     module Precomputation = struct

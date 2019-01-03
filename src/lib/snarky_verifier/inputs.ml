@@ -68,6 +68,14 @@ module type S = sig
     val equal : t -> t -> (Boolean.var, _) Checked.t
   end
 
+  module Fqe : sig
+    type _ t_
+
+    val real_part : 'a t_ -> 'a
+
+    val parts : 'a t_ -> 'a list
+  end
+
   val group_miller_loop :
        (Sgn.t * G1_precomputation.t * G2_precomputation.t) list
     -> (Fqk.t, _) Checked.t
