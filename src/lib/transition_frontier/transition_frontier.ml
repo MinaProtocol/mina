@@ -338,7 +338,7 @@ struct
     then
       Logger.warn t.logger
         !"attach_node_to with breadcrumb for state %{sexp:State_hash.t} \
-          already present; catchup monitor bug?"
+          already present; catchup scheduler bug?"
         hash
     else
       Hashtbl.set t.table
