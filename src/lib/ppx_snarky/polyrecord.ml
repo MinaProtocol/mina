@@ -215,7 +215,7 @@ let typ_fold ~loc ~field_module ~fname ~fmod fields_info =
   let typ_fn mod_ name =
     Exp.ident ~loc (mkloc (Ldot (Ldot (Lident "Typ", mod_), name)) loc)
   in
-  List.fold_left fields_info
+  List.fold_left (List.rev fields_info)
     ~init:
       (Exp.apply (typ_fn fmod "return")
          [(Nolabel, fields_expression ~loc fields_info)])

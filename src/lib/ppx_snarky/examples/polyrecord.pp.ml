@@ -33,16 +33,15 @@ include struct
 
     let typ =
       let store {length; timestamp; previous_hash; next_hash; new_hash} =
-        Typ.Store.bind (Typ.store Hash.Snarkable.typ new_hash) (fun new_hash ->
-            Typ.Store.bind (Typ.store Hash.Snarkable.typ next_hash)
-              (fun next_hash ->
+        Typ.Store.bind (Typ.store Nat.Snark.typ length) (fun length ->
+            Typ.Store.bind (Typ.store Snarky.Time.Checked.typ timestamp)
+              (fun timestamp ->
                 Typ.Store.bind (Typ.store Hash.Snarkable.typ previous_hash)
                   (fun previous_hash ->
-                    Typ.Store.bind
-                      (Typ.store Snarky.Time.Checked.typ timestamp)
-                      (fun timestamp ->
-                        Typ.Store.bind (Typ.store Nat.Snark.typ length)
-                          (fun length ->
+                    Typ.Store.bind (Typ.store Hash.Snarkable.typ next_hash)
+                      (fun next_hash ->
+                        Typ.Store.bind (Typ.store Hash.Snarkable.typ new_hash)
+                          (fun new_hash ->
                             Typ.Store.return
                               { length
                               ; timestamp
@@ -51,15 +50,15 @@ include struct
                               ; new_hash } ) ) ) ) )
       in
       let read {length; timestamp; previous_hash; next_hash; new_hash} =
-        Typ.Read.bind (Typ.read Hash.Snarkable.typ new_hash) (fun new_hash ->
-            Typ.Read.bind (Typ.read Hash.Snarkable.typ next_hash)
-              (fun next_hash ->
+        Typ.Read.bind (Typ.read Nat.Snark.typ length) (fun length ->
+            Typ.Read.bind (Typ.read Snarky.Time.Checked.typ timestamp)
+              (fun timestamp ->
                 Typ.Read.bind (Typ.read Hash.Snarkable.typ previous_hash)
                   (fun previous_hash ->
-                    Typ.Read.bind (Typ.read Snarky.Time.Checked.typ timestamp)
-                      (fun timestamp ->
-                        Typ.Read.bind (Typ.read Nat.Snark.typ length)
-                          (fun length ->
+                    Typ.Read.bind (Typ.read Hash.Snarkable.typ next_hash)
+                      (fun next_hash ->
+                        Typ.Read.bind (Typ.read Hash.Snarkable.typ new_hash)
+                          (fun new_hash ->
                             Typ.Read.return
                               { length
                               ; timestamp
@@ -68,16 +67,15 @@ include struct
                               ; new_hash } ) ) ) ) )
       in
       let alloc {length; timestamp; previous_hash; next_hash; new_hash} =
-        Typ.Alloc.bind (Typ.alloc Hash.Snarkable.typ new_hash) (fun new_hash ->
-            Typ.Alloc.bind (Typ.alloc Hash.Snarkable.typ next_hash)
-              (fun next_hash ->
+        Typ.Alloc.bind (Typ.alloc Nat.Snark.typ length) (fun length ->
+            Typ.Alloc.bind (Typ.alloc Snarky.Time.Checked.typ timestamp)
+              (fun timestamp ->
                 Typ.Alloc.bind (Typ.alloc Hash.Snarkable.typ previous_hash)
                   (fun previous_hash ->
-                    Typ.Alloc.bind
-                      (Typ.alloc Snarky.Time.Checked.typ timestamp)
-                      (fun timestamp ->
-                        Typ.Alloc.bind (Typ.alloc Nat.Snark.typ length)
-                          (fun length ->
+                    Typ.Alloc.bind (Typ.alloc Hash.Snarkable.typ next_hash)
+                      (fun next_hash ->
+                        Typ.Alloc.bind (Typ.alloc Hash.Snarkable.typ new_hash)
+                          (fun new_hash ->
                             Typ.Alloc.return
                               { length
                               ; timestamp
@@ -86,16 +84,15 @@ include struct
                               ; new_hash } ) ) ) ) )
       in
       let check {length; timestamp; previous_hash; next_hash; new_hash} =
-        Typ.Check.bind (Typ.check Hash.Snarkable.typ new_hash) (fun new_hash ->
-            Typ.Check.bind (Typ.check Hash.Snarkable.typ next_hash)
-              (fun next_hash ->
+        Typ.Check.bind (Typ.check Nat.Snark.typ length) (fun length ->
+            Typ.Check.bind (Typ.check Snarky.Time.Checked.typ timestamp)
+              (fun timestamp ->
                 Typ.Check.bind (Typ.check Hash.Snarkable.typ previous_hash)
                   (fun previous_hash ->
-                    Typ.Check.bind
-                      (Typ.check Snarky.Time.Checked.typ timestamp)
-                      (fun timestamp ->
-                        Typ.Check.bind (Typ.check Nat.Snark.typ length)
-                          (fun length ->
+                    Typ.Check.bind (Typ.check Hash.Snarkable.typ next_hash)
+                      (fun next_hash ->
+                        Typ.Check.bind (Typ.check Hash.Snarkable.typ new_hash)
+                          (fun new_hash ->
                             Typ.Check.return
                               { length
                               ; timestamp
