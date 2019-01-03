@@ -12,11 +12,10 @@ module Make (Inputs : Inputs.S) = struct
 
     include Summary.Make (Inputs)
 
-    let summary {query_base; query; delta; alpha_beta_inv} =
-      let g1s = query_base :: query in
-      let g2s = [delta] in
-      let gts = [alpha_beta_inv] in
-      summary ~g1s ~g2s ~gts
+    let summary_input {query_base; query; delta; alpha_beta_inv} =
+      { Summary.Input.g1s= query_base :: query
+      ; g2s= [delta]
+      ; gts= [alpha_beta_inv] }
 
     type ('a, 'b, 'c) vk = ('a, 'b, 'c) t_
 

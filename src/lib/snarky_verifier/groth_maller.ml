@@ -19,7 +19,7 @@ module Make (Inputs : Inputs.S) = struct
 
     include Summary.Make (Inputs)
 
-    let summary
+    let summary_input
         { g_alpha
         ; g_gamma
         ; query_base
@@ -28,10 +28,9 @@ module Make (Inputs : Inputs.S) = struct
         ; h_beta
         ; h_gamma
         ; g_alpha_h_beta } =
-      let g1s = g_alpha :: g_gamma :: query_base :: query in
-      let g2s = [h; h_beta; h_gamma] in
-      let gts = [g_alpha_h_beta] in
-      summary ~g1s ~g2s ~gts
+      { Summary.Input.g1s= g_alpha :: g_gamma :: query_base :: query
+      ; g2s= [h; h_beta; h_gamma]
+      ; gts= [g_alpha_h_beta] }
 
     type ('a, 'b, 'c) vk = ('a, 'b, 'c) t_
 

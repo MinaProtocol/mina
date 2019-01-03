@@ -12,12 +12,16 @@ module type Inputs_intf = sig
   end
 end
 
+module Input = struct
+  type ('g1, 'g2, 'gt) t = {g1s: 'g1 list; g2s: 'g2 list; gts: 'gt list}
+end
+
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
   open Impl
   open Let_syntax
 
-  let summary ~g1s ~g2s ~gts =
+  let summary {Input.g1s; g2s; gts} =
     let%map elts =
       List.map g1s ~f:(fun (x, _) -> x)
       @ List.concat_map g2s ~f:(fun (x, _) -> Fqe.parts x)
@@ -39,6 +43,25 @@ module Make (Inputs : Inputs_intf) = struct
       and g2s = Checked.List.map g2s ~f:(fun (_, y) -> real_part_parity y)
       and gts = Checked.List.map gts ~f:(fun (_, b) -> real_part_parity b) in
       g1s @ g2s @ gts
+    in
+    elts @ signs
+
+  let summary_unchecked {Input.g1s; g2s; gts} =
+    let parity x = Bigint.(test_bit (of_field x) 0) in
+    let elts =
+      List.map g1s ~f:(fun (x, _) -> x)
+      @ List.concat_map g2s ~f:(fun (x, _) -> Fqe.parts x)
+      @ List.concat_map gts ~f:(fun (a, _) -> Fqe.parts a)
+      |> List.map ~f:parity
+    and signs =
+      let real_part_parity a =
+        let x = Fqe.real_part a in
+        assert (not (Field.equal Field.zero x)) ;
+        parity x
+      in
+      List.map g1s ~f:(fun (_, y) -> parity y)
+      @ List.map g2s ~f:(fun (_, y) -> real_part_parity y)
+      @ List.map gts ~f:(fun (_, b) -> real_part_parity b)
     in
     elts @ signs
 end
