@@ -242,10 +242,6 @@ module type Main_intf = sig
 
     module Staged_ledger_diff : sig
       type t [@@deriving sexp, bin_io]
-
-      module Verified : sig
-        type t [@@deriving sexp, bin_io]
-      end
     end
 
     module Internal_transition :
@@ -264,9 +260,9 @@ module type Main_intf = sig
       with type state_hash := State_hash.t
        and type external_transition_verified := External_transition.Verified.t
        and type ledger_database := Coda_base.Ledger.Db.t
-       and type ledger_diff_verified := Staged_ledger_diff.Verified.t
        and type masked_ledger := Coda_base.Ledger.t
        and type staged_ledger := Staged_ledger.t
+       and type staged_ledger_diff := Staged_ledger_diff.t
        and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
   end
 
@@ -528,8 +524,6 @@ struct
     end
 
     include Staged_ledger.Make (Inputs)
-
-    type verified_diff = Staged_ledger_diff.Verified.t
   end
 
   module Staged_ledger_aux = Staged_ledger.Scan_state
@@ -546,7 +540,7 @@ struct
     end
 
     let forget {With_valid_signatures_and_proofs.old; diff} =
-      {old; diff= Staged_ledger_diff.forget_validated diff}
+      {old; diff= Staged_ledger_diff.forget diff}
   end
 
   module Internal_transition =

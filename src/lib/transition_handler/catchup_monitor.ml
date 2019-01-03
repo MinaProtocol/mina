@@ -59,10 +59,14 @@ module Make (Inputs : Inputs.S) = struct
                 in
                 Rose_tree.Deferred.fold_map branch ~init:branch_parent
                   ~f:(fun parent transition_with_hash ->
-                    Deferred.create (fun ivar ->
-                        Transition_frontier.Breadcrumb.build ~logger ~parent
-                          ~transition_with_hash
-                        |> Or_error.ok_exn |> Ivar.fill ivar ) ) )
+                    match%map
+                      Transition_frontier.Breadcrumb.build ~logger ~parent
+                        ~transition_with_hash
+                    with
+                    | Error (`Validation_error e) ->
+                        (*TODO: Punish*) Error.raise e
+                    | Error (`Fatal_error e) -> raise e
+                    | Ok breadcrumb -> breadcrumb ) )
           in
           Writer.write catchup_breadcrumbs_writer breadcrumbs )
     in

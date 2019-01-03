@@ -32,21 +32,17 @@ module Make (Inputs : Inputs.S) :
       fold_result_seq external_transitions ~init:(initial_staged_ledger, [])
         ~f:(fun (staged_ledger, acc) external_transition ->
           let diff =
-            External_transition.Verified.staged_ledger_diff external_transition
+            External_transition.Verified.staged_ledger_diff
+              (With_hash.data external_transition)
           in
           let%map _, _, `Staged_ledger staged_ledger =
-            Deferred.create (fun ivar ->
-                Ivar.fill ivar
-                @@ Staged_ledger.apply ~logger staged_ledger diff )
-          in
-          let transition_with_hash =
-            With_hash.of_data external_transition
-              ~hash_data:
-                (Fn.compose Consensus.Mechanism.Protocol_state.hash
-                   External_transition.Verified.protocol_state)
+            let open Deferred.Let_syntax in
+            match%map Staged_ledger.apply ~logger staged_ledger diff with
+            | Ok x -> Ok x
+            | Error e -> Error (Staged_ledger.Staged_ledger_error.to_error e)
           in
           let new_breadcrumb =
-            Transition_frontier.Breadcrumb.create transition_with_hash
+            Transition_frontier.Breadcrumb.create external_transition
               staged_ledger
           in
           (staged_ledger, new_breadcrumb :: acc) )
@@ -56,7 +52,8 @@ module Make (Inputs : Inputs.S) :
   let materialize_breadcrumbs ~frontier ~logger ~peer external_transitions =
     let root_transition = List.hd_exn external_transitions in
     let initial_state_hash =
-      root_transition |> External_transition.Verified.protocol_state
+      With_hash.data root_transition
+      |> External_transition.Verified.protocol_state
       |> External_transition.Protocol_state.previous_state_hash
     in
     match Transition_frontier.find frontier initial_state_hash with
@@ -98,14 +95,31 @@ module Make (Inputs : Inputs.S) :
             Deferred.return @@ Or_error.error_string message
         | Some queried_transitions ->
             let%bind queried_transitions_verified =
-              let staged_ledger =
-                Transition_frontier.best_tip frontier
-                |> Transition_frontier.Breadcrumb.staged_ledger
-              in
-              Deferred.Or_error.List.map queried_transitions
+              Deferred.Or_error.List.filter_map queried_transitions
                 ~f:(fun transition ->
-                  Transition_handler_validator.verify_transition ~staged_ledger
-                    ~transition )
+                  let open Deferred.Let_syntax in
+                  let transition_with_hash =
+                    With_hash.of_data transition
+                      ~hash_data:
+                        (Fn.compose Consensus.Mechanism.Protocol_state.hash
+                           External_transition.protocol_state)
+                  in
+                  match%map
+                    Transition_handler_validator.validate_transition ~logger
+                      ~frontier transition_with_hash
+                  with
+                  | Ok verified_transition -> Ok (Some verified_transition)
+                  | Error `Duplicate ->
+                      Logger.info logger
+                        !"transition queried during ledger catchup has \
+                          already been seen" ;
+                      Ok None
+                  | Error (`Invalid reason) ->
+                      Logger.faulty_peer logger
+                        !"transition queried during ledger catchup was not \
+                          valid because %s"
+                        reason ;
+                      Error (Error.of_string reason) )
             in
             materialize_breadcrumbs ~frontier ~logger ~peer
               queried_transitions_verified )

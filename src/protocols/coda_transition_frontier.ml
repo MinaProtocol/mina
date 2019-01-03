@@ -27,6 +27,7 @@ module type Network_intf = sig
 
   val get_ancestry :
        t
+    -> peer
     -> ancestor_proof_input
     -> (protocol_state * ancestor_proof) Deferred.Or_error.t
 end
@@ -56,7 +57,8 @@ module type Transition_frontier_base_intf = sig
       -> transition_with_hash:( external_transition_verified
                               , state_hash )
                               With_hash.t
-      -> t Or_error.t
+      -> (t, [`Validation_error of Error.t | `Fatal_error of exn]) Result.t
+         Deferred.t
 
     val transition_with_hash :
       t -> (external_transition_verified, state_hash) With_hash.t
@@ -66,7 +68,7 @@ module type Transition_frontier_base_intf = sig
 
   type ledger_database
 
-  type ledger_diff_verified
+  type staged_ledger_diff
 
   type t
 
@@ -75,10 +77,12 @@ module type Transition_frontier_base_intf = sig
     -> root_transition:(external_transition_verified, state_hash) With_hash.t
     -> root_snarked_ledger:ledger_database
     -> root_transaction_snark_scan_state:transaction_snark_scan_state
-    -> root_staged_ledger_diff:ledger_diff_verified option
+    -> root_staged_ledger_diff:staged_ledger_diff option
     -> t Deferred.t
 
   val find_exn : t -> state_hash -> Breadcrumb.t
+
+  val logger : t -> Logger.t
 end
 
 module type Transition_frontier_intf = sig
@@ -115,8 +119,7 @@ module type Transition_frontier_intf = sig
 
   val attach_breadcrumb_exn : t -> Breadcrumb.t -> unit
 
-  val add_transition_exn :
-    t -> (external_transition_verified, state_hash) With_hash.t -> Breadcrumb.t
+  val add_breadcrumb_exn : t -> Breadcrumb.t -> unit
 
   val clear_paths : t -> unit
 
@@ -184,10 +187,15 @@ module type Transition_handler_validator_intf = sig
                                Writer.t
     -> unit
 
-  val verify_transition :
-       staged_ledger:staged_ledger
-    -> transition:external_transition
-    -> external_transition_verified Or_error.t Deferred.t
+  val validate_transition :
+       ?time_received:Unix_timestamp.t
+    -> logger:Logger.t
+    -> frontier:transition_frontier
+    -> (external_transition, state_hash) With_hash.t
+    -> ( (external_transition_verified, state_hash) With_hash.t
+       , [`Duplicate | `Invalid of string] )
+       Result.t
+       Deferred.t
 end
 
 module type Transition_handler_processor_intf = sig
@@ -207,10 +215,14 @@ module type Transition_handler_processor_intf = sig
        logger:Logger.t
     -> time_controller:time_controller
     -> frontier:transition_frontier
-    -> valid_transition_reader:( external_transition_verified
-                               , state_hash )
-                               With_hash.t
-                               Reader.t
+    -> primary_transition_reader:( external_transition_verified
+                                 , state_hash )
+                                 With_hash.t
+                                 Reader.t
+    -> proposer_transition_reader:( external_transition_verified
+                                  , state_hash )
+                                  With_hash.t
+                                  Reader.t
     -> catchup_job_writer:( ( external_transition_verified
                             , state_hash )
                             With_hash.t
@@ -328,10 +340,14 @@ module type Transition_frontier_controller_intf = sig
     -> network:network
     -> time_controller:time_controller
     -> frontier:transition_frontier
-    -> transition_reader:( [ `Transition of external_transition
-                                            Envelope.Incoming.t ]
-                         * [`Time_received of time] )
-                         Reader.t
+    -> network_transition_reader:( [ `Transition of external_transition
+                                                    Envelope.Incoming.t ]
+                                 * [`Time_received of time] )
+                                 Reader.t
+    -> proposer_transition_reader:( external_transition_verified
+                                  , state_hash )
+                                  With_hash.t
+                                  Reader.t
     -> clear_reader:[`Clear] Reader.t
     -> (external_transition_verified, state_hash) With_hash.t Reader.t
 end
@@ -359,9 +375,13 @@ module type Transition_router_intf = sig
     -> time_controller:time_controller
     -> frontier_mvar:transition_frontier Mvar.Read_write.t
     -> ledger_db:ledger_db
-    -> transition_reader:( [ `Transition of external_transition
-                                            Envelope.Incoming.t ]
-                         * [`Time_received of time] )
-                         Reader.t
+    -> network_transition_reader:( [ `Transition of external_transition
+                                                    Envelope.Incoming.t ]
+                                 * [`Time_received of time] )
+                                 Reader.t
+    -> proposer_transition_reader:( external_transition_verified
+                                  , state_hash )
+                                  With_hash.t
+                                  Reader.t
     -> (external_transition_verified, state_hash) With_hash.t Reader.t
 end

@@ -16,8 +16,8 @@ module type Inputs_intf = sig
      and type external_transition_verified := External_transition.Verified.t
      and type ledger_database := Ledger.Db.t
      and type staged_ledger := Staged_ledger.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type ledger_diff_verified := Staged_ledger_diff.Verified.t
      and type masked_ledger := Coda_base.Ledger.t
 
   module Network :
@@ -87,7 +87,7 @@ module Make (Inputs : Inputs_intf) :
   let get_root_state frontier =
     Transition_frontier.root frontier
     |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
-    |> External_transition.forget |> External_transition.protocol_state
+    |> External_transition.of_verified |> External_transition.protocol_state
 
   module Broadcaster = struct
     type 'a t = {mutable var: 'a; f: 'a -> unit}
@@ -114,7 +114,7 @@ module Make (Inputs : Inputs_intf) :
       (`Transition_frontier_controller (new_frontier, reader, writer))
 
   let run ~logger ~network ~time_controller ~frontier_mvar ~ledger_db
-      ~transition_reader =
+      ~network_transition_reader ~proposer_transition_reader =
     let clean_transition_frontier_controller_and_start_bootstrap
         ~controller_type ~clear_writer ~transition_frontier_controller_reader
         ~transition_frontier_controller_writer ~old_frontier
@@ -146,7 +146,8 @@ module Make (Inputs : Inputs_intf) :
       let transition_reader, transition_writer = create_bufferred_pipe () in
       let new_verified_transition_reader =
         Transition_frontier_controller.run ~logger ~network ~time_controller
-          ~frontier ~transition_reader ~clear_reader
+          ~frontier ~network_transition_reader:transition_reader
+          ~proposer_transition_reader ~clear_reader
       in
       Strict_pipe.Reader.iter new_verified_transition_reader
         ~f:
@@ -182,7 +183,8 @@ module Make (Inputs : Inputs_intf) :
               in
               ())
     in
-    Strict_pipe.Reader.iter transition_reader ~f:(fun network_transition ->
+    Strict_pipe.Reader.iter network_transition_reader
+      ~f:(fun network_transition ->
         let `Transition incoming_transition, `Time_received tm =
           network_transition
         in

@@ -14,7 +14,7 @@ module type Inputs_intf = sig
      and type ledger_database := Ledger.Db.t
      and type masked_ledger := Ledger.Mask.Attached.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type ledger_diff_verified := Staged_ledger_diff.Verified.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
 
   module Merkle_address : Merkle_address.S
@@ -74,7 +74,7 @@ module Make (Inputs : Inputs_intf) :
             else new_child :: children )
   end
 
-  let worth_getting_root t candidate time_received =
+  let worth_getting_root t candidate =
     `Keep
     = Consensus.Mechanism.select ~logger:t.logger
         ~existing:
@@ -82,7 +82,6 @@ module Make (Inputs : Inputs_intf) :
              t.best_with_root.state)
         ~candidate:
           (Consensus.Mechanism.Protocol_state.consensus_state candidate)
-        ~time_received
 
   let received_bad_proof t e =
     (* TODO: Punish *)
@@ -95,7 +94,7 @@ module Make (Inputs : Inputs_intf) :
     Consensus.Mechanism.Protocol_state.consensus_state protocol_state
     |> Consensus.Mechanism.Consensus_state.length |> Coda_numbers.Length.to_int
 
-  let on_transition t (transition, time_received) =
+  let on_transition t ~sender (transition, time_received) =
     let module Protocol_state = Consensus.Mechanism.Protocol_state in
     let candidate = External_transition.protocol_state transition in
     let previous_state_hash = Protocol_state.previous_state_hash candidate in
@@ -104,12 +103,20 @@ module Make (Inputs : Inputs_intf) :
       ; generations= length candidate - length t.best_with_root.root }
     in
     if
-      done_syncing_root t
-      || (not @@ worth_getting_root t candidate time_received)
-    then Deferred.unit
+      not
+        (Consensus.Mechanism.received_at_valid_time
+           (Protocol_state.consensus_state candidate)
+           ~time_received)
+    then (
+      Logger.faulty_peer t.logger
+        "received protocol state at invalid time while bootstrapping" ;
+      Deferred.unit )
+    else if done_syncing_root t || (not @@ worth_getting_root t candidate) then
+      Deferred.unit
     else
       match%map
-        Network.get_ancestry t.network (input.descendant, input.generations)
+        Network.get_ancestry t.network sender
+          (input.descendant, input.generations)
       with
       | Error e ->
           Logger.error t.logger
@@ -148,22 +155,37 @@ module Make (Inputs : Inputs_intf) :
 
   (* TODO: We need to do catchup jobs for all remaining transitions in the cache. 
            This will be hooked into `run` when we do this. #1326 *)
-  let _expand_root ~frontier root_hash cache =
-    let rec dfs state_hash =
-      Option.iter (Hashtbl.find_and_remove cache state_hash)
-        ~f:(fun children ->
-          List.iter children ~f:(fun transition ->
-              Transition_frontier.add_transition_exn frontier transition
-              |> ignore ;
-              dfs (With_hash.hash transition) ) )
+  let _expand_root ~logger ~frontier root_hash cache =
+    let rec dfs parent =
+      let parent_hash =
+        With_hash.hash
+          (Transition_frontier.Breadcrumb.transition_with_hash parent)
+      in
+      match Hashtbl.find_and_remove cache parent_hash with
+      | None -> Deferred.return ()
+      | Some children ->
+          Deferred.List.iter children ~f:(fun transition_with_hash ->
+              let%bind breadcrumb =
+                match%map
+                  Transition_frontier.Breadcrumb.build ~logger ~parent
+                    ~transition_with_hash
+                with
+                | Error (`Validation_error e) -> (*TODO: Punish*) Error.raise e
+                | Error (`Fatal_error e) -> raise e
+                | Ok breadcrumb -> breadcrumb
+              in
+              Transition_frontier.add_breadcrumb_exn frontier breadcrumb ;
+              dfs breadcrumb )
     in
-    dfs root_hash
+    dfs (Transition_frontier.find_exn frontier root_hash)
 
   let sync_ledger t ~transition_graph ~transition_reader =
     Reader.iter transition_reader
       ~f:(fun (`Transition incoming_transition, `Time_received time_received)
          ->
         let transition = Envelope.Incoming.data incoming_transition in
+        (* #TODO : the 0 below is a dummy, should be a valid port *)
+        let sender = (Envelope.Incoming.sender incoming_transition, 0) in
         let protocol_state = External_transition.protocol_state transition in
         let previous_state_hash =
           External_transition.Protocol_state.previous_state_hash protocol_state
@@ -171,8 +193,8 @@ module Make (Inputs : Inputs_intf) :
         Transition_cache.add transition_graph ~parent:previous_state_hash
           transition ;
         (* TODO: Efficiently limiting the number of green threads in #1337 *)
-        if worth_getting_root t protocol_state time_received then
-          on_transition t (transition, time_received) |> don't_wait_for ;
+        if worth_getting_root t protocol_state then
+          on_transition t ~sender (transition, time_received) |> don't_wait_for ;
         Deferred.unit )
     |> don't_wait_for ;
     Syncable_ledger.valid_tree t.syncable_ledger
@@ -187,7 +209,7 @@ module Make (Inputs : Inputs_intf) :
     let initial_breadcrumb = Transition_frontier.root frontier in
     let initial_root_state =
       initial_breadcrumb |> Transition_frontier.Breadcrumb.transition_with_hash
-      |> With_hash.data |> External_transition.forget
+      |> With_hash.data |> External_transition.of_verified
       |> External_transition.protocol_state
     in
     let t =
