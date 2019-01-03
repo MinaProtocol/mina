@@ -11,7 +11,7 @@ module type S = sig
      and type ledger_database := Ledger.Db.t
      and type masked_ledger := Ledger.Mask.Attached.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type ledger_diff_verified := Staged_ledger_diff.Verified.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
 
   module Transition_handler_validator :
