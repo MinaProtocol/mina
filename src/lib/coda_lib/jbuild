@@ -3,7 +3,7 @@
 (library
  ((name coda_lib)
   (public_name coda_lib)
-  (flags (:standard -short-paths -warn-error -27-58))
+  (flags (:standard -short-paths))
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core protocols envelope pipe_lib logger async async_extra kademlia unix_timestamp debug_assert o1trace))

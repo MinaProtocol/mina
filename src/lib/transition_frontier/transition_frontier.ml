@@ -91,6 +91,30 @@ struct
 
   let max_length = Max_length.length
 
+  module Transaction_work_proof_pool = struct
+    type t =
+      { statement_ref_count_table: int Ledger_proof_statement.Table.t
+      ; completed_work_proof_table: Priced_proof.t Work.Table.t }
+
+    let add_completed_work t work =
+      let save_proof () = Hashtbl.set t.completed_work_proof_table ~key:work ~data:(Priced_proof.create proof fee) in
+      if
+        List.for_all (Work.statements work) ~f:(fun stmt ->
+          Hashtbl.find t.statement_ref_count_table stmt
+          |> Option.map ~f:(fun ref_count -> ref_count > 0)
+          |> Option.value ~default:false)
+      then
+        (match Hashtbl.find t.work_proof_table work with
+        | None -> save_proof (); `Rebroadcast
+        | Some prev_proof ->
+            if Fee.( < ) fee (Priced_proof.fee prev_proof) then
+              (save_proof (); `Rebroadcast)
+            else
+              `Don't_rebroadcast)
+      else
+        `Don't_rebroadcast
+  end
+
   module Breadcrumb = struct
     type t =
       { transition_with_hash:
@@ -184,9 +208,48 @@ struct
     ; mutable root: State_hash.t
     ; mutable best_tip: State_hash.t
     ; logger: Logger.t
-    ; table: node State_hash.Table.t }
+    ; node_table: node State_hash.Table.t
+    ; statement_ref_count_table: int Ledger_proof_statement.Table.t
+    ; completed_work_proof_table: Priced_proof.t Ledger_proof_work.Table.t }
 
   let logger t = t.logger
+
+  (* marking/unmarking staged ledger diffs updates the statement ref count table
+   * by inrementing/decrementing records for each of the available pieces of
+   * work in the staged ledger diff *)
+  let mark_staged_ledger_diff t staged_ledger_diff =
+    Staged_ledger_diff.available_work staged_ledger_diff
+    |> List.iter ~f:(fun work ->
+        List.iter (Ledger_proof_work.statements work) ~f:(
+          Hashtbl.incr t.statement_ref_count_table))
+
+  let unmark_staged_ledger_diff t staged_ledger_diff =
+    Staged_ledger_diff.available_work staged_ledger_diff
+    |> List.iter ~f:(fun work ->
+        List.iter (Ledger_proof_work.statements work) ~f:(
+          Hashtbl.decr ~remove_if_zero:true t.statement_ref_count_table))
+
+  let add_completed_work t completed_work =
+    let save_proof () =
+      Hashtbl.set t.completed_work_proof_table
+        ~key:completed_work
+        ~data:(Priced_proof.create proof fee)
+    in
+    if
+      List.for_all (Ledger_proof_work.statements completed_work) ~f:(fun statement ->
+          Hashtbl.find t.statement_ref_count_table statement
+          |> Option.map ~f:((>) 0)
+          |> Option.value ~default:false)
+    then
+      (match Hashtbl.find t.completed_work_proof_table completed_work with
+      | None -> save_proof (); `Rebroadcast
+      | Some prev_proof ->
+          if Fee.( < ) fee (Priced_proof.fee prev_proof) then
+            (save_proof (); `Rebroadcast)
+          else
+            `Don't_rebroadcast)
+    else
+      `Don't_rebroadcast
 
   (* TODO: load from and write to disk *)
   let create ~logger
@@ -263,6 +326,8 @@ struct
                     "Did not expect a ledger proof after applying the first \
                      diff" )
         in
+        let snark_pool = Snark_pool.create ~logger in
+        Snark_pool.mark_staged_ledger snark_pool root_staged_ledger;
         let root_breadcrumb =
           { Breadcrumb.transition_with_hash= root_transition
           ; staged_ledger= root_staged_ledger }
@@ -275,6 +340,7 @@ struct
         ; root_snarked_ledger
         ; root= root_hash
         ; best_tip= root_hash
+        ; snark_pool
         ; table }
 
   let all_breadcrumbs t =

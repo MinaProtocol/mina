@@ -1,0 +1,38 @@
+module Resource = struct
+  module Module = struct
+    module type S = sig
+      type t
+      val create : unit -> t
+      val destroy : t -> unit
+    end
+
+    module T = struct
+      type 'a t = (module S with type t := 'a)
+    end
+
+    include T
+    module Hlist = Make_hlist(T)
+  end
+end
+
+module Backend = struct
+  module Descriptor = struct
+    module T = struct
+      type ('a, 'b) t = 'a * 'b Resource.Module.Hlist.t
+    end
+
+    include T
+    module Hlist = Make_hlist2(T)
+  end
+
+  module Module = struct
+    module type S = sig
+      type args
+      val run : args -> unit
+    end
+  end
+
+  let create : type a. a Descriptor.t -> a =
+    function
+    | 
+end

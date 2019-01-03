@@ -1,0 +1,21 @@
+include Switch.Make (struct
+  open Switch
+
+  type _ state =
+    | Participating : Participation_controller.args state
+    | Bootstrapping : Bootstrap_controller.args state
+
+  let initial_state = Participating
+
+  let backend : type a. t ->  a state -> a Backend.Module.t =
+    fun t backend ->
+      match backend with
+      | Participating -> (module Participation_controller)
+      | Bootstrapping -> (module Bootstrap_controller)
+
+  let resources : type res. t -> (_, res) state -> res =
+    | Pariticipating ->
+        { network_transition_reader= `Forward network_transition_reader
+        ; proposer_transition_reader= `Forward proposer_transition_reader
+    | Bootstrapping -> []
+end)

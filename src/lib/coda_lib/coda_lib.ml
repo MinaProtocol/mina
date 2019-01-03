@@ -152,7 +152,9 @@ end
 module type Snark_pool_intf = sig
   type t
 
-  type completed_work_statement
+  type statement
+
+  type completed_work
 
   type completed_work_checked
 
@@ -162,12 +164,13 @@ module type Snark_pool_intf = sig
 
   val load :
        parent_log:Logger.t
+    -> relevant_statement_changes_reader:(statement, int) List.Assoc.t Linear_pipe.Reader.t
     -> disk_location:string
     -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
     -> t Deferred.t
 
   val get_completed_work :
-    t -> completed_work_statement -> completed_work_checked option
+    t -> completed_work-> completed_work_checked option
 end
 
 module type Ktree_intf = sig
@@ -369,7 +372,8 @@ module type Inputs_intf = sig
 
   module Snark_pool :
     Snark_pool_intf
-    with type completed_work_statement := Transaction_snark_work.Statement.t
+    with type statement := Ledger_proof_statement.t
+     and type completed_work := Transaction_snark_work.Statement.t
      and type completed_work_checked := Transaction_snark_work.Checked.t
 
   module Work_selector :
@@ -793,6 +797,7 @@ module Make (Inputs : Inputs_intf) = struct
           (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;
         let%bind snark_pool =
           Snark_pool.load ~parent_log:config.log
+            ~relevant_statement_changes_reader
             ~disk_location:config.snark_pool_disk_location
             ~incoming_diffs:(Net.snark_pool_diffs net)
         in

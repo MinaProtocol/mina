@@ -671,8 +671,15 @@ struct
   end
 
   module Snark_pool = struct
-    module Work = Transaction_snark_work.Statement
     module Proof = Transaction_snark_work_proof
+
+    module Statement = Ledger_proof_statement
+
+    module Work = struct
+      include Transaction_snark_work.Statement
+
+      let statements = Fn.id
+    end
 
     module Fee = struct
       module T = struct
@@ -703,8 +710,20 @@ struct
             {fee; prover} )
     end
 
-    module Pool = Snark_pool.Make (Proof) (Fee) (Work)
-    module Diff = Network_pool.Snark_pool_diff.Make (Proof) (Fee) (Work) (Pool)
+    module Pool = Snark_pool.Make (struct
+      module Proof = Proof
+      module Fee = Fee
+      module Statement = Statement
+      module Work = Work
+    end)
+
+    module Diff = Network_pool.Snark_pool_diff.Make (struct
+      module Proof = Proof
+      module Fee = Fee
+      module Statement = Statement
+      module Work = Work
+      module Snark_pool = Pool
+    end)
 
     type pool_diff = Diff.t
 
@@ -717,10 +736,10 @@ struct
           Transaction_snark_work.Checked.create_unsafe
             {Transaction_snark_work.fee; proofs= proof; prover} )
 
-    let load ~parent_log ~disk_location ~incoming_diffs =
+    let load ~parent_log ~relevant_statement_changes_reader ~disk_location ~incoming_diffs =
       match%map Reader.load_bin_prot disk_location Pool.bin_reader_t with
       | Ok pool -> of_pool_and_diffs pool ~parent_log ~incoming_diffs
-      | Error _e -> create ~parent_log ~incoming_diffs
+      | Error _e -> create ~parent_log ~incoming_diffs ~pool:(Pool.create ~parent_log ~relevant_statement_changes_reader)
 
     open Snark_work_lib.Work
     open Network_pool.Snark_pool_diff
