@@ -118,7 +118,7 @@ module type Network_intf = sig
     -> transition_catchup:(   state_hash Envelope.Incoming.t
                            -> state_with_witness list Deferred.Option.t)
     -> get_ancestry:(   (state_hash * int) Envelope.Incoming.t
-                     -> (protocol_state * state_body_hash list)
+                     -> (state_with_witness * state_body_hash list)
                         Deferred.Option.t)
     -> t Deferred.t
 end
@@ -749,13 +749,12 @@ module Make (Inputs : Inputs_intf) = struct
                 let%map transition_with_hash =
                   Transition_frontier.find frontier state_hash
                 in
-                let protocol_state =
+                let external_transition =
                   transition_with_hash
                   |> Transition_frontier.Breadcrumb.transition_with_hash
                   |> With_hash.data |> External_transition.of_verified
-                  |> External_transition.protocol_state
                 in
-                (protocol_state, proof)
+                (external_transition, proof)
               in
               Deferred.return result )
         in
