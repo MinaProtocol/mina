@@ -86,20 +86,20 @@ let get t addr = Merkle_tree.get_req ~depth (var_to_hash_packed t) addr
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the account [f account] at path [addr].
 *)
-let modify_account t pk ~(filter : Account.var -> ('a, _) Checked.t) ~f =
-  with_label __LOC__
-    (let%bind addr =
-       request_witness Account.Index.Unpacked.typ
-         As_prover.(
-           map (read Public_key.Compressed.typ pk) ~f:(fun s -> Find_index s))
-     in
-     handle
-       (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
-          ~f:(fun account ->
-            let%bind x = filter account in
-            f x account ))
-       reraise_merkle_requests
-     >>| var_of_hash_packed)
+let%snarkydef modify_account t pk ~(filter : Account.var -> ('a, _) Checked.t)
+    ~f =
+  let%bind addr =
+    request_witness Account.Index.Unpacked.typ
+      As_prover.(
+        map (read Public_key.Compressed.typ pk) ~f:(fun s -> Find_index s))
+  in
+  handle
+    (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
+       ~f:(fun account ->
+         let%bind x = filter account in
+         f x account ))
+    reraise_merkle_requests
+  >>| var_of_hash_packed
 
 (*
    [modify_account_send t pk ~f] implements the following spec:
