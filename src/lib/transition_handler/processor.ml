@@ -16,7 +16,7 @@ module Make (Inputs : Inputs.S) :
               Inputs.Transition_frontier.Breadcrumb.t = struct
   open Inputs
   open Consensus.Mechanism
-  module Catchup_monitor = Catchup_monitor.Make (Inputs)
+  module Catchup_scheduler = Catchup_scheduler.Make (Inputs)
 
   (* TODO: calculate a sensible value from postake consensus arguments *)
   let catchup_timeout_duration = Time.Span.of_ms 6000L
@@ -30,8 +30,8 @@ module Make (Inputs : Inputs.S) :
       ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
       ~processed_transition_writer =
     let logger = Logger.child logger "Transition_handler.Catchup" in
-    let catchup_monitor =
-      Catchup_monitor.create ~logger ~frontier ~time_controller
+    let catchup_scheduler =
+      Catchup_scheduler.create ~logger ~frontier ~time_controller
         ~catchup_job_writer ~catchup_breadcrumbs_writer
     in
     ignore
@@ -61,7 +61,7 @@ module Make (Inputs : Inputs.S) :
                  with
                  | None ->
                      return
-                       (Catchup_monitor.watch catchup_monitor
+                       (Catchup_scheduler.watch catchup_scheduler
                           ~timeout_duration:catchup_timeout_duration
                           ~transition)
                  | Some _ -> (
@@ -94,7 +94,7 @@ module Make (Inputs : Inputs.S) :
                        Transition_frontier.add_breadcrumb_exn frontier
                          breadcrumb ;
                        Writer.write processed_transition_writer transition ;
-                       Catchup_monitor.notify catchup_monitor ~transition
+                       Catchup_scheduler.notify catchup_scheduler ~transition
                      with
                      | Ok () -> ()
                      | Error err ->
