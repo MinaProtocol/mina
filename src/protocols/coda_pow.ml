@@ -637,9 +637,9 @@ module type Transaction_snark_scan_state_intf = sig
 
   val next_k_jobs : t -> k:int -> Available_job.t list Or_error.t
 
-  val next_jobs : t -> Available_job.t list
+  val next_jobs : t -> Available_job.t list Or_error.t
 
-  val next_jobs_sequence : t -> Available_job.t Sequence.t
+  val next_jobs_sequence : t -> Available_job.t Sequence.t Or_error.t
 
   val is_valid : t -> bool
 

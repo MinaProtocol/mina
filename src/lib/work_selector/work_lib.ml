@@ -75,7 +75,7 @@ module Make (Inputs : Inputs.Inputs_intf) = struct
 
   let all_works (staged_ledger : Inputs.Staged_ledger.t) (state : State.t) =
     let state = State.remove_old_assignments state in
-    let all_jobs = Inputs.Staged_ledger.all_work_pairs staged_ledger in
+    let all_jobs = Inputs.Staged_ledger.all_work_pairs_exn staged_ledger in
     let unseen_jobs =
       List.filter all_jobs ~f:(fun js ->
           not @@ Map.mem state (statement_pair js) )

@@ -442,7 +442,7 @@ struct
       in
       List.fold locations_and_accounts ~init:parent_result ~f:f'
 
-    let foldi t ~init ~f = foldi_with_ignored_keys t Key.Set.empty ~init ~f
+    let _foldi t ~init ~f = foldi_with_ignored_keys t Key.Set.empty ~init ~f
 
     (* we would want fold_until to combine results from the parent and the mask
        way (1): use the parent result as the init of the mask fold (or vice-versa)

@@ -88,7 +88,7 @@ end = struct
 
   let is_valid t =
     Parallel_scan.parallelism ~state:t
-    = Int.pow 2 (Config.transaction_capacity_log_2 + 1)
+    = Int.pow 2 (Config.transaction_capacity_log_2 + 2)
     && Parallel_scan.is_valid t
 
   include Binable.Of_binable
@@ -341,7 +341,7 @@ end = struct
     Option.map result ~f:fst
 
   let create ~transaction_capacity_log_2 =
-    Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 1)
+    Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 2)
 
   let empty () =
     let open Config in
