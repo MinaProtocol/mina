@@ -92,6 +92,7 @@ struct
   let max_length = Max_length.length
 
   module Breadcrumb = struct
+    (* TODO: external_transition should be type : External_transition.With_valid_protocol_state.t #1344 *)
     type t =
       { transition_with_hash:
           (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
@@ -406,10 +407,6 @@ struct
     if node.length > best_tip_node.length then t.best_tip <- hash
 
   let clear_paths t = Hashtbl.clear t.table
-
-  let rebuild t new_root_hash =
-    t.root <- new_root_hash ;
-    t.best_tip <- new_root_hash
 end
 
 let%test_module "Transition_frontier tests" =
