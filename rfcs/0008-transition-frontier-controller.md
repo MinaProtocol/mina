@@ -147,14 +147,14 @@ table and not applying an ledger-builder-diffs.
 
 The add process runs in two phases:
 
-1. Perform a `lookup` on the `Transition_frontier` for the previous `State_hash.t` of this transition. If it is absent, send to [catchup monitor](#catchup-monitor). If present, continue.
+1. Perform a `lookup` on the `Transition_frontier` for the previous `State_hash.t` of this transition. If it is absent, send to [catchup scheduler](#catchup-scheduler). If present, continue.
 2. Derive a mask from the parent retrieved in (1) and apply the `Staged_ledger_diff.t` of the breadcrumb to that new mask. See [Transition Frontier](#transition-frontier) for more.
 3. Construct the new `Breadcrumb.t` from the new mask and transition, and attempt a true mutate-add to the underlying [Transition Frontier](#transition-frontier) data.
 
-<a href="catchup-monitor"></a>
-#### Catchup Monitor
+<a href="catchup-scheduler"></a>
+#### Catchup Scheduler
 
-The catchup monitor is responsible for waiting a bit before initiating a long
+The catchup scheduler is responsible for waiting a bit before initiating a long
 catchup job. The idea here is to mitigate out-of-order messages since it is much
 quicker to avoid such catchups if possible. This will be a module that waits on
 a small timeout before yielding to the ledger catchup component. And can be
@@ -181,11 +181,11 @@ sync ledger queries if we have ledger builders at every position.
 <a href="ledger-catchup"></a>
 ### Ledger Catchup
 
-Input: `External_transition.t` (from catchup monitor)
+Input: `External_transition.t` (from catchup scheduler)
 Output: `Breadcrumb.t list` (to processor)
 
 Ledger catchup runs a single catchup worker job at a time. Whenever catchup
-monitor descides it's time for a new catchup job to start, it will send
+scheduler decides it's time for a new catchup job to start, it will send
 something on the pipe.
 
 #### Catchup worker
@@ -351,4 +351,3 @@ this function unless they are late joiners.
 The implementation of this feature before the first merge will omit the mutable
 transition frontier implementation (if we can pass integration tests by wrapping
 the existing ktree)
-

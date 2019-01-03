@@ -1,12 +1,12 @@
 (**
- * [Catchup_monitor] defines a process which schedules catchup jobs and
+ * [Catchup_scheduler] defines a process which schedules catchup jobs and
  * monitors them for invalidation. This allows the transition frontier
  * controller to handle out of order transitions without spinning up
- * and tearing down catchup jobs constantly. The [Catchup_monitor] must
+ * and tearing down catchup jobs constantly. The [Catchup_scheduler] must
  * receive notifications whenever a new transition is added to the
  * transition frontier so that it can determine if any pending catchup
  * jobs can be invalidated. When catchup jobs are invalidated, the
- * catchup monitor extracts all of the invalidated catchup jobs and
+ * catchup scheduler extracts all of the invalidated catchup jobs and
  * spins up a process to materialize breadcrumbs from those transitions,
  * which will write the breadcrumbs back into the processor as if
  * catchup had successfully completed.
@@ -42,7 +42,7 @@ module Make (Inputs : Inputs.S) = struct
 
   let create ~logger ~frontier ~time_controller ~catchup_job_writer
       ~catchup_breadcrumbs_writer =
-    let logger = Logger.child logger "catchup_monitor" in
+    let logger = Logger.child logger "catchup_scheduler" in
     let timeouts = State_hash.Table.create () in
     let breadcrumb_builder_supervisor =
       Capped_supervisor.create ~job_capacity:5 (fun transition_branches ->
