@@ -8,4 +8,5 @@
     transition_frontier
     transition_frontier_controller
     bootstrap_controller
+    protocol_state_validator
     ))

@@ -815,6 +815,15 @@ struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
   end)
 
+  module Protocol_state_validator = Protocol_state_validator.Make (struct
+    include Inputs0
+    module State_proof = Protocol_state_proof
+    module Transaction_snark_work = Transaction_snark_work
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+  end)
+
   module Ledger_catchup = Ledger_catchup.Make (struct
     include Inputs0
     module Staged_ledger_diff = Staged_ledger_diff
@@ -822,6 +831,7 @@ struct
     module Transition_handler_validator = Transition_handler.Validator
     module Ledger_proof_statement = Ledger_proof_statement
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Protocol_state_validator = Protocol_state_validator
     module Network = Net
   end)
 
@@ -834,6 +844,7 @@ struct
     module Syncable_ledger = Sync_root_ledger
     module Merkle_address = Ledger.Db.Addr
     module Consensus_mechanism = Consensus.Mechanism
+    module Protocol_state_validator = Protocol_state_validator
     module Network = Net
   end)
 
@@ -870,6 +881,8 @@ struct
     module Network = Net
     module Bootstrap_controller = Bootstrap_controller
     module Transition_frontier_controller = Transition_frontier_controller
+    module Protocol_state_validator = Protocol_state_validator
+    module State_proof = Protocol_state_proof
   end)
 
   module Proposer = Proposer.Make (struct

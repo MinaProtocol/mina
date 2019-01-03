@@ -1,5 +1,22 @@
 open Core
 
+module type Base_intf = sig
+  (* TODO: delegate forget here *)
+  type t [@@deriving sexp, bin_io, compare, eq]
+
+  type protocol_state
+
+  type protocol_state_proof
+
+  type staged_ledger_diff
+
+  val protocol_state : t -> protocol_state
+
+  val protocol_state_proof : t -> protocol_state_proof
+
+  val staged_ledger_diff : t -> staged_ledger_diff
+end
+
 module type S = sig
   module Protocol_state : Protocol_state.S
 
@@ -7,21 +24,23 @@ module type S = sig
     type t [@@deriving bin_io, sexp]
   end
 
-  type t [@@deriving sexp, bin_io, compare, eq]
+  include
+    Base_intf
+    with type protocol_state := Protocol_state.value
+     and type protocol_state_proof := Proof.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
 
-  module Verified : sig
-    type t [@@deriving sexp, bin_io, compare, eq]
+  module Proof_verified :
+    Base_intf
+    with type protocol_state := Protocol_state.value
+     and type protocol_state_proof := Proof.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
 
-    val protocol_state : t -> Protocol_state.value
-
-    val protocol_state_proof : t -> Proof.t
-
-    val staged_ledger_diff : t -> Staged_ledger_diff.t
-  end
-
-  val to_verified : t -> [`I_swear_this_is_safe_see_my_comment of Verified.t]
-
-  val of_verified : Verified.t -> t
+  module Verified :
+    Base_intf
+    with type protocol_state := Protocol_state.value
+     and type protocol_state_proof := Proof.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
 
   val create :
        protocol_state:Protocol_state.value
@@ -29,13 +48,18 @@ module type S = sig
     -> staged_ledger_diff:Staged_ledger_diff.t
     -> t
 
-  val protocol_state : t -> Protocol_state.value
-
-  val protocol_state_proof : t -> Proof.t
-
-  val staged_ledger_diff : t -> Staged_ledger_diff.t
-
   val timestamp : t -> Block_time.t
+
+  val to_proof_verified :
+    t -> [`I_swear_this_is_safe_see_my_comment of Proof_verified.t]
+
+  val to_verified : t -> [`I_swear_this_is_safe_see_my_comment of Verified.t]
+
+  val of_verified : Verified.t -> t
+
+  val of_proof_verified : Proof_verified.t -> t
+
+  val forget_consensus_state_verification : Verified.t -> Proof_verified.t
 end
 
 module Make (Staged_ledger_diff : sig
@@ -56,6 +80,7 @@ end)
       ; staged_ledger_diff: Staged_ledger_diff.t }
     [@@deriving sexp, fields, bin_io]
 
+    (* TODO: Important for bkase to review *)
     let compare t1 t2 =
       Protocol_state.compare t1.protocol_state t2.protocol_state
 
@@ -64,11 +89,18 @@ end)
   end
 
   include T
+  module Proof_verified = T
   module Verified = T
+
+  let to_proof_verified x = `I_swear_this_is_safe_see_my_comment x
 
   let to_verified x = `I_swear_this_is_safe_see_my_comment x
 
   let of_verified = Fn.id
+
+  let of_proof_verified = Fn.id
+
+  let forget_consensus_state_verification = Fn.id
 
   let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff =
     {protocol_state; protocol_state_proof; staged_ledger_diff}
