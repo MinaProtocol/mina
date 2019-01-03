@@ -34,8 +34,6 @@ module type Coda_intf = sig
     (t -> Signature_lib.Public_key.Compressed.t list -> Lite_base.Lite_chain.t)
     option
 
-  val best_ledger : t -> Inputs.Ledger.t
-
   val strongest_ledgers :
        t
     -> (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
