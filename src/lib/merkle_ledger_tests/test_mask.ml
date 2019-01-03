@@ -82,6 +82,17 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         | `Existed -> failwith "Expected to allocate a new account"
         | `Added -> location
 
+      let create_existing_account_exn mask ({Account.public_key; _} as account)
+          =
+        let action, location =
+          Mask.Attached.get_or_create_account_exn mask public_key account
+        in
+        match action with
+        | `Existed ->
+            Mask.Attached.set mask location account ;
+            location
+        | `Added -> failwith "Expected to re-use an existing account"
+
       let parent_create_new_account_exn parent
           ({Account.public_key; _} as account) =
         let action, location =
@@ -471,7 +482,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             (* put same accounts in mask, but with zero balance *)
             let mask_accounts = List.map parent_accounts ~f:zero_balance in
             List.iter mask_accounts ~f:(fun account ->
-                ignore @@ create_new_account_exn attached_mask account ) ;
+                ignore @@ create_existing_account_exn attached_mask account ) ;
             let mask_list = Mask.Attached.to_list attached_mask in
             (* same number of accounts after adding them to mask *)
             assert (Int.equal (List.length parent_list) (List.length mask_list)) ;
@@ -509,9 +520,13 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             (* put same accounts in mask, but with zero balance *)
             let mask_accounts = List.map parent_accounts ~f:zero_balance in
             List.iter mask_accounts ~f:(fun account ->
-                ignore @@ create_new_account_exn attached_mask account ) ;
+                ignore @@ create_existing_account_exn attached_mask account ) ;
             let mask_sum =
-              Mask.Attached.foldi attached_mask ~init:0 ~f:balance_summer
+              Mask.Attached.foldi_with_ignored_keys attached_mask
+                ( Key.Set.of_list
+                @@ List.map parent_accounts ~f:(fun {Account.public_key; _} ->
+                       public_key ) )
+                ~init:0 ~f:balance_summer
             in
             (* sum should not include any parent balances *)
             assert (Int.equal mask_sum 0) )
@@ -526,7 +541,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             | `Existed, _ ->
                 failwith
                   "create_empty with empty ledger somehow already has that key?"
-            | `Added, new_loc ->
+            | `Added, _new_loc ->
                 [%test_eq: Hash.t] start_hash (merkle_root ledger) )
 
       let%test_unit "reuse of locations for removed accounts" =
@@ -619,6 +634,9 @@ let%test_module "Test mask connected to underlying Merkle tree" =
       (* test runner *)
       let with_instances f =
         let db = Base_db.create () in
+        [%test_result: Int.t]
+          ~message:"Base_db num accounts should start at zero" ~expect:0
+          (Base_db.num_accounts db) ;
         let maskable = Any_base.cast (module Base_db) db in
         let mask = Mask.create () in
         f maskable mask

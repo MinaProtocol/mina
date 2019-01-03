@@ -18,6 +18,8 @@ open Core_kernel
 module type S = sig
   type key
 
+  type key_set
+
   type account
 
   type hash
@@ -33,6 +35,7 @@ module type S = sig
     with module Addr = Location.Addr
     with module Location = Location
     with type key := key
+     and type key_set := key_set
      and type hash := hash
      and type root_hash := hash
      and type account := account
@@ -53,6 +56,7 @@ module Make_base
   with module Location = Location
   with type key := Key.t
    and type hash := Hash.t
+   and type key_set := Key.Set.t
    and type account := Account.t = struct
   module Location = Location
 

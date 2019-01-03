@@ -13,8 +13,7 @@ module Location0 : Merkle_ledger.Location_intf.S =
 
 module Location_at_depth = Location0
 
-type key_set = Public_key.Compressed.Set.t
-
+(*
 module Key = struct
   module T = struct
     type t = Account.key [@@deriving sexp, bin_io, compare, hash, eq]
@@ -25,6 +24,7 @@ module Key = struct
   include T
   include Hashable.Make_binable (T)
 end
+*)
 
 module Kvdb : Intf.Key_value_database = Rocksdb.Database
 
@@ -51,17 +51,22 @@ module Db :
   with type root_hash := Ledger_hash.t
    and type hash := Ledger_hash.t
    and type account := Account.t
+   and type key_set := Public_key.Compressed.Set.t
    and type key := Public_key.Compressed.t =
-  Database.Make (Key) (Account) (Hash) (Depth) (Location_at_depth) (Kvdb)
+  Database.Make (Public_key.Compressed) (Account) (Hash) (Depth)
+    (Location_at_depth)
+    (Kvdb)
     (Storage_locations)
 
 module Any_ledger :
   Merkle_ledger.Any_ledger.S
   with module Location = Location_at_depth
   with type account := Account.t
-   and type key := Key.t
+   and type key := Public_key.Compressed.t
+   and type key_set := Public_key.Compressed.Set.t
    and type hash := Hash.t =
-  Merkle_ledger.Any_ledger.Make_base (Key) (Account) (Hash) (Location_at_depth)
+  Merkle_ledger.Any_ledger.Make_base (Public_key.Compressed) (Account) (Hash)
+    (Location_at_depth)
     (Depth)
 
 module Mask :
@@ -70,11 +75,12 @@ module Mask :
   with module Addr = Location_at_depth.Addr
    and module Attached.Addr = Location_at_depth.Addr
   with type account := Account.t
-   and type key := Key.t
+   and type key := Public_key.Compressed.t
+   and type key_set := Public_key.Compressed.Set.t
    and type hash := Hash.t
    and type location := Location_at_depth.t
    and type parent := Any_ledger.M.t =
-  Merkle_mask.Masking_merkle_tree.Make (Key) (Account) (Hash)
+  Merkle_mask.Masking_merkle_tree.Make (Public_key.Compressed) (Account) (Hash)
     (Location_at_depth)
     (Any_ledger.M)
 
@@ -83,13 +89,15 @@ module Maskable :
   with module Location = Location_at_depth
   with module Addr = Location_at_depth.Addr
   with type account := Account.t
-   and type key := Key.t
+   and type key := Public_key.Compressed.t
+   and type key_set := Public_key.Compressed.Set.t
    and type hash := Hash.t
    and type root_hash := Hash.t
    and type unattached_mask := Mask.t
    and type attached_mask := Mask.Attached.t
    and type t := Any_ledger.M.t =
-  Merkle_mask.Maskable_merkle_tree.Make (Key) (Account) (Hash)
+  Merkle_mask.Maskable_merkle_tree.Make (Public_key.Compressed) (Account)
+    (Hash)
     (Location_at_depth)
     (Any_ledger.M)
     (Mask)
