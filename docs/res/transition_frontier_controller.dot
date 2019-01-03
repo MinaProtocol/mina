@@ -8,11 +8,11 @@ digraph G {
   "Transition_handler.Validator" -> "Transition_handler.Processor" [label="valid transitions (overflow: drop old)",color=blue];
   "Transition_handler.Processor" -> "transition has parent";
   "transition has parent" -> Frontier [label="yes",color=red];
-  "transition has parent" -> "Catchup.Monitor" [label="no"];
-  "Transition_handler.Processor" -> "Catchup.Monitor" [label="notify"];
+  "transition has parent" -> "Catchup.Scheduler" [label="no"];
+  "Transition_handler.Processor" -> "Catchup.Scheduler" [label="notify"];
 
   "after timeout" [shape=diamond];
-  "Catchup.Monitor" -> "after timeout";
+  "Catchup.Scheduler" -> "after timeout";
   "after timeout" -> "Catchup.Worker" [label="catchup job (overflow: drop old)",color=blue];
   "Catchup.Worker" -> "Transition_handler.Processor" [label="bulk breadcrumbs (overflow: blocking)",color=blue];
 
