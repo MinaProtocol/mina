@@ -1,5 +1,7 @@
 module Bignum_bigint = Bigint
 open Core_kernel
+module Constraint0 = Constraint
+module Boolean0 = Boolean
 
 module type Basic = sig
   module Proving_key : sig
@@ -61,7 +63,7 @@ module type Basic = sig
   end
 
   module rec Constraint : sig
-    type t
+    type t = Field.Checked.t Constraint0.t
 
     type 'k with_constraint_args = ?label:string -> 'k
 
@@ -88,28 +90,34 @@ module type Basic = sig
   
   and Typ : sig
     module Store : sig
-      include Monad.S
+      include
+        Monad.S
+        with type 'a t = ('a, Field.t, Field.Checked.t) Typ_monads.Store.t
 
       val store : field -> Field.Checked.t t
     end
 
     module Alloc : sig
-      include Monad.S
+      include Monad.S with type 'a t = ('a, Field.Checked.t) Typ_monads.Alloc.t
 
       val alloc : Field.Checked.t t
     end
 
     module Read : sig
-      include Monad.S
+      include
+        Monad.S
+        with type 'a t = ('a, Field.t, Field.Checked.t) Typ_monads.Read.t
 
       val read : Field.Checked.t -> field t
     end
 
     type ('var, 'value) t =
-      { store: 'value -> 'var Store.t
-      ; read: 'var -> 'value Read.t
-      ; alloc: 'var Alloc.t
-      ; check: 'var -> (unit, unit) Checked.t }
+      ( 'var
+      , 'value
+      , Field.t
+      , Field.Checked.t
+      , R1CS_constraint_system.t )
+      Types.Typ.t
 
     val store : ('var, 'value) t -> 'value -> 'var Store.t
 
@@ -176,7 +184,7 @@ module type Basic = sig
   end
   
   and Boolean : sig
-    type var = private Field.Checked.t
+    type var = Field.Checked.t Boolean0.t
 
     type value = bool
 
@@ -244,7 +252,15 @@ module type Basic = sig
   end
   
   and Checked : sig
-    include Monad.S2
+    include
+      Monad.S2
+      with type ('a, 's) t =
+                  ( 'a
+                  , 's
+                  , Field.t
+                  , Field.Checked.t
+                  , R1CS_constraint_system.t )
+                  Types.Checked.t
 
     module List :
       Monad_sequence.S
@@ -271,7 +287,7 @@ module type Basic = sig
     val project : bool list -> t
 
     module Checked : sig
-      type t
+      type t = private (field, Var.t) Cvar.t
 
       val length : t -> int
       (** For debug purposes *)
