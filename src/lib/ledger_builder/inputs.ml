@@ -99,6 +99,7 @@ module type S = sig
                 User_command.With_valid_signature.t
      and type public_key := Compressed_public_key.t
      and type ledger_builder_hash := Ledger_builder_hash.t
+     and type fee_transfer_single := Fee_transfer.single
 
   module Config : sig
     val transaction_capacity_log_2 : int

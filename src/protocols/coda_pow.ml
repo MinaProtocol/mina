@@ -264,7 +264,7 @@ module type Fee_transfer_intf = sig
 
   type public_key
 
-  type single = public_key * Fee.Unsigned.t
+  type single = public_key * Fee.Unsigned.t [@@deriving sexp, bin_io, eq]
 
   val of_single : public_key * Fee.Unsigned.t -> t
 
@@ -415,6 +415,9 @@ module type Ledger_builder_diff_intf = sig
 
   type completed_work_checked
 
+  type fee_transfer_single = public_key * Fee.Unsigned.t
+
+  (*[@@deriving sexp, bin_io, eq]*)
   module At_most_two : sig
     type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
     [@@deriving sexp, bin_io]
@@ -433,11 +436,11 @@ module type Ledger_builder_diff_intf = sig
   [@@deriving sexp, bin_io]
 
   type diff_with_at_most_two_coinbase =
-    {diff: diff; coinbase_parts: completed_work At_most_two.t}
+    {diff: diff; coinbase_parts: fee_transfer_single At_most_two.t}
   [@@deriving sexp, bin_io]
 
   type diff_with_at_most_one_coinbase =
-    {diff: diff; coinbase_added: completed_work At_most_one.t}
+    {diff: diff; coinbase_added: fee_transfer_single At_most_one.t}
   [@@deriving sexp, bin_io]
 
   type pre_diffs =
@@ -457,11 +460,11 @@ module type Ledger_builder_diff_intf = sig
     [@@deriving sexp]
 
     type diff_with_at_most_two_coinbase =
-      {diff: diff; coinbase_parts: completed_work_checked At_most_two.t}
+      {diff: diff; coinbase_parts: fee_transfer_single At_most_two.t}
     [@@deriving sexp]
 
     type diff_with_at_most_one_coinbase =
-      {diff: diff; coinbase_added: completed_work_checked At_most_one.t}
+      {diff: diff; coinbase_added: fee_transfer_single At_most_one.t}
     [@@deriving sexp]
 
     type pre_diffs =
@@ -1068,6 +1071,7 @@ Merge Snark:
      and type public_key := Public_key.Compressed.t
      and type completed_work := Completed_work.t
      and type completed_work_checked := Completed_work.Checked.t
+     and type fee_transfer_single := Fee_transfer.single
 
   module Sparse_ledger : sig
     type t
