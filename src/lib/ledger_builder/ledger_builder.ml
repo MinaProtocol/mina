@@ -1,5 +1,5 @@
-(*[%%import
-"../../config.mlh"]*)
+[%%import
+"../../config.mlh"]
 
 open Core_kernel
 open Async_kernel
@@ -1939,10 +1939,9 @@ end = struct
                 Compressed_public_key.Map.remove t.fee_transfers
                   to_be_discarded.prover
             | Some fee ->
-                if fee > Currency.Fee.zero then (
-                  Core.printf !"Some non zero fee %!" ;
+                if fee > Currency.Fee.zero then
                   Compressed_public_key.Map.update t.fee_transfers
-                    to_be_discarded.prover ~f:(fun _ -> fee ) )
+                    to_be_discarded.prover ~f:(fun _ -> fee )
                 else
                   Compressed_public_key.Map.remove t.fee_transfers
                     to_be_discarded.prover
@@ -2070,8 +2069,8 @@ end = struct
       else
         check_constraints_and_update (perform_n_updates resources ~f:Resources.discard_user_command n)*)
 
-  let one_prediff logger cw_seq ts_seq ledger self ~add_coinbase
-      available_queue_space current_job_sequence_no max_job_count =
+  let one_prediff logger cw_seq ts_seq self ~add_coinbase available_queue_space
+      current_job_sequence_no max_job_count =
     (* Deducting 1 for coinbase. TODO remove when adding coinbase *)
     let init_resources =
       Resources.init ts_seq cw_seq max_job_count available_queue_space self
@@ -2101,8 +2100,8 @@ end = struct
     let _ = undo_txns ledger txns_to_undo in
     res_util_with_txns.resources*)
 
-  let generate logger cw_seq ts_seq ledger self partitions
-      current_job_sequence_no max_job_count =
+  let generate logger cw_seq ts_seq self partitions current_job_sequence_no
+      max_job_count =
     let pre_diff_with_one (res : Resources.t) :
         Ledger_builder_diff.With_valid_signatures_and_proofs
         .pre_diff_with_at_most_one_coinbase =
@@ -2162,7 +2161,7 @@ end = struct
       let rec go seq rev_seq =
         match Sequence.next seq with
         | Some (w, rem_seq) ->
-            go rem_seq (Sequence.append rev_seq (Sequence.singleton w))
+            go rem_seq (Sequence.append (Sequence.singleton w) rev_seq)
         | None -> rev_seq
       in
       go seq Sequence.empty
@@ -2170,7 +2169,7 @@ end = struct
     match partitions with
     | `One x ->
         let res =
-          one_prediff logger cw_seq ts_seq ledger self x ~add_coinbase:true
+          one_prediff logger cw_seq ts_seq self x ~add_coinbase:true
             current_job_sequence_no max_job_count
         in
         (*let _ = undo_txns ledger res.user_commands in*)
@@ -2178,10 +2177,10 @@ end = struct
         make_diff res None
     | `Two (x, y) ->
         let work_count = Sequence.length cw_seq in
-        if work_count > x || work_count = max_job_count then (
+        if work_count > x || work_count = max_job_count then
           (*Add txns to the first partition without the coinbase because we know there's atleast one bundle of work for a slot in the second parition which can be used for the coinbase if all the slots in this partition are filled*)
           let res =
-            one_prediff logger cw_seq ts_seq ledger self x ~add_coinbase:false
+            one_prediff logger cw_seq ts_seq self x ~add_coinbase:false
               current_job_sequence_no max_job_count
           in
           match Resources.available_space res with
@@ -2192,46 +2191,52 @@ end = struct
                 max_job_count - Sequence.length res.completed_work_rev
               in
               let res2 =
-                one_prediff logger cw_seq res.discarded.user_commands_rev
-                  ledger self y ~add_coinbase:true current_job_sequence_no
-                  max_jobs
+                one_prediff logger cw_seq res.discarded.user_commands_rev self
+                  y ~add_coinbase:true current_job_sequence_no max_jobs
               in
               make_diff res (Some res2)
               (*TODO: rename this to just coinbase*)
-          | 1 ->
-              (*There's a slot available in the previous partition, fill it with coinbase*)
-              let new_res = Resources.incr_coinbase_part_by res `One in
-              let cw_seq = seq_rev new_res.discarded.completed_work in
-              let res2 =
-                one_prediff logger cw_seq new_res.discarded.user_commands_rev
-                  ledger self y ~add_coinbase:false current_job_sequence_no
-                  (max_job_count - Sequence.length new_res.completed_work_rev)
-              in
-              make_diff new_res (Some res2)
-          | 2 ->
-              (*There are two slots which cannot be filled using transactions, so we split the coinbase into two parts and fill in those two spots...*)
+          | x -> (
               if Sequence.is_empty res.discarded.user_commands_rev then
-                (*... not if it is not required. Here, there are no more user_commands to be added in the second partition and so just add one coinbase to fill the empty slot in the first partition and be done*)
+                (*There are no more user_commands to be added in the second partition and so just add one coinbase to fill the empty slot in the first partition and be done*)
                 let new_res = Resources.incr_coinbase_part_by res `One in
                 make_diff new_res None
               else
-                let new_res = Resources.incr_coinbase_part_by res `Two in
-                let cw_seq = seq_rev new_res.discarded.completed_work in
-                let res2 =
-                  one_prediff logger cw_seq new_res.discarded.user_commands_rev
-                    ledger self y ~add_coinbase:false current_job_sequence_no
-                    (max_job_count - Sequence.length new_res.completed_work_rev)
-                in
-                make_diff new_res (Some res2)
-          | _ ->
-              Logger.error logger "Tried to split the coinbase more than twice" ;
-              ( { completed_works= []
-                ; user_commands= []
-                ; coinbase= Ledger_builder_diff.At_most_two.Zero }
-              , None ) )
+                match x with
+                | 1 ->
+                    (*There's a slot available in the previous partition, fill it with coinbase*)
+                    let new_res = Resources.incr_coinbase_part_by res `One in
+                    let cw_seq = seq_rev new_res.discarded.completed_work in
+                    let res2 =
+                      one_prediff logger cw_seq
+                        new_res.discarded.user_commands_rev self y
+                        ~add_coinbase:false current_job_sequence_no
+                        ( max_job_count
+                        - Sequence.length new_res.completed_work_rev )
+                    in
+                    make_diff new_res (Some res2)
+                | 2 ->
+                    (*There are two slots which cannot be filled using transactions, so we split the coinbase into two parts and fill in those two spots...*)
+                    let new_res = Resources.incr_coinbase_part_by res `Two in
+                    let cw_seq = seq_rev new_res.discarded.completed_work in
+                    let res2 =
+                      one_prediff logger cw_seq
+                        new_res.discarded.user_commands_rev self y
+                        ~add_coinbase:false current_job_sequence_no
+                        ( max_job_count
+                        - Sequence.length new_res.completed_work_rev )
+                    in
+                    make_diff new_res (Some res2)
+                | _ ->
+                    Logger.error logger
+                      "Tried to split the coinbase more than twice" ;
+                    ( { completed_works= []
+                      ; user_commands= []
+                      ; coinbase= Ledger_builder_diff.At_most_two.Zero }
+                    , None ) )
         else
           let res =
-            one_prediff logger cw_seq ts_seq ledger self x ~add_coinbase:true
+            one_prediff logger cw_seq ts_seq self x ~add_coinbase:true
               current_job_sequence_no max_job_count
           in
           (*let _ = undo_txns ledger res.user_commands in*)
@@ -2326,13 +2331,21 @@ end = struct
           | None -> Stop seq )
         ~finish:Fn.id
     in
-    let transactions_max_rev =
+    let transactions_rev =
       Sequence.fold transactions_by_fee ~init:Sequence.empty ~f:(fun seq t ->
-          Sequence.append (Sequence.singleton t) seq )
+          match Ledger.apply_transaction ledger (User_command t) with
+          | Error _ ->
+              Logger.error logger
+                !"Invalid user command: %{sexp: \
+                  User_command.With_valid_signature.t} \n\
+                  %!"
+                t ;
+              seq
+          | Ok _ -> Sequence.append (Sequence.singleton t) seq )
     in
     let diff =
-      generate logger completed_works_rev transactions_max_rev ledger self
-        partitions current_job_sequence_no
+      generate logger completed_works_rev transactions_rev self partitions
+        current_job_sequence_no
         (Sequence.length work_to_do)
       (*let pre_diffs =
       generate_prediff logger work_to_do transactions_by_fee get_completed_work
@@ -2856,7 +2869,7 @@ let%test_module "test" =
       end
 
       module Config = struct
-        let transaction_capacity_log_2 = 7
+        let transaction_capacity_log_2 = 6
 
         let work_availability_factor = 2
       end
@@ -2997,6 +3010,7 @@ let%test_module "test" =
               ) ;
               let cb = coinbase_added diff in
               (*At worst case number of provers coinbase should not be split more than two times*)
+              Core.printf !"coinbase: %d \n %!" cb ;
               assert (cb > 0 && cb < 3) ;
               let x =
                 List.length
