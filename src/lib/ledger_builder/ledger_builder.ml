@@ -476,9 +476,8 @@ end = struct
       Make_statement_scanner (Deferred) (Inputs.Ledger_proof_verifier)
 
     let is_valid t =
-      let k = max Config.work_availability_factor 2 in
       Parallel_scan.parallelism ~state:t
-      = Int.pow 2 (Config.transaction_capacity_log_2 + k)
+      = Int.pow 2 (Config.transaction_capacity_log_2 + 2)
       && Parallel_scan.is_valid t
 
     include Binable.Of_binable
@@ -526,13 +525,13 @@ end = struct
     let module L = Ledger_proof_statement in
     let single_spec (job : job) =
       match job with
-      | A.Base (d, _) ->
+      | A.Base d ->
           let transaction =
             Or_error.ok_exn @@ Ledger.Undo.transaction d.transaction_with_info
           in
           Snark_work_lib.Work.Single.Spec.Transition
             (d.statement, transaction, d.witness)
-      | A.Merge ((p1, _), (p2, _), _) ->
+      | A.Merge ((p1, _), (p2, _)) ->
           let merged =
             Ledger_proof_statement.merge
               (Ledger_proof.statement p1)
@@ -658,18 +657,17 @@ end = struct
 
   let create ~ledger : t =
     let open Config in
-    (* Transaction capacity log_2 is 1/2^work_availability_factor the capacity for work parallelism *)
-    let k = max Config.work_availability_factor 2 in
+    (* Transaction capacity log_2 is one-fourth the capacity for work parallelism *)
     { scan_state=
-        Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + k)
+        Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 2)
     ; ledger }
 
   let current_ledger_proof t =
     Option.map (Parallel_scan.last_emitted_value t.scan_state) ~f:fst
 
   let statement_of_job : job -> Ledger_proof_statement.t option = function
-    | Base ({statement; _}, _) -> Some statement
-    | Merge ((p1, _), (p2, _), _) ->
+    | Base {statement; _} -> Some statement
+    | Merge ((p1, _), (p2, _)) ->
         let stmt1 = Ledger_proof.statement p1
         and stmt2 = Ledger_proof.statement p2 in
         let open Option.Let_syntax in
@@ -693,10 +691,10 @@ end = struct
     let sok_digest = Ledger_proof.sok_digest current_proof
     and proof = Ledger_proof.underlying_proof current_proof in
     match job with
-    | Base ({statement; _}, _) ->
+    | Base {statement; _} ->
         let ledger_proof = Ledger_proof.create ~statement ~sok_digest ~proof in
         Ok (Lifted (ledger_proof, Sok_message.create ~fee ~prover))
-    | Merge ((p, _), (p', _), _) ->
+    | Merge ((p, _), (p', _)) ->
         let s = Ledger_proof.statement p and s' = Ledger_proof.statement p' in
         let open Or_error.Let_syntax in
         let%map fee_excess =
@@ -1466,7 +1464,7 @@ end = struct
           check_constraints_and_update (Resources.discard_last_work resources)
 
   let one_prediff cw_seq ts_seq self ~add_coinbase available_queue_space
-      _current_job_sequence_no max_job_count =
+      max_job_count =
     let init_resources =
       Resources.init ts_seq cw_seq max_job_count available_queue_space self
         ~add_coinbase
@@ -1474,8 +1472,7 @@ end = struct
     let r = check_constraints_and_update init_resources in
     discard_extra_work r
 
-  let generate logger cw_seq ts_seq self partitions current_job_sequence_no
-      max_job_count =
+  let generate logger cw_seq ts_seq self partitions max_job_count =
     let pre_diff_with_one (res : Resources.t) :
         Ledger_builder_diff.With_valid_signatures_and_proofs
         .pre_diff_with_at_most_one_coinbase =
@@ -1508,8 +1505,7 @@ end = struct
     match partitions with
     | `One x ->
         let res =
-          one_prediff cw_seq ts_seq self x ~add_coinbase:true
-            current_job_sequence_no max_job_count
+          one_prediff cw_seq ts_seq self x ~add_coinbase:true max_job_count
         in
         make_diff res None
     | `Two (x, y) ->
@@ -1517,8 +1513,7 @@ end = struct
         if work_count > x || work_count = max_job_count then
           (*Add txns to the first partition without the coinbase because we know there's atleast one bundle of work for a slot in the second parition which can be used for the coinbase if all the slots in this partition are filled*)
           let res =
-            one_prediff cw_seq ts_seq self x ~add_coinbase:false
-              current_job_sequence_no max_job_count
+            one_prediff cw_seq ts_seq self x ~add_coinbase:false max_job_count
           in
           match Resources.available_space res with
           | 0 ->
@@ -1529,7 +1524,7 @@ end = struct
               in
               let res2 =
                 one_prediff cw_seq res.discarded.user_commands_rev self y
-                  ~add_coinbase:true current_job_sequence_no max_jobs
+                  ~add_coinbase:true max_jobs
               in
               make_diff res (Some res2)
               (*TODO: rename this to just coinbase*)
@@ -1546,7 +1541,7 @@ end = struct
                     let cw_seq = new_res.discarded.completed_work in
                     let res2 =
                       one_prediff cw_seq new_res.discarded.user_commands_rev
-                        self y ~add_coinbase:false current_job_sequence_no
+                        self y ~add_coinbase:false
                         ( max_job_count
                         - Sequence.length new_res.completed_work_rev )
                     in
@@ -1557,7 +1552,7 @@ end = struct
                     let cw_seq = new_res.discarded.completed_work in
                     let res2 =
                       one_prediff cw_seq new_res.discarded.user_commands_rev
-                        self y ~add_coinbase:false current_job_sequence_no
+                        self y ~add_coinbase:false
                         ( max_job_count
                         - Sequence.length new_res.completed_work_rev )
                     in
@@ -1571,8 +1566,7 @@ end = struct
                     , None ) )
         else
           let res =
-            one_prediff cw_seq ts_seq self x ~add_coinbase:true
-              current_job_sequence_no max_job_count
+            one_prediff cw_seq ts_seq self x ~add_coinbase:true max_job_count
           in
           make_diff res None
 
@@ -1590,11 +1584,7 @@ end = struct
         t'.scan_state
     in
     (*TODO: return an or_error here *)
-    (* get the k value and*)
     let work_to_do = work_to_do_exn t'.scan_state in
-    let current_job_sequence_no =
-      Parallel_scan.current_job_sequence_number t'.scan_state
-    in
     let completed_works =
       Sequence.fold_until work_to_do ~init:Sequence.empty
         ~f:(fun seq w ->
@@ -1619,7 +1609,6 @@ end = struct
     in
     let diff =
       generate logger completed_works transactions_rev self partitions
-        current_job_sequence_no
         (Sequence.length work_to_do)
     in
     let proofs_available =
@@ -2135,8 +2124,6 @@ let%test_module "test" =
 
       module Config = struct
         let transaction_capacity_log_2 = 7
-
-        let work_availability_factor = 2
       end
 
       let check :

@@ -33,8 +33,7 @@ type ('a, 'd) t =
   ; mutable base_none_pos: int option
   ; mutable recent_tree_data: 'd list
   ; mutable other_trees_data: 'd list list
-  ; stateful_work_order: int Queue.t
-  ; mutable curr_job_seq_no: int }
+  ; stateful_work_order: int Queue.t }
 [@@deriving sexp, bin_io]
 
 module Hash = struct
@@ -43,13 +42,8 @@ end
 
 (* TODO: This should really be computed iteratively *)
 let hash
-    { jobs
-    ; acc
-    ; current_data_length
-    ; base_none_pos
-    ; capacity
-    ; level_pointer
-    ; curr_job_seq_no; _ } a_to_string d_to_string =
+    {jobs; acc; current_data_length; base_none_pos; capacity; level_pointer; _}
+    a_to_string d_to_string =
   let h = ref (Digestif.SHA256.init ()) in
   let add_string s = h := Digestif.SHA256.feed_string !h s in
   Ring_buffer.iter jobs ~f:(function
@@ -74,7 +68,6 @@ let hash
   ( match x with
   | None -> add_string "None"
   | Some a -> add_string (Int.to_string a) ) ;
-  add_string (Int.to_string curr_job_seq_no) ;
   Digestif.SHA256.get !h
 
 let acc s = snd s.acc
@@ -95,8 +88,6 @@ let other_trees_data s = s.other_trees_data
 
 let stateful_work_order s = s.stateful_work_order
 
-let curr_job_seq_no s = s.curr_job_seq_no
-
 let copy
     { jobs
     ; acc
@@ -106,8 +97,7 @@ let copy
     ; level_pointer
     ; recent_tree_data
     ; other_trees_data
-    ; stateful_work_order
-    ; curr_job_seq_no } =
+    ; stateful_work_order } =
   { jobs= Ring_buffer.copy jobs
   ; acc
   ; capacity
@@ -116,5 +106,4 @@ let copy
   ; level_pointer= Array.copy level_pointer
   ; recent_tree_data
   ; other_trees_data
-  ; stateful_work_order= Queue.copy stateful_work_order
-  ; curr_job_seq_no }
+  ; stateful_work_order= Queue.copy stateful_work_order }
