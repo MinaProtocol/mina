@@ -687,7 +687,7 @@ module Make (Inputs : Inputs_intf) = struct
         let (`I_swear_this_is_safe_see_my_comment first_transition) =
           External_transition.to_verified
             (External_transition.create ~protocol_state:genesis_protocol_state
-               ~protocol_state_proof:Protocol_state_proof.dummy
+               ~protocol_state_proof:Genesis.proof
                ~staged_ledger_diff:empty_diff)
         in
         let ledger_db = Ledger_db.create () in

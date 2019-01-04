@@ -85,77 +85,7 @@ let main () =
   let%bind (module M) =
     if use_dummy_values then return (module Dummy : S)
     else
-      let module Consensus_mechanism =
-      Consensus.Proof_of_signature.Make (struct
-        module Time = Coda_base.Block_time
-        module Proof = Coda_base.Proof
-        module Genesis_ledger = Genesis_ledger
-
-        let proposal_interval = Time.Span.of_ms @@ Int64.of_int 5000
-
-        module Staged_ledger_diff = Staged_ledger.Make_diff (struct
-          open Signature_lib
-          open Coda_base
-          module Compressed_public_key = Public_key.Compressed
-
-          module User_command = struct
-            include (
-              User_command :
-                module type of User_command
-                with module With_valid_signature := User_command
-                                                    .With_valid_signature )
-
-            let receiver _ = failwith "stub"
-
-            let sender _ = failwith "stub"
-
-            let fee _ = failwith "stub"
-
-            let compare _ _ = failwith "stub"
-
-            module With_valid_signature = struct
-              include User_command.With_valid_signature
-
-              let compare _ _ = failwith "stub"
-            end
-          end
-
-          module Ledger_proof = Transaction_snark
-
-          module Transaction_snark_work = struct
-            include Staged_ledger.Make_completed_work
-                      (Compressed_public_key)
-                      (Ledger_proof)
-                      (Transaction_snark.Statement)
-
-            let check _ _ = failwith "stub"
-          end
-
-          module Ledger_hash = struct
-            include Ledger_hash.Stable.V1
-
-            let to_bytes = Ledger_hash.to_bytes
-          end
-
-          module Staged_ledger_aux_hash = struct
-            include Staged_ledger_hash.Aux_hash.Stable.V1
-
-            let of_bytes = Staged_ledger_hash.Aux_hash.of_bytes
-          end
-
-          module Staged_ledger_hash = struct
-            include Staged_ledger_hash.Stable.V1
-
-            let ledger_hash = Staged_ledger_hash.ledger_hash
-
-            let aux_hash = Staged_ledger_hash.aux_hash
-
-            let of_aux_and_ledger_hash =
-              Staged_ledger_hash.of_aux_and_ledger_hash
-          end
-        end)
-      end) in
-      let module Keys = Keys_lib.Keys.Make (Consensus_mechanism) in
+      let module Keys = Keys_lib.Keys.Make (Consensus.Mechanism) in
       let%map (module K) = Keys.create () in
       (module Make_real (K) : S)
   in

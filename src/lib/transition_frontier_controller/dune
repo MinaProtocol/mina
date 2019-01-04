@@ -1,4 +1,4 @@
 (library
   (name transition_frontier_controller)
   (public_name transition_frontier_controller)
-  (libraries core_kernel consensus protocols coda_base syncable_ledger merkle_address merkle_mask sync_handler transition_handler genesis_ledger))
+  (libraries core_kernel consensus protocols coda_base syncable_ledger merkle_address merkle_mask sync_handler transition_handler genesis_ledger kademlia))
