@@ -10,6 +10,10 @@ type t
     the given HTML. *)
 val of_html : name:string -> Html.t -> t
 
+(** Specify that there ought to be a file with the given path containing
+    the given HTML. *)
+val of_html_path : name:string -> Html.t -> t
+
 (** Specify that there ought to be a copy of the file at the given path
     with the given name. If no name is provided the basename of the path
     will be used. *)

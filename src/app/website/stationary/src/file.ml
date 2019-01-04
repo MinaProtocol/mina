@@ -11,6 +11,9 @@ let of_html ~name html =
   validate_filename name;
   Html (name, html)
 
+let of_html_path ~name html =
+  Html (name, html)
+
 let of_path ?name path =
   let name =
     match name with
@@ -27,7 +30,10 @@ let build t ~in_directory =
   match t with
   | Html (name, html) ->
     let%bind contents = Html.to_string html in
-    Writer.save (in_directory ^/ name) ~contents
+    let filename = (in_directory ^/ name) in
+    let dir = Filename.dirname filename in
+    let%bind () = Async.Unix.mkdir ~p:() dir in
+    Writer.save filename ~contents:("<!DOCTYPE html>" ^ contents)
   | Of_path {name; path} ->
     Process.run_expect_no_output_exn ~prog:"cp"
       ~args:[ path; in_directory ^/ name ]

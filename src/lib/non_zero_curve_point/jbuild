@@ -6,4 +6,4 @@
   (flags (:standard -short-paths))
   (library_flags (-linkall))
   (libraries (core_kernel snark_params fold_lib base64 codable))
-  (preprocess (pps (ppx_jane ppx_deriving.eq)))))
+  (preprocess (pps (ppx_snarky ppx_jane ppx_deriving.eq)))))
