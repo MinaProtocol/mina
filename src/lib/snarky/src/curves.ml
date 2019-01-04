@@ -312,55 +312,48 @@ module Edwards = struct
           ()
       end
 
-      let add_known (x1, y1) (x2, y2) =
-        with_label __LOC__
-          (let x1x2 = Field.Checked.scale x1 x2
-           and y1y2 = Field.Checked.scale y1 y2
-           and x1y2 = Field.Checked.scale x1 y2
-           and y1x2 = Field.Checked.scale y1 x2 in
-           let%bind p = Field.Checked.mul x1x2 y1y2 in
-           let open Field.Checked.Infix in
-           let p = Params.d * p in
-           let%map a =
-             Field.Checked.div (x1y2 + y1x2)
-               (Field.Checked.constant Field.one + p)
-           and b =
-             Field.Checked.div (y1y2 - x1x2)
-               (Field.Checked.constant Field.one - p)
-           in
-           (a, b))
+      let%snarkydef add_known (x1, y1) (x2, y2) =
+        let x1x2 = Field.Checked.scale x1 x2
+        and y1y2 = Field.Checked.scale y1 y2
+        and x1y2 = Field.Checked.scale x1 y2
+        and y1x2 = Field.Checked.scale y1 x2 in
+        let%bind p = Field.Checked.mul x1x2 y1y2 in
+        let open Field.Checked.Infix in
+        let p = Params.d * p in
+        let%map a =
+          Field.Checked.div (x1y2 + y1x2) (Field.Checked.constant Field.one + p)
+        and b =
+          Field.Checked.div (y1y2 - x1x2) (Field.Checked.constant Field.one - p)
+        in
+        (a, b)
 
       (* TODO: Optimize -- could probably shave off one constraint. *)
-      let add (x1, y1) (x2, y2) =
-        with_label __LOC__
-          (let%bind x1x2 = Field.Checked.mul x1 x2
-           and y1y2 = Field.Checked.mul y1 y2
-           and x1y2 = Field.Checked.mul x1 y2
-           and x2y1 = Field.Checked.mul x2 y1 in
-           let%bind p = Field.Checked.mul x1x2 y1y2 in
-           let open Field.Checked.Infix in
-           let p = Params.d * p in
-           let%map a =
-             Field.Checked.div (x1y2 + x2y1)
-               (Field.Checked.constant Field.one + p)
-           and b =
-             Field.Checked.div (y1y2 - x1x2)
-               (Field.Checked.constant Field.one - p)
-           in
-           (a, b))
+      let%snarkydef add (x1, y1) (x2, y2) =
+        let%bind x1x2 = Field.Checked.mul x1 x2
+        and y1y2 = Field.Checked.mul y1 y2
+        and x1y2 = Field.Checked.mul x1 y2
+        and x2y1 = Field.Checked.mul x2 y1 in
+        let%bind p = Field.Checked.mul x1x2 y1y2 in
+        let open Field.Checked.Infix in
+        let p = Params.d * p in
+        let%map a =
+          Field.Checked.div (x1y2 + x2y1) (Field.Checked.constant Field.one + p)
+        and b =
+          Field.Checked.div (y1y2 - x1x2) (Field.Checked.constant Field.one - p)
+        in
+        (a, b)
 
-      let double (x, y) =
-        with_label __LOC__
-          (let%bind xy = Field.Checked.mul x y
-           and xx = Field.Checked.mul x x
-           and yy = Field.Checked.mul y y in
-           let open Field.Checked.Infix in
-           let two = Field.of_int 2 in
-           let%map a = Field.Checked.div (two * xy) (xx + yy)
-           and b =
-             Field.Checked.div (yy - xx) (Field.Checked.constant two - xx - yy)
-           in
-           (a, b))
+      let%snarkydef double (x, y) =
+        let%bind xy = Field.Checked.mul x y
+        and xx = Field.Checked.mul x x
+        and yy = Field.Checked.mul y y in
+        let open Field.Checked.Infix in
+        let two = Field.of_int 2 in
+        let%map a = Field.Checked.div (two * xy) (xx + yy)
+        and b =
+          Field.Checked.div (yy - xx) (Field.Checked.constant two - xx - yy)
+        in
+        (a, b)
 
       let if_value (b : Boolean.var) ~then_:(x1, y1) ~else_:(x2, y2) =
         let not_b = (Boolean.not b :> Field.Checked.t) in
@@ -405,79 +398,73 @@ module Edwards = struct
              in
              r)
 
-      let scale t (c : Scalar.var) =
-        with_label __LOC__
-          (let rec go i acc pt = function
-             | [] -> return acc
-             | b :: bs ->
-                 let%bind acc' =
-                   with_label (sprintf "acc_%d" i)
-                     (let%bind add_pt = add acc pt in
-                      let don't_add_pt = acc in
-                      if_ b ~then_:add_pt ~else_:don't_add_pt)
-                 and pt' = double pt in
-                 go (i + 1) acc' pt' bs
-           in
-           match c with
-           | [] -> failwith "Edwards.Checked.scale: Empty bits"
-           | b :: bs ->
-               let%bind acc = if_ b ~then_:t ~else_:identity
-               and pt = double t in
-               go 1 acc pt bs)
+      let%snarkydef scale t (c : Scalar.var) =
+        let rec go i acc pt = function
+          | [] -> return acc
+          | b :: bs ->
+              let%bind acc' =
+                with_label (sprintf "acc_%d" i)
+                  (let%bind add_pt = add acc pt in
+                   let don't_add_pt = acc in
+                   if_ b ~then_:add_pt ~else_:don't_add_pt)
+              and pt' = double pt in
+              go (i + 1) acc' pt' bs
+        in
+        match c with
+        | [] -> failwith "Edwards.Checked.scale: Empty bits"
+        | b :: bs ->
+            let%bind acc = if_ b ~then_:t ~else_:identity and pt = double t in
+            go 1 acc pt bs
 
       (* TODO: Unit test *)
-      let cond_add ((x2, y2) : value) ~to_:((x1, y1) : var)
+      let%snarkydef cond_add ((x2, y2) : value) ~to_:((x1, y1) : var)
           ~if_:(b : Boolean.var) : (var, _) Checked.t =
-        with_label __LOC__
-          (let one = Field.Checked.constant Field.one in
-           let b = (b :> Field.Checked.t) in
-           let open Let_syntax in
-           let open Field.Checked.Infix in
-           let res a1 a3 =
-             let%bind a =
-               provide_witness Typ.field
-                 (let open As_prover in
-                 let open As_prover.Let_syntax in
-                 let open Field.Infix in
-                 let%map b = read_var b
-                 and a3 = read_var a3
-                 and a1 = read_var a1 in
-                 a1 + (b * (a3 - a1)))
-             in
-             let%map () = assert_r1cs b (a3 - a1) (a - a1) in
-             a
-           in
-           let%bind beta = Field.Checked.mul x1 y1 in
-           let p = Field.Infix.(Params.d * x2 * y2) * beta in
-           let%bind x3 = Field.Checked.div ((y2 * x1) + (x2 * y1)) (one + p)
-           and y3 = Field.Checked.div ((y2 * y1) - (x2 * x1)) (one - p) in
-           let%map x_res = res x1 x3 and y_res = res y1 y3 in
-           (x_res, y_res))
+        let one = Field.Checked.constant Field.one in
+        let b = (b :> Field.Checked.t) in
+        let open Let_syntax in
+        let open Field.Checked.Infix in
+        let res a1 a3 =
+          let%bind a =
+            provide_witness Typ.field
+              (let open As_prover in
+              let open As_prover.Let_syntax in
+              let open Field.Infix in
+              let%map b = read_var b
+              and a3 = read_var a3
+              and a1 = read_var a1 in
+              a1 + (b * (a3 - a1)))
+          in
+          let%map () = assert_r1cs b (a3 - a1) (a - a1) in
+          a
+        in
+        let%bind beta = Field.Checked.mul x1 y1 in
+        let p = Field.Infix.(Params.d * x2 * y2) * beta in
+        let%bind x3 = Field.Checked.div ((y2 * x1) + (x2 * y1)) (one + p)
+        and y3 = Field.Checked.div ((y2 * y1) - (x2 * x1)) (one - p) in
+        let%map x_res = res x1 x3 and y_res = res y1 y3 in
+        (x_res, y_res)
 
-      let scale_known (t : value) (c : Scalar.var) =
-        with_label __LOC__
-          (let rec go i acc pt = function
-             | b :: bs ->
-                 let%bind acc' =
-                   with_label (sprintf "acc_%d" i)
-                     (cond_add pt ~to_:acc ~if_:b)
-                 in
-                 go (i + 1) acc' (double_value pt) bs
-             | [] -> return acc
-           in
-           match c with
-           | [] -> failwith "scale_known: Empty bits"
-           | b :: bs ->
-               let acc =
-                 let b = (b :> Field.Checked.t) in
-                 let x_id, y_id = identity_value in
-                 let x_t, y_t = t in
-                 let open Field.Checked.Infix in
-                 ( (Field.Infix.(x_t - x_id) * b) + Field.Checked.constant x_id
-                 , (Field.Infix.(y_t - y_id) * b) + Field.Checked.constant y_id
-                 )
-               in
-               go 1 acc (double_value t) bs)
+      let%snarkydef scale_known (t : value) (c : Scalar.var) =
+        let rec go i acc pt = function
+          | b :: bs ->
+              let%bind acc' =
+                with_label (sprintf "acc_%d" i) (cond_add pt ~to_:acc ~if_:b)
+              in
+              go (i + 1) acc' (double_value pt) bs
+          | [] -> return acc
+        in
+        match c with
+        | [] -> failwith "scale_known: Empty bits"
+        | b :: bs ->
+            let acc =
+              let b = (b :> Field.Checked.t) in
+              let x_id, y_id = identity_value in
+              let x_t, y_t = t in
+              let open Field.Checked.Infix in
+              ( (Field.Infix.(x_t - x_id) * b) + Field.Checked.constant x_id
+              , (Field.Infix.(y_t - y_id) * b) + Field.Checked.constant y_id )
+            in
+            go 1 acc (double_value t) bs
     end
   end
 
@@ -528,7 +515,8 @@ module type Weierstrass_checked_intf = sig
 
   val constant : t -> var
 
-  val add_unsafe : var -> var -> (var, _) Checked.t
+  val add_unsafe :
+    var -> var -> ([`I_thought_about_this_very_carefully of var], _) Checked.t
 
   val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
@@ -624,42 +612,72 @@ module Make_weierstrass_checked
     let equal = assert_equal
   end
 
-  let add_unsafe (ax, ay) (bx, by) =
-    with_label __LOC__
-      (let open Let_syntax in
-      let%bind lambda = Field.Checked.(div (sub by ay) (sub bx ax)) in
-      let%bind cx =
-        provide_witness Typ.field
-          (let open As_prover in
-          let open Let_syntax in
-          let%map ax = read_var ax
-          and bx = read_var bx
-          and lambda = read_var lambda in
-          Field.(sub (square lambda) (add ax bx)))
-      in
-      let%bind () =
-        (* lambda^2 = cx + ax + bx
+  let%snarkydef add' ~div (ax, ay) (bx, by) =
+    let open Let_syntax in
+    let%bind lambda =
+      div (Field.Checked.sub by ay) (Field.Checked.sub bx ax)
+    in
+    let%bind cx =
+      provide_witness Typ.field
+        (let open As_prover in
+        let open Let_syntax in
+        let%map ax = read_var ax
+        and bx = read_var bx
+        and lambda = read_var lambda in
+        Field.(sub (square lambda) (add ax bx)))
+    in
+    let%bind () =
+      (* lambda^2 = cx + ax + bx
             cx = lambda^2 - (ax + bc)
         *)
-        assert_
-          (Constraint.square ~label:"c1" lambda
-             Field.Checked.Infix.(cx + ax + bx))
+      assert_
+        (Constraint.square ~label:"c1" lambda
+           Field.Checked.Infix.(cx + ax + bx))
+    in
+    let%bind cy =
+      provide_witness Typ.field
+        (let open As_prover in
+        let open Let_syntax in
+        let%map ax = read_var ax
+        and ay = read_var ay
+        and cx = read_var cx
+        and lambda = read_var lambda in
+        Field.(sub (mul lambda (sub ax cx)) ay))
+    in
+    let%map () =
+      Field.Checked.Infix.(assert_r1cs ~label:"c2" lambda (ax - cx) (cy + ay))
+    in
+    (cx, cy)
+
+  (* This function MUST NOT be called UNLESS you are certain the two points
+   on which it is called are not equal. If it is called on equal points,
+   the prover can return almost any curve point they want to from this function. *)
+  let add_unsafe =
+    let open Let_syntax in
+    let div_unsafe x y =
+      let%bind z =
+        provide_witness Field.typ
+          As_prover.(map2 (read_var x) (read_var y) ~f:Field.Infix.( / ))
       in
-      let%bind cy =
-        provide_witness Typ.field
-          (let open As_prover in
-          let open Let_syntax in
-          let%map ax = read_var ax
-          and ay = read_var ay
-          and cx = read_var cx
-          and lambda = read_var lambda in
-          Field.(sub (mul lambda (sub ax cx)) ay))
-      in
-      let%map () =
-        Field.Checked.Infix.(
-          assert_r1cs ~label:"c2" lambda (ax - cx) (cy + ay))
-      in
-      (cx, cy))
+      (* Constraint: y * z = x
+
+         Cases:
+         x = 0, y = 0 -> 0 * z = 0 (i.e., z is arbitrary)
+
+         x = 0, y <> 0 -> z = 0 / y = 0.
+
+         x <> 0, y = 0 -> 0 * z = x. (i.e., unsat)
+
+         x <> 0, y <> 0 -> z = x / y
+      *)
+      let%map () = assert_r1cs y z x in
+      z
+    in
+    fun p q ->
+      let%map r = add' ~div:div_unsafe p q in
+      `I_thought_about_this_very_carefully r
+
+  let add_exn p q = add' ~div:Field.Checked.div p q
 
   (* TODO-someday: Make it so this doesn't have to compute both branches *)
   let if_ =
@@ -714,9 +732,9 @@ module Make_weierstrass_checked
 
       let if_ = if_
 
-      let unshift_nonzero shifted = add_unsafe (negate shift) shifted
+      let unshift_nonzero shifted = add_exn (negate shift) shifted
 
-      let add shifted x = add_unsafe shifted x
+      let add shifted x = add_exn shifted x
 
       module Assert = struct
         let equal = assert_equal
@@ -734,43 +752,42 @@ module Make_weierstrass_checked
       (module M : S)
   end
 
-  let double (ax, ay) =
-    with_label __LOC__
-      (let open Let_syntax in
-      let%bind x_squared = Field.Checked.square ax in
-      let%bind lambda =
-        provide_witness Typ.field
-          As_prover.(
-            map2 (read_var x_squared) (read_var ay) ~f:(fun x_squared ay ->
-                let open Field in
-                let open Infix in
-                ((of_int 3 * x_squared) + Params.a) * inv (of_int 2 * ay) ))
-      in
-      let%bind bx =
-        provide_witness Typ.field
-          As_prover.(
-            map2 (read_var lambda) (read_var ax) ~f:(fun lambda ax ->
-                let open Field in
-                Infix.(square lambda - (of_int 2 * ax)) ))
-      in
-      let%bind by =
-        provide_witness Typ.field
-          (let open As_prover in
-          let open Let_syntax in
-          let%map lambda = read_var lambda
-          and ax = read_var ax
-          and ay = read_var ay
-          and bx = read_var bx in
-          Field.Infix.((lambda * (ax - bx)) - ay))
-      in
-      let two = Field.of_int 2 in
-      let open Field.Checked.Infix in
-      let%map () =
-        assert_r1cs (two * lambda) ay
-          ((Field.of_int 3 * x_squared) + Field.Checked.constant Params.a)
-      and () = assert_square lambda (bx + (two * ax))
-      and () = assert_r1cs lambda (ax - bx) (by + ay) in
-      (bx, by))
+  let%snarkydef double (ax, ay) =
+    let open Let_syntax in
+    let%bind x_squared = Field.Checked.square ax in
+    let%bind lambda =
+      provide_witness Typ.field
+        As_prover.(
+          map2 (read_var x_squared) (read_var ay) ~f:(fun x_squared ay ->
+              let open Field in
+              let open Infix in
+              ((of_int 3 * x_squared) + Params.a) * inv (of_int 2 * ay) ))
+    in
+    let%bind bx =
+      provide_witness Typ.field
+        As_prover.(
+          map2 (read_var lambda) (read_var ax) ~f:(fun lambda ax ->
+              let open Field in
+              Infix.(square lambda - (of_int 2 * ax)) ))
+    in
+    let%bind by =
+      provide_witness Typ.field
+        (let open As_prover in
+        let open Let_syntax in
+        let%map lambda = read_var lambda
+        and ax = read_var ax
+        and ay = read_var ay
+        and bx = read_var bx in
+        Field.Infix.((lambda * (ax - bx)) - ay))
+    in
+    let two = Field.of_int 2 in
+    let open Field.Checked.Infix in
+    let%map () =
+      assert_r1cs (two * lambda) ay
+        ((Field.of_int 3 * x_squared) + Field.Checked.constant Params.a)
+    and () = assert_square lambda (bx + (two * ax))
+    and () = assert_r1cs lambda (ax - bx) (by + ay) in
+    (bx, by)
 
   let if_value (cond : Boolean.var) ~then_ ~else_ =
     let x1, y1 = Curve.to_coords then_ in
@@ -782,25 +799,25 @@ module Make_weierstrass_checked
     in
     (choose x1 x2, choose y1 y2)
 
-  let scale (type shifted) (module Shifted : Shifted.S with type t = shifted) t
+  let%snarkydef scale (type shifted)
+      (module Shifted : Shifted.S with type t = shifted) t
       (c : Boolean.var Bitstring_lib.Bitstring.Lsb_first.t) ~(init : shifted) :
       (shifted, _) Checked.t =
     let c = Bitstring_lib.Bitstring.Lsb_first.to_list c in
-    with_label __LOC__
-      (let open Let_syntax in
-      let rec go i bs0 acc pt =
-        match bs0 with
-        | [] -> return acc
-        | b :: bs ->
-            let%bind acc' =
-              with_label (sprintf "acc_%d" i)
-                (let%bind add_pt = Shifted.add acc pt in
-                 let don't_add_pt = acc in
-                 Shifted.if_ b ~then_:add_pt ~else_:don't_add_pt)
-            and pt' = double pt in
-            go (i + 1) bs acc' pt'
-      in
-      go 0 c init t)
+    let open Let_syntax in
+    let rec go i bs0 acc pt =
+      match bs0 with
+      | [] -> return acc
+      | b :: bs ->
+          let%bind acc' =
+            with_label (sprintf "acc_%d" i)
+              (let%bind add_pt = Shifted.add acc pt in
+               let don't_add_pt = acc in
+               Shifted.if_ b ~then_:add_pt ~else_:don't_add_pt)
+          and pt' = double pt in
+          go (i + 1) bs acc' pt'
+    in
+    go 0 c init t
 
   (* This 'looks up' a field element from a lookup table of size 2^2 = 4 with
    a 2 bit index.  See https://github.com/zcash/zcash/issues/2234#issuecomment-383736266 for

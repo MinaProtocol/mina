@@ -1,20 +1,6 @@
-[%%import
-"../../../config.mlh"]
-
 open Core
 open Ctypes
 open Foreign
-
-[%%if
-call_logger]
-
-let foreign name t =
-  let f = foreign name t in
-  fun x ->
-    Coda_debug.Call_logger.record_call name ;
-    f x
-
-[%%endif]
 
 let with_prefix prefix s = sprintf "%s_%s" prefix s
 
@@ -44,9 +30,10 @@ module Make_foreign (M : Prefix_intf) = struct
   let delete = foreign (func_name "delete") (typ @-> returning void)
 end
 
-let set_profiling = foreign "camlsnark_set_profiling" (bool @-> returning void)
+let set_no_profiling =
+  foreign "camlsnark_set_profiling" (bool @-> returning void)
 
-let () = set_profiling false
+let () = set_no_profiling true
 
 module Make_G1 (M : sig
   val prefix : string
