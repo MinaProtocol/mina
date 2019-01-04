@@ -15,6 +15,8 @@ module type S = sig
     (* This should check if the input is constant and do [scale_known] if so *)
     val scale : t -> Boolean.var list -> (t, _) Checked.t
 
+    val add_exn : t -> t -> (t, _) Checked.t
+
     module Shifted : sig
       module type S =
         Snarky.Curves.Shifted_intf
@@ -30,6 +32,8 @@ module type S = sig
 
   module G2 : sig
     type t
+
+    val add_exn : t -> t -> (t, _) Checked.t
 
     module Unchecked : sig
       type t
@@ -66,6 +70,8 @@ module type S = sig
     val ( * ) : t -> t -> (t, _) Checked.t
 
     val equal : t -> t -> (Boolean.var, _) Checked.t
+
+    val one : t
   end
 
   val group_miller_loop :

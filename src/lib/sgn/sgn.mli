@@ -1,7 +1,8 @@
 open Core_kernel
 open Snark_params.Tick
 
-type t = Pos | Neg [@@deriving sexp, bin_io, hash, compare, eq]
+type t = Sgn_type.Sgn.t = Pos | Neg
+[@@deriving sexp, bin_io, hash, compare, eq]
 
 val to_field : t -> Field.t
 
