@@ -1,5 +1,14 @@
 open Core_kernel
 
+type ('f, 'v) t =
+  | Constant of 'f
+  | Var of 'v
+  | Add of ('f, 'v) t * ('f, 'v) t
+  | Scale of 'f * ('f, 'v) t
+[@@deriving sexp]
+
+type ('f, 'v) cvar = ('f, 'v) t [@@deriving sexp]
+
 module Make
     (Field : Field_intf.Extended) (Var : sig
         include Comparable.S
@@ -7,12 +16,7 @@ module Make
         include Sexpable.S with type t := t
     end) =
 struct
-  type t =
-    | Constant of Field.t
-    | Var of Var.t
-    | Add of t * t
-    | Scale of Field.t * t
-  [@@deriving sexp]
+  type t = (Field.t, Var.t) cvar [@@deriving sexp]
 
   let length _ = failwith "TODO"
 
@@ -45,9 +49,16 @@ struct
       let c, ts = go Field.one Field.zero [] t in
       (Some c, ts)
 
-  let add x y = Add (x, y)
+  let add x y =
+    match (x, y) with
+    | Constant x, Constant y -> Constant (Field.add x y)
+    | _, _ -> Add (x, y)
 
-  let scale x s = Scale (s, x)
+  let scale x s =
+    match x with
+    | Constant x -> Constant (Field.mul x s)
+    | Scale (sx, x) -> Scale (Field.mul sx s, x)
+    | _ -> Scale (s, x)
 
   let neg_one = Field.(sub zero one)
 

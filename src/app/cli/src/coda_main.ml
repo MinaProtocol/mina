@@ -964,19 +964,20 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         Logger.debug log
           !"Added  payment %{sexp:User_command.t} into receipt_chain \
             database. You should wait for a bit to see your account's receipt \
-            chain hash update as %{sexp:Receipt.Chain_hash.t}"
-          txn hash ;
+            chain hash update as %s"
+          txn
+          (Receipt.Chain_hash.to_string hash) ;
         hash
     | `Duplicate hash ->
         Logger.warn log !"Already sent transaction %{sexp:User_command.t}" txn ;
         hash
     | `Error_multiple_previous_receipts parent_hash ->
         Logger.fatal log
-          !"A payment is derived from two different blockchain states \
-            (%{sexp:Receipt.Chain_hash.t}, %{sexp:Receipt.Chain_hash.t}). \
-            Receipt.Chain_hash is supposed to be collision resistant. This \
-            collision should not happen."
-          parent_hash previous ;
+          !"A payment is derived from two different blockchain states (%s, \
+            %s). Receipt.Chain_hash is supposed to be collision resistant. \
+            This collision should not happen."
+          (Receipt.Chain_hash.to_string parent_hash)
+          (Receipt.Chain_hash.to_string previous) ;
         Core.exit 1
 
   module Payment_verifier =
@@ -1000,28 +1001,38 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         verifying_txn
 
   let schedule_payment log t (txn : User_command.t) account_opt =
-    if not (is_valid_payment t txn account_opt) then (
-      Core.Printf.eprintf "Invalid payment: account balance is too low" ;
-      Core.exit 1 ) ;
-    let txn_pool = transaction_pool t in
-    don't_wait_for (Transaction_pool.add txn_pool txn) ;
-    Logger.info log
-      !"Added payment %{sexp: User_command.t} to pool successfully"
-      txn ;
-    txn_count := !txn_count + 1
+    if not (is_valid_payment t txn account_opt) then
+      Or_error.error_string "Invalid payment: account balance is too low"
+    else
+      let txn_pool = transaction_pool t in
+      don't_wait_for (Transaction_pool.add txn_pool txn) ;
+      Logger.info log
+        !"Added payment %{sexp: User_command.t} to pool successfully"
+        txn ;
+      txn_count := !txn_count + 1 ;
+      Or_error.return ()
 
   let send_payment log t (txn : User_command.t) =
+    Deferred.return
+    @@
+    let open Or_error.Let_syntax in
     let public_key = Public_key.compress txn.sender in
     let account_opt = get_account t public_key in
-    schedule_payment log t txn account_opt ;
-    Deferred.return @@ record_payment ~log t txn (Option.value_exn account_opt)
+    let%map () = schedule_payment log t txn account_opt in
+    record_payment ~log t txn (Option.value_exn account_opt)
 
   (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
   let schedule_payments log t txns =
     List.iter txns ~f:(fun (txn : User_command.t) ->
         let public_key = Public_key.compress txn.sender in
         let account_opt = get_account t public_key in
-        schedule_payment log t txn account_opt )
+        match schedule_payment log t txn account_opt with
+        | Ok () -> ()
+        | Error err ->
+            Logger.warn log
+              !"Failure in schedule_payments: %{sexp:Error.t}. This is not \
+                yet reported to the client, see #1143"
+              err )
 
   let prove_receipt t ~proving_receipt ~resulting_receipt :
       Payment_proof.t Deferred.Or_error.t =
@@ -1081,6 +1092,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
     ; user_commands_sent= !txn_count
     ; run_snark_worker= run_snark_worker t
+    ; proposal_interval= Int64.to_int_exn Consensus.Mechanism.block_interval_ms
     ; propose_pubkey=
         Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t) }
 

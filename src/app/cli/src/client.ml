@@ -13,14 +13,18 @@ let dispatch rpc query port =
       | Error exn -> return (Or_error.of_exn exn)
       | Ok conn -> Rpc.Rpc.dispatch rpc conn query )
 
+(** Call an RPC, passing handlers for a successful call and a failing one. Note
+   that a successful *call* may have failed on the server side and returned a
+   failing result. To deal with that, the success handler returns an
+   Or_error. *)
 let dispatch_with_message rpc query port ~success ~error =
+  let fail err = eprintf "%s\n" err ; exit 1 in
   match%bind dispatch rpc query port with
-  | Ok x ->
-      printf "%s\n" (success x) ;
-      Deferred.unit
-  | Error e ->
-      eprintf "%s\n" (error e) ;
-      exit 1
+  | Ok x -> (
+    match success x with
+    | Ok res -> printf "%s\n" res ; Deferred.unit
+    | Error e -> fail (Error.to_string_hum e) )
+  | Error e -> fail (error e)
 
 let dispatch_pretty_message (type t)
     (module Print : Cli_lib.Render.Printable_intf with type t = t)
@@ -105,17 +109,13 @@ let prove_payment =
   in
   let address_flag =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
-      (required public_key)
+      (required public_key_compressed)
   in
   Command.async ~summary:"Generate a proof of a sent payment"
     (Cli_lib.Background_daemon.init (Args.zip2 receipt_hash_flag address_flag)
        ~f:(fun port (receipt_chain_hash, pk) ->
-         dispatch_with_message Prove_receipt.rpc
-           (receipt_chain_hash, Public_key.compress pk)
-           port
-           ~success:(function
-             | Ok result -> Cli_lib.Render.Prove_receipt.to_text result
-             | Error e -> Error.to_string_hum e)
+         dispatch_with_message Prove_receipt.rpc (receipt_chain_hash, pk) port
+           ~success:(Or_error.map ~f:Cli_lib.Render.Prove_receipt.to_text)
            ~error:Error.to_string_hum ))
 
 let read_json filepath =
@@ -139,7 +139,7 @@ let verify_payment =
   in
   let address_flag =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
-      (required public_key)
+      (required public_key_compressed)
   in
   Command.async ~summary:"Verify a proof of a sent payment"
     (Cli_lib.Background_daemon.init
@@ -157,9 +157,7 @@ let verify_payment =
            and proof =
              Payment_proof.of_yojson proof_json |> to_deferred_or_error
            in
-           dispatch Verify_proof.rpc
-             (Public_key.compress pk, payment, proof)
-             port
+           dispatch Verify_proof.rpc (pk, payment, proof) port
          in
          match%map dispatch_result with
          | Ok (Ok ()) -> printf "Payment is valid on the existing blockchain!"
@@ -272,7 +270,8 @@ let batch_send_payments =
     dispatch_with_message Daemon_rpcs.Send_user_commands.rpc
       (ts :> User_command.t list)
       port
-      ~success:(fun () -> "Successfully enqueued payments in pool")
+      ~success:(fun () ->
+        Or_error.return "Successfully enqueued payments in pool" )
       ~error:(fun e ->
         sprintf "Failed to send payments %s" (Error.to_string_hum e) )
   in
@@ -311,10 +310,12 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
          dispatch_with_message Daemon_rpcs.Send_user_command.rpc
            (payment :> User_command.t)
            port
-           ~success:(fun receipt_chain_hash ->
-             sprintf "Successfully enqueued %s in pool\nReceipt_chain_hash: %s"
-               label
-               (Receipt.Chain_hash.to_string receipt_chain_hash) )
+           ~success:
+             (Or_error.map ~f:(fun receipt_chain_hash ->
+                  sprintf
+                    "Successfully enqueued %s in pool\nReceipt_chain_hash: %s"
+                    label
+                    (Receipt.Chain_hash.to_string receipt_chain_hash) ))
            ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e)) ))
 
 let send_payment =

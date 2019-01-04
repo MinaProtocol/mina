@@ -1,6 +1,7 @@
 _build*
+*.pdf
 *.install
-.merlin
+.merlin*
 result
 test.log
 build.log

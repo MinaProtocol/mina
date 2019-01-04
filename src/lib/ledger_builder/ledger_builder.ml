@@ -7,6 +7,10 @@ open Protocols
 open Coda_pow
 open O1trace
 
+let val_or_exn label = function
+  | Error e -> failwithf "%s: %s" label (Error.to_string_hum e) ()
+  | Ok x -> x
+
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
 
@@ -489,7 +493,7 @@ end = struct
 
     let is_valid t =
       Parallel_scan.parallelism ~state:t
-      = Int.pow 2 (Config.transaction_capacity_log_2 + 1)
+      = Int.pow 2 (Config.transaction_capacity_log_2 + 2)
       && Parallel_scan.is_valid t
 
     include Binable.Of_binable
@@ -529,8 +533,10 @@ end = struct
             | None -> Yield (List.rev (x :: acc), ([], 0, seq))
             | _ -> Skip (x :: acc, i + 1, seq) ) )
 
-  let all_work_pairs t =
-    let all_jobs = Parallel_scan.next_jobs ~state:t.scan_state in
+  let all_work_pairs_exn t =
+    let all_jobs =
+      val_or_exn "Next jobs" (Parallel_scan.next_jobs ~state:t.scan_state)
+    in
     let module A = Parallel_scan.Available_job in
     let module L = Ledger_proof_statement in
     let single_spec (job : job) =
@@ -587,9 +593,7 @@ end = struct
     let open Or_error.Let_syntax in
     let txns_still_being_worked_on = Parallel_scan.current_data scan_state in
     Debug_assert.debug_assert (fun () ->
-        let parallelism =
-          Int.pow 2 (Inputs.Config.transaction_capacity_log_2 + 1)
-        in
+        let parallelism = Parallel_scan.parallelism ~state:scan_state in
         [%test_pred: int]
           (( >= ) (Inputs.Config.transaction_capacity_log_2 * parallelism))
           (List.length txns_still_being_worked_on) ) ;
@@ -669,9 +673,9 @@ end = struct
 
   let create ~ledger : t =
     let open Config in
-    (* Transaction capacity log_2 is half the capacity for work parallelism *)
+    (* Transaction capacity log_2 is one-fourth the capacity for work parallelism *)
     { scan_state=
-        Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 1)
+        Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 2)
     ; ledger }
 
   let current_ledger_proof t =
@@ -1004,6 +1008,15 @@ end = struct
   (* TODO: when we move to a disk-backed db, this should call "Ledger.commit_changes" at the end. *)
   let apply_diff t (diff : Ledger_builder_diff.t) ~logger =
     let open Result_with_rollback.Let_syntax in
+    let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
+    let%bind spots_available, proofs_waiting =
+      let%map jobs =
+        Parallel_scan.next_jobs ~state:t.scan_state
+        |> Result_with_rollback.of_or_error
+      in
+      ( Int.min (Parallel_scan.free_space ~state:t.scan_state) max_throughput
+      , List.length jobs )
+    in
     let apply_pre_diff_with_at_most_two
         (pre_diff1 : Ledger_builder_diff.diff_with_at_most_two_coinbase) =
       let coinbase_parts =
@@ -1072,8 +1085,9 @@ end = struct
     in
     Logger.info logger
       "Block info: No of transactions included:%d Coinbase parts:%d Work \
-       count:%d"
-      user_commands_count cb_parts_count (List.length works) ;
+       count:%d Spots available:%d Proofs waiting to be solved:%d"
+      user_commands_count cb_parts_count (List.length works) spots_available
+      proofs_waiting ;
     (`Hash_after_applying (hash t), `Ledger_proof res_opt)
 
   let apply t witness ~logger =
@@ -1162,8 +1176,11 @@ end = struct
     Or_error.ok_exn (verify_scan_state_after_apply t.ledger t.scan_state) ;
     (`Hash_after_applying (hash t), `Ledger_proof res_opt)
 
-  let work_to_do scan_state : Completed_work.Statement.t Sequence.t =
-    let work_seq = Parallel_scan.next_jobs_sequence ~state:scan_state in
+  let work_to_do_exn scan_state : Completed_work.Statement.t Sequence.t =
+    let work_seq =
+      val_or_exn "Work to do"
+        (Parallel_scan.next_jobs_sequence ~state:scan_state)
+    in
     sequence_chunks_of ~n:Completed_work.proofs_length
     @@ Sequence.map work_seq ~f:(fun maybe_work ->
            match statement_of_job maybe_work with
@@ -1657,10 +1674,18 @@ end = struct
       Parallel_scan.partition_if_overflowing ~max_slots:max_throughput
         t'.scan_state
     in
+    (*TODO: return an or_error here *)
+    let work_to_do = work_to_do_exn t'.scan_state in
     let pre_diffs =
-      generate_prediff logger (work_to_do t'.scan_state) transactions_by_fee
-        get_completed_work ledger self partitions
+      generate_prediff logger work_to_do transactions_by_fee get_completed_work
+        ledger self partitions
     in
+    let proofs_available =
+      Sequence.filter_map work_to_do ~f:get_completed_work
+      |> Sequence.to_list |> List.length
+    in
+    Logger.info logger "Block stats: Proofs ready for purchase: %d"
+      proofs_available ;
     trace_event "prediffs done" ;
     { Ledger_builder_diff.With_valid_signatures_and_proofs.pre_diffs
     ; creator= self
@@ -2257,7 +2282,7 @@ let%test_module "test" =
     let%test_unit "Max throughput" =
       (*Always at worst case number of provers*)
       let logger = Logger.create () in
-      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
+      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger in
@@ -2265,9 +2290,7 @@ let%test_module "test" =
           Async.Thread_safe.block_on_async_exn (fun () ->
               let open Deferred.Let_syntax in
               let old_ledger = !(Lb.ledger lb) in
-              let all_ts =
-                txns (p / 2) (fun x -> (x + 1) * 100) (fun _ -> 4)
-              in
+              let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let%map proof, diff =
                 create_and_apply lb logger (Sequence.of_list all_ts)
                   stmt_to_work
@@ -2298,7 +2321,7 @@ let%test_module "test" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
+      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger in
@@ -2344,7 +2367,7 @@ let%test_module "test" =
       in
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
+      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger in
@@ -2407,7 +2430,7 @@ let%test_module "test" =
     let%test_unit "Snarked ledger" =
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
+      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger in

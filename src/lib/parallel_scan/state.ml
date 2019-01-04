@@ -32,7 +32,8 @@ type ('a, 'd) t =
   ; mutable current_data_length: int
   ; mutable base_none_pos: int option
   ; mutable recent_tree_data: 'd list
-  ; mutable other_trees_data: 'd list list }
+  ; mutable other_trees_data: 'd list list
+  ; stateful_work_order: int Queue.t }
 [@@deriving sexp, bin_io]
 
 module Hash = struct
@@ -85,6 +86,8 @@ let recent_tree_data s = s.recent_tree_data
 
 let other_trees_data s = s.other_trees_data
 
+let stateful_work_order s = s.stateful_work_order
+
 let copy
     { jobs
     ; acc
@@ -93,7 +96,8 @@ let copy
     ; capacity
     ; level_pointer
     ; recent_tree_data
-    ; other_trees_data } =
+    ; other_trees_data
+    ; stateful_work_order } =
   { jobs= Ring_buffer.copy jobs
   ; acc
   ; capacity
@@ -101,4 +105,5 @@ let copy
   ; base_none_pos
   ; level_pointer= Array.copy level_pointer
   ; recent_tree_data
-  ; other_trees_data }
+  ; other_trees_data
+  ; stateful_work_order= Queue.copy stateful_work_order }

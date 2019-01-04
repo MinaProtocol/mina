@@ -36,17 +36,19 @@ let main () =
   let%map result =
     let open Deferred.Option.Let_syntax in
     (* TODO: we should test sending multiple payments simultaneously. See #1143*)
-    let%bind receipt_chain_hash =
+    match%bind
       Coda_worker_testnet.Api.send_payment_with_receipt testnet 0 sender_sk
         receiver_pk send_amount fee
-    in
-    let%map proof =
-      Coda_worker_testnet.Api.prove_receipt testnet 0 receipt_chain_hash
-        receipt_chain_hash
-    in
-    Receipt.Chain_hash.equal
-      (Payment_proof.initial_receipt proof)
-      receipt_chain_hash
+    with
+    | Error err -> assert false
+    | Ok receipt_chain_hash ->
+        let%map proof =
+          Coda_worker_testnet.Api.prove_receipt testnet 0 receipt_chain_hash
+            receipt_chain_hash
+        in
+        Receipt.Chain_hash.equal
+          (Payment_proof.initial_receipt proof)
+          receipt_chain_hash
   in
   assert (Option.value ~default:false result)
 

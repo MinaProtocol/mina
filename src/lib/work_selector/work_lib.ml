@@ -75,7 +75,7 @@ module Make (Inputs : Inputs.Inputs_intf) = struct
 
   let all_works (ledger_builder : Inputs.Ledger_builder.t) (state : State.t) =
     let state = State.remove_old_assignments state in
-    let all_jobs = Inputs.Ledger_builder.all_work_pairs ledger_builder in
+    let all_jobs = Inputs.Ledger_builder.all_work_pairs_exn ledger_builder in
     let unseen_jobs =
       List.filter all_jobs ~f:(fun js ->
           not @@ Map.mem state (statement_pair js) )

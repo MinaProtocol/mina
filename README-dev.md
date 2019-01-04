@@ -40,7 +40,7 @@ Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debi
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-6862c63e4f3f4989db7a27c1fe79420ae0ba7397`
+`docker pull codaprotocol/coda:toolchain-7ebc54574da84dfc6c7ee2a28ea3e8dca093dbf5`
 
 * Create local builder image
 
@@ -55,6 +55,11 @@ Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debi
 `make USEDOCKER=TRUE build`
 
 #### Customizing your dev environment for autocomplete/merlin
+
+* If you build in Docker, the files created for merlin will have invalid paths. You can fix those paths after a
+  build
+
+`make USEDOCKER=TRUE merlin-fixup`
 
 * If you use vim, add this snippet in your vimrc to use merlin. (REMEMBER to change the HOME directory to match yours)
 

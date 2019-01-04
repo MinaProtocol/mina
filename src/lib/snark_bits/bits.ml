@@ -246,26 +246,23 @@ module Snarkable = struct
     let compare_var x y =
       Impl.Field.Checked.compare ~bit_length:V.length (pack_var x) (pack_var y)
 
-    let increment_if_var bs (b : Boolean.var) =
+    let%snarkydef increment_if_var bs (b : Boolean.var) =
       let open Impl in
-      with_label __LOC__
-        (let v = Field.Checked.pack bs in
-         let v' = Field.Checked.add v (b :> Field.Checked.t) in
-         Field.Checked.unpack v' ~length:V.length)
+      let v = Field.Checked.pack bs in
+      let v' = Field.Checked.add v (b :> Field.Checked.t) in
+      Field.Checked.unpack v' ~length:V.length
 
-    let increment_var bs =
+    let%snarkydef increment_var bs =
       let open Impl in
-      with_label __LOC__
-        (let v = Field.Checked.pack bs in
-         let v' = Field.Checked.add v (Field.Checked.constant Field.one) in
-         Field.Checked.unpack v' ~length:V.length)
+      let v = Field.Checked.pack bs in
+      let v' = Field.Checked.add v (Field.Checked.constant Field.one) in
+      Field.Checked.unpack v' ~length:V.length
 
-    let equal_var (n : Unpacked.var) (n' : Unpacked.var) =
-      with_label __LOC__ (Field.Checked.equal (pack_var n) (pack_var n'))
+    let%snarkydef equal_var (n : Unpacked.var) (n' : Unpacked.var) =
+      Field.Checked.equal (pack_var n) (pack_var n')
 
-    let assert_equal_var (n : Unpacked.var) (n' : Unpacked.var) =
-      with_label __LOC__
-        (Field.Checked.Assert.equal (pack_var n) (pack_var n'))
+    let%snarkydef assert_equal_var (n : Unpacked.var) (n' : Unpacked.var) =
+      Field.Checked.Assert.equal (pack_var n) (pack_var n')
 
     let if_ (cond : Boolean.var) ~(then_ : Unpacked.var)
         ~(else_ : Unpacked.var) : (Unpacked.var, _) Checked.t =
