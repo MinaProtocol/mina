@@ -819,13 +819,12 @@ module Make_basic (Backend : Backend_intf.S) = struct
             let s', (_ : unit option) = run_as_prover (Some x) s in
             go stack k handler s'
         | Add_constraint (c, t) ->
-            Option.iter system ~f:(fun system ->
-                if eval_constraints && not (Constraint.eval c get_value) then
-                  failwithf "Constraint unsatisfied:\n%s\n%s\n"
-                    (Constraint.annotation c)
-                    (Constraint.stack_to_string stack)
-                    () ;
-                Constraint.add ~stack c system ) ;
+            if eval_constraints && not (Constraint.eval c get_value) then
+              failwithf "Constraint unsatisfied:\n%s\n%s\n"
+                (Constraint.annotation c)
+                (Constraint.stack_to_string stack)
+                () ;
+            Option.iter system ~f:(fun system -> Constraint.add ~stack c system) ;
             go stack t handler s
         | With_state (p, and_then, t_sub, k) ->
             let s, s_sub = run_as_prover (Some p) s in
