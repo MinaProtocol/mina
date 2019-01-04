@@ -431,52 +431,64 @@ module type Ledger_builder_diff_intf = sig
     val increase : 'a t -> 'a list -> 'a t Or_error.t
   end
 
-  type diff =
-    {completed_works: completed_work list; user_commands: user_command list}
+  type pre_diff_with_at_most_two_coinbase =
+    { completed_works: completed_work list
+    ; user_commands: user_command list
+    ; coinbase: fee_transfer_single At_most_two.t }
   [@@deriving sexp, bin_io]
 
-  type diff_with_at_most_two_coinbase =
+  type pre_diff_with_at_most_one_coinbase =
+    { completed_works: completed_work list
+    ; user_commands: user_command list
+    ; coinbase: fee_transfer_single At_most_one.t }
+  [@@deriving sexp, bin_io]
+
+  (*type diff_with_at_most_two_coinbase =
     {diff: diff; coinbase_parts: fee_transfer_single At_most_two.t}
   [@@deriving sexp, bin_io]
 
   type diff_with_at_most_one_coinbase =
     {diff: diff; coinbase_added: fee_transfer_single At_most_one.t}
-  [@@deriving sexp, bin_io]
+  [@@deriving sexp, bin_io]*)
 
-  type pre_diffs =
-    ( diff_with_at_most_one_coinbase
+  type diff =
+    pre_diff_with_at_most_two_coinbase
+    * pre_diff_with_at_most_one_coinbase option
+    (*( diff_with_at_most_one_coinbase
     , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase )
-    Either.t
+    Either.t*)
   [@@deriving sexp, bin_io]
 
-  type t =
-    {pre_diffs: pre_diffs; prev_hash: ledger_builder_hash; creator: public_key}
+  type t = {diff: diff; prev_hash: ledger_builder_hash; creator: public_key}
   [@@deriving sexp, bin_io]
 
   module With_valid_signatures_and_proofs : sig
-    type diff =
+    type pre_diff_with_at_most_two_coinbase =
       { completed_works: completed_work_checked list
-      ; user_commands: user_command_with_valid_signature list }
+      ; user_commands: user_command_with_valid_signature list
+      ; coinbase: fee_transfer_single At_most_two.t }
     [@@deriving sexp]
 
-    type diff_with_at_most_two_coinbase =
+    type pre_diff_with_at_most_one_coinbase =
+      { completed_works: completed_work_checked list
+      ; user_commands: user_command_with_valid_signature list
+      ; coinbase: fee_transfer_single At_most_one.t }
+    [@@deriving sexp]
+
+    (*type diff_with_at_most_two_coinbase =
       {diff: diff; coinbase_parts: fee_transfer_single At_most_two.t}
     [@@deriving sexp]
 
     type diff_with_at_most_one_coinbase =
       {diff: diff; coinbase_added: fee_transfer_single At_most_one.t}
+    [@@deriving sexp]*)
+
+    type diff =
+      pre_diff_with_at_most_two_coinbase
+      * pre_diff_with_at_most_one_coinbase option
     [@@deriving sexp]
 
-    type pre_diffs =
-      ( diff_with_at_most_one_coinbase
-      , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase )
-      Either.t
-    [@@deriving sexp]
-
-    type t =
-      { pre_diffs: pre_diffs
-      ; prev_hash: ledger_builder_hash
-      ; creator: public_key }
+    type t = {diff: diff; prev_hash: ledger_builder_hash; creator: public_key}
     [@@deriving sexp]
 
     val user_commands : t -> user_command_with_valid_signature list
