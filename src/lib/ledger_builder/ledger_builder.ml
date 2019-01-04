@@ -17,8 +17,6 @@ let option lab =
 let check_or_error label b =
   if not b then Or_error.error_string label else Ok ()
 
-let place = 0
-
 let map2_or_error xs ys ~f =
   let rec go xs ys acc =
     match (xs, ys) with
@@ -369,15 +367,14 @@ end = struct
         in
         let fold_step acc_statement job =
           match job with
-          | Parallel_scan.State.Job.Merge (Rcomp (p, message))
-           |Merge (Lcomp (p, message)) ->
+          | Parallel_scan.State.Job.Merge (None, Some (p, message))
+           |Merge (Some (p, message), None) ->
               merge_acc
                 ~verify_proof:(fun () ->
                   Verifier.verify ~message p (Ledger_proof.statement p) )
                 acc_statement (Ledger_proof.statement p)
-          | Merge Empty -> M.Or_error.return acc_statement
-          | Merge (Bcomp ((proof_1, message_1), (proof_2, message_2), _place))
-            ->
+          | Merge (None, None) -> M.Or_error.return acc_statement
+          | Merge (Some (proof_1, message_1), Some (proof_2, message_2)) ->
               let open M.Or_error.Let_syntax in
               let%bind merged_statement =
                 M.return
@@ -396,7 +393,7 @@ end = struct
                   in
                   List.for_all verified_list ~f:Fn.id )
           | Base None -> M.Or_error.return acc_statement
-          | Base (Some (transaction, _place)) ->
+          | Base (Some transaction) ->
               with_error "Bad base statement" ~f:(fun () ->
                   let open M.Or_error.Let_syntax in
                   let%bind expected_statement =
