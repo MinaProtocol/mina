@@ -1193,7 +1193,7 @@ end = struct
       ; user_commands_rev: User_command.With_valid_signature.t Sequence.t
       ; completed_work_rev: Completed_work.Checked.t Sequence.t
       ; fee_transfers: Currency.Fee.t Compressed_public_key.Map.t
-      ; work_for_coinbase:
+      ; coinbase:
           (Compressed_public_key.t * Currency.Fee.t)
           Ledger_builder_diff.At_most_two.t
       ; self_pk: Compressed_public_key.t
@@ -1217,7 +1217,7 @@ end = struct
         go seq Sequence.empty
       in
       let cw_unchecked = Sequence.map cw_seq ~f:Completed_work.forget in
-      let work_for_coinbase, rem_cw =
+      let coinbase, rem_cw =
         match (add_coinbase, Sequence.next cw_unchecked) with
         | true, Some (cw, rem_cw) ->
             (Ledger_builder_diff.At_most_two.One (coinbase_ft cw), rem_cw)
@@ -1256,7 +1256,7 @@ end = struct
       ; completed_work_rev= seq_rev cw_seq
       ; fee_transfers
       ; self_pk
-      ; work_for_coinbase
+      ; coinbase
       ; budget
       ; discarded }
 
@@ -1276,7 +1276,7 @@ end = struct
       match t.budget with Ok _ -> true | Error _ -> false
 
     let coinbase_added t =
-      match t.work_for_coinbase with
+      match t.coinbase with
       | Ledger_builder_diff.At_most_two.Zero -> 0
       | One _ -> 1
       | Two _ -> 2
@@ -1318,17 +1318,15 @@ end = struct
         with
         | Some (w, rem_work), _ ->
             let w' = Completed_work.forget w in
-            let work_for_coinbase =
-              incr (res.work_for_coinbase, coinbase_ft w')
-            in
+            let coinbase = incr (res.coinbase, coinbase_ft w') in
             { res with
               completed_work_rev=
                 Sequence.append (Sequence.singleton w) res.completed_work_rev
             ; discarded= {res.discarded with completed_work= rem_work}
-            ; work_for_coinbase }
+            ; coinbase }
         | None, true ->
-            let work_for_coinbase = incr (res.work_for_coinbase, None) in
-            {res with work_for_coinbase}
+            let coinbase = incr (res.coinbase, None) in
+            {res with coinbase}
         | _ -> res
       in
       match count with `One -> by_one t | `Two -> by_one (by_one t)
@@ -1350,12 +1348,11 @@ end = struct
       else `More
 
     let discard_coinbase_ft t =
-      match t.work_for_coinbase with
+      match t.coinbase with
       | Ledger_builder_diff.At_most_two.One (Some _) ->
-          {t with work_for_coinbase= Ledger_builder_diff.At_most_two.One None}
-      | Two (Some (_, None)) -> {t with work_for_coinbase= Two None}
-      | Two (Some (ft1, Some _)) ->
-          {t with work_for_coinbase= Two (Some (ft1, None))}
+          {t with coinbase= Ledger_builder_diff.At_most_two.One None}
+      | Two (Some (_, None)) -> {t with coinbase= Two None}
+      | Two (Some (ft1, Some _)) -> {t with coinbase= Two (Some (ft1, None))}
       | _ -> t
 
     let discard_last_work t =
@@ -1402,12 +1399,11 @@ end = struct
       match Sequence.next t.user_commands_rev with
       | None -> (
         (* If we have reached here then we couldn't add any transaction and therefore discard the fee_transfer *)
-        match t.work_for_coinbase with
+        match t.coinbase with
         | Ledger_builder_diff.At_most_two.Zero -> t
-        | One _ ->
-            {t with work_for_coinbase= Ledger_builder_diff.At_most_two.Zero}
-        | Two None -> {t with work_for_coinbase= One None}
-        | Two (Some (ft, _)) -> {t with work_for_coinbase= One (Some ft)} )
+        | One _ -> {t with coinbase= Ledger_builder_diff.At_most_two.Zero}
+        | Two None -> {t with coinbase= One None}
+        | Two (Some (ft, _)) -> {t with coinbase= One (Some ft)} )
       | Some (uc, rem_seq) ->
           let discarded = Discarded.add_user_command t.discarded uc in
           let new_t = {t with user_commands_rev= rem_seq; discarded} in
@@ -1489,7 +1485,7 @@ end = struct
       (* We have to reverse here because we only know they work in THIS order *)
       { user_commands= Sequence.to_list_rev res.user_commands_rev
       ; completed_works= Sequence.to_list_rev res.completed_work_rev
-      ; coinbase= to_at_most_one res.work_for_coinbase }
+      ; coinbase= to_at_most_one res.coinbase }
     in
     let pre_diff_with_two (res : Resources.t) :
         Ledger_builder_diff.With_valid_signatures_and_proofs
@@ -1497,7 +1493,7 @@ end = struct
       (* We have to reverse here because we only know they work in THIS order *)
       { user_commands= Sequence.to_list_rev res.user_commands_rev
       ; completed_works= Sequence.to_list_rev res.completed_work_rev
-      ; coinbase= res.work_for_coinbase }
+      ; coinbase= res.coinbase }
     in
     let make_diff res1 res2_opt =
       (pre_diff_with_two res1, Option.map res2_opt ~f:pre_diff_with_one)
@@ -1527,7 +1523,6 @@ end = struct
                   ~add_coinbase:true max_jobs
               in
               make_diff res (Some res2)
-              (*TODO: rename this to just coinbase*)
           | x -> (
               if Sequence.is_empty res.discarded.user_commands_rev then
                 (*There are no more user_commands to be added in the second partition and so just add one coinbase to fill the empty slot in the first partition and be done*)
