@@ -153,6 +153,7 @@ let gen_keys () =
     module Ledger_builder_diff = Ledger_builder.Make_diff (struct
       open Coda_base
       module Compressed_public_key = Public_key.Compressed
+      module Fee_transfer = Fee_transfer
 
       module User_command = struct
         include (
