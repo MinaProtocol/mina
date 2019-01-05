@@ -1331,13 +1331,15 @@ end = struct
       in
       match count with `One -> by_one t | `Two -> by_one (by_one t)
 
-    let enough_proofs t =
+    let dynamic_work_constraint_satisfied t =
+      (*Are there enough proofs for the slots currently occupied? *)
       let occupied = slots_occupied t in
       let no_of_proofs = Sequence.length t.completed_work_rev in
       let all_proofs = max_work_done t in
       no_of_proofs >= occupied || all_proofs
 
-    let work_constraint_satisfied t =
+    let static_work_constraint_satisfied t =
+      (*At least all the proofs available or max proofs required for filling up the given space *)
       let no_of_proofs = Sequence.length t.completed_work_rev in
       let all_proofs = no_of_proofs = t.max_jobs in
       let max_bundles = t.max_space in
@@ -1398,7 +1400,7 @@ end = struct
     let discard_user_command t =
       match Sequence.next t.user_commands_rev with
       | None -> (
-        (* If we have reached here then we couldn't add any transaction and therefore discard the fee_transfer *)
+        (* If we have reached here then it means we couldn't add any transaction and so, discard the fee_transfer *)
         match t.coinbase with
         | Ledger_builder_diff.At_most_two.Zero -> t
         | One _ -> {t with coinbase= Ledger_builder_diff.At_most_two.Zero}
@@ -1417,46 +1419,51 @@ end = struct
           {new_t with budget}
   end
 
-  let rec discard_extra_work (resources : Resources.t) =
+  let rec discard_any_extra_work (resources : Resources.t) =
     if Sequence.is_empty resources.completed_work_rev then resources
     else
       let r = Resources.discard_last_work resources in
-      if Resources.enough_proofs r then discard_extra_work r else resources
+      if Resources.dynamic_work_constraint_satisfied r then
+        discard_any_extra_work r
+      else resources
 
-  let worked_extra (resources : Resources.t) =
+  let worked_more_than_required (resources : Resources.t) =
     if Sequence.is_empty resources.completed_work_rev then false
     else
+      (*Is the work constraint satisfied even after discarding a work bundle? *)
       let r = Resources.discard_last_work resources in
-      Resources.enough_proofs r
+      Resources.dynamic_work_constraint_satisfied r
 
   let rec check_constraints_and_update (resources : Resources.t) =
     let work_length = Sequence.length resources.completed_work_rev in
     let txn_length = Sequence.length resources.user_commands_rev in
+    let check_space_and_budget res =
+      if Resources.space_constraint_satisfied res then
+        if Resources.budget_sufficient res then res
+        else
+          (* insufficient budget; reduce the cost*)
+          check_constraints_and_update (Resources.discard_last_work res)
+      else if worked_more_than_required res then
+        (*There are too many fee_transfers(from the proofs) occupying the slots. discard one and check*)
+        check_constraints_and_update (Resources.discard_last_work res)
+      else
+        (*Well, there's no space; discard a user command *)
+        check_constraints_and_update (Resources.discard_user_command res)
+    in
     if work_length = 0 && txn_length = 0 then resources
     else
-      match Resources.work_constraint_satisfied resources with
-      | `Satisfied ->
-          if Resources.space_constraint_satisfied resources then
-            if Resources.budget_sufficient resources then resources
-            else
-              check_constraints_and_update
-                (Resources.discard_last_work resources)
-          else if worked_extra resources then
-            check_constraints_and_update
-              (Resources.discard_last_work resources)
-          else
-            check_constraints_and_update
-              (Resources.discard_user_command resources)
+      match Resources.static_work_constraint_satisfied resources with
+      | `Satisfied -> check_space_and_budget resources
       | `Less ->
-          if worked_extra resources then
-            check_constraints_and_update
-              (Resources.discard_last_work resources)
-          else if not (Resources.enough_proofs resources) then
-            (* No of transactions should be equal to the proof bundles. Discard extra transactions *)
+          if Resources.dynamic_work_constraint_satisfied resources then
+            (*it's okay, there's enough work. Check if they satisfy other constraints*)
+            check_space_and_budget resources
+          else
+            (* There isn't enough work for the transactions. No of transactions should be equal to the proof bundles. Discard them extra transactions! *)
             check_constraints_and_update
               (Resources.discard_user_command resources)
-          else resources
       | `More ->
+          (*More work than the given slots *)
           check_constraints_and_update (Resources.discard_last_work resources)
 
   let one_prediff cw_seq ts_seq self ~add_coinbase available_queue_space
@@ -1466,7 +1473,7 @@ end = struct
         ~add_coinbase
     in
     let r = check_constraints_and_update init_resources in
-    discard_extra_work r
+    discard_any_extra_work r
 
   let generate logger cw_seq ts_seq self partitions max_job_count =
     let pre_diff_with_one (res : Resources.t) :
@@ -1498,6 +1505,7 @@ end = struct
     let make_diff res1 res2_opt =
       (pre_diff_with_two res1, Option.map res2_opt ~f:pre_diff_with_one)
     in
+    (*Partitioning explained in PR #687 *)
     match partitions with
     | `One x ->
         let res =
@@ -1507,44 +1515,45 @@ end = struct
     | `Two (x, y) ->
         let work_count = Sequence.length cw_seq in
         if work_count > x || work_count = max_job_count then
-          (*Add txns to the first partition without the coinbase because we know there's atleast one bundle of work for a slot in the second parition which can be used for the coinbase if all the slots in this partition are filled*)
+          (*There's enough work to fill up first partition. Add txns to the first partition without the coinbase because we know there's atleast one bundle of work for a slot in the second parition which can be used for the coinbase if all the slots in the first partition are filled*)
           let res =
             one_prediff cw_seq ts_seq self x ~add_coinbase:false max_job_count
           in
           match Resources.available_space res with
           | 0 ->
               (*generate the next prediff with a coinbase at least*)
-              let cw_seq = res.discarded.completed_work in
               let max_jobs =
                 max_job_count - Sequence.length res.completed_work_rev
               in
               let res2 =
-                one_prediff cw_seq res.discarded.user_commands_rev self y
-                  ~add_coinbase:true max_jobs
+                one_prediff res.discarded.completed_work
+                  res.discarded.user_commands_rev self y ~add_coinbase:true
+                  max_jobs
               in
               make_diff res (Some res2)
           | x -> (
               if Sequence.is_empty res.discarded.user_commands_rev then
-                (*There are no more user_commands to be added in the second partition and so just add one coinbase to fill the empty slot in the first partition and be done*)
+                (*There are no more user_commands to be added in the second partition and so just add one coinbase to fill an empty slot in the first partition and be done*)
                 let new_res = Resources.incr_coinbase_part_by res `One in
                 make_diff new_res None
               else
                 match x with
                 | 1 ->
-                    (*There's a slot available in the previous partition, fill it with coinbase*)
+                    (*There's a slot available in the first partition, fill it with coinbase and create another pre_diff for the slots in the second partiton with the remaining user commands and work *)
                     let new_res = Resources.incr_coinbase_part_by res `One in
-                    let cw_seq = new_res.discarded.completed_work in
                     let res2 =
-                      one_prediff cw_seq new_res.discarded.user_commands_rev
-                        self y ~add_coinbase:false
+                      one_prediff new_res.discarded.completed_work
+                        new_res.discarded.user_commands_rev self y
+                        ~add_coinbase:false
                         ( max_job_count
                         - Sequence.length new_res.completed_work_rev )
                     in
                     make_diff new_res (Some res2)
                 | 2 ->
-                    (*There are two slots which cannot be filled using transactions, so we split the coinbase into two parts and fill in those two spots...*)
+                    (*There are two slots which cannot be filled using user commands, so we split the coinbase into two parts and fill those two spots*)
                     let new_res = Resources.incr_coinbase_part_by res `Two in
                     let cw_seq = new_res.discarded.completed_work in
+                    (*Create a second pre_diff for the remaing user_commands*)
                     let res2 =
                       one_prediff cw_seq new_res.discarded.user_commands_rev
                         self y ~add_coinbase:false
@@ -1560,6 +1569,7 @@ end = struct
                       ; coinbase= Ledger_builder_diff.At_most_two.Zero }
                     , None ) )
         else
+          (*There's not enough proofs for slots in the next partition, so just create one diff with coinbase in it *)
           let res =
             one_prediff cw_seq ts_seq self x ~add_coinbase:true max_job_count
           in
@@ -1580,7 +1590,7 @@ end = struct
     in
     (*TODO: return an or_error here *)
     let work_to_do = work_to_do_exn t'.scan_state in
-    let completed_works =
+    let completed_works_seq =
       Sequence.fold_until work_to_do ~init:Sequence.empty
         ~f:(fun seq w ->
           match get_completed_work w with
@@ -1603,7 +1613,7 @@ end = struct
           | Ok _ -> Sequence.append (Sequence.singleton t) seq )
     in
     let diff =
-      generate logger completed_works transactions_rev self partitions
+      generate logger completed_works_seq transactions_rev self partitions
         (Sequence.length work_to_do)
     in
     let proofs_available =
