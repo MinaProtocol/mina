@@ -264,7 +264,7 @@ module type Fee_transfer_intf = sig
 
   type public_key
 
-  type single = public_key * Fee.Unsigned.t [@@deriving sexp, bin_io, eq]
+  type single = public_key * Fee.Unsigned.t [@@deriving sexp, bin_io]
 
   val of_single : public_key * Fee.Unsigned.t -> t
 
@@ -443,20 +443,9 @@ module type Ledger_builder_diff_intf = sig
     ; coinbase: fee_transfer_single At_most_one.t }
   [@@deriving sexp, bin_io]
 
-  (*type diff_with_at_most_two_coinbase =
-    {diff: diff; coinbase_parts: fee_transfer_single At_most_two.t}
-  [@@deriving sexp, bin_io]
-
-  type diff_with_at_most_one_coinbase =
-    {diff: diff; coinbase_added: fee_transfer_single At_most_one.t}
-  [@@deriving sexp, bin_io]*)
-
   type diff =
     pre_diff_with_at_most_two_coinbase
     * pre_diff_with_at_most_one_coinbase option
-    (*( diff_with_at_most_one_coinbase
-    , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase )
-    Either.t*)
   [@@deriving sexp, bin_io]
 
   type t = {diff: diff; prev_hash: ledger_builder_hash; creator: public_key}
@@ -474,14 +463,6 @@ module type Ledger_builder_diff_intf = sig
       ; user_commands: user_command_with_valid_signature list
       ; coinbase: fee_transfer_single At_most_one.t }
     [@@deriving sexp]
-
-    (*type diff_with_at_most_two_coinbase =
-      {diff: diff; coinbase_parts: fee_transfer_single At_most_two.t}
-    [@@deriving sexp]
-
-    type diff_with_at_most_one_coinbase =
-      {diff: diff; coinbase_added: fee_transfer_single At_most_one.t}
-    [@@deriving sexp]*)
 
     type diff =
       pre_diff_with_at_most_two_coinbase
