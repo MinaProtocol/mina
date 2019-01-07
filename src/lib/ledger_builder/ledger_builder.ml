@@ -1580,14 +1580,17 @@ end = struct
                     in
                     make_diff new_res (Some res2)
                 | _ ->
-                    Logger.error logger
-                      "Tried to split the coinbase more than twice" ;
                     (*The number of transaction and provers were such that, it
                     created more than two empty slots. Shouldn't have occured
                     given that we restrict max number of provers we can buy
                     proofs from by bundling the proofs. Just fill one slot with
                     the coinbase and don't fill the remaining slots in this
                     partiton or in the next one*)
+                    Logger.fatal logger
+                      !"Tried to split the coinbase more than twice. Resource \
+                        consumption: %{sexp: Resources.t} \n\
+                       \ %!"
+                      res ;
                     let new_res = Resources.incr_coinbase_part_by res `One in
                     make_diff new_res None )
         else
