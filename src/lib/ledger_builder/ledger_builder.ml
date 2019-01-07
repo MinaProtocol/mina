@@ -835,7 +835,8 @@ end = struct
             ~f:(fun (job, proof) -> verify ~message job proof ) )
       |> Deferred.map ~f:(check_or_error "proofs did not verify"))
 
-  let create_fee_transfers completed_works delta public_key =
+  let create_fee_transfers completed_works delta public_key coinbase_fts =
+    let open Or_error.Let_syntax in
     let singles =
       (if Fee.Unsigned.(equal zero delta) then [] else [(public_key, delta)])
       @ List.filter_map completed_works
@@ -843,9 +844,24 @@ end = struct
             if Fee.Unsigned.equal fee Fee.Unsigned.zero then None
             else Some (prover, fee) )
     in
+    let%bind singles_map =
+      Or_error.try_with (fun () ->
+          Compressed_public_key.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
+              Option.value_exn (Fee.Unsigned.add f1 f2) ) )
+    in
+    (* deduct the coinbase work fee from the singles_map. It is already part of the coinbase *)
     Or_error.try_with (fun () ->
-        Compressed_public_key.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
-            Option.value_exn (Fee.Unsigned.add f1 f2) )
+        List.fold coinbase_fts ~init:singles_map ~f:(fun accum single ->
+            match Compressed_public_key.Map.find accum (fst single) with
+            | None -> accum
+            | Some fee ->
+                let new_fee =
+                  Option.value_exn (Currency.Fee.sub fee (snd single))
+                in
+                if new_fee > Currency.Fee.zero then
+                  Compressed_public_key.Map.update accum (fst single)
+                    ~f:(fun _ -> new_fee )
+                else Compressed_public_key.Map.remove accum (fst single) )
         (* TODO: This creates a weird incentive to have a small public_key *)
         |> Map.to_alist ~key_order:`Increasing
         |> Fee_transfer.of_single_list )
@@ -879,27 +895,16 @@ end = struct
         ^ ") \n %!" )
         (Currency.Amount.sub a1 a2)
     in
-    let single {Completed_work.fee; prover; _} =
-      if
-        Fee.Unsigned.equal fee Fee.Unsigned.zero
-        || Compressed_public_key.equal prover proposer
-      then None
-      else Some (prover, fee)
-    in
-    let fee_transfer cw_opt = Option.bind cw_opt ~f:single in
-    let two_parts amt w1 w2 =
+    let two_parts amt ft1 ft2 =
       let%bind rem_coinbase = overflow_err coinbase amt in
       let%bind _ =
         overflow_err rem_coinbase
-          (Option.value_map ~default:Currency.Amount.zero w2
-             ~f:(fun {Completed_work.fee; _} -> Currency.Amount.of_fee fee ))
+          (Option.value_map ~default:Currency.Amount.zero ft2 ~f:(fun single ->
+               Currency.Amount.of_fee (snd single) ))
       in
-      let%bind cb1 =
-        Coinbase.create ~amount:amt ~proposer ~fee_transfer:(fee_transfer w1)
-      in
+      let%bind cb1 = Coinbase.create ~amount:amt ~proposer ~fee_transfer:ft1 in
       let%map cb2 =
-        Coinbase.create ~amount:rem_coinbase ~proposer
-          ~fee_transfer:(fee_transfer w2)
+        Coinbase.create ~amount:rem_coinbase ~proposer ~fee_transfer:ft2
       in
       [cb1; cb2]
     in
@@ -907,19 +912,15 @@ end = struct
     | `Zero -> return []
     | `One x ->
         let%map cb =
-          Coinbase.create ~amount:coinbase ~proposer
-            ~fee_transfer:(fee_transfer x)
+          Coinbase.create ~amount:coinbase ~proposer ~fee_transfer:x
         in
         [cb]
-    | `Two None ->
-        let amt = Currency.Amount.of_int 1 in
-        two_parts amt None None
-    | `Two (Some ((w1 : Completed_work.t), w2)) ->
-        let amt = Currency.Amount.of_fee w1.fee in
-        two_parts amt (Some w1) w2
+    | `Two None -> two_parts (Currency.Amount.of_int 1) None None
+    | `Two (Some (ft1, ft2)) ->
+        two_parts (Currency.Amount.of_fee (snd ft1)) (Some ft1) ft2
 
   let fee_remainder (user_commands : User_command.With_valid_signature.t list)
-      completed_works =
+      completed_works coinbase_fee =
     let open Or_error.Let_syntax in
     let%bind budget =
       sum_fees user_commands ~f:(fun t -> User_command.fee (t :> User_command.t)
@@ -928,23 +929,25 @@ end = struct
     let%bind work_fee =
       sum_fees completed_works ~f:(fun {Completed_work.fee; _} -> fee)
     in
-    option "budget did not suffice" (Fee.Unsigned.sub budget work_fee)
+    let total_work_fee =
+      Option.value ~default:Currency.Fee.zero
+        (Currency.Fee.sub work_fee coinbase_fee)
+    in
+    option "budget did not suffice" (Fee.Unsigned.sub budget total_work_fee)
 
   module Prediff_info = struct
     type ('data, 'work) t =
       { data: 'data
       ; work: 'work list
-      ; coinbase_work: 'work list
       ; user_commands_count: int
       ; coinbase_parts_count: int }
   end
 
-  let apply_pre_diff t coinbase_parts proposer
-      (diff : Ledger_builder_diff.diff) =
+  let apply_pre_diff t coinbase_parts proposer user_commands completed_works =
     let open Result_with_rollback.Let_syntax in
     let%bind user_commands =
       let%map user_commands' =
-        List.fold_until diff.user_commands ~init:[]
+        List.fold_until user_commands ~init:[]
           ~f:(fun acc t ->
             match User_command.check t with
             | Some t -> Continue (t :: acc)
@@ -956,23 +959,27 @@ end = struct
       in
       List.rev user_commands'
     in
-    let coinbase_work =
+    let coinbase_fts =
       match coinbase_parts with
-      | `One (Some w) -> [w]
-      | `Two (Some (w, None)) -> [w]
-      | `Two (Some (w1, Some w2)) -> [w1; w2]
+      | `Zero -> []
+      | `One (Some ft) -> [ft]
+      | `Two (Some (ft, None)) -> [ft]
+      | `Two (Some (ft1, Some ft2)) -> [ft1; ft2]
       | _ -> []
+    in
+    let%bind coinbase_work_fees =
+      sum_fees coinbase_fts ~f:snd |> Result_with_rollback.of_or_error
     in
     let%bind coinbase =
       create_coinbase coinbase_parts proposer
       |> Result_with_rollback.of_or_error
     in
     let%bind delta =
-      fee_remainder user_commands diff.completed_works
+      fee_remainder user_commands completed_works coinbase_work_fees
       |> Result_with_rollback.of_or_error
     in
     let%bind fee_transfers =
-      create_fee_transfers diff.completed_works delta proposer
+      create_fee_transfers completed_works delta proposer coinbase_fts
       |> Result_with_rollback.of_or_error
     in
     let transactions =
@@ -984,13 +991,12 @@ end = struct
       update_ledger_and_get_statements t.ledger transactions
     in
     { Prediff_info.data= new_data
-    ; work= diff.completed_works
-    ; coinbase_work
+    ; work= completed_works
     ; user_commands_count= List.length user_commands
     ; coinbase_parts_count= List.length coinbase }
 
   (* TODO: when we move to a disk-backed db, this should call "Ledger.commit_changes" at the end. *)
-  let apply_diff t (diff : Ledger_builder_diff.t) ~logger =
+  let apply_diff t (lb_diff : Ledger_builder_diff.t) ~logger =
     let open Result_with_rollback.Let_syntax in
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
     let%bind spots_available, proofs_waiting =
@@ -1002,21 +1008,23 @@ end = struct
       , List.length jobs )
     in
     let apply_pre_diff_with_at_most_two
-        (pre_diff1 : Ledger_builder_diff.diff_with_at_most_two_coinbase) =
+        (pre_diff1 : Ledger_builder_diff.pre_diff_with_at_most_two_coinbase) =
       let coinbase_parts =
-        match pre_diff1.coinbase_parts with
+        match pre_diff1.coinbase with
         | Zero -> `Zero
         | One x -> `One x
         | Two x -> `Two x
       in
-      apply_pre_diff t coinbase_parts diff.creator pre_diff1.diff
+      apply_pre_diff t coinbase_parts lb_diff.creator pre_diff1.user_commands
+        pre_diff1.completed_works
     in
     let apply_pre_diff_with_at_most_one
-        (pre_diff2 : Ledger_builder_diff.diff_with_at_most_one_coinbase) =
+        (pre_diff2 : Ledger_builder_diff.pre_diff_with_at_most_one_coinbase) =
       let coinbase_added =
-        match pre_diff2.coinbase_added with Zero -> `Zero | One x -> `One x
+        match pre_diff2.coinbase with Zero -> `Zero | One x -> `One x
       in
-      apply_pre_diff t coinbase_added diff.creator pre_diff2.diff
+      apply_pre_diff t coinbase_added lb_diff.creator pre_diff2.user_commands
+        pre_diff2.completed_works
     in
     let%bind () =
       let curr_hash = hash t in
@@ -1024,31 +1032,25 @@ end = struct
         (sprintf
            !"bad prev_hash: Expected %{sexp:Ledger_builder_hash.t}, got \
              %{sexp:Ledger_builder_hash.t}"
-           curr_hash diff.prev_hash)
-        (Ledger_builder_hash.equal diff.prev_hash (hash t))
+           curr_hash lb_diff.prev_hash)
+        (Ledger_builder_hash.equal lb_diff.prev_hash (hash t))
       |> Result_with_rollback.of_or_error
     in
     let%bind data, works, user_commands_count, cb_parts_count =
-      Either.value_map diff.pre_diffs
-        ~first:(fun d ->
-          let%map { data
-                  ; work
-                  ; coinbase_work
-                  ; user_commands_count
-                  ; coinbase_parts_count } =
-            apply_pre_diff_with_at_most_one d
-          in
-          ( data
-          , coinbase_work @ work
-          , user_commands_count
-          , coinbase_parts_count ) )
-        ~second:(fun d ->
-          let%bind p1 = apply_pre_diff_with_at_most_two (fst d) in
-          let%map p2 = apply_pre_diff_with_at_most_one (snd d) in
-          ( p1.data @ p2.data
-          , p1.work @ p1.coinbase_work @ p2.coinbase_work @ p2.work
-          , p1.user_commands_count + p2.user_commands_count
-          , p1.coinbase_parts_count + p2.coinbase_parts_count ) )
+      let%bind p1 = apply_pre_diff_with_at_most_two (fst lb_diff.diff) in
+      let%map p2 =
+        Option.value_map ~f:apply_pre_diff_with_at_most_one (snd lb_diff.diff)
+          ~default:
+            (Result_with_rollback.return
+               { Prediff_info.data= []
+               ; work= []
+               ; user_commands_count= 0
+               ; coinbase_parts_count= 0 })
+      in
+      ( p1.data @ p2.data
+      , p1.work @ p2.work
+      , p1.user_commands_count + p2.user_commands_count
+      , p1.coinbase_parts_count + p2.coinbase_parts_count )
     in
     let%bind () = check_completed_works t works in
     let%bind res_opt =
@@ -1077,26 +1079,29 @@ end = struct
   let apply t witness ~logger =
     Result_with_rollback.run (apply_diff t witness ~logger)
 
-  let forget_work_opt = Option.map ~f:Completed_work.forget
-
-  let apply_pre_diff_unchecked t coinbase_parts proposer
-      (diff : Ledger_builder_diff.With_valid_signatures_and_proofs.diff) =
-    let user_commands = diff.user_commands in
-    let txn_works = List.map ~f:Completed_work.forget diff.completed_works in
-    let coinbase_work =
+  let apply_pre_diff_unchecked t coinbase_parts proposer user_commands
+      completed_works =
+    let user_commands = user_commands in
+    let txn_works = List.map ~f:Completed_work.forget completed_works in
+    let coinbase_fts =
       match coinbase_parts with
-      | `One (Some w) -> [w]
-      | `Two (Some (w, None)) -> [w]
-      | `Two (Some (w1, Some w2)) -> [w1; w2]
+      | `One (Some ft) -> [ft]
+      | `Two (Some (ft, None)) -> [ft]
+      | `Two (Some (ft1, Some ft2)) -> [ft1; ft2]
       | _ -> []
     in
+    let coinbase_work_fees = sum_fees coinbase_fts ~f:snd |> Or_error.ok_exn in
     let coinbase_parts =
       measure "create_coinbase" (fun () ->
           Or_error.ok_exn (create_coinbase coinbase_parts proposer) )
     in
-    let delta = Or_error.ok_exn (fee_remainder user_commands txn_works) in
+    let delta =
+      Or_error.ok_exn
+        (fee_remainder user_commands txn_works coinbase_work_fees)
+    in
     let fee_transfers =
-      Or_error.ok_exn (create_fee_transfers txn_works delta proposer)
+      Or_error.ok_exn
+        (create_fee_transfers txn_works delta proposer coinbase_fts)
     in
     let transactions =
       List.map user_commands ~f:(fun t -> Transaction.User_command t)
@@ -1109,49 +1114,42 @@ end = struct
           let _undo, t = Or_error.ok_exn r in
           t )
     in
-    (new_data, txn_works, coinbase_work)
+    (new_data, txn_works)
 
   let apply_diff_unchecked t
-      (diff : Ledger_builder_diff.With_valid_signatures_and_proofs.t) =
+      (lb_diff : Ledger_builder_diff.With_valid_signatures_and_proofs.t) =
     let apply_pre_diff_with_at_most_two
         (pre_diff1 :
           Ledger_builder_diff.With_valid_signatures_and_proofs
-          .diff_with_at_most_two_coinbase) =
+          .pre_diff_with_at_most_two_coinbase) =
       let coinbase_parts =
-        match pre_diff1.coinbase_parts with
+        match pre_diff1.coinbase with
         | Zero -> `Zero
-        | One x -> `One (forget_work_opt x)
-        | Two x ->
-            `Two
-              (Option.map x ~f:(fun (w, w_opt) ->
-                   (Completed_work.forget w, forget_work_opt w_opt) ))
+        | One x -> `One x
+        | Two x -> `Two x
       in
-      apply_pre_diff_unchecked t coinbase_parts diff.creator pre_diff1.diff
+      apply_pre_diff_unchecked t coinbase_parts lb_diff.creator
+        pre_diff1.user_commands pre_diff1.completed_works
     in
     let apply_pre_diff_with_at_most_one
         (pre_diff2 :
           Ledger_builder_diff.With_valid_signatures_and_proofs
-          .diff_with_at_most_one_coinbase) =
+          .pre_diff_with_at_most_one_coinbase) =
       let coinbase_added =
-        match pre_diff2.coinbase_added with
-        | Zero -> `Zero
-        | One x -> `One (forget_work_opt x)
+        match pre_diff2.coinbase with Zero -> `Zero | One x -> `One x
       in
-      apply_pre_diff_unchecked t coinbase_added diff.creator pre_diff2.diff
+      apply_pre_diff_unchecked t coinbase_added lb_diff.creator
+        pre_diff2.user_commands pre_diff2.completed_works
     in
     let%map data, works =
-      Either.value_map diff.pre_diffs
-        ~first:(fun d ->
-          let%map data, works, cb_works = apply_pre_diff_with_at_most_one d in
-          (data, cb_works @ works) )
-        ~second:(fun d ->
-          let%bind data1, works1, cb_works1 =
-            apply_pre_diff_with_at_most_two (fst d)
-          in
-          let%map data2, works2, cb_works2 =
-            apply_pre_diff_with_at_most_one (snd d)
-          in
-          (data1 @ data2, works1 @ cb_works1 @ cb_works2 @ works2) )
+      let%bind data1, work1 =
+        apply_pre_diff_with_at_most_two (fst lb_diff.diff)
+      in
+      let%map data2, work2 =
+        Option.value_map ~f:apply_pre_diff_with_at_most_one (snd lb_diff.diff)
+          ~default:(Deferred.return ([], []))
+      in
+      (data1 @ data2, work1 @ work2)
     in
     let res_opt =
       Or_error.ok_exn (fill_in_completed_work t.scan_state works)
