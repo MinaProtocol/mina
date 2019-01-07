@@ -96,6 +96,7 @@ let main () =
           open Signature_lib
           open Coda_base
           module Compressed_public_key = Public_key.Compressed
+          module Fee_transfer = Fee_transfer
 
           module User_command = struct
             include (

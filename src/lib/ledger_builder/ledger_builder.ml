@@ -112,6 +112,9 @@ module Make_diff (Inputs : sig
     with type public_key := Compressed_public_key.t
      and type statement := Transaction_snark.Statement.t
      and type proof := Ledger_proof.t
+
+  module Fee_transfer :
+    Fee_transfer_intf with type public_key := Compressed_public_key.t
 end) :
   Coda_pow.Ledger_builder_diff_intf
   with type user_command := Inputs.User_command.t
@@ -120,7 +123,8 @@ end) :
    and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
    and type public_key := Inputs.Compressed_public_key.t
    and type completed_work := Inputs.Completed_work.t
-   and type completed_work_checked := Inputs.Completed_work.Checked.t = struct
+   and type completed_work_checked := Inputs.Completed_work.Checked.t
+   and type fee_transfer_single := Inputs.Fee_transfer.single = struct
   open Inputs
 
   module At_most_two = struct
@@ -147,107 +151,87 @@ end) :
       | _ -> Or_error.error_string "Error incrementing coinbase parts"
   end
 
+  type ft = Inputs.Fee_transfer.single [@@deriving sexp, bin_io]
+
+  type pre_diff_with_at_most_two_coinbase =
+    { completed_works: Completed_work.t list
+    ; user_commands: User_command.t list
+    ; coinbase: ft At_most_two.t }
+  [@@deriving sexp, bin_io]
+
+  type pre_diff_with_at_most_one_coinbase =
+    { completed_works: Completed_work.t list
+    ; user_commands: User_command.t list
+    ; coinbase: ft At_most_one.t }
+  [@@deriving sexp, bin_io]
+
   type diff =
-    {completed_works: Completed_work.t list; user_commands: User_command.t list}
-  [@@deriving sexp, bin_io]
-
-  type diff_with_at_most_two_coinbase =
-    {diff: diff; coinbase_parts: Completed_work.t At_most_two.t}
-  [@@deriving sexp, bin_io]
-
-  type diff_with_at_most_one_coinbase =
-    {diff: diff; coinbase_added: Completed_work.t At_most_one.t}
-  [@@deriving sexp, bin_io]
-
-  type pre_diffs =
-    ( diff_with_at_most_one_coinbase
-    , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase )
-    Either.t
+    pre_diff_with_at_most_two_coinbase
+    * pre_diff_with_at_most_one_coinbase option
   [@@deriving sexp, bin_io]
 
   type t =
-    { pre_diffs: pre_diffs
+    { diff: diff
     ; prev_hash: Ledger_builder_hash.t
     ; creator: Compressed_public_key.t }
   [@@deriving sexp, bin_io]
 
   module With_valid_signatures_and_proofs = struct
-    type diff =
+    type pre_diff_with_at_most_two_coinbase =
       { completed_works: Completed_work.Checked.t list
-      ; user_commands: User_command.With_valid_signature.t list }
+      ; user_commands: User_command.With_valid_signature.t list
+      ; coinbase: ft At_most_two.t }
     [@@deriving sexp]
 
-    type diff_with_at_most_two_coinbase =
-      { diff: diff
-      ; coinbase_parts: Inputs.Completed_work.Checked.t At_most_two.t }
+    type pre_diff_with_at_most_one_coinbase =
+      { completed_works: Completed_work.Checked.t list
+      ; user_commands: User_command.With_valid_signature.t list
+      ; coinbase: ft At_most_one.t }
     [@@deriving sexp]
 
-    type diff_with_at_most_one_coinbase =
-      { diff: diff
-      ; coinbase_added: Inputs.Completed_work.Checked.t At_most_one.t }
-    [@@deriving sexp]
-
-    type pre_diffs =
-      ( diff_with_at_most_one_coinbase
-      , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase )
-      Either.t
+    type diff =
+      pre_diff_with_at_most_two_coinbase
+      * pre_diff_with_at_most_one_coinbase option
     [@@deriving sexp]
 
     type t =
-      { pre_diffs: pre_diffs
+      { diff: diff
       ; prev_hash: Ledger_builder_hash.t
       ; creator: Compressed_public_key.t }
     [@@deriving sexp]
 
     let user_commands t =
-      Either.value_map t.pre_diffs
-        ~first:(fun d -> d.diff.user_commands)
-        ~second:(fun d ->
-          (fst d).diff.user_commands @ (snd d).diff.user_commands )
+      (fst t.diff).user_commands
+      @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d -> d.user_commands)
   end
 
-  let forget_diff
-      {With_valid_signatures_and_proofs.completed_works; user_commands} =
-    { completed_works= List.map ~f:Completed_work.forget completed_works
-    ; user_commands= (user_commands :> User_command.t list) }
-
-  let forget_work_opt = Option.map ~f:Completed_work.forget
+  let forget_cw cw_list = List.map ~f:Completed_work.forget cw_list
 
   let forget_pre_diff_with_at_most_two
-      {With_valid_signatures_and_proofs.diff; coinbase_parts} =
-    let forget_cw =
-      match coinbase_parts with
-      | At_most_two.Zero -> At_most_two.Zero
-      | One cw -> One (forget_work_opt cw)
-      | Two cw_pair ->
-          Two
-            (Option.map cw_pair ~f:(fun (cw, cw_opt) ->
-                 (Completed_work.forget cw, forget_work_opt cw_opt) ))
-    in
-    {diff= forget_diff diff; coinbase_parts= forget_cw}
+      (pre_diff :
+        With_valid_signatures_and_proofs.pre_diff_with_at_most_two_coinbase) :
+      pre_diff_with_at_most_two_coinbase =
+    { completed_works= forget_cw pre_diff.completed_works
+    ; user_commands= (pre_diff.user_commands :> User_command.t list)
+    ; coinbase= pre_diff.coinbase }
 
   let forget_pre_diff_with_at_most_one
-      {With_valid_signatures_and_proofs.diff; coinbase_added} =
-    let forget_cw =
-      match coinbase_added with
-      | At_most_one.Zero -> At_most_one.Zero
-      | One cw -> One (forget_work_opt cw)
-    in
-    {diff= forget_diff diff; coinbase_added= forget_cw}
+      (pre_diff :
+        With_valid_signatures_and_proofs.pre_diff_with_at_most_one_coinbase) =
+    { completed_works= forget_cw pre_diff.completed_works
+    ; user_commands= (pre_diff.user_commands :> User_command.t list)
+    ; coinbase= pre_diff.coinbase }
 
   let forget (t : With_valid_signatures_and_proofs.t) =
-    { pre_diffs=
-        Either.map t.pre_diffs ~first:forget_pre_diff_with_at_most_one
-          ~second:(fun d ->
-            ( forget_pre_diff_with_at_most_two (fst d)
-            , forget_pre_diff_with_at_most_one (snd d) ) )
+    { diff=
+        ( forget_pre_diff_with_at_most_two (fst t.diff)
+        , Option.map (snd t.diff) ~f:forget_pre_diff_with_at_most_one )
     ; prev_hash= t.prev_hash
     ; creator= t.creator }
 
   let user_commands (t : t) =
-    Either.value_map t.pre_diffs
-      ~first:(fun d -> d.diff.user_commands)
-      ~second:(fun d -> (fst d).diff.user_commands @ (snd d).diff.user_commands)
+    (fst t.diff).user_commands
+    @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d -> d.user_commands)
 end
 
 module Make (Inputs : Inputs.S) : sig
