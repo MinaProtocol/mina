@@ -284,7 +284,12 @@ let daemon log =
        in
        let module M = Coda_main.Make_coda (Init) in
        let module Run = Run (Config0) (M) in
-       Async.Scheduler.report_long_cycle_times ~cutoff:(sec 0.5) () ;
+       Stream.iter
+         (Async.Scheduler.long_cycles
+            ~at_least:(sec 0.5 |> Time_ns.Span.of_span))
+         ~f:(fun span ->
+           Logger.warn log "long async cycle %s" (Time_ns.Span.to_string span)
+           ) ;
        let%bind () =
          let open M in
          let run_snark_worker_action =
