@@ -1582,10 +1582,14 @@ end = struct
                 | _ ->
                     Logger.error logger
                       "Tried to split the coinbase more than twice" ;
-                    ( { completed_works= []
-                      ; user_commands= []
-                      ; coinbase= Ledger_builder_diff.At_most_two.Zero }
-                    , None ) )
+                    (*The number of transaction and provers were such that, it
+                    created more than two empty slots. Shouldn't have occured
+                    given that we restrict max number of provers we can buy
+                    proofs from by bundling the proofs. Just fill one slot with
+                    the coinbase and don't fill the remaining slots in this
+                    partiton or in the next one*)
+                    let new_res = Resources.incr_coinbase_part_by res `One in
+                    make_diff new_res None )
         else
           (*There's not enough proofs for slots in the next partition, so just create one diff with coinbase in it *)
           let res =
