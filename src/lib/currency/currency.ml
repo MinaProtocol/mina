@@ -405,11 +405,12 @@ end = struct
       let add (x : var) (y : var) =
         let%bind xv = to_field_var x and yv = to_field_var y in
         let%bind sgn =
-          provide_witness Sgn.typ
-            (let open As_prover in
-            let open Let_syntax in
-            let%map x = read typ x and y = read typ y in
-            (Option.value_exn (add x y)).sgn)
+          exists Sgn.typ
+            ~compute:
+              (let open As_prover in
+              let open Let_syntax in
+              let%map x = read typ x and y = read typ y in
+              (Option.value_exn (add x y)).sgn)
         in
         let%bind res =
           Tick.Field.Checked.mul

@@ -7,7 +7,7 @@ module Make_test (F : Intf.Basic) = struct
       let (), r =
         run_and_check
           (let open Checked.Let_syntax in
-          let%bind x = provide_witness arg_typ (As_prover.return x) in
+          let%bind x = exists arg_typ ~compute:(As_prover.return x) in
           checked x >>| As_prover.read F.typ)
           ()
         |> Or_error.ok_exn
@@ -67,8 +67,9 @@ module Make (F : Intf.Basic) = struct
     | Some x, Some y -> return (constant Unchecked.(x / y))
     | _, _ ->
         let%bind x_over_y =
-          provide_witness typ
-            As_prover.(map2 (read typ x) (read typ y) ~f:Unchecked.( / ))
+          exists typ
+            ~compute:
+              As_prover.(map2 (read typ x) (read typ y) ~f:Unchecked.( / ))
         in
         let%map () = assert_r1cs y x_over_y x in
         x_over_y
@@ -87,8 +88,10 @@ module Make (F : Intf.Basic) = struct
           | Some x, Some y -> return (constant Unchecked.(x * y))
           | _, _ ->
               let%bind res =
-                provide_witness typ
-                  As_prover.(map2 (read typ x) (read typ y) ~f:Unchecked.( * ))
+                exists typ
+                  ~compute:
+                    As_prover.(
+                      map2 (read typ x) (read typ y) ~f:Unchecked.( * ))
               in
               let%map () = assert_r1cs x y res in
               res )
@@ -106,8 +109,8 @@ module Make (F : Intf.Basic) = struct
           | Some x -> return (constant (Unchecked.square x))
           | None ->
               let%bind res =
-                provide_witness typ
-                  As_prover.(map (read typ x) ~f:Unchecked.square)
+                exists typ
+                  ~compute:As_prover.(map (read typ x) ~f:Unchecked.square)
               in
               let%map () = assert_square x res in
               res )
@@ -125,8 +128,8 @@ module Make (F : Intf.Basic) = struct
           | Some x -> return (constant (Unchecked.inv x))
           | None ->
               let%bind res =
-                provide_witness typ
-                  As_prover.(map (read typ t) ~f:Unchecked.inv)
+                exists typ
+                  ~compute:As_prover.(map (read typ t) ~f:Unchecked.inv)
               in
               let%map () = assert_r1cs t res one in
               res )
