@@ -622,6 +622,8 @@ module type Transaction_snark_scan_state_intf = sig
 
   val empty : unit -> t
 
+  val capacity : t -> int
+
   val enqueue_transactions :
     t -> Transaction_with_witness.t list -> unit Or_error.t
 

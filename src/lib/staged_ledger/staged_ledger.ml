@@ -207,10 +207,8 @@ end = struct
       Scan_state.staged_transactions scan_state
     in
     Debug_assert.debug_assert (fun () ->
-        let total_capacity_log_2 =
-          Inputs.Config.transaction_capacity_log_2 + 2
-        in
-        let parallelism = Int.pow 2 total_capacity_log_2 in
+        let parallelism = Scan_state.capacity scan_state in
+        let total_capacity_log_2 = Int.ceil_log2 parallelism in
         [%test_pred: int]
           (( >= ) (total_capacity_log_2 * parallelism))
           (List.length txns_still_being_worked_on) ) ;
