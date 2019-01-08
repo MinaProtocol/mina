@@ -214,7 +214,9 @@ struct
         ~manual_install_path:Cache_dir.manual_install_path
         ~digest_input:
           (Fn.compose Md5.to_hex Tick.R1CS_constraint_system.digest)
-        ~create_env:Tick.Keypair.generate
+        ~create_env:(fun x ->
+          Coda_base.Ci_die.skip_key_generation () ;
+          Tick.Keypair.generate x )
         ~input:
           (Tick.constraint_system ~exposing:(Step_base.input ()) Step_base.main)
 
@@ -241,7 +243,9 @@ struct
           ~manual_install_path:Cache_dir.manual_install_path
           ~digest_input:
             (Fn.compose Md5.to_hex Tock.R1CS_constraint_system.digest)
-          ~create_env:Tock.Keypair.generate
+          ~create_env:(fun x ->
+            Coda_base.Ci_die.skip_key_generation () ;
+            Tock.Keypair.generate x )
           ~input:(Tock.constraint_system ~exposing:Wrap.input Wrap.main)
       in
       let%map wrap_vk, wrap_pk = Cached.run wrap_cached in
