@@ -1058,7 +1058,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
               ~then_:Field.(Var.constant zero)
               ~else_:
                 ( Length.pack_var previous_state.curr_epoch_data.length
-                  :> Field.var )
+                  :> Field.Var.t )
           in
           Length.var_of_field Field.(Var.(add (constant one) base))
         and ledger =

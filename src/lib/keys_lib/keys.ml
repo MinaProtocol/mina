@@ -24,7 +24,7 @@ module type S = sig
 
     val input :
          unit
-      -> ('a, 'b, Tick.Field.var -> 'a, Tick.Field.t -> 'b) Tick.Data_spec.t
+      -> ('a, 'b, Tick.Field.Var.t -> 'a, Tick.Field.t -> 'b) Tick.Data_spec.t
 
     module Verification_key : sig
       val to_bool_list : Tock.Verification_key.t -> bool list
@@ -35,7 +35,7 @@ module type S = sig
     val instance_hash :
       Consensus_mechanism.Protocol_state.value -> Tick.Field.t
 
-    val main : Tick.Field.var -> (unit, Prover_state.t) Tick.Checked.t
+    val main : Tick.Field.Var.t -> (unit, Prover_state.t) Tick.Checked.t
   end
 
   module Wrap : sig

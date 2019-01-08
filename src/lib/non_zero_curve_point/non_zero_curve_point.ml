@@ -12,7 +12,7 @@ end
 include Stable.V1
 include Comparable.Make_binable (Stable.V1)
 
-type var = Tick.Field.var * Tick.Field.var
+type var = Tick.Field.Var.t * Tick.Field.Var.t
 
 let var_of_t (x, y) = (Tick.Field.Var.constant x, Tick.Field.Var.constant y)
 
@@ -78,7 +78,7 @@ module Compressed = struct
 
   let length_in_triples = bit_length_to_triple_length (1 + Field.size_in_bits)
 
-  type var = (Field.var, Boolean.var) t_
+  type var = (Field.Var.t, Boolean.var) t_
 
   let to_hlist {x; is_odd} = Snarky.H_list.[x; is_odd]
 

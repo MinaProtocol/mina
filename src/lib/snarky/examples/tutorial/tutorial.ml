@@ -44,24 +44,23 @@ let () =
 (* Try seeing what operations there are in the [Field] module by using
    your editor's auto-completion feature
 *)
-(* Inside Checked.t's we work with "Field.var"s. These are sort of like
+(* Inside Checked.t's we work with "Field.Var.t"s. These are sort of like
    Field.t's but we can make assertions about them.
 
    Field.Checked provides "Checked" versions of the usual field operations.
 *)
-(* [assert_equal : Field.var -> Field.var -> (unit, _) Checked.t] lets us
+(* [assert_equal : Field.Var.t -> Field.Var.t -> (unit, _) Checked.t] lets us
    make an assertion that two field elements are equal.
 
    Here we assert that [x] is a square root of 9.
 *)
-let assert_is_square_root_of_9 (x : Field.var) : (unit, _) Checked.t =
+let assert_is_square_root_of_9 (x : Field.Var.t) : (unit, _) Checked.t =
   let%bind x_squared = Field.Checked.mul x x in
-  Field.Checked.Assert.equal x_squared
-    (Field.Checked.constant (Field.of_int 9))
+  Field.Checked.Assert.equal x_squared (Field.Var.constant (Field.of_int 9))
 
 (* Exercise 1:
    Write a function
-   [assert_is_cube_root_of_1 : Field.var -> (unit, _) Checked.t]
+   [assert_is_cube_root_of_1 : Field.Var.t -> (unit, _) Checked.t]
    that asserts its argument is a cube root of 1.
 
    Aside:
@@ -82,7 +81,7 @@ let assert_is_square_root_of_9 (x : Field.var) : (unit, _) Checked.t =
 (* In this field, it happens to be the case that -3 is a square. *)
 let () = assert (Field.is_square (Field.of_int (-3)))
 
-let assert_is_cube_root_of_1 (x : Field.var) = failwith "Exercise 1"
+let assert_is_cube_root_of_1 (x : Field.Var.t) = failwith "Exercise 1"
 
 let cube_root_of_1 =
   let open Field in
@@ -96,7 +95,7 @@ let exercise1 () =
      list type constructors. We also need to make input a function over unit due
      to value restriction reasons.
 
-     Here our function `assert_is_curbe_root_of_1` takes a single Field.var as
+     Here our function `assert_is_curbe_root_of_1` takes a single Field.Var.t as
      input. The type of that var is `Field.typ`.
    *)
   let input () = Data_spec.[Field.typ] in
@@ -215,7 +214,7 @@ module Exercise3 = struct
    * monad, and the Field.Checked version with the Checked monad
    *)
   module Mat_checked = struct
-    type t = Field.var array array
+    type t = Field.Var.t array array
 
     (* Exercise 3: fill me out *)
     let mul : t -> t -> (t, _) Checked.t =
@@ -231,7 +230,7 @@ module Exercise3 = struct
      matrix (the square of [1; 2]; [4; 5] )
   *)
   let assert_exists_sqrt sqrt_x =
-    let f x = Field.Checked.constant (Field.of_int x) in
+    let f x = Field.Var.constant (Field.of_int x) in
     assert_exists_mat_sqrt [|[|f 9; f 12|]; [|f 24; f 33|]|] sqrt_x
 
   (* Now the data_spec is more interesting:

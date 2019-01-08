@@ -19,7 +19,7 @@ module Make
 
       type t [@@deriving sexp]
 
-      type var = Field.var * Field.var
+      type var = Field.Var.t * Field.Var.t
 
       val typ : (var, t) Typ.t
 
@@ -271,7 +271,7 @@ struct
 
     type t = (Inner_curve.t, Field.t) t_ [@@deriving sexp]
 
-    type var = (Inner_curve.var, Field.var) t_
+    type var = (Inner_curve.var, Field.Var.t) t_
 
     let of_hlist
         (H_list.([query_base; query; other_data]) :
@@ -438,7 +438,7 @@ struct
 
     type input =
       { pvk: Preprocessed_verification_key.t
-      ; accumulated_input: Field.var * Field.var
+      ; accumulated_input: Field.Var.t * Field.Var.t
       ; proof: Proof.t }
 
     type witness = unit

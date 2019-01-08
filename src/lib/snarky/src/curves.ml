@@ -571,7 +571,7 @@ module Make_weierstrass_checked
   Weierstrass_checked_intf
   with module Impl := Impl
    and type t := Curve.t
-   and type var := Impl.Field.var * Impl.Field.var = struct
+   and type var := Impl.Field.Var.t * Impl.Field.Var.t = struct
   open Impl
 
   type var = Field.Var.t * Field.Var.t

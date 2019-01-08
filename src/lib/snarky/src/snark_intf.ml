@@ -566,6 +566,6 @@ module type S = sig
     with type ('a, 'b) checked := ('a, 'b) Checked.t
      and type ('a, 'b) typ := ('a, 'b) Typ.t
      and type bool_var := Boolean.var
-     and type var = Field.var
+     and type var = Field.Var.t
      and type t := M.t
 end

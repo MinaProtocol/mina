@@ -119,13 +119,13 @@ module Strength = struct
           (Tick.Field.Checked.constant (Tick.Field.of_int b))
       in
       let m =
-        Tick.Field.Checked.(sub (constant (Tick.Field.of_int (b + 1))) k)
+        Tick.Field.Var.(sub (constant (Tick.Field.of_int (b + 1))) k)
       in
       let%bind z_unpacked = Tick.Field.Checked.unpack z ~length:b in
       Tick.Util.assert_num_bits_upper_bound z_unpacked m
     in
     let%bind zy = Tick.Field.Checked.mul z y in
-    let numerator = Tick.Field.Checked.constant (two_to_the b) in
+    let numerator = Tick.Field.Var.constant (two_to_the b) in
     let%map () = Tick.Field.Checked.Assert.lte ~bit_length:(b + 1) zy numerator
     and () =
       Tick.Field.Checked.Assert.lt ~bit_length:(b + 1) numerator
@@ -141,7 +141,7 @@ module Strength = struct
               map (read Target.Packed.typ y) ~f:of_target_unchecked)
       else
         floor_divide ~numerator:(`Two_to_the bit_length)
-          (y :> Tick.Field.var)
+          (y :> Tick.Field.Var.t)
           (Target.Unpacked.var_to_bits y_unpacked) )
 
   let ( < ) x y = compare x y < 0

@@ -330,14 +330,14 @@ end = struct
 
         type t =
           { gadget: Compression_gadget.t
-          ; output_unconstrained: Impl.Field.var list }
+          ; output_unconstrained: Impl.Field.Var.t list }
 
         let create pb conv conv_back {prev_state; block} =
           let conv_bits (bits : Boolean.var list) =
             let arr = Protoboard.Variable_array.create () in
             List.iter bits ~f:(fun b ->
                 Protoboard.Variable_array.emplace_back arr
-                  (conv (b :> Impl.Field.var)) ) ;
+                  (conv (b :> Impl.Field.Var.t)) ) ;
             arr
           in
           let prev_state = conv_bits prev_state in
