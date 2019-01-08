@@ -691,7 +691,9 @@ module Make (Inputs : Inputs_intf) = struct
                ~protocol_state_proof:Genesis.proof
                ~staged_ledger_diff:empty_diff)
         in
-        let ledger_db = Ledger_db.create () in
+        let ledger_db =
+          Ledger_db.create ?directory_name:config.ledger_db_location ()
+        in
         let%bind transition_frontier =
           Transition_frontier.create ~logger:config.log
             ~root_transition:
