@@ -1382,14 +1382,20 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
     type var = Cvar.t
 
+    type var' = Var.t
+
     let typ = Typ.field
 
-    module Checked = struct
+    module Var = struct
       include Cvar1
 
       let to_constant : var -> Field0.t option = function
         | Constant x -> Some x
         | _ -> None
+    end
+
+    module Checked = struct
+      include Cvar1
 
       let equal = Checked.equal
 
@@ -1415,7 +1421,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
           (let alpha_packed =
              Cvar.Infix.(Cvar.constant (two_to_the bit_length) + b - a)
            in
-           let%bind alpha = unpack alpha_packed ~length:(bit_length + 1) in
+           let%bind alpha = Var.unpack alpha_packed ~length:(bit_length + 1) in
            let prefix, less_or_equal =
              match Core_kernel.List.split_n alpha bit_length with
              | p, [l] -> (p, l)
@@ -1446,8 +1452,9 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
         let equal x y = Checked.assert_equal ~label:"Checked.Assert.equal" x y
 
-        let not_equal (x : t) (y : t) =
-          Checked.with_label "Checked.Assert.not_equal" (non_zero (sub x y))
+        let not_equal (x : Var.t) (y : Var.t) =
+          Checked.with_label "Checked.Assert.not_equal"
+            (non_zero (Var.sub x y))
       end
 
       let lt_bitstring_value =

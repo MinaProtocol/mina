@@ -17,7 +17,7 @@ module Pow_hash = struct
     let open Let_syntax in
     let%map {less; _} =
       Field.Checked.compare ~bit_length:length_in_bits (var_to_hash_packed pow)
-        (target :> Field.Checked.t)
+        (target :> Field.Var.t)
     in
     less
 end
@@ -45,7 +45,7 @@ module Strength = struct
     assert (Tick.Field.compare x max <= 0) ;
     x
 
-  let field_var_to_unpacked (x: Tick.Field.Checked.t) =
+  let field_var_to_unpacked (x: Tick.Field.Var.t) =
     Tick.Field.Checked.unpack ~length:bit_length x
 
   include Bits.Snarkable.Small (Tick)

@@ -28,7 +28,7 @@ module Chain_hash = struct
 
   module Checked = struct
     let constant (t : t) =
-      var_of_hash_packed (Field.Checked.constant (t :> Field.t))
+      var_of_hash_packed (Field.Var.constant (t :> Field.t))
 
     type t = var
 

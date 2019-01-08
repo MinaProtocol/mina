@@ -49,7 +49,7 @@ module Make_intf (Impl : Snark_intf.S) = struct
 
     type 'a t = 'a * 'a
 
-    type var = Field.Checked.t t
+    type var = Field.Var.t t
 
     type value = Field.t t
 
@@ -261,7 +261,7 @@ module Edwards = struct
      and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
      and type boolean_var := Impl.Boolean.var
      and type field := Impl.Field.t
-     and type var = Impl.Field.Checked.t * Impl.Field.Checked.t
+     and type var = Impl.Field.Var.t * Impl.Field.Var.t
      and type value = Impl.Field.t * Impl.Field.t
      and module Scalar = Scalar = struct
     open Impl
@@ -270,12 +270,11 @@ module Edwards = struct
 
     type 'a tup = 'a * 'a [@@deriving eq, sexp]
 
-    type var = Field.Checked.t tup
+    type var = Field.Var.t tup
 
     type value = Field.t tup [@@deriving eq, sexp]
 
-    let var_of_value (x, y) =
-      (Field.Checked.constant x, Field.Checked.constant y)
+    let var_of_value (x, y) = (Field.Var.constant x, Field.Var.constant y)
 
     let identity_value = identity
 
@@ -285,8 +284,7 @@ module Edwards = struct
       let open Let_syntax in
       let%bind x2 = Field.Checked.mul x x and y2 = Field.Checked.mul y y in
       let open Field.Checked.Infix in
-      assert_r1cs (Params.d * x2) y2
-        (x2 + y2 - Field.Checked.constant Field.one)
+      assert_r1cs (Params.d * x2) y2 (x2 + y2 - Field.Var.constant Field.one)
 
     let typ_unchecked : (var, value) Typ.t = Typ.(tuple2 field field)
 
@@ -313,17 +311,17 @@ module Edwards = struct
       end
 
       let%snarkydef add_known (x1, y1) (x2, y2) =
-        let x1x2 = Field.Checked.scale x1 x2
-        and y1y2 = Field.Checked.scale y1 y2
-        and x1y2 = Field.Checked.scale x1 y2
-        and y1x2 = Field.Checked.scale y1 x2 in
+        let x1x2 = Field.Var.scale x1 x2
+        and y1y2 = Field.Var.scale y1 y2
+        and x1y2 = Field.Var.scale x1 y2
+        and y1x2 = Field.Var.scale y1 x2 in
         let%bind p = Field.Checked.mul x1x2 y1y2 in
         let open Field.Checked.Infix in
         let p = Params.d * p in
         let%map a =
-          Field.Checked.div (x1y2 + y1x2) (Field.Checked.constant Field.one + p)
+          Field.Checked.div (x1y2 + y1x2) (Field.Var.constant Field.one + p)
         and b =
-          Field.Checked.div (y1y2 - x1x2) (Field.Checked.constant Field.one - p)
+          Field.Checked.div (y1y2 - x1x2) (Field.Var.constant Field.one - p)
         in
         (a, b)
 
@@ -337,9 +335,9 @@ module Edwards = struct
         let open Field.Checked.Infix in
         let p = Params.d * p in
         let%map a =
-          Field.Checked.div (x1y2 + x2y1) (Field.Checked.constant Field.one + p)
+          Field.Checked.div (x1y2 + x2y1) (Field.Var.constant Field.one + p)
         and b =
-          Field.Checked.div (y1y2 - x1x2) (Field.Checked.constant Field.one - p)
+          Field.Checked.div (y1y2 - x1x2) (Field.Var.constant Field.one - p)
         in
         (a, b)
 
@@ -351,13 +349,13 @@ module Edwards = struct
         let two = Field.of_int 2 in
         let%map a = Field.Checked.div (two * xy) (xx + yy)
         and b =
-          Field.Checked.div (yy - xx) (Field.Checked.constant two - xx - yy)
+          Field.Checked.div (yy - xx) (Field.Var.constant two - xx - yy)
         in
         (a, b)
 
       let if_value (b : Boolean.var) ~then_:(x1, y1) ~else_:(x2, y2) =
-        let not_b = (Boolean.not b :> Field.Checked.t) in
-        let b = (b :> Field.Checked.t) in
+        let not_b = (Boolean.not b :> Field.Var.t) in
+        let b = (b :> Field.Var.t) in
         let choose_field t e =
           let open Field.Checked in
           Infix.((t * b) + (e * not_b))
@@ -392,7 +390,7 @@ module Edwards = struct
                  ~f:(fun i r t e ->
                    let open Field.Checked.Infix in
                    Constraint.r1cs ~label:(sprintf "main_%d" i)
-                     (b :> Field.Checked.t)
+                     (b :> Field.Var.t)
                      (t - e) (r - e) )
                |> assert_all
              in
@@ -419,8 +417,8 @@ module Edwards = struct
       (* TODO: Unit test *)
       let%snarkydef cond_add ((x2, y2) : value) ~to_:((x1, y1) : var)
           ~if_:(b : Boolean.var) : (var, _) Checked.t =
-        let one = Field.Checked.constant Field.one in
-        let b = (b :> Field.Checked.t) in
+        let one = Field.Var.constant Field.one in
+        let b = (b :> Field.Var.t) in
         let open Let_syntax in
         let open Field.Checked.Infix in
         let res a1 a3 =
@@ -457,12 +455,12 @@ module Edwards = struct
         | [] -> failwith "scale_known: Empty bits"
         | b :: bs ->
             let acc =
-              let b = (b :> Field.Checked.t) in
+              let b = (b :> Field.Var.t) in
               let x_id, y_id = identity_value in
               let x_t, y_t = t in
               let open Field.Checked.Infix in
-              ( (Field.Infix.(x_t - x_id) * b) + Field.Checked.constant x_id
-              , (Field.Infix.(y_t - y_id) * b) + Field.Checked.constant y_id )
+              ( (Field.Infix.(x_t - x_id) * b) + Field.Var.constant x_id
+              , (Field.Infix.(y_t - y_id) * b) + Field.Var.constant y_id )
             in
             go 1 acc (double_value t) bs
     end
@@ -483,7 +481,7 @@ module Edwards = struct
      and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
      and type boolean_var := Impl.Boolean.var
      and type field := Impl.Field.t
-     and type var = Impl.Field.Checked.t * Impl.Field.Checked.t
+     and type var = Impl.Field.Var.t * Impl.Field.Var.t
      and type value = Impl.Field.t * Impl.Field.t =
     Extend (Impl) (Scalar) (Basic.Make (Impl.Field) (Params))
 end
@@ -576,7 +574,7 @@ module Make_weierstrass_checked
    and type var := Impl.Field.var * Impl.Field.var = struct
   open Impl
 
-  type var = Field.Checked.t * Field.Checked.t
+  type var = Field.Var.t * Field.Var.t
 
   type t = Curve.t
 
@@ -585,8 +583,7 @@ module Make_weierstrass_checked
     let%bind x2 = Field.Checked.square x in
     let%bind x3 = Field.Checked.mul x2 x in
     assert_square y
-      Field.Checked.Infix.(
-        x3 + (Params.a * x) + Field.Checked.constant Params.b)
+      Field.Checked.Infix.(x3 + (Params.a * x) + Field.Var.constant Params.b)
 
   let typ : (var, t) Typ.t =
     let unchecked =
@@ -596,12 +593,11 @@ module Make_weierstrass_checked
     in
     {unchecked with check= assert_on_curve}
 
-  let negate ((x, y) : var) : var =
-    (x, Field.Checked.scale y Field.(negate one))
+  let negate ((x, y) : var) : var = (x, Field.Var.scale y Field.(negate one))
 
   let constant (t : t) : var =
     let x, y = Curve.to_coords t in
-    Field.Checked.(constant x, constant y)
+    Field.Var.(constant x, constant y)
 
   let assert_equal (x1, y1) (x2, y2) =
     assert_all [Constraint.equal x1 x2; Constraint.equal y1 y2]
@@ -614,9 +610,7 @@ module Make_weierstrass_checked
 
   let%snarkydef add' ~div (ax, ay) (bx, by) =
     let open Let_syntax in
-    let%bind lambda =
-      div (Field.Checked.sub by ay) (Field.Checked.sub bx ax)
-    in
+    let%bind lambda = div (Field.Var.sub by ay) (Field.Var.sub bx ax) in
     let%bind cx =
       provide_witness Typ.field
         (let open As_prover in
@@ -706,7 +700,7 @@ module Make_weierstrass_checked
           ~f:(fun i r t e ->
             let open Field.Checked.Infix in
             Constraint.r1cs ~label:(sprintf "main_%d" i)
-              (b :> Field.Checked.t)
+              (b :> Field.Var.t)
               (t - e) (r - e) )
         |> assert_all
       in
@@ -784,7 +778,7 @@ module Make_weierstrass_checked
     let open Field.Checked.Infix in
     let%map () =
       assert_r1cs (two * lambda) ay
-        ((Field.of_int 3 * x_squared) + Field.Checked.constant Params.a)
+        ((Field.of_int 3 * x_squared) + Field.Var.constant Params.a)
     and () = assert_square lambda (bx + (two * ax))
     and () = assert_r1cs lambda (ax - bx) (by + ay) in
     (bx, by)
@@ -792,10 +786,10 @@ module Make_weierstrass_checked
   let if_value (cond : Boolean.var) ~then_ ~else_ =
     let x1, y1 = Curve.to_coords then_ in
     let x2, y2 = Curve.to_coords else_ in
-    let cond = (cond :> Field.Checked.t) in
+    let cond = (cond :> Field.Var.t) in
     let choose a1 a2 =
       let open Field.Checked in
-      Infix.((a1 * cond) + (a2 * (constant Field.one - cond)))
+      Infix.((a1 * cond) + (a2 * (Field.Var.constant Field.one - cond)))
     in
     (choose x1 x2, choose y1 y2)
 
@@ -830,10 +824,10 @@ module Make_weierstrass_checked
       let open Field.Infix in
       let ( * ) = Field.Checked.Infix.( * ) in
       let ( +^ ) = Field.Checked.Infix.( + ) in
-      Field.Checked.constant a1
-      +^ ((a2 - a1) * (b0 :> Field.Checked.t))
-      +^ ((a3 - a1) * (b1 :> Field.Checked.t))
-      +^ ((a4 + a1 - a2 - a3) * (b0_and_b1 :> Field.Checked.t))
+      Field.Var.constant a1
+      +^ ((a2 - a1) * (b0 :> Field.Var.t))
+      +^ ((a3 - a1) * (b1 :> Field.Var.t))
+      +^ ((a4 + a1 - a2 - a3) * (b0_and_b1 :> Field.Var.t))
     in
     let x1, y1 = Curve.to_coords t1
     and x2, y2 = Curve.to_coords t2
@@ -845,7 +839,7 @@ module Make_weierstrass_checked
   let lookup_single_bit (b : Boolean.var) (t1, t2) =
     let lookup_one (a1, a2) =
       let open Field.Checked.Infix in
-      Field.Checked.constant a1 + (Field.sub a2 a1 * (b :> Field.Checked.t))
+      Field.Var.constant a1 + (Field.sub a2 a1 * (b :> Field.Var.t))
     in
     let x1, y1 = Curve.to_coords t1 and x2, y2 = Curve.to_coords t2 in
     (lookup_one (x1, x2), lookup_one (y1, y2))

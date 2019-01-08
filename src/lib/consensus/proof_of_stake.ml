@@ -1055,12 +1055,12 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         and length =
           let%bind base =
             Field.Checked.if_ epoch_increased
-              ~then_:Field.(Checked.constant zero)
+              ~then_:Field.(Var.constant zero)
               ~else_:
                 ( Length.pack_var previous_state.curr_epoch_data.length
                   :> Field.var )
           in
-          Length.var_of_field Field.(Checked.(add (constant one) base))
+          Length.var_of_field Field.(Var.(add (constant one) base))
         and ledger =
           Epoch_ledger.if_ epoch_increased
             ~then_:

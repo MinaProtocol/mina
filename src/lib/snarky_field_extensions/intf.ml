@@ -26,7 +26,7 @@ module type Basic = sig
       type t = Field.t t_
     end
 
-    type t = Field.Checked.t t_
+    type t = Field.Var.t t_
   end
 
   module A : Traversable_applicative with module Impl := Impl
@@ -51,7 +51,7 @@ module type Basic = sig
 
   val scale : t -> Field.t -> t
 
-  val mul_field : t -> Field.Checked.t -> (t, _) Checked.t
+  val mul_field : t -> Field.Var.t -> (t, _) Checked.t
 
   val assert_r1cs : t -> t -> t -> (unit, _) Checked.t
 

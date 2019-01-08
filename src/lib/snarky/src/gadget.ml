@@ -19,8 +19,8 @@ module Make
 
         val create :
              Libsnark.Protoboard.t
-          -> (Impl.Field.Checked.t -> Libsnark.Protoboard.Variable.t)
-          -> (Libsnark.Protoboard.Variable.t -> Impl.Field.Checked.t)
+          -> (Impl.Field.Var.t -> Libsnark.Protoboard.Variable.t)
+          -> (Libsnark.Protoboard.Variable.t -> Impl.Field.Var.t)
           -> input
           -> t
 
@@ -39,7 +39,7 @@ struct
     let num_input_vars = ref 0 in
     let var_pairs = ref [] in
     let conv cvar =
-      let c, terms = Field.Checked.to_constant_and_terms cvar in
+      let c, terms = Field.Var.to_constant_and_terms cvar in
       let lc =
         match c with
         | None -> Linear_combination.create ()

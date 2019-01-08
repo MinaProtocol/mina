@@ -141,7 +141,7 @@ module Schnorr
 
         type t [@@deriving eq]
 
-        type var = Field.Checked.t * Field.Checked.t
+        type var = Field.Var.t * Field.Var.t
 
         module Checked :
           Curves.Weierstrass_checked_intf

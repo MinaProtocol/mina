@@ -42,7 +42,7 @@ struct
     let conv_input conv (all_bits : input) =
       let bits = Pb.Variable_array.create () in
       List.iter all_bits ~f:(fun b ->
-          Pb.Variable_array.emplace_back bits (conv (b :> Field.Checked.t)) ) ;
+          Pb.Variable_array.emplace_back bits (conv (b :> Field.Var.t)) ) ;
       bits
 
     let create =
@@ -50,8 +50,7 @@ struct
         foreign (func_name "create")
           (Pb.typ @-> Pb.Variable_array.typ @-> int @-> returning typ)
       in
-      fun pb (conv : Field.Checked.t -> Pb.Variable.t)
-          (bits : Pb.Variable_array.t) ->
+      fun pb (conv : Field.Var.t -> Pb.Variable.t) (bits : Pb.Variable_array.t) ->
         let t = stub pb bits Info.input_size in
         Caml.Gc.finalise delete t ; t
 
@@ -129,7 +128,7 @@ struct
   end
 
   module T = struct
-    type t = {gadget: unit ptr; result: Field.Checked.t}
+    type t = {gadget: unit ptr; result: Field.Var.t}
 
     let typ = ptr void
 
@@ -153,13 +152,13 @@ struct
         ( Pb.typ @-> Verification_key.typ @-> Pb.Variable_array.typ @-> int
         @-> Proof.typ @-> Pb.Variable.typ @-> returning typ )
 
-    let create pb (conv : Field.Checked.t -> Pb.Variable.t)
-        (conv_back : Pb.Variable.t -> Field.Checked.t)
-        {vk; input; elt_size; proof} =
+    let create pb (conv : Field.Var.t -> Pb.Variable.t)
+        (conv_back : Pb.Variable.t -> Field.Var.t) {vk; input; elt_size; proof}
+        =
       let input_pb = Pb.Variable_array.create () in
       List.iter
         ~f:(fun v -> Pb.Variable_array.emplace_back input_pb (conv v))
-        (input :> Field.Checked.t list) ;
+        (input :> Field.Var.t list) ;
       let result_pb = Pb.allocate_variable pb in
       let result = conv_back result_pb in
       let t = create_stub pb vk input_pb elt_size proof result_pb in
@@ -199,7 +198,7 @@ struct
         printf "next converting input bits\n%!" ;
         List.iter
           ~f:(fun v -> Pb.Variable_array.emplace_back input_pb (conv v))
-          (input :> Field.Checked.t list) ;
+          (input :> Field.Var.t list) ;
         let vk = Verification_key.create pb conv vk_bits_arr in
         let proof = Proof.create pb conv conv_back () in
         let result_pb = Pb.allocate_variable pb in

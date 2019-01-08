@@ -195,9 +195,9 @@ end) : sig
 
   val var_of_bits : Boolean.var Bitstring.Lsb_first.t -> var
 
-  val unpack_var : Field.Checked.t -> (var, _) Tick.Checked.t
+  val unpack_var : Field.Var.t -> (var, _) Tick.Checked.t
 
-  val pack_var : var -> Field.Checked.t
+  val pack_var : var -> Field.Var.t
 end = struct
   let max_int = Unsigned.max_int
 
@@ -401,7 +401,7 @@ end = struct
         Bitstring.pad_to_triple_list ~default:Boolean.false_ (to_bits t)
 
       let to_field_var ({magnitude; sgn} : var) =
-        Tick.Field.Checked.mul (pack_var magnitude) (sgn :> Field.Checked.t)
+        Tick.Field.Checked.mul (pack_var magnitude) (sgn :> Field.Var.t)
 
       let add (x : var) (y : var) =
         let%bind xv = to_field_var x and yv = to_field_var y in
@@ -413,9 +413,7 @@ end = struct
             (Option.value_exn (add x y)).sgn)
         in
         let%bind res =
-          Tick.Field.Checked.mul
-            (sgn :> Field.Checked.t)
-            (Field.Checked.add xv yv)
+          Tick.Field.Checked.mul (sgn :> Field.Var.t) (Field.Var.add xv yv)
         in
         let%map magnitude = unpack_var res in
         {magnitude; sgn}
@@ -426,7 +424,7 @@ end = struct
         (* (x + b(y - x), y + b(x - y)) *)
         let open Field.Checked.Infix in
         let%map b_y_minus_x =
-          Tick.Field.Checked.mul (b :> Field.Checked.t) (y - x)
+          Tick.Field.Checked.mul (b :> Field.Var.t) (y - x)
         in
         (x + b_y_minus_x, y - b_y_minus_x)
 
@@ -462,10 +460,10 @@ end = struct
 
     (* Unpacking protects against underflow *)
     let sub (x : Unpacked.var) (y : Unpacked.var) =
-      unpack_var (Field.Checked.sub (pack_var x) (pack_var y))
+      unpack_var (Field.Var.sub (pack_var x) (pack_var y))
 
     let sub_flagged x y =
-      let z = Field.Checked.sub (pack_var x) (pack_var y) in
+      let z = Field.Var.sub (pack_var x) (pack_var y) in
       let%map bits, `Success no_underflow =
         Field.Checked.unpack_flagged z ~length:length_in_bits
       in
@@ -492,10 +490,10 @@ end = struct
 
     (* Unpacking protects against overflow *)
     let add (x : Unpacked.var) (y : Unpacked.var) =
-      unpack_var (Field.Checked.add (pack_var x) (pack_var y))
+      unpack_var (Field.Var.add (pack_var x) (pack_var y))
 
     let add_flagged x y =
-      let z = Field.Checked.add (pack_var x) (pack_var y) in
+      let z = Field.Var.add (pack_var x) (pack_var y) in
       let%map bits, `Success no_overflow =
         Field.Checked.unpack_flagged z ~length:length_in_bits
       in
@@ -507,7 +505,7 @@ end = struct
 
     let add_signed (t : var) (d : Signed.var) =
       let%bind d = Signed.Checked.to_field_var d in
-      Field.Checked.add (pack_var t) d |> unpack_var
+      Field.Var.add (pack_var t) d |> unpack_var
 
     let%test_module "currency_test" =
       ( module struct
@@ -626,7 +624,7 @@ module Amount = struct
     let to_fee (t : var) : Fee.var = t
 
     let add_fee (t : var) (fee : Fee.var) =
-      Field.Checked.add (pack_var t) (Fee.pack_var fee) |> unpack_var
+      Field.Var.add (pack_var t) (Fee.pack_var fee) |> unpack_var
   end
 end
 

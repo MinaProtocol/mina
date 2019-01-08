@@ -4,7 +4,7 @@ module M = Snarky.Knapsack.Make (Impl)
 
 let dimension = 1
 
-type var = Field.Checked.t list
+type var = Field.Var.t list
 
 type t = Field.t list
 

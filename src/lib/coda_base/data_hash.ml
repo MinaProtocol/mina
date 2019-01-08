@@ -113,7 +113,7 @@ struct
 
   let var_of_t t =
     let n = Bigint.of_field t in
-    { digest= Field.Checked.constant t
+    { digest= Field.Var.constant t
     ; bits=
         Some
           (Bitstring.Lsb_first.of_list

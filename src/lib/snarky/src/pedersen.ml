@@ -7,7 +7,7 @@ let local_function ~negate quad (b0, b1, b2) =
 
 module Make
     (Impl : Snark_intf.S) (Weierstrass_curve : sig
-        type var = Impl.Field.Checked.t * Impl.Field.Checked.t
+        type var = Impl.Field.Var.t * Impl.Field.Var.t
 
         type t [@@deriving eq]
 
@@ -44,7 +44,7 @@ module Make
   open Impl
 
   module Digest : sig
-    type var = Field.Checked.t
+    type var = Field.Var.t
 
     module Unpacked : sig
       type var = private Boolean.var list
@@ -53,7 +53,7 @@ module Make
 
       val typ : (var, t) Typ.t
 
-      val project : var -> Field.Checked.t
+      val project : var -> Field.Var.t
 
       val constant : t -> var
     end
@@ -117,10 +117,10 @@ end = struct
     let%bind s_and = Boolean.(s0 && s1) in
     let open Field.Checked.Infix in
     let lookup_one (a1, a2, a3, a4) =
-      Field.Checked.constant a1
-      + (Field.Infix.(a2 - a1) * (s0 :> Field.Checked.t))
-      + (Field.Infix.(a3 - a1) * (s1 :> Field.Checked.t))
-      + (Field.Infix.(a4 + a1 - a2 - a3) * (s_and :> Field.Checked.t))
+      Field.Var.constant a1
+      + (Field.Infix.(a2 - a1) * (s0 :> Field.Var.t))
+      + (Field.Infix.(a3 - a1) * (s1 :> Field.Var.t))
+      + (Field.Infix.(a4 + a1 - a2 - a3) * (s_and :> Field.Var.t))
     in
     let x_q, y_q = coords q in
     let x = lookup_one x_q in
@@ -128,8 +128,7 @@ end = struct
       let sign =
         (* sign = 1 if s2 = 0
           sign = -1 if s2 = 1 *)
-        Field.Checked.constant Field.one
-        - (Field.of_int 2 * (s2 :> Field.Checked.t))
+        Field.Var.constant Field.one - (Field.of_int 2 * (s2 :> Field.Var.t))
       in
       Field.Checked.mul sign (lookup_one y_q)
     in
@@ -150,7 +149,7 @@ end = struct
       let constant = List.map ~f:Boolean.var_of_value
     end
 
-    type var = Field.Checked.t
+    type var = Field.Var.t
 
     type t = Field.t
 

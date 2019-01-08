@@ -35,14 +35,14 @@ module Make (Impl : Snark_intf.S) = struct
 
   module Checked = struct
     let hash_to_field ({dimension; max_input_length; coefficients} : t)
-        (vs : Boolean.var list) : (Field.Checked.t list, _) Checked.t =
-      let vs = (vs :> Field.Checked.t list) in
+        (vs : Boolean.var list) : (Field.Var.t list, _) Checked.t =
+      let vs = (vs :> Field.Var.t list) in
       let input_len = List.length vs in
       if input_len > max_input_length then
         failwithf "Input size %d exceeded max %d" input_len max_input_length () ;
       List.map coefficients ~f:(fun cs ->
-          Field.Checked.linear_combination
-            (map2_lax cs vs ~f:(fun c v -> (c, v))) )
+          Field.Var.linear_combination (map2_lax cs vs ~f:(fun c v -> (c, v)))
+      )
       |> Checked.return
 
     let hash_to_bits (t : t) (vs : Boolean.var list) :
@@ -90,12 +90,12 @@ module Make (Impl : Snark_intf.S) = struct
         let open Field.Checked.Infix in
         assert_all
           (List.map3_exn
-             (xs :> Field.Checked.t list)
-             (ys :> Field.Checked.t list)
-             (res :> Field.Checked.t list)
+             (xs :> Field.Var.t list)
+             (ys :> Field.Var.t list)
+             (res :> Field.Var.t list)
              ~f:(fun x y r ->
                Constraint.r1cs ~label:"Knapsack.Hash.if_"
-                 (b :> Field.Checked.t)
+                 (b :> Field.Var.t)
                  (y - x) (r - x) ))
       in
       res

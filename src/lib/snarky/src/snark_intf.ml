@@ -63,19 +63,18 @@ module type Basic = sig
   end
 
   module rec Constraint : sig
-    type t = Field.Checked.t Constraint0.t
+    type t = Field.Var.t Constraint0.t
 
     type 'k with_constraint_args = ?label:string -> 'k
 
-    val boolean : (Field.Checked.t -> t) with_constraint_args
+    val boolean : (Field.Var.t -> t) with_constraint_args
 
-    val equal : (Field.Checked.t -> Field.Checked.t -> t) with_constraint_args
+    val equal : (Field.Var.t -> Field.Var.t -> t) with_constraint_args
 
     val r1cs :
-      (Field.Checked.t -> Field.Checked.t -> Field.Checked.t -> t)
-      with_constraint_args
+      (Field.Var.t -> Field.Var.t -> Field.Var.t -> t) with_constraint_args
 
-    val square : (Field.Checked.t -> Field.Checked.t -> t) with_constraint_args
+    val square : (Field.Var.t -> Field.Var.t -> t) with_constraint_args
   end
   
   and Data_spec : sig
@@ -91,31 +90,29 @@ module type Basic = sig
   and Typ : sig
     module Store : sig
       include
-        Monad.S
-        with type 'a t = ('a, Field.t, Field.Checked.t) Typ_monads.Store.t
+        Monad.S with type 'a t = ('a, Field.t, Field.Var.t) Typ_monads.Store.t
 
-      val store : field -> Field.Checked.t t
+      val store : field -> Field.Var.t t
     end
 
     module Alloc : sig
-      include Monad.S with type 'a t = ('a, Field.Checked.t) Typ_monads.Alloc.t
+      include Monad.S with type 'a t = ('a, Field.Var.t) Typ_monads.Alloc.t
 
-      val alloc : Field.Checked.t t
+      val alloc : Field.Var.t t
     end
 
     module Read : sig
       include
-        Monad.S
-        with type 'a t = ('a, Field.t, Field.Checked.t) Typ_monads.Read.t
+        Monad.S with type 'a t = ('a, Field.t, Field.Var.t) Typ_monads.Read.t
 
-      val read : Field.Checked.t -> field t
+      val read : Field.Var.t -> field t
     end
 
     type ('var, 'value) t =
       ( 'var
       , 'value
       , Field.t
-      , Field.Checked.t
+      , Field.Var.t
       , R1CS_constraint_system.t )
       Types.Typ.t
 
@@ -129,7 +126,7 @@ module type Basic = sig
 
     val unit : (unit, unit) t
 
-    val field : (Field.Checked.t, field) t
+    val field : (Field.Var.t, field) t
 
     val tuple2 :
          ('var1, 'value1) t
@@ -184,7 +181,7 @@ module type Basic = sig
   end
   
   and Boolean : sig
-    type var = Field.Checked.t Boolean0.t
+    type var = Field.Var.t Boolean0.t
 
     type value = bool
 
@@ -204,7 +201,7 @@ module type Basic = sig
 
     val all : var list -> (var, _) Checked.t
 
-    val of_field : Field.Checked.t -> (var, _) Checked.t
+    val of_field : Field.Var.t -> (var, _) Checked.t
 
     val var_of_value : value -> var
 
@@ -235,7 +232,7 @@ module type Basic = sig
     end
 
     module Unsafe : sig
-      val of_cvar : Field.Checked.t -> var
+      val of_cvar : Field.Var.t -> var
     end
 
     module Assert : sig
@@ -258,7 +255,7 @@ module type Basic = sig
                   ( 'a
                   , 's
                   , Field.t
-                  , Field.Checked.t
+                  , Field.Var.t
                   , R1CS_constraint_system.t )
                   Types.Checked.t
 
@@ -286,7 +283,9 @@ module type Basic = sig
 
     val project : bool list -> t
 
-    module Checked : sig
+    type var' = Var.t
+
+    module Var : sig
       type t = (field, Var.t) Cvar.t
 
       val length : t -> int
@@ -309,73 +308,76 @@ module type Basic = sig
       val sub : t -> t -> t
 
       val scale : t -> field -> t
+    end
 
-      val mul : t -> t -> (t, _) Checked.t
+    module Checked : sig
+      val mul : Var.t -> Var.t -> (Var.t, _) Checked.t
 
-      val square : t -> (t, _) Checked.t
+      val square : Var.t -> (Var.t, _) Checked.t
 
-      val div : t -> t -> (t, _) Checked.t
+      val div : Var.t -> Var.t -> (Var.t, _) Checked.t
 
-      val inv : t -> (t, _) Checked.t
+      val inv : Var.t -> (Var.t, _) Checked.t
 
-      val equal : t -> t -> (Boolean.var, 's) Checked.t
+      val equal : Var.t -> Var.t -> (Boolean.var, 's) Checked.t
 
-      val project : Boolean.var list -> t
+      val project : Boolean.var list -> Var.t
 
-      val pack : Boolean.var list -> t
+      val pack : Boolean.var list -> Var.t
 
-      val unpack : t -> length:int -> (Boolean.var list, _) Checked.t
+      val unpack : Var.t -> length:int -> (Boolean.var list, _) Checked.t
 
       val unpack_flagged :
-           t
+           Var.t
         -> length:int
         -> (Boolean.var list * [`Success of Boolean.var], _) Checked.t
 
       val unpack_full :
-        t -> (Boolean.var Bitstring_lib.Bitstring.Lsb_first.t, _) Checked.t
+        Var.t -> (Boolean.var Bitstring_lib.Bitstring.Lsb_first.t, _) Checked.t
 
       val choose_preimage_var :
-        t -> length:int -> (Boolean.var list, _) Checked.t
+        Var.t -> length:int -> (Boolean.var list, _) Checked.t
 
       type comparison_result = {less: Boolean.var; less_or_equal: Boolean.var}
 
       val compare :
-        bit_length:int -> t -> t -> (comparison_result, _) Checked.t
+        bit_length:int -> Var.t -> Var.t -> (comparison_result, _) Checked.t
 
-      val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
+      val if_ :
+        Boolean.var -> then_:Var.t -> else_:Var.t -> (Var.t, _) Checked.t
 
       module Infix : sig
-        val ( + ) : t -> t -> t
+        val ( + ) : Var.t -> Var.t -> Var.t
 
-        val ( - ) : t -> t -> t
+        val ( - ) : Var.t -> Var.t -> Var.t
 
-        val ( * ) : field -> t -> t
+        val ( * ) : field -> Var.t -> Var.t
       end
 
       module Unsafe : sig
-        val of_var : Var.t -> t
+        val of_var : var' -> Var.t
       end
 
       module Assert : sig
-        val lte : bit_length:int -> t -> t -> (unit, _) Checked.t
+        val lte : bit_length:int -> Var.t -> Var.t -> (unit, _) Checked.t
 
-        val gte : bit_length:int -> t -> t -> (unit, _) Checked.t
+        val gte : bit_length:int -> Var.t -> Var.t -> (unit, _) Checked.t
 
-        val lt : bit_length:int -> t -> t -> (unit, _) Checked.t
+        val lt : bit_length:int -> Var.t -> Var.t -> (unit, _) Checked.t
 
-        val gt : bit_length:int -> t -> t -> (unit, _) Checked.t
+        val gt : bit_length:int -> Var.t -> Var.t -> (unit, _) Checked.t
 
-        val not_equal : t -> t -> (unit, _) Checked.t
+        val not_equal : Var.t -> Var.t -> (unit, _) Checked.t
 
-        val equal : t -> t -> (unit, _) Checked.t
+        val equal : Var.t -> Var.t -> (unit, _) Checked.t
 
-        val non_zero : t -> (unit, _) Checked.t
+        val non_zero : Var.t -> (unit, _) Checked.t
       end
     end
 
-    type var = Checked.t
+    type var = Var.t
 
-    val typ : (var, t) Typ.t
+    val typ : (Var.t, t) Typ.t
   end
 
   include Monad.Syntax2 with type ('a, 's) t := ('a, 's) Checked.t
@@ -419,7 +421,7 @@ module type Basic = sig
 
     val map2 : ('a, 's) t -> ('b, 's) t -> f:('a -> 'b -> 'c) -> ('c, 's) t
 
-    val read_var : Field.Checked.t -> (field, 'prover_state) t
+    val read_var : Field.Var.t -> (field, 'prover_state) t
 
     val get_state : ('prover_state, 'prover_state) t
 
@@ -445,13 +447,13 @@ module type Basic = sig
 
   val assert_r1cs :
        ?label:string
-    -> Field.Checked.t
-    -> Field.Checked.t
-    -> Field.Checked.t
+    -> Field.Var.t
+    -> Field.Var.t
+    -> Field.Var.t
     -> (unit, _) Checked.t
 
   val assert_square :
-    ?label:string -> Field.Checked.t -> Field.Checked.t -> (unit, _) Checked.t
+    ?label:string -> Field.Var.t -> Field.Var.t -> (unit, _) Checked.t
 
   val as_prover : (unit, 's) As_prover.t -> (unit, 's) Checked.t
 
@@ -554,7 +556,7 @@ module type S = sig
     Number_intf.S
     with type ('a, 'b) checked := ('a, 'b) Checked.t
      and type field := field
-     and type field_var := Field.Checked.t
+     and type field_var := Field.Var.t
      and type bool_var := Boolean.var
 
   module Enumerable (M : sig

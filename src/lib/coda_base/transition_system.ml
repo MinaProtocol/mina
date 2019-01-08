@@ -52,7 +52,7 @@ end
 module Make (Digest : sig
   module Tick :
     Tick.Snarkable.Bits.Lossy
-    with type Packed.var = Tick.Field.Checked.t
+    with type Packed.var = Tick.Field.Var.t
      and type Packed.value = Tick.Pedersen.Digest.t
 end)
 (System : S) =

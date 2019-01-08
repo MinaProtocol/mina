@@ -34,7 +34,7 @@ module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
        and type ('a, 'b) checked := ('a, 'b) Checked.t
        and type boolean_var := Boolean.var
        and type comparison_result := Field.Checked.comparison_result
-       and type field_var := Field.Checked.t
+       and type field_var := Field.Var.t
   end
 end
 
@@ -112,7 +112,7 @@ module Make_inner_curve_aux
 struct
   open Impl
 
-  type var = Field.Checked.t * Field.Checked.t
+  type var = Field.Var.t * Field.Var.t
 
   module Scalar = Make_inner_curve_scalar (Impl) (Other_impl)
 

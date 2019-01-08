@@ -168,7 +168,7 @@ struct
 
     type t = Field.t t_ [@@deriving sexp]
 
-    type var = Field.Checked.t t_
+    type var = Field.Var.t t_
 
     let bit_length (characterizing_length, sign_length) =
       (characterizing_length * Field.size_in_bits) + sign_length
@@ -215,15 +215,15 @@ struct
 
     module Checked = struct
       let constant ({sign; characterizing_up_to_sign} : t) : var =
-        { sign= List.map sign ~f:Field.Checked.constant
+        { sign= List.map sign ~f:Field.Var.constant
         ; characterizing_up_to_sign=
-            List.map characterizing_up_to_sign ~f:Field.Checked.constant }
+            List.map characterizing_up_to_sign ~f:Field.Var.constant }
 
       let if_value (choice : Boolean.var) ~then_:t1 ~else_:t2 =
         let if_value x y =
-          let choice = (choice :> Field.Checked.t) in
+          let choice = (choice :> Field.Var.t) in
           let open Field.Checked in
-          Infix.((x * choice) + (y * (constant Field.one - choice)))
+          Infix.((x * choice) + (y * (Field.Var.constant Field.one - choice)))
         in
         let if_list xs ys = List.map2_exn ~f:if_value xs ys in
         { characterizing_up_to_sign=
@@ -434,7 +434,7 @@ struct
 
     let gadget_typ = ptr void
 
-    type t = {gadget: gadget; result: Field.Checked.t}
+    type t = {gadget: gadget; result: Field.Var.t}
 
     type input =
       { pvk: Preprocessed_verification_key.t
@@ -457,8 +457,8 @@ struct
         @-> Pb.Variable.typ @-> Proof.typ @-> Pb.Variable.typ
         @-> returning gadget_typ )
 
-    let create pb (conv : Field.Checked.t -> Pb.Variable.t)
-        (conv_back : Pb.Variable.t -> Field.Checked.t)
+    let create pb (conv : Field.Var.t -> Pb.Variable.t)
+        (conv_back : Pb.Variable.t -> Field.Var.t)
         {pvk; accumulated_input= acc_x, acc_y; proof} =
       let acc_x = conv acc_x and acc_y = conv acc_y in
       let result_pb = Pb.allocate_variable pb in
@@ -501,8 +501,8 @@ struct
         ; vk: Verification_key_var.t
         ; proof: Proof.t
         ; result: Boolean.var
-        ; vk_characterizing_vars_up_to_sign: Field.Checked.t list
-        ; vk_sign_vars: Field.Checked.t list }
+        ; vk_characterizing_vars_up_to_sign: Field.Var.t list
+        ; vk_sign_vars: Field.Var.t list }
 
       type input = Inner_curve.var
 
@@ -539,19 +539,19 @@ struct
         let open Libsnark.Linear_combination in
         let var = Pb.Variable.of_int (Libsnark.Var.index (Term.var term)) in
         let coeff = Term.coeff term in
-        Field.Checked.scale (conv_back var) coeff
+        Field.Var.scale (conv_back var) coeff
 
       let conv_lc conv_back lc =
         let open Libsnark.Linear_combination in
         let terms = terms lc in
         let n = Term.Vector.length terms in
-        if Int.equal n 0 then Field.Checked.constant Field.zero
+        if Int.equal n 0 then Field.Var.constant Field.zero
         else
           let rec go i acc =
             if Int.equal i n then acc
             else
               let term = Term.Vector.get terms i in
-              let acc = Field.Checked.add (conv_term conv_back term) acc in
+              let acc = Field.Var.add (conv_term conv_back term) acc in
               go (i + 1) acc
           in
           go 1 (conv_term conv_back (Term.Vector.get terms 0))

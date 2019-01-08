@@ -19,9 +19,9 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
       (y - 1) * x = 0
     *)
     assert_r1cs
-      Field.Checked.(sub (y :> Field.Checked.t) (constant Field.one))
-      (x :> Field.Checked.t)
-      (Field.Checked.constant Field.zero)
+      Field.Var.(sub (y :> Field.Var.t) (constant Field.one))
+      (x :> Field.Var.t)
+      (Field.Var.constant Field.zero)
 
   let assert_decreasing : Boolean.var list -> (unit, _) Checked.t =
     let rec go prev (bs0 : Boolean.var list) =
@@ -44,15 +44,12 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     let rec go acc two_to_the_i = function
       | b :: bs ->
           go
-            (Field.Checked.add acc (Field.Checked.scale b two_to_the_i))
+            (Field.Var.add acc (Field.Var.scale b two_to_the_i))
             (Field.add two_to_the_i two_to_the_i)
             bs
       | [] -> acc
     in
-    go
-      (Field.Checked.constant Field.zero)
-      Field.one
-      (bs0 :> Field.Checked.t list)
+    go (Field.Var.constant Field.zero) Field.one (bs0 :> Field.Var.t list)
 
   type _ Snarky.Request.t += N_ones : bool list Snarky.Request.t
 
@@ -71,7 +68,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     in
     let%map () =
       Field.Checked.Assert.equal
-        (Field.Checked.sum (bs :> Field.Checked.t list))
+        (Field.Var.sum (bs :> Field.Var.t list))
         (* This can't overflow since the field is huge *)
         n
     and () = assert_decreasing bs in
@@ -107,7 +104,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
 
   (* Someday: this could definitely be made more efficient *)
   let num_bits_upper_bound_unpacked :
-      Boolean.var list -> (Field.Checked.t, _) Checked.t =
+      Boolean.var list -> (Field.Var.t, _) Checked.t =
    fun x_unpacked ->
     let%bind res =
       exists Typ.field
@@ -121,8 +118,8 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     let%map () = assert_num_bits_upper_bound x_unpacked res in
     res
 
-  let num_bits_upper_bound ~max_length (x : Field.Checked.t) :
-      (Field.Checked.t, _) Checked.t =
+  let num_bits_upper_bound ~max_length (x : Field.Var.t) :
+      (Field.Var.t, _) Checked.t =
     Field.Checked.unpack x ~length:max_length >>= num_bits_upper_bound_unpacked
 
   let%test_module "Snark_util" =
@@ -143,8 +140,8 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
           let (), (less, less_or_equal) =
             run_and_check
               (let%map {less; less_or_equal} =
-                 Field.Checked.compare ~bit_length (Field.Checked.constant x)
-                   (Field.Checked.constant y)
+                 Field.Checked.compare ~bit_length (Field.Var.constant x)
+                   (Field.Var.constant y)
                in
                As_prover.(
                  map2 (read Boolean.typ less)
@@ -183,9 +180,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
       let%test_unit "n_ones" =
         let total_length = 6 in
         let test n =
-          let t =
-            n_ones ~total_length (Field.Checked.constant (Field.of_int n))
-          in
+          let t = n_ones ~total_length (Field.Var.constant (Field.of_int n)) in
           let handle_with (resp : bool list) =
             handle t (fun (With {request; respond}) ->
                 match request with
@@ -224,7 +219,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
       let test x =
         let handle_with resp =
           handle
-            (num_bits_upper_bound ~max_length (Field.Checked.constant x))
+            (num_bits_upper_bound ~max_length (Field.Var.constant x))
             (fun (With {request; respond}) ->
               match request with
               | Num_bits_upper_bound -> respond (Field.of_int resp)
