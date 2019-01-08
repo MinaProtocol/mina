@@ -20,11 +20,11 @@ let timestamp () =
 let new_event (k : event_kind) : event =
   {name= ""; categories= []; phase= k; timestamp= timestamp (); pid= 0; tid= 0}
 
-let trace_new_thread' wr (name : string) (ctx : Execution_context.t) =
-  emit_event wr {(new_event New_thread) with name; tid= ctx.tid}
+let trace_new_thread' ~pid wr (name : string) (ctx : Execution_context.t) =
+  emit_event wr {(new_event New_thread) with name; tid= ctx.tid; pid}
 
-let trace_thread_switch' wr (new_ctx : Execution_context.t) =
-  emit_event wr {(new_event Thread_switch) with tid= new_ctx.tid}
+let trace_thread_switch' ~pid wr (new_ctx : Execution_context.t) =
+  emit_event wr {(new_event Thread_switch) with tid= new_ctx.tid; pid}
 
 let tid = ref 1
 
@@ -54,9 +54,10 @@ let trace_recurring_task (name : string) (f : unit -> 'a) =
       f () )
 
 let measure' wr (name : string) (f : unit -> 'a) : 'a =
-  emit_event wr {(new_event Start) with name} ;
+  let pid = Pid.to_int (Unix.getpid ()) in
+  emit_event wr {(new_event Start) with name; pid} ;
   let res = f () in
-  emit_event wr (new_event End) ;
+  emit_event wr {(new_event End) with pid} ;
   res
 
 let measure_impl = ref (fun _ f -> f ())
@@ -77,7 +78,9 @@ let start_tracing wr =
   Scheduler.set_on_end_of_cycle sch (fun () ->
       sch.cycle_started <- true ;
       if sch.current_execution_context.tid <> 0 then
-        emit_event wr (new_event Cycle_end) )
+        emit_event wr
+          {(new_event Cycle_end) with tid= sch.current_execution_context.tid}
+  )
 
 [%%else]
 
