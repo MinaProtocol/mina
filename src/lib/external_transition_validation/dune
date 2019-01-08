@@ -1,0 +1,5 @@
+(library
+  (name external_transition_validation)
+  (public_name external_transition_validation)
+  (libraries async_kernel core_kernel protocols transition_frontier)
+  (preprocess (pps ppx_jane)))
