@@ -105,14 +105,23 @@ module In_memory_kvdb : Intf.Key_value_database = struct
     include Hashable.Make_binable (T)
   end
 
-  type t = {uuid: Uuid.t; table: Bigstring_frozen.t Bigstring_frozen.Table.t}
+  type t =
+    {uuid: Uuid.Stable.V1.t; table: Bigstring_frozen.t Bigstring_frozen.Table.t}
+  [@@deriving sexp]
+
+  let to_alist t =
+    let unsorted = Bigstring_frozen.Table.to_alist t.table in
+    (* sort by key *)
+    List.sort
+      ~compare:(fun (k1, _) (k2, _) -> Bigstring_frozen.compare k1 k2)
+      unsorted
 
   let get_uuid t = t.uuid
 
   let create ~directory:_ =
     {uuid= Uuid.create (); table= Bigstring_frozen.Table.create ()}
 
-  let destroy _ = ()
+  let close _ = ()
 
   let get t ~key = Bigstring_frozen.Table.find t.table key
 
@@ -121,10 +130,7 @@ module In_memory_kvdb : Intf.Key_value_database = struct
   let set_batch tbl ~key_data_pairs =
     List.iter key_data_pairs ~f:(fun (key, data) -> set tbl ~key ~data)
 
-  let delete t ~key = Bigstring_frozen.Table.remove t.table key
-
-  let copy (t : t) =
-    {uuid= Uuid.create (); table= Bigstring_frozen.Table.copy t.table}
+  let remove t ~key = Bigstring_frozen.Table.remove t.table key
 end
 
 module Storage_locations : Intf.Storage_locations = struct
@@ -140,8 +146,6 @@ module Key = struct
   let gen = Account.key_gen
 
   let empty = Account.empty.public_key
-
-  let to_string = Format.sprintf !"%{sexp: T.t}"
 
   let gen_keys num_keys =
     (* TODO : the Quickcheck generator for Public_key.Compressed produces duplicates

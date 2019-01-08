@@ -70,7 +70,8 @@ module type S = sig
 
   val block_interval_ms : Int64.t
 
-  val genesis_protocol_state : Protocol_state.value
+  val genesis_protocol_state :
+    (Protocol_state.value, Coda_base.State_hash.t) With_hash.t
 
   val generate_transition :
        previous_protocol_state:Protocol_state.value
@@ -89,10 +90,10 @@ module type S = sig
    * transition cannot be generated.
    *)
 
-  val is_valid :
+  val received_at_valid_time :
     Consensus_state.value -> time_received:Unix_timestamp.t -> bool
   (**
-   * Check transition invariants to determine the validity of an external transition
+   * Check that a consensus state was received at a valid time.
    *)
 
   val next_state_checked :
@@ -112,7 +113,6 @@ module type S = sig
        existing:Consensus_state.value
     -> candidate:Consensus_state.value
     -> logger:Logger.t
-    -> time_received:Unix_timestamp.t
     -> [`Keep | `Take]
   (**
    * Select between two ledger builder controller tips given the consensus
@@ -143,5 +143,11 @@ module type S = sig
     -> unit
   (**
    * A hook for managing local state when the locked tip is updated.
+   *)
+
+  val should_bootstrap :
+    existing:Consensus_state.value -> candidate:Consensus_state.value -> bool
+  (**
+   * Indicator of when we should bootstrap  
    *)
 end

@@ -88,20 +88,6 @@ end = struct
     type t = index [@@deriving sexp, compare, hash, eq]
   end
 
-  let copy t =
-    let copy_tree tree =
-      { leafs= Key.Table.copy tree.leafs
-      ; unset_slots= tree.unset_slots
-      ; dirty= tree.dirty
-      ; syncing= false
-      ; nodes_height= tree.nodes_height
-      ; nodes= List.map tree.nodes ~f:Dyn_array.copy
-      ; dirty_indices= tree.dirty_indices }
-    in
-    { uuid= Uuid.create ()
-    ; accounts= Dyn_array.copy t.accounts
-    ; tree= copy_tree t.tree }
-
   module Path = Merkle_path.Make (Hash)
 
   type path = Path.t
@@ -135,7 +121,11 @@ end = struct
         ; nodes= []
         ; dirty_indices= [] } }
 
-  let destroy _t = failwith "destroy: not implemented"
+  let with_ledger ~f =
+    let t = create () in
+    f t
+
+  let close _t = failwith "close: not implemented"
 
   let get_uuid t = t.uuid
 
@@ -172,6 +162,10 @@ end = struct
     Hashtbl.set t.tree.leafs ~key ~data:merkle_index ;
     (t.tree).dirty_indices <- merkle_index :: t.tree.dirty_indices ;
     merkle_index
+
+  let last_filled t =
+    let merkle_index = Dyn_array.length t.accounts in
+    if merkle_index = 0 then None else Some merkle_index
 
   let get_or_create_account t key account =
     match location_of_key t key with

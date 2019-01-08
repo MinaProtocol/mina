@@ -1,4 +1,5 @@
 (library
   (name ledger_catchup)
   (public_name ledger_catchup)
-  (libraries async_kernel core_kernel protocols pipe_lib syncable_ledger merkle_address coda_base))
+  (preprocess (pps ppx_jane) )
+  (libraries async_kernel transition_frontier transition_handler consensus core_kernel protocols pipe_lib syncable_ledger merkle_address coda_base kademlia))
