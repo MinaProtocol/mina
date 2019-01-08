@@ -277,6 +277,17 @@ let%test_module "test functor on in memory databases" =
           res ) ;
       assert (mr_start = L16.merkle_root ledger)
 
+    let%test_unit "create_empty doesn't modify the hash" =
+      let open L3 in
+      let key = List.nth_exn (Key_with_gen.gen_keys 1) 0 in
+      let ledger = create () in
+      let start_hash = merkle_root ledger in
+      match get_or_create_account_exn ledger key Account.empty with
+      | `Existed, _ ->
+          failwith
+            "create_empty with empty ledger somehow already has that key?"
+      | `Added, _new_loc -> [%test_eq: Hash.t] start_hash (merkle_root ledger)
+
     let%test_unit "remove last two accounts is as if they were never there" =
       (* NB: because of the issue with duplicates in public _key generation,
          given numbers of accounts n and m, where m > n, the key list produced by load_ledger on n

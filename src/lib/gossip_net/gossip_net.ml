@@ -36,9 +36,10 @@ module type S = sig
 
   module Config : Config_intf
 
-  val create : Config.t -> unit Rpc.Implementation.t list -> t Deferred.t
+  val create :
+    Config.t -> Host_and_port.t Rpc.Implementation.t list -> t Deferred.t
 
-  val received : t -> msg Linear_pipe.Reader.t
+  val received : t -> msg Envelope.Incoming.t Linear_pipe.Reader.t
 
   val broadcast : t -> msg Linear_pipe.Writer.t
 
@@ -64,7 +65,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     ; log: Logger.t
     ; target_peer_count: int
     ; broadcast_writer: Message.msg Linear_pipe.Writer.t
-    ; received_reader: Message.msg Linear_pipe.Reader.t
+    ; received_reader: Message.msg Envelope.Incoming.t Linear_pipe.Reader.t
     ; peers: Peer.Hash_set.t }
 
   module Config = struct
@@ -82,8 +83,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   (* OPTIMIZATION: use fast n choose k implementation - see python or old flow code *)
   let random_sublist xs n = List.take (List.permute xs) n
 
-  let create_connection_with_menu r w =
-    match%bind Rpc.Connection.create r w ~connection_state:(fun _ -> ()) with
+  let create_connection_with_menu peer r w =
+    match%bind Rpc.Connection.create r w ~connection_state:(fun _ -> peer) with
     | Error exn -> return (Or_error.of_exn exn)
     | Ok conn -> Versioned_rpc.Connection_with_menu.create conn
 
@@ -91,7 +92,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     try_with (fun () ->
         Tcp.with_connection (Tcp.Where_to_connect.of_host_and_port peer)
           ~timeout (fun _ r w ->
-            create_connection_with_menu r w
+            create_connection_with_menu peer r w
             >>=? fun conn -> dispatch conn query ) )
     >>| function
     | Ok (Ok result) -> Ok result
@@ -115,7 +116,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     let selected_peers = random_sublist (Hash_set.to_list t.peers) n in
     broadcast_selected t selected_peers msg
 
-  let create (config : Config.t) implementations =
+  let create (config : Config.t)
+      (implementations : Host_and_port.t Rpc.Implementation.t list) =
     let log = Logger.child config.parent_log __MODULE__ in
     trace_task "gossip net" (fun () ->
         let%map membership =
@@ -152,10 +154,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         let implementations =
           let implementations =
             Versioned_rpc.Menu.add
-              ( Message.implement_multi (fun () ~version:_ msg ->
+              ( Message.implement_multi (fun peer ~version:_ msg ->
                     Linear_pipe.force_write_maybe_drop_head
                       ~capacity:broadcast_received_capacity received_writer
-                      received_reader msg )
+                      received_reader
+                      (Envelope.Incoming.wrap ~data:msg ~sender:peer) )
               @ implementations )
           in
           Rpc.Implementations.create_exn ~implementations
@@ -181,9 +184,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                (`Call
                  (fun _ exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
              (Tcp.Where_to_listen.of_port (snd config.me))
-             (fun _ reader writer ->
+             (fun peer reader writer ->
                Rpc.Connection.server_with_close reader writer ~implementations
-                 ~connection_state:(fun _ -> ())
+                 ~connection_state:(fun _ ->
+                   Socket.Address.Inet.to_host_and_port peer )
                  ~on_handshake_error:
                    (`Call
                      (fun exn ->
