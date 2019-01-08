@@ -142,6 +142,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
   module Constraint = struct
     open Constraint
+    include Constraint.T
 
     type basic = Cvar.t Constraint.basic
 
@@ -178,19 +179,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
           R1CS_constraint.set_is_square constr false ;
           constr
 
-    let create_basic ?label basic = {basic; annotation= label}
-
-    let override_label {basic; annotation= a} label_opt =
-      {basic; annotation= (match label_opt with Some x -> Some x | None -> a)}
-
-    let equal ?label x y = [create_basic ?label (Equal (x, y))]
-
-    let boolean ?label x = [create_basic ?label (Boolean x)]
-
-    let r1cs ?label a b c = [create_basic ?label (R1CS (a, b, c))]
-
-    let square ?label a c = [create_basic ?label (Square (a, c))]
-
     let stack_to_string = String.concat ~sep:"\n"
 
     let add ~stack (t : t) system =
@@ -212,10 +200,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
     let eval t get_value =
       List.for_all t ~f:(fun {basic; _} -> eval_basic basic get_value)
-
-    let annotation (t : t) =
-      String.concat ~sep:"; "
-        (List.filter_map t ~f:(fun {annotation; _} -> annotation))
   end
 
   module Typ_monads = struct
