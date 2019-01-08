@@ -268,10 +268,10 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
   module As_prover0 = struct
     include As_prover.Make (struct
-      type t = Cvar.t -> Field.t
-    end)
+      type var = Cvar.t
 
-    let read_var (v : Cvar.t) : (Field.t, 's) t = fun tbl s -> (s, tbl v)
+      type field = Field.t
+    end)
   end
 
   module Handler = struct
