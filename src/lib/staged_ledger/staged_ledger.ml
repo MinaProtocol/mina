@@ -665,8 +665,6 @@ end = struct
 
   let apply t witness ~logger = apply_diff t witness ~logger
 
-  let forget_work_opt = Option.map ~f:Transaction_snark_work.forget
-
   let ok_exn' (t : ('a, Staged_ledger_error.t) Result.t) =
     match t with
     | Ok x -> x
