@@ -606,11 +606,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
   module Handle = struct
     include Handle
-
-    let value (t : ('var, 'value) t) : ('value, 's) As_prover0.t =
-     fun _ s -> (s, Option.value_exn t.value)
-
-    let var {var; _} = var
   end
 
   module Checked = struct
