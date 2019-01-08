@@ -91,16 +91,18 @@ template<typename ppT>
 bool r1cs_gg_ppzksnark_verification_key<ppT>::operator==(const r1cs_gg_ppzksnark_verification_key<ppT> &other) const
 {
     return (this->alpha_g1_beta_g2 == other.alpha_g1_beta_g2 &&
+            this->gamma_g2 == other.gamma_g2 &&
             this->delta_g2 == other.delta_g2 &&
-            this->ABC_g1 == other.ABC_g1);
+            this->gamma_ABC_g1 == other.gamma_ABC_g1);
 }
 
 template<typename ppT>
 std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzksnark_verification_key<ppT> &vk)
 {
     out << vk.alpha_g1_beta_g2 << OUTPUT_NEWLINE;
+    out << vk.gamma_g2 << OUTPUT_NEWLINE;
     out << vk.delta_g2 << OUTPUT_NEWLINE;
-    out << vk.ABC_g1 << OUTPUT_NEWLINE;
+    out << vk.gamma_ABC_g1 << OUTPUT_NEWLINE;
 
     return out;
 }
@@ -110,9 +112,11 @@ std::istream& operator>>(std::istream &in, r1cs_gg_ppzksnark_verification_key<pp
 {
     in >> vk.alpha_g1_beta_g2;
     libff::consume_OUTPUT_NEWLINE(in);
+    in >> vk.gamma_g2;
+    libff::consume_OUTPUT_NEWLINE(in);
     in >> vk.delta_g2;
     libff::consume_OUTPUT_NEWLINE(in);
-    in >> vk.ABC_g1;
+    in >> vk.gamma_ABC_g1;
     libff::consume_OUTPUT_NEWLINE(in);
 
     return in;
@@ -122,18 +126,18 @@ template<typename ppT>
 bool r1cs_gg_ppzksnark_processed_verification_key<ppT>::operator==(const r1cs_gg_ppzksnark_processed_verification_key<ppT> &other) const
 {
     return (this->vk_alpha_g1_beta_g2 == other.vk_alpha_g1_beta_g2 &&
-            this->vk_generator_g2_precomp == other.vk_generator_g2_precomp &&
+            this->vk_gamma_g2_precomp == other.vk_gamma_g2_precomp &&
             this->vk_delta_g2_precomp == other.vk_delta_g2_precomp &&
-            this->ABC_g1 == other.ABC_g1);
+            this->gamma_ABC_g1 == other.gamma_ABC_g1);
 }
 
 template<typename ppT>
 std::ostream& operator<<(std::ostream &out, const r1cs_gg_ppzksnark_processed_verification_key<ppT> &pvk)
 {
     out << pvk.vk_alpha_g1_beta_g2 << OUTPUT_NEWLINE;
-    out << pvk.vk_generator_g2_precomp << OUTPUT_NEWLINE;
+    out << pvk.vk_gamma_g2_precomp << OUTPUT_NEWLINE;
     out << pvk.vk_delta_g2_precomp << OUTPUT_NEWLINE;
-    out << pvk.ABC_g1 << OUTPUT_NEWLINE;
+    out << pvk.gamma_ABC_g1 << OUTPUT_NEWLINE;
 
     return out;
 }
@@ -143,11 +147,11 @@ std::istream& operator>>(std::istream &in, r1cs_gg_ppzksnark_processed_verificat
 {
     in >> pvk.vk_alpha_g1_beta_g2;
     libff::consume_OUTPUT_NEWLINE(in);
-    in >> pvk.vk_generator_g2_precomp;
+    in >> pvk.vk_gamma_g2_precomp;
     libff::consume_OUTPUT_NEWLINE(in);
     in >> pvk.vk_delta_g2_precomp;
     libff::consume_OUTPUT_NEWLINE(in);
-    in >> pvk.ABC_g1;
+    in >> pvk.gamma_ABC_g1;
     libff::consume_OUTPUT_NEWLINE(in);
 
     return in;
@@ -189,6 +193,7 @@ r1cs_gg_ppzksnark_verification_key<ppT> r1cs_gg_ppzksnark_verification_key<ppT>:
 {
     r1cs_gg_ppzksnark_verification_key<ppT> result;
     result.alpha_g1_beta_g2 = libff::Fr<ppT>::random_element() * libff::GT<ppT>::random_element();
+    result.gamma_g2 = libff::G2<ppT>::random_element();
     result.delta_g2 = libff::G2<ppT>::random_element();
 
     libff::G1<ppT> base = libff::G1<ppT>::random_element();
@@ -198,7 +203,7 @@ r1cs_gg_ppzksnark_verification_key<ppT> r1cs_gg_ppzksnark_verification_key<ppT>:
         v.emplace_back(libff::G1<ppT>::random_element());
     }
 
-    result.ABC_g1 = accumulation_vector<libff::G1<ppT> >(std::move(base), std::move(v));
+    result.gamma_ABC_g1 = accumulation_vector<libff::G1<ppT> >(std::move(base), std::move(v));
 
     return result;
 }
@@ -216,7 +221,9 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
     const libff::Fr<ppT> t = libff::Fr<ppT>::random_element();
     const libff::Fr<ppT> alpha = libff::Fr<ppT>::random_element();
     const libff::Fr<ppT> beta = libff::Fr<ppT>::random_element();
+    const libff::Fr<ppT> gamma = libff::Fr<ppT>::random_element();
     const libff::Fr<ppT> delta = libff::Fr<ppT>::random_element();
+    const libff::Fr<ppT> gamma_inverse = gamma.inverse();
     const libff::Fr<ppT> delta_inverse = delta.inverse();
 
     /* A quadratic arithmetic program evaluated at t. */
@@ -249,17 +256,17 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
     libff::Fr_vector<ppT> Ct = std::move(qap.Ct);
     libff::Fr_vector<ppT> Ht = std::move(qap.Ht);
 
-    /* The product component: (beta*A_i(t) + alpha*B_i(t) + C_i(t)). */
-    libff::enter_block("Compute ABC for R1CS verification key");
-    libff::Fr_vector<ppT> ABC;
-    ABC.reserve(qap.num_inputs());
+    /* The gamma inverse product component: (beta*A_i(t) + alpha*B_i(t) + C_i(t)) * gamma^{-1}. */
+    libff::enter_block("Compute gamma_ABC for R1CS verification key");
+    libff::Fr_vector<ppT> gamma_ABC;
+    gamma_ABC.reserve(qap.num_inputs());
 
-    const libff::Fr<ppT> ABC_0 = beta * At[0] + alpha * Bt[0] + Ct[0];
+    const libff::Fr<ppT> gamma_ABC_0 = (beta * At[0] + alpha * Bt[0] + Ct[0]) * gamma_inverse;
     for (size_t i = 1; i < qap.num_inputs() + 1; ++i)
     {
-        ABC.emplace_back(beta * At[i] + alpha * Bt[i] + Ct[i]);
+        gamma_ABC.emplace_back((beta * At[i] + alpha * Bt[i] + Ct[i]) * gamma_inverse);
     }
-    libff::leave_block("Compute ABC for R1CS verification key");
+    libff::leave_block("Compute gamma_ABC for R1CS verification key");
 
     /* The delta inverse product component: (beta*A_i(t) + alpha*B_i(t) + C_i(t)) * delta^{-1}. */
     libff::enter_block("Compute L query for R1CS proving key");
@@ -346,20 +353,22 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
 
     libff::enter_block("Generate R1CS verification key");
     libff::GT<ppT> alpha_g1_beta_g2 = ppT::reduced_pairing(alpha_g1, beta_g2);
+    libff::G2<ppT> gamma_g2 = gamma * G2_gen;
 
-    libff::enter_block("Encode ABC for R1CS verification key");
-    libff::G1<ppT> ABC_g1_0 = ABC_0 * g1_generator;
-    libff::G1_vector<ppT> ABC_g1_values = batch_exp(g1_scalar_size, g1_window_size, g1_table, ABC);
-    libff::leave_block("Encode ABC for R1CS verification key");
+    libff::enter_block("Encode gamma_ABC for R1CS verification key");
+    libff::G1<ppT> gamma_ABC_g1_0 = gamma_ABC_0 * g1_generator;
+    libff::G1_vector<ppT> gamma_ABC_g1_values = batch_exp(g1_scalar_size, g1_window_size, g1_table, gamma_ABC);
+    libff::leave_block("Encode gamma_ABC for R1CS verification key");
     libff::leave_block("Generate R1CS verification key");
 
     libff::leave_block("Call to r1cs_gg_ppzksnark_generator");
 
-    accumulation_vector<libff::G1<ppT> > ABC_g1(std::move(ABC_g1_0), std::move(ABC_g1_values));
+    accumulation_vector<libff::G1<ppT> > gamma_ABC_g1(std::move(gamma_ABC_g1_0), std::move(gamma_ABC_g1_values));
 
     r1cs_gg_ppzksnark_verification_key<ppT> vk = r1cs_gg_ppzksnark_verification_key<ppT>(alpha_g1_beta_g2,
+                                                                                         gamma_g2,
                                                                                          delta_g2,
-                                                                                         ABC_g1);
+                                                                                         gamma_ABC_g1);
 
     r1cs_gg_ppzksnark_proving_key<ppT> pk = r1cs_gg_ppzksnark_proving_key<ppT>(std::move(alpha_g1),
                                                                                std::move(beta_g1),
@@ -502,9 +511,9 @@ r1cs_gg_ppzksnark_processed_verification_key<ppT> r1cs_gg_ppzksnark_verifier_pro
 
     r1cs_gg_ppzksnark_processed_verification_key<ppT> pvk;
     pvk.vk_alpha_g1_beta_g2 = vk.alpha_g1_beta_g2;
-    pvk.vk_generator_g2_precomp = ppT::precompute_G2(libff::G2<ppT>::one());
+    pvk.vk_gamma_g2_precomp = ppT::precompute_G2(vk.gamma_g2);
     pvk.vk_delta_g2_precomp = ppT::precompute_G2(vk.delta_g2);
-    pvk.ABC_g1 = vk.ABC_g1;
+    pvk.gamma_ABC_g1 = vk.gamma_ABC_g1;
 
     libff::leave_block("Call to r1cs_gg_ppzksnark_verifier_process_vk");
 
@@ -517,10 +526,10 @@ bool r1cs_gg_ppzksnark_online_verifier_weak_IC(const r1cs_gg_ppzksnark_processed
                                                const r1cs_gg_ppzksnark_proof<ppT> &proof)
 {
     libff::enter_block("Call to r1cs_gg_ppzksnark_online_verifier_weak_IC");
-    assert(pvk.ABC_g1.domain_size() >= primary_input.size());
+    assert(pvk.gamma_ABC_g1.domain_size() >= primary_input.size());
 
     libff::enter_block("Accumulate input");
-    const accumulation_vector<libff::G1<ppT> > accumulated_IC = pvk.ABC_g1.template accumulate_chunk<libff::Fr<ppT> >(primary_input.begin(), primary_input.end(), 0);
+    const accumulation_vector<libff::G1<ppT> > accumulated_IC = pvk.gamma_ABC_g1.template accumulate_chunk<libff::Fr<ppT> >(primary_input.begin(), primary_input.end(), 0);
     const libff::G1<ppT> &acc = accumulated_IC.first;
     libff::leave_block("Accumulate input");
 
@@ -546,7 +555,7 @@ bool r1cs_gg_ppzksnark_online_verifier_weak_IC(const r1cs_gg_ppzksnark_processed
 
     const libff::Fqk<ppT> QAP1 = ppT::miller_loop(proof_g_A_precomp,  proof_g_B_precomp);
     const libff::Fqk<ppT> QAP2 = ppT::double_miller_loop(
-        acc_precomp, pvk.vk_generator_g2_precomp,
+        acc_precomp, pvk.vk_gamma_g2_precomp,
         proof_g_C_precomp, pvk.vk_delta_g2_precomp);
     const libff::GT<ppT> QAP = ppT::final_exponentiation(QAP1 * QAP2.unitary_inverse());
 
@@ -586,9 +595,9 @@ bool r1cs_gg_ppzksnark_online_verifier_strong_IC(const r1cs_gg_ppzksnark_process
     bool result = true;
     libff::enter_block("Call to r1cs_gg_ppzksnark_online_verifier_strong_IC");
 
-    if (pvk.ABC_g1.domain_size() != primary_input.size())
+    if (pvk.gamma_ABC_g1.domain_size() != primary_input.size())
     {
-        libff::print_indent(); printf("Input length differs from expected (got %zu, expected %zu).\n", primary_input.size(), pvk.ABC_g1.domain_size());
+        libff::print_indent(); printf("Input length differs from expected (got %zu, expected %zu).\n", primary_input.size(), pvk.gamma_ABC_g1.domain_size());
         result = false;
     }
     else
@@ -618,13 +627,13 @@ bool r1cs_gg_ppzksnark_affine_verifier_weak_IC(const r1cs_gg_ppzksnark_verificat
                                                const r1cs_gg_ppzksnark_proof<ppT> &proof)
 {
     libff::enter_block("Call to r1cs_gg_ppzksnark_affine_verifier_weak_IC");
-    assert(vk.ABC_g1.domain_size() >= primary_input.size());
+    assert(vk.gamma_ABC_g1.domain_size() >= primary_input.size());
 
-    libff::affine_ate_G2_precomp<ppT> pvk_vk_generator_g2_precomp = ppT::affine_ate_precompute_G2(libff::G2<ppT>::one());
+    libff::affine_ate_G2_precomp<ppT> pvk_vk_gamma_g2_precomp = ppT::affine_ate_precompute_G2(vk.gamma_g2);
     libff::affine_ate_G2_precomp<ppT> pvk_vk_delta_g2_precomp = ppT::affine_ate_precompute_G2(vk.delta_g2);
 
     libff::enter_block("Accumulate input");
-    const accumulation_vector<libff::G1<ppT> > accumulated_IC = vk.ABC_g1.template accumulate_chunk<libff::Fr<ppT> >(primary_input.begin(), primary_input.end(), 0);
+    const accumulation_vector<libff::G1<ppT> > accumulated_IC = vk.gamma_ABC_g1.template accumulate_chunk<libff::Fr<ppT> >(primary_input.begin(), primary_input.end(), 0);
     const libff::G1<ppT> &acc = accumulated_IC.first;
     libff::leave_block("Accumulate input");
 
@@ -648,7 +657,7 @@ bool r1cs_gg_ppzksnark_affine_verifier_weak_IC(const r1cs_gg_ppzksnark_verificat
     const libff::affine_ate_G1_precomp<ppT> acc_precomp = ppT::affine_ate_precompute_G1(acc);
 
     const libff::Fqk<ppT> QAP_miller = ppT::affine_ate_e_times_e_over_e_miller_loop(
-        acc_precomp, pvk_vk_generator_g2_precomp,
+        acc_precomp, pvk_vk_gamma_g2_precomp,
         proof_g_C_precomp, pvk_vk_delta_g2_precomp,
         proof_g_A_precomp,  proof_g_B_precomp);
     const libff::GT<ppT> QAP = ppT::final_exponentiation(QAP_miller.unitary_inverse());
