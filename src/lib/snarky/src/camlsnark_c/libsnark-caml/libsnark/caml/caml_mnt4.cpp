@@ -632,6 +632,29 @@ r1cs_gg_ppzksnark_verification_key<ppT>* camlsnark_mnt4_verification_key_of_stri
   return vk;
 }
 
+std::vector<libff::G1<ppT>>*
+camlsnark_mnt4_verification_key_query(r1cs_gg_ppzksnark_verification_key<ppT>* vk) {
+  std::vector<libff::G1<ppT>>* res = new std::vector<libff::G1<ppT>>();
+  printf("Test\n");
+  res->emplace_back(vk->ABC_g1.first);
+  for (size_t i = 0; i < vk->ABC_g1.rest.values.size(); ++i)
+  {
+  printf("Test %d\n", i);
+      res->emplace_back(vk->ABC_g1.rest.values[i]);
+  }
+  return res;
+}
+
+libff::G2<ppT>*
+camlsnark_mnt4_verification_key_delta(r1cs_gg_ppzksnark_verification_key<ppT>* vk) {
+  return new libff::G2<ppT>(vk->delta_g2);
+}
+
+libff::Fqk<ppT>*
+camlsnark_mnt4_verification_key_alpha_beta(r1cs_gg_ppzksnark_verification_key<ppT>* vk) {
+  return new libff::Fqk<ppT>(vk->alpha_g1_beta_g2);
+}
+
 r1cs_gg_ppzksnark_proving_key<ppT>* camlsnark_mnt4_keypair_pk(r1cs_gg_ppzksnark_keypair<ppT>* keypair) {
   return new r1cs_gg_ppzksnark_proving_key<ppT>(keypair->pk);
 }
@@ -682,7 +705,20 @@ bool camlsnark_mnt4_proof_verify(
     std::vector<FieldT>* primary_input) {
   return r1cs_gg_ppzksnark_verifier_weak_IC(*key, *primary_input, *proof);
 }
-// End ppzksnark specific code
+
+libff::G1<ppT>* camlsnark_mnt4_proof_a(r1cs_gg_ppzksnark_proof<ppT>* proof) {
+  return new libff::G1<ppT>(proof->g_A);
+}
+
+libff::G2<ppT>* camlsnark_mnt4_proof_b(r1cs_gg_ppzksnark_proof<ppT>* proof) {
+  return new libff::G2<ppT>(proof->g_B);
+}
+
+libff::G1<ppT>* camlsnark_mnt4_proof_c(r1cs_gg_ppzksnark_proof<ppT>* proof) {
+  return new libff::G1<ppT>(proof->g_C);
+}
+
+// End gg_ppzksnark specific code
 
 // Begin Groth-Maller specific code
 r1cs_constraint_system<FieldT>* camlsnark_mnt4_gm_proving_key_r1cs_constraint_system(
@@ -750,6 +786,13 @@ camlsnark_mnt4_gm_verification_key_h_gamma (
     r1cs_se_ppzksnark_verification_key<ppT>* vk
 ) {
   return new libff::G2<ppT>(vk->H_gamma);
+}
+
+libff::Fqk<ppT>* 
+camlsnark_mnt4_gm_verification_key_g_alpha_h_beta (
+    r1cs_se_ppzksnark_verification_key<ppT>* vk
+) {
+  return new libff::Fqk<ppT>(vk->G_alpha_H_beta);
 }
 
 std::vector< libff::G1<ppT> >*
