@@ -11,7 +11,7 @@ type response += Unhandled
 let unhandled = Unhandled
 
 module Response = struct
-  type 'a t = Provide of 'a | Reraise of 'a req | Unhandled
+  type 'a t = Provide of 'a | Delegate of 'a req | Unhandled
 end
 
 type request =
@@ -31,7 +31,7 @@ module Handler = struct
       | {handle} :: hs -> (
         match handle req with
         | Provide x -> x
-        | Reraise req' -> go req' hs
+        | Delegate req' -> go req' hs
         | Unhandled -> go req hs )
     in
     go req0 stack0
