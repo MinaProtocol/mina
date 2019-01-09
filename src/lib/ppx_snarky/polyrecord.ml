@@ -296,15 +296,21 @@ let read_arg_exn ~loc ~arguments name =
   | Some instances_info -> instances_info
   | None -> raise_errorf ~loc "Expected an %s argument." name
 
-let str_poly_record ~loc ~path:_ expr =
+type options =
+  { fields: field_info list
+  ; instances: label Location.loc list
+  ; contents: (label Location.loc * expression) list }
+
+let parse_options expr =
+  let loc = expr.pexp_loc in
   let arguments = parse_arguments expr in
   let instances_info =
-    read_arg_exn ~loc:expr.pexp_loc ~arguments "Instances"
+    read_arg_exn ~loc ~arguments "Instances"
     |> parse_listlike
     |> List.map ~f:parse_to_modname
   in
   let fields_info =
-    read_arg_exn ~loc:expr.pexp_loc ~arguments "Fields"
+    read_arg_exn ~loc ~arguments "Fields"
     |> parse_listlike
     |> List.folding_map
          ~init:(Map.empty (module String))
@@ -316,10 +322,14 @@ let str_poly_record ~loc ~path:_ expr =
         List.map ~f:(parse_content ~loc) (parse_listlike contents_info)
     | None -> []
   in
-  let polytype = polymorphic_type_stri ~loc fields_info in
-  let accessors = accessors_stri ~loc fields_info in
+  {fields= fields_info; instances= instances_info; contents= contents_info}
+
+let str_poly_record ~loc ~path:_ expr =
+  let options = parse_options expr in
+  let polytype = polymorphic_type_stri ~loc options.fields in
+  let accessors = accessors_stri ~loc options.fields in
   let instances =
-    instances_str ~loc instances_info fields_info contents_info
+    instances_str ~loc options.instances options.fields options.contents
   in
   include_ ~loc (Mod.structure ~loc (polytype :: accessors :: instances))
 
