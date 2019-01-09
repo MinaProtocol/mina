@@ -978,18 +978,6 @@ module type External_transition_validation_intf = sig
 
   type transition_frontier
 
-  module Truth : sig
-    type true_
-
-    type false_
-
-    type _ t = True : true_ t | False : false_ t
-
-    type true_t = true_ t
-
-    type false_t = false_ t
-  end
-
   type ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t =
     'time_received * 'proof * 'frontier_dependencies * 'staged_ledger_diff
     constraint 'time_received = [`Time_received] * _ Truth.t

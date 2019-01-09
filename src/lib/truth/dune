@@ -1,0 +1,3 @@
+(library
+  (name truth)
+  (public_name truth))

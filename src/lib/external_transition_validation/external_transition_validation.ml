@@ -31,7 +31,6 @@ module Make (Inputs : Inputs_intf) :
    and type staged_ledger_error := Inputs.Staged_ledger.Staged_ledger_error.t
    and type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
-  module Truth = Truth
 
   type ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t =
     'time_received * 'proof * 'frontier_dependencies * 'staged_ledger_diff
