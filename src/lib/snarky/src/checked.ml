@@ -69,8 +69,6 @@ module T = struct
       (r : ('value Request.t, 'cvar -> 'field, 's) As_prover.t) =
     Exists (typ, Request r, fun h -> return (Handle.var h))
 
-  (*let perform req = request_witness Typ.unit req*)
-
   let request ?such_that typ r =
     match such_that with
     | None -> request_witness typ (As_prover.return r)
@@ -140,6 +138,8 @@ module T = struct
       Add_constraint
         ( map_concat_rev ~f:(fun c -> Constraint.override_label c label) cs
         , return () )
+
+  let assert_equal ?label x y = assert_ (Constraint.equal ?label x y)
 end
 
 include T

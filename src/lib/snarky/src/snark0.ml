@@ -463,8 +463,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
     let perform req = request_witness Typ.unit req
 
-    let assert_equal ?label x y = assert_ (Constraint.equal ?label x y)
-
     let constraint_count (t : (_, _) t) : int =
       let next_auxiliary = ref 1 in
       let alloc_var () =
