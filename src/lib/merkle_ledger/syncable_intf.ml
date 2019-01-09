@@ -7,7 +7,7 @@ module type S = sig
 
   type addr
 
-  type t
+  type t [@@deriving sexp]
 
   type path
 

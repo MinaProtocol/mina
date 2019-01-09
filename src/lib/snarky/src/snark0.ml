@@ -736,7 +736,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
     let assert_equal ?label x y = assert_ (Constraint.equal ?label x y)
 
-    let constraint_count (t : (_, _) t) : int =
+    let constraint_count ?(log = fun ?start _ _ -> ()) (t : (_, _) t) : int =
       let next_auxiliary = ref 1 in
       let alloc_var () =
         let v = Backend.Var.create !next_auxiliary in
@@ -750,8 +750,10 @@ module Make_basic (Backend : Backend_intf.S) = struct
         | As_prover (_x, k) -> go count k
         | Add_constraint (_c, t) -> go (count + 1) t
         | Next_auxiliary k -> go count (k !next_auxiliary)
-        | With_label (_s, t, k) ->
+        | With_label (s, t, k) ->
+            log ~start:true s count ;
             let count', y = go count t in
+            log s count' ;
             go count' (k y)
         | With_state (_p, _and_then, t_sub, k) ->
             let count', y = go count t_sub in
@@ -819,13 +821,12 @@ module Make_basic (Backend : Backend_intf.S) = struct
             let s', (_ : unit option) = run_as_prover (Some x) s in
             go stack k handler s'
         | Add_constraint (c, t) ->
-            Option.iter system ~f:(fun system ->
-                if eval_constraints && not (Constraint.eval c get_value) then
-                  failwithf "Constraint unsatisfied:\n%s\n%s\n"
-                    (Constraint.annotation c)
-                    (Constraint.stack_to_string stack)
-                    () ;
-                Constraint.add ~stack c system ) ;
+            if eval_constraints && not (Constraint.eval c get_value) then
+              failwithf "Constraint unsatisfied:\n%s\n%s\n"
+                (Constraint.annotation c)
+                (Constraint.stack_to_string stack)
+                () ;
+            Option.iter system ~f:(fun system -> Constraint.add ~stack c system) ;
             go stack t handler s
         | With_state (p, and_then, t_sub, k) ->
             let s, s_sub = run_as_prover (Some p) s in
@@ -1574,6 +1575,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
   include Checked
 
   let generate_keypair = Run.generate_keypair
+
+  let conv f = Run.conv (fun x _ -> f x)
 
   let prove = Run.prove
 
