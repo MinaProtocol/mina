@@ -287,13 +287,11 @@ let instances_str ~loc options =
       @ snark_mod_instance ~loc snark_mod options.fields options.contents
 
 let parse_arguments expr =
-  List.map (parse_listlike expr) ~f:(fun expr ->
+  List.filter_map (parse_listlike expr) ~f:(fun expr ->
       match expr.pexp_desc with
       | Pexp_variant (variant_name, Some variant_info) ->
-          (variant_name, variant_info)
-      | _ ->
-          raise_errorf ~loc:expr.pexp_loc
-            "Expected a variant type. Try `Instances (T, Snarkable)" )
+          Some (variant_name, variant_info)
+      | _ -> None )
 
 let read_arg ~arguments name =
   List.Assoc.find arguments name ~equal:String.equal
