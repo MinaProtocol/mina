@@ -34,7 +34,8 @@ end = struct
 
   let create () = Core.Uuid.create ()
 
-  let remove_accounts_exn _t = failwith "remove_accounts_exn: null ledgers cannot be mutated"
+  let remove_accounts_exn _t =
+    failwith "remove_accounts_exn: null ledgers cannot be mutated"
 
   let empty_hash_at_heights depth =
     let empty_hash_at_heights =
@@ -79,7 +80,8 @@ end = struct
 
   let index_of_key_exn _t = failwith "index_of_key_exn: null ledgers are empty"
 
-  let set_at_index_exn _t = failwith "set_at_index_exn: null ledgers cannot be mutated"
+  let set_at_index_exn _t =
+    failwith "set_at_index_exn: null ledgers cannot be mutated"
 
   let get_at_index_exn _t = failwith "get_at_index_exn: null ledgers are empty"
 
@@ -95,9 +97,11 @@ end = struct
 
   let close _t = ()
 
-  let get_or_create_account_exn _t = failwith "get_or_create_accoutn_exn: null ledgers cannot be mutated"
+  let get_or_create_account_exn _t =
+    failwith "get_or_create_accoutn_exn: null ledgers cannot be mutated"
 
-  let get_or_create_account _t = failwith "get_or_create_account: null ledgers cannot be mutated"
+  let get_or_create_account _t =
+    failwith "get_or_create_account: null ledgers cannot be mutated"
 
   let location_of_key _t _ = None
 
@@ -117,9 +121,11 @@ end = struct
   let set_all_accounts_rooted_at_exn _t =
     failwith "set_all_accounts_rooted_at_exn: null ledgers cannot be mutated"
 
-  let set_inner_hash_at_addr_exn _t = failwith "set_inner_hash_at_addr_exn: null ledgers cannot be mutated"
+  let set_inner_hash_at_addr_exn _t =
+    failwith "set_inner_hash_at_addr_exn: null ledgers cannot be mutated"
 
-  let get_inner_hash_at_addr_exn _t addr = empty_hash_at_height (Addr.height addr)
+  let get_inner_hash_at_addr_exn _t addr =
+    empty_hash_at_height (Addr.height addr)
 
   let num_accounts _t = 0
 
