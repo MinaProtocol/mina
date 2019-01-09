@@ -58,6 +58,9 @@ module Db :
     (Kvdb)
     (Storage_locations)
 
+module Null =
+  Null_ledger.Make (Public_key.Compressed) (Account) (Hash) (Location_at_depth) (Depth)
+
 module Any_ledger :
   Merkle_ledger.Any_ledger.S
   with module Location = Location_at_depth
@@ -124,6 +127,12 @@ let of_database db =
    shadow create in order to create an attached mask
 *)
 let create ?directory_name () = of_database (Db.create ?directory_name ())
+
+let create_ephemeral () =
+  let maskable = Null.create () in
+  let casted = Any_ledger.cast (module Null) maskable in
+  let mask = Mask.create () in
+  Maskable.register_mask casted mask
 
 let with_ledger ~f =
   let ledger = create () in
