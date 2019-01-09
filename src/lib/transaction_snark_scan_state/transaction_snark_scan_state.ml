@@ -340,6 +340,8 @@ end = struct
     in
     Option.map result ~f:fst
 
+  let capacity t = Parallel_scan.parallelism ~state:t
+
   let create ~transaction_capacity_log_2 =
     Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 2)
 

@@ -669,10 +669,11 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let net_ivar = Ivar.create () in
         let empty_diff =
-          { Staged_ledger_diff.pre_diffs=
-              Either.First
-                { diff= {completed_works= []; user_commands= []}
-                ; coinbase_added= Staged_ledger_diff.At_most_one.Zero }
+          { Staged_ledger_diff.diff=
+              ( { completed_works= []
+                ; user_commands= []
+                ; coinbase= Staged_ledger_diff.At_most_two.Zero }
+              , None )
           ; prev_hash=
               Staged_ledger_hash.of_aux_and_ledger_hash
                 (Staged_ledger_aux_hash.of_bytes "")
