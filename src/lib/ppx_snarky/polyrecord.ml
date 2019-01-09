@@ -43,6 +43,11 @@ let parse_to_modname expr =
 type field_info =
   {field_name: str; field_module: lid; field_snark_module: lid; var_name: str}
 
+type options =
+  { fields: field_info list
+  ; instances: label Location.loc list
+  ; contents: (label Location.loc * expression) list }
+
 let field_module {field_module; _} = field_module
 
 let field_snark_module {field_snark_module; _} = field_snark_module
@@ -123,23 +128,25 @@ let unique_field_types fields_info =
   List.dedup_and_sort fields_info ~compare:(fun field_info1 field_info2 ->
       String.compare field_info1.var_name.txt field_info2.var_name.txt )
 
-let polymorphic_type_stri ~loc fields_info =
-  let fields =
-    List.map fields_info ~f:(fun {field_name; var_name; _} ->
-        Type.field ~loc field_name (Typ.var ~loc:var_name.loc var_name.txt) )
+let polymorphic_type_stri ~loc {fields; _} =
+  let record_typ =
+    Ptype_record
+      (List.map fields ~f:(fun {field_name; var_name; _} ->
+           Type.field ~loc field_name (Typ.var ~loc:var_name.loc var_name.txt)
+       ))
   in
   let params =
-    List.map (unique_field_types fields_info) ~f:(fun {var_name; _} ->
+    List.map (unique_field_types fields) ~f:(fun {var_name; _} ->
         (Typ.var ~loc:var_name.loc var_name.txt, Invariant) )
   in
   Str.type_ Nonrecursive
-    [Type.mk ~loc ~params ~kind:(Ptype_record fields) (mkloc type_name loc)]
+    [Type.mk ~loc ~params ~kind:record_typ (mkloc type_name loc)]
 
 let pat_var name = Pat.var ~loc:name.loc name
 
-let accessors_stri ~loc fields_info =
+let accessors_stri ~loc {fields; _} =
   Str.value ~loc Nonrecursive
-    (List.map fields_info ~f:(fun {field_name; _} ->
+    (List.map fields ~f:(fun {field_name; _} ->
          let field_ident = loc_map ~f:Longident.parse field_name in
          let name_pat = pat_var field_name in
          let destr_record = Pat.record [(field_ident, name_pat)] Open in
@@ -271,13 +278,13 @@ let snark_mod_instance ~loc modname fields_info contents_info =
              fields_info
          :: typ_stri ~loc fields_info :: contents ) ]
 
-let instances_str ~loc instances_info fields_info contents_info =
-  match instances_info with
+let instances_str ~loc options =
+  match options.instances with
   | [] -> []
-  | [t_mod] -> t_mod_instance ~loc t_mod fields_info
+  | [t_mod] -> t_mod_instance ~loc t_mod options.fields
   | t_mod :: snark_mod :: _ ->
-      t_mod_instance ~loc t_mod fields_info
-      @ snark_mod_instance ~loc snark_mod fields_info contents_info
+      t_mod_instance ~loc t_mod options.fields
+      @ snark_mod_instance ~loc snark_mod options.fields options.contents
 
 let parse_arguments expr =
   List.map (parse_listlike expr) ~f:(fun expr ->
@@ -295,11 +302,6 @@ let read_arg_exn ~loc ~arguments name =
   match read_arg ~arguments name with
   | Some instances_info -> instances_info
   | None -> raise_errorf ~loc "Expected an %s argument." name
-
-type options =
-  { fields: field_info list
-  ; instances: label Location.loc list
-  ; contents: (label Location.loc * expression) list }
 
 let parse_options expr =
   let loc = expr.pexp_loc in
@@ -326,11 +328,9 @@ let parse_options expr =
 
 let str_poly_record ~loc ~path:_ expr =
   let options = parse_options expr in
-  let polytype = polymorphic_type_stri ~loc options.fields in
-  let accessors = accessors_stri ~loc options.fields in
-  let instances =
-    instances_str ~loc options.instances options.fields options.contents
-  in
+  let polytype = polymorphic_type_stri ~loc options in
+  let accessors = accessors_stri ~loc options in
+  let instances = instances_str ~loc options in
   include_ ~loc (Mod.structure ~loc (polytype :: accessors :: instances))
 
 let ext =
