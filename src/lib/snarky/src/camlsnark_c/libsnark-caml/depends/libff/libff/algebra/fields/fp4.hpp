@@ -66,6 +66,8 @@ public:
     Fp4_model unitary_inverse() const;
     Fp4_model cyclotomic_squared() const;
 
+    std::vector<my_Fp> all_base_field_elements() { return { c0.c0, c0.c1, c1.c0, c1.c1 }; }
+
     static my_Fp2 mul_by_non_residue(const my_Fp2 &elt);
 
     template<mp_size_t m>

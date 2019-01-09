@@ -518,4 +518,12 @@ std::vector<libff::Fq<ppT>>* camlsnark_mnt6_g2_y(libff::G2<ppT>* a) {
   return new std::vector< libff::Fq<ppT> >(a->Y().all_base_field_elements());
 }
 
+void camlsnark_mnt6_fqk_delete(libff::Fqk<ppT>* a) {
+  delete a;
+}
+
+std::vector<libff::Fq<ppT>>* camlsnark_mnt6_fqk_to_elts(libff::Fqk<ppT>* a) {
+  return new std::vector<libff::Fq<ppT>>(a->all_base_field_elements());
+}
+
 }
