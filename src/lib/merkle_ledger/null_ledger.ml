@@ -53,7 +53,7 @@ end = struct
 
   let empty_hash_at_height d = memoized_empty_hash_at_height.(d)
 
-  let merkle_path t location =
+  let merkle_path _t location =
     let location =
       if Location.is_account location then
         Location.Hash (Location.to_path_exn location)
