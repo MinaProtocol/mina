@@ -318,7 +318,7 @@ module type Fee_transfer_intf = sig
 
   type public_key
 
-  type single = public_key * Fee.Unsigned.t
+  type single = public_key * Fee.Unsigned.t [@@deriving sexp, bin_io]
 
   val of_single : public_key * Fee.Unsigned.t -> t
 
@@ -470,6 +470,8 @@ module type Staged_ledger_diff_intf = sig
 
   type completed_work_checked
 
+  type fee_transfer_single = public_key * Fee.Unsigned.t
+
   module At_most_two : sig
     type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
     [@@deriving sexp, bin_io]
@@ -483,50 +485,45 @@ module type Staged_ledger_diff_intf = sig
     val increase : 'a t -> 'a list -> 'a t Or_error.t
   end
 
+  type pre_diff_with_at_most_two_coinbase =
+    { completed_works: completed_work list
+    ; user_commands: user_command list
+    ; coinbase: fee_transfer_single At_most_two.t }
+  [@@deriving sexp, bin_io]
+
+  type pre_diff_with_at_most_one_coinbase =
+    { completed_works: completed_work list
+    ; user_commands: user_command list
+    ; coinbase: fee_transfer_single At_most_one.t }
+  [@@deriving sexp, bin_io]
+
   type diff =
-    {completed_works: completed_work list; user_commands: user_command list}
+    pre_diff_with_at_most_two_coinbase
+    * pre_diff_with_at_most_one_coinbase option
   [@@deriving sexp, bin_io]
 
-  type diff_with_at_most_two_coinbase =
-    {diff: diff; coinbase_parts: completed_work At_most_two.t}
-  [@@deriving sexp, bin_io]
-
-  type diff_with_at_most_one_coinbase =
-    {diff: diff; coinbase_added: completed_work At_most_one.t}
-  [@@deriving sexp, bin_io]
-
-  type pre_diffs =
-    ( diff_with_at_most_one_coinbase
-    , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase )
-    Either.t
-  [@@deriving sexp, bin_io]
-
-  type t =
-    {pre_diffs: pre_diffs; prev_hash: staged_ledger_hash; creator: public_key}
+  type t = {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
   [@@deriving sexp, bin_io]
 
   module With_valid_signatures_and_proofs : sig
-    type diff =
+    type pre_diff_with_at_most_two_coinbase =
       { completed_works: completed_work_checked list
-      ; user_commands: user_command_with_valid_signature list }
+      ; user_commands: user_command_with_valid_signature list
+      ; coinbase: fee_transfer_single At_most_two.t }
     [@@deriving sexp]
 
-    type diff_with_at_most_two_coinbase =
-      {diff: diff; coinbase_parts: completed_work_checked At_most_two.t}
+    type pre_diff_with_at_most_one_coinbase =
+      { completed_works: completed_work_checked list
+      ; user_commands: user_command_with_valid_signature list
+      ; coinbase: fee_transfer_single At_most_one.t }
     [@@deriving sexp]
 
-    type diff_with_at_most_one_coinbase =
-      {diff: diff; coinbase_added: completed_work_checked At_most_one.t}
+    type diff =
+      pre_diff_with_at_most_two_coinbase
+      * pre_diff_with_at_most_one_coinbase option
     [@@deriving sexp]
 
-    type pre_diffs =
-      ( diff_with_at_most_one_coinbase
-      , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase )
-      Either.t
-    [@@deriving sexp]
-
-    type t =
-      {pre_diffs: pre_diffs; prev_hash: staged_ledger_hash; creator: public_key}
+    type t = {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
     [@@deriving sexp]
 
     val user_commands : t -> user_command_with_valid_signature list
@@ -624,6 +621,8 @@ module type Transaction_snark_scan_state_intf = sig
   end
 
   val empty : unit -> t
+
+  val capacity : t -> int
 
   val enqueue_transactions :
     t -> Transaction_with_witness.t list -> unit Or_error.t
@@ -967,6 +966,108 @@ module type External_transition_intf = sig
   val staged_ledger_diff : t -> staged_ledger_diff
 end
 
+module type External_transition_validation_intf = sig
+  type state_hash
+
+  type external_transition
+
+  type staged_ledger
+
+  type staged_ledger_error
+
+  type transition_frontier
+
+  type ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t =
+    'time_received * 'proof * 'frontier_dependencies * 'staged_ledger_diff
+    constraint 'time_received = [`Time_received] * _ Truth.t
+    constraint 'proof = [`Proof] * _ Truth.t
+    constraint 'frontier_dependencies = [`Frontier_dependencies] * _ Truth.t
+    constraint 'staged_ledger_diff = [`Staged_ledger_diff] * _ Truth.t
+
+  type 'a all =
+    ( [`Time_received] * 'a
+    , [`Proof] * 'a
+    , [`Frontier_dependencies] * 'a
+    , [`Staged_ledger_diff] * 'a )
+    t
+    constraint 'a = _ Truth.t
+
+  type fully_invalid = Truth.false_t all
+
+  type fully_valid = Truth.true_t all
+
+  type ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) with_transition =
+    (external_transition, state_hash) With_hash.t
+    * ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t
+
+  val fully_invalid : fully_invalid
+
+  val fully_valid : fully_valid
+
+  val validate_time_received :
+       ( [`Time_received] * Truth.false_t
+       , 'proof
+       , 'frontier_dependencies
+       , 'staged_ledger_diff )
+       with_transition
+    -> time_received:Unix_timestamp.t
+    -> ( ( [`Time_received] * Truth.true_t
+         , 'proof
+         , 'frontier_dependencies
+         , 'staged_ledger_diff )
+         with_transition
+       , [`Invalid_time_received] )
+       Result.t
+
+  val validate_proof :
+       ( 'time_received
+       , [`Proof] * Truth.false_t
+       , 'frontier_dependencies
+       , 'staged_ledger_diff )
+       with_transition
+    -> ( ( 'time_received
+         , [`Proof] * Truth.true_t
+         , 'frontier_dependencies
+         , 'staged_ledger_diff )
+         with_transition
+       , [`Invalid_proof] )
+       Deferred.Result.t
+
+  val validate_frontier_dependencies :
+       ( 'time_received
+       , 'proof
+       , [`Frontier_dependencies] * Truth.false_t
+       , 'staged_ledger_diff )
+       with_transition
+    -> logger:Logger.t
+    -> frontier:transition_frontier
+    -> ( ( 'time_received
+         , 'proof
+         , [`Frontier_dependencies] * Truth.true_t
+         , 'staged_ledger_diff )
+         with_transition
+       , [`Already_in_frontier | `Not_selected_over_frontier_root] )
+       Result.t
+
+  val validate_staged_ledger_diff :
+       ( 'time_received
+       , 'proof
+       , 'frontier_dependencies
+       , [`Staged_ledger_diff] * Truth.false_t )
+       with_transition
+    -> logger:Logger.t
+    -> parent_staged_ledger:staged_ledger
+    -> ( ( 'time_received
+         , 'proof
+         , 'frontier_dependencies
+         , [`Staged_ledger_diff] * Truth.true_t )
+         with_transition
+         * staged_ledger
+       , [ `Invalid_ledger_hash_after_staged_ledger_application
+         | `Staged_ledger_application_failed of staged_ledger_error ] )
+       Deferred.Result.t
+end
+
 module type Consensus_mechanism_intf = sig
   type proof
 
@@ -1292,6 +1393,7 @@ Merge Snark:
      and type public_key := Public_key.Compressed.t
      and type completed_work := Transaction_snark_work.t
      and type completed_work_checked := Transaction_snark_work.Checked.t
+     and type fee_transfer_single := Fee_transfer.single
 
   module Sparse_ledger : sig
     type t

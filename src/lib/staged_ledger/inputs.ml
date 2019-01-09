@@ -83,6 +83,7 @@ module type S = sig
                 User_command.With_valid_signature.t
      and type public_key := Compressed_public_key.t
      and type staged_ledger_hash := Staged_ledger_hash.t
+     and type fee_transfer_single := Fee_transfer.single
 
   module Account : sig
     type t
