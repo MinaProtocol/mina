@@ -123,7 +123,5 @@ end = struct
 
   let num_accounts _t = 0
 
-  (* This better be the same depth inside Base or you're going to have a bad
-     * time *)
   let depth = Depth.depth
 end
