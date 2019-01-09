@@ -43,6 +43,7 @@ module type Inputs_intf = sig
      and type public_key := Public_key.Compressed.t
      and type completed_work := Transaction_snark_work.t
      and type completed_work_checked := Transaction_snark_work.Checked.t
+     and type fee_transfer_single := Fee_transfer.single
 
   module External_transition :
     External_transition.S
