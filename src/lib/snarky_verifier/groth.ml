@@ -1,23 +1,31 @@
 open Core
 
-(* This module implements a snarky function for the gammaless Groth16 verifier. *)
+(* This module implements a snarky function for the Groth16 verifier. *)
 module Make (Inputs : Inputs.S) = struct
   open Inputs
   open Impl
 
   module Verification_key = struct
     type ('g1, 'g2, 'fqk) t_ =
-      {query_base: 'g1; query: 'g1 list; delta: 'g2; alpha_beta_inv: 'fqk}
+      { query_base: 'g1
+      ; query: 'g1 list
+      ; delta: 'g2
+      ; gamma: 'g2
+      ; alpha_beta_inv: 'fqk }
 
     type ('a, 'b, 'c) vk = ('a, 'b, 'c) t_
 
     module Precomputation = struct
-      type t = {delta: G2_precomputation.t}
+      type t = {delta: G2_precomputation.t; gamma: G2_precomputation.t}
 
-      let create (vk : (_, _, _) vk) = G2_precomputation.create vk.delta
+      let create (vk : (_, _, _) vk) =
+        let%map delta = G2_precomputation.create vk.delta
+        and gamma = G2_precomputation.create vk.gamma in
+        {delta; gamma}
 
       let create_constant (vk : (_, _, _) vk) =
-        G2_precomputation.create_constant vk.delta
+        { delta= G2_precomputation.create_constant vk.delta
+        ; gamma= G2_precomputation.create_constant vk.gamma }
     end
   end
 
@@ -54,9 +62,7 @@ module Make (Inputs : Inputs.S) = struct
       let%bind b = G2_precomputation.create b in
       group_miller_loop
         (* This is where we use [one : G2.t] rather than gamma. *)
-        [ ( Pos
-          , G1_precomputation.create acc
-          , G2_precomputation.create_constant G2.Unchecked.one )
+        [ (Pos, G1_precomputation.create acc, vk_precomp.gamma)
         ; (Pos, G1_precomputation.create c, vk_precomp.delta)
         ; (Neg, G1_precomputation.create a, b) ]
       >>= final_exponentiation
