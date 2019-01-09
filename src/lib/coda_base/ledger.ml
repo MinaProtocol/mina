@@ -59,7 +59,8 @@ module Db :
     (Storage_locations)
 
 module Null =
-  Null_ledger.Make (Public_key.Compressed) (Account) (Hash) (Location_at_depth) (Depth)
+  Null_ledger.Make (Public_key.Compressed) (Account) (Hash) (Location_at_depth)
+    (Depth)
 
 module Any_ledger :
   Merkle_ledger.Any_ledger.S
