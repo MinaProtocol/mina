@@ -60,6 +60,8 @@ struct
 
     val add : t -> t -> t
 
+    val ( + ) : t -> t -> t
+
     val negate : t -> t
 
     val double : t -> t
@@ -72,9 +74,9 @@ struct
 
     val one : t
 
-    val to_coords : t -> Fq.t * Fq.t
+    val to_affine_coordinates : t -> Fq.t * Fq.t
 
-    val of_coords : Fq.t * Fq.t -> t
+    val of_affine_coordinates : Fq.t * Fq.t -> t
 
     val equal : t -> t -> bool
 
@@ -123,7 +125,7 @@ struct
         let x = stub () in
         schedule_delete x ; x
 
-    let of_coords =
+    let of_affine_coordinates =
       let stub =
         foreign (func_name "of_coords") (Fq.typ @-> Fq.typ @-> returning typ)
       in
@@ -149,6 +151,8 @@ struct
         let z = stub x y in
         schedule_delete z ; z
 
+    let ( + ) = add
+
     let scale =
       let stub =
         foreign (func_name "scale") (Bigint_r.typ @-> typ @-> returning typ)
@@ -167,7 +171,7 @@ struct
 
     let equal = foreign (func_name "equal") (typ @-> typ @-> returning bool)
 
-    let to_coords =
+    let to_affine_coordinates =
       let stub_to_affine =
         foreign (func_name "to_affine_coordinates") (typ @-> returning void)
       in
@@ -187,11 +191,13 @@ struct
     let to_repr t : Repr.t =
       if equal zero t then Zero
       else
-        let x, y = to_coords t in
+        let x, y = to_affine_coordinates t in
         Non_zero {x; y}
 
     let of_repr (r : Repr.t) =
-      match r with Zero -> zero | Non_zero {x; y} -> of_coords (x, y)
+      match r with
+      | Zero -> zero
+      | Non_zero {x; y} -> of_affine_coordinates (x, y)
 
     include Binable.Of_binable
               (Repr)
@@ -1335,6 +1341,38 @@ module Mnt6_0 = Make_full (struct
   let prefix = "camlsnark_mnt6"
 end)
 
+module Make_Groth16_verification_key_accessors (Prefix : sig
+  val prefix : string
+end)
+(Verification_key : Foreign_intf) (G1 : sig
+    include Deletable_intf
+
+    module Vector : Deletable_intf
+end)
+(G2 : Deletable_intf)
+(Fqk : Deletable_intf) =
+struct
+  open Prefix
+
+  let prefix = with_prefix prefix "verification_key"
+
+  let func_name = with_prefix prefix
+
+  let func name ret delete =
+    let stub =
+      foreign (func_name name) (Verification_key.typ @-> returning ret)
+    in
+    fun vk ->
+      let r = stub vk in
+      Caml.Gc.finalise delete r ; r
+
+  let delta = func "delta" G2.typ G2.delete
+
+  let query = func "query" G1.Vector.typ G1.Vector.delete
+
+  let alpha_beta = func "alpha_beta" Fqk.typ Fqk.delete
+end
+
 module Make_GM_verification_key_accessors (Prefix : sig
   val prefix : string
 end)
@@ -1343,7 +1381,8 @@ end)
 
     module Vector : Deletable_intf
 end)
-(G2 : Deletable_intf) =
+(G2 : Deletable_intf)
+(Fqk : Deletable_intf) =
 struct
   open Prefix
 
@@ -1370,9 +1409,11 @@ struct
   let h_gamma = func "h_gamma" G2.typ G2.delete
 
   let query = func "query" G1.Vector.typ G1.Vector.delete
+
+  let g_alpha_h_beta = func "g_alpha_h_beta" Fqk.typ Fqk.delete
 end
 
-module Make_GM_proof_accessors (Prefix : sig
+module Make_proof_accessors (Prefix : sig
   val prefix : string
 end)
 (Proof : Foreign_intf) (G1 : sig
@@ -1383,8 +1424,6 @@ end)
 (G2 : Deletable_intf) =
 struct
   open Prefix
-
-  let prefix = with_prefix prefix "gm_proof"
 
   let func_name = with_prefix prefix
 
@@ -1432,26 +1471,93 @@ struct
       (get_x t, get_y t)
 end
 
+module Make_fqk
+    (Prefix : Prefix_intf) (Fq : sig
+        include Deletable_intf
+
+        module Vector : Deletable_intf
+    end) =
+struct
+  include Make_foreign (struct
+    let prefix = with_prefix Prefix.prefix "fqk"
+  end)
+
+  let to_elts =
+    let stub =
+      foreign (func_name "to_elts") (typ @-> returning Fq.Vector.typ)
+    in
+    fun t ->
+      let v = stub t in
+      Caml.Gc.finalise Fq.Vector.delete v ;
+      v
+end
+
 module Mnt4 = struct
   include Mnt4_0
+  module Fqk = Make_fqk (Prefix) (Mnt6_0.Field)
   module G2 = Make_G2 (Prefix) (Mnt6_0.Field)
   include Make_G1 (Prefix) (Mnt4_0.Field) (Mnt4_0.Bigint.R) (Mnt6_0.Field)
+
   module GM_proof_accessors =
-    Make_GM_proof_accessors (Prefix) (GM.Proof) (Group) (G2)
+    Make_proof_accessors (struct
+        let prefix = with_prefix Prefix.prefix "gm_proof"
+      end)
+      (GM.Proof)
+      (Group)
+      (G2)
+
   module GM_verification_key_accessors =
     Make_GM_verification_key_accessors (Prefix) (GM.Verification_key) (Group)
       (G2)
+      (Fqk)
+
+  module Groth16_proof_accessors =
+    Make_proof_accessors (struct
+        let prefix = with_prefix Prefix.prefix "proof"
+      end)
+      (GM.Proof)
+      (Group)
+      (G2)
+
+  module Groth16_verification_key_accessors =
+    Make_Groth16_verification_key_accessors (Prefix) (Default.Verification_key)
+      (Group)
+      (G2)
+      (Fqk)
 end
 
 module Mnt6 = struct
   include Mnt6_0
+  module Fqk = Make_fqk (Prefix) (Mnt4_0.Field)
   module G2 = Make_G2 (Prefix) (Mnt4_0.Field)
   include Make_G1 (Prefix) (Mnt6_0.Field) (Mnt6_0.Bigint.R) (Mnt4_0.Field)
+
   module GM_proof_accessors =
-    Make_GM_proof_accessors (Prefix) (GM.Proof) (Group) (G2)
+    Make_proof_accessors (struct
+        let prefix = with_prefix Prefix.prefix "gm_proof"
+      end)
+      (GM.Proof)
+      (Group)
+      (G2)
+
   module GM_verification_key_accessors =
     Make_GM_verification_key_accessors (Prefix) (GM.Verification_key) (Group)
       (G2)
+      (Fqk)
+
+  module Groth16_proof_accessors =
+    Make_proof_accessors (struct
+        let prefix = with_prefix Prefix.prefix "proof"
+      end)
+      (GM.Proof)
+      (Group)
+      (G2)
+
+  module Groth16_verification_key_accessors =
+    Make_Groth16_verification_key_accessors (Prefix) (Default.Verification_key)
+      (Group)
+      (G2)
+      (Fqk)
 end
 
 module type S = sig

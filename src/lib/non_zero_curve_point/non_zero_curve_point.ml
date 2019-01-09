@@ -21,9 +21,9 @@ let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
 
 let ( = ) = equal
 
-let of_inner_curve_exn = Tick.Inner_curve.to_coords
+let of_inner_curve_exn = Tick.Inner_curve.to_affine_coordinates
 
-let to_inner_curve = Tick.Inner_curve.of_coords
+let to_inner_curve = Tick.Inner_curve.of_affine_coordinates
 
 let gen : t Quickcheck.Generator.t =
   Quickcheck.Generator.filter_map Tick.Field.gen ~f:(fun x ->
