@@ -121,6 +121,7 @@ module type Init_intf = sig
      and type user_command := User_command.t
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
+     and type fee_transfer_single := Fee_transfer.single
 
   module Make_work_selector : Work_selector_F
 
@@ -350,6 +351,7 @@ module User_command = struct
   end
 end
 
+module Fee_transfer = Coda_base.Fee_transfer
 module Ledger_proof_statement = Transaction_snark.Statement
 module Transaction_snark_work =
   Staged_ledger.Make_completed_work (Public_key.Compressed) (Ledger_proof)
@@ -363,6 +365,7 @@ module Staged_ledger_diff = Staged_ledger.Make_diff (struct
   module Compressed_public_key = Public_key.Compressed
   module User_command = User_command
   module Transaction_snark_work = Transaction_snark_work
+  module Fee_transfer = Fee_transfer
 end)
 
 let make_init ~should_propose (module Config : Config_intf) :
@@ -445,8 +448,8 @@ struct
           false
   end
 
-  module Fee_transfer = Coda_base.Fee_transfer
   module Coinbase = Coda_base.Coinbase
+  module Fee_transfer = Fee_transfer
   module Account = Account
 
   module Transaction = struct
