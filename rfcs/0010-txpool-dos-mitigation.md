@@ -1,5 +1,4 @@
 ## Mitigations for DOS attacks based on bogus transactions
-[summary]: #summary
 
 We add some rules for deciding whether to store incoming transactions in the
 pending transaction pool and gossip them. I'm using the phrase "pending
@@ -11,8 +10,6 @@ resistant design, but it's much more complicated. See the private document for
 those.
 
 ## Motivation
-
-[motivation]: #motivation
 
 Every transaction consumes resources: computation, storage, and bandwidth. In
 the case of transactions that are eventually included in a block, those
@@ -31,8 +28,6 @@ store them and whether we forward them on, making other nodes deal with them.
 
 ## Detailed design
 
-[detailed-design]: #detailed-design
-
 As a general principle, we want to accept transactions into the pool iff they
 will eventually be mined into a future block. That's the purpose of the pending
 transaction pool. For DoS protection, we assume that the cost of including a
@@ -44,24 +39,24 @@ resources are paid for at a price that network participants would be happy with.
 
 In this context, we have the following goals:
 
-1. Support a pool of pending transactions with a maximum size, evicting
-   transactions when at the maximum size based on fee.
-2. Allow multiple queued transactions from one address. Since payments aren't
-   instant, users will want this. We could make transaction senders responsible
-   for queuing, but that wouldn't allow multiple transactions sent from the
-   same address to be included in the same block.
-3. Allow for transaction replacement, while aligning incentives by charging for
-   it appropriately. Users can e.g. cancel payments by replacing them with a
-   no-op transaction (send themselves $0) or resend them with a higher fee if
-   they're processing too slow. This is important for two reasons. A) a
-   transaction sent with too low of a fee will get "stuck", and without the
-   ability to replace it the user's account is bricked until the transaction
-   ages out of the txpool or is evicted if the pool is full. B) a transaction
-   sent with too low of a fee may simply take long enough that the user would
-   rather not have sent it. E.g. if I'm buying a coffee I don't want to wait in
-   the shop for half an hour while my payment goes through. Or if I'm using a
-   market based on smart contracts and my trade execution is delayed, the reason
-   I wanted to make the trade may no longer be valid when it actually executes.
+1.  Support a pool of pending transactions with a maximum size, evicting
+    transactions when at the maximum size based on fee.
+2.  Allow multiple queued transactions from one address. Since payments aren't
+    instant, users will want this. We could make transaction senders responsible
+    for queuing, but that wouldn't allow multiple transactions sent from the
+    same address to be included in the same block.
+3.  Allow for transaction replacement, while aligning incentives by charging for
+    it appropriately. Users can e.g. cancel payments by replacing them with a
+    no-op transaction (send themselves $0) or resend them with a higher fee if
+    they're processing too slow. This is important for two reasons. A) a
+    transaction sent with too low of a fee will get "stuck", and without the
+    ability to replace it the user's account is bricked until the transaction
+    ages out of the txpool or is evicted if the pool is full. B) a transaction
+    sent with too low of a fee may simply take long enough that the user would
+    rather not have sent it. E.g. if I'm buying a coffee I don't want to wait in
+    the shop for half an hour while my payment goes through. Or if I'm using a
+    market based on smart contracts and my trade execution is delayed, the reason
+    I wanted to make the trade may no longer be valid when it actually executes.
 
 ### When we first receive a transaction: rules
 
@@ -69,14 +64,13 @@ When we receive a gossiped transaction, we will check the below constraints,
 with respect to our current longest chain. If any of the checks fail, we ignore
 the transaction and do not gossip it.
 
-* Validity:
-  1. The signature.
-  2. The sender's account exists.
-  3. The sender's balance (inclusive of any pending txs from the same account
-  with lower nonce) is >= the transaction amount + fee.
-  4. The tx nonce is equal to the sending account's next nonce, inclusive of
-  transactions already in the pool. (If it conflicts with one in the pool, see
-  below.)
+1.  The signature.
+2.  The sender's account exists.
+3.  The sender's balance (inclusive of any pending txs from the same account
+    with lower nonce) is >= the transaction amount + fee.
+4.  The tx nonce is equal to the sending account's next nonce, inclusive of
+    transactions already in the pool. (If it conflicts with one in the pool, see
+    below.)
 
 If we get any transactions where the signature is invalid, we blacklist the
 sending node immediately. No honest node sends transactions like that. If we get
@@ -129,82 +123,81 @@ other by sending them different transactions at the same nonce.
 
 ### Constants
 
-* `bad_tx_blacklist_ratio`: There are two situations where honest nodes send us
-  bad transactions. The first is when they are slightly behind us on the
-  consensus state, which is going to happen all the time just because of network
-  delay. The second is when they are substantially out of sync but haven't
-  noticed yet. After they notice they're supposed to disable gossip until
-  they're caught up. Dishonest nodes will send us invalid transactions in order
-  to waste our resources. Let's set this to 50% bad transactions. An attacker
-  then has to spend 2x as much resources to send a given amount of transactions.
-* `good_faith_tx_credits`: Let's say we assume good faith if the first two
-  transactions we receive from a new peer are bad, but give up on them after
-  that. That means this value should be 2.
-* `max_txpool_size`: This is interesting. If there were a fixed limit on the
-  number of transactions per block I'd say set it to an hour's worth or
-  something. But the limit is set by the parameters of the parallel scan, and
-  supposedly that'll become dynamic in the future, so I'm not sure. So let's say
-  1000?
+-   `bad_tx_blacklist_ratio`: There are two situations where honest nodes send us
+    bad transactions. The first is when they are slightly behind us on the
+    consensus state, which is going to happen all the time just because of network
+    delay. The second is when they are substantially out of sync but haven't
+    noticed yet. After they notice they're supposed to disable gossip until
+    they're caught up. Dishonest nodes will send us invalid transactions in order
+    to waste our resources. Let's set this to 50% bad transactions. An attacker
+    then has to spend 2x as much resources to send a given amount of transactions.
+-   `good_faith_tx_credits`: Let's say we assume good faith if the first two
+    transactions we receive from a new peer are bad, but give up on them after
+    that. That means this value should be 2.
+-   `max_txpool_size`: This is interesting. If there were a fixed limit on the
+    number of transactions per block I'd say set it to an hour's worth or
+    something. But the limit is set by the parameters of the parallel scan, and
+    supposedly that'll become dynamic in the future, so I'm not sure. So let's say
+    1000?
 
 ## Drawbacks
-[drawbacks]: #drawbacks
 
 This is vulnerable to the attack in the private document.
 
 ## Rationale and alternatives
-[rationale-and-alternatives]: #rationale-and-alternatives
 
-* Why is this design the best in the space of possible designs?
+-   Why is this design the best in the space of possible designs?
 
 There is virtue in simplicity, especially in a winner-take-all market like ours.
 This is simple and relatively easy to implement and not worse than what else
 exists. A fancier thing would delay launch further.
 
-* What other designs have been considered and what is the rationale for not choosing them?
-  * Allow pending txs that spend money not (yet) in the sender's account
+-   What other designs have been considered and what is the rationale for not choosing them?
 
-    Ethereum does this. It's abusable, an attacker can send transactions that
-    will never be mined. The countermeasure is having a hard limit on pending
-    transactions per account, which I don't like:
-  * Max pending tx per account
+    -   Allow pending txs that spend money not (yet) in the sender's account
 
-    There are legitimate use cases for sending lots of transactions from one
-    address rapidly, and I strongly prefer charging for things to banning
-    things. For an example, imagine an exchange. To process withdrawals they may
-    need to send 100s of transactions per minute from a single address. So long
-    as that is priced efficiently they should be able to do so. Yes, they should
-    probably be doing transaction batching in this scenario, but it's better
-    that doing individual transactions is expensive than if it were impossible.
-  * Skip validation for speed
+        Ethereum does this. It's abusable, an attacker can send transactions that
+        will never be mined. The countermeasure is having a hard limit on pending
+        transactions per account, which I don't like:
+    -   Max pending tx per account
 
-    This is (partly) what we do now, and is vulnerable to all sorts of stuff.
-  * Block lookback window for validity.
+        There are legitimate use cases for sending lots of transactions from one
+        address rapidly, and I strongly prefer charging for things to banning
+        things. For an example, imagine an exchange. To process withdrawals they may
+        need to send 100s of transactions per minute from a single address. So long
+        as that is priced efficiently they should be able to do so. Yes, they should
+        probably be doing transaction batching in this scenario, but it's better
+        that doing individual transactions is expensive than if it were impossible.
+    -   Skip validation for speed
 
-    Part of Brandon's original plan was to accept transactions that were valid
-    at any point in the transition frontier, or within some fixed lookback from
-    a current tip. This is abusable. Mallory can move funds around such that she
-    can make transactions that were valid recently but aren't now, and consume
-    resources for free. The attack requires her to move them around at least
-    once every lookback window blocks, and lets her consume resources for
-    lookback window blocks, so with a sufficiently small window it's probably
-    impractical, but I'd rather avoid the headache. I don't see a use case for
-    it. Since the account holder is the only one who can spend funds from their
-    account, and since insufficient funds is (almost) the only reason payments
-    can fail, they should never be sending transactions that used to be valid
-    but aren't now.
-  * Have a minimum transaction fee
-    In this design, an attacker can fill the txpool with bogus transactions with
-    fees too low to ever be included in a block for "free". This is bad, and
-    imposing a overall minimum fee that is at least as much as SNARKing a
-    payment costs would prevent it, but figuring out what that minimum should be
-    is complicated, and the attack is only good so long as the pool isn't full,
-    so I think it's not worth it.
-* What is the impact of not doing this?
+        This is (partly) what we do now, and is vulnerable to all sorts of stuff.
+    -   Block lookback window for validity.
 
-  Various vulnerabilities.
+        Part of Brandon's original plan was to accept transactions that were valid
+        at any point in the transition frontier, or within some fixed lookback from
+        a current tip. This is abusable. Mallory can move funds around such that she
+        can make transactions that were valid recently but aren't now, and consume
+        resources for free. The attack requires her to move them around at least
+        once every lookback window blocks, and lets her consume resources for
+        lookback window blocks, so with a sufficiently small window it's probably
+        impractical, but I'd rather avoid the headache. I don't see a use case for
+        it. Since the account holder is the only one who can spend funds from their
+        account, and since insufficient funds is (almost) the only reason payments
+        can fail, they should never be sending transactions that used to be valid
+        but aren't now.
+    -   Have a minimum transaction fee
+
+        In this design, an attacker can fill the txpool with bogus transactions with
+        fees too low to ever be included in a block for "free". This is bad, and
+        imposing a overall minimum fee that is at least as much as SNARKing a
+        payment costs would prevent it, but figuring out what that minimum should be
+        is complicated, and the attack is only good so long as the pool isn't full,
+        so I think it's not worth it.
+-   What is the impact of not doing this?
+
+    Various vulnerabilities.
 
 ## Prior art
-[prior-art]: #prior-art
 
 Ethereum allows transaction replacement, and multiple pending transactions from
 the same account, without requiring they be valid when run sequentially. If a
@@ -227,20 +220,19 @@ transactions. When a transaction is evicted from the mempool, they also evict
 any transactions that depend on it.
 
 ## Unresolved questions
-[unresolved-questions]: #unresolved-questions
 
-* What parts of the design do you expect to resolve through the RFC process
-  before this gets merged?
+-   What parts of the design do you expect to resolve through the RFC process
+    before this gets merged?
 
-  Decide if it's worth it to do the more complicated thing.
+    Decide if it's worth it to do the more complicated thing.
 
-* What parts of the design do you expect to resolve through the implementation
-  of this feature before merge?
+-   What parts of the design do you expect to resolve through the implementation
+    of this feature before merge?
 
-  Nothing comes to mind.
+    Nothing comes to mind.
 
-* What related issues do you consider out of scope for this RFC that could be
-  addressed in the future independently of the solution that comes out of this
-  RFC?
-  
-  The SNARK pool has similar concerns.
+-   What related issues do you consider out of scope for this RFC that could be
+    addressed in the future independently of the solution that comes out of this
+    RFC?
+
+    The SNARK pool has similar concerns.
