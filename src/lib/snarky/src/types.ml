@@ -22,14 +22,14 @@ and Checked : sig
         ('sys -> unit) * ('a, 's, 'f, 'v, 'sys) t
         -> ('a, 's, 'f, 'v, 'sys) t
     | As_prover :
-        (unit, 'v -> 'f, 's) As_prover.t * ('a, 's, 'f, 'v, 'sys) t
+        (unit, 'v -> 'f, 's) As_prover0.t * ('a, 's, 'f, 'v, 'sys) t
         -> ('a, 's, 'f, 'v, 'sys) t
     | With_label :
         string * ('a, 's, 'f, 'v, 'sys) t * ('a -> ('b, 's, 'f, 'v, 'sys) t)
         -> ('b, 's, 'f, 'v, 'sys) t
     | With_state :
-        ('s1, 'v -> 'f, 's) As_prover.t
-        * ('s1 -> (unit, 'v -> 'f, 's) As_prover.t)
+        ('s1, 'v -> 'f, 's) As_prover0.t
+        * ('s1 -> (unit, 'v -> 'f, 's) As_prover0.t)
         * ('b, 's1, 'f, 'v, 'sys) t
         * ('b -> ('a, 's, 'f, 'v, 'sys) t)
         -> ('a, 's, 'f, 'v, 'sys) t

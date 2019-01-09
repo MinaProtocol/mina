@@ -66,26 +66,26 @@ module T = struct
   include T0
 
   let request_witness (typ : ('var, 'value, 'field, 'cvar, 'sys) Types.Typ.t)
-      (r : ('value Request.t, 'cvar -> 'field, 's) As_prover.t) =
+      (r : ('value Request.t, 'cvar -> 'field, 's) As_prover0.t) =
     Exists (typ, Request r, fun h -> return (Handle.var h))
 
   let request ?such_that typ r =
     match such_that with
-    | None -> request_witness typ (As_prover.return r)
+    | None -> request_witness typ (As_prover0.return r)
     | Some such_that ->
         let open Let_syntax in
-        let%bind x = request_witness typ (As_prover.return r) in
+        let%bind x = request_witness typ (As_prover0.return r) in
         let%map () = such_that x in
         x
 
   let provide_witness (typ : ('var, 'value, 'field, 'cvar, 'sys) Types.Typ.t)
-      (c : ('value, 'cvar -> 'field, 's) As_prover.t) =
+      (c : ('value, 'cvar -> 'field, 's) As_prover0.t) =
     Exists (typ, Compute c, fun h -> return (Handle.var h))
 
   let exists ?request ?compute typ =
     let provider =
       let request =
-        Option.value request ~default:(As_prover.return Request.Fail)
+        Option.value request ~default:(As_prover0.return Request.Fail)
       in
       match compute with
       | None -> Provider.Request request
@@ -111,7 +111,7 @@ module T = struct
 
   let with_label s t = With_label (s, t, return)
 
-  let do_nothing _ = As_prover.return ()
+  let do_nothing _ = As_prover0.return ()
 
   let with_state ?(and_then = do_nothing) f sub =
     With_state (f, and_then, sub, return)

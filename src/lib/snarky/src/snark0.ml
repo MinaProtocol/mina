@@ -250,14 +250,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
     end
   end
 
-  module As_prover0 = struct
-    include As_prover.Make (struct
-      type var = Cvar.t
-
-      type field = Field.t
-    end)
-  end
-
   module Handler = struct
     type t = Request.request -> Request.response
   end
@@ -430,27 +422,13 @@ module Make_basic (Backend : Backend_intf.S) = struct
   end
 
   module As_prover = struct
-    include As_prover0
+    include As_prover.Make (struct
+      type var = Cvar.t
+
+      type field = Field.t
+    end)
 
     type ('a, 'prover_state) as_prover = ('a, 'prover_state) t
-
-    let read ({read; _} : ('var, 'value) Typ.t) (var : 'var) :
-        ('value, 'prover_state) t =
-     fun tbl s -> (s, Typ.Read.run (read var) tbl)
-
-    module Ref = struct
-      type 'a t = 'a option ref
-
-      let create (x : ('a, 's) As_prover0.t) : ('a t, 's) Checked0.t =
-        let r = ref None in
-        let open Checked0.Let_syntax in
-        let%map () = Checked0.as_prover (map x ~f:(fun x -> r := Some x)) in
-        r
-
-      let get (r : 'a t) _tbl s = (s, Option.value_exn !r)
-
-      let set (r : 'a t) x _tbl s = (s, (r := Some x))
-    end
   end
 
   module Handle = struct

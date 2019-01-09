@@ -1,6 +1,8 @@
 open Core_kernel
 
-type ('a, 'e, 's) t = 'e -> 's -> 's * 'a
+type ('a, 'e, 's) t = ('a, 'e, 's) As_prover0.t
+
+type ('a, 'e, 's) as_prover = ('a, 'e, 's) t
 
 module type S = sig
   type var
@@ -22,36 +24,46 @@ module type S = sig
   val map2 : ('a, 's) t -> ('b, 's) t -> f:('a -> 'b -> 'c) -> ('c, 's) t
 
   val read_var : var -> (field, 's) t
+
+  val read :
+    ('var, 'value, field, var, 'sys) Typ.t -> 'var -> ('value, 'prover_state) t
+
+  module Ref : sig
+    type 'a t
+
+    val create :
+         ('a, env, 'prover_state) as_prover
+      -> ('a t, 'prover_state, field, var, 'sys) Checked.t
+
+    val get : 'a t -> ('a, env, _) as_prover
+
+    val set : 'a t -> 'a -> (unit, env, _) as_prover
+  end
 end
 
 module T = struct
-  let map t ~f tbl s =
-    let s', x = t tbl s in
-    (s', f x)
+  include As_prover0.T
 
-  let bind t ~f tbl s =
-    let s', x = t tbl s in
-    f x tbl s'
+  let read ({read; _} : ('var, 'value, 'field, 'cvar, 'sys) Typ.t) (var : 'var)
+      : ('value, 'cvar -> 'field, 'prover_state) t =
+   fun tbl s -> (s, Typ_monads.Read.run (read var) tbl)
 
-  let return x _ s = (s, x)
+  module Ref = struct
+    type 'a t = 'a option ref
 
-  let run t tbl s = t tbl s
+    let create (x : ('a, 'cvar -> 'field, 's) As_prover0.t) :
+        ('a t, 's, 'field, 'cvar, 'sys) Checked.t =
+      let r = ref None in
+      let open Checked in
+      let%map () =
+        Checked.as_prover (As_prover0.map x ~f:(fun x -> r := Some x))
+      in
+      r
 
-  let get_state _tbl s = (s, s)
+    let get (r : 'a t) _tbl s = (s, Option.value_exn !r)
 
-  let read_var v tbl s = (s, tbl v)
-
-  let set_state s tbl _ = (s, ())
-
-  let modify_state f _tbl s = (f s, ())
-
-  let map2 x y ~f tbl s =
-    let s, x = x tbl s in
-    let s, y = y tbl s in
-    (s, f x y)
-
-  let read_var (v : 'var) : ('field, 'var -> 'field, 's) t =
-   fun tbl s -> (s, tbl v)
+    let set (r : 'a t) x _tbl s = (s, (r := Some x))
+  end
 end
 
 module Make (Env : sig

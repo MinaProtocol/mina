@@ -25,7 +25,7 @@ module T = struct
   let check (type field cvar)
       ({check; _} : ('var, 'value, field, cvar, 'sys) t) (v : 'var) :
       (unit, 's, field, cvar, 'sys) Types.Checked.t =
-    let do_nothing : (unit, cvar -> field, _) As_prover.t =
+    let do_nothing : (unit, cvar -> field, _) As_prover0.t =
      fun _ s -> (s, ())
     in
     With_state (do_nothing, (fun () -> do_nothing), check v, Checked.return)
