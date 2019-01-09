@@ -284,7 +284,12 @@ let daemon log =
        in
        let module M = Coda_main.Make_coda (Init) in
        let module Run = Run (Config0) (M) in
-       Async.Scheduler.report_long_cycle_times ~cutoff:(sec 0.5) () ;
+       Stream.iter
+         (Async.Scheduler.long_cycles
+            ~at_least:(sec 0.5 |> Time_ns.Span.of_span))
+         ~f:(fun span ->
+           Logger.warn log "long async cycle %s" (Time_ns.Span.to_string span)
+           ) ;
        let%bind () =
          let open M in
          let run_snark_worker_action =
@@ -301,8 +306,10 @@ let daemon log =
          let banlist =
            Coda_base.Banlist.create ~suspicious_dir ~punished_dir
          in
+         let time_controller = Inputs.Time.Controller.create () in
          let net_config =
            { Inputs.Net.Config.parent_log= log
+           ; time_controller
            ; gossip_net_params=
                { timeout= Time.Span.of_sec 1.
                ; parent_log= log
@@ -322,14 +329,15 @@ let daemon log =
            Run.create
              (Run.Config.make ~log ~net_config
                 ~run_snark_worker:(Option.is_some run_snark_worker_flag)
-                ~ledger_builder_persistant_location:
-                  (conf_dir ^/ "ledger_builder")
+                ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+                ~ledger_db_location:(conf_dir ^/ "ledger_db")
                 ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
-                ~time_controller:(Inputs.Time.Controller.create ())
-                ?propose_keypair:Config0.propose_keypair () ~banlist)
+                ~time_controller ?propose_keypair:Config0.propose_keypair ()
+                ~banlist)
          in
+         M.start coda ;
          let web_service = Web_pipe.get_service () in
          Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;
          Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
