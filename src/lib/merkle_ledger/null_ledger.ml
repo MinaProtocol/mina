@@ -98,7 +98,7 @@ end = struct
   let close _t = ()
 
   let get_or_create_account_exn _t =
-    failwith "get_or_create_accoutn_exn: null ledgers cannot be mutated"
+    failwith "get_or_create_account_exn: null ledgers cannot be mutated"
 
   let get_or_create_account _t =
     failwith "get_or_create_account: null ledgers cannot be mutated"
