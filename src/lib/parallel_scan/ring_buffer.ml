@@ -39,6 +39,12 @@ let iter t ~f =
     f t.data.((t.position + i) mod n)
   done
 
+let iter_i t ~f =
+  let n = Array.length t.data in
+  for i = 0 to n - 1 do
+    f i t.data.((t.position + i) mod n)
+  done
+
 let fold t = Array.fold t.data
 
 let read t = t.data.(t.position)

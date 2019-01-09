@@ -13,6 +13,15 @@ module Available_job = struct
   type ('a, 'd) t = Base of 'd | Merge of 'a * 'a [@@deriving sexp]
 end
 
+module Serializable_job = struct
+  type 'a node = Base of 'a option | Merge of 'a option * 'a option
+  [@@deriving sexp]
+
+  type 'a t = int * 'a node [@@deriving sexp]
+
+  (*val serialize_data : ('a, 'd) State.t -> ('a -> 'c) -> ('d -> 'c) -> ('c, 'c) State.t =*)
+end
+
 module State = struct
   include State
 
@@ -383,6 +392,21 @@ module State = struct
     Foldable_ident.fold_chronological_until t ~init
       ~f:(fun acc job -> Container.Continue_or_stop.Continue (f acc job))
       ~finish:Fn.id
+
+  let jobs_for_cli t fa fd =
+    let jobs' =
+      Ring_buffer.create
+        ~len:((parallelism t * 2) - 1)
+        ~default:(0, Serializable_job.Base None)
+    in
+    Ring_buffer.iter_i t.jobs ~f:(fun i job ->
+        let job' =
+          match job with
+          | Job.Base x -> Serializable_job.Base (Option.map ~f:fd x)
+          | Merge (x, y) -> Merge (Option.map ~f:fa x, Option.map ~f:fa y)
+        in
+        Or_error.ok_exn
+          (Ring_buffer.direct_update jobs' i ~f:(fun _ -> Ok (i, job'))) )
 end
 
 let start : type a d. parallelism_log_2:int -> (a, d) State.t = State.create
