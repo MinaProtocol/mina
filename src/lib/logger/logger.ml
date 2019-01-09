@@ -3,7 +3,15 @@ open Async
 
 module Level = struct
   type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
-  [@@deriving bin_io, sexp, compare, yojson]
+  [@@deriving bin_io, sexp, compare, show]
+
+  let of_string str =
+    try Ok (t_of_sexp (Sexp.Atom str)) with Sexp.Of_sexp_error (err, _) ->
+      Error (Exn.to_string err)
+
+  let to_yojson t = `String (show t)
+
+  let of_yojson json = of_string @@ Yojson.Safe.Util.to_string json
 end
 
 module Attribute = struct
@@ -45,6 +53,26 @@ module Message = struct
     ; location: string option
     ; message: string }
   [@@deriving sexp, bin_io, yojson]
+
+  let escape_string str =
+    String.to_list str
+    |> List.bind ~f:(function
+         | '"' -> ['\\'; '"']
+         | '\\' -> ['\\'; '\\']
+         | c -> [c] )
+    |> String.of_char_list
+
+  (* escape strings for json formatting *)
+  let escape m =
+    { m with
+      attributes=
+        List.map m.attributes ~f:(fun (k, v) ->
+            (escape_string k, escape_string v) )
+        (* we assume the path, host and location do not need to be escaped *)
+        (* ; path= List.map m.path ~f:escape_string *)
+        (* ; host= escape_string m.host *)
+        (* ; location= Option.map m.location ~f:escape_string *)
+    ; message= escape_string m.message }
 end
 
 type t =
@@ -96,8 +124,9 @@ let log ~level ?loc ?(attrs = []) t fmt =
           if get_sexp_logging () then
             (* S-expression output *)
             Sexp.to_string_mach (Message.sexp_of_t m)
-          else (* JSON output *)
-            Yojson.Safe.to_string (Message.to_yojson m)
+          else
+            (* JSON output *)
+            Yojson.Safe.to_string (Message.to_yojson (Message.escape m))
         in
         printf "%s\n" output )
     fmt
