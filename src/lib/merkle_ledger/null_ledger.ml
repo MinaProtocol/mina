@@ -119,9 +119,9 @@ end = struct
 
   let set_inner_hash_at_addr_exn _t = failwith "set_inner_hash_at_addr_exn: null ledgers cannot be mutated"
 
-  let get_inner_hash_at_addr_exn _t = failwith "null ledgers are empty"
+  let get_inner_hash_at_addr_exn _t addr = empty_hash_at_height (Addr.height addr)
 
-  let num_accounts _t = failwith "intentionally unimplemented"
+  let num_accounts _t = 0
 
   (* This better be the same depth inside Base or you're going to have a bad
      * time *)
