@@ -27,11 +27,17 @@ let env name ~f ~default =
                     name x) )
   |> Option.value ~default
 
+let blocks_till_finality =
+  env "BLOCKS_TILL_FINALITY" ~default:1024 ~f:(fun str ->
+      try Some (Int.of_string str) with _ -> None )
+
 [%%if
 defined consensus_mechanism]
 
 [%%if
 consensus_mechanism = "proof_of_signature"]
+
+let blocks_till_finality = 1
 
 include Proof_of_signature.Make (struct
   module Genesis_ledger = Genesis_ledger
@@ -65,6 +71,8 @@ include Proof_of_stake.Make (struct
       env "COINBASE" ~default:(Currency.Amount.of_int 20) ~f:(fun str ->
           try Some (Currency.Amount.of_int @@ Int.of_string str) with _ -> None
       )
+
+    let blocks_till_finality = blocks_till_finality
 
     let slot_length =
       env "SLOT_INTERVAL"

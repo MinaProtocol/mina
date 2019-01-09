@@ -10,7 +10,7 @@ module type S = sig
     end
   end
 
-  include Hashable.S with type t := t
+  include Hashable.S_binable with type t := t
 
   val of_byte_string : string -> t
 
@@ -37,6 +37,8 @@ module type S = sig
   val sibling : t -> t
 
   val next : t -> t Option.t
+
+  val prev : t -> t Option.t
 
   val is_parent_of : t -> maybe_child:t -> bool
 
@@ -120,6 +122,17 @@ end) : S = struct
       module T = struct
         type nonrec t = t
 
+        include Binable.Of_binable (struct
+                    type t = int * string [@@deriving bin_io]
+                  end)
+                  (struct
+                    type nonrec t = t
+
+                    let to_binable = to_tuple
+
+                    let of_binable = of_tuple
+                  end)
+
         let sexp_of_t = Fn.compose sexp_of_string to_string
 
         let t_of_sexp =
@@ -141,18 +154,7 @@ end) : S = struct
       end
 
       include T
-      include Hashable.Make (T)
-
-      include Binable.Of_binable (struct
-                  type t = int * string [@@deriving bin_io]
-                end)
-                (struct
-                  type nonrec t = t
-
-                  let to_binable = to_tuple
-
-                  let of_binable = of_tuple
-                end)
+      include Hashable.Make_binable (T)
     end
   end
 
@@ -236,6 +238,26 @@ end) : S = struct
     clear_bits (rightmost_clear_index + 1) ;
     path
 
+  let prev (path : t) : t Option.t =
+    let open Option.Let_syntax in
+    let path = copy path in
+    let len = depth path in
+    let rec find_rightmost_one_bit i =
+      if i < 0 then None
+      else if is_set path i then Some i
+      else find_rightmost_one_bit (i - 1)
+    in
+    let rec set_bits i =
+      if i >= len then ()
+      else (
+        set path i ;
+        set_bits (i + 1) )
+    in
+    let%map rightmost_clear_index = find_rightmost_one_bit (len - 1) in
+    clear path rightmost_clear_index ;
+    set_bits (rightmost_clear_index + 1) ;
+    path
+
   let serialize path =
     let path = add_padding path in
     let path_len = depth path in
@@ -307,6 +329,15 @@ end) : S = struct
       ~f:(fun directions ->
         let address = of_directions directions in
         [%test_result: t] ~expect:address (sibling @@ sibling address) )
+
+  let%test_unit "prev(next(addr)) = addr" =
+    Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
+      (Direction.gen_list Input.depth) ~f:(fun directions ->
+        let address = of_directions directions in
+        match next address with
+        | None -> ()
+        | Some addr' ->
+            [%test_result: t option] ~expect:(Some address) (prev addr') )
 end
 
 let%test_module "Address" =

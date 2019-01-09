@@ -1,0 +1,5 @@
+(library
+  (name otp_lib)
+  (public_name otp_lib)
+  (libraries core_kernel async_kernel pipe_lib)
+  (preprocess (pps ppx_jane)))

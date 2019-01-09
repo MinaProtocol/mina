@@ -5,10 +5,13 @@
   (public_name coda_base)
   (flags (:standard -short-paths -warn-error -35-32-33-9-27-34-58-39))
   (inline_tests)
+  (c_library_flags (-lrocksdb))
   (library_flags (-linkall))
   (libraries
     ( lite_base
+      linked_tree
       hash_prefixes
+      syncable_ledger
       base64
       signature_lib
       test_util
@@ -31,11 +34,13 @@
       bignum_bigint
       coda_numbers
       debug_assert
+      merkle_mask
       banlist_lib
       receipt_chain_database_lib
       storage
       yojson
-      codable))
+      codable
+      rocksdb))
   (preprocessor_deps ("../../config.mlh"))
   (preprocess (pps (ppx_snarky ppx_jane ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord ppx_deriving_yojson bisect_ppx -conditional)))
   (synopsis "Snarks and friends necessary for keypair generation")))

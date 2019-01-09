@@ -40,7 +40,7 @@ struct
 
     type path = MT.Path.t
 
-    type t = MT.t
+    type t = MT.t [@@deriving sexp]
 
     let depth = Depth.depth
 

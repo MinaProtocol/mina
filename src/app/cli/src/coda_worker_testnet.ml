@@ -103,7 +103,7 @@ let start_prefix_check log workers events proposal_interval testnet =
   in
   let last_time = ref (Time.now ()) in
   don't_wait_for
-    (let epsilon = 0.5 in
+    (let epsilon = 1.0 in
      let rec go () =
        let diff = Time.diff (Time.now ()) !last_time in
        let diff = Time.Span.to_sec diff in
