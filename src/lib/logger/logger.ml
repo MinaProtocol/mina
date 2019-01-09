@@ -3,7 +3,7 @@ open Async
 
 module Level = struct
   type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
-  [@@deriving bin_io, sexp, compare, show]
+  [@@deriving bin_io, sexp, compare, show {with_path= false}]
 
   let of_string str =
     try Ok (t_of_sexp (Sexp.Atom str)) with Sexp.Of_sexp_error (err, _) ->
