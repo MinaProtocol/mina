@@ -966,6 +966,108 @@ module type External_transition_intf = sig
   val staged_ledger_diff : t -> staged_ledger_diff
 end
 
+module type External_transition_validation_intf = sig
+  type state_hash
+
+  type external_transition
+
+  type staged_ledger
+
+  type staged_ledger_error
+
+  type transition_frontier
+
+  type ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t =
+    'time_received * 'proof * 'frontier_dependencies * 'staged_ledger_diff
+    constraint 'time_received = [`Time_received] * _ Truth.t
+    constraint 'proof = [`Proof] * _ Truth.t
+    constraint 'frontier_dependencies = [`Frontier_dependencies] * _ Truth.t
+    constraint 'staged_ledger_diff = [`Staged_ledger_diff] * _ Truth.t
+
+  type 'a all =
+    ( [`Time_received] * 'a
+    , [`Proof] * 'a
+    , [`Frontier_dependencies] * 'a
+    , [`Staged_ledger_diff] * 'a )
+    t
+    constraint 'a = _ Truth.t
+
+  type fully_invalid = Truth.false_t all
+
+  type fully_valid = Truth.true_t all
+
+  type ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) with_transition =
+    (external_transition, state_hash) With_hash.t
+    * ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t
+
+  val fully_invalid : fully_invalid
+
+  val fully_valid : fully_valid
+
+  val validate_time_received :
+       ( [`Time_received] * Truth.false_t
+       , 'proof
+       , 'frontier_dependencies
+       , 'staged_ledger_diff )
+       with_transition
+    -> time_received:Unix_timestamp.t
+    -> ( ( [`Time_received] * Truth.true_t
+         , 'proof
+         , 'frontier_dependencies
+         , 'staged_ledger_diff )
+         with_transition
+       , [`Invalid_time_received] )
+       Result.t
+
+  val validate_proof :
+       ( 'time_received
+       , [`Proof] * Truth.false_t
+       , 'frontier_dependencies
+       , 'staged_ledger_diff )
+       with_transition
+    -> ( ( 'time_received
+         , [`Proof] * Truth.true_t
+         , 'frontier_dependencies
+         , 'staged_ledger_diff )
+         with_transition
+       , [`Invalid_proof] )
+       Deferred.Result.t
+
+  val validate_frontier_dependencies :
+       ( 'time_received
+       , 'proof
+       , [`Frontier_dependencies] * Truth.false_t
+       , 'staged_ledger_diff )
+       with_transition
+    -> logger:Logger.t
+    -> frontier:transition_frontier
+    -> ( ( 'time_received
+         , 'proof
+         , [`Frontier_dependencies] * Truth.true_t
+         , 'staged_ledger_diff )
+         with_transition
+       , [`Already_in_frontier | `Not_selected_over_frontier_root] )
+       Result.t
+
+  val validate_staged_ledger_diff :
+       ( 'time_received
+       , 'proof
+       , 'frontier_dependencies
+       , [`Staged_ledger_diff] * Truth.false_t )
+       with_transition
+    -> logger:Logger.t
+    -> parent_staged_ledger:staged_ledger
+    -> ( ( 'time_received
+         , 'proof
+         , 'frontier_dependencies
+         , [`Staged_ledger_diff] * Truth.true_t )
+         with_transition
+         * staged_ledger
+       , [ `Invalid_ledger_hash_after_staged_ledger_application
+         | `Staged_ledger_application_failed of staged_ledger_error ] )
+       Deferred.Result.t
+end
+
 module type Consensus_mechanism_intf = sig
   type proof
 
