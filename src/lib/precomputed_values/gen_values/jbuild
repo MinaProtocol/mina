@@ -13,11 +13,11 @@
       snark_keys
       ppxlib
       ppx_util
-      ledger_builder
+      staged_ledger
       global_signer_private_key
     ))
    (preprocessor_deps ("../../../config.mlh"))
    (preprocess (pps (ppx_jane ppxlib.metaquot ppxlib.runner)))
-   (flags (-w -40 -g -warn-error +3+4+6+8+9+10+11+12+14+16+20+21+23+24+26+27+29+32..39+56-58+59+60+61))
+   (flags (-w -40 -g -warn-error +3+4+6+8+9+10+11+12+14+16+20+21+23+24+26+27+29+32..39+56-58+59+60+61 -cclib -lrocksdb))
    (modes (native))
   ))

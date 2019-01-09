@@ -1,7 +1,7 @@
 (* masking_merkle_tree_intf.ml *)
 (* the type of a Merkle tree mask associated with a parent Merkle tree *)
 module type S = sig
-  type t
+  type t [@@deriving bin_io]
 
   type unattached = t
 
@@ -49,11 +49,16 @@ module type S = sig
     val parent_set_notify : t -> location -> account -> unit
     (** called when parent sets an account; update local state *)
 
+    val copy : t -> t
+    (* makes new mask instance with copied tables, re-use parent *)
+
     (** already have module For_testing from include above *)
     module For_testing : sig
       val location_in_mask : t -> location -> bool
 
       val address_in_mask : t -> Addr.t -> bool
+
+      val current_location : t -> Location.t option
     end
   end
 
