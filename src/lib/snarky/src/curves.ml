@@ -557,9 +557,9 @@ module Make_weierstrass_checked
 
       val random : unit -> t
 
-      val to_coords : t -> Impl.Field.t * Impl.Field.t
+      val to_affine_coordinates : t -> Impl.Field.t * Impl.Field.t
 
-      val of_coords : Impl.Field.t * Impl.Field.t -> t
+      val of_affine_coordinates : Impl.Field.t * Impl.Field.t -> t
 
       val double : t -> t
 
@@ -592,7 +592,7 @@ module Make_weierstrass_checked
     let unchecked =
       Typ.transport
         Typ.(tuple2 field field)
-        ~there:Curve.to_coords ~back:Curve.of_coords
+        ~there:Curve.to_affine_coordinates ~back:Curve.of_affine_coordinates
     in
     {unchecked with check= assert_on_curve}
 
@@ -600,7 +600,7 @@ module Make_weierstrass_checked
     (x, Field.Checked.scale y Field.(negate one))
 
   let constant (t : t) : var =
-    let x, y = Curve.to_coords t in
+    let x, y = Curve.to_affine_coordinates t in
     Field.Checked.(constant x, constant y)
 
   let assert_equal (x1, y1) (x2, y2) =
@@ -790,8 +790,8 @@ module Make_weierstrass_checked
     (bx, by)
 
   let if_value (cond : Boolean.var) ~then_ ~else_ =
-    let x1, y1 = Curve.to_coords then_ in
-    let x2, y2 = Curve.to_coords else_ in
+    let x1, y1 = Curve.to_affine_coordinates then_ in
+    let x2, y2 = Curve.to_affine_coordinates else_ in
     let cond = (cond :> Field.Checked.t) in
     let choose a1 a2 =
       let open Field.Checked in
@@ -835,10 +835,10 @@ module Make_weierstrass_checked
       +^ ((a3 - a1) * (b1 :> Field.Checked.t))
       +^ ((a4 + a1 - a2 - a3) * (b0_and_b1 :> Field.Checked.t))
     in
-    let x1, y1 = Curve.to_coords t1
-    and x2, y2 = Curve.to_coords t2
-    and x3, y3 = Curve.to_coords t3
-    and x4, y4 = Curve.to_coords t4 in
+    let x1, y1 = Curve.to_affine_coordinates t1
+    and x2, y2 = Curve.to_affine_coordinates t2
+    and x3, y3 = Curve.to_affine_coordinates t3
+    and x4, y4 = Curve.to_affine_coordinates t4 in
     (lookup_one (x1, x2, x3, x4), lookup_one (y1, y2, y3, y4))
 
   (* Similar to the above, but doing lookup in a size 1 table *)
@@ -847,7 +847,8 @@ module Make_weierstrass_checked
       let open Field.Checked.Infix in
       Field.Checked.constant a1 + (Field.sub a2 a1 * (b :> Field.Checked.t))
     in
-    let x1, y1 = Curve.to_coords t1 and x2, y2 = Curve.to_coords t2 in
+    let x1, y1 = Curve.to_affine_coordinates t1
+    and x2, y2 = Curve.to_affine_coordinates t2 in
     (lookup_one (x1, x2), lookup_one (y1, y2))
 
   let scale_known (type shifted)
