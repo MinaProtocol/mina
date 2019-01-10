@@ -23,18 +23,20 @@
 namespace libfqfft {
 
 template<typename FieldT>
-basic_radix2_domain<FieldT>::basic_radix2_domain(const size_t m) : evaluation_domain<FieldT>(m)
+basic_radix2_domain<FieldT>::basic_radix2_domain(const size_t m, bool* err) : evaluation_domain<FieldT>(m)
 {
-    if (m <= 1) throw InvalidSizeException("basic_radix2(): expected m > 1");
-
-    if (!std::is_same<FieldT, libff::Double>::value)
-    {
+    if (m <= 1) {
+      *err = true;
+      omega = FieldT(1,1);
+    } else if (!std::is_same<FieldT, libff::Double>::value) {
         const size_t logm = libff::log2(m);
-        if (logm > (FieldT::s)) throw DomainSizeException("basic_radix2(): expected logm <= FieldT::s");
+        if (logm > (FieldT::s)) {
+          *err = true;
+          omega = FieldT(1,1);
+        } else {
+          omega = libff::get_root_of_unity<FieldT>(m, err);
+        }
     }
-
-    try { omega = libff::get_root_of_unity<FieldT>(m); }
-    catch (const std::invalid_argument& e) { throw DomainSizeException(e.what()); }
 }
 
 template<typename FieldT>
