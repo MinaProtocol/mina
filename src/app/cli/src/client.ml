@@ -425,6 +425,16 @@ let constraint_system_digests =
          List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
          Deferred.unit ))
 
+let snark_job_list =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"List of snark jobs in JSON format"
+    (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
+         match%map dispatch Daemon_rpcs.Snark_job_list.rpc () port with
+         | Ok str -> printf "%s" str
+         | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e ))
+
 let command =
   Command.group ~summary:"Lightweight client process"
     [ ("get-balance", get_balance)
@@ -440,4 +450,5 @@ let command =
     ; ("dump-keypair", dump_keypair)
     ; ("dump-ledger", dump_ledger)
     ; ("constraint-system-digests", constraint_system_digests)
-    ; ("generate-keypair", generate_keypair) ]
+    ; ("generate-keypair", generate_keypair)
+    ; ("snark-job-list", snark_job_list) ]

@@ -691,11 +691,17 @@ module type Staged_ledger_base_intf = sig
   module Scan_state : sig
     type t [@@deriving bin_io]
 
+    module Job_view : sig
+      type t [@@deriving sexp, to_yojson]
+    end
+
     val hash : t -> staged_ledger_aux_hash
 
     val is_valid : t -> bool
 
     val empty : unit -> t
+
+    val export_jobs : t -> Job_view.t list
   end
 
   module Staged_ledger_error : sig

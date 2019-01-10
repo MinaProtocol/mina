@@ -63,38 +63,27 @@ end = struct
   end
 
   module Job_view = struct
-    (*type statement_view = 
-      {
-        source: Frozen_ledger_hash.t
-      ; target: Frozen_ledger_hash.t
-      ; fee_excess: Currency.Fee.Signed.t
-      ; supply_increase: Currency.Amount.t
-      }
-      [@@deriving sexp, to_yojson]*)
     type t = Ledger_proof_statement.t Parallel_scan.Job_view.t
     [@@deriving sexp]
 
     let to_yojson ((pos, job) : t) : Yojson.Safe.json =
       let hash_string h = Sexp.to_string (Frozen_ledger_hash.sexp_of_t h) in
       let statement_to_yojson (s : Ledger_proof_statement.t) =
-        `List
-          [ `Variant ("Source", Some (`String (hash_string s.source)))
-          ; `Variant ("Target", Some (`String (hash_string s.target)))
-          ; `Variant
-              ("Fee Excess", Some (Currency.Fee.Signed.to_yojson s.fee_excess))
-          ; `Variant
-              ( "Supply Increase"
-              , Some (Currency.Amount.to_yojson s.supply_increase) ) ]
+        `Assoc
+          [ ("Source", `String (hash_string s.source))
+          ; ("Target", `String (hash_string s.target))
+          ; ("Fee Excess", Currency.Fee.Signed.to_yojson s.fee_excess)
+          ; ("Supply Increase", Currency.Amount.to_yojson s.supply_increase) ]
       in
       let opt_json x =
-        Option.value_map x ~default:(`String "") ~f:statement_to_yojson
+        Option.value_map x ~default:(`List []) ~f:statement_to_yojson
       in
       let job_to_yojson =
         match job with
-        | Merge (x, y) -> `Variant ("M", Some (`List [opt_json x; opt_json y]))
-        | Base x -> `Variant ("B", Some (opt_json x))
+        | Merge (x, y) -> `Assoc [("M", `List [opt_json x; opt_json y])]
+        | Base x -> `Assoc [("B", `List [opt_json x])]
       in
-      `Tuple [`Int pos; job_to_yojson]
+      `List [`Int pos; job_to_yojson]
   end
 
   type job = Available_job.t
@@ -414,14 +403,8 @@ end = struct
 
   let export_jobs (t : t) : Job_view.t list =
     let fa (a : Ledger_proof_with_sok_message.t) =
-      (*let {Ledger_proof_statement.source; target; fee_excess; supply_increase; _} = Ledger_proof.statement (fst a)
-      in {Job_view.source; target; fee_excess; supply_increase}*)
       Ledger_proof.statement (fst a)
     in
-    let fd (d : Transaction_with_witness.t) =
-      (*let {Ledger_proof_statement.source; target; fee_excess; supply_increase;_} = d.statement 
-      in {Job_view.source; target; fee_excess; supply_increase}*)
-      d.statement
-    in
+    let fd (d : Transaction_with_witness.t) = d.statement in
     Parallel_scan.view_jobs_with_position t fa fd
 end
