@@ -8,6 +8,15 @@ let name = "snarky_polyrecord"
 
 let type_name = "polymorphic"
 
+let is_listlike expr =
+  match expr.pexp_desc with
+  | Pexp_array _ | Pexp_tuple _
+   |Pexp_construct
+      ({txt= Lident "::"; _}, Some {pexp_desc= Pexp_tuple [_; _]; _})
+   |Pexp_construct ({txt= Lident "[]"; _}, None) ->
+      true
+  | _ -> false
+
 let rec parse_listlike expr =
   match expr.pexp_desc with
   | Pexp_array exprs -> exprs
