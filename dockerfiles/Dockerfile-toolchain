@@ -10,8 +10,6 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     libgmp-dev \
     libgmp3-dev \
     libprocps-dev \
-    librocksdb-dev \
-    librocksdb4.5 \
     libsodium-dev \
     libssl-dev \
     lsb \
@@ -33,6 +31,11 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - && \
     sudo apt-get update -y && sudo apt-get install google-cloud-sdk -y
 
+# Source copy of ocaml-rocksdb
+ADD /src/external/ocaml-rocksdb /ocaml-rocksdb
+# This installs librocksdb-dev and librocksdb v5.x from sources
+RUN /ocaml-rocksdb/install_rocksdb.sh
+
 # Opam dependencies
 # Pull freshest repository
 RUN git -C /home/opam/opam-repository pull
@@ -50,8 +53,11 @@ RUN opam switch import opam.export ; rm opam.export
 ADD /src/external/ocaml-sodium /ocaml-sodium
 RUN cd /ocaml-sodium && yes | opam pin add .
 
-# Source copy of ocaml-rocksdb (exposes opaque types)
-ADD /src/external/ocaml-rocksdb /ocaml-rocksdb
+# Source copy of rpc_parallel (modified for macOS support)
+ADD /src/external/rpc_parallel /rpc_parallel
+RUN cd /rpc_parallel && yes | opam pin add .
+
+# Install local copy of ocaml-rocksdb (exposes opaque types)
 RUN cd /ocaml-rocksdb && yes | opam pin add .
 
 # Get coda-kademlia from packages repo
@@ -59,3 +65,4 @@ RUN sudo apt-get install --yes apt-transport-https ca-certificates && \
       echo "deb [trusted=yes] https://packages.o1test.net unstable main" | sudo tee -a /etc/apt/sources.list.d/coda.list && \
       sudo apt-get update && \
       sudo apt-get install --yes coda-kademlia
+

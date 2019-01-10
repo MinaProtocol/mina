@@ -70,3 +70,6 @@ let strongest_ledgers_exn (conn, proc, _) =
       ~f:Coda_worker.functions.strongest_ledgers ~arg:()
   in
   Linear_pipe.wrap_reader r
+
+let start_exn (conn, proc, _) =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.start ~arg:()

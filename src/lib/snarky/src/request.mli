@@ -9,7 +9,7 @@ type response
 val unhandled : response
 
 module Response : sig
-  type nonrec 'a t = Provide of 'a | Reraise of 'a t | Unhandled
+  type nonrec 'a t = Provide of 'a | Delegate of 'a t | Unhandled
 end
 
 type request =

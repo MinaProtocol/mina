@@ -9,8 +9,8 @@ mkDerivation {
   version = "1.1.0.1";
   src = fetchgit {
     url = "https://github.com/bkase/kademlia.git";
-    sha256 = "01z3p2mhx3nbdmhi2mml5gh169i0rk8cwvnmdffxygglsbhp6rcf";
-    rev = "516efa38923642fed4481b7f79d0fe247f68d24a";
+    sha256 = "11jkwwissfkqnnsibgb17a25hzjijh0ybnss4msw9i7slhnq8d6m";
+    rev = "e6fd924c36701fb338702a929f70f06c24f2e7e2";
   };
   isLibrary = true;
   isExecutable = true;

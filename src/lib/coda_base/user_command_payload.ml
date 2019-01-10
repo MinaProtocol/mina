@@ -105,7 +105,7 @@ end
 module Stable = struct
   module V1 = struct
     type ('common, 'body) t_ = {common: 'common; body: 'body}
-    [@@deriving bin_io, eq, sexp, hash, yojson]
+    [@@deriving bin_io, eq, sexp, hash, yojson, compare]
 
     type t = (Common.Stable.V1.t, Body.Stable.V1.t) t_
     [@@deriving bin_io, eq, sexp, hash, yojson]
