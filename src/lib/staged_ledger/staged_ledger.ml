@@ -657,6 +657,12 @@ end = struct
        count:%d Spots available:%d Proofs waiting to be solved:%d"
       user_commands_count cb_parts_count (List.length works) spots_available
       proofs_waiting ;
+    Logger.info logger !"Jobs: %s \n %!"
+      (Yojson.Safe.to_string
+         (`List
+           (List.map
+              (Scan_state.export_jobs scan_state')
+              ~f:Scan_state.Job_view.to_yojson))) ;
     ( `Hash_after_applying (hash t)
     , `Ledger_proof res_opt
     , `Staged_ledger {scan_state= scan_state'; ledger= new_ledger} )

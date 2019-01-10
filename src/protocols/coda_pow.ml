@@ -601,6 +601,10 @@ module type Transaction_snark_scan_state_intf = sig
     type t
   end
 
+  module Job_view : sig
+    type t [@@deriving sexp, to_yojson]
+  end
+
   module Make_statement_scanner
       (M : Monad_with_Or_error_intf) (Verifier : sig
           val verify :
@@ -658,6 +662,8 @@ module type Transaction_snark_scan_state_intf = sig
     t -> max_slots:int -> [`One of int | `Two of int * int]
 
   val statement_of_job : Available_job.t -> ledger_proof_statement option
+
+  val export_jobs : t -> Job_view.t list
 end
 
 module type Staged_ledger_base_intf = sig
