@@ -40,7 +40,7 @@ Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debi
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-a5cc8a0501bef5075fe614d2246153d42a67e49f`
+`docker pull codaprotocol/coda:toolchain-5b183eb006ea0bf720c8f14965c31f7890909e91`
 
 * Create local builder image
 
@@ -131,6 +131,7 @@ with `dune`, so you need to add them manually:
 * `opam pin add src/external/ocaml-sodium`
 * `opam pin add src/external/ocaml-rocksdb`
 * `opam pin add src/external/ocaml-dune`
+* `opam pin add src/external/rpc_parallel`
 
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles. Unlike most of the C libraries,

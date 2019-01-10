@@ -53,6 +53,10 @@ RUN opam switch import opam.export ; rm opam.export
 ADD /src/external/ocaml-sodium /ocaml-sodium
 RUN cd /ocaml-sodium && yes | opam pin add .
 
+# Source copy of rpc_parallel (modified for macOS support)
+ADD /src/external/rpc_parallel /rpc_parallel
+RUN cd /rpc_parallel && yes | opam pin add .
+
 # Install local copy of ocaml-rocksdb (exposes opaque types)
 RUN cd /ocaml-rocksdb && yes | opam pin add .
 

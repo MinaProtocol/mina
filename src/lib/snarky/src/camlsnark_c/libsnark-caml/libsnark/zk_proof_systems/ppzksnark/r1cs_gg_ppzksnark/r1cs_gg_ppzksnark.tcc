@@ -297,7 +297,7 @@ r1cs_gg_ppzksnark_keypair<ppT> r1cs_gg_ppzksnark_generator(const r1cs_gg_ppzksna
     libff::leave_block("Generating G1 MSM window table");
 
     libff::enter_block("Generating G2 MSM window table");
-    const libff::G2<ppT> G2_gen = libff::G2<ppT>::random_element();
+    const libff::G2<ppT> G2_gen = libff::G2<ppT>::one();
     const size_t g2_scalar_count = non_zero_Bt;
     const size_t g2_scalar_size = libff::Fr<ppT>::size_in_bits();
     size_t g2_window_size = libff::get_exp_window_size<libff::G2<ppT> >(g2_scalar_count);
