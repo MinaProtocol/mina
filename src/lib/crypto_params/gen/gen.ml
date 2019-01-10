@@ -178,7 +178,7 @@ let generate_ml_file filename structure =
   Pprintast.top_phrase fmt (Ptop_def (structure ~loc:Ppxlib.Location.none))
 
 let () =
-  ignore (generate_ml_file "pedersen_params.ml" params_structure) ;
-  ignore (generate_ml_file "pedersen_chunk_table.ml" chunk_table_structure) ;
+  generate_ml_file "pedersen_params.ml" params_structure ;
+  generate_ml_file "pedersen_chunk_table.ml" chunk_table_structure ;
   ignore (exit 0) ;
   never_returns (Scheduler.go ())
