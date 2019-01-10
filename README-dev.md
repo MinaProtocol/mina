@@ -131,6 +131,7 @@ with `dune`, so you need to add them manually:
 * `opam pin add src/external/ocaml-sodium`
 * `opam pin add src/external/ocaml-rocksdb`
 * `opam pin add src/external/ocaml-dune`
+* `opam pin add src/external/rpc_parallel`
 
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles. Unlike most of the C libraries,

@@ -1,0 +1,56 @@
+# Mental Model
+
+- =Worker.t= identifies a worker rpc server
+- =spawn= (=serve=) starts a worker Rpc server in another process (the same
+  process)
+- =client= connects to a worker Rpc server
+- =run= dispatches on a connection to a worker Rpc server
+
+# Top-level
+
+It is highly recommended for =Rpc\_parallel.start\_app= and =Rpc\_parallel.Make=
+calls to be top-level. But the real requirements are:
+
+1) The master's state is initialized before any calls to =spawn=. This will be
+   achieved either by =Rpc\_parallel.start\_app= or
+   =Rpc\_parallel.Expert.start\_master\_server\_exn=.
+
+2) Spawned workers (runs of your executable with a certain environment variable
+   set) must start running as a worker. This will be achieved either by
+   =Rpc\_parallel.start\_app= or =Rpc\_parallel.Expert.worker\_command=.
+
+3) Spawned workers must be able to find their function implementations when they
+   start running as a worker. These implementations are gathered on the
+   application of the =Rpc\_parallel.Make= functor.
+
+4) The worker implementations must be defined completely and in the same order,
+   regardless of master and worker code paths. This is necessary for the masters
+   and workers to agree on certain generated ids.
+
+# Monitoring your workers
+
+Uncaught exceptions in workers will always result in the worker shutting down.
+The master can be notified of these exceptions in multiple ways:
+
+- If the exception occured in a function implementation =f= before =f= is
+  determined, the exception will be returned back to the caller. E.g. the caller
+  of =spawn= or =run= will get an =Error.t= describing the exception.
+
+- If the exception occured after =f= is determined, =on\_failure exn= will be
+  called (in =Monitor.current ()= at the time of =spawn=) in the spawning
+  process.
+
+- If =redirect\_stderr= specifies a file, the worker will also write its
+  exception to that file before shutting down.
+
+# Optional Rpc Settings
+
+The master's Rpc server will be started with the =max\_message\_size=,
+=heartbeat\_config=, and =handshake\_timeout= settings passed in to
+=start\_app=/=init\_master\_exn=.
+
+Each worker's Rpc server will be started with the settings passed in upon
+=spawn= or =serve= of that worker.
+
+All =client= calls will use the corresponding Rpc settings for the given
+worker/master that it is connecting to.
