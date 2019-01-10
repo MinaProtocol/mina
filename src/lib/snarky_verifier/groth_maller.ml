@@ -17,6 +17,21 @@ module Make (Inputs : Inputs.S) = struct
       ; h_gamma: 'g2
       ; g_alpha_h_beta: 'fqk }
 
+    include Summary.Make (Inputs)
+
+    let summary_input
+        { g_alpha
+        ; g_gamma
+        ; query_base
+        ; query
+        ; h
+        ; h_beta
+        ; h_gamma
+        ; g_alpha_h_beta } =
+      { Summary.Input.g1s= g_alpha :: g_gamma :: query_base :: query
+      ; g2s= [h; h_beta; h_gamma]
+      ; gts= [g_alpha_h_beta] }
+
     type ('a, 'b, 'c) vk = ('a, 'b, 'c) t_
 
     module Precomputation = struct
