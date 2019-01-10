@@ -8,7 +8,7 @@ module type Inputs_intf = sig
 
     val real_part : 'a t_ -> 'a
 
-    val parts : 'a t_ -> 'a list
+    val to_list : 'a t_ -> 'a list
   end
 end
 
@@ -21,11 +21,21 @@ module Make (Inputs : Inputs_intf) = struct
   open Impl
   open Let_syntax
 
+  let summary_length_in_bits ~twist_extension_degree ~g1_count ~g2_count
+      ~gt_count =
+    let elts =
+      g1_count
+      + (twist_extension_degree * g2_count)
+      + (twist_extension_degree * gt_count)
+    in
+    let signs = g1_count + g2_count + gt_count in
+    (elts * Field.size_in_bits) + signs
+
   let summary {Input.g1s; g2s; gts} =
     let%map elts =
       List.map g1s ~f:(fun (x, _) -> x)
-      @ List.concat_map g2s ~f:(fun (x, _) -> Fqe.parts x)
-      @ List.concat_map gts ~f:(fun (a, _) -> Fqe.parts a)
+      @ List.concat_map g2s ~f:(fun (x, _) -> Fqe.to_list x)
+      @ List.concat_map gts ~f:(fun (a, _) -> Fqe.to_list a)
       |> Checked.List.map ~f:(fun x ->
              Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
              >>| List.hd_exn )
@@ -50,8 +60,8 @@ module Make (Inputs : Inputs_intf) = struct
     let parity x = Bigint.(test_bit (of_field x) 0) in
     let elts =
       List.map g1s ~f:(fun (x, _) -> x)
-      @ List.concat_map g2s ~f:(fun (x, _) -> Fqe.parts x)
-      @ List.concat_map gts ~f:(fun (a, _) -> Fqe.parts a)
+      @ List.concat_map g2s ~f:(fun (x, _) -> Fqe.to_list x)
+      @ List.concat_map gts ~f:(fun (a, _) -> Fqe.to_list a)
       |> List.map ~f:parity
     and signs =
       let real_part_parity a =
