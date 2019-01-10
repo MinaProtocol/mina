@@ -71,9 +71,9 @@ type _ Request.t +=
 
 let reraise_merkle_requests (With {request; respond}) =
   match request with
-  | Merkle_tree.Get_path addr -> respond (Reraise (Get_path addr))
-  | Merkle_tree.Set (addr, account) -> respond (Reraise (Set (addr, account)))
-  | Merkle_tree.Get_element addr -> respond (Reraise (Get_element addr))
+  | Merkle_tree.Get_path addr -> respond (Delegate (Get_path addr))
+  | Merkle_tree.Set (addr, account) -> respond (Delegate (Set (addr, account)))
+  | Merkle_tree.Get_element addr -> respond (Delegate (Get_element addr))
   | _ -> unhandled
 
 let get t addr = Merkle_tree.get_req ~depth (var_to_hash_packed t) addr
