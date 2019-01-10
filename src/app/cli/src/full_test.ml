@@ -65,8 +65,10 @@ let run_test () : unit Deferred.t =
   let receipt_chain_database =
     Coda_base.Receipt_chain_database.create ~directory:receipt_chain_dir_name
   in
+  let time_controller = Inputs.Time.Controller.create () in
   let net_config =
     { Inputs.Net.Config.parent_log= log
+    ; time_controller
     ; gossip_net_params=
         { Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
         ; parent_log= log
@@ -80,14 +82,17 @@ let run_test () : unit Deferred.t =
     Main.create
       (Main.Config.make ~log ~net_config ~propose_keypair:keypair
          ~run_snark_worker:true
-         ~ledger_builder_persistant_location:(temp_conf_dir ^/ "ledger_builder")
+         ~staged_ledger_persistant_location:(temp_conf_dir ^/ "staged_ledger")
          ~transaction_pool_disk_location:(temp_conf_dir ^/ "transaction_pool")
          ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
-         ~time_controller:(Inputs.Time.Controller.create ())
-         ~receipt_chain_database () ~banlist
+         ~time_controller ~receipt_chain_database () ~banlist
          ~snark_work_fee:(Currency.Fee.of_int 0))
   in
-  don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers coda)) ;
+  Main.start coda ;
+  don't_wait_for
+    (Strict_pipe.Reader.iter_without_pushback
+       (Main.strongest_ledgers coda)
+       ~f:ignore) ;
   let wait_until_cond ~(f : t -> bool) ~(timeout : Float.t) =
     let rec go () =
       if f coda then return ()
@@ -99,7 +104,9 @@ let run_test () : unit Deferred.t =
   in
   let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
     let cond t =
-      match Run.get_balance t receiver_pk with
+      match
+        Run.get_balance t receiver_pk |> Participating_state.active_exn
+      with
       | Some b when not (Currency.Balance.equal b initial_receiver_balance) ->
           true
       | _ -> false
@@ -107,7 +114,7 @@ let run_test () : unit Deferred.t =
     wait_until_cond ~f:cond ~timeout:3.
   in
   let assert_balance pk amount =
-    match Run.get_balance coda pk with
+    match Run.get_balance coda pk |> Participating_state.active_exn with
     | Some balance ->
         if not (Currency.Balance.equal balance amount) then
           failwithf
@@ -138,7 +145,10 @@ let run_test () : unit Deferred.t =
   let send_amount = Currency.Amount.of_int 10 in
   (* Send money to someone *)
   let build_payment amount sender_sk receiver_pk fee =
-    let nonce = Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn in
+    let nonce =
+      Run.get_nonce coda (pk_of_sk sender_sk)
+      |> Participating_state.active_exn |> Option.value_exn
+    in
     let payload : User_command.Payload.t =
       User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
         ~body:(Payment {receiver= receiver_pk; amount})
@@ -151,21 +161,23 @@ let run_test () : unit Deferred.t =
       build_payment send_amount sender_sk receiver_pk (Currency.Fee.of_int 0)
     in
     let prev_sender_balance =
-      Run.get_balance coda (pk_of_sk sender_sk) |> Option.value_exn
+      Run.get_balance coda (pk_of_sk sender_sk)
+      |> Participating_state.active_exn |> Option.value_exn
     in
     let prev_receiver_balance =
       Run.get_balance coda receiver_pk
+      |> Participating_state.active_exn
       |> Option.value ~default:Currency.Balance.zero
     in
     let%bind p1_res = Run.send_payment log coda (payment :> User_command.t) in
-    assert_ok p1_res ;
+    assert_ok (p1_res |> Participating_state.active_exn) ;
     (* Send a similar payment twice on purpose; this second one will be rejected
        because the nonce is wrong *)
     let payment' =
       build_payment send_amount sender_sk receiver_pk (Currency.Fee.of_int 0)
     in
     let%bind p2_res = Run.send_payment log coda (payment' :> User_command.t) in
-    assert_ok p2_res ;
+    assert_ok (p2_res |> Participating_state.active_exn) ;
     (* The payment fails, but the rpc command doesn't indicate that because that
        failure comes from the network. *)
     (* Let the system settle, mine some blocks *)
@@ -195,7 +207,8 @@ let run_test () : unit Deferred.t =
             (Currency.Balance.add_amount (Option.value_exn v) amount) )
     in
     let%map p_res = Run.send_payment log coda (payment :> User_command.t) in
-    assert_ok p_res ; new_balance_sheet'
+    p_res |> Participating_state.active_exn |> assert_ok ;
+    new_balance_sheet'
   in
   let send_payments accounts pks balance_sheet f_amount =
     Deferred.List.foldi accounts ~init:balance_sheet
@@ -209,7 +222,7 @@ let run_test () : unit Deferred.t =
           receiver (f_amount i) acc (Currency.Fee.of_int 0) )
   in
   let block_count t =
-    Run.best_protocol_state t
+    Run.best_protocol_state t |> Participating_state.active_exn
     |> Inputs.Consensus_mechanism.Protocol_state.consensus_state
     |> Inputs.Consensus_mechanism.Consensus_state.length
   in

@@ -108,8 +108,7 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) :
     let%snarkydef is_base_hash h =
       Field.Checked.equal
         (Field.Checked.constant
-           ( Protocol_state.hash Consensus_mechanism.genesis_protocol_state
-             :> Field.t ))
+           (Consensus_mechanism.genesis_protocol_state.hash :> Field.t))
         (State_hash.var_to_hash_packed h)
 
     let%snarkydef hash (t : Protocol_state.var) =

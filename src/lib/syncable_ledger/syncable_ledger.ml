@@ -5,7 +5,7 @@ open Pipe_lib
 let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 
 module type S = sig
-  type t
+  type t [@@deriving sexp]
 
   type merkle_tree
 
@@ -42,13 +42,18 @@ module type S = sig
 
   val create : merkle_tree -> parent_log:Logger.t -> t
 
-  val answer_writer : t -> (root_hash * answer) Linear_pipe.Writer.t
+  val answer_writer :
+    t -> (root_hash * answer) Envelope.Incoming.t Linear_pipe.Writer.t
 
   val query_reader : t -> (root_hash * query) Linear_pipe.Reader.t
 
   val destroy : t -> unit
 
-  val new_goal : t -> root_hash -> unit
+  val new_goal : t -> root_hash -> [`Repeat | `New]
+
+  val peek_valid_tree : t -> merkle_tree option
+
+  val valid_tree : t -> merkle_tree Deferred.t
 
   val wait_until_valid :
        t
@@ -299,14 +304,19 @@ module Make
     ; tree: MT.t
     ; mutable validity: Valid.t
     ; log: Logger.t
-    ; answers: (Root_hash.t * answer) Linear_pipe.Reader.t
-    ; answer_writer: (Root_hash.t * answer) Linear_pipe.Writer.t
+    ; answers: (Root_hash.t * answer) Envelope.Incoming.t Linear_pipe.Reader.t
+    ; answer_writer:
+        (Root_hash.t * answer) Envelope.Incoming.t Linear_pipe.Writer.t
     ; queries: (Root_hash.t * query) Linear_pipe.Writer.t
     ; query_reader: (Root_hash.t * query) Linear_pipe.Reader.t
     ; waiting_parents: waiting Addr.Table.t
     ; waiting_content: Hash.t Addr.Table.t
     ; mutable validity_listener:
         [`Ok | `Target_changed of Root_hash.t option * Root_hash.t] Ivar.t }
+
+  let t_of_sexp _ = failwith "t_of_sexp: not implemented"
+
+  let sexp_of_t _ = failwith "sexp_of_t: not implemented"
 
   let desired_root_exn {desired_root; _} = desired_root |> Option.value_exn
 
@@ -446,7 +456,8 @@ module Make
      will stick around until the SL is destroyed, or else cause a
      node to never be verified *)
   let main_loop t =
-    let handle_answer (root_hash, a) =
+    let handle_answer env =
+      let root_hash, a = Envelope.Incoming.data env in
       Logger.trace t.log !"Handle answer for %{sexp: Root_hash.t}" root_hash ;
       if not (Root_hash.equal root_hash (desired_root_exn t)) then (
         Logger.trace t.log
@@ -462,8 +473,10 @@ module Make
             (* TODO #435: Stick this in a log, punish the sender *)
             | Error e ->
                 Logger.faulty_peer t.log
-                  !"Got error when trying to add child_hash %{sexp: Hash.t} %s"
-                  h' (Error.to_string_hum e) ;
+                  !"Got error from when trying to add child_hash %{sexp: \
+                    Hash.t} %s %{sexp: Host_and_port.t}"
+                  h' (Error.to_string_hum e)
+                  (Envelope.Incoming.sender env) ;
                 ()
             | Ok (`Good children_to_verify) ->
                 (* TODO #312: Make sure we don't write too much *)
@@ -500,8 +513,21 @@ module Make
       t.desired_root <- Some h ;
       Valid.set t.validity (Addr.root ()) (Stale, Root_hash.to_hash h)
       |> ignore ;
-      Linear_pipe.write_without_pushback t.queries (h, Num_accounts) )
-    else Logger.info t.log "new_goal to same hash, not doing anything"
+      Linear_pipe.write_without_pushback t.queries (h, Num_accounts) ;
+      `New )
+    else (
+      Logger.info t.log "new_goal to same hash, not doing anything" ;
+      `Repeat )
+
+  let rec valid_tree t =
+    match%bind Ivar.read t.validity_listener with
+    | `Ok -> return t.tree
+    | `Target_changed _ -> valid_tree t
+
+  let peek_valid_tree t =
+    Option.bind (Ivar.peek t.validity_listener) ~f:(function
+      | `Ok -> Some t.tree
+      | `Target_changed _ -> None )
 
   let wait_until_valid t h =
     if not (Root_hash.equal h (desired_root_exn t)) then
@@ -511,7 +537,9 @@ module Make
         | `Target_changed payload -> `Target_changed payload
         | `Ok -> `Ok t.tree )
 
-  let fetch t rh = new_goal t rh ; wait_until_valid t rh
+  let fetch t rh =
+    new_goal t rh |> ignore ;
+    wait_until_valid t rh
 
   let create mt ~parent_log =
     let qr, qw = Linear_pipe.create () in
