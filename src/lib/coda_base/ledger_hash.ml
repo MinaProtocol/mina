@@ -54,8 +54,9 @@ let merge ~height (h1 : t) (h2 : t) =
 
 (* TODO: @ihm cryptography review *)
 let empty_hash =
-  Tick.Pedersen.digest_fold
-    (Tick.Pedersen.State.create Tick.Pedersen.params)
+  let open Tick.Pedersen in
+  digest_fold
+    (State.create params Curve_chunk_table.{curve_points_table; chunk_size})
     (Fold.string_triples "nothing up my sleeve")
   |> of_hash
 

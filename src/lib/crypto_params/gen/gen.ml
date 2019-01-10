@@ -4,6 +4,8 @@ open Parsetree
 open Longident
 open Core
 open Async
+open Fold_lib
+open Chunked_triples
 
 let seed = "CodaPedersenParams"
 
@@ -55,7 +57,9 @@ let params =
       let tt = Group.double t in
       (t, tt, Group.add t tt, Group.double tt) )
 
-let params ~loc =
+let params_array = Array.of_list params
+
+let params_ast ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
   end) in
@@ -78,22 +82,107 @@ let params ~loc =
     (fun (g1, g2, g3, g4) -> (conv g1, conv g2, conv g3, conv g4))
     [%e earray]
 
-let structure ~loc =
+let params_structure ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
   end) in
   let open E in
   [%str open Crypto_params_init
 
-        let params = [%e params ~loc]]
+        let params = [%e params_ast ~loc]]
 
-let main () =
-  let fmt =
-    Format.formatter_of_out_channel (Out_channel.create "pedersen_params.ml")
+(* for a chunk with value n, compute its curve value
+   start is the starting parameter position of the chunk, based
+    on its position in a list of chunks
+*)
+let compute_chunk_value ~start n =
+  let fold = Chunk.of_int n |> Fold.of_list in
+  let acc, _ =
+    fold.fold ~init:(Group.zero, 0) ~f:(fun (acc, i) triple ->
+        let term =
+          Snarky.Pedersen.local_function ~negate:Group.negate
+            params_array.(start + i)
+            triple
+        in
+        (Group.add acc term, i + 1) )
   in
-  Pprintast.top_phrase fmt (Ptop_def (structure ~loc:Ppxlib.Location.none)) ;
-  exit 0
+  acc
+
+(* for each chunk boundary, 0, size, 2 * size, ..., num parameters / size
+     for each possible chunk (2 ** (size * 3) of them)
+       store its value in the array
+*)
+let get_chunk_table () =
+  let num_params = Array.length params_array in
+  let max_chunks = num_params / Chunk.size in
+  let rec loop ~chunk arrays =
+    if
+      chunk > max_chunks
+      || (* less than full chunk, don't create entry *)
+         (Int.equal chunk max_chunks && (chunk + 1) * Chunk.size >= num_params)
+    then Array.of_list (List.rev arrays)
+    else
+      (* max_int + 1, because we need an entry for 0 *)
+      let array = Array.create ~len:(Chunk.max_int + 1) Group.zero in
+      for n = 0 to Chunk.max_int do
+        array.(n) <- compute_chunk_value ~start:(chunk * Chunk.size) n
+      done ;
+      loop ~chunk:(chunk + 1) (array :: arrays)
+  in
+  let result = loop ~chunk:0 [] in
+  result
+
+(* the type t here must be exactly the same as the Chunk_table.t
+   in chunk_table_structure below, so that serialization and
+   deserialization works correctly
+*)
+module Chunk_table = struct
+  type t = {chunk_size: int; table_data: Group.t array array}
+  [@@deriving bin_io]
+
+  let create chunk_size table_data = {chunk_size; table_data}
+end
+
+let chunk_table_ast ~loc =
+  let module E = Ppxlib.Ast_builder.Make (struct
+    let loc = loc
+  end) in
+  let open E in
+  let chunk_table = Chunk_table.create Chunk.size (get_chunk_table ()) in
+  let chunk_table_string =
+    Binable.to_string (module Chunk_table) chunk_table
+  in
+  estring chunk_table_string
+
+let chunk_table_structure ~loc =
+  let module E = Ppxlib.Ast_builder.Make (struct
+    let loc = loc
+  end) in
+  let open E in
+  [%str
+    open Core
+    module Group = Crypto_params_init.Tick_backend.Inner_curve
+
+    let chunk_table_string = [%e chunk_table_ast ~loc]
+
+    module Chunk_table = struct
+      type t = {chunk_size: int; table_data: Group.t array array}
+      [@@deriving bin_io]
+    end
+
+    let chunk_table : Chunk_table.t =
+      Binable.of_string (module Chunk_table) chunk_table_string
+
+    let curve_points_table = chunk_table.table_data
+
+    let chunk_size = chunk_table.chunk_size]
+
+let generate_ml_file filename structure =
+  let fmt = Format.formatter_of_out_channel (Out_channel.create filename) in
+  Pprintast.top_phrase fmt (Ptop_def (structure ~loc:Ppxlib.Location.none))
 
 let () =
-  ignore (main ()) ;
+  ignore (generate_ml_file "pedersen_params.ml" params_structure) ;
+  ignore (generate_ml_file "pedersen_chunk_table.ml" chunk_table_structure) ;
+  ignore (exit 0) ;
   never_returns (Scheduler.go ())

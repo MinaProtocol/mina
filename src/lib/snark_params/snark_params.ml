@@ -229,10 +229,12 @@ module Tick = struct
 
   module Pedersen = struct
     include Crypto_params.Pedersen_params
+    include Crypto_params.Pedersen_chunk_table
     include Pedersen.Make (Field) (Bigint) (Inner_curve)
 
     let zero_hash =
-      digest_fold (State.create params)
+      digest_fold
+        (State.create params Curve_chunk_table.{curve_points_table; chunk_size})
         (Fold_lib.Fold.of_list [(false, false, false)])
 
     module Checked = struct

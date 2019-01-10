@@ -2,6 +2,7 @@ open Core_kernel
 open Snark_bits
 open Fold_lib
 open Tuple_lib
+open Chunked_triples
 
 module type S = sig
   type curve
@@ -28,16 +29,32 @@ module type S = sig
     type t = curve Quadruple.t array
   end
 
-  module State : sig
-    type t = {triples_consumed: int; acc: curve; params: Params.t}
+  (* curve_points_table.(i).(j) is the curve element for a chunk at position i within
+     a list of chunks, and j is an integer representing the chunk considered as bits
+  *)
+  module Curve_chunk_table : sig
+    type t = {curve_points_table: curve array array; chunk_size: int}
+  end
 
-    val create : ?triples_consumed:int -> ?init:curve -> Params.t -> t
+  module State : sig
+    type t =
+      { triples_consumed: int
+      ; acc: curve
+      ; params: Params.t
+      ; chunk_table: Curve_chunk_table.t }
+
+    val create :
+         ?triples_consumed:int
+      -> ?init:curve
+      -> Params.t
+      -> Curve_chunk_table.t
+      -> t
 
     val update_fold : t -> bool Triple.t Fold.t -> t
 
     val digest : t -> Digest.t
 
-    val salt : Params.t -> string -> t
+    val salt : Params.t -> Curve_chunk_table.t -> string -> t
   end
 
   val hash_fold : State.t -> bool Triple.t Fold.t -> State.t
@@ -78,11 +95,20 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
     type t = Curve.t Quadruple.t array
   end
 
-  module State = struct
-    type t = {triples_consumed: int; acc: Curve.t; params: Params.t}
+  module Curve_chunk_table = struct
+    type t = {curve_points_table: Curve.t array array; chunk_size: int}
+  end
 
-    let create ?(triples_consumed = 0) ?(init = Curve.zero) params =
-      {acc= init; triples_consumed; params}
+  module State = struct
+    type t =
+      { triples_consumed: int
+      ; acc: Curve.t
+      ; params: Params.t
+      ; chunk_table: Curve_chunk_table.t }
+
+    let create ?(triples_consumed = 0) ?(init = Curve.zero) params chunk_table
+        =
+      {acc= init; triples_consumed; params; chunk_table}
 
     let update_fold (t : t) (fold : bool Triple.t Fold.t) =
       let params = t.params in
@@ -100,10 +126,59 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
       let x, _y = Curve.to_coords t.acc in
       x
 
-    let salt params s = update_fold (create params) (Fold.string_triples s)
+    let salt params chunk_table s =
+      update_fold (create params chunk_table) (Fold.string_triples s)
   end
 
-  let hash_fold s fold = State.update_fold s fold
+  (* break fold into list of chunks and maybe a less-than-full chunk *)
+  let chunk_fold (t : State.t) (fold : bool Triple.t Fold.t) :
+      Chunk.t list * Chunk.t option =
+    let chunk_size = t.chunk_table.chunk_size in
+    let rec loop triples accum =
+      if List.is_empty triples then
+        (* only full chunks, no straggler *)
+        (List.rev accum, None)
+      else
+        let some, rest = List.split_n triples chunk_size in
+        if List.is_empty rest && List.length some < chunk_size then
+          (* less than full chunk *)
+          (List.rev accum, Some some)
+        else loop rest (some :: accum)
+    in
+    loop (Fold.to_list fold) []
+
+  (* curve point from a list of chunks (and possible straggler) *)
+  let update_from_chunks (s : State.t)
+      ((chunks, maybe_chunk) : Chunk.t list * Chunk.t option) : State.t =
+    let curve_points_table = s.chunk_table.curve_points_table in
+    let triples_consumed = s.triples_consumed in
+    let chunk_size = s.chunk_table.chunk_size in
+    (* if we have consumed a number of triples that is not an integral number of chunks,
+       can't use the chunk table; 0 always satisfies that constraint, but there is a
+       non-zero number of consumed triples when salt is used
+    *)
+    if not (Int.equal (triples_consumed mod chunk_size) 0) then
+      failwith
+        "update_from_chunks: can't use chunk table given the number of \
+         consumed triples" ;
+    let param_offset = s.triples_consumed / chunk_size in
+    let get_chunk_state i accum chunk =
+      let n = Chunk.to_int chunk in
+      let g = curve_points_table.(param_offset + i).(n) in
+      { accum with
+        State.triples_consumed=
+          accum.State.triples_consumed + List.length chunk
+      ; State.acc= Curve.add accum.State.acc g }
+    in
+    let state = List.foldi chunks ~init:s ~f:get_chunk_state in
+    (* handle less-than-full straggler chunk, if needed *)
+    match maybe_chunk with
+    | None -> state
+    | Some chunk -> State.update_fold state (Fold.of_list chunk)
+
+  let hash_fold s fold =
+    let chunks = chunk_fold s fold in
+    update_from_chunks s chunks
 
   let digest_fold s fold = State.digest (hash_fold s fold)
 end

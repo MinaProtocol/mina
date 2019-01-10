@@ -7,12 +7,11 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries
-    ( snarky bignum_bigint crypto_params_init ))
+    (snarky bignum_bigint crypto_params_init tuple_lib))
   (preprocess (pps (ppx_jane bisect_ppx -conditional)))
   (synopsis "Cryptographic parameters")))
 
 (rule
- ((targets (pedersen_params.ml))
+ ((targets (pedersen_params.ml pedersen_chunk_table.ml))
   (deps    (gen/gen.exe))
   (action  (run ${<} ${@}))))
-
