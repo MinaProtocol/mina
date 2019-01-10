@@ -1,9 +1,15 @@
-module type Applicative = sig
+module type Traversable_applicative = sig
   type _ t
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 
   val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
+
+  module Impl : Snarky.Snark_intf.S
+
+  open Impl
+
+  val sequence : ('a, 's) Checked.t t -> ('a t, 's) Checked.t
 end
 
 module type Basic = sig
@@ -23,11 +29,15 @@ module type Basic = sig
     type t = Field.Checked.t t_
   end
 
-  module A : Applicative
+  module A : Traversable_applicative with module Impl := Impl
 
   type 'a t_ = 'a Base.t_ A.t
 
+  val to_list : 'a t_ -> 'a list
+
   val map_ : 'a t_ -> f:('a -> 'b) -> 'b t_
+
+  val map2_ : 'a t_ -> 'b t_ -> f:('a -> 'b -> 'c) -> 'c t_
 
   module Unchecked : Snarkette.Fields.Intf with type t = Base.Unchecked.t A.t
 
@@ -51,6 +61,8 @@ module type Basic = sig
 
   val negate : t -> t
 
+  val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
+
   (* These definitions are shadowed in the below interface *)
   val assert_square : [`Define | `Custom of t -> t -> (unit, _) Checked.t]
 
@@ -67,6 +79,8 @@ module type S = sig
   open Impl
 
   val assert_square : t -> t -> (unit, _) Checked.t
+
+  val assert_equal : t -> t -> (unit, _) Checked.t
 
   val ( * ) : t -> t -> (t, _) Checked.t
 
