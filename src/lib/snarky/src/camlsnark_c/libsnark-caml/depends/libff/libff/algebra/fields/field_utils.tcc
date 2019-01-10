@@ -16,11 +16,6 @@
 #include <libff/common/double.hpp>
 #include <libff/common/utils.hpp>
 
-#include <execinfo.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-
 namespace libff {
 
 template<typename FieldT>
@@ -31,7 +26,7 @@ FieldT coset_shift()
 
 template<typename FieldT>
 typename std::enable_if<std::is_same<FieldT, Double>::value, FieldT>::type
-get_root_of_unity(const size_t n, bool* err)
+get_root_of_unity(const size_t n, bool &err)
 {
     const double PI = 3.141592653589793238460264338328L;
 
@@ -44,16 +39,16 @@ get_root_of_unity(const size_t n, bool* err)
 
 template<typename FieldT>
 typename std::enable_if<!std::is_same<FieldT, Double>::value, FieldT>::type
-get_root_of_unity(const size_t n, bool* err)
+get_root_of_unity(const size_t n, bool &err)
 {
     const size_t logn = log2(n);
     if (n != (1u << logn)) {
-      *err = true;
+      err = true;
       return FieldT(1,1);
     }
 
     if (logn > FieldT::s) {
-      *err = true;
+      err = true;
       return FieldT(1,1);
     }
 

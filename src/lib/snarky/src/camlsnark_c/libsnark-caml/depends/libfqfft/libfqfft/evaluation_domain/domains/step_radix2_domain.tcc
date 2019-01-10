@@ -18,10 +18,10 @@
 namespace libfqfft {
 
 template<typename FieldT>
-step_radix2_domain<FieldT>::step_radix2_domain(const size_t m, bool* err) : evaluation_domain<FieldT>(m)
+step_radix2_domain<FieldT>::step_radix2_domain(const size_t m, bool& err) : evaluation_domain<FieldT>(m)
 {
     if (m <= 1) {
-      *err = true;
+      err = true;
       big_m = 0;
       small_m = 0;
       omega = FieldT(1,1);
@@ -34,7 +34,7 @@ step_radix2_domain<FieldT>::step_radix2_domain(const size_t m, bool* err) : eval
     small_m = m - big_m;
 
     if (small_m != 1ul<<libff::log2(small_m)) {
-      *err = true;
+      err = true;
       omega = FieldT(1,1);
       big_omega = FieldT(1,1);
       small_omega = FieldT(1,1);
@@ -42,7 +42,7 @@ step_radix2_domain<FieldT>::step_radix2_domain(const size_t m, bool* err) : eval
     }
 
     omega = libff::get_root_of_unity<FieldT>(1ul<<libff::log2(m), err);
-    if (*err) {
+    if (err) {
       big_omega = omega;
       small_omega = omega;
       return;
@@ -81,7 +81,7 @@ void step_radix2_domain<FieldT>::FFT(std::vector<FieldT> &a)
     _basic_radix2_FFT(c, omega.squared());
 
     bool err = false;
-    auto root_of_unity_small_m = libff::get_root_of_unity<FieldT>(small_m, &err);
+    auto root_of_unity_small_m = libff::get_root_of_unity<FieldT>(small_m, err);
     if (err) {
       throw DomainSizeException("Failed to get_root_of_unity");
     }
@@ -108,7 +108,7 @@ void step_radix2_domain<FieldT>::iFFT(std::vector<FieldT> &a)
 
     _basic_radix2_FFT(U0, omega.squared().inverse());
     bool err = false;
-    auto root_of_unity_small_m = libff::get_root_of_unity<FieldT>(small_m, &err);
+    auto root_of_unity_small_m = libff::get_root_of_unity<FieldT>(small_m, err);
     if (err) {
       throw DomainSizeException("Failed get_root_of_unity");
     }

@@ -18,10 +18,10 @@
 namespace libfqfft {
 
 template<typename FieldT>
-extended_radix2_domain<FieldT>::extended_radix2_domain(const size_t m, bool* err) : evaluation_domain<FieldT>(m)
+extended_radix2_domain<FieldT>::extended_radix2_domain(const size_t m, bool &err) : evaluation_domain<FieldT>(m)
 {
     if (m <= 1) {
-      *err = true;
+      err = true;
       omega = FieldT(1,1);
       small_m = 0;
       shift = FieldT(1,1);
@@ -32,7 +32,7 @@ extended_radix2_domain<FieldT>::extended_radix2_domain(const size_t m, bool* err
     {
         const size_t logm = libff::log2(m);
         if (logm != (FieldT::s + 1))  {
-          *err = true;
+          err = true;
           omega = FieldT(1,1);
           small_m = 0;
           shift = FieldT(1,1);

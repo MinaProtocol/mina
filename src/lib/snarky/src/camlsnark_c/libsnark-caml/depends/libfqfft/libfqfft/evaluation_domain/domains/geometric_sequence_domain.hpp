@@ -27,7 +27,7 @@ namespace libfqfft {
     std::vector<FieldT> geometric_triangular_sequence;
     void do_precomputation();
 
-    geometric_sequence_domain(const size_t m, bool* err);
+    geometric_sequence_domain(const size_t m, bool &err);
 
     void FFT(std::vector<FieldT> &a);
     void iFFT(std::vector<FieldT> &a);

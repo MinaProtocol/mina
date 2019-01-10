@@ -39,56 +39,56 @@ std::shared_ptr<evaluation_domain<FieldT> > get_evaluation_domain(const size_t m
     const size_t rounded_small = (1ul<<libff::log2(small));
 
     bool err = false;
-    auto basic = new basic_radix2_domain<FieldT>(min_size, &err);
+    auto basic = new basic_radix2_domain<FieldT>(min_size, err);
     if (!err) {
       result.reset(basic);
       return result;
     }
     err = false;
 
-    auto extended = new extended_radix2_domain<FieldT>(min_size, &err);
+    auto extended = new extended_radix2_domain<FieldT>(min_size, err);
     if (!err) {
       result.reset(extended);
       return result;
     }
     err = false;
 
-    auto step = new step_radix2_domain<FieldT>(min_size, &err);
+    auto step = new step_radix2_domain<FieldT>(min_size, err);
     if (!err) {
       result.reset(step);
       return result;
     }
     err = false;
 
-    auto basic2 = new basic_radix2_domain<FieldT>(big + rounded_small, &err);
+    auto basic2 = new basic_radix2_domain<FieldT>(big + rounded_small, err);
     if (!err) {
       result.reset(basic2);
       return result;
     }
     err = false;
 
-    auto extended2 = new extended_radix2_domain<FieldT>(big + rounded_small, &err);
+    auto extended2 = new extended_radix2_domain<FieldT>(big + rounded_small, err);
     if (!err) {
       result.reset(extended2);
       return result;
     }
     err = false;
 
-    auto step2 = new step_radix2_domain<FieldT>(big + rounded_small, &err);
+    auto step2 = new step_radix2_domain<FieldT>(big + rounded_small, err);
     if (!err) {
       result.reset(step2);
       return result;
     }
     err = false;
 
-    auto geometric = new geometric_sequence_domain<FieldT>(min_size, &err);
+    auto geometric = new geometric_sequence_domain<FieldT>(min_size, err);
     if (!err) {
       result.reset(geometric);
       return result;
     }
     err = false;
 
-    auto arithmetic = new arithmetic_sequence_domain<FieldT>(min_size, &err);
+    auto arithmetic = new arithmetic_sequence_domain<FieldT>(min_size, err);
     if (!err) {
       result.reset(arithmetic);
       return result;

@@ -23,15 +23,15 @@
 namespace libfqfft {
 
 template<typename FieldT>
-basic_radix2_domain<FieldT>::basic_radix2_domain(const size_t m, bool* err) : evaluation_domain<FieldT>(m)
+basic_radix2_domain<FieldT>::basic_radix2_domain(const size_t m, bool &err) : evaluation_domain<FieldT>(m)
 {
     if (m <= 1) {
-      *err = true;
+      err = true;
       omega = FieldT(1,1);
     } else if (!std::is_same<FieldT, libff::Double>::value) {
         const size_t logm = libff::log2(m);
         if (logm > (FieldT::s)) {
-          *err = true;
+          err = true;
           omega = FieldT(1,1);
         } else {
           omega = libff::get_root_of_unity<FieldT>(m, err);
