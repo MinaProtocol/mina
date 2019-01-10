@@ -48,6 +48,17 @@ module Make (F : Intf.Basic) = struct
 
   let assert_r1cs = F.assert_r1cs
 
+  let equal x y =
+    Checked.all
+      (List.map2_exn (F.to_list x) (F.to_list y) ~f:Field.Checked.equal)
+    >>= Boolean.all
+
+  let assert_equal x y =
+    assert_all
+      (List.map2_exn
+         ~f:(fun x y -> Constraint.equal x y)
+         (F.to_list x) (F.to_list y))
+
   let ( + ) = F.( + )
 
   let%test_unit "add" =
@@ -132,7 +143,10 @@ module Make (F : Intf.Basic) = struct
               res )
 end
 
-module Make_applicative (F : Intf.S) (A : Intf.Applicative) = struct
+module Make_applicative
+    (F : Intf.S)
+    (A : Intf.Traversable_applicative with module Impl := F.Impl) =
+struct
   type t = F.t A.t
 
   type 'a t_ = 'a F.t_ A.t
@@ -150,6 +164,9 @@ module Make_applicative (F : Intf.S) (A : Intf.Applicative) = struct
                | None -> raise None_exn ))
       with None_exn -> None
 
+  let if_ b ~then_ ~else_ =
+    A.sequence (A.map2 then_ else_ ~f:(fun t e -> F.if_ b ~then_:t ~else_:e))
+
   let scale t x = A.map t ~f:(fun a -> F.scale a x)
 
   let scale' t x = A.map t ~f:(fun a -> F.scale x a)
@@ -161,6 +178,8 @@ module Make_applicative (F : Intf.S) (A : Intf.Applicative) = struct
   let ( - ) = A.map2 ~f:F.( - )
 
   let map_ t ~f = A.map t ~f:(F.map_ ~f)
+
+  let map2_ t1 t2 ~f = A.map2 t1 t2 ~f:(fun x1 x2 -> F.map2_ x1 x2 ~f)
 end
 
 module F (Impl : Snarky.Snark_intf.S) :
@@ -171,6 +190,8 @@ struct
     open Impl
 
     let map_ t ~f = f t
+
+    let map2_ t1 t2 ~f = f t1 t2
 
     module Base = struct
       type 'a t_ = 'a
@@ -187,12 +208,16 @@ struct
     module A = struct
       type 'a t = 'a
 
-      let map t ~f = f t
+      let map = map_
 
-      let map2 t1 t2 ~f = f t1 t2
+      let map2 = map2_
+
+      let sequence = Fn.id
     end
 
     type 'a t_ = 'a
+
+    let to_list x = [x]
 
     module Unchecked = struct
       include Field
@@ -200,6 +225,8 @@ struct
     end
 
     type t = Field.Checked.t
+
+    let if_ = Field.Checked.if_
 
     let typ = Field.typ
 
@@ -260,7 +287,13 @@ module E2
       let map (x, y) ~f = (f x, f y)
 
       let map2 (x1, y1) (x2, y2) ~f = (f x1 x2, f y1 y2)
+
+      let sequence (x, y) =
+        let%map x = x and y = y in
+        (x, y)
     end
+
+    let to_list (x, y) = F.to_list x @ F.to_list y
 
     (* A value [(a, b) : t] should be thought of as the field element
    a + b sqrt(s). Then all operations are just what follow algebraically. *)
@@ -351,6 +384,15 @@ end
 
    Let S = cube_root(s) in the following.
 *)
+
+module T3 = struct
+  type 'a t = 'a * 'a * 'a
+
+  let map (x, y, z) ~f = (f x, f y, f z)
+
+  let map2 (x1, y1, z1) (x2, y2, z2) ~f = (f x1 x2, f y1 y2, f z1 z2)
+end
+
 module E3
     (F : Intf.S) (Params : sig
         val non_residue : F.Unchecked.t
@@ -373,12 +415,14 @@ module E3
     open Let_syntax
 
     module A = struct
-      type 'a t = 'a * 'a * 'a
+      include T3
 
-      let map (x, y, z) ~f = (f x, f y, f z)
-
-      let map2 (x1, y1, z1) (x2, y2, z2) ~f = (f x1 x2, f y1 y2, f z1 z2)
+      let sequence (x, y, z) =
+        let%map x = x and y = y and z = z in
+        (x, y, z)
     end
+
+    let to_list (x, y, z) = F.to_list x @ F.to_list y @ F.to_list z
 
     include Make_applicative (Base) (A)
 
@@ -529,12 +573,14 @@ module F3
       (F.scale c Params.non_residue, a, b)
 
     module A = struct
-      type 'a t = 'a * 'a * 'a
+      include T3
 
-      let map (x, y, z) ~f = (f x, f y, f z)
-
-      let map2 (x1, y1, z1) (x2, y2, z2) ~f = (f x1 x2, f y1 y2, f z1 z2)
+      let sequence (x, y, z) =
+        let%map x = x and y = y and z = z in
+        (x, y, z)
     end
+
+    let to_list (x, y, z) = [x; y; z]
 
     include Make_applicative (Base) (A)
 
@@ -635,4 +681,150 @@ module Cyclotomic_square = struct
         , fpos asq1 a1
         , fpos bsq1 c1 ) )
   end
+end
+
+module F6
+    (Fq : Intf.S with type 'a A.t = 'a and type 'a Base.t_ = 'a)
+    (Fq2 : Intf.S_with_primitive_element
+           with module Impl = Fq.Impl
+            and type 'a A.t = 'a * 'a
+            and type 'a Base.t_ = 'a Fq.t_) (Fq3 : sig
+        include
+          Intf.S_with_primitive_element
+          with module Impl = Fq.Impl
+           and type 'a A.t = 'a * 'a * 'a
+           and type 'a Base.t_ = 'a Fq.t_
+
+        module Params : sig
+          val non_residue : Fq.Unchecked.t
+
+          val frobenius_coeffs_c1 : Fq.Unchecked.t array
+
+          val frobenius_coeffs_c2 : Fq.Unchecked.t array
+        end
+    end) (Params : sig
+      val frobenius_coeffs_c1 : Fq.Unchecked.t array
+    end) =
+struct
+  include E2
+            (Fq3)
+            (struct
+              let non_residue : Fq3.Unchecked.t =
+                Fq.Unchecked.(zero, one, zero)
+
+              let mul_by_non_residue = Fq3.mul_by_primitive_element
+            end)
+
+  let fq_mul_by_non_residue x = Fq.scale x Fq3.Params.non_residue
+
+  (* Number to beat: 3 constraints + 2 fq3 muls *)
+  let special_mul (a0, a1) (b0, b1) =
+    let open Impl.Let_syntax in
+    let%bind v1 = Fq3.(a1 * b1) in
+    let%bind v0 =
+      let a00, a01, a02 = a0 in
+      let _, _, b02 = b0 in
+      let%map a00b02 = Fq.(a00 * b02)
+      and a01b02 = Fq.(a01 * b02)
+      and a02b02 = Fq.(a02 * b02) in
+      (fq_mul_by_non_residue a01b02, fq_mul_by_non_residue a02b02, a00b02)
+    in
+    (* I think this is right... *)
+    let beta_v1 = Fq3.mul_by_primitive_element v1 in
+    let%map t = Fq3.((a0 + a1) * (b0 + b1)) in
+    Fq3.(v0 + beta_v1, t - v0 - v1)
+
+  let assert_special_mul ((((a00, a01, a02) as a0), a1) : t)
+      ((((_, _, b02) as b0), b1) : t) ((c00, c01, c02), c1) =
+    let open Impl in
+    let open Let_syntax in
+    let%bind ((v10, v11, v12) as v1) = Fq3.(a1 * b1) in
+    let%bind v0 =
+      provide_witness Fq3.typ
+        As_prover.(
+          map2 ~f:Fq3.Unchecked.( * ) (read Fq3.typ a0) (read Fq3.typ b0))
+      (* v0
+          = (a00 + s a01 s^2 a02) (s^2 b02)
+        = non_residue a01 b02 + non_residue s a02 b02 + s^2 a00 b02 *)
+    in
+    let%map () =
+      let%map () =
+        Fq.assert_r1cs a01
+          (Fq.scale b02 Fq3.Params.non_residue)
+          (Field.Checked.linear_combination
+             [(Field.one, c00); (Field.negate Fq3.Params.non_residue, v12)])
+      and () =
+        Fq.assert_r1cs a02 (Fq.scale b02 Fq3.Params.non_residue) Fq.(c01 - v10)
+      and () = Fq.assert_r1cs a00 b02 Fq.(c02 - v11) in
+      ()
+    and () = Fq3.assert_r1cs Fq3.(a0 + a1) Fq3.(b0 + b1) Fq3.(c1 + v0 + v1) in
+    ()
+
+  let special_div_unsafe a b =
+    let open Impl in
+    let open Let_syntax in
+    let%bind result =
+      provide_witness typ
+        As_prover.(map2 ~f:Unchecked.( / ) (read typ a) (read typ b))
+    in
+    (* result * b = a *)
+    let%map () = assert_special_mul result b a in
+    result
+
+  (* TODO: Make sure this is ok *)
+  let special_div = special_div_unsafe
+
+  include Cyclotomic_square.Make_F6
+            (Fq2)
+            (struct
+              let cubic_non_residue = Fq3.Params.non_residue
+            end)
+
+  let frobenius ((c00, c01, c02), (c10, c11, c12)) power =
+    let module Field = Impl.Field in
+    let p3 = power mod 3 in
+    let p6 = power mod 6 in
+    let ( * ) s x = Field.Checked.scale x s in
+    ( ( c00
+      , Fq3.Params.frobenius_coeffs_c1.(p3) * c01
+      , Fq3.Params.frobenius_coeffs_c2.(p3) * c02 )
+    , ( Params.frobenius_coeffs_c1.(p6) * c10
+      , Field.mul
+          Params.frobenius_coeffs_c1.(p6)
+          Fq3.Params.frobenius_coeffs_c1.(p3)
+        * c11
+      , Field.mul
+          Params.frobenius_coeffs_c1.(p6)
+          Fq3.Params.frobenius_coeffs_c2.(p3)
+        * c12 ) )
+end
+
+module F4
+    (Fq2 : Intf.S_with_primitive_element
+           with type 'a A.t = 'a * 'a
+            and type 'a Base.t_ = 'a) (Params : sig
+        val frobenius_coeffs_c1 : Fq2.Impl.Field.t array
+    end) =
+struct
+  include E2
+            (Fq2)
+            (struct
+              let non_residue = Fq2.Impl.Field.(zero, one)
+
+              let mul_by_non_residue = Fq2.mul_by_primitive_element
+            end)
+
+  let special_mul = ( * )
+
+  (* TODO: Make sure this is ok *)
+  let special_div = div_unsafe
+
+  include Cyclotomic_square.Make_F4 (Fq2)
+
+  let frobenius ((c00, c01), (c10, c11)) power =
+    let module Field = Impl.Field in
+    let p2 = Params.frobenius_coeffs_c1.(Int.( * ) (power mod 2) 2) in
+    let p4 = Params.frobenius_coeffs_c1.(power mod 4) in
+    let ( * ) s x = Field.Checked.scale x s in
+    ((c00, p2 * c01), (p4 * c10, Field.Infix.(p4 * p2) * c11))
 end
