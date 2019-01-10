@@ -41,10 +41,12 @@ In this context, we have the following goals:
 
 1.  Support a pool of pending transactions with a maximum size, evicting
     transactions when at the maximum size based on fee.
+
 2.  Allow multiple queued transactions from one address. Since payments aren't
     instant, users will want this. We could make transaction senders responsible
     for queuing, but that wouldn't allow multiple transactions sent from the
     same address to be included in the same block.
+
 3.  Allow for transaction replacement, while aligning incentives by charging for
     it appropriately. Users can e.g. cancel payments by replacing them with a
     no-op transaction (send themselves $0) or resend them with a higher fee if
@@ -65,9 +67,12 @@ with respect to our current longest chain. If any of the checks fail, we ignore
 the transaction and do not gossip it.
 
 1.  The signature.
+
 2.  The sender's account exists.
+
 3.  The sender's balance (inclusive of any pending txs from the same account
     with lower nonce) is >= the transaction amount + fee.
+
 4.  The tx nonce is equal to the sending account's next nonce, inclusive of
     transactions already in the pool. (If it conflicts with one in the pool, see
     below.)
@@ -131,9 +136,11 @@ other by sending them different transactions at the same nonce.
     they're caught up. Dishonest nodes will send us invalid transactions in order
     to waste our resources. Let's set this to 50% bad transactions. An attacker
     then has to spend 2x as much resources to send a given amount of transactions.
+
 -   `good_faith_tx_credits`: Let's say we assume good faith if the first two
     transactions we receive from a new peer are bad, but give up on them after
     that. That means this value should be 2.
+
 -   `max_txpool_size`: This is interesting. If there were a fixed limit on the
     number of transactions per block I'd say set it to an hour's worth or
     something. But the limit is set by the parameters of the parallel scan, and
@@ -159,6 +166,7 @@ exists. A fancier thing would delay launch further.
         Ethereum does this. It's abusable, an attacker can send transactions that
         will never be mined. The countermeasure is having a hard limit on pending
         transactions per account, which I don't like:
+
     -   Max pending tx per account
 
         There are legitimate use cases for sending lots of transactions from one
@@ -168,9 +176,11 @@ exists. A fancier thing would delay launch further.
         as that is priced efficiently they should be able to do so. Yes, they should
         probably be doing transaction batching in this scenario, but it's better
         that doing individual transactions is expensive than if it were impossible.
+
     -   Skip validation for speed
 
         This is (partly) what we do now, and is vulnerable to all sorts of stuff.
+
     -   Block lookback window for validity.
 
         Part of Brandon's original plan was to accept transactions that were valid
@@ -185,6 +195,7 @@ exists. A fancier thing would delay launch further.
         account, and since insufficient funds is (almost) the only reason payments
         can fail, they should never be sending transactions that used to be valid
         but aren't now.
+
     -   Have a minimum transaction fee
 
         In this design, an attacker can fill the txpool with bogus transactions with
@@ -193,6 +204,7 @@ exists. A fancier thing would delay launch further.
         payment costs would prevent it, but figuring out what that minimum should be
         is complicated, and the attack is only good so long as the pool isn't full,
         so I think it's not worth it.
+
 -   What is the impact of not doing this?
 
     Various vulnerabilities.
