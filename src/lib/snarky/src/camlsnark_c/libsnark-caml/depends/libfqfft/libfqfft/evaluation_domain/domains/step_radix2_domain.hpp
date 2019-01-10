@@ -29,7 +29,7 @@ public:
     FieldT big_omega;
     FieldT small_omega;
 
-    step_radix2_domain(const size_t m);
+    step_radix2_domain(const size_t m, bool &err);
 
     void FFT(std::vector<FieldT> &a);
     void iFFT(std::vector<FieldT> &a);

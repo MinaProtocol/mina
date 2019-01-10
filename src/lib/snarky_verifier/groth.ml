@@ -4,10 +4,18 @@ open Core
 module Make (Inputs : Inputs.S) = struct
   open Inputs
   open Impl
+  open Let_syntax
 
   module Verification_key = struct
     type ('g1, 'g2, 'fqk) t_ =
       {query_base: 'g1; query: 'g1 list; delta: 'g2; alpha_beta_inv: 'fqk}
+
+    include Summary.Make (Inputs)
+
+    let summary_input {query_base; query; delta; alpha_beta_inv} =
+      { Summary.Input.g1s= query_base :: query
+      ; g2s= [delta]
+      ; gts= [alpha_beta_inv] }
 
     type ('a, 'b, 'c) vk = ('a, 'b, 'c) t_
 
@@ -40,7 +48,6 @@ module Make (Inputs : Inputs.S) = struct
 
   let verify (vk : (_, _, _) Verification_key.t_)
       (vk_precomp : Verification_key.Precomputation.t) inputs {Proof.a; b; c} =
-    let open Let_syntax in
     let%bind acc =
       let%bind (module Shifted) = G1.Shifted.create () in
       let%bind init = Shifted.(add zero vk.query_base) in
