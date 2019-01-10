@@ -47,7 +47,7 @@ module Make (Inputs : Inputs_intf) = struct
     in
     go (Array.length naf - 1) false Fqk.one
 
-  let final_exponentiation el =
+  let final_exponentiation6 el =
     let%bind el_q_3_minus_1 =
       let%bind el_inv = Fqk.inv_exn el in
       Fqk.(frobenius el 3 * el_inv)
@@ -55,7 +55,6 @@ module Make (Inputs : Inputs_intf) = struct
     let alpha = Fqk.frobenius el_q_3_minus_1 1 in
     let%bind beta = Fqk.(alpha * el_q_3_minus_1) in
     let%bind w0 =
-      (* TODO: Find out why libsnark computes inv_beta in a roundabout way *)
       let%bind base =
         if Params.final_exponent_last_chunk_is_w0_neg then Fqk.inv_exn beta
         else return beta
@@ -64,6 +63,23 @@ module Make (Inputs : Inputs_intf) = struct
     and w1 =
       let beta_q = Fqk.frobenius beta 1 in
       exponentiate beta_q Params.final_exponent_last_chunk_w1
+    in
+    Fqk.(w0 * w1)
+
+  let final_exponentiation4 el =
+    let%bind el_inv = Fqk.inv_exn el in
+    let%bind el_q_2_minus_1 = Fqk.(el_inv * Fqk.frobenius el 2) in
+    let%bind w1 =
+      let el_q_3_minus_q = Fqk.frobenius el_q_2_minus_1 1 in
+      exponentiate el_q_3_minus_q Params.final_exponent_last_chunk_w1
+    in
+    let%bind w0 =
+      let%bind base =
+        if Params.final_exponent_last_chunk_is_w0_neg then
+          Fqk.(el * Fqk.frobenius el_inv 2) (* el_inv_q_2_minus_1 *)
+        else return el_q_2_minus_1
+      in
+      exponentiate base Params.final_exponent_last_chunk_abs_of_w0
     in
     Fqk.(w0 * w1)
 end
