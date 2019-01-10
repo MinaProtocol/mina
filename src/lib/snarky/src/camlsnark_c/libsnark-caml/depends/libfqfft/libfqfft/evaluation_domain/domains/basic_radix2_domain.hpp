@@ -26,7 +26,7 @@ public:
 
     FieldT omega;
 
-    basic_radix2_domain(const size_t m);
+    basic_radix2_domain(const size_t m, bool &err);
 
     void FFT(std::vector<FieldT> &a);
     void iFFT(std::vector<FieldT> &a);
