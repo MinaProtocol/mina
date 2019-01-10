@@ -106,6 +106,27 @@ let common_prefix ~loc lid1 lid2 =
   in
   longident_of_revlist ~loc (List.rev (common_prefix names1 names2))
 
+let is_listlike expr =
+  match expr.pexp_desc with
+  | Pexp_array _ | Pexp_tuple _
+   |Pexp_construct
+      ({txt= Lident "::"; _}, Some {pexp_desc= Pexp_tuple [_; _]; _})
+   |Pexp_construct ({txt= Lident "[]"; _}, None) ->
+      true
+  | _ -> false
+
+let rec parse_listlike expr =
+  match expr.pexp_desc with
+  | Pexp_array exprs -> exprs
+  | Pexp_tuple exprs -> exprs
+  | Pexp_construct
+      ({txt= Lident "::"; _}, Some {pexp_desc= Pexp_tuple [hd; tl]; _}) ->
+      hd :: parse_listlike tl
+  | Pexp_construct ({txt= Lident "[]"; _}, None) -> []
+  | _ ->
+      raise_errorf ~loc:expr.pexp_loc
+        "Could not convert expression into a list of expressions"
+
 module Polydef = struct
   let parse_field var_name_map ({loc; txt= name}, expr) =
     let label =
@@ -113,10 +134,7 @@ module Polydef = struct
       | Lident label -> {loc; txt= label}
       | _ -> raise_errorf ~loc "Expected a bare identifier."
     in
-    let modules =
-      if Polyrecord.is_listlike expr then Polyrecord.parse_listlike expr
-      else [expr]
-    in
+    let modules = if is_listlike expr then parse_listlike expr else [expr] in
     let modules = List.map modules ~f:parse_to_modinfo in
     let var_name =
       match modules with

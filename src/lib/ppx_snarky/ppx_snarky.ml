@@ -1,1 +1,1 @@
-let () = Snarkydef.main () ; Polyrecord.main () ; Snarky_module.main ()
+let () = Snarkydef.main () ; Snarky_module.main ()
