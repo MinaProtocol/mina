@@ -87,16 +87,16 @@ module Make (Blockchain_state : Coda_base.Blockchain_state.S) = struct
       Lite_base.Ledger_hash.t =
     digest (h :> Tick.Pedersen.Digest.t)
 
-  let ledger_builder_hash (h : Coda_base.Ledger_builder_hash.t) =
-    { Lite_base.Ledger_builder_hash.ledger_hash=
-        ledger_hash (Coda_base.Ledger_builder_hash.ledger_hash h)
-    ; aux_hash= Coda_base.Ledger_builder_hash.(Aux_hash.to_bytes (aux_hash h))
+  let ledger_builder_hash (h : Coda_base.Staged_ledger_hash.t) =
+    { Lite_base.Staged_ledger_hash.ledger_hash=
+        ledger_hash (Coda_base.Staged_ledger_hash.ledger_hash h)
+    ; aux_hash= Coda_base.Staged_ledger_hash.(Aux_hash.to_bytes (aux_hash h))
     }
 
   let blockchain_state
-      ({ledger_builder_hash= lbh; ledger_hash= lh; timestamp} :
+      ({staged_ledger_hash= lbh; ledger_hash= lh; timestamp} :
         Blockchain_state.t) : Lite_base.Blockchain_state.t =
-    { ledger_builder_hash= ledger_builder_hash lbh
+    { staged_ledger_hash= ledger_builder_hash lbh
     ; ledger_hash= frozen_ledger_hash lh
     ; timestamp= time timestamp }
 end
