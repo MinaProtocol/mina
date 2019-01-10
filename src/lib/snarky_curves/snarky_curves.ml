@@ -144,7 +144,7 @@ module Make_weierstrass_checked
   Weierstrass_checked_intf
   with module Impl := F.Impl
    and type unchecked := Curve.t
-   and type t := F.t * F.t = struct
+   and type t = F.t * F.t = struct
   open F.Impl
 
   type t = F.t * F.t
