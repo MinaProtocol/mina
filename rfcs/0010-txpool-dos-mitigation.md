@@ -6,7 +6,7 @@ transaction pool" or "txpool" rather than "mempool" because I think it's
 clearer. Lots of things are stored in memory. This is a simple approach that
 offers basically equivalent DDoS resistance to existent cryptocurrencies. I have
 some ideas for attacks that work against them and this, as well as a more attack
-resistant design, but it's much more complicated. See the private document for
+resistant design, but it's much more complicated. See [the private document](https://docs.google.com/document/d/1FhBThENWdSN6bfT4re_tt78uMjViSan5f212faabBNg/edit?usp=sharing) for
 those.
 
 ## Motivation
