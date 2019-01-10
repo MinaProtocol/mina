@@ -33,7 +33,7 @@ module type S = sig
      a list of chunks, and j is an integer representing the chunk considered as bits
   *)
   module Curve_chunk_table : sig
-    type t = {curve_points_table: curve array array; chunk_size: int}
+    type t = {curve_points_table: curve array array}
   end
 
   module State : sig
@@ -96,7 +96,7 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
   end
 
   module Curve_chunk_table = struct
-    type t = {curve_points_table: Curve.t array array; chunk_size: int}
+    type t = {curve_points_table: Curve.t array array}
   end
 
   module State = struct
@@ -130,38 +130,35 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
       update_fold (create params chunk_table) (Fold.string_triples s)
   end
 
-  (* break fold into list of chunks and maybe a less-than-full chunk *)
-  let chunk_fold (t : State.t) (fold : bool Triple.t Fold.t) :
+  (* break triples list into list of chunks and maybe a less-than-full chunk *)
+  let chunk_triples (triples : bool Triple.t list) :
       Chunk.t list * Chunk.t option =
-    let chunk_size = t.chunk_table.chunk_size in
     let rec loop triples accum =
       if List.is_empty triples then
         (* only full chunks, no straggler *)
         (List.rev accum, None)
       else
-        let some, rest = List.split_n triples chunk_size in
-        if List.is_empty rest && List.length some < chunk_size then
+        let some, rest = List.split_n triples Chunk.size in
+        if List.is_empty rest && List.length some < Chunk.size then
           (* less than full chunk *)
           (List.rev accum, Some some)
         else loop rest (some :: accum)
     in
-    loop (Fold.to_list fold) []
+    loop triples []
 
   (* curve point from a list of chunks (and possible straggler) *)
   let update_from_chunks (s : State.t)
       ((chunks, maybe_chunk) : Chunk.t list * Chunk.t option) : State.t =
     let curve_points_table = s.chunk_table.curve_points_table in
     let triples_consumed = s.triples_consumed in
-    let chunk_size = s.chunk_table.chunk_size in
     (* if we have consumed a number of triples that is not an integral number of chunks,
-       can't use the chunk table; 0 always satisfies that constraint, but there is a
-       non-zero number of consumed triples when salt is used
+       can't use the chunk table; 
     *)
-    if not (Int.equal (triples_consumed mod chunk_size) 0) then
+    if not (Int.equal (triples_consumed mod Chunk.size) 0) then
       failwith
         "update_from_chunks: can't use chunk table given the number of \
          consumed triples" ;
-    let param_offset = s.triples_consumed / chunk_size in
+    let param_offset = s.triples_consumed / Chunk.size in
     let get_chunk_state i accum chunk =
       let n = Chunk.to_int chunk in
       let g = curve_points_table.(param_offset + i).(n) in
@@ -176,9 +173,25 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
     | None -> state
     | Some chunk -> State.update_fold state (Fold.of_list chunk)
 
+  (* if the number of triples consumed isn't on a chunk boundary,
+     process just enough triples to get to a chunk boundary
+   *)
+  let synch_to_chunk_boundary (s : State.t) (fold : bool Triple.t Fold.t) :
+      State.t * bool Triple.t list =
+    let triples = Fold.to_list fold in
+    let num_extra = s.triples_consumed mod Chunk.size in
+    if num_extra > 0 then
+      (* do the sync *)
+      let extras, rest = List.split_n triples (Chunk.size - num_extra) in
+      let extras_fold = Fold.of_list extras in
+      (State.update_fold s extras_fold, rest)
+    else (* no sync needed *)
+      (s, triples)
+
   let hash_fold s fold =
-    let chunks = chunk_fold s fold in
-    update_from_chunks s chunks
+    let synched_s, triples = synch_to_chunk_boundary s fold in
+    let chunks = chunk_triples triples in
+    update_from_chunks synched_s chunks
 
   let digest_fold s fold = State.digest (hash_fold s fold)
 end

@@ -5,9 +5,7 @@ let length_in_triples = length_in_triples
 
 let salt (s : t) =
   Snark_params.Tick.Pedersen.(
-    State.salt params
-      Curve_chunk_table.{curve_points_table; chunk_size}
-      (s :> string))
+    State.salt params Curve_chunk_table.{curve_points_table} (s :> string))
 
 let protocol_state = salt protocol_state
 

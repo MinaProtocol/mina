@@ -234,7 +234,7 @@ module Tick = struct
 
     let zero_hash =
       digest_fold
-        (State.create params Curve_chunk_table.{curve_points_table; chunk_size})
+        (State.create params Curve_chunk_table.{curve_points_table})
         (Fold_lib.Fold.of_list [(false, false, false)])
 
     module Checked = struct

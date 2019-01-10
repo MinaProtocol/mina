@@ -1,4 +1,3 @@
-(* if you change length_in_bytes, may need to change Chunk_triples.Chunk.size *)
 let length_in_bytes = 20
 
 let length_in_triples = ((8 * length_in_bytes) + 2) / 3

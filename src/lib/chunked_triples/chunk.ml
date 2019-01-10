@@ -12,8 +12,6 @@ type t = bool Triple.t list
 
    a size of 3 gives reasonable compile times, 4 starts to get unreasonable
 
-   because of hash salt, size must divide Hash_prefixes.Hash_prefixes.length_in_triples evenly
-
 *)
 
 let size = 3

@@ -21,7 +21,7 @@ module Chain_hash = struct
     of_hash
       ( Pedersen.(
           State.salt params
-            Curve_chunk_table.{curve_points_table; chunk_size}
+            Curve_chunk_table.{curve_points_table}
             "CodaReceiptEmpty")
       |> Pedersen.State.digest )
 

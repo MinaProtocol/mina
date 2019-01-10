@@ -137,10 +137,9 @@ let get_chunk_table () =
    deserialization works correctly
 *)
 module Chunk_table = struct
-  type t = {chunk_size: int; table_data: Group.t array array}
-  [@@deriving bin_io]
+  type t = {table_data: Group.t array array} [@@deriving bin_io]
 
-  let create chunk_size table_data = {chunk_size; table_data}
+  let create chunk_size table_data = {table_data}
 end
 
 let chunk_table_ast ~loc =
@@ -166,16 +165,13 @@ let chunk_table_structure ~loc =
     let chunk_table_string = [%e chunk_table_ast ~loc]
 
     module Chunk_table = struct
-      type t = {chunk_size: int; table_data: Group.t array array}
-      [@@deriving bin_io]
+      type t = {table_data: Group.t array array} [@@deriving bin_io]
     end
 
     let chunk_table : Chunk_table.t =
       Binable.of_string (module Chunk_table) chunk_table_string
 
-    let curve_points_table = chunk_table.table_data
-
-    let chunk_size = chunk_table.chunk_size]
+    let curve_points_table = chunk_table.table_data]
 
 let generate_ml_file filename structure =
   let fmt = Format.formatter_of_out_channel (Out_channel.create filename) in

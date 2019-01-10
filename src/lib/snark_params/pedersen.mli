@@ -29,7 +29,7 @@ module type S = sig
   end
 
   module Curve_chunk_table : sig
-    type t = {curve_points_table: curve array array; chunk_size: int}
+    type t = {curve_points_table: curve array array}
   end
 
   module State : sig
