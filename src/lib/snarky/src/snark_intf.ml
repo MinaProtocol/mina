@@ -287,7 +287,7 @@ module type Basic = sig
     val project : bool list -> t
 
     module Checked : sig
-      type t = private (field, Var.t) Cvar.t
+      type t = (field, Var.t) Cvar.t
 
       val length : t -> int
       (** For debug purposes *)
