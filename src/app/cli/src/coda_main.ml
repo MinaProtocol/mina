@@ -1231,7 +1231,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let%map sl = best_staged_ledger t in
     Staged_ledger.Scan_state.snark_job_list_json (Staged_ledger.scan_state sl)
 
-  let get_status t =
+  let get_status ~flag t =
     let open Participating_state.Let_syntax in
     let%bind ledger = best_ledger t in
     let ledger_merkle_root =
@@ -1251,6 +1251,36 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       Time_ns.diff (Time_ns.now ()) start_time
       |> Time_ns.Span.to_sec |> Int.of_float
     in
+    let r = Perf_histograms.report in
+    let histograms =
+      match flag with
+      | `Performance ->
+          let rpc_timings =
+            let open Daemon_rpcs.Types.Status.Rpc_timings in
+            { get_staged_ledger_aux=
+                { Rpc_pair.dispatch=
+                    r ~name:"rpc_dispatch_get_staged_ledger_aux"
+                ; impl= r ~name:"rpc_impl_get_staged_ledger_aux" }
+            ; answer_sync_ledger_query=
+                { Rpc_pair.dispatch=
+                    r ~name:"rpc_dispatch_answer_sync_ledger_query"
+                ; impl= r ~name:"rpc_impl_answer_sync_ledger_query" }
+            ; get_ancestry=
+                { Rpc_pair.dispatch= r ~name:"rpc_dispatch_get_ancestry"
+                ; impl= r ~name:"rpc_impl_get_ancestry" }
+            ; transition_catchup=
+                { Rpc_pair.dispatch= r ~name:"rpc_dispatch_transition_catchup"
+                ; impl= r ~name:"rpc_impl_transition_catchup" } }
+          in
+          Some
+            { Daemon_rpcs.Types.Status.Histograms.rpc_timings
+            ; external_transition_latency=
+                r ~name:"external_transition_latency"
+            ; snark_worker_transition_time=
+                r ~name:"snark_worker_transition_time"
+            ; snark_worker_merge_time= r ~name:"snark_worker_merge_time" }
+      | `None -> None
+    in
     let%map staged_ledger = best_staged_ledger t in
     { Daemon_rpcs.Types.Status.num_accounts
     ; block_count= Int.of_string (Length.to_string block_count)
@@ -1260,12 +1290,6 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         staged_ledger |> Staged_ledger.hash |> Staged_ledger_hash.sexp_of_t
         |> Sexp.to_string
     ; state_hash
-    ; external_transition_latency=
-        Perf_histograms.report ~name:"external_transition_latency"
-    ; snark_worker_transition_time=
-        Perf_histograms.report ~name:"snark_worker_transition_time"
-    ; snark_worker_merge_time=
-        Perf_histograms.report ~name:"snark_worker_merge_time"
     ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
     ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
@@ -1273,7 +1297,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; run_snark_worker= run_snark_worker t
     ; proposal_interval= Int64.to_int_exn Consensus.Mechanism.block_interval_ms
     ; propose_pubkey=
-        Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t) }
+        Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
+    ; histograms }
 
   let get_lite_chain :
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =
@@ -1321,7 +1346,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         let proof = Lite_compat.proof proof in
         {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
-  let clear_hist_status t = Perf_histograms.wipe () ; get_status t
+  let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 
   (* TODO: handle participation_status more appropriately than doing participate_exn *)
   let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda ~log
@@ -1370,10 +1395,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             return (get_public_keys coda |> Participating_state.active_exn) )
       ; Rpc.Rpc.implement Daemon_rpcs.Get_nonce.rpc (fun () pk ->
             return (get_nonce coda pk |> Participating_state.active_exn) )
-      ; Rpc.Rpc.implement Daemon_rpcs.Get_status.rpc (fun () () ->
-            return (get_status coda |> Participating_state.active_exn) )
-      ; Rpc.Rpc.implement Daemon_rpcs.Clear_hist_status.rpc (fun () () ->
-            return (clear_hist_status coda |> Participating_state.active_exn)
+      ; Rpc.Rpc.implement Daemon_rpcs.Get_status.rpc (fun () flag ->
+            return (get_status ~flag coda |> Participating_state.active_exn) )
+      ; Rpc.Rpc.implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
+            return
+              (clear_hist_status ~flag coda |> Participating_state.active_exn)
         )
       ; Rpc.Rpc.implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
             get_ledger coda lh )
@@ -1421,12 +1447,15 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                   let route_not_found () =
                     Server.respond_string ~status:`Not_found "Route not found"
                   in
+                  let status flag =
+                    Server.respond_string
+                      ( get_status ~flag coda |> Participating_state.active_exn
+                      |> Daemon_rpcs.Types.Status.to_yojson
+                      |> Yojson.Safe.pretty_to_string )
+                  in
                   match Uri.path uri with
-                  | "/status" ->
-                      Server.respond_string
-                        ( get_status coda |> Participating_state.active_exn
-                        |> Daemon_rpcs.Types.Status.to_yojson
-                        |> Yojson.Safe.pretty_to_string )
+                  | "/status" -> status `None
+                  | "/status/performance" -> status `Performance
                   | _ -> route_not_found () )) )
         |> ignore ) ;
     let where_to_listen =
