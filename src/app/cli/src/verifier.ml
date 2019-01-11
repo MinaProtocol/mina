@@ -50,9 +50,7 @@ module Worker_state = struct
            (struct
              let key = bc_vk.wrap
 
-             let key_to_bool_list =
-               let open B.Step_base.Verifier.Verification_key_data in
-               Fn.compose to_bits full_data_of_verification_key
+             let key_to_bool_list = Snark_params.tock_vk_to_bool_list
            end)
        in
        let module M = struct

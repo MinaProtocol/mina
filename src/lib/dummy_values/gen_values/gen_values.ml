@@ -9,15 +9,21 @@ module Curve_name = struct
   type t = Tick | Tock
 
   let to_string = function Tick -> "Tick" | Tock -> "Tock"
+end
 
-  let backend = function
-    | Tick -> (module Crypto_params.Tick_backend : Snarky.Backend_intf.S)
-    | Tock -> (module Crypto_params.Tock_backend : Snarky.Backend_intf.S)
+module Proof_system_name = struct
+  type t = Groth16 | GrothMaller17
+
+  let to_string = function
+    | Groth16 -> "Groth16"
+    | GrothMaller17 -> "GrothMaller17"
 end
 
 module Make
     (B : Snarky.Backend_intf.S) (M : sig
-        val name : Curve_name.t
+        val curve : Curve_name.t
+
+        val proof_system : Proof_system_name.t
     end) =
 struct
   open M
@@ -27,7 +33,11 @@ struct
     let open Impl in
     let proof =
       let exposing = Data_spec.[Typ.field] in
-      let main x = Field.Checked.Assert.equal x x in
+      let main x =
+        let open Let_syntax in
+        let%bind z = Field.Checked.mul x x in
+        Field.Checked.Assert.equal x x
+      in
       let keypair = generate_keypair main ~exposing in
       prove (Keypair.pk keypair) exposing () main Field.one
     in
@@ -36,7 +46,7 @@ struct
   let vk_string, pk_string =
     let open Impl in
     let kp =
-      match M.name with
+      match M.curve with
       | Tick ->
           generate_keypair
             Data_spec.[Boolean.typ]
@@ -67,8 +77,12 @@ struct
       let loc = loc
     end) in
     let open E in
-    let curve_name = Curve_name.to_string name in
-    let curve_module_name = sprintf "Crypto_params.%s_backend" curve_name in
+    let curve_name = Curve_name.to_string curve in
+    let curve_module_name =
+      match proof_system with
+      | GrothMaller17 -> sprintf "Crypto_params.%s_backend" curve_name
+      | Groth16 -> sprintf "Crypto_params.%s_backend.Full.Default" curve_name
+    in
     let of_string_expr submodule_name str =
       [%expr
         [%e
@@ -87,15 +101,31 @@ struct
       [%stri let proving_key = [%e of_string_expr "Proving_key" pk_string]]
     in
     pstr_module
-      (module_binding ~name:(Loc.make ~loc curve_name)
+      (module_binding
+         ~name:(Loc.make ~loc (Proof_system_name.to_string proof_system))
          ~expr:(pmod_structure [proof_stri; vk_stri; pk_stri]))
 end
 
-let structure_item_of_curve (name : Curve_name.t) =
+type spec = Curve_name.t * Proof_system_name.t
+
+let backend_of_spec (s : spec) =
+  match s with
+  | Tick, GrothMaller17 ->
+      (module Crypto_params.Tick_backend : Snarky.Backend_intf.S)
+  | Tock, GrothMaller17 ->
+      (module Crypto_params.Tock_backend : Snarky.Backend_intf.S)
+  | Tick, Groth16 ->
+      (module Crypto_params.Tick_backend.Full.Default : Snarky.Backend_intf.S)
+  | Tock, Groth16 ->
+      (module Crypto_params.Tock_backend.Full.Default : Snarky.Backend_intf.S)
+
+let structure_item_of_spec ((curve, proof_system) as spec : spec) =
   let module N = struct
-    let name = name
+    let curve = curve
+
+    let proof_system = proof_system
   end in
-  let module B = (val Curve_name.backend name) in
+  let module B = (val backend_of_spec spec) in
   let module M = Make (B) (N) in
   M.structure ~loc:Ppxlib.Location.none
 
@@ -105,7 +135,21 @@ let main () =
   let fmt =
     Format.formatter_of_out_channel (Out_channel.create "dummy_values.ml")
   in
-  let structure = List.map curves ~f:structure_item_of_curve in
+  let structure =
+    let loc = Ppxlib.Location.none in
+    List.map curves ~f:(fun curve ->
+        let module E = Ppxlib.Ast_builder.Make (struct
+          let loc = loc
+        end) in
+        let open E in
+        pstr_module
+          (module_binding
+             ~name:(Loc.make ~loc (Curve_name.to_string curve))
+             ~expr:
+               (pmod_structure
+                  (List.map [Proof_system_name.Groth16; GrothMaller17]
+                     ~f:(fun sys -> structure_item_of_spec (curve, sys) )))) )
+  in
   Pprintast.top_phrase fmt (Ptop_def structure) ;
   exit 0
 

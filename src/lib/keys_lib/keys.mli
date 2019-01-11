@@ -12,17 +12,21 @@ module type S = sig
   end
 
   module Wrap_prover_state : sig
-    type t = {proof: Tick.Proof.t}
+    type t = {proof: Tick.Groth16.Proof.t}
   end
 
   val transaction_snark_keys : Transaction_snark.Keys.Verification.t
 
   module Step : sig
-    val keys : Tick.Keypair.t
+    val keys : Tick.Groth16.Keypair.t
 
     val input :
          unit
-      -> ('a, 'b, Tick.Field.var -> 'a, Tick.Field.t -> 'b) Tick.Data_spec.t
+      -> ( 'a
+         , 'b
+         , Tick.Field.var -> 'a
+         , Tick.Field.t -> 'b )
+         Tick.Groth16.Data_spec.t
 
     module Verification_key : sig
       val to_bool_list : Tock.Verification_key.t -> bool list

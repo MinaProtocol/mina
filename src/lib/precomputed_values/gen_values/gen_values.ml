@@ -30,7 +30,7 @@ module Dummy = struct
 
   let base_hash_expr = [%expr Snark_params.Tick.Field.zero]
 
-  let base_proof_expr = [%expr Dummy_values.Tock.proof]
+  let base_proof_expr = [%expr Dummy_values.Tock.GrothMaller17.proof]
 end
 
 module Make_real (Keys : Keys_lib.Keys.S) = struct
@@ -64,8 +64,8 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
       ; update= Keys.Consensus_mechanism.Snark_transition.genesis }
     in
     let tick =
-      Tick.prove
-        (Tick.Keypair.pk Keys.Step.keys)
+      Tick.Groth16.prove
+        (Tick.Groth16.Keypair.pk Keys.Step.keys)
         (Keys.Step.input ()) prover_state Keys.Step.main base_hash
     in
     let proof = wrap base_hash tick in

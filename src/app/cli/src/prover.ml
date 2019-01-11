@@ -91,8 +91,8 @@ module Worker_state = struct
               (Consensus_mechanism.Prover_state.handler state_for_handler)
           in
           let prev_proof =
-            Tick.prove
-              (Tick.Keypair.pk Keys.Step.keys)
+            Tick.Groth16.prove
+              (Tick.Groth16.Keypair.pk Keys.Step.keys)
               (Keys.Step.input ()) prover_state main next_state_top_hash
           in
           { Blockchain.state= next_state

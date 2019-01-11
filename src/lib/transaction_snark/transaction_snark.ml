@@ -133,9 +133,9 @@ module Verification_keys = struct
   [@@deriving bin_io]
 
   let dummy : t =
-    { merge= Dummy_values.Tick.verification_key
-    ; base= Dummy_values.Tick.verification_key
-    ; wrap= Dummy_values.Tock.verification_key }
+    { merge= Dummy_values.Tick.GrothMaller17.verification_key
+    ; base= Dummy_values.Tick.GrothMaller17.verification_key
+    ; wrap= Dummy_values.Tock.GrothMaller17.verification_key }
 end
 
 module Keys0 = struct
@@ -149,9 +149,9 @@ module Keys0 = struct
     [@@deriving bin_io]
 
     let dummy =
-      { merge= Dummy_values.Tick.proving_key
-      ; base= Dummy_values.Tick.proving_key
-      ; wrap= Dummy_values.Tock.proving_key }
+      { merge= Dummy_values.Tick.GrothMaller17.proving_key
+      ; base= Dummy_values.Tick.GrothMaller17.proving_key
+      ; wrap= Dummy_values.Tock.GrothMaller17.proving_key }
   end
 
   module T = struct
@@ -1414,9 +1414,9 @@ let%test_module "transaction_snark" =
 
 let constraint_system_digests () =
   let module W = Wrap (struct
-    let merge = Dummy_values.Tick.verification_key
+    let merge = Dummy_values.Tick.GrothMaller17.verification_key
 
-    let base = Dummy_values.Tick.verification_key
+    let base = Dummy_values.Tick.GrothMaller17.verification_key
   end) in
   let digest = Tick.R1CS_constraint_system.digest in
   let digest' = Tock.R1CS_constraint_system.digest in
