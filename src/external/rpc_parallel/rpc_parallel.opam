@@ -1,0 +1,29 @@
+opam-version: "1.2"
+version: "v0.11.0"
+maintainer: "opensource@janestreet.com"
+authors: ["Jane Street Group, LLC <opensource@janestreet.com>"]
+homepage: "https://github.com/janestreet/rpc_parallel"
+bug-reports: "https://github.com/janestreet/rpc_parallel/issues"
+dev-repo: "git+https://github.com/janestreet/rpc_parallel.git"
+license: "Apache-2.0"
+build: [
+  ["jbuilder" "build" "-p" name "-j" jobs]
+]
+depends: [
+  "async"                   {>= "v0.11" & < "v0.12"}
+  "core"                    {>= "v0.11" & < "v0.12"}
+  "ppx_jane"                {>= "v0.11" & < "v0.12"}
+  "sexplib"                 {>= "v0.11" & < "v0.12"}
+  "jbuilder"                {build & >= "1.0+beta18.1"}
+  "ocaml-migrate-parsetree" {>= "1.0"}
+  "ppxlib"                  {>= "0.1.0"}
+]
+available: [ ocaml-version >= "4.04.1" ]
+descr: "
+Type-safe parallel library built on top of Async_rpc
+
+Rpc_parallel offers an API to define various workers and protocols,
+spawn workers as separate processes, and communicate with them using
+Async Rpc.
+
+"
