@@ -162,14 +162,18 @@ let chunk_table_structure ~loc =
     open Core
     module Group = Crypto_params_init.Tick_backend.Inner_curve
 
-    let chunk_table_string = [%e chunk_table_ast ~loc]
+    let chunk_table_string_opt_ref = ref (Some [%e chunk_table_ast ~loc])
 
     module Chunk_table = struct
       type t = {table_data: Group.t array array} [@@deriving bin_io]
     end
 
     let chunk_table : Chunk_table.t =
-      Binable.of_string (module Chunk_table) chunk_table_string
+      let chunk_table_string = Option.value_exn !chunk_table_string_opt_ref in
+      let result = Binable.of_string (module Chunk_table) chunk_table_string in
+      (* allow string to be GCed *)
+      chunk_table_string_opt_ref := None ;
+      result
 
     let curve_points_table = chunk_table.table_data]
 
