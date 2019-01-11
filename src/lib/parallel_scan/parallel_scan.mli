@@ -122,6 +122,13 @@ module Available_job : sig
   [@@deriving sexp]
 end
 
+module Job_view : sig
+  type 'a node = Base of 'a option | Merge of 'a option * 'a option
+  [@@deriving sexp]
+
+  type 'a t = int * 'a node [@@deriving sexp]
+end
+
 val start : parallelism_log_2:int -> ('a, 'd) State.t
 (** The initial state of the parallel scan at some parallelism *)
 
@@ -183,4 +190,8 @@ val update_curr_job_seq_no : ('a, 'd) State.t -> unit Or_error.t
 (*Update the current job sequence number by 1. All the completed jobs created will have the current job sequence number*)
 
 val current_job_sequence_number : ('a, 'd) State.t -> int
+
 (*Get the current job sequence number *)
+
+val view_jobs_with_position :
+  ('a, 'd) State.t -> ('a -> 'c) -> ('d -> 'c) -> 'c Job_view.t list

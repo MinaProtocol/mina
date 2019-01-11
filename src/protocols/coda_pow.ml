@@ -601,6 +601,10 @@ module type Transaction_snark_scan_state_intf = sig
     type t
   end
 
+  module Job_view : sig
+    type t [@@deriving sexp, to_yojson]
+  end
+
   module Make_statement_scanner
       (M : Monad_with_Or_error_intf) (Verifier : sig
           val verify :
@@ -662,6 +666,8 @@ module type Transaction_snark_scan_state_intf = sig
   val current_job_sequence_number : t -> int
 
   val filter_jobs_by_seq_no : t -> Available_job.t list Or_error.t
+
+  val snark_job_list_json : t -> string
 end
 
 module type Staged_ledger_base_intf = sig
@@ -689,11 +695,17 @@ module type Staged_ledger_base_intf = sig
   module Scan_state : sig
     type t [@@deriving bin_io]
 
+    module Job_view : sig
+      type t [@@deriving sexp, to_yojson]
+    end
+
     val hash : t -> staged_ledger_aux_hash
 
     val is_valid : t -> bool
 
     val empty : unit -> t
+
+    val snark_job_list_json : t -> string
   end
 
   module Staged_ledger_error : sig

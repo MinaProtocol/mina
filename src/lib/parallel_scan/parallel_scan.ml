@@ -16,7 +16,14 @@ module Available_job = struct
   [@@deriving sexp]
 end
 
-let place = 0
+module Job_view = struct
+  type 'a node = Base of 'a option | Merge of 'a option * 'a option
+  [@@deriving sexp]
+
+  type 'a t = int * 'a node [@@deriving sexp]
+end
+
+let default_seq_no = 0
 
 module State = struct
   include State
@@ -267,8 +274,8 @@ module State = struct
       match (dir, cur_job) with
       | `Left, Merge Empty -> Ok (Merge (Lcomp z))
       | `Right, Merge Empty -> Ok (Merge (Rcomp z))
-      | `Left, Merge (Rcomp a) -> Ok (Merge (Bcomp (z, a, place)))
-      | `Right, Merge (Lcomp a) -> Ok (Merge (Bcomp (a, z, place)))
+      | `Left, Merge (Rcomp a) -> Ok (Merge (Bcomp (z, a, default_seq_no)))
+      | `Right, Merge (Lcomp a) -> Ok (Merge (Bcomp (a, z, default_seq_no)))
       | `Left, Merge (Lcomp _) | `Right, Merge (Rcomp _) | _, Merge (Bcomp _)
         ->
           (*TODO: punish the sender*)
@@ -346,7 +353,7 @@ module State = struct
     let open Or_error.Let_syntax in
     let f (job : ('a, 'd) State.Job.t) : ('a, 'd) State.Job.t Or_error.t =
       match job with
-      | Base None -> Ok (Base (Some (value, place)))
+      | Base None -> Ok (Base (Some (value, default_seq_no)))
       | _ ->
           Or_error.error_string "Invalid job encountered while enqueuing data"
     in
@@ -433,6 +440,20 @@ module State = struct
         in
         new_seq_no )
 end
+
+let view_jobs_with_position (t : ('a, 'd) State.t) fa fd =
+  Ring_buffer.foldi t.jobs ~init:[] ~f:(fun i jobs job ->
+      let job' =
+        match job with
+        | State.Job.Base x ->
+            Job_view.Base (Option.map ~f:(fun (d, _) -> fd d) x)
+        | Merge Empty -> Merge (None, None)
+        | Merge (Lcomp x) -> Merge (Some (fa x), None)
+        | Merge (Rcomp y) -> Merge (None, Some (fa y))
+        | Merge (Bcomp (x, y, _)) -> Merge (Some (fa x), Some (fa y))
+      in
+      (i, job') :: jobs )
+  |> List.rev
 
 let start : type a d. parallelism_log_2:int -> (a, d) State.t = State.create
 
@@ -978,9 +999,11 @@ let%test_module "scans" =
       let empty_jobs = State.copy empty_tree in
       let _ =
         List.fold ~init:() [p - 1; p] ~f:(fun _ pos ->
-            create_job empty_jobs pos (Base (Some (1, place))) )
+            create_job empty_jobs pos (Base (Some (1, default_seq_no))) )
       in
-      let _ = create_job empty_jobs level_i (Merge (Bcomp (1, 1, place))) in
+      let _ =
+        create_job empty_jobs level_i (Merge (Bcomp (1, 1, default_seq_no)))
+      in
       assert (not_valid empty_jobs) ;
       let incorrect_data_length = State.copy empty_leaves in
       let incorrect_data_length =
@@ -988,13 +1011,15 @@ let%test_module "scans" =
       in
       let _ =
         List.fold ~init:() [p - 1; p] ~f:(fun _ pos ->
-            create_job incorrect_data_length pos (Base (Some (1, place))) )
+            create_job incorrect_data_length pos
+              (Base (Some (1, default_seq_no))) )
       in
       assert (not_valid incorrect_data_length) ;
       let interspersed_data = State.copy incorrect_data_length in
       let _ =
         List.fold ~init:() [p + 2; p + 4] ~f:(fun _ pos ->
-            create_job interspersed_data pos (Base (Some (1, place))) )
+            create_job interspersed_data pos (Base (Some (1, default_seq_no)))
+        )
       in
       assert (not_valid interspersed_data)
   end )
