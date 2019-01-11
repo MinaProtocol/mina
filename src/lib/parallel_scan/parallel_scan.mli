@@ -183,4 +183,4 @@ val update_curr_job_seq_no : ('a, 'd) State.t -> unit Or_error.t
 (*Update the current job sequence number by 1. All the completed jobs created will have the current job sequence number*)
 
 val current_job_sequence_number : ('a, 'd) State.t -> int
-(*Get the current/latest job sequence number *)
+(*Get the current job sequence number *)

@@ -381,4 +381,17 @@ end = struct
     | Parallel_scan.Available_job.Base (d, _) ->
         First (d.transaction_with_info, d.statement, d.witness)
     | Merge ((p1, _), (p2, _), _) -> Second (p1, p2)
+
+  let filter_jobs_by_seq_no t =
+    let open Or_error.Let_syntax in
+    let current_seq = Parallel_scan.current_job_sequence_number t in
+    let min_seq_no = max 0 current_seq - Config.work_availability_factor in
+    let%map all_jobs = next_jobs t in
+    List.filter all_jobs ~f:(fun job ->
+        let cur_seq =
+          match job with
+          | Parallel_scan.Available_job.Base (_, seq) -> seq
+          | Merge (_, _, seq) -> seq
+        in
+        cur_seq <= min_seq_no )
 end

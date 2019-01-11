@@ -660,6 +660,8 @@ module type Transaction_snark_scan_state_intf = sig
   val statement_of_job : Available_job.t -> ledger_proof_statement option
 
   val current_job_sequence_number : t -> int
+
+  val filter_jobs_by_seq_no : t -> Available_job.t list Or_error.t
 end
 
 module type Staged_ledger_base_intf = sig

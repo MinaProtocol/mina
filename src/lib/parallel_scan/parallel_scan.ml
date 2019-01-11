@@ -396,19 +396,23 @@ module State = struct
       ~f:(fun acc job -> Container.Continue_or_stop.Continue (f acc job))
       ~finish:Fn.id
 
+  (* Reset the sequence number starting from 1
+     If [997;997;998;998;998;999;999] is sequence number of the current 
+     available jobs 
+     then [1;1;2;2;2;3;3] will be the new sequence numbers of the same jobs *)
   let reset_seq_no t =
     let open Or_error.Let_syntax in
     let seq_no_at x =
       match Ring_buffer.read_i t.jobs x with
-      | Job.Base (Some (_, o)) -> Ok o
-      | Merge (Bcomp (_, _, o)) -> Ok o
+      | Job.Base (Some (_, s)) -> Ok s
+      | Merge (Bcomp (_, _, s)) -> Ok s
       | _ ->
           Or_error.error_string (sprintf "Expecting a completed job at %d" x)
     in
-    let new_seq_job x s =
+    let job_with_new_seq x seq_no =
       match Ring_buffer.read_i t.jobs x with
-      | Job.Base (Some (d, _)) -> Ok (Job.Base (Some (d, s)))
-      | Merge (Bcomp (a1, a2, _)) -> Ok (Merge (Bcomp (a1, a2, s)))
+      | Job.Base (Some (d, _)) -> Ok (Job.Base (Some (d, seq_no)))
+      | Merge (Bcomp (a1, a2, _)) -> Ok (Merge (Bcomp (a1, a2, seq_no)))
       | _ ->
           Or_error.error_string (sprintf "Expecting a completed job at %d" x)
     in
@@ -417,15 +421,15 @@ module State = struct
       | None -> Ok 1
       | Some x -> seq_no_at x
     in
-    Queue.fold ~init:(Ok 0) t.stateful_work_order ~f:(fun latest_seq index ->
+    Queue.fold ~init:(Ok 0) t.stateful_work_order ~f:(fun cur_seq index ->
         let%bind seq_no =
-          Or_error.bind latest_seq ~f:(fun _ -> seq_no_at index)
+          Or_error.bind cur_seq ~f:(fun _ -> seq_no_at index)
         in
-        let%bind first_seq_no = first_seq_no in
-        let new_seq_no = seq_no - first_seq_no + 1 in
+        let%bind offset = first_seq_no in
+        let new_seq_no = seq_no - offset + 1 in
         let%map () =
-          Or_error.bind (new_seq_job index new_seq_no) ~f:(fun updated_job ->
-              update_cur_job t updated_job index )
+          Or_error.bind (job_with_new_seq index new_seq_no)
+            ~f:(fun updated_job -> update_cur_job t updated_job index )
         in
         new_seq_no )
 end

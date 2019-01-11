@@ -1196,18 +1196,24 @@ end = struct
         t.scan_state
     in
     (*TODO: return an or_error here *)
-    let work_to_do = work_to_do_exn t.scan_state in
-    let _current_job_sequence_no =
-      Scan_state.current_job_sequence_number t.scan_state
+    let all_work_to_do = work_to_do_exn t.scan_state in
+    let min_work_to_do =
+      Or_error.ok_exn (Scan_state.filter_jobs_by_seq_no t.scan_state)
     in
     let completed_works_seq =
-      Sequence.fold_until work_to_do ~init:Sequence.empty
+      Sequence.fold_until all_work_to_do ~init:Sequence.empty
         ~f:(fun seq w ->
           match get_completed_work w with
           | Some cw_checked ->
               Continue (Sequence.append seq (Sequence.singleton cw_checked))
           | None -> Stop seq )
         ~finish:Fn.id
+    in
+    (* max number of jobs that can be done *)
+    let max_jobs_count =
+      max
+        (Sequence.length completed_works_seq)
+        (min (Sequence.length all_work_to_do) (List.length min_work_to_do))
     in
     (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
     let transactions_rev =
@@ -1224,13 +1230,10 @@ end = struct
     in
     let diff =
       generate logger completed_works_seq transactions_rev self partitions
-        (Sequence.length work_to_do)
-    in
-    let proofs_available =
-      Sequence.filter_map work_to_do ~f:get_completed_work |> Sequence.length
+        max_jobs_count
     in
     Logger.info logger "Block stats: Proofs ready for purchase: %d"
-      proofs_available ;
+      (Sequence.length completed_works_seq) ;
     trace_event "prediffs done" ;
     { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
     ; creator= self
