@@ -1,3 +1,0 @@
-(library
- (wrapped false)
- (public_name foo.bar))

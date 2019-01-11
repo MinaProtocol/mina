@@ -1,3 +1,0 @@
-(alias
- (name foo)
- (deps (x y z)))

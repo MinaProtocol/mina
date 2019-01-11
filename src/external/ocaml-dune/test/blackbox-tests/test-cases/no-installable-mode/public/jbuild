@@ -1,9 +1,0 @@
-(jbuild_version 1)
-
-(executable
-  (
-   (name mylib)
-   (public_name mylib)
-   (modes (shared_object))
-   )
-  )

@@ -1,3 +1,0 @@
-(library
- (name foo)
- (modules :standard \ fake))

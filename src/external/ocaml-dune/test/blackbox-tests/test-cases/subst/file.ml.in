@@ -1,3 +1,0 @@
-let name = "%_%NAME%_%"
-let authors = "%_%PKG_AUTHORS%_%"
-let version = "%_%VERSION%_%"
