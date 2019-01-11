@@ -1515,7 +1515,7 @@ module Mnt4 = struct
     Make_proof_accessors (struct
         let prefix = with_prefix Prefix.prefix "proof"
       end)
-      (GM.Proof)
+      (Default.Proof)
       (Group)
       (G2)
 
@@ -1549,7 +1549,7 @@ module Mnt6 = struct
     Make_proof_accessors (struct
         let prefix = with_prefix Prefix.prefix "proof"
       end)
-      (GM.Proof)
+      (Default.Proof)
       (Group)
       (G2)
 
