@@ -1014,7 +1014,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
       let b = (b :> Cvar.t) in
       match (then_, else_) with
       | Constant t, Constant e ->
-          return Cvar.(Infix.(t * (b + (e * (constant Field0.one - b)))))
+          return Cvar.(Infix.((t * b) + (e * (constant Field0.one - b))))
       | _, _ ->
           let%bind r =
             provide_witness Typ.field
