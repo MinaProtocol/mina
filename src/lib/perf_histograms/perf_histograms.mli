@@ -1,5 +1,16 @@
 open Core_kernel
 
+module Rpc : sig
+  module Plain : sig
+    module Extend (Rpc : Intf.Rpc.S) :
+      Intf.Patched.S
+      with type callee_query := Rpc.Callee.query
+       and type callee_response := Rpc.Callee.response
+       and type caller_query := Rpc.Caller.query
+       and type caller_response := Rpc.Caller.response
+  end
+end
+
 module Report : sig
   type t =
     { values: int list
