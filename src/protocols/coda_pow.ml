@@ -663,7 +663,7 @@ module type Transaction_snark_scan_state_intf = sig
 
   val statement_of_job : Available_job.t -> ledger_proof_statement option
 
-  val export_jobs : t -> Job_view.t list
+  val snark_job_list_json : t -> string
 end
 
 module type Staged_ledger_base_intf = sig
@@ -701,7 +701,7 @@ module type Staged_ledger_base_intf = sig
 
     val empty : unit -> t
 
-    val export_jobs : t -> Job_view.t list
+    val snark_job_list_json : t -> string
   end
 
   module Staged_ledger_error : sig

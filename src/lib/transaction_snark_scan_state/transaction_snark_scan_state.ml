@@ -401,10 +401,13 @@ end = struct
         First (d.transaction_with_info, d.statement, d.witness)
     | Merge ((p1, _), (p2, _)) -> Second (p1, p2)
 
-  let export_jobs (t : t) : Job_view.t list =
-    let fa (a : Ledger_proof_with_sok_message.t) =
-      Ledger_proof.statement (fst a)
+  let snark_job_list_json t =
+    let all_jobs : Job_view.t list =
+      let fa (a : Ledger_proof_with_sok_message.t) =
+        Ledger_proof.statement (fst a)
+      in
+      let fd (d : Transaction_with_witness.t) = d.statement in
+      Parallel_scan.view_jobs_with_position t fa fd
     in
-    let fd (d : Transaction_with_witness.t) = d.statement in
-    Parallel_scan.view_jobs_with_position t fa fd
+    Yojson.Safe.to_string (`List (List.map all_jobs ~f:Job_view.to_yojson))
 end

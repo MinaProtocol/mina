@@ -1229,15 +1229,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let snark_job_list_json t =
     let open Participating_state.Let_syntax in
     let%map sl = best_staged_ledger t in
-    let str =
-      Yojson.Safe.to_string
-        (`List
-          (List.map
-             (Staged_ledger.Scan_state.export_jobs
-                (Staged_ledger.scan_state sl))
-             ~f:Staged_ledger.Scan_state.Job_view.to_yojson))
-    in
-    str
+    Staged_ledger.Scan_state.snark_job_list_json (Staged_ledger.scan_state sl)
 
   let get_status t =
     let open Participating_state.Let_syntax in
