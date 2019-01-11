@@ -62,6 +62,30 @@ end = struct
       Parallel_scan.Available_job.t
   end
 
+  module Job_view = struct
+    type t = Ledger_proof_statement.t Parallel_scan.Job_view.t
+    [@@deriving sexp]
+
+    let to_yojson ((pos, job) : t) : Yojson.Safe.json =
+      let hash_string h = Sexp.to_string (Frozen_ledger_hash.sexp_of_t h) in
+      let statement_to_yojson (s : Ledger_proof_statement.t) =
+        `Assoc
+          [ ("Source", `String (hash_string s.source))
+          ; ("Target", `String (hash_string s.target))
+          ; ("Fee Excess", Currency.Fee.Signed.to_yojson s.fee_excess)
+          ; ("Supply Increase", Currency.Amount.to_yojson s.supply_increase) ]
+      in
+      let opt_json x =
+        Option.value_map x ~default:(`List []) ~f:statement_to_yojson
+      in
+      let job_to_yojson =
+        match job with
+        | Merge (x, y) -> `Assoc [("M", `List [opt_json x; opt_json y])]
+        | Base x -> `Assoc [("B", `List [opt_json x])]
+      in
+      `List [`Int pos; job_to_yojson]
+  end
+
   type job = Available_job.t
 
   type parallel_scan_completed_job =
@@ -376,4 +400,14 @@ end = struct
     | Parallel_scan.Available_job.Base d ->
         First (d.transaction_with_info, d.statement, d.witness)
     | Merge ((p1, _), (p2, _)) -> Second (p1, p2)
+
+  let snark_job_list_json t =
+    let all_jobs : Job_view.t list =
+      let fa (a : Ledger_proof_with_sok_message.t) =
+        Ledger_proof.statement (fst a)
+      in
+      let fd (d : Transaction_with_witness.t) = d.statement in
+      Parallel_scan.view_jobs_with_position t fa fd
+    in
+    Yojson.Safe.to_string (`List (List.map all_jobs ~f:Job_view.to_yojson))
 end
