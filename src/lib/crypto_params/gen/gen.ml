@@ -142,6 +142,14 @@ module Chunk_table = struct
   let create chunk_size table_data = {table_data}
 end
 
+(* the AST representation of the chunk table is its string serialization
+   - an AST for the table itself, using string representations of 
+      Field pairs, as is done for the params, is too large, causing
+      ocamlopt to segfault
+  - Binable.to_string is slow, and Marshal.to_string is much faster,
+      but I (@psteckler) observed segfaults on deserialization for 
+      the latter
+ *)
 let chunk_table_ast ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
