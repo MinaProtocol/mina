@@ -579,6 +579,8 @@ module type Transaction_snark_scan_state_intf = sig
 
   type transaction_snark_work
 
+  type transaction_snark_work_statement
+
   type transaction_with_info
 
   type frozen_ledger_hash
@@ -628,11 +630,11 @@ module type Transaction_snark_scan_state_intf = sig
 
   val capacity : t -> int
 
-  val enqueue_transactions :
-    t -> Transaction_with_witness.t list -> unit Or_error.t
-
-  val fill_in_transaction_snark_work :
-    t -> transaction_snark_work list -> ledger_proof option Or_error.t
+  val fill_work_and_enqueue_transactions :
+       t
+    -> Transaction_with_witness.t list
+    -> transaction_snark_work list
+    -> ledger_proof option Or_error.t
 
   val latest_ledger_proof : t -> Ledger_proof_with_sok_message.t option
 
@@ -665,9 +667,15 @@ module type Transaction_snark_scan_state_intf = sig
 
   val current_job_sequence_number : t -> int
 
-  val filter_jobs_by_seq_no : t -> Available_job.t list Or_error.t
+  (*val filter_jobs_by_seq_no : t -> Available_job.t Sequence.t Or_error.t*)
 
   val snark_job_list_json : t -> string
+
+  val all_work_to_do :
+    t -> transaction_snark_work_statement Sequence.t Or_error.t
+
+  val min_work_to_do :
+    t -> transaction_snark_work_statement Sequence.t Or_error.t
 end
 
 module type Staged_ledger_base_intf = sig

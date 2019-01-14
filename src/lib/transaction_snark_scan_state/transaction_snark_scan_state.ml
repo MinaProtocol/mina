@@ -39,6 +39,8 @@ module Make (Inputs : Inputs.S) : sig
      and type frozen_ledger_hash := Inputs.Frozen_ledger_hash.t
      and type sok_message := Inputs.Sok_message.t
      and type staged_ledger_aux_hash := Inputs.Staged_ledger_aux_hash.t
+     and type transaction_snark_work_statement :=
+                Inputs.Transaction_snark_work.Statement.t
 end = struct
   open Inputs
 
@@ -60,6 +62,7 @@ end = struct
       ( Ledger_proof_with_sok_message.t
       , Transaction_with_witness.t )
       Parallel_scan.Available_job.t
+    [@@deriving sexp]
   end
 
   module Job_view = struct
@@ -86,7 +89,7 @@ end = struct
       `List [`Int pos; job_to_yojson]
   end
 
-  type job = Available_job.t
+  type job = Available_job.t [@@deriving sexp]
 
   type parallel_scan_completed_job =
     Ledger_proof_with_sok_message.t Parallel_scan.State.Completed_job.t
@@ -346,25 +349,6 @@ end = struct
         ; fee_excess
         ; proof_type= `Merge }
 
-  let fill_in_transaction_snark_work t (works : Transaction_snark_work.t list)
-      : Ledger_proof.t option Or_error.t =
-    let open Or_error.Let_syntax in
-    let%bind next_jobs =
-      Parallel_scan.next_k_jobs ~state:t ~k:(total_proofs works)
-    in
-    let%bind scanable_work_list =
-      map2_or_error next_jobs
-        (List.concat_map works
-           ~f:(fun {Transaction_snark_work.fee; proofs; prover} ->
-             List.map proofs ~f:(fun proof -> (fee, proof, prover)) ))
-        ~f:completed_work_to_scanable_work
-    in
-    let%map result =
-      Parallel_scan.fill_in_completed_jobs ~state:t
-        ~completed_jobs:scanable_work_list
-    in
-    Option.map result ~f:fst
-
   let capacity t = Parallel_scan.parallelism ~state:t
 
   let create ~transaction_capacity_log_2 =
@@ -376,8 +360,34 @@ end = struct
     let open Config in
     create ~transaction_capacity_log_2
 
-  let enqueue_transactions t transactions =
-    Parallel_scan.enqueue_data ~state:t ~data:transactions
+  let fill_work_and_enqueue_transactions t transactions work =
+    let open Or_error.Let_syntax in
+    let enqueue_transactions t transactions =
+      Parallel_scan.enqueue_data ~state:t ~data:transactions
+    in
+    let fill_in_transaction_snark_work t
+        (works : Transaction_snark_work.t list) :
+        Ledger_proof.t option Or_error.t =
+      let%bind next_jobs =
+        Parallel_scan.next_k_jobs ~state:t ~k:(total_proofs works)
+      in
+      let%bind scanable_work_list =
+        map2_or_error next_jobs
+          (List.concat_map works
+             ~f:(fun {Transaction_snark_work.fee; proofs; prover} ->
+               List.map proofs ~f:(fun proof -> (fee, proof, prover)) ))
+          ~f:completed_work_to_scanable_work
+      in
+      let%map result =
+        Parallel_scan.fill_in_completed_jobs ~state:t
+          ~completed_jobs:scanable_work_list
+      in
+      Option.map result ~f:fst
+    in
+    let%bind () = Parallel_scan.update_curr_job_seq_no t in
+    let%bind proof_opt = fill_in_transaction_snark_work t work in
+    let%map () = enqueue_transactions t transactions in
+    proof_opt
 
   let latest_ledger_proof = Parallel_scan.last_emitted_value
 
@@ -409,9 +419,9 @@ end = struct
   let filter_jobs_by_seq_no t =
     let open Or_error.Let_syntax in
     let current_seq = Parallel_scan.current_job_sequence_number t in
-    let min_seq_no = max 0 current_seq - Config.work_availability_factor in
-    let%map all_jobs = next_jobs t in
-    List.filter all_jobs ~f:(fun job ->
+    let min_seq_no = max 0 (current_seq - Config.work_availability_factor) in
+    let%map all_jobs = next_jobs_sequence t in
+    Sequence.filter all_jobs ~f:(fun job ->
         let cur_seq =
           match job with
           | Parallel_scan.Available_job.Base (_, seq) -> seq
@@ -428,4 +438,39 @@ end = struct
       Parallel_scan.view_jobs_with_position t fa fd
     in
     Yojson.Safe.to_string (`List (List.map all_jobs ~f:Job_view.to_yojson))
+
+  let sequence_chunks_of seq ~n =
+    Sequence.unfold_step ~init:([], 0, seq) ~f:(fun (acc, i, seq) ->
+        if i = n then Yield (List.rev acc, ([], 0, seq))
+        else
+          match Sequence.next seq with
+          | None -> Done
+          (* skip the last one if it's odd*)
+          (*| Some (x, seq) -> (
+            (*allow a chunk of 1 proof as well*)
+            match Sequence.next seq with
+            | None -> Yield (List.rev (x :: acc), ([], 0, seq))*)
+          | Some (x, seq) -> Skip (x :: acc, i + 1, seq) )
+
+  let all_work_to_do scan_state :
+      Transaction_snark_work.Statement.t Sequence.t Or_error.t =
+    let open Or_error.Let_syntax in
+    let%map work_seq = next_jobs_sequence scan_state in
+    Sequence.chunks_exn
+      (Sequence.map work_seq ~f:(fun maybe_work ->
+           match statement_of_job maybe_work with
+           | None -> assert false
+           | Some work -> work ))
+      Transaction_snark_work.proofs_length
+
+  let min_work_to_do scan_state :
+      Transaction_snark_work.Statement.t Sequence.t Or_error.t =
+    let open Or_error.Let_syntax in
+    let%map work_seq = filter_jobs_by_seq_no scan_state in
+    Core.printf "work count: %d \n %!" (Sequence.length work_seq) ;
+    sequence_chunks_of ~n:Transaction_snark_work.proofs_length
+    @@ Sequence.map work_seq ~f:(fun maybe_work ->
+           match statement_of_job maybe_work with
+           | None -> assert false
+           | Some work -> work )
 end

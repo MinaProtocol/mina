@@ -135,7 +135,7 @@ end = struct
 
   let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
 
-  let sequence_chunks_of seq ~n =
+  (*let sequence_chunks_of seq ~n =
     Sequence.unfold_step ~init:([], 0, seq) ~f:(fun (acc, i, seq) ->
         if i = n then Yield (List.rev acc, ([], 0, seq))
         else
@@ -145,7 +145,7 @@ end = struct
             (*allow a chunk of 1 proof as well*)
             match Sequence.next seq with
             | None -> Yield (List.rev (x :: acc), ([], 0, seq))
-            | _ -> Skip (x :: acc, i + 1, seq) ) )
+            | _ -> Skip (x :: acc, i + 1, seq) ) )*)
 
   let all_work_pairs_exn t =
     let all_jobs = Scan_state.next_jobs t.scan_state |> Or_error.ok_exn in
@@ -633,30 +633,35 @@ end = struct
       , p1.user_commands_count + p2.user_commands_count
       , p1.coinbase_parts_count + p2.coinbase_parts_count )
     in
-    let%bind () = check_completed_works t.scan_state works in
+    let%bind () = check_completed_works scan_state' works in
     let%bind res_opt =
       (* TODO: Add rollback *)
-      let r = Scan_state.fill_in_transaction_snark_work scan_state' works in
+      let r =
+        Scan_state.fill_work_and_enqueue_transactions scan_state' data works
+      in
       Or_error.iter_error r ~f:(fun e ->
           (* TODO: Pass a logger here *)
           eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e ) ;
       Deferred.return (to_staged_ledger_or_error r)
     in
-    let%bind () =
+    (*let%bind () =
       Deferred.return
         ( to_staged_ledger_or_error
         @@ Scan_state.enqueue_transactions scan_state' data )
-    in
+    in*)
     let%map () =
       Deferred.return
         ( verify_scan_state_after_apply new_ledger scan_state'
         |> to_staged_ledger_or_error )
     in
-    Logger.info logger
-      "Block info: No of transactions included:%d Coinbase parts:%d Work \
-       count:%d Spots available:%d Proofs waiting to be solved:%d"
-      user_commands_count cb_parts_count (List.length works) spots_available
-      proofs_waiting ;
+    (*Core.printf !"Scan state: %{sexp:scan_state}\n %!" scan_state' ;*)
+    let _f () =
+      Logger.info logger
+        "Block info: No of transactions included:%d Coinbase parts:%d Work \
+         count:%d Spots available:%d Proofs waiting to be solved:%d"
+        user_commands_count cb_parts_count (List.length works) spots_available
+        proofs_waiting
+    in
     ( `Hash_after_applying (hash t)
     , `Ledger_proof res_opt
     , `Staged_ledger {scan_state= scan_state'; ledger= new_ledger} )
@@ -747,15 +752,14 @@ end = struct
     in
     let res_opt =
       Or_error.ok_exn
-        (Scan_state.fill_in_transaction_snark_work scan_state' works)
+        (Scan_state.fill_work_and_enqueue_transactions scan_state' data works)
     in
-    Or_error.ok_exn (Scan_state.enqueue_transactions scan_state' data) ;
     Or_error.ok_exn (verify_scan_state_after_apply new_ledger scan_state') ;
     ( `Hash_after_applying (hash t)
     , `Ledger_proof res_opt
     , `Staged_ledger {scan_state= scan_state'; ledger= new_ledger} )
 
-  let work_to_do_exn scan_state : Transaction_snark_work.Statement.t Sequence.t
+  (*let work_to_do_exn scan_state : Transaction_snark_work.Statement.t Sequence.t
       =
     let work_seq =
       Scan_state.next_jobs_sequence scan_state |> Or_error.ok_exn
@@ -765,6 +769,18 @@ end = struct
            match Scan_state.statement_of_job maybe_work with
            | None -> assert false
            | Some work -> work )
+
+  let _min_work_to_do_exn scan_state :
+      Transaction_snark_work.Statement.t Sequence.t
+      =
+    let work_seq =
+      Scan_state.next_jobs_sequence scan_state |> Or_error.ok_exn
+    in
+    sequence_chunks_of ~n:Transaction_snark_work.proofs_length
+    @@ Sequence.map work_seq ~f:(fun maybe_work ->
+           match Scan_state.statement_of_job maybe_work with
+           | None -> assert false
+           | Some work -> work )*)
 
   module Resources = struct
     module Discarded = struct
@@ -1196,9 +1212,11 @@ end = struct
         t.scan_state
     in
     (*TODO: return an or_error here *)
-    let all_work_to_do = work_to_do_exn t.scan_state in
+    let all_work_to_do =
+      Scan_state.all_work_to_do t.scan_state |> Or_error.ok_exn
+    in
     let min_work_to_do =
-      Or_error.ok_exn (Scan_state.filter_jobs_by_seq_no t.scan_state)
+      Scan_state.min_work_to_do t.scan_state |> Or_error.ok_exn
     in
     let completed_works_seq =
       Sequence.fold_until all_work_to_do ~init:Sequence.empty
@@ -1213,8 +1231,12 @@ end = struct
     let max_jobs_count =
       max
         (Sequence.length completed_works_seq)
-        (min (Sequence.length all_work_to_do) (List.length min_work_to_do))
+        (min (Sequence.length all_work_to_do) (Sequence.length min_work_to_do))
     in
+    Core.printf "all: %d min: %d curr: %d \n %!"
+      (Sequence.length all_work_to_do)
+      (Sequence.length min_work_to_do)
+      (Sequence.length completed_works_seq) ;
     (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
     let transactions_rev =
       Sequence.fold transactions_by_fee ~init:Sequence.empty ~f:(fun seq t ->
@@ -1232,8 +1254,10 @@ end = struct
       generate logger completed_works_seq transactions_rev self partitions
         max_jobs_count
     in
-    Logger.info logger "Block stats: Proofs ready for purchase: %d"
-      (Sequence.length completed_works_seq) ;
+    let _f () =
+      Logger.info logger "Block stats: Proofs ready for purchase: %d"
+        (Sequence.length completed_works_seq)
+    in
     trace_event "prediffs done" ;
     { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
     ; creator= self
@@ -1242,6 +1266,9 @@ end
 
 let%test_module "test" =
   ( module struct
+    let intpair_to_str ((i1 : int), (i2 : int)) =
+      Int.to_string i1 ^ " " ^ Int.to_string i2
+
     module Test_input1 = struct
       open Coda_pow
       module Compressed_public_key = String
@@ -1391,15 +1418,29 @@ let%test_module "test" =
       end
 
       module Ledger_hash = struct
-        include String
+        module T = struct
+          type t = int * int [@@deriving sexp, bin_io, compare, hash, eq]
+        end
 
-        let to_bytes : t -> string = fun t -> t
+        include T
+        include Hashable.Make_binable (T)
+
+        let to_bytes : t -> string =
+         fun _ -> failwith "to_bytes in ledger hash"
+
+        let gen =
+          let open Quickcheck.Generator.Let_syntax in
+          let%bind i = Int.gen in
+          let%map j = Int.gen in
+          (i, j)
       end
 
       module Frozen_ledger_hash = struct
         include Ledger_hash
 
         let of_ledger_hash = Fn.id
+
+        let equal t t' = fst t = fst t'
       end
 
       module Ledger_proof_statement = struct
@@ -1415,11 +1456,11 @@ let%test_module "test" =
           let merge s1 s2 =
             let open Or_error.Let_syntax in
             let%bind _ =
-              if Ledger_hash.equal s1.target s2.source then Ok ()
+              if fst s1.target = fst s2.source then Ok ()
               else
                 Or_error.errorf
                   !"Invalid merge: target: %s source %s"
-                  s1.target s2.source
+                  (intpair_to_str s1.target) (intpair_to_str s2.source)
             in
             let%map fee_excess =
               Fee.Signed.add s1.fee_excess s2.fee_excess
@@ -1479,7 +1520,7 @@ let%test_module "test" =
 
       module Ledger = struct
         (*TODO: Test with a ledger that's more comprehensive*)
-        type t = int ref [@@deriving sexp, bin_io, compare]
+        type t = (int * int) ref [@@deriving sexp, bin_io, compare]
 
         type ledger_hash = Ledger_hash.t
 
@@ -1491,27 +1532,25 @@ let%test_module "test" =
           let transaction t = Ok t
         end
 
-        let create ?directory_name:_ () = ref 0
+        let create ?directory_name:_ () = ref (0, 0)
 
         let copy : t -> t = fun t -> ref !t
 
-        let merkle_root : t -> ledger_hash = fun t -> Int.to_string !t
-
-        let to_list t = [!t]
+        let merkle_root : t -> ledger_hash = fun t -> !t
 
         let num_accounts _ = 0
 
         (* BEGIN BOILERPLATE UNUSED *)
-        type serializable = int [@@deriving bin_io]
+        type serializable = int * int [@@deriving bin_io]
 
         type maskable_ledger = t
 
         type attached_mask = t [@@deriving sexp]
 
         module Mask = struct
-          type t = int [@@deriving bin_io]
+          type t = int * int [@@deriving bin_io]
 
-          let create () = 0
+          let create () = (0, 0)
         end
 
         type unattached_mask = Mask.t
@@ -1528,18 +1567,20 @@ let%test_module "test" =
 
         let commit _t = ()
 
+        let to_list _ = failwith "unimplemented"
+
         let apply_transaction : t -> Undo.t -> Undo.t Or_error.t =
          fun t s ->
           match s with
           | User_command t' ->
-              t := !t + fst t' ;
+              t := (fst !t + fst t', snd !t) ;
               Or_error.return (Transaction.User_command t')
           | Fee_transfer f ->
               let t' = Fee_transfer.fee_excess_int f in
-              t := !t + t' ;
+              t := (fst !t + t', snd !t) ;
               Or_error.return (Transaction.Fee_transfer f)
           | Coinbase c ->
-              t := !t + Currency.Amount.to_int c.amount ;
+              t := (fst !t + Currency.Amount.to_int c.amount, snd !t) ;
               Or_error.return (Transaction.Coinbase c)
 
         let undo_transaction : t -> transaction -> unit Or_error.t =
@@ -1550,14 +1591,14 @@ let%test_module "test" =
             | Fee_transfer f -> Fee_transfer.fee_excess_int f
             | Coinbase c -> Currency.Amount.to_int c.amount
           in
-          t := !t - v ;
+          t := (fst !t - v, snd !t) ;
           Or_error.return ()
 
         let undo t (txn : Undo.t) = undo_transaction t txn
       end
 
       module Sparse_ledger = struct
-        type t = int [@@deriving sexp, bin_io]
+        type t = int * int [@@deriving sexp, bin_io]
 
         let of_ledger_subset_exn :
             Ledger.t -> Compressed_public_key.t list -> t =
@@ -1590,7 +1631,7 @@ let%test_module "test" =
 
         let of_aux_and_ledger_hash : staged_ledger_aux_hash -> ledger_hash -> t
             =
-         fun ah h -> ah ^ h
+         fun ah h -> ah ^ intpair_to_str h
       end
 
       module Transaction_snark_work = struct
@@ -1771,7 +1812,7 @@ let%test_module "test" =
       end
 
       module Config = struct
-        let transaction_capacity_log_2 = 7
+        let transaction_capacity_log_2 = 3
 
         let work_availability_factor = 2
       end
@@ -1789,15 +1830,37 @@ let%test_module "test" =
 
     let self_pk = "me"
 
-    let stmt_to_work (stmts : Test_input1.Transaction_snark_work.Statement.t) :
-        Test_input1.Transaction_snark_work.Checked.t option =
+    let _stmt_to_work (stmts : Test_input1.Transaction_snark_work.Statement.t)
+        : Test_input1.Transaction_snark_work.Checked.t option =
       let prover =
-        List.fold stmts ~init:"P" ~f:(fun p stmt -> p ^ stmt.target)
+        List.fold stmts ~init:"P" ~f:(fun p stmt ->
+            p ^ intpair_to_str stmt.target )
       in
       Some
         { Test_input1.Transaction_snark_work.Checked.fee= Fee.Unsigned.of_int 1
         ; proofs= stmts
         ; prover }
+
+    let stmt_to_work_restricted (create_for : int -> bool)
+        (stmts : Test_input1.Transaction_snark_work.Statement.t) :
+        Test_input1.Transaction_snark_work.Checked.t option =
+      let prover =
+        List.fold stmts ~init:"P" ~f:(fun p stmt ->
+            p ^ intpair_to_str stmt.target )
+      in
+      let last_stmt : Test_input1.Ledger_proof_statement.t =
+        List.nth_exn stmts (List.length stmts - 1)
+      in
+      let block_number = snd last_stmt.target in
+      if create_for block_number then
+        Some
+          { Test_input1.Transaction_snark_work.Checked.fee=
+              Fee.Unsigned.of_int 1
+          ; proofs= stmts
+          ; prover }
+      else (
+        Core.printf "did not create proof \n %!" ;
+        None )
 
     let create_and_apply sl logger txns stmt_to_work =
       let open Deferred.Let_syntax in
@@ -1833,19 +1896,20 @@ let%test_module "test" =
     let assert_at_least_coinbase_added txns cb = assert (txns > 0 || cb > 0)
 
     let expected_ledger no_txns_included txns_sent old_ledger =
-      old_ledger
-      + Currency.Amount.to_int Protocols.Coda_praos.coinbase_amount
-      + List.sum
-          (module Int)
-          (List.take txns_sent no_txns_included)
-          ~f:(fun (t, fee) -> t + fee)
+      ( fst old_ledger
+        + Currency.Amount.to_int Protocols.Coda_praos.coinbase_amount
+        + List.sum
+            (module Int)
+            (List.take txns_sent no_txns_included)
+            ~f:(fun (t, fee) -> t + fee)
+      , snd old_ledger )
 
     let%test_unit "Max throughput" =
       (*Always at worst case number of provers*)
       let logger = Logger.create () in
       let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
-      let initial_ledger = ref 0 in
+      let initial_ledger = ref (0, 0) in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
       Quickcheck.test g ~trials:1000 ~f:(fun _ ->
           Async.Thread_safe.block_on_async_exn (fun () ->
@@ -1853,10 +1917,18 @@ let%test_module "test" =
               let all_ts =
                 txns (p / 2) (fun x -> (x + 1) * 100) (fun _ -> 4)
               in
+              Core.printf !"ledger %{sexp: (int*int)} \n %!" !(Sl.ledger !sl) ;
               let%map ledger_proof, diff =
                 create_and_apply sl logger (Sequence.of_list all_ts)
-                  stmt_to_work
+                  (stmt_to_work_restricted (fun x ->
+                       x
+                       <= max 0
+                            ( snd !(Sl.ledger !sl)
+                            - Test_input1.Config.work_availability_factor ) ))
               in
+              Core.printf "block number: %d \n %! " (snd !(Sl.ledger !sl)) ;
+              let l = Sl.ledger !sl in
+              l := (fst !l, snd !l + 1) ;
               let fee_excess =
                 Option.value_map ~default:Currency.Fee.Signed.zero ledger_proof
                   ~f:(fun proof ->
@@ -1875,15 +1947,15 @@ let%test_module "test" =
               in
               assert_at_least_coinbase_added x cb ;
               let expected_value = expected_ledger x all_ts old_ledger in
-              assert (!(Sl.ledger !sl) = expected_value) ) )
+              assert (fst !(Sl.ledger !sl) = fst expected_value) ) )
 
-    let%test_unit "Be able to include random number of user_commands" =
+    (*let%test_unit "Be able to include random number of user_commands" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
       let logger = Logger.create () in
       let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
-      let initial_ledger = ref 0 in
+      let initial_ledger = ref (0,0)in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
       Quickcheck.test g ~trials:1000 ~f:(fun i ->
           Async.Thread_safe.block_on_async_exn (fun () ->
@@ -1927,7 +1999,7 @@ let%test_module "test" =
       let logger = Logger.create () in
       let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
-      let initial_ledger = ref 0 in
+      let initial_ledger = ref (0,0)in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
       Quickcheck.test g ~trials:1000 ~f:(fun i ->
           Async.Thread_safe.block_on_async_exn (fun () ->
@@ -1975,7 +2047,7 @@ let%test_module "test" =
             @ [[(1, 0); (1, 0); (1, 0)]] @ [[(1, 0); (1, 0)]]
             @ [[(1, 0); (1, 0)]]
           in
-          let ledger = ref 0 in
+          let ledger = ref (0,0) in
           let sl = ref (Sl.create ~ledger) in
           let%map _ =
             Deferred.List.fold ~init:() txns ~f:(fun _ ts ->
@@ -1991,9 +2063,9 @@ let%test_module "test" =
       let logger = Logger.create () in
       let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
-      let initial_ledger = ref 0 in
+      let initial_ledger = ref (0,0)in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
-      let expected_snarked_ledger = ref 0 in
+      let expected_snarked_ledger = ref (0,0) in
       Quickcheck.test g ~trials:50 ~f:(fun i ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
@@ -2001,17 +2073,17 @@ let%test_module "test" =
               let%map proof, _ =
                 create_and_apply sl logger (Sequence.of_list ts) stmt_to_work
               in
-              let last_snarked_ledger, snarked_ledger_hash =
+              let last_snarked_ledger, _snarked_ledger_hash =
                 Option.value_map
                   ~default:
                     ( !expected_snarked_ledger
-                    , Int.to_string !expected_snarked_ledger )
-                  ~f:(fun p -> (Int.of_string p.target, p.target))
+                    , intpair_to_str !expected_snarked_ledger )
+                  ~f:(fun p -> ( p.target, intpair_to_str p.target))
                   proof
               in
               expected_snarked_ledger := last_snarked_ledger ;
               let materialized_ledger =
-                Or_error.ok_exn @@ Sl.snarked_ledger !sl ~snarked_ledger_hash
+                Or_error.ok_exn @@ Sl.snarked_ledger !sl ~snarked_ledger_hash:last_snarked_ledger
               in
-              assert (!expected_snarked_ledger = !materialized_ledger) ) )
+              assert (!expected_snarked_ledger = !materialized_ledger) ) )*)
   end )

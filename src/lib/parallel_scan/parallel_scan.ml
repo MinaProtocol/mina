@@ -23,8 +23,6 @@ module Job_view = struct
   type 'a t = int * 'a node [@@deriving sexp]
 end
 
-let default_seq_no = 0
-
 module State = struct
   include State
 
@@ -56,7 +54,7 @@ module State = struct
     ; recent_tree_data= []
     ; other_trees_data= []
     ; stateful_work_order= Queue.create ()
-    ; curr_job_seq_no= 1 }
+    ; curr_job_seq_no= 0 }
 
   let next_leaf_pos p cur_pos =
     if cur_pos = (2 * p) - 2 then p - 1 else cur_pos + 1
@@ -274,8 +272,8 @@ module State = struct
       match (dir, cur_job) with
       | `Left, Merge Empty -> Ok (Merge (Lcomp z))
       | `Right, Merge Empty -> Ok (Merge (Rcomp z))
-      | `Left, Merge (Rcomp a) -> Ok (Merge (Bcomp (z, a, default_seq_no)))
-      | `Right, Merge (Lcomp a) -> Ok (Merge (Bcomp (a, z, default_seq_no)))
+      | `Left, Merge (Rcomp a) -> Ok (Merge (Bcomp (z, a, t.curr_job_seq_no)))
+      | `Right, Merge (Lcomp a) -> Ok (Merge (Bcomp (a, z, t.curr_job_seq_no)))
       | `Left, Merge (Lcomp _) | `Right, Merge (Rcomp _) | _, Merge (Bcomp _)
         ->
           (*TODO: punish the sender*)
@@ -353,7 +351,7 @@ module State = struct
     let open Or_error.Let_syntax in
     let f (job : ('a, 'd) State.Job.t) : ('a, 'd) State.Job.t Or_error.t =
       match job with
-      | Base None -> Ok (Base (Some (value, default_seq_no)))
+      | Base None -> Ok (Base (Some (value, state.curr_job_seq_no)))
       | _ ->
           Or_error.error_string "Invalid job encountered while enqueuing data"
     in
@@ -666,6 +664,8 @@ let gen :
       Or_error.ok_exn @@ enqueue_data ~state:s ~data:chunk ;
       assert (is_valid s) ;
       s )
+
+let default_seq_no = 0
 
 let%test_module "scans" =
   ( module struct
