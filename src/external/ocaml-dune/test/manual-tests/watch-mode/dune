@@ -1,8 +1,0 @@
-(rule
- (deps    x)
- (targets y)
- (action  (run ./client.exe)))
-
-(executables
- (names orchestrate client)
- (libraries unix threads))

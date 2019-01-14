@@ -1,4 +1,0 @@
-(library
- (name lib)
- (wrapped false)
- (private_modules x))

@@ -1,5 +1,0 @@
-
-(library
- ((name foo_ppx_rewriter_jbuild)
-  (public_name foo.ppx_rewriter_jbuild)
-  (kind ppx_rewriter)))

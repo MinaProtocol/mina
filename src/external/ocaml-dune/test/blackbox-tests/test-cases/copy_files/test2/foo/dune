@@ -1,5 +1,0 @@
-(copy_files# ../dummy.txt)
-
-(alias
- (name cat)
- (action (cat %{dep:dummy.txt})))

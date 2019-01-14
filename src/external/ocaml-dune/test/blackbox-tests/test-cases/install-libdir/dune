@@ -1,9 +1,0 @@
-(library
- (name        foo)
- (public_name foo)
-)
-
-(install
- (section man)
- (files a-man-page.1 another-man-page.3 a-man-page-with-no-ext)
-)

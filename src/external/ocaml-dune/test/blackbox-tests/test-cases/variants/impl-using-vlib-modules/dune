@@ -1,7 +1,0 @@
-(executable
- (name test)
- (libraries impl))
-
-(alias
- (name default)
- (action (run ./test.exe)))
