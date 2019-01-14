@@ -1,2 +1,0 @@
-(menhir (modules parser))
-(library (name foo))

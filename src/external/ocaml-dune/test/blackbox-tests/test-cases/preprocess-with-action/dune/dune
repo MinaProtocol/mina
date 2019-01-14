@@ -1,3 +1,0 @@
-(test
- (name test)
- (preprocess (action (run pp/pp.exe %{input-file}))))

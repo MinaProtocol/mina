@@ -1,1 +1,0 @@
-print_endline _STRING_

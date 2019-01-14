@@ -1,7 +1,0 @@
-(executable
- (name run)
- (libraries impl))
-
-(alias
- (name default)
- (action (run ./run.exe)))
