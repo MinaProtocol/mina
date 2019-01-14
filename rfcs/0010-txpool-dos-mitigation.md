@@ -77,24 +77,58 @@ the transaction and do not gossip it.
     transactions already in the pool. (If it conflicts with one in the pool, see
     below.)
 
-If we get any transactions where the signature is invalid, we blacklist the
-sending node immediately. No honest node sends transactions like that. If we get
-transactions that fail for other reasons - the ones that depend on the current
-chain state - then we increment the node's bad tx count. We track the bad/good
-tx ratio, and blacklist the node if it exceeds `bad_tx_blacklist_ratio`. Honest
-nodes that are out of date might innocently send us transactions that are not
-valid, but they won't send us a lot of them. If a node detects it is
-substantially behind the network, it should disable gossip until it catches up.
-We give new peers `good_faith_tx_credits` good transaction credits when we first
-connect to them. That way we won't erroneously blacklist honest peers early on.
+#### New punishment scheme
+
+There are scenarios where an honest node may send us transactions we don't want,
+e.g. insufficient fee transactions if their pool is less full than ours or
+out-of-date transactions if they're behind us. These consume resources but are
+useless to us, and attackers may send lots of them. So we need a way to punish
+nodes for sending them, while not banning innocent nodes. We may also be subject
+to Sybil attacks - an attacker may create lots of nodes that never do anything
+bannable but also don't properly gossip or otherwise contribute. They can
+degrade service if the Sybil nodes crowd out real ones. So we want a way to
+reward nodes for good conduct, and to punish them for bad but potentially honest
+conduct.
+
+So we modify `banlist.ml` and friends. Rather than a node being either `Normal`,
+`Punished`, or `Suspicious`, every node has a continuous, real valued "trust"
+score. Nodes that give us useful data gain trust, nodes that give us useless
+data lose trust, and nodes that give us invalid data lose a lot of trust. Trust
+exponentially decays towards zero over time, with the decay rate set such that
+half of it decays in 24 hours. This works out to decay factor of
+~0.999991977495368389 as applied every second. We'll update trust scores lazily:
+for each node we store the score the last time it was updated, and the time it
+was updated. The new score = `decay_factor**(seconds since last update) * old
+score`. We'll need to adapt the existing code that bans/punishes peers.
+
+If a node's trust goes below -100, we'll ban it for 24 hours. In the future it
+may be worth it to prioritize nodes based on trust rather than using a sharp
+threshold. This would mitigate Sybil attacks: if we bias peer selection towards
+more trusted nodes, then an attacker would have to contribute in order to get
+connections, and can't crowd out honest nodes. The best way to do that is to
+modify the Kademlia system. The way it works now is that nodes are prioritized
+in buckets based on how old they are - on the basis that nodes that have been up
+for longer are likelier to continue to be up than newer ones, and that having to
+run nodes for a long time makes Sybil attacks expensive. We'd replace age with
+trust score. But this is a pretty substantial modification (and maybe we're
+replacing kad anyway?), so for now we'll just use the discrete banned/not banned
+state.
+
+If we get any transactions where the signature is invalid, we reduce the peer's
+trust by 100, effectively banning it for 24 hours. No honest node sends
+transactions like that. If we get transactions that fail for other reasons - the
+ones that depend on the current chain state - then we reduce the peer's trust by
+`tx_trust_increment`. If we accept the transaction we increase trust by the same
+amount. Honest nodes that are out of date might innocently send us transactions
+that are not valid, but they won't send us a lot of them. If a node detects it
+is substantially behind the network, it should disable gossip until it catches
+up.
 
 #### Replacing transactions
 
 A useful feature of existing cryptocurrencies is the ability to replace a
 pending transaction with a different one by broadcasting a new one with the same
-nonce. Users can e.g. cancel payments by replacing them with a no-op transaction
-(send themselves $0) or resend them with a higher fee if they're processing too
-slow.
+nonce.
 
 We want to have this feature, but it allows an attacker to make proposers
 process transactions which won't eventually get mined (the ones that are
@@ -121,25 +155,19 @@ transaction from the mempool, or drop the incoming transaction if its fee is <=
 the lowest fee transaction in the mempool.
 
 If an incoming transaction has too low of a fee for us to accept, we count it as
-bad for the purposes of `bad_tx_blacklist_ratio`. Except in the case of
-replacement transactions. If we punished nodes for sending transactions without
-the replacement fee increment, an attacker could induce nodes to blacklist each
+bad for the purposes of trust scores. Except in the case of replacement
+transactions. If we punished nodes for sending transactions without the
+replacement fee increment, an attacker could induce nodes to blacklist each
 other by sending them different transactions at the same nonce.
 
 ### Constants
 
--   `bad_tx_blacklist_ratio`: There are two situations where honest nodes send us
-    bad transactions. The first is when they are slightly behind us on the
-    consensus state, which is going to happen all the time just because of network
-    delay. The second is when they are substantially out of sync but haven't
-    noticed yet. After they notice they're supposed to disable gossip until
-    they're caught up. Dishonest nodes will send us invalid transactions in order
-    to waste our resources. Let's set this to 50% bad transactions. An attacker
-    then has to spend 2x as much resources to send a given amount of transactions.
-
--   `good_faith_tx_credits`: Let's say we assume good faith if the first two
-    transactions we receive from a new peer are bad, but give up on them after
-    that. That means this value should be 2.
+-   `tx_trust_increment`: Let's say we target a max rate of bad transactions of
+    one per 10 seconds. The maximum rate bad transactions can be sent at without
+    getting banned is when the peer is just below the ban threshold -
+    exponential decay means the trust decays fastest when it's absolute value is
+    highest. The ban threshold is 100, so the algebra comes out to
+    `100 * decay_rate ** 10 + 100` = 8.022215015188294e-3.
 
 -   `max_txpool_size`: This is interesting. If there were a fixed limit on the
     number of transactions per block I'd say set it to an hour's worth or
