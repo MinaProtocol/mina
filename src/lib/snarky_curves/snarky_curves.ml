@@ -134,7 +134,7 @@ module Make_weierstrass_checked
 
       val double : t -> t
 
-      val add : t -> t -> t
+      val ( + ) : t -> t -> t
 
       val negate : t -> t
 
@@ -144,7 +144,7 @@ module Make_weierstrass_checked
   Weierstrass_checked_intf
   with module Impl := F.Impl
    and type unchecked := Curve.t
-   and type t := F.t * F.t = struct
+   and type t = F.t * F.t = struct
   open F.Impl
 
   type t = F.t * F.t
@@ -403,9 +403,9 @@ module Make_weierstrass_checked
     let to_term ~two_to_the_i ~two_to_the_i_plus_1 bits =
       lookup_point bits
         ( sigma
-        , Curve.add sigma two_to_the_i
-        , Curve.add sigma two_to_the_i_plus_1
-        , Curve.(add sigma (add two_to_the_i two_to_the_i_plus_1)) )
+        , Curve.(sigma + two_to_the_i)
+        , Curve.(sigma + two_to_the_i_plus_1)
+        , Curve.(sigma + two_to_the_i + two_to_the_i_plus_1) )
     in
     (*
        Say b = b0, b1, .., b_{n-1}.
@@ -431,7 +431,7 @@ module Make_weierstrass_checked
       | [] -> return acc
       | [b_i] ->
           let term =
-            lookup_single_bit b_i (sigma, Curve.add sigma two_to_the_i)
+            lookup_single_bit b_i (sigma, Curve.(sigma + two_to_the_i))
           in
           Shifted.add acc term
       | b_i :: b_i_plus_1 :: rest ->
@@ -447,6 +447,16 @@ module Make_weierstrass_checked
       Curve.scale (Curve.negate sigma) (Scalar.of_int sigma_count)
     in
     Shifted.add result_with_shift (constant unshift)
+
+  let to_constant (x, y) =
+    let open Option.Let_syntax in
+    let%map x = F.to_constant x and y = F.to_constant y in
+    Curve.of_affine_coordinates (x, y)
+
+  let scale m t c ~init =
+    match to_constant t with
+    | Some t -> scale_known m t c ~init
+    | None -> scale m t c ~init
 
   let sum (type shifted) (module Shifted : Shifted.S with type t = shifted) xs
       ~init =

@@ -2,13 +2,18 @@ open Core_kernel
 
 let ( = ) = `Don't_use_polymorphic_compare
 
-module Make
-    (N : Nat_intf.S)
-    (Fq : Fields.Intf) (Coefficients : sig
-        val a : Fq.t
+module Make (N : sig
+  type t
 
-        val b : Fq.t
-    end) =
+  val test_bit : t -> int -> bool
+
+  val num_bits : t -> int
+end)
+(Fq : Fields.Intf) (Coefficients : sig
+    val a : Fq.t
+
+    val b : Fq.t
+end) =
 struct
   type t = {x: Fq.t; y: Fq.t; z: Fq.t} [@@deriving bin_io, sexp]
 
@@ -19,6 +24,8 @@ struct
   let to_affine_coordinates {x; y; z} =
     let z_inv = Fq.inv z in
     Fq.(x * z_inv, y * z_inv)
+
+  let of_affine_coordinates (x, y) = {x; y; z= Fq.one}
 
   let is_zero t = Fq.(equal zero t.x) && Fq.(equal zero t.z)
 
