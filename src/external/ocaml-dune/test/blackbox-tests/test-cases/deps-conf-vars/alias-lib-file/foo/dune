@@ -1,7 +1,0 @@
-(library
- (public_name foo))
-
-(install
- (section lib)
- (package foo)
- (files (a as theories/a)))

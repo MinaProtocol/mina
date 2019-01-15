@@ -1,3 +1,0 @@
-(alias
- (name default)
- (action (echo "default target works")))

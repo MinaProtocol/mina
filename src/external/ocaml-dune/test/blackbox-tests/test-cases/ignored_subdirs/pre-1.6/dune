@@ -1,3 +1,0 @@
-(ignored_subdirs (data))
-;; more than ignored_subdirs is counted
-(ignored_subdirs (garbage))
