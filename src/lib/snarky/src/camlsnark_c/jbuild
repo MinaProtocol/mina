@@ -31,7 +31,7 @@
  ((targets (libcamlsnark_c_stubs.a ))
   (deps ((files_recursively_in libsnark-caml)))
   (action (bash "
-  if [ $(uname) = "Linux" ]; then
+  if [ $(uname) = 'Linux' ]; then
     pushd libsnark-caml
     mkdir -p build
     pushd build
@@ -53,7 +53,7 @@
     popd
     popd
     mv libsnark-caml/build/libcamlsnark_c_stubs.a .
-elif [ $(uname) = "Darwin" ]; then
+elif [ $(uname) = 'Darwin' ]; then
   pushd libsnark-caml
     mkdir -p build
     pushd build
@@ -77,7 +77,7 @@ elif [ $(uname) = "Darwin" ]; then
   mv libsnark-caml/build/libcamlsnark_c_stubs.a .
     
 else
-    echo "I do not know how to build libsnark on $(uname)"
+    echo I do not know how to build libsnark on $(uname)
     exit 1
 fi
 "))))
