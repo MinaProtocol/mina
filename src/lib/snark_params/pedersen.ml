@@ -110,19 +110,84 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
         =
       {acc= init; triples_consumed; params; chunk_table}
 
+    type fold_result =
+      { acc: Curve.t
+      ; triples_consumed: int
+      ; synched: bool (* have we reached a chunk boundary *)
+      ; chunk_rev: bool Triple.t list (* reversed chunk, or part of one *)
+      ; chunk_rev_len: int (* length of chunk_rev *)
+      ; params_ndx: int
+      (* index into the chunk table to use *) }
+
     let update_fold (t : t) (fold : bool Triple.t Fold.t) =
       let params = t.params in
-      let acc, triples_consumed =
-        fold.fold ~init:(t.acc, t.triples_consumed) ~f:(fun (acc, i) triple ->
-            let term =
-              Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
-                triple
-            in
-            (Curve.add acc term, i + 1) )
+      let params_ndx =
+        if Int.equal (t.triples_consumed mod Chunk.size) 0 then
+          (* at chunk boundary *)
+          t.triples_consumed / Chunk.size
+        else (* next chunk boundary *)
+          (t.triples_consumed / Chunk.size) + 1
       in
-      {t with acc; triples_consumed}
+      let ({acc; triples_consumed; chunk_rev; _} : fold_result) =
+        fold.fold
+          ~init:
+            { acc= t.acc
+            ; triples_consumed= t.triples_consumed
+            ; synched= false
+            ; chunk_rev= []
+            ; chunk_rev_len= 0
+            ; params_ndx } ~f:(fun accum triple ->
+            let synched =
+              accum.synched
+              || Int.equal (t.triples_consumed mod Chunk.size) (Chunk.size - 1)
+            in
+            if synched then
+              if Int.equal (accum.chunk_rev_len + 1) Chunk.size then
+                (* full chunk *)
+                let n = Chunk.to_int (List.rev (triple :: accum.chunk_rev)) in
+                let g =
+                  t.chunk_table.curve_points_table.(accum.params_ndx).(n)
+                in
+                { acc= Curve.add accum.acc g
+                ; triples_consumed= accum.triples_consumed + Chunk.size
+                ; synched= true (* once synched, stay synched *)
+                ; chunk_rev= [] (* start new chunk *)
+                ; chunk_rev_len= 0
+                ; params_ndx= accum.params_ndx + 1 }
+              else
+                (* build next chunk *)
+                { accum with
+                  synched= true
+                ; chunk_rev= triple :: accum.chunk_rev
+                ; chunk_rev_len= accum.chunk_rev_len + 1 }
+            else
+              (* not synched, consume one triple *)
+              let term =
+                Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
+                  triple
+              in
+              { accum with
+                acc= Curve.add accum.acc term
+              ; triples_consumed= accum.triples_consumed + 1 } )
+      in
+      let new_state = {t with acc; triples_consumed} in
+      if List.is_empty chunk_rev then (* no stragglers *)
+        new_state
+      else
+        let stragglers = List.rev chunk_rev in
+        let acc, triples_consumed =
+          List.fold stragglers
+            ~init:(new_state.acc, new_state.triples_consumed)
+            ~f:(fun (acc, i) triple ->
+              let term =
+                Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
+                  triple
+              in
+              (Curve.add acc term, i + 1) )
+        in
+        {new_state with acc; triples_consumed}
 
-    let digest t =
+    let digest (t : t) =
       let x, _y = Curve.to_coords t.acc in
       x
 

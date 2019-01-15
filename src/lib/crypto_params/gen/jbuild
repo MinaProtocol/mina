@@ -12,6 +12,7 @@
       tuple_lib
       ppxlib
       crypto_params_init
+      chunk_table
       chunked_triples
     ))
    (preprocess (pps (ppx_jane ppxlib.metaquot ppxlib.runner)))

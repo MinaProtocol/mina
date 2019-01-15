@@ -3,7 +3,6 @@ open Asttypes
 open Parsetree
 open Longident
 open Core
-open Async
 open Fold_lib
 open Chunked_triples
 
@@ -132,16 +131,6 @@ let get_chunk_table () =
   let result = loop ~chunk:0 [] in
   result
 
-(* the type t here must be exactly the same as the Chunk_table.t
-   in chunk_table_structure below, so that serialization and
-   deserialization works correctly
-*)
-module Chunk_table = struct
-  type t = {table_data: Group.t array array} [@@deriving bin_io]
-
-  let create chunk_size table_data = {table_data}
-end
-
 (* the AST representation of the chunk table is its string serialization
    - an AST for the table itself, using string representations of 
       Field pairs, as is done for the params, is too large, causing
@@ -155,7 +144,7 @@ let chunk_table_ast ~loc =
     let loc = loc
   end) in
   let open E in
-  let chunk_table = Chunk_table.create Chunk.size (get_chunk_table ()) in
+  let chunk_table = Chunk_table.create (get_chunk_table ()) in
   let chunk_table_string =
     Binable.to_string (module Chunk_table) chunk_table
   in
@@ -171,10 +160,6 @@ let chunk_table_structure ~loc =
     module Group = Crypto_params_init.Tick_backend.Inner_curve
 
     let chunk_table_string_opt_ref = ref (Some [%e chunk_table_ast ~loc])
-
-    module Chunk_table = struct
-      type t = {table_data: Group.t array array} [@@deriving bin_io]
-    end
 
     let chunk_table : Chunk_table.t =
       let chunk_table_string = Option.value_exn !chunk_table_string_opt_ref in
@@ -192,5 +177,4 @@ let generate_ml_file filename structure =
 let () =
   generate_ml_file "pedersen_params.ml" params_structure ;
   generate_ml_file "pedersen_chunk_table.ml" chunk_table_structure ;
-  ignore (exit 0) ;
-  never_returns (Scheduler.go ())
+  ignore (exit 0)

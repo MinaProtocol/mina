@@ -7,7 +7,7 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries
-    (snarky bignum_bigint crypto_params_init tuple_lib))
+    (snarky bignum_bigint crypto_params_init chunk_table tuple_lib))
   (preprocess (pps (ppx_jane bisect_ppx -conditional)))
   (synopsis "Cryptographic parameters")))
 

@@ -38,7 +38,7 @@ let to_int t =
 let max_int =
   (* 3 because triples *)
   let num_bits = size * 3 in
-  int_of_float (2. ** float_of_int num_bits) - 1
+  Int.pow 2 num_bits - 1
 
 let of_int n : t =
   if n > max_int then
