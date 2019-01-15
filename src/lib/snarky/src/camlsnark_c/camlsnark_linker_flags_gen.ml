@@ -9,6 +9,7 @@ let () =
     ( match l with
     | "Darwin" ->
         [ sprintf "-Wl,-force_load,%s/libcamlsnark_c_stubs.a" cwd
+        ; "-L/usr/local/Cellar/openssl/1.0.2q/lib"
         ; "-lssl"
         ; "-lcrypto"
         ; "-lgmp"
