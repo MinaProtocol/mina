@@ -124,6 +124,21 @@ that are not valid, but they won't send us a lot of them. If a node detects it
 is substantially behind the network, it should disable gossip until it catches
 up.
 
+There was [some discussion](https://github.com/CodaProtocol/coda/pull/761#issuecomment-424456658)
+about score decay when the RFC for blacklisting was first proposed. It wasn't
+resolved and the current system doesn't implement any decay. A punishment score
+system with decay is equivalent to trust scores if you only count bad behavior.
+These are pretty close in effect, especially when we're doing discrete bans
+rather than prioritization, but there is an important difference. Imagine a very
+active peer, an exchange or a payment processor or something. It's not beyond
+the realm of possibility for a single node to send 1000txs/hr, especially since
+scalability is one of our core goals. If such a peer sends e.g. 2% bad
+transactions due to network delay + data corruption + whatever else, it will be
+banned if we only track bad behavior and not good - its punishment score will
+rise over time, by assumption faster than the decay. In this design with trust
+scores, its trust will increase faster than it falls and everything will be
+fine.
+
 #### Replacing transactions
 
 A useful feature of existing cryptocurrencies is the ability to replace a
