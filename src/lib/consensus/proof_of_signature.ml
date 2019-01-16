@@ -166,6 +166,18 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     module Prover_state = Prover_state
   end)
 
+  module For_tests = struct
+    let gen_consensus_state ~gen_slot_advancement:_ =
+      let open Consensus_state in
+      Quickcheck.Generator.return
+      @@ fun ~previous_protocol_state ~snarked_ledger_hash:_ ->
+      let prev =
+        Protocol_state.consensus_state (With_hash.data previous_protocol_state)
+      in
+      { length= Length.succ prev.length
+      ; signer_public_key= prev.signer_public_key }
+  end
+
   let block_interval_ms = Time.Span.to_ms proposal_interval
 
   let generate_transition ~previous_protocol_state ~blockchain_state ~time:_
@@ -191,7 +203,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     in
     (protocol_state, consensus_transition_data)
 
-  let is_valid _ ~time_received:_ = true
+  let received_at_valid_time _ ~time_received:_ = true
 
   let is_transition_valid_checked (transition : Snark_transition.var) =
     let Consensus_transition_data.({signature}) =
@@ -227,7 +239,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     ()
 
   let select ~existing:Consensus_state.({length= l1; _})
-      ~candidate:Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
+      ~candidate:Consensus_state.({length= l2; _}) ~logger:_ =
     if Length.compare l1 l2 >= 0 then `Keep else `Take
 
   let next_proposal now _state ~local_state:_ ~keypair ~logger:_ =
@@ -245,11 +257,16 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     ()
 
   let genesis_protocol_state =
-    Protocol_state.create_value
-      ~previous_state_hash:(Protocol_state.hash Protocol_state.negative_one)
-      ~blockchain_state:
-        (Snark_transition.genesis |> Snark_transition.blockchain_state)
-      ~consensus_state:
-        (Consensus_state.update
-           (Protocol_state.consensus_state Protocol_state.negative_one))
+    let state =
+      Protocol_state.create_value
+        ~previous_state_hash:(Protocol_state.hash Protocol_state.negative_one)
+        ~blockchain_state:
+          (Snark_transition.genesis |> Snark_transition.blockchain_state)
+        ~consensus_state:
+          (Consensus_state.update
+             (Protocol_state.consensus_state Protocol_state.negative_one))
+    in
+    With_hash.of_data ~hash_data:Protocol_state.hash state
+
+  let should_bootstrap ~existing:_ ~candidate:_ = false
 end

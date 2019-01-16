@@ -287,7 +287,7 @@ module type Basic = sig
     val project : bool list -> t
 
     module Checked : sig
-      type t = private (field, Var.t) Cvar.t
+      type t = (field, Var.t) Cvar.t
 
       val length : t -> int
       (** For debug purposes *)
@@ -477,9 +477,6 @@ module type Basic = sig
     -> ('var, 's) Checked.t
   (** TODO: Come up with a better name for this in relation to the above *)
 
-  val provide_witness :
-    ('var, 'value) Typ.t -> ('value, 's) As_prover.t -> ('var, 's) Checked.t
-
   val exists :
        ?request:('value Request.t, 's) As_prover.t
     -> ?compute:('value, 's) As_prover.t
@@ -517,6 +514,12 @@ module type Basic = sig
     -> 'k_var
     -> Keypair.t
 
+  val conv :
+       ('r_var -> 'r_value)
+    -> ('r_var, 'r_value, 'k_var, 'k_value) Data_spec.t
+    -> 'k_var
+    -> 'k_value
+
   val prove :
        Proving_key.t
     -> ((unit, 's) Checked.t, Proof.t, 'k_var, 'k_value) Data_spec.t
@@ -537,7 +540,8 @@ module type Basic = sig
 
   val check : ('a, 's) Checked.t -> 's -> bool
 
-  val constraint_count : (_, _) Checked.t -> int
+  val constraint_count :
+    ?log:(?start:bool -> string -> int -> unit) -> (_, _) Checked.t -> int
 end
 
 module type S = sig

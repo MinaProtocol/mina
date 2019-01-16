@@ -1,2 +1,0 @@
-(tests
- (names expect_test regular_test regular_test2))

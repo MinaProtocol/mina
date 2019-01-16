@@ -1,3 +1,0 @@
-#!/bin/sh
-export PATH="$ORIG_PATH"
-exec ocamlc "$@"

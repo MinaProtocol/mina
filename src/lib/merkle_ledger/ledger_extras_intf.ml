@@ -3,6 +3,8 @@
 module type S = sig
   include Merkle_ledger_intf.S
 
+  val with_ledger : f:(t -> 'a) -> 'a
+
   val set_at_addr_exn : t -> Addr.t -> account -> unit
 
   val key_of_index : t -> index -> key option

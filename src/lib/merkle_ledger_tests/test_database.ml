@@ -189,31 +189,17 @@ let%test_module "test functor on in memory databases" =
                 let result = MT.get_all_accounts_rooted_at_exn mdb address in
                 assert (List.equal ~equal:Account.equal accounts result) ) )
 
-      let%test_unit "copy" =
-        Test.with_instance (fun mdb ->
-            let gift = 1 in
-            let balance_gen = Int.gen_incl gift (Int.max_value - gift) in
-            let public_key =
-              Quickcheck.random_value ~seed:(`Deterministic "pk") Key.gen
-            in
-            let balance_int = Quickcheck.random_value balance_gen in
-            let balance = Balance.of_int balance_int in
-            let account = Account.create public_key balance in
-            let account_location = create_new_account_exn mdb account in
-            let mdb_copy = MT.copy mdb in
-            (* because of bounds on balance_int, sum won't overflow *)
-            let balance_with_gift =
-              Balance.of_int (Int.( + ) balance_int gift)
-            in
-            let updated_account =
-              {account with Account.balance= balance_with_gift}
-            in
-            MT.set mdb_copy account_location updated_account ;
-            let account' = MT.get mdb account_location |> Option.value_exn in
-            let updated_account' =
-              MT.get mdb_copy account_location |> Option.value_exn
-            in
-            assert (account' <> updated_account') )
+      let%test_unit "create_empty doesn't modify the hash" =
+        Test.with_instance (fun ledger ->
+            let open MT in
+            let key = List.nth_exn (Key.gen_keys 1) 0 in
+            let start_hash = merkle_root ledger in
+            match get_or_create_account_exn ledger key Account.empty with
+            | `Existed, _ ->
+                failwith
+                  "create_empty with empty ledger somehow already has that key?"
+            | `Added, new_loc ->
+                [%test_eq: Hash.t] start_hash (merkle_root ledger) )
 
       let%test "get_at_index_exn t (index_of_key_exn t public_key) = account" =
         Test.with_instance (fun mdb ->
@@ -276,8 +262,7 @@ let%test_module "test functor on in memory databases" =
             let accounts = random_accounts max_height |> dedup_accounts in
             List.iter accounts ~f:(fun account ->
                 create_new_account_exn mdb account |> ignore ) ;
-            assert (List.equal ~equal:Account.equal accounts (MT.to_list mdb))
-        )
+            [%test_result: Account.t list] accounts ~expect:(MT.to_list mdb) )
 
       let%test_unit "Add 2^d accounts (for testing, d is small)" =
         if Test.depth <= 8 then
@@ -389,7 +374,7 @@ let%test_module "test functor on in memory databases" =
           (Storage_locations)
 
       (* TODO: maybe this function should work with dynamic modules *)
-      let with_instance (type a) (f : MT.t -> a) =
+      let with_instance (f : MT.t -> 'a) =
         let mdb = MT.create () in
         f mdb
     end)

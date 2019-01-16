@@ -79,6 +79,7 @@ module T = struct
 
   type 'worker functions =
     { peers: ('worker, unit, Peers.t) Rpc_parallel.Function.t
+    ; start: ('worker, unit, unit) Rpc_parallel.Function.t
     ; get_balance:
         ( 'worker
         , Public_key.Compressed.t
@@ -99,6 +100,7 @@ module T = struct
 
   type coda_functions =
     { coda_peers: unit -> Peers.t Deferred.t
+    ; coda_start: unit -> unit Deferred.t
     ; coda_get_balance: Public_key.Compressed.t -> Maybe_currency.t Deferred.t
     ; coda_send_payment:
         Send_payment_input.t -> Receipt.Chain_hash.t Or_error.t Deferred.t
@@ -137,8 +139,14 @@ module T = struct
     let prove_receipt_impl ~worker_state ~conn_state:() input =
       worker_state.coda_prove_receipt input
 
+    let start_impl ~worker_state ~conn_state:() () = worker_state.coda_start ()
+
     let peers =
       C.create_rpc ~f:peers_impl ~bin_input:Unit.bin_t ~bin_output:Peers.bin_t
+        ()
+
+    let start =
+      C.create_rpc ~f:start_impl ~bin_input:Unit.bin_t ~bin_output:Unit.bin_t
         ()
 
     let get_balance =
@@ -158,7 +166,12 @@ module T = struct
         ~bin_output:State_hashes.bin_t ()
 
     let functions =
-      {peers; strongest_ledgers; get_balance; send_payment; prove_receipt}
+      { peers
+      ; start
+      ; strongest_ledgers
+      ; get_balance
+      ; send_payment
+      ; prove_receipt }
 
     let init_worker_state
         { host
@@ -174,11 +187,11 @@ module T = struct
       let log =
         Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string external_port)
       in
-      let%bind conf_temp_dir = Unix.mkdtemp conf_dir in
+      let%bind () = File_system.create_dir conf_dir in
       let module Config = struct
         let logger = log
 
-        let conf_dir = conf_temp_dir
+        let conf_dir = conf_dir
 
         let lbc_tree_max_depth = `Finite 50
 
@@ -198,26 +211,27 @@ module T = struct
       let%bind (module Init) = make_init ~should_propose (module Config) in
       let module Main = Coda_main.Make_coda (Init) in
       let module Run = Run (Config) (Main) in
-      let banlist_dir_name = conf_temp_dir ^/ "banlist" in
-      let%bind () = Async.Unix.mkdir banlist_dir_name in
+      let banlist_dir_name = conf_dir ^/ "banlist" in
+      let%bind () = File_system.create_dir banlist_dir_name in
       let%bind suspicious_dir =
         Unix.mkdtemp (banlist_dir_name ^/ "suspicious")
       in
       let%bind punished_dir = Unix.mkdtemp (banlist_dir_name ^/ "banned") in
-      let%bind receipt_chain_dir_name =
-        Unix.mkdtemp (conf_temp_dir ^/ "receipt_chain")
-      in
+      let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
+      let%bind () = File_system.create_dir receipt_chain_dir_name in
       let receipt_chain_database =
         Coda_base.Receipt_chain_database.create
           ~directory:receipt_chain_dir_name
       in
       let banlist = Coda_base.Banlist.create ~suspicious_dir ~punished_dir in
+      let time_controller = Main.Inputs.Time.Controller.create () in
       let net_config =
         { Main.Inputs.Net.Config.parent_log= log
+        ; time_controller
         ; gossip_net_params=
             { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
             ; target_peer_count= 8
-            ; conf_dir= conf_temp_dir
+            ; conf_dir
             ; initial_peers= peers
             ; me=
                 (Host_and_port.create ~host ~port:discovery_port, external_port)
@@ -229,13 +243,11 @@ module T = struct
         Main.create
           (Main.Config.make ~log ~net_config
              ~run_snark_worker:(Option.is_some snark_worker_config)
-             ~ledger_builder_persistant_location:
-               (conf_temp_dir ^/ "ledger_builder")
-             ~transaction_pool_disk_location:
-               (conf_temp_dir ^/ "transaction_pool")
-             ~snark_pool_disk_location:(conf_temp_dir ^/ "snark_pool")
-             ~time_controller:(Main.Inputs.Time.Controller.create ())
-             ~receipt_chain_database ~snark_work_fee:(Currency.Fee.of_int 0)
+             ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
+             ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
+             ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+             ~time_controller ~receipt_chain_database
+             ~snark_work_fee:(Currency.Fee.of_int 0)
              ?propose_keypair:Config.propose_keypair () ~banlist)
       in
       Option.iter snark_worker_config ~f:(fun config ->
@@ -244,14 +256,18 @@ module T = struct
           Run.run_snark_worker ~log ~client_port:config.port run_snark_worker
       ) ;
       let coda_peers () = return (Main.peers coda) in
-      let coda_get_balance pk = return (Run.get_balance coda pk) in
+      let coda_start () = return (Main.start coda) in
+      let coda_get_balance pk =
+        return (Run.get_balance coda pk |> Participating_state.active_exn)
+      in
       let coda_send_payment (sk, pk, amount, fee, memo) =
         let pk_of_sk sk =
           Public_key.of_private_key_exn sk |> Public_key.compress
         in
         let build_txn amount sender_sk receiver_pk fee =
           let nonce =
-            Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn
+            Run.get_nonce coda (pk_of_sk sender_sk)
+            |> Participating_state.active_exn |> Option.value_exn
           in
           let payload : User_command.Payload.t =
             User_command.Payload.create ~fee ~nonce ~memo
@@ -260,7 +276,10 @@ module T = struct
           User_command.sign (Keypair.of_private_key_exn sender_sk) payload
         in
         let payment = build_txn amount sk pk fee in
-        Run.send_payment log coda (payment :> User_command.t)
+        let%map receipt =
+          Run.send_payment log coda (payment :> User_command.t)
+        in
+        receipt |> Participating_state.active_exn
       in
       let coda_prove_receipt (proving_receipt, resulting_receipt) =
         match%map
@@ -279,15 +298,16 @@ module T = struct
       let coda_strongest_ledgers () =
         let r, w = Linear_pipe.create () in
         don't_wait_for
-          (Linear_pipe.iter (Main.strongest_ledgers coda) ~f:(fun t ->
-               let p = Main.Inputs.External_transition.protocol_state t in
+          (Strict_pipe.Reader.iter (Main.strongest_ledgers coda) ~f:(fun t ->
+               let open Main.Inputs in
+               let p =
+                 External_transition.Verified.protocol_state (With_hash.data t)
+               in
                let prev_state_hash =
                  Main.Inputs.Consensus_mechanism.Protocol_state
                  .previous_state_hash p
                in
-               let state_hash =
-                 Main.Inputs.Consensus_mechanism.Protocol_state.hash p
-               in
+               let state_hash = With_hash.hash t in
                let prev_state_hash = State_hash.to_bits prev_state_hash in
                let state_hash = State_hash.to_bits state_hash in
                Linear_pipe.write w (prev_state_hash, state_hash) )) ;
@@ -298,7 +318,8 @@ module T = struct
         ; coda_strongest_ledgers
         ; coda_get_balance
         ; coda_send_payment
-        ; coda_prove_receipt }
+        ; coda_prove_receipt
+        ; coda_start }
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end

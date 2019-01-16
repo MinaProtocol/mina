@@ -43,7 +43,7 @@ module Compressed = struct
     module V1 = struct
       module T = struct
         type t = (Field.t, bool) t_
-        [@@deriving bin_io, sexp, eq, compare, hash]
+        [@@deriving sexp, bin_io, eq, compare, hash]
       end
 
       include T
@@ -67,10 +67,6 @@ module Compressed = struct
   include Hashable.Make_binable (Stable.V1)
 
   let compress (x, y) : t = {x; is_odd= parity y}
-
-  let to_base64 t = Binable.to_string (module Stable.V1) t |> B64.encode
-
-  let of_base64_exn s = B64.decode s |> Binable.of_string (module Stable.V1)
 
   let empty = {x= Field.zero; is_odd= false}
 
@@ -160,9 +156,10 @@ let parity_var y =
 
 let decompress_var ({x; is_odd} as c : Compressed.var) =
   let%bind y =
-    provide_witness Typ.field
-      As_prover.(
-        map (read Compressed.typ c) ~f:(fun c -> snd (decompress_exn c)))
+    exists Typ.field
+      ~compute:
+        As_prover.(
+          map (read Compressed.typ c) ~f:(fun c -> snd (decompress_exn c)))
   in
   let%map () = Inner_curve.Checked.Assert.on_curve (x, y)
   and () = parity_var y >>= Boolean.Assert.(( = ) is_odd) in

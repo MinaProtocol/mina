@@ -5,6 +5,10 @@ FROM nixos/nix:latest
 # Add OS tools
 RUN apk add patchelf dpkg tar
 
+# Update nixkgs
+RUN nix-channel --add https://nixos.org/channels/nixpkgs-unstable nixpkgs
+RUN nix-channel --update
+
 # Source tree nix-built haskell kademlia
 ADD /src/app/kademlia-haskell /src
 

@@ -1,3 +1,0 @@
-(lang dune 1.2)
-
-(using in_development_do_not_use_variants 0.1)

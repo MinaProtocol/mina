@@ -673,10 +673,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
           let%map () = such_that x in
           x
 
-    let provide_witness (typ : ('var, 'value) Typ.t)
-        (c : ('value, 's) As_prover.t) =
-      Exists (typ, Compute c, fun h -> return (Handle.var h))
-
     let exists ?request ?compute typ =
       let provider =
         let request =
@@ -736,7 +732,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
     let assert_equal ?label x y = assert_ (Constraint.equal ?label x y)
 
-    let constraint_count (t : (_, _) t) : int =
+    let constraint_count ?(log = fun ?start _ _ -> ()) (t : (_, _) t) : int =
       let next_auxiliary = ref 1 in
       let alloc_var () =
         let v = Backend.Var.create !next_auxiliary in
@@ -750,8 +746,10 @@ module Make_basic (Backend : Backend_intf.S) = struct
         | As_prover (_x, k) -> go count k
         | Add_constraint (_c, t) -> go (count + 1) t
         | Next_auxiliary k -> go count (k !next_auxiliary)
-        | With_label (_s, t, k) ->
+        | With_label (s, t, k) ->
+            log ~start:true s count ;
             let count', y = go count t in
+            log s count' ;
             go count' (k y)
         | With_state (_p, _and_then, t_sub, k) ->
             let count', y = go count t_sub in
@@ -819,13 +817,12 @@ module Make_basic (Backend : Backend_intf.S) = struct
             let s', (_ : unit option) = run_as_prover (Some x) s in
             go stack k handler s'
         | Add_constraint (c, t) ->
-            Option.iter system ~f:(fun system ->
-                if eval_constraints && not (Constraint.eval c get_value) then
-                  failwithf "Constraint unsatisfied:\n%s\n%s\n"
-                    (Constraint.annotation c)
-                    (Constraint.stack_to_string stack)
-                    () ;
-                Constraint.add ~stack c system ) ;
+            if eval_constraints && not (Constraint.eval c get_value) then
+              failwithf "Constraint unsatisfied:\n%s\n%s\n"
+                (Constraint.annotation c)
+                (Constraint.stack_to_string stack)
+                () ;
+            Option.iter system ~f:(fun system -> Constraint.add ~stack c system) ;
             go stack t handler s
         | With_state (p, and_then, t_sub, k) ->
             let s, s_sub = run_as_prover (Some p) s in
@@ -929,15 +926,17 @@ module Make_basic (Backend : Backend_intf.S) = struct
     let equal (x : Cvar.t) (y : Cvar.t) : (Cvar.t Boolean.t, _) t =
       let open Let_syntax in
       let%bind inv =
-        provide_witness Typ.field
-          (let open As_prover.Let_syntax in
-          let%map x = As_prover.read_var x and y = As_prover.read_var y in
-          if Field.equal x y then Field.zero else Field.inv (Field.sub x y))
+        exists Typ.field
+          ~compute:
+            (let open As_prover.Let_syntax in
+            let%map x = As_prover.read_var x and y = As_prover.read_var y in
+            if Field.equal x y then Field.zero else Field.inv (Field.sub x y))
       and r =
-        provide_witness Typ.field
-          (let open As_prover.Let_syntax in
-          let%map x = As_prover.read_var x and y = As_prover.read_var y in
-          if Field.equal x y then Field.one else Field.zero)
+        exists Typ.field
+          ~compute:
+            (let open As_prover.Let_syntax in
+            let%map x = As_prover.read_var x and y = As_prover.read_var y in
+            if Field.equal x y then Field.one else Field.zero)
       in
       let%map () =
         let open Constraint in
@@ -957,8 +956,9 @@ module Make_basic (Backend : Backend_intf.S) = struct
           with_label label
             (let open Let_syntax in
             let%bind z =
-              provide_witness Typ.field
-                As_prover.(map2 (read_var x) (read_var y) ~f:Field.mul)
+              exists Typ.field
+                ~compute:
+                  As_prover.(map2 (read_var x) (read_var y) ~f:Field.mul)
             in
             let%map () = assert_r1cs x y z in
             z)
@@ -970,8 +970,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
           with_label label
             (let open Let_syntax in
             let%bind z =
-              provide_witness Typ.field
-                As_prover.(map (read_var x) ~f:Field.square)
+              exists Typ.field
+                ~compute:As_prover.(map (read_var x) ~f:Field.square)
             in
             let%map () = assert_square x z in
             z)
@@ -986,11 +986,12 @@ module Make_basic (Backend : Backend_intf.S) = struct
           with_label label
             (let open Let_syntax in
             let%bind x_inv =
-              provide_witness Typ.field
-                As_prover.(
-                  map (read_var x) ~f:(fun x ->
-                      if Field.(equal zero x) then Field.zero
-                      else Backend.Field.inv x ))
+              exists Typ.field
+                ~compute:
+                  As_prover.(
+                    map (read_var x) ~f:(fun x ->
+                        if Field.(equal zero x) then Field.zero
+                        else Backend.Field.inv x ))
             in
             let%map () =
               assert_r1cs ~label:"field_inverse" x x_inv
@@ -1010,11 +1011,12 @@ module Make_basic (Backend : Backend_intf.S) = struct
       r - e = b (t - e)
     *)
       let%bind r =
-        provide_witness Typ.field
-          (let open As_prover in
-          let open Let_syntax in
-          let%bind b = read_var (b :> Cvar.t) in
-          read Typ.field (if Field.equal b Field.one then then_ else else_))
+        exists Typ.field
+          ~compute:
+            (let open As_prover in
+            let open Let_syntax in
+            let%bind b = read_var (b :> Cvar.t) in
+            read Typ.field (if Field.equal b Field.one then then_ else else_))
       in
       let%map () =
         assert_r1cs
@@ -1059,12 +1061,13 @@ module Make_basic (Backend : Backend_intf.S) = struct
         let y = (y :> Cvar.t) in
         let open Let_syntax in
         let%bind z =
-          provide_witness Typ.field
-            (let open As_prover in
-            let open Let_syntax in
-            let%map x = read_var x and y = read_var y in
-            if Field.(equal one x) && Field.(equal one y) then Field.one
-            else Field.zero)
+          exists Typ.field
+            ~compute:
+              (let open As_prover in
+              let open Let_syntax in
+              let%map x = read_var x and y = read_var y in
+              if Field.(equal one x) && Field.(equal one y) then Field.one
+              else Field.zero)
         in
         let%map () =
           let x_plus_y = Cvar.add x y in
@@ -1574,6 +1577,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
   include Checked
 
   let generate_keypair = Run.generate_keypair
+
+  let conv f = Run.conv (fun x _ -> f x)
 
   let prove = Run.prove
 

@@ -123,7 +123,11 @@ template<typename FieldT>
 void _polynomial_multiplication_on_fft(std::vector<FieldT> &c, const std::vector<FieldT> &a, const std::vector<FieldT> &b)
 {
     const size_t n = libff::get_power_of_two(a.size() + b.size() - 1);
-    FieldT omega = libff::get_root_of_unity<FieldT>(n);
+    bool err = false;
+    FieldT omega = libff::get_root_of_unity<FieldT>(n, err);
+    if (err) {
+      throw DomainSizeException("Failed root of unity");
+    }
 
     std::vector<FieldT> u(a);
     std::vector<FieldT> v(b);

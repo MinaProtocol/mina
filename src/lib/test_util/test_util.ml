@@ -13,7 +13,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     let (), checked_result =
       run_and_check
         (let open Let_syntax in
-        let%bind input = provide_witness typ1 (As_prover.return input) in
+        let%bind input = exists typ1 ~compute:(As_prover.return input) in
         let%map result = checked input in
         As_prover.read typ2 result)
         ()
@@ -26,7 +26,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     let (), checked =
       run_and_check
         (let open Let_syntax in
-        let%bind input = provide_witness typ (As_prover.return input) in
+        let%bind input = exists typ ~compute:(As_prover.return input) in
         let%map result = var_to_triples input in
         As_prover.all
           (List.map result
