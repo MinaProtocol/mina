@@ -18,11 +18,11 @@ namespace libff {
 // returns root of unity of order n (for n a power of 2), if one exists
 template<typename FieldT>
 typename std::enable_if<std::is_same<FieldT, Double>::value, FieldT>::type
-get_root_of_unity(const size_t n);
+get_root_of_unity(const size_t n, bool &err);
 
 template<typename FieldT>
 typename std::enable_if<!std::is_same<FieldT, Double>::value, FieldT>::type
-get_root_of_unity(const size_t n);
+get_root_of_unity(const size_t n, bool &err);
 
 template<typename FieldT>
 std::vector<FieldT> pack_int_vector_into_field_element_vector(const std::vector<size_t> &v, const size_t w);

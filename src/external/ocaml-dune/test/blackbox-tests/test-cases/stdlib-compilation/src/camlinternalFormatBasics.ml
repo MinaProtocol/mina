@@ -1,1 +1,0 @@
-type fmt = Fmt

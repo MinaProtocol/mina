@@ -34,12 +34,6 @@ module type Hash_intf = sig
 end
 
 module type Time_intf = sig
-  module Stable : sig
-    module V1 : sig
-      type t [@@deriving sexp, bin_io]
-    end
-  end
-
   module Controller : Time_controller_intf
 
   type t [@@deriving sexp]
@@ -601,6 +595,10 @@ module type Transaction_snark_scan_state_intf = sig
     type t
   end
 
+  module Job_view : sig
+    type t [@@deriving sexp, to_yojson]
+  end
+
   module Make_statement_scanner
       (M : Monad_with_Or_error_intf) (Verifier : sig
           val verify :
@@ -658,6 +656,8 @@ module type Transaction_snark_scan_state_intf = sig
     t -> max_slots:int -> [`One of int | `Two of int * int]
 
   val statement_of_job : Available_job.t -> ledger_proof_statement option
+
+  val snark_job_list_json : t -> string
 end
 
 module type Staged_ledger_base_intf = sig
@@ -685,11 +685,17 @@ module type Staged_ledger_base_intf = sig
   module Scan_state : sig
     type t [@@deriving bin_io]
 
+    module Job_view : sig
+      type t [@@deriving sexp, to_yojson]
+    end
+
     val hash : t -> staged_ledger_aux_hash
 
     val is_valid : t -> bool
 
     val empty : unit -> t
+
+    val snark_job_list_json : t -> string
   end
 
   module Staged_ledger_error : sig

@@ -134,7 +134,7 @@ module Make_weierstrass_checked
 
       val double : t -> t
 
-      val add : t -> t -> t
+      val ( + ) : t -> t -> t
 
       val negate : t -> t
 
@@ -188,13 +188,14 @@ module Make_weierstrass_checked
     let open F in
     let%bind lambda = div (by - ay) (bx - ax) in
     let%bind cx =
-      provide_witness typ
-        (let open As_prover in
-        let open Let_syntax in
-        let%map ax = read typ ax
-        and bx = read typ bx
-        and lambda = read typ lambda in
-        Unchecked.(square lambda - (ax + bx)))
+      exists typ
+        ~compute:
+          (let open As_prover in
+          let open Let_syntax in
+          let%map ax = read typ ax
+          and bx = read typ bx
+          and lambda = read typ lambda in
+          Unchecked.(square lambda - (ax + bx)))
     in
     let%bind () =
       (* lambda^2 = cx + ax + bx
@@ -203,14 +204,15 @@ module Make_weierstrass_checked
       assert_square lambda F.(cx + ax + bx)
     in
     let%bind cy =
-      provide_witness typ
-        (let open As_prover in
-        let open Let_syntax in
-        let%map ax = read typ ax
-        and ay = read typ ay
-        and cx = read typ cx
-        and lambda = read typ lambda in
-        Unchecked.((lambda * (ax - cx)) - ay))
+      exists typ
+        ~compute:
+          (let open As_prover in
+          let open Let_syntax in
+          let%map ax = read typ ax
+          and ay = read typ ay
+          and cx = read typ cx
+          and lambda = read typ lambda in
+          Unchecked.((lambda * (ax - cx)) - ay))
     in
     let%map () = assert_r1cs lambda (ax - cx) (cy + ay) in
     (cx, cy)
@@ -261,7 +263,7 @@ module Make_weierstrass_checked
 
     let create () : ((module S), _) Checked.t =
       let%map shift =
-        provide_witness typ As_prover.(map (return ()) ~f:Curve.random)
+        exists typ ~compute:As_prover.(map (return ()) ~f:Curve.random)
       in
       let module M = Make (struct
         let shift = shift
@@ -273,28 +275,32 @@ module Make_weierstrass_checked
     let open F in
     let%bind x_squared = square ax in
     let%bind lambda =
-      provide_witness typ
-        As_prover.(
-          map2 (read typ x_squared) (read typ ay) ~f:(fun x_squared ay ->
-              let open F.Unchecked in
-              (x_squared + x_squared + x_squared + Params.a) * inv (ay + ay) ))
+      exists typ
+        ~compute:
+          As_prover.(
+            map2 (read typ x_squared) (read typ ay) ~f:(fun x_squared ay ->
+                let open F.Unchecked in
+                (x_squared + x_squared + x_squared + Params.a) * inv (ay + ay)
+            ))
     in
     let%bind bx =
-      provide_witness typ
-        As_prover.(
-          map2 (read typ lambda) (read typ ax) ~f:(fun lambda ax ->
-              let open F.Unchecked in
-              square lambda - (ax + ax) ))
+      exists typ
+        ~compute:
+          As_prover.(
+            map2 (read typ lambda) (read typ ax) ~f:(fun lambda ax ->
+                let open F.Unchecked in
+                square lambda - (ax + ax) ))
     in
     let%bind by =
-      provide_witness typ
-        (let open As_prover in
-        let open Let_syntax in
-        let%map lambda = read typ lambda
-        and ax = read typ ax
-        and ay = read typ ay
-        and bx = read typ bx in
-        F.Unchecked.((lambda * (ax - bx)) - ay))
+      exists typ
+        ~compute:
+          (let open As_prover in
+          let open Let_syntax in
+          let%map lambda = read typ lambda
+          and ax = read typ ax
+          and ay = read typ ay
+          and bx = read typ bx in
+          F.Unchecked.((lambda * (ax - bx)) - ay))
     in
     let two = Field.of_int 2 in
     let%map () =
@@ -403,9 +409,9 @@ module Make_weierstrass_checked
     let to_term ~two_to_the_i ~two_to_the_i_plus_1 bits =
       lookup_point bits
         ( sigma
-        , Curve.add sigma two_to_the_i
-        , Curve.add sigma two_to_the_i_plus_1
-        , Curve.(add sigma (add two_to_the_i two_to_the_i_plus_1)) )
+        , Curve.(sigma + two_to_the_i)
+        , Curve.(sigma + two_to_the_i_plus_1)
+        , Curve.(sigma + two_to_the_i + two_to_the_i_plus_1) )
     in
     (*
        Say b = b0, b1, .., b_{n-1}.
@@ -431,7 +437,7 @@ module Make_weierstrass_checked
       | [] -> return acc
       | [b_i] ->
           let term =
-            lookup_single_bit b_i (sigma, Curve.add sigma two_to_the_i)
+            lookup_single_bit b_i (sigma, Curve.(sigma + two_to_the_i))
           in
           Shifted.add acc term
       | b_i :: b_i_plus_1 :: rest ->
@@ -447,6 +453,16 @@ module Make_weierstrass_checked
       Curve.scale (Curve.negate sigma) (Scalar.of_int sigma_count)
     in
     Shifted.add result_with_shift (constant unshift)
+
+  let to_constant (x, y) =
+    let open Option.Let_syntax in
+    let%map x = F.to_constant x and y = F.to_constant y in
+    Curve.of_affine_coordinates (x, y)
+
+  let scale m t c ~init =
+    match to_constant t with
+    | Some t -> scale_known m t c ~init
+    | None -> scale m t c ~init
 
   let sum (type shifted) (module Shifted : Shifted.S with type t = shifted) xs
       ~init =

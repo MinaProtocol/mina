@@ -1,4 +1,0 @@
-(install
- (section etc)
- (files file.conf)
-)

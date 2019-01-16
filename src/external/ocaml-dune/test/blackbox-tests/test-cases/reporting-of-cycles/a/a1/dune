@@ -1,4 +1,0 @@
-(library
- (name a1)
- (public_name a.1)
- (libraries b))

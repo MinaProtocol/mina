@@ -287,7 +287,7 @@ module type Basic = sig
     val project : bool list -> t
 
     module Checked : sig
-      type t = private (field, Var.t) Cvar.t
+      type t = (field, Var.t) Cvar.t
 
       val length : t -> int
       (** For debug purposes *)
@@ -476,9 +476,6 @@ module type Basic = sig
     -> 'value Request.t
     -> ('var, 's) Checked.t
   (** TODO: Come up with a better name for this in relation to the above *)
-
-  val provide_witness :
-    ('var, 'value) Typ.t -> ('value, 's) As_prover.t -> ('var, 's) Checked.t
 
   val exists :
        ?request:('value Request.t, 's) As_prover.t
