@@ -473,9 +473,10 @@ struct
       (let%bind prev_entry_hash = Elt.hash prev
        and next_entry_hash = Elt.hash next
        and prev_path =
-         provide_witness (Path.typ ~depth)
-           As_prover.(
-             map2 ~f:get_path get_state (read (Address.typ ~depth) addr0))
+         exists (Path.typ ~depth)
+           ~compute:
+             As_prover.(
+               map2 ~f:get_path get_state (read (Address.typ ~depth) addr0))
        in
        let%bind prev_root_hash =
          implied_root prev_entry_hash addr0 prev_path

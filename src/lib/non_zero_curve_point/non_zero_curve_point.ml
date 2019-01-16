@@ -156,9 +156,10 @@ let parity_var y =
 
 let decompress_var ({x; is_odd} as c : Compressed.var) =
   let%bind y =
-    provide_witness Typ.field
-      As_prover.(
-        map (read Compressed.typ c) ~f:(fun c -> snd (decompress_exn c)))
+    exists Typ.field
+      ~compute:
+        As_prover.(
+          map (read Compressed.typ c) ~f:(fun c -> snd (decompress_exn c)))
   in
   let%map () = Inner_curve.Checked.Assert.on_curve (x, y)
   and () = parity_var y >>= Boolean.Assert.(( = ) is_odd) in
