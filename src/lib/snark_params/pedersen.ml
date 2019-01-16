@@ -112,22 +112,29 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
 
     type fold_result =
       { acc: Curve.t
-      ; triples_consumed: int
-      ; synched: bool (* have we reached a chunk boundary *)
-      ; chunk_rev: bool Triple.t list (* reversed chunk, or part of one *)
-      ; chunk_rev_len: int (* length of chunk_rev *)
-      ; params_ndx: int
-      (* index into the chunk table to use *) }
+      ; triples_consumed: int (* have we reached a chunk boundary *)
+      ; synched: bool (* reversed chunk, or part of one *)
+      ; chunk_rev: bool Triple.t list (* length of chunk_rev *)
+      ; chunk_rev_len: int (* index into the chunk table to use *)
+      ; chunk_ndx: int }
 
     let update_fold (t : t) (fold : bool Triple.t Fold.t) =
       let params = t.params in
-      let params_ndx =
+      let chunk_ndx =
+        let boundary = t.triples_consumed / Chunk.size in
         if Int.equal (t.triples_consumed mod Chunk.size) 0 then
-          (* at chunk boundary *)
-          t.triples_consumed / Chunk.size
+          (* exactly at chunk boundary *)
+          boundary
         else (* next chunk boundary *)
-          (t.triples_consumed / Chunk.size) + 1
+          boundary + 1
       in
+      let process_triple i triple =
+        Snarky.Pedersen.local_function ~negate:Curve.negate params.(i) triple
+      in
+      (* consume a triple at a time until we're at a chunk boundary, then
+         use chunk table; after processing all full chunks, consume any
+         straggler triples
+      *)
       let ({acc; triples_consumed; chunk_rev; _} : fold_result) =
         fold.fold
           ~init:
@@ -136,24 +143,23 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
             ; synched= false
             ; chunk_rev= []
             ; chunk_rev_len= 0
-            ; params_ndx } ~f:(fun accum triple ->
+            ; chunk_ndx } ~f:(fun accum triple ->
             let synched =
-              accum.synched
-              || Int.equal (t.triples_consumed mod Chunk.size) (Chunk.size - 1)
+              accum.synched || Int.equal (t.triples_consumed mod Chunk.size) 0
             in
             if synched then
               if Int.equal (accum.chunk_rev_len + 1) Chunk.size then
                 (* full chunk *)
                 let n = Chunk.to_int (List.rev (triple :: accum.chunk_rev)) in
                 let g =
-                  t.chunk_table.curve_points_table.(accum.params_ndx).(n)
+                  t.chunk_table.curve_points_table.(accum.chunk_ndx).(n)
                 in
                 { acc= Curve.add accum.acc g
                 ; triples_consumed= accum.triples_consumed + Chunk.size
-                ; synched= true (* once synched, stay synched *)
-                ; chunk_rev= [] (* start new chunk *)
+                ; synched= true (* stay synched *)
+                ; chunk_rev= [] (* new chunk *)
                 ; chunk_rev_len= 0
-                ; params_ndx= accum.params_ndx + 1 }
+                ; chunk_ndx= accum.chunk_ndx + 1 }
               else
                 (* build next chunk *)
                 { accum with
@@ -162,12 +168,10 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
                 ; chunk_rev_len= accum.chunk_rev_len + 1 }
             else
               (* not synched, consume one triple *)
-              let term =
-                Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
-                  triple
-              in
               { accum with
-                acc= Curve.add accum.acc term
+                acc=
+                  Curve.add accum.acc
+                    (process_triple accum.triples_consumed triple)
               ; triples_consumed= accum.triples_consumed + 1 } )
       in
       let new_state = {t with acc; triples_consumed} in
@@ -179,11 +183,7 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
           List.fold stragglers
             ~init:(new_state.acc, new_state.triples_consumed)
             ~f:(fun (acc, i) triple ->
-              let term =
-                Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
-                  triple
-              in
-              (Curve.add acc term, i + 1) )
+              (Curve.add acc (process_triple i triple), i + 1) )
         in
         {new_state with acc; triples_consumed}
 
@@ -195,68 +195,7 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
       update_fold (create params chunk_table) (Fold.string_triples s)
   end
 
-  (* break triples list into list of chunks and maybe a less-than-full chunk *)
-  let chunk_triples (triples : bool Triple.t list) :
-      Chunk.t list * Chunk.t option =
-    let rec loop triples accum =
-      if List.is_empty triples then
-        (* only full chunks, no straggler *)
-        (List.rev accum, None)
-      else
-        let some, rest = List.split_n triples Chunk.size in
-        if List.is_empty rest && List.length some < Chunk.size then
-          (* less than full chunk *)
-          (List.rev accum, Some some)
-        else loop rest (some :: accum)
-    in
-    loop triples []
-
-  (* curve point from a list of chunks (and possible straggler) *)
-  let update_from_chunks (s : State.t)
-      ((chunks, maybe_chunk) : Chunk.t list * Chunk.t option) : State.t =
-    let curve_points_table = s.chunk_table.curve_points_table in
-    let triples_consumed = s.triples_consumed in
-    (* if we have consumed a number of triples that is not an integral number of chunks,
-       can't use the chunk table; 
-    *)
-    if not (Int.equal (triples_consumed mod Chunk.size) 0) then
-      failwith
-        "update_from_chunks: can't use chunk table given the number of \
-         consumed triples" ;
-    let param_offset = s.triples_consumed / Chunk.size in
-    let get_chunk_state i accum chunk =
-      let n = Chunk.to_int chunk in
-      let g = curve_points_table.(param_offset + i).(n) in
-      { accum with
-        State.triples_consumed=
-          accum.State.triples_consumed + List.length chunk
-      ; State.acc= Curve.add accum.State.acc g }
-    in
-    let state = List.foldi chunks ~init:s ~f:get_chunk_state in
-    (* handle less-than-full straggler chunk, if needed *)
-    match maybe_chunk with
-    | None -> state
-    | Some chunk -> State.update_fold state (Fold.of_list chunk)
-
-  (* if the number of triples consumed isn't on a chunk boundary,
-     process just enough triples to get to a chunk boundary
-   *)
-  let synch_to_chunk_boundary (s : State.t) (fold : bool Triple.t Fold.t) :
-      State.t * bool Triple.t list =
-    let triples = Fold.to_list fold in
-    let num_extra = s.triples_consumed mod Chunk.size in
-    if num_extra > 0 then
-      (* do the sync *)
-      let extras, rest = List.split_n triples (Chunk.size - num_extra) in
-      let extras_fold = Fold.of_list extras in
-      (State.update_fold s extras_fold, rest)
-    else (* no sync needed *)
-      (s, triples)
-
-  let hash_fold s fold =
-    let synched_s, triples = synch_to_chunk_boundary s fold in
-    let chunks = chunk_triples triples in
-    update_from_chunks synched_s chunks
+  let hash_fold s fold = State.update_fold s fold
 
   let digest_fold s fold = State.digest (hash_fold s fold)
 end

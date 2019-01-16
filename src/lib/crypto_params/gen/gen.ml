@@ -95,9 +95,9 @@ let params_structure ~loc =
     on its position in a list of chunks
 *)
 let compute_chunk_value ~start n =
-  let fold = Chunk.of_int n |> Fold.of_list in
+  let chunk = Chunk.of_int n in
   let acc, _ =
-    fold.fold ~init:(Group.zero, 0) ~f:(fun (acc, i) triple ->
+    List.fold chunk ~init:(Group.zero, 0) ~f:(fun (acc, i) triple ->
         let term =
           Snarky.Pedersen.local_function ~negate:Group.negate
             params_array.(start + i)
@@ -115,11 +115,7 @@ let get_chunk_table () =
   let num_params = Array.length params_array in
   let max_chunks = num_params / Chunk.size in
   let rec loop ~chunk arrays =
-    if
-      chunk > max_chunks
-      || (* less than full chunk, don't create entry *)
-         (Int.equal chunk max_chunks && (chunk + 1) * Chunk.size >= num_params)
-    then Array.of_list (List.rev arrays)
+    if chunk >= max_chunks then Array.of_list (List.rev arrays)
     else
       (* max_int + 1, because we need an entry for 0 *)
       let array = Array.create ~len:(Chunk.max_int + 1) Group.zero in
@@ -132,11 +128,11 @@ let get_chunk_table () =
   result
 
 (* the AST representation of the chunk table is its string serialization
-   - an AST for the table itself, using string representations of 
+   - an AST for the table itself, using string representations of
       Field pairs, as is done for the params, is too large, causing
       ocamlopt to segfault
   - Binable.to_string is slow, and Marshal.to_string is much faster,
-      but I (@psteckler) observed segfaults on deserialization for 
+      but I (@psteckler) observed segfaults on deserialization for
       the latter
  *)
 let chunk_table_ast ~loc =
