@@ -1,0 +1,14 @@
+digraph full_system {
+  rankdir=LR;
+
+  {Client} -> {Txn_pool Transition_Frontier_Controller};
+  {Snark_pool} -> {Transition_Frontier_Controller};
+  {Snark_worker} -> {Snark_pool};
+  {Snark_pool} -> {Snark_worker};
+  {Txn_pool} -> {Transition_Frontier_Controller};
+  {Transition_Frontier_Controller} -> {Proposer Network Snark_pool}
+  {Network} -> {Snark_pool Txn_pool};
+  {Snark_pool Txn_pool} -> {Network};
+  {Proposer} -> {Prover Transition_Frontier_Controller};
+  {Prover} -> {Proposer};
+}

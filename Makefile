@@ -265,7 +265,7 @@ docs/res/%.dot.png: docs/res/%.dot
 	dot -Tpng $< > $@
 
 docs/res/%.tex.pdf: docs/res/%.tex
-	cd docs/res && pdflatex $(notdir $<)
+	cd docs/res && (pdflatex $(notdir $<) || lualatex $(notdir $<))
 	cp $(@:.tex.pdf=.pdf) $@
 
 docs/res/%.tex.png: docs/res/%.tex.pdf
