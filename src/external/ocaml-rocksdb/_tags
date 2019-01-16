@@ -1,5 +1,0 @@
-true: annot, bin_annot, debug
-
-true: package(ctypes), package(ctypes.foreign)
-
-<rocksdb>: -traverse

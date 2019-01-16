@@ -1,4 +1,0 @@
-(library
- (name foo)
- (public_name foo)
- (modules_without_implementation intf))

@@ -1,3 +1,0 @@
-(library
- (public_name impl)
- (implements vlib))

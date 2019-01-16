@@ -1,3 +1,0 @@
-(executables
- (public_names ocamlformat refmt)
-)

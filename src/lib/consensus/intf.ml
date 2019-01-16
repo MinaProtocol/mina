@@ -68,6 +68,17 @@ module type S = sig
     val prover_state : t -> Prover_state.t
   end
 
+  module For_tests : sig
+    val gen_consensus_state :
+         gen_slot_advancement:int Quickcheck.Generator.t
+      -> (   previous_protocol_state:( Protocol_state.value
+                                     , Coda_base.State_hash.t )
+                                     With_hash.t
+          -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
+          -> Consensus_state.value)
+         Quickcheck.Generator.t
+  end
+
   val block_interval_ms : Int64.t
 
   val genesis_protocol_state :
