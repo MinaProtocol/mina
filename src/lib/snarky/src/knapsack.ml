@@ -80,11 +80,12 @@ module Make (Impl : Snark_intf.S) = struct
     let if_ (b : Boolean.var) ~then_:ys ~else_:xs : (var, _) Impl.Checked.t =
       let open Impl.Let_syntax in
       let%bind res =
-        provide_witness typ_unchecked
-          (let open As_prover.Let_syntax in
-          match%bind As_prover.read Boolean.typ b with
-          | false -> As_prover.read typ xs
-          | true -> As_prover.read typ ys)
+        exists typ_unchecked
+          ~compute:
+            (let open As_prover.Let_syntax in
+            match%bind As_prover.read Boolean.typ b with
+            | false -> As_prover.read typ xs
+            | true -> As_prover.read typ ys)
       in
       let%map () =
         let open Field.Checked.Infix in

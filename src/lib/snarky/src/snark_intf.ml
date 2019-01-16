@@ -479,9 +479,6 @@ module type Basic = sig
     -> ('var, 's) Checked.t
   (** TODO: Come up with a better name for this in relation to the above *)
 
-  val provide_witness :
-    ('var, 'value) Typ.t -> ('value, 's) As_prover.t -> ('var, 's) Checked.t
-
   val exists :
        ?request:('value Request.t, 's) As_prover.t
     -> ?compute:('value, 's) As_prover.t
