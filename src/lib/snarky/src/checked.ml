@@ -52,6 +52,8 @@ let rec all_unit = function
   | t :: ts -> T0.bind t ~f:(fun () -> all_unit ts)
 
 module Let_syntax = struct
+  let return = T0.return
+
   let bind = T0.bind
 
   let map =
@@ -59,7 +61,23 @@ module Let_syntax = struct
     | `Define_using_bind -> fun ma ~f -> bind ma ~f:(fun a -> T0.return (f a))
     | `Custom x -> x
 
+  let ( >>= ) t f = bind t ~f
+
+  let ( >>| ) t f = map t ~f
+
   let both a b = bind a ~f:(fun a -> map b ~f:(fun b -> (a, b)))
+
+  module Let_syntax = struct
+    let return = return
+
+    let bind = bind
+
+    let map = map
+
+    let both a b = a >>= fun a -> b >>| fun b -> (a, b)
+
+    module Open_on_rhs = struct end
+  end
 end
 
 module T = struct
