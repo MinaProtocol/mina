@@ -1,0 +1,7 @@
+(library
+  (name transition_frontier_controller_tests)
+  (public_name transition_frontier_controller_tests)
+  (inline_tests)
+  (libraries core_kernel consensus protocols coda_base sync_handler transition_handler transition_frontier_controller genesis_ledger quickcheck_lib)
+  (preprocess (pps ppx_jane ppx_deriving.eq)))
+  

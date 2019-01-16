@@ -1,4 +1,0 @@
-(library
- (name alib)
- (public_name alib)
- (libraries blib))

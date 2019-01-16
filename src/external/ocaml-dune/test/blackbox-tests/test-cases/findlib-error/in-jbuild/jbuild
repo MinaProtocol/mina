@@ -1,5 +1,0 @@
-(jbuild_version 1)
-
-(rule
-(write-file target.txt ${findlib:pkg:file})
-)

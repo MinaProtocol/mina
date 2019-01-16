@@ -1,3 +1,0 @@
-(executable
- (name x)
- (libraries does-not-exist))

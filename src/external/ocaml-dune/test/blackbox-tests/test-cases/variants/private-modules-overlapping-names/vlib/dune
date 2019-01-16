@@ -1,4 +1,0 @@
-(library
- (name vlib)
- (virtual_modules vlib)
- (private_modules priv))

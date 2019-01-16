@@ -1,2 +1,0 @@
-
-val q : unit -> int

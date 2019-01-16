@@ -40,7 +40,7 @@ Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debi
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-5b183eb006ea0bf720c8f14965c31f7890909e91`
+`docker pull codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060`
 
 * Create local builder image
 

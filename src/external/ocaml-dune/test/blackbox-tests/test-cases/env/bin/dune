@@ -1,3 +1,0 @@
-(env
- (default
-  (flags "in bin")))

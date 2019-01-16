@@ -1,2 +1,0 @@
-(executable (name gen))
-(include_subdirs no)

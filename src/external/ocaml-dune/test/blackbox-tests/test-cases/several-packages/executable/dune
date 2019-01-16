@@ -1,3 +1,0 @@
-(executable
-  (public_name an_executable)
-)

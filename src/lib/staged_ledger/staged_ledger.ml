@@ -1767,14 +1767,6 @@ let%test_module "test" =
       module Config = struct
         let transaction_capacity_log_2 = 7
       end
-
-      let check :
-             Transaction_snark_work.t
-          -> Transaction_snark_work.statement list
-          -> Transaction_snark_work.Checked.t option Deferred.t =
-       fun {fee= f; proofs= p; prover= pr} _ ->
-        Deferred.return
-        @@ Some {Transaction_snark_work.Checked.fee= f; proofs= p; prover= pr}
     end
 
     module Sl = Make (Test_input1)

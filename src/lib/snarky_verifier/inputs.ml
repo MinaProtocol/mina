@@ -1,3 +1,5 @@
+open Sgn_type
+
 module type S = sig
   module Impl : Snarky.Snark_intf.S
 
@@ -12,10 +14,29 @@ module type S = sig
 
     val typ : (t, Unchecked.t) Typ.t
 
-    (* This should check if the input is constant and do [scale_known] if so *)
-    val scale : t -> Boolean.var list -> (t, _) Checked.t
+    module Shifted : sig
+      module type S =
+        Snarky.Curves.Shifted_intf
+        with type ('a, 'b) checked := ('a, 'b) Checked.t
+         and type curve_var := t
+         and type boolean_var := Boolean.var
 
-    val add_exn : t -> t -> (t, _) Checked.t
+      type 'a m = (module S with type t = 'a)
+
+      val create : unit -> ((module S), _) Checked.t
+    end
+
+    (* This should check if the input is constant and do [scale_known] if so *)
+    val scale :
+         's Shifted.m
+      -> t
+      -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
+      -> init:'s
+      -> ('s, _) Checked.t
+  end
+
+  module G2 : sig
+    type t
 
     module Shifted : sig
       module type S =
@@ -28,12 +49,6 @@ module type S = sig
 
       val create : unit -> ((module S), _) Checked.t
     end
-  end
-
-  module G2 : sig
-    type t
-
-    val add_exn : t -> t -> (t, _) Checked.t
 
     module Unchecked : sig
       type t
@@ -79,10 +94,10 @@ module type S = sig
 
     val real_part : 'a t_ -> 'a
 
-    val parts : 'a t_ -> 'a list
+    val to_list : 'a t_ -> 'a list
   end
 
-  val group_miller_loop :
+  val batch_miller_loop :
        (Sgn.t * G1_precomputation.t * G2_precomputation.t) list
     -> (Fqk.t, _) Checked.t
 
