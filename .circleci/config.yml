@@ -3,7 +3,7 @@ version: 2
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-a5cc8a0501bef5075fe614d2246153d42a67e49f
+            - image: codaprotocol/coda:toolchain-rust-5b183eb006ea0bf720c8f14965c31f7890909e91
         steps:
             - checkout
             - run:
@@ -13,7 +13,7 @@ jobs:
     build:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-a5cc8a0501bef5075fe614d2246153d42a67e49f
+        - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
         steps:
             - checkout
             - run:
@@ -40,7 +40,7 @@ jobs:
     build_withsnark:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-a5cc8a0501bef5075fe614d2246153d42a67e49f
+        - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
         steps:
             - checkout
             - run:
@@ -67,7 +67,7 @@ jobs:
     build_public:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-a5cc8a0501bef5075fe614d2246153d42a67e49f
+        - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
         steps:
             - checkout
             - run:
@@ -85,7 +85,7 @@ jobs:
     test-unit-test:
        resource_class: large
        docker:
-       - image: codaprotocol/coda:toolchain-a5cc8a0501bef5075fe614d2246153d42a67e49f
+       - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
        steps:
            - checkout
            - run:
@@ -95,7 +95,7 @@ jobs:
     test-withsnark:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-a5cc8a0501bef5075fe614d2246153d42a67e49f
+        - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
         steps:
             - checkout
             - run:
@@ -109,7 +109,7 @@ jobs:
     test-all_sig_integration_tests:
       resource_class: large
       docker:
-      - image: codaprotocol/coda:toolchain-a5cc8a0501bef5075fe614d2246153d42a67e49f
+      - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
       steps:
           - checkout
           - run:
@@ -150,7 +150,7 @@ jobs:
     test-all_stake_integration_tests:
       resource_class: large
       docker:
-      - image: codaprotocol/coda:toolchain-a5cc8a0501bef5075fe614d2246153d42a67e49f
+      - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
       steps:
           - checkout
           - run:

@@ -1,3 +1,0 @@
-(alias
- (name runtest)
- (action (run foo-does-not-exist)))

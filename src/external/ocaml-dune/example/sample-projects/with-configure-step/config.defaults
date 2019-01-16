@@ -1,7 +1,0 @@
-(* -*- tuareg -*- *)
-
-(* Default configuration, copy this file to "config" and edit it to change the build
-   configuration. Alternatively call ./configure *)
-
-(* Enable support for blah *)
-let enable_blah = Auto

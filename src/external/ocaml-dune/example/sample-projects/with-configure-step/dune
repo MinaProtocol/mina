@@ -1,9 +1,0 @@
-(rule
- (mode fallback)
- (targets config)
- (action  (copy config.defaults %{targets})))
-
-(rule
- (targets config.full)
- (deps    config_common.ml config)
- (action  (run ocaml %{dep:real_configure.ml})))
