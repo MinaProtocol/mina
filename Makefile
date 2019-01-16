@@ -67,8 +67,7 @@ dht: kademlia
 
 build: git_hooks
 	$(info Starting Build)
-	ulimit -s 65536
-	cd src ; $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && ulimit -n 10240 && ulimit -u 2128 && cd src ; $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 dev: codabuilder containerstart build
@@ -93,6 +92,17 @@ else
 	@echo "Not building in Docker, .merlin files unchanged"
 endif
 
+#######################################
+## Environment setup
+
+macos-setup-download:
+	./scripts/macos-setup.sh download
+
+macos-setup-compile:
+	./scripts/macos-setup.sh compile
+
+macos-setup: macos-setup-download macos-setup-compile
+
 ########################################
 ## Containers and container management
 
@@ -100,7 +110,7 @@ endif
 # push steps require auth on docker hub
 docker-toolchain:
 	@if git diff-index --quiet HEAD ; then \
-		docker build --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/coda:toolchain-$(GITLONGHASH) . && \
+		docker build --no-cache --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/coda:toolchain-$(GITLONGHASH) . && \
 		docker tag  codaprotocol/coda:toolchain-$(GITLONGHASH) codaprotocol/coda:toolchain-latest && \
 		docker push codaprotocol/coda:toolchain-$(GITLONGHASH) && \
 		docker push codaprotocol/coda:toolchain-latest ;\
@@ -265,7 +275,7 @@ docs/res/%.dot.png: docs/res/%.dot
 	dot -Tpng $< > $@
 
 docs/res/%.tex.pdf: docs/res/%.tex
-	cd docs/res && pdflatex $(notdir $<)
+	cd docs/res && (pdflatex $(notdir $<) || lualatex $(notdir $<))
 	cp $(@:.tex.pdf=.pdf) $@
 
 docs/res/%.tex.png: docs/res/%.tex.pdf
@@ -274,15 +284,8 @@ docs/res/%.tex.png: docs/res/%.tex.pdf
 doc_diagrams: $(addsuffix .png,$(wildcard docs/res/*.tex) $(wildcard docs/res/*.dot))
 
 ########################################
-# Generate odoc documentation
-
-ml-docs:
-	cd src; $(WRAPSRC) dune build --profile=$(DUNE_PROFILE) @doc
-
-########################################
 # To avoid unintended conflicts with file names, always add to .PHONY
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams ml-docs
-
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams

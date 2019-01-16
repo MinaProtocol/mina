@@ -138,6 +138,24 @@ These are also listed in the dockerfiles. Unlike most of the C libraries,
 which are installed using `apt` in the dockerfiles, the libraries for RocksDB are
 installed via the script `src/external/ocaml-rocksdb/install_rocksdb.sh`.
 
+## Steps for adding a new dependency
+
+Rarely, you may edit one of our forked opam pacakages, or add a new system
+dependency (like libsodium).
+
+In that case, you must do all of the following:
+
+1. Update [`Dockerfile-toolchain`](/dockerfiles/Dockerfile-toolchain) as required
+2. Update [`scripts/macos-setup.sh`](scripts/macos-setup.sh) with the required commands for Darwin systems
+3. Bust the circle-ci Darwin cache by incrementing the version number in the cache keys as required inside [`.circleci/config.yml.jinja`](.circleci/config.yml.jinja)
+4. Commit your changes
+5. Re-render the jinja template and recreate the docker toolchains `make update-deps`
+6. Commit your changes again
+
+Rebuilding the docker toolchain will take a long time. Running circleci for
+macos once you've busted the cache will also take a long time. However, only
+you have to do the waiting and all other developers will get the fast path.
+
 ## Common dune tasks
 
 To run unit tests for a single library, do `dune runtest lib/$LIBNAME`.
