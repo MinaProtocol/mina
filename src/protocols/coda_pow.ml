@@ -34,12 +34,6 @@ module type Hash_intf = sig
 end
 
 module type Time_intf = sig
-  module Stable : sig
-    module V1 : sig
-      type t [@@deriving sexp, bin_io]
-    end
-  end
-
   module Controller : Time_controller_intf
 
   type t [@@deriving sexp]
