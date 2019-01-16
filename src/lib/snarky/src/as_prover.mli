@@ -2,8 +2,6 @@ open Core_kernel
 
 include Monad.S3 with type ('a, 'e, 's) t = 'e -> 's -> 's * 'a
 
-type ('a, 'e, 's) as_prover = ('a, 'e, 's) t
-
 val run : ('a, 'e, 's) t -> 'e -> 's -> 's * 'a
 
 module type S = sig
@@ -34,12 +32,12 @@ module type S = sig
     type 'a t
 
     val create :
-         ('a, env, 'prover_state) as_prover
+         ('a, env, 'prover_state) As_prover0.t
       -> ('a t, 'prover_state, field, var, 'sys) Checked.t
 
-    val get : 'a t -> ('a, env, _) as_prover
+    val get : 'a t -> ('a, env, _) As_prover0.t
 
-    val set : 'a t -> 'a -> (unit, env, _) as_prover
+    val set : 'a t -> 'a -> (unit, env, _) As_prover0.t
   end
 end
 
