@@ -1,2 +1,0 @@
-val y   :
-  unit

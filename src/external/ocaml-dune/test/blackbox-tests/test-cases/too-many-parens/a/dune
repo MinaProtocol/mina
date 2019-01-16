@@ -1,5 +1,0 @@
-(executable (
-  (name hello)
-  (public_name hello)
-  (libraries (lib))
-))

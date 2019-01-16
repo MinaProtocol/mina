@@ -73,6 +73,8 @@ val with_ledger : f:(t -> 'a) -> 'a
 
 val create : ?directory_name:string -> unit -> t
 
+val create_ephemeral : unit -> t
+
 val of_database : Db.t -> t
 
 val copy : t -> t

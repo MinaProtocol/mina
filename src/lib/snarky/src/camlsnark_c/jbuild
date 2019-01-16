@@ -3,16 +3,28 @@
 ;; having to merge the .a and .so for libre2 and for the stubs of re2,
 ;; which is hard to do in a portable way
 
+(executable
+ ( (name camlsnark_linker_flags_gen)
+   (modules camlsnark_linker_flags_gen)
+   (libraries (dune.configurator))
+ ))
+
+ (rule
+  ( (targets (flags.sexp))
+    (action (run ./camlsnark_linker_flags_gen.exe) )
+  ))
+
+
 (library
  ((name        camlsnark_c)
   (libraries (core ctypes ctypes.foreign))
   (no_dynlink)
   (modes (native))
+  (modules (:standard \ camlsnark_linker_flags_gen))
   (public_name snarky.c)
   (preprocess no_preprocessing)
   (flags (:standard -short-paths -safe-string))
-  (c_library_flags (:standard -Wl,-E -Wl,-whole-archive -lcamlsnark_c_stubs -Wl,-no-whole-archive -fopenmp -lssl -lcrypto -lprocps -lgmp -lstdc++ 
-  ))
+  (c_library_flags (:standard (:include flags.sexp)))
   (self_build_stubs_archive (camlsnark_c))))
 
 (rule
