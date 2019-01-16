@@ -131,6 +131,7 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
       let process_triple i triple =
         Snarky.Pedersen.local_function ~negate:Curve.negate params.(i) triple
       in
+      let table = t.chunk_table.curve_points_table in
       (* consume a triple at a time until we're at a chunk boundary, then
          use chunk table; after processing all full chunks, consume any
          straggler triples
@@ -151,9 +152,7 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
               if Int.equal (accum.chunk_rev_len + 1) Chunk.size then
                 (* full chunk *)
                 let n = Chunk.to_int (List.rev (triple :: accum.chunk_rev)) in
-                let g =
-                  t.chunk_table.curve_points_table.(accum.chunk_ndx).(n)
-                in
+                let g = table.(accum.chunk_ndx).(n) in
                 { acc= Curve.add accum.acc g
                 ; triples_consumed= accum.triples_consumed + Chunk.size
                 ; synched= true (* stay synched *)

@@ -38,6 +38,7 @@ let to_int t =
 let max_int =
   (* 3 because triples *)
   let num_bits = size * 3 in
+  assert (num_bits < Int.num_bits) ;
   Int.pow 2 num_bits - 1
 
 let of_int n : t =
@@ -45,7 +46,7 @@ let of_int n : t =
     failwith "of_int: integer value too great to represent in a chunk" ;
   let not_zero n = not (Int.equal n 0) in
   let rec loop ~sz n accum =
-    if sz <= 0 && n <= 0 then accum
+    if sz <= 0 then accum
     else
       let triple =
         ( not_zero (n land 0b100)
