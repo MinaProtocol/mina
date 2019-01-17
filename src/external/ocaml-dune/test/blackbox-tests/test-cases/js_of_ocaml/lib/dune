@@ -1,8 +1,0 @@
-(library
- (name x)
- (public_name x)
- (js_of_ocaml (flags (--pretty))
-              (javascript_files runtime.js))
- (c_names stubs)
- (preprocess (pps js_of_ocaml-ppx))
- )

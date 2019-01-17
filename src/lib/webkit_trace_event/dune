@@ -1,0 +1,5 @@
+(library
+ (name webkit_trace_event)
+  (public_name webkit_trace_event)
+  (libraries core async)
+  (synopsis "Binary and JSON output of WebKit trace events"))

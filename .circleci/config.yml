@@ -3,7 +3,7 @@ version: 2
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-7ebc54574da84dfc6c7ee2a28ea3e8dca093dbf5
+            - image: codaprotocol/coda:toolchain-rust-5b183eb006ea0bf720c8f14965c31f7890909e91
         steps:
             - checkout
             - run:
@@ -13,7 +13,7 @@ jobs:
     build:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-7ebc54574da84dfc6c7ee2a28ea3e8dca093dbf5
+        - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
         steps:
             - checkout
             - run:
@@ -37,10 +37,43 @@ jobs:
             - store_artifacts:
                 path: /tmp/artifacts
 
+    build-macos:
+        macos:
+            xcode: "10.1.0"
+        working_directory: /Users/distiller/coda
+        env:
+            HOMEBREW_LOGS: /Users/distiller/homebrew.log
+        steps:
+            - restore_cache:
+                keys:
+                    - macos-v1
+                    - macos-v1-opam
+            - checkout
+            - run:
+                name: Download Deps -- make macos-setup-download
+                command: make macos-setup-download
+            - save_cache:
+                key: macos-v1
+                paths:
+                    - "/usr/local/Homebrew"
+            - run:
+                name: Compile Deps -- make macos-setup-compile
+                command: make macos-setup-compile
+            - save_cache:
+                key: macos-v1-opam
+                paths:
+                    - "/Users/distiller/.opam"
+            - run:
+                name: Build OCaml
+                command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                name: Run all tests (on master)
+                command: bash -c '[ ! "$(CIRCLE_BRANCH)" = "master" ] || (`opam config env` && make test)'
+
     build_withsnark:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-7ebc54574da84dfc6c7ee2a28ea3e8dca093dbf5
+        - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
         steps:
             - checkout
             - run:
@@ -67,7 +100,7 @@ jobs:
     build_public:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-7ebc54574da84dfc6c7ee2a28ea3e8dca093dbf5
+        - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
         steps:
             - checkout
             - run:
@@ -85,7 +118,7 @@ jobs:
     test-unit-test:
        resource_class: large
        docker:
-       - image: codaprotocol/coda:toolchain-7ebc54574da84dfc6c7ee2a28ea3e8dca093dbf5
+       - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
        steps:
            - checkout
            - run:
@@ -95,7 +128,7 @@ jobs:
     test-withsnark:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-7ebc54574da84dfc6c7ee2a28ea3e8dca093dbf5
+        - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
         steps:
             - checkout
             - run:
@@ -109,7 +142,7 @@ jobs:
     test-all_sig_integration_tests:
       resource_class: large
       docker:
-      - image: codaprotocol/coda:toolchain-7ebc54574da84dfc6c7ee2a28ea3e8dca093dbf5
+      - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
       steps:
           - checkout
           - run:
@@ -150,7 +183,7 @@ jobs:
     test-all_stake_integration_tests:
       resource_class: large
       docker:
-      - image: codaprotocol/coda:toolchain-7ebc54574da84dfc6c7ee2a28ea3e8dca093dbf5
+      - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
       steps:
           - checkout
           - run:
@@ -194,6 +227,7 @@ workflows:
     coda_parallel:
         jobs:
             - build
+            - build-macos
             - build_withsnark
             - build_public
             

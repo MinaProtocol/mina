@@ -26,7 +26,14 @@ The short version:
 
 Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debian!
 
-### Developer Setup
+### Developer Setup (MacOS)
+
+* Invoke `make macos-setup`
+* Wait a long time...
+* Invoke `make build`
+* Jump to [customizing your editor for autocomplete](#dev-env)
+
+### Developer Setup (Linux)
 
 #### Install or have Ubuntu 18
 
@@ -40,7 +47,7 @@ Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debi
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-7ebc54574da84dfc6c7ee2a28ea3e8dca093dbf5`
+`docker pull codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060`
 
 * Create local builder image
 
@@ -54,6 +61,7 @@ Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debi
 
 `make USEDOCKER=TRUE build`
 
+<a href="#dev-env"></a>
 #### Customizing your dev environment for autocomplete/merlin
 
 * If you build in Docker, the files created for merlin will have invalid paths. You can fix those paths after a
@@ -131,11 +139,30 @@ with `dune`, so you need to add them manually:
 * `opam pin add src/external/ocaml-sodium`
 * `opam pin add src/external/ocaml-rocksdb`
 * `opam pin add src/external/ocaml-dune`
+* `opam pin add src/external/rpc_parallel`
 
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles. Unlike most of the C libraries,
 which are installed using `apt` in the dockerfiles, the libraries for RocksDB are
 installed via the script `src/external/ocaml-rocksdb/install_rocksdb.sh`.
+
+## Steps for adding a new dependency
+
+Rarely, you may edit one of our forked opam pacakages, or add a new system
+dependency (like libsodium).
+
+In that case, you must do all of the following:
+
+1. Update [`Dockerfile-toolchain`](/dockerfiles/Dockerfile-toolchain) as required
+2. Update [`scripts/macos-setup.sh`](scripts/macos-setup.sh) with the required commands for Darwin systems
+3. Bust the circle-ci Darwin cache by incrementing the version number in the cache keys as required inside [`.circleci/config.yml.jinja`](.circleci/config.yml.jinja)
+4. Commit your changes
+5. Re-render the jinja template and recreate the docker toolchains `make update-deps`
+6. Commit your changes again
+
+Rebuilding the docker toolchain will take a long time. Running circleci for
+macos once you've busted the cache will also take a long time. However, only
+you have to do the waiting and all other developers will get the fast path.
 
 ## Common dune tasks
 

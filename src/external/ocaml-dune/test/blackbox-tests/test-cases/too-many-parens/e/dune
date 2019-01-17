@@ -1,5 +1,0 @@
-(alias
- (name a)
- (deps (glob *)) ; this form doesn't exist
- (action (echo test))
-)

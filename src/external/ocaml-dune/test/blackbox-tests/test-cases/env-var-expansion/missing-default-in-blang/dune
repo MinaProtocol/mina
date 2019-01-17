@@ -1,4 +1,0 @@
-(alias
- (name echo)
- (enabled_if (= true %{env:DUNE_ENV_VAR}))
- (action (echo "enabled!")))

@@ -12,7 +12,7 @@
       blockchain_snark
       async
       core
-      ledger_builder
+      staged_ledger
     ))
    (preprocessor_deps ("../../../config.mlh"))
    (preprocess (pps (ppx_jane ppxlib.metaquot ppxlib.runner)))

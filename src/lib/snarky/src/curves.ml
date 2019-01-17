@@ -380,11 +380,12 @@ module Edwards = struct
         fun b ~then_ ~else_ ->
           with_label __LOC__
             (let%bind r =
-               provide_witness typ
-                 (let open As_prover in
-                 let open Let_syntax in
-                 let%bind b = read Boolean.typ b in
-                 read typ (if b then then_ else else_))
+               exists typ
+                 ~compute:
+                   (let open As_prover in
+                   let open Let_syntax in
+                   let%bind b = read Boolean.typ b in
+                   read typ (if b then then_ else else_))
              in
              (*     r - e = b (t - e) *)
              let%map () =
@@ -425,14 +426,15 @@ module Edwards = struct
         let open Field.Checked.Infix in
         let res a1 a3 =
           let%bind a =
-            provide_witness Typ.field
-              (let open As_prover in
-              let open As_prover.Let_syntax in
-              let open Field.Infix in
-              let%map b = read_var b
-              and a3 = read_var a3
-              and a1 = read_var a1 in
-              a1 + (b * (a3 - a1)))
+            exists Typ.field
+              ~compute:
+                (let open As_prover in
+                let open As_prover.Let_syntax in
+                let open Field.Infix in
+                let%map b = read_var b
+                and a3 = read_var a3
+                and a1 = read_var a1 in
+                a1 + (b * (a3 - a1)))
           in
           let%map () = assert_r1cs b (a3 - a1) (a - a1) in
           a
@@ -557,9 +559,9 @@ module Make_weierstrass_checked
 
       val random : unit -> t
 
-      val to_coords : t -> Impl.Field.t * Impl.Field.t
+      val to_affine_coordinates : t -> Impl.Field.t * Impl.Field.t
 
-      val of_coords : Impl.Field.t * Impl.Field.t -> t
+      val of_affine_coordinates : Impl.Field.t * Impl.Field.t -> t
 
       val double : t -> t
 
@@ -592,7 +594,7 @@ module Make_weierstrass_checked
     let unchecked =
       Typ.transport
         Typ.(tuple2 field field)
-        ~there:Curve.to_coords ~back:Curve.of_coords
+        ~there:Curve.to_affine_coordinates ~back:Curve.of_affine_coordinates
     in
     {unchecked with check= assert_on_curve}
 
@@ -600,7 +602,7 @@ module Make_weierstrass_checked
     (x, Field.Checked.scale y Field.(negate one))
 
   let constant (t : t) : var =
-    let x, y = Curve.to_coords t in
+    let x, y = Curve.to_affine_coordinates t in
     Field.Checked.(constant x, constant y)
 
   let assert_equal (x1, y1) (x2, y2) =
@@ -618,13 +620,14 @@ module Make_weierstrass_checked
       div (Field.Checked.sub by ay) (Field.Checked.sub bx ax)
     in
     let%bind cx =
-      provide_witness Typ.field
-        (let open As_prover in
-        let open Let_syntax in
-        let%map ax = read_var ax
-        and bx = read_var bx
-        and lambda = read_var lambda in
-        Field.(sub (square lambda) (add ax bx)))
+      exists Typ.field
+        ~compute:
+          (let open As_prover in
+          let open Let_syntax in
+          let%map ax = read_var ax
+          and bx = read_var bx
+          and lambda = read_var lambda in
+          Field.(sub (square lambda) (add ax bx)))
     in
     let%bind () =
       (* lambda^2 = cx + ax + bx
@@ -635,14 +638,15 @@ module Make_weierstrass_checked
            Field.Checked.Infix.(cx + ax + bx))
     in
     let%bind cy =
-      provide_witness Typ.field
-        (let open As_prover in
-        let open Let_syntax in
-        let%map ax = read_var ax
-        and ay = read_var ay
-        and cx = read_var cx
-        and lambda = read_var lambda in
-        Field.(sub (mul lambda (sub ax cx)) ay))
+      exists Typ.field
+        ~compute:
+          (let open As_prover in
+          let open Let_syntax in
+          let%map ax = read_var ax
+          and ay = read_var ay
+          and cx = read_var cx
+          and lambda = read_var lambda in
+          Field.(sub (mul lambda (sub ax cx)) ay))
     in
     let%map () =
       Field.Checked.Infix.(assert_r1cs ~label:"c2" lambda (ax - cx) (cy + ay))
@@ -656,8 +660,9 @@ module Make_weierstrass_checked
     let open Let_syntax in
     let div_unsafe x y =
       let%bind z =
-        provide_witness Field.typ
-          As_prover.(map2 (read_var x) (read_var y) ~f:Field.Infix.( / ))
+        exists Field.typ
+          ~compute:
+            As_prover.(map2 (read_var x) (read_var y) ~f:Field.Infix.( / ))
       in
       (* Constraint: y * z = x
 
@@ -694,11 +699,12 @@ module Make_weierstrass_checked
     fun b ~then_ ~else_ ->
       let open Let_syntax in
       let%bind r =
-        provide_witness typ
-          (let open As_prover in
-          let open Let_syntax in
-          let%bind b = read Boolean.typ b in
-          read typ (if b then then_ else else_))
+        exists typ
+          ~compute:
+            (let open As_prover in
+            let open Let_syntax in
+            let%bind b = read Boolean.typ b in
+            read typ (if b then then_ else else_))
       in
       (*     r - e = b (t - e) *)
       let%map () =
@@ -744,7 +750,7 @@ module Make_weierstrass_checked
     let create (type shifted) () : ((module S), _) Checked.t =
       let open Let_syntax in
       let%map shift =
-        provide_witness typ As_prover.(map (return ()) ~f:Curve.random)
+        exists typ ~compute:As_prover.(map (return ()) ~f:Curve.random)
       in
       let module M = Make (struct
         let shift = shift
@@ -756,29 +762,32 @@ module Make_weierstrass_checked
     let open Let_syntax in
     let%bind x_squared = Field.Checked.square ax in
     let%bind lambda =
-      provide_witness Typ.field
-        As_prover.(
-          map2 (read_var x_squared) (read_var ay) ~f:(fun x_squared ay ->
-              let open Field in
-              let open Infix in
-              ((of_int 3 * x_squared) + Params.a) * inv (of_int 2 * ay) ))
+      exists Typ.field
+        ~compute:
+          As_prover.(
+            map2 (read_var x_squared) (read_var ay) ~f:(fun x_squared ay ->
+                let open Field in
+                let open Infix in
+                ((of_int 3 * x_squared) + Params.a) * inv (of_int 2 * ay) ))
     in
     let%bind bx =
-      provide_witness Typ.field
-        As_prover.(
-          map2 (read_var lambda) (read_var ax) ~f:(fun lambda ax ->
-              let open Field in
-              Infix.(square lambda - (of_int 2 * ax)) ))
+      exists Typ.field
+        ~compute:
+          As_prover.(
+            map2 (read_var lambda) (read_var ax) ~f:(fun lambda ax ->
+                let open Field in
+                Infix.(square lambda - (of_int 2 * ax)) ))
     in
     let%bind by =
-      provide_witness Typ.field
-        (let open As_prover in
-        let open Let_syntax in
-        let%map lambda = read_var lambda
-        and ax = read_var ax
-        and ay = read_var ay
-        and bx = read_var bx in
-        Field.Infix.((lambda * (ax - bx)) - ay))
+      exists Typ.field
+        ~compute:
+          (let open As_prover in
+          let open Let_syntax in
+          let%map lambda = read_var lambda
+          and ax = read_var ax
+          and ay = read_var ay
+          and bx = read_var bx in
+          Field.Infix.((lambda * (ax - bx)) - ay))
     in
     let two = Field.of_int 2 in
     let open Field.Checked.Infix in
@@ -790,8 +799,8 @@ module Make_weierstrass_checked
     (bx, by)
 
   let if_value (cond : Boolean.var) ~then_ ~else_ =
-    let x1, y1 = Curve.to_coords then_ in
-    let x2, y2 = Curve.to_coords else_ in
+    let x1, y1 = Curve.to_affine_coordinates then_ in
+    let x2, y2 = Curve.to_affine_coordinates else_ in
     let cond = (cond :> Field.Checked.t) in
     let choose a1 a2 =
       let open Field.Checked in
@@ -835,10 +844,10 @@ module Make_weierstrass_checked
       +^ ((a3 - a1) * (b1 :> Field.Checked.t))
       +^ ((a4 + a1 - a2 - a3) * (b0_and_b1 :> Field.Checked.t))
     in
-    let x1, y1 = Curve.to_coords t1
-    and x2, y2 = Curve.to_coords t2
-    and x3, y3 = Curve.to_coords t3
-    and x4, y4 = Curve.to_coords t4 in
+    let x1, y1 = Curve.to_affine_coordinates t1
+    and x2, y2 = Curve.to_affine_coordinates t2
+    and x3, y3 = Curve.to_affine_coordinates t3
+    and x4, y4 = Curve.to_affine_coordinates t4 in
     (lookup_one (x1, x2, x3, x4), lookup_one (y1, y2, y3, y4))
 
   (* Similar to the above, but doing lookup in a size 1 table *)
@@ -847,7 +856,8 @@ module Make_weierstrass_checked
       let open Field.Checked.Infix in
       Field.Checked.constant a1 + (Field.sub a2 a1 * (b :> Field.Checked.t))
     in
-    let x1, y1 = Curve.to_coords t1 and x2, y2 = Curve.to_coords t2 in
+    let x1, y1 = Curve.to_affine_coordinates t1
+    and x2, y2 = Curve.to_affine_coordinates t2 in
     (lookup_one (x1, x2), lookup_one (y1, y2))
 
   let scale_known (type shifted)

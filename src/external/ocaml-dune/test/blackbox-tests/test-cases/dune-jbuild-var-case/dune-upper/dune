@@ -1,3 +1,0 @@
-(alias
- (name runtest)
- (action (with-stdout-to %{null} (echo %{MAKE}))))

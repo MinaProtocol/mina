@@ -68,7 +68,8 @@ struct
                     ~percent:(Percent.of_percentage 20.))
              else Deferred.unit
            in
-           Linear_pipe.write aw (desired_root, answ) )) ;
+           Linear_pipe.write aw (Envelope.Incoming.local (desired_root, answ))
+       )) ;
     match
       Async.Thread_safe.block_on_async_exn (fun () ->
           SL.fetch lsync desired_root )
@@ -100,11 +101,12 @@ struct
                  sr :=
                    SR.create l3 (fun q -> seen_queries := q :: !seen_queries) ;
                  desired_root := L.merkle_root l3 ;
-                 SL.new_goal lsync !desired_root ;
+                 SL.new_goal lsync !desired_root |> ignore ;
                  Deferred.unit )
                else
                  let answ = SR.answer_query !sr query in
-                 Linear_pipe.write aw (!desired_root, answ)
+                 Linear_pipe.write aw
+                   (Envelope.Incoming.local (!desired_root, answ))
              in
              ctr := !ctr + 1 ;
              res )) ;

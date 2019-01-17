@@ -41,6 +41,8 @@ let iter t ~f =
 
 let fold t = Array.fold t.data
 
+let foldi t = Array.foldi t.data
+
 let read t = t.data.(t.position)
 
 let filter t ~f =

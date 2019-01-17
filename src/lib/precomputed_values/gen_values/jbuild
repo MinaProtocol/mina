@@ -13,7 +13,7 @@
       snark_keys
       ppxlib
       ppx_util
-      ledger_builder
+      staged_ledger
       global_signer_private_key
     ))
    (preprocessor_deps ("../../../config.mlh"))

@@ -1,7 +1,0 @@
-(env
- (_
-  (binaries (../priv/priv.exe as foo))))
-
-(alias
- (name runtest)
- (action (run foo)))

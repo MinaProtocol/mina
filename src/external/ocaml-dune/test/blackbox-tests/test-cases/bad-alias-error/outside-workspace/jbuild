@@ -1,4 +1,0 @@
-
-(alias
- ((name runtest)
-  (deps ((alias ${ROOT}/../../../foobar)))))

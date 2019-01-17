@@ -7,7 +7,7 @@ module Make_test (F : Intf.Basic) = struct
       let (), r =
         run_and_check
           (let open Checked.Let_syntax in
-          let%bind x = provide_witness arg_typ (As_prover.return x) in
+          let%bind x = exists arg_typ ~compute:(As_prover.return x) in
           checked x >>| As_prover.read F.typ)
           ()
         |> Or_error.ok_exn
@@ -48,6 +48,12 @@ module Make (F : Intf.Basic) = struct
 
   let assert_r1cs = F.assert_r1cs
 
+  let assert_equal x y =
+    assert_all
+      (List.map2_exn
+         ~f:(fun x y -> Constraint.equal x y)
+         (F.to_list x) (F.to_list y))
+
   let ( + ) = F.( + )
 
   let%test_unit "add" =
@@ -67,8 +73,9 @@ module Make (F : Intf.Basic) = struct
     | Some x, Some y -> return (constant Unchecked.(x / y))
     | _, _ ->
         let%bind x_over_y =
-          provide_witness typ
-            As_prover.(map2 (read typ x) (read typ y) ~f:Unchecked.( / ))
+          exists typ
+            ~compute:
+              As_prover.(map2 (read typ x) (read typ y) ~f:Unchecked.( / ))
         in
         let%map () = assert_r1cs y x_over_y x in
         x_over_y
@@ -87,8 +94,10 @@ module Make (F : Intf.Basic) = struct
           | Some x, Some y -> return (constant Unchecked.(x * y))
           | _, _ ->
               let%bind res =
-                provide_witness typ
-                  As_prover.(map2 (read typ x) (read typ y) ~f:Unchecked.( * ))
+                exists typ
+                  ~compute:
+                    As_prover.(
+                      map2 (read typ x) (read typ y) ~f:Unchecked.( * ))
               in
               let%map () = assert_r1cs x y res in
               res )
@@ -106,8 +115,8 @@ module Make (F : Intf.Basic) = struct
           | Some x -> return (constant (Unchecked.square x))
           | None ->
               let%bind res =
-                provide_witness typ
-                  As_prover.(map (read typ x) ~f:Unchecked.square)
+                exists typ
+                  ~compute:As_prover.(map (read typ x) ~f:Unchecked.square)
               in
               let%map () = assert_square x res in
               res )
@@ -125,14 +134,17 @@ module Make (F : Intf.Basic) = struct
           | Some x -> return (constant (Unchecked.inv x))
           | None ->
               let%bind res =
-                provide_witness typ
-                  As_prover.(map (read typ t) ~f:Unchecked.inv)
+                exists typ
+                  ~compute:As_prover.(map (read typ t) ~f:Unchecked.inv)
               in
               let%map () = assert_r1cs t res one in
               res )
 end
 
-module Make_applicative (F : Intf.S) (A : Intf.Applicative) = struct
+module Make_applicative
+    (F : Intf.S)
+    (A : Intf.Traversable_applicative with module Impl := F.Impl) =
+struct
   type t = F.t A.t
 
   type 'a t_ = 'a F.t_ A.t
@@ -150,6 +162,9 @@ module Make_applicative (F : Intf.S) (A : Intf.Applicative) = struct
                | None -> raise None_exn ))
       with None_exn -> None
 
+  let if_ b ~then_ ~else_ =
+    A.sequence (A.map2 then_ else_ ~f:(fun t e -> F.if_ b ~then_:t ~else_:e))
+
   let scale t x = A.map t ~f:(fun a -> F.scale a x)
 
   let scale' t x = A.map t ~f:(fun a -> F.scale x a)
@@ -161,6 +176,8 @@ module Make_applicative (F : Intf.S) (A : Intf.Applicative) = struct
   let ( - ) = A.map2 ~f:F.( - )
 
   let map_ t ~f = A.map t ~f:(F.map_ ~f)
+
+  let map2_ t1 t2 ~f = A.map2 t1 t2 ~f:(fun x1 x2 -> F.map2_ x1 x2 ~f)
 end
 
 module F (Impl : Snarky.Snark_intf.S) :
@@ -171,6 +188,8 @@ struct
     open Impl
 
     let map_ t ~f = f t
+
+    let map2_ t1 t2 ~f = f t1 t2
 
     module Base = struct
       type 'a t_ = 'a
@@ -187,12 +206,16 @@ struct
     module A = struct
       type 'a t = 'a
 
-      let map t ~f = f t
+      let map = map_
 
-      let map2 t1 t2 ~f = f t1 t2
+      let map2 = map2_
+
+      let sequence = Fn.id
     end
 
     type 'a t_ = 'a
+
+    let to_list x = [x]
 
     module Unchecked = struct
       include Field
@@ -200,6 +223,8 @@ struct
     end
 
     type t = Field.Checked.t
+
+    let if_ = Field.Checked.if_
 
     let typ = Field.typ
 
@@ -260,7 +285,13 @@ module E2
       let map (x, y) ~f = (f x, f y)
 
       let map2 (x1, y1) (x2, y2) ~f = (f x1 x2, f y1 y2)
+
+      let sequence (x, y) =
+        let%map x = x and y = y in
+        (x, y)
     end
+
+    let to_list (x, y) = F.to_list x @ F.to_list y
 
     (* A value [(a, b) : t] should be thought of as the field element
    a + b sqrt(s). Then all operations are just what follow algebraically. *)
@@ -351,6 +382,15 @@ end
 
    Let S = cube_root(s) in the following.
 *)
+
+module T3 = struct
+  type 'a t = 'a * 'a * 'a
+
+  let map (x, y, z) ~f = (f x, f y, f z)
+
+  let map2 (x1, y1, z1) (x2, y2, z2) ~f = (f x1 x2, f y1 y2, f z1 z2)
+end
+
 module E3
     (F : Intf.S) (Params : sig
         val non_residue : F.Unchecked.t
@@ -373,12 +413,14 @@ module E3
     open Let_syntax
 
     module A = struct
-      type 'a t = 'a * 'a * 'a
+      include T3
 
-      let map (x, y, z) ~f = (f x, f y, f z)
-
-      let map2 (x1, y1, z1) (x2, y2, z2) ~f = (f x1 x2, f y1 y2, f z1 z2)
+      let sequence (x, y, z) =
+        let%map x = x and y = y and z = z in
+        (x, y, z)
     end
+
+    let to_list (x, y, z) = F.to_list x @ F.to_list y @ F.to_list z
 
     include Make_applicative (Base) (A)
 
@@ -529,12 +571,14 @@ module F3
       (F.scale c Params.non_residue, a, b)
 
     module A = struct
-      type 'a t = 'a * 'a * 'a
+      include T3
 
-      let map (x, y, z) ~f = (f x, f y, f z)
-
-      let map2 (x1, y1, z1) (x2, y2, z2) ~f = (f x1 x2, f y1 y2, f z1 z2)
+      let sequence (x, y, z) =
+        let%map x = x and y = y and z = z in
+        (x, y, z)
     end
+
+    let to_list (x, y, z) = [x; y; z]
 
     include Make_applicative (Base) (A)
 

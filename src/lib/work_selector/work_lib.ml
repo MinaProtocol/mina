@@ -52,7 +52,7 @@ module Make (Inputs : Inputs.Inputs_intf) = struct
     Option.value_map ~default:true
       (Inputs.Snark_pool.get_completed_work snark_pool statements)
       ~f:(fun priced_proof ->
-        let competing_fee = Inputs.Completed_work.fee priced_proof in
+        let competing_fee = Inputs.Transaction_snark_work.fee priced_proof in
         Inputs.Fee.compare fee competing_fee < 0 )
 
   module For_tests = struct
@@ -73,9 +73,9 @@ module Make (Inputs : Inputs.Inputs_intf) = struct
       ~f:
         (Fn.compose (does_not_have_better_fee ~snark_pool ~fee) statement_pair)
 
-  let all_works (ledger_builder : Inputs.Ledger_builder.t) (state : State.t) =
+  let all_works (staged_ledger : Inputs.Staged_ledger.t) (state : State.t) =
     let state = State.remove_old_assignments state in
-    let all_jobs = Inputs.Ledger_builder.all_work_pairs_exn ledger_builder in
+    let all_jobs = Inputs.Staged_ledger.all_work_pairs_exn staged_ledger in
     let unseen_jobs =
       List.filter all_jobs ~f:(fun js ->
           not @@ Map.mem state (statement_pair js) )
