@@ -4,7 +4,7 @@
 FROM debian:stretch-slim
 
 # Recent version.
-ARG OCAML_VERSION=4.07.0
+ARG OCAML_VERSION=4.07.1
 
 # Install the libsnark dependencies and a bootstrap OCaml environment.
 RUN apt-get -q update && \
