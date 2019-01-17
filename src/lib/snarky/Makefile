@@ -2,6 +2,9 @@
 all : docker googlecloud minikube
 .PHONY : all
 
+build :
+	dune build --root=.
+
 docker :
 	./rebuild-docker.sh ocaml-camlsnark
 
