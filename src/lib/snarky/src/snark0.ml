@@ -1022,7 +1022,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
                 (let open As_prover in
                 let open Let_syntax in
                 let%bind b = read_var b in
-                read Typ.field (if Field.equal b Field.one then then_ else else_))
+                read Typ.field
+                  (if Field.equal b Field.one then then_ else else_))
           in
           let%map () =
             assert_r1cs b Cvar.Infix.(then_ - else_) Cvar.Infix.(r - else_)
