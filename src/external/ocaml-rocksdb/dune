@@ -35,7 +35,7 @@
 
       case $(uname) in
       'Linux') nproc=nproc ;;
-      'Darwin') nproc=sysctl -n hw.ncpu ;;
+      'Darwin') nproc="sysctl -n hw.ncpu" ;;
       *) echo I do not know how to build on $(uname) ; exit 1
       esac
       env ROCKSDB_DISABLE_SNAPPY=1 ROCKSDB_DISABLE_GFLAGS=1 ROCKSDB_DISABLE_LZ4=1 ROCKSDB_DISABLE_ZSTD=1 ROCKSDB_DISABLE_NUMA=1 ROCKSDB_DISABLE_TBB=1 ROCKSDB_DISABLE_JEMALLOC=1 ROCKSDB_DISABLE_TCMALLOC=1 ROCKSDB_DISABLE_BACKTRACE=1 make static_lib -j$(nproc)
