@@ -1,4 +1,4 @@
-https://github.com/CodaProtocol/coda/pull/1440/files#diff-b67911656ef5d18c4ae36cb6741b7965R70# Coda
+# Coda
 
 Coda is a new cryptocurrency protocol with a lightweight, constant sized blockchain.
 
