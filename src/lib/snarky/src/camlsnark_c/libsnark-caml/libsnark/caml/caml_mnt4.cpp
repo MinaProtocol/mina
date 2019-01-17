@@ -635,11 +635,9 @@ r1cs_gg_ppzksnark_verification_key<ppT>* camlsnark_mnt4_verification_key_of_stri
 std::vector<libff::G1<ppT>>*
 camlsnark_mnt4_verification_key_query(r1cs_gg_ppzksnark_verification_key<ppT>* vk) {
   std::vector<libff::G1<ppT>>* res = new std::vector<libff::G1<ppT>>();
-  printf("Test\n");
   res->emplace_back(vk->ABC_g1.first);
   for (size_t i = 0; i < vk->ABC_g1.rest.values.size(); ++i)
   {
-  printf("Test %d\n", i);
       res->emplace_back(vk->ABC_g1.rest.values[i]);
   }
   return res;
