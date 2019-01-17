@@ -122,6 +122,9 @@ jobs:
        steps:
            - checkout
            - run:
+              name: Build OCaml
+              command: eval `opam config env` && DUNE_PROFILE=test_sigs make build 2>&1 | tee /tmp/buildocaml.log
+           - run:
               name: Test make test-runtest
               command: source ~/.profile && DUNE_PROFILE=test_sigs make test-runtest
 
