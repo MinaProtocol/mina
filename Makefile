@@ -101,7 +101,8 @@ macos-setup-download:
 macos-setup-compile:
 	./scripts/macos-setup.sh compile
 
-macos-setup: macos-setup-download macos-setup-compile
+macos-setup:
+	./scripts/macos-setup.sh all
 
 ########################################
 ## Containers and container management
