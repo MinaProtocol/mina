@@ -52,7 +52,7 @@ let max_input_size = 20000
 
 let params =
   List.init (max_input_size / 4) ~f:(fun i ->
-      let t = Group.of_coords (random_point ()) in
+      let t = Group.of_affine_coordinates (random_point ()) in
       let tt = Group.double t in
       (t, tt, Group.add t tt, Group.double tt) )
 
@@ -68,13 +68,13 @@ let params_ast ~loc =
       (List.map params ~f:(fun (g1, g2, g3, g4) ->
            E.pexp_tuple
              (List.map [g1; g2; g3; g4] ~f:(fun g ->
-                  let x, y = Group.to_coords g in
+                  let x, y = Group.to_affine_coordinates g in
                   E.pexp_tuple
                     [ estring (Impl.Field.to_string x)
                     ; estring (Impl.Field.to_string y) ] )) ))
   in
   let%expr conv (x, y) =
-    Tick_backend.Inner_curve.of_coords
+    Tick_backend.Inner_curve.of_affine_coordinates
       (Tick0.Field.of_string x, Tick0.Field.of_string y)
   in
   Array.map

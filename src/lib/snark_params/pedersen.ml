@@ -70,7 +70,7 @@ end)
 (Bigint : Snarky.Bigint_intf.Extended with type field := Field.t) (Curve : sig
     type t
 
-    val to_coords : t -> Field.t * Field.t
+    val to_affine_coordinates : t -> Field.t * Field.t
 
     val zero : t
 
@@ -187,8 +187,8 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
         in
         {new_state with acc; triples_consumed}
 
-    let digest (t : t) =
-      let x, _y = Curve.to_coords t.acc in
+    let digest t =
+      let x, _y = Curve.to_affine_coordinates t.acc in
       x
 
     let salt params chunk_table s =
