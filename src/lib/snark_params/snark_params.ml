@@ -136,9 +136,9 @@ module Tock = struct
               (struct
                 type nonrec t = t
 
-                let to_sexpable = to_coords
+                let to_sexpable = to_affine_coordinates
 
-                let of_sexpable = of_coords
+                let of_sexpable = of_affine_coordinates
               end)
 
     include Make_inner_curve_aux (Tock0) (Tick0)
@@ -200,9 +200,9 @@ module Tick = struct
               (struct
                 type nonrec t = t
 
-                let to_sexpable = to_coords
+                let to_sexpable = to_affine_coordinates
 
-                let of_sexpable = of_coords
+                let of_sexpable = of_affine_coordinates
               end)
 
     include Make_inner_curve_aux (Tick0) (Tock0)

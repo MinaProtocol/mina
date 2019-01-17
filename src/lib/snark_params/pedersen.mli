@@ -53,7 +53,7 @@ end)
 (Bigint : Snarky.Bigint_intf.Extended with type field := Field.t) (Curve : sig
     type t
 
-    val to_coords : t -> Field.t * Field.t
+    val to_affine_coordinates : t -> Field.t * Field.t
 
     val zero : t
 
