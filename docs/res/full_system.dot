@@ -1,14 +1,34 @@
+/*
+ * The following diagram shows the dataflow between major components of Coda
+ */
 digraph full_system {
   rankdir=LR;
 
-  {Client} -> {Txn_pool Transition_Frontier_Controller};
-  {Snark_pool} -> {Transition_Frontier_Controller};
-  {Snark_worker} -> {Snark_pool};
-  {Snark_pool} -> {Snark_worker};
-  {Txn_pool} -> {Transition_Frontier_Controller};
-  {Transition_Frontier_Controller} -> {Proposer Network Snark_pool}
-  {Network} -> {Snark_pool Txn_pool};
-  {Snark_pool Txn_pool} -> {Network};
-  {Proposer} -> {Prover Transition_Frontier_Controller};
-  {Prover} -> {Proposer};
+  Client -> Txn_pool;
+  Transition_frontier -> Client;
+  Txn_pool -> Proposer;
+
+  Transition_frontier -> Transition_router;
+  Transition_frontier -> Proposer;
+  Proposer -> Transition_router;
+
+  subgraph cluster_proposing {
+    label="Proposer Node";
+    Proposer -> Prover;
+  }
+
+  Network -> Transition_router;
+  Transition_router -> Network;
+  Prover -> Transition_router;
+
+  Txn_pool -> Network;
+  Network -> Txn_pool;
+
+  Snark_pool -> Network;
+  Network -> Snark_pool;
+
+  subgraph cluster_snark_worker {
+    label="Snark Worker Node";
+    Snark_worker -> Snark_pool;
+  }
 }
