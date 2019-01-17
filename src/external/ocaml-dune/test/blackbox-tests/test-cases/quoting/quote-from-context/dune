@@ -1,6 +1,0 @@
-(executable
- (name count_args))
-
-(alias
- (name runtest)
- (action (run ./count_args.exe %{read-lines:args})))

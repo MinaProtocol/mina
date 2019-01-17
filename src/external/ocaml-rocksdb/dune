@@ -1,0 +1,46 @@
+(library
+    (name rocks)
+    (public_name rocks)
+    (no_dynlink)
+    (modes native)
+    (libraries ctypes ctypes.foreign)
+    (flags (:standard -warn-error -A))
+    (modules (:standard \ rocks_linker_flags_gen rocks_test))
+    (c_library_flags (:standard (:include flags.sexp)))
+    (self_build_stubs_archive (rocksdb))
+    )
+
+(executable
+ (name rocks_linker_flags_gen)
+ (modules rocks_linker_flags_gen)
+ (libraries dune.configurator)
+ )
+
+(rule
+ (targets flags.sexp)
+ (action (run ./rocks_linker_flags_gen.exe)))
+
+(rule
+ (targets librocksdb_stubs.a)
+ (deps (source_tree rocksdb))
+ (action (bash "
+    if [ -e /usr/local/lib/librocksdb_coda.a ]; then
+      cp /usr/local/lib/librocksdb_coda.a librocksdb_stubs.a
+    else
+      if [ ! -d rocksdb ]; then git clone https://github.com/facebook/rocksdb -b v5.17.2 --depth=1; fi
+      pushd rocksdb
+      git fetch
+      git clean -dxf
+      git checkout v5.17.2
+
+      case $(uname) in
+      'Linux') jobs=$(nproc) ;;
+      'Darwin') jobs=2 ;;
+      *) echo I do not know how to build on $(uname) ; exit 1
+      esac
+      env ROCKSDB_DISABLE_SNAPPY=1 ROCKSDB_DISABLE_GFLAGS=1 ROCKSDB_DISABLE_LZ4=1 ROCKSDB_DISABLE_ZSTD=1 ROCKSDB_DISABLE_NUMA=1 ROCKSDB_DISABLE_TBB=1 ROCKSDB_DISABLE_JEMALLOC=1 ROCKSDB_DISABLE_TCMALLOC=1 ROCKSDB_DISABLE_BACKTRACE=1 make static_lib -j${jobs}
+
+      strip -S librocksdb.a
+      popd
+      cp rocksdb/librocksdb.a librocksdb_stubs.a
+    fi")))

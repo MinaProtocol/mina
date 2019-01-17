@@ -98,8 +98,9 @@ struct
            if i = num_aux_vars then return ()
            else
              let%bind _ =
-               provide_witness Typ.field
-                 As_prover.(map get_state ~f:(fun v -> Field.Vector.get v i))
+               exists Typ.field
+                 ~compute:
+                   As_prover.(map get_state ~f:(fun v -> Field.Vector.get v i))
              in
              go (i + 1)
          in

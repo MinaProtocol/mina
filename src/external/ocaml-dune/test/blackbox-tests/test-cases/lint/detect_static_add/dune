@@ -1,5 +1,0 @@
-(library
- (name detect_static_add)
- (kind ppx_rewriter)
- (libraries ocaml-migrate-parsetree)
-)

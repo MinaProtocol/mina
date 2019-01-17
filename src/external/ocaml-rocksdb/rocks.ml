@@ -72,7 +72,13 @@ module WriteBatch = struct
     delete_raw_string batch (ocaml_string_start key +@ pos) len
 end
 
-module Version = Rocks_version
+module Version = struct
+  let major = 5
+  let minor = 17
+  let patch = 2
+  let git_revision = "tags/v5.17.2-0-gf438b98e5"
+  let summary = (major, minor, patch, git_revision)
+end
 
 let returning_error typ = ptr string_opt @-> returning typ
 

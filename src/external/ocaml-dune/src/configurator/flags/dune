@@ -1,4 +1,0 @@
-(executable
- (name mk))
-
-(rule (with-stdout-to flags.sexp (run ./mk.exe -ocamlv %{ocaml_version})))
