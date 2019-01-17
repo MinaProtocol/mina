@@ -1005,25 +1005,28 @@ module Make_basic (Backend : Backend_intf.S) = struct
         let%bind y_inv = inv y in
         mul x y_inv)
 
-    let%snarkydef if_ (b : Cvar.t Boolean.t) ~then_ ~else_ =
+    let%snarkydef if_ (b : Cvar.t Boolean.t) ~(then_ : Cvar.t)
+        ~(else_ : Cvar.t) =
       let open Let_syntax in
       (* r = e + b (t - e)
       r - e = b (t - e)
     *)
-      let%bind r =
-        provide_witness Typ.field
-          (let open As_prover in
-          let open Let_syntax in
-          let%bind b = read_var (b :> Cvar.t) in
-          read Typ.field (if Field.equal b Field.one then then_ else else_))
-      in
-      let%map () =
-        assert_r1cs
-          (b :> Cvar.t)
-          Cvar.Infix.(then_ - else_)
-          Cvar.Infix.(r - else_)
-      in
-      r
+      let b = (b :> Cvar.t) in
+      match (then_, else_) with
+      | Constant t, Constant e ->
+          return Cvar.(Infix.((t * b) + (e * (constant Field0.one - b))))
+      | _, _ ->
+          let%bind r =
+            provide_witness Typ.field
+              (let open As_prover in
+              let open Let_syntax in
+              let%bind b = read_var b in
+              read Typ.field (if Field.equal b Field.one then then_ else else_))
+          in
+          let%map () =
+            assert_r1cs b Cvar.Infix.(then_ - else_) Cvar.Infix.(r - else_)
+          in
+          r
 
     let%snarkydef assert_non_zero (v : Cvar.t) =
       let open Let_syntax in
