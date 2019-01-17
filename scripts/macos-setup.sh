@@ -2,33 +2,27 @@
 set -x #echo on
 set -eu
 
-USAGE="$0 <download|opam|compile|all>"
+USAGE="$0 <download|compile|all>"
 
 if [[ $# -eq 0 ]]; then
   echo $USAGE
   exit 1
 fi
 
-if [[ $1 == "download" ]]; then
-  DOWNLOAD_THINGS=YES
-  OPAM_INIT=NO
-  COMPILE_THINGS=NO
-elif [[ $1 == "compile" ]]; then
-  DOWNLOAD_THINGS=NO
-  OPAM_INIT=NO
-  COMPILE_THINGS=YES
-elif [[ $1 == "opam" ]]; then
-  DOWNLOAD_THINGS=NO
-  OPAM_INIT=YES
-  COMPILE_THINGS=NO
-elif [[ $1 == "all" ]]; then
-  DOWNLOAD_THINGS=YES
-  OPAM_INIT=YES
-  COMPILE_THINGS=YES
-else
-  echo $USAGE
-  exit 1
-fi
+case $1 in
+  "download")
+    DOWNLOAD_THINGS=YES
+    COMPILE_THINGS=NO ;;
+  "compile")
+    DOWNLOAD_THINGS=NO
+    COMPILE_THINGS=YES ;;
+  "all")
+    DOWNLOAD_THINGS=YES
+    COMPILE_THINGS=YES ;;
+  *)
+    echo $USAGE
+    exit 1
+esac
 
 if [[ $DOWNLOAD_THINGS == "YES" ]]; then
   PACKAGES="gpatch opam cmake gmp pkg-config openssl libffi libsodium boost zlib"
