@@ -11,7 +11,7 @@ module Make
 
         type t [@@deriving eq]
 
-        val to_coords : t -> Impl.Field.t * Impl.Field.t
+        val to_affine_coordinates : t -> Impl.Field.t * Impl.Field.t
 
         val typ : (var, t) Impl.Typ.t
 
@@ -105,10 +105,10 @@ end = struct
          Weierstrass_curve.t Quadruple.t
       -> Field.t Quadruple.t * Field.t Quadruple.t =
    fun (t1, t2, t3, t4) ->
-    let x1, y1 = Weierstrass_curve.to_coords t1
-    and x2, y2 = Weierstrass_curve.to_coords t2
-    and x3, y3 = Weierstrass_curve.to_coords t3
-    and x4, y4 = Weierstrass_curve.to_coords t4 in
+    let x1, y1 = Weierstrass_curve.to_affine_coordinates t1
+    and x2, y2 = Weierstrass_curve.to_affine_coordinates t2
+    and x3, y3 = Weierstrass_curve.to_affine_coordinates t3
+    and x4, y4 = Weierstrass_curve.to_affine_coordinates t4 in
     ((x1, x2, x3, x4), (y1, y2, y3, y4))
 
   let lookup ((s0, s1, s2) : Boolean.var Triple.t)
