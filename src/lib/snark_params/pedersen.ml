@@ -63,7 +63,7 @@ module type S = sig
 end
 
 module Make (Field : sig
-  type t [@@deriving sexp, bin_io, compare, hash, eq]
+  type t [@@deriving sexp, bin_io, compare, hash]
 
   include Snarky.Field_intf.S with type t := t
 end)
@@ -111,7 +111,7 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
       {acc= init; triples_consumed; params; chunk_table}
 
     type fold_result =
-      { acc: Curve.t
+      { sum: Curve.t
       ; triples_consumed: int
       ; synched: bool (* have we reached a chunk boundary *)
       ; chunk_rev: bool Triple.t list (* reversed chunk, or part of one *)
@@ -137,10 +137,10 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
          use chunk table; after processing all full chunks, consume any
          straggler triples
       *)
-      let ({acc; triples_consumed; chunk_rev; _} : fold_result) =
+      let ({sum; triples_consumed; chunk_rev; _} : fold_result) =
         fold.fold
           ~init:
-            { acc= t.acc
+            { sum= t.acc
             ; triples_consumed= t.triples_consumed
             ; synched= false
             ; chunk_rev= []
@@ -154,7 +154,7 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
                 (* full chunk; use int value of the reversed chunk as table index *)
                 let n = Chunk.to_int (triple :: accum.chunk_rev) in
                 let g = table.(accum.chunk_ndx).(n) in
-                { acc= Curve.add accum.acc g
+                { sum= Curve.add accum.sum g
                 ; triples_consumed= accum.triples_consumed + Chunk.size
                 ; synched= true (* stay synched *)
                 ; chunk_rev= [] (* new chunk *)
@@ -169,12 +169,12 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
             else
               (* not synched, consume one triple *)
               { accum with
-                acc=
-                  Curve.add accum.acc
+                sum=
+                  Curve.add accum.sum
                     (process_triple accum.triples_consumed triple)
               ; triples_consumed= accum.triples_consumed + 1 } )
       in
-      let new_state = {t with acc; triples_consumed} in
+      let new_state = {t with acc= sum; triples_consumed} in
       if List.is_empty chunk_rev then (* no stragglers *)
         new_state
       else
