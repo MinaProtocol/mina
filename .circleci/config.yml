@@ -68,7 +68,7 @@ jobs:
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                 name: Run all tests (on master)
-                command: ["$(CIRCLE_BRANCH)" != "master"] || (`opam config env` && make test)
+                command: bash -c '[ ! "$(CIRCLE_BRANCH)" = "master"] || (`opam config env` && make test)'
 
     build_withsnark:
         resource_class: large
