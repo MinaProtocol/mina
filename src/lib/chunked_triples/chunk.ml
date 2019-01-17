@@ -5,7 +5,7 @@ open Tuple_lib
 
 type t = bool Triple.t list
 
-(* increasing the size should improve Pedersen hash performance, at the cost of increased compile time
+(* increasing the chunk size improves Pedersen hash performance, at the cost of increased compile time
 
    a larger size reduces the size of the memoized hashes outer array slightly, but each increment doubles the
     size of each inner array

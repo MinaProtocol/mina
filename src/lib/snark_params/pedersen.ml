@@ -112,11 +112,12 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
 
     type fold_result =
       { acc: Curve.t
-      ; triples_consumed: int (* have we reached a chunk boundary *)
-      ; synched: bool (* reversed chunk, or part of one *)
-      ; chunk_rev: bool Triple.t list (* length of chunk_rev *)
-      ; chunk_rev_len: int (* index into the chunk table to use *)
-      ; chunk_ndx: int }
+      ; triples_consumed: int
+      ; synched: bool (* have we reached a chunk boundary *)
+      ; chunk_rev: bool Triple.t list (* reversed chunk, or part of one *)
+      ; chunk_rev_len: int (* length of chunk_rev *)
+      ; chunk_ndx: int
+      (* index into the chunk table to use *) }
 
     let update_fold (t : t) (fold : bool Triple.t Fold.t) =
       let params = t.params in
@@ -150,8 +151,8 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
             in
             if synched then
               if Int.equal (accum.chunk_rev_len + 1) Chunk.size then
-                (* full chunk *)
-                let n = Chunk.to_int (List.rev (triple :: accum.chunk_rev)) in
+                (* full chunk; use int value of the reversed chunk as table index *)
+                let n = Chunk.to_int (triple :: accum.chunk_rev) in
                 let g = table.(accum.chunk_ndx).(n) in
                 { acc= Curve.add accum.acc g
                 ; triples_consumed= accum.triples_consumed + Chunk.size

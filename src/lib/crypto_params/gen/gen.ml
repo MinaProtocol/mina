@@ -90,12 +90,12 @@ let params_structure ~loc =
 
         let params = [%e params_ast ~loc]]
 
-(* for a chunk with value n, compute its curve value
+(* for the reversed chunk with value n, compute its curve value
    start is the starting parameter position of the chunk, based
     on its position in a list of chunks
 *)
 let compute_chunk_value ~start n =
-  let chunk = Chunk.of_int n in
+  let chunk = List.rev (Chunk.of_int n) in
   let acc, _ =
     List.fold chunk ~init:(Group.zero, 0) ~f:(fun (acc, i) triple ->
         let term =
