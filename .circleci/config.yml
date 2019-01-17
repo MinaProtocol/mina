@@ -37,6 +37,39 @@ jobs:
             - store_artifacts:
                 path: /tmp/artifacts
 
+    build-macos:
+        macos:
+            xcode: "10.1.0"
+        working_directory: /Users/distiller/coda
+        env:
+            HOMEBREW_LOGS: /Users/distiller/homebrew.log
+        steps:
+            - restore_cache:
+                keys:
+                    - macos-v1
+                    - macos-v1-opam
+            - checkout
+            - run:
+                name: Download Deps -- make macos-setup-download
+                command: make macos-setup-download
+            - save_cache:
+                key: macos-v1
+                paths:
+                    - "/usr/local/Homebrew"
+            - run:
+                name: Compile Deps -- make macos-setup-compile
+                command: make macos-setup-compile
+            - save_cache:
+                key: macos-v1-opam
+                paths:
+                    - "/Users/distiller/.opam"
+            - run:
+                name: Build OCaml
+                command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                name: Run all tests (on master)
+                command: bash -c '[ ! "$(CIRCLE_BRANCH)" = "master" ] || (`opam config env` && make test)'
+
     build_withsnark:
         resource_class: large
         docker:
@@ -194,6 +227,7 @@ workflows:
     coda_parallel:
         jobs:
             - build
+            - build-macos
             - build_withsnark
             - build_public
             
