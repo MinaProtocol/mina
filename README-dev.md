@@ -26,7 +26,14 @@ The short version:
 
 Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debian!
 
-### Developer Setup
+### Developer Setup (MacOS)
+
+* Invoke `make macos-setup`
+* Wait a long time...
+* Invoke `make build`
+* Jump to [customizing your editor for autocomplete](#dev-env)
+
+### Developer Setup (Linux)
 
 #### Install or have Ubuntu 18
 
@@ -54,6 +61,7 @@ Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debi
 
 `make USEDOCKER=TRUE build`
 
+<a href="#dev-env"></a>
 #### Customizing your dev environment for autocomplete/merlin
 
 * If you build in Docker, the files created for merlin will have invalid paths. You can fix those paths after a
