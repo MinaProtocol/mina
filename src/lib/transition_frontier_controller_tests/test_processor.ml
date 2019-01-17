@@ -1,3 +1,4 @@
+(*
 open Core
 open Async
 open Pipe_lib
@@ -17,7 +18,6 @@ module Processor = Transition_handler.Processor.Make (struct
   module Staged_ledger_aux_hash = Staged_ledger_aux_hash
 end)
 
-(*
 let%test_module "Transition_handler.Processor tests" =
   ( module struct
     let%test "adding transitions whose parents are in the frontier" =
