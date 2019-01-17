@@ -4,7 +4,9 @@ set -euxo pipefail
 if [[ $CIRCLE_BRANCH == 'master' ]]; then
 
     # GC credentials
+    set +x
     echo $JSON_GCLOUD_CREDENTIALS > google_creds.json
+    set -x
     /usr/bin/gcloud auth activate-service-account --key-file=google_creds.json
     /usr/bin/gcloud config set project $(cat google_creds.json | jq -r .project_id)
 
