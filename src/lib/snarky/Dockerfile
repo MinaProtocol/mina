@@ -8,7 +8,7 @@ ARG OCAML_VERSION=4.07.1
 
 # Install the libsnark dependencies and a bootstrap OCaml environment.
 RUN apt-get -q update && \
-    apt-get -q -y install \
+    apt-get --no-install-recommends -q -y install \
         build-essential=12.3 \
         cmake=3.7.2-1 \
         git=1:2.11.0-3+deb9u4 \
@@ -50,13 +50,13 @@ RUN opam init -y && \
 WORKDIR /source
 
 # Pin and install the dependencies.
-RUN eval `opam config env` && \
+RUN eval "$(opam config env)" && \
     opam pin add -y interval_union .
 
-RUN eval `opam config env` && \
+RUN eval "$opam config env)" && \
     opam pin add -y bitstring_lib .
 
-RUN eval `opam config env` && \
+RUN eval "$(opam config env)" && \
     opam pin add -y snarky .
 
 # Docker inception
