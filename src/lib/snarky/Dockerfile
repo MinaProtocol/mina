@@ -9,22 +9,22 @@ ARG OCAML_VERSION=4.07.1
 # Install the libsnark dependencies and a bootstrap OCaml environment.
 RUN apt-get -q update && \
     apt-get -q -y install \
-        build-essential \
-        cmake \
-        git \
-        libboost-dev \
-        libboost-program-options-dev \
-        libffi-dev \
-        libgmp-dev \
-        libgmp3-dev \
-        libprocps-dev \
-        libssl-dev \
-        m4 \
-        nano \
-        ocaml \
-        opam \
-        pkg-config \
-        python-markdown && \
+        build-essential=12.3 \
+        cmake=3.7.2-1 \
+        git=1:2.11.0-3+deb9u4 \
+        libboost-dev=1.62.0.1 \
+        libboost-program-options-dev=1.62.0.1 \
+        libffi-dev=3.2.1-6 \
+        libgmp-dev=2:6.1.2+dfsg-1 \
+        libgmp3-dev=2:6.1.2+dfsg-1 \
+        libprocps-dev=2:3.3.12-3+deb9u1 \
+        libssl-dev=1.1.0j-1~deb9u1 \
+        m4=1.4.18-1 \
+        nano=2.7.4-1 \
+        ocaml=4.02.3-9 \
+        opam=1.2.2-5+b7 \
+        pkg-config=0.29-4+b1 \
+        python-markdown=2.6.8-1 && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -35,7 +35,7 @@ RUN useradd snarky -m
 # we'll copy the local context. To update the snarky 
 # library itself later, bind mount your updated source 
 # over this and run the build again.
-ADD . /source
+COPY . /source
 RUN chown -R snarky:snarky /source
 VOLUME ["/source"]
 
