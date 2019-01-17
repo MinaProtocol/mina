@@ -89,7 +89,7 @@ let daemon log =
            "CAPACITY_LOG_2 Log of capacity of transactions per transition \
             (default: 4)"
          (optional int)
-     and work_availability_factor =
+     and scan_state_size_incr =
        flag "work-availability-factor"
          ~doc:
            "An integer value that determines the scan state size (default: 2)"
@@ -174,9 +174,9 @@ let daemon log =
          or_from_config YJ.Util.to_int_option "txn-capacity" ~default:4
            transaction_capacity_log_2
        in
-       let work_availability_factor =
+       let scan_state_size_incr =
          or_from_config YJ.Util.to_int_option "work-availability-factor"
-           ~default:2 work_availability_factor
+           ~default:2 scan_state_size_incr
        in
        let snark_work_fee_flag =
          Currency.Fee.of_int
@@ -282,7 +282,9 @@ let daemon log =
 
          let transaction_capacity_log_2 = transaction_capacity_log_2
 
-         let work_availability_factor = work_availability_factor
+         let scan_state_size_incr = scan_state_size_incr
+
+         let work_availability_factor = scan_state_size_incr - 1
 
          let commit_id = commit_id
 

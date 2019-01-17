@@ -204,7 +204,9 @@ module T = struct
 
         let transaction_capacity_log_2 = 3
 
-        let work_availability_factor = 2
+        let scan_state_size_incr = 2
+
+        let work_availability_factor = scan_state_size_incr - 1
 
         let commit_id = None
 

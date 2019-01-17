@@ -98,6 +98,8 @@ module type Config_intf = sig
   val transaction_capacity_log_2 : int
   (** Capacity of transactions per block *)
 
+  val scan_state_size_incr : int
+
   val work_availability_factor : int
 
   val commit_id : Daemon_rpcs.Types.Git_sha.t option

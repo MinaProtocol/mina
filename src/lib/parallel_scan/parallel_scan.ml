@@ -277,8 +277,9 @@ module State = struct
       | `Left, Merge (Lcomp _) | `Right, Merge (Rcomp _) | _, Merge (Bcomp _)
         ->
           (*TODO: punish the sender*)
-          Or_error.error_string
-            "Impossible: the side of merge we want is not empty"
+          Or_error.errorf
+            !"Impossible: the side of merge we want is not empty (loc: %d)"
+            pos
       | _, Base _ -> Error (Error.of_string "impossible: we never fill base")
     in
     Ring_buffer.direct_update t.jobs pos ~f:new_job

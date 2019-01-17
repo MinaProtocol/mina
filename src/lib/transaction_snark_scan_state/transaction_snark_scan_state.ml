@@ -114,9 +114,11 @@ end = struct
     Staged_ledger_aux_hash.of_bytes (state_hash :> string)
 
   let is_valid t =
-    let k = max Config.work_availability_factor 2 in
+    let k = max Config.scan_state_size_incr 2 in
     Parallel_scan.parallelism ~state:t
     = Int.pow 2 (Config.transaction_capacity_log_2 + k)
+    (*allow delay upto at least one set of 2^transaction_capacity_log_2 slots are available*)
+    && Config.work_availability_factor < Int.pow 2 k - 1
     && Parallel_scan.is_valid t
 
   include Binable.Of_binable
@@ -352,8 +354,8 @@ end = struct
   let capacity t = Parallel_scan.parallelism ~state:t
 
   let create ~transaction_capacity_log_2 =
-    (* Transaction capacity log_2 is 1/2^work_availability_factor the capacity for work parallelism *)
-    let k = max Config.work_availability_factor 2 in
+    (* Transaction capacity log_2 is 1/2^scan_state_size_incr the capacity for work parallelism *)
+    let k = max Config.scan_state_size_incr 2 in
     Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + k)
 
   let empty () =
@@ -421,6 +423,9 @@ end = struct
     let current_seq = Parallel_scan.current_job_sequence_number t in
     let min_seq_no = max 0 (current_seq - Config.work_availability_factor) in
     let%map all_jobs = next_jobs_sequence t in
+    Core.printf
+      !"current seq no: %d min seq no: %d \n %!"
+      current_seq min_seq_no ;
     Sequence.filter all_jobs ~f:(fun job ->
         let cur_seq =
           match job with
@@ -439,7 +444,7 @@ end = struct
     in
     Yojson.Safe.to_string (`List (List.map all_jobs ~f:Job_view.to_yojson))
 
-  let sequence_chunks_of seq ~n =
+  let _sequence_chunks_of seq ~n =
     Sequence.unfold_step ~init:([], 0, seq) ~f:(fun (acc, i, seq) ->
         if i = n then Yield (List.rev acc, ([], 0, seq))
         else
@@ -468,9 +473,10 @@ end = struct
     let open Or_error.Let_syntax in
     let%map work_seq = filter_jobs_by_seq_no scan_state in
     Core.printf "work count: %d \n %!" (Sequence.length work_seq) ;
-    sequence_chunks_of ~n:Transaction_snark_work.proofs_length
-    @@ Sequence.map work_seq ~f:(fun maybe_work ->
+    Sequence.chunks_exn
+      (Sequence.map work_seq ~f:(fun maybe_work ->
            match statement_of_job maybe_work with
            | None -> assert false
-           | Some work -> work )
+           | Some work -> work ))
+      Transaction_snark_work.proofs_length
 end

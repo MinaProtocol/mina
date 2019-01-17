@@ -294,6 +294,8 @@ end = struct
   let current_ledger_proof t =
     Option.map (Scan_state.latest_ledger_proof t.scan_state) ~f:fst
 
+  let min_work_to_do = Scan_state.min_work_to_do
+
   let total_proofs (works : Transaction_snark_work.t list) =
     List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
 
@@ -561,6 +563,9 @@ end = struct
         in
         (user_commands, coinbase, transactions))
     in
+    Core.printf
+      !"total transactions added in this pre diff: %d\n %!"
+      (List.length transactions) ;
     let%map new_data = update_ledger_and_get_statements ledger transactions in
     { Prediff_info.data= new_data
     ; work= completed_works
@@ -580,6 +585,9 @@ end = struct
       ( Int.min (Scan_state.free_space t.scan_state) max_throughput
       , List.length jobs )
     in
+    (*Core.printf
+        !"diff: %{sexp: Staged_ledger_diff.t}\n %!"
+        sl_diff ;*)
     let apply_pre_diff_with_at_most_two
         (pre_diff1 : Staged_ledger_diff.pre_diff_with_at_most_two_coinbase)
         ledger =
@@ -1640,7 +1648,7 @@ let%test_module "test" =
         type proof = Ledger_proof.t [@@deriving sexp, bin_io, compare]
 
         type statement = Ledger_proof_statement.t
-        [@@deriving sexp, bin_io, compare, hash]
+        [@@deriving sexp, bin_io, compare, hash, eq]
 
         type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
 
@@ -1656,7 +1664,8 @@ let%test_module "test" =
 
         module Statement = struct
           module T = struct
-            type t = statement list [@@deriving sexp, bin_io, compare, hash]
+            type t = statement list
+            [@@deriving sexp, bin_io, compare, hash, eq]
           end
 
           include T
@@ -1812,9 +1821,15 @@ let%test_module "test" =
       end
 
       module Config = struct
-        let transaction_capacity_log_2 = 3
+        let transaction_capacity_log_2 = 5
 
-        let work_availability_factor = 2
+        let scan_state_size_incr = 2
+
+        (*should be >= 3 because of FIFO and that there are more transactions added that proofs emitted. May be we should explore how to drop emit proofs mid way (2^transaction_capacity_log_2's root)*)
+
+        let work_availability_factor = 1
+
+        (*less than work_availability *)
       end
 
       let check :
@@ -1841,18 +1856,23 @@ let%test_module "test" =
         ; proofs= stmts
         ; prover }
 
-    let stmt_to_work_restricted (create_for : int -> bool)
+    let stmt_to_work_restricted min_work_seq
         (stmts : Test_input1.Transaction_snark_work.Statement.t) :
         Test_input1.Transaction_snark_work.Checked.t option =
       let prover =
         List.fold stmts ~init:"P" ~f:(fun p stmt ->
             p ^ intpair_to_str stmt.target )
       in
-      let last_stmt : Test_input1.Ledger_proof_statement.t =
+      (*let last_stmt : Test_input1.Ledger_proof_statement.t =
         List.nth_exn stmts (List.length stmts - 1)
       in
-      let block_number = snd last_stmt.target in
-      if create_for block_number then
+      let block_number = last_stmt in
+      Core.printf "block number of the statement currently being proved : %d \n %!" block_number;*)
+      if
+        Option.is_some
+          (Sequence.find min_work_seq ~f:(fun s ->
+               Test_input1.Transaction_snark_work.Statement.equal s stmts ))
+      then
         Some
           { Test_input1.Transaction_snark_work.Checked.fee=
               Fee.Unsigned.of_int 1
@@ -1909,24 +1929,45 @@ let%test_module "test" =
       let logger = Logger.create () in
       let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
-      let initial_ledger = ref (0, 0) in
+      let initial_ledger = ref (0, 1) in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
-      Quickcheck.test g ~trials:1000 ~f:(fun _ ->
+      let total_transactions (sl_diff : Test_input1.Staged_ledger_diff.t) =
+        let diff_length_2
+            (p :
+              Test_input1.Staged_ledger_diff.pre_diff_with_at_most_two_coinbase)
+            =
+          List.length p.user_commands + (List.length p.completed_works / 2)
+        in
+        let diff_length_1
+            (p :
+              Test_input1.Staged_ledger_diff.pre_diff_with_at_most_one_coinbase)
+            =
+          List.length p.user_commands + (List.length p.completed_works / 2)
+        in
+        diff_length_2 (fst sl_diff.diff)
+        + Option.value_map ~default:0 (snd sl_diff.diff) ~f:diff_length_1
+        + coinbase_added sl_diff
+      in
+      Quickcheck.test g ~trials:2000 ~f:(fun _ ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let old_ledger = !(Sl.ledger !sl) in
-              let all_ts =
-                txns (p / 2) (fun x -> (x + 1) * 100) (fun _ -> 4)
+              let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
+              let scan_state = Sl.scan_state !sl in
+              (*Core.printf
+                !"Scan State: %{sexp:Sl.Scan_state.t} \n %!"
+                scan_state ;*)
+              let min_work_to_do =
+                Sl.min_work_to_do scan_state |> Or_error.ok_exn
               in
-              Core.printf !"ledger %{sexp: (int*int)} \n %!" !(Sl.ledger !sl) ;
               let%map ledger_proof, diff =
                 create_and_apply sl logger (Sequence.of_list all_ts)
-                  (stmt_to_work_restricted (fun x ->
+                  (stmt_to_work_restricted min_work_to_do)
+                (*(fun x ->
                        x
-                       <= max 0
+                       < max 0
                             ( snd !(Sl.ledger !sl)
-                            - Test_input1.Config.work_availability_factor ) ))
+                            - Test_input1.Config.scan_state_size_incr ) ))*)
               in
-              Core.printf "block number: %d \n %! " (snd !(Sl.ledger !sl)) ;
               let l = Sl.ledger !sl in
               l := (fst !l, snd !l + 1) ;
               let fee_excess =
@@ -1945,25 +1986,36 @@ let%test_module "test" =
               let x =
                 List.length (Test_input1.Staged_ledger_diff.user_commands diff)
               in
+              let _total_transactions = total_transactions diff in
+              (*max throughput
+              Core.printf !"diff: %{sexp: Test_input1.Staged_ledger_diff.t}\n %!" diff;*)
+              Core.printf "all_ts:%d user commands included: %d \n %!"
+                (List.length all_ts) x ;
+              assert (x > 0) ;
               assert_at_least_coinbase_added x cb ;
               let expected_value = expected_ledger x all_ts old_ledger in
               assert (fst !(Sl.ledger !sl) = fst expected_value) ) )
 
-    (*let%test_unit "Be able to include random number of user_commands" =
+    let%test_unit "Be able to include random number of user_commands" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
       let logger = Logger.create () in
       let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
-      let initial_ledger = ref (0,0)in
+      let initial_ledger = ref (0, 0) in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
-      Quickcheck.test g ~trials:1000 ~f:(fun i ->
+      Quickcheck.test g ~trials:5000 ~f:(fun i ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let old_ledger = !(Sl.ledger !sl) in
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let ts = List.take all_ts i in
+              let scan_state = Sl.scan_state !sl in
+              let min_work_to_do =
+                Sl.min_work_to_do scan_state |> Or_error.ok_exn
+              in
               let%map proof, diff =
-                create_and_apply sl logger (Sequence.of_list ts) stmt_to_work
+                create_and_apply sl logger (Sequence.of_list ts)
+                  (stmt_to_work_restricted min_work_to_do)
               in
               let fee_excess =
                 Option.value_map ~default:Currency.Fee.Signed.zero proof
@@ -1985,7 +2037,7 @@ let%test_module "test" =
               let expected_value = expected_ledger x all_ts old_ledger in
               assert (!(Sl.ledger !sl) = expected_value) ) )
 
-    let%test_unit "Be able to include random number of user_commands (One \
+    (*let%test_unit "Be able to include random number of user_commands (One \
                    prover)" =
       let get_work (stmts : Test_input1.Transaction_snark_work.Statement.t) :
           Test_input1.Transaction_snark_work.Checked.t option =
@@ -2056,7 +2108,7 @@ let%test_module "test" =
                 in
                 () )
           in
-          () )
+          () ) 
 
     let%test_unit "Snarked ledger" =
       Backtrace.elide := false ;

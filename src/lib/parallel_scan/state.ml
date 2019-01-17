@@ -49,8 +49,8 @@ type ('a, 'd) t =
   ; mutable acc: int * 'a option
   ; mutable current_data_length: int
   ; mutable base_none_pos: int option
-  ; mutable recent_tree_data: 'd list
-  ; mutable other_trees_data: 'd list list
+  ; mutable recent_tree_data: 'd list sexp_opaque
+  ; mutable other_trees_data: 'd list list sexp_opaque
   ; stateful_work_order: int Queue.t
   ; mutable curr_job_seq_no: int }
 [@@deriving sexp, bin_io]
