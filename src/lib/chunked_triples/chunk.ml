@@ -14,8 +14,10 @@ type t = bool Triple.t list
 
 *)
 
+(** size of a chunk *)
 let size = 3
 
+(** integer representation of a chunk *)
 let to_int t =
   if not (Int.equal (List.length t) size) then
     failwith "to_int: invalid chunk size" ;
@@ -35,12 +37,14 @@ let to_int t =
   in
   List.fold t ~init:0 ~f:shift_and_add
 
+(** maximum possible integer representation of a chunk *)
 let max_int =
   (* 3 because triples *)
   let num_bits = size * 3 in
   assert (num_bits < Int.num_bits) ;
   Int.pow 2 num_bits - 1
 
+(** chunk from its int representation *)
 let of_int n : t =
   if n > max_int then
     failwith "of_int: integer value too great to represent in a chunk" ;
