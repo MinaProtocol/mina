@@ -7,13 +7,13 @@ open Async
 
 let%test_module "Command line tests" =
   ( module struct
-    let kill port =
-      Process.run_exn () ~prog:"dune"
+    let stop port =
+      Process.run () ~prog:"dune"
         ~args:
           [ "exec"
           ; "coda"
           ; "client"
-          ; "stop"
+          ; "stop-daemon"
           ; "--"
           ; "-daemon-port"
           ; sprintf "%d" port ]
@@ -34,6 +34,7 @@ let%test_module "Command line tests" =
           ()
       in
       let%bind () = after (Time.Span.of_ms 100.0) in
+      let open Deferred.Or_error.Let_syntax in
       let%bind result =
         Process.run ~prog:"dune"
           ~args:
@@ -46,7 +47,7 @@ let%test_module "Command line tests" =
             ; sprintf "%d" port ]
           ()
       in
-      let%map _ : string = kill port in
+      let%map _ = stop port in
       result
 
     let%test "The coda daemon performs work in the background" =
