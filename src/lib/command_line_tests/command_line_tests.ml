@@ -7,14 +7,22 @@ open Async
 
 let%test_module "Command line tests" =
   ( module struct
-    let kill p =
-      Process.run_exn () ~prog:"kill" ~args:[Pid.to_string @@ Process.pid p]
+    let kill port =
+      Process.run_exn () ~prog:"dune"
+        ~args:
+          [ "exec"
+          ; "coda"
+          ; "client"
+          ; "stop"
+          ; "--"
+          ; "-daemon-port"
+          ; sprintf "%d" port ]
 
     let test_background_daemon () =
       let open Deferred.Let_syntax in
       let port = 1337 in
-      let%bind daemon_process =
-        Process.create_exn ~prog:"dune"
+      let%bind _ =
+        Process.run_exn ~prog:"dune"
           ~args:
             [ "exec"
             ; "coda"
@@ -25,6 +33,7 @@ let%test_module "Command line tests" =
             ; sprintf "%d" port ]
           ()
       in
+      let%bind () = after (Time.Span.of_ms 100.0) in
       let%bind result =
         Process.run ~prog:"dune"
           ~args:
@@ -37,7 +46,7 @@ let%test_module "Command line tests" =
             ; sprintf "%d" port ]
           ()
       in
-      let%map _ : string = kill daemon_process in
+      let%map _ : string = kill port in
       result
 
     let%test "The coda daemon performs work in the background" =
