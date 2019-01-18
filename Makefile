@@ -284,6 +284,12 @@ docs/res/%.tex.png: docs/res/%.tex.pdf
 doc_diagrams: $(addsuffix .png,$(wildcard docs/res/*.tex) $(wildcard docs/res/*.dot))
 
 ########################################
+# Generate odoc documentation
+
+ml-docs:
+	cd src; $(WRAPSRC) dune build --profile=$(DUNE_PROFILE) @doc
+
+########################################
 # To avoid unintended conflicts with file names, always add to .PHONY
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
