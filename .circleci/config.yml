@@ -129,7 +129,7 @@ jobs:
            - run: git submodule sync && git submodule update --init --recursive
            - run:
               name: Test make test-runtest
-              command: source ~/.profile && DUNE_PROFILE=test_sigs make test-runtest
+              command: source ~/.profile && DUNE_PROFILE=test_sigs MYPROCS=8 make test-runtest
 
     test-withsnark:
         resource_class: large
