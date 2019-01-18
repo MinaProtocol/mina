@@ -234,7 +234,9 @@ module T = struct
             ; conf_dir
             ; initial_peers= peers
             ; me=
-                (Host_and_port.create ~host ~port:discovery_port, external_port)
+                Kademlia.Peer.create
+                  (Unix.Inet_addr.of_string host)
+                  ~discovery_port ~communication_port:external_port
             ; parent_log= log
             ; banlist } }
       in
