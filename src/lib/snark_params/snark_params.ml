@@ -290,7 +290,9 @@ module Tock = struct
 
     include T
     include Snarky_pairing.Miller_loop.Make (T)
-    include Snarky_pairing.Final_exponentiation.Make (T)
+    module FE = Snarky_pairing.Final_exponentiation.Make (T)
+
+    let final_exponentiation = FE.final_exponentiation4
   end
 
   module Proof = struct
@@ -311,9 +313,9 @@ module Tock = struct
       Pairing.G2.Unchecked.of_affine_coordinates (conv_fqe x, conv_fqe y)
 
     let conv_fqk p =
-      let v = Tock_backend.Full.Fqk.to_elts p in
+      let v = Tick_backend.Full.Fqk.to_elts p in
       let f i =
-        let x j = Tick0.Field.Vector.get v ((2 * i) + j) in
+        let x j = Tock0.Field.Vector.get v ((2 * i) + j) in
         (x 0, x 1)
       in
       (f 0, f 1)
@@ -330,6 +332,13 @@ module Tock = struct
       ; query= List.init (length q - 1) ~f:(fun i -> get q (i + 1))
       ; delta= conv_g2 (delta vk)
       ; alpha_beta= conv_fqk (alpha_beta vk) }
+
+    let constant_vk vk =
+      let open Verification_key in
+      { query_base= Inner_curve.Checked.constant vk.query_base
+      ; query= List.map ~f:Inner_curve.Checked.constant vk.query
+      ; delta= Pairing.G2.constant vk.delta
+      ; alpha_beta= Pairing.Fqk.constant vk.alpha_beta }
   end
 
   module Verifier_gadget =
@@ -568,7 +577,9 @@ module Tick = struct
 
     include T
     include Snarky_pairing.Miller_loop.Make (T)
-    include Snarky_pairing.Final_exponentiation.Make (T)
+    module FE = Snarky_pairing.Final_exponentiation.Make (T)
+
+    let final_exponentiation = FE.final_exponentiation6
   end
 
   module Groth_maller_verifier = struct
@@ -580,10 +591,10 @@ module Tick = struct
       let x, y = Tick_backend.Inner_twisted_curve.to_coords p in
       Pairing.G2.Unchecked.of_affine_coordinates (conv_fqe x, conv_fqe y)
 
-    let conv_fqk p =
-      let v = Tick_backend.Full.Fqk.to_elts p in
+    let conv_fqk (p : Tock_backend.Full.Fqk.t) =
+      let v = Tock_backend.Full.Fqk.to_elts p in
       let f i =
-        let x j = Tock.Field.Vector.get v ((3 * i) + j) in
+        let x j = Tick0.Field.Vector.get v ((3 * i) + j) in
         (x 0, x 1, x 2)
       in
       (f 0, f 1)
@@ -592,7 +603,7 @@ module Tick = struct
       let open Tock_backend.Full.GM_proof_accessors in
       {Proof.a= a p; b= conv_g2 (b p); c= c p}
 
-    let vk_of_backend_vk vk =
+    let vk_of_backend_vk (vk : Tock_backend.Full.GM.Verification_key.t) =
       let open Tock_backend.Full.GM_verification_key_accessors in
       let open Inner_curve.Vector in
       let q = query vk in
@@ -606,6 +617,17 @@ module Tick = struct
       ; g_gamma= g_gamma vk
       ; h_gamma= conv_g2 (h_gamma vk)
       ; g_alpha_h_beta= conv_fqk (g_alpha_h_beta vk) }
+
+    let constant_vk vk =
+      let open Verification_key in
+      { query_base= Inner_curve.Checked.constant vk.query_base
+      ; query= List.map ~f:Inner_curve.Checked.constant vk.query
+      ; h= Pairing.G2.constant vk.h
+      ; g_alpha= Pairing.G1.constant vk.g_alpha
+      ; h_beta= Pairing.G2.constant vk.h_beta
+      ; g_gamma= Pairing.G1.constant vk.g_gamma
+      ; h_gamma= Pairing.G2.constant vk.h_gamma
+      ; g_alpha_h_beta= Pairing.Fqk.constant vk.g_alpha_h_beta }
   end
 
   module Groth_verifier = Snarky_verifier.Groth.Make (Pairing)
