@@ -1,7 +1,0 @@
-opam-version: "1.2"
-version: "0.1"
-build: [
-  ["jbuilder" "build" "--only" "bitstring_lib" "--root" "." "-j" jobs "@install"]
-]
-depends: [ "core" "ppx_deriving" "ppx_jane" ]
-

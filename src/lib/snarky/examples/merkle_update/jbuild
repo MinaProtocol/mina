@@ -1,7 +1,0 @@
-(jbuild_version 1)
-
-(executables
- ((names (merkle_update))
-  (modes (native))
-  (preprocess (pps (ppx_jane)))
-  (libraries (snarky core))))
