@@ -144,9 +144,9 @@ let core () =
        prediction markets. He has made open source contributions to Idris and \
        various parts of the Haskell ecosystem. He's also made and lost a fair \
        amount of money trading predictions on Augur. Before joining O(1) \
-       Labs, Echo worked on an text messaging platform for educators, using \
-       functional programming techniques to deliver hundreds of thousands of \
-       messages to students."
+       Labs, Echo worked on an text messaging platform for academic \
+       conselors, using functional programming techniques to deliver hundreds \
+       of thousands of messages to students."
   and matthew =
     plain "Matthew Ryan" "Protocol Engineer"
       "Matthew Ryan is a self-taught programmer with a strong interest in \
@@ -154,7 +154,7 @@ let core () =
        functional programming. He has been involved with several open-source \
        projects, and passionately believes in the open-source philosophy. He \
        has a BSc in Mathematics from the University of Warwick, U.K., where \
-       he studied cryptography"
+       he studied cryptography."
   and rebekah =
     plain "Rebekah Mercer" "Protocol Researcher"
       "Most recently, Rebekah was a PhD student at Aarhus University, where \
