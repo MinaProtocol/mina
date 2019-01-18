@@ -4,6 +4,27 @@ open Protocols.Coda_transition_frontier
 open Pipe_lib
 open Coda_base
 
+(** [Ledger_catchup] is a process that connects a foreign external transition
+    into a transition frontier by asking it's peer a path of external_transitions.
+    It receives the external_transition from [Catchup_monitor]. With that
+    external_transition, it will ask it's peers for a path of
+    external_transitions from it's root to the transition it is asking for. It
+    will then do some verifications on these breadcrumbs. If all the
+    breadcrumbs are valid, it will then send them to the [Processor] via
+    writing them to catchup_breadcrumbs_writer. Otherwise, the sender who send
+    these breadcrumbs will be punished. Here are the validations that are done
+    with receiving a trail of external_transitions:
+
+    1. The root should exist in the frontier. The frontier should not be
+    missing too many external_transitions, so the querying node should have the
+    root in it's transition_frontier.
+
+    2. Each transitions are checked through [Transition_processor.Validator]
+    and [Protocol_state_validator]
+
+    3. Verifying each staged_ledger_diff by iteratively folding through each
+    staged_ledger *)
+
 module Make (Inputs : Inputs.S) :
   Catchup_intf
   with type external_transition_verified :=
@@ -21,9 +42,9 @@ module Make (Inputs : Inputs.S) :
         | Error e -> Deferred.return (Error e)
         | Ok acc -> f acc elem )
 
-  (* We would like the async scheduler to context switch between each iteration 
-  of external transitions when trying to build breadcrumb_path. Therefore, this 
-  function needs to return a Deferred *)
+  (* We would like the async scheduler to context switch between each iteration
+     of external transitions when trying to build breadcrumb_path. Therefore,
+     this function needs to return a Deferred *)
   let construct_breadcrumb_path ~logger initial_staged_ledger
       external_transitions =
     let open Deferred.Or_error.Let_syntax in
@@ -103,11 +124,10 @@ module Make (Inputs : Inputs.S) :
                       |> Deferred.Result.map_error ~f:(fun error ->
                              `Invalid (Error.to_string_hum error) )
                     in
-                    (* We need to coerce the transition from a proof_verified 
-                      transition to a fully verified in 
-                      order to add the transition to be added to the 
-                      transition frontier and to be fed through the 
-                      transition_handler_validator. *)
+                    (* We need to coerce the transition from a proof_verified
+                       transition to a fully verified in order to add the
+                       transition to be added to the transition frontier and to
+                       be fed through the transition_handler_validator. *)
                     let (`I_swear_this_is_safe_see_my_comment
                           verified_transition) =
                       External_transition.to_verified transition
