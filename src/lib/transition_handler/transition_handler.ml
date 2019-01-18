@@ -1,6 +1,7 @@
 open Protocols.Coda_transition_frontier
 open Coda_base
 module Inputs = Inputs
+module Processor = Processor
 
 module Make (Inputs : Inputs.S) :
   Transition_handler_intf

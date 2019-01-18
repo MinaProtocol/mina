@@ -13,8 +13,7 @@ let tick_input () =
 
 let wrap_input = Tock.Data_spec.[Wrap_input.typ]
 
-let provide_witness' typ ~f =
-  Tick.(provide_witness typ As_prover.(map get_state ~f))
+let exists' typ ~f = Tick.(exists typ ~compute:As_prover.(map get_state ~f))
 
 module Input = struct
   type t =
@@ -314,11 +313,11 @@ module Base = struct
   let%snarkydef main top_hash =
     let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
     let%bind root_before =
-      provide_witness' Frozen_ledger_hash.typ ~f:Prover_state.state1
+      exists' Frozen_ledger_hash.typ ~f:Prover_state.state1
     in
     let%bind t =
       with_label __LOC__
-        (provide_witness' Transaction_union.typ ~f:Prover_state.transaction)
+        (exists' Transaction_union.typ ~f:Prover_state.transaction)
     in
     let%bind root_after, fee_excess, supply_increase =
       apply_tagged_transaction (module Shifted) root_before t
@@ -328,7 +327,7 @@ module Base = struct
         (let%bind b1 = Frozen_ledger_hash.var_to_triples root_before
          and b2 = Frozen_ledger_hash.var_to_triples root_after
          and sok_digest =
-           provide_witness' Sok_message.Digest.typ ~f:Prover_state.sok_digest
+           exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest
          in
          let fee_excess = Amount.Signed.Checked.to_triples fee_excess in
          let supply_increase = Amount.var_to_triples supply_increase in
@@ -471,11 +470,10 @@ module Merge = struct
     let%bind is_base =
       let get_type s = get_transition_data s |> Transition_data.proof |> fst in
       with_label __LOC__
-        (provide_witness' Boolean.typ ~f:(fun s ->
-             Proof_type.is_base (get_type s) ))
+        (exists' Boolean.typ ~f:(fun s -> Proof_type.is_base (get_type s)))
     in
     let%bind sok_digest =
-      provide_witness' Sok_message.Digest.typ
+      exists' Sok_message.Digest.typ
         ~f:(Fn.compose Transition_data.sok_digest get_transition_data)
     in
     let%bind all_but_vk_top_hash =
@@ -528,25 +526,25 @@ module Merge = struct
   *)
   let%snarkydef main (top_hash : Pedersen.Checked.Digest.var) =
     let%bind tock_vk =
-      provide_witness'
+      exists'
         (Verifier.Verification_key.typ ~input_size:wrap_input_size)
         ~f:(fun {Prover_state.tock_vk; _} -> Verifier.vk_of_backend_vk tock_vk
       )
-    and s1 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash1
-    and s2 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash2
-    and s3 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash3
+    and s1 = exists' wrap_input_typ ~f:Prover_state.ledger_hash1
+    and s2 = exists' wrap_input_typ ~f:Prover_state.ledger_hash2
+    and s3 = exists' wrap_input_typ ~f:Prover_state.ledger_hash3
     and fee_excess12 =
-      provide_witness' Amount.Signed.typ
+      exists' Amount.Signed.typ
         ~f:(Fn.compose Transition_data.fee_excess Prover_state.transition12)
     and fee_excess23 =
-      provide_witness' Amount.Signed.typ
+      exists' Amount.Signed.typ
         ~f:(Fn.compose Transition_data.fee_excess Prover_state.transition23)
     and supply_increase12 =
-      provide_witness' Amount.typ
+      exists' Amount.typ
         ~f:
           (Fn.compose Transition_data.supply_increase Prover_state.transition12)
     and supply_increase23 =
-      provide_witness' Amount.typ
+      exists' Amount.typ
         ~f:
           (Fn.compose Transition_data.supply_increase Prover_state.transition23)
     in
@@ -580,7 +578,7 @@ module Merge = struct
       in
       let%bind input =
         let%bind sok_digest =
-          provide_witness' Sok_message.Digest.typ ~f:Prover_state.sok_digest
+          exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest
         in
         construct_input_checked ~prefix:(`Value Hash_prefix.merge_snark.acc)
           ~sok_digest ~state1:s1_section ~state2:s3_section ~supply_increase
@@ -808,8 +806,7 @@ struct
     [@@deriving fields]
   end
 
-  let provide_witness' typ ~f =
-    provide_witness typ As_prover.(map get_state ~f)
+  let exists' typ ~f = exists typ ~compute:As_prover.(map get_state ~f)
 
   (* spec for [main input]:
    constraints pass iff
@@ -819,7 +816,7 @@ struct
     let open Let_syntax in
     let%bind input = with_label __LOC__ (Wrap_input.Checked.to_scalar input) in
     let%bind is_base =
-      provide_witness' Boolean.typ ~f:(fun {Prover_state.proof_type; _} ->
+      exists' Boolean.typ ~f:(fun {Prover_state.proof_type; _} ->
           Proof_type.is_base proof_type )
     in
     let%bind verification_key_precomp =

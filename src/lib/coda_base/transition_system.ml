@@ -133,20 +133,18 @@ struct
       in
       Verifier.verify wrap_vk precomp prev_top_hash proof
 
-    let provide_witness' typ ~f =
-      provide_witness typ As_prover.(map get_state ~f)
+    let exists' typ ~f = exists typ ~compute:As_prover.(map get_state ~f)
 
     let%snarkydef main (top_hash : Digest.Tick.Packed.var) =
-      let%bind prev_state =
-        provide_witness' State.typ ~f:Prover_state.prev_state
-      and update = provide_witness' Update.typ ~f:Prover_state.update in
+      let%bind prev_state = exists' State.typ ~f:Prover_state.prev_state
+      and update = exists' Update.typ ~f:Prover_state.update in
       let%bind prev_state_hash = State.Checked.hash prev_state in
       let%bind next_state_hash, _next_state, `Success success =
         with_label __LOC__
           (State.Checked.update (prev_state_hash, prev_state) update)
       in
       let%bind wrap_vk =
-        provide_witness'
+        exists'
           (Verifier.Verification_key.typ ~input_size:wrap_input_size)
           ~f:(fun {Prover_state.wrap_vk; _} ->
             Verifier.vk_of_backend_vk wrap_vk )

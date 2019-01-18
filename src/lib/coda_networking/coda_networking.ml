@@ -47,7 +47,13 @@ struct
     end
 
     include T.T
-    include Versioned_rpc.Both_convert.Plain.Make (T)
+    module M = Versioned_rpc.Both_convert.Plain.Make (T)
+    include M
+
+    include Perf_histograms.Rpc.Plain.Extend (struct
+      include M
+      include T
+    end)
 
     module V1 = struct
       module T = struct
@@ -88,7 +94,13 @@ struct
     end
 
     include T.T
-    include Versioned_rpc.Both_convert.Plain.Make (T)
+    module M = Versioned_rpc.Both_convert.Plain.Make (T)
+    include M
+
+    include Perf_histograms.Rpc.Plain.Extend (struct
+      include M
+      include T
+    end)
 
     module V1 = struct
       module T = struct
@@ -125,7 +137,13 @@ struct
     end
 
     include T.T
-    include Versioned_rpc.Both_convert.Plain.Make (T)
+    module M = Versioned_rpc.Both_convert.Plain.Make (T)
+    include M
+
+    include Perf_histograms.Rpc.Plain.Extend (struct
+      include M
+      include T
+    end)
 
     module V1 = struct
       module T = struct
@@ -163,7 +181,13 @@ struct
     end
 
     include T.T
-    include Versioned_rpc.Both_convert.Plain.Make (T)
+    module M = Versioned_rpc.Both_convert.Plain.Make (T)
+    include M
+
+    include Perf_histograms.Rpc.Plain.Extend (struct
+      include M
+      include T
+    end)
 
     module V1 = struct
       module T = struct

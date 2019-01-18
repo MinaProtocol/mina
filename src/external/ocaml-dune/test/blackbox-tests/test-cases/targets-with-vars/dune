@@ -1,8 +1,0 @@
-(rule
- (targets foo%{ext_obj})
- (action (with-stdout-to %{targets} (echo "hola"))))
-
-(alias
- (name runtest)
- (deps foo%{ext_obj})
- (action (cat %{deps})))

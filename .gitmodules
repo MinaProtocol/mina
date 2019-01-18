@@ -1,0 +1,3 @@
+[submodule "src/lib/snarky"]
+	path = src/lib/snarky
+	url = git@github.com:o1-labs/snarky

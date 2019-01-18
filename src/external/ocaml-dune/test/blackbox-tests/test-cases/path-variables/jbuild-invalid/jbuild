@@ -1,5 +1,0 @@
-(rule (write-file generated-file dynamic-contents))
-
-(alias
-  ((name test-dep)
-   (action (cat ${dep:generated-file}))))

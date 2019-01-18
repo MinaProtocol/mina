@@ -13,6 +13,13 @@ module Available_job = struct
   type ('a, 'd) t = Base of 'd | Merge of 'a * 'a [@@deriving sexp]
 end
 
+module Job_view = struct
+  type 'a node = Base of 'a option | Merge of 'a option * 'a option
+  [@@deriving sexp]
+
+  type 'a t = int * 'a node [@@deriving sexp]
+end
+
 module State = struct
   include State
 
@@ -384,6 +391,16 @@ module State = struct
       ~f:(fun acc job -> Container.Continue_or_stop.Continue (f acc job))
       ~finish:Fn.id
 end
+
+let view_jobs_with_position (t : ('a, 'd) State.t) fa fd =
+  Ring_buffer.foldi t.jobs ~init:[] ~f:(fun i jobs job ->
+      let job' =
+        match job with
+        | State.Job.Base x -> Job_view.Base (Option.map ~f:fd x)
+        | Merge (x, y) -> Merge (Option.map ~f:fa x, Option.map ~f:fa y)
+      in
+      (i, job') :: jobs )
+  |> List.rev
 
 let start : type a d. parallelism_log_2:int -> (a, d) State.t = State.create
 

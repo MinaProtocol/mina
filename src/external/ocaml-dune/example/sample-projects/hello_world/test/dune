@@ -1,3 +1,0 @@
-(test
- (name test)
- (libraries hello_world))

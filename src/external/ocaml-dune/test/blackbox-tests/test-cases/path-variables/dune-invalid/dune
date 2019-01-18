@@ -1,8 +1,0 @@
-(alias
-  (name test-path-no-dep)
-  (action
-    (chdir
-      sub-tree/dir
-      (progn
-        (echo "%{path-no-dep:file-that-does-not-exist}\n")
-        (echo "%{path-no-dep:.}\n")))))

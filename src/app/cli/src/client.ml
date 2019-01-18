@@ -191,20 +191,35 @@ let get_nonce_cmd =
 let status =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
+  let open Command.Param in
+  let flag =
+    let open Command.Param in
+    return (fun a b -> (a, b))
+    <*> Cli_lib.Flag.json <*> Cli_lib.Flag.performance
+  in
   Command.async ~summary:"Get running daemon status"
-    (Cli_lib.Background_daemon.init Cli_lib.Flag.json ~f:(fun port json ->
+    (Cli_lib.Background_daemon.init flag ~f:(fun port (json, performance) ->
          dispatch_pretty_message ~json
            (module Daemon_rpcs.Types.Status)
-           Get_status.rpc () port ))
+           Get_status.rpc
+           (if performance then `Performance else `None)
+           port ))
 
 let status_clear_hist =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
+  let flag =
+    let open Command.Param in
+    return (fun a b -> (a, b))
+    <*> Cli_lib.Flag.json <*> Cli_lib.Flag.performance
+  in
   Command.async ~summary:"Clear histograms reported in status"
-    (Cli_lib.Background_daemon.init Cli_lib.Flag.json ~f:(fun port json ->
+    (Cli_lib.Background_daemon.init flag ~f:(fun port (json, performance) ->
          dispatch_pretty_message ~json
            (module Daemon_rpcs.Types.Status)
-           Clear_hist_status.rpc () port ))
+           Clear_hist_status.rpc
+           (if performance then `Performance else `None)
+           port ))
 
 let get_nonce_exn public_key port =
   match%bind get_nonce public_key port with
@@ -425,6 +440,16 @@ let constraint_system_digests =
          List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
          Deferred.unit ))
 
+let snark_job_list =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"List of snark jobs in JSON format"
+    (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
+         match%map dispatch Daemon_rpcs.Snark_job_list.rpc () port with
+         | Ok str -> printf "%s" str
+         | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e ))
+
 let command =
   Command.group ~summary:"Lightweight client process"
     [ ("get-balance", get_balance)
@@ -440,4 +465,5 @@ let command =
     ; ("dump-keypair", dump_keypair)
     ; ("dump-ledger", dump_ledger)
     ; ("constraint-system-digests", constraint_system_digests)
-    ; ("generate-keypair", generate_keypair) ]
+    ; ("generate-keypair", generate_keypair)
+    ; ("snark-job-list", snark_job_list) ]

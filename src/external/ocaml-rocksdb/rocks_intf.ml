@@ -27,10 +27,12 @@ module type ITERATOR = sig
   val prev : t -> unit
 
   val get_key_string : t -> string
+
   (** returned buffer is only valid as long as [t] is not modified *)
   val get_key : t -> bigarray
 
   val get_value_string : t -> string
+
   (** returned buffer is only valid as long as [t] is not modified *)
   val get_value : t -> bigarray
 
