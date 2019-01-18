@@ -1,3 +1,5 @@
+open Core_kernel
+
 module type S = sig
   module Impl : Snarky.Snark_intf.S
 
@@ -25,6 +27,7 @@ struct
 
   module Coeff = struct
     type t = {rx: Fqe.t; ry: Fqe.t; gamma: Fqe.t; gamma_x: Fqe.t}
+    [@@deriving fields]
   end
 
   type g2 = Fqe.t * Fqe.t
@@ -33,6 +36,28 @@ struct
 
   open Impl
   open Let_syntax
+
+  let if_g2 b ~then_:(tx, ty) ~else_:(ex, ey) =
+    let%map x = Fqe.if_ b ~then_:tx ~else_:ex
+    and y = Fqe.if_ b ~then_:ty ~else_:ey in
+    (x, y)
+
+  let if_coeff b ~(then_ : Coeff.t) ~(else_ : Coeff.t) =
+    let c p = Fqe.if_ b ~then_:(p then_) ~else_:(p else_) in
+    let open Coeff in
+    let%map rx = c rx
+    and ry = c ry
+    and gamma = c gamma
+    and gamma_x = c gamma_x in
+    {rx; ry; gamma; gamma_x}
+
+  let if_ b ~then_ ~else_ =
+    let%map q = if_g2 b ~then_:then_.q ~else_:else_.q
+    and coeffs =
+      Checked.List.map (List.zip_exn then_.coeffs else_.coeffs)
+        ~f:(fun (t, e) -> if_coeff b ~then_:t ~else_:e )
+    in
+    {q; coeffs}
 
   type 'fqe loop_state = {rx: 'fqe; ry: 'fqe}
 
