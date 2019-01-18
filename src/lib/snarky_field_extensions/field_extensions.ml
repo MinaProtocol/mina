@@ -267,11 +267,15 @@ module E2
         val non_residue : F.Unchecked.t
 
         val mul_by_non_residue : F.t -> F.t
-    end) :
-  Intf.S_with_primitive_element
-  with module Impl = F.Impl
-   and module Base = F
-   and type 'a A.t = 'a * 'a = struct
+    end) : sig
+  include
+    Intf.S_with_primitive_element
+    with module Impl = F.Impl
+     and module Base = F
+     and type 'a A.t = 'a * 'a
+
+  val unitary_inverse : t -> t
+end = struct
   open Params
 
   module T = struct
@@ -376,6 +380,8 @@ module E2
 
   include T
   include Make (T)
+
+  let unitary_inverse (a, b) = (a, Base.negate b)
 end
 
 (* Given a prime order field F and s : F (called [non_residue] below)
