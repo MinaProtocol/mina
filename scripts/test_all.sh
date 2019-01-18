@@ -14,7 +14,7 @@ run_dune() {
 run_unit_tests() {
   date
   myprocs=`nproc --all`  # Linux specific
-  run_dune runtest --verbose -j${myprocs}
+  run_dune runtest --verbose -j8
 }
 
 run_unit_tests_with_coverage() {
