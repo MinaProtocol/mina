@@ -68,6 +68,8 @@ end = struct
 
   let fold_until = C.fold_until
 
+  let keys t = C.to_list t |> List.map ~f:Account.public_key |> Key.Set.of_list
+
   let key_of_index t index =
     if index >= Dyn_array.length t.accounts then None
     else Some (Dyn_array.get t.accounts index |> Account.public_key)
