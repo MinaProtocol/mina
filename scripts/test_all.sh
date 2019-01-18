@@ -13,13 +13,13 @@ run_dune() {
 
 run_unit_tests() {
   date
-  myprocs=`nproc --all`  # Linux specific
+  myprocs=8
   run_dune runtest --verbose -j${myprocs}
 }
 
 run_unit_tests_with_coverage() {
   date
-  myprocs=`nproc --all`  # Linux specific
+  myprocs=8
   # force to make sure all coverage files generated
   BISECT_ENABLE=YES run_dune runtest --force -j${myprocs}
 }
