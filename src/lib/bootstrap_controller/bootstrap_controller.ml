@@ -212,8 +212,17 @@ module Make (Inputs : Inputs_intf) :
         let (transition : External_transition.Verified.t) =
           Envelope.Incoming.data incoming_transition
         in
-        (* #TODO : the 0 below is a dummy, should be a valid port *)
-        let sender = (Envelope.Incoming.sender incoming_transition, 0) in
+        (* #TODO : the 0 ports below are dummies
+           the port in the envelope is an ephemeral port which 
+             won't appear in a bonafide Peer.t
+           see issue #1367
+         *)
+        let sender =
+          let host_and_port = Envelope.Incoming.sender incoming_transition in
+          Kademlia.Peer.create
+            (Host_and_port.host host_and_port |> Unix.Inet_addr.of_string)
+            ~discovery_port:0 ~communication_port:0
+        in
         let protocol_state =
           External_transition.Verified.protocol_state transition
         in
