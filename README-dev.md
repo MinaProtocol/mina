@@ -20,7 +20,7 @@ Currently, Coda only builds/runs on Linux. Building on macOS [is tracked in this
 The short version:
 
  1. Start with Ubuntu 18 or run it in a [virtual machine](https://www.osboxes.org/ubuntu/)
- 2. Pull in the snarky sub-module: `git submodule init && git submodule update`
+ 2. Pull in the snarky sub-module: `git submodule init && git submodule update --recursive`
  3. Install Docker, GNU make, and bash
  4. `make USEDOCKER=TRUE dev`
  5. `make USEDOCKER=TRUE deb`
