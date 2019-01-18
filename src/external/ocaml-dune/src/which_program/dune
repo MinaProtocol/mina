@@ -1,5 +1,0 @@
-(library
- (name        which_program)
- (public_name dune._which-program)
- (synopsis    "[Internal] Standard library of Dune")
- (virtual_modules which_program))

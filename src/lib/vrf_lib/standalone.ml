@@ -42,10 +42,10 @@ module Make
       val typ : (var, t) Impl.Typ.t
 
       module Checked :
-        Snarky.Curves.Weierstrass_checked_intf
+        Snarky_curves.Weierstrass_checked_intf
         with module Impl := Impl
-         and type t := t
-         and type var := var
+         and type unchecked := t
+         and type t = var
     end) (Message : sig
       open Impl
 
@@ -412,7 +412,8 @@ let%test_module "vrf-test" =
       include Snarky.Libsnark.Mnt6.Group
 
       module Checked = struct
-        include Snarky.Curves.Make_weierstrass_checked (Impl) (Scalar)
+        include Snarky_curves.Make_weierstrass_checked
+                  (Snarky_field_extensions.Field_extensions.F (Impl)) (Scalar)
                   (struct
                     include Snarky.Libsnark.Mnt6.Group
 
@@ -438,9 +439,9 @@ let%test_module "vrf-test" =
                   (struct
                     type t = Curve.t
 
-                    let to_sexpable = Curve.to_coords
+                    let to_sexpable = Curve.to_affine_coordinates
 
-                    let of_sexpable = Curve.of_coords
+                    let of_sexpable = Curve.of_affine_coordinates
                   end)
       end
 
@@ -464,7 +465,7 @@ let%test_module "vrf-test" =
       let typ = Curve.typ
 
       let to_bits (t : t) =
-        let x, y = Curve.to_coords t in
+        let x, y = Curve.to_affine_coordinates t in
         List.hd_exn (Field.unpack y) :: Field.unpack x
 
       let gen =
@@ -527,9 +528,9 @@ let%test_module "vrf-test" =
                 (struct
                   type t = Curve.t
 
-                  let to_sexpable = Curve.to_coords
+                  let to_sexpable = Curve.to_affine_coordinates
 
-                  let of_sexpable = Curve.of_coords
+                  let of_sexpable = Curve.of_affine_coordinates
                 end)
 
       type var = Curve.var
@@ -555,7 +556,7 @@ let%test_module "vrf-test" =
           Curve.add acc
             (Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
                triple) )
-      |> Curve.to_coords |> fst
+      |> Curve.to_affine_coordinates |> fst
 
     let hash_bits_checked bits =
       let open Impl.Let_syntax in

@@ -1,6 +1,0 @@
-(documentation
- (mld_files doc))
-
-(alias
- (name default)
- (action (echo "%{read:foo.install}")))

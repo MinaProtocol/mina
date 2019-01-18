@@ -1,4 +1,0 @@
-(alias
- (name runtest)
- (action (echo "From dune-file/a/b/: %{project_root}\n"))
-)

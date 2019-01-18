@@ -1,8 +1,0 @@
-
-(alias
- (name unquoted)
- (action (echo %{read:foo bar.txt})))
-
-(alias
- (name quoted)
- (action (echo "%{read:foo bar.txt}")))

@@ -17,6 +17,73 @@ module Make (Inputs : Inputs.S) = struct
       ; h_gamma: 'g2
       ; g_alpha_h_beta: 'fqk }
 
+    let to_hlist
+        { query_base
+        ; query
+        ; h
+        ; g_alpha
+        ; h_beta
+        ; g_gamma
+        ; h_gamma
+        ; g_alpha_h_beta } =
+      Snarky.H_list.
+        [ query_base
+        ; query
+        ; h
+        ; g_alpha
+        ; h_beta
+        ; g_gamma
+        ; h_gamma
+        ; g_alpha_h_beta ]
+
+    let of_hlist :
+           (unit, _ -> _ -> _ -> _ -> _ -> _ -> _ -> _ -> unit) Snarky.H_list.t
+        -> _ =
+     fun Snarky.H_list.([ query_base
+                        ; query
+                        ; h
+                        ; g_alpha
+                        ; h_beta
+                        ; g_gamma
+                        ; h_gamma
+                        ; g_alpha_h_beta ]) ->
+      {query_base; query; h; g_alpha; h_beta; g_gamma; h_gamma; g_alpha_h_beta}
+
+    let typ ~input_size =
+      let spec =
+        Data_spec.
+          [ G1.typ
+          ; Typ.list ~length:input_size G1.typ
+          ; G2.typ
+          ; G1.typ
+          ; G2.typ
+          ; G1.typ
+          ; G2.typ
+          ; Fqk.typ ]
+      in
+      Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+    include Summary.Make (Inputs)
+
+    let summary_length_in_bits ~twist_extension_degree ~input_size =
+      summary_length_in_bits ~twist_extension_degree
+        ~g1_count:(1 + input_size + 2)
+        ~g2_count:3 ~gt_count:1
+
+    let summary_input
+        { g_alpha
+        ; g_gamma
+        ; query_base
+        ; query
+        ; h
+        ; h_beta
+        ; h_gamma
+        ; g_alpha_h_beta } =
+      { Summary.Input.g1s= g_alpha :: g_gamma :: query_base :: query
+      ; g2s= [h; h_beta; h_gamma]
+      ; gts= [g_alpha_h_beta] }
+
     type ('a, 'b, 'c) vk = ('a, 'b, 'c) t_
 
     module Precomputation = struct
@@ -48,21 +115,24 @@ module Make (Inputs : Inputs.S) = struct
 
   let verify (vk : (_, _, _) Verification_key.t_)
       (vk_precomp : Verification_key.Precomputation.t) inputs {Proof.a; b; c} =
+    let%bind (module G1_shifted) = G1.Shifted.create () in
+    let%bind (module G2_shifted) = G2.Shifted.create () in
     let%bind acc =
-      let%bind (module Shifted) = G1.Shifted.create () in
-      let%bind init = Shifted.(add zero vk.query_base) in
+      let%bind init = G1_shifted.(add zero vk.query_base) in
       Checked.List.fold (List.zip_exn vk.query inputs) ~init
         ~f:(fun acc (g, input) ->
-          let%bind term = G1.scale g input in
-          Shifted.add acc term )
-      >>= Shifted.unshift_nonzero
+          G1.scale (module G1_shifted) g input ~init:acc )
+      >>= G1_shifted.unshift_nonzero
     in
     let%bind test1 =
-      let%bind a_g_alpha = G1.add_exn a vk.g_alpha in
-      let%bind b_h_beta =
-        G2.add_exn b vk.h_beta >>= G2_precomputation.create
+      let%bind a_g_alpha =
+        G1_shifted.(add zero a >>= Fn.flip add vk.g_alpha >>= unshift_nonzero)
       in
-      group_miller_loop
+      let%bind b_h_beta =
+        G2_shifted.(add zero b >>= Fn.flip add vk.h_beta >>= unshift_nonzero)
+        >>= G2_precomputation.create
+      in
+      batch_miller_loop
         [ (Pos, G1_precomputation.create a_g_alpha, b_h_beta)
         ; (Neg, G1_precomputation.create acc, vk_precomp.h_gamma)
         ; (Neg, G1_precomputation.create c, vk_precomp.h) ]
@@ -70,7 +140,7 @@ module Make (Inputs : Inputs.S) = struct
       >>= Fqk.equal vk.g_alpha_h_beta
     and test2 =
       let%bind b = G2_precomputation.create b in
-      group_miller_loop
+      batch_miller_loop
         [ (Pos, G1_precomputation.create a, vk_precomp.h_gamma)
         ; (Neg, G1_precomputation.create vk.g_gamma, b) ]
       >>= final_exponentiation >>= Fqk.equal Fqk.one
