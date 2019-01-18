@@ -1,7 +1,0 @@
-*.o
-*.a
-*.so
-*.d
-build
-profiler
-profiling_menu
