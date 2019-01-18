@@ -247,6 +247,89 @@ module Tick = struct
       let digest_triples ts ~init =
         Checked.map (hash_triples ts ~init) ~f:digest
     end
+
+    (* easier to put these hashing tests here, where Pedersen.Make has been applied, than
+      inside the Pedersen functor
+    *)
+    module For_tests = struct
+      open Fold_lib
+      open Tuple_lib
+
+      let equal_curves c1 c2 =
+        if phys_equal c1 Inner_curve.zero || phys_equal c2 Inner_curve.zero
+        then phys_equal c1 c2
+        else
+          let c1_x, c1_y = Inner_curve.to_affine_coordinates c1 in
+          let c2_x, c2_y = Inner_curve.to_affine_coordinates c2 in
+          Field.equal c1_x c2_x && Field.equal c1_y c2_y
+
+      let equal_states s1 s2 =
+        equal_curves s1.State.acc s2.State.acc
+        && Int.equal s1.triples_consumed s2.triples_consumed
+        (* params, chunk_table should never be modified *)
+        && phys_equal s1.params s2.params
+        && phys_equal s1.chunk_table s2.chunk_table
+
+      (* this is the old update_fold code (specialized to Inner_curve), before we added chunking *)
+      let update_fold_unchunked (t : State.t) (fold : bool Triple.t Fold.t) =
+        let params = t.params in
+        let acc, triples_consumed =
+          fold.fold ~init:(t.acc, t.triples_consumed)
+            ~f:(fun (acc, i) triple ->
+              let term =
+                Snarky.Pedersen.local_function ~negate:Inner_curve.negate
+                  params.(i) triple
+              in
+              (Inner_curve.add acc term, i + 1) )
+        in
+        {t with acc; triples_consumed}
+
+      let gen_fold n =
+        let gen_triple =
+          Quickcheck.Generator.map (Int.gen_incl 0 7) ~f:(function
+            | 0 -> (false, false, false)
+            | 1 -> (false, false, true)
+            | 2 -> (false, true, false)
+            | 3 -> (false, true, true)
+            | 4 -> (true, false, false)
+            | 5 -> (true, false, true)
+            | 6 -> (true, true, false)
+            | 7 -> (true, true, true)
+            | _ -> failwith "gen_triple: got unexpected integer" )
+        in
+        let gen_triples n =
+          Quickcheck.random_value
+            (Quickcheck.Generator.list_with_length n gen_triple)
+        in
+        Fold.of_list (gen_triples n)
+
+      let initial_state =
+        State.create params Curve_chunk_table.{curve_points_table}
+
+      let run_updates fold =
+        let result = State.update_fold initial_state fold in
+        let unchunked_result = update_fold_unchunked initial_state fold in
+        (result, unchunked_result)
+
+      let run_hash_test n =
+        let fold = gen_fold 1 in
+        let result, unchunked_result = run_updates fold in
+        assert (equal_states result unchunked_result)
+    end
+
+    let%test_unit "hash one triple" = For_tests.run_hash_test 1
+
+    let%test_unit "hash small number of chunks" =
+      For_tests.run_hash_test (Chunked_triples.Chunk.size * 25)
+
+    let%test_unit "hash small number of chunks plus 1" =
+      For_tests.run_hash_test ((Chunked_triples.Chunk.size * 25) + 1)
+
+    let%test_unit "hash large number of chunks" =
+      For_tests.run_hash_test (Chunked_triples.Chunk.size * 250)
+
+    let%test_unit "hash large number of chunks plus 2" =
+      For_tests.run_hash_test ((Chunked_triples.Chunk.size * 250) + 2)
   end
 
   module Util = Snark_util.Make (Tick0)
