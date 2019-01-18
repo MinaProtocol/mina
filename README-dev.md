@@ -138,8 +138,6 @@ Some of our dependencies aren't taken from `opam`, and aren't integrated
 with `dune`, so you need to add them manually:
 
 * `opam pin add src/external/ocaml-sodium`
-* `opam pin add src/external/ocaml-rocksdb`
-* `opam pin add src/external/ocaml-dune`
 * `opam pin add src/external/rpc_parallel`
 
 There are a variety of C libraries we expect to be available in the system.
