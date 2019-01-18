@@ -46,11 +46,11 @@ module Make (Depth : Intf.Depth) = struct
               Format.pp_print_string fmt (Bigstring.to_string bstr)]
       | Account of Addr.t
       | Hash of Addr.t
-    [@@deriving hash, sexp, compare, eq]
+    [@@deriving hash, sexp, compare, eq, bin_io]
   end
 
   include T
-  include Hashable.Make (T)
+  include Hashable.Make_binable (T)
 
   let is_generic = function Generic _ -> true | _ -> false
 
@@ -120,6 +120,13 @@ module Make (Depth : Intf.Depth) = struct
           (Invalid_argument "next: generic locations have no next location")
     | Account path -> Addr.next path |> Option.map ~f:(fun next -> Account next)
     | Hash path -> Addr.next path |> Option.map ~f:(fun next -> Hash next)
+
+  let prev : t -> t Option.t = function
+    | Generic _ ->
+        raise
+          (Invalid_argument "prev: generic locations have no prev location")
+    | Account path -> Addr.prev path |> Option.map ~f:(fun prev -> Account prev)
+    | Hash path -> Addr.prev path |> Option.map ~f:(fun prev -> Hash prev)
 
   let sibling : t -> t = function
     | Generic _ ->

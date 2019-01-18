@@ -23,6 +23,6 @@ Discord](https://discordapp.com/invite/cCYQbqN), for general OCaml help.
 ## License
 
 This repository is distributed under the terms of the Apache 2.0 license,
-available in the LICENSE fail and online at
+available in the LICENSE file and online at
 https://www.apache.org/licenses/LICENSE-2.0. Commits older than 2018-10-03 do
 not have a LICENSE file or this notice, but are distributed under the same terms.

@@ -1,0 +1,8 @@
+(library
+  (name linked_tree)
+  (public_name linked_tree)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (libraries
+    core
+    coda_numbers
+    ))

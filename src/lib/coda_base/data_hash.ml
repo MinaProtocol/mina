@@ -46,7 +46,7 @@ module type Basic = sig
 
   include Bits_intf.S with type t := t
 
-  include Hashable.S with type t := t
+  include Hashable_binable with type t := t
 
   val fold : t -> bool Triple.t Fold.t
 end
@@ -136,14 +136,13 @@ struct
       >>| fun x -> (x :> Boolean.var list)
     else Field.Checked.unpack ~length:length_in_bits
 
-  let var_to_bits t =
-    with_label __LOC__
-      ( match t.bits with
-      | Some bits -> return (bits :> Boolean.var list)
-      | None ->
-          let%map bits = unpack t.digest in
-          t.bits <- Some (Bitstring.Lsb_first.of_list bits) ;
-          bits )
+  let%snarkydef var_to_bits t =
+    match t.bits with
+    | Some bits -> return (bits :> Boolean.var list)
+    | None ->
+        let%map bits = unpack t.digest in
+        t.bits <- Some (Bitstring.Lsb_first.of_list bits) ;
+        bits
 
   let var_to_triples t =
     var_to_bits t >>| Bitstring.pad_to_triple_list ~default:Boolean.false_

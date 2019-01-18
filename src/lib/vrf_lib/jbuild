@@ -5,7 +5,7 @@
   (public_name vrf_lib)
   (flags (:standard -short-paths))
   (library_flags (-linkall))
-  (libraries (core snarky test_util))
+  (libraries (core snarky snarky_curves test_util))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (modules (integrated standalone))
   (synopsis "VRF instantiation")))
@@ -13,6 +13,16 @@
 (library
  ((name tests)
   (inline_tests)
-  (libraries (core snarky test_util signature_lib snark_params vrf_lib coda_base sha256_lib fold_lib))
-  (preprocess (pps (ppx_jane ppx_deriving.eq)))
+  (libraries
+    ( core
+      snarky
+      snarky_curves
+      test_util
+      signature_lib
+      snark_params
+      vrf_lib
+      coda_base
+      sha256_lib
+      fold_lib))
+  (preprocess (pps (ppx_jane ppx_deriving.eq bisect_ppx -conditional)))
   (modules (integrated_test))))

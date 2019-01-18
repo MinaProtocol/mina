@@ -1,3 +1,0 @@
-(library
- (name foo_impl)
- (implements foo))

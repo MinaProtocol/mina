@@ -24,12 +24,22 @@
 namespace libfqfft {
 
 template<typename FieldT>
-geometric_sequence_domain<FieldT>::geometric_sequence_domain(const size_t m) : evaluation_domain<FieldT>(m)
+geometric_sequence_domain<FieldT>::geometric_sequence_domain(const size_t m, bool &err) : evaluation_domain<FieldT>(m)
 {
-  if (m <= 1) throw InvalidSizeException("geometric(): expected m > 1");
-  if (FieldT::geometric_generator() == FieldT::zero())
-    throw InvalidSizeException("geometric(): expected FieldT::geometric_generator() != FieldT::zero()");
-  
+  bool precomputation_sentinel;
+
+  if (m <= 1) {
+    err = true;
+    precomputation_sentinel = false;
+    return;
+  }
+
+  if (FieldT::geometric_generator() == FieldT::zero()) {
+    err = true;
+    precomputation_sentinel = false;
+    return;
+  }
+
   precomputation_sentinel = 0;
 }
 

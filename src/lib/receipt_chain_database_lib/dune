@@ -1,9 +1,10 @@
 (library
  (name receipt_chain_database_lib)
   (public_name receipt_chain_database_lib)
+  (flags (:standard -short-paths -warn-error -39))
   (library_flags (-linkall))
-  (libraries core key_value_database)
+  (libraries core key_value_database ppx_deriving_yojson.runtime yojson)
   (inline_tests)
-  (preprocess (pps ppx_jane ppx_deriving.eq))
-  (synopsis "A library that contains a database that records sent payments for an individual account and generates a merkle list of a payment. 
-  Also, the library contains a verifier that proves the correctness of a merkle list of payments"))
+  (preprocess (pps bisect_ppx -conditional ppx_jane ppx_deriving.eq ppx_deriving_yojson ppx_fields_conv))
+  (synopsis "A library that contains a database that records sent payments for an individual account and generates a proof of a payment. 
+  Also, the library contains a verifier that proves the correctness of the proof of payments"))

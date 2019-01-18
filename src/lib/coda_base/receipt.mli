@@ -7,6 +7,8 @@ module Chain_hash : sig
 
   val to_string : t -> string
 
+  val of_string : string -> t
+
   val empty : t
 
   val cons : User_command.Payload.t -> t -> t

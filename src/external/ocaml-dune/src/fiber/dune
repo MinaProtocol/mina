@@ -1,4 +1,0 @@
-(library
- (name      fiber)
- (libraries stdune)
- (synopsis  "Monadic concurrency library"))

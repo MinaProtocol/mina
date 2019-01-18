@@ -8,7 +8,7 @@ open Blockchain_snark
 open Cli_lib
 open Coda_main
 module YJ = Yojson.Safe
-module Git_sha = Client_lib.Git_sha
+module Git_sha = Daemon_rpcs.Types.Git_sha
 
 [%%if
 tracing]
@@ -32,19 +32,9 @@ module type Coda_intf = sig
   module Make (Init : Init_intf) () : Main_intf
 end
 
-module type Consensus_mechanism_intf = sig
-  module Make (Ledger_builder_diff : sig
-    type t [@@deriving bin_io, sexp]
-  end) :
-    Consensus.Mechanism.S
-    with type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
-     and type External_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
-end
-
-let default_external_port = 8302
-
-let daemon (module Kernel : Kernel_intf) log =
+let daemon log =
   let open Command.Let_syntax in
+  let open Cli_lib.Arg_type in
   Command.async ~summary:"Coda daemon"
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
@@ -75,14 +65,14 @@ let daemon (module Kernel : Kernel_intf) log =
            (Printf.sprintf
               "PORT Base server port for daemon TCP (discovery UDP on port+1) \
                (default: %d)"
-              default_external_port)
+              Port.default_external)
          (optional int16)
      and client_port =
        flag "client-port"
          ~doc:
            (Printf.sprintf
               "PORT Client to daemon local communication (default: %d)"
-              default_client_port)
+              Port.default_client)
          (optional int16)
      and rest_server_port =
        flag "rest-port"
@@ -107,6 +97,9 @@ let daemon (module Kernel : Kernel_intf) log =
            "FEE Amount a worker wants to get compensated for generating a \
             snark proof"
          (optional int)
+     and sexp_logging =
+       flag "sexp-logging" no_arg
+         ~doc:"Use S-expressions in log output, instead of JSON"
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -117,14 +110,17 @@ let daemon (module Kernel : Kernel_intf) log =
          if is_background then (
            let home = Core.Sys.home_directory () in
            let conf_dir = compute_conf_dir home in
+           Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
+             conf_dir ;
            Daemon.daemonize
-             ~redirect_stdout:(`File_append (conf_dir ^/ "coda.stdout"))
-             ~redirect_stderr:(`File_append (conf_dir ^/ "coda.stderr"))
+             ~redirect_stdout:(`File_append (conf_dir ^/ "coda.log"))
+             ~redirect_stderr:(`File_append (conf_dir ^/ "coda.log"))
              () ;
            Deferred.return conf_dir )
          else Sys.home_directory () >>| compute_conf_dir
        in
        Parallel.init_master () ;
+       ignore (Logger.set_sexp_logging sexp_logging) ;
        let%bind config =
          match%map
            Monitor.try_with_or_error ~extract_exn:true (fun () ->
@@ -163,11 +159,11 @@ let daemon (module Kernel : Kernel_intf) log =
        in
        let external_port : int =
          or_from_config YJ.Util.to_int_option "external-port"
-           ~default:default_external_port external_port
+           ~default:Port.default_external external_port
        in
        let client_port =
          or_from_config YJ.Util.to_int_option "client-port"
-           ~default:default_client_port client_port
+           ~default:Port.default_client client_port
        in
        let transaction_capacity_log_2 =
          or_from_config YJ.Util.to_int_option "txn-capacity" ~default:8
@@ -255,7 +251,8 @@ let daemon (module Kernel : Kernel_intf) log =
          | None -> Deferred.return None
        in
        let%bind propose_keypair =
-         Option.map ~f:Cli_lib.read_keypair_exn' propose_key |> sequence
+         Option.map ~f:Cli_lib.Keypair.Terminal_stdin.read_exn propose_key
+         |> sequence
        in
        let%bind client_whitelist =
          Reader.load_sexp
@@ -284,11 +281,15 @@ let daemon (module Kernel : Kernel_intf) log =
          make_init
            ~should_propose:(Option.is_some propose_keypair)
            (module Config0)
-           (module Kernel)
        in
        let module M = Coda_main.Make_coda (Init) in
        let module Run = Run (Config0) (M) in
-       Async.Scheduler.report_long_cycle_times ~cutoff:(sec 0.5) () ;
+       Stream.iter
+         (Async.Scheduler.long_cycles
+            ~at_least:(sec 0.5 |> Time_ns.Span.of_span))
+         ~f:(fun span ->
+           Logger.warn log "long async cycle %s" (Time_ns.Span.to_string span)
+           ) ;
        let%bind () =
          let open M in
          let run_snark_worker_action =
@@ -305,8 +306,10 @@ let daemon (module Kernel : Kernel_intf) log =
          let banlist =
            Coda_base.Banlist.create ~suspicious_dir ~punished_dir
          in
+         let time_controller = Inputs.Time.Controller.create () in
          let net_config =
            { Inputs.Net.Config.parent_log= log
+           ; time_controller
            ; gossip_net_params=
                { timeout= Time.Span.of_sec 1.
                ; parent_log= log
@@ -326,14 +329,15 @@ let daemon (module Kernel : Kernel_intf) log =
            Run.create
              (Run.Config.make ~log ~net_config
                 ~run_snark_worker:(Option.is_some run_snark_worker_flag)
-                ~ledger_builder_persistant_location:
-                  (conf_dir ^/ "ledger_builder")
+                ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+                ~ledger_db_location:(conf_dir ^/ "ledger_db")
                 ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
-                ~time_controller:(Inputs.Time.Controller.create ())
-                ?propose_keypair:Config0.propose_keypair () ~banlist)
+                ~time_controller ?propose_keypair:Config0.propose_keypair ()
+                ~banlist)
          in
+         M.start coda ;
          let web_service = Web_pipe.get_service () in
          Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;
          Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
@@ -341,28 +345,6 @@ let daemon (module Kernel : Kernel_intf) log =
          Run.run_snark_worker ~log ~client_port run_snark_worker_action
        in
        Async.never ())
-
-let exit1 ?msg =
-  match msg with
-  | None -> Core.exit 1
-  | Some msg ->
-      Core.Printf.eprintf "%s\n" msg ;
-      Core.exit 1
-
-let env name ~f ~default =
-  let name = Printf.sprintf "CODA_%s" name in
-  Unix.getenv name
-  |> Option.map ~f:(fun x ->
-         match f @@ String.uppercase x with
-         | Some v -> v
-         | None ->
-             exit1
-               ~msg:
-                 (Printf.sprintf
-                    "Inside env var %s, there was a value I don't understand \
-                     \"%s\""
-                    name x) )
-  |> Option.value ~default
 
 [%%if
 force_updates]
@@ -402,17 +384,16 @@ let rec ensure_testnet_id_still_good log =
         (* Maybe the Git_sha.of_string is a bit gratuitous *)
         let finish local_id remote_ids =
           let str x = Git_sha.sexp_of_t x |> Sexp.to_string in
-          exit1
-            ~msg:
-              (sprintf
-                 "The version for the testnet has changed, and this client \
-                  (version %s) is no longer compatible. Please download the \
-                  latest Coda software!\n\
-                  Valid versions:\n\
-                  %s"
-                 ( local_id |> Option.map ~f:str
-                 |> Option.value ~default:"[COMMIT_SHA1 not set]" )
-                 remote_ids)
+          eprintf
+            "The version for the testnet has changed, and this client \
+             (version %s) is no longer compatible. Please download the latest \
+             Coda software!\n\
+             Valid versions:\n\
+             %s"
+            ( local_id |> Option.map ~f:str
+            |> Option.value ~default:"[COMMIT_SHA1 not set]" )
+            remote_ids ;
+          exit 1
         in
         match commit_id with
         | None -> finish None body_string
@@ -429,91 +410,6 @@ let ensure_testnet_id_still_good _ = Deferred.unit
 
 [%%endif]
 
-let consensus_mechanism () : (module Consensus_mechanism_intf) =
-  let mechanism =
-    env "CONSENSUS_MECHANISM" ~default:`Proof_of_signature ~f:(function
-      | "PROOF_OF_SIGNATURE" -> Some `Proof_of_signature
-      | "PROOF_OF_STAKE" -> Some `Proof_of_stake
-      | _ -> None )
-  in
-  match mechanism with
-  | `Proof_of_signature ->
-      ( module struct
-        module Make (Ledger_builder_diff : sig
-          type t [@@deriving sexp, bin_io]
-        end) =
-        Consensus.Proof_of_signature.Make (struct
-          module Genesis_ledger = Genesis_ledger
-          module Proof = Coda_base.Proof
-          module Ledger_builder_diff = Ledger_builder_diff
-          module Time = Coda_base.Block_time
-
-          let proposal_interval =
-            env "PROPOSAL_INTERVAL"
-              ~default:(Time.Span.of_ms @@ Int64.of_int 5000)
-              ~f:(fun str ->
-                try Some (Time.Span.of_ms @@ Int64.of_string str) with _ ->
-                  None )
-        end)
-      end )
-  | `Proof_of_stake ->
-      ( module struct
-        module Make (Ledger_builder_diff : sig
-          type t [@@deriving sexp, bin_io]
-        end) =
-        Consensus.Proof_of_stake.Make (struct
-          module Genesis_ledger = Genesis_ledger
-          module Proof = Coda_base.Proof
-          module Ledger_builder_diff = Ledger_builder_diff
-          module Time = Coda_base.Block_time
-
-          (* TODO: choose reasonable values *)
-          let genesis_state_timestamp =
-            let default =
-              Core.Time.of_date_ofday
-                (Core.Time.Zone.of_utc_offset ~hours:(-7))
-                (Core.Date.create_exn ~y:2018 ~m:Month.Sep ~d:1)
-                (Core.Time.Ofday.create ~hr:10 ())
-              |> Time.of_time
-            in
-            env "GENESIS_STATE_TIMESTAMP" ~default ~f:(fun str ->
-                try Some (Time.of_time @@ Core.Time.of_string str) with _ ->
-                  None )
-
-          let coinbase =
-            env "COINBASE" ~default:(Currency.Amount.of_int 20) ~f:(fun str ->
-                try Some (Currency.Amount.of_int @@ Int.of_string str)
-                with _ -> None )
-
-          let slot_interval =
-            env "SLOT_INTERVAL"
-              ~default:(Time.Span.of_ms (Int64.of_int 5000))
-              ~f:(fun str ->
-                try Some (Time.Span.of_ms @@ Int64.of_string str) with _ ->
-                  None )
-
-          let unforkable_transition_count =
-            env "UNFORKABLE_TRANSITION_COUNT" ~default:12 ~f:(fun str ->
-                try Some (Int.of_string str) with _ -> None )
-
-          let probable_slots_per_transition_count =
-            env "PROBABLE_SLOTS_PER_TRANSITION_COUNT" ~default:8 ~f:(fun str ->
-                try Some (Int.of_string str) with _ -> None )
-
-          (* Conservatively pick 1seconds *)
-          let expected_network_delay =
-            env "EXPECTED_NETWORK_DELAY"
-              ~default:(Time.Span.of_ms (Int64.of_int 1000))
-              ~f:(fun str ->
-                try Some (Time.Span.of_ms @@ Int64.of_string str) with _ ->
-                  None )
-
-          let approximate_network_diameter =
-            env "APPROXIMATE_NETWORK_DIAMETER" ~default:3 ~f:(fun str ->
-                try Some (Int.of_string str) with _ -> None )
-        end)
-      end )
-
 [%%if
 with_snark]
 
@@ -527,26 +423,18 @@ let internal_commands =
 
 [%%endif]
 
-let coda_commands (module Kernel : Kernel_intf) log =
+let coda_commands log =
   [ (Parallel.worker_command_name, Parallel.worker_command)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
-  ; ("daemon", daemon (module Kernel) log)
-  ; ("client", Client.command) ]
+  ; ("daemon", daemon log)
+  ; ("client", Client.command)
+  ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
 
 [%%if
 integration_tests]
 
-let coda_commands (module Kernel : Kernel_intf) log =
+let coda_commands log =
   let group =
-    let module Coda_peers_test = Coda_peers_test.Make (Kernel) in
-    let module Coda_block_production_test =
-      Coda_block_production_test.Make (Kernel) in
-    let module Coda_shared_prefix_test = Coda_shared_prefix_test.Make (Kernel) in
-    let module Coda_restart_node_test = Coda_restart_node_test.Make (Kernel) in
-    let module Coda_shared_state_test = Coda_shared_state_test.Make (Kernel) in
-    let module Coda_receipt_chain_test = Coda_receipt_chain_test.Make (Kernel) in
-    let module Coda_transitive_peers_test =
-      Coda_transitive_peers_test.Make (Kernel) in
     [ (Coda_peers_test.name, Coda_peers_test.command)
     ; (Coda_block_production_test.name, Coda_block_production_test.command)
     ; (Coda_shared_state_test.name, Coda_shared_state_test.command)
@@ -554,10 +442,10 @@ let coda_commands (module Kernel : Kernel_intf) log =
     ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
     ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
     ; (Coda_receipt_chain_test.name, Coda_receipt_chain_test.command)
-    ; ("full-test", Full_test.command (module Kernel))
+    ; ("full-test", Full_test.command)
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
   in
-  coda_commands (module Kernel) log
+  coda_commands log
   @ [("integration-tests", Command.group ~summary:"Integration tests" group)]
 
 [%%endif]
@@ -566,8 +454,5 @@ let () =
   Random.self_init () ;
   let log = Logger.create () in
   don't_wait_for (ensure_testnet_id_still_good log) ;
-  let (module Consensus_mechanism) = consensus_mechanism () in
-  let module Kernel = Make_kernel (Consensus_mechanism.Make) in
-  Command.run
-    (Command.group ~summary:"Coda" (coda_commands (module Kernel) log)) ;
+  Command.run (Command.group ~summary:"Coda" (coda_commands log)) ;
   Core.exit 0

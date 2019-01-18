@@ -1,4 +1,4 @@
-(** Any_ledger let's you use any arbitrary ledger whenever some ledger is
+(** Any_ledger lets you use any arbitrary ledger whenever some ledger is
  * required. This uses dynamic dispatch and is equivalent to the notion of
  * consuming a value conforming to an interface in Java.
  *
@@ -14,7 +14,36 @@
  * *)
 
 open Core_kernel
-open Async_kernel
+
+module type S = sig
+  type key
+
+  type key_set
+
+  type account
+
+  type hash
+
+  module Location : Location_intf.S
+
+  (** The type of the witness for a base ledger exposed here so that it can
+   * be easily accessed from outside this module *)
+  type witness [@@deriving sexp_of]
+
+  module type Base_intf =
+    Base_ledger_intf.S
+    with module Addr = Location.Addr
+    with module Location = Location
+    with type key := key
+     and type key_set := key_set
+     and type hash := hash
+     and type root_hash := hash
+     and type account := account
+
+  val cast : (module Base_intf with type t = 'a) -> 'a -> witness
+
+  module M : Base_intf with type t = witness
+end
 
 module Make_base
     (Key : Intf.Key)
@@ -22,20 +51,30 @@ module Make_base
     (Hash : Intf.Hash with type account := Account.t)
     (Location : Location_intf.S) (Depth : sig
         val depth : int
-    end) =
-struct
+    end) :
+  S
+  with module Location = Location
+  with type key := Key.t
+   and type hash := Hash.t
+   and type key_set := Key.Set.t
+   and type account := Account.t = struct
+  module Location = Location
+
   module type Base_intf =
     Base_ledger_intf.S
     with module Addr = Location.Addr
     with module Location = Location
     with type key := Key.t
+     and type key_set := Key.Set.t
      and type hash := Hash.t
      and type root_hash := Hash.t
      and type account := Account.t
 
-  (** The type of the witness for a base ledger exposed here so that it can
-   * be easily accessed from outside this module *)
   type witness = T : (module Base_intf with type t = 't) * 't -> witness
+
+  let cast (m : (module Base_intf with type t = 'a)) (t : 'a) = T (m, t)
+
+  let sexp_of_witness (T ((module B), t)) = B.sexp_of_t t
 
   (** M can be used wherever a base ledger is demanded, construct instances
    * by using the witness constructor directly
@@ -45,7 +84,9 @@ struct
    * In the future, this should be a `ppx`.
    *)
   module M : Base_intf with type t = witness = struct
-    type t = witness
+    type t = witness [@@deriving sexp_of]
+
+    let t_of_sexp _ = failwith "t_of_sexp unimplemented"
 
     type index = int
 
@@ -55,8 +96,6 @@ struct
     type path = Path.t
 
     module Addr = Location.Addr
-
-    let copy (T ((module Base), t)) = T ((module Base), Base.copy t)
 
     let remove_accounts_exn (T ((module Base), t)) = Base.remove_accounts_exn t
 
@@ -81,7 +120,9 @@ struct
 
     let get_uuid (T ((module Base), t)) = Base.get_uuid t
 
-    let destroy (T ((module Base), t)) = Base.destroy t
+    let last_filled (T ((module Base), t)) = Base.last_filled t
+
+    let close (T ((module Base), t)) = Base.close t
 
     let get_or_create_account_exn (T ((module Base), t)) =
       Base.get_or_create_account_exn t
@@ -92,6 +133,12 @@ struct
     let location_of_key (T ((module Base), t)) = Base.location_of_key t
 
     let fold_until (T ((module Base), t)) = Base.fold_until t
+
+    (* ignored_keys must be Base.Keys.Set.t, but that isn't necessarily the same as Keys.Set.t for the
+       Keys passed to this functor; as long as we use the same Keys for all ledgers, this should work
+     *)
+    let foldi_with_ignored_keys (T ((module Base), t)) =
+      Base.foldi_with_ignored_keys t
 
     let foldi (T ((module Base), t)) = Base.foldi t
 

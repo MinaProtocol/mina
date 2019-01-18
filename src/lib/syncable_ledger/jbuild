@@ -6,7 +6,7 @@
   (modules (syncable_ledger))
   (library_flags (-linkall))
   (flags (:standard -short-paths -warn-error -32-34-58))
-  (libraries (core async async_extra pipe_lib merkle_ledger logger interruptible))
+  (libraries (core async async_extra pipe_lib merkle_ledger logger interruptible envelope))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "Synchronization of Merkle-tree backed ledgers")))
 
@@ -15,5 +15,5 @@
     (modules (test test_db test_ledger))
     (inline_tests)
     (libraries (core async merkle_ledger merkle_ledger_tests syncable_ledger))
-    (preprocess (pps (ppx_jane ppx_deriving.eq)))
+    (preprocess (pps (ppx_jane ppx_deriving.eq bisect_ppx -conditional)))
     ))

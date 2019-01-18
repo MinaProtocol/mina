@@ -3,10 +3,10 @@
 (library
  ((name logger)
   (public_name logger)
-  (flags (:standard -short-paths -warn-error -58))
+  (flags (:standard -short-paths -warn-error -58-39))
   (library_flags (-linkall))
   (inline_tests)
-  (libraries (core async))
-  (preprocess (pps (ppx_jane)))
+  (libraries (core async yojson ppx_deriving_yojson.runtime))
+  (preprocess (pps (ppx_jane ppx_deriving.std ppx_deriving_yojson bisect_ppx -conditional)))
   (synopsis "Logging library")))
 

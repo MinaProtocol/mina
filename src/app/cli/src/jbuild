@@ -7,7 +7,7 @@
     ( base64
       core
       debug_assert
-      client_lib
+      daemon_rpcs
       pipe_lib
       coda_networking
       proposer
@@ -20,8 +20,7 @@
       lite_compat
       coda_base
       test_util
-      ledger_builder
-      ledger_builder_controller
+      staged_ledger
       sparse_ledger_lib
       syncable_ledger
       blockchain_snark
@@ -36,6 +35,13 @@
       keys_lib
       storage
       logger
+      transition_frontier
+      transition_frontier_controller
+      sync_handler
+      ledger_catchup
+      transition_handler
+      bootstrap_controller
+      transition_router
       async
       async_extra
       rpc_parallel

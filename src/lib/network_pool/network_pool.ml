@@ -15,7 +15,7 @@ module type Pool_diff_intf = sig
 
   val summary : t -> string
 
-  val apply : pool -> t -> t Deferred.Or_error.t
+  val apply : pool -> t Envelope.Incoming.t -> t Deferred.Or_error.t
 end
 
 module type Network_pool_intf = sig
@@ -26,19 +26,22 @@ module type Network_pool_intf = sig
   type pool_diff
 
   val create :
-    parent_log:Logger.t -> incoming_diffs:pool_diff Linear_pipe.Reader.t -> t
+       parent_log:Logger.t
+    -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
+    -> t
 
   val of_pool_and_diffs :
        pool
     -> parent_log:Logger.t
-    -> incoming_diffs:pool_diff Linear_pipe.Reader.t
+    -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
     -> t
 
   val pool : t -> pool
 
   val broadcasts : t -> pool_diff Linear_pipe.Reader.t
 
-  val apply_and_broadcast : t -> pool_diff -> unit Deferred.t
+  val apply_and_broadcast :
+    t -> pool_diff Envelope.Incoming.t -> unit Deferred.t
 end
 
 module Snark_pool_diff = Snark_pool_diff
@@ -119,7 +122,8 @@ let%test_module "network pool test" =
                | Some {proof; fee= _} -> assert (proof = priced_proof.proof)
                | None -> failwith "There should have been a proof here" ) ;
                Deferred.unit ) ;
-        Mock_network_pool.apply_and_broadcast network_pool command )
+        Mock_network_pool.apply_and_broadcast network_pool
+          (Envelope.Incoming.local command) )
       |> Async.Thread_safe.block_on_async_exn
 
     let%test_unit "when creating a network, the incoming diffs in reader pipe \
@@ -128,8 +132,9 @@ let%test_module "network pool test" =
       let verify_unsolved_work () =
         let work_diffs =
           List.map works ~f:(fun work ->
-              Snark_pool_diff.Add_solved_work
-                (work, {Mock_snark_pool_diff.proof= 0; fee= 0}) )
+              Envelope.Incoming.local
+                (Snark_pool_diff.Add_solved_work
+                   (work, {Mock_snark_pool_diff.proof= 0; fee= 0})) )
           |> Linear_pipe.of_list
         in
         let network_pool =

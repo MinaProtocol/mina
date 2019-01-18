@@ -4,16 +4,18 @@ module Ledger = Merkle_ledger.Ledger
 
 let%test_module "test functor on in memory databases" =
   ( module struct
-    module Key = Test_stubs.Key
+    module Key_with_gen = Test_stubs.Key
     module Hash = Test_stubs.Hash
     module Account = Test_stubs.Account
     module Receipt = Test_stubs.Receipt
     module Balance = Test_stubs.Balance
 
     module Make (Depth : Intf.Depth) = struct
-      include Ledger.Make (Key) (Account) (Hash) (Depth)
+      include Ledger.Make (Key_with_gen) (Account) (Hash) (Depth)
 
-      type key = Key.t
+      type key = Key_with_gen.t
+
+      type key_set = Key_with_gen.Set.t
 
       type account = Account.t
 
@@ -32,7 +34,7 @@ let%test_module "test functor on in memory databases" =
         (ledger, keys)
 
       let load_ledger num_accounts balance : t * key list =
-        let keys = Key.gen_keys num_accounts in
+        let keys = Key_with_gen.gen_keys num_accounts in
         load_ledger_with_keys keys balance
     end
 
@@ -78,7 +80,8 @@ let%test_module "test functor on in memory databases" =
       let b = 100 in
       let ledger, _ = L16.load_ledger 10 (Balance.of_int b) in
       let key =
-        Quickcheck.random_value ~seed:(`Deterministic "key_nonexist") Key.gen
+        Quickcheck.random_value ~seed:(`Deterministic "key_nonexist")
+          Key_with_gen.gen
       in
       None = L16.location_of_key ledger key
 
@@ -86,7 +89,8 @@ let%test_module "test functor on in memory databases" =
       let b = 100 in
       let ledger, _keys = L16.load_ledger 10 (Balance.of_int b) in
       let key =
-        Quickcheck.random_value ~seed:(`Deterministic "idx_nonexist") Key.gen
+        Quickcheck.random_value ~seed:(`Deterministic "idx_nonexist")
+          Key_with_gen.gen
       in
       None = get (module L16) ledger key
 
@@ -112,7 +116,7 @@ let%test_module "test functor on in memory databases" =
       let new_b = Balance.of_int 50 in
       let public_key =
         Quickcheck.random_value ~seed:(`Deterministic "modify_account_by_idx")
-          Key.gen
+          Key_with_gen.gen
       in
       L16.set_at_index_exn ledger idx (Account.create public_key new_b) ;
       assert (
@@ -273,6 +277,17 @@ let%test_module "test functor on in memory databases" =
           res ) ;
       assert (mr_start = L16.merkle_root ledger)
 
+    let%test_unit "create_empty doesn't modify the hash" =
+      let open L3 in
+      let key = List.nth_exn (Key_with_gen.gen_keys 1) 0 in
+      let ledger = create () in
+      let start_hash = merkle_root ledger in
+      match get_or_create_account_exn ledger key Account.empty with
+      | `Existed, _ ->
+          failwith
+            "create_empty with empty ledger somehow already has that key?"
+      | `Added, _new_loc -> [%test_eq: Hash.t] start_hash (merkle_root ledger)
+
     let%test_unit "remove last two accounts is as if they were never there" =
       (* NB: because of the issue with duplicates in public _key generation,
          given numbers of accounts n and m, where m > n, the key list produced by load_ledger on n
@@ -280,7 +295,7 @@ let%test_module "test functor on in memory databases" =
 
          therefore, we produce the key list separately, take a prefix, and pass that to load_ledger_with_keys
        *)
-      let all_keys = Key.gen_keys 10 in
+      let all_keys = Key_with_gen.gen_keys 10 in
       let l1_keys = List.take all_keys 8 in
       let l1, _ = L16.load_ledger_with_keys l1_keys Balance.one in
       let l2_keys = all_keys in
@@ -291,7 +306,7 @@ let%test_module "test functor on in memory databases" =
 
     let%test_unit "remove last account is as if it were never there" =
       (* see remark in previous test about load_ledger *)
-      let all_keys = Key.gen_keys 10 in
+      let all_keys = Key_with_gen.gen_keys 10 in
       let l1_keys = List.take all_keys 9 in
       let l1, _ = L16.load_ledger_with_keys l1_keys Balance.one in
       let l2_keys = all_keys in
@@ -375,7 +390,7 @@ let%test_module "test functor on in memory databases" =
 
     let%test_unit "set_all_accounts_rooted_at_exn can work out of order" =
       (* see remark for test "remove last two accounts is as if they were never there" above *)
-      let all_keys = Key.gen_keys 8 in
+      let all_keys = Key_with_gen.gen_keys 8 in
       let l1_keys = all_keys in
       let l1, _ = L16.load_ledger_with_keys l1_keys Balance.one in
       let l2_keys = List.take all_keys 2 in

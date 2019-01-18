@@ -1,5 +1,7 @@
 module Bignum_bigint = Bigint
 open Core_kernel
+module Constraint0 = Constraint
+module Boolean0 = Boolean
 
 module type Basic = sig
   module Proving_key : sig
@@ -61,7 +63,7 @@ module type Basic = sig
   end
 
   module rec Constraint : sig
-    type t
+    type t = Field.Checked.t Constraint0.t
 
     type 'k with_constraint_args = ?label:string -> 'k
 
@@ -88,28 +90,34 @@ module type Basic = sig
   
   and Typ : sig
     module Store : sig
-      include Monad.S
+      include
+        Monad.S
+        with type 'a t = ('a, Field.t, Field.Checked.t) Typ_monads.Store.t
 
       val store : field -> Field.Checked.t t
     end
 
     module Alloc : sig
-      include Monad.S
+      include Monad.S with type 'a t = ('a, Field.Checked.t) Typ_monads.Alloc.t
 
       val alloc : Field.Checked.t t
     end
 
     module Read : sig
-      include Monad.S
+      include
+        Monad.S
+        with type 'a t = ('a, Field.t, Field.Checked.t) Typ_monads.Read.t
 
       val read : Field.Checked.t -> field t
     end
 
     type ('var, 'value) t =
-      { store: 'value -> 'var Store.t
-      ; read: 'var -> 'value Read.t
-      ; alloc: 'var Alloc.t
-      ; check: 'var -> (unit, unit) Checked.t }
+      ( 'var
+      , 'value
+      , Field.t
+      , Field.Checked.t
+      , R1CS_constraint_system.t )
+      Types.Typ.t
 
     val store : ('var, 'value) t -> 'value -> 'var Store.t
 
@@ -176,7 +184,7 @@ module type Basic = sig
   end
   
   and Boolean : sig
-    type var = private Field.Checked.t
+    type var = Field.Checked.t Boolean0.t
 
     type value = bool
 
@@ -244,7 +252,15 @@ module type Basic = sig
   end
   
   and Checked : sig
-    include Monad.S2
+    include
+      Monad.S2
+      with type ('a, 's) t =
+                  ( 'a
+                  , 's
+                  , Field.t
+                  , Field.Checked.t
+                  , R1CS_constraint_system.t )
+                  Types.Checked.t
 
     module List :
       Monad_sequence.S
@@ -258,6 +274,8 @@ module type Basic = sig
   and Field : sig
     type t = field [@@deriving bin_io, sexp, hash, compare, eq]
 
+    val gen : t Core_kernel.Quickcheck.Generator.t
+
     include Field_intf.Extended with type t := t
 
     include Stringable.S with type t := t
@@ -269,7 +287,7 @@ module type Basic = sig
     val project : bool list -> t
 
     module Checked : sig
-      type t
+      type t = (field, Var.t) Cvar.t
 
       val length : t -> int
       (** For debug purposes *)
@@ -279,6 +297,8 @@ module type Basic = sig
       val to_constant_and_terms : t -> field option * (field * Var.t) list
 
       val constant : field -> t
+
+      val to_constant : t -> field option
 
       val linear_combination : (field * t) list -> t
 
@@ -369,6 +389,11 @@ module type Basic = sig
 
     val equal : t -> t -> (Boolean.var, _) Checked.t
 
+    val lt_value :
+         Boolean.var Bitstring_lib.Bitstring.Msb_first.t
+      -> bool Bitstring_lib.Bitstring.Msb_first.t
+      -> (Boolean.var, _) Checked.t
+
     module Assert : sig
       val equal : t -> t -> (unit, _) Checked.t
     end
@@ -452,9 +477,6 @@ module type Basic = sig
     -> ('var, 's) Checked.t
   (** TODO: Come up with a better name for this in relation to the above *)
 
-  val provide_witness :
-    ('var, 'value) Typ.t -> ('value, 's) As_prover.t -> ('var, 's) Checked.t
-
   val exists :
        ?request:('value Request.t, 's) As_prover.t
     -> ?compute:('value, 's) As_prover.t
@@ -492,6 +514,12 @@ module type Basic = sig
     -> 'k_var
     -> Keypair.t
 
+  val conv :
+       ('r_var -> 'r_value)
+    -> ('r_var, 'r_value, 'k_var, 'k_value) Data_spec.t
+    -> 'k_var
+    -> 'k_value
+
   val prove :
        Proving_key.t
     -> ((unit, 's) Checked.t, Proof.t, 'k_var, 'k_value) Data_spec.t
@@ -512,7 +540,8 @@ module type Basic = sig
 
   val check : ('a, 's) Checked.t -> 's -> bool
 
-  val constraint_count : (_, _) Checked.t -> int
+  val constraint_count :
+    ?log:(?start:bool -> string -> int -> unit) -> (_, _) Checked.t -> int
 end
 
 module type S = sig

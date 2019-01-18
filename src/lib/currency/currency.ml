@@ -54,6 +54,8 @@ module type Basic = sig
 
   val var_of_t : t -> var
 
+  val var_to_number : var -> Number.t
+
   val var_to_triples : var -> Boolean.var Triple.t list
 end
 
@@ -76,7 +78,8 @@ module type Signed_intf = sig
 
   type ('magnitude, 'sgn) t_
 
-  type t = (magnitude, Sgn.t) t_ [@@deriving sexp, hash, bin_io, compare, eq]
+  type t = (magnitude, Sgn.t) t_
+  [@@deriving sexp, hash, bin_io, compare, eq, to_yojson]
 
   val gen : t Quickcheck.Generator.t
 
@@ -84,7 +87,7 @@ module type Signed_intf = sig
     module V1 : sig
       type nonrec ('magnitude, 'sgn) t_ = ('magnitude, 'sgn) t_
 
-      type nonrec t = t [@@deriving bin_io, sexp, hash, compare, eq]
+      type nonrec t = t [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
     end
   end
 
@@ -264,8 +267,11 @@ end = struct
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
   include Unpacked
 
+  let var_to_number t = Number.of_bits (var_to_bits t :> Boolean.var list)
+
   let var_to_triples t =
-    Bitstring.pad_to_triple_list ~default:Boolean.false_ (var_to_bits t)
+    Bitstring.pad_to_triple_list ~default:Boolean.false_
+      (var_to_bits t :> Boolean.var list)
 
   let var_of_bits (bits : Boolean.var Bitstring.Lsb_first.t) : var =
     let bits = (bits :> Boolean.var list) in
@@ -291,7 +297,7 @@ end = struct
   let var_of_t t =
     List.init M.length ~f:(fun i -> Boolean.var_of_value (Vector.get t i))
 
-  type magnitude = t [@@deriving sexp, bin_io, hash, compare, eq]
+  type magnitude = t [@@deriving sexp, bin_io, hash, compare, eq, to_yojson]
 
   let fold_bits = fold
 
@@ -305,12 +311,12 @@ end = struct
     module Stable = struct
       module V1 = struct
         type ('magnitude, 'sgn) t_ = {magnitude: 'magnitude; sgn: 'sgn}
-        [@@deriving bin_io, sexp, hash, compare, fields, eq]
+        [@@deriving bin_io, sexp, hash, compare, fields, eq, to_yojson]
 
         let create ~magnitude ~sgn = {magnitude; sgn}
 
         type t = (magnitude, Sgn.t) t_
-        [@@deriving bin_io, sexp, hash, compare, eq]
+        [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
       end
     end
 
@@ -377,7 +383,7 @@ end = struct
 
     module Checked = struct
       let to_bits {magnitude; sgn} =
-        var_to_bits magnitude @ [Sgn.Checked.is_pos sgn]
+        (var_to_bits magnitude :> Boolean.var list) @ [Sgn.Checked.is_pos sgn]
 
       let constant {magnitude; sgn} =
         {magnitude= var_of_t magnitude; sgn= Sgn.Checked.constant sgn}
@@ -400,11 +406,12 @@ end = struct
       let add (x : var) (y : var) =
         let%bind xv = to_field_var x and yv = to_field_var y in
         let%bind sgn =
-          provide_witness Sgn.typ
-            (let open As_prover in
-            let open Let_syntax in
-            let%map x = read typ x and y = read typ y in
-            (Option.value_exn (add x y)).sgn)
+          exists Sgn.typ
+            ~compute:
+              (let open As_prover in
+              let open Let_syntax in
+              let%map x = read typ x and y = read typ y in
+              (Option.value_exn (add x y)).sgn)
         in
         let%bind res =
           Tick.Field.Checked.mul

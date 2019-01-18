@@ -1,0 +1,12 @@
+(jbuild_version 1)
+
+(library
+ ((name tuple_lib)
+  (public_name tuple_lib)
+  (flags (:standard -short-paths))
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries
+   ( core_kernel))
+  (preprocess (pps (ppx_jane ppx_deriving.eq bisect_ppx -conditional)))
+  (synopsis "Tuple types")))

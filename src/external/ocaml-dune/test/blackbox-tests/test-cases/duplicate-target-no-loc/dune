@@ -1,3 +1,0 @@
-(install
- (section doc)
- (files (a as foo) (b as foo)))

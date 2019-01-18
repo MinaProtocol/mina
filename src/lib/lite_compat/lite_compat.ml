@@ -15,7 +15,7 @@ module Make (Blockchain_state : Coda_base.Blockchain_state.S) = struct
     (c 0, c 1, c 2)
 
   let g1 (t : Tick.Inner_curve.t) : LTock.G1.t =
-    let x, y = Tick.Inner_curve.to_coords t in
+    let x, y = Tick.Inner_curve.to_affine_coordinates t in
     {x= field x; y= field y; z= LTock.Fq.one}
 
   let g2 (t : Snarky.Libsnark.Mnt6.G2.t) : LTock.G2.t =
@@ -87,16 +87,16 @@ module Make (Blockchain_state : Coda_base.Blockchain_state.S) = struct
       Lite_base.Ledger_hash.t =
     digest (h :> Tick.Pedersen.Digest.t)
 
-  let ledger_builder_hash (h : Coda_base.Ledger_builder_hash.t) =
-    { Lite_base.Ledger_builder_hash.ledger_hash=
-        ledger_hash (Coda_base.Ledger_builder_hash.ledger_hash h)
-    ; aux_hash= Coda_base.Ledger_builder_hash.(Aux_hash.to_bytes (aux_hash h))
+  let ledger_builder_hash (h : Coda_base.Staged_ledger_hash.t) =
+    { Lite_base.Staged_ledger_hash.ledger_hash=
+        ledger_hash (Coda_base.Staged_ledger_hash.ledger_hash h)
+    ; aux_hash= Coda_base.Staged_ledger_hash.(Aux_hash.to_bytes (aux_hash h))
     }
 
   let blockchain_state
-      ({ledger_builder_hash= lbh; ledger_hash= lh; timestamp} :
+      ({staged_ledger_hash= lbh; ledger_hash= lh; timestamp} :
         Blockchain_state.t) : Lite_base.Blockchain_state.t =
-    { ledger_builder_hash= ledger_builder_hash lbh
+    { staged_ledger_hash= ledger_builder_hash lbh
     ; ledger_hash= frozen_ledger_hash lh
     ; timestamp= time timestamp }
 end

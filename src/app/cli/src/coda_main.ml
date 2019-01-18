@@ -25,18 +25,20 @@ end
 
 [%%endif]
 
-module Ledger_builder_aux_hash = struct
-  include Ledger_builder_hash.Aux_hash.Stable.V1
+module Staged_ledger_aux_hash = struct
+  include Staged_ledger_hash.Aux_hash.Stable.V1
 
-  let of_bytes = Ledger_builder_hash.Aux_hash.of_bytes
+  let of_bytes = Staged_ledger_hash.Aux_hash.of_bytes
 end
 
-module Ledger_builder_hash = struct
-  include Ledger_builder_hash.Stable.V1
+module Staged_ledger_hash = struct
+  include Staged_ledger_hash.Stable.V1
 
-  let ledger_hash = Ledger_builder_hash.ledger_hash
+  let ledger_hash = Staged_ledger_hash.ledger_hash
 
-  let of_aux_and_ledger_hash = Ledger_builder_hash.of_aux_and_ledger_hash
+  let aux_hash = Staged_ledger_hash.aux_hash
+
+  let of_aux_and_ledger_hash = Staged_ledger_hash.of_aux_and_ledger_hash
 end
 
 module Ledger_hash = struct
@@ -47,6 +49,10 @@ module Ledger_hash = struct
   let merge = Ledger_hash.merge
 
   let to_bytes = Ledger_hash.to_bytes
+
+  let of_digest = Ledger_hash.of_digest
+
+  let merge = Ledger_hash.merge
 end
 
 module Frozen_ledger_hash = struct
@@ -63,6 +69,291 @@ module type Ledger_proof_verifier_intf = sig
     -> Transaction_snark.Statement.t
     -> message:Sok_message.t
     -> bool Deferred.t
+end
+
+module type Work_selector_F = functor
+  (Inputs : Work_selector.Inputs.Inputs_intf)
+  -> Protocols.Coda_pow.Work_selector_intf
+     with type staged_ledger := Inputs.Staged_ledger.t
+      and type work :=
+                 ( Inputs.Ledger_proof_statement.t
+                 , Inputs.Transaction.t
+                 , Inputs.Sparse_ledger.t
+                 , Inputs.Ledger_proof.t )
+                 Snark_work_lib.Work.Single.Spec.t
+      and type snark_pool := Inputs.Snark_pool.t
+      and type fee := Inputs.Fee.t
+
+module type Config_intf = sig
+  val logger : Logger.t
+
+  val conf_dir : string
+
+  val lbc_tree_max_depth : [`Infinity | `Finite of int]
+
+  val propose_keypair : Keypair.t option
+
+  val genesis_proof : Snark_params.Tock.Proof.t
+
+  val transaction_capacity_log_2 : int
+  (** Capacity of transactions per block *)
+
+  val commit_id : Daemon_rpcs.Types.Git_sha.t option
+
+  val work_selection : Protocols.Coda_pow.Work_selection.t
+end
+
+module type Init_intf = sig
+  include Config_intf
+
+  module Transaction_snark_work :
+    Protocols.Coda_pow.Transaction_snark_work_intf
+    with type proof := Ledger_proof.t
+     and type statement := Transaction_snark.Statement.t
+     and type public_key := Public_key.Compressed.t
+
+  module Staged_ledger_diff :
+    Protocols.Coda_pow.Staged_ledger_diff_intf
+    with type completed_work_checked := Transaction_snark_work.Checked.t
+     and type completed_work := Transaction_snark_work.t
+     and type public_key := Public_key.Compressed.t
+     and type staged_ledger_hash := Staged_ledger_hash.t
+     and type user_command := User_command.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
+     and type fee_transfer_single := Fee_transfer.single
+
+  module Make_work_selector : Work_selector_F
+
+  val proposer_prover : [`Proposer of Prover.t | `Non_proposer]
+
+  val verifier : Verifier.t
+
+  val genesis_proof : Proof.t
+end
+
+module type Main_intf = sig
+  module Inputs : sig
+    module Time : Protocols.Coda_pow.Time_intf
+
+    module Ledger : sig
+      type t [@@deriving sexp]
+
+      val copy : t -> t
+
+      val location_of_key :
+        t -> Public_key.Compressed.t -> Ledger.Location.t option
+
+      val get : t -> Ledger.Location.t -> Account.t option
+
+      val merkle_path :
+           t
+        -> Ledger.Location.t
+        -> [`Left of Ledger_hash.t | `Right of Ledger_hash.t] list
+
+      val num_accounts : t -> int
+
+      val depth : int
+
+      val merkle_root : t -> Ledger_hash.t
+
+      val to_list : t -> Account.t list
+
+      val fold_until :
+           t
+        -> init:'accum
+        -> f:('accum -> Account.t -> ('accum, 'stop) Base.Continue_or_stop.t)
+        -> finish:('accum -> 'stop)
+        -> 'stop
+    end
+
+    module Net : sig
+      type t
+
+      module Peer : sig
+        type t = Host_and_port.Stable.V1.t * int
+        [@@deriving bin_io, sexp, compare, hash]
+
+        val external_rpc : t -> Host_and_port.Stable.V1.t
+      end
+
+      module Gossip_net : sig
+        module Config : Gossip_net.Config_intf
+      end
+
+      module Config :
+        Coda_networking.Config_intf
+        with type gossip_config := Gossip_net.Config.t
+         and type time_controller := Time.Controller.t
+    end
+
+    module Sparse_ledger : sig
+      type t
+    end
+
+    module Ledger_proof : sig
+      type t
+
+      type statement
+    end
+
+    module Ledger_proof_statement : sig
+      type t
+
+      include Comparable.S with type t := t
+    end
+
+    module Transaction : sig
+      type t
+    end
+
+    module Snark_worker :
+      Snark_worker_lib.Intf.S
+      with type proof := Ledger_proof.t
+       and type statement := Ledger_proof.statement
+       and type transition := Transaction.t
+       and type sparse_ledger := Sparse_ledger.t
+
+    module Snark_pool : sig
+      type t
+
+      val add_completed_work :
+        t -> Snark_worker.Work.Result.t -> unit Deferred.t
+    end
+
+    module Transaction_pool : sig
+      type t
+
+      val add : t -> User_command.t -> unit Deferred.t
+    end
+
+    module Protocol_state_proof : sig
+      type t
+
+      val dummy : t
+    end
+
+    module Transaction_snark_work :
+      Protocols.Coda_pow.Transaction_snark_work_intf
+      with type proof := Ledger_proof.t
+       and type statement := Transaction_snark.Statement.t
+       and type public_key := Public_key.Compressed.t
+
+    module Staged_ledger_diff :
+      Protocols.Coda_pow.Staged_ledger_diff_intf
+      with type completed_work := Transaction_snark_work.t
+       and type completed_work_checked := Transaction_snark_work.Checked.t
+       and type user_command := User_command.t
+       and type user_command_with_valid_signature :=
+                  User_command.With_valid_signature.t
+       and type public_key := Public_key.Compressed.t
+       and type staged_ledger_hash := Staged_ledger_hash.t
+       and type fee_transfer_single := Fee_transfer.single
+
+    module Staged_ledger_hash : sig
+      type t [@@deriving sexp]
+    end
+
+    module Staged_ledger :
+      Protocols.Coda_pow.Staged_ledger_intf
+      with type diff := Staged_ledger_diff.t
+       and type valid_diff :=
+                  Staged_ledger_diff.With_valid_signatures_and_proofs.t
+       and type staged_ledger_hash := Staged_ledger_hash.t
+       and type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
+       and type ledger_hash := Ledger_hash.t
+       and type frozen_ledger_hash := Frozen_ledger_hash.t
+       and type public_key := Public_key.Compressed.t
+       and type ledger := Ledger.t
+       and type ledger_proof := Ledger_proof.t
+       and type user_command_with_valid_signature :=
+                  User_command.With_valid_signature.t
+       and type statement := Transaction_snark_work.Statement.t
+       and type completed_work_checked := Transaction_snark_work.Checked.t
+       and type sparse_ledger := Sparse_ledger.t
+       and type ledger_proof_statement := Ledger_proof_statement.t
+       and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
+       and type transaction := Transaction.t
+       and type user_command := User_command.t
+
+    module Internal_transition :
+      Coda_base.Internal_transition.S
+      with module Snark_transition = Consensus.Mechanism.Snark_transition
+       and module Prover_state := Consensus.Mechanism.Prover_state
+       and module Staged_ledger_diff := Staged_ledger_diff
+
+    module External_transition :
+      Coda_base.External_transition.S
+      with module Protocol_state = Consensus.Mechanism.Protocol_state
+       and module Staged_ledger_diff := Staged_ledger_diff
+
+    module Transition_frontier :
+      Protocols.Coda_pow.Transition_frontier_intf
+      with type state_hash := State_hash.t
+       and type external_transition_verified := External_transition.Verified.t
+       and type ledger_database := Coda_base.Ledger.Db.t
+       and type masked_ledger := Coda_base.Ledger.t
+       and type staged_ledger := Staged_ledger.t
+       and type staged_ledger_diff := Staged_ledger_diff.t
+       and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+  end
+
+  module Config : sig
+    (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
+    type t =
+      { log: Logger.t
+      ; propose_keypair: Keypair.t option
+      ; run_snark_worker: bool
+      ; net_config: Inputs.Net.Config.t
+      ; staged_ledger_persistant_location: string
+      ; transaction_pool_disk_location: string
+      ; snark_pool_disk_location: string
+      ; ledger_db_location: string option
+      ; staged_ledger_transition_backup_capacity: int [@default 10]
+      ; time_controller: Inputs.Time.Controller.t
+      ; banlist: Banlist.t
+      ; receipt_chain_database: Receipt_chain_database.t
+      ; snark_work_fee: Currency.Fee.t }
+    [@@deriving make]
+  end
+
+  type t
+
+  val propose_keypair : t -> Keypair.t option
+
+  val run_snark_worker : t -> bool
+
+  val request_work : t -> Inputs.Snark_worker.Work.Spec.t option
+
+  val best_staged_ledger : t -> Inputs.Staged_ledger.t Participating_state.t
+
+  val best_ledger : t -> Inputs.Ledger.t Participating_state.t
+
+  val best_protocol_state :
+    t -> Consensus.Mechanism.Protocol_state.value Participating_state.t
+
+  val best_tip :
+    t -> Inputs.Transition_frontier.Breadcrumb.t Participating_state.t
+
+  val peers : t -> Kademlia.Peer.t list
+
+  val strongest_ledgers :
+       t
+    -> (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
+       Strict_pipe.Reader.t
+
+  val transaction_pool : t -> Inputs.Transaction_pool.t
+
+  val snark_pool : t -> Inputs.Snark_pool.t
+
+  val create : Config.t -> t Deferred.t
+
+  val staged_ledger_ledger_proof : t -> Inputs.Ledger_proof.t option
+
+  val get_ledger :
+    t -> Staged_ledger_hash.t -> Account.t list Deferred.Or_error.t
+
+  val receipt_chain_database : t -> Receipt_chain_database.t
 end
 
 module User_command = struct
@@ -91,122 +382,26 @@ module User_command = struct
   end
 end
 
+module Fee_transfer = Coda_base.Fee_transfer
 module Ledger_proof_statement = Transaction_snark.Statement
+module Transaction_snark_work =
+  Staged_ledger.Make_completed_work (Public_key.Compressed) (Ledger_proof)
+    (Ledger_proof_statement)
 
-module type Kernel_intf = sig
-  module Completed_work :
-    Protocols.Coda_pow.Completed_work_intf
-    with type public_key := Public_key.Compressed.t
-     and type statement := Transaction_snark.Statement.t
-     and type proof := Ledger_proof.t
+module Staged_ledger_diff = Staged_ledger.Make_diff (struct
+  module Ledger_proof = Ledger_proof
+  module Ledger_hash = Ledger_hash
+  module Staged_ledger_hash = Staged_ledger_hash
+  module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+  module Compressed_public_key = Public_key.Compressed
+  module User_command = User_command
+  module Transaction_snark_work = Transaction_snark_work
+  module Fee_transfer = Fee_transfer
+end)
 
-  module Ledger_builder_diff :
-    Protocols.Coda_pow.Ledger_builder_diff_intf
-    with type completed_work_checked := Completed_work.Checked.t
-     and type completed_work := Completed_work.t
-     and type public_key := Public_key.Compressed.t
-     and type ledger_builder_hash := Ledger_builder_hash.t
-     and type user_command := User_command.t
-     and type user_command_with_valid_signature :=
-                User_command.With_valid_signature.t
-
-  module Consensus_mechanism :
-    Consensus.Mechanism.S
-    with type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
-     and type External_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
-
-  module Blockchain :
-    Blockchain.S with module Consensus_mechanism = Consensus_mechanism
-
-  module Prover :
-    Prover.S
-    with module Consensus_mechanism = Consensus_mechanism
-     and module Blockchain = Blockchain
-
-  module Verifier : Verifier.S with type blockchain := Blockchain.t
-end
-
-module Make_kernel
-    (Make_consensus_mechanism : functor
-      (Ledger_builder_diff :sig
-                            
-                            type t [@@deriving sexp, bin_io]
-                          end)
-      -> Consensus.Mechanism.S
-         with type Internal_transition.Ledger_builder_diff.t =
-                     Ledger_builder_diff.t
-          and type External_transition.Ledger_builder_diff.t =
-                     Ledger_builder_diff.t) : Kernel_intf = struct
-  module Completed_work =
-    Ledger_builder.Make_completed_work (Public_key.Compressed) (Ledger_proof)
-      (Ledger_proof_statement)
-
-  module Ledger_builder_diff = Ledger_builder.Make_diff (struct
-    module Ledger_proof = Ledger_proof
-    module Ledger_hash = Ledger_hash
-    module Ledger_builder_hash = Ledger_builder_hash
-    module Ledger_builder_aux_hash = Ledger_builder_aux_hash
-    module Compressed_public_key = Public_key.Compressed
-    module User_command = User_command
-    module Completed_work = Completed_work
-  end)
-
-  module Consensus_mechanism = Make_consensus_mechanism (Ledger_builder_diff)
-  module Blockchain = Blockchain.Make (Consensus_mechanism)
-  module Prover = Prover.Make (Consensus_mechanism) (Blockchain)
-  module Verifier = Verifier.Make (Consensus_mechanism) (Blockchain)
-end
-
-module type Config_intf = sig
-  val logger : Logger.t
-
-  val conf_dir : string
-
-  val lbc_tree_max_depth : [`Infinity | `Finite of int]
-
-  val propose_keypair : Keypair.t option
-
-  val genesis_proof : Snark_params.Tock.Proof.t
-
-  val transaction_capacity_log_2 : int
-  (** Capacity of transactions per block *)
-
-  val commit_id : Client_lib.Git_sha.t option
-
-  val work_selection : Protocols.Coda_pow.Work_selection.t
-end
-
-module type Work_selector_F = functor
-  (Inputs : Work_selector.Inputs.Inputs_intf)
-  -> Protocols.Coda_pow.Work_selector_intf
-     with type ledger_builder := Inputs.Ledger_builder.t
-      and type work :=
-                 ( Inputs.Ledger_proof_statement.t
-                 , Inputs.Transaction.t
-                 , Inputs.Sparse_ledger.t
-                 , Inputs.Ledger_proof.t )
-                 Snark_work_lib.Work.Single.Spec.t
-      and type snark_pool := Inputs.Snark_pool.t
-      and type fee := Inputs.Fee.t
-
-module type Init_intf = sig
-  include Config_intf
-
-  include Kernel_intf
-
-  module Make_work_selector : Work_selector_F
-
-  val proposer_prover : [`Proposer of Prover.t | `Non_proposer]
-
-  val verifier : Verifier.t
-
-  val genesis_proof : Proof.t
-end
-
-let make_init ~should_propose (module Config : Config_intf)
-    (module Kernel : Kernel_intf) : (module Init_intf) Deferred.t =
+let make_init ~should_propose (module Config : Config_intf) :
+    (module Init_intf) Deferred.t =
   let open Config in
-  let open Kernel in
   let%bind proposer_prover =
     if should_propose then Prover.create ~conf_dir >>| fun p -> `Proposer p
     else return `Non_proposer
@@ -218,27 +413,17 @@ let make_init ~should_propose (module Config : Config_intf)
     | Random -> (module Work_selector.Random.Make : Work_selector_F)
   in
   let module Init = struct
-    include Kernel
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Transaction_snark_work = Transaction_snark_work
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Make_work_selector = Make_work_selector
     include Config
 
     let proposer_prover = proposer_prover
 
     let verifier = verifier
-
-    module Make_work_selector = Make_work_selector
   end in
   (module Init : Init_intf)
-
-module type State_proof_intf = sig
-  module Consensus_mechanism : Consensus.Mechanism.S
-
-  type t [@@deriving bin_io, sexp]
-
-  include
-    Protocols.Coda_pow.Proof_intf
-    with type input := Consensus_mechanism.Protocol_state.value
-     and type t := t
-end
 
 module Make_inputs0
     (Init : Init_intf)
@@ -246,8 +431,7 @@ module Make_inputs0
 struct
   open Protocols.Coda_pow
   open Init
-  module Consensus_mechanism = Consensus_mechanism
-  module Protocol_state = Consensus_mechanism.Protocol_state
+  module Protocol_state = Consensus.Mechanism.Protocol_state
   module Protocol_state_hash = State_hash.Stable.V1
 
   module Time : Time_intf with type t = Block_time.t = Block_time
@@ -261,6 +445,7 @@ struct
       Block_time.Span.( < ) (Block_time.diff t now) limit
   end
 
+  module Masked_ledger = Ledger.Mask.Attached
   module Sok_message = Sok_message
 
   module Amount = struct
@@ -280,10 +465,11 @@ struct
 
     type input = Protocol_state.value
 
+    let dummy = Coda_base.Proof.dummy
+
     let verify state_proof state =
       match%map
-        Init.Verifier.verify_blockchain Init.verifier
-          {proof= state_proof; state}
+        Verifier.verify_blockchain Init.verifier {proof= state_proof; state}
       with
       | Ok b -> b
       | Error e ->
@@ -293,8 +479,9 @@ struct
           false
   end
 
-  module Fee_transfer = Coda_base.Fee_transfer
   module Coinbase = Coda_base.Coinbase
+  module Fee_transfer = Fee_transfer
+  module Account = Account
 
   module Transaction = struct
     module T = struct
@@ -317,6 +504,8 @@ struct
   end
 
   module Ledger = Ledger
+  module Ledger_db = Ledger.Db
+  module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger_db)
 
   module Transaction_snark = struct
     include Ledger_proof
@@ -327,17 +516,18 @@ struct
   module Ledger_proof = Ledger_proof
   module Sparse_ledger = Coda_base.Sparse_ledger
 
-  module Completed_work_proof = struct
+  module Transaction_snark_work_proof = struct
     type t = Ledger_proof.t list [@@deriving sexp, bin_io]
   end
 
-  module Ledger_builder = struct
+  module Staged_ledger = struct
     module Inputs = struct
       module Sok_message = Sok_message
+      module Account = Account
       module Proof = Proof
       module Sparse_ledger = Sparse_ledger
       module Amount = Amount
-      module Completed_work = Completed_work
+      module Transaction_snark_work = Transaction_snark_work
       module Compressed_public_key = Public_key.Compressed
       module User_command = User_command
       module Fee_transfer = Fee_transfer
@@ -349,12 +539,12 @@ struct
       module Ledger_proof_statement = Ledger_proof_statement
       module Ledger_hash = Ledger_hash
       module Frozen_ledger_hash = Frozen_ledger_hash
-      module Ledger_builder_diff = Ledger_builder_diff
-      module Ledger_builder_hash = Ledger_builder_hash
-      module Ledger_builder_aux_hash = Ledger_builder_aux_hash
+      module Staged_ledger_diff = Staged_ledger_diff
+      module Staged_ledger_hash = Staged_ledger_hash
+      module Staged_ledger_aux_hash = Staged_ledger_aux_hash
       module Config = Init
 
-      let check (Completed_work.({fee; prover; proofs}) as t) stmts =
+      let check (Transaction_snark_work.({fee; prover; proofs}) as t) stmts =
         let message = Sok_message.create ~fee ~prover in
         match List.zip proofs stmts with
         | None -> return None
@@ -363,31 +553,47 @@ struct
               Deferred.List.for_all ps ~f:(fun (proof, stmt) ->
                   Transaction_snark.verify ~message proof stmt )
             in
-            Option.some_if good (Completed_work.Checked.create_unsafe t)
+            Option.some_if good
+              (Transaction_snark_work.Checked.create_unsafe t)
     end
 
-    include Ledger_builder.Make (Inputs)
+    include Staged_ledger.Make (Inputs)
   end
 
-  module Ledger_builder_aux = Ledger_builder.Aux
+  module Staged_ledger_aux = Staged_ledger.Scan_state
 
-  module Ledger_builder_transition = struct
-    type t = {old: Ledger_builder.t; diff: Ledger_builder_diff.t}
+  module Staged_ledger_transition = struct
+    type t = {old: Staged_ledger.t sexp_opaque; diff: Staged_ledger_diff.t}
     [@@deriving sexp]
 
     module With_valid_signatures_and_proofs = struct
       type t =
-        { old: Ledger_builder.t
-        ; diff: Ledger_builder_diff.With_valid_signatures_and_proofs.t }
+        { old: Staged_ledger.t sexp_opaque
+        ; diff: Staged_ledger_diff.With_valid_signatures_and_proofs.t }
       [@@deriving sexp]
     end
 
     let forget {With_valid_signatures_and_proofs.old; diff} =
-      {old; diff= Ledger_builder_diff.forget diff}
+      {old; diff= Staged_ledger_diff.forget diff}
   end
 
-  module External_transition = Consensus_mechanism.External_transition
-  module Internal_transition = Consensus_mechanism.Internal_transition
+  module Internal_transition =
+    Coda_base.Internal_transition.Make
+      (Staged_ledger_diff)
+      (Consensus.Mechanism.Snark_transition)
+      (Consensus.Mechanism.Prover_state)
+  module External_transition =
+    Coda_base.External_transition.Make (Staged_ledger_diff) (Protocol_state)
+
+  module Transition_frontier = Transition_frontier.Make (struct
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Ledger_proof = Ledger_proof
+    module Transaction_snark_work = Transaction_snark_work
+    module Staged_ledger_diff = Staged_ledger_diff
+    module External_transition = External_transition
+    module Staged_ledger = Staged_ledger
+  end)
 
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (User_command)
@@ -403,27 +609,32 @@ struct
 
     (* TODO: This causes the signature to get checked twice as it is checked
    below before feeding it to add *)
-    let add t txn = apply_and_broadcast t [txn]
+    let add t txn = apply_and_broadcast t (Envelope.Incoming.local [txn])
   end
 
   module Transaction_pool_diff = Transaction_pool.Pool.Diff
 
   module Tip = struct
     type t =
-      { protocol_state: Protocol_state.value
+      { state: Protocol_state.value
       ; proof: Protocol_state_proof.t
-      ; ledger_builder: Ledger_builder.t }
-    [@@deriving sexp, bin_io, fields]
+      ; staged_ledger: Staged_ledger.t sexp_opaque }
+    [@@deriving sexp, fields]
 
-    let of_transition_and_lb transition ledger_builder =
-      { protocol_state=
-          Consensus_mechanism.External_transition.protocol_state transition
-      ; proof=
-          Consensus_mechanism.External_transition.protocol_state_proof
-            transition
-      ; ledger_builder }
+    type external_transition_verified = External_transition.Verified.t
 
-    let copy t = {t with ledger_builder= Ledger_builder.copy t.ledger_builder}
+    let of_verified_transition_and_staged_ledger transition staged_ledger =
+      { state= External_transition.Verified.protocol_state transition
+      ; proof= External_transition.Verified.protocol_state_proof transition
+      ; staged_ledger }
+
+    let bin_tip =
+      [%bin_type_class:
+        Protocol_state.value
+        * Protocol_state_proof.t
+        * Staged_ledger.serializable]
+
+    let copy t = {t with staged_ledger= Staged_ledger.copy t.staged_ledger}
   end
 end
 
@@ -436,10 +647,11 @@ struct
   module Inputs0 = Make_inputs0 (Init) (Ledger_proof_verifier)
   include Inputs0
   module Blockchain_state = Coda_base.Blockchain_state
-  module Ledger_builder_diff = Ledger_builder_diff
-  module Completed_work = Completed_work
-  module Ledger_builder_hash = Ledger_builder_hash
-  module Ledger_builder_aux_hash = Ledger_builder_aux_hash
+  module Staged_ledger_diff = Staged_ledger_diff
+  module Transaction_snark_work = Transaction_snark_work
+  module State_body_hash = State_body_hash
+  module Staged_ledger_hash = Staged_ledger_hash
+  module Staged_ledger_aux_hash = Staged_ledger_aux_hash
   module Ledger_proof_verifier = Ledger_proof_verifier
   module Ledger_hash = Ledger_hash
   module Frozen_ledger_hash = Frozen_ledger_hash
@@ -459,33 +671,33 @@ struct
 
   module State_with_witness = struct
     type t =
-      { ledger_builder_transition:
-          Ledger_builder_transition.With_valid_signatures_and_proofs.t
+      { staged_ledger_transition:
+          Staged_ledger_transition.With_valid_signatures_and_proofs.t
       ; state: Proof_carrying_state.t }
     [@@deriving sexp]
 
     module Stripped = struct
       type t =
-        { ledger_builder_transition: Ledger_builder_transition.t
+        { staged_ledger_transition: Staged_ledger_transition.t
         ; state: Proof_carrying_state.t }
     end
 
-    let strip {ledger_builder_transition; state} =
-      { Stripped.ledger_builder_transition=
-          Ledger_builder_transition.forget ledger_builder_transition
+    let strip {staged_ledger_transition; state} =
+      { Stripped.staged_ledger_transition=
+          Staged_ledger_transition.forget staged_ledger_transition
       ; state }
 
-    let forget_witness {ledger_builder_transition; state} = state
+    let forget_witness {staged_ledger_transition; state} = state
 
     (* TODO: How do we check this *)
-    let add_witness ledger_builder_transition state =
-      Or_error.return {ledger_builder_transition; state}
+    let add_witness staged_ledger_transition state =
+      Or_error.return {staged_ledger_transition; state}
 
     let add_witness_exn l s = add_witness l s |> Or_error.ok_exn
   end
 
   module Genesis = struct
-    let state = Consensus_mechanism.genesis_protocol_state
+    let state = Consensus.Mechanism.genesis_protocol_state
 
     let ledger = Genesis_ledger.t
 
@@ -493,8 +705,8 @@ struct
   end
 
   module Snark_pool = struct
-    module Work = Completed_work.Statement
-    module Proof = Completed_work_proof
+    module Work = Transaction_snark_work.Statement
+    module Proof = Transaction_snark_work_proof
 
     module Fee = struct
       module T = struct
@@ -536,8 +748,8 @@ struct
       Option.map
         (Pool.request_proof (pool t) statement)
         ~f:(fun {proof; fee= {fee; prover}} ->
-          Completed_work.Checked.create_unsafe
-            {Completed_work.fee; proofs= proof; prover} )
+          Transaction_snark_work.Checked.create_unsafe
+            {Transaction_snark_work.fee; proofs= proof; prover} )
 
     let load ~parent_log ~disk_location ~incoming_diffs =
       match%map Reader.load_bin_prot disk_location Pool.bin_reader_t with
@@ -545,23 +757,20 @@ struct
       | Error _e -> create ~parent_log ~incoming_diffs
 
     open Snark_work_lib.Work
+    open Network_pool.Snark_pool_diff
 
     let add_completed_work t
         (res :
           (('a, 'b, 'c, 'd) Single.Spec.t Spec.t, Ledger_proof.t) Result.t) =
       apply_and_broadcast t
-        (Add_solved_work
-           ( List.map res.spec.instances ~f:Single.Spec.statement
-           , {proof= res.proofs; fee= {fee= res.spec.fee; prover= res.prover}}
-           ))
+        (Envelope.Incoming.wrap
+           ~data:
+             (Add_solved_work
+                ( List.map res.spec.instances ~f:Single.Spec.statement
+                , { Diff.proof= res.proofs
+                  ; fee= {fee= res.spec.fee; prover= res.prover} } ))
+           ~sender:(Host_and_port.of_string "127.0.0.1:0"))
   end
-
-  module type S_tmp =
-    Coda_lib.Network_intf
-    with type state_with_witness := State_with_witness.t
-     and type ledger_builder := Ledger_builder.t
-     and type protocol_state := Protocol_state.value
-     and type ledger_builder_hash := Ledger_builder_hash.t
 
   module Sync_ledger =
     Syncable_ledger.Make (Ledger.Addr) (Account)
@@ -587,73 +796,138 @@ struct
         let subtree_height = 3
       end)
 
+  module Sync_root_ledger =
+    Syncable_ledger.Make (Ledger.Db.Addr) (Account)
+      (struct
+        include Ledger_hash
+
+        let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
+
+        let empty_account = hash_account Account.empty
+      end)
+      (struct
+        include Ledger_hash
+
+        let to_hash (h : t) =
+          Ledger_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
+      end)
+      (struct
+        include Ledger.Db
+
+        let f = Account.hash
+      end)
+      (struct
+        let subtree_height = 3
+      end)
+
   module Net = Coda_networking.Make (struct
     include Inputs0
     module Snark_pool = Snark_pool
     module Snark_pool_diff = Snark_pool.Diff
     module Sync_ledger = Sync_ledger
-    module Ledger_builder_hash = Ledger_builder_hash
+    module Staged_ledger_hash = Staged_ledger_hash
     module Ledger_hash = Ledger_hash
-    module Ledger_builder_aux_hash = Ledger_builder_aux_hash
-    module Blockchain_state = Consensus_mechanism.Blockchain_state
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Blockchain_state = Consensus.Mechanism.Blockchain_state
   end)
 
-  module Ledger_builder_controller = struct
-    module Inputs = struct
-      module Security = struct
-        let max_depth = Init.lbc_tree_max_depth
-      end
+  module Sync_handler = Sync_handler.Make (struct
+    include Inputs0
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Transaction_snark_work = Transaction_snark_work
+    module Syncable_ledger = Sync_ledger
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+  end)
 
-      module Tip = Tip
-      module Snark_pool = Snark_pool
-      module Ledger_hash = Ledger_hash
-      module Frozen_ledger_hash = Frozen_ledger_hash
-      module Ledger_proof = Transaction_snark
-      module Private_key = Private_key
+  module Transition_handler = Transition_handler.Make (struct
+    include Inputs0
+    module State_proof = Protocol_state_proof
+    module Transaction_snark_work = Transaction_snark_work
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+  end)
 
-      module Public_key = struct
-        module Private_key = Private_key
-        include Public_key
-      end
+  module Protocol_state_validator = Protocol_state_validator.Make (struct
+    include Inputs0
+    module State_proof = Protocol_state_proof
+    module Transaction_snark_work = Transaction_snark_work
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+  end)
 
-      module Keypair = Keypair
-      module Ledger_proof_statement = Ledger_proof_statement
-      module Ledger_builder_hash = Ledger_builder_hash
-      module Ledger = Ledger
-      module Ledger_builder_diff = Ledger_builder_diff
-      module Ledger_builder_aux_hash = Ledger_builder_aux_hash
-      module Ledger_builder = Ledger_builder
-      module Blockchain_state = Blockchain_state
-      module Consensus_mechanism = Consensus_mechanism
-      module Protocol_state = Protocol_state
-      module Protocol_state_proof = Protocol_state_proof
-      module State_hash = State_hash
-      module Valid_user_command = User_command.With_valid_signature
-      module Internal_transition = Internal_transition
+  module Ledger_catchup = Ledger_catchup.Make (struct
+    include Inputs0
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Transaction_snark_work = Transaction_snark_work
+    module Transition_handler_validator = Transition_handler.Validator
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Protocol_state_validator = Protocol_state_validator
+    module Network = Net
+  end)
 
-      module Net = struct
-        type net = Net.t
+  module Bootstrap_controller = Bootstrap_controller.Make (struct
+    include Inputs0
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Transaction_snark_work = Transaction_snark_work
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Syncable_ledger = Sync_root_ledger
+    module Merkle_address = Ledger.Db.Addr
+    module Consensus_mechanism = Consensus.Mechanism
+    module Protocol_state_validator = Protocol_state_validator
+    module Network = Net
+  end)
 
-        include Net.Ledger_builder_io
-      end
+  module Transition_frontier_controller =
+  Transition_frontier_controller.Make (struct
+    include Inputs0
+    module Transaction_snark_work = Transaction_snark_work
+    module Syncable_ledger = Sync_ledger
+    module Sync_handler = Sync_handler
+    module Merkle_address = Ledger.Addr
+    module Catchup = Ledger_catchup
+    module Transition_handler = Transition_handler
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Ledger_diff = Staged_ledger_diff
+    module Consensus_mechanism = Consensus.Mechanism
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Network = Net
+  end)
 
-      module Store = Store
-      module Sync_ledger = Sync_ledger
-
-      let verify_blockchain proof state =
-        Init.Verifier.verify_blockchain Init.verifier {proof; state}
-    end
-
-    include Ledger_builder_controller.Make (Inputs)
-  end
+  module Transition_router = Transition_router.Make (struct
+    include Inputs0
+    module Transaction_snark_work = Transaction_snark_work
+    module Syncable_ledger = Sync_root_ledger
+    module Sync_handler = Sync_handler
+    module Merkle_address = Ledger.Addr
+    module Catchup = Ledger_catchup
+    module Transition_handler = Transition_handler
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Ledger_diff = Staged_ledger_diff
+    module Consensus_mechanism = Consensus.Mechanism
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Network = Net
+    module Bootstrap_controller = Bootstrap_controller
+    module Transition_frontier_controller = Transition_frontier_controller
+    module Protocol_state_validator = Protocol_state_validator
+    module State_proof = Protocol_state_proof
+  end)
 
   module Proposer = Proposer.Make (struct
     include Inputs0
-    module Ledger_builder_diff = Ledger_builder_diff
+    module Genesis_ledger = Genesis_ledger
+    module State_hash = State_hash
+    module Staged_ledger_diff = Staged_ledger_diff
     module Ledger_proof_verifier = Ledger_proof_verifier
-    module Completed_work = Completed_work
-    module Ledger_builder_hash = Ledger_builder_hash
-    module Ledger_builder_aux_hash = Ledger_builder_aux_hash
+    module Transaction_snark_work = Transaction_snark_work
+    module Staged_ledger_hash = Staged_ledger_hash
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Ledger_proof_statement = Ledger_proof_statement
     module Ledger_hash = Ledger_hash
     module Frozen_ledger_hash = Frozen_ledger_hash
@@ -662,22 +936,21 @@ struct
     module Private_key = Private_key
     module Keypair = Keypair
     module Compressed_public_key = Public_key.Compressed
+    module Consensus_mechanism = Consensus.Mechanism
 
     module Prover = struct
       let prove ~prev_state ~prev_state_proof ~next_state
-          (transition : Init.Consensus_mechanism.Internal_transition.t) =
+          (transition : Internal_transition.t) =
         match Init.proposer_prover with
         | `Non_proposer -> failwith "prove: Coda not run as proposer"
         | `Proposer prover ->
             let open Deferred.Or_error.Let_syntax in
-            Init.Prover.extend_blockchain prover
-              (Init.Blockchain.create ~proof:prev_state_proof ~state:prev_state)
+            Prover.extend_blockchain prover
+              (Blockchain.create ~proof:prev_state_proof ~state:prev_state)
               next_state
-              (Init.Consensus_mechanism.Internal_transition.snark_transition
-                 transition)
-              (Init.Consensus_mechanism.Internal_transition.prover_state
-                 transition)
-            >>| fun {Init.Blockchain.proof; _} -> proof
+              (Internal_transition.snark_transition transition)
+              (Internal_transition.prover_state transition)
+            >>| fun {Blockchain.proof; _} -> proof
     end
   end)
 
@@ -687,28 +960,39 @@ struct
     module Transaction = Transaction
     module Ledger_hash = Ledger_hash
     module Ledger_proof = Ledger_proof
-    module Ledger_builder = Ledger_builder
+    module Staged_ledger = Staged_ledger
     module Fee = Fee.Unsigned
     module Snark_pool = Snark_pool
 
-    module Completed_work = struct
-      type t = Completed_work.Checked.t
+    module Transaction_snark_work = struct
+      type t = Transaction_snark_work.Checked.t
 
       let fee t =
-        let {Completed_work.fee; _} = Completed_work.forget t in
+        let {Transaction_snark_work.fee; _} =
+          Transaction_snark_work.forget t
+        in
         fee
     end
   end
 
   module Work_selector = Make_work_selector (Work_selector_inputs)
 
-  let request_work ~best_ledger_builder
+  let request_work ~log ~best_staged_ledger
       ~(seen_jobs : 'a -> Work_selector.State.t)
       ~(set_seen_jobs : 'a -> Work_selector.State.t -> unit)
       ~(snark_pool : 'a -> Snark_pool.t) (t : 'a) (fee : Fee.Unsigned.t) =
-    let lb = best_ledger_builder t in
+    let best_staged_ledger t =
+      match best_staged_ledger t with
+      | `Active staged_ledger -> Some staged_ledger
+      | `Bootstrapping ->
+          Logger.info log
+            "Could not retrieve staged_ledger due to bootstrapping" ;
+          None
+    in
+    let open Option.Let_syntax in
+    let%bind sl = best_staged_ledger t in
     let instances, seen_jobs =
-      Work_selector.work ~fee ~snark_pool:(snark_pool t) lb (seen_jobs t)
+      Work_selector.work ~fee ~snark_pool:(snark_pool t) sl (seen_jobs t)
     in
     set_seen_jobs t seen_jobs ;
     if List.is_empty instances then None
@@ -730,7 +1014,7 @@ module Make_coda (Init : Init_intf) = struct
       then Deferred.return false
       else
         match%map
-          Init.Verifier.verify_transaction_snark Init.verifier t ~message
+          Verifier.verify_transaction_snark Init.verifier t ~message
         with
         | Ok b -> b
         | Error e ->
@@ -742,18 +1026,17 @@ module Make_coda (Init : Init_intf) = struct
 
   module Inputs = struct
     include Make_inputs (Init) (Ledger_proof_verifier) (Storage.Disk)
+    module Genesis_ledger = Genesis_ledger
     module Ledger_proof_statement = Ledger_proof_statement
     module Snark_worker = Snark_worker_lib.Prod.Worker
+    module Consensus_mechanism = Consensus.Mechanism
   end
 
-  module Consensus_mechanism = Init.Consensus_mechanism
-  module Blockchain = Init.Blockchain
-  module Prover = Init.Prover
   include Coda_lib.Make (Inputs)
 
   let request_work t =
-    Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
-      ~snark_pool t (snark_work_fee t)
+    Inputs.request_work ~log:t.log ~best_staged_ledger ~seen_jobs
+      ~set_seen_jobs ~snark_pool t (snark_work_fee t)
 end
 
 [%%else]
@@ -765,246 +1048,60 @@ module Make_coda (Init : Init_intf) = struct
 
   module Inputs = struct
     include Make_inputs (Init) (Ledger_proof_verifier) (Storage.Disk)
+    module Genesis_ledger = Genesis_ledger
     module Ledger_proof_statement = Ledger_proof_statement
     module Snark_worker = Snark_worker_lib.Debug.Worker
+    module Consensus_mechanism = Consensus.Mechanism
   end
 
-  module Consensus_mechanism = Init.Consensus_mechanism
-  module Blockchain = Init.Blockchain
-  module Prover = Init.Prover
   include Coda_lib.Make (Inputs)
 
   let request_work t =
-    Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
-      ~snark_pool t t.snark_work_fee
+    Inputs.request_work ~log:t.log ~best_staged_ledger ~seen_jobs
+      ~set_seen_jobs ~snark_pool t (snark_work_fee t)
 end
 
 [%%endif]
-
-module type Main_intf = sig
-  module Inputs : sig
-    module Time : Protocols.Coda_pow.Time_intf
-
-    module Ledger : sig
-      type t [@@deriving sexp]
-
-      type account
-
-      val copy : t -> t
-
-      val location_of_key :
-        t -> Public_key.Compressed.t -> Ledger.Location.t option
-
-      val get : t -> Ledger.Location.t -> Account.t option
-
-      val merkle_path :
-           t
-        -> Ledger.Location.t
-        -> [`Left of Ledger_hash.t | `Right of Ledger_hash.t] list
-
-      val num_accounts : t -> int
-
-      val depth : int
-
-      val merkle_root : t -> Coda_base.Ledger_hash.t
-
-      val to_list : t -> Account.t list
-
-      val fold_until :
-           t
-        -> init:'accum
-        -> f:('accum -> Account.t -> ('accum, 'stop) Base.Continue_or_stop.t)
-        -> finish:('accum -> 'stop)
-        -> 'stop
-    end
-
-    module Ledger_builder_diff : sig
-      type t [@@deriving sexp, bin_io]
-    end
-
-    module Consensus_mechanism :
-      Consensus.Mechanism.S
-      with type Internal_transition.Ledger_builder_diff.t =
-                  Ledger_builder_diff.t
-       and type External_transition.Ledger_builder_diff.t =
-                  Ledger_builder_diff.t
-
-    module Net : sig
-      type t
-
-      module Peer : sig
-        type t = Host_and_port.Stable.V1.t * int
-        [@@deriving bin_io, sexp, compare, hash]
-
-        val external_rpc : t -> Host_and_port.Stable.V1.t
-      end
-
-      module Gossip_net : sig
-        module Config : Gossip_net.Config_intf
-      end
-
-      module Config :
-        Coda_networking.Config_intf
-        with type gossip_config := Gossip_net.Config.t
-    end
-
-    module Sparse_ledger : sig
-      type t
-    end
-
-    module Ledger_proof : sig
-      type t
-
-      type statement
-    end
-
-    module Transaction : sig
-      type t
-    end
-
-    module Snark_worker :
-      Snark_worker_lib.Intf.S
-      with type proof := Ledger_proof.t
-       and type statement := Ledger_proof.statement
-       and type transition := Transaction.t
-       and type sparse_ledger := Sparse_ledger.t
-
-    module Snark_pool : sig
-      type t
-
-      val add_completed_work :
-        t -> Snark_worker.Work.Result.t -> unit Deferred.t
-    end
-
-    module Transaction_pool : sig
-      type t
-
-      val add : t -> User_command.t -> unit Deferred.t
-    end
-
-    module Protocol_state_proof : sig
-      type t
-    end
-
-    module Ledger_builder_hash : sig
-      type t [@@deriving sexp]
-    end
-
-    module Ledger_builder : sig
-      type t
-
-      val hash : t -> Ledger_builder_hash.t
-    end
-  end
-
-  module Consensus_mechanism : Consensus.Mechanism.S
-
-  module Blockchain :
-    Blockchain.S with module Consensus_mechanism = Consensus_mechanism
-
-  module Prover :
-    Prover.S
-    with module Consensus_mechanism = Consensus_mechanism
-     and module Blockchain = Blockchain
-
-  module Config : sig
-    type t =
-      { log: Logger.t
-      ; propose_keypair: Keypair.t option
-      ; run_snark_worker: bool
-      ; net_config: Inputs.Net.Config.t
-      ; ledger_builder_persistant_location: string
-      ; transaction_pool_disk_location: string
-      ; snark_pool_disk_location: string
-      ; ledger_builder_transition_backup_capacity: int [@default 10]
-      ; time_controller: Inputs.Time.Controller.t
-      ; banlist: Banlist.t
-      ; receipt_chain_database: Receipt_chain_database.t
-      ; snark_work_fee: Currency.Fee.t }
-    [@@deriving make]
-  end
-
-  type t
-
-  val propose_keypair : t -> Keypair.t option
-
-  val run_snark_worker : t -> bool
-
-  val request_work : t -> Inputs.Snark_worker.Work.Spec.t option
-
-  val best_ledger_builder : t -> Inputs.Ledger_builder.t
-
-  val best_ledger : t -> Inputs.Ledger.t
-
-  val best_tip :
-       t
-    -> Inputs.Ledger.t
-       * Inputs.Consensus_mechanism.Protocol_state.value
-       * Inputs.Protocol_state_proof.t
-
-  val best_protocol_state :
-    t -> Inputs.Consensus_mechanism.Protocol_state.value
-
-  val best_tip :
-       t
-    -> Inputs.Ledger.t
-       * Inputs.Consensus_mechanism.Protocol_state.value
-       * Proof.t
-
-  val peers : t -> Kademlia.Peer.t list
-
-  val strongest_ledgers :
-    t -> Inputs.Consensus_mechanism.External_transition.t Linear_pipe.Reader.t
-
-  val transaction_pool : t -> Inputs.Transaction_pool.t
-
-  val snark_pool : t -> Inputs.Snark_pool.t
-
-  val create : Config.t -> t Deferred.t
-
-  val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
-
-  val get_ledger :
-    t -> Ledger_builder_hash.t -> Account.t list Deferred.Or_error.t
-
-  val receipt_chain_database : t -> Receipt_chain_database.t
-end
 
 module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   include Program
   open Inputs
 
   module For_tests = struct
-    let ledger_proof t = ledger_builder_ledger_proof t
+    let ledger_proof t = staged_ledger_ledger_proof t
   end
 
-  module Lite_compat = Lite_compat.Make (Consensus_mechanism.Blockchain_state)
+  module Lite_compat = Lite_compat.Make (Consensus.Mechanism.Blockchain_state)
 
   let get_account t (addr : Public_key.Compressed.t) =
-    let open Option.Let_syntax in
-    let ledger = best_ledger t in
-    let%bind location = Ledger.location_of_key ledger addr in
-    Ledger.get ledger location
+    let open Participating_state.Let_syntax in
+    let%map ledger = best_ledger t in
+    Ledger.location_of_key ledger addr |> Option.bind ~f:(Ledger.get ledger)
 
   let get_balance t (addr : Public_key.Compressed.t) =
-    let open Option.Let_syntax in
+    let open Participating_state.Option.Let_syntax in
     let%map account = get_account t addr in
     account.Account.balance
 
   let get_accounts t =
-    let ledger = best_ledger t in
+    let open Participating_state.Let_syntax in
+    let%map ledger = best_ledger t in
     Ledger.to_list ledger
 
   let string_of_public_key =
     Fn.compose Public_key.Compressed.to_base64 Account.public_key
 
-  let get_public_keys t = get_accounts t |> List.map ~f:string_of_public_key
+  let get_public_keys t =
+    let open Participating_state.Let_syntax in
+    let%map account = get_accounts t in
+    List.map account ~f:string_of_public_key
 
   let get_keys_with_balances t =
-    get_accounts t
-    |> List.map ~f:(fun account ->
-           ( Account.balance account |> Currency.Balance.to_int
-           , string_of_public_key account ) )
+    let open Participating_state.Let_syntax in
+    let%map accounts = get_accounts t in
+    List.map accounts ~f:(fun account ->
+        ( Account.balance account |> Currency.Balance.to_int
+        , string_of_public_key account ) )
 
   let is_valid_payment t (txn : User_command.t) account_opt =
     let remainder =
@@ -1032,19 +1129,20 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         Logger.debug log
           !"Added  payment %{sexp:User_command.t} into receipt_chain \
             database. You should wait for a bit to see your account's receipt \
-            chain hash update as %{sexp:Receipt.Chain_hash.t}"
-          txn hash ;
+            chain hash update as %s"
+          txn
+          (Receipt.Chain_hash.to_string hash) ;
         hash
     | `Duplicate hash ->
         Logger.warn log !"Already sent transaction %{sexp:User_command.t}" txn ;
         hash
     | `Error_multiple_previous_receipts parent_hash ->
         Logger.fatal log
-          !"A payment is derived from two different blockchain states \
-            (%{sexp:Receipt.Chain_hash.t}, %{sexp:Receipt.Chain_hash.t}). \
-            Receipt.Chain_hash is supposed to be collision resistant. This \
-            collision should not happen."
-          parent_hash previous ;
+          !"A payment is derived from two different blockchain states (%s, \
+            %s). Receipt.Chain_hash is supposed to be collision resistant. \
+            This collision should not happen."
+          (Receipt.Chain_hash.to_string parent_hash)
+          (Receipt.Chain_hash.to_string previous) ;
         Core.exit 1
 
   module Payment_verifier =
@@ -1052,14 +1150,16 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       (User_command)
       (Receipt.Chain_hash)
 
-  let verify_payment t (addr : Public_key.Compressed.Stable.V1.t)
+  let verify_payment t log (addr : Public_key.Compressed.Stable.V1.t)
       (verifying_txn : User_command.t) proof =
-    let account = get_account t addr |> Option.value_exn in
+    let open Participating_state.Let_syntax in
+    let%map account = get_account t addr in
+    let account = account |> Option.value_exn in
     let resulting_receipt = Account.receipt_chain_hash account in
     let open Or_error.Let_syntax in
     let%bind () = Payment_verifier.verify ~resulting_receipt proof in
     if
-      List.exists proof ~f:(fun (_, txn) ->
+      List.exists (Payment_proof.payments proof) ~f:(fun txn ->
           User_command.equal verifying_txn txn )
     then Ok ()
     else
@@ -1068,33 +1168,47 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         verifying_txn
 
   let schedule_payment log t (txn : User_command.t) account_opt =
-    if not (is_valid_payment t txn account_opt) then (
-      Core.Printf.eprintf "Invalid payment: account balance is too low" ;
-      Core.exit 1 ) ;
-    let txn_pool = transaction_pool t in
-    don't_wait_for (Transaction_pool.add txn_pool txn) ;
-    Logger.info log
-      !"Added payment %{sexp: User_command.t} to pool successfully"
-      txn ;
-    txn_count := !txn_count + 1
+    if not (is_valid_payment t txn account_opt) then
+      Or_error.error_string "Invalid payment: account balance is too low"
+    else
+      let txn_pool = transaction_pool t in
+      don't_wait_for (Transaction_pool.add txn_pool txn) ;
+      Logger.info log
+        !"Added payment %{sexp: User_command.t} to pool successfully"
+        txn ;
+      txn_count := !txn_count + 1 ;
+      Or_error.return ()
 
   let send_payment log t (txn : User_command.t) =
+    Deferred.return
+    @@
     let public_key = Public_key.compress txn.sender in
-    let account_opt = get_account t public_key in
-    schedule_payment log t txn account_opt ;
-    Deferred.return @@ record_payment ~log t txn (Option.value_exn account_opt)
+    let open Participating_state.Let_syntax in
+    let%map account_opt = get_account t public_key in
+    let open Or_error.Let_syntax in
+    let%map () = schedule_payment log t txn account_opt in
+    record_payment ~log t txn (Option.value_exn account_opt)
 
   (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
   let schedule_payments log t txns =
-    List.iter txns ~f:(fun (txn : User_command.t) ->
+    List.map txns ~f:(fun (txn : User_command.t) ->
         let public_key = Public_key.compress txn.sender in
-        let account_opt = get_account t public_key in
-        schedule_payment log t txn account_opt )
+        let open Participating_state.Let_syntax in
+        let%map account_opt = get_account t public_key in
+        match schedule_payment log t txn account_opt with
+        | Ok () -> ()
+        | Error err ->
+            Logger.warn log
+              !"Failure in schedule_payments: %{sexp:Error.t}. This is not \
+                yet reported to the client, see #1143"
+              err )
+    |> Participating_state.sequence
+    |> Participating_state.map ~f:ignore
 
   let prove_receipt t ~proving_receipt ~resulting_receipt :
       Payment_proof.t Deferred.Or_error.t =
     let receipt_chain_database = receipt_chain_database t in
-    (* TODO: since we are making so many reads to `receipt_chain_database`, 
+    (* TODO: since we are making so many reads to `receipt_chain_database`,
     reads should be async to not get IO-blocked. See #1125 *)
     let result =
       Receipt_chain_database.prove receipt_chain_database ~proving_receipt
@@ -1103,60 +1217,103 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     Deferred.return result
 
   let get_nonce t (addr : Public_key.Compressed.t) =
+    let open Participating_state.Let_syntax in
+    let%map ledger = best_ledger t in
     let open Option.Let_syntax in
-    let ledger = best_ledger t in
     let%bind location = Ledger.location_of_key ledger addr in
     let%map account = Ledger.get ledger location in
     account.Account.nonce
 
   let start_time = Time_ns.now ()
 
-  let get_status t =
-    let ledger = best_ledger t in
+  let snark_job_list_json t =
+    let open Participating_state.Let_syntax in
+    let%map sl = best_staged_ledger t in
+    Staged_ledger.Scan_state.snark_job_list_json (Staged_ledger.scan_state sl)
+
+  let get_status ~flag t =
+    let open Participating_state.Let_syntax in
+    let%bind ledger = best_ledger t in
     let ledger_merkle_root =
       Ledger.merkle_root ledger |> [%sexp_of: Ledger_hash.t] |> Sexp.to_string
     in
     let num_accounts = Ledger.num_accounts ledger in
-    let state = best_protocol_state t in
+    let%bind state = best_protocol_state t in
     let state_hash =
-      Consensus_mechanism.Protocol_state.hash state
+      Consensus.Mechanism.Protocol_state.hash state
       |> [%sexp_of: State_hash.t] |> Sexp.to_string
     in
     let block_count =
-      state |> Consensus_mechanism.Protocol_state.consensus_state
-      |> Consensus_mechanism.Consensus_state.length
+      state |> Consensus.Mechanism.Protocol_state.consensus_state
+      |> Consensus.Mechanism.Consensus_state.length
     in
     let uptime_secs =
       Time_ns.diff (Time_ns.now ()) start_time
       |> Time_ns.Span.to_sec |> Int.of_float
     in
-    { Client_lib.Status.num_accounts
+    let r = Perf_histograms.report in
+    let histograms =
+      match flag with
+      | `Performance ->
+          let rpc_timings =
+            let open Daemon_rpcs.Types.Status.Rpc_timings in
+            { get_staged_ledger_aux=
+                { Rpc_pair.dispatch=
+                    r ~name:"rpc_dispatch_get_staged_ledger_aux"
+                ; impl= r ~name:"rpc_impl_get_staged_ledger_aux" }
+            ; answer_sync_ledger_query=
+                { Rpc_pair.dispatch=
+                    r ~name:"rpc_dispatch_answer_sync_ledger_query"
+                ; impl= r ~name:"rpc_impl_answer_sync_ledger_query" }
+            ; get_ancestry=
+                { Rpc_pair.dispatch= r ~name:"rpc_dispatch_get_ancestry"
+                ; impl= r ~name:"rpc_impl_get_ancestry" }
+            ; transition_catchup=
+                { Rpc_pair.dispatch= r ~name:"rpc_dispatch_transition_catchup"
+                ; impl= r ~name:"rpc_impl_transition_catchup" } }
+          in
+          Some
+            { Daemon_rpcs.Types.Status.Histograms.rpc_timings
+            ; external_transition_latency=
+                r ~name:"external_transition_latency"
+            ; snark_worker_transition_time=
+                r ~name:"snark_worker_transition_time"
+            ; snark_worker_merge_time= r ~name:"snark_worker_merge_time" }
+      | `None -> None
+    in
+    let%map staged_ledger = best_staged_ledger t in
+    { Daemon_rpcs.Types.Status.num_accounts
     ; block_count= Int.of_string (Length.to_string block_count)
     ; uptime_secs
     ; ledger_merkle_root
-    ; ledger_builder_hash=
-        best_ledger_builder t |> Ledger_builder.hash
-        |> Ledger_builder_hash.sexp_of_t |> Sexp.to_string
+    ; staged_ledger_hash=
+        staged_ledger |> Staged_ledger.hash |> Staged_ledger_hash.sexp_of_t
+        |> Sexp.to_string
     ; state_hash
-    ; external_transition_latency=
-        Perf_histograms.report ~name:"external_transition_latency"
-    ; snark_worker_transition_time=
-        Perf_histograms.report ~name:"snark_worker_transition_time"
-    ; snark_worker_merge_time=
-        Perf_histograms.report ~name:"snark_worker_merge_time"
     ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
     ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
     ; user_commands_sent= !txn_count
     ; run_snark_worker= run_snark_worker t
+    ; proposal_interval= Int64.to_int_exn Consensus.Mechanism.block_interval_ms
     ; propose_pubkey=
-        Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t) }
+        Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
+    ; histograms }
 
   let get_lite_chain :
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =
-    Option.map Consensus_mechanism.Consensus_state.to_lite
+    Option.map Consensus.Mechanism.Consensus_state.to_lite
       ~f:(fun consensus_state_to_lite t pks ->
-        let ledger, state, proof = best_tip t in
+        let ledger = best_ledger t |> Participating_state.active_exn in
+        let transition =
+          With_hash.data
+            (Transition_frontier.Breadcrumb.transition_with_hash
+               (best_tip t |> Participating_state.active_exn))
+        in
+        let state = External_transition.Verified.protocol_state transition in
+        let proof =
+          External_transition.Verified.protocol_state_proof transition
+        in
         let ledger =
           List.fold pks
             ~f:(fun acc key ->
@@ -1175,20 +1332,23 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         let protocol_state : Lite_base.Protocol_state.t =
           { previous_state_hash=
               Lite_compat.digest
-                ( Consensus_mechanism.Protocol_state.previous_state_hash state
+                ( Consensus.Mechanism.Protocol_state.previous_state_hash state
                   :> Snark_params.Tick.Pedersen.Digest.t )
-          ; blockchain_state=
-              Lite_compat.blockchain_state
-                (Consensus_mechanism.Protocol_state.blockchain_state state)
-          ; consensus_state=
-              consensus_state_to_lite
-                (Consensus_mechanism.Protocol_state.consensus_state state) }
+          ; body=
+              { blockchain_state=
+                  Lite_compat.blockchain_state
+                    (Consensus.Mechanism.Protocol_state.blockchain_state state)
+              ; consensus_state=
+                  consensus_state_to_lite
+                    (Consensus.Mechanism.Protocol_state.consensus_state state)
+              } }
         in
         let proof = Lite_compat.proof proof in
         {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
-  let clear_hist_status t = Perf_histograms.wipe () ; get_status t
+  let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 
+  (* TODO: handle participation_status more appropriately than doing participate_exn *)
   let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda ~log
       ~client_port () =
     let client_whitelist =
@@ -1197,21 +1357,24 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
     let client_impls =
-      [ Rpc.Rpc.implement Client_lib.Send_user_command.rpc (fun () tx ->
-            send_payment log coda tx )
-      ; Rpc.Rpc.implement Client_lib.Send_user_commands.rpc (fun () ts ->
-            schedule_payments log coda ts ;
+      [ Rpc.Rpc.implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
+            let%map result = send_payment log coda tx in
+            result |> Participating_state.active_exn )
+      ; Rpc.Rpc.implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
+            schedule_payments log coda ts |> Participating_state.active_exn ;
             Deferred.unit )
-      ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
-            return (get_balance coda pk) )
-      ; Rpc.Rpc.implement Client_lib.Verify_proof.rpc
-          (fun () (pk, tx, proof) -> return (verify_payment coda pk tx proof)
-        )
-      ; Rpc.Rpc.implement Client_lib.Prove_receipt.rpc
+      ; Rpc.Rpc.implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
+            return (get_balance coda pk |> Participating_state.active_exn) )
+      ; Rpc.Rpc.implement Daemon_rpcs.Verify_proof.rpc
+          (fun () (pk, tx, proof) ->
+            return
+              ( verify_payment coda log pk tx proof
+              |> Participating_state.active_exn ) )
+      ; Rpc.Rpc.implement Daemon_rpcs.Prove_receipt.rpc
           (fun () (proving_receipt, pk) ->
             let open Deferred.Or_error.Let_syntax in
             let%bind account =
-              get_account coda pk
+              get_account coda pk |> Participating_state.active_exn
               |> Result.of_option
                    ~error:
                      (Error.of_string
@@ -1223,18 +1386,29 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             in
             prove_receipt coda ~proving_receipt
               ~resulting_receipt:(Account.receipt_chain_hash account) )
-      ; Rpc.Rpc.implement Client_lib.Get_public_keys_with_balances.rpc
-          (fun () () -> return (get_keys_with_balances coda) )
-      ; Rpc.Rpc.implement Client_lib.Get_public_keys.rpc (fun () () ->
-            return (get_public_keys coda) )
-      ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun () pk ->
-            return (get_nonce coda pk) )
-      ; Rpc.Rpc.implement Client_lib.Get_status.rpc (fun () () ->
-            return (get_status coda) )
-      ; Rpc.Rpc.implement Client_lib.Clear_hist_status.rpc (fun () () ->
-            return (clear_hist_status coda) )
-      ; Rpc.Rpc.implement Client_lib.Get_ledger.rpc (fun () lh ->
-            get_ledger coda lh ) ]
+      ; Rpc.Rpc.implement Daemon_rpcs.Get_public_keys_with_balances.rpc
+          (fun () () ->
+            return
+              (get_keys_with_balances coda |> Participating_state.active_exn)
+        )
+      ; Rpc.Rpc.implement Daemon_rpcs.Get_public_keys.rpc (fun () () ->
+            return (get_public_keys coda |> Participating_state.active_exn) )
+      ; Rpc.Rpc.implement Daemon_rpcs.Get_nonce.rpc (fun () pk ->
+            return (get_nonce coda pk |> Participating_state.active_exn) )
+      ; Rpc.Rpc.implement Daemon_rpcs.Get_status.rpc (fun () flag ->
+            return (get_status ~flag coda |> Participating_state.active_exn) )
+      ; Rpc.Rpc.implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
+            return
+              (clear_hist_status ~flag coda |> Participating_state.active_exn)
+        )
+      ; Rpc.Rpc.implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
+            get_ledger coda lh )
+      ; Rpc.Rpc.implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
+            Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
+            Deferred.unit )
+      ; Rpc.Rpc.implement Daemon_rpcs.Snark_job_list.rpc (fun () () ->
+            return (snark_job_list_json coda |> Participating_state.active_exn)
+        ) ]
     in
     let snark_worker_impls =
       [ Rpc.Rpc.implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
@@ -1273,11 +1447,15 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                   let route_not_found () =
                     Server.respond_string ~status:`Not_found "Route not found"
                   in
+                  let status flag =
+                    Server.respond_string
+                      ( get_status ~flag coda |> Participating_state.active_exn
+                      |> Daemon_rpcs.Types.Status.to_yojson
+                      |> Yojson.Safe.pretty_to_string )
+                  in
                   match Uri.path uri with
-                  | "/status" ->
-                      Server.respond_string
-                        ( get_status coda |> Client_lib.Status.to_yojson
-                        |> Yojson.Safe.pretty_to_string )
+                  | "/status" -> status `None
+                  | "/status/performance" -> status `Performance
                   | _ -> route_not_found () )) )
         |> ignore ) ;
     let where_to_listen =

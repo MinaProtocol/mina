@@ -7,6 +7,6 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core cache_dir cached snarky coda_base bignum))
-  (preprocess (pps (ppx_jane ppx_deriving.std)))
+  (preprocess (pps (ppx_snarky ppx_jane ppx_deriving.std bisect_ppx -conditional)))
   (synopsis "Transaction state transition snarking library")))
 

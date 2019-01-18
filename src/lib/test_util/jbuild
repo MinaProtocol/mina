@@ -8,6 +8,6 @@
   (inline_tests)
   (libraries
     ( snark_params fold_lib core_kernel snarky ))
-  (preprocess (pps (ppx_jane ppx_deriving.eq)))
+  (preprocess (pps (ppx_jane ppx_deriving.eq bisect_ppx -conditional)))
   (synopsis "test utils")))
 

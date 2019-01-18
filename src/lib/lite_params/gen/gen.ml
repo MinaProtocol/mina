@@ -22,7 +22,7 @@ module Proof_of_signature = Consensus.Proof_of_signature.Make (struct
 
   let proposal_interval = Time.Span.of_ms Int64.zero
 
-  module Ledger_builder_diff = Unit
+  module Staged_ledger_diff = Unit
   module Genesis_ledger = Genesis_ledger
 end)
 
@@ -92,10 +92,11 @@ let protocol_state (s : Proof_of_signature.Protocol_state.value) :
       Lite_compat.digest
         ( Protocol_state.previous_state_hash s
           :> Snark_params.Tick.Pedersen.Digest.t )
-  ; blockchain_state=
-      Lite_compat.blockchain_state
-        (Proof_of_signature.Protocol_state.blockchain_state s)
-  ; consensus_state }
+  ; body=
+      { blockchain_state=
+          Lite_compat.blockchain_state
+            (Proof_of_signature.Protocol_state.blockchain_state s)
+      ; consensus_state } }
 
 let genesis ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
@@ -103,11 +104,11 @@ let genesis ~loc =
   end) in
   let open E in
   let protocol_state =
-    protocol_state Proof_of_signature.genesis_protocol_state
+    protocol_state Proof_of_signature.genesis_protocol_state.data
   in
   let ledger =
     Sparse_ledger_lib.Sparse_ledger.of_hash ~depth:0
-      protocol_state.blockchain_state.ledger_builder_hash.ledger_hash
+      protocol_state.body.blockchain_state.staged_ledger_hash.ledger_hash
   in
   let proof = Lite_compat.proof Precomputed_values.base_proof in
   let chain = {Lite_base.Lite_chain.protocol_state; ledger; proof} in

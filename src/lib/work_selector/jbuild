@@ -6,6 +6,6 @@
   (flags (:standard -short-paths -warn-error -58))
   (library_flags (-linkall))
   (inline_tests)
-  (libraries (core debug_assert logger protocols async async_extra unix_timestamp ledger_builder snark_pool))
-  (preprocess (pps (ppx_jane ppx_deriving.std)))
+  (libraries (core debug_assert logger protocols async async_extra unix_timestamp staged_ledger snark_pool))
+  (preprocess (pps (ppx_jane ppx_deriving.std bisect_ppx -conditional)))
   (synopsis "Selects work from the work pool")))

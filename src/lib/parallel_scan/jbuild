@@ -6,7 +6,7 @@
   (flags (:standard -short-paths -warn-error -58))
   (inline_tests)
   (library_flags (-linkall))
-  (libraries (pipe_lib digestif.ocaml core async async_extra))
-  (preprocess (pps (ppx_jane ppx_deriving.eq)))
+  (libraries (pipe_lib digestif.ocaml core async async_extra sgn))
+  (preprocess (pps (ppx_jane ppx_deriving.eq bisect_ppx -conditional)))
   (synopsis "Parallel scan over an infinite stream (incremental map-reduce)")))
 

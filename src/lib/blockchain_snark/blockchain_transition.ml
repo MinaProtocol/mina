@@ -166,13 +166,15 @@ struct
                   let typ : (var, value) Tick.Typ.t =
                     Tick.Pedersen.Checked.Digest.Unpacked.typ
 
-                  let var_to_bits (x : var) = (x :> Tick.Boolean.var list)
+                  let var_to_bits (x : var) =
+                    Bitstring_lib.Bitstring.Lsb_first.of_list
+                      (x :> Tick.Boolean.var list)
 
                   let var_to_triples xs =
                     let open Fold in
                     to_list
                       (group3 ~default:Tick.Boolean.false_
-                         (of_list (var_to_bits xs)))
+                         (of_list (var_to_bits xs :> Tick.Boolean.var list)))
 
                   let var_of_value =
                     Tick.Pedersen.Checked.Digest.Unpacked.constant
@@ -258,3 +260,21 @@ struct
       (location, t, checksum)
   end
 end
+
+let constraint_system_digests () =
+  let module M =
+    Make
+      (Consensus.Mechanism)
+      (Transaction_snark.Verification.Make (struct
+        let keys = Transaction_snark.Keys.Verification.dummy
+      end))
+  in
+  let module W = M.Wrap_base (struct
+    let verification_key = Dummy_values.Tick.verification_key
+  end) in
+  let digest = Tick.R1CS_constraint_system.digest in
+  let digest' = Tock.R1CS_constraint_system.digest in
+  [ ( "blockchain-step"
+    , digest M.Step_base.(Tick.constraint_system ~exposing:(input ()) main) )
+  ; ("blockchain-wrap", digest' W.(Tock.constraint_system ~exposing:input main))
+  ]

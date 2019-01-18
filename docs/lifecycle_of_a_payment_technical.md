@@ -20,7 +20,7 @@ Specifically [Core](https://opensource.janestreet.com/core/) (common datastructu
 On top of most files you'll see some variant of `open Core` and `open Async`.
 Here in [client.ml](../src/app/cli/src/client.ml) we see that too. `Async` shadows the `Command` type and lets us declaratively express the details of each command.
 If you scroll to the bottom of [client.ml](../src/app/cli/src/client.ml), you'll find we register the `send-payment` command to the function `send_payment`.
-Here we describe the flags this action depends on: `receiver` a [public key](#public-key), a fee, an amount, and a path to your [private key](#private-key). These flag param kinds are defined in [client_lib.ml](../src/lib/client_lib.ml).
+Here we describe the flags this action depends on: `receiver` a [public key](#public-key), a fee, an amount, and a path to your [private key](#private-key). These flag param kinds are defined in [daemon_rpcs.ml](../src/lib/daemon_rpcs.ml).
 In the body of `send_payment` we build a payment and send it over to the [daemon](#daemon).
 
 <a name="payment"></a>
@@ -89,7 +89,7 @@ Fees are handled out-of-band see the [fee excess system](#fee-excess).
 
 This is encoded inside the SNARK in [transaction_snark.ml](../src/lib/transaction_snark/transaction_snark.ml), specifically the `apply_tagged_transaction` function, although you'll need to look at how the bool flags are set in the `is_normal` case.
 
-It's captured outside the SNARK here: (TODO: where is this? Ledger_builder somewhere?)
+It's captured outside the SNARK here: (TODO: where is this? Staged_ledger somewhere?)
 
 <a name="account-nonce"></a>
 ### Account Nonce
@@ -137,7 +137,7 @@ Let's assume we have an instance of `Run.t` already created, and we'll circle ba
 <a name="client-rpc"></a>
 ### Client_rpc
 
-In [client_lib.ml](../src/lib/client_lib/client_lib.ml), we define the concrete RPC calls that the client uses to communicate to the daemon. We use [Async](https://opensource.janestreet.com/async/)'s RPC library for this. `Send_payments` defined the RPC call we use to send the payment: the query type is the input -- the payments we want to send -- and the response is the output -- in this case `unit`, because we don't get any meaningful feedback other than "the payment has been enqueued" on success.
+In [daemon_rpcs.ml](../src/lib/daemon_rpcs/daemon_rpcs.ml), we define the concrete RPC calls that the client uses to communicate to the daemon. We use [Async](https://opensource.janestreet.com/async/)'s RPC library for this. `Send_payments` defined the RPC call we use to send the payment: the query type is the input -- the payments we want to send -- and the response is the output -- in this case `unit`, because we don't get any meaningful feedback other than "the payment has been enqueued" on success.
 
 ### Schedule payment into Transaction pool
 
@@ -186,7 +186,7 @@ A ledger builder can be regarded as a "Pending accounts database" that has trans
 A ledger builder consists of the accounts state (what we currently call ledger) and a data structure called [parallel_scan.ml](../src/lib/parallel_scan/parallel_scan.ml). It keeps track of all the transactions that need to be snarked (grep for `Available_job.t`) to produce a single transaction snark that certifies a set of transactions. This is exposed as Aux in the ledger builder.
 Parallel scan is a tree like structure that stores statements needed to be proved. A statement can be of applying a single transaction `Base` or of composing other statements `Merge`. Snarking of these statements is delegated to snark-workers. The snark workers submit snarks for the corresponding statements which are used by the proposer to update the parallel scan state.
 
-When the propser wins a block, the payments read from the transaction pool are sent to the ledger builder to create a diff `Ledger_builder_diff`. 
+When the propser wins a block, the payments read from the transaction pool are sent to the ledger builder to create a diff `Staged_ledger_diff`. 
 A diff consists of 
 1. Payments included in the block
 2. A list of proofs that prove some of the transactions (payments, coinbase, and proof-fees) from previous blocks

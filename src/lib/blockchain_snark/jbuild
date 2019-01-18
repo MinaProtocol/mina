@@ -7,5 +7,5 @@
   (library_flags (-linkall))
   (libraries (core cached cache_dir protocols snarky snark_params coda_base transaction_snark bignum_bigint consensus))
   (inline_tests)
-  (preprocess (pps (ppx_jane ppx_deriving.eq)))
+  (preprocess (pps (ppx_snarky ppx_jane ppx_deriving.eq bisect_ppx -conditional)))
   (synopsis "blockchain state transition snarking library")))

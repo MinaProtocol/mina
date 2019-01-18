@@ -134,11 +134,10 @@ module Strength = struct
     z
 
   (* floor(two_to_the bit_length / y) *)
-  let of_target (y: Target.Packed.var) (y_unpacked: Target.Unpacked.var) =
-    Tick.with_label __LOC__
+  let%snarkydef of_target (y: Target.Packed.var) (y_unpacked: Target.Unpacked.var) =
       ( if Insecure.strength_calculation then
-          Tick.provide_witness Tick.Typ.field
-            Tick.As_prover.(
+          Tick.exists Tick.Typ.field
+            ~compute:Tick.As_prover.(
               map (read Target.Packed.typ y) ~f:of_target_unchecked)
       else
         floor_divide ~numerator:(`Two_to_the bit_length)

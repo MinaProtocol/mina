@@ -69,6 +69,8 @@ public:
     Fp6_2over3_model unitary_inverse() const;
     Fp6_2over3_model cyclotomic_squared() const;
 
+    std::vector<my_Fp> all_base_field_elements() { return { c0.c0, c0.c1, c0.c2, c1.c0, c1.c1, c1.c2 }; }
+
     static my_Fp3 mul_by_non_residue(const my_Fp3 &elem);
 
     template<mp_size_t m>

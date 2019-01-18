@@ -150,9 +150,10 @@ let gen_keys () =
 
     let private_key = None
 
-    module Ledger_builder_diff = Ledger_builder.Make_diff (struct
+    module Staged_ledger_diff = Staged_ledger.Make_diff (struct
       open Coda_base
       module Compressed_public_key = Public_key.Compressed
+      module Fee_transfer = Fee_transfer
 
       module User_command = struct
         include (
@@ -178,8 +179,8 @@ let gen_keys () =
 
       module Ledger_proof = Transaction_snark
 
-      module Completed_work = struct
-        include Ledger_builder.Make_completed_work
+      module Transaction_snark_work = struct
+        include Staged_ledger.Make_completed_work
                   (Compressed_public_key)
                   (Ledger_proof)
                   (Transaction_snark.Statement)
@@ -193,16 +194,20 @@ let gen_keys () =
         let to_bytes = Ledger_hash.to_bytes
       end
 
-      module Ledger_builder_aux_hash = struct
-        include Ledger_builder_hash.Aux_hash.Stable.V1
+      module Staged_ledger_aux_hash = struct
+        include Staged_ledger_hash.Aux_hash.Stable.V1
 
-        let of_bytes = Ledger_builder_hash.Aux_hash.of_bytes
+        let of_bytes = Staged_ledger_hash.Aux_hash.of_bytes
       end
 
-      module Ledger_builder_hash = struct
-        include Ledger_builder_hash.Stable.V1
+      module Staged_ledger_hash = struct
+        include Staged_ledger_hash.Stable.V1
 
-        let of_aux_and_ledger_hash = Ledger_builder_hash.of_aux_and_ledger_hash
+        let ledger_hash = Staged_ledger_hash.ledger_hash
+
+        let aux_hash = Staged_ledger_hash.aux_hash
+
+        let of_aux_and_ledger_hash = Staged_ledger_hash.of_aux_and_ledger_hash
       end
     end)
   end) in

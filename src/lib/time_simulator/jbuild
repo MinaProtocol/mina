@@ -8,6 +8,6 @@
   (inline_tests)
   (libraries
     ( protocols ))
-  (preprocess (pps (ppx_jane ppx_deriving.eq)))
+  (preprocess (pps (ppx_jane ppx_deriving.eq bisect_ppx -conditional)))
   (synopsis "Time simulator. Time moves faster if nothing is happening.")))
 

@@ -2,9 +2,8 @@ open Core
 open Import
 open Snark_params.Tick
 
-include Sparse_ledger_lib.Sparse_ledger.Make (struct
-            include Ledger_hash
-          end)
+include Sparse_ledger_lib.Sparse_ledger.Make
+          (Ledger_hash)
           (Public_key.Compressed.Stable.V1)
           (struct
             include Account.Stable.V1
@@ -17,7 +16,8 @@ let of_root (h : Ledger_hash.t) =
 
 let of_ledger_root ledger = of_root (Ledger.merkle_root ledger)
 
-let of_ledger_subset_exn (ledger : Ledger.t) keys =
+let of_ledger_subset_exn (oledger : Ledger.t) keys =
+  let ledger = Ledger.copy oledger in
   let new_keys, sparse =
     List.fold keys
       ~f:(fun (new_keys, sl) key ->
@@ -33,8 +33,6 @@ let of_ledger_subset_exn (ledger : Ledger.t) keys =
             (key :: new_keys, add_path sl path key acct) )
       ~init:([], of_ledger_root ledger)
   in
-  O1trace.measure "remove accounts exn" (fun () ->
-      Ledger.remove_accounts_exn ledger new_keys ) ;
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
         (Ledger.merkle_root ledger)
@@ -53,13 +51,13 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
     let privkey = Private_key.create () in
     (privkey, Public_key.of_private_key_exn privkey |> Public_key.compress)
   in
-  let ledger = Ledger.create () in
-  let _, pub1 = keygen () in
-  let _, pub2 = keygen () in
-  let sl = of_ledger_subset_exn ledger [pub1; pub2] in
-  [%test_eq: Ledger_hash.t]
-    (Ledger.merkle_root ledger)
-    ((merkle_root sl :> Pedersen.Digest.t) |> Ledger_hash.of_hash)
+  Ledger.with_ledger ~f:(fun ledger ->
+      let _, pub1 = keygen () in
+      let _, pub2 = keygen () in
+      let sl = of_ledger_subset_exn ledger [pub1; pub2] in
+      [%test_eq: Ledger_hash.t]
+        (Ledger.merkle_root ledger)
+        ((merkle_root sl :> Pedersen.Digest.t) |> Ledger_hash.of_hash) )
 
 let get_or_initialize_exn public_key t idx =
   let account = get_exn t idx in
@@ -119,7 +117,8 @@ let apply_fee_transfer_exn =
   fun t transfer ->
     List.fold (Fee_transfer.to_list transfer) ~f:apply_single ~init:t
 
-let apply_coinbase_exn t ({proposer; fee_transfer} : Coinbase.t) =
+let apply_coinbase_exn t
+    ({proposer; fee_transfer; amount= coinbase_amount} : Coinbase.t) =
   let open Currency in
   let add_to_balance t pk amount =
     let idx = find_index_exn t pk in
@@ -129,13 +128,10 @@ let apply_coinbase_exn t ({proposer; fee_transfer} : Coinbase.t) =
   in
   let proposer_reward, t =
     match fee_transfer with
-    | None -> (Protocols.Coda_praos.coinbase_amount, t)
+    | None -> (coinbase_amount, t)
     | Some (receiver, fee) ->
         let fee = Amount.of_fee fee in
-        let reward =
-          Amount.sub Protocols.Coda_praos.coinbase_amount fee
-          |> Option.value_exn
-        in
+        let reward = Amount.sub coinbase_amount fee |> Option.value_exn in
         (reward, add_to_balance t receiver fee)
   in
   add_to_balance t proposer proposer_reward

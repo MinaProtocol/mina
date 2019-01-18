@@ -5,58 +5,62 @@ open Coda_main
 open Coda_base
 open Signature_lib
 
-module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
-  module Coda_processes = Coda_processes.Make (Kernel)
-  module Coda_worker_testnet = Coda_worker_testnet.Make (Kernel)
+let name = "coda-receipt-chain-test"
 
-  let name = "coda-receipt-chain-test"
+let lift = Deferred.map ~f:Option.some
 
-  let main () =
-    let open Keypair in
-    let log = Logger.create () in
-    let log = Logger.child log name in
-    let largest_account_keypair =
-      Genesis_ledger.largest_account_keypair_exn ()
-    in
-    let another_account_keypair =
-      Genesis_ledger.find_new_account_record_exn
-        [largest_account_keypair.public_key]
-      |> Genesis_ledger.keypair_of_account_record_exn
-    in
-    let n = 2 in
-    let should_propose i = i = 0 in
-    let snark_work_public_keys i =
-      if i = 0 then
-        Some (Public_key.compress largest_account_keypair.public_key)
-      else None
-    in
-    let receiver_pk = Public_key.compress another_account_keypair.public_key in
-    let sender_sk = largest_account_keypair.private_key in
-    let send_amount = Currency.Amount.of_int 10 in
-    let fee = Currency.Fee.of_int 0 in
-    let%bind testnet =
-      Coda_worker_testnet.test log n should_propose snark_work_public_keys
-        Protocols.Coda_pow.Work_selection.Seq
-    in
-    let%map result =
-      let open Deferred.Option.Let_syntax in
-      (* TODO: we should test sending multiple payments simultaneously. See #1143*)
-      let%bind receipt_chain_hash =
-        Coda_worker_testnet.Api.send_payment_with_receipt testnet 0 sender_sk
-          receiver_pk send_amount fee
-      in
-      let%map merkle_list =
-        Coda_worker_testnet.Api.prove_receipt testnet 0 receipt_chain_hash
-          receipt_chain_hash
-      in
-      Receipt.Chain_hash.equal
-        (merkle_list |> List.hd_exn |> fst)
-        receipt_chain_hash
-    in
-    assert (Option.value ~default:false result)
+(* TODO: This should completely kill the coda daemon for a worker *)
+let restart_node worker ~config =
+  let%bind () = Coda_process.disconnect worker in
+  Coda_process.spawn_exn config
 
-  let command =
-    let open Command.Let_syntax in
-    Command.async ~summary:"Test that peers can prove sent payments"
-      (Command.Param.return main)
-end
+let main () =
+  let open Keypair in
+  let largest_account_keypair =
+    Genesis_ledger.largest_account_keypair_exn ()
+  in
+  let another_account_keypair =
+    Genesis_ledger.find_new_account_record_exn
+      [largest_account_keypair.public_key]
+    |> Genesis_ledger.keypair_of_account_record_exn
+  in
+  let proposal_interval =
+    Int64.to_int_exn Consensus.Mechanism.block_interval_ms
+  in
+  let n = 2 in
+  let receiver_pk = Public_key.compress another_account_keypair.public_key in
+  let sender_sk = largest_account_keypair.private_key in
+  let send_amount = Currency.Amount.of_int 10 in
+  let fee = Currency.Fee.of_int 0 in
+  let%bind program_dir = Unix.getcwd () in
+  let work_selection = Protocols.Coda_pow.Work_selection.Seq in
+  Parallel.init_master () ;
+  let configs =
+    Coda_processes.local_configs n ~program_dir ~proposal_interval
+      ~snark_worker_public_keys:None ~should_propose:(Fn.const false)
+      ~work_selection
+  in
+  let%bind workers = Coda_processes.spawn_local_processes_exn configs in
+  let worker = List.hd_exn workers in
+  let config = List.hd_exn configs in
+  let%bind receipt_chain_hash =
+    Coda_process.send_payment_exn worker sender_sk receiver_pk send_amount fee
+      User_command_memo.dummy
+  in
+  let receipt_chain_hash = Or_error.ok_exn receipt_chain_hash in
+  let%bind restarted_worker = restart_node ~config worker in
+  let%map proof =
+    Coda_process.prove_receipt_exn restarted_worker receipt_chain_hash
+      receipt_chain_hash
+  in
+  let result =
+    Receipt.Chain_hash.equal
+      (Payment_proof.initial_receipt proof)
+      receipt_chain_hash
+  in
+  assert result
+
+let command =
+  let open Command.Let_syntax in
+  Command.async ~summary:"Test that peers can prove sent payments"
+    (Command.Param.return main)

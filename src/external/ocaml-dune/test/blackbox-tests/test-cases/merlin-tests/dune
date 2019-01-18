@@ -1,4 +1,0 @@
-(alias
- (name print-merlins)
- (deps lib/.merlin exe/.merlin)
- (action (run ./sanitize-dot-merlin/sanitize_dot_merlin.exe %{deps})))

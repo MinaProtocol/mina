@@ -111,6 +111,13 @@ module Available_job : sig
   type ('a, 'd) t = Base of 'd | Merge of 'a * 'a [@@deriving sexp]
 end
 
+module Job_view : sig
+  type 'a node = Base of 'a option | Merge of 'a option * 'a option
+  [@@deriving sexp]
+
+  type 'a t = int * 'a node [@@deriving sexp]
+end
+
 val start : parallelism_log_2:int -> ('a, 'd) State.t
 (** The initial state of the parallel scan at some parallelism *)
 
@@ -118,11 +125,12 @@ val next_k_jobs :
   state:('a, 'd) State.t -> k:int -> ('a, 'd) Available_job.t list Or_error.t
 (** Get the next k available jobs *)
 
-val next_jobs : state:('a, 'd) State.t -> ('a, 'd) Available_job.t list
+val next_jobs :
+  state:('a, 'd) State.t -> ('a, 'd) Available_job.t list Or_error.t
 (** Get all the available jobs *)
 
 val next_jobs_sequence :
-  state:('a, 'd) State.t -> ('a, 'd) Available_job.t Sequence.t
+  state:('a, 'd) State.t -> ('a, 'd) Available_job.t Sequence.t Or_error.t
 (** Get all the available jobs as a sequence *)
 
 val enqueue_data : state:('a, 'd) State.t -> data:'d list -> unit Or_error.t
@@ -165,3 +173,6 @@ val is_valid : ('a, 'd) State.t -> bool
 val current_data : ('a, 'd) State.t -> 'd list
 (** The data ['d] that is pending and would be returned by available [Base]
  * jobs *)
+
+val view_jobs_with_position :
+  ('a, 'd) State.t -> ('a -> 'c) -> ('d -> 'c) -> 'c Job_view.t list

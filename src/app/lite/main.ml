@@ -106,7 +106,7 @@ module State = struct
     ; tooltip_stage= None }
 
   let chain_length chain =
-    chain.Lite_chain.protocol_state.consensus_state.length
+    chain.Lite_chain.protocol_state.body.consensus_state.length
 
   let should_update state (new_chain : Lite_chain.t) =
     Length.compare (chain_length new_chain) (chain_length state.chain) > 0
@@ -545,8 +545,8 @@ let merkle_tree num_layers_to_show =
         match List.last_exn specs with
         | Spec.Node _ -> None
         | Spec.Account
-            {pos= _; account= {public_key; balance; nonce; receipt_chain_hash}}
-          ->
+            { pos= _
+            ; account= {public_key; balance; nonce; receipt_chain_hash; _} } ->
             let record =
               let open Html.Record in
               create None
@@ -709,12 +709,12 @@ let state_html state =
       ; tooltip_stage= _
       ; chain=
           { protocol_state=
-              {previous_state_hash; blockchain_state; consensus_state}
+              {previous_state_hash; body= {blockchain_state; consensus_state}}
           ; ledger
           ; proof } } =
     state
   in
-  let {Blockchain_state.ledger_builder_hash; ledger_hash; timestamp} =
+  let {Blockchain_state.staged_ledger_hash; ledger_hash; timestamp} =
     blockchain_state
   in
   let {Consensus_state.length; _} = consensus_state in
@@ -752,7 +752,7 @@ let state_html state =
       ; [create_entry "timestamp" timestamp]
       ; [create_entry "locked_ledger_hash" (field_to_base64 ledger_hash)]
       ; [ create_entry "staged_ledger_hash"
-            (field_to_base64 ledger_builder_hash.ledger_hash) ] ]
+            (field_to_base64 staged_ledger_hash.ledger_hash) ] ]
   in
   let hoverable = hoverable state in
   let _ = ledger in

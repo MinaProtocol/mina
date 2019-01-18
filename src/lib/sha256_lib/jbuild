@@ -10,6 +10,6 @@
     ( core
       digestif.ocaml
       snark_params ))
-  (preprocess (pps (ppx_jane ppx_deriving.eq)))
+  (preprocess (pps (ppx_jane ppx_deriving.eq bisect_ppx -conditional)))
   (synopsis "SNARK keys")))
 

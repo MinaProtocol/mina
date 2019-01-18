@@ -1,0 +1,12 @@
+(jbuild_version 1)
+
+(library
+ ((name daemon_rpcs)
+  (public_name daemon_rpcs)
+  (flags (:standard -short-paths -warn-error -58-39))
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries (core async coda_base ppx_deriving_yojson.runtime yojson perf_histograms))
+  (preprocess (pps (ppx_jane ppx_deriving_yojson ppx_deriving.eq ppx_deriving.make bisect_ppx -conditional)))
+  (synopsis "Lib powering the client interactions with the daemon")))
+

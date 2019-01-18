@@ -11,7 +11,7 @@ module Make
 
         type t [@@deriving eq]
 
-        val to_coords : t -> Impl.Field.t * Impl.Field.t
+        val to_affine_coordinates : t -> Impl.Field.t * Impl.Field.t
 
         val typ : (var, t) Impl.Typ.t
 
@@ -24,9 +24,19 @@ module Make
         module Checked : sig
           val constant : t -> var
 
-          val add_unsafe : var -> var -> (var, _) Impl.Checked.t
+          val add_unsafe :
+               var
+            -> var
+            -> ( [`I_thought_about_this_very_carefully of var]
+               , _ )
+               Impl.Checked.t
 
-          val add_known_unsafe : var -> t -> (var, _) Impl.Checked.t
+          val add_known_unsafe :
+               var
+            -> t
+            -> ( [`I_thought_about_this_very_carefully of var]
+               , _ )
+               Impl.Checked.t
         end
     end) (Params : sig
       val params : Weierstrass_curve.t Quadruple.t array
@@ -95,10 +105,10 @@ end = struct
          Weierstrass_curve.t Quadruple.t
       -> Field.t Quadruple.t * Field.t Quadruple.t =
    fun (t1, t2, t3, t4) ->
-    let x1, y1 = Weierstrass_curve.to_coords t1
-    and x2, y2 = Weierstrass_curve.to_coords t2
-    and x3, y3 = Weierstrass_curve.to_coords t3
-    and x4, y4 = Weierstrass_curve.to_coords t4 in
+    let x1, y1 = Weierstrass_curve.to_affine_coordinates t1
+    and x2, y2 = Weierstrass_curve.to_affine_coordinates t2
+    and x3, y3 = Weierstrass_curve.to_affine_coordinates t3
+    and x4, y4 = Weierstrass_curve.to_affine_coordinates t4 in
     ((x1, x2, x3, x4), (y1, y2, y3, y4))
 
   let lookup ((s0, s1, s2) : Boolean.var Triple.t)
@@ -164,12 +174,18 @@ end = struct
         let open Let_syntax in
         match (t1, t2) with
         | `Var v1, `Var v2 ->
-            let%map v = Weierstrass_curve.Checked.add_unsafe v1 v2 in
+            (* This is acceptable as both v1 and v2 will be linear combinations of
+             distinct sets of random group elements (as this is only called from disjoint_union_exn) *)
+            let%map (`I_thought_about_this_very_carefully v) =
+              Weierstrass_curve.Checked.add_unsafe v1 v2
+            in
             `Var v
         | `Var v, `Value x | `Value x, `Var v ->
             if Weierstrass_curve.(equal zero x) then return (`Var v)
             else
-              let%map v = Weierstrass_curve.Checked.add_known_unsafe v x in
+              let%map (`I_thought_about_this_very_carefully v) =
+                Weierstrass_curve.Checked.add_known_unsafe v x
+              in
               `Var v
         | `Value x1, `Value x2 -> return (`Value (Weierstrass_curve.add x1 x2))
 
@@ -216,8 +232,13 @@ end = struct
       let open Let_syntax in
       let hash offset init xs =
         Checked.List.foldi xs ~init ~f:(fun i acc x ->
-            get_term (offset + i) x
-            >>= Weierstrass_curve.Checked.add_unsafe acc )
+            (* This is acceptable because [get_term (offset+i) x] is a linear combination
+             of random elements not involved in the calculation of acc *)
+            let%map (`I_thought_about_this_very_carefully acc) =
+              get_term (offset + i) x
+              >>= Weierstrass_curve.Checked.add_unsafe acc
+            in
+            acc )
       in
       match triples with
       | [] -> return t
@@ -232,7 +253,13 @@ end = struct
                 let%bind init_term = get_term start x in
                 let%bind init =
                   if Weierstrass_curve.(equal zero v) then return init_term
-                  else Weierstrass_curve.Checked.add_known_unsafe init_term v
+                  else
+                    (* This is acceptable because [t.acc] is a pedersen hash on a domain
+                              disjoint from the random group elements used in computing [init_term]. *)
+                    let%map (`I_thought_about_this_very_carefully r) =
+                      Weierstrass_curve.Checked.add_known_unsafe init_term v
+                    in
+                    r
                 in
                 hash (start + 1) init xs
             | `Var v -> hash start v (x :: xs)

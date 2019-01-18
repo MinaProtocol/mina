@@ -1,0 +1,12 @@
+(jbuild_version 1)
+
+(library
+ ((name transaction_snark_scan_state)
+  (public_name transaction_snark_scan_state)
+  (flags (:standard -short-paths -warn-error -58))
+  (inline_tests)
+  (library_flags (-linkall))
+  (libraries (pipe_lib core async async_extra sgn parallel_scan transaction_snark coda_base protocols logger ppx_deriving_yojson.runtime yojson))
+  (preprocess (pps (ppx_jane ppx_deriving.eq ppx_deriving_yojson)))
+  (synopsis "Parallel scan over an infinite stream (incremental map-reduce)")))
+

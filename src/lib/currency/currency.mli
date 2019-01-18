@@ -51,6 +51,8 @@ module type Basic = sig
 
   val var_of_t : t -> var
 
+  val var_to_number : var -> Number.t
+
   val var_to_triples : var -> Boolean.var Triple.t list
 end
 
@@ -101,7 +103,8 @@ module type Signed_intf = sig
 
   type ('magnitude, 'sgn) t_
 
-  type t = (magnitude, Sgn.t) t_ [@@deriving sexp, hash, bin_io, compare, eq]
+  type t = (magnitude, Sgn.t) t_
+  [@@deriving sexp, hash, bin_io, compare, eq, to_yojson]
 
   val gen : t Quickcheck.Generator.t
 
@@ -109,7 +112,7 @@ module type Signed_intf = sig
     module V1 : sig
       type nonrec ('magnitude, 'sgn) t_ = ('magnitude, 'sgn) t_
 
-      type nonrec t = t [@@deriving bin_io, sexp, hash, compare, eq]
+      type nonrec t = t [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
     end
   end
 

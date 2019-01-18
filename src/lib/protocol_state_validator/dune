@@ -1,0 +1,10 @@
+(library
+  (name protocol_state_validator)
+  (public_name protocol_state_validator)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (libraries
+    core
+    async
+    transition_frontier
+    protocols
+    ))

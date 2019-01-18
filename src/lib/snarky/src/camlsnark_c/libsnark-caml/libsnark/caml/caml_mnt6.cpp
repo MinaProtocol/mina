@@ -588,101 +588,135 @@ void camlsnark_mnt6_field_vector_delete(std::vector<FieldT>* v) {
 
 // Begin ppzksnark specific code
 r1cs_constraint_system<FieldT>* camlsnark_mnt6_proving_key_r1cs_constraint_system(
-    r1cs_ppzksnark_proving_key<ppT>* pk) {
+    r1cs_gg_ppzksnark_proving_key<ppT>* pk) {
   return &pk->constraint_system;
 }
 
-std::string* camlsnark_mnt6_proving_key_to_string(r1cs_ppzksnark_proving_key<ppT>* pk) {
+std::string* camlsnark_mnt6_proving_key_to_string(r1cs_gg_ppzksnark_proving_key<ppT>* pk) {
   std::stringstream stream;
   stream << *pk;
   return new std::string(stream.str());
 }
 
-r1cs_ppzksnark_proving_key<ppT>* camlsnark_mnt6_proving_key_of_string(std::string* s) {
-  r1cs_ppzksnark_proving_key<ppT>*  pk = new r1cs_ppzksnark_proving_key<ppT>();
+r1cs_gg_ppzksnark_proving_key<ppT>* camlsnark_mnt6_proving_key_of_string(std::string* s) {
+  r1cs_gg_ppzksnark_proving_key<ppT>*  pk = new r1cs_gg_ppzksnark_proving_key<ppT>();
   std::stringstream stream(*s);
   stream >> *pk;
   return pk;
 }
 
-void camlsnark_mnt6_proving_key_delete(r1cs_ppzksnark_proving_key<ppT>* pk) {
+void camlsnark_mnt6_proving_key_delete(r1cs_gg_ppzksnark_proving_key<ppT>* pk) {
   delete pk;
 }
 
-void camlsnark_mnt6_verification_key_delete(r1cs_ppzksnark_verification_key<ppT>* vk) {
+void camlsnark_mnt6_verification_key_delete(r1cs_gg_ppzksnark_verification_key<ppT>* vk) {
   delete vk;
 }
 
 int camlsnark_mnt6_verification_key_size_in_bits(
-    r1cs_ppzksnark_verification_key<ppT>* vk
+    r1cs_gg_ppzksnark_verification_key<ppT>* vk
 ) {
   return vk->size_in_bits();
 }
 
-std::string* camlsnark_mnt6_verification_key_to_string(r1cs_ppzksnark_verification_key<ppT>* vk) {
+std::string* camlsnark_mnt6_verification_key_to_string(r1cs_gg_ppzksnark_verification_key<ppT>* vk) {
   std::stringstream stream;
   stream << *vk;
   return new std::string(stream.str());
 }
 
-r1cs_ppzksnark_verification_key<ppT>* camlsnark_mnt6_verification_key_of_string(std::string* s) {
-  r1cs_ppzksnark_verification_key<ppT>*  vk = new r1cs_ppzksnark_verification_key<ppT>();
+r1cs_gg_ppzksnark_verification_key<ppT>* camlsnark_mnt6_verification_key_of_string(std::string* s) {
+  r1cs_gg_ppzksnark_verification_key<ppT>*  vk = new r1cs_gg_ppzksnark_verification_key<ppT>();
   std::stringstream stream(*s);
   stream >> *vk;
   return vk;
 }
 
-r1cs_ppzksnark_proving_key<ppT>* camlsnark_mnt6_keypair_pk(r1cs_ppzksnark_keypair<ppT>* keypair) {
-  return new r1cs_ppzksnark_proving_key<ppT>(keypair->pk);
+std::vector<libff::G1<ppT>>*
+camlsnark_mnt6_verification_key_query(r1cs_gg_ppzksnark_verification_key<ppT>* vk) {
+  std::vector<libff::G1<ppT>>* res = new std::vector<libff::G1<ppT>>();
+  res->emplace_back(vk->ABC_g1.first);
+  for (size_t i = 0; i < vk->ABC_g1.rest.values.size(); ++i)
+  {
+      res->emplace_back(vk->ABC_g1.rest.values[i]);
+  }
+  return res;
 }
 
-r1cs_ppzksnark_verification_key<ppT>* camlsnark_mnt6_keypair_vk(r1cs_ppzksnark_keypair<ppT>* keypair) {
-  return new r1cs_ppzksnark_verification_key<ppT>(keypair->vk);
+libff::G2<ppT>*
+camlsnark_mnt6_verification_key_delta(r1cs_gg_ppzksnark_verification_key<ppT>* vk) {
+  return new libff::G2<ppT>(vk->delta_g2);
 }
 
-void camlsnark_mnt6_keypair_delete(r1cs_ppzksnark_keypair<ppT>* keypair) {
+libff::Fqk<ppT>*
+camlsnark_mnt6_verification_key_alpha_beta(r1cs_gg_ppzksnark_verification_key<ppT>* vk) {
+  return new libff::Fqk<ppT>(vk->alpha_g1_beta_g2);
+}
+
+r1cs_gg_ppzksnark_proving_key<ppT>* camlsnark_mnt6_keypair_pk(r1cs_gg_ppzksnark_keypair<ppT>* keypair) {
+  return new r1cs_gg_ppzksnark_proving_key<ppT>(keypair->pk);
+}
+
+r1cs_gg_ppzksnark_verification_key<ppT>* camlsnark_mnt6_keypair_vk(r1cs_gg_ppzksnark_keypair<ppT>* keypair) {
+  return new r1cs_gg_ppzksnark_verification_key<ppT>(keypair->vk);
+}
+
+void camlsnark_mnt6_keypair_delete(r1cs_gg_ppzksnark_keypair<ppT>* keypair) {
   delete keypair;
 }
 
-r1cs_ppzksnark_keypair<ppT>* camlsnark_mnt6_keypair_create(
+r1cs_gg_ppzksnark_keypair<ppT>* camlsnark_mnt6_keypair_create(
     r1cs_constraint_system<FieldT>* sys) {
-  r1cs_ppzksnark_keypair<ppT> res = r1cs_ppzksnark_generator<ppT>(*sys);
-  return new r1cs_ppzksnark_keypair<ppT>(res);
+  r1cs_gg_ppzksnark_keypair<ppT> res = r1cs_gg_ppzksnark_generator<ppT>(*sys);
+  return new r1cs_gg_ppzksnark_keypair<ppT>(res);
 }
 
 std::string* camlsnark_mnt6_proof_to_string(
-    r1cs_ppzksnark_proof<ppT>* p) {
+    r1cs_gg_ppzksnark_proof<ppT>* p) {
   std::stringstream stream;
   stream << *p;
   return new std::string(stream.str());
 }
 
-r1cs_ppzksnark_proof<ppT>* camlsnark_mnt6_proof_of_string(std::string* s) {
-  r1cs_ppzksnark_proof<ppT>*  p = new r1cs_ppzksnark_proof<ppT>();
+r1cs_gg_ppzksnark_proof<ppT>* camlsnark_mnt6_proof_of_string(std::string* s) {
+  r1cs_gg_ppzksnark_proof<ppT>*  p = new r1cs_gg_ppzksnark_proof<ppT>();
   std::stringstream stream(*s);
   stream >> *p;
   return p;
 }
 
-r1cs_ppzksnark_proof<ppT>* camlsnark_mnt6_proof_create(
-    r1cs_ppzksnark_proving_key<ppT>* key,
+r1cs_gg_ppzksnark_proof<ppT>* camlsnark_mnt6_proof_create(
+    r1cs_gg_ppzksnark_proving_key<ppT>* key,
     std::vector<FieldT>* primary_input,
     std::vector<FieldT>* auxiliary_input) {
-  auto res = r1cs_ppzksnark_prover(*key, *primary_input, *auxiliary_input);
-  return new r1cs_ppzksnark_proof<ppT>(res);
+  auto res = r1cs_gg_ppzksnark_prover(*key, *primary_input, *auxiliary_input);
+  return new r1cs_gg_ppzksnark_proof<ppT>(res);
 }
 
-void camlsnark_mnt6_proof_delete(r1cs_ppzksnark_proof<ppT>* proof) {
+void camlsnark_mnt6_proof_delete(r1cs_gg_ppzksnark_proof<ppT>* proof) {
   delete proof;
 }
 
 bool camlsnark_mnt6_proof_verify(
-    r1cs_ppzksnark_proof<ppT>* proof,
-    r1cs_ppzksnark_verification_key<ppT>* key,
+    r1cs_gg_ppzksnark_proof<ppT>* proof,
+    r1cs_gg_ppzksnark_verification_key<ppT>* key,
     std::vector<FieldT>* primary_input) {
-  return r1cs_ppzksnark_verifier_weak_IC(*key, *primary_input, *proof);
+  return r1cs_gg_ppzksnark_verifier_weak_IC(*key, *primary_input, *proof);
 }
-// End ppzksnark specific code
+
+libff::G1<ppT>* camlsnark_mnt6_proof_a(r1cs_gg_ppzksnark_proof<ppT>* proof) {
+  return new libff::G1<ppT>(proof->g_A);
+}
+
+libff::G2<ppT>* camlsnark_mnt6_proof_b(r1cs_gg_ppzksnark_proof<ppT>* proof) {
+  return new libff::G2<ppT>(proof->g_B);
+}
+
+libff::G1<ppT>* camlsnark_mnt6_proof_c(r1cs_gg_ppzksnark_proof<ppT>* proof) {
+  return new libff::G1<ppT>(proof->g_C);
+}
+
+// End gg_ppzksnark specific code
 
 // Begin Groth-Maller specific code
 r1cs_constraint_system<FieldT>* camlsnark_mnt6_gm_proving_key_r1cs_constraint_system(
@@ -750,6 +784,13 @@ camlsnark_mnt6_gm_verification_key_h_gamma (
     r1cs_se_ppzksnark_verification_key<ppT>* vk
 ) {
   return new libff::G2<ppT>(vk->H_gamma);
+}
+
+libff::Fqk<ppT>* 
+camlsnark_mnt6_gm_verification_key_g_alpha_h_beta (
+    r1cs_se_ppzksnark_verification_key<ppT>* vk
+) {
+  return new libff::Fqk<ppT>(vk->G_alpha_H_beta);
 }
 
 std::vector< libff::G1<ppT> >*

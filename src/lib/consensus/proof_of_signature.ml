@@ -12,8 +12,8 @@ module Global_public_key = struct
   global_signer_real]
 
   let compressed =
-    Public_key.Compressed.of_base64_exn
-      "KBWuaAm5Sl5jH/dlpiTKQeUUsty/4Rq6Xz2Py2Y2i/VweJmDHwUAAAAB"
+    Snark_params.Tick.Inner_curve.one
+    |> Non_zero_curve_point.of_inner_curve_exn |> Public_key.compress
 
   let genesis_private_key = Global_signer_private_key.t
 
@@ -34,10 +34,6 @@ end
 module type Inputs_intf = sig
   module Time : Protocols.Coda_pow.Time_intf
 
-  module Ledger_builder_diff : sig
-    type t [@@deriving bin_io, sexp]
-  end
-
   module Genesis_ledger : sig
     val t : Coda_base.Ledger.t
   end
@@ -45,14 +41,8 @@ module type Inputs_intf = sig
   val proposal_interval : Time.Span.t
 end
 
-module Make (Inputs : Inputs_intf) :
-  Mechanism.S
-  with type Internal_transition.Ledger_builder_diff.t =
-              Inputs.Ledger_builder_diff.t
-   and type External_transition.Ledger_builder_diff.t =
-              Inputs.Ledger_builder_diff.t = struct
+module Make (Inputs : Inputs_intf) : Intf.S = struct
   open Inputs
-  module Ledger_builder_diff = Ledger_builder_diff
 
   module Local_state = struct
     type t = unit [@@deriving sexp]
@@ -176,11 +166,17 @@ module Make (Inputs : Inputs_intf) :
     module Prover_state = Prover_state
   end)
 
-  module Internal_transition =
-    Internal_transition.Make (Ledger_builder_diff) (Snark_transition)
-      (Prover_state)
-  module External_transition =
-    External_transition.Make (Ledger_builder_diff) (Protocol_state)
+  module For_tests = struct
+    let gen_consensus_state ~gen_slot_advancement:_ =
+      let open Consensus_state in
+      Quickcheck.Generator.return
+      @@ fun ~previous_protocol_state ~snarked_ledger_hash:_ ->
+      let prev =
+        Protocol_state.consensus_state (With_hash.data previous_protocol_state)
+      in
+      { length= Length.succ prev.length
+      ; signer_public_key= prev.signer_public_key }
+  end
 
   let block_interval_ms = Time.Span.to_ms proposal_interval
 
@@ -207,6 +203,8 @@ module Make (Inputs : Inputs_intf) :
     in
     (protocol_state, consensus_transition_data)
 
+  let received_at_valid_time _ ~time_received:_ = true
+
   let is_transition_valid_checked (transition : Snark_transition.var) =
     let Consensus_transition_data.({signature}) =
       Snark_transition.consensus_data transition
@@ -221,26 +219,27 @@ module Make (Inputs : Inputs_intf) :
       (Public_key.var_of_t Global_public_key.t)
       (transition |> Snark_transition.blockchain_state)
 
-  let next_state_checked (state : Consensus_state.var) _state_hash _block
-      _supply_increase =
+  let next_state_checked ~(prev_state : Protocol_state.var) ~prev_state_hash:_
+      block _supply_increase =
     let open Consensus_state in
     let open Snark_params.Tick.Let_syntax in
-    let%bind length = Length.increment_var state.length in
+    let prev_state = Protocol_state.consensus_state prev_state in
+    let%bind length = Length.increment_var prev_state.length in
     let signer_public_key =
       Public_key.Compressed.var_of_t @@ Global_public_key.compressed
     in
     let%map () =
-      Public_key.Compressed.Checked.Assert.equal state.signer_public_key
+      Public_key.Compressed.Checked.Assert.equal prev_state.signer_public_key
         signer_public_key
-    in
-    {length; signer_public_key}
+    and success = is_transition_valid_checked block in
+    (`Success success, {length; signer_public_key})
 
   let update_local_state _ ~previous_consensus_state:_ ~next_consensus_state:_
       ~ledger:_ =
     ()
 
   let select ~existing:Consensus_state.({length= l1; _})
-      ~candidate:Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
+      ~candidate:Consensus_state.({length= l2; _}) ~logger:_ =
     if Length.compare l1 l2 >= 0 then `Keep else `Take
 
   let next_proposal now _state ~local_state:_ ~keypair ~logger:_ =
@@ -258,11 +257,16 @@ module Make (Inputs : Inputs_intf) :
     ()
 
   let genesis_protocol_state =
-    Protocol_state.create_value
-      ~previous_state_hash:(Protocol_state.hash Protocol_state.negative_one)
-      ~blockchain_state:
-        (Snark_transition.genesis |> Snark_transition.blockchain_state)
-      ~consensus_state:
-        (Consensus_state.update
-           (Protocol_state.consensus_state Protocol_state.negative_one))
+    let state =
+      Protocol_state.create_value
+        ~previous_state_hash:(Protocol_state.hash Protocol_state.negative_one)
+        ~blockchain_state:
+          (Snark_transition.genesis |> Snark_transition.blockchain_state)
+        ~consensus_state:
+          (Consensus_state.update
+             (Protocol_state.consensus_state Protocol_state.negative_one))
+    in
+    With_hash.of_data ~hash_data:Protocol_state.hash state
+
+  let should_bootstrap ~existing:_ ~candidate:_ = false
 end

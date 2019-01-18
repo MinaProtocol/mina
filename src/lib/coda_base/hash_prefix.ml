@@ -7,6 +7,8 @@ let salt (s : t) = Snark_params.Tick.Pedersen.(State.salt params (s :> string))
 
 let protocol_state = salt protocol_state
 
+let protocol_state_body = salt protocol_state_body
+
 let account = salt account
 
 let merkle_tree =

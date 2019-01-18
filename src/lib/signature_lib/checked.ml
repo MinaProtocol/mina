@@ -159,7 +159,7 @@ module Schnorr
 
         val scale : t -> Scalar.t -> t
 
-        val to_coords : t -> Field.t * Field.t
+        val to_affine_coordinates : t -> Field.t * Field.t
     end)
     (Message : Message_intf
                with type boolean_var := Impl.Boolean.var
@@ -195,7 +195,7 @@ module Schnorr
   end
 
   let compress (t : Curve.t) =
-    let x, _ = Curve.to_coords t in
+    let x, _ = Curve.to_affine_coordinates t in
     Field.unpack x
 
   module Public_key : sig
@@ -257,37 +257,33 @@ module Schnorr
 
     open Impl.Let_syntax
 
-    let verification_hash (type s)
+    let%snarkydef verification_hash (type s)
         ((module Shifted) as shifted :
           (module Curve.Checked.Shifted.S with type t = s))
         ((s, h) : Signature.var) (public_key : Public_key.var)
         (m : Message.var) =
-      with_label __LOC__
-        (let%bind pre_r =
-           (* s * g + h * public_key *)
-           let%bind s_g =
-             Curve.Checked.scale_known shifted Curve.one
-               (Curve.Scalar.Checked.to_bits s)
-               ~init:Shifted.zero
-           in
-           let%bind s_g_h_pk =
-             Curve.Checked.scale shifted public_key
-               (Curve.Scalar.Checked.to_bits h)
-               ~init:s_g
-           in
-           Shifted.unshift_nonzero s_g_h_pk
-         in
-         let%bind r = compress pre_r in
-         Message.hash_checked m ~nonce:r)
+      let%bind pre_r =
+        (* s * g + h * public_key *)
+        let%bind s_g =
+          Curve.Checked.scale_known shifted Curve.one
+            (Curve.Scalar.Checked.to_bits s)
+            ~init:Shifted.zero
+        in
+        let%bind s_g_h_pk =
+          Curve.Checked.scale shifted public_key
+            (Curve.Scalar.Checked.to_bits h)
+            ~init:s_g
+        in
+        Shifted.unshift_nonzero s_g_h_pk
+      in
+      let%bind r = compress pre_r in
+      Message.hash_checked m ~nonce:r
 
-    let verifies shifted ((_, h) as signature) pk m =
-      with_label __LOC__
-        ( verification_hash shifted signature pk m
-        >>= Curve.Scalar.Checked.equal h )
+    let%snarkydef verifies shifted ((_, h) as signature) pk m =
+      verification_hash shifted signature pk m >>= Curve.Scalar.Checked.equal h
 
-    let assert_verifies shifted ((_, h) as signature) pk m =
-      with_label __LOC__
-        ( verification_hash shifted signature pk m
-        >>= Curve.Scalar.Checked.Assert.equal h )
+    let%snarkydef assert_verifies shifted ((_, h) as signature) pk m =
+      verification_hash shifted signature pk m
+      >>= Curve.Scalar.Checked.Assert.equal h
   end
 end

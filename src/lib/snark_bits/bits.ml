@@ -158,6 +158,7 @@ module Snarkable = struct
     with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
      and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
      and type boolean_var := Impl.Boolean.var
+     and type field_var := Impl.Field.Checked.t
      and type Packed.var = Impl.Field.Checked.t
      and type Packed.value = V.t
      and type Unpacked.var = Impl.Boolean.var list
@@ -227,7 +228,7 @@ module Snarkable = struct
           (Typ.list ~length:V.length Boolean.typ)
           ~there:(v_to_list V.length) ~back:v_of_list
 
-      let var_to_bits = Fn.id
+      let var_to_bits = Bitstring_lib.Bitstring.Lsb_first.of_list
 
       let var_to_triples (bs : var) =
         Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_ bs
@@ -238,31 +239,30 @@ module Snarkable = struct
 
     let unpack_var x = Impl.Field.Checked.unpack x ~length:bit_length
 
+    let var_of_field = unpack_var
+
     let unpack_value (x : Packed.value) : Unpacked.value = x
 
     let compare_var x y =
       Impl.Field.Checked.compare ~bit_length:V.length (pack_var x) (pack_var y)
 
-    let increment_if_var bs (b : Boolean.var) =
+    let%snarkydef increment_if_var bs (b : Boolean.var) =
       let open Impl in
-      with_label __LOC__
-        (let v = Field.Checked.pack bs in
-         let v' = Field.Checked.add v (b :> Field.Checked.t) in
-         Field.Checked.unpack v' ~length:V.length)
+      let v = Field.Checked.pack bs in
+      let v' = Field.Checked.add v (b :> Field.Checked.t) in
+      Field.Checked.unpack v' ~length:V.length
 
-    let increment_var bs =
+    let%snarkydef increment_var bs =
       let open Impl in
-      with_label __LOC__
-        (let v = Field.Checked.pack bs in
-         let v' = Field.Checked.add v (Field.Checked.constant Field.one) in
-         Field.Checked.unpack v' ~length:V.length)
+      let v = Field.Checked.pack bs in
+      let v' = Field.Checked.add v (Field.Checked.constant Field.one) in
+      Field.Checked.unpack v' ~length:V.length
 
-    let equal_var (n : Unpacked.var) (n' : Unpacked.var) =
-      with_label __LOC__ (Field.Checked.equal (pack_var n) (pack_var n'))
+    let%snarkydef equal_var (n : Unpacked.var) (n' : Unpacked.var) =
+      Field.Checked.equal (pack_var n) (pack_var n')
 
-    let assert_equal_var (n : Unpacked.var) (n' : Unpacked.var) =
-      with_label __LOC__
-        (Field.Checked.Assert.equal (pack_var n) (pack_var n'))
+    let%snarkydef assert_equal_var (n : Unpacked.var) (n' : Unpacked.var) =
+      Field.Checked.Assert.equal (pack_var n) (pack_var n')
 
     let if_ (cond : Boolean.var) ~(then_ : Unpacked.var)
         ~(else_ : Unpacked.var) : (Unpacked.var, _) Checked.t =
@@ -309,7 +309,7 @@ module Snarkable = struct
           ~there:(unpack_field Field.unpack ~bit_length)
           ~back:Field.project
 
-      let var_to_bits = Fn.id
+      let var_to_bits = Bitstring_lib.Bitstring.Lsb_first.of_list
 
       let var_to_triples (bs : var) =
         Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_ bs
