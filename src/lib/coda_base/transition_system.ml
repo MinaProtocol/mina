@@ -144,8 +144,7 @@ struct
           (State.Checked.update (prev_state_hash, prev_state) update)
       in
       let%bind wrap_vk =
-        exists'
-          (Verifier.Verification_key.typ ~input_size:wrap_input_size)
+        exists' (Verifier.Verification_key.typ ~input_size:wrap_input_size)
           ~f:(fun {Prover_state.wrap_vk; _} ->
             Verifier.vk_of_backend_vk wrap_vk )
       in

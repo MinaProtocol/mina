@@ -526,8 +526,7 @@ module Merge = struct
   *)
   let%snarkydef main (top_hash : Pedersen.Checked.Digest.var) =
     let%bind tock_vk =
-      exists'
-        (Verifier.Verification_key.typ ~input_size:wrap_input_size)
+      exists' (Verifier.Verification_key.typ ~input_size:wrap_input_size)
         ~f:(fun {Prover_state.tock_vk; _} -> Verifier.vk_of_backend_vk tock_vk
       )
     and s1 = exists' wrap_input_typ ~f:Prover_state.ledger_hash1
