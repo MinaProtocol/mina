@@ -67,7 +67,7 @@ dht: kademlia
 
 build: git_hooks
 	$(info Starting Build)
-	ulimit -s 65532 && ulimit -n 10240 && (ulimit -u 2128 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && (ulimit -u 2128 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 dev: codabuilder containerstart build
@@ -283,6 +283,12 @@ docs/res/%.tex.png: docs/res/%.tex.pdf
 	convert -density 600x600 $< -quality 90 -resize 1080x1080 $@
 
 doc_diagrams: $(addsuffix .png,$(wildcard docs/res/*.tex) $(wildcard docs/res/*.dot))
+
+########################################
+# Generate odoc documentation
+
+ml-docs:
+	cd src; $(WRAPSRC) dune build --profile=$(DUNE_PROFILE) @doc
 
 ########################################
 # To avoid unintended conflicts with file names, always add to .PHONY
