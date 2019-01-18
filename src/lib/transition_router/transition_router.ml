@@ -132,7 +132,8 @@ module Make (Inputs : Inputs_intf) :
         ~controller_type ~clear_writer ~transition_frontier_controller_reader
         ~transition_frontier_controller_writer ~old_frontier
         (`Transition incoming_transition, `Time_received tm) =
-      kill transition_frontier_controller_reader
+      failwith "Bootstrap is disabled as there this an infinite loop here"
+      (*      kill transition_frontier_controller_reader
         transition_frontier_controller_writer ;
       Strict_pipe.Writer.write clear_writer `Clear |> don't_wait_for ;
       let bootstrap_controller_reader, bootstrap_controller_writer =
@@ -152,7 +153,7 @@ module Make (Inputs : Inputs_intf) :
           ~transition_reader:bootstrap_controller_reader
       in
       kill bootstrap_controller_reader bootstrap_controller_writer ;
-      new_frontier
+      new_frontier *)
     in
     let start_transition_frontier_controller ~verified_transition_writer
         ~clear_reader frontier =
