@@ -1447,8 +1447,11 @@ end) (Fq : sig
   include Deletable_intf
 
   module Vector : Deletable_intf
-end) =
-struct
+end) : sig
+  include Deletable_intf
+
+  val to_coords : t -> Fq.Vector.t * Fq.Vector.t
+end = struct
   include Make_foreign (struct
     let prefix = with_prefix Prefix.prefix "g2"
   end)
@@ -1476,8 +1479,11 @@ module Make_fqk
         include Deletable_intf
 
         module Vector : Deletable_intf
-    end) =
-struct
+    end) : sig
+  include Deletable_intf
+
+  val to_elts : t -> Fq.Vector.t
+end = struct
   include Make_foreign (struct
     let prefix = with_prefix Prefix.prefix "fqk"
   end)
