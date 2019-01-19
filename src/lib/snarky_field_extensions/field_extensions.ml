@@ -726,7 +726,6 @@ struct
 
   let fq_mul_by_non_residue x = Fq.scale x Fq3.Params.non_residue
 
-  (* Number to beat: 3 constraints + 2 fq3 muls *)
   let special_mul (a0, a1) (b0, b1) =
     let open Impl.Let_syntax in
     let%bind v1 = Fq3.(a1 * b1) in
@@ -738,7 +737,6 @@ struct
       and a02b02 = Fq.(a02 * b02) in
       (fq_mul_by_non_residue a01b02, fq_mul_by_non_residue a02b02, a00b02)
     in
-    (* I think this is right... *)
     let beta_v1 = Fq3.mul_by_primitive_element v1 in
     let%map t = Fq3.((a0 + a1) * (b0 + b1)) in
     Fq3.(v0 + beta_v1, t - v0 - v1)
