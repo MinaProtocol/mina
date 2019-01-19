@@ -546,8 +546,11 @@ module Make (Inputs : Inputs_intf) = struct
                     Staged_ledger_hash %{sexp: Staged_ledger_hash.t}"
                   peer staged_ledger_hash ;
                 Ok
-                  (Envelope.Incoming.wrap ~data:staged_ledger_aux
-                     ~sender:(fst peer)) )
+                  (Envelope.Incoming.wrap
+                     ~data:
+                       staged_ledger_aux
+                       (* TODO: this isn't really a discovery port, how to handle? *)
+                     ~sender:(Peer.to_discovery_host_and_port peer)) )
               else (
                 Logger.faulty_peer t.log
                   !"%{sexp: Peer.t} sent contents resulting in a bad \
@@ -597,7 +600,9 @@ module Make (Inputs : Inputs_intf) = struct
                     !"Received answer from peer %{sexp: Peer.t} on \
                       ledger_hash %{sexp: Ledger_hash.t}"
                     peer (fst answer) ;
-                  Some (Envelope.Incoming.wrap ~data:answer ~sender:(fst peer))
+                  Some
+                    (Envelope.Incoming.wrap ~data:answer
+                       ~sender:(Peer.to_discovery_host_and_port peer))
               | Ok (Error e) ->
                   Logger.info t.log "Rpc error: %s" (Error.to_string_mach e) ;
                   Hash_set.add peers_tried peer ;

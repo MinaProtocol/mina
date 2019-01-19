@@ -44,8 +44,9 @@ let main () =
     peers expected_peers ;
   let module S = Host_and_port.Set in
   assert (
-    S.equal (S.of_list (peers |> List.map ~f:fst)) (S.of_list expected_peers)
-  )
+    S.equal
+      (S.of_list (peers |> List.map ~f:Kademlia.Peer.to_discovery_host_and_port))
+      (S.of_list expected_peers) )
 
 let command =
   Command.async
