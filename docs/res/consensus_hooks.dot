@@ -1,24 +1,21 @@
 digraph G {
   rankdir=LR;
 
-  "Consensus.Local_state" [shape="rectangle"];
-  "External_transition_pipe" [shape="diamond"];
+  { rank=source; Network; Proposer }
+  { rank=same; Transition_router; Blockchain_snark }
+  { rank=sink; Consensus }
 
-  Network -> External_transition_pipe;
-  Proposer -> External_transition_pipe;
-  External_transition_pipe -> Pending_account_db;
-  Pending_account_db -> Network [label="broadcast_transition"];
+  {Network, Proposer, Transition_router} -> Transition_frontier_controller;
+  Transition_frontier_controller -> Network [label="broadcast_transition"];
 
-  "Consensus.Local_state" -> Proposer;
-  "Consensus.Local_state" -> Pending_account_db;
+  Transition_router -> Consensus [label="should_bootstrap"];
+
+  Transition_frontier_controller -> Consensus [label="select"];
+  Transition_frontier_controller -> Consensus [label="lock_transition"];
 
   Proposer -> Consensus [label="generate_transition"];
   Proposer -> Consensus [label="next_proposal"];
   Proposer -> Blockchain_snark [label="prove"];
 
-  Blockchain_snark -> Consensus [label="is_transition_valid_checked"];
   Blockchain_snark -> Consensus [label="next_state_checked"];
-
-  Pending_account_db -> Consensus [label="select"];
-  Pending_account_db -> Consensus [label="lock_transition"];
 }
