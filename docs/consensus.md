@@ -5,7 +5,7 @@ Consensus refers to the process by which the network determines which informatio
 
 A consensus mechanism controls many aspects in a protocol which is built on top of it. For the purpose of this discussion, we will separate the provisions of a consensus mechanism into two parts: the data (data structures made available and the interactions available with them) and hooks (specific top level hooks called by the protocol built on top of the consensus mechanism). Data structures provided by the consensus mechanism are kept abstract to the outside system interacting with them and are instead primarily consumed by the consensus mechanism's hooks.
 
-<sup>_NOTE: this document only covers the generalized consensus mechanism abstraction in Coda. For information on the implementation of Proof of Stake in Coda, [see the relevant documentation](proof\__of\__stake.md)._</sup>
+<sup>_NOTE: this document only covers the generalized consensus mechanism abstraction in Coda. For information on the implementation of Proof of Stake in Coda, [see the relevant documentation](proof\_of\_stake.md)._</sup>
 
 ## Data
 
@@ -48,7 +48,7 @@ The `generate_transition` hook fully generates a new protocol state and consensu
 
 The `next_proposal` hook informs the protocol when it is valid to generate and propose the next transition. This hook may either return a time to propose a transition at, or a time to check the hook again. This allows a consensus mechanism to space out proposals, as well as control more advanced scheduling of proposals based on other information in the protocol.
 
-<sup>_For more information on how the `next\__proposal` hook interacts the `Proposer`, see the [`Proposer` documentation](proposer.md#proposal-scheduling)._</sup>
+<sup>_For more information on how the `next_proposal` hook interacts the `Proposer`, see the [`Proposer` documentation](proposer.md#proposal-scheduling)._</sup>
 
 ### next\_state\_checked
 
