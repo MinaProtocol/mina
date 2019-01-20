@@ -1303,7 +1303,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; proposal_interval= Int64.to_int_exn Consensus.Mechanism.block_interval_ms
     ; propose_pubkey=
         Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
-    ; histograms }
+    ; histograms
+    ; consensus_mechanism= Consensus.Mechanism.name }
 
   let get_lite_chain :
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =
