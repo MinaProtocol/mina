@@ -124,27 +124,27 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     Coda_base.Ledger.merkle_root Genesis_ledger.t
     |> Coda_base.Frozen_ledger_hash.of_ledger_hash
 
-  let compute_delegators self_pk ledger =
+  let compute_delegators self_pk ~iter_accounts =
     let open Coda_base in
     let t = Account.Index.Table.create () in
-    Ledger.foldi ledger ~init:() ~f:(fun i () acct ->
+    iter_accounts (fun (acct : Account.t) i ->
         (* TODO: The second disjunct is a hack and should be removed once the delegation
-         command PR lands. *)
+               command PR lands.
+               Also, we now depend on the second disjunct because we take
+               ledger-subset via this logic as well *)
         if
           Public_key.Compressed.equal self_pk acct.delegate
           || Public_key.Compressed.equal self_pk acct.public_key
-        then
-          Hashtbl.add t ~key:(Ledger.Addr.to_int i) ~data:acct.balance
-          |> ignore
+        then Hashtbl.add t ~key:i ~data:acct.balance |> ignore
         else () ) ;
     t
 
   module Local_state = struct
     type t =
-      { mutable last_epoch_ledger: Coda_base.Ledger.t option
-      ; mutable curr_epoch_ledger: Coda_base.Ledger.t option
+      { mutable last_epoch_ledger: Coda_base.Sparse_ledger.t option
+      ; mutable curr_epoch_ledger: Coda_base.Sparse_ledger.t option
       ; mutable delegators: Currency.Balance.t Coda_base.Account.Index.Table.t
-      }
+      ; genesis_epoch_ledger: Coda_base.Sparse_ledger.t }
     [@@deriving sexp]
 
     let create keypair =
@@ -152,11 +152,18 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         match keypair with
         | None -> Coda_base.Account.Index.Table.create ()
         | Some k ->
-            compute_delegators
-              (Public_key.compress k.Keypair.public_key)
-              Genesis_ledger.t
+            compute_delegators (Public_key.compress k.Keypair.public_key)
+              ~iter_accounts:(fun f ->
+                let open Coda_base in
+                Ledger.foldi ~init:() Genesis_ledger.t ~f:(fun i () acct ->
+                    f acct (Ledger.Addr.to_int i) ) )
       in
-      {last_epoch_ledger= None; curr_epoch_ledger= None; delegators}
+      { last_epoch_ledger= None
+      ; curr_epoch_ledger= None
+      ; delegators
+      ; genesis_epoch_ledger=
+          Coda_base.Sparse_ledger.of_ledger_index_subset_exn Genesis_ledger.t
+            (delegators |> Core_kernel.Int.Table.keys) }
   end
 
   module Epoch = struct
@@ -529,7 +536,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           lhs <= rhs
 
         (* It was somewhat involved to implement that check with the small field, so
-          we've stubbed it out for now. *)
+           we've stubbed it out for now. *)
         let is_satisfied ~my_stake:_ ~total_stake:_ _vrf_output =
           let () = assert Coda_base.Insecure.vrf_threshold_check in
           Snark_params.Tick.(Checked.return Boolean.true_)
@@ -585,7 +592,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       let open Option.Let_syntax in
       let%bind ledger =
         if Coda_base.Frozen_ledger_hash.equal ledger_hash genesis_ledger_hash
-        then Some Genesis_ledger.t
+        then Some local_state.Local_state.genesis_epoch_ledger
         else local_state.Local_state.last_epoch_ledger
       in
       Logger.info logger "Checking vrf evaluations at %d:%d"
@@ -610,11 +617,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
                 return
                   (Some
                      { Proposal_data.stake_proof=
-                         { private_key
-                         ; delegator
-                         ; ledger=
-                             Coda_base.Sparse_ledger.of_ledger_index_subset_exn
-                               ledger [delegator] }
+                         {private_key; delegator; ledger}
                      ; vrf_result }) ) ;
           None )
   end
@@ -1364,7 +1367,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
        * epoch. If that is the case, we need to select the staged vrf inputs
        * instead of the last vrf inputs, since if the protocol state were actually
        * up to date with the epoch, those would be the last vrf inputs.
-       *)
+      *)
       let epoch_data =
         Logger.info logger
           !"Selecting correct epoch data from state -- epoch by time: %d, \
@@ -1374,7 +1377,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           (Length.to_int state.epoch_length) ;
         (* If we are in the current epoch or we are in the first epoch (before any
          * transitions), use the last epoch data.
-         *)
+        *)
         if
           Epoch.equal epoch state.curr_epoch
           || Length.equal state.epoch_length Length.zero
@@ -1433,8 +1436,13 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           local_state.delegators <- Coda_base.Account.Index.Table.create ()
       | Some pk ->
           Option.iter local_state.last_epoch_ledger ~f:(fun l ->
-              local_state.delegators <- compute_delegators pk l ) ) ;
-      local_state.curr_epoch_ledger <- Some ledger )
+              local_state.delegators
+              <- compute_delegators pk ~iter_accounts:(fun f ->
+                     Coda_base.Sparse_ledger.iter_accounts l ~f ) ) ) ;
+      local_state.curr_epoch_ledger
+      <- Some
+           (Coda_base.Sparse_ledger.of_ledger_index_subset_exn ledger
+              (local_state.delegators |> Core_kernel.Int.Table.keys)) )
 
   let genesis_protocol_state =
     let consensus_state =

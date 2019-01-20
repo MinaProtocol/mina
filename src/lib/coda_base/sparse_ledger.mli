@@ -19,4 +19,6 @@ val of_ledger_subset_exn : Ledger.t -> Public_key.Compressed.t list -> t
 
 val of_ledger_index_subset_exn : Ledger.t -> int list -> t
 
+val iter_accounts : t -> f:(Account.t -> Account.Index.t -> unit) -> unit
+
 val handler : t -> Handler.t Staged.t
