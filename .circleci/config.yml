@@ -85,7 +85,7 @@ jobs:
                 command: scripts/getkeys.sh
             - run:
                 name: Build OCaml
-                command: eval `opam config env` && DUNE_PROFILE=testnet_posig make build 2>&1 | tee /tmp/buildocaml.log
+                command: eval `opam config env` && DUNE_PROFILE=testnet_postake make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                 name: Build deb Package with verification keys
                 command: make deb
