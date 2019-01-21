@@ -134,9 +134,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     in
     iter_accounts (fun i (acct : Account.t) ->
         (* TODO: The second disjunct is a hack and should be removed once the delegation
-               command PR lands.
-               Also, we now depend on the second disjunct because we take
-               ledger-subset via this logic as well *)
+               command PR lands. *)
         if
           Public_key.Compressed.equal (snd self_pk) acct.delegate
           || matches_pubkey acct.public_key
