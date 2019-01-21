@@ -127,10 +127,10 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
   let compute_delegators self_pk ~iter_accounts =
     let open Coda_base in
     let t = Account.Index.Table.create () in
-    let matches_pubkey =
+    let matches_pubkey pubkey =
       match self_pk with
-      | `Include_self, pk -> Public_key.Compressed.equal pk
-      | `Don't_include_self, _ -> fun _ -> false
+      | `Include_self, pk -> Public_key.Compressed.equal pk pubkey
+      | `Don't_include_self, _ -> false
     in
     iter_accounts (fun i (acct : Account.t) ->
         (* TODO: The second disjunct is a hack and should be removed once the delegation
