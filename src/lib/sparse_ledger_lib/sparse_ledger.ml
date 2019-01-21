@@ -38,7 +38,7 @@ module type S = sig
   val add_path :
     t -> [`Left of hash | `Right of hash] list -> key -> account -> t
 
-  val iter_accounts : t -> f:(account -> index -> unit) -> unit
+  val iteri : t -> f:(index -> account -> unit) -> unit
 
   val merkle_root : t -> hash
 end
@@ -120,10 +120,10 @@ struct
       tree= add_path t.depth t.tree path account
     ; indexes= (key, index) :: t.indexes }
 
-  let iter_accounts t ~f =
+  let iteri t ~f =
     let rec go acc i tree ~f =
       match tree with
-      | Account a -> f a acc
+      | Account a -> f acc a
       | Hash _ -> ()
       | Node (_, l, r) ->
           go acc (i - 1) l ~f ;

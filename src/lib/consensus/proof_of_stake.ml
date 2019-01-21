@@ -127,14 +127,19 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
   let compute_delegators self_pk ~iter_accounts =
     let open Coda_base in
     let t = Account.Index.Table.create () in
-    iter_accounts (fun (acct : Account.t) i ->
+    let matches_pubkey =
+      match self_pk with
+      | `Include_self, pk -> Public_key.Compressed.equal pk
+      | `Don't_include_self, _ -> fun _ -> false
+    in
+    iter_accounts (fun i (acct : Account.t) ->
         (* TODO: The second disjunct is a hack and should be removed once the delegation
                command PR lands.
                Also, we now depend on the second disjunct because we take
                ledger-subset via this logic as well *)
         if
-          Public_key.Compressed.equal self_pk acct.delegate
-          || Public_key.Compressed.equal self_pk acct.public_key
+          Public_key.Compressed.equal (snd self_pk) acct.delegate
+          || matches_pubkey acct.public_key
         then Hashtbl.add t ~key:i ~data:acct.balance |> ignore
         else () ) ;
     t
@@ -152,11 +157,13 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         match keypair with
         | None -> Coda_base.Account.Index.Table.create ()
         | Some k ->
-            compute_delegators (Public_key.compress k.Keypair.public_key)
+            compute_delegators
+              (* TODO: Propagate Include_self to the right place *)
+              (`Include_self, Public_key.compress k.Keypair.public_key)
               ~iter_accounts:(fun f ->
                 let open Coda_base in
                 Ledger.foldi ~init:() Genesis_ledger.t ~f:(fun i () acct ->
-                    f acct (Ledger.Addr.to_int i) ) )
+                    f (Ledger.Addr.to_int i) acct ) )
       in
       { last_epoch_ledger= None
       ; curr_epoch_ledger= None
@@ -1437,8 +1444,11 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       | Some pk ->
           Option.iter local_state.last_epoch_ledger ~f:(fun l ->
               local_state.delegators
-              <- compute_delegators pk ~iter_accounts:(fun f ->
-                     Coda_base.Sparse_ledger.iter_accounts l ~f ) ) ) ;
+              <- compute_delegators
+                   (* TODO: Propagate Include_self to the right place *)
+                   (`Include_self, pk)
+                   ~iter_accounts:(fun f -> Coda_base.Sparse_ledger.iteri l ~f)
+          ) ) ;
       local_state.curr_epoch_ledger
       <- Some
            (Coda_base.Sparse_ledger.of_ledger_index_subset_exn ledger
