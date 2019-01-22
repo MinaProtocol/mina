@@ -10,6 +10,7 @@ compiler: [
 roots: [
   "async_ssl.v0.11.0"
   "bignum.v0.11.0"
+  "bisect_ppx.1.4.0"
   "bitstring.3.1.0"
   "camlp4.4.07+1"
   "cohttp-async.1.2.0"
