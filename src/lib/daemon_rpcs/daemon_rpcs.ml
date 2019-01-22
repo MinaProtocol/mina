@@ -143,7 +143,8 @@ module Types = struct
       ; run_snark_worker: bool
       ; proposal_interval: int
       ; propose_pubkey: Public_key.t option
-      ; histograms: Histograms.t option }
+      ; histograms: Histograms.t option
+      ; consensus_mechanism: string }
     [@@deriving to_yojson, bin_io, fields]
 
     (* Text response *)
@@ -193,6 +194,8 @@ module Types = struct
             | None -> acc
             | Some histograms ->
                 ("Histograms", Histograms.to_text histograms) :: acc )
+          ~consensus_mechanism:(fun acc x ->
+            ("Consensus Mechanism", f x) :: acc )
         |> List.rev
       in
       digest_entries ~title entries
