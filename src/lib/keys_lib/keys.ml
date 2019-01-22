@@ -99,8 +99,7 @@ let create () : (module S) Async.Deferred.t =
         module Step = struct
           include (
             Step :
-              module type of Step
-              with module Prover_state := Step.Prover_state )
+              module type of Step with module Prover_state := Step.Prover_state )
 
           module Prover_state = Step_prover_state
 
@@ -127,12 +126,11 @@ let create () : (module S) Async.Deferred.t =
           end
 
           let main x =
-            let there {Prover_state.wrap_vk; prev_proof; prev_state; update}
-                =
+            let there {Prover_state.wrap_vk; prev_proof; prev_state; update} =
               {Step.Prover_state.wrap_vk; prev_proof; prev_state; update}
             in
-            let back
-                {Step.Prover_state.wrap_vk; prev_proof; prev_state; update} =
+            let back {Step.Prover_state.wrap_vk; prev_proof; prev_state; update}
+                =
               {Prover_state.wrap_vk; prev_proof; prev_state; update}
             in
             let open Tick in
@@ -145,8 +143,7 @@ let create () : (module S) Async.Deferred.t =
         module Wrap = struct
           include (
             Wrap :
-              module type of Wrap
-              with module Prover_state := Wrap.Prover_state )
+              module type of Wrap with module Prover_state := Wrap.Prover_state )
 
           module Prover_state = Wrap_prover_state
 

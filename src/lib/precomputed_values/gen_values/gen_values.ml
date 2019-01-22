@@ -37,8 +37,7 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
   let loc = Ppxlib.Location.none
 
   let base_hash =
-    Keys.Step.instance_hash
-      Consensus.Mechanism.genesis_protocol_state.data
+    Keys.Step.instance_hash Consensus.Mechanism.genesis_protocol_state.data
 
   let base_hash_expr =
     [%expr
@@ -68,8 +67,7 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
         Consensus.Mechanism.Prover_state.dummy_handler
     in
     printf
-      !"State out of snark: %{sexp: \
-        Consensus.Mechanism.Protocol_state.value}\n\
+      !"State out of snark: %{sexp: Consensus.Mechanism.Protocol_state.value}\n\
         %!"
       Consensus.Mechanism.genesis_protocol_state.data ;
     let tick =
