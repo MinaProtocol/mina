@@ -49,7 +49,7 @@ jobs:
             - restore_cache:
                 keys:
                     - macos-v1
-                    - macos-v1-opam
+                    - macos-v2-opam
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
@@ -63,7 +63,7 @@ jobs:
                 name: Compile Deps -- make macos-setup-compile
                 command: make macos-setup-compile
             - save_cache:
-                key: macos-v1-opam
+                key: macos-v2-opam
                 paths:
                     - "/Users/distiller/.opam"
             - run:
