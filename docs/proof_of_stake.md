@@ -1,7 +1,7 @@
 Proof of Stake
 ==============
 
-The proof of stake consensus mechanism implemented in Coda is a version of the [Ouroboros Praos]() protocol, extended and modified slightly for our sucinct blockchain. This document will provide an high level overview of how Ouroboros proof of stake works with detailed sections on our changes and additions. For a full description of the Ouroboros protocol, please refer to the original Ouroboros papers: [the original]() and [Praos]().
+The proof of stake consensus mechanism implemented in Coda is a version of the [Ouroboros Praos](https://iohk.io/research/papers/#XJ6MHFXX) protocol, extended and modified slightly for our sucinct blockchain. This document will provide an high level overview of how Ouroboros proof of stake works with detailed sections on our changes and additions. For a full description of the Ouroboros protocol, please refer to the original Ouroboros papers: [the original](https://eprint.iacr.org/2016/889.pdf) and [Praos](https://eprint.iacr.org/2017/573.pdf).
 
 ### A note on Praos, Genesis, and Coda
 
