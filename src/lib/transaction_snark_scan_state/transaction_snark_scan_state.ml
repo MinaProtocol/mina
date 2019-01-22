@@ -444,7 +444,8 @@ end = struct
     in
     Yojson.Safe.to_string (`List (List.map all_jobs ~f:Job_view.to_yojson))
 
-  let _sequence_chunks_of seq ~n =
+  (*create chunks of full capacity only*)
+  let sequence_chunks_of seq n =
     Sequence.unfold_step ~init:([], 0, seq) ~f:(fun (acc, i, seq) ->
         if i = n then Yield (List.rev acc, ([], 0, seq))
         else
@@ -471,9 +472,15 @@ end = struct
   let min_work_to_do scan_state :
       Transaction_snark_work.Statement.t Sequence.t Or_error.t =
     let open Or_error.Let_syntax in
-    let%map work_seq = filter_jobs_by_seq_no scan_state in
+    let%bind work_seq = filter_jobs_by_seq_no scan_state in
+    let%map all_work = next_jobs_sequence scan_state in
+    let f =
+      if Sequence.length work_seq = Sequence.length all_work then
+        Sequence.chunks_exn
+      else sequence_chunks_of
+    in
     Core.printf "work count: %d \n %!" (Sequence.length work_seq) ;
-    Sequence.chunks_exn
+    f
       (Sequence.map work_seq ~f:(fun maybe_work ->
            match statement_of_job maybe_work with
            | None -> assert false
