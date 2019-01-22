@@ -338,8 +338,13 @@ struct
         | [] -> [] )
       |> ignore
 
+    let keys t =
+      Location.Table.data t.account_tbl
+      |> List.map ~f:Account.public_key
+      |> Key.Set.of_list
+
     let num_accounts t =
-      Base.num_accounts (get_parent t) + Location.Table.length t.account_tbl
+      Key.Set.union (Base.keys (get_parent t)) (keys t) |> Key.Set.length
 
     let location_of_key t key =
       let mask_result = find_location t key in
