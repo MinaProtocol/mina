@@ -53,6 +53,8 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
   module Prover_state = struct
     include Unit
 
+    let dummy_handler _ = Snarky.Request.unhandled
+
     let handler _ _ = Snarky.Request.unhandled
   end
 

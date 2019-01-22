@@ -138,7 +138,7 @@ struct
       let%bind prev_state = exists' State.typ ~f:Prover_state.prev_state
       and update = exists' Update.typ ~f:Prover_state.update in
       let%bind prev_state_hash = State.Checked.hash prev_state in
-      let%bind next_state_hash, _next_state, `Success success =
+      let%bind next_state_hash, next_state, `Success success =
         with_label __LOC__
           (State.Checked.update (prev_state_hash, prev_state) update)
       in
@@ -152,6 +152,16 @@ struct
       in
       let%bind wrap_vk_section = hash_vk_data wrap_vk_data in
       let%bind () =
+        let%bind () =
+          exists Typ.unit
+            ~compute:
+              As_prover.(
+                Let_syntax.(
+                  let%map next_state = read State.typ next_state in
+                  printf
+                    !"State in the snark: %{sexp: State.value}\n%!"
+                    next_state))
+        in
         with_label __LOC__
           (let%bind sh = State.Hash.var_to_triples next_state_hash in
            (* We could be reusing the intermediate state of the hash on sh here instead of

@@ -63,10 +63,19 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
       ; prev_state= Keys.Consensus_mechanism.Protocol_state.negative_one
       ; update= Keys.Consensus_mechanism.Snark_transition.genesis }
     in
+    let main x =
+      Tick.handle (Keys.Step.main x)
+        Consensus.Mechanism.Prover_state.dummy_handler
+    in
+    printf
+      !"State out of snark: %{sexp: \
+        Keys.Consensus_mechanism.Protocol_state.value}\n\
+        %!"
+      Keys.Consensus_mechanism.genesis_protocol_state.data ;
     let tick =
       Tick.prove
         (Tick.Keypair.pk Keys.Step.keys)
-        (Keys.Step.input ()) prover_state Keys.Step.main base_hash
+        (Keys.Step.input ()) prover_state main base_hash
     in
     let proof = wrap base_hash tick in
     [%expr
