@@ -38,7 +38,7 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
 
   let base_hash =
     Keys.Step.instance_hash
-      Keys.Consensus_mechanism.genesis_protocol_state.data
+      Consensus.Mechanism.genesis_protocol_state.data
 
   let base_hash_expr =
     [%expr
@@ -60,8 +60,8 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
     let prover_state =
       { Keys.Step.Prover_state.prev_proof= Tock.Proof.dummy
       ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-      ; prev_state= Keys.Consensus_mechanism.Protocol_state.negative_one
-      ; update= Keys.Consensus_mechanism.Snark_transition.genesis }
+      ; prev_state= Consensus.Mechanism.Protocol_state.negative_one
+      ; update= Consensus.Mechanism.Snark_transition.genesis }
     in
     let main x =
       Tick.handle (Keys.Step.main x)
@@ -69,9 +69,9 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
     in
     printf
       !"State out of snark: %{sexp: \
-        Keys.Consensus_mechanism.Protocol_state.value}\n\
+        Consensus.Mechanism.Protocol_state.value}\n\
         %!"
-      Keys.Consensus_mechanism.genesis_protocol_state.data ;
+      Consensus.Mechanism.genesis_protocol_state.data ;
     let tick =
       Tick.prove
         (Tick.Keypair.pk Keys.Step.keys)
@@ -94,8 +94,7 @@ let main () =
   let%bind (module M) =
     if use_dummy_values then return (module Dummy : S)
     else
-      let module Keys = Keys_lib.Keys.Make (Consensus.Mechanism) in
-      let%map (module K) = Keys.create () in
+      let%map (module K) = Keys_lib.Keys.create () in
       (module Make_real (K) : S)
   in
   let structure =

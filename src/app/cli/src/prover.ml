@@ -53,8 +53,7 @@ module Worker_state = struct
 
   let create () : t Deferred.t =
     Deferred.return
-      (let module Keys = Keys_lib.Keys.Make (Consensus_mechanism) in
-      let%map (module Keys) = Keys.create () in
+      (let%map (module Keys) = Keys_lib.Keys.create () in
       let module Transaction_snark =
       Transaction_snark.Verification.Make (struct
         let keys = Keys.transaction_snark_keys
@@ -62,10 +61,10 @@ module Worker_state = struct
       let module M = struct
         open Snark_params
         open Keys
-        module Consensus_mechanism = Keys.Consensus_mechanism
+        module Consensus_mechanism = Consensus.Mechanism
         module Transaction_snark = Transaction_snark
         module Blockchain_state =
-          Blockchain_state.Make (Keys.Consensus_mechanism)
+          Blockchain_state.Make (Consensus.Mechanism)
         module State = Blockchain_state.Make_update (Transaction_snark)
 
         let wrap hash proof =
@@ -76,8 +75,8 @@ module Worker_state = struct
             (Wrap_input.of_tick_field hash)
 
         let extend_blockchain (chain : Blockchain.t)
-            (next_state : Keys.Consensus_mechanism.Protocol_state.value)
-            (block : Keys.Consensus_mechanism.Snark_transition.value)
+            (next_state : Consensus.Mechanism.Protocol_state.value)
+            (block : Consensus.Mechanism.Snark_transition.value)
             state_for_handler =
           let next_state_top_hash = Keys.Step.instance_hash next_state in
           let prover_state =
