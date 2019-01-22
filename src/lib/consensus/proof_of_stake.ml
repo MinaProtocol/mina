@@ -1481,7 +1481,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       Or_error.ok_exn
         (Consensus_state.update
            ~proposer_vrf_result:
-             (let pk, sk = Coda_base.Sample_keypairs.keypairs.(0) in
+             (let _pk, sk = Coda_base.Sample_keypairs.keypairs.(0) in
               Vrf.eval ~private_key:sk
                 Vrf.
                   { Message.epoch= Epoch.zero
