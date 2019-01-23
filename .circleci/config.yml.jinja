@@ -6,6 +6,7 @@ jobs:
             - image: codaprotocol/coda:toolchain-rust-5b183eb006ea0bf720c8f14965c31f7890909e91
         steps:
             - checkout
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
                 name: Build trace-tool
                 command: cd src/app/trace-tool && cargo build --frozen
@@ -16,6 +17,7 @@ jobs:
         - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
         steps:
             - checkout
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
                 name: Lint
                 command: eval `opam config env` && make check-format
@@ -49,6 +51,7 @@ jobs:
                     - macos-v1
                     - macos-v1-opam
             - checkout
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
                 name: Download Deps -- make macos-setup-download
                 command: make macos-setup-download
@@ -76,6 +79,7 @@ jobs:
         - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
         steps:
             - checkout
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
                 name: Download Stable Proving Keys
                 command: scripts/getkeys.sh
@@ -103,6 +107,7 @@ jobs:
         - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
         steps:
             - checkout
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
                 name: Build OCaml
                 command: eval `opam config env` && DUNE_PROFILE=testnet_public make build 2>&1 | tee /tmp/buildocaml.log
@@ -121,9 +126,10 @@ jobs:
        - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
        steps:
            - checkout
+           - run: git submodule sync && git submodule update --init --recursive
            - run:
               name: Test make test-runtest
-              command: source ~/.profile && DUNE_PROFILE=test_sigs make test-runtest
+              command: source ~/.profile && DUNE_PROFILE=test_sigs MYPROCS=8 make test-runtest
 
     test-withsnark:
         resource_class: large
@@ -131,6 +137,7 @@ jobs:
         - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
         steps:
             - checkout
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
                 name: Build OCaml
                 command: eval `opam config env` && DUNE_PROFILE=test_snark make build 2>&1 | tee /tmp/buildocaml.log
@@ -145,6 +152,7 @@ jobs:
       - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
       steps:
           - checkout
+          - run: git submodule sync && git submodule update --init --recursive
           - run:
               name: Check .circleci Render
               command: make check-render-circleci

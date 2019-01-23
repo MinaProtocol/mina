@@ -32,11 +32,19 @@ if [[ $DOWNLOAD_THINGS == "YES" ]]; then
     PACKAGES=${PACKAGES//$p/}
   done;
 
-  yes | env HOMEBREW_NO_AUTO_UPDATE=1 brew install $PACKAGES
+  # only run if there's work to do
+  if [[ $PACKAGES = *[![:space:]]* ]];
+   then
+    yes | env HOMEBREW_NO_AUTO_UPDATE=1 brew install $PACKAGES
+  else
+    echo 'All brew packages have already been installed.'
+  fi
 
   # ocaml downloading
   yes | opam init
   eval $(opam config env)
+else
+  echo 'Not running download step'
 fi
 
 
@@ -58,5 +66,6 @@ if [[ $COMPILE_THINGS == "YES" ]]; then
   . ~/.nix-profile/etc/profile.d/nix.sh
   set -u
   make kademlia
+else
+  echo 'Not running compile step.'
 fi
-
