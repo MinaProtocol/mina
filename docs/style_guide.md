@@ -202,7 +202,7 @@ let%test_unit =
 <a name="functors"></a>
 ### Functors
 
-We are in the process of migrating to using module signature equalities -- see [the style guidelines](style_guidelines.md#functor-signature-equalities) and [the rfc for rationale](../rfcs/0004-style-guidelines.md), but we still have a lot of code using type substitutions (`with type foo := bar`).
+We are in the process of migrating to using module signature equalities -- see [the above section](#functor-signature-equalities) and [the rfc for rationale](../rfcs/0004-style-guidelines.md), but we still have a lot of code using type substitutions (`with type foo := bar`).
 
 In [signature_lib/checked.ml](../src/lib/signature_lib/checked.ml) we have an example of a definition using type substitutions. First we define the resulting module type of the functor, keeping all types we'll be functoring in abstract.
 

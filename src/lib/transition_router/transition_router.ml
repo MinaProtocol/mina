@@ -82,7 +82,7 @@ module Make (Inputs : Inputs_intf) :
   let create_bufferred_pipe () =
     Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
 
-  let kill reader writer =
+  let _kill reader writer =
     Strict_pipe.Reader.clear reader ;
     Strict_pipe.Writer.close writer
 
@@ -114,7 +114,7 @@ module Make (Inputs : Inputs_intf) :
     let get {var; _} = var
   end
 
-  let set_bootstrap_phase ~controller_type root_state
+  let _set_bootstrap_phase ~controller_type root_state
       bootstrap_controller_writer =
     assert (not @@ is_bootstrapping (Broadcaster.get controller_type)) ;
     Broadcaster.broadcast controller_type
@@ -126,13 +126,15 @@ module Make (Inputs : Inputs_intf) :
     Broadcaster.broadcast controller_type
       (`Transition_frontier_controller (new_frontier, reader, writer))
 
-  let run ~logger ~network ~time_controller ~frontier_mvar ~ledger_db
+  let run ~logger ~network ~time_controller ~frontier_mvar ~ledger_db:_
       ~network_transition_reader ~proposer_transition_reader =
     let clean_transition_frontier_controller_and_start_bootstrap
-        ~controller_type ~clear_writer ~transition_frontier_controller_reader
-        ~transition_frontier_controller_writer ~old_frontier
-        (`Transition incoming_transition, `Time_received tm) =
-      kill transition_frontier_controller_reader
+        ~controller_type:_ ~clear_writer:_
+        ~transition_frontier_controller_reader:_
+        ~transition_frontier_controller_writer:_ ~old_frontier:_
+        (`Transition _incoming_transition, `Time_received _tm) =
+      failwith "Bootstrap is disabled as there this an infinite loop here"
+      (*      kill transition_frontier_controller_reader
         transition_frontier_controller_writer ;
       Strict_pipe.Writer.write clear_writer `Clear |> don't_wait_for ;
       let bootstrap_controller_reader, bootstrap_controller_writer =
@@ -152,7 +154,7 @@ module Make (Inputs : Inputs_intf) :
           ~transition_reader:bootstrap_controller_reader
       in
       kill bootstrap_controller_reader bootstrap_controller_writer ;
-      new_frontier
+      new_frontier *)
     in
     let start_transition_frontier_controller ~verified_transition_writer
         ~clear_reader frontier =
