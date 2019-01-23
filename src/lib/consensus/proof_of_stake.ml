@@ -607,7 +607,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           | _ -> ledger_handler t
 
       let vrf_output =
-        let pk, sk = Coda_base.Sample_keypairs.keypairs.(0) in
+        let _, sk = Coda_base.Sample_keypairs.keypairs.(0) in
         eval ~private_key:sk
           { Message.epoch= Epoch.zero
           ; slot= Epoch.Slot.zero
