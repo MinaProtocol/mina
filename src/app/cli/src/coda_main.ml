@@ -171,10 +171,12 @@ module type Main_intf = sig
       type t
 
       module Peer : sig
-        type t = Host_and_port.Stable.V1.t * int
+        type t =
+          { host: Unix.Inet_addr.Blocking_sexp.t
+          ; discovery_port: int (* UDP *)
+          ; communication_port: int
+          (* TCP *) }
         [@@deriving bin_io, sexp, compare, hash]
-
-        val external_rpc : t -> Host_and_port.Stable.V1.t
       end
 
       module Gossip_net : sig
@@ -1292,13 +1294,17 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; state_hash
     ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
-    ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
+    ; peers=
+        List.map (peers t) ~f:(fun peer ->
+            Kademlia.Peer.to_discovery_host_and_port peer
+            |> Host_and_port.to_string )
     ; user_commands_sent= !txn_count
     ; run_snark_worker= run_snark_worker t
     ; proposal_interval= Int64.to_int_exn Consensus.Mechanism.block_interval_ms
     ; propose_pubkey=
         Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
-    ; histograms }
+    ; histograms
+    ; consensus_mechanism= Consensus.Mechanism.name }
 
   let get_lite_chain :
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =
