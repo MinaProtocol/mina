@@ -297,16 +297,23 @@ module Make (Inputs : Inputs_intf) :
                   Interruptible.uninterruptible
                     (let open Deferred.Let_syntax in
                     let t0 = Time.now time_controller in
+                    printf
+                      !"State out of checked: %{sexp: Protocol_state.value}\n\
+                        %!"
+                      protocol_state ;
                     match%bind
                       Prover.prove ~prev_state:previous_protocol_state
                         ~prev_state_proof:previous_protocol_state_proof
                         ~next_state:protocol_state internal_transition
                     with
                     | Error err ->
-                        Logger.error logger
-                          "failed to prove generated protocol state: %s"
-                          (Error.to_string_hum err) ;
-                        return ()
+                        failwithf
+                          "failed to prove generated protocol state; %s"
+                          (Error.to_string_hum err) ()
+                    (*Logger.error logger*)
+                    (*"failed to prove generated protocol state: %s"*)
+                    (*(Error.to_string_hum err) ;*)
+                    (*return ()*)
                     | Ok protocol_state_proof ->
                         let span = Time.diff (Time.now time_controller) t0 in
                         Logger.info logger

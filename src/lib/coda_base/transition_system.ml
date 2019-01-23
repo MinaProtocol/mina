@@ -152,6 +152,14 @@ struct
       in
       let%bind wrap_vk_section = hash_vk_data wrap_vk_data in
       let%bind () =
+        let%bind () =
+          exists Typ.unit
+            ~compute:
+              As_prover.(
+                Let_syntax.(
+                  let%map state = read State.typ next_state in
+                  printf !"State in checked: %{sexp: State.value}\n%!" state))
+        in
         with_label __LOC__
           (let%bind sh = State.Hash.var_to_triples next_state_hash in
            (* We could be reusing the intermediate state of the hash on sh here instead of
