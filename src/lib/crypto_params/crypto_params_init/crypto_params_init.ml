@@ -54,7 +54,7 @@ module Wrap_input = struct
 
     module Checked : sig
       val tick_field_to_scalars :
-           Tick0.Field.var
+           Tick0.Field.Var.t
         -> (Tick0.Boolean.var Bitstring.Lsb_first.t list, _) Tick0.Checked.t
 
       val to_scalar : var -> (Boolean.var Bitstring.Lsb_first.t, _) Checked.t
@@ -64,7 +64,7 @@ module Wrap_input = struct
   module Tock_field_larger : S = struct
     open Tock0
 
-    type var = Field.var
+    type var = Field.Var.t
 
     type t = Field.t
 
@@ -90,7 +90,7 @@ module Wrap_input = struct
   module Tock_field_smaller : S = struct
     open Tock0
 
-    type var = {low_bits: Field.var; high_bit: Boolean.var}
+    type var = {low_bits: Field.Var.t; high_bit: Boolean.var}
 
     type t = Tick0.Field.t
 

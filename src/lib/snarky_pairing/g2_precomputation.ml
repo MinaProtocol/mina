@@ -39,7 +39,7 @@ struct
   type loop_state = {rx: Fqe.t; ry: Fqe.t}
 
   let length (a, b, c) =
-    let l = Field.Checked.length in
+    let l = Field.Var.length in
     max (l a) (max (l b) (l c))
 
   (* I verified using sage that if the input [s] satisfies ry^2 = rx^3 + a rx + b, then
