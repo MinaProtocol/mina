@@ -100,7 +100,7 @@ module type Config_intf = sig
 
   val scan_state_size_incr : int
 
-  val work_availability_factor : int
+  val work_capacity : int
 
   val commit_id : Daemon_rpcs.Types.Git_sha.t option
 

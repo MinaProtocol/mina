@@ -46,7 +46,7 @@ let run_test () : unit Deferred.t =
 
     let scan_state_size_incr = 2
 
-    let work_availability_factor = scan_state_size_incr - 1
+    let work_capacity = scan_state_size_incr - 1
 
     let commit_id = None
 

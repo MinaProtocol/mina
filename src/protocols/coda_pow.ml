@@ -676,6 +676,8 @@ module type Transaction_snark_scan_state_intf = sig
 
   val min_work_to_do :
     t -> transaction_snark_work_statement Sequence.t Or_error.t
+
+  val current_job_count : t -> int
 end
 
 module type Staged_ledger_base_intf = sig

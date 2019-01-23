@@ -89,6 +89,6 @@ module type S = sig
 
     val scan_state_size_incr : int
 
-    val work_availability_factor : int
+    val work_capacity : int
   end
 end
