@@ -268,7 +268,7 @@ let run_test () : unit Deferred.t =
         assert_balance key data ) ;
     block_count coda
   in
-  let test_duplicate_payments (sender_keypair : Signature_lib.Keypair.t)
+  let _test_duplicate_payments (sender_keypair : Signature_lib.Keypair.t)
       (receiver_keypair : Signature_lib.Keypair.t) =
     let%bind () =
       test_sending_payment sender_keypair.private_key
@@ -313,6 +313,10 @@ let run_test () : unit Deferred.t =
            (Genesis_ledger.keypair_of_account_record_exn (sk, account), account)
        )
   in
+  let accoutns = List.take other_accounts 2 in
+  let%map _ = test_multiple_payments accoutns (pks accoutns) 5. in
+  ()
+  (*
   if with_snark then
     let accounts = List.take other_accounts 2 in
     let%bind block_count' =
@@ -327,7 +331,7 @@ let run_test () : unit Deferred.t =
     let%bind _ =
       test_multiple_payments other_accounts (pks other_accounts) 5.
     in
-    test_duplicate_payments sender_keypair receiver_keypair
+    test_duplicate_payments sender_keypair receiver_keypair*)
 
 let command =
   let open Core in

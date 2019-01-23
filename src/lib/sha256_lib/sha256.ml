@@ -51,12 +51,18 @@ let digest_string (s : string) : Digest.t =
   let t =
     if r = 0 then s else s ^ String.init ~f:(fun _ -> '\000') (block_length - r)
   in
-  Digest.of_bits (Digestif.SHA256.(feed_string (init ()) t).h |> words_to_bits)
+  let ctx = Digestif.SHA256.init () in
+  let ctx' = Digestif.SHA256.feed_string ctx t in
+  let digest = (Digestif.SHA256.get ctx' :> string) in
+  let bit_at s i = (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1 in
+  let bits = List.init 256 ~f:(bit_at digest) in
+  Digest.of_bits bits
 
 let digest_bits (bits : bool list) : Digest.t =
-  Digest.of_bits
-  @@ ( Digestif.SHA256.(feed_string (init ()) (bits_to_string (pad false bits)))
-         .h |> words_to_bits )
+  let digest = (Digestif.SHA256.(feed_string (init ()) (bits_to_string (pad false bits))|>get) :> string) in
+  let bit_at s i = (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1 in
+  let bits = List.init 256 ~f:(bit_at digest) in
+  Digest.of_bits bits
 
 module Checked = struct
   open Tick
