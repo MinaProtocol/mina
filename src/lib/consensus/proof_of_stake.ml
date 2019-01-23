@@ -764,7 +764,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       ; seed= Epoch_seed.initial
       ; start_checkpoint= Coda_base.State_hash.(of_hash zero)
       ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
-      ; length= Length.zero }
+      ; length= Length.of_int 1 }
 
     let update_pair (last_data, curr_data) epoch_length ~prev_epoch ~next_epoch
         ~curr_slot ~prev_protocol_state_hash ~proposer_vrf_result
@@ -777,7 +777,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
             ; ledger= {hash= snarked_ledger_hash; total_currency}
             ; start_checkpoint= prev_protocol_state_hash
             ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
-            ; length= Length.zero }
+            ; length= Length.of_int 1 }
           , Length.succ epoch_length )
         else (
           assert (Epoch.equal next_epoch prev_epoch) ;
