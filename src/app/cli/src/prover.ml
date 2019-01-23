@@ -53,58 +53,56 @@ module Worker_state = struct
 
   let create () : t Deferred.t =
     Deferred.return
-      (let module Keys = Keys_lib.Keys.Make (Consensus_mechanism) in
-      let%map (module Keys) = Keys.create () in
-      let module Transaction_snark =
-      Transaction_snark.Verification.Make (struct
-        let keys = Keys.transaction_snark_keys
-      end) in
-      let module M = struct
-        open Snark_params
-        open Keys
-        module Consensus_mechanism = Keys.Consensus_mechanism
-        module Transaction_snark = Transaction_snark
-        module Blockchain_state =
-          Blockchain_state.Make (Keys.Consensus_mechanism)
-        module State = Blockchain_state.Make_update (Transaction_snark)
+      (let%map (module Keys) = Keys_lib.Keys.create () in
+       let module Transaction_snark =
+       Transaction_snark.Verification.Make (struct
+         let keys = Keys.transaction_snark_keys
+       end) in
+       let module M = struct
+         open Snark_params
+         open Keys
+         module Consensus_mechanism = Consensus.Mechanism
+         module Transaction_snark = Transaction_snark
+         module Blockchain_state = Blockchain_state.Make (Consensus.Mechanism)
+         module State = Blockchain_state.Make_update (Transaction_snark)
 
-        let wrap hash proof =
-          let module Wrap = Keys.Wrap in
-          Tock.prove
-            (Tock.Keypair.pk Wrap.keys)
-            Wrap.input {Wrap.Prover_state.proof} Wrap.main
-            (Wrap_input.of_tick_field hash)
+         let wrap hash proof =
+           let module Wrap = Keys.Wrap in
+           Tock.prove
+             (Tock.Keypair.pk Wrap.keys)
+             Wrap.input {Wrap.Prover_state.proof} Wrap.main
+             (Wrap_input.of_tick_field hash)
 
-        let extend_blockchain (chain : Blockchain.t)
-            (next_state : Keys.Consensus_mechanism.Protocol_state.value)
-            (block : Keys.Consensus_mechanism.Snark_transition.value)
-            state_for_handler =
-          let next_state_top_hash = Keys.Step.instance_hash next_state in
-          let prover_state =
-            { Keys.Step.Prover_state.prev_proof= chain.proof
-            ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-            ; prev_state= chain.state
-            ; update= block }
-          in
-          let main x =
-            Tick.handle (Keys.Step.main x)
-              (Consensus_mechanism.Prover_state.handler state_for_handler)
-          in
-          let prev_proof =
-            Tick.prove
-              (Tick.Keypair.pk Keys.Step.keys)
-              (Keys.Step.input ()) prover_state main next_state_top_hash
-          in
-          { Blockchain.state= next_state
-          ; proof= wrap next_state_top_hash prev_proof }
+         let extend_blockchain (chain : Blockchain.t)
+             (next_state : Consensus.Mechanism.Protocol_state.value)
+             (block : Consensus.Mechanism.Snark_transition.value)
+             state_for_handler =
+           let next_state_top_hash = Keys.Step.instance_hash next_state in
+           let prover_state =
+             { Keys.Step.Prover_state.prev_proof= chain.proof
+             ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
+             ; prev_state= chain.state
+             ; update= block }
+           in
+           let main x =
+             Tick.handle (Keys.Step.main x)
+               (Consensus_mechanism.Prover_state.handler state_for_handler)
+           in
+           let prev_proof =
+             Tick.prove
+               (Tick.Keypair.pk Keys.Step.keys)
+               (Keys.Step.input ()) prover_state main next_state_top_hash
+           in
+           { Blockchain.state= next_state
+           ; proof= wrap next_state_top_hash prev_proof }
 
-        let verify state proof =
-          Tock.verify proof
-            (Tock.Keypair.vk Wrap.keys)
-            Wrap.input
-            (Wrap_input.of_tick_field (Keys.Step.instance_hash state))
-      end in
-      (module M : S))
+         let verify state proof =
+           Tock.verify proof
+             (Tock.Keypair.vk Wrap.keys)
+             Wrap.input
+             (Wrap_input.of_tick_field (Keys.Step.instance_hash state))
+       end in
+       (module M : S))
 
   let get = Fn.id
 end
