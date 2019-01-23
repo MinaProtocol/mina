@@ -17,6 +17,8 @@ depends: [
   "jbuilder"                {build & >= "1.0+beta18.1"}
   "ocaml-migrate-parsetree" {>= "1.0"}
   "ppxlib"                  {>= "0.1.0"}
+  "ctypes"                  {>= "0.14" & < "0.15" }
+  "ctypes-foreign"          {>= "0.4" & < "0.5" }
 ]
 available: [ ocaml-version >= "4.04.1" ]
 descr: "
