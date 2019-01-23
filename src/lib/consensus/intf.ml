@@ -6,6 +6,8 @@ open Coda_numbers
 module type Prover_state_intf = sig
   type t [@@deriving bin_io, sexp]
 
+  val precomputed_handler : Snark_params.Tick.Handler.t
+
   val handler : t -> Snark_params.Tick.Handler.t
 end
 
