@@ -429,10 +429,10 @@ module type Transaction_snark_work_intf = sig
   end
 
   (* TODO: The SOK message actually should bind the SNARK to
-   be in this particular bundle. The easiest way would be to
-   SOK with
-   H(all_statements_in_bundle || fee || public_key)
-*)
+     be in this particular bundle. The easiest way would be to
+     SOK with
+     H(all_statements_in_bundle || fee || public_key)
+  *)
 
   type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
   [@@deriving sexp, bin_io]
