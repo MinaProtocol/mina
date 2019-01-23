@@ -591,6 +591,30 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
 
     let eval = T.eval
 
+    module Precomputed = struct
+      let handler : Snark_params.Tick.Handler.t =
+        let pk, sk = Coda_base.Sample_keypairs.keypairs.(0) in
+        let dummy_sparse_ledger =
+          Coda_base.Sparse_ledger.of_ledger_subset_exn Genesis_ledger.t [pk]
+        in
+        let ledger_handler =
+          unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger)
+        in
+        fun (With {request; respond} as t) ->
+          match request with
+          | Winner_address -> respond (Provide 0)
+          | Private_key -> respond (Provide sk)
+          | _ -> ledger_handler t
+
+      let vrf_output =
+        let pk, sk = Coda_base.Sample_keypairs.keypairs.(0) in
+        eval ~private_key:sk
+          { Message.epoch= Epoch.zero
+          ; slot= Epoch.Slot.zero
+          ; seed= Epoch_seed.initial
+          ; delegator= 0 }
+    end
+
     let check ~local_state ~epoch ~slot ~seed ~private_key ~total_stake
         ~ledger_hash ~logger =
       let open Message in
@@ -1027,7 +1051,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       ; last_epoch_data
       ; curr_epoch_data }
 
-    module Scoped = struct
+    include struct
       open Crypto_params_init.Tick0
 
       let%snarkydef update_var (previous_state : var)
@@ -1125,8 +1149,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
             ; curr_epoch_data= curr_data } )
     end
 
-    include Scoped
-
     let length (t : value) = t.length
 
     let to_lite = None
@@ -1148,19 +1170,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
   module Prover_state = struct
     include Coda_base.Stake_proof
 
-    let dummy_handler : Snark_params.Tick.Handler.t =
-      let pk, sk = Coda_base.Sample_keypairs.keypairs.(0) in
-      let dummy_sparse_ledger =
-        Coda_base.Sparse_ledger.of_ledger_subset_exn Genesis_ledger.t [pk]
-      in
-      let ledger_handler =
-        unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger)
-      in
-      fun (With {request; respond} as t) ->
-        match request with
-        | Vrf.Winner_address -> respond (Provide 0)
-        | Vrf.Private_key -> respond (Provide sk)
-        | _ -> ledger_handler t
+    let precomputed_handler = Vrf.Precomputed.handler
 
     let handler {delegator; ledger; private_key} : Snark_params.Tick.Handler.t
         =
@@ -1269,7 +1279,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       (consensus_state.curr_epoch, consensus_state.curr_slot)
       ~time_received
 
-  module Scoped = struct
+  include struct
     open Crypto_params_init.Tick0
 
     let%snarkydef next_state_checked ~(prev_state : Protocol_state.var)
@@ -1283,8 +1293,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           ( Protocol_state.blockchain_state prev_state
           |> Blockchain_state.ledger_hash )
   end
-
-  include Scoped
 
   let select ~existing ~candidate ~logger =
     let open Consensus_state in
@@ -1479,15 +1487,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
   let genesis_protocol_state =
     let consensus_state =
       Or_error.ok_exn
-        (Consensus_state.update
-           ~proposer_vrf_result:
-             (let _pk, sk = Coda_base.Sample_keypairs.keypairs.(0) in
-              Vrf.eval ~private_key:sk
-                Vrf.
-                  { Message.epoch= Epoch.zero
-                  ; slot= Epoch.Slot.zero
-                  ; seed= Epoch_seed.initial
-                  ; delegator= 0 })
+        (Consensus_state.update ~proposer_vrf_result:Vrf.Precomputed.vrf_output
            ~previous_consensus_state:
              Protocol_state.(consensus_state negative_one)
            ~previous_protocol_state_hash:Protocol_state.(hash negative_one)

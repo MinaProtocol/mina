@@ -64,12 +64,8 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
     in
     let main x =
       Tick.handle (Keys.Step.main x)
-        Consensus.Mechanism.Prover_state.dummy_handler
+        Consensus.Mechanism.Prover_state.precomputed_handler
     in
-    printf
-      !"State out of snark: %{sexp: Consensus.Mechanism.Protocol_state.value}\n\
-        %!"
-      Consensus.Mechanism.genesis_protocol_state.data ;
     let tick =
       Tick.prove
         (Tick.Keypair.pk Keys.Step.keys)

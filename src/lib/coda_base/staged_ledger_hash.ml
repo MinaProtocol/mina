@@ -74,4 +74,10 @@ let typ : (var, t) Typ.t =
   Typ.transport
     (Typ.list ~length:length_in_triples (triple Boolean.typ))
     ~there:(Fn.compose Fold.to_list fold)
-    ~back:(fun _ -> dummy)
+    ~back:(fun _ ->
+      (* If we put a failwith here, we lose the ability to printf-inspect
+       * anything that uses staged-ledger-hashes from within Checked
+       * computations. It's useful when debugging to dump the protocol state
+       * and so we can just lie here instead. *)
+      printf "WARNING: improperly transportting staged-ledger-hash\n" ;
+      dummy )
