@@ -1,3 +1,0 @@
-(executable (name priv))
-
-(ocamllex path_lexer)

@@ -143,7 +143,8 @@ module Types = struct
       ; run_snark_worker: bool
       ; proposal_interval: int
       ; propose_pubkey: Public_key.t option
-      ; histograms: Histograms.t option }
+      ; histograms: Histograms.t option
+      ; consensus_mechanism: string }
     [@@deriving to_yojson, bin_io, fields]
 
     (* Text response *)
@@ -193,6 +194,8 @@ module Types = struct
             | None -> acc
             | Some histograms ->
                 ("Histograms", Histograms.to_text histograms) :: acc )
+          ~consensus_mechanism:(fun acc x ->
+            ("Consensus Mechanism", f x) :: acc )
         |> List.rev
       in
       digest_entries ~title entries
@@ -336,4 +339,15 @@ module Stop_daemon = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Stop_daemon" ~version:0 ~bin_query ~bin_response
+end
+
+module Snark_job_list = struct
+  type query = unit [@@deriving bin_io]
+
+  type response = string [@@deriving bin_io]
+
+  type error = unit
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Snark_job_list" ~version:0 ~bin_query ~bin_response
 end

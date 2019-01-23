@@ -82,24 +82,31 @@ module Haskell_process = struct
     in
     Sys.remove lock_path
 
-  let cli_format (addr, port) : string =
+  let cli_format peer : string =
     (* assertion for discovery_port = external_port - 1 *)
-    assert (Host_and_port.port addr - 1 = port) ;
-    Printf.sprintf "(\"%s\", %d)" (Host_and_port.host addr)
-      (Host_and_port.port addr)
+    assert (Int.equal (peer.Peer.discovery_port - 1) peer.communication_port) ;
+    Printf.sprintf "(\"%s\", %d)"
+      (Unix.Inet_addr.to_string peer.host)
+      peer.discovery_port
 
   let cli_format_initial_peer addr : string =
     Printf.sprintf "(\"%s\", %d)" (Host_and_port.host addr)
       (Host_and_port.port addr)
 
-  let filter_initial_peers initial_peers me =
+  let filter_initial_peers initial_peers (me : Peer.t) =
+    let me_host_and_discovery_port = Peer.to_discovery_host_and_port me in
     List.filter initial_peers ~f:(fun peer ->
-        not (Host_and_port.equal peer (fst me)) )
+        not (Host_and_port.equal peer me_host_and_discovery_port) )
 
   let%test "filter_initial_peers_test" =
-    let me = (Host_and_port.create ~host:"1.1.1.1" ~port:8000, 8001) in
+    let me =
+      Peer.create
+        (Unix.Inet_addr.of_string "1.1.1.1")
+        ~discovery_port:8000 ~communication_port:8001
+    in
     let other = Host_and_port.create ~host:"1.1.1.2" ~port:8000 in
-    filter_initial_peers [fst me; other] me = [other]
+    filter_initial_peers [Peer.to_discovery_host_and_port me; other] me
+    = [other]
 
   let create ~initial_peers ~me ~log ~conf_dir =
     let lock_path = Filename.concat conf_dir lock_file in
@@ -258,7 +265,7 @@ end = struct
   let live t lives =
     let unbanned_lives =
       List.filter lives ~f:(fun (peer, _) ->
-          not (is_banned t.banlist (fst peer)) )
+          not (is_banned t.banlist (Peer.to_discovery_host_and_port peer)) )
     in
     List.iter unbanned_lives ~f:(fun (peer, kkey) ->
         let _ = Peer.Table.add ~key:peer ~data:kkey t.peers in
@@ -295,10 +302,24 @@ end = struct
                  match String.split ~on:' ' line with
                  | [addr; kademliaKey; "on"] ->
                      let addr = Host_and_port.of_string addr in
-                     `Fst ((addr, Host_and_port.port addr - 1), kademliaKey)
+                     let discovery_port = Host_and_port.port addr in
+                     let peer =
+                       Peer.create
+                         (Host_and_port.host addr |> Unix.Inet_addr.of_string)
+                         ~discovery_port
+                         ~communication_port:(discovery_port - 1)
+                     in
+                     `Fst (peer, kademliaKey)
                  | [addr; _; "off"] ->
                      let addr = Host_and_port.of_string addr in
-                     `Snd (addr, Host_and_port.port addr - 1)
+                     let discovery_port = Host_and_port.port addr in
+                     let peer =
+                       Peer.create
+                         (Host_and_port.host addr |> Unix.Inet_addr.of_string)
+                         ~discovery_port
+                         ~communication_port:(discovery_port - 1)
+                     in
+                     `Snd peer
                  | _ -> failwith (Printf.sprintf "Unexpected line %s\n" line)
              )
            in
@@ -325,7 +346,8 @@ end = struct
     in
     let peers = Peer.Table.keys t.peers in
     let banned_peers, normal_peers =
-      split peers ~f:(Fn.compose (is_banned t.banlist) fst)
+      split peers
+        ~f:(Fn.compose (is_banned t.banlist) Peer.to_discovery_host_and_port)
     in
     don't_wait_for (dead t banned_peers) ;
     normal_peers
@@ -389,7 +411,9 @@ let%test_module "Tests" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           match%bind
             M.connect ~initial_peers:[]
-              ~me:(Host_and_port.create ~host:"127.0.0.1" ~port:3001, 3000)
+              ~me:
+                (Peer.create Unix.Inet_addr.localhost ~discovery_port:3001
+                   ~communication_port:3000)
               ~parent_log:(Logger.create ())
               ~conf_dir:(Filename.temp_dir_name ^/ "membership-test")
           with
@@ -471,10 +495,10 @@ let%test_module "Tests" =
               ~f:(fun acc e ->
                 match (acc, e) with
                 | `On p :: rest, Peer.Event.Connect [peer]
-                  when Host_and_port.port (fst peer) = p ->
+                  when Int.equal peer.discovery_port p ->
                     rest
                 | `Off p :: rest, Peer.Event.Disconnect [peer]
-                  when Host_and_port.port (fst peer) = p ->
+                  when Int.equal peer.discovery_port p ->
                     rest
                 | _ ->
                     failwith
@@ -490,9 +514,9 @@ let%test_module "Tests" =
       (* Just make sure the dummy is outputting things *)
       fold_membership (module M) ~init:false ~f:(fun b _e -> b || true)
 
-    let addr i =
-      ( Host_and_port.of_string (Printf.sprintf "127.0.0.1:%d" (3006 + i))
-      , 3005 + i )
+    let peer_of_int i =
+      Peer.create Unix.Inet_addr.localhost ~discovery_port:(3006 + i)
+        ~communication_port:(3005 + i)
 
     let conf_dir = Filename.temp_dir_name ^/ ".kademlia-test-"
 
@@ -530,10 +554,11 @@ let%test_module "Tests" =
       run_connection_test ~f:(fun conf_dir_1 conf_dir_2 ->
           let open Deferred.Let_syntax in
           let%bind n0 =
-            Haskell.For_tests.node (addr 0) [] conf_dir_1 (create_banlist ())
+            Haskell.For_tests.node (peer_of_int 0) [] conf_dir_1
+              (create_banlist ())
           and n1 =
-            Haskell.For_tests.node (addr 1)
-              [fst (addr 0)]
+            Haskell.For_tests.node (peer_of_int 1)
+              [Peer.to_discovery_host_and_port (peer_of_int 0)]
               conf_dir_2 (create_banlist ())
           in
           let%bind n0_peers =
@@ -549,7 +574,8 @@ let%test_module "Tests" =
           in
           assert (List.length n1_peers <> 0) ;
           assert (
-            List.hd_exn n0_peers = addr 1 && List.hd_exn n1_peers = addr 0 ) ;
+            List.hd_exn n0_peers = peer_of_int 1
+            && List.hd_exn n1_peers = peer_of_int 0 ) ;
           let%bind () = Haskell.stop n0 and () = Haskell.stop n1 in
           Deferred.unit )
 
@@ -611,9 +637,9 @@ let%test_module "Tests" =
         let%test_unit "connect with ban logic" =
           (* This flakes 1 in 20 times, so try a couple times if it fails *)
           run_connection_test ~f:(fun banner_conf_dir normal_conf_dir ->
-              let banner_addr = addr 0 in
-              let normal_addr = addr 1 in
-              let normal_peer = fst normal_addr in
+              let banner_addr = peer_of_int 0 in
+              let normal_addr = peer_of_int 1 in
+              let normal_peer = Peer.to_discovery_host_and_port normal_addr in
               let banlist = Banlist.create () in
               let%bind banner_node =
                 Haskell_banlist.For_tests.node banner_addr [normal_peer]
@@ -647,7 +673,7 @@ let%test_module "Tests" =
                       Haskell_banlist.first_peers new_banner_node
                     in
                     List.length peers_after_reconnect <> 0
-                    && List.hd_exn peers_after_reconnect = addr 1 )
+                    && List.hd_exn peers_after_reconnect = peer_of_int 1 )
               in
               assert is_reconnecting_to_banned_peer ;
               let%bind () = Haskell_banlist.stop new_banner_node
@@ -661,7 +687,8 @@ let%test_module "Tests" =
           let open Deferred.Let_syntax in
           File_system.with_temp_dir conf_dir ~f:(fun temp_dir ->
               let%bind n =
-                Haskell.For_tests.node (addr 1) [] temp_dir (create_banlist ())
+                Haskell.For_tests.node (peer_of_int 1) [] temp_dir
+                  (create_banlist ())
               in
               let lock_path = Filename.concat temp_dir lock_file in
               let%bind yes_result = Sys.file_exists lock_path in

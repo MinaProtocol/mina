@@ -1,5 +1,0 @@
-(menhir (modules a))
-
-(library
- (name bar)
- (public_name bar))

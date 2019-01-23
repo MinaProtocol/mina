@@ -171,10 +171,12 @@ module type Main_intf = sig
       type t
 
       module Peer : sig
-        type t = Host_and_port.Stable.V1.t * int
+        type t =
+          { host: Unix.Inet_addr.Blocking_sexp.t
+          ; discovery_port: int (* UDP *)
+          ; communication_port: int
+          (* TCP *) }
         [@@deriving bin_io, sexp, compare, hash]
-
-        val external_rpc : t -> Host_and_port.Stable.V1.t
       end
 
       module Gossip_net : sig
@@ -195,6 +197,12 @@ module type Main_intf = sig
       type t
 
       type statement
+    end
+
+    module Ledger_proof_statement : sig
+      type t
+
+      include Comparable.S with type t := t
     end
 
     module Transaction : sig
@@ -227,23 +235,48 @@ module type Main_intf = sig
       val dummy : t
     end
 
+    module Transaction_snark_work :
+      Protocols.Coda_pow.Transaction_snark_work_intf
+      with type proof := Ledger_proof.t
+       and type statement := Transaction_snark.Statement.t
+       and type public_key := Public_key.Compressed.t
+
+    module Staged_ledger_diff :
+      Protocols.Coda_pow.Staged_ledger_diff_intf
+      with type completed_work := Transaction_snark_work.t
+       and type completed_work_checked := Transaction_snark_work.Checked.t
+       and type user_command := User_command.t
+       and type user_command_with_valid_signature :=
+                  User_command.With_valid_signature.t
+       and type public_key := Public_key.Compressed.t
+       and type staged_ledger_hash := Staged_ledger_hash.t
+       and type fee_transfer_single := Fee_transfer.single
+
     module Staged_ledger_hash : sig
       type t [@@deriving sexp]
     end
 
-    module Staged_ledger : sig
-      type t
-
-      val hash : t -> Staged_ledger_hash.t
-
-      module Scan_state : sig
-        type t
-      end
-    end
-
-    module Staged_ledger_diff : sig
-      type t [@@deriving sexp, bin_io]
-    end
+    module Staged_ledger :
+      Protocols.Coda_pow.Staged_ledger_intf
+      with type diff := Staged_ledger_diff.t
+       and type valid_diff :=
+                  Staged_ledger_diff.With_valid_signatures_and_proofs.t
+       and type staged_ledger_hash := Staged_ledger_hash.t
+       and type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
+       and type ledger_hash := Ledger_hash.t
+       and type frozen_ledger_hash := Frozen_ledger_hash.t
+       and type public_key := Public_key.Compressed.t
+       and type ledger := Ledger.t
+       and type ledger_proof := Ledger_proof.t
+       and type user_command_with_valid_signature :=
+                  User_command.With_valid_signature.t
+       and type statement := Transaction_snark_work.Statement.t
+       and type completed_work_checked := Transaction_snark_work.Checked.t
+       and type sparse_ledger := Sparse_ledger.t
+       and type ledger_proof_statement := Ledger_proof_statement.t
+       and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
+       and type transaction := Transaction.t
+       and type user_command := User_command.t
 
     module Internal_transition :
       Coda_base.Internal_transition.S
@@ -1195,6 +1228,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   let start_time = Time_ns.now ()
 
+  let snark_job_list_json t =
+    let open Participating_state.Let_syntax in
+    let%map sl = best_staged_ledger t in
+    Staged_ledger.Scan_state.snark_job_list_json (Staged_ledger.scan_state sl)
+
   let get_status ~flag t =
     let open Participating_state.Let_syntax in
     let%bind ledger = best_ledger t in
@@ -1256,13 +1294,17 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; state_hash
     ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
-    ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
+    ; peers=
+        List.map (peers t) ~f:(fun peer ->
+            Kademlia.Peer.to_discovery_host_and_port peer
+            |> Host_and_port.to_string )
     ; user_commands_sent= !txn_count
     ; run_snark_worker= run_snark_worker t
     ; proposal_interval= Int64.to_int_exn Consensus.Mechanism.block_interval_ms
     ; propose_pubkey=
         Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
-    ; histograms }
+    ; histograms
+    ; consensus_mechanism= Consensus.Mechanism.name }
 
   let get_lite_chain :
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =
@@ -1369,7 +1411,10 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             get_ledger coda lh )
       ; Rpc.Rpc.implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
             Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
-            Deferred.unit ) ]
+            Deferred.unit )
+      ; Rpc.Rpc.implement Daemon_rpcs.Snark_job_list.rpc (fun () () ->
+            return (snark_job_list_json coda |> Participating_state.active_exn)
+        ) ]
     in
     let snark_worker_impls =
       [ Rpc.Rpc.implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->

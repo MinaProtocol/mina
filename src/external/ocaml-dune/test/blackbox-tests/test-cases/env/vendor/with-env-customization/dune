@@ -1,3 +1,0 @@
-(env
- (default
-  (flags :standard ":standard + in vendor/with-env-customization")))

@@ -131,12 +131,13 @@ struct
         with_label __LOC__
           (let%bind rx =
              let%bind res =
-               provide_witness Fqe.typ
-                 As_prover.(
-                   Let_syntax.(
-                     let%map gamma = read Fqe.typ c.gamma
-                     and srx = read Fqe.typ s.rx in
-                     Fqe.Unchecked.(square gamma - (srx + srx))))
+               exists Fqe.typ
+                 ~compute:
+                   As_prover.(
+                     Let_syntax.(
+                       let%map gamma = read Fqe.typ c.gamma
+                       and srx = read Fqe.typ s.rx in
+                       Fqe.Unchecked.(square gamma - (srx + srx))))
              in
              (* rx = c.gamma^2 - 2 * s.rx
            rx + 2 * s.rx = c.gamma^2
@@ -152,14 +153,15 @@ struct
            ry + s.ry = c.gamma * (s.rx - rx)
         *)
              let%bind res =
-               provide_witness Fqe.typ
-                 As_prover.(
-                   Let_syntax.(
-                     let%map gamma = read Fqe.typ c.gamma
-                     and srx = read Fqe.typ s.rx
-                     and rx = read Fqe.typ rx
-                     and sry = read Fqe.typ s.ry in
-                     Fqe.Unchecked.((gamma * (srx - rx)) - sry)))
+               exists Fqe.typ
+                 ~compute:
+                   As_prover.(
+                     Let_syntax.(
+                       let%map gamma = read Fqe.typ c.gamma
+                       and srx = read Fqe.typ s.rx
+                       and rx = read Fqe.typ rx
+                       and sry = read Fqe.typ s.ry in
+                       Fqe.Unchecked.((gamma * (srx - rx)) - sry)))
              in
              let%map () = assert_r1cs c.gamma (s.rx - rx) (res + s.ry) in
              res
@@ -193,13 +195,14 @@ struct
            c.gamma^2 = rx + s.rx + qx
         *)
           let%bind res =
-            provide_witness Fqe.typ
-              As_prover.(
-                Let_syntax.(
-                  let%map gamma = read Fqe.typ c.gamma
-                  and srx = read Fqe.typ s.rx
-                  and qx = read Fqe.typ qx in
-                  Unchecked.(square gamma - (srx + qx))))
+            exists Fqe.typ
+              ~compute:
+                As_prover.(
+                  Let_syntax.(
+                    let%map gamma = read Fqe.typ c.gamma
+                    and srx = read Fqe.typ s.rx
+                    and qx = read Fqe.typ qx in
+                    Unchecked.(square gamma - (srx + qx))))
           in
           let%map () = assert_square c.gamma (res + s.rx + qx) in
           res
@@ -209,14 +212,15 @@ struct
            c.gamma * (s.rx - rx) = ry + s.ry
         *)
           let%bind res =
-            provide_witness Fqe.typ
-              As_prover.(
-                Let_syntax.(
-                  let%map gamma = read Fqe.typ c.gamma
-                  and srx = read Fqe.typ s.rx
-                  and rx = read Fqe.typ rx
-                  and sry = read Fqe.typ s.ry in
-                  Unchecked.((gamma * (srx - rx)) - sry)))
+            exists Fqe.typ
+              ~compute:
+                As_prover.(
+                  Let_syntax.(
+                    let%map gamma = read Fqe.typ c.gamma
+                    and srx = read Fqe.typ s.rx
+                    and rx = read Fqe.typ rx
+                    and sry = read Fqe.typ s.ry in
+                    Unchecked.((gamma * (srx - rx)) - sry)))
           in
           let%map () = assert_r1cs c.gamma (s.rx - rx) (res + s.ry) in
           res

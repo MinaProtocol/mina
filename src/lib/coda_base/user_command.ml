@@ -77,7 +77,7 @@ module With_valid_signature = struct
 end
 
 let check_signature ({payload; sender; signature} : t) =
-  Schnorr.verify signature (Inner_curve.of_coords sender) payload
+  Schnorr.verify signature (Inner_curve.of_affine_coordinates sender) payload
 
 let gen_test =
   let keys = Array.init 2 ~f:(fun _ -> Signature_keypair.create ()) in

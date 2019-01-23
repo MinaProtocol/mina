@@ -1,7 +1,0 @@
-(jbuild_version 1)
-
-(library
- ((name a)
-  (public_name a)
-  (kind ppx_rewriter)
-  (libraries (a_kernel))))

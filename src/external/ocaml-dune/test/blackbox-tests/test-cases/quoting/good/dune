@@ -1,3 +1,0 @@
-(rule
- (targets s t)
- (action (with-stdout-to "%{targets}" (echo foo))))

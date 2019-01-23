@@ -243,7 +243,9 @@ let daemon log =
          match ip with None -> Find_ip.find () | Some ip -> return ip
        in
        let me =
-         (Host_and_port.create ~host:ip ~port:discovery_port, external_port)
+         Kademlia.Peer.create
+           (Unix.Inet_addr.of_string ip)
+           ~discovery_port ~communication_port:external_port
        in
        let sequence maybe_def =
          match maybe_def with

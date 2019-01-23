@@ -1,2 +1,0 @@
-requires = "bar"
-requires(ppx_driver) = "baz"
