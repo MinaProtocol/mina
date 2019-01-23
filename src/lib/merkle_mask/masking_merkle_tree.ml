@@ -347,7 +347,21 @@ struct
       |> Key.Set.of_list
 
     let num_accounts t =
-      Key.Set.union (Base.keys (get_parent t)) (keys t) |> Key.Set.length
+      let f = Printf.eprintf !"KEY: %{sexp:Key.t}\n%!" in
+      let base_keys = Base.keys (get_parent t) in
+      let mask_keys = keys t in
+      let all_keys = Key.Set.union (Base.keys (get_parent t)) (keys t) in
+      Printf.eprintf "IN MASK: %s\n%!" (get_uuid t |> Uuid.to_string) ;
+      Printf.eprintf "NUM BASE KEYS: %d\n%!" (Key.Set.length base_keys) ;
+      Printf.eprintf "NUM MASK KEYS: %d\n%!" (Key.Set.length mask_keys) ;
+      Printf.eprintf "NUM ALL KEYS: %d\n%!" (Key.Set.length all_keys) ;
+      Printf.eprintf "BASE KEYS:\n%!" ;
+      Key.Set.iter base_keys ~f ;
+      Printf.eprintf "MASK KEYS:\n%!" ;
+      Key.Set.iter mask_keys ~f ;
+      Printf.eprintf "ALL KEYS:\n%!" ;
+      Key.Set.iter all_keys ~f ;
+      all_keys |> Key.Set.length
 
     let location_of_key t key =
       let mask_result = find_location t key in

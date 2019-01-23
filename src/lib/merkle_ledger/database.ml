@@ -112,6 +112,10 @@ module Make
   let to_list mdb = account_list_bin mdb Account.bin_read_t
 
   let keys mdb =
+    Printf.eprintf "IN DB: %s\n%!" (get_uuid mdb |> Uuid.to_string) ;
+    let db_keys = to_list mdb |> List.map ~f:Account.public_key in
+    Printf.eprintf "DB KEYS:\n%!" ;
+    List.iter db_keys ~f:(Printf.eprintf !"KEY:%{sexp:Key.t}\n%!") ;
     to_list mdb |> List.map ~f:Account.public_key |> Key.Set.of_list
 
   let set_raw {kvdb; _} location bin =
@@ -300,9 +304,12 @@ module Make
     |> Result.ok_exn
 
   let num_accounts t =
-    match Account_location.last_location_address t with
-    | None -> 0
-    | Some addr -> Addr.to_int addr + 1
+    let last_loc =
+      match Account_location.last_location_address t with
+      | None -> 0
+      | Some addr -> Addr.to_int addr + 1
+    in
+    last_loc
 
   let get_all_accounts_rooted_at_exn mdb address =
     let first_node, last_node = Addr.Range.subtree_range address in

@@ -439,6 +439,7 @@ module Make
         (desired_root_exn t, What_hash (Addr.child_exn addr Direction.Right)) )
 
   let num_accounts t n content_hash =
+    Printf.eprintf "SYNCABLE LEDGER NUM_ACCOUNTS\n%!" ;
     let rh = Root_hash.to_hash (desired_root_exn t) in
     let height = Int.ceil_log2 n in
     (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
