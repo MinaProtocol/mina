@@ -159,7 +159,7 @@ module Schnorr
 
         val scale : t -> Scalar.t -> t
 
-        val to_coords : t -> Field.t * Field.t
+        val to_affine_coordinates : t -> Field.t * Field.t
     end)
     (Message : Message_intf
                with type boolean_var := Impl.Boolean.var
@@ -195,7 +195,7 @@ module Schnorr
   end
 
   let compress (t : Curve.t) =
-    let x, _ = Curve.to_coords t in
+    let x, _ = Curve.to_affine_coordinates t in
     Field.unpack x
 
   module Public_key : sig

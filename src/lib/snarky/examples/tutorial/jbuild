@@ -1,9 +1,0 @@
-(jbuild_version 1)
-
-(executables
- ((names (tutorial))
-  (modes (native))
-  (flags (:standard -warn-error -27-26))
-  (preprocess (pps (ppx_jane)))
-  (libraries
-    (snarky core))))

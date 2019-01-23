@@ -1,2 +1,0 @@
-(executable (name pp))
-(ocamllex lexer)

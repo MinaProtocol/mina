@@ -1,0 +1,5 @@
+(library
+  (name chunk_table)
+  (public_name crypto_params.chunk_table)
+  (libraries crypto_params_init)
+  (preprocess (pps ppx_jane)))

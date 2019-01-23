@@ -105,6 +105,8 @@ end = struct
 
   let location_of_key _t _ = None
 
+  let keys _t = Key.Set.empty
+
   let fold_until _t ~init ~f:_ ~finish = finish init
 
   let foldi_with_ignored_keys _t _ ~init ~f:_ = init

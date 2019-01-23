@@ -4,6 +4,13 @@ let json =
   Command.Param.(
     flag "json" no_arg ~doc:"Use json output (default: plaintext)")
 
+let performance =
+  Command.Param.(
+    flag "performance" no_arg
+      ~doc:
+        "Include performance histograms in status output (default: don't \
+         include)")
+
 let privkey_write_path =
   let open Command.Param in
   flag "privkey-path"

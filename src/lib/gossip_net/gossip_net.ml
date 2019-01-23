@@ -100,7 +100,9 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     | Error exn -> Or_error.of_exn exn
 
   let broadcast_selected t peers msg =
-    let peers = List.map peers ~f:(fun peer -> Peer.external_rpc peer) in
+    let peers =
+      List.map peers ~f:(fun peer -> Peer.to_communications_host_and_port peer)
+    in
     let send peer =
       try_call_rpc peer t.timeout
         (fun conn m -> return (Message.dispatch_multi conn m))
@@ -183,7 +185,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
              ~on_handler_error:
                (`Call
                  (fun _ exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
-             (Tcp.Where_to_listen.of_port (snd config.me))
+             (Tcp.Where_to_listen.of_port config.me.Peer.communication_port)
              (fun peer reader writer ->
                Rpc.Connection.server_with_close reader writer ~implementations
                  ~connection_state:(fun _ ->
@@ -217,7 +219,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
 
   let query_peer t (peer : Peer.t) rpc query =
     Logger.trace t.log !"Querying peer %{sexp: Peer.t}" peer ;
-    let peer = Peer.external_rpc peer in
+    let peer = Peer.to_communications_host_and_port peer in
     try_call_rpc peer t.timeout rpc query
 
   let query_random_peers t n rpc query =
