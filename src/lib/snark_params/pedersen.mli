@@ -1,3 +1,5 @@
+[%%import "../../config.mlh"]
+
 open Core_kernel
 open Snark_bits
 open Fold_lib
@@ -33,11 +35,20 @@ module type S = sig
   end
 
   module State : sig
+    [%%if fake_hash]
+    type t =
+      { triples_consumed: int
+      ; acc: curve
+      ; params: Params.t
+      ; ctx: Digestif.SHA256.ctx
+      ; chunk_table: Curve_chunk_table.t }
+    [%%else]
     type t =
       { triples_consumed: int
       ; acc: curve
       ; params: Params.t
       ; chunk_table: Curve_chunk_table.t }
+    [%%endif]
 
     val create :
          ?triples_consumed:int
@@ -62,6 +73,8 @@ module Make (Field : sig
   type t [@@deriving sexp, bin_io, compare, hash, eq]
 
   include Snarky.Field_intf.S with type t := t
+
+  val project : bool list -> t
 end)
 (Bigint : Snarky.Bigint_intf.Extended with type field := Field.t) (Curve : sig
     type t
