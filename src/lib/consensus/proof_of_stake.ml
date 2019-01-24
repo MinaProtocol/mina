@@ -257,10 +257,12 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           Test_util.test_equal Unpacked.typ Snark_params.Tick.Boolean.typ
             in_seed_update_range_var in_seed_update_range
         in
-        Quickcheck.test ~trials:100 gen ~f:test ;
         let c = UInt32.to_int unforkable_count in
-        let edge_cases = [c; c - 1; c + 1; c * 2; (c * 2) - 1; (c * 2) + 1] in
-        List.iter edge_cases ~f:(Fn.compose test UInt32.of_int)
+        let examples =
+          List.map ~f:UInt32.of_int
+            [c; c - 1; c + 1; c * 2; (c * 2) - 1; (c * 2) + 1]
+        in
+        Quickcheck.test ~trials:100 ~examples gen ~f:test
     end
 
     let slot_start_time (epoch : t) (slot : Slot.t) =
