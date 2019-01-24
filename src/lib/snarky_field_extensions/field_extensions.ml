@@ -747,9 +747,10 @@ struct
     let open Let_syntax in
     let%bind ((v10, v11, v12) as v1) = Fq3.(a1 * b1) in
     let%bind v0 =
-      provide_witness Fq3.typ
-        As_prover.(
-          map2 ~f:Fq3.Unchecked.( * ) (read Fq3.typ a0) (read Fq3.typ b0))
+      exists Fq3.typ
+        ~compute:
+          As_prover.(
+            map2 ~f:Fq3.Unchecked.( * ) (read Fq3.typ a0) (read Fq3.typ b0))
       (* v0
           = (a00 + s a01 s^2 a02) (s^2 b02)
         = non_residue a01 b02 + non_residue s a02 b02 + s^2 a00 b02 *)
@@ -771,8 +772,8 @@ struct
     let open Impl in
     let open Let_syntax in
     let%bind result =
-      provide_witness typ
-        As_prover.(map2 ~f:Unchecked.( / ) (read typ a) (read typ b))
+      exists typ
+        ~compute:As_prover.(map2 ~f:Unchecked.( / ) (read typ a) (read typ b))
     in
     (* result * b = a *)
     let%map () = assert_special_mul result b a in
