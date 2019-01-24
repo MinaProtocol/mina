@@ -1,3 +1,5 @@
+open Sgn_type
+
 module type Inputs_intf = sig
   module Impl : Snarky.Snark_intf.S
 
@@ -101,7 +103,7 @@ module Make (Inputs : Inputs_intf) = struct
       (let%map res = go (Array.length naf - 1) false q.coeffs Fqk.one in
        if Params.loop_count_is_neg then unitary_inverse res else res)
 
-  let group_miller_loop
+  let batch_miller_loop
       (pairs : (Sgn.t * G1_precomputation.t * G2_precomputation.t) list) =
     let naf = Snarkette.Fields.find_wnaf (module N) 1 Params.loop_count in
     let accum f acc pairs =
