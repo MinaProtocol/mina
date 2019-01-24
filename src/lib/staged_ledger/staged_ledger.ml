@@ -1188,15 +1188,19 @@ end = struct
             Transaction_snark_work.Statement.t
          -> Transaction_snark_work.Checked.t option) =
     let curr_hash = hash t in
+    O1trace.trace_event "curr_hash" ;
     let new_mask = Inputs.Ledger.Mask.create () in
     let tmp_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
+    O1trace.trace_event "done mask" ;
     let partitions =
       Scan_state.partition_if_overflowing ~max_slots:max_throughput
         t.scan_state
     in
+    O1trace.trace_event "partitioned" ;
     (*TODO: return an or_error here *)
     let work_to_do = work_to_do_exn t.scan_state in
+    O1trace.trace_event "computed_work" ;
     let completed_works_seq =
       Sequence.fold_until work_to_do ~init:Sequence.empty
         ~f:(fun seq w ->
@@ -1206,6 +1210,7 @@ end = struct
           | None -> Stop seq )
         ~finish:Fn.id
     in
+    O1trace.trace_event "found completed work" ;
     (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
     let transactions_rev =
       Sequence.fold transactions_by_fee ~init:Sequence.empty ~f:(fun seq t ->
@@ -1219,13 +1224,16 @@ end = struct
               seq
           | Ok _ -> Sequence.append (Sequence.singleton t) seq )
     in
+    O1trace.trace_event "applied transactions" ;
     let diff =
       generate logger completed_works_seq transactions_rev self partitions
         (Sequence.length work_to_do)
     in
+    O1trace.trace_event "made diff" ;
     let proofs_available =
       Sequence.filter_map work_to_do ~f:get_completed_work |> Sequence.length
     in
+    O1trace.trace_event "found available work" ;
     Logger.info logger "Block stats: Proofs ready for purchase: %d"
       proofs_available ;
     trace_event "prediffs done" ;
