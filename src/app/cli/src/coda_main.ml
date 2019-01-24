@@ -1362,21 +1362,24 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     in
     let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
+    let implement rpc f =
+      Rpc.Rpc.implement rpc (fun () input ->
+          trace_recurring_task (Rpc.Rpc.name rpc) (fun () -> f () input) )
+    in
     let client_impls =
-      [ Rpc.Rpc.implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
+      [ implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
             let%map result = send_payment log coda tx in
             result |> Participating_state.active_exn )
-      ; Rpc.Rpc.implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
+      ; implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
             schedule_payments log coda ts |> Participating_state.active_exn ;
             Deferred.unit )
-      ; Rpc.Rpc.implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
+      ; implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
             return (get_balance coda pk |> Participating_state.active_exn) )
-      ; Rpc.Rpc.implement Daemon_rpcs.Verify_proof.rpc
-          (fun () (pk, tx, proof) ->
+      ; implement Daemon_rpcs.Verify_proof.rpc (fun () (pk, tx, proof) ->
             return
               ( verify_payment coda log pk tx proof
               |> Participating_state.active_exn ) )
-      ; Rpc.Rpc.implement Daemon_rpcs.Prove_receipt.rpc
+      ; implement Daemon_rpcs.Prove_receipt.rpc
           (fun () (proving_receipt, pk) ->
             let open Deferred.Or_error.Let_syntax in
             let%bind account =
@@ -1392,38 +1395,36 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             in
             prove_receipt coda ~proving_receipt
               ~resulting_receipt:(Account.receipt_chain_hash account) )
-      ; Rpc.Rpc.implement Daemon_rpcs.Get_public_keys_with_balances.rpc
-          (fun () () ->
+      ; implement Daemon_rpcs.Get_public_keys_with_balances.rpc (fun () () ->
             return
               (get_keys_with_balances coda |> Participating_state.active_exn)
         )
-      ; Rpc.Rpc.implement Daemon_rpcs.Get_public_keys.rpc (fun () () ->
+      ; implement Daemon_rpcs.Get_public_keys.rpc (fun () () ->
             return (get_public_keys coda |> Participating_state.active_exn) )
-      ; Rpc.Rpc.implement Daemon_rpcs.Get_nonce.rpc (fun () pk ->
+      ; implement Daemon_rpcs.Get_nonce.rpc (fun () pk ->
             return (get_nonce coda pk |> Participating_state.active_exn) )
-      ; Rpc.Rpc.implement Daemon_rpcs.Get_status.rpc (fun () flag ->
+      ; implement Daemon_rpcs.Get_status.rpc (fun () flag ->
             return (get_status ~flag coda |> Participating_state.active_exn) )
-      ; Rpc.Rpc.implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
+      ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
             return
               (clear_hist_status ~flag coda |> Participating_state.active_exn)
         )
-      ; Rpc.Rpc.implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
-            get_ledger coda lh )
-      ; Rpc.Rpc.implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
+      ; implement Daemon_rpcs.Get_ledger.rpc (fun () lh -> get_ledger coda lh)
+      ; implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
             Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
             Deferred.unit )
-      ; Rpc.Rpc.implement Daemon_rpcs.Snark_job_list.rpc (fun () () ->
+      ; implement Daemon_rpcs.Snark_job_list.rpc (fun () () ->
             return (snark_job_list_json coda |> Participating_state.active_exn)
         ) ]
     in
     let snark_worker_impls =
-      [ Rpc.Rpc.implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
+      [ implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
             let r = request_work coda in
             Option.iter r ~f:(fun r ->
                 Logger.info log !"Get_work: %{sexp:Snark_worker.Work.Spec.t}" r
             ) ;
             return r )
-      ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc
+      ; implement Snark_worker.Rpcs.Submit_work.rpc
           (fun () (work : Snark_worker.Work.Result.t) ->
             Logger.info log
               !"Submit_work: %{sexp:Snark_worker.Work.Spec.t}"
