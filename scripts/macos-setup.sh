@@ -50,6 +50,7 @@ fi
 
 # Compile things
 if [[ $COMPILE_THINGS == "YES" ]]; then
+  opam update
   # All our ocaml packages
   env TERM=xterm opam switch -y import src/opam.export
   eval $(opam config env)
