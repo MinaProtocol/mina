@@ -68,10 +68,11 @@ let measure name (f : unit -> 'a) : 'a =
   (Obj.magic !measure_impl : string -> (unit -> 'a) -> 'a) name f
 
 let start_tracing wr =
-  emit_event wr {(new_event Pid_is) with pid= Unix.getpid () |> Pid.to_int} ;
+  let pid = Unix.getpid () |> Pid.to_int in
+  emit_event wr {(new_event Pid_is) with pid} ;
   Async_kernel.Tracing.fns :=
-    { trace_thread_switch= trace_thread_switch' wr
-    ; trace_new_thread= trace_new_thread' wr } ;
+    { trace_thread_switch= trace_thread_switch' wr ~pid
+    ; trace_new_thread= trace_new_thread' wr ~pid } ;
   trace_event_impl := trace_event' wr ;
   measure_impl := measure' wr ;
   let sch = Scheduler.t () in

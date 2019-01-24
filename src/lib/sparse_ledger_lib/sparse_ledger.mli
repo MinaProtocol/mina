@@ -36,6 +36,8 @@ module type S = sig
   val add_path :
     t -> [`Left of hash | `Right of hash] list -> key -> account -> t
 
+  val iteri : t -> f:(index -> account -> unit) -> unit
+
   val merkle_root : t -> hash
 end
 

@@ -39,6 +39,8 @@ consensus_mechanism = "proof_of_signature"]
 
 let blocks_till_finality = 1
 
+let name = "proof_of_signature"
+
 include Proof_of_signature.Make (struct
   module Genesis_ledger = Genesis_ledger
   module Proof = Coda_base.Proof
@@ -53,6 +55,8 @@ end)
 
 [%%elif
 consensus_mechanism = "proof_of_stake"]
+
+let name = "proof_of_stake"
 
 include Proof_of_stake.Make (struct
   module Genesis_ledger = Genesis_ledger

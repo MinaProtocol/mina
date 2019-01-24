@@ -7,8 +7,23 @@ open Coda_base
 open Coda_main
 open Signature_lib
 open Pipe_lib
+open O1trace
 
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
+
+[%%if
+tracing]
+
+let start_tracing () =
+  Async.Writer.open_file
+    (sprintf "/tmp/coda-profile-%d" (Unix.getpid () |> Pid.to_int))
+  >>| O1trace.start_tracing
+
+[%%else]
+
+let start_tracing () = Deferred.unit
+
+[%%endif]
 
 [%%if
 with_snark]
@@ -52,6 +67,7 @@ let run_test () : unit Deferred.t =
   let module Main = Coda_main.Make_coda (Init) in
   let module Run = Run (Config) (Main) in
   let open Main in
+  let%bind () = start_tracing () in
   let banlist_dir_name = temp_conf_dir ^/ "banlist" in
   let%bind () = Async.Unix.mkdir banlist_dir_name in
   let%bind suspicious_dir =
@@ -147,15 +163,16 @@ let run_test () : unit Deferred.t =
   let send_amount = Currency.Amount.of_int 10 in
   (* Send money to someone *)
   let build_payment amount sender_sk receiver_pk fee =
-    let nonce =
-      Run.get_nonce coda (pk_of_sk sender_sk)
-      |> Participating_state.active_exn |> Option.value_exn
-    in
-    let payload : User_command.Payload.t =
-      User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
-        ~body:(Payment {receiver= receiver_pk; amount})
-    in
-    User_command.sign (Keypair.of_private_key_exn sender_sk) payload
+    trace_recurring_task "build_payment" (fun () ->
+        let nonce =
+          Run.get_nonce coda (pk_of_sk sender_sk)
+          |> Participating_state.active_exn |> Option.value_exn
+        in
+        let payload : User_command.Payload.t =
+          User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
+            ~body:(Payment {receiver= receiver_pk; amount})
+        in
+        User_command.sign (Keypair.of_private_key_exn sender_sk) payload )
   in
   let assert_ok x = assert (Or_error.is_ok x) in
   let test_sending_payment sender_sk receiver_pk =

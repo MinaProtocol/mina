@@ -11,16 +11,26 @@ jobs:
                 name: Build trace-tool
                 command: cd src/app/trace-tool && cargo build --frozen
 
-    build:
-        resource_class: large
+    lint:
         docker:
-        - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
+        - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                name: Lint
+                name: OCamlformat (make check-format)
                 command: eval `opam config env` && make check-format
+            - run:
+                name: Snarky tracks master (make check-snarky-submodule)
+                command: make check-snarky-submodule
+
+    build:
+        resource_class: large
+        docker:
+        - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
                 name: Build OCaml
                 command: eval `opam config env` && DUNE_PROFILE=dev make build 2>&1 | tee /tmp/buildocaml.log
@@ -48,22 +58,22 @@ jobs:
         steps:
             - restore_cache:
                 keys:
-                    - macos-v1
-                    - macos-v1-opam
+                    - macos-v3
+                    - macos-v3-opam
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                 name: Download Deps -- make macos-setup-download
                 command: make macos-setup-download
             - save_cache:
-                key: macos-v1
+                key: macos-v3
                 paths:
                     - "/usr/local/Homebrew"
             - run:
                 name: Compile Deps -- make macos-setup-compile
                 command: make macos-setup-compile
             - save_cache:
-                key: macos-v1-opam
+                key: macos-v3-opam
                 paths:
                     - "/Users/distiller/.opam"
             - run:
@@ -76,7 +86,7 @@ jobs:
     build_withsnark:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
+        - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -84,8 +94,11 @@ jobs:
                 name: Download Stable Proving Keys
                 command: scripts/getkeys.sh
             - run:
-                name: Build OCaml
+                name: Build OCaml (sig)
                 command: eval `opam config env` && DUNE_PROFILE=testnet_posig make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                name: Build OCaml (stake)
+                command: eval `opam config env` && DUNE_PROFILE=testnet_postake make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                 name: Build deb Package with verification keys
                 command: make deb
@@ -104,7 +117,7 @@ jobs:
     build_public:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
+        - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -123,7 +136,7 @@ jobs:
     test-unit-test:
        resource_class: large
        docker:
-       - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
+       - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
        steps:
            - checkout
            - run: git submodule sync && git submodule update --init --recursive
@@ -134,7 +147,7 @@ jobs:
     test-withsnark:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
+        - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -149,7 +162,7 @@ jobs:
     test-{{test.name}}:
       resource_class: large
       docker:
-      - image: codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060
+      - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
       steps:
           - checkout
           - run: git submodule sync && git submodule update --init --recursive

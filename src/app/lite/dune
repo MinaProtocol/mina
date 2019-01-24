@@ -10,8 +10,7 @@
     num
     core_kernel
     virtual_dom
-    js_of_ocaml
-    js_of_ocaml.syntax)
+    js_of_ocaml)
   (preprocess (pps ppx_jane ppx_deriving.eq js_of_ocaml-ppx))
   (js_of_ocaml (flags +nat.js))
   )
