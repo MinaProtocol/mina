@@ -1,5 +1,7 @@
 # Coda
 
+DONT MERGE
+
 Coda is a new cryptocurrency protocol with a lightweight, constant sized blockchain.
 
 Please see our [developer README](README-dev.md) if you are interested in building coda from source code.
