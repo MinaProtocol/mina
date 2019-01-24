@@ -1029,7 +1029,9 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         let open Consensus_transition_data in
         let open Snark_params.Tick in
         let open Let_syntax in
-        let {curr_epoch= prev_epoch; curr_slot= prev_slot; _} = previous_state in
+        let {curr_epoch= prev_epoch; curr_slot= prev_slot; _} =
+          previous_state
+        in
         let {epoch= next_epoch; slot= _} = transition_data in
         let%bind epoch_increased =
           let%bind c = Epoch.compare_var prev_epoch next_epoch in
