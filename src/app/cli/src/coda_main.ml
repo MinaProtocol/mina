@@ -89,8 +89,6 @@ module type Config_intf = sig
 
   val conf_dir : string
 
-  val lbc_tree_max_depth : [`Infinity | `Finite of int]
-
   val propose_keypair : Keypair.t option
 
   val genesis_proof : Snark_params.Tock.Proof.t
@@ -307,6 +305,7 @@ module type Main_intf = sig
       ; propose_keypair: Keypair.t option
       ; run_snark_worker: bool
       ; net_config: Inputs.Net.Config.t
+      ; transition_frontier_max_length: int
       ; staged_ledger_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string

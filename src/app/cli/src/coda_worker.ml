@@ -193,7 +193,7 @@ module T = struct
 
         let conf_dir = conf_dir
 
-        let lbc_tree_max_depth = `Finite 50
+        let transition_frontier_max_length = 50
 
         let propose_keypair =
           if should_propose then
@@ -245,6 +245,8 @@ module T = struct
         Main.create
           (Main.Config.make ~log ~net_config
              ~run_snark_worker:(Option.is_some snark_worker_config)
+             ~transition_frontier_max_length:
+               Config.transition_frontier_max_length
              ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
              ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
              ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")

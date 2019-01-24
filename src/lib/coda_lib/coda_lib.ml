@@ -634,6 +634,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; propose_keypair: Keypair.t option
       ; run_snark_worker: bool
       ; net_config: Net.Config.t
+      ; transition_frontier_max_length: int (* aka "k" for ouroboros *)
       ; staged_ledger_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
@@ -696,6 +697,7 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let%bind transition_frontier =
           Transition_frontier.create ~logger:config.log
+            ~max_length:config.transition_frontier_max_length
             ~root_transition:
               (With_hash.of_data first_transition
                  ~hash_data:

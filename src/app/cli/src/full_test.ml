@@ -43,12 +43,12 @@ let run_test () : unit Deferred.t =
     Async.Unix.mkdtemp (Filename.temp_dir_name ^/ "full_test_config")
   in
   let keypair = Genesis_ledger.largest_account_keypair_exn () in
-  let module Config = struct
+  let module Config0 = struct
     let logger = log
 
     let conf_dir = temp_conf_dir
 
-    let lbc_tree_max_depth = `Finite 50
+    let transition_frontier_max_length = 50
 
     let propose_keypair = Some keypair
 
@@ -63,10 +63,11 @@ let run_test () : unit Deferred.t =
 
     let work_selection = Protocols.Coda_pow.Work_selection.Seq
   end in
-  let%bind (module Init) = make_init ~should_propose:true (module Config) in
+  let%bind (module Init) = make_init ~should_propose:true (module Config0) in
   let module Main = Coda_main.Make_coda (Init) in
-  let module Run = Run (Config) (Main) in
+  let module Run = Run (Config0) (Main) in
   let open Main in
+  let module Config = Config0 in
   let%bind () = start_tracing () in
   let banlist_dir_name = temp_conf_dir ^/ "banlist" in
   let%bind () = Async.Unix.mkdir banlist_dir_name in
@@ -99,6 +100,7 @@ let run_test () : unit Deferred.t =
   let%bind coda =
     Main.create
       (Main.Config.make ~log ~net_config ~propose_keypair:keypair
+         ~transition_frontier_max_length:Config.transition_frontier_max_length
          ~run_snark_worker:true
          ~staged_ledger_persistant_location:(temp_conf_dir ^/ "staged_ledger")
          ~transaction_pool_disk_location:(temp_conf_dir ^/ "transaction_pool")

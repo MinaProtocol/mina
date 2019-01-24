@@ -5,10 +5,6 @@ open Protocols.Coda_transition_frontier
 open Coda_base
 open Signature_lib
 
-module Max_length = struct
-  let length = Consensus.Mechanism.blocks_till_finality
-end
-
 module type Inputs_intf = sig
   module Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf
 
@@ -89,8 +85,6 @@ struct
     Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
 
   exception Already_exists of State_hash.t
-
-  let max_length = Max_length.length
 
   module Breadcrumb = struct
     (* TODO: external_transition should be type : External_transition.With_valid_protocol_state.t #1344 *)
@@ -188,13 +182,16 @@ struct
     { root_snarked_ledger: Ledger.Db.t
     ; mutable root: State_hash.t
     ; mutable best_tip: State_hash.t
+    ; max_length: int
     ; logger: Logger.t
     ; table: node State_hash.Table.t }
 
   let logger t = t.logger
 
+  let max_length t = t.max_length
+
   (* TODO: load from and write to disk *)
-  let create ~logger
+  let create ~logger ~max_length
       ~(root_transition :
          (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t)
       ~root_snarked_ledger ~root_transaction_snark_scan_state
@@ -280,6 +277,7 @@ struct
         ; root_snarked_ledger
         ; root= root_hash
         ; best_tip= root_hash
+        ; max_length
         ; table }
 
   let all_breadcrumbs t =
@@ -391,7 +389,7 @@ struct
         (* 2.a *)
         let distance_to_parent = root_node.length - node.length in
         (* 2.b *)
-        if distance_to_parent > max_length then (
+        if distance_to_parent > t.max_length then (
           (* 2.b.I *)
           let new_root_hash = List.hd_exn (hash_path t node.breadcrumb) in
           (* 2.b.II *)
@@ -425,9 +423,6 @@ let%test_module "Transition_frontier tests" =
     let module Frontier = Make (struct
       module State_hash = Test_mocks.Hash.Int_unchecked
       module External_transition = Test_mocks.External_transition.T
-      module Max_length = struct
-        let length = 5
-      end
     end) in
     let open Frontier in
     let t = create ~log:(Logger.create ()) in

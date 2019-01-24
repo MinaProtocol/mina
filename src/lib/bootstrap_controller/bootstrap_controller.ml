@@ -267,6 +267,7 @@ module Make (Inputs : Inputs_intf) :
       External_transition.(t.current_root |> of_proof_verified |> to_verified)
     in
     Transition_frontier.create ~logger:parent_log
+      ~max_length:(Transition_frontier.max_length frontier)
       ~root_snarked_ledger:ledger_db
       ~root_transaction_snark_scan_state:(Staged_ledger.Scan_state.empty ())
       ~root_staged_ledger_diff:None

@@ -267,7 +267,7 @@ let daemon log =
 
          let conf_dir = conf_dir
 
-         let lbc_tree_max_depth = `Finite 50
+         let transition_frontier_max_length = 50
 
          let propose_keypair = propose_keypair
 
@@ -330,6 +330,8 @@ let daemon log =
          let%map coda =
            Run.create
              (Run.Config.make ~log ~net_config
+                ~transition_frontier_max_length:
+                  Config0.transition_frontier_max_length
                 ~run_snark_worker:(Option.is_some run_snark_worker_flag)
                 ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")

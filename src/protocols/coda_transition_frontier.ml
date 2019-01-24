@@ -72,6 +72,7 @@ module type Transition_frontier_base_intf = sig
 
   val create :
        logger:Logger.t
+    -> max_length:int
     -> root_transition:(external_transition_verified, state_hash) With_hash.t
     -> root_snarked_ledger:ledger_database
     -> root_transaction_snark_scan_state:transaction_snark_scan_state
@@ -91,7 +92,7 @@ module type Transition_frontier_intf = sig
 
   exception Already_exists of state_hash
 
-  val max_length : int
+  val max_length : t -> int
 
   val all_breadcrumbs : t -> Breadcrumb.t list
 

@@ -281,7 +281,8 @@ let gen_breadcrumb ~logger :
     | Error (`Validation_error e) ->
         failwithf !"Validation Error : %{sexp:Error.t}" e ()
 
-let create_root_frontier ~logger : Transition_frontier.t Deferred.t =
+let create_root_frontier ~logger ~max_length : Transition_frontier.t Deferred.t
+    =
   let accounts = Genesis_ledger.accounts in
   let root_snarked_ledger = Coda_base.Ledger.Db.create () in
   List.iter accounts ~f:(fun (_, account) ->
@@ -319,15 +320,15 @@ let create_root_frontier ~logger : Transition_frontier.t Deferred.t =
     ; hash= With_hash.hash Consensus.Mechanism.genesis_protocol_state }
   in
   let frontier =
-    Transition_frontier.create ~logger
+    Transition_frontier.create ~logger ~max_length
       ~root_transition:root_transition_with_data ~root_snarked_ledger
       ~root_transaction_snark_scan_state ~root_staged_ledger_diff:None
   in
   frontier
 
-let gen_frontier ~logger :
+let gen_frontier ~logger ~max_length :
     Transition_frontier.t Deferred.t Quickcheck.Generator.t =
-  let frontier_deferred = create_root_frontier ~logger in
+  let frontier_deferred = create_root_frontier ~logger ~max_length in
   let root_breadcrumb =
     frontier_deferred |> Deferred.map ~f:Transition_frontier.root
   in
