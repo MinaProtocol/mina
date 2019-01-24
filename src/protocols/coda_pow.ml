@@ -824,8 +824,6 @@ module type Staged_ledger_intf = sig
        list
 
   val statement_exn : t -> [`Non_empty of ledger_proof_statement | `Empty]
-
-  val min_work_to_do : Scan_state.t -> statement Sequence.t Or_error.t
 end
 
 module type Work_selector_intf = sig

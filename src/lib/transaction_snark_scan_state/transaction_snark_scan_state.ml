@@ -488,10 +488,10 @@ end = struct
     let open Or_error.Let_syntax in
     let%map work_seq = next_jobs_sequence t in
     Sequence.chunks_exn
-      (Sequence.map work_seq ~f:(fun maybe_work ->
-           match statement_of_job maybe_work with
+      (Sequence.map work_seq ~f:(fun job ->
+           match statement_of_job job with
            | None -> assert false
-           | Some work -> work ))
+           | Some stmt -> stmt ))
       Transaction_snark_work.proofs_length
 
   let min_work_to_do t :
