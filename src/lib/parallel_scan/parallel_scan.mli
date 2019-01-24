@@ -43,19 +43,11 @@ end
 
 module State : sig
   module Job : sig
-    (** An incomplete job -- base may contain data ['d], merge can have zero components, one component (either the left or the right), or two components in which case there is an integer (sequence_no) representing a set of (completed)jobs in a sequence of (completed)jobs created.
+    (** An incomplete job -- base may contain data ['d], merge contains zero or
+     * more ['a] work.
      *)
-    type sequence_no = int [@@deriving sexp, bin_io]
-
-    type 'a merge =
-      | Empty
-      | Lcomp of 'a
-      | Rcomp of 'a
-      | Bcomp of ('a * 'a * sequence_no)
-    [@@deriving sexp, bin_io]
-
-    type ('a, 'd) t = Merge of 'a merge | Base of ('d * sequence_no) option
-    [@@deriving sexp, bin_io]
+    type ('a, 'd) t = Merge of 'a option * 'a option | Base of 'd option
+    [@@deriving bin_io, sexp]
   end
 
   module Completed_job : sig
