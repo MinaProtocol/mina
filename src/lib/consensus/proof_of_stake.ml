@@ -253,9 +253,14 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         >>| UInt32.of_int
 
       let%test_unit "in_seed_update_range unchecked vs. checked equality" =
-        Quickcheck.test ~trials:100 gen ~f:(fun slot ->
-            Test_util.test_equal Unpacked.typ Snark_params.Tick.Boolean.typ
-              in_seed_update_range_var in_seed_update_range slot )
+        let test =
+          Test_util.test_equal Unpacked.typ Snark_params.Tick.Boolean.typ
+            in_seed_update_range_var in_seed_update_range
+        in
+        Quickcheck.test ~trials:100 gen ~f:test ;
+        let c = UInt32.to_int unforkable_count in
+        let edge_cases = [c; c - 1; c + 1; c * 2; (c * 2) - 1; (c * 2) + 1] in
+        List.iter edge_cases ~f:(Fn.compose test UInt32.of_int)
     end
 
     let slot_start_time (epoch : t) (slot : Slot.t) =
@@ -767,7 +772,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       ; length= Length.of_int 1 }
 
     let update_pair (last_data, curr_data) epoch_length ~prev_epoch ~next_epoch
-        ~curr_slot ~prev_protocol_state_hash ~proposer_vrf_result
+        ~prev_slot ~prev_protocol_state_hash ~proposer_vrf_result
         ~snarked_ledger_hash ~total_currency =
       let open Epoch_ledger in
       let last_data, curr_data, epoch_length =
@@ -786,59 +791,10 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           , epoch_length ) )
       in
       let curr_seed, curr_lock_checkpoint =
-        if Epoch.Slot.in_seed_update_range curr_slot then
+        if Epoch.Slot.in_seed_update_range prev_slot then
           ( Epoch_seed.update curr_data.seed proposer_vrf_result
           , prev_protocol_state_hash )
         else (curr_data.seed, curr_data.lock_checkpoint)
-      in
-      let curr_data =
-        {curr_data with seed= curr_seed; lock_checkpoint= curr_lock_checkpoint}
-      in
-      (last_data, curr_data, epoch_length)
-
-    let _update_pair_checked (last_data, curr_data) epoch_length ~prev_epoch
-        ~next_epoch ~next_slot:_ ~curr_slot ~prev_protocol_state_hash
-        ~proposer_vrf_result ~new_ledger_hash ~new_total_currency =
-      let open Snark_params.Tick in
-      let open Let_syntax in
-      let%bind last_data, curr_data, epoch_length =
-        let%bind epoch_increased =
-          let%bind c = Epoch.compare_var prev_epoch next_epoch in
-          let%map () = Boolean.Assert.is_true c.less_or_equal in
-          c.less
-        in
-        let%map last_data =
-          if_ epoch_increased ~then_:curr_data ~else_:last_data
-        and curr_data =
-          if_ epoch_increased
-            ~then_:
-              { seed= Epoch_seed.(var_of_t initial)
-              ; ledger=
-                  {hash= new_ledger_hash; total_currency= new_total_currency}
-              ; start_checkpoint= prev_protocol_state_hash
-              ; lock_checkpoint= Coda_base.State_hash.(var_of_t (of_hash zero))
-              ; length= Length.Unpacked.var_of_value Length.zero }
-            ~else_:curr_data
-        and epoch_length =
-          Length.increment_if_var epoch_length epoch_increased
-        in
-        (last_data, curr_data, epoch_length)
-      in
-      let%map curr_seed, curr_lock_checkpoint =
-        let%bind updated_curr_seed =
-          Epoch_seed.update_var curr_data.seed proposer_vrf_result
-        and in_seed_update_range =
-          (* TODO: Should this be next_slot? *)
-          Epoch.Slot.in_seed_update_range_var curr_slot
-        in
-        let%map curr_seed =
-          Epoch_seed.if_ in_seed_update_range ~then_:updated_curr_seed
-            ~else_:curr_data.seed
-        and curr_lock_checkpoint =
-          Coda_base.State_hash.if_ in_seed_update_range
-            ~then_:prev_protocol_state_hash ~else_:curr_data.lock_checkpoint
-        in
-        (curr_seed, curr_lock_checkpoint)
       in
       let curr_data =
         {curr_data with seed= curr_seed; lock_checkpoint= curr_lock_checkpoint}
@@ -1046,7 +1002,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           previous_consensus_state.epoch_length
           ~prev_epoch:previous_consensus_state.curr_epoch
           ~next_epoch:consensus_transition_data.epoch
-          ~curr_slot:previous_consensus_state.curr_slot
+          ~prev_slot:previous_consensus_state.curr_slot
           ~prev_protocol_state_hash:previous_protocol_state_hash
           ~proposer_vrf_result ~snarked_ledger_hash ~total_currency
       in
@@ -1068,11 +1024,11 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           ~(supply_increase : Currency.Amount.var)
           ~(previous_blockchain_state_ledger_hash :
              Coda_base.Frozen_ledger_hash.var) =
+        let open Consensus_transition_data in
         let open Snark_params.Tick in
         let open Let_syntax in
-        let prev_epoch = previous_state.curr_epoch in
-        let next_epoch = transition_data.epoch in
-        let next_slot = transition_data.slot in
+        let {curr_epoch= prev_epoch; curr_slot= prev_slot} = previous_state in
+        let {epoch= next_epoch; slot= next_slot} = transition_data in
         let%bind epoch_increased =
           let%bind c = Epoch.compare_var prev_epoch next_epoch in
           let%map () = Boolean.Assert.is_true c.less_or_equal in
@@ -1092,7 +1048,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         let%bind curr_data =
           let%map seed =
             let%bind in_seed_update_range =
-              Epoch.Slot.in_seed_update_range_var next_slot
+              Epoch.Slot.in_seed_update_range_var prev_slot
             in
             let%bind base =
               Epoch_seed.if_ epoch_increased
@@ -1230,7 +1186,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           Epoch_data.update_pair
             (prev.last_epoch_data, prev.curr_epoch_data)
             prev.epoch_length ~prev_epoch:prev.curr_epoch
-            ~next_epoch:curr_epoch ~curr_slot
+            ~next_epoch:curr_epoch ~prev_slot:prev.curr_slot
             ~prev_protocol_state_hash:(With_hash.hash previous_protocol_state)
             ~proposer_vrf_result ~snarked_ledger_hash ~total_currency
         in
