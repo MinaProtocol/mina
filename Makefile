@@ -81,6 +81,9 @@ reformat: git_hooks
 check-format:
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
 
+check-snarky-submodule:
+	./scripts/check-snarky-submodule.sh
+
 ########################################
 ## Merlin fixup for docker builds
 
