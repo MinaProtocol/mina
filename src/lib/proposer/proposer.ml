@@ -310,10 +310,15 @@ module Make (Inputs : Inputs_intf) :
                             ~next_state:protocol_state internal_transition )
                     with
                     | Error err ->
+                        failwithf
+                          "failed to prove generated protocol state: %s"
+                          (Error.to_string_hum err) ()
+                        (*
                         Logger.error logger
                           "failed to prove generated protocol state: %s"
                           (Error.to_string_hum err) ;
                         return ()
+                        *)
                     | Ok protocol_state_proof ->
                         let span = Time.diff (Time.now time_controller) t0 in
                         Logger.info logger
