@@ -50,7 +50,13 @@ module type S = sig
       -> Curve_chunk_table.t
       -> t
 
+    val update_fold_chunked : t -> bool Triple.t Fold.t -> t
+
+    val update_fold_unchunked : t -> bool Triple.t Fold.t -> t
+
     val update_fold : t -> bool Triple.t Fold.t -> t
+
+    val set_chunked_fold : bool -> unit
 
     val digest : t -> Digest.t
 
@@ -119,7 +125,7 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
       ; chunk_ndx: int
       (* index into the chunk table to use *) }
 
-    let update_fold (t : t) (fold : bool Triple.t Fold.t) =
+    let update_fold_chunked (t : t) (fold : bool Triple.t Fold.t) =
       O1trace.measure "pedersen fold" (fun () ->
           let params = t.params in
           let chunk_ndx =
@@ -189,6 +195,26 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
                   (Curve.add acc (process_triple i triple), i + 1) )
             in
             {new_state with acc; triples_consumed} )
+
+    let update_fold_unchunked (t : t) (fold : bool Triple.t Fold.t) =
+      let params = t.params in
+      let acc, triples_consumed =
+        fold.fold ~init:(t.acc, t.triples_consumed) ~f:(fun (acc, i) triple ->
+            let term =
+              Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
+                triple
+            in
+            (Curve.add acc term, i + 1) )
+      in
+      {t with acc; triples_consumed}
+
+    let update_fold_fun_ref = ref update_fold_unchunked
+
+    let set_chunked_fold b =
+      update_fold_fun_ref :=
+        if b then update_fold_chunked else update_fold_unchunked
+
+    let update_fold t fold = !update_fold_fun_ref t fold
 
     let digest t =
       let x, _y = Curve.to_affine_coordinates t.acc in

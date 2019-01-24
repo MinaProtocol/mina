@@ -254,7 +254,6 @@ module Tick = struct
     *)
     module For_tests = struct
       open Fold_lib
-      open Tuple_lib
 
       let equal_curves c1 c2 =
         if phys_equal c1 Inner_curve.zero || phys_equal c2 Inner_curve.zero
@@ -270,20 +269,6 @@ module Tick = struct
         (* params, chunk_table should never be modified *)
         && phys_equal s1.params s2.params
         && phys_equal s1.chunk_table s2.chunk_table
-
-      (* this is the old update_fold code (specialized to Inner_curve), before we added chunking *)
-      let update_fold_unchunked (t : State.t) (fold : bool Triple.t Fold.t) =
-        let params = t.params in
-        let acc, triples_consumed =
-          fold.fold ~init:(t.acc, t.triples_consumed)
-            ~f:(fun (acc, i) triple ->
-              let term =
-                Snarky.Pedersen.local_function ~negate:Inner_curve.negate
-                  params.(i) triple
-              in
-              (Inner_curve.add acc term, i + 1) )
-        in
-        {t with acc; triples_consumed}
 
       let gen_fold n =
         let gen_triple =
@@ -308,8 +293,10 @@ module Tick = struct
         State.create params Curve_chunk_table.{curve_points_table}
 
       let run_updates fold =
-        let result = State.update_fold initial_state fold in
-        let unchunked_result = update_fold_unchunked initial_state fold in
+        let result = State.update_fold_chunked initial_state fold in
+        let unchunked_result =
+          State.update_fold_unchunked initial_state fold
+        in
         (result, unchunked_result)
 
       let run_hash_test n =
