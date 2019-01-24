@@ -563,8 +563,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       | Winner_address : Coda_base.Account.Index.t Snarky.Request.t
       | Private_key : Scalar.value Snarky.Request.t
 
-    open Crypto_params_init.Tick0
-
     let%snarkydef get_vrf_evaluation shifted ~ledger ~message =
       let open Coda_base in
       let open Snark_params.Tick in
@@ -587,8 +585,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       (evaluation, account.balance)
 
     module Checked = struct
-      open Crypto_params_init.Tick0
-
       let%snarkydef check shifted ~(epoch_ledger : Epoch_ledger.var) ~epoch
           ~slot ~seed =
         let open Snark_params.Tick in
@@ -1018,8 +1014,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       ; curr_epoch_data }
 
     include struct
-      open Crypto_params_init.Tick0
-
       let%snarkydef update_var (previous_state : var)
           (transition_data : Consensus_transition_data.var)
           (previous_protocol_state_hash : Coda_base.State_hash.var)
@@ -1248,8 +1242,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       ~time_received
 
   include struct
-    open Crypto_params_init.Tick0
-
     let%snarkydef next_state_checked ~(prev_state : Protocol_state.var)
         ~(prev_state_hash : Coda_base.State_hash.var) transition
         supply_increase =
