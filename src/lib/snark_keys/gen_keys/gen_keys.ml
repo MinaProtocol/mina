@@ -141,80 +141,10 @@ let gen_keys () =
   let%bind tx_keys_location, tx_keys, tx_keys_checksum =
     Transaction_snark.Keys.cached ()
   in
-  let module Consensus_mechanism = Consensus.Proof_of_signature.Make (struct
-    module Time = Coda_base.Block_time
-    module Proof = Coda_base.Proof
-    module Genesis_ledger = Genesis_ledger
-
-    let proposal_interval = Time.Span.of_ms @@ Int64.of_int 5000
-
-    let private_key = None
-
-    module Staged_ledger_diff = Staged_ledger.Make_diff (struct
-      open Coda_base
-      module Compressed_public_key = Public_key.Compressed
-      module Fee_transfer = Fee_transfer
-
-      module User_command = struct
-        include (
-          User_command :
-            module type of User_command
-            with module With_valid_signature := User_command
-                                                .With_valid_signature )
-
-        let receiver _ = failwith "stub"
-
-        let sender _ = failwith "stub"
-
-        let fee _ = failwith "stub"
-
-        let compare _ _ = failwith "stub"
-
-        module With_valid_signature = struct
-          include User_command.With_valid_signature
-
-          let compare _ _ = failwith "stub"
-        end
-      end
-
-      module Ledger_proof = Transaction_snark
-
-      module Transaction_snark_work = struct
-        include Staged_ledger.Make_completed_work
-                  (Compressed_public_key)
-                  (Ledger_proof)
-                  (Transaction_snark.Statement)
-
-        let check _ _ = failwith "stub"
-      end
-
-      module Ledger_hash = struct
-        include Ledger_hash.Stable.V1
-
-        let to_bytes = Ledger_hash.to_bytes
-      end
-
-      module Staged_ledger_aux_hash = struct
-        include Staged_ledger_hash.Aux_hash.Stable.V1
-
-        let of_bytes = Staged_ledger_hash.Aux_hash.of_bytes
-      end
-
-      module Staged_ledger_hash = struct
-        include Staged_ledger_hash.Stable.V1
-
-        let ledger_hash = Staged_ledger_hash.ledger_hash
-
-        let aux_hash = Staged_ledger_hash.aux_hash
-
-        let of_aux_and_ledger_hash = Staged_ledger_hash.of_aux_and_ledger_hash
-      end
-    end)
-  end) in
   let module M =
     (* TODO make toplevel library to encapsulate consensus params *)
       Blockchain_snark.Blockchain_transition.Make
-        (Consensus_mechanism)
+        (Consensus.Mechanism)
         (Transaction_snark.Verification.Make (struct
           let keys = tx_keys
         end))

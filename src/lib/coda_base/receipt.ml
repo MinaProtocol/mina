@@ -19,7 +19,11 @@ module Chain_hash = struct
 
   let empty =
     of_hash
-      (Pedersen.(State.salt params "CodaReceiptEmpty") |> Pedersen.State.digest)
+      ( Pedersen.(
+          State.salt params
+            Curve_chunk_table.{curve_points_table}
+            "CodaReceiptEmpty")
+      |> Pedersen.State.digest )
 
   let cons payload t =
     Pedersen.digest_fold Hash_prefix.receipt_chain

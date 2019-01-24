@@ -111,6 +111,9 @@ module Make
 
   let to_list mdb = account_list_bin mdb Account.bin_read_t
 
+  let keys mdb =
+    to_list mdb |> List.map ~f:Account.public_key |> Key.Set.of_list
+
   let set_raw {kvdb; _} location bin =
     Kvdb.set kvdb ~key:(Location.serialize location) ~data:bin
 
