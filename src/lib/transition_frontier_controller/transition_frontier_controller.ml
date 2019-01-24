@@ -15,6 +15,7 @@ module type Inputs_intf = sig
     with type hash := State_hash.t
      and type transition_frontier := Transition_frontier.t
      and type ancestor_proof := State_body_hash.t list
+     and type external_transition := External_transition.t
 
   module Transition_handler :
     Transition_handler_intf

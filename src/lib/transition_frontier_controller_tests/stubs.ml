@@ -3,12 +3,14 @@ open Core_kernel
 open Protocols.Coda_pow
 open Coda_base
 open Signature_lib
+
+(** [Stubs] is a set of modules used for testing different components of tfc  *)
 module Time = Coda_base.Block_time
 
 module State_proof = struct
   include Coda_base.Proof
 
-  let verify _ = failwith "STUB: state_proof"
+  let verify _ _ = return true
 end
 
 module Ledger_proof_statement = Transaction_snark.Statement
@@ -170,7 +172,7 @@ let gen_payments ledger : User_command.With_valid_signature.t Sequence.t =
 module Blockchain_state = External_transition.Protocol_state.Blockchain_state
 module Protocol_state = External_transition.Protocol_state
 
-module Transition_frontier = Transition_frontier.Make (struct
+module Transition_frontier_inputs = struct
   module Staged_ledger_aux_hash = Staged_ledger_aux_hash
   module Ledger_proof_statement = Ledger_proof_statement
   module Ledger_proof = Ledger_proof
@@ -178,7 +180,10 @@ module Transition_frontier = Transition_frontier.Make (struct
   module Staged_ledger_diff = Staged_ledger_diff
   module External_transition = External_transition
   module Staged_ledger = Staged_ledger
-end)
+end
+
+module Transition_frontier =
+  Transition_frontier.Make (Transition_frontier_inputs)
 
 let gen_breadcrumb ~logger :
     (   Transition_frontier.Breadcrumb.t Deferred.t
@@ -281,7 +286,8 @@ let gen_breadcrumb ~logger :
     | Error (`Validation_error e) ->
         failwithf !"Validation Error : %{sexp:Error.t}" e ()
 
-let create_root_frontier ~logger : Transition_frontier.t Deferred.t =
+let create_root_frontier ~max_length ~logger : Transition_frontier.t Deferred.t
+    =
   let accounts = Genesis_ledger.accounts in
   let root_snarked_ledger = Coda_base.Ledger.Db.create () in
   List.iter accounts ~f:(fun (_, account) ->
@@ -321,26 +327,44 @@ let create_root_frontier ~logger : Transition_frontier.t Deferred.t =
   let frontier =
     Transition_frontier.create ~logger
       ~root_transition:root_transition_with_data ~root_snarked_ledger
-      ~root_transaction_snark_scan_state ~root_staged_ledger_diff:None
+      ~root_transaction_snark_scan_state ~max_length
+      ~root_staged_ledger_diff:None
   in
   frontier
 
-let gen_frontier ~logger :
-    Transition_frontier.t Deferred.t Quickcheck.Generator.t =
-  let frontier_deferred = create_root_frontier ~logger in
-  let root_breadcrumb =
-    frontier_deferred |> Deferred.map ~f:Transition_frontier.root
+let build_frontier_randomly ~gen_root_breadcrumb_builder frontier :
+    unit Deferred.t =
+  let root_breadcrumb = Transition_frontier.root frontier in
+  (* HACK: This removes the overhead of having to deal with the quickcheck generator monad *)
+  let deferred_breadcrumbs =
+    gen_root_breadcrumb_builder root_breadcrumb |> Quickcheck.random_value
   in
-  let open Quickcheck.Let_syntax in
-  let%map deferred_breadcrumbs =
-    Quickcheck_lib.gen_imperative_ktree (return root_breadcrumb)
-      (gen_breadcrumb ~logger)
-  in
-  let open Deferred.Let_syntax in
-  let%bind () =
-    Deferred.List.iter deferred_breadcrumbs ~f:(fun deferred_breadcrumbs ->
-        let%map breadcrumb = deferred_breadcrumbs
-        and frontier = frontier_deferred in
-        Transition_frontier.attach_breadcrumb_exn frontier breadcrumb )
-  in
-  frontier_deferred
+  Deferred.List.iter deferred_breadcrumbs ~f:(fun deferred_breadcrumb ->
+      let%map breadcrumb = deferred_breadcrumb in
+      Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
+
+module Protocol_state_validator = Protocol_state_validator.Make (struct
+  include Transition_frontier_inputs
+  module Time = Time
+  module State_proof = State_proof
+end)
+
+module Sync_handler = Sync_handler.Make (struct
+  include Transition_frontier_inputs
+  module Transition_frontier = Transition_frontier
+end)
+
+module Network = struct
+  type t = Transition_frontier.t Kademlia.Peer.Table.t
+
+  let random_peers _ = failwith "STUB: Network.random_peers"
+
+  let catchup_transition _ = failwith "STUB: Network.catchup_transition"
+
+  let get_ancestry t peer (descendent, count) =
+    (let open Option.Let_syntax in
+    let%bind frontier = Hashtbl.find t peer in
+    Sync_handler.prove_ancestry ~frontier count descendent)
+    |> Result.of_option ~error:(Error.of_string "Mock Network error")
+    |> Deferred.return
+end

@@ -76,6 +76,7 @@ module type Transition_frontier_base_intf = sig
     -> root_snarked_ledger:ledger_database
     -> root_transaction_snark_scan_state:transaction_snark_scan_state
     -> root_staged_ledger_diff:staged_ledger_diff option
+    -> max_length:int
     -> t Deferred.t
 
   val find_exn : t -> state_hash -> Breadcrumb.t
@@ -91,7 +92,7 @@ module type Transition_frontier_intf = sig
 
   exception Already_exists of state_hash
 
-  val max_length : int
+  val max_length : t -> int
 
   val all_breadcrumbs : t -> Breadcrumb.t list
 
@@ -115,11 +116,15 @@ module type Transition_frontier_intf = sig
 
   val iter : t -> f:(Breadcrumb.t -> unit) -> unit
 
-  val attach_breadcrumb_exn : t -> Breadcrumb.t -> unit
-
   val add_breadcrumb_exn : t -> Breadcrumb.t -> unit
 
   val clear_paths : t -> unit
+
+  val best_tip_path_length_exn : t -> int
+
+  module For_tests : sig
+    val root_snarked_ledger : t -> ledger_database
+  end
 end
 
 module type Catchup_intf = sig
@@ -267,11 +272,13 @@ module type Sync_handler_intf = sig
 
   type ancestor_proof
 
+  type external_transition
+
   val prove_ancestry :
        frontier:transition_frontier
     -> int
     -> hash
-    -> (hash * ancestor_proof) option
+    -> (external_transition * ancestor_proof) option
 end
 
 module type Bootstrap_controller_intf = sig

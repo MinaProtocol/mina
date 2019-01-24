@@ -52,8 +52,7 @@ module Make (Inputs : Inputs.S) :
                         ~f:
                           (Rose_tree.iter
                              ~f:
-                               (Transition_frontier.attach_breadcrumb_exn
-                                  frontier)))
+                               (Transition_frontier.add_breadcrumb_exn frontier)))
                | `Valid_transition transition -> (
                  match
                    Transition_frontier.find frontier

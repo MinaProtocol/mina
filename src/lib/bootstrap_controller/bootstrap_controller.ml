@@ -48,14 +48,37 @@ module type Inputs_intf = sig
      and type external_transition_verified := External_transition.Verified.t
 end
 
-module Make (Inputs : Inputs_intf) :
-  Bootstrap_controller_intf
-  with type network := Inputs.Network.t
-   and type transition_frontier := Inputs.Transition_frontier.t
-   and type external_transition_verified :=
-              Inputs.External_transition.Verified.t
-   and type ancestor_prover := Ancestor.Prover.t
-   and type ledger_db := Ledger.Db.t = struct
+module Make (Inputs : Inputs_intf) : sig
+  include
+    Bootstrap_controller_intf
+    with type network := Inputs.Network.t
+     and type transition_frontier := Inputs.Transition_frontier.t
+     and type external_transition_verified :=
+                Inputs.External_transition.Verified.t
+     and type ancestor_prover := Ancestor.Prover.t
+     and type ledger_db := Ledger.Db.t
+
+  module For_tests : sig
+    type t
+
+    val make_bootstrap :
+         logger:Logger.t
+      -> syncable_ledger:Inputs.Syncable_ledger.t
+      -> ancestor_prover:Ancestor.Prover.t
+      -> genesis_root:Inputs.External_transition.Proof_verified.t
+      -> network:Inputs.Network.t
+      -> max_length:int
+      -> t
+
+    val on_transition :
+         t
+      -> sender:Kademlia.Peer.t
+      -> Inputs.External_transition.Proof_verified.t
+      -> unit Deferred.t
+
+    val dummy_port : int * int
+  end
+end = struct
   open Inputs
 
   type t =
@@ -64,7 +87,8 @@ module Make (Inputs : Inputs_intf) :
     ; ancestor_prover: Ancestor.Prover.t
     ; mutable best_seen_transition: External_transition.Proof_verified.t
     ; mutable current_root: External_transition.Proof_verified.t
-    ; network: Network.t }
+    ; network: Network.t
+    ; max_length: int }
 
   (* Cache represents a graph. The key is a State_hash, which is the node in 
   the graph, and the value is the children transitions of the node *)
@@ -85,7 +109,7 @@ module Make (Inputs : Inputs_intf) :
   end
 
   let worth_getting_root t candidate =
-    `Keep
+    `Take
     = Consensus.Mechanism.select ~logger:t.logger
         ~existing:
           ( t.best_seen_transition
@@ -115,9 +139,14 @@ module Make (Inputs : Inputs_intf) :
     let previous_state_hash =
       Protocol_state.previous_state_hash candidate_state
     in
+    let generations =
+      Int.min
+        (length candidate_transition - length t.current_root)
+        t.max_length
+      - 1
+    in
     let input : Ancestor.Input.t =
-      { descendant= previous_state_hash
-      ; generations= length candidate_transition - length t.current_root }
+      {descendant= previous_state_hash; generations}
     in
     if done_syncing_root t || (not @@ worth_getting_root t candidate_state)
     then Deferred.unit
@@ -129,9 +158,8 @@ module Make (Inputs : Inputs_intf) :
       | Error e ->
           Deferred.return
           @@ Logger.error t.logger
-               !"Could not get the proof of ancestors from the \
-                 network:%{sexp:Error.t}"
-               e
+               !"Could not get the proof of ancestors from the network: %s"
+               (Error.to_string_hum e)
       | Ok (ancestor_transition, proof) -> (
           let result =
             let open Deferred.Or_error.Let_syntax in
@@ -206,6 +234,8 @@ module Make (Inputs : Inputs_intf) :
     in
     dfs (Transition_frontier.find_exn frontier root_hash)
 
+  let dummy_port = (0, 0)
+
   let sync_ledger t ~transition_graph ~transition_reader =
     Reader.iter transition_reader
       ~f:(fun (`Transition incoming_transition, `Time_received _) ->
@@ -219,9 +249,10 @@ module Make (Inputs : Inputs_intf) :
          *)
         let sender =
           let host_and_port = Envelope.Incoming.sender incoming_transition in
+          let discovery_port, communication_port = dummy_port in
           Kademlia.Peer.create
             (Host_and_port.host host_and_port |> Unix.Inet_addr.of_string)
-            ~discovery_port:0 ~communication_port:0
+            ~discovery_port ~communication_port
         in
         let protocol_state =
           External_transition.Verified.protocol_state transition
@@ -249,13 +280,15 @@ module Make (Inputs : Inputs_intf) :
       |> With_hash.data
       |> External_transition.forget_consensus_state_verification
     in
+    let max_length = Transition_frontier.max_length frontier in
     let t =
       { network
       ; logger
       ; ancestor_prover
       ; best_seen_transition= initial_root_transition
       ; current_root= initial_root_transition
-      ; syncable_ledger= Syncable_ledger.create ledger_db ~parent_log:logger }
+      ; syncable_ledger= Syncable_ledger.create ledger_db ~parent_log:logger
+      ; max_length }
     in
     let transition_graph = Transition_cache.create () in
     Transition_frontier.clear_paths frontier ;
@@ -269,10 +302,28 @@ module Make (Inputs : Inputs_intf) :
     Transition_frontier.create ~logger:parent_log
       ~root_snarked_ledger:ledger_db
       ~root_transaction_snark_scan_state:(Staged_ledger.Scan_state.empty ())
-      ~root_staged_ledger_diff:None
+      ~root_staged_ledger_diff:None ~max_length
       ~root_transition:
         (With_hash.of_data new_root
            ~hash_data:
              (Fn.compose Consensus.Mechanism.Protocol_state.hash
                 External_transition.Verified.protocol_state))
+
+  module For_tests = struct
+    type nonrec t = t
+
+    let make_bootstrap ~logger ~syncable_ledger ~ancestor_prover ~genesis_root
+        ~network ~max_length =
+      { syncable_ledger
+      ; logger
+      ; ancestor_prover
+      ; best_seen_transition= genesis_root
+      ; current_root= genesis_root
+      ; network
+      ; max_length }
+
+    let on_transition = on_transition
+
+    let dummy_port = dummy_port
+  end
 end

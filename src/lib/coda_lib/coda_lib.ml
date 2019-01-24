@@ -491,7 +491,7 @@ module type Inputs_intf = sig
          frontier:Transition_frontier.t
       -> int
       -> Protocol_state_hash.t
-      -> (Protocol_state_hash.t * State_body_hash.t list) option
+      -> (External_transition.t * State_body_hash.t list) option
   end
 end
 
@@ -696,6 +696,7 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let%bind transition_frontier =
           Transition_frontier.create ~logger:config.log
+            ~max_length:Consensus.Mechanism.blocks_till_finality
             ~root_transition:
               (With_hash.of_data first_transition
                  ~hash_data:
@@ -746,18 +747,7 @@ module Make (Inputs : Inputs_intf) = struct
               let result =
                 let open Option.Let_syntax in
                 let%bind frontier = Mvar.peek frontier_read_ref in
-                let%bind state_hash, proof =
-                  Sync_handler.prove_ancestry ~frontier count descendent
-                in
-                let%map transition_with_hash =
-                  Transition_frontier.find frontier state_hash
-                in
-                let external_transition =
-                  transition_with_hash
-                  |> Transition_frontier.Breadcrumb.transition_with_hash
-                  |> With_hash.data |> External_transition.of_verified
-                in
-                (external_transition, proof)
+                Sync_handler.prove_ancestry ~frontier count descendent
               in
               Deferred.return result )
         in

@@ -20,12 +20,13 @@ module Make (Inputs : Inputs_intf) :
   Sync_handler_intf
   with type hash := State_hash.t
    and type transition_frontier := Inputs.Transition_frontier.t
-   and type ancestor_proof := State_body_hash.t list = struct
+   and type ancestor_proof := State_body_hash.t list
+   and type external_transition := Inputs.External_transition.t = struct
   open Inputs
 
   let prove_ancestry ~frontier generations descendants =
     let open Option.Let_syntax in
-    let rec go acc iter_traversal state_hash =
+    let rec create_proof acc iter_traversal state_hash =
       if iter_traversal = 0 then Some (state_hash, acc)
       else
         let%bind breadcrumb = Transition_frontier.find frontier state_hash in
@@ -43,7 +44,17 @@ module Make (Inputs : Inputs_intf) :
         let previous_state_hash =
           External_transition.Protocol_state.previous_state_hash protocol_state
         in
-        go (state_body_hash :: acc) (iter_traversal - 1) previous_state_hash
+        create_proof (state_body_hash :: acc) (iter_traversal - 1)
+          previous_state_hash
     in
-    go [] generations descendants
+    let%bind state_hash, proof = create_proof [] generations descendants in
+    let%map transition_with_hash =
+      Transition_frontier.find frontier state_hash
+    in
+    let external_transition =
+      transition_with_hash
+      |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
+      |> External_transition.of_verified
+    in
+    (external_transition, proof)
 end
