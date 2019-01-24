@@ -13,11 +13,9 @@ module type S = sig
 end
 
 module Make
-    (Fqe : Snarky_field_extensions.Intf.S
-           with type 'a A.t = 'a * 'a * 'a
-            and type 'a Base.t_ = 'a)
+    (Fqe : Snarky_field_extensions.Intf.S)
     (N : Snarkette.Nat_intf.S) (Params : sig
-        val coeff_a : Fqe.t
+        val coeff_a : Fqe.Unchecked.t
 
         val loop_count : N.t
     end) =
@@ -36,22 +34,90 @@ struct
   open Impl
   open Let_syntax
 
-  type loop_state = {rx: Fqe.t; ry: Fqe.t}
+  type 'fqe loop_state = {rx: 'fqe; ry: 'fqe}
 
   let length (a, b, c) =
     let l = Field.Checked.length in
     max (l a) (max (l b) (l c))
 
+  let doubling_step_unchecked (s : Fqe.Unchecked.t loop_state) =
+    let open Fqe in
+    let open Unchecked in
+    let gamma =
+      let rx_squared = square s.rx in
+      (rx_squared + rx_squared + rx_squared + Params.coeff_a) / (s.ry + s.ry)
+    in
+    let c =
+      let gamma_x = gamma * s.rx in
+      { Coeff.rx= constant s.rx
+      ; ry= constant s.ry
+      ; gamma= constant gamma
+      ; gamma_x= constant gamma_x }
+    in
+    let s =
+      let rx = square gamma - (s.rx + s.rx) in
+      let ry = (gamma * (s.rx - rx)) - s.ry in
+      {rx; ry}
+    in
+    (s, c)
+
+  let addition_step_unchecked naf_i ~q:(qx, qy)
+      (s : Fqe.Unchecked.t loop_state) =
+    let open Fqe in
+    let open Unchecked in
+    let gamma =
+      let top = if naf_i > 0 then s.ry - qy else s.ry + qy in
+      (*  This [div_unsafe] is definitely safe in the context of pre-processing
+            a verification key. The reason is the following. The top hash of the SNARK commits
+            the prover to using the correct verification key inside the SNARK, and we know for
+            that verification key that we will not hit a 0/0 case.
+
+            In the general pairing context (e.g., for precomputing on G2 elements in the proof),
+            I am not certain about this use of [div_unsafe]. *)
+      top / (s.rx - qx)
+    in
+    let c =
+      let gamma_x = gamma * qx in
+      { Coeff.rx= constant s.rx
+      ; ry= constant s.ry
+      ; gamma= constant gamma
+      ; gamma_x= constant gamma_x }
+    in
+    let s =
+      let rx = square gamma - (s.rx + qx) in
+      let ry = (gamma * (s.rx - rx)) - s.ry in
+      {rx; ry}
+    in
+    (s, c)
+
+  let create_constant ((qx, qy) as q) =
+    let naf = Snarkette.Fields.find_wnaf (module N) 1 Params.loop_count in
+    let rec go i found_nonzero (s : Fqe.Unchecked.t loop_state) acc =
+      if i < 0 then List.rev acc
+      else if not found_nonzero then
+        go (i - 1) (found_nonzero || naf.(i) <> 0) s acc
+      else
+        let s, c = doubling_step_unchecked s in
+        let acc = c :: acc in
+        if naf.(i) <> 0 then
+          let s, c = addition_step_unchecked naf.(i) ~q s in
+          let acc = c :: acc in
+          go (i - 1) found_nonzero s acc
+        else go (i - 1) found_nonzero s acc
+    in
+    let coeffs = go (Array.length naf - 1) false {rx= qx; ry= qy} [] in
+    {q= Fqe.(constant qx, constant qy); coeffs}
+
   (* I verified using sage that if the input [s] satisfies ry^2 = rx^3 + a rx + b, then
    so does the output. *)
-  let doubling_step (s : loop_state) =
+  let doubling_step (s : Fqe.t loop_state) =
     with_label __LOC__
       (let open Fqe in
       let%bind c =
         let%bind gamma =
           let%bind rx_squared = square s.rx in
           div_unsafe
-            (scale rx_squared (Field.of_int 3) + Params.coeff_a)
+            (scale rx_squared (Field.of_int 3) + constant Params.coeff_a)
             (scale s.ry (Field.of_int 2))
           (* ry will never be zero. And thus this [div_unsafe] is ok.
              A loop invariant is that s is actually a non-identity curve point.
@@ -105,7 +171,7 @@ struct
       (s, c))
 
   (* I verified using sage that if both q and s are on the curve than so is the output. *)
-  let addition_step naf_i ~q:(qx, qy) (s : loop_state) =
+  let addition_step naf_i ~q:(qx, qy) (s : Fqe.t loop_state) =
     with_label __LOC__
       (let open Fqe in
       let%bind c =
@@ -167,7 +233,7 @@ struct
      Not a huge deal, but it does waste a few [Fqe] multiplications. *)
   let create ((qx, qy) as q) =
     let naf = Snarkette.Fields.find_wnaf (module N) 1 Params.loop_count in
-    let rec go i found_nonzero (s : loop_state) acc =
+    let rec go i found_nonzero (s : Fqe.t loop_state) acc =
       if i < 0 then return (List.rev acc)
       else if not found_nonzero then
         go (i - 1) (found_nonzero || naf.(i) <> 0) s acc
