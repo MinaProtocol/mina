@@ -120,72 +120,75 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
       (* index into the chunk table to use *) }
 
     let update_fold (t : t) (fold : bool Triple.t Fold.t) =
-      let params = t.params in
-      let chunk_ndx =
-        let boundary = t.triples_consumed / Chunk.size in
-        if Int.equal (t.triples_consumed mod Chunk.size) 0 then
-          (* exactly at chunk boundary *)
-          boundary
-        else (* next chunk boundary *)
-          boundary + 1
-      in
-      let process_triple i triple =
-        Snarky.Pedersen.local_function ~negate:Curve.negate params.(i) triple
-      in
-      let table = t.chunk_table.curve_points_table in
-      (* consume a triple at a time until we're at a chunk boundary, then
+      O1trace.measure "pedersen fold" (fun () ->
+          let params = t.params in
+          let chunk_ndx =
+            let boundary = t.triples_consumed / Chunk.size in
+            if Int.equal (t.triples_consumed mod Chunk.size) 0 then
+              (* exactly at chunk boundary *)
+              boundary
+            else (* next chunk boundary *)
+              boundary + 1
+          in
+          let process_triple i triple =
+            Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
+              triple
+          in
+          let table = t.chunk_table.curve_points_table in
+          (* consume a triple at a time until we're at a chunk boundary, then
          use chunk table; after processing all full chunks, consume any
          straggler triples
       *)
-      let ({sum; triples_consumed; chunk_rev; _} : fold_result) =
-        fold.fold
-          ~init:
-            { sum= t.acc
-            ; triples_consumed= t.triples_consumed
-            ; synched= false
-            ; chunk_rev= []
-            ; chunk_rev_len= 0
-            ; chunk_ndx } ~f:(fun accum triple ->
-            let synched =
-              accum.synched || Int.equal (t.triples_consumed mod Chunk.size) 0
-            in
-            if synched then
-              if Int.equal (accum.chunk_rev_len + 1) Chunk.size then
-                (* full chunk; use int value of the reversed chunk as table index *)
-                let n = Chunk.to_int (triple :: accum.chunk_rev) in
-                let g = table.(accum.chunk_ndx).(n) in
-                { sum= Curve.add accum.sum g
-                ; triples_consumed= accum.triples_consumed + Chunk.size
-                ; synched= true (* stay synched *)
-                ; chunk_rev= [] (* new chunk *)
+          let ({sum; triples_consumed; chunk_rev; _} : fold_result) =
+            fold.fold
+              ~init:
+                { sum= t.acc
+                ; triples_consumed= t.triples_consumed
+                ; synched= false
+                ; chunk_rev= []
                 ; chunk_rev_len= 0
-                ; chunk_ndx= accum.chunk_ndx + 1 }
-              else
-                (* build next chunk *)
-                { accum with
-                  synched= true
-                ; chunk_rev= triple :: accum.chunk_rev
-                ; chunk_rev_len= accum.chunk_rev_len + 1 }
-            else
-              (* not synched, consume one triple *)
-              { accum with
-                sum=
-                  Curve.add accum.sum
-                    (process_triple accum.triples_consumed triple)
-              ; triples_consumed= accum.triples_consumed + 1 } )
-      in
-      let new_state = {t with acc= sum; triples_consumed} in
-      if List.is_empty chunk_rev then (* no stragglers *)
-        new_state
-      else
-        let stragglers = List.rev chunk_rev in
-        let acc, triples_consumed =
-          List.fold stragglers
-            ~init:(new_state.acc, new_state.triples_consumed)
-            ~f:(fun (acc, i) triple ->
-              (Curve.add acc (process_triple i triple), i + 1) )
-        in
-        {new_state with acc; triples_consumed}
+                ; chunk_ndx } ~f:(fun accum triple ->
+                let synched =
+                  accum.synched
+                  || Int.equal (t.triples_consumed mod Chunk.size) 0
+                in
+                if synched then
+                  if Int.equal (accum.chunk_rev_len + 1) Chunk.size then
+                    (* full chunk; use int value of the reversed chunk as table index *)
+                    let n = Chunk.to_int (triple :: accum.chunk_rev) in
+                    let g = table.(accum.chunk_ndx).(n) in
+                    { sum= Curve.add accum.sum g
+                    ; triples_consumed= accum.triples_consumed + Chunk.size
+                    ; synched= true (* stay synched *)
+                    ; chunk_rev= [] (* new chunk *)
+                    ; chunk_rev_len= 0
+                    ; chunk_ndx= accum.chunk_ndx + 1 }
+                  else
+                    (* build next chunk *)
+                    { accum with
+                      synched= true
+                    ; chunk_rev= triple :: accum.chunk_rev
+                    ; chunk_rev_len= accum.chunk_rev_len + 1 }
+                else
+                  (* not synched, consume one triple *)
+                  { accum with
+                    sum=
+                      Curve.add accum.sum
+                        (process_triple accum.triples_consumed triple)
+                  ; triples_consumed= accum.triples_consumed + 1 } )
+          in
+          let new_state = {t with acc= sum; triples_consumed} in
+          if List.is_empty chunk_rev then (* no stragglers *)
+            new_state
+          else
+            let stragglers = List.rev chunk_rev in
+            let acc, triples_consumed =
+              List.fold stragglers
+                ~init:(new_state.acc, new_state.triples_consumed)
+                ~f:(fun (acc, i) triple ->
+                  (Curve.add acc (process_triple i triple), i + 1) )
+            in
+            {new_state with acc; triples_consumed} )
 
     let digest t =
       let x, _y = Curve.to_affine_coordinates t.acc in
