@@ -3,3 +3,14 @@
   (mode fallback)
   (deps config/%{profile}.mlh)
   (action (copy "%{deps}" config.mlh)))
+
+(executable
+ (name digestif_flags_gen)
+ (modules digestif_flags_gen)
+ (preprocessor_deps "config.mlh")
+ (preprocess (pps ppx_optcomp))
+ (libraries dune.configurator))
+
+(rule
+ (targets digestif.flags)
+ (action (run ./digestif_flags_gen.exe)))
