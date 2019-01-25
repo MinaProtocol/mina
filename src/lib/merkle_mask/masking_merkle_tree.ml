@@ -352,6 +352,8 @@ struct
       let mask_keys = keys t in
       let all_keys = Key.Set.union (Base.keys (get_parent t)) (keys t) in
       Printf.eprintf "IN MASK: %s\n%!" (get_uuid t |> Uuid.to_string) ;
+      Printf.eprintf "WITH BASE: %s\n%!"
+        (Base.get_uuid (get_parent t) |> Uuid.to_string) ;
       Printf.eprintf "NUM BASE KEYS: %d\n%!" (Key.Set.length base_keys) ;
       Printf.eprintf "NUM MASK KEYS: %d\n%!" (Key.Set.length mask_keys) ;
       Printf.eprintf "NUM ALL KEYS: %d\n%!" (Key.Set.length all_keys) ;
