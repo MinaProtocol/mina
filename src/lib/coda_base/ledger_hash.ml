@@ -56,7 +56,7 @@ let merge ~height (h1 : t) (h2 : t) =
 let empty_hash =
   let open Tick.Pedersen in
   digest_fold
-    (State.create params Curve_chunk_table.{curve_points_table})
+    (State.create params ~get_chunk_table)
     (Fold.string_triples "nothing up my sleeve")
   |> of_hash
 
