@@ -238,17 +238,20 @@ struct
           set_hash t addr hash )
 
     (* if the mask's parent sets an account, we can prune an entry in the mask if the account in the parent
-     is the same in the mask
-       *)
-    let parent_set_notify t location account =
-      match find_account t location with
-      | Some existing_account ->
-          if
-            Key.equal
-              (Account.public_key account)
-              (Account.public_key existing_account)
-          then remove_account_and_update_hashes t location
+       is the same in the mask
+     *)
+    let parent_set_notify t account =
+      match find_location t (Account.public_key account) with
       | None -> ()
+      | Some location -> (
+        match find_account t location with
+        | Some existing_account ->
+            if
+              Key.equal
+                (Account.public_key account)
+                (Account.public_key existing_account)
+            then remove_account_and_update_hashes t location
+        | None -> () )
 
     (* as for accounts, we see if we have it in the mask, else delegate to parent *)
     let get_hash t addr =
