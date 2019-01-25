@@ -220,6 +220,7 @@ workflows:
     version: 2
     coda_parallel:
         jobs:
+            - lint
             - build
             - build-macos
             - build_withsnark_sig
