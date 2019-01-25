@@ -12,10 +12,9 @@ end
 include Stable.V1
 include Comparable.Make_binable (Stable.V1)
 
-type var = Tick.Field.var * Tick.Field.var
+type var = Tick.Field.Var.t * Tick.Field.Var.t
 
-let var_of_t (x, y) =
-  (Tick.Field.Checked.constant x, Tick.Field.Checked.constant y)
+let var_of_t (x, y) = (Tick.Field.Var.constant x, Tick.Field.Var.constant y)
 
 let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
 
@@ -83,7 +82,7 @@ module Compressed = struct
 
   let length_in_triples = bit_length_to_triple_length (1 + Field.size_in_bits)
 
-  type var = (Field.var, Boolean.var) t_
+  type var = (Field.Var.t, Boolean.var) t_
 
   let to_hlist {x; is_odd} = Snarky.H_list.[x; is_odd]
 
@@ -97,7 +96,7 @@ module Compressed = struct
       ~value_of_hlist:of_hlist
 
   let var_of_t ({x; is_odd} : t) : var =
-    {x= Field.Checked.constant x; is_odd= Boolean.var_of_value is_odd}
+    {x= Field.Var.constant x; is_odd= Boolean.var_of_value is_odd}
 
   let assert_equal (t1 : var) (t2 : var) =
     let open Let_syntax in
