@@ -960,6 +960,7 @@ end = struct
       len - cb_work
 
     let discard_last_work t =
+      (*Coinbase work is paid by the coinbase, so don't delete that unless the coinbase itself is deleted*)
       if non_coinbase_work t > 0 then
         match Sequence.next t.completed_work_rev with
         | None -> t

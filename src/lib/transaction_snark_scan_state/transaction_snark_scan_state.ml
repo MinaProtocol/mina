@@ -132,7 +132,6 @@ end = struct
     let k = max Config.work_delay_factor 2 in
     Parallel_scan.parallelism ~state:t.tree
     = Int.pow 2 (Config.transaction_capacity_log_2 + k)
-    (*allow delay upto at least one set of 2^transaction_capacity_log_2 slots are available*)
     && t.job_count < work_capacity ()
     && Parallel_scan.is_valid t.tree
 
