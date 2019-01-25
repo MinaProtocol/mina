@@ -1194,6 +1194,23 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         ; curr_epoch_data }
   end
 
+  let configuration =
+    [ ("delta", Int.to_string Constants.network_delay)
+    ; ("k", Int.to_string Constants.unforkable_transition_count)
+    ; ("c", Int.to_string Constants.probable_slots_per_transition_count)
+    ; ( "c*k"
+      , Int.to_string
+          ( Constants.unforkable_transition_count
+          * Constants.probable_slots_per_transition_count ) )
+    ; ("slots_per_epoch", UInt32.to_string Epoch.size)
+    ; ("slot_duration", Int64.to_string Constants.slot_length_ms)
+    ; ("epoch_duration", Int64.to_string (Time.Span.to_ms Epoch.length))
+    ; ( "acceptable_network_delay"
+      , Int64.to_string
+          (Int64.mul
+             (Int64.of_int Constants.network_delay)
+             Constants.slot_length_ms) ) ]
+
   (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
   let generate_transition ~(previous_protocol_state : Protocol_state.value)
       ~blockchain_state ~time ~proposal_data ~transactions:_

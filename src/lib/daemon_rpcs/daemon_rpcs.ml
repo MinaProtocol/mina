@@ -141,10 +141,10 @@ module Types = struct
       ; peers: string list
       ; user_commands_sent: int
       ; run_snark_worker: bool
-      ; proposal_interval: int
       ; propose_pubkey: Public_key.t option
       ; histograms: Histograms.t option
-      ; consensus_mechanism: string }
+      ; consensus_mechanism: string
+      ; consensus_configuration: (string * string) list }
     [@@deriving to_yojson, bin_io, fields]
 
     (* Text response *)
@@ -180,8 +180,6 @@ module Types = struct
             ("User_commands Sent", Int.to_string (f x)) :: acc )
           ~run_snark_worker:(fun acc x ->
             ("Snark Worker Running", Bool.to_string (f x)) :: acc )
-          ~proposal_interval:(fun acc x ->
-            ("Proposal Interval", Int.to_string (f x)) :: acc )
           ~propose_pubkey:(fun acc x ->
             match f x with
             | None -> ("Proposer Running", "false") :: acc
@@ -196,6 +194,12 @@ module Types = struct
                 ("Histograms", Histograms.to_text histograms) :: acc )
           ~consensus_mechanism:(fun acc x ->
             ("Consensus Mechanism", f x) :: acc )
+          ~consensus_configuration:(fun acc vars ->
+            let rec render = function
+              | [] -> "\n"
+              | (k, v) :: t -> sprintf "\n    %s = %s" k v ^ render t
+            in
+            ("Consensus Configuration", render (f vars)) :: acc )
         |> List.rev
       in
       digest_entries ~title entries

@@ -81,7 +81,10 @@ module type S = sig
          Quickcheck.Generator.t
   end
 
+  (* TODO: this needs to be changed -- code outside consensus should not be relying on this value *)
   val block_interval_ms : Int64.t
+
+  val configuration : (string * string) list
 
   val genesis_protocol_state :
     (Protocol_state.value, Coda_base.State_hash.t) With_hash.t
