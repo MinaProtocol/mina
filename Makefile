@@ -238,7 +238,7 @@ test-stakes:
 
 test-withsnark: SHELL := /bin/bash
 test-withsnark:
-	source scripts/test_all.sh ; cd src; CODA_PROPOSAL_INTERVAL=30000 WITH_SNARKS=true DUNE_PROFILE=test_snark run_integration_test full-test
+	source scripts/test_all.sh ; cd src; CODA_BLOCK_DURATION=30000 WITH_SNARKS=true DUNE_PROFILE=test_snark run_integration_test full-test
 
 web:
 	./scripts/web.sh

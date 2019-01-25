@@ -28,11 +28,13 @@ let local_config ?proposal_interval ~peers ~discovery_port ~external_port
   let config =
     { Coda_worker.Input.host
     ; env=
-        (* FIXME #1089: what about all the PoS env vars? Shouldn't we just inherit? *)
-        Option.map proposal_interval ~f:(fun interval ->
-            [ ("CODA_PROPOSAL_INTERVAL", Int.to_string interval)
-            ; ("CODA_SLOT_INTERVAL", Int.to_string interval) ] )
-        |> Option.value ~default:[]
+        Core.Unix.environment ()
+        |> Array.map
+             ~f:
+               (Fn.compose
+                  (function [a; b] -> (a, b) | _ -> failwith "unexpected")
+                  (String.split ~on:'='))
+        |> Array.to_list
     ; should_propose
     ; external_port
     ; snark_worker_config

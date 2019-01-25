@@ -3,6 +3,8 @@
 
 open Core
 open Async
+module Proof_of_stake0 = Proof_of_stake
+module Proof_of_signature0 = Proof_of_signature
 include Intf
 
 let exit1 ?msg =
@@ -27,9 +29,21 @@ let env name ~f ~default =
                     name x) )
   |> Option.value ~default
 
-let blocks_till_finality =
-  env "BLOCKS_TILL_FINALITY" ~default:1024 ~f:(fun str ->
-      try Some (Int.of_string str) with _ -> None )
+module Constants0 = struct
+  (** k is the number of blocks required to reach finality *)
+  let k =
+    env "K" ~default:12 ~f:(fun str ->
+        try Some (Int.of_string str) with _ -> None )
+
+  let coinbase =
+    env "COINBASE" ~default:(Currency.Amount.of_int 20) ~f:(fun str ->
+        try Some (Currency.Amount.of_int @@ Int.of_string str) with _ -> None
+    )
+
+  let block_duration_ms =
+    env "BLOCK_DURATION" ~default:(Int64.of_int 5000) ~f:(fun str ->
+        try Some (Int64.of_string str) with _ -> None )
+end
 
 [%%if
 defined consensus_mechanism]
@@ -41,16 +55,11 @@ let blocks_till_finality = 1
 
 let name = "proof_of_signature"
 
-include Proof_of_signature.Make (struct
+include Proof_of_signature0.Make (struct
   module Genesis_ledger = Genesis_ledger
   module Proof = Coda_base.Proof
   module Time = Coda_base.Block_time
-
-  let proposal_interval =
-    env "PROPOSAL_INTERVAL"
-      ~default:(Time.Span.of_ms @@ Int64.of_int 5000)
-      ~f:(fun str ->
-        try Some (Time.Span.of_ms @@ Int64.of_string str) with _ -> None )
+  module Constants = Constants0
 end)
 
 [%%elif
@@ -58,12 +67,14 @@ consensus_mechanism = "proof_of_stake"]
 
 let name = "proof_of_stake"
 
-include Proof_of_stake.Make (struct
+include Proof_of_stake0.Make (struct
   module Genesis_ledger = Genesis_ledger
   module Proof = Coda_base.Proof
   module Time = Coda_base.Block_time
 
   module Constants = struct
+    include Constants0
+
     (* TODO: change these variables into variables for config file. See #1176  *)
     (* TODO: choose reasonable values *)
     let genesis_state_timestamp =
@@ -71,29 +82,17 @@ include Proof_of_stake.Make (struct
       env "GENESIS_STATE_TIMESTAMP" ~default ~f:(fun str ->
           try Some (Time.of_time @@ Core.Time.of_string str) with _ -> None )
 
-    let coinbase =
-      env "COINBASE" ~default:(Currency.Amount.of_int 20) ~f:(fun str ->
-          try Some (Currency.Amount.of_int @@ Int.of_string str) with _ -> None
-      )
-
-    let blocks_till_finality = blocks_till_finality
-
-    let slot_length =
-      env "SLOT_INTERVAL"
-        ~default:(Time.Span.of_ms (Int64.of_int 5000))
-        ~f:(fun str ->
-          try Some (Time.Span.of_ms @@ Int64.of_string str) with _ -> None )
-
-    let unforkable_transition_count =
-      env "UNFORKABLE_TRANSITION_COUNT" ~default:12 ~f:(fun str ->
+    (** c is the number of slots after which we can be confident at least one
+     * block was produced (Note: c=8 in Ouroboros Praos papers) *)
+    let c =
+      env "C" ~default:8 ~f:(fun str ->
           try Some (Int.of_string str) with _ -> None )
 
-    let probable_slots_per_transition_count =
-      env "PROBABLE_SLOTS_PER_TRANSITION_COUNT" ~default:8 ~f:(fun str ->
-          try Some (Int.of_string str) with _ -> None )
-
-    let network_delay =
-      env "NETWORK_DELAY" ~default:4 ~f:(fun str ->
+    (** delta is the network delay (as a number of slots) that we can be sure
+     * we've received a block if it was gossiped by some honest node on the
+     * network *)
+    let delta =
+      env "DELTA" ~default:4 ~f:(fun str ->
           try Some (Int.of_string str) with _ -> None )
   end
 end)
