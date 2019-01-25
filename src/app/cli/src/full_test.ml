@@ -44,9 +44,7 @@ let run_test () : unit Deferred.t =
         (*this works because we don't have prover fees. Once we have that, the transaction_capacity_log_2 has to be at least 2 for transactions to be included*)
       else 2
 
-    let scan_state_size_incr = 2
-
-    let work_capacity_factor = scan_state_size_incr - 1
+    let work_delay_factor = 1
 
     let commit_id = None
 

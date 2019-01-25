@@ -87,8 +87,6 @@ module type S = sig
   module Config : sig
     val transaction_capacity_log_2 : int
 
-    val scan_state_size_incr : int
-
-    val work_capacity_factor : int
+    val work_delay_factor : int
   end
 end

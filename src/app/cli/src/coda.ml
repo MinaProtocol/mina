@@ -89,10 +89,11 @@ let daemon log =
            "CAPACITY_LOG_2 Log of capacity of transactions per transition \
             (default: 4)"
          (optional int)
-     and scan_state_size_incr =
-       flag "work-availability-factor"
+     and work_delay_factor =
+       flag "work-delay-factor"
          ~doc:
-           "An integer value that determines the scan state size (default: 2)"
+           "Number of block-times snark workers take to produce atleast two \
+            proofs (default:1)"
          (optional int)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
@@ -174,9 +175,9 @@ let daemon log =
          or_from_config YJ.Util.to_int_option "txn-capacity" ~default:4
            transaction_capacity_log_2
        in
-       let scan_state_size_incr =
-         or_from_config YJ.Util.to_int_option "work-availability-factor"
-           ~default:2 scan_state_size_incr
+       let work_delay_factor =
+         or_from_config YJ.Util.to_int_option "work-delay-factor" ~default:1
+           work_delay_factor
        in
        let snark_work_fee_flag =
          Currency.Fee.of_int
@@ -282,9 +283,7 @@ let daemon log =
 
          let transaction_capacity_log_2 = transaction_capacity_log_2
 
-         let scan_state_size_incr = scan_state_size_incr
-
-         let work_capacity_factor = scan_state_size_incr - 1
+         let work_delay_factor = work_delay_factor
 
          let commit_id = commit_id
 

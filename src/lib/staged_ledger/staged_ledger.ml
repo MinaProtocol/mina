@@ -1,5 +1,5 @@
-(*[%%import
-"../../config.mlh"]*)
+[%%import
+"../../config.mlh"]
 
 open Core_kernel
 open Async_kernel
@@ -266,14 +266,14 @@ end = struct
       (Scan_state.hash scan_state)
       (Ledger.merkle_root ledger)
 
-  (*[%%if
+  [%%if
   call_logger]
 
   let hash t =
     Coda_debug.Call_logger.record_call "Staged_ledger.hash" ;
     hash t
 
-  [%%endif]*)
+  [%%endif]
 
   let ledger {ledger; _} = ledger
 
@@ -621,7 +621,6 @@ end = struct
       , p1.user_commands_count + p2.user_commands_count
       , p1.coinbase_parts_count + p2.coinbase_parts_count )
     in
-    Core.printf !"Total txns: %d \n %!" (List.length data) ;
     let%bind () = check_completed_works scan_state' works in
     let%bind res_opt =
       (* TODO: Add rollback *)
@@ -764,7 +763,7 @@ end = struct
       ; cur_work_count: int (*Current work capacity of the scan state *)
       ; work_capacity:
           int
-          (*max number of pending jobs (present or future) allowed on the tree*)
+          (*max number of pending jobs (currently in the tree and the ones that would arise in the future when current jobs are done) allowed on the tree*)
       ; user_commands_rev: User_command.With_valid_signature.t Sequence.t
       ; completed_work_rev: Transaction_snark_work.Checked.t Sequence.t
       ; fee_transfers: Currency.Fee.t Compressed_public_key.Map.t
@@ -774,15 +773,14 @@ end = struct
       ; self_pk: Compressed_public_key.t
       ; budget: Currency.Fee.t Or_error.t
       ; discarded: Discarded.t
-      (*; logger: Logger.t *) }
-    [@@deriving sexp_of]
+      ; logger: Logger.t }
 
     let coinbase_ft (cw : Transaction_snark_work.t) =
       Option.some_if (cw.fee > Currency.Fee.zero) (cw.prover, cw.fee)
 
     let init (uc_seq : User_command.With_valid_signature.t Sequence.t)
         (cw_seq : Transaction_snark_work.Checked.t Sequence.t) max_job_count
-        max_space self_pk ~add_coinbase cur_work_count _logger =
+        max_space self_pk ~add_coinbase cur_work_count logger =
       let seq_rev seq =
         let rec go seq rev_seq =
           match Sequence.next seq with
@@ -801,7 +799,7 @@ end = struct
         | true, Some (cw, rem_cw) ->
             (Staged_ledger_diff.At_most_two.One (coinbase_ft cw), rem_cw)
         | true, None ->
-            (*the new capacity after a coinbase is added*)
+            (*new count after a coinbase is added should be less that capacity*)
             let new_count = cur_work_count + 2 in
             if max_job_count = 0 || new_count < work_capacity then
               (One None, cw_unchecked)
@@ -843,7 +841,8 @@ end = struct
       ; self_pk
       ; coinbase
       ; budget
-      ; discarded (*; logger*) }
+      ; discarded
+      ; logger }
 
     let re_budget t =
       let revenue =
@@ -934,21 +933,19 @@ end = struct
         in
         match res' with
         | Ok res'' -> if within_capacity res'' then res'' else res
-        | Error _ ->
-            (*Logger.error t.logger "%s" (Error.to_string_hum e);*) res
+        | Error e ->
+            Logger.error t.logger "%s" (Error.to_string_hum e) ;
+            res
       in
       match count with `One -> by_one t | `Two -> by_one (by_one t)
 
     let work_constraint_satisfied (t : t) =
       (*Are we doing all the work available? *)
       let all_proofs = max_work_done t in
-      (*if there are no user_commands then it doesn't matter how many proofs you have*)
+      (*check if the job count doesn't exceed the capacity*)
       let work_capacity_satisfied = within_capacity t in
+      (*if there are no user_commands then it doesn't matter how many proofs you have*)
       let uc_count = Sequence.length t.user_commands_rev in
-      Core.printf
-        !"all_proofs: %{sexp:bool} work_capacity %{sexp:bool} uc_count%d \n\
-         \ %!"
-        all_proofs work_capacity_satisfied uc_count ;
       all_proofs || work_capacity_satisfied || uc_count = 0
 
     let non_coinbase_work t =
@@ -988,10 +985,6 @@ end = struct
                       to_be_discarded.prover
             in
             let discarded = Discarded.add_completed_work t.discarded w in
-            (*let updated_coinbase = 
-            if Sequence.is_empty rem_seq then discard_coinbase_ft t
-            else t.coinbase (*TODO: if it is the second last as well*)
-          in*)
             let new_t =
               { t with
                 completed_work_rev= rem_seq
@@ -1010,6 +1003,7 @@ end = struct
 
     let discard_user_command t =
       let decr_coinbase t =
+        (*When discarding coinbase's fee transfer, add the fee transfer to the fee_transfers map so that budget checks can be done *)
         let update_fee_transfers t ft coinbase =
           let updated_fee_transfers =
             Compressed_public_key.Map.update t.fee_transfers (fst ft)
@@ -1074,7 +1068,7 @@ end = struct
         (* insufficient budget; reduce the cost*)
         check_constraints_and_update (Resources.discard_last_work resources)
     else
-      (* There isn't enough work for the transactions. Discard aa trasnaction and check again *)
+      (* There isn't enough work for the transactions. Discard a trasnaction and check again *)
       check_constraints_and_update (Resources.discard_user_command resources)
 
   let one_prediff cw_seq ts_seq self ~add_coinbase available_queue_space
@@ -1083,11 +1077,7 @@ end = struct
       Resources.init ts_seq cw_seq max_job_count available_queue_space self
         ~add_coinbase cur_work_count logger
     in
-    let r = check_constraints_and_update init_resources in
-    let cur_work_count = Resources.new_work_count r in
-    Core.printf !"cur_job_count: %d \n%!" cur_work_count ;
-    (*!"txns: %d completed_work: %d coinbase: %d \nResources: %{sexp: Resources.t}\n %!" (Sequence.length r.user_commands_rev) (Sequence.length r.completed_work_rev) (Resources.coinbase_added r)r;*)
-    r
+    check_constraints_and_update init_resources
 
   let generate logger cw_seq ts_seq self partitions max_job_count
       cur_work_count =
@@ -1183,11 +1173,6 @@ end = struct
               in
               (new_res, None)
         in
-        Core.printf
-          !"Resources1: %{sexp:Resources.t} \n\
-           \ Resources2: %{sexp:Resources.t option} \n\
-           \ %!"
-          res1 res2 ;
         let coinbase_added =
           Resources.coinbase_added res1
           + Option.value_map ~f:Resources.coinbase_added res2 ~default:0
@@ -1199,7 +1184,6 @@ end = struct
             one_prediff cw_seq ts_seq self x ~add_coinbase:true max_job_count
               cur_work_count logger
           in
-          Core.printf !"Resources3: %{sexp:Resources.t} \n %!" res ;
           make_diff res None
 
   let create_diff t ~self ~logger
@@ -1244,11 +1228,6 @@ end = struct
               seq
           | Ok _ -> Sequence.append (Sequence.singleton t) seq )
     in
-    let p = match partitions with `One x -> (x, 0) | `Two x -> x in
-    Core.printf
-      !"total txns: %d partition: %{sexp: int*int}\n %!"
-      (Sequence.length transactions_rev)
-      p ;
     let diff =
       generate logger completed_works_seq transactions_rev self partitions
         max_jobs_count unbundled_job_count
@@ -1803,15 +1782,13 @@ let%test_module "test" =
       end
 
       module Config = struct
-        let transaction_capacity_log_2 = 7
+        let transaction_capacity_log_2 = 3
 
         (*This has to be a minimum of 3 for the tests to pass otherwise the assertion that the number of transactions added in every block be > 0 will not hold. With transaction_capcity_log_2 as 2, the total number of slots available are 4 and in the case of maximum  number of provers, 3 slots are needed to add one transaction. But, when slots reach the end of the tree causing them to be split into two halves, no transaction can be added in either of the halves. This causes only coinbase to be added to the tree *)
 
-        let scan_state_size_incr = 3
+        let work_delay_factor = 1
 
-        (* Size of the tree is 2^(transaction_capacity_log_2, scan_state_size_incr). Should be atleast 2.Why? -> When a single slot is left in the tree, the jobs on the left side of the tree are completed faster than the jobs on the right, this ultimately causes space conflict in the root node where the left child is completed before the root- NOT GOOD *)
-
-        let work_capacity_factor = 0
+        (* This essentially number of subtrees each having (2^transaction_capacity_log_2) leaves. Size of the tree is 2^(transaction_capacity_log_2, work_delay_factor). Should be atleast 2.Why? -> When there is a single slot at the end of the tree before continuing at the begining of the tree (referring to the last level), the jobs on the right side of the tree are done along with the jobs on the left (because it wasn't added until then). The root node has to wait until the right sub-tree has completed before the next round begins. By the time the right sub-tree is completed, the left tree is also ready with the proof but has to wait until the root is emitted. This won't work with our succint datastructure impl and FIFO work order.*)
       end
 
       let check :
@@ -1855,9 +1832,7 @@ let%test_module "test" =
               Fee.Unsigned.of_int 1
           ; proofs= stmts
           ; prover }
-      else (
-        Core.printf "did not create proof \n %!" ;
-        None )
+      else None
 
     let create_and_apply sl logger txns stmt_to_work =
       let open Deferred.Let_syntax in
@@ -1890,8 +1865,6 @@ let%test_module "test" =
       + Option.value_map ~default:0 (snd sl_diff.diff) ~f:(fun d ->
             coinbase_added_second_prediff d.coinbase )
 
-    (*let assert_at_least_coinbase_added txns cb = assert (txns > 0 || cb > 0)*)
-
     let expected_ledger no_txns_included txns_sent old_ledger =
       old_ledger
       + Currency.Amount.to_int Protocols.Coda_praos.coinbase_amount
@@ -1901,7 +1874,7 @@ let%test_module "test" =
           ~f:(fun (t, fee) -> t + fee)
 
     let%test_unit "Max throughput" =
-      (*Always at worst case number of provers*)
+      (*Always at worst case number of provers. This is enforced by creating proof bundles *)
       let logger = Logger.create () in
       let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
       let g = Int.gen_incl 1 p in
@@ -1932,7 +1905,6 @@ let%test_module "test" =
                 List.length (Test_input1.Staged_ledger_diff.user_commands diff)
               in
               assert (x > 0) ;
-              (*assert_at_least_coinbase_added x cb ;*)
               let expected_value = expected_ledger x all_ts old_ledger in
               assert (!(Sl.ledger !sl) = expected_value) ) )
 
@@ -1968,7 +1940,6 @@ let%test_module "test" =
               let x =
                 List.length (Test_input1.Staged_ledger_diff.user_commands diff)
               in
-              (*assert_at_least_coinbase_added x cb ;*)
               let expected_value = expected_ledger x all_ts old_ledger in
               assert (!(Sl.ledger !sl) = expected_value) ) )
 
@@ -2111,7 +2082,6 @@ let%test_module "test" =
               ) ;
               let cb = coinbase_added diff in
               (*coinbase is zero only when there are no proofs created*)
-              Core.printf !"coinbase %d\n %!" cb ;
               if i > 0 then assert (cb > 0 && cb < 3) ;
               let x =
                 List.length (Test_input1.Staged_ledger_diff.user_commands diff)
@@ -2230,7 +2200,7 @@ let%test_module "test" =
               let x =
                 List.length (Test_input1.Staged_ledger_diff.user_commands diff)
               in
-              (*I have more than two proof bundles I should be able at least one payment, first and the second proof bundles are for coinbase and fee_transfer resp*)
+              (*There are than two proof bundles. Should be able to add at least one payment. First and the second proof bundles would go for coinbase and fee_transfer resp.*)
               if j > 2 then assert (x > 0) ;
               let expected_value = expected_ledger x all_ts old_ledger in
               if cb > 0 then assert (!(Sl.ledger !sl) = expected_value) ) )

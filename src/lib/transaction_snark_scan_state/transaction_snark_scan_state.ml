@@ -97,45 +97,27 @@ end = struct
 
   module T = struct
     type t =
-      { tree:
+      { (*Job_count: Keeping track of the number of jobs added to the tree. Every transaction added amounts to two jobs*)
+        tree:
           ( Ledger_proof_with_sok_message.t
           , Transaction_with_witness.t )
           Parallel_scan.State.t
       ; mutable job_count: int }
-    [@@(*Keeping track of the number of jobs added to the tree. Every transaction added amounts to two jobs*)
-      deriving
-      sexp, bin_io]
+    [@@deriving sexp, bin_io]
   end
 
   include T
 
-  (*Work capacity represents max number of work(present and future) in the tree. 
-  if t = transaction_capacity_log_2
-     i = scan_state_size_incr
-     w = work_capacity_factor
-  then
-    3 * 2^t < 2^w < 2^(t+i+1)
-    or
-    total work added in one block < work capacity < total work that can be o the tree 
-  
-  When there is high throughput and all the work is available for purchase, the value (1
-          + Int.pow 2 (transaction_capacity_log_2 + max 2 scan_state_size_incr)) is max number of jobs that would be in the tree. Hence, when there is delay in work, max_capacity should be set to a value greater than this (governed by Config.work_capacity_factor) *)
+  (*Work capacity represents max number of work(currently in the tree and the ones that would arise in the future when current jobs are done) in the tree. *)
   let work_capacity () =
     let open Config in
-    (*let x = if work_capacity_factor < transaction_capacity_log_2+scan_state_size_incr+1 && work_capacity_factor >= transaction_capacity_log_2+2
-    then
-    (*extra one for the buffer until the job count is adjusted. See fill_work_and_enqueue_transactions*)
-    Int.pow 2 work_capacity_factor
-    else  
-    1+(Int.pow 2 (transaction_capacity_log_2+1))
-    in
-    Core.printf "Capacity: %d \n %!" x; 
-    x*)
     (*+1 because of <, +1 to give enough time to adjust the counter after proof is emitted, +1 to due to delay in proof emitting*)
+    (*For Evan: Having C= 2x(txns/block * total-no-of-trees) essentially means all the trees can have full leaves without having to do any work. This doesn't work with the succinct representation and FIFO work order during when this specific edge case occurs*)
+    (*Edge case:When there is a single slot at the end of the tree before continuing at the begining of the tree (referring to the last level), the jobs on the right side of the tree are done along with the jobs on the left (because it wasn't added until then). The root node has to wait until the right sub-tree has completed before the next round begins. By the time the right sub-tree is completed, the left tree is also ready with the proof but has to wait until the root is emitted. This won't work with our succint datastructure impl and FIFO work order.*)
     let nearest_log_2_txn = Int.ceil_log2 transaction_capacity_log_2 in
-    let nearest_log_2_incr = Int.ceil_log2 scan_state_size_incr in
+    let nearest_log_2_incr = Int.ceil_log2 work_delay_factor in
     3 + nearest_log_2_incr + nearest_log_2_txn
-    + Int.pow 2 (transaction_capacity_log_2 + scan_state_size_incr)
+    + Int.pow 2 (transaction_capacity_log_2 + work_delay_factor)
 
   let hash t =
     let state_hash =
@@ -147,7 +129,7 @@ end = struct
       ((state_hash :> string) ^ Int.to_string t.job_count)
 
   let is_valid t =
-    let k = (*max*) Config.scan_state_size_incr (*2*) in
+    let k = max Config.work_delay_factor 2 in
     Parallel_scan.parallelism ~state:t.tree
     = Int.pow 2 (Config.transaction_capacity_log_2 + k)
     (*allow delay upto at least one set of 2^transaction_capacity_log_2 slots are available*)
@@ -387,8 +369,8 @@ end = struct
   let capacity t = Parallel_scan.parallelism ~state:t.tree
 
   let create ~transaction_capacity_log_2 =
-    (* Transaction capacity log_2 is 1/2^scan_state_size_incr the capacity for work parallelism *)
-    let k = (*max*) Config.scan_state_size_incr (*2*) in
+    (* Transaction capacity log_2 is 1/2^work_delay_factor the capacity for work parallelism *)
+    let k = max Config.work_delay_factor 2 in
     { tree=
         Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + k)
     ; job_count= 0 }
@@ -490,7 +472,6 @@ end = struct
       Transaction_snark_work.Statement.t Sequence.t Or_error.t =
     let open Or_error.Let_syntax in
     let%map work_seq = next_jobs_sequence t in
-    Core.printf !"\n\nall jobs: %d\n %!" (Sequence.length work_seq) ;
     Sequence.chunks_exn
       (Sequence.map work_seq ~f:(fun job ->
            match statement_of_job job with
