@@ -198,6 +198,12 @@ struct
       | None -> Base.merkle_root (get_parent t)
 
     let remove_account_and_update_hashes t location =
+      Printf.eprintf "REMOVE ACCOUNT / UPDATE HASHES, IN MASK: %s\n%!"
+        (get_uuid t |> Uuid.to_string) ;
+      Printf.eprintf "REMOVE / UPDATE HASHES STACK:\n%!" ;
+      Printf.eprintf "%s\n%!"
+        ( Stdlib.Printexc.get_callstack 20
+        |> Stdlib.Printexc.raw_backtrace_to_string ) ;
       (* remove account and key from tables *)
       let account = Option.value_exn (find_account t location) in
       Location.Table.remove t.account_tbl location ;
@@ -384,6 +390,12 @@ struct
       get_hash t address |> Option.value_exn
 
     let remove_accounts_exn t keys =
+      Printf.eprintf "REMOVE ACCOUNTS IN MASK: %s\n%!"
+        (get_uuid t |> Uuid.to_string) ;
+      Printf.eprintf "REMOVE STACK:\n%!" ;
+      Printf.eprintf "%s\n%!"
+        ( Stdlib.Printexc.get_callstack 20
+        |> Stdlib.Printexc.raw_backtrace_to_string ) ;
       let rec loop keys parent_keys mask_locations =
         match keys with
         | [] -> (parent_keys, mask_locations)
