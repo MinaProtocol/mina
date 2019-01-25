@@ -216,7 +216,8 @@ workflows:
         jobs:
             - build
             - build-macos
-            - build_withsnark
+            - build_withsnark_sig
+            - build_withsnark_stake
             - build_public
             {%- for test in tests%}
             - test-{{test.name}}

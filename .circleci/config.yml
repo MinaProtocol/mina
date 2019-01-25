@@ -278,7 +278,8 @@ workflows:
         jobs:
             - build
             - build-macos
-            - build_withsnark
+            - build_withsnark_sig
+            - build_withsnark_stake
             - build_public
             - test-all_sig_integration_tests
             - test-all_stake_integration_tests
