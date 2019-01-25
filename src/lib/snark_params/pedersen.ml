@@ -134,15 +134,15 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
       ; acc: Curve.t
       ; params: Params.t
       ; ctx: Digestif.SHA256.ctx
-      ; chunk_table: Curve_chunk_table.t }
+      ; get_chunk_table: chunk_table_fun }
 
-    let create ?(triples_consumed = 0) ?(init = Curve.zero) params chunk_table
+    let create ?(triples_consumed = 0) ?(init = Curve.zero) params ~get_chunk_table
         =
       { acc= init
       ; triples_consumed
       ; params
       ; ctx= Digestif.SHA256.init ()
-      ; chunk_table }
+      ; get_chunk_table }
 
     let update_fold (t : t) (fold : bool Triple.t Fold.t) =
       O1trace.measure "pedersen fold" (fun () ->
@@ -171,9 +171,14 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
           let bits = List.init 256 ~f:(bit_at dgst) in
           Field.project bits )
 
-    let salt params ct s =
-      update_fold (create params ct) (Fold.string_triples s)
+    let salt params ~get_chunk_table s =
+      update_fold (create params ~get_chunk_table) (Fold.string_triples s)
 
+    let set_chunked_fold _ = ()
+
+    let update_fold_chunked = update_fold
+
+    let update_fold_unchunked = update_fold
     [%%else]
 
     open Chunked_triples
