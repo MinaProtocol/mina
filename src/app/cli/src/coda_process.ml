@@ -32,7 +32,9 @@ let local_config ?proposal_interval ~peers ~discovery_port ~external_port
         |> Array.map
              ~f:
                (Fn.compose
-                  (function [a; b] -> (a, b) | _ -> failwith "unexpected")
+                  (function
+                    | [a; b; _] -> (a, b)
+                    | s -> failwithf !"unexpected: %{sexp: string List.t}" s ())
                   (String.split ~on:'='))
         |> Array.to_list
     ; should_propose
