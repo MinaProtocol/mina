@@ -111,9 +111,4 @@ module type S = sig
 
     val work_delay_factor : int
   end
-
-  val check :
-       Transaction_snark_work.t
-    -> Ledger_proof_statement.t list
-    -> Transaction_snark_work.Checked.t option Async_kernel.Deferred.t
 end
