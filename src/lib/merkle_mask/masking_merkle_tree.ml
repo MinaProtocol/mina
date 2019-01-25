@@ -198,12 +198,6 @@ struct
       | None -> Base.merkle_root (get_parent t)
 
     let remove_account_and_update_hashes t location =
-      Printf.eprintf "REMOVE ACCOUNT / UPDATE HASHES, IN MASK: %s\n%!"
-        (get_uuid t |> Uuid.to_string) ;
-      Printf.eprintf "REMOVE / UPDATE HASHES STACK:\n%!" ;
-      Printf.eprintf "%s\n%!"
-        ( Stdlib.Printexc.get_callstack 20
-        |> Stdlib.Printexc.raw_backtrace_to_string ) ;
       (* remove account and key from tables *)
       let account = Option.value_exn (find_account t location) in
       Location.Table.remove t.account_tbl location ;
@@ -292,11 +286,6 @@ struct
 
     (* transfer state from mask to parent; flush local state *)
     let commit t =
-      Printf.eprintf "COMMIT IN MASK: %s\n%!" (get_uuid t |> Uuid.to_string) ;
-      Printf.eprintf "COMMIT STACK:\n%!" ;
-      Printf.eprintf "%s\n%!"
-        ( Stdlib.Printexc.get_callstack 20
-        |> Stdlib.Printexc.raw_backtrace_to_string ) ;
       let account_data = Location.Table.to_alist t.account_tbl in
       Base.set_batch (get_parent t) account_data ;
       Location.Table.clear t.account_tbl ;
@@ -304,11 +293,6 @@ struct
 
     (* copy tables in t; use same parent *)
     let copy t =
-      Printf.eprintf "COPY IN MASK: %s\n%!" (get_uuid t |> Uuid.to_string) ;
-      Printf.eprintf "COPY STACK:\n%!" ;
-      Printf.eprintf "%s\n%!"
-        ( Stdlib.Printexc.get_callstack 20
-        |> Stdlib.Printexc.raw_backtrace_to_string ) ;
       { uuid= Uuid.create ()
       ; parent= get_parent t
       ; account_tbl= Location.Table.copy t.account_tbl
@@ -357,29 +341,17 @@ struct
         | [] -> [] )
       |> ignore
 
+    (* keys from this mask and all ancestors *)
     let keys t =
-      Location.Table.data t.account_tbl
-      |> List.map ~f:Account.public_key
-      |> Key.Set.of_list
+      let mask_keys =
+        Location.Table.data t.account_tbl
+        |> List.map ~f:Account.public_key
+        |> Key.Set.of_list
+      in
+      let parent_keys = Base.keys (get_parent t) in
+      Key.Set.union parent_keys mask_keys
 
-    let num_accounts t =
-      let f = Printf.eprintf !"KEY: %{sexp:Key.t}\n%!" in
-      let base_keys = Base.keys (get_parent t) in
-      let mask_keys = keys t in
-      let all_keys = Key.Set.union (Base.keys (get_parent t)) (keys t) in
-      Printf.eprintf "IN MASK: %s\n%!" (get_uuid t |> Uuid.to_string) ;
-      Printf.eprintf "WITH BASE: %s\n%!"
-        (Base.get_uuid (get_parent t) |> Uuid.to_string) ;
-      Printf.eprintf "NUM BASE KEYS: %d\n%!" (Key.Set.length base_keys) ;
-      Printf.eprintf "NUM MASK KEYS: %d\n%!" (Key.Set.length mask_keys) ;
-      Printf.eprintf "NUM ALL KEYS: %d\n%!" (Key.Set.length all_keys) ;
-      Printf.eprintf "BASE KEYS:\n%!" ;
-      Key.Set.iter base_keys ~f ;
-      Printf.eprintf "MASK KEYS:\n%!" ;
-      Key.Set.iter mask_keys ~f ;
-      Printf.eprintf "ALL KEYS:\n%!" ;
-      Key.Set.iter all_keys ~f ;
-      all_keys |> Key.Set.length
+    let num_accounts t = keys t |> Key.Set.length
 
     let location_of_key t key =
       let mask_result = find_location t key in
@@ -395,12 +367,6 @@ struct
       get_hash t address |> Option.value_exn
 
     let remove_accounts_exn t keys =
-      Printf.eprintf "REMOVE ACCOUNTS IN MASK: %s\n%!"
-        (get_uuid t |> Uuid.to_string) ;
-      Printf.eprintf "REMOVE STACK:\n%!" ;
-      Printf.eprintf "%s\n%!"
-        ( Stdlib.Printexc.get_callstack 20
-        |> Stdlib.Printexc.raw_backtrace_to_string ) ;
       let rec loop keys parent_keys mask_locations =
         match keys with
         | [] -> (parent_keys, mask_locations)
@@ -432,11 +398,6 @@ struct
     (* Destroy intentionally does not commit before destroying
      * as sometimes this is desired behavior *)
     let close t =
-      Printf.eprintf "CLOSE IN MASK: %s\n%!" (get_uuid t |> Uuid.to_string) ;
-      Printf.eprintf "CLOSE STACK:\n%!" ;
-      Printf.eprintf "%s\n%!"
-        ( Stdlib.Printexc.get_callstack 20
-        |> Stdlib.Printexc.raw_backtrace_to_string ) ;
       Location.Table.clear t.account_tbl ;
       Addr.Table.clear t.hash_tbl ;
       Key.Table.clear t.location_tbl
@@ -472,12 +433,6 @@ struct
       mask_accounts @ in_parent_not_in_mask_accounts
 
     let foldi_with_ignored_keys t ignored_keys ~init ~f =
-      Printf.eprintf "FOLDI IGNORED KEYS IN MASK: %s\n%!"
-        (get_uuid t |> Uuid.to_string) ;
-      Printf.eprintf "FOLDI IGNORED KEYS STACK:\n%!" ;
-      Printf.eprintf "%s\n%!"
-        ( Stdlib.Printexc.get_callstack 20
-        |> Stdlib.Printexc.raw_backtrace_to_string ) ;
       let locations_and_accounts = Location.Table.to_alist t.account_tbl in
       (* parent should ignore keys in this mask *)
       let mask_keys =
@@ -571,11 +526,6 @@ struct
       |> Result.ok_exn
 
     let foldi t ~init ~f =
-      Printf.eprintf "FOLDI IN MASK: %s\n%!" (get_uuid t |> Uuid.to_string) ;
-      Printf.eprintf "FOLDI STACK:\n%!" ;
-      Printf.eprintf "%s\n%!"
-        ( Stdlib.Printexc.get_callstack 20
-        |> Stdlib.Printexc.raw_backtrace_to_string ) ;
       (* fold over parent, then mask *)
       let parent_result = Base.foldi (get_parent t) ~init ~f in
       Location.Table.fold t.account_tbl ~init:parent_result
