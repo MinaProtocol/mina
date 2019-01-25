@@ -70,23 +70,23 @@ run_all_integration_tests() {
 
 run_all_sig_integration_tests() {
     DUNE_PROFILE=test_sigs \
-    CODA_PROPOSAL_INTERVAL=1000 \
+    CODA_BLOCK_DURATION=1000 \
     run_all_integration_tests
 }
 
 run_all_stake_integration_tests() {
     DUNE_PROFILE=test_stakes \
-    CODA_SLOT_INTERVAL=1000 \
-    CODA_UNFORKABLE_TRANSITION_COUNT=24 \
-    CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 \
+    CODA_BLOCK_DURATION=1000 \
+    CODA_K=24 \
+    CODA_C=8 \
     run_all_integration_tests
 }
 
 run_epoch_stake_integration_test() {
     DUNE_PROFILE=test_stakes \
-    CODA_SLOT_INTERVAL=1000 \
-    CODA_UNFORKABLE_TRANSITION_COUNT=2 \
-    CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=2 \
+    CODA_BLOCK_DURATION=1000 \
+    CODA_K=2 \
+    CODA_C=2 \
     run_integration_test full-test
 }
 

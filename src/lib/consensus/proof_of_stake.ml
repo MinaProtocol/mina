@@ -7,53 +7,6 @@ open Sha256_lib
 open Fold_lib
 open Signature_lib
 
-module type Inputs_intf = sig
-  module Time : sig
-    type t
-
-    module Span : sig
-      type t
-
-      val to_ms : t -> Int64.t
-
-      val of_ms : Int64.t -> t
-
-      val ( + ) : t -> t -> t
-
-      val ( * ) : t -> t -> t
-    end
-
-    val ( < ) : t -> t -> bool
-
-    val ( >= ) : t -> t -> bool
-
-    val diff : t -> t -> Span.t
-
-    val to_span_since_epoch : t -> Span.t
-
-    val of_span_since_epoch : Span.t -> t
-
-    val add : t -> Span.t -> t
-  end
-
-  module Constants : sig
-    val genesis_state_timestamp : Time.t
-
-    val coinbase : Amount.t
-
-    val blocks_till_finality : int
-
-    val network_delay : int
-
-    val slot_length : Time.Span.t
-
-    val unforkable_transition_count : int
-    (** also known as [K] *)
-
-    val probable_slots_per_transition_count : int
-  end
-end
-
 module Segment_id = Nat.Make32 ()
 
 module Epoch_seed = struct
@@ -88,20 +41,31 @@ let uint32_of_int64 x = x |> Int64.to_int64 |> UInt32.of_int64
 
 let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64
 
-module Make (Inputs : Inputs_intf) : Intf.S = struct
+module Make (Inputs : Intf.Proof_of_stake.Inputs.S) : Intf.S = struct
   module Time = Inputs.Time
 
   module Constants = struct
     include Inputs.Constants
 
-    let slot_length_ms = Time.Span.to_ms slot_length
+    module Slot = struct
+      let duration = Time.Span.of_ms block_duration_ms
 
-    let network_window_length =
-      Time.Span.of_ms
-        (Int64.of_int (Int64.to_int slot_length_ms * network_delay))
+      let duration_ms = block_duration_ms
+    end
+
+    module Epoch = struct
+      (** Number of slots =24k in ouroboros praos *)
+      let size = UInt32.of_int (3 * c * k)
+
+      (** Amount of time in total for an epoch *)
+      let duration =
+        Time.Span.of_ms Int64.Infix.(Slot.duration_ms * int64_of_uint32 size)
+    end
+
+    (** The duration of delta *)
+    let delta_duration =
+      Time.Span.of_ms (Int64.of_int (Int64.to_int Slot.duration_ms * delta))
   end
-
-  let block_interval_ms = Constants.slot_length_ms
 
   module Proposal_data = struct
     type t = {stake_proof: Coda_base.Stake_proof.t; vrf_result: Sha256.Digest.t}
@@ -174,15 +138,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
   module Epoch = struct
     include Segment_id
 
-    let size =
-      UInt32.of_int
-        ( 3 * Constants.probable_slots_per_transition_count
-        * Constants.unforkable_transition_count )
-
-    let length =
-      Time.Span.of_ms
-        Int64.Infix.(Constants.slot_length_ms * int64_of_uint32 size)
-
     let of_time_exn t : t =
       if Time.(t < Constants.genesis_state_timestamp) then
         raise
@@ -191,36 +146,33 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       let time_since_genesis = Time.diff t Constants.genesis_state_timestamp in
       uint32_of_int64
         Int64.Infix.(
-          Time.Span.to_ms time_since_genesis / Time.Span.to_ms length)
+          Time.Span.to_ms time_since_genesis
+          / Time.Span.to_ms Constants.Epoch.duration)
 
     let start_time (epoch : t) =
       let ms =
         let open Int64.Infix in
         Time.Span.to_ms
           (Time.to_span_since_epoch Constants.genesis_state_timestamp)
-        + (int64_of_uint32 epoch * Time.Span.to_ms length)
+        + (int64_of_uint32 epoch * Time.Span.to_ms Constants.Epoch.duration)
       in
       Time.of_span_since_epoch (Time.Span.of_ms ms)
 
-    let end_time (epoch : t) = Time.add (start_time epoch) length
+    let end_time (epoch : t) =
+      Time.add (start_time epoch) Constants.Epoch.duration
 
     module Slot = struct
       include Segment_id
 
-      let length = Constants.slot_length
-
-      let unforkable_count =
-        UInt32.of_int
-          ( Constants.probable_slots_per_transition_count
-          * Constants.unforkable_transition_count )
-
       let after_lock_checkpoint (slot : t) =
+        let ck = Constants.(c * k |> UInt32.of_int) in
         let open UInt32.Infix in
-        unforkable_count * UInt32.of_int 2 < slot
+        ck * UInt32.of_int 2 < slot
 
       let in_seed_update_range (slot : t) =
+        let ck = Constants.(c * k |> UInt32.of_int) in
         let open UInt32.Infix in
-        unforkable_count <= slot && slot < unforkable_count * UInt32.of_int 2
+        ck <= slot && slot < ck * UInt32.of_int 2
 
       let in_seed_update_range_var (slot : Unpacked.var) =
         let open Snark_params.Tick in
@@ -232,35 +184,30 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           |> Bitstring_lib.Bitstring.Msb_first.of_list
         in
         let ( < ) = Bitstring_checked.lt_value in
-        let unforkable_count = uint32_msb unforkable_count
-        and unforkable_count_times_2 =
-          uint32_msb UInt32.(Infix.(of_int 2 * unforkable_count))
-        in
+        let ck = Constants.(c * k) |> UInt32.of_int in
+        let ck_bitstring = uint32_msb ck
+        and ck_times_2 = uint32_msb UInt32.(Infix.(of_int 2 * ck)) in
         let slot_msb =
           Bitstring_lib.Bitstring.Msb_first.of_lsb_first
             (Unpacked.var_to_bits slot)
         in
-        let%bind slot_gte_unforkable_count =
-          slot_msb < unforkable_count >>| Boolean.not
-        and slot_lt_unforkable_count_times_2 =
-          slot_msb < unforkable_count_times_2
-        in
-        Boolean.(slot_gte_unforkable_count && slot_lt_unforkable_count_times_2)
+        let%bind slot_gte_ck = slot_msb < ck_bitstring >>| Boolean.not
+        and slot_lt_ck_times_2 = slot_msb < ck_times_2 in
+        Boolean.(slot_gte_ck && slot_lt_ck_times_2)
 
       let gen =
         let open Quickcheck.Let_syntax in
-        Core.Int.gen_incl 0 (UInt32.to_int unforkable_count * 3)
-        >>| UInt32.of_int
+        Core.Int.gen_incl 0 (Constants.(c * k) * 3) >>| UInt32.of_int
 
       let%test_unit "in_seed_update_range unchecked vs. checked equality" =
         let test =
           Test_util.test_equal Unpacked.typ Snark_params.Tick.Boolean.typ
             in_seed_update_range_var in_seed_update_range
         in
-        let c = UInt32.to_int unforkable_count in
+        let x = Constants.(c * k) in
         let examples =
           List.map ~f:UInt32.of_int
-            [c; c - 1; c + 1; c * 2; (c * 2) - 1; (c * 2) + 1]
+            [x; x - 1; x + 1; x * 2; (x * 2) - 1; (x * 2) + 1]
         in
         Quickcheck.test ~trials:100 ~examples gen ~f:test
     end
@@ -268,10 +215,10 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     let slot_start_time (epoch : t) (slot : Slot.t) =
       Time.add (start_time epoch)
         (Time.Span.of_ms
-           Int64.Infix.(int64_of_uint32 slot * Time.Span.to_ms Slot.length))
+           Int64.Infix.(int64_of_uint32 slot * Constants.Slot.duration_ms))
 
     let slot_end_time (epoch : t) (slot : Slot.t) =
-      Time.add (slot_start_time epoch slot) Slot.length
+      Time.add (slot_start_time epoch slot) Constants.Slot.duration
 
     let epoch_and_slot_of_time_exn t : t * Slot.t =
       let epoch = of_time_exn t in
@@ -279,7 +226,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       let slot =
         uint32_of_int64
         @@ Int64.Infix.(
-             Time.Span.to_ms time_since_epoch / Time.Span.to_ms Slot.length)
+             Time.Span.to_ms time_since_epoch / Constants.Slot.duration_ms)
       in
       (epoch, slot)
   end
@@ -1170,8 +1117,8 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
         let length = Length.succ prev.length in
         let curr_epoch, curr_slot =
           let slot = prev.curr_slot + UInt32.of_int slot_advancement in
-          let epoch_advancement = slot / Epoch.size in
-          (prev.curr_epoch + epoch_advancement, slot mod Epoch.size)
+          let epoch_advancement = slot / Constants.Epoch.size in
+          (prev.curr_epoch + epoch_advancement, slot mod Constants.Epoch.size)
         in
         let total_currency =
           Option.value_exn (Amount.add prev.total_currency Constants.coinbase)
@@ -1228,7 +1175,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       of_span_since_epoch (Span.of_ms (Unix_timestamp.to_int64 time_received))
     in
     let window_start = Epoch.slot_start_time epoch slot in
-    let window_end = add window_start Constants.network_window_length in
+    let window_end = add window_start Constants.delta_duration in
     window_start < time_received && time_received < window_end
 
   let received_at_valid_time consensus_state ~time_received =
@@ -1400,7 +1347,8 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
           ~ledger_hash:epoch_data.ledger.hash ~logger
       in
       let rec find_winning_slot slot =
-        if UInt32.of_int (Epoch.Slot.to_int slot) >= Epoch.size then None
+        if UInt32.of_int (Epoch.Slot.to_int slot) >= Constants.Epoch.size then
+          None
         else
           match proposal_data slot with
           | None -> find_winning_slot (Epoch.Slot.succ slot)
@@ -1469,8 +1417,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
 
   let should_bootstrap ~existing ~candidate =
     let length = Fn.compose Length.to_int Consensus_state.length in
-    length existing - length candidate
-    > (2 * Constants.blocks_till_finality) + Constants.network_delay
+    length existing - length candidate > (2 * Constants.k) + Constants.delta
 
   let to_unix_timestamp recieved_time =
     recieved_time |> Time.to_span_since_epoch |> Time.Span.to_ms
@@ -1478,7 +1425,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
 
   let%test "Receive a valid consensus_state with a bit of delay" =
     let {Consensus_state.curr_epoch; curr_slot; _} = Consensus_state.genesis in
-    let delay = Constants.network_delay / 2 |> UInt32.of_int in
+    let delay = Constants.delta / 2 |> UInt32.of_int in
     let new_slot = UInt32.Infix.(curr_slot + delay) in
     let time_received = Epoch.slot_start_time curr_epoch new_slot in
     received_at_valid_time Consensus_state.genesis
@@ -1493,7 +1440,7 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
     in
     let too_early = Epoch.start_time Consensus_state.genesis.curr_slot in
     let too_late =
-      let delay = Constants.network_delay * 2 |> UInt32.of_int in
+      let delay = Constants.delta * 2 |> UInt32.of_int in
       let delayed_slot = UInt32.Infix.(curr_slot + delay) in
       Epoch.slot_start_time curr_epoch delayed_slot
     in
@@ -1514,15 +1461,13 @@ let%test_module "Proof_of_stake tests" =
 
         let coinbase = Amount.of_int 20
 
-        let blocks_till_finality = 1024
+        let block_duration_ms = Int64.of_int 200
 
-        let slot_length = Coda_base.Block_time.Span.of_ms (Int64.of_int 200)
+        let k = 12
 
-        let unforkable_transition_count = 24
+        let c = 8
 
-        let probable_slots_per_transition_count = 8
-
-        let network_delay = 4
+        let delta = 4
       end
     end)
   end )
