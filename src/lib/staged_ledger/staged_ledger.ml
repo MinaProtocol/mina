@@ -1193,18 +1193,22 @@ end = struct
             Transaction_snark_work.Statement.t
          -> Transaction_snark_work.Checked.t option) =
     let curr_hash = hash t in
+    O1trace.trace_event "curr_hash" ;
     let new_mask = Inputs.Ledger.Mask.create () in
     let tmp_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
+    O1trace.trace_event "done mask" ;
     let partitions =
       Scan_state.partition_if_overflowing ~max_slots:max_throughput
         t.scan_state
     in
+    O1trace.trace_event "partitioned" ;
     (*TODO: return an or_error here *)
     let all_work_to_do =
       Scan_state.all_work_to_do t.scan_state |> Or_error.ok_exn
     in
     let unbundled_job_count = Scan_state.current_job_count t.scan_state in
+    O1trace.trace_event "computed_work" ;
     let completed_works_seq =
       Sequence.fold_until all_work_to_do ~init:Sequence.empty
         ~f:(fun seq w ->
@@ -1216,6 +1220,7 @@ end = struct
     in
     (* max number of jobs that can be done *)
     let max_jobs_count = Sequence.length all_work_to_do in
+    O1trace.trace_event "found completed work" ;
     (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
     let transactions_rev =
       Sequence.fold transactions_by_fee ~init:Sequence.empty ~f:(fun seq t ->
@@ -1229,10 +1234,12 @@ end = struct
               seq
           | Ok _ -> Sequence.append (Sequence.singleton t) seq )
     in
+    O1trace.trace_event "applied transactions" ;
     let diff =
       generate logger completed_works_seq transactions_rev self partitions
         max_jobs_count unbundled_job_count
     in
+    O1trace.trace_event "made diff" ;
     Logger.info logger "Block stats: Proofs ready for purchase: %d"
       (Sequence.length completed_works_seq) ;
     trace_event "prediffs done" ;
@@ -1791,14 +1798,6 @@ let%test_module "test" =
 
         (* This essentially number of subtrees each having (2^transaction_capacity_log_2) leaves. Size of the tree is 2^(transaction_capacity_log_2, work_delay_factor). Should be atleast 2.Why? -> When there is a single slot at the end of the tree before continuing at the begining of the tree (referring to the last level), the jobs on the right side of the tree are done along with the jobs on the left (because it wasn't added until then). The root node has to wait until the right sub-tree has completed before the next round begins. By the time the right sub-tree is completed, the left tree is also ready with the proof but has to wait until the root is emitted. This won't work with our succint datastructure impl and FIFO work order.*)
       end
-
-      let check :
-             Transaction_snark_work.t
-          -> Transaction_snark_work.statement list
-          -> Transaction_snark_work.Checked.t option Deferred.t =
-       fun {fee= f; proofs= p; prover= pr} _ ->
-        Deferred.return
-        @@ Some {Transaction_snark_work.Checked.fee= f; proofs= p; prover= pr}
     end
 
     module Sl = Make (Test_input1)

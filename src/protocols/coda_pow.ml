@@ -34,12 +34,6 @@ module type Hash_intf = sig
 end
 
 module type Time_intf = sig
-  module Stable : sig
-    module V1 : sig
-      type t [@@deriving sexp, bin_io]
-    end
-  end
-
   module Controller : Time_controller_intf
 
   type t [@@deriving sexp]
@@ -435,10 +429,10 @@ module type Transaction_snark_work_intf = sig
   end
 
   (* TODO: The SOK message actually should bind the SNARK to
-   be in this particular bundle. The easiest way would be to
-   SOK with
-   H(all_statements_in_bundle || fee || public_key)
-*)
+     be in this particular bundle. The easiest way would be to
+     SOK with
+     H(all_statements_in_bundle || fee || public_key)
+  *)
 
   type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
   [@@deriving sexp, bin_io]

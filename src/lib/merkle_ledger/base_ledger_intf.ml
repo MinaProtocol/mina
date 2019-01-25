@@ -43,7 +43,7 @@ module type S = sig
     -> f:(Addr.t -> 'accum -> account -> 'accum)
     -> 'accum
 
-  (* the set of keys are ledger elements to skip during the fold, because they're in a mask *)
+  (** the set of keys are ledger elements to skip during the fold, because they're in a mask *)
 
   val foldi :
     t -> init:'accum -> f:(Addr.t -> 'accum -> account -> 'accum) -> 'accum
@@ -54,6 +54,9 @@ module type S = sig
     -> f:('accum -> account -> ('accum, 'stop) Base.Continue_or_stop.t)
     -> finish:('accum -> 'stop)
     -> 'stop
+
+  val keys : t -> key_set
+  (** set of public keys associated with accounts *)
 
   val location_of_key : t -> key -> Location.t option
 

@@ -1,3 +1,0 @@
-(alias
- (name echo)
- (action (echo %{env:DUNE_ENV_VAR})))

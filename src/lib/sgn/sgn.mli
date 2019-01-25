@@ -8,7 +8,7 @@ val to_field : t -> Field.t
 
 val gen : t Quickcheck.Generator.t
 
-type var = private Field.Checked.t
+type var = private Field.Var.t
 
 val typ : (var, t) Typ.t
 

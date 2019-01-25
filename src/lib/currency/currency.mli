@@ -155,7 +155,7 @@ module type Signed_intf = sig
 
     val ( + ) : var -> var -> (var, _) Checked.t
 
-    val to_field_var : var -> (Field.var, _) Checked.t
+    val to_field_var : var -> (Field.Var.t, _) Checked.t
 
     val cswap :
          Boolean.var

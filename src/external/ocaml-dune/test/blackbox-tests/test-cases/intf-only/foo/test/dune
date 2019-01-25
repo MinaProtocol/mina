@@ -1,4 +1,0 @@
-(library
- (name bar)
- (public_name foo.bar)
- (libraries foo))

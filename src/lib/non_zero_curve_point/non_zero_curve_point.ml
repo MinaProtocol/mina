@@ -12,18 +12,17 @@ end
 include Stable.V1
 include Comparable.Make_binable (Stable.V1)
 
-type var = Tick.Field.var * Tick.Field.var
+type var = Tick.Field.Var.t * Tick.Field.Var.t
 
-let var_of_t (x, y) =
-  (Tick.Field.Checked.constant x, Tick.Field.Checked.constant y)
+let var_of_t (x, y) = (Tick.Field.Var.constant x, Tick.Field.Var.constant y)
 
 let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
 
 let ( = ) = equal
 
-let of_inner_curve_exn = Tick.Inner_curve.to_coords
+let of_inner_curve_exn = Tick.Inner_curve.to_affine_coordinates
 
-let to_inner_curve = Tick.Inner_curve.of_coords
+let to_inner_curve = Tick.Inner_curve.of_affine_coordinates
 
 let gen : t Quickcheck.Generator.t =
   Quickcheck.Generator.filter_map Tick.Field.gen ~f:(fun x ->
@@ -43,7 +42,7 @@ module Compressed = struct
     module V1 = struct
       module T = struct
         type t = (Field.t, bool) t_
-        [@@deriving sexp, bin_io, eq, compare, hash]
+        [@@deriving bin_io, sexp, eq, compare, hash]
       end
 
       include T
@@ -68,6 +67,10 @@ module Compressed = struct
 
   let compress (x, y) : t = {x; is_odd= parity y}
 
+  let to_base64 t = Binable.to_string (module Stable.V1) t |> B64.encode
+
+  let of_base64_exn s = B64.decode s |> Binable.of_string (module Stable.V1)
+
   let empty = {x= Field.zero; is_odd= false}
 
   let gen =
@@ -79,7 +82,7 @@ module Compressed = struct
 
   let length_in_triples = bit_length_to_triple_length (1 + Field.size_in_bits)
 
-  type var = (Field.var, Boolean.var) t_
+  type var = (Field.Var.t, Boolean.var) t_
 
   let to_hlist {x; is_odd} = Snarky.H_list.[x; is_odd]
 
@@ -93,7 +96,7 @@ module Compressed = struct
       ~value_of_hlist:of_hlist
 
   let var_of_t ({x; is_odd} : t) : var =
-    {x= Field.Checked.constant x; is_odd= Boolean.var_of_value is_odd}
+    {x= Field.Var.constant x; is_odd= Boolean.var_of_value is_odd}
 
   let assert_equal (t1 : var) (t2 : var) =
     let open Let_syntax in
@@ -156,9 +159,10 @@ let parity_var y =
 
 let decompress_var ({x; is_odd} as c : Compressed.var) =
   let%bind y =
-    provide_witness Typ.field
-      As_prover.(
-        map (read Compressed.typ c) ~f:(fun c -> snd (decompress_exn c)))
+    exists Typ.field
+      ~compute:
+        As_prover.(
+          map (read Compressed.typ c) ~f:(fun c -> snd (decompress_exn c)))
   in
   let%map () = Inner_curve.Checked.Assert.on_curve (x, y)
   and () = parity_var y >>= Boolean.Assert.(( = ) is_odd) in

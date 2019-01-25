@@ -67,8 +67,7 @@ dht: kademlia
 
 build: git_hooks
 	$(info Starting Build)
-	ulimit -s 65536
-	cd src ; $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && (ulimit -u 2128 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 dev: codabuilder containerstart build
@@ -82,6 +81,9 @@ reformat: git_hooks
 check-format:
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
 
+check-snarky-submodule:
+	./scripts/check-snarky-submodule.sh
+
 ########################################
 ## Merlin fixup for docker builds
 
@@ -92,6 +94,18 @@ ifeq ($(USEDOCKER),TRUE)
 else
 	@echo "Not building in Docker, .merlin files unchanged"
 endif
+
+#######################################
+## Environment setup
+
+macos-setup-download:
+	./scripts/macos-setup.sh download
+
+macos-setup-compile:
+	./scripts/macos-setup.sh compile
+
+macos-setup:
+	./scripts/macos-setup.sh all
 
 ########################################
 ## Containers and container management
@@ -176,13 +190,10 @@ publish_deb:
 publish_debs: publish_deb publish_kademlia_deb
 
 provingkeys:
-	@if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
-		$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH).tar.bz2  /tmp/coda_cache_dir ; \
-		mkdir -p /tmp/artifacts ; \
-		cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
-	else \
-		echo "Skipping because not on master" ; \
-	fi
+	$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH)_$(CODA_CONSENSUS).tar.bz2  /tmp/coda_cache_dir ; \
+	mkdir -p /tmp/artifacts ; \
+	cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
+
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts
@@ -284,5 +295,4 @@ ml-docs:
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams ml-docs
-
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams ml-docs macos-setup macos-setup-download macos-setup-compile

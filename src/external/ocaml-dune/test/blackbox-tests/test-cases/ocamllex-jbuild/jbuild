@@ -1,7 +1,0 @@
-(ocamllex
- ((modules (foo))))
-
-(ocamllex (bar))
-
-(executable
- ((name foo)))

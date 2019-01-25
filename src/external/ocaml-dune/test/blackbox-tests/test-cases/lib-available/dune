@@ -1,7 +1,0 @@
-(alias
- (name runtest)
- (action (system "%{lib-available:unix}")))
-
-(alias
- (name runtest)
- (action (system "%{lib-available:library-that-surely-doesnt-exist} && exit 1 || exit 0")))
