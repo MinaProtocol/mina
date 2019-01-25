@@ -304,6 +304,11 @@ struct
 
     (* copy tables in t; use same parent *)
     let copy t =
+      Printf.eprintf "COPY IN MASK: %s\n%!" (get_uuid t |> Uuid.to_string) ;
+      Printf.eprintf "COPY STACK:\n%!" ;
+      Printf.eprintf "%s\n%!"
+        ( Stdlib.Printexc.get_callstack 20
+        |> Stdlib.Printexc.raw_backtrace_to_string ) ;
       { uuid= Uuid.create ()
       ; parent= get_parent t
       ; account_tbl= Location.Table.copy t.account_tbl
@@ -467,6 +472,12 @@ struct
       mask_accounts @ in_parent_not_in_mask_accounts
 
     let foldi_with_ignored_keys t ignored_keys ~init ~f =
+      Printf.eprintf "FOLDI IGNORED KEYS IN MASK: %s\n%!"
+        (get_uuid t |> Uuid.to_string) ;
+      Printf.eprintf "FOLDI IGNORED KEYS STACK:\n%!" ;
+      Printf.eprintf "%s\n%!"
+        ( Stdlib.Printexc.get_callstack 20
+        |> Stdlib.Printexc.raw_backtrace_to_string ) ;
       let locations_and_accounts = Location.Table.to_alist t.account_tbl in
       (* parent should ignore keys in this mask *)
       let mask_keys =
@@ -560,6 +571,11 @@ struct
       |> Result.ok_exn
 
     let foldi t ~init ~f =
+      Printf.eprintf "FOLDI IN MASK: %s\n%!" (get_uuid t |> Uuid.to_string) ;
+      Printf.eprintf "FOLDI STACK:\n%!" ;
+      Printf.eprintf "%s\n%!"
+        ( Stdlib.Printexc.get_callstack 20
+        |> Stdlib.Printexc.raw_backtrace_to_string ) ;
       (* fold over parent, then mask *)
       let parent_result = Base.foldi (get_parent t) ~init ~f in
       Location.Table.fold t.account_tbl ~init:parent_result
