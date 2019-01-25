@@ -56,6 +56,11 @@ module type S = sig
   val to_hex: t -> string
 end
 
+module type S' = sig
+  include S
+  val get_h : ctx -> int32 array
+end
+
 module type Desc =
 sig
   val digest_size : int
@@ -303,7 +308,10 @@ end
 module MD5 : S with type kind = [ `MD5 ] = Make (Baijiu_md5.Unsafe) (struct let (digest_size, block_size) = (16, 64) end)
 module SHA1 : S with type kind = [ `SHA1 ] = Make (Baijiu_sha1.Unsafe) (struct let (digest_size, block_size) = (20, 64) end)
 module SHA224 : S with type kind = [ `SHA224 ] = Make (Baijiu_sha224.Unsafe) (struct let (digest_size, block_size) = (28, 64) end)
-module SHA256 : S with type kind = [ `SHA256 ] and type ctx = Baijiu_sha256.Unsafe.ctx = Make (Baijiu_sha256.Unsafe) (struct let (digest_size, block_size) = (32, 64) end)
+module SHA256 : S' with type kind = [ `SHA256 ] and type ctx = Baijiu_sha256.Unsafe.ctx = struct
+  include Make (Baijiu_sha256.Unsafe) (struct let (digest_size, block_size) = (32, 64) end)
+  let get_h = Baijiu_sha256.Unsafe.unsafe_get_h
+end
 module SHA384 : S with type kind = [ `SHA384 ] = Make (Baijiu_sha384.Unsafe) (struct let (digest_size, block_size) = (48, 128) end)
 module SHA512 : S with type kind = [ `SHA512 ] = Make (Baijiu_sha512.Unsafe) (struct let (digest_size, block_size) = (64, 128) end)
 module BLAKE2B : S with type kind = [ `BLAKE2B ] = Make_BLAKE2 (Baijiu_blake2b.Unsafe) (struct let (digest_size, block_size) = (64, 128) end)

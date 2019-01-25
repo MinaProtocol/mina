@@ -341,10 +341,21 @@ module Make_BLAKE2 (F : Foreign_BLAKE2) (D : Desc) = struct
   let hmacv_bigstring ~key bufs = hmaci_bigstring ~key (fun f -> List.iter f bufs)
 end
 
+module type S' = sig
+  include S
+  val get_h : ctx -> int32 array
+end
+
 module MD5 : S with type kind = [ `MD5 ] = Make (Native.MD5) (struct let (digest_size, block_size) = (16, 64) end)
 module SHA1 : S with type kind = [ `SHA1 ] = Make (Native.SHA1) (struct let (digest_size, block_size) = (20, 64) end)
 module SHA224 : S with type kind = [ `SHA224 ] = Make (Native.SHA224) (struct let (digest_size, block_size) = (28, 64) end)
-module SHA256 : S with type kind = [ `SHA256 ] = Make (Native.SHA256) (struct let (digest_size, block_size) = (32, 64) end)
+module SHA256 : S' with type kind = [ `SHA256 ] = struct
+    include Make (Native.SHA256) (struct let (digest_size, block_size) = (32, 64) end)
+    let get_h ctx =
+      let bst = Bi.create 32 in
+      Native.SHA256.Bigstring.get_h ctx bst 0 ;
+      Array.init 8 (fun i -> Bi.unsafe_get_32 bst i)
+  end
 module SHA384 : S with type kind = [ `SHA384 ] = Make (Native.SHA384) (struct let (digest_size, block_size) = (48, 128) end)
 module SHA512 : S with type kind = [ `SHA512 ] = Make (Native.SHA512) (struct let (digest_size, block_size) = (64, 128) end)
 module BLAKE2B : S with type kind = [ `BLAKE2B ] = Make_BLAKE2(Native.BLAKE2B) (struct let (digest_size, block_size) = (64, 128) end)

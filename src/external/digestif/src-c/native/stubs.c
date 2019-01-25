@@ -70,6 +70,19 @@ __define_hash (blake2s, BLAKE2S)
 __define_hash (rmd160, RMD160)
 
 CAMLprim value
+caml_digestif_sha256_ba_get_h(value ctx, value dst, value off) {
+    digestif_sha256_get_h((struct sha256_ctx*) String_val(ctx), _ba_uint8_off(dst, off));
+    return Val_unit;
+}
+
+
+CAMLprim value
+caml_digestif_sha256_st_get_h(value ctx, value dst, value off) {
+    digestif_sha256_get_h((struct sha256_ctx*) String_val(ctx), _st_uint8_off(dst, off));
+    return Val_unit;
+}
+
+CAMLprim value
 caml_digestif_blake2b_ba_init_with_outlen_and_key(value ctx, value outlen, value key, value off, value len)
 {
   digestif_blake2b_init_with_outlen_and_key(
