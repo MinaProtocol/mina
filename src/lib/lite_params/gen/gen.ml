@@ -20,7 +20,13 @@ let key_generation = false
 module Proof_of_signature = Consensus.Proof_of_signature.Make (struct
   module Time = Coda_base.Block_time
 
-  let proposal_interval = Time.Span.of_ms Int64.zero
+  module Constants = struct
+    let coinbase = Currency.Amount.zero
+
+    let k = 10
+
+    let block_duration_ms = Int64.zero
+  end
 
   module Staged_ledger_diff = Unit
   module Genesis_ledger = Genesis_ledger

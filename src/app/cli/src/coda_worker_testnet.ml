@@ -246,7 +246,7 @@ let start_checks log workers proposal_interval payment_reader start_reader
 let test log n should_propose snark_work_public_keys work_selection =
   let log = Logger.child log "worker_testnet" in
   let proposal_interval =
-    Int64.to_int_exn Consensus.Mechanism.block_interval_ms
+    Int64.to_int_exn Consensus.Mechanism.Constants.block_duration_ms
   in
   let%bind program_dir = Unix.getcwd () in
   Coda_processes.init () ;
