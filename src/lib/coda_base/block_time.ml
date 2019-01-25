@@ -111,7 +111,7 @@ module Timeout = struct
   let cancel () {cancel; _} value = cancel value
 end
 
-let field_var_to_unpacked (x : Tick.Field.Checked.t) =
+let field_var_to_unpacked (x : Tick.Field.Var.t) =
   Tick.Field.Checked.unpack ~length:64 x
 
 let epoch = of_time Time.epoch
@@ -127,7 +127,7 @@ let to_span_since_epoch t = diff t epoch
 let of_span_since_epoch s = UInt64.add s epoch
 
 let diff_checked x y =
-  let pack = Tick.Field.Checked.project in
+  let pack = Tick.Field.Var.project in
   Span.unpack_var Tick.Field.Checked.Infix.(pack x - pack y)
 
 let modulus t span = UInt64.rem t span

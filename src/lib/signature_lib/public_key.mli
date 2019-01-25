@@ -16,7 +16,7 @@ end
 
 include Comparable.S_binable with type t := t
 
-type var = Field.var * Field.var
+type var = Field.Var.t * Field.Var.t
 
 val typ : (var, t) Typ.t
 
@@ -45,7 +45,7 @@ module Compressed : sig
 
   val length_in_triples : int
 
-  type var = (Field.var, Boolean.var) t_
+  type var = (Field.Var.t, Boolean.var) t_
 
   val typ : (var, t) Typ.t
 

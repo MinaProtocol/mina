@@ -313,11 +313,11 @@ module Make_weierstrass_checked
   let if_value (cond : Boolean.var) ~then_ ~else_ =
     let x1, y1 = Curve.to_affine_coordinates then_ in
     let x2, y2 = Curve.to_affine_coordinates else_ in
-    let cond = (cond :> Field.Checked.t) in
+    let cond = (cond :> Field.Var.t) in
     let choose a1 a2 =
       let open Field.Checked in
       F.map2_ a1 a2 ~f:(fun a1 a2 ->
-          Infix.((a1 * cond) + (a2 * (constant Field.one - cond))) )
+          Infix.((a1 * cond) + (a2 * (Field.Var.constant Field.one - cond))) )
     in
     (choose x1 x2, choose y1 y2)
 
@@ -349,12 +349,12 @@ module Make_weierstrass_checked
     let%map b0_and_b1 = Boolean.( && ) b0 b1 in
     let lookup_one (a1, a2, a3, a4) =
       let open F.Unchecked in
-      let ( * ) x b = F.map_ x ~f:(fun x -> Field.Checked.scale b x) in
+      let ( * ) x b = F.map_ x ~f:(fun x -> Field.Var.scale b x) in
       let ( +^ ) = F.( + ) in
       F.constant a1
-      +^ ((a2 - a1) * (b0 :> Field.Checked.t))
-      +^ ((a3 - a1) * (b1 :> Field.Checked.t))
-      +^ ((a4 + a1 - a2 - a3) * (b0_and_b1 :> Field.Checked.t))
+      +^ ((a2 - a1) * (b0 :> Field.Var.t))
+      +^ ((a3 - a1) * (b1 :> Field.Var.t))
+      +^ ((a4 + a1 - a2 - a3) * (b0_and_b1 :> Field.Var.t))
     in
     let x1, y1 = Curve.to_affine_coordinates t1
     and x2, y2 = Curve.to_affine_coordinates t2
@@ -367,9 +367,7 @@ module Make_weierstrass_checked
     let lookup_one (a1, a2) =
       let open F in
       constant a1
-      + map_
-          Unchecked.(a2 - a1)
-          ~f:(Field.Checked.scale (b :> Field.Checked.t))
+      + map_ Unchecked.(a2 - a1) ~f:(Field.Var.scale (b :> Field.Var.t))
     in
     let x1, y1 = Curve.to_affine_coordinates t1
     and x2, y2 = Curve.to_affine_coordinates t2 in

@@ -563,8 +563,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       | Winner_address : Coda_base.Account.Index.t Snarky.Request.t
       | Private_key : Scalar.value Snarky.Request.t
 
-    open Crypto_params_init.Tick0
-
     let%snarkydef get_vrf_evaluation shifted ~ledger ~message =
       let open Coda_base in
       let open Snark_params.Tick in
@@ -587,8 +585,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       (evaluation, account.balance)
 
     module Checked = struct
-      open Crypto_params_init.Tick0
-
       let%snarkydef check shifted ~(epoch_ledger : Epoch_ledger.var) ~epoch
           ~slot ~seed =
         let open Snark_params.Tick in
@@ -1017,105 +1013,99 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       ; last_epoch_data
       ; curr_epoch_data }
 
-    include struct
-      open Crypto_params_init.Tick0
-
-      let%snarkydef update_var (previous_state : var)
-          (transition_data : Consensus_transition_data.var)
-          (previous_protocol_state_hash : Coda_base.State_hash.var)
-          ~(supply_increase : Currency.Amount.var)
-          ~(previous_blockchain_state_ledger_hash :
-             Coda_base.Frozen_ledger_hash.var) =
-        let open Consensus_transition_data in
-        let open Snark_params.Tick in
-        let open Let_syntax in
-        let {curr_epoch= prev_epoch; curr_slot= prev_slot; _} =
-          previous_state
-        in
-        let {epoch= next_epoch; slot= _} = transition_data in
-        let%bind epoch_increased =
-          let%bind c = Epoch.compare_var prev_epoch next_epoch in
-          let%map () = Boolean.Assert.is_true c.less_or_equal in
-          c.less
-        in
-        let%bind last_data =
-          Epoch_data.if_ epoch_increased ~then_:previous_state.curr_epoch_data
-            ~else_:previous_state.last_epoch_data
-        in
-        let%bind threshold_satisfied, vrf_result =
-          let%bind (module M) = Inner_curve.Checked.Shifted.create () in
-          Vrf.Checked.check
-            (module M)
-            ~epoch_ledger:last_data.ledger ~epoch:transition_data.epoch
-            ~slot:transition_data.slot ~seed:last_data.seed
-        in
-        let%bind curr_data =
-          let%map seed =
-            let%bind in_seed_update_range =
-              Epoch.Slot.in_seed_update_range_var prev_slot
-            in
-            let%bind base =
-              Epoch_seed.if_ epoch_increased
-                ~then_:Epoch_seed.(var_of_t initial)
-                ~else_:previous_state.curr_epoch_data.seed
-            in
-            let%bind updated = Epoch_seed.update_var base vrf_result in
-            Epoch_seed.if_ in_seed_update_range ~then_:updated ~else_:base
-          and length =
-            let%bind base =
-              Field.Checked.if_ epoch_increased
-                ~then_:Field.(Checked.constant zero)
-                ~else_:
-                  ( Length.pack_var previous_state.curr_epoch_data.length
-                    :> Field.var )
-            in
-            Length.var_of_field Field.(Checked.(add (constant one) base))
-          and ledger =
-            Epoch_ledger.if_ epoch_increased
-              ~then_:
-                { total_currency= previous_state.total_currency
-                ; hash= previous_blockchain_state_ledger_hash }
-              ~else_:previous_state.curr_epoch_data.ledger
-          and start_checkpoint =
-            Coda_base.State_hash.if_ epoch_increased
-              ~then_:previous_protocol_state_hash
-              ~else_:previous_state.curr_epoch_data.start_checkpoint
-          (* Want this to be the protocol state hash once we leave the seed
-             update range. *)
-          and lock_checkpoint =
-            let%bind base =
-              (* TODO: Should this be zero or some other sentinel value? *)
-              Coda_base.State_hash.if_ epoch_increased
-                ~then_:Coda_base.State_hash.(var_of_t (of_hash zero))
-                ~else_:previous_state.curr_epoch_data.lock_checkpoint
-            in
-            let%bind in_seed_update_range =
-              Epoch.Slot.in_seed_update_range_var previous_state.curr_slot
-            in
-            Coda_base.State_hash.if_ in_seed_update_range
-              ~then_:previous_protocol_state_hash ~else_:base
+    let%snarkydef update_var (previous_state : var)
+        (transition_data : Consensus_transition_data.var)
+        (previous_protocol_state_hash : Coda_base.State_hash.var)
+        ~(supply_increase : Currency.Amount.var)
+        ~(previous_blockchain_state_ledger_hash :
+           Coda_base.Frozen_ledger_hash.var) =
+      let open Consensus_transition_data in
+      let open Snark_params.Tick in
+      let open Let_syntax in
+      let {curr_epoch= prev_epoch; curr_slot= prev_slot; _} = previous_state in
+      let {epoch= next_epoch; slot= _} = transition_data in
+      let%bind epoch_increased =
+        let%bind c = Epoch.compare_var prev_epoch next_epoch in
+        let%map () = Boolean.Assert.is_true c.less_or_equal in
+        c.less
+      in
+      let%bind last_data =
+        Epoch_data.if_ epoch_increased ~then_:previous_state.curr_epoch_data
+          ~else_:previous_state.last_epoch_data
+      in
+      let%bind threshold_satisfied, vrf_result =
+        let%bind (module M) = Inner_curve.Checked.Shifted.create () in
+        Vrf.Checked.check
+          (module M)
+          ~epoch_ledger:last_data.ledger ~epoch:transition_data.epoch
+          ~slot:transition_data.slot ~seed:last_data.seed
+      in
+      let%bind curr_data =
+        let%map seed =
+          let%bind in_seed_update_range =
+            Epoch.Slot.in_seed_update_range_var prev_slot
           in
-          {Epoch_data.seed; length; ledger; start_checkpoint; lock_checkpoint}
-        and length = Length.increment_var previous_state.length
-        (* TODO: keep track of total_currency in transaction snark. The current_slot
-         * implementation would allow an adversary to make then total_currency incorrect by
-         * not adding the coinbase to their account. *)
-        and new_total_currency =
-          Amount.Checked.add previous_state.total_currency supply_increase
-        and epoch_length =
-          Length.increment_if_var previous_state.epoch_length epoch_increased
+          let%bind base =
+            Epoch_seed.if_ epoch_increased
+              ~then_:Epoch_seed.(var_of_t initial)
+              ~else_:previous_state.curr_epoch_data.seed
+          in
+          let%bind updated = Epoch_seed.update_var base vrf_result in
+          Epoch_seed.if_ in_seed_update_range ~then_:updated ~else_:base
+        and length =
+          let%bind base =
+            Field.Checked.if_ epoch_increased
+              ~then_:Field.(Var.constant zero)
+              ~else_:
+                ( Length.pack_var previous_state.curr_epoch_data.length
+                  :> Field.Var.t )
+          in
+          Length.var_of_field Field.(Var.(add (constant one) base))
+        and ledger =
+          Epoch_ledger.if_ epoch_increased
+            ~then_:
+              { total_currency= previous_state.total_currency
+              ; hash= previous_blockchain_state_ledger_hash }
+            ~else_:previous_state.curr_epoch_data.ledger
+        and start_checkpoint =
+          Coda_base.State_hash.if_ epoch_increased
+            ~then_:previous_protocol_state_hash
+            ~else_:previous_state.curr_epoch_data.start_checkpoint
+        (* Want this to be the protocol state hash once we leave the seed
+           update range. *)
+        and lock_checkpoint =
+          let%bind base =
+            (* TODO: Should this be zero or some other sentinel value? *)
+            Coda_base.State_hash.if_ epoch_increased
+              ~then_:Coda_base.State_hash.(var_of_t (of_hash zero))
+              ~else_:previous_state.curr_epoch_data.lock_checkpoint
+          in
+          let%bind in_seed_update_range =
+            Epoch.Slot.in_seed_update_range_var previous_state.curr_slot
+          in
+          Coda_base.State_hash.if_ in_seed_update_range
+            ~then_:previous_protocol_state_hash ~else_:base
         in
-        return
-          ( `Success threshold_satisfied
-          , { length
-            ; epoch_length
-            ; last_vrf_output= vrf_result
-            ; curr_epoch= transition_data.epoch
-            ; curr_slot= transition_data.slot
-            ; total_currency= new_total_currency
-            ; last_epoch_data= last_data
-            ; curr_epoch_data= curr_data } )
-    end
+        {Epoch_data.seed; length; ledger; start_checkpoint; lock_checkpoint}
+      and length = Length.increment_var previous_state.length
+      (* TODO: keep track of total_currency in transaction snark. The current_slot
+       * implementation would allow an adversary to make then total_currency incorrect by
+       * not adding the coinbase to their account. *)
+      and new_total_currency =
+        Amount.Checked.add previous_state.total_currency supply_increase
+      and epoch_length =
+        Length.increment_if_var previous_state.epoch_length epoch_increased
+      in
+      return
+        ( `Success threshold_satisfied
+        , { length
+          ; epoch_length
+          ; last_vrf_output= vrf_result
+          ; curr_epoch= transition_data.epoch
+          ; curr_slot= transition_data.slot
+          ; total_currency= new_total_currency
+          ; last_epoch_data= last_data
+          ; curr_epoch_data= curr_data } )
 
     let length (t : value) = t.length
 
@@ -1248,8 +1238,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       ~time_received
 
   include struct
-    open Crypto_params_init.Tick0
-
     let%snarkydef next_state_checked ~(prev_state : Protocol_state.var)
         ~(prev_state_hash : Coda_base.State_hash.var) transition
         supply_increase =
