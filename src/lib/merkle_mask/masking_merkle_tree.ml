@@ -341,13 +341,17 @@ struct
         | [] -> [] )
       |> ignore
 
+    (* keys from this mask and all ancestors *)
     let keys t =
-      Location.Table.data t.account_tbl
-      |> List.map ~f:Account.public_key
-      |> Key.Set.of_list
+      let mask_keys =
+        Location.Table.data t.account_tbl
+        |> List.map ~f:Account.public_key
+        |> Key.Set.of_list
+      in
+      let parent_keys = Base.keys (get_parent t) in
+      Key.Set.union parent_keys mask_keys
 
-    let num_accounts t =
-      Key.Set.union (Base.keys (get_parent t)) (keys t) |> Key.Set.length
+    let num_accounts t = keys t |> Key.Set.length
 
     let location_of_key t key =
       let mask_result = find_location t key in
