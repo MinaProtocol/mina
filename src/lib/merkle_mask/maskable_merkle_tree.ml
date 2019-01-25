@@ -62,5 +62,5 @@ struct
     | None -> ()
     | Some masks ->
         List.iter masks ~f:(fun mask ->
-            Mask.Attached.parent_set_notify mask location account )
+            Mask.Attached.parent_set_notify mask account )
 end
