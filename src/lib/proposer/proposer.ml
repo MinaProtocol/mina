@@ -303,6 +303,9 @@ module Make (Inputs : Inputs_intf) :
                   Interruptible.uninterruptible
                     (let open Deferred.Let_syntax in
                     let t0 = Time.now time_controller in
+                    printf
+                      !"State out of snark: %{sexp: Protocol_state.value}\n%!"
+                      protocol_state ;
                     match%bind
                       measure "proving state transition valid" (fun () ->
                           Prover.prove ~prev_state:previous_protocol_state

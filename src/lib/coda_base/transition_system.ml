@@ -159,8 +159,12 @@ struct
                 Let_syntax.(
                   let%bind prev_state = read State.typ prev_state in
                   let%map next_state = read State.typ next_state in
-                  printf !"Previous state in checked: %{sexp: State.value}" prev_state;
-                  printf !"Next state in checked: %{sexp: State.value}\n%!" next_state))
+                  printf
+                    !"Previous state in checked: %{sexp: State.value}"
+                    prev_state ;
+                  printf
+                    !"Next state in checked: %{sexp: State.value}\n%!"
+                    next_state))
         in
         with_label __LOC__
           (let%bind sh = State.Hash.var_to_triples next_state_hash in
@@ -168,6 +172,14 @@ struct
                hashing anew *)
            compute_top_hash wrap_vk_section sh
            >>= Field.Checked.Assert.equal top_hash)
+      in
+      let%bind () =
+        exists Typ.unit
+          ~compute:
+            As_prover.(
+              Let_syntax.(
+                printf !"Passed the assertion that states were equal\n%!" ;
+                return ()))
       in
       let%bind prev_state_valid =
         prev_state_valid wrap_vk_section wrap_vk wrap_vk_data prev_state_hash
