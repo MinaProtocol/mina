@@ -30,7 +30,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
         environment:
-            CODA_CONSENSUS: posig_dev
+            CODA_CONSENSUS: posig-dev
             DUNE_PROFILE: dev
         steps:
             - checkout
@@ -92,7 +92,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
         environment:
-            CODA_CONSENSUS: posig_snark
+            CODA_CONSENSUS: posig-snark
             DUNE_PROFILE: testnet_posig
         steps:
             - checkout
@@ -123,7 +123,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
         environment:
-            CODA_CONSENSUS: postake_snark
+            CODA_CONSENSUS: postake-snark
             DUNE_PROFILE: testnet_postake
         steps:
             - checkout
@@ -154,7 +154,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
         environment:
-            CODA_CONSENSUS: posig_public
+            CODA_CONSENSUS: posig-public
             DUNE_PROFILE: testnet_public
         steps:
             - checkout
