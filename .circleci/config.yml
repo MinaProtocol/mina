@@ -29,12 +29,15 @@ jobs:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+        environment:
+            CODA_CONSENSUS: posig_dev
+            DUNE_PROFILE: dev
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=dev make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                   name: rm snark_params
                   command: rm -rf src/_build/default/lib/snark_params
@@ -89,7 +92,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
         environment:
-            CODA_CONSENSUS: posig
+            CODA_CONSENSUS: posig_snark
             DUNE_PROFILE: testnet_posig
         steps:
             - checkout
@@ -120,8 +123,8 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
         environment:
-            CODA_CONSENSUS: posig
-            DUNE_PROFILE: testnet_posig
+            CODA_CONSENSUS: postake_snark
+            DUNE_PROFILE: testnet_postake
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -130,7 +133,7 @@ jobs:
                   command: scripts/getkeys.sh
             - run:
                   name: Build OCaml (stake)
-                  command: eval `opam config env` && DUNE_PROFILE=testnet_postake make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                   name: Build deb Package with keys
                   command: make deb
@@ -151,7 +154,7 @@ jobs:
         docker:
             - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
         environment:
-            CODA_CONSENSUS: posig
+            CODA_CONSENSUS: posig_public
             DUNE_PROFILE: testnet_public
         steps:
             - checkout
