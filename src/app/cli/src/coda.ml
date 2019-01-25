@@ -284,7 +284,7 @@ let daemon log =
 
          let scan_state_size_incr = scan_state_size_incr
 
-         let work_capacity = scan_state_size_incr - 1
+         let work_capacity_factor = scan_state_size_incr - 1
 
          let commit_id = commit_id
 

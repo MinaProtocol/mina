@@ -17,8 +17,6 @@ module Job = struct
   let gen a_gen d_gen =
     let open Quickcheck.Generator in
     let open Quickcheck.Generator.Let_syntax in
-    (*let maybe_a = Option.gen a_gen in
-    let maybe_int = Option.gen Int.gen in*)
     match%map
       variant2
         (variant4 Bool.gen a_gen a_gen (tuple3 a_gen a_gen Int.gen))

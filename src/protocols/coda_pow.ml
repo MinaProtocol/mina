@@ -667,17 +667,14 @@ module type Transaction_snark_scan_state_intf = sig
 
   val current_job_sequence_number : t -> int
 
-  (*val filter_jobs_by_seq_no : t -> Available_job.t Sequence.t Or_error.t*)
-
   val snark_job_list_json : t -> string
 
   val all_work_to_do :
     t -> transaction_snark_work_statement Sequence.t Or_error.t
 
-  val min_work_to_do :
-    t -> transaction_snark_work_statement Sequence.t Or_error.t
-
   val current_job_count : t -> int
+
+  val work_capacity : unit -> int
 end
 
 module type Staged_ledger_base_intf = sig

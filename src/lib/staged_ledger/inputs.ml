@@ -111,7 +111,7 @@ module type S = sig
 
     val scan_state_size_incr : int
 
-    val work_capacity : int
+    val work_capacity_factor : int
     (*The number of jobs the tree can hold at any given time. transactions can be enqueued for free until this number is reached*)
     (* Same as work_availability factor(say k) if the transitions are at max throughput which means do all the work that was created until the last k transitions before allowing transactions to be even if the statements in the last k blocks were not available for purchase (shouldn't this be part of consensus then?). When they are not, it would mean do all the work until the last x > k transitions but free after that.*)
     (*Or is it really different. if snarking is slow then we need to accumulate more jobs and therefore bigger tree and more space for adding free transactions *)

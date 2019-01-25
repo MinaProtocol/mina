@@ -109,6 +109,34 @@ end = struct
 
   include T
 
+  (*Work capacity represents max number of work(present and future) in the tree. 
+  if t = transaction_capacity_log_2
+     i = scan_state_size_incr
+     w = work_capacity_factor
+  then
+    3 * 2^t < 2^w < 2^(t+i+1)
+    or
+    total work added in one block < work capacity < total work that can be o the tree 
+  
+  When there is high throughput and all the work is available for purchase, the value (1
+          + Int.pow 2 (transaction_capacity_log_2 + max 2 scan_state_size_incr)) is max number of jobs that would be in the tree. Hence, when there is delay in work, max_capacity should be set to a value greater than this (governed by Config.work_capacity_factor) *)
+  let work_capacity () =
+    let open Config in
+    (*let x = if work_capacity_factor < transaction_capacity_log_2+scan_state_size_incr+1 && work_capacity_factor >= transaction_capacity_log_2+2
+    then
+    (*extra one for the buffer until the job count is adjusted. See fill_work_and_enqueue_transactions*)
+    Int.pow 2 work_capacity_factor
+    else  
+    1+(Int.pow 2 (transaction_capacity_log_2+1))
+    in
+    Core.printf "Capacity: %d \n %!" x; 
+    x*)
+    (*+1 because of <, +1 to give enough time to adjust the counter after proof is emitted, +1 to due to delay in proof emitting*)
+    let nearest_log_2_txn = Int.ceil_log2 transaction_capacity_log_2 in
+    let nearest_log_2_incr = Int.ceil_log2 scan_state_size_incr in
+    3 + nearest_log_2_incr + nearest_log_2_txn
+    + Int.pow 2 (transaction_capacity_log_2 + scan_state_size_incr)
+
   let hash t =
     let state_hash =
       Parallel_scan.State.hash t.tree
@@ -123,7 +151,7 @@ end = struct
     Parallel_scan.parallelism ~state:t.tree
     = Int.pow 2 (Config.transaction_capacity_log_2 + k)
     (*allow delay upto at least one set of 2^transaction_capacity_log_2 slots are available*)
-    && t.job_count < Config.work_capacity
+    && t.job_count < work_capacity ()
     && Parallel_scan.is_valid t.tree
 
   include Binable.Of_binable
@@ -401,16 +429,22 @@ end = struct
     in
     let%bind () = Parallel_scan.update_curr_job_seq_no t.tree in
     let%bind proof_opt = fill_in_transaction_snark_work t.tree work in
-    let%map () = enqueue_transactions t.tree transactions in
-    (*Everytime a proof is emitted, reduce the job count by 1 because you only had to do (2^x - 1 extra jobs)*)
+    let%bind () = enqueue_transactions t.tree transactions in
+    (*important: Everytime a proof is emitted, reduce the job count by 1 because you only had to do (2^x - 1 extra jobs). This is important because otherwise the job count would never become zero*)
     let adjust_job_count =
       Option.value_map ~default:0 ~f:(fun _ -> 1) proof_opt
     in
-    t.job_count
-    <- t.job_count
-       + (List.length transactions * 2)
-       - work_count - adjust_job_count ;
-    proof_opt
+    let new_count =
+      t.job_count
+      + (List.length transactions * 2)
+      - work_count - adjust_job_count
+    in
+    if new_count < work_capacity () then (
+      t.job_count <- new_count ;
+      Ok proof_opt )
+    else
+      Or_error.error_string
+        "Job count exceeded work_capacity. Cannot enqueue the transactions"
 
   let latest_ledger_proof t = Parallel_scan.last_emitted_value t.tree
 
@@ -442,23 +476,6 @@ end = struct
         First (d.transaction_with_info, d.statement, d.witness)
     | Merge ((p1, _), (p2, _), _) -> Second (p1, p2)
 
-  let filter_jobs_by_seq_no t =
-    let open Or_error.Let_syntax in
-    (*let current_seq = Parallel_scan.current_job_sequence_number t in
-    let min_seq_no = max 0 (current_seq - Config.work_capacity) in*)
-    let%map all_jobs = next_jobs_sequence t in
-    (*Core.printf
-      !"current seq no: %d min seq no: %d \n %!"
-      current_seq min_seq_no ;
-    Sequence.filter all_jobs ~f:(fun job ->
-        let cur_seq =
-          match job with
-          | Parallel_scan.Available_job.Base (_, seq) -> seq
-          | Merge (_, _, seq) -> seq
-        in
-        cur_seq <= min_seq_no )*)
-    Sequence.drop_eagerly all_jobs Config.work_capacity
-
   let snark_job_list_json t =
     let all_jobs : Job_view.t list =
       let fa (a : Ledger_proof_with_sok_message.t) =
@@ -469,46 +486,15 @@ end = struct
     in
     Yojson.Safe.to_string (`List (List.map all_jobs ~f:Job_view.to_yojson))
 
-  (*create chunks of full capacity only*)
-  let sequence_chunks_of seq n =
-    Sequence.unfold_step ~init:([], 0, seq) ~f:(fun (acc, i, seq) ->
-        if i = n then Yield (List.rev acc, ([], 0, seq))
-        else
-          match Sequence.next seq with
-          | None -> Done
-          (* skip the last one if it's odd*)
-          (*| Some (x, seq) -> (
-            (*allow a chunk of 1 proof as well*)
-            match Sequence.next seq with
-            | None -> Yield (List.rev (x :: acc), ([], 0, seq))*)
-          | Some (x, seq) -> Skip (x :: acc, i + 1, seq) )
-
   let all_work_to_do t :
       Transaction_snark_work.Statement.t Sequence.t Or_error.t =
     let open Or_error.Let_syntax in
     let%map work_seq = next_jobs_sequence t in
+    Core.printf !"\n\nall jobs: %d\n %!" (Sequence.length work_seq) ;
     Sequence.chunks_exn
       (Sequence.map work_seq ~f:(fun job ->
            match statement_of_job job with
            | None -> assert false
            | Some stmt -> stmt ))
-      Transaction_snark_work.proofs_length
-
-  let min_work_to_do t :
-      Transaction_snark_work.Statement.t Sequence.t Or_error.t =
-    let open Or_error.Let_syntax in
-    let%bind work_seq = filter_jobs_by_seq_no t in
-    let%map all_work = next_jobs_sequence t in
-    let f =
-      if Sequence.length work_seq = Sequence.length all_work then
-        Sequence.chunks_exn
-      else sequence_chunks_of
-    in
-    Core.printf "work count: %d \n %!" (Sequence.length work_seq) ;
-    f
-      (Sequence.map work_seq ~f:(fun maybe_work ->
-           match statement_of_job maybe_work with
-           | None -> assert false
-           | Some work -> work ))
       Transaction_snark_work.proofs_length
 end

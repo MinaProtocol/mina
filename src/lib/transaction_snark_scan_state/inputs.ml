@@ -89,6 +89,6 @@ module type S = sig
 
     val scan_state_size_incr : int
 
-    val work_capacity : int
+    val work_capacity_factor : int
   end
 end
