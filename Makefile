@@ -190,13 +190,10 @@ publish_deb:
 publish_debs: publish_deb publish_kademlia_deb
 
 provingkeys:
-	@if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
-		$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH)_$(CODA_CONSENSUS).tar.bz2  /tmp/coda_cache_dir ; \
-		mkdir -p /tmp/artifacts ; \
-		cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
-	else \
-		echo "Skipping because not on master" ; \
-	fi
+	$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH)_$(CODA_CONSENSUS).tar.bz2  /tmp/coda_cache_dir ; \
+	mkdir -p /tmp/artifacts ; \
+	cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
+
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts
