@@ -292,7 +292,9 @@ module Tick = struct
       let initial_state = State.create params ~get_chunk_table
 
       let run_updates fold =
-        (* deserialize chunk table before running test *)
+        (* make sure chunk table deserialized before running test;
+           actual deserialization happens just once
+         *)
         ignore (Crypto_params.Pedersen_chunk_table.deserialize ()) ;
         let result = State.update_fold_chunked initial_state fold in
         let unchunked_result =
@@ -344,6 +346,9 @@ let embed (x : Tick.Field.t) : Tock.Field.t =
         (i + 1)
   in
   go Tock.Field.one Tock.Field.zero 0
+
+(** enable/disable use of chunk table in Pedersen hashing *)
+let set_chunked_hashing b = Tick.Pedersen.State.set_chunked_fold b
 
 let ledger_depth = 30
 

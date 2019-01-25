@@ -29,7 +29,7 @@ module type S = sig
     type t = curve Quadruple.t array
   end
 
-  (* for the table returned by chunk_table_fun, item at index i, j is the curve element for a chunk 
+  (* for the table returned by get_chunk_table, the item at index i, j is the curve element for a chunk
      at position i within a list of chunks, and j is an integer representing the *reversed* chunk considered as bits
   *)
   module State : sig
@@ -207,12 +207,7 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
     let update_fold_fun_ref = ref update_fold_unchunked
 
     let set_chunked_fold b =
-      (* even though the functor here allows different curves, it's always
-         the particular curve in the chunk table
-       *)
-      if b then (
-        Crypto_params.Pedersen_chunk_table.deserialize () ;
-        update_fold_fun_ref := update_fold_chunked )
+      if b then update_fold_fun_ref := update_fold_chunked
       else update_fold_fun_ref := update_fold_unchunked
 
     let update_fold t fold = !update_fold_fun_ref t fold

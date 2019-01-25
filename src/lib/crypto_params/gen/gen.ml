@@ -175,6 +175,7 @@ let chunk_table_structure ~loc =
         chunk_table_ref := result ;
         deserialized := true )
 
+    (** returns valid chunk table *)
     let get_chunk_table () = deserialize () ; !chunk_table_ref.table_data]
 
 let generate_ml_file filename structure =
