@@ -286,6 +286,11 @@ struct
 
     (* transfer state from mask to parent; flush local state *)
     let commit t =
+      Printf.eprintf "COMMIT IN MASK: %s\n%!" (get_uuid t |> Uuid.to_string) ;
+      Printf.eprintf "COMMIT STACK:\n%!" ;
+      Printf.eprintf "%s\n%!"
+        ( Stdlib.Printexc.get_callstack 20
+        |> Stdlib.Printexc.raw_backtrace_to_string ) ;
       let account_data = Location.Table.to_alist t.account_tbl in
       Base.set_batch (get_parent t) account_data ;
       Location.Table.clear t.account_tbl ;
@@ -410,6 +415,11 @@ struct
     (* Destroy intentionally does not commit before destroying
      * as sometimes this is desired behavior *)
     let close t =
+      Printf.eprintf "CLOSE IN MASK: %s\n%!" (get_uuid t |> Uuid.to_string) ;
+      Printf.eprintf "CLOSE STACK:\n%!" ;
+      Printf.eprintf "%s\n%!"
+        ( Stdlib.Printexc.get_callstack 20
+        |> Stdlib.Printexc.raw_backtrace_to_string ) ;
       Location.Table.clear t.account_tbl ;
       Addr.Table.clear t.hash_tbl ;
       Key.Table.clear t.location_tbl
