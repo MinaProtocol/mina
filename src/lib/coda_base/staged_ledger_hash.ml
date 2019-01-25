@@ -2,6 +2,7 @@ open Core
 open Fold_lib
 open Tuple_lib
 open Snark_params.Tick
+open Coda_digestif
 
 module Aux_hash = struct
   let length_in_bits = 256

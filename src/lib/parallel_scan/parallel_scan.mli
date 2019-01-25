@@ -31,6 +31,7 @@
  *)
 
 open Core_kernel
+open Coda_digestif
 
 (** A ring-buffer that backs our state *)
 module Ring_buffer : sig

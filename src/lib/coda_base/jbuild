@@ -15,7 +15,7 @@
       signature_lib
       test_util
       sha256_lib
-      digestif.c
+      coda_digestif
       snark_bits
       currency
       snark_params

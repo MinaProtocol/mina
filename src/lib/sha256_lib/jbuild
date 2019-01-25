@@ -8,7 +8,7 @@
   (inline_tests)
   (libraries
     ( core
-      digestif.c
+      coda_digestif
       snark_params ))
   (preprocess (pps (ppx_jane ppx_deriving.eq bisect_ppx -conditional)))
   (synopsis "SNARK keys")))

@@ -1,5 +1,6 @@
 open Core
 open Snark_params
+open Coda_digestif
 
 let chunks_of n xs = List.groupi ~break:(fun i _ _ -> i mod n = 0) xs
 
