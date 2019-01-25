@@ -51,10 +51,10 @@ module type S = sig
     (** compute hash one triple at a time *)
 
     val update_fold : t -> bool Triple.t Fold.t -> t
-    (** dispatches to chunked or unchunked (default) version; called by daemon startup to use chunked version *)
+    (** dispatches to chunked or unchunked (default) version *)
 
     val set_chunked_fold : bool -> unit
-    (** use chunked folding iff b *)
+    (** use chunked folding iff b; called by daemon startup to use chunked version *)
 
     val digest : t -> Digest.t
 
