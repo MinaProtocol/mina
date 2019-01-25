@@ -1,4 +1,5 @@
 # WARNING: config.yml file is generated from config.yml.jinja
+---
 version: 2
 jobs:
     tracetool:
@@ -8,12 +9,12 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                name: Build trace-tool
-                command: cd src/app/trace-tool && cargo build --frozen
+                  name: Build trace-tool
+                  command: cd src/app/trace-tool && cargo build --frozen
 
     lint:
         docker:
-        - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -27,7 +28,7 @@ jobs:
     build:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -83,10 +84,13 @@ jobs:
                 name: Run all tests (on master)
                 command: bash -c '[ ! "$(CIRCLE_BRANCH)" = "master" ] || (`opam config env` && make test)'
 
-    build_withsnark:
+    build_withsnark_sig:
         resource_class: large
         docker:
         - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+          environment:
+            CODA_CONSENSUS: posig
+            DUNE_PROFILE: testnet_posig
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -95,7 +99,35 @@ jobs:
                 command: scripts/getkeys.sh
             - run:
                 name: Build OCaml (sig)
-                command: eval `opam config env` && DUNE_PROFILE=testnet_posig make build 2>&1 | tee /tmp/buildocaml.log
+                command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                name: Build deb Package with verification keys
+                command: make deb
+            - run:
+                name: Build provingkeys
+                command: make provingkeys
+            - run:
+                name: Store Genesis keys
+                command: make genesiskeys
+            - run:
+                name: Upload deb to repo
+                command: make publish_deb
+            - store_artifacts:
+                path: /tmp/artifacts
+
+    build_withsnark_stake:
+        resource_class: large
+        docker:
+        - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+          environment:
+            CODA_CONSENSUS: posig
+            DUNE_PROFILE: testnet_posig
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                name: Download Stable Proving Keys
+                command: scripts/getkeys.sh
             - run:
                 name: Build OCaml (stake)
                 command: eval `opam config env` && DUNE_PROFILE=testnet_postake make build 2>&1 | tee /tmp/buildocaml.log
@@ -157,8 +189,8 @@ jobs:
             - run:
                 name: Test make test-withsnark
                 command: source ~/.profile && DUNE_PROFILE=test_snark make test-withsnark
+    {%-for test in tests%}
 
-    {%for test in tests%}
     test-{{test.name}}:
       resource_class: large
       docker:
@@ -172,11 +204,11 @@ jobs:
           - run:
               name: Build OCaml
               command: eval `opam config env` && DUNE_PROFILE={{test.config}} make build 2>&1 | tee /tmp/buildocaml.log
-            {% for action in test.actions %}
+            {%- for action in test.actions %}
           - run:
               name: Running test - {{ test.friendly }} | {{ action }}
-              command: source ~/.profile && DUNE_PROFILE={{test.config}} source scripts/test_all.sh && cd src/ && {{test.env_str}} 'run_integration_test' '{{ action }}' {% endfor %}
-      {% endfor %}
+              command: source ~/.profile && DUNE_PROFILE={{test.config}} source scripts/test_all.sh && cd src/ && {{test.env_str}} 'run_integration_test' '{{ action }}'{% endfor %}
+      {%- endfor %}
 
 workflows:
     version: 2
@@ -186,9 +218,9 @@ workflows:
             - build-macos
             - build_withsnark
             - build_public
-            {%for test in tests%}
+            {%- for test in tests%}
             - test-{{test.name}}
-            {%endfor%}
+            {%- endfor%}
             - test-withsnark
             - test-unit-test
             - tracetool

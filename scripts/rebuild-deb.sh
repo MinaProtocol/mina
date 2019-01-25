@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd $SCRIPTPATH/../src/_build
 
-PROJECT='coda'
+PROJECT="coda-${CODA_CONSENSUS}"
 DATE=$(date +%Y-%m-%d)
 GITHASH=$(git rev-parse --short=8 HEAD)
 
