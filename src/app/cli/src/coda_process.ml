@@ -28,15 +28,12 @@ let local_config ?proposal_interval ~peers ~discovery_port ~external_port
   let config =
     { Coda_worker.Input.host
     ; env=
-        Core.Unix.environment ()
-        |> Array.map
+        Core.Unix.environment () |> Array.to_list
+        |> List.filter_map
              ~f:
                (Fn.compose
-                  (function
-                    | [a; b; _] | [a; b] -> (a, b)
-                    | s -> failwithf !"unexpected: %{sexp: string List.t}" s ())
+                  (function [a; b] -> Some (a, b) | _ -> None)
                   (String.split ~on:'='))
-        |> Array.to_list
     ; should_propose
     ; external_port
     ; snark_worker_config
