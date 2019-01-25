@@ -37,7 +37,7 @@ struct
   type 'fqe loop_state = {rx: 'fqe; ry: 'fqe}
 
   let length (a, b, c) =
-    let l = Field.Checked.length in
+    let l = Field.Var.length in
     max (l a) (max (l b) (l c))
 
   let doubling_step_unchecked (s : Fqe.Unchecked.t loop_state) =

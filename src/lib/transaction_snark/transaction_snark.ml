@@ -915,7 +915,7 @@ let check_transaction_union sok_message source target transaction handler =
   let main =
     handle
       (Checked.map
-         (Base.main (Field.Checked.constant top_hash))
+         (Base.main (Field.Var.constant top_hash))
          ~f:As_prover.return)
       handler
   in

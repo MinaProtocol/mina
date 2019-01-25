@@ -113,7 +113,7 @@ struct
 
   let var_of_t t =
     let n = Bigint.of_field t in
-    { digest= Field.Checked.constant t
+    { digest= Field.Var.constant t
     ; bits=
         Some
           (Bitstring.Lsb_first.of_list
@@ -166,8 +166,7 @@ struct
           go (i - 1) (b :: acc)
       in
       let%map bits = go (Field.size_in_bits - 1) [] in
-      { bits= Some bits
-      ; digest= Field.Checked.project (bits :> Boolean.var list) }
+      {bits= Some bits; digest= Field.Var.project (bits :> Boolean.var list)}
     in
     let read (t : var) = Field.typ.read t.digest in
     let alloc =
@@ -179,8 +178,7 @@ struct
           go (i - 1) (b :: acc)
       in
       let%map bits = go (Field.size_in_bits - 1) [] in
-      { bits= Some bits
-      ; digest= Field.Checked.project (bits :> Boolean.var list) }
+      {bits= Some bits; digest= Field.Var.project (bits :> Boolean.var list)}
     in
     let check {bits; _} =
       Checked.List.iter
