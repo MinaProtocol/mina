@@ -4,7 +4,7 @@ date: 2019-01-25
 ---
 O(1) Labs is aiming to develop the first cryptocurrency protocol that can deliver on the promise of supporting real-world applications and widespread use. Our team is based in San Francisco, and we are funded by top investors (including Polychain, Metastable, Max Levchin, and Naval Ravikant).
 
-Mainstream cryptocurrencies handle large amounts of value exchange each day. As a result, rigorous security practices, thorough testing, and rock-solid infrastructure are of paramount importance. We're seeking a protocol reliability engineer who wants to use modern tools like Kubernetes and Docker to develop the core tooling we use to test, monitor secure, and stabilize our growing cryptocurrency network.
+Mainstream cryptocurrencies handle large amounts of value exchange each day. As a result, rigorous security practices, thorough testing, and rock-solid infrastructure are of paramount importance. We're seeking a protocol reliability engineer who wants to use modern tools to develop the core tooling we use to test, monitor secure, and stabilize our growing cryptocurrency network.
 
 We’re hiring engineers to work on a bunch of exciting projects, including:
 
