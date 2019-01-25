@@ -29,25 +29,23 @@ module type S = sig
     type t = curve Quadruple.t array
   end
 
-  (* curve_points_table.(i).(j) is the curve element for a chunk at position i within
-     a list of chunks, and j is an integer representing the chunk considered as bits
+  (* for the table returned by chunk_table_fun, item at index i, j is the curve element for a chunk 
+     at position i within a list of chunks, and j is an integer representing the *reversed* chunk considered as bits
   *)
-  module Curve_chunk_table : sig
-    type t = {curve_points_table: curve array array}
-  end
-
   module State : sig
+    type chunk_table_fun = unit -> curve array array
+
     type t =
       { triples_consumed: int
       ; acc: curve
       ; params: Params.t
-      ; chunk_table: Curve_chunk_table.t }
+      ; get_chunk_table: chunk_table_fun }
 
     val create :
          ?triples_consumed:int
       -> ?init:curve
       -> Params.t
-      -> Curve_chunk_table.t
+      -> get_chunk_table:chunk_table_fun
       -> t
 
     val update_fold_chunked : t -> bool Triple.t Fold.t -> t
@@ -60,7 +58,7 @@ module type S = sig
 
     val digest : t -> Digest.t
 
-    val salt : Params.t -> Curve_chunk_table.t -> string -> t
+    val salt : Params.t -> get_chunk_table:chunk_table_fun -> string -> t
   end
 
   val hash_fold : State.t -> bool Triple.t Fold.t -> State.t
@@ -101,20 +99,18 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
     type t = Curve.t Quadruple.t array
   end
 
-  module Curve_chunk_table = struct
-    type t = {curve_points_table: Curve.t array array}
-  end
-
   module State = struct
+    type chunk_table_fun = unit -> Curve.t array array
+
     type t =
       { triples_consumed: int
       ; acc: Curve.t
       ; params: Params.t
-      ; chunk_table: Curve_chunk_table.t }
+      ; get_chunk_table: chunk_table_fun }
 
-    let create ?(triples_consumed = 0) ?(init = Curve.zero) params chunk_table
-        =
-      {acc= init; triples_consumed; params; chunk_table}
+    let create ?(triples_consumed = 0) ?(init = Curve.zero) params
+        ~get_chunk_table =
+      {acc= init; triples_consumed; params; get_chunk_table}
 
     type fold_result =
       { sum: Curve.t
@@ -140,11 +136,11 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
             Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
               triple
           in
-          let table = t.chunk_table.curve_points_table in
+          let table = t.get_chunk_table () in
           (* consume a triple at a time until we're at a chunk boundary, then
-         use chunk table; after processing all full chunks, consume any
-         straggler triples
-      *)
+             use chunk table; after processing all full chunks, consume any
+             straggler triples
+           *)
           let ({sum; triples_consumed; chunk_rev; _} : fold_result) =
             fold.fold
               ~init:
@@ -211,8 +207,13 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
     let update_fold_fun_ref = ref update_fold_unchunked
 
     let set_chunked_fold b =
-      update_fold_fun_ref :=
-        if b then update_fold_chunked else update_fold_unchunked
+      (* even though the functor here allows different curves, it's always
+         the particular curve in the chunk table
+       *)
+      if b then (
+        Crypto_params.Pedersen_chunk_table.deserialize () ;
+        update_fold_fun_ref := update_fold_chunked )
+      else update_fold_fun_ref := update_fold_unchunked
 
     let update_fold t fold = !update_fold_fun_ref t fold
 
@@ -220,8 +221,8 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
       let x, _y = Curve.to_affine_coordinates t.acc in
       x
 
-    let salt params chunk_table s =
-      update_fold (create params chunk_table) (Fold.string_triples s)
+    let salt params ~get_chunk_table s =
+      update_fold (create params ~get_chunk_table) (Fold.string_triples s)
   end
 
   let hash_fold s fold = State.update_fold s fold

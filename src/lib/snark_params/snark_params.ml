@@ -235,7 +235,7 @@ module Tick = struct
 
     let zero_hash =
       digest_fold
-        (State.create params Curve_chunk_table.{curve_points_table})
+        (State.create params ~get_chunk_table)
         (Fold_lib.Fold.of_list [(false, false, false)])
 
     module Checked = struct
@@ -266,9 +266,9 @@ module Tick = struct
       let equal_states s1 s2 =
         equal_curves s1.State.acc s2.State.acc
         && Int.equal s1.triples_consumed s2.triples_consumed
-        (* params, chunk_table should never be modified *)
+        (* params, chunk_tables should never be modified *)
         && phys_equal s1.params s2.params
-        && phys_equal s1.chunk_table s2.chunk_table
+        && phys_equal (s1.get_chunk_table ()) (s2.get_chunk_table ())
 
       let gen_fold n =
         let gen_triple =
@@ -289,10 +289,11 @@ module Tick = struct
         in
         Fold.of_list (gen_triples n)
 
-      let initial_state =
-        State.create params Curve_chunk_table.{curve_points_table}
+      let initial_state = State.create params ~get_chunk_table
 
       let run_updates fold =
+        (* deserialize chunk table before running test *)
+        ignore (Crypto_params.Pedersen_chunk_table.deserialize ()) ;
         let result = State.update_fold_chunked initial_state fold in
         let unchunked_result =
           State.update_fold_unchunked initial_state fold
@@ -300,7 +301,7 @@ module Tick = struct
         (result, unchunked_result)
 
       let run_hash_test n =
-        let fold = gen_fold 1 in
+        let fold = gen_fold n in
         let result, unchunked_result = run_updates fold in
         assert (equal_states result unchunked_result)
     end

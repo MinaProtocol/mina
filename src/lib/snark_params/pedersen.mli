@@ -28,22 +28,20 @@ module type S = sig
     type t = curve Quadruple.t array
   end
 
-  module Curve_chunk_table : sig
-    type t = {curve_points_table: curve array array}
-  end
-
   module State : sig
+    type chunk_table_fun = unit -> curve array array
+
     type t =
       { triples_consumed: int
       ; acc: curve
       ; params: Params.t
-      ; chunk_table: Curve_chunk_table.t }
+      ; get_chunk_table: chunk_table_fun }
 
     val create :
          ?triples_consumed:int
       -> ?init:curve
       -> Params.t
-      -> Curve_chunk_table.t
+      -> get_chunk_table:chunk_table_fun
       -> t
 
     val update_fold_chunked : t -> bool Triple.t Fold.t -> t
@@ -60,7 +58,7 @@ module type S = sig
 
     val digest : t -> Digest.t
 
-    val salt : Params.t -> Curve_chunk_table.t -> string -> t
+    val salt : Params.t -> get_chunk_table:chunk_table_fun -> string -> t
   end
 
   val hash_fold : State.t -> bool Triple.t Fold.t -> State.t

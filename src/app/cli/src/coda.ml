@@ -305,6 +305,7 @@ let daemon log =
          let%bind () = Async.Unix.mkdir ~p:() suspicious_dir in
          let%bind () = Async.Unix.mkdir ~p:() punished_dir in
          let%bind () = start_tracing () in
+         let () = Snark_params.Tick.Pedersen.State.set_chunked_fold true in
          let banlist =
            Coda_base.Banlist.create ~suspicious_dir ~punished_dir
          in
