@@ -60,7 +60,11 @@ let digest_string (s : string) : Digest.t =
   Digest.of_bits bits
 
 let digest_bits (bits : bool list) : Digest.t =
-  let digest = (Digestif.SHA256.(feed_string (init ()) (bits_to_string (pad false bits))|>get) :> string) in
+  let digest =
+    ( Digestif.SHA256.(
+        feed_string (init ()) (bits_to_string (pad false bits)) |> get)
+      :> string )
+  in
   let bit_at s i = (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1 in
   let bits = List.init 256 ~f:(bit_at digest) in
   Digest.of_bits bits

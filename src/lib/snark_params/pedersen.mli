@@ -4,8 +4,11 @@ open Core_kernel
 open Snark_bits
 open Fold_lib
 open Tuple_lib
+
 [%%if fake_hash]
+
 open Coda_digestif
+
 [%%endif]
 
 module type S = sig
@@ -37,6 +40,7 @@ module type S = sig
     type chunk_table_fun = unit -> curve array array
 
     [%%if fake_hash]
+
     type t =
       { triples_consumed: int
       ; acc: curve
@@ -44,6 +48,7 @@ module type S = sig
       ; ctx: Digestif.SHA256.ctx
       ; get_chunk_table: chunk_table_fun }
     [%%else]
+
     type t =
       { triples_consumed: int
       ; acc: curve

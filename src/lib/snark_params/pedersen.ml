@@ -5,8 +5,12 @@ open Core_kernel
 open Snark_bits
 open Fold_lib
 open Tuple_lib
-[%%if fake_hash]
+
+[%%if
+fake_hash]
+
 open Coda_digestif
+
 [%%endif]
 
 module type S = sig
@@ -41,6 +45,7 @@ module type S = sig
     type chunk_table_fun = unit -> curve array array
 
     [%%if fake_hash]
+
     type t =
       { triples_consumed: int
       ; acc: curve
@@ -48,6 +53,7 @@ module type S = sig
       ; ctx: Digestif.SHA256.ctx
       ; get_chunk_table: chunk_table_fun }
     [%%else]
+
     type t =
       { triples_consumed: int
       ; acc: curve
@@ -118,36 +124,56 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
   module State = struct
     type chunk_table_fun = unit -> Curve.t array array
 
-    [%%if fake_hash]
+    [%%if
+    fake_hash]
 
-    type t = {triples_consumed: int; acc: Curve.t; params: Params.t; ctx: Digestif.SHA256.ctx; chunk_table: Curve_chunk_table.t}
+    type t =
+      { triples_consumed: int
+      ; acc: Curve.t
+      ; params: Params.t
+      ; ctx: Digestif.SHA256.ctx
+      ; chunk_table: Curve_chunk_table.t }
 
-    let create ?(triples_consumed = 0) ?(init = Curve.zero) params chunk_table =
-      {acc= init; triples_consumed; params; ctx= Digestif.SHA256.init (); chunk_table}
+    let create ?(triples_consumed = 0) ?(init = Curve.zero) params chunk_table
+        =
+      { acc= init
+      ; triples_consumed
+      ; params
+      ; ctx= Digestif.SHA256.init ()
+      ; chunk_table }
 
     let update_fold (t : t) (fold : bool Triple.t Fold.t) =
       O1trace.measure "pedersen fold" (fun () ->
-      let params = t.params in
-      let max_num_params = Array.length params in
-      (* As much space as we could need: we can only have up to [length params] triples before we overflow that, and each triple is packed into a single byte *)
-      let bs = Bigstring.init max_num_params ~f:(fun _ -> '0') in
-      let triples_consumed_here =
-        fold.fold ~init:0 ~f:(fun i (b0, b1, b2) ->
-            Bigstring.set_uint8 bs ~pos:i
-              ((4 * Bool.to_int b2) + (2 * Bool.to_int b1) + Bool.to_int b0) ;
-            i + 1 ) in
-      let ctx = Digestif.SHA256.feed_bigstring t.ctx bs in
-      {t with ctx; triples_consumed= t.triples_consumed + triples_consumed_here})
+          let params = t.params in
+          let max_num_params = Array.length params in
+          (* As much space as we could need: we can only have up to [length params] triples before we overflow that, and each triple is packed into a single byte *)
+          let bs = Bigstring.init max_num_params ~f:(fun _ -> '0') in
+          let triples_consumed_here =
+            fold.fold ~init:0 ~f:(fun i (b0, b1, b2) ->
+                Bigstring.set_uint8 bs ~pos:i
+                  ((4 * Bool.to_int b2) + (2 * Bool.to_int b1) + Bool.to_int b0) ;
+                i + 1 )
+          in
+          let ctx = Digestif.SHA256.feed_bigstring t.ctx bs in
+          { t with
+            ctx; triples_consumed= t.triples_consumed + triples_consumed_here
+          } )
 
     let digest t =
-      let bit_at s i = (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1 in
-      let dgst  = (Digestif.SHA256.get t.ctx :> string) in
-      let bits = List.init 256 ~f:(bit_at dgst) in
-      Field.project bits
+      O1trace.measure "digest" (fun () ->
+          let bit_at s i =
+            (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1
+          in
+          let dgst = (Digestif.SHA256.get t.ctx :> string) in
+          O1trace.trace_event "about to make field element" ;
+          let bits = List.init 256 ~f:(bit_at dgst) in
+          Field.project bits )
 
-    let salt params ct s = update_fold (create params ct) (Fold.string_triples s)
+    let salt params ct s =
+      update_fold (create params ct) (Fold.string_triples s)
 
-    [%%else ]
+    [%%else]
+
     open Chunked_triples
 
     type t =

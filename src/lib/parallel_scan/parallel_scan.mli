@@ -78,11 +78,11 @@ module State : sig
    * helpful for debugging. [visualize state ~draw_a:(Fn.const "A") ~draw_d:(Fn.const "D")]
    * creates a tree that looks like this:
    *
-                                                            (_,_)                                                             
-                            (A,A)                                                           (_,_)                             
-            (_,_)                           (A,A)                           (_,_)              
-      _             (_,_)           (A,A)           (_,_)      
-   _       _     (_,_)   (A,A)   (_,_)  
+                                                            (_,_)
+                            (A,A)                                                           (_,_)
+            (_,_)                           (A,A)                           (_,_)
+      _             (_,_)           (A,A)           (_,_)
+   _       _     (_,_)   (A,A)   (_,_)
  D   _   _  (_,_(A,A(_,_
 D D _ _ (_(A(_
    *)

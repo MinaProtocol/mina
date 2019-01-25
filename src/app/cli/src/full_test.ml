@@ -316,7 +316,8 @@ let run_test () : unit Deferred.t =
   let accoutns = List.take other_accounts 2 in
   let%map _ = test_multiple_payments accoutns (pks accoutns) 5. in
   ()
-  (*
+
+(*
   if with_snark then
     let accounts = List.take other_accounts 2 in
     let%bind block_count' =
