@@ -47,6 +47,7 @@ module type S = sig
       ; params: Params.t
       ; ctx: Digestif.SHA256.ctx
       ; get_chunk_table: chunk_table_fun }
+
     [%%else]
 
     type t =
@@ -54,6 +55,7 @@ module type S = sig
       ; acc: curve
       ; params: Params.t
       ; get_chunk_table: chunk_table_fun }
+
     [%%endif]
 
     val create :
