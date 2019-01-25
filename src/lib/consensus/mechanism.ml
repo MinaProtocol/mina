@@ -30,7 +30,6 @@ let env name ~f ~default =
   |> Option.value ~default
 
 module Constants0 = struct
-  (** k is the number of blocks required to reach finality *)
   let k =
     env "K" ~default:12 ~f:(fun str ->
         try Some (Int.of_string str) with _ -> None )
@@ -82,15 +81,10 @@ include Proof_of_stake0.Make (struct
       env "GENESIS_STATE_TIMESTAMP" ~default ~f:(fun str ->
           try Some (Time.of_time @@ Core.Time.of_string str) with _ -> None )
 
-    (** c is the number of slots after which we can be confident at least one
-     * block was produced (Note: c=8 in Ouroboros Praos papers) *)
     let c =
       env "C" ~default:8 ~f:(fun str ->
           try Some (Int.of_string str) with _ -> None )
 
-    (** delta is the network delay (as a number of slots) that we can be sure
-     * we've received a block if it was gossiped by some honest node on the
-     * network *)
     let delta =
       env "DELTA" ~default:4 ~f:(fun str ->
           try Some (Int.of_string str) with _ -> None )

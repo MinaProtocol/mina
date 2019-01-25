@@ -178,7 +178,7 @@ module type S = sig
    * for a new transition. Called from the proposer in order to generate
    * a new transition to propose to the network. Returns `None` if a new
    * transition cannot be generated.
-  *)
+   *)
 
   val received_at_valid_time :
     Consensus_state.value -> time_received:Unix_timestamp.t -> bool
