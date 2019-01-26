@@ -136,8 +136,8 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
       ; ctx: Digestif.SHA256.ctx
       ; get_chunk_table: chunk_table_fun }
 
-    let create ?(triples_consumed = 0) ?(init = Curve.zero) params ~get_chunk_table
-        =
+    let create ?(triples_consumed = 0) ?(init = Curve.zero) params
+        ~get_chunk_table =
       { acc= init
       ; triples_consumed
       ; params
@@ -179,6 +179,7 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
     let update_fold_chunked = update_fold
 
     let update_fold_unchunked = update_fold
+
     [%%else]
 
     open Chunked_triples
