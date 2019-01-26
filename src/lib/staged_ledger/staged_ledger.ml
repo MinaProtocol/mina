@@ -567,6 +567,45 @@ end = struct
     ; user_commands_count= List.length user_commands
     ; coinbase_parts_count= List.length coinbase }
 
+  let zero_fee_excess scan_state data =
+    let max_throughput = Int.pow 2 Config.transaction_capacity_log_2 in
+    let zero = Currency.Fee.Signed.zero in
+    let partitions =
+      Scan_state.partition_if_overflowing ~max_slots:max_throughput scan_state
+    in
+    let total_fee_excess txns =
+      List.fold txns ~init:(Ok (Some zero))
+        ~f:(fun fe (txn : Scan_state.Transaction_with_witness.t) ->
+          let open Or_error.Let_syntax in
+          let%bind fe' = fe in
+          let%bind t = txn.transaction_with_info |> Ledger.Undo.transaction in
+          let%map fee_excess = Transaction.fee_excess t in
+          Option.bind fe' ~f:(fun f -> Currency.Fee.Signed.add f fee_excess) )
+      |> to_staged_ledger_or_error
+    in
+    let check txns =
+      let open Result.Let_syntax in
+      let%bind fe = total_fee_excess txns in
+      let%bind fe_no_overflow =
+        Option.value_map
+          ~default:
+            (to_staged_ledger_or_error
+               (Or_error.error_string "fee excess overflow"))
+          ~f:(fun fe -> Ok fe)
+          fe
+      in
+      if Currency.Fee.Signed.equal fe_no_overflow zero then Ok ()
+      else
+        to_staged_ledger_or_error
+          (Or_error.error_string "diff has non zero fee excess")
+    in
+    match partitions with
+    | `One _ -> check data
+    | `Two (x, _) ->
+        Result.bind
+          (check (List.take data x))
+          ~f:(fun _ -> check (List.drop data x))
+
   (* N.B.: we don't expose apply_diff_unverified
      in For_tests only, we expose apply apply_unverified, which calls apply_diff_unverified *)
   let apply_diff t (sl_diff : Staged_ledger_diff.t) ~logger =
@@ -634,6 +673,7 @@ end = struct
       , p1.coinbase_parts_count + p2.coinbase_parts_count )
     in
     let%bind () = check_completed_works t.scan_state works in
+    let%bind () = Deferred.return (zero_fee_excess t.scan_state data) in
     let%bind res_opt =
       (* TODO: Add rollback *)
       let r = Scan_state.fill_in_transaction_snark_work scan_state' works in
