@@ -28,13 +28,6 @@ module type Staged_ledger_io_intf = sig
        t
     -> staged_ledger_hash
     -> staged_ledger_aux Envelope.Incoming.t Deferred.Or_error.t
-
-  val glue_sync_ledger :
-       t
-    -> (ledger_hash * sync_ledger_query) Linear_pipe.Reader.t
-    -> (ledger_hash * sync_ledger_answer) Envelope.Incoming.t
-       Linear_pipe.Writer.t
-    -> unit
 end
 
 module type Network_intf = sig
@@ -91,15 +84,12 @@ module type Network_intf = sig
 
   val broadcast_transaction_pool_diff : t -> transaction_pool_diff -> unit
 
-  module Staged_ledger_io :
-    Staged_ledger_io_intf
-    with type net := t
-     and type staged_ledger_aux := parallel_scan_state
-     and type staged_ledger_hash := staged_ledger_hash
-     and type ledger_hash := ledger_hash
-     and type protocol_state := protocol_state
-     and type sync_ledger_query := sync_ledger_query
-     and type sync_ledger_answer := sync_ledger_answer
+  val glue_sync_ledger :
+       t
+    -> (ledger_hash * sync_ledger_query) Linear_pipe.Reader.t
+    -> (ledger_hash * sync_ledger_answer) Envelope.Incoming.t
+       Linear_pipe.Writer.t
+    -> unit
 
   module Config : sig
     type t
@@ -390,20 +380,6 @@ module type Inputs_intf = sig
                 User_command.With_valid_signature.t
      and type transaction := User_command.t
 
-  module Sync_ledger : sig
-    type query [@@deriving bin_io]
-
-    type answer [@@deriving bin_io]
-
-    module Responder : sig
-      type t
-
-      val create : Ledger.t -> (query -> unit) -> t
-
-      val answer_query : t -> query -> answer
-    end
-  end
-
   module State_body_hash : sig
     type t
   end
@@ -418,8 +394,8 @@ module type Inputs_intf = sig
      and type transaction_pool_diff := Transaction_pool.pool_diff
      and type parallel_scan_state := Staged_ledger.Scan_state.t
      and type ledger_hash := Ledger_hash.t
-     and type sync_ledger_query := Sync_ledger.query
-     and type sync_ledger_answer := Sync_ledger.answer
+     and type sync_ledger_query := Coda_base.Sync_ledger.query
+     and type sync_ledger_answer := Coda_base.Sync_ledger.answer
      and type time := Time.t
      and type state_hash := Protocol_state_hash.t
      and type state_body_hash := State_body_hash.t
@@ -486,13 +462,15 @@ module type Inputs_intf = sig
     val proof : Protocol_state_proof.t
   end
 
-  module Sync_handler : sig
-    val prove_ancestry :
-         frontier:Transition_frontier.t
-      -> int
-      -> Protocol_state_hash.t
-      -> (External_transition.t * State_body_hash.t list) option
-  end
+  module Sync_handler :
+    Protocols.Coda_transition_frontier.Sync_handler_intf
+    with type state_hash := Protocol_state_hash.t
+     and type ledger_hash := Ledger_hash.t
+     and type transition_frontier := Transition_frontier.t
+     and type ancestor_proof := State_body_hash.t list
+     and type external_transition := External_transition.t
+     and type syncable_ledger_query := Coda_base.Sync_ledger.query
+     and type syncable_ledger_answer := Coda_base.Sync_ledger.answer
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -717,17 +695,19 @@ module Make (Inputs : Inputs_intf) = struct
             ~get_staged_ledger_aux_at_hash:(fun _hash ->
               failwith "shouldn't be necessary right now?" )
             ~answer_sync_ledger_query:(fun query_env ->
-              let open Deferred.Or_error.Let_syntax in
-              let ledger_hash, query = Envelope.Incoming.data query_env in
-              let%bind frontier =
-                Deferred.return @@ peek_frontier frontier_read_ref
+              let open Or_error.Let_syntax in
+              let result =
+                let ledger_hash, query = Envelope.Incoming.data query_env in
+                let%bind frontier = peek_frontier frontier_read_ref in
+                Sync_handler.answer_query ~frontier ledger_hash query
+                |> Result.of_option
+                     ~error:
+                       (Error.createf
+                          !"Could not answer query for ledger_hash: \
+                            %{sexp:Ledger_hash.t}"
+                          ledger_hash)
               in
-              let%map ledger = get_ledger_by_hash frontier ledger_hash in
-              let responder = Sync_ledger.Responder.create ledger ignore in
-              let answer =
-                Sync_ledger.Responder.answer_query responder query
-              in
-              (ledger_hash, answer) )
+              result |> Deferred.return )
             ~transition_catchup:(fun enveloped_hash ->
               let open Deferred.Option.Let_syntax in
               let hash = Envelope.Incoming.data enveloped_hash in

@@ -4,12 +4,6 @@ open Kademlia
 open Coda_base
 open Pipe_lib
 
-module type Sync_ledger_intf = sig
-  type query [@@deriving bin_io]
-
-  type answer [@@deriving bin_io]
-end
-
 module Rpcs (Inputs : sig
   module Staged_ledger_aux_hash :
     Protocols.Coda_pow.Staged_ledger_aux_hash_intf
@@ -24,8 +18,6 @@ module Rpcs (Inputs : sig
      and type ledger_hash := Ledger_hash.t
 
   module Blockchain_state : Blockchain_state.S
-
-  module Sync_ledger : Sync_ledger_intf
 
   module External_transition : External_transition.S
 end) =
@@ -83,7 +75,9 @@ struct
       let name = "answer_sync_ledger_query"
 
       module T = struct
-        type query = Ledger_hash.t * Sync_ledger.query [@@deriving bin_io]
+        type query =
+          Ledger_hash.t * Ledger.Location.Addr.t Syncable_ledger.query
+        [@@deriving bin_io]
 
         type response = (Ledger_hash.t * Sync_ledger.answer) Or_error.t
         [@@deriving bin_io]
@@ -274,8 +268,6 @@ module type Inputs_intf = sig
 
   module Blockchain_state : Coda_base.Blockchain_state.S
 
-  module Sync_ledger : Sync_ledger_intf
-
   module Staged_ledger_aux : sig
     type t [@@deriving bin_io]
 
@@ -340,7 +332,8 @@ module Make (Inputs : Inputs_intf) = struct
             Staged_ledger_hash.t Envelope.Incoming.t
          -> (Staged_ledger_aux.t * Ledger_hash.t) option Deferred.t)
       ~(answer_sync_ledger_query :
-            (Ledger_hash.t * Sync_ledger.query) Envelope.Incoming.t
+            (Ledger_hash.t * Ledger.Location.Addr.t Syncable_ledger.query)
+            Envelope.Incoming.t
          -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t)
       ~(transition_catchup :
             State_hash.t Envelope.Incoming.t
@@ -511,122 +504,62 @@ module Make (Inputs : Inputs_intf) = struct
         let peers = get_random_peers () in
         get_ancestry_non_preferred_peers t input peers
 
-  module Staged_ledger_io = struct
-    type nonrec t = t
-
-    let create = Fn.id
-
-    let get_staged_ledger_aux_at_hash t staged_ledger_hash =
-      let peers = Gossip_net.random_peers t.gossip_net 8 in
-      Logger.trace t.log
-        !"Get_aux querying the following peers %{sexp: Peer.t list}"
-        peers ;
-      find_map' peers ~f:(fun peer ->
-          Logger.trace t.log
-            !"Asking %{sexp: Peer.t} query regarding staged_ledger_hash \
-              %{sexp: Staged_ledger_hash.t}"
-            peer staged_ledger_hash ;
-          match%map
-            Gossip_net.query_peer t.gossip_net peer
-              Rpcs.Get_staged_ledger_aux_at_hash.dispatch_multi
-              staged_ledger_hash
-          with
-          | Ok (Some (staged_ledger_aux, staged_ledger_aux_merkle_sibling)) ->
-              let implied_staged_ledger_hash =
-                Staged_ledger_hash.of_aux_and_ledger_hash
-                  (Staged_ledger_aux.hash staged_ledger_aux)
-                  staged_ledger_aux_merkle_sibling
-              in
-              if
-                Staged_ledger_hash.equal implied_staged_ledger_hash
-                  staged_ledger_hash
-              then (
-                Logger.trace t.log
-                  !"%{sexp: Peer.t} sent contents resulting in a good \
-                    Staged_ledger_hash %{sexp: Staged_ledger_hash.t}"
-                  peer staged_ledger_hash ;
-                Ok
-                  (Envelope.Incoming.wrap
-                     ~data:
-                       staged_ledger_aux
-                       (* TODO: this isn't really a discovery port, how to handle? *)
-                     ~sender:(Peer.to_discovery_host_and_port peer)) )
-              else (
-                Logger.faulty_peer t.log
-                  !"%{sexp: Peer.t} sent contents resulting in a bad \
-                    Staged_ledger_hash %{sexp: Staged_ledger_hash.t}, we \
-                    wanted %{sexp: Staged_ledger_hash.t}"
-                  peer implied_staged_ledger_hash staged_ledger_hash ;
-                Or_error.error_string "Evil! TODO: Punish" )
-          | Ok None ->
-              Logger.trace t.log
-                !"%{sexp: Peer.t} didn't find a staged_ledger_aux at \
-                  staged_ledger_hash %{sexp: Staged_ledger_hash.t}"
-                peer staged_ledger_hash ;
-              Or_error.error_string "no ledger builder aux found"
-          | Error err ->
-              Logger.warn t.log
-                !"Staged_ledger_aux acquisition hit network error %s"
-                (Error.to_string_mach err) ;
-              Error err )
-
-    (* TODO: Check whether responses are good or not. *)
-    let glue_sync_ledger t query_reader response_writer =
-      (* We attempt to query 3 random peers, retry_max times. We keep track
+  (* TODO: Check whether responses are good or not. *)
+  let glue_sync_ledger t query_reader response_writer =
+    (* We attempt to query 3 random peers, retry_max times. We keep track
       of the peers that couldn't answer a particular query and won't try them
       again. *)
-      let retry_max = 6 in
-      let retry_interval = Core.Time.Span.of_ms 200. in
-      let rec answer_query ctr peers_tried query =
-        O1trace.trace_event "ask sync ledger query" ;
-        let peers =
-          Gossip_net.random_peers_except t.gossip_net 3 ~except:peers_tried
-        in
-        Logger.trace t.log
-          !"SL: Querying the following peers %{sexp: Peer.t list}"
-          peers ;
-        match%bind
-          find_map peers ~f:(fun peer ->
-              Logger.trace t.log
-                !"Asking %{sexp: Peer.t} query regarding ledger_hash %{sexp: \
-                  Ledger_hash.t}"
-                peer (fst query) ;
-              match%map
-                Gossip_net.query_peer t.gossip_net peer
-                  Rpcs.Answer_sync_ledger_query.dispatch_multi query
-              with
-              | Ok (Ok answer) ->
-                  Logger.trace t.log
-                    !"Received answer from peer %{sexp: Peer.t} on \
-                      ledger_hash %{sexp: Ledger_hash.t}"
-                    peer (fst answer) ;
-                  Some
-                    (Envelope.Incoming.wrap ~data:answer
-                       ~sender:(Peer.to_discovery_host_and_port peer))
-              | Ok (Error e) ->
-                  Logger.info t.log "Rpc error: %s" (Error.to_string_mach e) ;
-                  Hash_set.add peers_tried peer ;
-                  None
-              | Error err ->
-                  Logger.warn t.log "Network error: %s"
-                    (Error.to_string_mach err) ;
-                  None )
-        with
-        | Some answer ->
-            Logger.trace t.log
-              !"Succeeding with answer on ledger_hash %{sexp: Ledger_hash.t}"
-              (fst answer.data) ;
-            (* TODO *)
-            Linear_pipe.write_if_open response_writer answer
-        | None ->
-            Logger.info t.log !"None of the peers I asked knew; trying more" ;
-            if ctr > retry_max then Deferred.unit
-            else
-              let%bind () = Clock.after retry_interval in
-              answer_query (ctr + 1) peers_tried query
+    let retry_max = 6 in
+    let retry_interval = Core.Time.Span.of_ms 200. in
+    let rec answer_query ctr peers_tried query =
+      O1trace.trace_event "ask sync ledger query" ;
+      let peers =
+        Gossip_net.random_peers_except t.gossip_net 3 ~except:peers_tried
       in
-      Linear_pipe.iter_unordered ~max_concurrency:8 query_reader
-        ~f:(answer_query 0 (Peer.Hash_set.of_list []))
-      |> don't_wait_for
-  end
+      Logger.trace t.log
+        !"SL: Querying the following peers %{sexp: Peer.t list}"
+        peers ;
+      match%bind
+        find_map peers ~f:(fun peer ->
+            Logger.trace t.log
+              !"Asking %{sexp: Peer.t} query regarding ledger_hash %{sexp: \
+                Ledger_hash.t}"
+              peer (fst query) ;
+            match%map
+              Gossip_net.query_peer t.gossip_net peer
+                Rpcs.Answer_sync_ledger_query.dispatch_multi query
+            with
+            | Ok (Ok answer) ->
+                Logger.trace t.log
+                  !"Received answer from peer %{sexp: Peer.t} on ledger_hash \
+                    %{sexp: Ledger_hash.t}"
+                  peer (fst answer) ;
+                Some
+                  (Envelope.Incoming.wrap ~data:answer
+                     ~sender:(Peer.to_discovery_host_and_port peer))
+            | Ok (Error e) ->
+                Logger.info t.log "Rpc error: %s" (Error.to_string_mach e) ;
+                Hash_set.add peers_tried peer ;
+                None
+            | Error err ->
+                Logger.warn t.log "Network error: %s"
+                  (Error.to_string_mach err) ;
+                None )
+      with
+      | Some answer ->
+          Logger.trace t.log
+            !"Succeeding with answer on ledger_hash %{sexp: Ledger_hash.t}"
+            (fst answer.data) ;
+          (* TODO *)
+          Linear_pipe.write_if_open response_writer answer
+      | None ->
+          Logger.info t.log !"None of the peers I asked knew; trying more" ;
+          if ctr > retry_max then Deferred.unit
+          else
+            let%bind () = Clock.after retry_interval in
+            answer_query (ctr + 1) peers_tried query
+    in
+    Linear_pipe.iter_unordered ~max_concurrency:8 query_reader
+      ~f:(answer_query 0 (Peer.Hash_set.of_list []))
+    |> don't_wait_for
 end
