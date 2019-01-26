@@ -6,7 +6,7 @@
     ( async
       core
       crs
-      digestif.ocaml
+      coda_digestif
       fold_lib
       snarky
       tuple_lib
