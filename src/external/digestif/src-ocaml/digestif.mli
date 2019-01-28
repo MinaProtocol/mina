@@ -150,6 +150,11 @@ module type S = sig
   (** [to_hex] makes a hex-decimal representation of {!t}. *)
 end
 
+module type S' = sig
+  include S
+  val get_h : ctx -> int32 array
+end
+
 type sha256_ctx =
   { mutable size : int64
   ; b : Bytes.t
@@ -180,7 +185,7 @@ type 'k hash =
 module MD5: S with type kind = [  `MD5 ]
 module SHA1: S with type kind = [ `SHA1 ]
 module SHA224: S with type kind = [ `SHA224 ]
-module SHA256: S with type kind = [ `SHA256 ] and type ctx = sha256_ctx
+module SHA256: S' with type kind = [ `SHA256 ] and type ctx = sha256_ctx
 module SHA384: S with type kind = [ `SHA384 ]
 module SHA512: S with type kind = [ `SHA512 ]
 module BLAKE2B: S with type kind = [ `BLAKE2B ]

@@ -196,6 +196,23 @@ jobs:
                   name: Test make test-withsnark
                   command: source ~/.profile && DUNE_PROFILE=test_snark make test-withsnark
 
+    test-fake_hash_full_test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Check .circleci Render
+                  command: make check-render-circleci
+            - run:
+                  name: Build OCaml
+                  command: eval `opam config env` && DUNE_PROFILE=fake_hash make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Running test - Fake Hash | full-test
+                  command: source ~/.profile && DUNE_PROFILE=fake_hash source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'full-test'
+
     test-all_sig_integration_tests:
         resource_class: large
         docker:
@@ -288,6 +305,7 @@ workflows:
             - build_withsnark_sig
             - build_withsnark_stake
             - build_public
+            - test-fake_hash_full_test
             - test-all_sig_integration_tests
             - test-all_stake_integration_tests
             - test-withsnark

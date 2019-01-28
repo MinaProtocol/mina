@@ -1,8 +1,17 @@
+[%%import
+"../../config.mlh"]
+
 open Core_kernel
 open Snark_bits
 open Fold_lib
 open Tuple_lib
-open Chunked_triples
+
+[%%if
+fake_hash]
+
+open Coda_digestif
+
+[%%endif]
 
 module type S = sig
   type curve
@@ -35,11 +44,24 @@ module type S = sig
   module State : sig
     type chunk_table_fun = unit -> curve array array
 
+    [%%if fake_hash]
+
+    type t =
+      { triples_consumed: int
+      ; acc: curve
+      ; params: Params.t
+      ; ctx: Digestif.SHA256.ctx
+      ; get_chunk_table: chunk_table_fun }
+
+    [%%else]
+
     type t =
       { triples_consumed: int
       ; acc: curve
       ; params: Params.t
       ; get_chunk_table: chunk_table_fun }
+
+    [%%endif]
 
     val create :
          ?triples_consumed:int
@@ -70,6 +92,8 @@ module Make (Field : sig
   type t [@@deriving sexp, bin_io, compare, hash]
 
   include Snarky.Field_intf.S with type t := t
+
+  val project : bool list -> t
 end)
 (Bigint : Snarky.Bigint_intf.Extended with type field := Field.t) (Curve : sig
     type t
@@ -101,6 +125,64 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
 
   module State = struct
     type chunk_table_fun = unit -> Curve.t array array
+
+    [%%if
+    fake_hash]
+
+    type t =
+      { triples_consumed: int
+      ; acc: Curve.t
+      ; params: Params.t
+      ; ctx: Digestif.SHA256.ctx
+      ; get_chunk_table: chunk_table_fun }
+
+    let create ?(triples_consumed = 0) ?(init = Curve.zero) params
+        ~get_chunk_table =
+      { acc= init
+      ; triples_consumed
+      ; params
+      ; ctx= Digestif.SHA256.init ()
+      ; get_chunk_table }
+
+    let update_fold (t : t) (fold : bool Triple.t Fold.t) =
+      O1trace.measure "pedersen fold" (fun () ->
+          let params = t.params in
+          let max_num_params = Array.length params in
+          (* As much space as we could need: we can only have up to [length params] triples before we overflow that, and each triple is packed into a single byte *)
+          let bs = Bigstring.init max_num_params ~f:(fun _ -> '0') in
+          let triples_consumed_here =
+            fold.fold ~init:0 ~f:(fun i (b0, b1, b2) ->
+                Bigstring.set_uint8 bs ~pos:i
+                  ((4 * Bool.to_int b2) + (2 * Bool.to_int b1) + Bool.to_int b0) ;
+                i + 1 )
+          in
+          let ctx = Digestif.SHA256.feed_bigstring t.ctx bs in
+          { t with
+            ctx; triples_consumed= t.triples_consumed + triples_consumed_here
+          } )
+
+    let digest t =
+      O1trace.measure "digest" (fun () ->
+          let bit_at s i =
+            (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1
+          in
+          let dgst = (Digestif.SHA256.get t.ctx :> string) in
+          O1trace.trace_event "about to make field element" ;
+          let bits = List.init 256 ~f:(bit_at dgst) in
+          Field.project bits )
+
+    let salt params ~get_chunk_table s =
+      update_fold (create params ~get_chunk_table) (Fold.string_triples s)
+
+    let set_chunked_fold _ = ()
+
+    let update_fold_chunked = update_fold
+
+    let update_fold_unchunked = update_fold
+
+    [%%else]
+
+    open Chunked_triples
 
     type t =
       { triples_consumed: int
@@ -218,6 +300,8 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
 
     let salt params ~get_chunk_table s =
       update_fold (create params ~get_chunk_table) (Fold.string_triples s)
+
+    [%%endif]
   end
 
   let hash_fold s fold = State.update_fold s fold
