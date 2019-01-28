@@ -876,6 +876,62 @@ let%test_module "scans" =
                   let%map _ = fill_some_zeros v s in
                   let acc_plus_one = State.acc s |> Option.value_exn in
                   assert (Int64.(equal acc_plus_one (acc + one))) ) )
+
+        let%test_unit "sequence number reset" =
+          (*create jobs with unique sequence numbers starting from 1. At any point, after reset, the jobs should be labelled starting from 1. Therefore,  sum of those sequence numbers should be equal to sum of first n (number of jobs) natutal numbers*)
+          Backtrace.elide := false ;
+          let p = 3 in
+          let g = Int.gen_incl 0 (Int.pow 2 p) in
+          let jobs state = Or_error.ok_exn (next_jobs ~state) in
+          let verify_sequence_number state =
+            let state_copy = State.copy state in
+            let job_count = List.length (jobs state) in
+            let sum_of_n = job_count * (job_count + 1) / 2 in
+            let _ = State.reset_seq_no state_copy in
+            let sum_of_all_seq_numbers =
+              List.sum
+                (module Int)
+                ~f:(fun (job : (int64, int64) Available_job.t) ->
+                  match job with
+                  | Merge (_, _, seq) -> seq
+                  | Base (_, seq) -> seq )
+                (jobs state_copy)
+            in
+            assert (sum_of_all_seq_numbers = sum_of_n)
+          in
+          let state = State.create ~parallelism_log_2:p in
+          Quickcheck.test g ~trials:50 ~f:(fun _ ->
+              if free_space ~state < Int.pow 2 p then
+                (*Work until all the leaves are empty*)
+                let jobs = Or_error.ok_exn (next_jobs ~state) in
+                let jobs_done = List.map (List.take jobs 2) ~f:job_done in
+                let () = Or_error.ok_exn (update_curr_job_seq_no state) in
+                let emitted_val_opt =
+                  Or_error.ok_exn
+                  @@ fill_in_completed_jobs ~state ~completed_jobs:jobs_done
+                in
+                let () =
+                  if Option.is_some emitted_val_opt then
+                    let jobs_done =
+                      List.map (List.take (List.drop jobs 1) 1) ~f:job_done
+                    in
+                    let _ =
+                      Or_error.ok_exn
+                      @@ fill_in_completed_jobs ~state
+                           ~completed_jobs:jobs_done
+                    in
+                    ()
+                in
+                verify_sequence_number state
+              else
+                (*Fill up the leaves*)
+                let data = List.init 8 ~f:Int64.of_int in
+                List.iter data ~f:(fun d ->
+                    let () = Or_error.ok_exn (update_curr_job_seq_no state) in
+                    let () =
+                      Or_error.ok_exn @@ enqueue_data ~state ~data:[d]
+                    in
+                    verify_sequence_number state ) )
       end )
 
     let%test_module "scan (+) over ints, map from string" =
