@@ -1,4 +1,5 @@
 open Core_kernel
+open Coda_digestif
 
 module Job = struct
   type sequence_no = int [@@deriving sexp, bin_io]

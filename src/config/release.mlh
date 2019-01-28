@@ -7,3 +7,4 @@
 [%%define global_signer_real true]
 [%%define tracing false]
 [%%define consensus_mechanism "proof_of_signature"]
+[%%define fake_hash false]
