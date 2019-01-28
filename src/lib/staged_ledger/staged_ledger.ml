@@ -657,9 +657,10 @@ end = struct
        count:%d Spots available:%d Proofs waiting to be solved:%d"
       user_commands_count cb_parts_count (List.length works) spots_available
       proofs_waiting ;
-    ( `Hash_after_applying (hash t)
+    let new_staged_ledger = {scan_state= scan_state'; ledger= new_ledger} in
+    ( `Hash_after_applying (hash new_staged_ledger)
     , `Ledger_proof res_opt
-    , `Staged_ledger {scan_state= scan_state'; ledger= new_ledger} )
+    , `Staged_ledger new_staged_ledger )
 
   let apply t witness ~logger = apply_diff t witness ~logger
 
@@ -751,9 +752,10 @@ end = struct
     in
     Or_error.ok_exn (Scan_state.enqueue_transactions scan_state' data) ;
     Or_error.ok_exn (verify_scan_state_after_apply new_ledger scan_state') ;
-    ( `Hash_after_applying (hash t)
+    let new_staged_ledger = {scan_state= scan_state'; ledger= new_ledger} in
+    ( `Hash_after_applying (hash new_staged_ledger)
     , `Ledger_proof res_opt
-    , `Staged_ledger {scan_state= scan_state'; ledger= new_ledger} )
+    , `Staged_ledger new_staged_ledger )
 
   let work_to_do_exn scan_state : Transaction_snark_work.Statement.t Sequence.t
       =
@@ -1798,11 +1800,14 @@ let%test_module "test" =
           ~get_completed_work:stmt_to_work
       in
       let diff' = Test_input1.Staged_ledger_diff.forget diff in
-      let%map _, `Ledger_proof ledger_proof, `Staged_ledger sl' =
+      let%map ( `Hash_after_applying hash
+              , `Ledger_proof ledger_proof
+              , `Staged_ledger sl' ) =
         match%map Sl.apply !sl diff' ~logger with
         | Ok x -> x
         | Error e -> Error.raise (Sl.Staged_ledger_error.to_error e)
       in
+      assert (Test_input1.Staged_ledger_hash.equal hash (Sl.hash sl')) ;
       sl := sl' ;
       (ledger_proof, diff')
 
