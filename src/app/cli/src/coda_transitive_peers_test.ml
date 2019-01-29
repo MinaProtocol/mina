@@ -40,12 +40,13 @@ let main () =
   let%bind _ = after (Time.Span.of_sec 10.) in
   let%map peers = Coda_process.peers_exn worker in
   Logger.debug log
-    !"got peers %{sexp: Kademlia.Peer.t list} %{sexp: Host_and_port.t list}\n"
+    !"got peers %{sexp: Network_peer.Peer.t list} %{sexp: Host_and_port.t list}\n"
     peers expected_peers ;
   let module S = Host_and_port.Set in
   assert (
     S.equal
-      (S.of_list (peers |> List.map ~f:Kademlia.Peer.to_discovery_host_and_port))
+      (S.of_list
+         (peers |> List.map ~f:Network_peer.Peer.to_discovery_host_and_port))
       (S.of_list expected_peers) )
 
 let command =

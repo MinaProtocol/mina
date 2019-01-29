@@ -21,6 +21,10 @@ include Comparable.Make_binable (T)
 let create host ~discovery_port ~communication_port =
   {host; discovery_port; communication_port}
 
+(** localhost with dummy ports *)
+let local =
+  create Unix.Inet_addr.localhost ~discovery_port:0 ~communication_port:0
+
 let to_discovery_host_and_port t =
   Host_and_port.create
     ~host:(Unix.Inet_addr.to_string t.host)

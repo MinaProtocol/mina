@@ -3,6 +3,7 @@ open Async
 open Kademlia
 open Coda_base
 open Pipe_lib
+open Network_peer
 
 module type Sync_ledger_intf = sig
   type query [@@deriving bin_io]
@@ -37,7 +38,7 @@ struct
       let name = "get_staged_ledger_aux_at_hash"
 
       module T = struct
-        type query = Staged_ledger_hash.t
+        type query = Staged_ledger_hash.t Peered.t
 
         type response = (Staged_ledger_aux.t * Ledger_hash.t) option
       end
@@ -57,7 +58,7 @@ struct
 
     module V1 = struct
       module T = struct
-        type query = Staged_ledger_hash.t [@@deriving bin_io]
+        type query = Staged_ledger_hash.t Peered.t [@@deriving bin_io]
 
         type response = (Staged_ledger_aux.t * Ledger_hash.t) option
         [@@deriving bin_io]
@@ -83,7 +84,8 @@ struct
       let name = "answer_sync_ledger_query"
 
       module T = struct
-        type query = Ledger_hash.t * Sync_ledger.query [@@deriving bin_io]
+        type query = (Ledger_hash.t * Sync_ledger.query) Peered.t
+        [@@deriving bin_io]
 
         type response = (Ledger_hash.t * Sync_ledger.answer) Or_error.t
         [@@deriving bin_io]
@@ -127,7 +129,7 @@ struct
       let name = "transition_catchup"
 
       module T = struct
-        type query = State_hash.t [@@deriving bin_io]
+        type query = State_hash.t Peered.t [@@deriving bin_io]
 
         type response = External_transition.t list option [@@deriving bin_io]
       end
@@ -170,7 +172,7 @@ struct
       let name = "get_ancestry"
 
       module T = struct
-        type query = State_hash.t * int [@@deriving bin_io, sexp]
+        type query = (State_hash.t * int) Peered.t [@@deriving bin_io, sexp]
 
         type response = (External_transition.t * State_body_hash.t list) option
         [@@deriving bin_io]
@@ -228,11 +230,17 @@ struct
 
   module T = struct
     module T = struct
-      type msg =
+      type content =
         | New_state of External_transition.t
         | Snark_pool_diff of Snark_pool_diff.t
         | Transaction_pool_diff of Transaction_pool_diff.t
       [@@deriving sexp, bin_io]
+
+      type msg = content Peered.t [@@deriving sexp, bin_io]
+
+      let content = Peered.data
+
+      let peer = Peered.peer
     end
 
     let name = "message"
@@ -350,17 +358,28 @@ module Make (Inputs : Inputs_intf) = struct
          -> (External_transition.t * State_body_hash.t list) Deferred.Option.t)
       =
     let log = Logger.child config.parent_log "coda networking" in
-    let get_staged_ledger_aux_at_hash_rpc sender ~version:_ hash =
-      get_staged_ledger_aux_at_hash (Envelope.Incoming.wrap ~data:hash ~sender)
+    let get_staged_ledger_aux_at_hash_rpc _conn ~version:_ peered_hash =
+      let data = Peered.data peered_hash in
+      let sender = Peered.peer peered_hash in
+      get_staged_ledger_aux_at_hash (Envelope.Incoming.wrap ~data ~sender)
     in
-    let answer_sync_ledger_query_rpc sender ~version:_ query =
-      answer_sync_ledger_query (Envelope.Incoming.wrap ~data:query ~sender)
+    let answer_sync_ledger_query_rpc _conn ~version:_ peered_query =
+      let data = Peered.data peered_query in
+      let sender = Peered.peer peered_query in
+      answer_sync_ledger_query (Envelope.Incoming.wrap ~data ~sender)
     in
-    let transition_catchup_rpc sender ~version:_ hash =
-      transition_catchup (Envelope.Incoming.wrap ~data:hash ~sender)
+    let transition_catchup_rpc _conn ~version:_ peered_hash =
+      let data = Peered.data peered_hash in
+      let sender = Peered.peer peered_hash in
+      Stdlib.Printf.eprintf
+        !"DATA: %{sexp:State_hash.t} SENDER: %{sexp:Peer.t}\n%!"
+        data sender ;
+      transition_catchup (Envelope.Incoming.wrap ~data ~sender)
     in
-    let get_ancestry_rpc sender ~version:_ query =
-      get_ancestry (Envelope.Incoming.wrap ~data:query ~sender)
+    let get_ancestry_rpc _conn ~version:_ peered_query =
+      let data = Peered.data peered_query in
+      let sender = Peered.peer peered_query in
+      get_ancestry (Envelope.Incoming.wrap ~data ~sender)
     in
     let implementations =
       List.concat
@@ -400,12 +419,17 @@ module Make (Inputs : Inputs_intf) = struct
     Logger.trace t.log !"Broadcasting %{sexp: Message.msg} over gossip net" x ;
     Linear_pipe.write_without_pushback (Gossip_net.broadcast t.gossip_net) x
 
-  let broadcast_state t x = broadcast t (New_state x)
+  let broadcast_from_me t content =
+    let me = (gossip_net t).me in
+    broadcast t {Peered.data= content; peer= me}
+
+  let broadcast_state t x = broadcast_from_me t (Message.New_state x)
 
   let broadcast_transaction_pool_diff t x =
-    broadcast t (Transaction_pool_diff x)
+    broadcast_from_me t (Message.Transaction_pool_diff x)
 
-  let broadcast_snark_pool_diff t x = broadcast t (Snark_pool_diff x)
+  let broadcast_snark_pool_diff t x =
+    broadcast_from_me t (Message.Snark_pool_diff x)
 
   (* TODO: This is kinda inefficient *)
   let find_map xs ~f =
@@ -445,8 +469,10 @@ module Make (Inputs : Inputs_intf) = struct
     Gossip_net.random_peers_except gossip_net n ~except
 
   let catchup_transition t peer state_hash =
+    let me = (gossip_net t).me in
     Gossip_net.query_peer t.gossip_net peer
-      Rpcs.Transition_catchup.dispatch_multi state_hash
+      Rpcs.Transition_catchup.dispatch_multi
+      (Peered.create state_hash me)
 
   let get_ancestry_non_preferred_peers t input peers =
     let max_current_peers = 8 in
@@ -482,10 +508,11 @@ module Make (Inputs : Inputs_intf) = struct
     loop peers 1
 
   let get_ancestry t preferred_peer input =
+    let peered_input = Peered.create input (gossip_net t).me in
     (* try preferred_peer first *)
     let%bind ancestors_or_error =
       Gossip_net.query_peer t.gossip_net preferred_peer
-        Rpcs.Get_ancestry.dispatch_multi input
+        Rpcs.Get_ancestry.dispatch_multi peered_input
     in
     let get_random_peers () =
       let max_peers = 15 in
@@ -502,14 +529,14 @@ module Make (Inputs : Inputs_intf) = struct
             %{sexp: Peer.t}, trying non-preferred peers"
           preferred_peer ;
         let peers = get_random_peers () in
-        get_ancestry_non_preferred_peers t input peers
+        get_ancestry_non_preferred_peers t peered_input peers
     | Error e ->
         Logger.warn t.log
           !"get_ancestry generated error for the transition sender %{sexp: \
             Peer.t}: %{sexp: Error.t}; trying non-preferred peers"
           preferred_peer e ;
         let peers = get_random_peers () in
-        get_ancestry_non_preferred_peers t input peers
+        get_ancestry_non_preferred_peers t peered_input peers
 
   module Staged_ledger_io = struct
     type nonrec t = t
@@ -527,9 +554,10 @@ module Make (Inputs : Inputs_intf) = struct
               %{sexp: Staged_ledger_hash.t}"
             peer staged_ledger_hash ;
           match%map
+            let me = (gossip_net t).me in
             Gossip_net.query_peer t.gossip_net peer
               Rpcs.Get_staged_ledger_aux_at_hash.dispatch_multi
-              staged_ledger_hash
+              (Peered.create staged_ledger_hash me)
           with
           | Ok (Some (staged_ledger_aux, staged_ledger_aux_merkle_sibling)) ->
               let implied_staged_ledger_hash =
@@ -546,11 +574,7 @@ module Make (Inputs : Inputs_intf) = struct
                     Staged_ledger_hash %{sexp: Staged_ledger_hash.t}"
                   peer staged_ledger_hash ;
                 Ok
-                  (Envelope.Incoming.wrap
-                     ~data:
-                       staged_ledger_aux
-                       (* TODO: this isn't really a discovery port, how to handle? *)
-                     ~sender:(Peer.to_discovery_host_and_port peer)) )
+                  (Envelope.Incoming.wrap ~data:staged_ledger_aux ~sender:peer) )
               else (
                 Logger.faulty_peer t.log
                   !"%{sexp: Peer.t} sent contents resulting in a bad \
@@ -592,17 +616,17 @@ module Make (Inputs : Inputs_intf) = struct
                   Ledger_hash.t}"
                 peer (fst query) ;
               match%map
+                let me = (gossip_net t).me in
                 Gossip_net.query_peer t.gossip_net peer
-                  Rpcs.Answer_sync_ledger_query.dispatch_multi query
+                  Rpcs.Answer_sync_ledger_query.dispatch_multi
+                  (Peered.create query me)
               with
               | Ok (Ok answer) ->
                   Logger.trace t.log
                     !"Received answer from peer %{sexp: Peer.t} on \
                       ledger_hash %{sexp: Ledger_hash.t}"
                     peer (fst answer) ;
-                  Some
-                    (Envelope.Incoming.wrap ~data:answer
-                       ~sender:(Peer.to_discovery_host_and_port peer))
+                  Some (Envelope.Incoming.wrap ~data:answer ~sender:peer)
               | Ok (Error e) ->
                   Logger.info t.log "Rpc error: %s" (Error.to_string_mach e) ;
                   Hash_set.add peers_tried peer ;
