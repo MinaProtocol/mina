@@ -328,7 +328,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; log: Logger.t
     ; states:
         (External_transition.t Envelope.Incoming.t * Time.t)
-        Linear_pipe.Reader.t
+        Strict_pipe.Reader.t
     ; transaction_pool_diffs:
         Transaction_pool_diff.t Envelope.Incoming.t Linear_pipe.Reader.t
     ; snark_pool_diffs:
@@ -393,7 +393,11 @@ module Make (Inputs : Inputs_intf) = struct
           | Transaction_pool_diff d ->
               `Trd (Envelope.Incoming.map x ~f:(fun _ -> d)) )
     in
-    {gossip_net; log; states; snark_pool_diffs; transaction_pool_diffs}
+    { gossip_net
+    ; log
+    ; states= Strict_pipe.Reader.of_linear_pipe states
+    ; snark_pool_diffs
+    ; transaction_pool_diffs }
 
   (* TODO: Have better pushback behavior *)
   let broadcast t x =
