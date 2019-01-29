@@ -662,7 +662,8 @@ module Make (Inputs : Inputs_intf) = struct
   let create (config : Config.t) =
     trace_task "coda" (fun () ->
         let external_transitions_reader, external_transitions_writer =
-          Linear_pipe.create ()
+          Strict_pipe.create Synchronous
+          (* Linear_pipe.create () *)
         in
         let proposer_transition_reader, proposer_transition_writer =
           Strict_pipe.create Synchronous
@@ -765,9 +766,13 @@ module Make (Inputs : Inputs_intf) = struct
           Transition_router.run ~logger:config.log ~network:net
             ~time_controller:config.time_controller ~frontier_mvar ~ledger_db
             ~network_transition_reader:
+              (Strict_pipe.Reader.map external_transitions_reader
+                 ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm) ))
+              (*
               (Strict_pipe.Reader.of_linear_pipe
                  (Linear_pipe.map external_transitions_reader
                     ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm) )))
+              *)
             ~proposer_transition_reader
         in
         let valid_transitions_for_network, valid_transitions_for_api =
@@ -792,7 +797,9 @@ module Make (Inputs : Inputs_intf) = struct
                  (External_transition.of_verified
                     (With_hash.data transition_with_hash)) )) ;
         don't_wait_for
-          (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;
+          (Strict_pipe.transfer
+             (Strict_pipe.Reader.of_linear_pipe (Net.states net))
+             external_transitions_writer ~f:ident) ;
         let%bind snark_pool =
           Snark_pool.load ~parent_log:config.log
             ~disk_location:config.snark_pool_disk_location
@@ -810,7 +817,8 @@ module Make (Inputs : Inputs_intf) = struct
           ; snark_pool
           ; transition_frontier= frontier_read_ref
           ; time_controller= config.time_controller
-          ; external_transitions_writer
+          ; external_transitions_writer=
+              Strict_pipe.Writer.to_linear_pipe external_transitions_writer
           ; strongest_ledgers= valid_transitions_for_api
           ; log= config.log
           ; seen_jobs= Work_selector.State.init
