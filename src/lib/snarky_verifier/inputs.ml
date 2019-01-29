@@ -102,9 +102,9 @@ module type S = sig
 
     val if_ :
          Boolean.var
-      -> then_:Field.var t_
-      -> else_:Field.var t_
-      -> (Field.var t_, _) Checked.t
+      -> then_:Field.Var.t t_
+      -> else_:Field.Var.t t_
+      -> (Field.Var.t t_, _) Checked.t
   end
 
   val batch_miller_loop :
