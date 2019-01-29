@@ -211,7 +211,10 @@ module Make (Message : Message_intf) :
              (fun client reader writer ->
                Rpc.Connection.server_with_close reader writer ~implementations
                  ~connection_state:(fun _ ->
-                   (* client IP and an ephemeral port, not its discovery or communication port *)
+                   (* connection state is the client's IP and ephemeral port when
+                      connecting to the server over TCP; the ephemeral port is
+                      distinct from the client's discovery and communication ports
+                    *)
                    Socket.Address.Inet.to_host_and_port client )
                  ~on_handshake_error:
                    (`Call
