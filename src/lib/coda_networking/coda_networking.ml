@@ -361,7 +361,7 @@ module Make (Inputs : Inputs_intf) = struct
       =
     let log = Logger.child config.parent_log "coda networking" in
     (* TODO: for following functions, could check that IP in _conn matches
-       the sender IP in envelope, punish if mismatch
+       the sender IP in envelope, punish if mismatch due to IP forgery
      *)
     let get_staged_ledger_aux_at_hash_rpc _conn ~version:_ hash_in_envelope =
       get_staged_ledger_aux_at_hash hash_in_envelope
