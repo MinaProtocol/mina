@@ -93,7 +93,7 @@ let daemon log =
        flag "work-delay-factor"
          ~doc:
            "Number of block-times snark workers take to produce atleast two \
-            proofs (default:1)"
+            proofs (default:2)"
          (optional int)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
@@ -176,8 +176,8 @@ let daemon log =
            transaction_capacity_log_2
        in
        let work_delay_factor =
-         or_from_config YJ.Util.to_int_option "work-delay-factor" ~default:1
-           work_delay_factor
+         or_from_config YJ.Util.to_int_option "work-delay-factor" ~default:2
+           (max 2 work_delay_factor)
        in
        let snark_work_fee_flag =
          Currency.Fee.of_int

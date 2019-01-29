@@ -1792,11 +1792,11 @@ let%test_module "test" =
       end
 
       module Config = struct
-        let transaction_capacity_log_2 = 3
+        let transaction_capacity_log_2 = 7
 
         (*This has to be a minimum of 3 for the tests to pass otherwise the assertion that the number of transactions added in every block be > 0 will not hold. With transaction_capcity_log_2 as 2, the total number of slots available are 4 and in the case of maximum  number of provers, 3 slots are needed to add one transaction. But, when slots reach the end of the tree causing them to be split into two halves, no transaction can be added in either of the halves. This causes only coinbase to be added to the tree *)
 
-        let work_delay_factor = 1
+        let work_delay_factor = 2
 
         (* This essentially number of subtrees each having (2^transaction_capacity_log_2) leaves. Size of the tree is 2^(transaction_capacity_log_2, work_delay_factor). Should be atleast 2.Why? -> When there is a single slot at the end of the tree before continuing at the begining of the tree (referring to the last level), the jobs on the right side of the tree are done along with the jobs on the left (because it wasn't added until then). The root node has to wait until the right sub-tree has completed before the next round begins. By the time the right sub-tree is completed, the left tree is also ready with the proof but has to wait until the root is emitted. This won't work with our succint datastructure impl and FIFO work order.*)
       end
