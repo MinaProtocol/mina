@@ -20,9 +20,10 @@ Currently, Coda only builds/runs on Linux. Building on macOS [is tracked in this
 The short version:
 
  1. Start with Ubuntu 18 or run it in a [virtual machine](https://www.osboxes.org/ubuntu/)
- 2. Install Docker, GNU make, and bash
- 3. `make USEDOCKER=TRUE dev`
- 4. `make USEDOCKER=TRUE deb`
+ 2. Pull in the snarky sub-module: `git submodule init && git submodule update --recursive`
+ 3. Install Docker, GNU make, and bash
+ 4. `make USEDOCKER=TRUE dev`
+ 5. `make USEDOCKER=TRUE deb`
 
 Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debian!
 
@@ -47,7 +48,7 @@ Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debi
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-b9a8adfab1599ef62e1a1bffe67b2be6899e9060`
+`docker pull codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e`
 
 * Create local builder image
 
@@ -137,8 +138,6 @@ Some of our dependencies aren't taken from `opam`, and aren't integrated
 with `dune`, so you need to add them manually:
 
 * `opam pin add src/external/ocaml-sodium`
-* `opam pin add src/external/ocaml-rocksdb`
-* `opam pin add src/external/ocaml-dune`
 * `opam pin add src/external/rpc_parallel`
 
 There are a variety of C libraries we expect to be available in the system.

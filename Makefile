@@ -67,7 +67,7 @@ dht: kademlia
 
 build: git_hooks
 	$(info Starting Build)
-	ulimit -s 65532 && ulimit -n 10240 && (ulimit -u 2128 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && (ulimit -u 2128 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 dev: codabuilder containerstart build
@@ -80,6 +80,9 @@ reformat: git_hooks
 
 check-format:
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
+
+check-snarky-submodule:
+	./scripts/check-snarky-submodule.sh
 
 ########################################
 ## Merlin fixup for docker builds
@@ -101,7 +104,8 @@ macos-setup-download:
 macos-setup-compile:
 	./scripts/macos-setup.sh compile
 
-macos-setup: macos-setup-download macos-setup-compile
+macos-setup:
+	./scripts/macos-setup.sh all
 
 ########################################
 ## Containers and container management
@@ -186,13 +190,10 @@ publish_deb:
 publish_debs: publish_deb publish_kademlia_deb
 
 provingkeys:
-	@if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
-		$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH).tar.bz2  /tmp/coda_cache_dir ; \
-		mkdir -p /tmp/artifacts ; \
-		cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
-	else \
-		echo "Skipping because not on master" ; \
-	fi
+	$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH)_$(CODA_CONSENSUS).tar.bz2  /tmp/coda_cache_dir ; \
+	mkdir -p /tmp/artifacts ; \
+	cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
+
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts
@@ -234,7 +235,7 @@ test-stakes:
 
 test-withsnark: SHELL := /bin/bash
 test-withsnark:
-	source scripts/test_all.sh ; cd src; CODA_PROPOSAL_INTERVAL=30000 WITH_SNARKS=true DUNE_PROFILE=test_snark run_integration_test full-test
+	source scripts/test_all.sh ; cd src; CODA_BLOCK_DURATION=30000 WITH_SNARKS=true DUNE_PROFILE=test_snark run_integration_test full-test
 
 web:
 	./scripts/web.sh
@@ -282,6 +283,12 @@ docs/res/%.tex.png: docs/res/%.tex.pdf
 	convert -density 600x600 $< -quality 90 -resize 1080x1080 $@
 
 doc_diagrams: $(addsuffix .png,$(wildcard docs/res/*.tex) $(wildcard docs/res/*.dot))
+
+########################################
+# Generate odoc documentation
+
+ml-docs:
+	cd src; $(WRAPSRC) dune build --profile=$(DUNE_PROFILE) @doc
 
 ########################################
 # To avoid unintended conflicts with file names, always add to .PHONY

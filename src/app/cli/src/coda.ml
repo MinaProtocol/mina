@@ -243,7 +243,9 @@ let daemon log =
          match ip with None -> Find_ip.find () | Some ip -> return ip
        in
        let me =
-         (Host_and_port.create ~host:ip ~port:discovery_port, external_port)
+         Kademlia.Peer.create
+           (Unix.Inet_addr.of_string ip)
+           ~discovery_port ~communication_port:external_port
        in
        let sequence maybe_def =
          match maybe_def with
@@ -300,6 +302,7 @@ let daemon log =
          let%bind () = Async.Unix.mkdir ~p:() banlist_dir_name in
          let suspicious_dir = banlist_dir_name ^/ "suspicious" in
          let punished_dir = banlist_dir_name ^/ "banned" in
+         let () = Snark_params.set_chunked_hashing true in
          let%bind () = Async.Unix.mkdir ~p:() suspicious_dir in
          let%bind () = Async.Unix.mkdir ~p:() punished_dir in
          let%bind () = start_tracing () in

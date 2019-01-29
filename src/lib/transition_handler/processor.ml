@@ -44,7 +44,7 @@ module Make (Inputs : Inputs.S) :
                `Valid_transition vt ) ]
          ~f:(fun msg ->
            let open Deferred.Let_syntax in
-           trace_task "transition_handler_processor" (fun () ->
+           trace_recurring_task "transition_handler_processor" (fun () ->
                match msg with
                | `Catchup_breadcrumbs breadcrumbs ->
                    return

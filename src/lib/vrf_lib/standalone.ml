@@ -407,7 +407,7 @@ let%test_module "vrf-test" =
     module Curve = struct
       open Impl
 
-      type var = Field.Checked.t * Field.Checked.t
+      type var = Field.Var.t * Field.Var.t
 
       include Snarky.Libsnark.Mnt6.Group
 

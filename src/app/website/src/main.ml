@@ -455,10 +455,9 @@ let home () =
 
 let positions =
   [ ("Protocol Engineer", "protocol-engineer")
-  ; ("Director of Business Development", "business-development")
+  ; ("Protocol Reliability Engineer", "protocol-reliability-engineer")
   ; ("Product Manager", "product-manager")
-  ; ("Engineering Manager", "engineering-manager")
-  ; ("Community Manager", "community-manager") ]
+  ; ("Engineering Manager", "engineering-manager") ]
 
 let jobs () =
   let top scheme =
