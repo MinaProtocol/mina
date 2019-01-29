@@ -174,7 +174,7 @@ module Make (Inputs : Inputs_intf) :
                   Protocol_state.blockchain_state
                     (External_transition.Proof_verified.protocol_state
                        verified_ancestor_transition)
-                  |> Blockchain_state.ledger_hash
+                  |> Blockchain_state.snarked_ledger_hash
                   |> Frozen_ledger_hash.to_ledger_hash)
               in
               Syncable_ledger.new_goal t.syncable_ledger ledger_hash |> ignore
