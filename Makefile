@@ -190,13 +190,10 @@ publish_deb:
 publish_debs: publish_deb publish_kademlia_deb
 
 provingkeys:
-	@if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
-		$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH).tar.bz2  /tmp/coda_cache_dir ; \
-		mkdir -p /tmp/artifacts ; \
-		cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
-	else \
-		echo "Skipping because not on master" ; \
-	fi
+	$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH)_$(CODA_CONSENSUS).tar.bz2  /tmp/coda_cache_dir ; \
+	mkdir -p /tmp/artifacts ; \
+	cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
+
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts
@@ -238,7 +235,7 @@ test-stakes:
 
 test-withsnark: SHELL := /bin/bash
 test-withsnark:
-	source scripts/test_all.sh ; cd src; CODA_PROPOSAL_INTERVAL=30000 WITH_SNARKS=true DUNE_PROFILE=test_snark run_integration_test full-test
+	source scripts/test_all.sh ; cd src; CODA_BLOCK_DURATION=30000 WITH_SNARKS=true DUNE_PROFILE=test_snark run_integration_test full-test
 
 web:
 	./scripts/web.sh
