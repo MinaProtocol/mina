@@ -73,7 +73,7 @@ module Make (Inputs : Inputs.S) :
              | Error (`Invalid reason) ->
                  Logger.warn logger
                    !"rejecting transitions because \"%s\" -- sent by %{sexp: \
-                     Host_and_port.t}"
+                     Network_peer.Peer.t}"
                    reason
                    (Envelope.Incoming.sender transition_env) ) ))
 end

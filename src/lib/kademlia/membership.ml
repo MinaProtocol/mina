@@ -2,6 +2,7 @@ open Async_kernel
 open Core_kernel
 open Banlist_lib
 open Pipe_lib
+open Network_peer
 
 exception Child_died
 
