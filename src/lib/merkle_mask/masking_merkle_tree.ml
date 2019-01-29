@@ -238,17 +238,20 @@ struct
           set_hash t addr hash )
 
     (* if the mask's parent sets an account, we can prune an entry in the mask if the account in the parent
-     is the same in the mask
-       *)
-    let parent_set_notify t location account =
-      match find_account t location with
-      | Some existing_account ->
-          if
-            Key.equal
-              (Account.public_key account)
-              (Account.public_key existing_account)
-          then remove_account_and_update_hashes t location
+       is the same in the mask
+     *)
+    let parent_set_notify t account =
+      match find_location t (Account.public_key account) with
       | None -> ()
+      | Some location -> (
+        match find_account t location with
+        | Some existing_account ->
+            if
+              Key.equal
+                (Account.public_key account)
+                (Account.public_key existing_account)
+            then remove_account_and_update_hashes t location
+        | None -> () )
 
     (* as for accounts, we see if we have it in the mask, else delegate to parent *)
     let get_hash t addr =
@@ -338,13 +341,17 @@ struct
         | [] -> [] )
       |> ignore
 
+    (* keys from this mask and all ancestors *)
     let keys t =
-      Location.Table.data t.account_tbl
-      |> List.map ~f:Account.public_key
-      |> Key.Set.of_list
+      let mask_keys =
+        Location.Table.data t.account_tbl
+        |> List.map ~f:Account.public_key
+        |> Key.Set.of_list
+      in
+      let parent_keys = Base.keys (get_parent t) in
+      Key.Set.union parent_keys mask_keys
 
-    let num_accounts t =
-      Key.Set.union (Base.keys (get_parent t)) (keys t) |> Key.Set.length
+    let num_accounts t = keys t |> Key.Set.length
 
     let location_of_key t key =
       let mask_result = find_location t key in

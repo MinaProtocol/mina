@@ -1,4 +1,5 @@
 open Core_kernel
+open Coda_digestif
 
 module Job = struct
   type ('a, 'd) t = Merge of 'a option * 'a option | Base of 'd option

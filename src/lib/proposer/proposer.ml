@@ -175,9 +175,11 @@ module Make (Inputs : Inputs_intf) :
       Interruptible.uninterruptible
         (let open Deferred.Let_syntax in
         let diff =
-          Staged_ledger.create_diff staged_ledger
-            ~self:(Public_key.compress keypair.public_key)
-            ~logger ~transactions_by_fee:transactions ~get_completed_work
+          measure "create_diff" (fun () ->
+              Staged_ledger.create_diff staged_ledger
+                ~self:(Public_key.compress keypair.public_key)
+                ~logger ~transactions_by_fee:transactions ~get_completed_work
+          )
         in
         let%map ( `Hash_after_applying next_staged_ledger_hash
                 , `Ledger_proof ledger_proof_opt
@@ -217,40 +219,43 @@ module Make (Inputs : Inputs_intf) :
             Time.now time_controller |> Time.to_span_since_epoch
             |> Time.Span.to_ms
           in
-          Consensus_mechanism.generate_transition ~previous_protocol_state
-            ~blockchain_state ~time ~proposal_data
-            ~transactions:
-              ( Staged_ledger_diff.With_valid_signatures_and_proofs
-                .user_commands diff
-                :> User_command.t list )
-            ~snarked_ledger_hash:
-              (Option.value_map ledger_proof_opt ~default:previous_ledger_hash
-                 ~f:(fun proof ->
-                   Ledger_proof.(statement proof |> statement_target) ))
-            ~supply_increase ~logger )
+          measure "consensus generate_transition" (fun () ->
+              Consensus_mechanism.generate_transition ~previous_protocol_state
+                ~blockchain_state ~time ~proposal_data
+                ~transactions:
+                  ( Staged_ledger_diff.With_valid_signatures_and_proofs
+                    .user_commands diff
+                    :> User_command.t list )
+                ~snarked_ledger_hash:
+                  (Option.value_map ledger_proof_opt
+                     ~default:previous_ledger_hash ~f:(fun proof ->
+                       Ledger_proof.(statement proof |> statement_target) ))
+                ~supply_increase ~logger ) )
     in
     lift_sync (fun () ->
-        let snark_transition =
-          Snark_transition.create_value
-            ?sok_digest:
-              (Option.map ledger_proof_opt ~f:(fun proof ->
-                   Ledger_proof.sok_digest proof ))
-            ?ledger_proof:
-              (Option.map ledger_proof_opt ~f:Ledger_proof.underlying_proof)
-            ~supply_increase:
-              (Option.value_map ~default:Currency.Amount.zero
-                 ~f:(fun proof ->
-                   (Ledger_proof.statement proof).supply_increase )
-                 ledger_proof_opt)
-            ~blockchain_state:(Protocol_state.blockchain_state protocol_state)
-            ~consensus_data:consensus_transition_data ()
-        in
-        let internal_transition =
-          Internal_transition.create ~snark_transition
-            ~prover_state:(Proposal_data.prover_state proposal_data)
-            ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
-        in
-        Some (protocol_state, internal_transition) )
+        measure "making Snark and Internal transitions" (fun () ->
+            let snark_transition =
+              Snark_transition.create_value
+                ?sok_digest:
+                  (Option.map ledger_proof_opt ~f:(fun proof ->
+                       Ledger_proof.sok_digest proof ))
+                ?ledger_proof:
+                  (Option.map ledger_proof_opt ~f:Ledger_proof.underlying_proof)
+                ~supply_increase:
+                  (Option.value_map ~default:Currency.Amount.zero
+                     ~f:(fun proof ->
+                       (Ledger_proof.statement proof).supply_increase )
+                     ledger_proof_opt)
+                ~blockchain_state:
+                  (Protocol_state.blockchain_state protocol_state)
+                ~consensus_data:consensus_transition_data ()
+            in
+            let internal_transition =
+              Internal_transition.create ~snark_transition
+                ~prover_state:(Proposal_data.prover_state proposal_data)
+                ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
+            in
+            Some (protocol_state, internal_transition) ) )
 
   let run ~parent_log ~get_completed_work ~transaction_pool ~time_controller
       ~keypair ~consensus_local_state ~frontier_reader ~transition_writer =
@@ -279,6 +284,7 @@ module Make (Inputs : Inputs_intf) :
                 , External_transition.Verified.protocol_state_proof transition
                 )
               in
+              trace_event "waiting for ivar..." ;
               let%bind () =
                 Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
               in
@@ -298,9 +304,10 @@ module Make (Inputs : Inputs_intf) :
                     (let open Deferred.Let_syntax in
                     let t0 = Time.now time_controller in
                     match%bind
-                      Prover.prove ~prev_state:previous_protocol_state
-                        ~prev_state_proof:previous_protocol_state_proof
-                        ~next_state:protocol_state internal_transition
+                      measure "proving state transition valid" (fun () ->
+                          Prover.prove ~prev_state:previous_protocol_state
+                            ~prev_state_proof:previous_protocol_state_proof
+                            ~next_state:protocol_state internal_transition )
                     with
                     | Error err ->
                         Logger.error logger
@@ -334,35 +341,38 @@ module Make (Inputs : Inputs_intf) :
         let proposal_supervisor = Singleton_supervisor.create ~task:propose in
         let scheduler = Singleton_scheduler.create time_controller in
         let rec check_for_proposal () =
-          match Mvar.peek frontier_reader with
-          | None -> log_bootstrap_mode ()
-          | Some transition_frontier -> (
-              let breadcrumb =
-                Transition_frontier.best_tip transition_frontier
-              in
-              let transition =
-                (Breadcrumb.transition_with_hash breadcrumb).data
-              in
-              let protocol_state =
-                External_transition.Verified.protocol_state transition
-              in
-              match
-                Consensus_mechanism.next_proposal
-                  (time_to_ms (Time.now time_controller))
-                  (Protocol_state.consensus_state protocol_state)
-                  ~local_state:consensus_local_state ~keypair ~logger
-              with
-              | `Check_again time ->
-                  Singleton_scheduler.schedule scheduler (time_of_ms time)
-                    ~f:check_for_proposal
-              | `Propose (time, data) ->
-                  Singleton_scheduler.schedule scheduler (time_of_ms time)
-                    ~f:(fun () ->
-                      ignore
-                        (Interruptible.finally
-                           (Singleton_supervisor.dispatch proposal_supervisor
-                              data)
-                           ~f:check_for_proposal) ) )
+          trace_recurring_task "check for proposal" (fun () ->
+              match Mvar.peek frontier_reader with
+              | None -> log_bootstrap_mode ()
+              | Some transition_frontier -> (
+                  let breadcrumb =
+                    Transition_frontier.best_tip transition_frontier
+                  in
+                  let transition =
+                    (Breadcrumb.transition_with_hash breadcrumb).data
+                  in
+                  let protocol_state =
+                    External_transition.Verified.protocol_state transition
+                  in
+                  match
+                    measure "asking conensus what to do" (fun () ->
+                        Consensus_mechanism.next_proposal
+                          (time_to_ms (Time.now time_controller))
+                          (Protocol_state.consensus_state protocol_state)
+                          ~local_state:consensus_local_state ~keypair ~logger
+                    )
+                  with
+                  | `Check_again time ->
+                      Singleton_scheduler.schedule scheduler (time_of_ms time)
+                        ~f:check_for_proposal
+                  | `Propose (time, data) ->
+                      Singleton_scheduler.schedule scheduler (time_of_ms time)
+                        ~f:(fun () ->
+                          ignore
+                            (Interruptible.finally
+                               (Singleton_supervisor.dispatch
+                                  proposal_supervisor data)
+                               ~f:check_for_proposal) ) ) )
         in
         check_for_proposal () )
 end

@@ -5,9 +5,9 @@ module type S = sig
 
   open Impl
 
-  type t = {p: Field.Checked.t * Field.Checked.t; py_twist_squared: Fqe.t}
+  type t = {p: Field.Var.t * Field.Var.t; py_twist_squared: Fqe.t}
 
-  val create : Field.Checked.t * Field.Checked.t -> t
+  val create : Field.Var.t * Field.Var.t -> t
 end
 
 module Make
@@ -21,7 +21,7 @@ struct
   module Fqe = Fqe
   open Impl
 
-  type g1 = Field.Checked.t * Field.Checked.t
+  type g1 = Field.Var.t * Field.Var.t
 
   type t = {p: g1; py_twist_squared: Fqe.t}
 
@@ -29,6 +29,6 @@ struct
     let _, y = p in
     let twist_squared = Fqe.Unchecked.square Params.twist in
     { p
-    ; py_twist_squared=
-        Fqe.map_ twist_squared ~f:(fun c -> Field.Checked.scale y c) }
+    ; py_twist_squared= Fqe.map_ twist_squared ~f:(fun c -> Field.Var.scale y c)
+    }
 end

@@ -6,7 +6,7 @@ open Coda_base
 open Signature_lib
 
 module Max_length = struct
-  let length = Consensus.Mechanism.blocks_till_finality
+  let length = Consensus.Mechanism.Constants.k
 end
 
 module type Inputs_intf = sig
@@ -104,71 +104,74 @@ struct
       {transition_with_hash; staged_ledger}
 
     let build ~logger ~parent ~transition_with_hash =
-      let open Deferred.Result.Let_syntax in
-      let logger = Logger.child logger __MODULE__ in
-      let staged_ledger = parent.staged_ledger in
-      let transition = With_hash.data transition_with_hash in
-      let transition_protocol_state =
-        Inputs.External_transition.Verified.protocol_state transition
-      in
-      let ledger_hash_from_proof p =
-        Inputs.Ledger_proof.statement_target (Inputs.Ledger_proof.statement p)
-      in
-      let blockchain_state_ledger_hash, blockchain_staged_ledger_hash =
-        let blockchain_state =
-          Consensus.Mechanism.Protocol_state.blockchain_state
-            transition_protocol_state
-        in
-        ( Consensus.Mechanism.Blockchain_state.ledger_hash blockchain_state
-        , Consensus.Mechanism.Blockchain_state.staged_ledger_hash
-            blockchain_state )
-      in
-      let%bind ( `Hash_after_applying staged_ledger_hash
-               , `Ledger_proof proof_opt
-               , `Staged_ledger transitioned_staged_ledger ) =
-        let open Deferred.Let_syntax in
-        match%map
-          Inputs.Staged_ledger.apply ~logger staged_ledger
-            (Inputs.External_transition.Verified.staged_ledger_diff transition)
-        with
-        | Ok x -> Ok x
-        | Error (Inputs.Staged_ledger.Staged_ledger_error.Unexpected e) ->
-            Error (`Fatal_error (Error.to_exn e))
-        | Error e ->
-            Error
-              (`Validation_error
-                (Error.of_string
-                   (Inputs.Staged_ledger.Staged_ledger_error.to_string e)))
-      in
-      let target_ledger_hash =
-        match proof_opt with
-        | None ->
-            Option.value_map
-              (Inputs.Staged_ledger.current_ledger_proof
-                 transitioned_staged_ledger)
-              ~f:ledger_hash_from_proof
-              ~default:
-                (Frozen_ledger_hash.of_ledger_hash
-                   (Ledger.merkle_root Genesis_ledger.t))
-        | Some proof -> ledger_hash_from_proof proof
-      in
-      let%map transitioned_staged_ledger =
-        if
-          Frozen_ledger_hash.equal target_ledger_hash
-            blockchain_state_ledger_hash
-          && Staged_ledger_hash.equal staged_ledger_hash
-               blockchain_staged_ledger_hash
-        then return transitioned_staged_ledger
-        else
-          Deferred.return
-            (Error
-               (`Validation_error
-                 (Error.of_string
-                    "Snarked ledger hash and Staged ledger hash after \
-                     applying the diff does not match blockchain state's \
-                     ledger hash and staged ledger hash resp.\n")))
-      in
-      {transition_with_hash; staged_ledger= transitioned_staged_ledger}
+      O1trace.measure "Breadcrumb.build" (fun () ->
+          let open Deferred.Result.Let_syntax in
+          let logger = Logger.child logger __MODULE__ in
+          let staged_ledger = parent.staged_ledger in
+          let transition = With_hash.data transition_with_hash in
+          let transition_protocol_state =
+            Inputs.External_transition.Verified.protocol_state transition
+          in
+          let ledger_hash_from_proof p =
+            Inputs.Ledger_proof.statement_target
+              (Inputs.Ledger_proof.statement p)
+          in
+          let blockchain_state_ledger_hash, blockchain_staged_ledger_hash =
+            let blockchain_state =
+              Consensus.Mechanism.Protocol_state.blockchain_state
+                transition_protocol_state
+            in
+            ( Consensus.Mechanism.Blockchain_state.ledger_hash blockchain_state
+            , Consensus.Mechanism.Blockchain_state.staged_ledger_hash
+                blockchain_state )
+          in
+          let%bind ( `Hash_after_applying staged_ledger_hash
+                   , `Ledger_proof proof_opt
+                   , `Staged_ledger transitioned_staged_ledger ) =
+            let open Deferred.Let_syntax in
+            match%map
+              Inputs.Staged_ledger.apply ~logger staged_ledger
+                (Inputs.External_transition.Verified.staged_ledger_diff
+                   transition)
+            with
+            | Ok x -> Ok x
+            | Error (Inputs.Staged_ledger.Staged_ledger_error.Unexpected e) ->
+                Error (`Fatal_error (Error.to_exn e))
+            | Error e ->
+                Error
+                  (`Validation_error
+                    (Error.of_string
+                       (Inputs.Staged_ledger.Staged_ledger_error.to_string e)))
+          in
+          let target_ledger_hash =
+            match proof_opt with
+            | None ->
+                Option.value_map
+                  (Inputs.Staged_ledger.current_ledger_proof
+                     transitioned_staged_ledger)
+                  ~f:ledger_hash_from_proof
+                  ~default:
+                    (Frozen_ledger_hash.of_ledger_hash
+                       (Ledger.merkle_root Genesis_ledger.t))
+            | Some proof -> ledger_hash_from_proof proof
+          in
+          let%map transitioned_staged_ledger =
+            if
+              Frozen_ledger_hash.equal target_ledger_hash
+                blockchain_state_ledger_hash
+              && Staged_ledger_hash.equal staged_ledger_hash
+                   blockchain_staged_ledger_hash
+            then return transitioned_staged_ledger
+            else
+              Deferred.return
+                (Error
+                   (`Validation_error
+                     (Error.of_string
+                        "Snarked ledger hash and Staged ledger hash after \
+                         applying the diff does not match blockchain state's \
+                         ledger hash and staged ledger hash resp.\n")))
+          in
+          {transition_with_hash; staged_ledger= transitioned_staged_ledger} )
 
     let hash {transition_with_hash; _} = With_hash.hash transition_with_hash
 
@@ -376,36 +379,40 @@ struct
    *      the current best tip
    *)
   let add_breadcrumb_exn t breadcrumb =
-    let hash = With_hash.hash (Breadcrumb.transition_with_hash breadcrumb) in
-    let root_node = Hashtbl.find_exn t.table t.root in
-    let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
-    (* 1 *)
-    attach_breadcrumb_exn t breadcrumb ;
-    let node = Hashtbl.find_exn t.table hash in
-    (* 2.a *)
-    let distance_to_parent = root_node.length - node.length in
-    (* 2.b *)
-    if distance_to_parent > max_length then (
-      (* 2.b.I *)
-      let new_root_hash = List.hd_exn (hash_path t node.breadcrumb) in
-      (* 2.b.II *)
-      let garbage_immediate_successors =
-        List.filter root_node.successor_hashes ~f:(fun succ_hash ->
-            not (State_hash.equal succ_hash new_root_hash) )
-      in
-      (* 2.b.III *)
-      let garbage =
-        t.root
-        :: List.bind garbage_immediate_successors ~f:(successor_hashes_rec t)
-      in
-      t.root <- new_root_hash ;
-      List.iter garbage ~f:(Hashtbl.remove t.table) ;
-      (* 2.b.IV *)
-      Ledger.Mask.Attached.commit
-        (Inputs.Staged_ledger.ledger
-           (Breadcrumb.staged_ledger root_node.breadcrumb)) ) ;
-    (* 3 *)
-    if node.length > best_tip_node.length then t.best_tip <- hash
+    O1trace.measure "add_breadcrumb" (fun () ->
+        let hash =
+          With_hash.hash (Breadcrumb.transition_with_hash breadcrumb)
+        in
+        let root_node = Hashtbl.find_exn t.table t.root in
+        let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
+        (* 1 *)
+        attach_breadcrumb_exn t breadcrumb ;
+        let node = Hashtbl.find_exn t.table hash in
+        (* 2.a *)
+        let distance_to_parent = root_node.length - node.length in
+        (* 2.b *)
+        if distance_to_parent > max_length then (
+          (* 2.b.I *)
+          let new_root_hash = List.hd_exn (hash_path t node.breadcrumb) in
+          (* 2.b.II *)
+          let garbage_immediate_successors =
+            List.filter root_node.successor_hashes ~f:(fun succ_hash ->
+                not (State_hash.equal succ_hash new_root_hash) )
+          in
+          (* 2.b.III *)
+          let garbage =
+            t.root
+            :: List.bind garbage_immediate_successors
+                 ~f:(successor_hashes_rec t)
+          in
+          t.root <- new_root_hash ;
+          List.iter garbage ~f:(Hashtbl.remove t.table) ;
+          (* 2.b.IV *)
+          Ledger.Mask.Attached.commit
+            (Inputs.Staged_ledger.ledger
+               (Breadcrumb.staged_ledger root_node.breadcrumb)) ) ;
+        (* 3 *)
+        if node.length > best_tip_node.length then t.best_tip <- hash )
 
   let clear_paths t = Hashtbl.clear t.table
 end

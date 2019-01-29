@@ -1,4 +1,5 @@
 # WARNING: config.yml file is generated from config.yml.jinja
+---
 version: 2
 jobs:
     tracetool:
@@ -8,36 +9,49 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                name: Build trace-tool
-                command: cd src/app/trace-tool && cargo build --frozen
+                  name: Build trace-tool
+                  command: cd src/app/trace-tool && cargo build --frozen
 
-    build:
-        resource_class: large
+    lint:
         docker:
-        - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                name: Lint
-                command: eval `opam config env` && make check-format
+                  name: OCamlformat (make check-format)
+                  command: eval `opam config env` && make check-format
             - run:
-                name: Build OCaml
-                command: eval `opam config env` && DUNE_PROFILE=dev make build 2>&1 | tee /tmp/buildocaml.log
+                  name: Snarky tracks master (make check-snarky-submodule)
+                  command: make check-snarky-submodule
+
+    build:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+        environment:
+            CODA_CONSENSUS: posig-dev
+            DUNE_PROFILE: dev
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                name: rm snark_params
-                command: rm -rf src/_build/default/lib/snark_params
+                  name: Build OCaml
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
-                name: Build Website -- make web
-                command: make web
+                  name: rm snark_params
+                  command: rm -rf src/_build/default/lib/snark_params
             - run:
-                name: Count OCaml Warns
-                command: ./scripts/buildwarns.py /tmp/buildocaml.log
+                  name: Build Website -- make web
+                  command: make web
             - run:
-                name: Build deb Package
-                command: make deb
+                  name: Count OCaml Warns
+                  command: ./scripts/buildwarns.py /tmp/buildocaml.log
+            - run:
+                  name: Build deb Package
+                  command: make deb
             - store_artifacts:
-                path: /tmp/artifacts
+                  path: /tmp/artifacts
 
     build-macos:
         macos:
@@ -47,149 +61,174 @@ jobs:
             HOMEBREW_LOGS: /Users/distiller/homebrew.log
         steps:
             - restore_cache:
-                keys:
-                    - macos-v3
-                    - macos-v3-opam
+                  keys:
+                      - macos-v3
+                      - macos-v3-opam
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                name: Download Deps -- make macos-setup-download
-                command: make macos-setup-download
+                  name: Download Deps -- make macos-setup-download
+                  command: make macos-setup-download
             - save_cache:
-                key: macos-v3
-                paths:
-                    - "/usr/local/Homebrew"
+                  key: macos-v3
+                  paths:
+                      - "/usr/local/Homebrew"
             - run:
-                name: Compile Deps -- make macos-setup-compile
-                command: make macos-setup-compile
+                  name: Compile Deps -- make macos-setup-compile
+                  command: make macos-setup-compile
             - save_cache:
-                key: macos-v3-opam
-                paths:
-                    - "/Users/distiller/.opam"
+                  key: macos-v3-opam
+                  paths:
+                      - "/Users/distiller/.opam"
             - run:
-                name: Build OCaml
-                command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  name: Build OCaml
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
-                name: Run all tests (on master)
-                command: bash -c '[ ! "$(CIRCLE_BRANCH)" = "master" ] || (`opam config env` && make test)'
+                  name: Run all tests (on master)
+                  command: bash -c '[ ! "$(CIRCLE_BRANCH)" = "master" ] || (`opam config env` && make test)'
 
-    build_withsnark:
+    build_withsnark_sig:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+        environment:
+            CODA_CONSENSUS: posig-snark
+            DUNE_PROFILE: testnet_posig
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                name: Download Stable Proving Keys
-                command: scripts/getkeys.sh
+                  name: Download Stable Proving Keys
+                  command: scripts/getkeys.sh
             - run:
-                name: Build OCaml (sig)
-                command: eval `opam config env` && DUNE_PROFILE=testnet_posig make build 2>&1 | tee /tmp/buildocaml.log
+                  name: Build OCaml (sig)
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
-                name: Build OCaml (stake)
-                command: eval `opam config env` && DUNE_PROFILE=testnet_postake make build 2>&1 | tee /tmp/buildocaml.log
+                  name: Build deb Package with keys
+                  command: make deb
             - run:
-                name: Build deb Package with verification keys
-                command: make deb
+                  name: Build provingkeys
+                  command: make provingkeys
             - run:
-                name: Build provingkeys
-                command: make provingkeys
+                  name: Store Genesis keys
+                  command: make genesiskeys
             - run:
-                name: Store Genesis keys
-                command: make genesiskeys
-            - run:
-                name: Upload deb to repo
-                command: make publish_deb
+                  name: Upload deb to repo
+                  command: make publish_deb
             - store_artifacts:
-                path: /tmp/artifacts
+                  path: /tmp/artifacts
+
+    build_withsnark_stake:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+        environment:
+            CODA_CONSENSUS: postake-snark
+            DUNE_PROFILE: testnet_postake
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Download Stable Proving Keys
+                  command: scripts/getkeys.sh
+            - run:
+                  name: Build OCaml (stake)
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Build deb Package with keys
+                  command: make deb
+            - run:
+                  name: Build provingkeys
+                  command: make provingkeys
+            - run:
+                  name: Store Genesis keys
+                  command: make genesiskeys
+            - run:
+                  name: Upload deb to repo
+                  command: make publish_deb
+            - store_artifacts:
+                  path: /tmp/artifacts
 
     build_public:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+        environment:
+            CODA_CONSENSUS: posig-public
+            DUNE_PROFILE: testnet_public
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                name: Build OCaml
-                command: eval `opam config env` && DUNE_PROFILE=testnet_public make build 2>&1 | tee /tmp/buildocaml.log
+                  name: Build OCaml
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
-                name: Build deb Package with verification keys
-                command: make deb
+                  name: Build deb Package with keys
+                  command: make deb
             - run:
-                name: Store Genesis keys
-                command: make genesiskeys
+                  name: Store Genesis keys
+                  command: make genesiskeys
             - store_artifacts:
-                path: /tmp/artifacts
+                  path: /tmp/artifacts
 
     test-unit-test:
-       resource_class: large
-       docker:
-       - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
-       steps:
-           - checkout
-           - run: git submodule sync && git submodule update --init --recursive
-           - run:
-              name: Test make test-runtest
-              command: source ~/.profile && DUNE_PROFILE=test_sigs MYPROCS=8 make test-runtest
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Test make test-runtest
+                  command: source ~/.profile && DUNE_PROFILE=test_sigs MYPROCS=8 make test-runtest
 
     test-withsnark:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                name: Build OCaml
-                command: eval `opam config env` && DUNE_PROFILE=test_snark make build 2>&1 | tee /tmp/buildocaml.log
+                  name: Build OCaml
+                  command: eval `opam config env` && DUNE_PROFILE=test_snark make build 2>&1 | tee /tmp/buildocaml.log
             - run:
-                name: Test make test-withsnark
-                command: source ~/.profile && DUNE_PROFILE=test_snark make test-withsnark
+                  name: Test make test-withsnark
+                  command: source ~/.profile && DUNE_PROFILE=test_snark make test-withsnark
+    {%-for test in tests%}
 
-    {%for test in tests%}
     test-{{test.name}}:
-      resource_class: large
-      docker:
-      - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
-      steps:
-          - checkout
-          - run: git submodule sync && git submodule update --init --recursive
-          - run:
-              name: Check .circleci Render
-              command: make check-render-circleci
-          - run:
-              name: Build OCaml
-              command: eval `opam config env` && DUNE_PROFILE={{test.config}} make build 2>&1 | tee /tmp/buildocaml.log
-            {% for action in test.actions %}
-          - run:
-              name: Running test - {{ test.friendly }} | {{ action }}
-              command: source ~/.profile && DUNE_PROFILE={{test.config}} source scripts/test_all.sh && cd src/ && {{test.env_str}} 'run_integration_test' '{{ action }}' {% endfor %}
-      {% endfor %}
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Check .circleci Render
+                  command: make check-render-circleci
+            - run:
+                  name: Build OCaml
+                  command: eval `opam config env` && DUNE_PROFILE={{test.config}} make build 2>&1 | tee /tmp/buildocaml.log
+                {%- for action in test.actions %}
+            - run:
+                  name: Running test - {{ test.friendly }} | {{ action }}
+                  command: source ~/.profile && DUNE_PROFILE={{test.config}} source scripts/test_all.sh && cd src/ && {{test.env_str}} 'run_integration_test' '{{ action }}'{% endfor %}
+        {%- endfor %}
 
 workflows:
     version: 2
     coda_parallel:
         jobs:
+            - lint
             - build
             - build-macos
-            - build_withsnark
+            - build_withsnark_sig
+            - build_withsnark_stake
             - build_public
-            {%for test in tests%}
+            {%- for test in tests%}
             - test-{{test.name}}
-            {%endfor%}
+            {%- endfor%}
             - test-withsnark
             - test-unit-test
             - tracetool
-
-# NOTES: Save this idea for later (nightly/scheduled workflows)
-    # nightly:
-    #     triggers:
-    #         - schedule:
-    #             cron: "0 0 * * *"
-    #             filters:
-    #                 branches:
-    #                     only: master
-    #     jobs:
-    #         - build_withsnark

@@ -657,9 +657,10 @@ end = struct
        count:%d Spots available:%d Proofs waiting to be solved:%d"
       user_commands_count cb_parts_count (List.length works) spots_available
       proofs_waiting ;
-    ( `Hash_after_applying (hash t)
+    let new_staged_ledger = {scan_state= scan_state'; ledger= new_ledger} in
+    ( `Hash_after_applying (hash new_staged_ledger)
     , `Ledger_proof res_opt
-    , `Staged_ledger {scan_state= scan_state'; ledger= new_ledger} )
+    , `Staged_ledger new_staged_ledger )
 
   let apply t witness ~logger = apply_diff t witness ~logger
 
@@ -751,9 +752,10 @@ end = struct
     in
     Or_error.ok_exn (Scan_state.enqueue_transactions scan_state' data) ;
     Or_error.ok_exn (verify_scan_state_after_apply new_ledger scan_state') ;
-    ( `Hash_after_applying (hash t)
+    let new_staged_ledger = {scan_state= scan_state'; ledger= new_ledger} in
+    ( `Hash_after_applying (hash new_staged_ledger)
     , `Ledger_proof res_opt
-    , `Staged_ledger {scan_state= scan_state'; ledger= new_ledger} )
+    , `Staged_ledger new_staged_ledger )
 
   let work_to_do_exn scan_state : Transaction_snark_work.Statement.t Sequence.t
       =
@@ -1188,15 +1190,19 @@ end = struct
             Transaction_snark_work.Statement.t
          -> Transaction_snark_work.Checked.t option) =
     let curr_hash = hash t in
+    O1trace.trace_event "curr_hash" ;
     let new_mask = Inputs.Ledger.Mask.create () in
     let tmp_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
+    O1trace.trace_event "done mask" ;
     let partitions =
       Scan_state.partition_if_overflowing ~max_slots:max_throughput
         t.scan_state
     in
+    O1trace.trace_event "partitioned" ;
     (*TODO: return an or_error here *)
     let work_to_do = work_to_do_exn t.scan_state in
+    O1trace.trace_event "computed_work" ;
     let completed_works_seq =
       Sequence.fold_until work_to_do ~init:Sequence.empty
         ~f:(fun seq w ->
@@ -1206,6 +1212,7 @@ end = struct
           | None -> Stop seq )
         ~finish:Fn.id
     in
+    O1trace.trace_event "found completed work" ;
     (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
     let transactions_rev =
       Sequence.fold transactions_by_fee ~init:Sequence.empty ~f:(fun seq t ->
@@ -1219,13 +1226,16 @@ end = struct
               seq
           | Ok _ -> Sequence.append (Sequence.singleton t) seq )
     in
+    O1trace.trace_event "applied transactions" ;
     let diff =
       generate logger completed_works_seq transactions_rev self partitions
         (Sequence.length work_to_do)
     in
+    O1trace.trace_event "made diff" ;
     let proofs_available =
       Sequence.filter_map work_to_do ~f:get_completed_work |> Sequence.length
     in
+    O1trace.trace_event "found available work" ;
     Logger.info logger "Block stats: Proofs ready for purchase: %d"
       proofs_available ;
     trace_event "prediffs done" ;
@@ -1790,11 +1800,14 @@ let%test_module "test" =
           ~get_completed_work:stmt_to_work
       in
       let diff' = Test_input1.Staged_ledger_diff.forget diff in
-      let%map _, `Ledger_proof ledger_proof, `Staged_ledger sl' =
+      let%map ( `Hash_after_applying hash
+              , `Ledger_proof ledger_proof
+              , `Staged_ledger sl' ) =
         match%map Sl.apply !sl diff' ~logger with
         | Ok x -> x
         | Error e -> Error.raise (Sl.Staged_ledger_error.to_error e)
       in
+      assert (Test_input1.Staged_ledger_hash.equal hash (Sl.hash sl')) ;
       sl := sl' ;
       (ledger_proof, diff')
 
