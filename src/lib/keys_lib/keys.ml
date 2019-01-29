@@ -106,6 +106,7 @@ let create () : (module S) Async.Deferred.t =
               module type of Step with module Prover_state := Step.Prover_state )
 
           module Prover_state = Step_prover_state
+
           module Verification_key = struct
             let to_bool_list = Snark_params.tock_vk_to_bool_list
           end
@@ -123,7 +124,7 @@ let create () : (module S) Async.Deferred.t =
             fun state ->
               Tick.Pedersen.digest_fold s
                 (State_hash.fold
-                    (Consensus_mechanism.Protocol_state.hash state))
+                   (Consensus_mechanism.Protocol_state.hash state))
 
           let main x =
             let there {Prover_state.wrap_vk; prev_proof; prev_state; update} =
