@@ -94,8 +94,8 @@ let run_test () : unit Deferred.t =
         ; initial_peers= []
         ; conf_dir= temp_conf_dir
         ; me=
-            Kademlia.Peer.create Unix.Inet_addr.localhost ~discovery_port:8001
-              ~communication_port:8000
+            Network_peer.Peer.create Unix.Inet_addr.localhost
+              ~discovery_port:8001 ~communication_port:8000
         ; banlist } }
   in
   let%bind coda =

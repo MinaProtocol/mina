@@ -56,7 +56,7 @@ end
 
 module T = struct
   module Peers = struct
-    type t = Kademlia.Peer.t List.t [@@deriving bin_io]
+    type t = Network_peer.Peer.t List.t [@@deriving bin_io]
   end
 
   module State_hashes = struct
@@ -236,7 +236,7 @@ module T = struct
             ; conf_dir
             ; initial_peers= peers
             ; me=
-                Kademlia.Peer.create
+                Network_peer.Peer.create
                   (Unix.Inet_addr.of_string host)
                   ~discovery_port ~communication_port:external_port
             ; parent_log= log

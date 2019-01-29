@@ -253,7 +253,7 @@ let daemon log =
          match ip with None -> Find_ip.find () | Some ip -> return ip
        in
        let me =
-         Kademlia.Peer.create
+         Network_peer.Peer.create
            (Unix.Inet_addr.of_string ip)
            ~discovery_port ~communication_port:external_port
        in

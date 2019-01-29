@@ -339,7 +339,7 @@ module type Main_intf = sig
   val best_tip :
     t -> Inputs.Transition_frontier.Breadcrumb.t Participating_state.t
 
-  val peers : t -> Kademlia.Peer.t list
+  val peers : t -> Network_peer.Peer.t list
 
   val strongest_ledgers :
        t
@@ -773,7 +773,7 @@ struct
                 ( List.map res.spec.instances ~f:Single.Spec.statement
                 , { Diff.proof= res.proofs
                   ; fee= {fee= res.spec.fee; prover= res.prover} } ))
-           ~sender:(Host_and_port.of_string "127.0.0.1:0"))
+           ~sender:Network_peer.Peer.local)
   end
 
   module Sync_ledger =
@@ -1298,7 +1298,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; conf_dir= Config_in.conf_dir
     ; peers=
         List.map (peers t) ~f:(fun peer ->
-            Kademlia.Peer.to_discovery_host_and_port peer
+            Network_peer.Peer.to_discovery_host_and_port peer
             |> Host_and_port.to_string )
     ; user_commands_sent= !txn_count
     ; run_snark_worker= run_snark_worker t
