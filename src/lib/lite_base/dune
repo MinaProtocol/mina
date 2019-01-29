@@ -4,7 +4,7 @@
   (preprocess (pps ppx_jane ppx_deriving.eq))
   (libraries
     base
-    digestif.ocaml
+    coda_digestif
     hash_prefixes
     pedersen_lib
     fold_lib

@@ -46,7 +46,7 @@ module type S = sig
     val get_parent : t -> parent
     (** get mask parent *)
 
-    val parent_set_notify : t -> location -> account -> unit
+    val parent_set_notify : t -> account -> unit
     (** called when parent sets an account; update local state *)
 
     val copy : t -> t

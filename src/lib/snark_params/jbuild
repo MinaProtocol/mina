@@ -8,17 +8,19 @@
   (inline_tests)
   (libraries
     ( fold_lib
+      o1trace
+      coda_digestif
       tuple_lib
       bitstring_lib
       core_kernel
       snarky
-      snark_bits
-      dummy_values
-      crypto_params
       snarky_verifier
       snarky_field_extensions
       snarky_curves
-      snarky_pairing ))
+      snarky_pairing
+      snark_bits
+      dummy_values
+      crypto_params
+      chunked_triples ))
   (preprocess (pps (ppx_jane ppx_deriving.eq bisect_ppx -conditional)))
   (synopsis "Snark parameters")))
-

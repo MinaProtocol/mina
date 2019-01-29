@@ -203,7 +203,7 @@ struct
         type t = Field.t t_
       end
 
-      type t = Field.Checked.t t_
+      type t = Field.Var.t t_
 
       let map_ = map_
     end
@@ -227,17 +227,17 @@ struct
       include Field.Infix
     end
 
-    type t = Field.Checked.t
+    type t = Field.Var.t
 
     let if_ = Field.Checked.if_
 
     let typ = Field.typ
 
-    let constant = Field.Checked.constant
+    let constant = Field.Var.constant
 
-    let to_constant = Field.Checked.to_constant
+    let to_constant = Field.Var.to_constant
 
-    let scale = Field.Checked.scale
+    let scale = Field.Var.scale
 
     let mul_field = Field.Checked.mul
 
@@ -247,7 +247,7 @@ struct
 
     let ( - ) = Field.Checked.Infix.( - )
 
-    let negate t = Field.Checked.scale t Unchecked.(negate one)
+    let negate t = Field.Var.scale t Unchecked.(negate one)
 
     let assert_square = `Custom (fun a c -> assert_square a c)
 
@@ -680,13 +680,13 @@ module Cyclotomic_square = struct
       and bsq0, bsq1 = F2.square b
       and csq0, csq1 = F2.square c in
       let fpos x y =
-        Field.(Checked.(add (scale x (of_int 3)) (scale y (of_int 2))))
+        Field.(Var.(add (scale x (of_int 3)) (scale y (of_int 2))))
       in
       let fneg x y =
-        Field.(Checked.(sub (scale x (of_int 3)) (scale y (of_int 2))))
+        Field.(Var.(sub (scale x (of_int 3)) (scale y (of_int 2))))
       in
       ( (fneg asq0 a0, fneg bsq0 c0, fneg csq0 b1)
-      , ( fpos (Field.Checked.scale csq1 Params.cubic_non_residue) b0
+      , ( fpos (Field.Var.scale csq1 Params.cubic_non_residue) b0
         , fpos asq1 a1
         , fpos bsq1 c1 ) )
   end
@@ -726,7 +726,6 @@ struct
 
   let fq_mul_by_non_residue x = Fq.scale x Fq3.Params.non_residue
 
-  (* Number to beat: 3 constraints + 2 fq3 muls *)
   let special_mul (a0, a1) (b0, b1) =
     let open Impl.Let_syntax in
     let%bind v1 = Fq3.(a1 * b1) in
@@ -738,7 +737,6 @@ struct
       and a02b02 = Fq.(a02 * b02) in
       (fq_mul_by_non_residue a01b02, fq_mul_by_non_residue a02b02, a00b02)
     in
-    (* I think this is right... *)
     let beta_v1 = Fq3.mul_by_primitive_element v1 in
     let%map t = Fq3.((a0 + a1) * (b0 + b1)) in
     Fq3.(v0 + beta_v1, t - v0 - v1)
@@ -749,9 +747,10 @@ struct
     let open Let_syntax in
     let%bind ((v10, v11, v12) as v1) = Fq3.(a1 * b1) in
     let%bind v0 =
-      provide_witness Fq3.typ
-        As_prover.(
-          map2 ~f:Fq3.Unchecked.( * ) (read Fq3.typ a0) (read Fq3.typ b0))
+      exists Fq3.typ
+        ~compute:
+          As_prover.(
+            map2 ~f:Fq3.Unchecked.( * ) (read Fq3.typ a0) (read Fq3.typ b0))
       (* v0
           = (a00 + s a01 s^2 a02) (s^2 b02)
         = non_residue a01 b02 + non_residue s a02 b02 + s^2 a00 b02 *)
@@ -760,7 +759,7 @@ struct
       let%map () =
         Fq.assert_r1cs a01
           (Fq.scale b02 Fq3.Params.non_residue)
-          (Field.Checked.linear_combination
+          (Field.Var.linear_combination
              [(Field.one, c00); (Field.negate Fq3.Params.non_residue, v12)])
       and () =
         Fq.assert_r1cs a02 (Fq.scale b02 Fq3.Params.non_residue) Fq.(c01 - v10)
@@ -773,8 +772,8 @@ struct
     let open Impl in
     let open Let_syntax in
     let%bind result =
-      provide_witness typ
-        As_prover.(map2 ~f:Unchecked.( / ) (read typ a) (read typ b))
+      exists typ
+        ~compute:As_prover.(map2 ~f:Unchecked.( / ) (read typ a) (read typ b))
     in
     (* result * b = a *)
     let%map () = assert_special_mul result b a in
@@ -793,7 +792,7 @@ struct
     let module Field = Impl.Field in
     let p3 = power mod 3 in
     let p6 = power mod 6 in
-    let ( * ) s x = Field.Checked.scale x s in
+    let ( * ) s x = Field.Var.scale x s in
     ( ( c00
       , Fq3.Params.frobenius_coeffs_c1.(p3) * c01
       , Fq3.Params.frobenius_coeffs_c2.(p3) * c02 )
@@ -834,6 +833,6 @@ struct
     let module Field = Impl.Field in
     let p2 = Params.frobenius_coeffs_c1.(Int.( * ) (power mod 2) 2) in
     let p4 = Params.frobenius_coeffs_c1.(power mod 4) in
-    let ( * ) s x = Field.Checked.scale x s in
+    let ( * ) s x = Field.Var.scale x s in
     ((c00, p2 * c01), (p4 * c10, Field.Infix.(p4 * p2) * c11))
 end

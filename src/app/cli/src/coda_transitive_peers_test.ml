@@ -13,7 +13,7 @@ let main () =
   let log = Logger.create () in
   let log = Logger.child log name in
   let proposal_interval =
-    Int64.to_int_exn Consensus.Mechanism.block_interval_ms
+    Int64.to_int_exn Consensus.Mechanism.Constants.block_duration_ms
   in
   let work_selection = Protocols.Coda_pow.Work_selection.Seq in
   Coda_processes.init () ;
@@ -44,8 +44,9 @@ let main () =
     peers expected_peers ;
   let module S = Host_and_port.Set in
   assert (
-    S.equal (S.of_list (peers |> List.map ~f:fst)) (S.of_list expected_peers)
-  )
+    S.equal
+      (S.of_list (peers |> List.map ~f:Kademlia.Peer.to_discovery_host_and_port))
+      (S.of_list expected_peers) )
 
 let command =
   Command.async

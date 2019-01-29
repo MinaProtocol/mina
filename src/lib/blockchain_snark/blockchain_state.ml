@@ -107,7 +107,7 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) :
   module Checked = struct
     let%snarkydef is_base_hash h =
       Field.Checked.equal
-        (Field.Checked.constant
+        (Field.Var.constant
            (Consensus_mechanism.genesis_protocol_state.hash :> Field.t))
         (State_hash.var_to_hash_packed h)
 

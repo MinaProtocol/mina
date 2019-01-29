@@ -19,7 +19,8 @@ module Chain_hash = struct
 
   let empty =
     of_hash
-      (Pedersen.(State.salt params "CodaReceiptEmpty") |> Pedersen.State.digest)
+      ( Pedersen.(State.salt params ~get_chunk_table "CodaReceiptEmpty")
+      |> Pedersen.State.digest )
 
   let cons payload t =
     Pedersen.digest_fold Hash_prefix.receipt_chain
@@ -28,7 +29,7 @@ module Chain_hash = struct
 
   module Checked = struct
     let constant (t : t) =
-      var_of_hash_packed (Field.Checked.constant (t :> Field.t))
+      var_of_hash_packed (Field.Var.constant (t :> Field.t))
 
     type t = var
 

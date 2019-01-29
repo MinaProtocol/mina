@@ -39,6 +39,7 @@ sig
   val unsafe_feed_bytes: ctx -> By.t -> int -> int -> unit
   val unsafe_feed_bigstring: ctx -> Bi.t -> int -> int -> unit
   val unsafe_get: ctx -> By.t
+  val unsafe_get_h : ctx -> int32 array
   val dup: ctx -> ctx
 end
 
@@ -199,4 +200,6 @@ module Unsafe : S
     do By.cpu_to_be32 res (i * 4) ctx.h.(i) done;
 
     res
+
+  let unsafe_get_h ctx = ctx.h
 end

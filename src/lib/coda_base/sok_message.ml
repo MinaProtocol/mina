@@ -3,6 +3,7 @@ open Snark_params
 open Tick
 open Fold_lib
 open Import
+open Coda_digestif
 
 module T = struct
   type t =

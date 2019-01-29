@@ -50,4 +50,6 @@ void digestif_sha256_init(struct sha256_ctx *ctx);
 void digestif_sha256_update(struct sha256_ctx *ctx, uint8_t *data, uint32_t len);
 void digestif_sha256_finalize(struct sha256_ctx *ctx, uint8_t *out);
 
+void digestif_sha256_get_h(struct sha256_ctx *ctx, uint8_t *out);
+
 #endif

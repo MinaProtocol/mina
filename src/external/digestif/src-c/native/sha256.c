@@ -173,3 +173,8 @@ void digestif_sha256_finalize(struct sha256_ctx *ctx, uint8_t *out)
 	for (i = 0; i < 8; i++)
 		p[i] = cpu_to_be32(ctx->h[i]);
 }
+
+void digestif_sha256_get_h(struct sha256_ctx *ctx, uint8_t *out) {
+    uint32_t *p = (uint32_t *)out;
+    for (int i = 0; i < 8; i++){p[i] = ctx->h[i];}
+}
