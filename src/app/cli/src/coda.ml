@@ -92,8 +92,8 @@ let daemon log =
      and work_delay_factor =
        flag "work-delay-factor"
          ~doc:
-           "Log of number of block-times snark workers take to produce \
-            atleast two proofs (default:2)"
+           "DELAY_LOG_2 Log of number of block-times snark workers take to \
+            produce atleast two proofs (default:2)"
          (optional int)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
