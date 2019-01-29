@@ -24,7 +24,7 @@ Ideal candidates will be interested in any of:
 * Mechanism design
 * Cryptocurrency
 
-If you'd be interested in talking further, please get in touch by sending an email with your resume and the subject "Product Manager" to jobs@o1labs.org.
+If you'd be interested in talking further, please get in touch by sending an email with your resume and the subject "Product Manager applicant" to [jobs@o1labs.org](mailto:jobs@o1labs.org?subject="Product Manager applicant").
 
 We are committed to building a diverse, inclusive company. People of color, LGBTQ individuals, women, and people with disabilities are strongly encouraged to apply.
 

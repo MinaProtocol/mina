@@ -198,7 +198,7 @@ struct
         type t = Field.t t_
       end
 
-      type t = Field.Checked.t t_
+      type t = Field.Var.t t_
 
       let map_ = map_
     end
@@ -222,17 +222,17 @@ struct
       include Field.Infix
     end
 
-    type t = Field.Checked.t
+    type t = Field.Var.t
 
     let if_ = Field.Checked.if_
 
     let typ = Field.typ
 
-    let constant = Field.Checked.constant
+    let constant = Field.Var.constant
 
-    let to_constant = Field.Checked.to_constant
+    let to_constant = Field.Var.to_constant
 
-    let scale = Field.Checked.scale
+    let scale = Field.Var.scale
 
     let mul_field = Field.Checked.mul
 
@@ -242,7 +242,7 @@ struct
 
     let ( - ) = Field.Checked.Infix.( - )
 
-    let negate t = Field.Checked.scale t Unchecked.(negate one)
+    let negate t = Field.Var.scale t Unchecked.(negate one)
 
     let assert_square = `Custom (fun a c -> assert_square a c)
 
@@ -669,13 +669,13 @@ module Cyclotomic_square = struct
       and bsq0, bsq1 = F2.square b
       and csq0, csq1 = F2.square c in
       let fpos x y =
-        Field.(Checked.(add (scale x (of_int 3)) (scale y (of_int 2))))
+        Field.(Var.(add (scale x (of_int 3)) (scale y (of_int 2))))
       in
       let fneg x y =
-        Field.(Checked.(sub (scale x (of_int 3)) (scale y (of_int 2))))
+        Field.(Var.(sub (scale x (of_int 3)) (scale y (of_int 2))))
       in
       ( (fneg asq0 a0, fneg bsq0 c0, fneg csq0 b1)
-      , ( fpos (Field.Checked.scale csq1 Params.cubic_non_residue) b0
+      , ( fpos (Field.Var.scale csq1 Params.cubic_non_residue) b0
         , fpos asq1 a1
         , fpos bsq1 c1 ) )
   end
