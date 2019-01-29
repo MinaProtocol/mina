@@ -175,7 +175,9 @@ module Make (Message : Message_intf) :
         let implementations =
           let implementations =
             Versioned_rpc.Menu.add
-              ( Message.implement_multi (fun _dummy_peer ~version:_ msg ->
+              ( Message.implement_multi
+                  (fun _client_host_and_port ~version:_ msg ->
+                    (* TODO: maybe check client host matches IP in msg, punish if mismatch *)
                     Linear_pipe.force_write_maybe_drop_head
                       ~capacity:broadcast_received_capacity received_writer
                       received_reader
@@ -209,6 +211,7 @@ module Make (Message : Message_intf) :
              (fun client reader writer ->
                Rpc.Connection.server_with_close reader writer ~implementations
                  ~connection_state:(fun _ ->
+                   (* client IP and an ephemeral port, not its discovery or communication port *)
                    Socket.Address.Inet.to_host_and_port client )
                  ~on_handshake_error:
                    (`Call

@@ -2,7 +2,7 @@ open Core
 open Network_peer
 
 module Incoming = struct
-  type 'a t = {data: 'a; sender: Peer.t}
+  type 'a t = {data: 'a; sender: Peer.t} [@@deriving sexp, bin_io]
 
   let sender {sender; _} = sender
 
