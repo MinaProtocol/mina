@@ -18,7 +18,7 @@ or process table entries.
 #load "unix.cma"
 
 let base =
-  "(library\n     (name coda_digestif)\n     (libraries digestif_ocaml))"
+  "(library\n     (name coda_digestif)\n     (libraries digestif.ocaml))"
 
 let make_dune digestif_name =
   "(library\n\
@@ -49,7 +49,7 @@ let dune_string =
         in
         let res =
           if detect_fake_hash (read_lines_rev []) then make_dune "digestif.c"
-          else make_dune "digestif_ocaml"
+          else make_dune "digestif.ocaml"
         in
         close_in ich ; res
     | _ -> failwith "recursive dune invocation failed for some reason."
