@@ -759,7 +759,7 @@ struct
       let%map () =
         Fq.assert_r1cs a01
           (Fq.scale b02 Fq3.Params.non_residue)
-          (Field.Checked.linear_combination
+          (Field.Var.linear_combination
              [(Field.one, c00); (Field.negate Fq3.Params.non_residue, v12)])
       and () =
         Fq.assert_r1cs a02 (Fq.scale b02 Fq3.Params.non_residue) Fq.(c01 - v10)
@@ -792,7 +792,7 @@ struct
     let module Field = Impl.Field in
     let p3 = power mod 3 in
     let p6 = power mod 6 in
-    let ( * ) s x = Field.Checked.scale x s in
+    let ( * ) s x = Field.Var.scale x s in
     ( ( c00
       , Fq3.Params.frobenius_coeffs_c1.(p3) * c01
       , Fq3.Params.frobenius_coeffs_c2.(p3) * c02 )
@@ -833,6 +833,6 @@ struct
     let module Field = Impl.Field in
     let p2 = Params.frobenius_coeffs_c1.(Int.( * ) (power mod 2) 2) in
     let p4 = Params.frobenius_coeffs_c1.(power mod 4) in
-    let ( * ) s x = Field.Checked.scale x s in
+    let ( * ) s x = Field.Var.scale x s in
     ((c00, p2 * c01), (p4 * c10, Field.Infix.(p4 * p2) * c11))
 end
