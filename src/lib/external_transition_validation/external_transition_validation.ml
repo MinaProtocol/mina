@@ -254,7 +254,7 @@ module Make (Inputs : Inputs_intf) :
     Deferred.return
       ( if
         Frozen_ledger_hash.equal target_ledger_hash
-          (Blockchain_state.ledger_hash blockchain_state)
+          (Blockchain_state.snarked_ledger_hash blockchain_state)
         && Staged_ledger_hash.equal staged_ledger_hash
              (Blockchain_state.staged_ledger_hash blockchain_state)
       then
