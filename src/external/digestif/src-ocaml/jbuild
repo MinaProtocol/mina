@@ -1,5 +1,5 @@
 (library
- ((name digestif.ocaml)
+ ((name digestif_ocaml)
   (public_name digestif.ocaml)
   (wrapped false)
   (libraries (bigarray))
