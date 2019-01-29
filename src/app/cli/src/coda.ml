@@ -177,7 +177,7 @@ let daemon log =
        in
        let work_delay_factor =
          or_from_config YJ.Util.to_int_option "work-delay-factor" ~default:2
-           (max 2 work_delay_factor)
+           work_delay_factor
        in
        let snark_work_fee_flag =
          Currency.Fee.of_int
