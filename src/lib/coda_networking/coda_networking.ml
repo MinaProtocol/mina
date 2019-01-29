@@ -3,6 +3,7 @@ open Async
 open Kademlia
 open Coda_base
 open Pipe_lib
+open Network_peer
 
 module type Sync_ledger_intf = sig
   type query [@@deriving bin_io]
@@ -37,7 +38,7 @@ struct
       let name = "get_staged_ledger_aux_at_hash"
 
       module T = struct
-        type query = Staged_ledger_hash.t
+        type query = Staged_ledger_hash.t Envelope.Incoming.t
 
         type response = (Staged_ledger_aux.t * Ledger_hash.t) option
       end
@@ -57,7 +58,8 @@ struct
 
     module V1 = struct
       module T = struct
-        type query = Staged_ledger_hash.t [@@deriving bin_io]
+        type query = Staged_ledger_hash.t Envelope.Incoming.t
+        [@@deriving bin_io]
 
         type response = (Staged_ledger_aux.t * Ledger_hash.t) option
         [@@deriving bin_io]
@@ -83,7 +85,8 @@ struct
       let name = "answer_sync_ledger_query"
 
       module T = struct
-        type query = Ledger_hash.t * Sync_ledger.query [@@deriving bin_io]
+        type query = (Ledger_hash.t * Sync_ledger.query) Envelope.Incoming.t
+        [@@deriving bin_io]
 
         type response = (Ledger_hash.t * Sync_ledger.answer) Or_error.t
         [@@deriving bin_io]
@@ -127,7 +130,7 @@ struct
       let name = "transition_catchup"
 
       module T = struct
-        type query = State_hash.t [@@deriving bin_io]
+        type query = State_hash.t Envelope.Incoming.t [@@deriving bin_io]
 
         type response = External_transition.t list option [@@deriving bin_io]
       end
@@ -170,7 +173,8 @@ struct
       let name = "get_ancestry"
 
       module T = struct
-        type query = State_hash.t * int [@@deriving bin_io, sexp]
+        type query = (State_hash.t * int) Envelope.Incoming.t
+        [@@deriving bin_io, sexp]
 
         type response = (External_transition.t * State_body_hash.t list) option
         [@@deriving bin_io]
@@ -228,11 +232,17 @@ struct
 
   module T = struct
     module T = struct
-      type msg =
+      type content =
         | New_state of External_transition.t
         | Snark_pool_diff of Snark_pool_diff.t
         | Transaction_pool_diff of Transaction_pool_diff.t
       [@@deriving sexp, bin_io]
+
+      type msg = content Envelope.Incoming.t [@@deriving sexp, bin_io]
+
+      let content = Envelope.Incoming.data
+
+      let peer = Envelope.Incoming.sender
     end
 
     let name = "message"
@@ -350,17 +360,20 @@ module Make (Inputs : Inputs_intf) = struct
          -> (External_transition.t * State_body_hash.t list) Deferred.Option.t)
       =
     let log = Logger.child config.parent_log "coda networking" in
-    let get_staged_ledger_aux_at_hash_rpc sender ~version:_ hash =
-      get_staged_ledger_aux_at_hash (Envelope.Incoming.wrap ~data:hash ~sender)
+    (* TODO: for following functions, could check that IP in _conn matches
+       the sender IP in envelope, punish if mismatch
+     *)
+    let get_staged_ledger_aux_at_hash_rpc _conn ~version:_ hash_in_envelope =
+      get_staged_ledger_aux_at_hash hash_in_envelope
     in
-    let answer_sync_ledger_query_rpc sender ~version:_ query =
-      answer_sync_ledger_query (Envelope.Incoming.wrap ~data:query ~sender)
+    let answer_sync_ledger_query_rpc _conn ~version:_ query_in_envelope =
+      answer_sync_ledger_query query_in_envelope
     in
-    let transition_catchup_rpc sender ~version:_ hash =
-      transition_catchup (Envelope.Incoming.wrap ~data:hash ~sender)
+    let transition_catchup_rpc _conn ~version:_ hash_in_envelope =
+      transition_catchup hash_in_envelope
     in
-    let get_ancestry_rpc sender ~version:_ query =
-      get_ancestry (Envelope.Incoming.wrap ~data:query ~sender)
+    let get_ancestry_rpc _conn ~version:_ query_in_envelope =
+      get_ancestry query_in_envelope
     in
     let implementations =
       List.concat
@@ -395,17 +408,25 @@ module Make (Inputs : Inputs_intf) = struct
     in
     {gossip_net; log; states; snark_pool_diffs; transaction_pool_diffs}
 
+  (* wrap data in envelope, with "me" in the gossip net as the sender *)
+  let envelope_from_me t data =
+    let me = (gossip_net t).me in
+    Envelope.Incoming.wrap ~data ~sender:me
+
   (* TODO: Have better pushback behavior *)
   let broadcast t x =
     Logger.trace t.log !"Broadcasting %{sexp: Message.msg} over gossip net" x ;
     Linear_pipe.write_without_pushback (Gossip_net.broadcast t.gossip_net) x
 
-  let broadcast_state t x = broadcast t (New_state x)
+  let broadcast_from_me t content = broadcast t (envelope_from_me t content)
+
+  let broadcast_state t x = broadcast_from_me t (Message.New_state x)
 
   let broadcast_transaction_pool_diff t x =
-    broadcast t (Transaction_pool_diff x)
+    broadcast_from_me t (Message.Transaction_pool_diff x)
 
-  let broadcast_snark_pool_diff t x = broadcast t (Snark_pool_diff x)
+  let broadcast_snark_pool_diff t x =
+    broadcast_from_me t (Message.Snark_pool_diff x)
 
   (* TODO: This is kinda inefficient *)
   let find_map xs ~f =
@@ -446,7 +467,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let catchup_transition t peer state_hash =
     Gossip_net.query_peer t.gossip_net peer
-      Rpcs.Transition_catchup.dispatch_multi state_hash
+      Rpcs.Transition_catchup.dispatch_multi
+      (envelope_from_me t state_hash)
 
   let get_ancestry_non_preferred_peers t input peers =
     let max_current_peers = 8 in
@@ -482,10 +504,11 @@ module Make (Inputs : Inputs_intf) = struct
     loop peers 1
 
   let get_ancestry t preferred_peer input =
+    let input_in_envelope = envelope_from_me t input in
     (* try preferred_peer first *)
     let%bind ancestors_or_error =
       Gossip_net.query_peer t.gossip_net preferred_peer
-        Rpcs.Get_ancestry.dispatch_multi input
+        Rpcs.Get_ancestry.dispatch_multi input_in_envelope
     in
     let get_random_peers () =
       let max_peers = 15 in
@@ -502,14 +525,14 @@ module Make (Inputs : Inputs_intf) = struct
             %{sexp: Peer.t}, trying non-preferred peers"
           preferred_peer ;
         let peers = get_random_peers () in
-        get_ancestry_non_preferred_peers t input peers
+        get_ancestry_non_preferred_peers t input_in_envelope peers
     | Error e ->
         Logger.warn t.log
           !"get_ancestry generated error for the transition sender %{sexp: \
             Peer.t}: %{sexp: Error.t}; trying non-preferred peers"
           preferred_peer e ;
         let peers = get_random_peers () in
-        get_ancestry_non_preferred_peers t input peers
+        get_ancestry_non_preferred_peers t input_in_envelope peers
 
   module Staged_ledger_io = struct
     type nonrec t = t
@@ -529,7 +552,7 @@ module Make (Inputs : Inputs_intf) = struct
           match%map
             Gossip_net.query_peer t.gossip_net peer
               Rpcs.Get_staged_ledger_aux_at_hash.dispatch_multi
-              staged_ledger_hash
+              (envelope_from_me t staged_ledger_hash)
           with
           | Ok (Some (staged_ledger_aux, staged_ledger_aux_merkle_sibling)) ->
               let implied_staged_ledger_hash =
@@ -545,12 +568,7 @@ module Make (Inputs : Inputs_intf) = struct
                   !"%{sexp: Peer.t} sent contents resulting in a good \
                     Staged_ledger_hash %{sexp: Staged_ledger_hash.t}"
                   peer staged_ledger_hash ;
-                Ok
-                  (Envelope.Incoming.wrap
-                     ~data:
-                       staged_ledger_aux
-                       (* TODO: this isn't really a discovery port, how to handle? *)
-                     ~sender:(Peer.to_discovery_host_and_port peer)) )
+                Ok (envelope_from_me t staged_ledger_aux) )
               else (
                 Logger.faulty_peer t.log
                   !"%{sexp: Peer.t} sent contents resulting in a bad \
@@ -593,16 +611,15 @@ module Make (Inputs : Inputs_intf) = struct
                 peer (fst query) ;
               match%map
                 Gossip_net.query_peer t.gossip_net peer
-                  Rpcs.Answer_sync_ledger_query.dispatch_multi query
+                  Rpcs.Answer_sync_ledger_query.dispatch_multi
+                  (envelope_from_me t query)
               with
               | Ok (Ok answer) ->
                   Logger.trace t.log
                     !"Received answer from peer %{sexp: Peer.t} on \
                       ledger_hash %{sexp: Ledger_hash.t}"
                     peer (fst answer) ;
-                  Some
-                    (Envelope.Incoming.wrap ~data:answer
-                       ~sender:(Peer.to_discovery_host_and_port peer))
+                  Some (Envelope.Incoming.wrap ~data:answer ~sender:peer)
               | Ok (Error e) ->
                   Logger.info t.log "Rpc error: %s" (Error.to_string_mach e) ;
                   Hash_set.add peers_tried peer ;
