@@ -30,7 +30,7 @@ module type Inputs_intf = sig
 
   module Network :
     Network_intf
-    with type peer := Kademlia.Peer.t
+    with type peer := Network_peer.Peer.t
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
      and type ancestor_proof_input := State_hash.t * int
@@ -174,7 +174,7 @@ module Make (Inputs : Inputs_intf) :
                   Protocol_state.blockchain_state
                     (External_transition.Proof_verified.protocol_state
                        verified_ancestor_transition)
-                  |> Blockchain_state.ledger_hash
+                  |> Blockchain_state.snarked_ledger_hash
                   |> Frozen_ledger_hash.to_ledger_hash)
               in
               Syncable_ledger.new_goal t.syncable_ledger ledger_hash |> ignore
@@ -212,17 +212,7 @@ module Make (Inputs : Inputs_intf) :
         let (transition : External_transition.Verified.t) =
           Envelope.Incoming.data incoming_transition
         in
-        (* #TODO : the 0 ports below are dummies
-           the port in the envelope is an ephemeral port which 
-             won't appear in a bonafide Peer.t
-           see issue #1367
-         *)
-        let sender =
-          let host_and_port = Envelope.Incoming.sender incoming_transition in
-          Kademlia.Peer.create
-            (Host_and_port.host host_and_port |> Unix.Inet_addr.of_string)
-            ~discovery_port:0 ~communication_port:0
-        in
+        let sender = Envelope.Incoming.sender incoming_transition in
         let protocol_state =
           External_transition.Verified.protocol_state transition
         in

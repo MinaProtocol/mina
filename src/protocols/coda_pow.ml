@@ -877,13 +877,13 @@ module type Blockchain_state_intf = sig
 
   val create_value :
        staged_ledger_hash:staged_ledger_hash
-    -> ledger_hash:frozen_ledger_hash
+    -> snarked_ledger_hash:frozen_ledger_hash
     -> timestamp:time
     -> value
 
   val staged_ledger_hash : value -> staged_ledger_hash
 
-  val ledger_hash : value -> frozen_ledger_hash
+  val snarked_ledger_hash : value -> frozen_ledger_hash
 
   val timestamp : value -> time
 end

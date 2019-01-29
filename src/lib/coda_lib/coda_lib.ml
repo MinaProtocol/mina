@@ -69,13 +69,13 @@ module type Network_intf = sig
   val states :
     t -> (state_with_witness Envelope.Incoming.t * time) Strict_pipe.Reader.t
 
-  val peers : t -> Kademlia.Peer.t list
+  val peers : t -> Network_peer.Peer.t list
 
-  val random_peers : t -> int -> Kademlia.Peer.t list
+  val random_peers : t -> int -> Network_peer.Peer.t list
 
   val catchup_transition :
        t
-    -> Kademlia.Peer.t
+    -> Network_peer.Peer.t
     -> state_hash
     -> state_with_witness list option Or_error.t Deferred.t
 

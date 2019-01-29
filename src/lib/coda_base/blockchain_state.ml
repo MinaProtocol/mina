@@ -9,9 +9,9 @@ open Bitstring_lib
 open Tuple_lib
 
 module type S = sig
-  type ('staged_ledger_hash, 'ledger_hash, 'time) t_ =
+  type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t_ =
     { staged_ledger_hash: 'staged_ledger_hash
-    ; ledger_hash: 'ledger_hash
+    ; snarked_ledger_hash: 'snarked_ledger_hash
     ; timestamp: 'time }
   [@@deriving sexp, eq, compare, fields]
 
@@ -21,7 +21,7 @@ module type S = sig
   module Stable : sig
     module V1 : sig
       type nonrec ('a, 'b, 'c) t_ = ('a, 'b, 'c) t_ =
-        {staged_ledger_hash: 'a; ledger_hash: 'b; timestamp: 'c}
+        {staged_ledger_hash: 'a; snarked_ledger_hash: 'b; timestamp: 'c}
       [@@deriving bin_io, sexp, eq, compare, hash]
 
       type nonrec t =
@@ -46,7 +46,7 @@ module type S = sig
 
   val create_value :
        staged_ledger_hash:Staged_ledger_hash.Stable.V1.t
-    -> ledger_hash:Frozen_ledger_hash.Stable.V1.t
+    -> snarked_ledger_hash:Frozen_ledger_hash.Stable.V1.t
     -> timestamp:Block_time.Stable.V1.t
     -> value
 
@@ -89,9 +89,9 @@ module Make (Genesis_ledger : sig
 end) : S = struct
   module Stable = struct
     module V1 = struct
-      type ('staged_ledger_hash, 'ledger_hash, 'time) t_ =
+      type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t_ =
         { staged_ledger_hash: 'staged_ledger_hash
-        ; ledger_hash: 'ledger_hash
+        ; snarked_ledger_hash: 'snarked_ledger_hash
         ; timestamp: 'time }
       [@@deriving bin_io, sexp, fields, eq, compare, hash]
 
@@ -114,17 +114,17 @@ end) : S = struct
 
   type value = t [@@deriving bin_io, sexp, eq, compare, hash]
 
-  let create_value ~staged_ledger_hash ~ledger_hash ~timestamp =
-    {staged_ledger_hash; ledger_hash; timestamp}
+  let create_value ~staged_ledger_hash ~snarked_ledger_hash ~timestamp =
+    {staged_ledger_hash; snarked_ledger_hash; timestamp}
 
-  let to_hlist {staged_ledger_hash; ledger_hash; timestamp} =
-    H_list.[staged_ledger_hash; ledger_hash; timestamp]
+  let to_hlist {staged_ledger_hash; snarked_ledger_hash; timestamp} =
+    H_list.[staged_ledger_hash; snarked_ledger_hash; timestamp]
 
   let of_hlist :
       (unit, 'lbh -> 'lh -> 'ti -> unit) H_list.t -> ('lbh, 'lh, 'ti) t_ =
     H_list.(
-      fun [staged_ledger_hash; ledger_hash; timestamp] ->
-        {staged_ledger_hash; ledger_hash; timestamp})
+      fun [staged_ledger_hash; snarked_ledger_hash; timestamp] ->
+        {staged_ledger_hash; snarked_ledger_hash; timestamp})
 
   let data_spec =
     let open Data_spec in
@@ -134,18 +134,20 @@ end) : S = struct
     Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let var_to_triples ({staged_ledger_hash; ledger_hash; timestamp} : var) =
-    let%map ledger_hash_triples = Frozen_ledger_hash.var_to_triples ledger_hash
+  let var_to_triples
+      ({staged_ledger_hash; snarked_ledger_hash; timestamp} : var) =
+    let%map ledger_hash_triples =
+      Frozen_ledger_hash.var_to_triples snarked_ledger_hash
     and staged_ledger_hash_triples =
       Staged_ledger_hash.var_to_triples staged_ledger_hash
     in
     staged_ledger_hash_triples @ ledger_hash_triples
     @ Block_time.Unpacked.var_to_triples timestamp
 
-  let fold ({staged_ledger_hash; ledger_hash; timestamp} : value) =
+  let fold ({staged_ledger_hash; snarked_ledger_hash; timestamp} : value) =
     Fold.(
       Staged_ledger_hash.fold staged_ledger_hash
-      +> Frozen_ledger_hash.fold ledger_hash
+      +> Frozen_ledger_hash.fold snarked_ledger_hash
       +> Block_time.fold timestamp)
 
   let length_in_triples =
@@ -156,7 +158,7 @@ end) : S = struct
 
   let genesis =
     { staged_ledger_hash= Staged_ledger_hash.dummy
-    ; ledger_hash=
+    ; snarked_ledger_hash=
         Frozen_ledger_hash.of_ledger_hash
         @@ Ledger.merkle_root Genesis_ledger.t
     ; timestamp= Genesis_state_timestamp.value |> Block_time.of_time }
@@ -164,7 +166,7 @@ end) : S = struct
   let to_string_record t =
     Printf.sprintf "{staged_ledger_hash|%s}|{ledger_hash|%s}|{timestamp|%s}"
       (Base64.encode_string (Staged_ledger_hash.to_string t.staged_ledger_hash))
-      (Base64.encode_string (Frozen_ledger_hash.to_bytes t.ledger_hash))
+      (Base64.encode_string (Frozen_ledger_hash.to_bytes t.snarked_ledger_hash))
       (Time.to_string (Block_time.to_time t.timestamp))
 
   module Message = struct

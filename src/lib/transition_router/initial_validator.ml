@@ -64,8 +64,8 @@ module Make (Inputs : Inputs_intf) :
             |> Writer.write valid_transition_writer
         | Error e ->
             Logger.warn logger
-              !"Got an invalid transition from peer : %{sexp:Host_and_port.t} \
-                %{sexp:Error.t}"
+              !"Got an invalid transition from peer : \
+                %{sexp:Network_peer.Peer.t} %{sexp:Error.t}"
               sender e )
     |> don't_wait_for
 end
