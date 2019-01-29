@@ -121,7 +121,8 @@ struct
               Consensus.Mechanism.Protocol_state.blockchain_state
                 transition_protocol_state
             in
-            ( Consensus.Mechanism.Blockchain_state.ledger_hash blockchain_state
+            ( Consensus.Mechanism.Blockchain_state.snarked_ledger_hash
+                blockchain_state
             , Consensus.Mechanism.Blockchain_state.staged_ledger_hash
                 blockchain_state )
           in
@@ -211,7 +212,8 @@ struct
       Protocol_state.blockchain_state root_protocol_state
     in
     let root_blockchain_state_ledger_hash, root_blockchain_staged_ledger_hash =
-      ( Protocol_state.Blockchain_state.ledger_hash root_blockchain_state
+      ( Protocol_state.Blockchain_state.snarked_ledger_hash
+          root_blockchain_state
       , Protocol_state.Blockchain_state.staged_ledger_hash
           root_blockchain_state )
     in
