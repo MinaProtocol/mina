@@ -1194,7 +1194,7 @@ module Make (Inputs : Intf.Proof_of_stake.Inputs.S) : Intf.S = struct
         prev_state_hash ~supply_increase
         ~previous_blockchain_state_ledger_hash:
           ( Protocol_state.blockchain_state prev_state
-          |> Blockchain_state.ledger_hash )
+          |> Blockchain_state.snarked_ledger_hash )
   end
 
   let select ~existing ~candidate ~logger =
