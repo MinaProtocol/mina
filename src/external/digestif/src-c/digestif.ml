@@ -5,7 +5,7 @@ type 'a compare = 'a -> 'a -> int
 type 'a equal = 'a -> 'a -> bool
 type 'a pp = Format.formatter -> 'a -> unit
 
-module Native = Rakia
+module Native = Digestif_native
 module By = Digestif_by
 module Bi = Digestif_bi
 module Eq = Digestif_eq
