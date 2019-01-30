@@ -111,6 +111,18 @@ At these points in the code, the blacklist API would be called with these constr
 API should take a severity argument and a string indicating the nature of the
 bad behavior.
 
+# Integration with trust system
+
+RFC 0010 proposes a trust system where peers can earn positive trust
+through good actions, and lose trust through bad actions. The ban
+scoring proposed here can be integrated with the trust system, by
+decrementing trust upon bad actions, according to the severities
+mentioned above.
+
+The events classified as SEV should result in an immediate
+ban. Therefore, trust should be capped so that a single SEV event
+decrements the trust to the level resulting in a ban.
+
 ## Drawbacks
 
 A banning system in necessary to preserve the integrity of the
@@ -135,10 +147,6 @@ history leading to a ban score.
 There is existing code in Coda to maintain a set of peers banned by IP address.
 
 See the discussion above of how Bitcoin computes ban scores.
-
-RFC-0010 mentions a trust scoring system, where bad behavior decrements trust, but positive
-behavior increases trust. The ban scoring system here only mentions bad behavior, but could
-be integrated with a trust system.
 
 ## Unresolved questions
 
