@@ -2,8 +2,8 @@
 
 We propose a regime for ban scoring to supplement the ban mechanism
 proposed in RFC 0001-blacklisting. We take Bitcoin's scoring mechanism
-as a starting point, since that currency is subject to many of the
-same transgressions as Coda.
+as a starting point, since the Bitcoin network is subject to many of the
+same transgressions as the Coda network.
 
 ## Motivation
 
@@ -107,7 +107,9 @@ them with suggested constructors:
 - in `ledger_catchup.ml`, a transition could not be validated (SEV)
 - in `transaction_pool.ml`, a payment check fails (SEV)
 
-At these points in the code, the blacklist API would be called with these constructors.
+At these points in the code, the blacklist API would be called with these constructors. The
+API should take a severity argument and a string indicating the nature of the
+bad behavior.
 
 ## Drawbacks
 
