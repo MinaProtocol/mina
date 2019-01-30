@@ -82,7 +82,7 @@ module Reader : sig
     -> f:('a -> [`Fst of 'b | `Snd of 'c | `Trd of 'd])
     -> 'b t * 'c t * 'd t
   (** This function would take a pipe and split the reader side into 3 ends. The
-   *`read`s to the new pipe have to be in the same order as the `write`s or else
+   * `read`s to the new pipe have to be in the same order as the `write`s or else
    * there will be a deadlock. *)
 end
 
