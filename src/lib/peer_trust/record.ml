@@ -1,8 +1,8 @@
 open Core
 
-module type S = sig
-  type t
+type t = unit
 
+module type S = sig
   val init : unit -> t
 
   val add_trust : t -> float -> t
@@ -22,8 +22,6 @@ let stub () = failwith "stub"
 module Make (Now : sig
   val now : unit -> Time.t
 end) : S = struct
-  type t = unit
-
   (** Create a new blank trust record. *)
   let init = stub
 

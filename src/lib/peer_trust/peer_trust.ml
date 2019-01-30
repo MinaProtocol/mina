@@ -1,6 +1,6 @@
 open Core
 
-module type Action = sig
+module type Action_intf = sig
   type t
 
   val to_trust_increment : t -> float
@@ -33,8 +33,7 @@ module Make (Peer : sig
 
   val sexp_of_t : t -> Sexp.t
 end)
-(Action : Action)
-(Record : Record.S)
+(Action : Action_intf)
 (Db : Key_value_database.S with type key := Peer.t and type value := Record.t) :
   S with type peer := Peer.t and type action := Action.t = struct
   type t = unit

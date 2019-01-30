@@ -1,6 +1,6 @@
 (library
- (name peer_trust_lib)
-  (public_name peer_trust_lib)
+ (name peer_trust)
+  (public_name peer_trust)
   (library_flags (-linkall))
   (flags (-warn-error -27))
   (libraries core async time_simulator key_value_database)
