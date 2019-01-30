@@ -1,7 +1,8 @@
-open Core_kernel
+open Core
+open Network_peer
 
 module Incoming = struct
-  type 'a t = {data: 'a; sender: Host_and_port.t}
+  type 'a t = {data: 'a; sender: Peer.t} [@@deriving sexp, bin_io]
 
   let sender {sender; _} = sender
 
@@ -11,5 +12,10 @@ module Incoming = struct
 
   let map ~f t = {t with data= f t.data}
 
-  let local data = {data; sender= Host_and_port.of_string "127.0.0.1:0"}
+  let local data =
+    let sender =
+      Peer.create Unix.Inet_addr.localhost ~discovery_port:0
+        ~communication_port:0
+    in
+    {data; sender}
 end

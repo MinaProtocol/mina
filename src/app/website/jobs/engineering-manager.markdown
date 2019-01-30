@@ -24,6 +24,6 @@ Ideal candidates will be interested in:
 
 There are no hard requirements and we're more interested in learning about your individual background.
 
-If you'd be interested in talking further, please get in touch by sending an email with your resume and the subject "Engineering Manager" to jobs@o1labs.org.
+If you'd be interested in talking further, please get in touch by sending an email with your resume and the subject "Engineering Manager applicant" to [jobs@o1labs.org](mailto:jobs@o1labs.org?subject="Engineering Manager applicant").
 
 We are committed to building a diverse, inclusive company. People of color, LGBTQ individuals, women, and people with disabilities are strongly encouraged to apply.

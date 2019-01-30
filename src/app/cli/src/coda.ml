@@ -87,7 +87,13 @@ let daemon log =
        flag "txn-capacity"
          ~doc:
            "CAPACITY_LOG_2 Log of capacity of transactions per transition \
-            (default: 4)"
+            (default: 8)"
+         (optional int)
+     and work_delay_factor =
+       flag "work-delay-factor"
+         ~doc:
+           "DELAY_LOG_2 Log of number of block-times snark workers take to \
+            produce atleast two proofs (default:2)"
          (optional int)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
@@ -169,6 +175,10 @@ let daemon log =
          or_from_config YJ.Util.to_int_option "txn-capacity" ~default:8
            transaction_capacity_log_2
        in
+       let work_delay_factor =
+         or_from_config YJ.Util.to_int_option "work-delay-factor" ~default:2
+           work_delay_factor
+       in
        let snark_work_fee_flag =
          Currency.Fee.of_int
            (or_from_config YJ.Util.to_int_option "snark-worker-fee" ~default:0
@@ -243,7 +253,7 @@ let daemon log =
          match ip with None -> Find_ip.find () | Some ip -> return ip
        in
        let me =
-         Kademlia.Peer.create
+         Network_peer.Peer.create
            (Unix.Inet_addr.of_string ip)
            ~discovery_port ~communication_port:external_port
        in
@@ -274,6 +284,8 @@ let daemon log =
          let genesis_proof = Precomputed_values.base_proof
 
          let transaction_capacity_log_2 = transaction_capacity_log_2
+
+         let work_delay_factor = work_delay_factor
 
          let commit_id = commit_id
 
