@@ -52,7 +52,7 @@ end
 module Make (Digest : sig
   module Tick :
     Tick.Snarkable.Bits.Lossy
-    with type Packed.var = Tick.Field.Checked.t
+    with type Packed.var = Tick.Field.Var.t
      and type Packed.value = Tick.Pedersen.Digest.t
 end)
 (System : S) =
@@ -138,7 +138,7 @@ struct
       let%bind prev_state = exists' State.typ ~f:Prover_state.prev_state
       and update = exists' Update.typ ~f:Prover_state.update in
       let%bind prev_state_hash = State.Checked.hash prev_state in
-      let%bind next_state_hash, _next_state, `Success success =
+      let%bind next_state_hash, next_state, `Success success =
         with_label __LOC__
           (State.Checked.update (prev_state_hash, prev_state) update)
       in

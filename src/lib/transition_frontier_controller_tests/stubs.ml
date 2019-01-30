@@ -125,6 +125,8 @@ module Staged_ledger = Staged_ledger.Make (struct
 
   module Config = struct
     let transaction_capacity_log_2 = 7
+
+    let work_delay_factor = 2
   end
 end)
 
@@ -231,7 +233,7 @@ let gen_breadcrumb ~logger :
     in
     let previous_ledger_hash =
       previous_protocol_state |> Protocol_state.blockchain_state
-      |> Protocol_state.Blockchain_state.ledger_hash
+      |> Protocol_state.Blockchain_state.snarked_ledger_hash
     in
     let next_ledger_hash =
       Option.value_map ledger_proof_opt
@@ -241,7 +243,7 @@ let gen_breadcrumb ~logger :
     in
     let next_blockchain_state =
       Blockchain_state.create_value ~timestamp:(Block_time.now ())
-        ~ledger_hash:next_ledger_hash
+        ~snarked_ledger_hash:next_ledger_hash
         ~staged_ledger_hash:next_staged_ledger_hash
     in
     let previous_state_hash =

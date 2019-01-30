@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd $SCRIPTPATH/../src/_build
 
-PROJECT='coda'
+PROJECT="coda-${CODA_CONSENSUS}"
 DATE=$(date +%Y-%m-%d)
 GITHASH=$(git rev-parse --short=8 HEAD)
 
@@ -39,14 +39,14 @@ mkdir -p ${BUILDDIR}/usr/local/bin
 cp ./default/app/cli/src/coda.exe ${BUILDDIR}/usr/local/bin/coda
 cp ./default/app/logproc/src/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
 
-# Verification keys
+# Include keys
 if [ -d "/var/lib/coda" ]; then
     mkdir -p ${BUILDDIR}/var/lib/coda
-    cp /var/lib/coda/*_verification ${BUILDDIR}/var/lib/coda
+    cp /var/lib/coda/* ${BUILDDIR}/var/lib/coda
 else
     if [ -d "/tmp/coda_cache_dir" ]; then
         mkdir -p ${BUILDDIR}/var/lib/coda
-        cp /tmp/coda_cache_dir/*_verification ${BUILDDIR}/var/lib/coda
+        cp /tmp/coda_cache_dir/* ${BUILDDIR}/var/lib/coda
     fi
 fi
 

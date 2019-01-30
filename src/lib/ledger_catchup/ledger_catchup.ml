@@ -85,7 +85,7 @@ module Make (Inputs : Inputs.S) :
         let message =
           sprintf
             !"Could not find root hash, %{sexp:State_hash.t}.Peer \
-              %{sexp:Kademlia.Peer.t} is seen as malicious"
+              %{sexp:Network_peer.Peer.t} is seen as malicious"
             initial_state_hash peer
         in
         Logger.faulty_peer logger !"%s" message ;
@@ -106,12 +106,12 @@ module Make (Inputs : Inputs.S) :
         | None ->
             Deferred.return
             @@ Or_error.errorf
-                 !"Peer %{sexp:Kademlia.Peer.t} did not have transition"
+                 !"Peer %{sexp:Network_peer.Peer.t} did not have transition"
                  peer
         | Some [] ->
             let message =
               sprintf
-                !"Peer %{sexp:Kademlia.Peer.t} gave an empty list of \
+                !"Peer %{sexp:Network_peer.Peer.t} gave an empty list of \
                   transitions. They should respond with none"
                 peer
             in

@@ -63,7 +63,7 @@ struct
             match Payment.check txn with
             | None ->
                 Logger.faulty_peer t.log
-                  !"Transaction doesn't check %{sexp: Host_and_port.t}"
+                  !"Transaction doesn't check %{sexp: Network_peer.Peer.t}"
                   (Envelope.Incoming.sender env) ;
                 (pool, acc)
             | Some txn ->

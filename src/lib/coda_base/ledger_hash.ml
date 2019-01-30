@@ -56,7 +56,7 @@ let merge ~height (h1 : t) (h2 : t) =
 let empty_hash =
   let open Tick.Pedersen in
   digest_fold
-    (State.create params Curve_chunk_table.{curve_points_table})
+    (State.create params ~get_chunk_table)
     (Fold.string_triples "nothing up my sleeve")
   |> of_hash
 
@@ -77,7 +77,10 @@ let reraise_merkle_requests (With {request; respond}) =
   | Merkle_tree.Get_element addr -> respond (Delegate (Get_element addr))
   | _ -> unhandled
 
-let get t addr = Merkle_tree.get_req ~depth (var_to_hash_packed t) addr
+let get t addr =
+  handle
+    (Merkle_tree.get_req ~depth (var_to_hash_packed t) addr)
+    reraise_merkle_requests
 
 (*
    [modify_account t pk ~filter ~f] implements the following spec:

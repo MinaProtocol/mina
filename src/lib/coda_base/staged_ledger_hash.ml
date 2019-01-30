@@ -2,6 +2,7 @@ open Core
 open Fold_lib
 open Tuple_lib
 open Snark_params.Tick
+open Coda_digestif
 
 module Aux_hash = struct
   let length_in_bits = 256
@@ -74,4 +75,10 @@ let typ : (var, t) Typ.t =
   Typ.transport
     (Typ.list ~length:length_in_triples (triple Boolean.typ))
     ~there:(Fn.compose Fold.to_list fold)
-    ~back:(fun _ -> failwith "Cannot read a staged_ledger_hash from a var")
+    ~back:(fun _ ->
+      (* If we put a failwith here, we lose the ability to printf-inspect
+       * anything that uses staged-ledger-hashes from within Checked
+       * computations. It's useful when debugging to dump the protocol state
+       * and so we can just lie here instead. *)
+      printf "WARNING: improperly transportting staged-ledger-hash\n" ;
+      dummy )

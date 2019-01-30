@@ -1,5 +1,6 @@
 open Core
 open Snark_params
+open Coda_digestif
 
 let chunks_of n xs = List.groupi ~break:(fun i _ _ -> i mod n = 0) xs
 
@@ -51,12 +52,14 @@ let digest_string (s : string) : Digest.t =
   let t =
     if r = 0 then s else s ^ String.init ~f:(fun _ -> '\000') (block_length - r)
   in
-  Digest.of_bits (Digestif.SHA256.(feed_string (init ()) t).h |> words_to_bits)
+  Digest.of_bits
+    (Digestif.SHA256.(feed_string (init ()) t |> get_h) |> words_to_bits)
 
 let digest_bits (bits : bool list) : Digest.t =
   Digest.of_bits
-  @@ ( Digestif.SHA256.(feed_string (init ()) (bits_to_string (pad false bits)))
-         .h |> words_to_bits )
+  @@ ( Digestif.SHA256.(
+         feed_string (init ()) (bits_to_string (pad false bits)) |> get_h)
+     |> words_to_bits )
 
 module Checked = struct
   open Tick

@@ -30,7 +30,7 @@ include
   Tick.Snarkable.Bits.Faithful
   with type Unpacked.value = t
    and type Packed.value = t
-   and type Packed.var = private Tick.Field.Checked.t
+   and type Packed.var = private Tick.Field.Var.t
 
 module Span : sig
   type t [@@deriving sexp]
@@ -90,7 +90,7 @@ val ( <= ) : t -> t -> bool
 val ( >= ) : t -> t -> bool
 
 val field_var_to_unpacked :
-  Tick.Field.Checked.t -> (Unpacked.var, _) Tick.Checked.t
+  Tick.Field.Var.t -> (Unpacked.var, _) Tick.Checked.t
 
 val diff_checked :
   Unpacked.var -> Unpacked.var -> (Span.Unpacked.var, _) Tick.Checked.t

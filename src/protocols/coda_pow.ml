@@ -429,10 +429,10 @@ module type Transaction_snark_work_intf = sig
   end
 
   (* TODO: The SOK message actually should bind the SNARK to
-   be in this particular bundle. The easiest way would be to
-   SOK with
-   H(all_statements_in_bundle || fee || public_key)
-*)
+     be in this particular bundle. The easiest way would be to
+     SOK with
+     H(all_statements_in_bundle || fee || public_key)
+  *)
 
   type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
   [@@deriving sexp, bin_io]
@@ -573,6 +573,8 @@ module type Transaction_snark_scan_state_intf = sig
 
   type transaction_snark_work
 
+  type transaction_snark_work_statement
+
   type transaction_with_info
 
   type frozen_ledger_hash
@@ -622,11 +624,11 @@ module type Transaction_snark_scan_state_intf = sig
 
   val capacity : t -> int
 
-  val enqueue_transactions :
-    t -> Transaction_with_witness.t list -> unit Or_error.t
-
-  val fill_in_transaction_snark_work :
-    t -> transaction_snark_work list -> ledger_proof option Or_error.t
+  val fill_work_and_enqueue_transactions :
+       t
+    -> Transaction_with_witness.t list
+    -> transaction_snark_work list
+    -> ledger_proof option Or_error.t
 
   val latest_ledger_proof : t -> Ledger_proof_with_sok_message.t option
 
@@ -657,7 +659,16 @@ module type Transaction_snark_scan_state_intf = sig
 
   val statement_of_job : Available_job.t -> ledger_proof_statement option
 
+  val current_job_sequence_number : t -> int
+
   val snark_job_list_json : t -> string
+
+  val all_work_to_do :
+    t -> transaction_snark_work_statement Sequence.t Or_error.t
+
+  val current_job_count : t -> int
+
+  val work_capacity : unit -> int
 end
 
 module type Staged_ledger_base_intf = sig
@@ -683,7 +694,7 @@ module type Staged_ledger_base_intf = sig
   type serializable [@@deriving bin_io]
 
   module Scan_state : sig
-    type t [@@deriving bin_io]
+    type t [@@deriving bin_io, sexp]
 
     module Job_view : sig
       type t [@@deriving sexp, to_yojson]
@@ -877,13 +888,13 @@ module type Blockchain_state_intf = sig
 
   val create_value :
        staged_ledger_hash:staged_ledger_hash
-    -> ledger_hash:frozen_ledger_hash
+    -> snarked_ledger_hash:frozen_ledger_hash
     -> timestamp:time
     -> value
 
   val staged_ledger_hash : value -> staged_ledger_hash
 
-  val ledger_hash : value -> frozen_ledger_hash
+  val snarked_ledger_hash : value -> frozen_ledger_hash
 
   val timestamp : value -> time
 end

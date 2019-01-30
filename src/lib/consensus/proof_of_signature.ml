@@ -31,18 +31,8 @@ module Global_public_key = struct
   let t = Public_key.decompress_exn compressed
 end
 
-module type Inputs_intf = sig
-  module Time : Protocols.Coda_pow.Time_intf
-
-  module Genesis_ledger : sig
-    val t : Coda_base.Ledger.t
-  end
-
-  val proposal_interval : Time.Span.t
-end
-
-module Make (Inputs : Inputs_intf) : Intf.S = struct
-  open Inputs
+module Make (Inputs : Intf.Proof_of_signature.Inputs.S) : Intf.S = struct
+  module Constants = Inputs.Constants
 
   module Local_state = struct
     type t = unit [@@deriving sexp]
@@ -52,6 +42,8 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
 
   module Prover_state = struct
     include Unit
+
+    let precomputed_handler _ = Snarky.Request.unhandled
 
     let handler _ _ = Snarky.Request.unhandled
   end
@@ -178,8 +170,6 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
       ; signer_public_key= prev.signer_public_key }
   end
 
-  let block_interval_ms = Time.Span.to_ms proposal_interval
-
   let generate_transition ~previous_protocol_state ~blockchain_state ~time:_
       ~proposal_data ~transactions:_ ~snarked_ledger_hash:_ ~supply_increase:_
       ~logger:_ =
@@ -245,10 +235,10 @@ module Make (Inputs : Inputs_intf) : Intf.S = struct
   let next_proposal now _state ~local_state:_ ~keypair ~logger:_ =
     let open Unix_timestamp in
     let time_since_last_interval =
-      rem now (Time.Span.to_ms Inputs.proposal_interval)
+      rem now Inputs.Constants.block_duration_ms
     in
     let proposal_time =
-      now - time_since_last_interval + Time.Span.to_ms Inputs.proposal_interval
+      now - time_since_last_interval + Inputs.Constants.block_duration_ms
     in
     `Propose (proposal_time, keypair.Keypair.private_key)
 

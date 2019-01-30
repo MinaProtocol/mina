@@ -129,6 +129,39 @@ let core () =
        NICTA. He also worked on the initial implementation of Alacris, a \
        cryptocurrency solution layered on top of existing blockchains. He \
        holds a PhD in computer science from Northeastern University."
+  and vanishree =
+    plain "Vanishree Rao" "Protocol Researcher"
+      "Vanishree is a theoretical and applied cryptographer with deep \
+       experience in industry and academia. She earned her PhD at UCLA \
+       through her work on zk-proofs, multiparty computation, hashing, and \
+       pseudorandom functions, among other projects. She then worked in \
+       industry at Xerox PARC and Intertrust Technologies. Vanishree enjoys \
+       developing cryptographic solutions for real-world challenges and \
+       communicating intuitive explanations of complex cryptography concepts."
+  and echo =
+    plain "Echo Nolan" "Protocol Engineer"
+      "Echo is interested in programming languages, type systems and \
+       prediction markets. He has made open source contributions to Idris and \
+       various parts of the Haskell ecosystem. He's also made and lost a fair \
+       amount of money trading predictions on Augur. Before joining O(1) \
+       Labs, Echo worked on an text messaging platform for academic \
+       conselors, using functional programming techniques to deliver hundreds \
+       of thousands of messages to students."
+  and matthew =
+    plain "Matthew Ryan" "Protocol Engineer"
+      "Matthew Ryan is a self-taught programmer with a strong interest in \
+       computer-aided theorem proving, formal program verification, and \
+       functional programming. He has been involved with several open-source \
+       projects, and passionately believes in the open-source philosophy. He \
+       has a BSc in Mathematics from the University of Warwick, U.K., where \
+       he studied cryptography."
+  and rebekah =
+    plain "Rebekah Mercer" "Protocol Researcher"
+      "Most recently, Rebekah was a PhD student at Aarhus University, where \
+       she was advised by Claudio Orlandi and Ivan Damgård.  Her research \
+       revolves around cryptography and privacy, particularly privacy in \
+       cryptocurrencies. Rebekah holds an MSc in Information Security from \
+       UCL and a BSc in Mathematics from the University of Manchester."
   and nacera =
     plain "Nacera Rodstein" "Operations Associate"
       "Nacera has had a career spanning startups, medium sized companies, and \
@@ -138,6 +171,13 @@ let core () =
        acquisition by Turner), Mokum Solutions, Sephora, Venture Beat, AMSI, \
        Oracle, and a software sales business which she helped start up and \
        scale."
+  and harold =
+    plain "Harold Herbert" "Lead Designer"
+      "Harold previously designed brands, products, and experiences at Hired, \
+       Flipboard, Zillow, and with a range of technology companies while \
+       running an independent design studio. He believe’s that all design \
+       is experience design. Regardless of the medium, the end goal is the \
+       well being of the user."
   and joe =
     advisor "Joseph Bonneau"
       {literal|
@@ -190,7 +230,12 @@ She holds a MSc from Magdalen College, Oxford, and an AB from Harvard, where she
     ; john
     ; joel
     ; paul_steckler
+    ; vanishree
+    ; echo
+    ; matthew
+    ; rebekah
     ; nacera
+    ; harold
     ; joe
     ; akis
     ; benedikt
