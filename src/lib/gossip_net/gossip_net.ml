@@ -173,7 +173,7 @@ module Make (Message : Message_intf) :
                  ~f:(fun m ->
                    Logger.trace log "broadcasting message" ;
                    broadcast_random t t.target_peer_count m )) ) ;
-          let implementations =
+        let implementations =
           let implementations =
             Versioned_rpc.Menu.add
               ( Message.implement_multi
@@ -181,8 +181,7 @@ module Make (Message : Message_intf) :
                     (* TODO: maybe check client host matches IP in msg, punish if
                        mismatch due to forgery
                      *)
-                    Strict_pipe.Writer.write
-                      received_writer
+                    Strict_pipe.Writer.write received_writer
                       (Envelope.Incoming.wrap ~data:(Message.content msg)
                          ~sender:(Message.peer msg)) )
               @ implementations )
