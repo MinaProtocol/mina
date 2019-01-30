@@ -171,6 +171,13 @@ let core () =
        acquisition by Turner), Mokum Solutions, Sephora, Venture Beat, AMSI, \
        Oracle, and a software sales business which she helped start up and \
        scale."
+  and harold =
+    plain "Harold Herbert" "Lead Designer"
+      "Harold previously designed brands, products, and experiences at Hired, \
+       Flipboard, Zillow, and with a range of technology companies while \
+       running an independent design studio. He believe’s that all design \
+       is experience design. Regardless of the medium, the end goal is the \
+       well being of the user."
   and joe =
     advisor "Joseph Bonneau"
       {literal|
@@ -228,6 +235,7 @@ She holds a MSc from Magdalen College, Oxford, and an AB from Harvard, where she
     ; matthew
     ; rebekah
     ; nacera
+    ; harold
     ; joe
     ; akis
     ; benedikt
