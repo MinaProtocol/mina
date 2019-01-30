@@ -44,11 +44,14 @@ end = struct
   module Scan_state = Transaction_snark_scan_state.Make (Inputs)
 
   module Staged_ledger_error = struct
+    type partition = int * int option [@@deriving sexp]
+
     type t =
       | Bad_signature of User_command.t
       | Coinbase_error of string
       | Bad_prev_hash of Staged_ledger_hash.t * Staged_ledger_hash.t
       | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
+      | Non_zero_fee_excess of partition * Transaction.t list
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -68,6 +71,12 @@ end = struct
             !"Transaction fee %{sexp: Currency.Fee.t} does not suffice proof \
               fee %{sexp: Currency.Fee.t} \n"
             f1 f2
+      | Non_zero_fee_excess (partition, txns) ->
+          Format.asprintf
+            !"Fee excess is non-zero for the transactions: %{sexp: \
+              Transaction.t list} and the current queue partition %{sexp: \
+              partition} \n"
+            txns partition
       | Unexpected e -> Error.to_string_hum e
 
     let to_error = Fn.compose Error.of_string to_string
@@ -556,23 +565,27 @@ end = struct
     ; coinbase_parts_count= List.length coinbase }
 
   let zero_fee_excess scan_state data =
-    let max_throughput = Int.pow 2 Config.transaction_capacity_log_2 in
     let zero = Currency.Fee.Signed.zero in
-    let partitions =
-      Scan_state.partition_if_overflowing ~max_slots:max_throughput scan_state
+    let partitions = Scan_state.partition_if_overflowing scan_state in
+    let txns_from_data data =
+      List.fold_right ~init:(Ok []) data
+        ~f:(fun (d : Scan_state.Transaction_with_witness.t) acc ->
+          let open Or_error.Let_syntax in
+          let%bind acc = acc in
+          let%map t = d.transaction_with_info |> Ledger.Undo.transaction in
+          t :: acc )
     in
     let total_fee_excess txns =
-      List.fold txns ~init:(Ok (Some zero))
-        ~f:(fun fe (txn : Scan_state.Transaction_with_witness.t) ->
+      List.fold txns ~init:(Ok (Some zero)) ~f:(fun fe (txn : Transaction.t) ->
           let open Or_error.Let_syntax in
           let%bind fe' = fe in
-          let%bind t = txn.transaction_with_info |> Ledger.Undo.transaction in
-          let%map fee_excess = Transaction.fee_excess t in
+          let%map fee_excess = Transaction.fee_excess txn in
           Option.bind fe' ~f:(fun f -> Currency.Fee.Signed.add f fee_excess) )
       |> to_staged_ledger_or_error
     in
-    let check txns =
+    let check txns slots =
       let open Result.Let_syntax in
+      let%bind txns = txns_from_data txns |> to_staged_ledger_or_error in
       let%bind fe = total_fee_excess txns in
       let%bind fe_no_overflow =
         Option.value_map
@@ -583,16 +596,14 @@ end = struct
           fe
       in
       if Currency.Fee.Signed.equal fe_no_overflow zero then Ok ()
-      else
-        to_staged_ledger_or_error
-          (Or_error.error_string "diff has non zero fee excess")
+      else Error (Non_zero_fee_excess (slots, txns))
     in
     match partitions with
-    | `One _ -> check data
-    | `Two (x, _) ->
+    | `One x -> check data (x, None)
+    | `Two (x, y) ->
         Result.bind
-          (check (List.take data x))
-          ~f:(fun _ -> check (List.drop data x))
+          (check (List.take data x) (x, Some y))
+          ~f:(fun _ -> check (List.drop data x) (x, Some y))
 
   (* N.B.: we don't expose apply_diff_unverified
      in For_tests only, we expose apply apply_unverified, which calls apply_diff_unverified *)
@@ -1238,12 +1249,8 @@ end = struct
     O1trace.trace_event "curr_hash" ;
     let new_mask = Inputs.Ledger.Mask.create () in
     let tmp_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
-    let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
     O1trace.trace_event "done mask" ;
-    let partitions =
-      Scan_state.partition_if_overflowing ~max_slots:max_throughput
-        t.scan_state
-    in
+    let partitions = Scan_state.partition_if_overflowing t.scan_state in
     O1trace.trace_event "partitioned" ;
     (*TODO: return an or_error here *)
     let all_work_to_do =
@@ -2059,6 +2066,75 @@ let%test_module "test" =
                 () )
           in
           () )
+
+    let%test_unit "Invalid diff test: check zero fee excess for partitions" =
+      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
+      let g = Int.gen_incl 1 p in
+      let initial_ledger = ref 0 in
+      let sl = ref (Sl.create ~ledger:initial_ledger) in
+      let create_diff_with_non_zero_fee_excess prev_hash txns completed_works
+          partition : Test_input1.Staged_ledger_diff.t =
+        match partition with
+        | `One _ ->
+            { diff=
+                ({completed_works; user_commands= txns; coinbase= Zero}, None)
+            ; prev_hash
+            ; creator= "C" }
+        | `Two (x, _) ->
+            let diff : Test_input1.Staged_ledger_diff.diff =
+              ( { completed_works
+                ; user_commands= List.take txns x
+                ; coinbase= Zero }
+              , Some
+                  { completed_works= []
+                  ; user_commands= List.drop txns x
+                  ; coinbase= Zero } )
+            in
+            {diff; prev_hash; creator= "C"}
+      in
+      Quickcheck.test g ~trials:50 ~f:(fun i ->
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              let open Deferred.Let_syntax in
+              let logger = Logger.create () in
+              let txns = txns i (fun x -> (x + 1) * 100) (fun _ -> 4) in
+              let scan_state = Sl.scan_state !sl in
+              let work =
+                Or_error.ok_exn (Sl.Scan_state.all_work_to_do scan_state)
+              in
+              let partitions =
+                Sl.Scan_state.partition_if_overflowing scan_state
+              in
+              let partition_pair =
+                match partitions with
+                | `One x -> (x, None)
+                | `Two (x, y) -> (x, Some y)
+              in
+              let work_done =
+                Sequence.filter_map
+                  ~f:(fun stmts ->
+                    Some
+                      { Test_input1.Transaction_snark_work.Checked.fee=
+                          Fee.Unsigned.zero
+                      ; proofs= stmts
+                      ; prover= "P" } )
+                  work
+              in
+              let hash = Sl.hash !sl in
+              let diff =
+                create_diff_with_non_zero_fee_excess hash txns
+                  (Sequence.to_list work_done)
+                  partitions
+              in
+              match%map Sl.apply !sl diff ~logger with
+              | Error (Sl.Staged_ledger_error.Non_zero_fee_excess (p, _)) ->
+                  assert (p = partition_pair) ;
+                  assert true
+              | Error _ -> assert false
+              | Ok
+                  ( `Hash_after_applying _hash
+                  , `Ledger_proof _ledger_proof
+                  , `Staged_ledger sl' ) ->
+                  sl := sl' ) )
 
     let%test_unit "Snarked ledger" =
       Backtrace.elide := false ;

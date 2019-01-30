@@ -654,8 +654,7 @@ module type Transaction_snark_scan_state_intf = sig
 
   val copy : t -> t
 
-  val partition_if_overflowing :
-    t -> max_slots:int -> [`One of int | `Two of int * int]
+  val partition_if_overflowing : t -> [`One of int | `Two of int * int]
 
   val statement_of_job : Available_job.t -> ledger_proof_statement option
 
@@ -688,6 +687,10 @@ module type Staged_ledger_base_intf = sig
 
   type user_command
 
+  type statement
+
+  type transaction
+
   (** The ledger in a ledger builder is always a mask *)
   type ledger
 
@@ -707,6 +710,10 @@ module type Staged_ledger_base_intf = sig
     val empty : unit -> t
 
     val snark_job_list_json : t -> string
+
+    val partition_if_overflowing : t -> [`One of int | `Two of int * int]
+
+    val all_work_to_do : t -> statement Sequence.t Or_error.t
   end
 
   module Staged_ledger_error : sig
@@ -715,6 +722,7 @@ module type Staged_ledger_base_intf = sig
       | Coinbase_error of string
       | Bad_prev_hash of staged_ledger_hash * staged_ledger_hash
       | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
+      | Non_zero_fee_excess of (int * int option) * transaction list
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -773,8 +781,6 @@ module type Staged_ledger_intf = sig
 
   type user_command_with_valid_signature
 
-  type statement
-
   type ledger_proof_statement
 
   type ledger_proof_statement_set
@@ -784,8 +790,6 @@ module type Staged_ledger_intf = sig
   type completed_work_checked
 
   type public_key
-
-  type transaction
 
   val current_ledger_proof : t -> ledger_proof option
 
