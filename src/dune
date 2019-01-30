@@ -1,4 +1,5 @@
 (rule
   (targets config.mlh)
+  (mode fallback)
   (deps config/%{profile}.mlh)
   (action (copy "%{deps}" config.mlh)))

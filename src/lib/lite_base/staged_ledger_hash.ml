@@ -1,6 +1,7 @@
 open Sexplib.Std
 open Bin_prot.Std
 open Fold_lib
+open Coda_digestif
 
 module Aux_hash = struct
   type t = string [@@deriving bin_io, eq, sexp]

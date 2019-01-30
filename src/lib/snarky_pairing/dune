@@ -3,7 +3,7 @@
   (public_name snarky_pairing)
   (preprocess (pps ppx_jane ppx_deriving.eq))
   (libraries
-    sgn
+    sgn_type
     snarky_field_extensions
     snarky
     snarkette

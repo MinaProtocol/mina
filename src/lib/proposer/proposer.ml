@@ -196,7 +196,7 @@ module Make (Inputs : Inputs_intf) :
       lift_sync (fun () ->
           let previous_ledger_hash =
             previous_protocol_state |> Protocol_state.blockchain_state
-            |> Blockchain_state.ledger_hash
+            |> Blockchain_state.snarked_ledger_hash
           in
           let next_ledger_hash =
             Option.value_map ledger_proof_opt
@@ -212,7 +212,7 @@ module Make (Inputs : Inputs_intf) :
           in
           let blockchain_state =
             Blockchain_state.create_value ~timestamp:(Time.now time_controller)
-              ~ledger_hash:next_ledger_hash
+              ~snarked_ledger_hash:next_ledger_hash
               ~staged_ledger_hash:next_staged_ledger_hash
           in
           let time =

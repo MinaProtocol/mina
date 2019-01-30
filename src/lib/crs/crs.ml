@@ -1,3 +1,5 @@
+open Coda_digestif
+
 type t = unit -> bool
 
 let ith_bit s i = (Char.code s.[i / 8] lsr (i mod 8)) land 1 = 1
