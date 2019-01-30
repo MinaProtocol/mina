@@ -23,7 +23,7 @@ type (_, _) type_ =
       [`Capacity of int] * [`Overflow of 'b overflow_behavior]
       -> ('b buffered, unit) type_
 
-module Reader = struct
+module Reader0 = struct
   type 't t = {reader: 't Pipe.Reader.t; mutable has_reader: bool}
 
   (* TODO: See #1281 *)
@@ -163,9 +163,30 @@ end
 let create type_ =
   let reader, writer = Pipe.create () in
   let reader, writer =
-    (Reader.{reader; has_reader= false}, Writer.{type_; reader; writer})
+    (Reader0.{reader; has_reader= false}, Writer.{type_; reader; writer})
   in
   (reader, writer)
 
 let transfer reader {Writer.writer; _} ~f =
-  Reader.enforce_single_reader reader (Pipe.transfer reader.reader writer ~f)
+  Reader0.enforce_single_reader reader (Pipe.transfer reader.reader writer ~f)
+
+module Reader = struct
+  include Reader0
+
+  let partition_map3 reader ~f =
+    let (reader_a, writer_a), (reader_b, writer_b), (reader_c, writer_c) =
+      (create Synchronous, create Synchronous, create Synchronous)
+    in
+    don't_wait_for
+      (Reader0.iter reader ~f:(fun x ->
+           match f x with
+           | `Fst x -> Writer.write writer_a x
+           | `Snd x -> Writer.write writer_b x
+           | `Trd x -> Writer.write writer_c x )) ;
+    don't_wait_for
+      (let%map () = Pipe.closed reader_a.reader
+       and () = Pipe.closed reader_b.reader
+       and () = Pipe.closed reader_c.reader in
+       Pipe.close_read reader.reader) ;
+    (reader_a, reader_b, reader_c)
+end
