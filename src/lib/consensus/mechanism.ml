@@ -31,7 +31,7 @@ let env name ~f ~default =
 
 module Constants0 = struct
   let k =
-    env "K" ~default:12 ~f:(fun str ->
+    env "K" ~default:24 ~f:(fun str ->
         try Some (Int.of_string str) with _ -> None )
 
   let coinbase =
@@ -40,7 +40,7 @@ module Constants0 = struct
     )
 
   let block_duration_ms =
-    env "BLOCK_DURATION" ~default:(Int64.of_int 5000) ~f:(fun str ->
+    env "BLOCK_DURATION" ~default:(Int64.of_int 60000) ~f:(fun str ->
         try Some (Int64.of_string str) with _ -> None )
 end
 
