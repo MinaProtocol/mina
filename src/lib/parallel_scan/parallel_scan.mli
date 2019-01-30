@@ -44,11 +44,19 @@ end
 
 module State : sig
   module Job : sig
-    (** An incomplete job -- base may contain data ['d], merge contains zero or
-     * more ['a] work.
+    (** An incomplete job -- base may contain data ['d], merge can have zero components, one component (either the left or the right), or two components in which case there is an integer (sequence_no) representing a set of (completed)jobs in a sequence of (completed)jobs created.
      *)
-    type ('a, 'd) t = Merge of 'a option * 'a option | Base of 'd option
-    [@@deriving bin_io, sexp]
+    type sequence_no = int [@@deriving sexp, bin_io]
+
+    type 'a merge =
+      | Empty
+      | Lcomp of 'a
+      | Rcomp of 'a
+      | Bcomp of ('a * 'a * sequence_no)
+    [@@deriving sexp, bin_io]
+
+    type ('a, 'd) t = Merge of 'a merge | Base of ('d * sequence_no) option
+    [@@deriving sexp, bin_io]
   end
 
   module Completed_job : sig
@@ -109,7 +117,10 @@ end
 module Available_job : sig
   (** An available job is an incomplete job that has enough information for one
    * to process it into a completed job *)
-  type ('a, 'd) t = Base of 'd | Merge of 'a * 'a [@@deriving sexp]
+  type sequence_no = int [@@deriving sexp]
+
+  type ('a, 'd) t = Base of 'd * sequence_no | Merge of 'a * 'a * sequence_no
+  [@@deriving sexp]
 end
 
 module Job_view : sig
@@ -174,6 +185,14 @@ val is_valid : ('a, 'd) State.t -> bool
 val current_data : ('a, 'd) State.t -> 'd list
 (** The data ['d] that is pending and would be returned by available [Base]
  * jobs *)
+
+val update_curr_job_seq_no : ('a, 'd) State.t -> unit Or_error.t
+
+(*Update the current job sequence number by 1. All the completed jobs created will have the current job sequence number*)
+
+val current_job_sequence_number : ('a, 'd) State.t -> int
+
+(*Get the current job sequence number *)
 
 val view_jobs_with_position :
   ('a, 'd) State.t -> ('a -> 'c) -> ('d -> 'c) -> 'c Job_view.t list
