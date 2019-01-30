@@ -144,6 +144,10 @@ There is existing code in Coda to maintain a set of peers banned by IP address.
 
 See the discussion above of how Bitcoin computes ban scores.
 
+RFC-0010 mentions a trust scoring system, where bad behavior decrements trust, but positive
+behavior increases trust. The ban scoring system here only mentions bad behavior, but could
+be integrated with a trust system.
+
 ## Unresolved questions
 
 [unresolved-questions]: #unresolved-questions
