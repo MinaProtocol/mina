@@ -30,16 +30,16 @@ amount. In other cases, the score is incremented by the value of a
 "DoS" value associated with a peer. There's a separate API for
 incrementing the DoS value when rejecting a transaction.
 
-At the time of writing (commit d6e700e), the Misbehaving API is called for certain 
+At the time of writing (commit d6e700e), the Misbehaving API is called for certain
 behaviors with fixed ban score increments. These behaviors have a score of 100,
 resulting in an immediate ban:
 
 - invalid block, invalid compact block, nonmatching block transactions
-- invalid Bloom filter version, too-large Bloom filter, 
+- invalid Bloom filter version, too-large Bloom filter,
 - too-large data item to add to Bloom filter, add to missing Bloom filter
 - invalid orphan tx, out-of-bounds tx indices
- 
-One misbehavior has a score of 50: 
+
+One misbehavior has a score of 50:
 
 - message too large for buffer
 
@@ -69,38 +69,40 @@ the DoS is not incremented, such as the "mempool-full" condition.
 
 # Coda at the moment
 
-Bitcoin is a mature codebase, so there are many places where ban scoring has been 
-used. Nonetheless, Bitcoin uses a relatively coarse ban scoring system; only 
-a few ban score increment values are used. In Coda, we could reify scores into a 
+Bitcoin is a mature codebase, so there are many places where ban scoring has been
+used. Nonetheless, Bitcoin uses a relatively coarse ban scoring system; only
+a few ban score increment values are used. In Coda, we could reify scores into a
 datatype:
 
 ```ocaml
-  type ban_score = 
-    | Ban_score_severe
-	| Ban_score_moderate
-	| Ban_score_trivial
+  module Ban_score = struct
+    type t =
+        | Severe
+	| Moderate
+	| Trivial
+  end
 ```
-A slightly finer gradation could be used, if desired. The blacklisting system 
+A slightly finer gradation could be used, if desired. The blacklisting system
 could translate these constructors into numerical scores. Let's call these
 constructors SEV, MOD, and TRV.
 
-In a number of places, the Coda codebase has comments indicating that 
+In a number of places, the Coda codebase has comments indicating that
 a peer should be punished, either via a `TODO` or call to `Logger.faulty_peer`.
-Let's classify those places where punishment has been flagged, and annotate 
+Let's classify those places where punishment has been flagged, and annotate
 them with suggested constructors:
 
-- in `bootstrap_controller.ml`, for bad proofs (SEV), and a validation error when 
+- in `bootstrap_controller.ml`, for bad proofs (SEV), and a validation error when
     building a breadcrumb (SEV)
 - in `coda_networking.ml`, when an invalid staged ledger hash is received (SEV), or
     when a transition sender does not return ancestors (MOD)
 - in `ledger_catchup.ml`, when a root hash can't be found (SEV), or a peer returns an empty list
     of transitions (instead of `None`) (TRV)
 - in `linked_tree.ml`, for peers requesting nonexistent ancestor paths (MOD)
-- in `parallel_scan.ml`, in `update_new_job` for unneeded merges (?) (MOD)
+- in `parallel_scan.ml`, in `update_new_job` for unneeded merges (?) (SEV)
 - in `staged_ledger.ml`, when a bad signature is encountered when applying a pre-diff (SEV)
-- in `syncable_ledger.ml`, in `num_accounts`, when a content hash doesn't match a stored root hash (SEV), 
+- in `syncable_ledger.ml`, in `num_accounts`, when a content hash doesn't match a stored root hash (SEV),
     and in `main_loop`, when a child hash can't be added (MOD)
-- in `catchup_scheduler.ml` and `processor.ml`, when a breadcrumb can't be built from a 
+- in `catchup_scheduler.ml` and `processor.ml`, when a breadcrumb can't be built from a
     transition (SEV) (same failure as in `bootstrap_controller.ml`, above)
 - in `ledger_catchup.ml`, a transition could not be validated (SEV)
 - in `transaction_pool.ml`, a payment check fails (SEV)
@@ -142,4 +144,3 @@ be integrated with a trust system.
 - Can a peer too-easily circumvent the system?
 - What are the numerical values associated with the constructors above?
 - What is the ban threshold?
-
