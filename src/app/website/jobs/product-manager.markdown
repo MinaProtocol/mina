@@ -16,6 +16,7 @@ Product managers will:
 This is a chance to join a small, collaborative team and have a ton of independence while working on fascinating cross-disciplinary problems that span cryptography, engineering, product design, economics, and sociology. We also offer competitive compensation both in salary and equity as well as top-of-the-market benefits.
 
 Ideal candidates will be interested in any of:
+
 * Design
 * API design
 * Developer relations
