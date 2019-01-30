@@ -125,6 +125,8 @@ module Staged_ledger = Staged_ledger.Make (struct
 
   module Config = struct
     let transaction_capacity_log_2 = 7
+
+    let work_delay_factor = 2
   end
 end)
 
