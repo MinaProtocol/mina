@@ -1,15 +1,11 @@
 ## Summary
 
-[summary]: #summary
-
 We propose a regime for ban scoring to supplement the ban mechanism
 proposed in RFC 0001-blacklisting. We take Bitcoin's scoring mechanism
 as a starting point, since that currency is subject to many of the
 same transgressions as Coda.
 
 ## Motivation
-
-[motivation]: #motivation
 
 There are several points in the code marked *TODO:punish*, but to
 date, there hasn't been a systematic review of how the behaviors at
@@ -18,8 +14,6 @@ should minimize the bad effects of malicious or buggy nodes, while
 allowing honest nodes to remain active in the network.
 
 ## Detailed design
-
-[detailed-design]: #detailed-design
 
 # Bitcoin
 
@@ -40,20 +34,20 @@ At the time of writing (commit d6e700e), the Misbehaving API is called for certa
 behaviors with fixed ban score increments. These behaviors have a score of 100,
 resulting in an immediate ban:
 
- - invalid block, invalid compact block, nonmatching block transactions
- - invalid Bloom filter version, too-large Bloom filter, 
- - too-large data item to add to Bloom filter, add to missing Bloom filter
- - invalid orphan tx, out-of-bounds tx indices
+- invalid block, invalid compact block, nonmatching block transactions
+- invalid Bloom filter version, too-large Bloom filter, 
+- too-large data item to add to Bloom filter, add to missing Bloom filter
+- invalid orphan tx, out-of-bounds tx indices
  
 One misbehavior has a score of 50: 
 
- - message too large for buffer
+- message too large for buffer
 
 For a score of 20:
 
- - too many unconnecting headers
- - too-big message "addr", "inventory", or "getdata" message sizes
- - too many headers, non-continuous headers
+- too many unconnecting headers
+- too-big message "addr", "inventory", or "getdata" message sizes
+- too many headers, non-continuous headers
 
 And a score of of 1:
 
@@ -95,27 +89,25 @@ a peer should be punished, either via a `TODO` or call to `Logger.faulty_peer`.
 Let's classify those places where punishment has been flagged, and annotate 
 them with suggested constructors:
 
-  - in `bootstrap_controller.ml`, for bad proofs (SEV), and a validation error when 
-      building a breadcrumb (SEV)
-  - in `coda_networking.ml`, when an invalid staged ledger hash is received (SEV), or
-      when a transition sender does not return ancestors (MOD)
-  - in `ledger_catchup.ml`, when a root hash can't be found (SEV), or a peer returns an empty list
-      of transitions (instead of `None`) (TRV)
-  - in `linked_tree.ml`, for peers requesting nonexistent ancestor paths (MOD)
-  - in `parallel_scan.ml`, in `update_new_job` for unneeded merges (?) (MOD)
-  - in `staged_ledger.ml`, when a bad signature is encountered when applying a pre-diff (SEV)
-  - in `syncable_ledger.ml`, in `num_accounts`, when a content hash doesn't match a stored root hash (SEV), 
-	  and in `main_loop`, when a child hash can't be added (MOD)
-  - in `catchup_scheduler.ml` and `processor.ml`, when a breadcrumb can't be built from a 
-      transition (SEV) (same failure as in `bootstrap_controller.ml`, above)
-  - in `ledger_catchup.ml`, a transition could not be validated (SEV)
-  - in `transaction_pool.ml`, a payment check fails (SEV)
+- in `bootstrap_controller.ml`, for bad proofs (SEV), and a validation error when 
+    building a breadcrumb (SEV)
+- in `coda_networking.ml`, when an invalid staged ledger hash is received (SEV), or
+    when a transition sender does not return ancestors (MOD)
+- in `ledger_catchup.ml`, when a root hash can't be found (SEV), or a peer returns an empty list
+    of transitions (instead of `None`) (TRV)
+- in `linked_tree.ml`, for peers requesting nonexistent ancestor paths (MOD)
+- in `parallel_scan.ml`, in `update_new_job` for unneeded merges (?) (MOD)
+- in `staged_ledger.ml`, when a bad signature is encountered when applying a pre-diff (SEV)
+- in `syncable_ledger.ml`, in `num_accounts`, when a content hash doesn't match a stored root hash (SEV), 
+    and in `main_loop`, when a child hash can't be added (MOD)
+- in `catchup_scheduler.ml` and `processor.ml`, when a breadcrumb can't be built from a 
+    transition (SEV) (same failure as in `bootstrap_controller.ml`, above)
+- in `ledger_catchup.ml`, a transition could not be validated (SEV)
+- in `transaction_pool.ml`, a payment check fails (SEV)
 
 At these points in the code, the blacklist API would be called with these constructors.
 
 ## Drawbacks
-
-[drawbacks]: #drawbacks
 
 A banning system in necessary to preserve the integrity of the
 network. The only drawback would be if the system is ineffective.
@@ -124,8 +116,6 @@ In this RFC, we don't consider how to make the ban scoring persistent,
 which will be required, since nodes stop and re-start.
 
 ## Rationale and alternatives
-
-[rationale-and-alternatives]: #rationale-and-alternatives
 
 The locations in the code mentioned above are only those already
 flagged with `TODO` or `faulty_peer`. There may be other code
@@ -138,8 +128,6 @@ history leading to a ban score.
 
 ## Prior art
 
-[prior-art]: #prior-art
-
 There is existing code in Coda to maintain a set of peers banned by IP address.
 
 See the discussion above of how Bitcoin computes ban scores.
@@ -150,10 +138,8 @@ be integrated with a trust system.
 
 ## Unresolved questions
 
-[unresolved-questions]: #unresolved-questions
-
- - Is there a principled way to decide the severity of transgressions by peers?
- - Can a peer too-easily circumvent the system?
- - What are the numerical values associated with the constructors above?
- - What is the ban threshold?
+- Is there a principled way to decide the severity of transgressions by peers?
+- Can a peer too-easily circumvent the system?
+- What are the numerical values associated with the constructors above?
+- What is the ban threshold?
 
