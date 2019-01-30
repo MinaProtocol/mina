@@ -156,7 +156,7 @@ module Make (Message : Message_intf) :
         let peer_events = Membership.changes membership in
         let broadcast_reader, broadcast_writer = Linear_pipe.create () in
         let received_reader, received_writer =
-          Strict_pipe.create Synchronous
+          Strict_pipe.create (Buffered (`Capacity 64, `Overflow Drop_head))
         in
         let t =
           { timeout= config.timeout
@@ -173,8 +173,7 @@ module Make (Message : Message_intf) :
                  ~f:(fun m ->
                    Logger.trace log "broadcasting message" ;
                    broadcast_random t t.target_peer_count m )) ) ;
-        let broadcast_received_capacity = 64 in
-        let implementations =
+          let implementations =
           let implementations =
             Versioned_rpc.Menu.add
               ( Message.implement_multi
@@ -182,10 +181,8 @@ module Make (Message : Message_intf) :
                     (* TODO: maybe check client host matches IP in msg, punish if
                        mismatch due to forgery
                      *)
-                    Linear_pipe.force_write_maybe_drop_head
-                      ~capacity:broadcast_received_capacity
-                      (Strict_pipe.Writer.to_linear_pipe received_writer)
-                      (Strict_pipe.Reader.to_linear_pipe received_reader)
+                    Strict_pipe.Writer.write
+                      received_writer
                       (Envelope.Incoming.wrap ~data:(Message.content msg)
                          ~sender:(Message.peer msg)) )
               @ implementations )
