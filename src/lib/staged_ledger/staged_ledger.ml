@@ -564,7 +564,7 @@ end = struct
     ; user_commands_count= List.length user_commands
     ; coinbase_parts_count= List.length coinbase }
 
-  let zero_fee_excess scan_state data =
+  let check_zero_fee_excess scan_state data =
     let zero = Currency.Fee.Signed.zero in
     let partitions = Scan_state.partition_if_overflowing scan_state in
     let txns_from_data data =
@@ -583,9 +583,9 @@ end = struct
           Option.bind fe' ~f:(fun f -> Currency.Fee.Signed.add f fee_excess) )
       |> to_staged_ledger_or_error
     in
-    let check txns slots =
+    let check data slots =
       let open Result.Let_syntax in
-      let%bind txns = txns_from_data txns |> to_staged_ledger_or_error in
+      let%bind txns = txns_from_data data |> to_staged_ledger_or_error in
       let%bind fe = total_fee_excess txns in
       let%bind fe_no_overflow =
         Option.value_map
@@ -672,7 +672,7 @@ end = struct
       , p1.coinbase_parts_count + p2.coinbase_parts_count )
     in
     let%bind () = check_completed_works scan_state' works in
-    let%bind () = Deferred.return (zero_fee_excess scan_state' data) in
+    let%bind () = Deferred.return (check_zero_fee_excess scan_state' data) in
     let%bind res_opt =
       (* TODO: Add rollback *)
       let r =
