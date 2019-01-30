@@ -100,6 +100,8 @@ end)
 
     val to_affine_coordinates : t -> Field.t * Field.t
 
+    val point_near_x : Field.t -> t
+
     val zero : t
 
     val add : t -> t -> t
@@ -157,22 +159,17 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
                 i + 1 )
           in
           let ctx = Digestif.SHA256.feed_bigstring t.ctx bs in
-          { t with
-            ctx; triples_consumed= t.triples_consumed + triples_consumed_here
-          } )
-
-    let digest t =
-      O1trace.measure "digest" (fun () ->
           let bit_at s i =
             (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1
           in
           let dgst = (Digestif.SHA256.get t.ctx :> string) in
           O1trace.trace_event "about to make field element" ;
           let bits = List.init 256 ~f:(bit_at dgst) in
-          Field.project bits )
-
-    let salt params ~get_chunk_table s =
-      update_fold (create params ~get_chunk_table) (Fold.string_triples s)
+          let x = Field.project bits in
+          { t with
+            acc= Curve.point_near_x x
+          ; ctx
+          ; triples_consumed= t.triples_consumed + triples_consumed_here } )
 
     let set_chunked_fold _ = ()
 
@@ -294,14 +291,14 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
 
     let update_fold t fold = !update_fold_fun_ref t fold
 
+    [%%endif]
+
     let digest t =
       let x, _y = Curve.to_affine_coordinates t.acc in
       x
 
     let salt params ~get_chunk_table s =
       update_fold (create params ~get_chunk_table) (Fold.string_triples s)
-
-    [%%endif]
   end
 
   let hash_fold s fold = State.update_fold s fold
