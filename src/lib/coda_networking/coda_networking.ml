@@ -393,7 +393,8 @@ module Make (Inputs : Inputs_intf) = struct
        block announcment).
     *)
     let states, snark_pool_diffs, transaction_pool_diffs =
-      Linear_pipe.partition_map3 (Gossip_net.received gossip_net) ~f:(fun x ->
+      Strict_pipe.Reader.partition_map3 (Gossip_net.received gossip_net)
+        ~f:(fun x ->
           match Envelope.Incoming.data x with
           | New_state s ->
               Perf_histograms.add_span ~name:"external_transition_latency"
@@ -408,9 +409,10 @@ module Make (Inputs : Inputs_intf) = struct
     in
     { gossip_net
     ; log
-    ; states= Strict_pipe.Reader.of_linear_pipe states
-    ; snark_pool_diffs
-    ; transaction_pool_diffs }
+    ; states
+    ; snark_pool_diffs= Strict_pipe.Reader.to_linear_pipe snark_pool_diffs
+    ; transaction_pool_diffs=
+        Strict_pipe.Reader.to_linear_pipe transaction_pool_diffs }
 
   (* wrap data in envelope, with "me" in the gossip net as the sender *)
   let envelope_from_me t data =

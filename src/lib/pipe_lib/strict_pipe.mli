@@ -76,6 +76,11 @@ module Reader : sig
 
     val two : 'a t -> 'a t * 'a t
   end
+
+  val partition_map3 :
+       'a t
+    -> f:('a -> [`Fst of 'b | `Snd of 'c | `Trd of 'd])
+    -> 'b t * 'c t * 'd t
 end
 
 module Writer : sig
