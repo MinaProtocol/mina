@@ -3,6 +3,8 @@ open Core_kernel
 (* A non-empty list is a tuple of the head and the rest (as a list) *)
 type 'a t = 'a * 'a list [@@deriving sexp, compare, eq, hash]
 
+let init x xs = (x, xs)
+
 let head (x, _) = x
 
 let tail (_, xs) = xs
@@ -30,3 +32,5 @@ let iter = C.iter
 let fold_until = C.fold_until
 
 let length = C.length
+
+let to_list (x, xs) = x :: xs

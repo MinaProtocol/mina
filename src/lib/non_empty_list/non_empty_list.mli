@@ -2,6 +2,9 @@
 
 type 'a t [@@deriving sexp, compare, eq, hash]
 
+val init : 'a -> 'a list -> 'a t
+(** Create a non-empty list by proving you have a head element *)
+
 val head : 'a t -> 'a
 (** The first element of the container *)
 
@@ -23,3 +26,6 @@ val fold : 'a t -> init:'accum -> f:('accum -> 'a -> 'accum) -> 'accum
 val iter : 'a t -> f:('a -> unit) -> unit
 
 val length : 'a t -> int
+
+val to_list : 'a t -> 'a list
+(** Note: This is O(1) not O(n) like on most container *)
