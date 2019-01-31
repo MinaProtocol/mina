@@ -258,38 +258,62 @@ module TestDB16_1026 =
       let num_accts = 1026
     end)
 
-module Mask3 = Test_mask.Make (struct
+module Mask3_Layer1 = Test_mask.Make (struct
   let depth = 3
+
+  let mask_layers = 1
 end)
 
-module Mask16 = Test_mask.Make (struct
+module Mask16_Layer1 = Test_mask.Make (struct
   let depth = 16
+
+  let mask_layers = 1
 end)
 
-module TestMask3_3 =
+module Mask16_Layer2 = Test_mask.Make (struct
+  let depth = 16
+
+  let mask_layers = 2
+end)
+
+module TestMask3_Layer1_3 =
   Make
-    (Mask3)
+    (Mask3_Layer1)
     (struct
       let num_accts = 3
     end)
 
-module TestMask3_8 =
+module TestMask3_Layer1_8 =
   Make
-    (Mask3)
+    (Mask3_Layer1)
     (struct
       let num_accts = 8
     end)
 
-module TestMask16_20 =
+module TestMask16_Layer1_20 =
   Make
-    (Mask16)
+    (Mask16_Layer1)
     (struct
       let num_accts = 20
     end)
 
-module TestMask16_1024 =
+module TestMask16_Layer1_1024 =
   Make
-    (Mask16)
+    (Mask16_Layer1)
+    (struct
+      let num_accts = 1024
+    end)
+
+module TestMask16_Layer2_20 =
+  Make
+    (Mask16_Layer2)
+    (struct
+      let num_accts = 20
+    end)
+
+module TestMask16_Layer2_1024 =
+  Make
+    (Mask16_Layer2)
     (struct
       let num_accts = 1024
     end)

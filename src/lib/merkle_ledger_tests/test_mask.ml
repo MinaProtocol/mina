@@ -2,8 +2,6 @@
 
 open Core
 open Test_stubs
-
-(* HACK: Put module instantiations outside of the test to render the code nicely for VScode *)
 module Database = Merkle_ledger.Database
 
 module type Test_intf = sig
