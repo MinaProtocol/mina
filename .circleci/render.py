@@ -23,8 +23,8 @@ build_profiles = [
 
 tests = [
    {'friendly': 'Fake Hash', 'config':'fake_hash',  'name': 'fake_hash_full_test', 'env_str': "CODA_PROPOSAL_INTERVAL=8000", 'actions': ['full-test']},
-   {'friendly': 'Sig Tests', 'config':'test_posig',  'name': 'all_sig_integration_tests', 'env_str': "CODA_PROPOSAL_INTERVAL=8000", 'actions': base_actions},
-   {'friendly': 'Stake Tests', 'config':'test_postake', 'name': 'all_stake_integration_tests', 'env_str': "CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8", 'actions': base_actions}
+   {'friendly': 'Proof of Signature Tests', 'config':'test_posig_snarkless',  'name': 'posig_integration_tests', 'env_str': "CODA_PROPOSAL_INTERVAL=8000", 'actions': base_actions},
+   {'friendly': 'Proof of Stake Tests', 'config':'test_postake_snarkless', 'name': 'posstake_integration_tests', 'env_str': "CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8", 'actions': base_actions}
 ]
 
 # Render it

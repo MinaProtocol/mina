@@ -215,7 +215,7 @@ jobs:
             - run:
                   name: Running test - Fake Hash | full-test
                   command: source ~/.profile && DUNE_PROFILE=fake_hash source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'full-test'
-    test-all_sig_integration_tests:
+    test-posig_integration_tests:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
@@ -227,35 +227,35 @@ jobs:
                   command: make check-render-circleci
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_posig make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && DUNE_PROFILE=test_posig_snarkless make build 2>&1 | tee /tmp/buildocaml.log
             - run:
-                  name: Running test - Sig Tests | full-test
-                  command: source ~/.profile && DUNE_PROFILE=test_posig source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'full-test'
+                  name: Running test - Proof of Signature Tests | full-test
+                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'full-test'
             - run:
-                  name: Running test - Sig Tests | coda-peers-test
-                  command: source ~/.profile && DUNE_PROFILE=test_posig source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-peers-test'
+                  name: Running test - Proof of Signature Tests | coda-peers-test
+                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-peers-test'
             - run:
-                  name: Running test - Sig Tests | coda-transitive-peers-test
-                  command: source ~/.profile && DUNE_PROFILE=test_posig source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-transitive-peers-test'
+                  name: Running test - Proof of Signature Tests | coda-transitive-peers-test
+                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-transitive-peers-test'
             - run:
-                  name: Running test - Sig Tests | coda-block-production-test
-                  command: source ~/.profile && DUNE_PROFILE=test_posig source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-block-production-test'
+                  name: Running test - Proof of Signature Tests | coda-block-production-test
+                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-block-production-test'
             - run:
-                  name: Running test - Sig Tests | coda-shared-prefix-test -who-proposes 0
-                  command: source ~/.profile && DUNE_PROFILE=test_posig source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
+                  name: Running test - Proof of Signature Tests | coda-shared-prefix-test -who-proposes 0
+                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
             - run:
-                  name: Running test - Sig Tests | coda-shared-prefix-test -who-proposes 1
-                  command: source ~/.profile && DUNE_PROFILE=test_posig source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
+                  name: Running test - Proof of Signature Tests | coda-shared-prefix-test -who-proposes 1
+                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
             - run:
-                  name: Running test - Sig Tests | coda-shared-state-test
-                  command: source ~/.profile && DUNE_PROFILE=test_posig source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-state-test'
+                  name: Running test - Proof of Signature Tests | coda-shared-state-test
+                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-state-test'
             - run:
-                  name: Running test - Sig Tests | coda-restart-node-test
-                  command: source ~/.profile && DUNE_PROFILE=test_posig source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-restart-node-test'
+                  name: Running test - Proof of Signature Tests | coda-restart-node-test
+                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-restart-node-test'
             - run:
-                  name: Running test - Sig Tests | transaction-snark-profiler -check-only
-                  command: source ~/.profile && DUNE_PROFILE=test_posig source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'transaction-snark-profiler -check-only'
-    test-all_stake_integration_tests:
+                  name: Running test - Proof of Signature Tests | transaction-snark-profiler -check-only
+                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'transaction-snark-profiler -check-only'
+    test-posstake_integration_tests:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
@@ -267,34 +267,34 @@ jobs:
                   command: make check-render-circleci
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_postake make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && DUNE_PROFILE=test_postake_snarkless make build 2>&1 | tee /tmp/buildocaml.log
             - run:
-                  name: Running test - Stake Tests | full-test
-                  command: source ~/.profile && DUNE_PROFILE=test_postake source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'full-test'
+                  name: Running test - Proof of Stake Tests | full-test
+                  command: source ~/.profile && DUNE_PROFILE=test_postake_snarkless source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'full-test'
             - run:
-                  name: Running test - Stake Tests | coda-peers-test
-                  command: source ~/.profile && DUNE_PROFILE=test_postake source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-peers-test'
+                  name: Running test - Proof of Stake Tests | coda-peers-test
+                  command: source ~/.profile && DUNE_PROFILE=test_postake_snarkless source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-peers-test'
             - run:
-                  name: Running test - Stake Tests | coda-transitive-peers-test
-                  command: source ~/.profile && DUNE_PROFILE=test_postake source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-transitive-peers-test'
+                  name: Running test - Proof of Stake Tests | coda-transitive-peers-test
+                  command: source ~/.profile && DUNE_PROFILE=test_postake_snarkless source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-transitive-peers-test'
             - run:
-                  name: Running test - Stake Tests | coda-block-production-test
-                  command: source ~/.profile && DUNE_PROFILE=test_postake source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-block-production-test'
+                  name: Running test - Proof of Stake Tests | coda-block-production-test
+                  command: source ~/.profile && DUNE_PROFILE=test_postake_snarkless source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-block-production-test'
             - run:
-                  name: Running test - Stake Tests | coda-shared-prefix-test -who-proposes 0
-                  command: source ~/.profile && DUNE_PROFILE=test_postake source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
+                  name: Running test - Proof of Stake Tests | coda-shared-prefix-test -who-proposes 0
+                  command: source ~/.profile && DUNE_PROFILE=test_postake_snarkless source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
             - run:
-                  name: Running test - Stake Tests | coda-shared-prefix-test -who-proposes 1
-                  command: source ~/.profile && DUNE_PROFILE=test_postake source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
+                  name: Running test - Proof of Stake Tests | coda-shared-prefix-test -who-proposes 1
+                  command: source ~/.profile && DUNE_PROFILE=test_postake_snarkless source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
             - run:
-                  name: Running test - Stake Tests | coda-shared-state-test
-                  command: source ~/.profile && DUNE_PROFILE=test_postake source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-state-test'
+                  name: Running test - Proof of Stake Tests | coda-shared-state-test
+                  command: source ~/.profile && DUNE_PROFILE=test_postake_snarkless source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-state-test'
             - run:
-                  name: Running test - Stake Tests | coda-restart-node-test
-                  command: source ~/.profile && DUNE_PROFILE=test_postake source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-restart-node-test'
+                  name: Running test - Proof of Stake Tests | coda-restart-node-test
+                  command: source ~/.profile && DUNE_PROFILE=test_postake_snarkless source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-restart-node-test'
             - run:
-                  name: Running test - Stake Tests | transaction-snark-profiler -check-only
-                  command: source ~/.profile && DUNE_PROFILE=test_postake source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'transaction-snark-profiler -check-only'
+                  name: Running test - Proof of Stake Tests | transaction-snark-profiler -check-only
+                  command: source ~/.profile && DUNE_PROFILE=test_postake_snarkless source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'transaction-snark-profiler -check-only'
 
 workflows:
     version: 2
@@ -307,8 +307,8 @@ workflows:
             - build_testnet_postake
             - build_testnet_public
             - test-fake_hash_full_test
-            - test-all_sig_integration_tests
-            - test-all_stake_integration_tests
+            - test-posig_integration_tests
+            - test-posstake_integration_tests
             - test-withsnark
             - test-unit-test
             - tracetool
