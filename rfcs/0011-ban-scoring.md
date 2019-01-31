@@ -15,7 +15,7 @@ allowing honest nodes to remain active in the network.
 
 ## Detailed design
 
-# Bitcoin
+### Bitcoin
 
 In Bitcoin, certain kinds of misbehavior increase a node's ban score.
 If a nodes score exceeds a threshold, by default equal to 100, the
@@ -67,7 +67,7 @@ work fails, increments DoS by 50. A previous-block-not-found rejection
 increments DoS by 10. In several cases, transactions are rejected, but
 the DoS is not incremented, such as the "mempool-full" condition.
 
-# Coda at the moment
+### Coda at the moment
 
 Bitcoin is a mature codebase, so there are many places where ban scoring has been
 used. Nonetheless, Bitcoin uses a relatively coarse ban scoring system; only
@@ -111,7 +111,7 @@ At these points in the code, the blacklist API would be called with these constr
 API should take a severity argument and a string indicating the nature of the
 bad behavior.
 
-# Integration with trust system
+### Integration with trust system
 
 RFC 0010 proposes a trust system where peers can earn positive trust
 through good actions, and lose trust through bad actions. The ban
