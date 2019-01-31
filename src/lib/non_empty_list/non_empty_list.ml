@@ -5,6 +5,10 @@ type 'a t = 'a * 'a list [@@deriving sexp, compare, eq, hash]
 
 let init x xs = (x, xs)
 
+let uncons = Fn.id
+
+let cons (x, xs) x' = (x', x :: xs)
+
 let head (x, _) = x
 
 let tail (_, xs) = xs
