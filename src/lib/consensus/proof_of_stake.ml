@@ -54,9 +54,9 @@ module Constants = struct
   include Constants
 
   module Slot = struct
-    let duration = Time.Span.of_ms block_window_duration_ms
+    let duration = Constants.block_window_duration
 
-    let duration_ms = block_window_duration_ms
+    let duration_ms = Int64.of_int block_window_duration_ms
   end
 
   module Epoch = struct
@@ -1426,26 +1426,5 @@ let%test "Receive an invalid consensus_state" =
       not
         (received_at_valid_time consensus_state
            ~time_received:(to_unix_timestamp time)) )
-
-let%test_module "Proof_of_stake tests" =
-  ( module struct
-    module Proof_of_stake = Make (struct
-      module Time = Coda_base.Block_time
-
-      module Constants = struct
-        let genesis_state_timestamp = Coda_base.Block_time.now ()
-
-        let coinbase = Amount.of_int 20
-
-        let block_duration_ms = Int64.of_int 200
-
-        let k = 12
-
-        let c = 8
-
-        let delta = 4
-      end
-    end)
-  end )
 
 [%%endif]
