@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd $SCRIPTPATH/../src/_build
 
-PROJECT="coda-${DUNE_PROFILE}"
+PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
 DATE=$(date +%Y-%m-%d)
 GITHASH=$(git rev-parse --short=8 HEAD)
 
