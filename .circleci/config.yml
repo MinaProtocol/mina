@@ -25,34 +25,6 @@ jobs:
                   name: Snarky tracks master (make check-snarky-submodule)
                   command: make check-snarky-submodule
 
-    build:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
-        environment:
-            CODA_CONSENSUS: posig-dev
-            DUNE_PROFILE: dev
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
-            - run:
-                  name: rm snark_params
-                  command: rm -rf src/_build/default/lib/snark_params
-            - run:
-                  name: Build Website -- make web
-                  command: make web
-            - run:
-                  name: Count OCaml Warns
-                  command: ./scripts/buildwarns.py /tmp/buildocaml.log
-            - run:
-                  name: Build deb Package
-                  command: make deb
-            - store_artifacts:
-                  path: /tmp/artifacts
-
     build-macos:
         macos:
             xcode: "10.1.0"
@@ -86,13 +58,40 @@ jobs:
             - run:
                   name: Run all tests (on master)
                   command: bash -c '[ ! "$(CIRCLE_BRANCH)" = "master" ] || (`opam config env` && make test)'
-
-    build_withsnark_sig:
+    build_dev:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
         environment:
-            CODA_CONSENSUS: posig-snark
+            DUNE_PROFILE: dev
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Download Stable Proving Keys
+                  command: scripts/getkeys.sh
+            - run:
+                  name: Build OCaml (sig)
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Build deb Package with keys
+                  command: make deb
+            - run:
+                  name: Build provingkeys
+                  command: make provingkeys
+            - run:
+                  name: Store Genesis keys
+                  command: make genesiskeys
+            - run:
+                  name: Upload deb to repo
+                  command: make publish_deb
+            - store_artifacts:
+                  path: /tmp/artifacts
+    build_testnet_posig:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+        environment:
             DUNE_PROFILE: testnet_posig
         steps:
             - checkout
@@ -117,13 +116,11 @@ jobs:
                   command: make publish_deb
             - store_artifacts:
                   path: /tmp/artifacts
-
-    build_withsnark_stake:
+    build_testnet_postake:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
         environment:
-            CODA_CONSENSUS: postake-snark
             DUNE_PROFILE: testnet_postake
         steps:
             - checkout
@@ -132,7 +129,36 @@ jobs:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
-                  name: Build OCaml (stake)
+                  name: Build OCaml (sig)
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Build deb Package with keys
+                  command: make deb
+            - run:
+                  name: Build provingkeys
+                  command: make provingkeys
+            - run:
+                  name: Store Genesis keys
+                  command: make genesiskeys
+            - run:
+                  name: Upload deb to repo
+                  command: make publish_deb
+            - store_artifacts:
+                  path: /tmp/artifacts
+    build_testnet_public:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+        environment:
+            DUNE_PROFILE: testnet_public
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Download Stable Proving Keys
+                  command: scripts/getkeys.sh
+            - run:
+                  name: Build OCaml (sig)
                   command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                   name: Build deb Package with keys
@@ -149,28 +175,6 @@ jobs:
             - store_artifacts:
                   path: /tmp/artifacts
 
-    build_public:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
-        environment:
-            CODA_CONSENSUS: posig-public
-            DUNE_PROFILE: testnet_public
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
-            - run:
-                  name: Build deb Package with keys
-                  command: make deb
-            - run:
-                  name: Store Genesis keys
-                  command: make genesiskeys
-            - store_artifacts:
-                  path: /tmp/artifacts
-
     test-unit-test:
         resource_class: large
         docker:
@@ -180,7 +184,7 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Test make test-runtest
-                  command: source ~/.profile && DUNE_PROFILE=test_sigs MYPROCS=8 make test-runtest
+                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless MYPROCS=8 make test-runtest
 
     test-withsnark:
         resource_class: large
@@ -191,11 +195,10 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_snark make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && DUNE_PROFILE=test_posig make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                   name: Test make test-withsnark
-                  command: source ~/.profile && DUNE_PROFILE=test_snark make test-withsnark
-
+                  command: source ~/.profile && DUNE_PROFILE=test_posig make test-withsnark
     test-fake_hash_full_test:
         resource_class: large
         docker:
@@ -212,7 +215,6 @@ jobs:
             - run:
                   name: Running test - Fake Hash | full-test
                   command: source ~/.profile && DUNE_PROFILE=fake_hash source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'full-test'
-
     test-all_sig_integration_tests:
         resource_class: large
         docker:
@@ -225,35 +227,34 @@ jobs:
                   command: make check-render-circleci
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_sigs make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && DUNE_PROFILE=test_posig make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                   name: Running test - Sig Tests | full-test
-                  command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'full-test'
+                  command: source ~/.profile && DUNE_PROFILE=test_posig source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'full-test'
             - run:
                   name: Running test - Sig Tests | coda-peers-test
-                  command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-peers-test'
+                  command: source ~/.profile && DUNE_PROFILE=test_posig source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-peers-test'
             - run:
                   name: Running test - Sig Tests | coda-transitive-peers-test
-                  command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-transitive-peers-test'
+                  command: source ~/.profile && DUNE_PROFILE=test_posig source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-transitive-peers-test'
             - run:
                   name: Running test - Sig Tests | coda-block-production-test
-                  command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-block-production-test'
+                  command: source ~/.profile && DUNE_PROFILE=test_posig source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-block-production-test'
             - run:
                   name: Running test - Sig Tests | coda-shared-prefix-test -who-proposes 0
-                  command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
+                  command: source ~/.profile && DUNE_PROFILE=test_posig source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
             - run:
                   name: Running test - Sig Tests | coda-shared-prefix-test -who-proposes 1
-                  command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
+                  command: source ~/.profile && DUNE_PROFILE=test_posig source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
             - run:
                   name: Running test - Sig Tests | coda-shared-state-test
-                  command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-state-test'
+                  command: source ~/.profile && DUNE_PROFILE=test_posig source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-state-test'
             - run:
                   name: Running test - Sig Tests | coda-restart-node-test
-                  command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-restart-node-test'
+                  command: source ~/.profile && DUNE_PROFILE=test_posig source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-restart-node-test'
             - run:
                   name: Running test - Sig Tests | transaction-snark-profiler -check-only
-                  command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'transaction-snark-profiler -check-only'
-
+                  command: source ~/.profile && DUNE_PROFILE=test_posig source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'transaction-snark-profiler -check-only'
     test-all_stake_integration_tests:
         resource_class: large
         docker:
@@ -266,34 +267,34 @@ jobs:
                   command: make check-render-circleci
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_stakes make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && DUNE_PROFILE=test_postake make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                   name: Running test - Stake Tests | full-test
-                  command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'full-test'
+                  command: source ~/.profile && DUNE_PROFILE=test_postake source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'full-test'
             - run:
                   name: Running test - Stake Tests | coda-peers-test
-                  command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-peers-test'
+                  command: source ~/.profile && DUNE_PROFILE=test_postake source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-peers-test'
             - run:
                   name: Running test - Stake Tests | coda-transitive-peers-test
-                  command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-transitive-peers-test'
+                  command: source ~/.profile && DUNE_PROFILE=test_postake source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-transitive-peers-test'
             - run:
                   name: Running test - Stake Tests | coda-block-production-test
-                  command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-block-production-test'
+                  command: source ~/.profile && DUNE_PROFILE=test_postake source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-block-production-test'
             - run:
                   name: Running test - Stake Tests | coda-shared-prefix-test -who-proposes 0
-                  command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
+                  command: source ~/.profile && DUNE_PROFILE=test_postake source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
             - run:
                   name: Running test - Stake Tests | coda-shared-prefix-test -who-proposes 1
-                  command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
+                  command: source ~/.profile && DUNE_PROFILE=test_postake source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
             - run:
                   name: Running test - Stake Tests | coda-shared-state-test
-                  command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-state-test'
+                  command: source ~/.profile && DUNE_PROFILE=test_postake source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-state-test'
             - run:
                   name: Running test - Stake Tests | coda-restart-node-test
-                  command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-restart-node-test'
+                  command: source ~/.profile && DUNE_PROFILE=test_postake source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-restart-node-test'
             - run:
                   name: Running test - Stake Tests | transaction-snark-profiler -check-only
-                  command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'transaction-snark-profiler -check-only'
+                  command: source ~/.profile && DUNE_PROFILE=test_postake source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'transaction-snark-profiler -check-only'
 
 workflows:
     version: 2
