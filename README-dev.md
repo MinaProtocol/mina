@@ -1,6 +1,6 @@
 # Coda
 
-Coda is a new cryptocurrency protocol with a lightweight, constant sized blockchain.
+Coda is a new cryptocurrency protocol with a lightweight, constant-sized blockchain.
 
 * [Developer homepage](https://codaprotocol.com/code.html)
 * [Roadmap](https://github.com/orgs/CodaProtocol/projects/1)
@@ -26,6 +26,13 @@ The short version:
  5. `make USEDOCKER=TRUE deb`
 
 Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debian!
+
+You should also run:
+
+ 6. `git config --local --add submodule.recurse true`
+
+so that the snarky sub-module gets updated automatically when updating your local
+copy of the repo.
 
 ### Developer Setup (MacOS)
 
