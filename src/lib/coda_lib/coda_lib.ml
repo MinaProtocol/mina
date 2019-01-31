@@ -568,22 +568,6 @@ module Make (Inputs : Inputs_intf) = struct
         Deferred.Or_error.error_string
           "ledger builder hash not found in transition frontier"
 
-  let get_ledger_by_hash tf ledger_hash =
-    match
-      List.find_map (Transition_frontier.all_breadcrumbs tf) ~f:(fun b ->
-          let ledger =
-            Transition_frontier.Breadcrumb.staged_ledger b
-            |> Staged_ledger.ledger
-          in
-          if Ledger_hash.equal (Ledger.merkle_root ledger) ledger_hash then
-            Some ledger
-          else None )
-    with
-    | Some x -> Deferred.return (Ok x)
-    | None ->
-        Deferred.Or_error.error_string
-          "ledger hash not found in transition frontier"
-
   let seen_jobs t = t.seen_jobs
 
   let set_seen_jobs t seen_jobs = t.seen_jobs <- seen_jobs
