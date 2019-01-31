@@ -257,3 +257,39 @@ module TestDB16_1026 =
     (struct
       let num_accts = 1026
     end)
+
+module Mask3 = Test_mask.Make (struct
+  let depth = 3
+end)
+
+module Mask16 = Test_mask.Make (struct
+  let depth = 16
+end)
+
+module TestMask3_3 =
+  Make
+    (Mask3)
+    (struct
+      let num_accts = 3
+    end)
+
+module TestMask3_8 =
+  Make
+    (Mask3)
+    (struct
+      let num_accts = 8
+    end)
+
+module TestMask16_20 =
+  Make
+    (Mask16)
+    (struct
+      let num_accts = 20
+    end)
+
+module TestMask16_1024 =
+  Make
+    (Mask16)
+    (struct
+      let num_accts = 1024
+    end)
