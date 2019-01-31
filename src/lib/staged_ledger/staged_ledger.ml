@@ -563,7 +563,9 @@ end = struct
     ; user_commands_count= List.length user_commands
     ; coinbase_parts_count= List.length coinbase }
 
-  (*The total fee excess caused by any diff should be zero. In the case where the slots are split into two partitions, total fee excess of the transactions to be enqueued on each of the partitions should be zero respectively *)
+  (**The total fee excess caused by any diff should be zero. In the case where
+  the slots are split into two partitions, total fee excess of the transactions
+  to be enqueued on each of the partitions should be zero respectively *)
   let check_zero_fee_excess scan_state data =
     let zero = Currency.Fee.Signed.zero in
     let partitions = Scan_state.partition_if_overflowing scan_state in
