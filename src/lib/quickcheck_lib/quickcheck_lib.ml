@@ -47,3 +47,41 @@ let gen_imperative_ktree ?(p = 0.75) (root_gen : 'a t)
           fun parent ->
             let x = this parent in
             x :: List.bind forks ~f:(fun f -> f x) )
+
+let gen_imperative_list (root_gen : 'a t) (node_gen : ('a -> 'a) t) =
+  let%bind root = root_gen in
+  imperative_fixed_point root ~f:(fun self ->
+      match%bind size with
+      | 0 -> return (fun _ -> [])
+      | n ->
+          let%bind this = node_gen in
+          let%map f = with_size ~size:(n - 1) self in
+          fun parent ->
+            let x = this parent in
+            x :: f x )
+
+let%test_module "Quickcheck lib tests" =
+  ( module struct
+    let%test_unit "gen_imperative_list" =
+      let increment = ( + ) 2 in
+      let root_gen = Int.gen_incl 0 100 in
+      let gen =
+        Int.gen_incl 2 100
+        >>= fun size ->
+        Quickcheck.Generator.with_size ~size
+          (gen_imperative_list root_gen (return increment))
+      in
+      Quickcheck.test gen ~f:(fun list ->
+          match list with
+          | [] -> failwith "We assume that our list has at least one element"
+          | x :: xs ->
+              let result =
+                List.fold_result xs ~init:x ~f:(fun elem next_elem ->
+                    if next_elem = increment elem then Result.return next_elem
+                    else
+                      Or_error.errorf
+                        !"elements do not add up correctly %d %d"
+                        elem next_elem )
+              in
+              assert (Result.is_ok result) )
+  end )

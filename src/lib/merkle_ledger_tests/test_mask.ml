@@ -24,8 +24,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
 
       module Mask :
         Merkle_mask.Masking_merkle_tree_intf.S
-        with module Addr = Location.Addr
-         and module Location = Location
+        with module Location = Location
          and module Attached.Addr = Location.Addr
         with type account := Account.t
          and type location := Location.t
@@ -633,7 +632,6 @@ let%test_module "Test mask connected to underlying Merkle tree" =
       module Mask :
         Merkle_mask.Masking_merkle_tree_intf.S
         with module Location = Location
-         and module Addr = Location.Addr
          and module Attached.Addr = Location.Addr
         with type account := Account.t
          and type location := Location.t
