@@ -162,7 +162,7 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
           let bit_at s i =
             (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1
           in
-          let dgst = (Digestif.SHA256.get t.ctx :> string) in
+          let dgst = (Digestif.SHA256.get ctx :> string) in
           O1trace.trace_event "about to make field element" ;
           let bits = List.init 256 ~f:(bit_at dgst) in
           let x = Field.project bits in
