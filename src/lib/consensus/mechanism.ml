@@ -50,8 +50,6 @@ defined consensus_mechanism]
 [%%if
 consensus_mechanism = "proof_of_signature"]
 
-let blocks_till_finality = 1
-
 let name = "proof_of_signature"
 
 include Proof_of_signature0.Make (struct
