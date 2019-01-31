@@ -774,32 +774,17 @@ struct
            ~sender:(Host_and_port.of_string "127.0.0.1:0"))
   end
 
-  module Sync_ledger =
-    Syncable_ledger.Make (Ledger.Addr) (Account)
-      (struct
-        include Ledger_hash
-
-        let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
-
-        let empty_account = hash_account Account.empty
-      end)
-      (struct
-        include Ledger_hash
-
-        let to_hash (h : t) =
-          Ledger_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
-      end)
-      (struct
-        include Ledger
-
-        let f = Account.hash
-      end)
-      (struct
-        let subtree_height = 3
-      end)
-
-  module Sync_root_ledger =
-    Syncable_ledger.Make (Ledger.Db.Addr) (Account)
+  module Root_sync_ledger :
+    Syncable_ledger.S
+    with type addr := Ledger.Location.Addr.t
+     and type hash := Ledger_hash.t
+     and type root_hash := Ledger_hash.t
+     and type merkle_tree := Ledger.Db.t
+     and type account := Account.t
+     and type merkle_path := Ledger.path
+     and type query := Sync_ledger.query
+     and type answer := Sync_ledger.answer =
+    Syncable_ledger.Make (Ledger.Location.Addr) (Account)
       (struct
         include Ledger_hash
 
@@ -877,8 +862,7 @@ struct
     module Transaction_snark_work = Transaction_snark_work
     module Ledger_proof_statement = Ledger_proof_statement
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Syncable_ledger = Sync_root_ledger
-    module Merkle_address = Ledger.Db.Addr
+    module Root_sync_ledger = Root_sync_ledger
     module Consensus_mechanism = Consensus.Mechanism
     module Protocol_state_validator = Protocol_state_validator
     module Network = Net
@@ -890,7 +874,6 @@ struct
     module Transaction_snark_work = Transaction_snark_work
     module Syncable_ledger = Sync_ledger
     module Sync_handler = Sync_handler
-    module Merkle_address = Ledger.Addr
     module Catchup = Ledger_catchup
     module Transition_handler = Transition_handler
     module Staged_ledger_diff = Staged_ledger_diff
@@ -904,9 +887,8 @@ struct
   module Transition_router = Transition_router.Make (struct
     include Inputs0
     module Transaction_snark_work = Transaction_snark_work
-    module Syncable_ledger = Sync_root_ledger
+    module Syncable_ledger = Root_sync_ledger
     module Sync_handler = Sync_handler
-    module Merkle_address = Ledger.Addr
     module Catchup = Ledger_catchup
     module Transition_handler = Transition_handler
     module Staged_ledger_diff = Staged_ledger_diff

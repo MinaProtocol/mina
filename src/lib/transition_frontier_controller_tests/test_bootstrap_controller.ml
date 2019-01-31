@@ -3,7 +3,7 @@ open Async
 open Coda_base
 open Stubs
 
-module Sync_root_ledger =
+module Root_sync_ledger =
   Syncable_ledger.Make (Ledger.Db.Addr) (Account)
     (struct
       include Ledger_hash
@@ -29,7 +29,7 @@ module Bootstrap_controller = Bootstrap_controller.Make (struct
   include Transition_frontier_inputs
   module Transition_frontier = Transition_frontier
   module Merkle_address = Ledger.Db.Addr
-  module Syncable_ledger = Sync_root_ledger
+  module Root_sync_ledger = Root_sync_ledger
   module Network = Network
   module Time = Time
   module Protocol_state_validator = Protocol_state_validator
@@ -60,14 +60,19 @@ let%test_module "Bootstrap Controller" =
             Transition_frontier.best_tip_path_length_exn peer_frontier
           in
           assert (best_tip_length = max_length) ;
-          let network = Kademlia.Peer.Table.create () in
+          let network = Network.create ~logger in
           let open Transition_frontier.For_tests in
           let open Bootstrap_controller.For_tests in
-          let syncable_ledger =
-            Sync_root_ledger.create
+          let root_sync_ledger =
+            Root_sync_ledger.create
               (root_snarked_ledger syncing_frontier)
               ~parent_log:logger
           in
+          let query_reader = Root_sync_ledger.query_reader root_sync_ledger in
+          let response_writer =
+            Root_sync_ledger.answer_writer root_sync_ledger
+          in
+          Network.glue_sync_ledger network query_reader response_writer ;
           let peer_address =
             (* TODO: We are assuming that all hosts are 127.0.01.
               This will be resolved when #1367 is completely finished *)
@@ -75,7 +80,7 @@ let%test_module "Bootstrap Controller" =
             Kademlia.Peer.create Unix.Inet_addr.localhost ~discovery_port
               ~communication_port
           in
-          Hashtbl.add_exn network ~key:peer_address ~data:peer_frontier ;
+          Network.add_exn network ~key:peer_address ~data:peer_frontier ;
           let ancestor_prover = Ancestor.Prover.create ~max_size:max_length in
           let genesis_root =
             Transition_frontier.root syncing_frontier
@@ -84,8 +89,8 @@ let%test_module "Bootstrap Controller" =
             |> External_transition.forget_consensus_state_verification
           in
           let bootstrap =
-            make_bootstrap ~logger ~syncable_ledger ~ancestor_prover
-              ~genesis_root ~network ~max_length
+            make_bootstrap ~logger ~ancestor_prover ~genesis_root ~network
+              ~max_length
           in
           let best_transition =
             Transition_frontier.best_tip peer_frontier
@@ -94,13 +99,13 @@ let%test_module "Bootstrap Controller" =
             |> External_transition.forget_consensus_state_verification
           in
           let%bind () =
-            on_transition bootstrap ~sender:peer_address best_transition
+            on_transition bootstrap ~root_sync_ledger ~sender:peer_address
+              best_transition
           in
-          (* TODO: Need to hook sync_ledger responder to network #1510. *)
+          (* TODO: Need to hook sync_ledger responder to network and make sure it works #1510. *)
           (* The comment code below will not progess if #1510 is not resolved *)
           Deferred.return true
-          (* let%map newly_syncing_frontier =
-            Sync_root_ledger.valid_tree syncable_ledger
+          (* let%map newly_syncing_frontier = Root_sync_ledger.valid_tree root_sync_ledger
           in
           let root_hash =
             Fn.compose Ledger.Db.merkle_root root_snarked_ledger

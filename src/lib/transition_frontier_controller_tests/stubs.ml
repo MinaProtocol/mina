@@ -355,16 +355,54 @@ module Sync_handler = Sync_handler.Make (struct
 end)
 
 module Network = struct
-  type t = Transition_frontier.t Kademlia.Peer.Table.t
+  type t =
+    {logger: Logger.t; table: Transition_frontier.t Kademlia.Peer.Table.t}
+
+  let create ~logger = {logger; table= Kademlia.Peer.Table.create ()}
+
+  let add_exn {table; _} = Hashtbl.add_exn table
 
   let random_peers _ = failwith "STUB: Network.random_peers"
 
   let catchup_transition _ = failwith "STUB: Network.catchup_transition"
 
-  let get_ancestry t peer (descendent, count) =
+  let get_ancestry {table; _} peer (descendent, count) =
     (let open Option.Let_syntax in
-    let%bind frontier = Hashtbl.find t peer in
+    let%bind frontier = Hashtbl.find table peer in
     Sync_handler.prove_ancestry ~frontier count descendent)
     |> Result.of_option ~error:(Error.of_string "Mock Network error")
     |> Deferred.return
+
+  let glue_sync_ledger {table; logger} query_reader response_writer : unit =
+    Pipe_lib.Linear_pipe.iter_unordered ~max_concurrency:8 query_reader
+      ~f:(fun (ledger_hash, sync_ledger_query) ->
+        Logger.info logger
+          !"Processing ledger query : %{sexp:(Ledger.Addr.t \
+            Syncable_ledger.query)}"
+          sync_ledger_query ;
+        let answer =
+          Hashtbl.to_alist table
+          |> List.find_map ~f:(fun (peer, frontier) ->
+                 let open Option.Let_syntax in
+                 let%map answer =
+                   Sync_handler.answer_query ~frontier ledger_hash
+                     sync_ledger_query
+                 in
+                 Envelope.Incoming.wrap ~data:answer
+                   ~sender:(Kademlia.Peer.to_discovery_host_and_port peer) )
+        in
+        match answer with
+        | None ->
+            Logger.info logger
+              !"Could not find an answer for : %{sexp:(Ledger.Addr.t \
+                Syncable_ledger.query)}"
+              sync_ledger_query ;
+            Deferred.unit
+        | Some answer ->
+            Logger.info logger
+              !"Found an answer for : %{sexp:(Ledger.Addr.t \
+                Syncable_ledger.query)}"
+              sync_ledger_query ;
+            Pipe_lib.Linear_pipe.write response_writer answer )
+    |> don't_wait_for
 end

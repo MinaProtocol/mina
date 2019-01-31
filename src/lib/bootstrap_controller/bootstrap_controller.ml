@@ -17,16 +17,16 @@ module type Inputs_intf = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
 
-  module Merkle_address : Merkle_address.S
-
-  module Syncable_ledger :
+  module Root_sync_ledger :
     Syncable_ledger.S
-    with type addr := Merkle_address.t
+    with type addr := Ledger.Location.Addr.t
      and type hash := Ledger_hash.t
      and type root_hash := Ledger_hash.t
      and type merkle_tree := Ledger.Db.t
      and type account := Account.t
      and type merkle_path := Ledger.path
+     and type query := Sync_ledger.query
+     and type answer := Sync_ledger.answer
 
   module Network :
     Network_intf
@@ -35,6 +35,9 @@ module type Inputs_intf = sig
      and type external_transition := External_transition.t
      and type ancestor_proof_input := State_hash.t * int
      and type ancestor_proof := Ancestor.Proof.t
+     and type ledger_hash := Ledger_hash.t
+     and type sync_ledger_query := Sync_ledger.query
+     and type sync_ledger_answer := Sync_ledger.answer
 
   module Time : Time_intf
 
@@ -63,7 +66,6 @@ module Make (Inputs : Inputs_intf) : sig
 
     val make_bootstrap :
          logger:Logger.t
-      -> syncable_ledger:Inputs.Syncable_ledger.t
       -> ancestor_prover:Ancestor.Prover.t
       -> genesis_root:Inputs.External_transition.Proof_verified.t
       -> network:Inputs.Network.t
@@ -73,6 +75,7 @@ module Make (Inputs : Inputs_intf) : sig
     val on_transition :
          t
       -> sender:Kademlia.Peer.t
+      -> root_sync_ledger:Inputs.Root_sync_ledger.t
       -> Inputs.External_transition.Proof_verified.t
       -> unit Deferred.t
 
@@ -82,8 +85,7 @@ end = struct
   open Inputs
 
   type t =
-    { syncable_ledger: Syncable_ledger.t
-    ; logger: Logger.t
+    { logger: Logger.t
     ; ancestor_prover: Ancestor.Prover.t
     ; mutable best_seen_transition: External_transition.Proof_verified.t
     ; mutable current_root: External_transition.Proof_verified.t
@@ -122,15 +124,15 @@ end = struct
     (* TODO: Punish *)
     Logger.faulty_peer t.logger !"Bad ancestor proof: %{sexp:Error.t}" e
 
-  let done_syncing_root t =
-    Option.is_some (Syncable_ledger.peek_valid_tree t.syncable_ledger)
+  let done_syncing_root root_sync_ledger =
+    Option.is_some (Root_sync_ledger.peek_valid_tree root_sync_ledger)
 
   let length external_transition =
     external_transition |> External_transition.Proof_verified.protocol_state
     |> Consensus.Mechanism.Protocol_state.consensus_state
     |> Consensus.Mechanism.Consensus_state.length |> Coda_numbers.Length.to_int
 
-  let on_transition t ~sender
+  let on_transition t ~sender ~root_sync_ledger
       (candidate_transition : External_transition.Proof_verified.t) =
     let module Protocol_state = Consensus.Mechanism.Protocol_state in
     let candidate_state =
@@ -148,7 +150,9 @@ end = struct
     let input : Ancestor.Input.t =
       {descendant= previous_state_hash; generations}
     in
-    if done_syncing_root t || (not @@ worth_getting_root t candidate_state)
+    if
+      done_syncing_root root_sync_ledger
+      || (not @@ worth_getting_root t candidate_state)
     then Deferred.unit
     else
       match%bind
@@ -205,7 +209,7 @@ end = struct
                   |> Blockchain_state.ledger_hash
                   |> Frozen_ledger_hash.to_ledger_hash)
               in
-              Syncable_ledger.new_goal t.syncable_ledger ledger_hash |> ignore
+              Root_sync_ledger.new_goal root_sync_ledger ledger_hash |> ignore
           | Error e -> received_bad_proof t e )
 
   (* TODO: We need to do catchup jobs for all remaining transitions in the cache. 
@@ -236,7 +240,13 @@ end = struct
 
   let dummy_port = (0, 0)
 
-  let sync_ledger t ~transition_graph ~transition_reader =
+  let sync_ledger t ~ledger_db ~transition_graph ~transition_reader =
+    let root_sync_ledger =
+      Root_sync_ledger.create ledger_db ~parent_log:t.logger
+    in
+    let query_reader = Root_sync_ledger.query_reader root_sync_ledger in
+    let response_writer = Root_sync_ledger.answer_writer root_sync_ledger in
+    Network.glue_sync_ledger t.network query_reader response_writer ;
     Reader.iter transition_reader
       ~f:(fun (`Transition incoming_transition, `Time_received _) ->
         let (transition : External_transition.Verified.t) =
@@ -264,12 +274,14 @@ end = struct
           transition ;
         (* TODO: Efficiently limiting the number of green threads in #1337 *)
         if worth_getting_root t protocol_state then
-          on_transition t ~sender
+          on_transition t ~sender ~root_sync_ledger
             (External_transition.forget_consensus_state_verification transition)
           |> don't_wait_for ;
         Deferred.unit )
     |> don't_wait_for ;
-    Syncable_ledger.valid_tree t.syncable_ledger
+    let%map synced_db = Root_sync_ledger.valid_tree root_sync_ledger in
+    Root_sync_ledger.destroy root_sync_ledger ;
+    synced_db
 
   let run ~parent_log ~network ~ancestor_prover ~frontier ~ledger_db
       ~transition_reader =
@@ -287,12 +299,13 @@ end = struct
       ; ancestor_prover
       ; best_seen_transition= initial_root_transition
       ; current_root= initial_root_transition
-      ; syncable_ledger= Syncable_ledger.create ledger_db ~parent_log:logger
       ; max_length }
     in
     let transition_graph = Transition_cache.create () in
     Transition_frontier.clear_paths frontier ;
-    let%bind synced_db = sync_ledger t ~transition_graph ~transition_reader in
+    let%bind synced_db =
+      sync_ledger t ~ledger_db ~transition_graph ~transition_reader
+    in
     assert (Ledger.Db.(merkle_root ledger_db = merkle_root synced_db)) ;
     (* Need to coerce new_root from a proof_verified transition to a fully
        verified transition because it will be added into transition frontier*)
@@ -312,10 +325,9 @@ end = struct
   module For_tests = struct
     type nonrec t = t
 
-    let make_bootstrap ~logger ~syncable_ledger ~ancestor_prover ~genesis_root
-        ~network ~max_length =
-      { syncable_ledger
-      ; logger
+    let make_bootstrap ~logger ~ancestor_prover ~genesis_root ~network
+        ~max_length =
+      { logger
       ; ancestor_prover
       ; best_seen_transition= genesis_root
       ; current_root= genesis_root

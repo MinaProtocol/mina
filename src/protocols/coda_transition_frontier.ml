@@ -9,6 +9,12 @@ module type Network_intf = sig
 
   type state_hash
 
+  type ledger_hash
+
+  type sync_ledger_query
+
+  type sync_ledger_answer
+
   type external_transition
 
   type ancestor_proof_input
@@ -28,6 +34,14 @@ module type Network_intf = sig
     -> peer
     -> ancestor_proof_input
     -> (external_transition * ancestor_proof) Deferred.Or_error.t
+
+  (* TODO: Change this to strict_pipe *)
+  val glue_sync_ledger :
+       t
+    -> (ledger_hash * sync_ledger_query) Pipe_lib.Linear_pipe.Reader.t
+    -> (ledger_hash * sync_ledger_answer) Envelope.Incoming.t
+       Pipe_lib.Linear_pipe.Writer.t
+    -> unit
 end
 
 module type Transition_frontier_base_intf = sig
@@ -266,7 +280,9 @@ module type Transition_handler_intf = sig
 end
 
 module type Sync_handler_intf = sig
-  type hash
+  type state_hash
+
+  type ledger_hash
 
   type transition_frontier
 
@@ -274,11 +290,21 @@ module type Sync_handler_intf = sig
 
   type external_transition
 
+  type syncable_ledger_query
+
+  type syncable_ledger_answer
+
   val prove_ancestry :
        frontier:transition_frontier
     -> int
-    -> hash
+    -> state_hash
     -> (external_transition * ancestor_proof) option
+
+  val answer_query :
+       frontier:transition_frontier
+    -> ledger_hash
+    -> syncable_ledger_query
+    -> (ledger_hash * syncable_ledger_answer) option
 end
 
 module type Bootstrap_controller_intf = sig
