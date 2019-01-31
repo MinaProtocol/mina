@@ -30,7 +30,7 @@ module type Inputs_intf = sig
 
   module Network :
     Network_intf
-    with type peer := Kademlia.Peer.t
+    with type peer := Network_peer.Peer.t
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
      and type ancestor_proof_input := State_hash.t * int
@@ -74,12 +74,10 @@ module Make (Inputs : Inputs_intf) : sig
 
     val on_transition :
          t
-      -> sender:Kademlia.Peer.t
+      -> sender:Network_peer.Peer.t
       -> root_sync_ledger:Inputs.Root_sync_ledger.t
       -> Inputs.External_transition.Proof_verified.t
       -> unit Deferred.t
-
-    val dummy_port : int * int
   end
 end = struct
   open Inputs
@@ -206,7 +204,7 @@ end = struct
                   Protocol_state.blockchain_state
                     (External_transition.Proof_verified.protocol_state
                        verified_ancestor_transition)
-                  |> Blockchain_state.ledger_hash
+                  |> Blockchain_state.snarked_ledger_hash
                   |> Frozen_ledger_hash.to_ledger_hash)
               in
               Root_sync_ledger.new_goal root_sync_ledger ledger_hash |> ignore
@@ -238,8 +236,6 @@ end = struct
     in
     dfs (Transition_frontier.find_exn frontier root_hash)
 
-  let dummy_port = (0, 0)
-
   let sync_ledger t ~ledger_db ~transition_graph ~transition_reader =
     let root_sync_ledger =
       Root_sync_ledger.create ledger_db ~parent_log:t.logger
@@ -252,18 +248,7 @@ end = struct
         let (transition : External_transition.Verified.t) =
           Envelope.Incoming.data incoming_transition
         in
-        (* #TODO : the 0 ports below are dummies
-           the port in the envelope is an ephemeral port which 
-             won't appear in a bonafide Peer.t
-           see issue #1367
-         *)
-        let sender =
-          let host_and_port = Envelope.Incoming.sender incoming_transition in
-          let discovery_port, communication_port = dummy_port in
-          Kademlia.Peer.create
-            (Host_and_port.host host_and_port |> Unix.Inet_addr.of_string)
-            ~discovery_port ~communication_port
-        in
+        let sender = Envelope.Incoming.sender incoming_transition in
         let protocol_state =
           External_transition.Verified.protocol_state transition
         in
@@ -335,7 +320,5 @@ end = struct
       ; max_length }
 
     let on_transition = on_transition
-
-    let dummy_port = dummy_port
   end
 end

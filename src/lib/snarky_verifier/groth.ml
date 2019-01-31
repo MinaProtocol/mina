@@ -9,6 +9,7 @@ module Make (Inputs : Inputs.S) = struct
   module Verification_key = struct
     type ('g1, 'g2, 'fqk) t_ =
       {query_base: 'g1; query: 'g1 list; delta: 'g2; alpha_beta: 'fqk}
+    [@@deriving fields]
 
     include Summary.Make (Inputs)
 
@@ -21,6 +22,27 @@ module Make (Inputs : Inputs.S) = struct
 
     type ('a, 'b, 'c) vk = ('a, 'b, 'c) t_
 
+    let if_pair if_ b ~then_:(tx, ty) ~else_:(ex, ey) =
+      let%map x = if_ b ~then_:tx ~else_:ex
+      and y = if_ b ~then_:ty ~else_:ey in
+      (x, y)
+
+    let if_g1 b ~then_ ~else_ = if_pair Field.Checked.if_ b ~then_ ~else_
+
+    let if_g2 b ~then_ ~else_ = if_pair Fqe.if_ b ~then_ ~else_
+
+    let if_list if_ b ~then_ ~else_ =
+      Checked.List.map (List.zip_exn then_ else_) ~f:(fun (t, e) ->
+          if_ b ~then_:t ~else_:e )
+
+    let if_ b ~then_ ~else_ =
+      let c if_ p = if_ b ~then_:(p then_) ~else_:(p else_) in
+      let%map query_base = c if_g1 query_base
+      and query = c (if_list if_g1) query
+      and delta = c if_g2 delta
+      and alpha_beta = c Fqk.if_ alpha_beta in
+      {query_base; query; delta; alpha_beta}
+
     module Precomputation = struct
       type t = {delta: G2_precomputation.t}
 
@@ -30,11 +52,17 @@ module Make (Inputs : Inputs.S) = struct
 
       let create_constant (vk : (_, _, _) vk) =
         {delta= G2_precomputation.create_constant vk.delta}
+
+      let if_ b ~then_ ~else_ =
+        let%map delta =
+          G2_precomputation.if_ b ~then_:then_.delta ~else_:else_.delta
+        in
+        {delta}
     end
   end
 
   module Proof = struct
-    type ('g1, 'g2) t_ = {a: 'g1; b: 'g2; c: 'g1}
+    type ('g1, 'g2) t_ = {a: 'g1; b: 'g2; c: 'g1} [@@deriving sexp]
 
     let to_hlist {a; b; c} = Snarky.H_list.[a; b; c]
 

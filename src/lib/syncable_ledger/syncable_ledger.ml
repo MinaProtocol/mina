@@ -478,7 +478,7 @@ module Make
             | Error e ->
                 Logger.faulty_peer t.log
                   !"Got error from when trying to add child_hash %{sexp: \
-                    Hash.t} %s %{sexp: Host_and_port.t}"
+                    Hash.t} %s %{sexp: Network_peer.Peer.t}"
                   h' (Error.to_string_hum e)
                   (Envelope.Incoming.sender env) ;
                 ()

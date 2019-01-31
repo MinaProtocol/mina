@@ -25,7 +25,7 @@ module type S = sig
 
   module Network :
     Network_intf
-    with type peer := Kademlia.Peer.t
+    with type peer := Network_peer.Peer.t
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
      and type ancestor_proof_input := State_hash.t * int

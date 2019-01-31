@@ -74,11 +74,8 @@ let%test_module "Bootstrap Controller" =
           in
           Network.glue_sync_ledger network query_reader response_writer ;
           let peer_address =
-            (* TODO: We are assuming that all hosts are 127.0.01.
-              This will be resolved when #1367 is completely finished *)
-            let discovery_port, communication_port = dummy_port in
-            Kademlia.Peer.create Unix.Inet_addr.localhost ~discovery_port
-              ~communication_port
+            Network_peer.Peer.create Unix.Inet_addr.localhost
+              ~discovery_port:1337 ~communication_port:1338
           in
           Network.add_exn network ~key:peer_address ~data:peer_frontier ;
           let ancestor_prover = Ancestor.Prover.create ~max_size:max_length in
@@ -102,8 +99,7 @@ let%test_module "Bootstrap Controller" =
             on_transition bootstrap ~root_sync_ledger ~sender:peer_address
               best_transition
           in
-          (* TODO: Need to hook sync_ledger responder to network and make sure it works #1510. *)
-          (* The comment code below will not progess if #1510 is not resolved *)
+          (* TODO: code below is currently failing *)
           Deferred.return true
           (* let%map newly_syncing_frontier = Root_sync_ledger.valid_tree root_sync_ledger
           in

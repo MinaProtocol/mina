@@ -40,7 +40,7 @@ run_integration_test() {
   pkill -9 coda
   sleep 1
 
-  run_dune exec coda -- integration-tests ${1} 2>&1 > test.log
+  run_dune exec coda -- integration-tests ${1} 2>&1 | tee test.log | ../scripts/jqproc.sh -f '.level=="Error" or .level=="Warning" or .level=="Faulty_peer" or .level=="Fatal"'
   OUT=$?
   echo "------------------------------------------------------------------------------------------" >> test.log
   echo "${CODA_ENV} ${1}" >> test.log

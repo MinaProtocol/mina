@@ -56,7 +56,7 @@ end
 
 module T = struct
   module Peers = struct
-    type t = Kademlia.Peer.t List.t [@@deriving bin_io]
+    type t = Network_peer.Peer.t List.t [@@deriving bin_io]
   end
 
   module State_hashes = struct
@@ -204,6 +204,8 @@ module T = struct
 
         let transaction_capacity_log_2 = 3
 
+        let work_delay_factor = 2
+
         let commit_id = None
 
         let work_selection = work_selection
@@ -234,7 +236,7 @@ module T = struct
             ; conf_dir
             ; initial_peers= peers
             ; me=
-                Kademlia.Peer.create
+                Network_peer.Peer.create
                   (Unix.Inet_addr.of_string host)
                   ~discovery_port ~communication_port:external_port
             ; parent_log= log
