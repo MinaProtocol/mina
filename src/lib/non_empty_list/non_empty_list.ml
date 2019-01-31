@@ -17,7 +17,7 @@ let tail (_, xs) = xs
 
 let of_list = function [] -> None | x :: xs -> Some (x, xs)
 
-let tail_opt = Fn.compose of_list tail
+let tail_opt t = of_list (tail t)
 
 let map (x, xs) ~f = (f x, List.map ~f xs)
 
