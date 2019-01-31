@@ -5,6 +5,9 @@ type 'a t [@@deriving sexp, compare, eq, hash]
 val init : 'a -> 'a list -> 'a t
 (** Create a non-empty list by proving you have a head element *)
 
+val singleton : 'a -> 'a t
+(** Create a non-empty list with a single element *)
+
 val uncons : 'a t -> 'a * 'a list
 (** Deconstruct a non-empty list into the head and tail *)
 
