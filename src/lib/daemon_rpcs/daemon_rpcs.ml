@@ -15,7 +15,7 @@ module Types = struct
       let max_key_length =
         List.map ~f:(fun (s, _) -> String.length s) entries
         |> List.max_elt ~compare:Int.compare
-        |> Option.value_exn
+        |> Option.value ~default:0
       in
       let output =
         List.map entries ~f:(fun (s, x) ->
