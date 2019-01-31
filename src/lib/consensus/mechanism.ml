@@ -50,7 +50,7 @@ defined consensus_mechanism]
 [%%if
 consensus_mechanism = "proof_of_signature"]
 
-let blocks_till_finality = 1
+module Constants = Constants0
 
 let name = "proof_of_signature"
 
