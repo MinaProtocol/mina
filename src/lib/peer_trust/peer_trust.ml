@@ -1,14 +1,16 @@
 open Core
 
+module Trust_response = struct
+  type t = Insta_ban | Trust_change of float
+end
+
 module type Action_intf = sig
   type t
 
-  val to_trust_increment : t -> float
+  val to_trust_response : t -> Trust_response.t
 end
 
 let stub () = failwith "stub"
-
-let insta_ban = 0.
 
 let max_rate _ = 0.
 
@@ -32,6 +34,8 @@ module Make (Peer : sig
   include Hashable.S
 
   val sexp_of_t : t -> Sexp.t
+end) (Now : sig
+  val now : unit -> Time.t
 end)
 (Action : Action_intf)
 (Db : Key_value_database.S with type key := Peer.t and type value := Record.t) :

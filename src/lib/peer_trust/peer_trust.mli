@@ -1,22 +1,29 @@
-(** Module handling peer "trust" scores. Trust scores increase when peers do
-    good things and decrease when they do bad things. If a peer does enough bad
-    things it gets banned. This module tracks, stores and updates trust, and
-    notifies the rest of the system when a peer is banned. It does *not* specify
-    specific things that cause trust to change, or how much, or actually do
-    anything when a peer should be banned. That's the responsibility of the
+(** Module handling peer "trust" scores. Trust scores are bounded between -1 and
+    +1, increase when peers do good things, and decrease when they do bad
+    things. If a peer's trust becomes <= -1, or takes an action that causes an
+    instant ban, it gets banned. This module tracks, stores and updates trust,
+    and notifies the rest of the system when a peer is banned. It does *not*
+    specify specific things that cause trust to change, or how much, or actually
+    do anything when a peer should be banned. That's the responsibility of the
     caller, which is coda_base. *)
 
 open Core
 
+(** What we do in response to some trust-affecting action. *)
+module Trust_response : sig
+  type t =
+    | Insta_ban  (** Ban the peer immediately *)
+    | Trust_change of float
+        (** Change trust by the specified amount, positive or negative. *)
+end
+
+(** Interface for trust-affecting actions. *)
 module type Action_intf = sig
   (* TODO add a show interface for logging. *)
   type t
 
-  val to_trust_increment : t -> float
+  val to_trust_response : t -> Trust_response.t
 end
-
-val insta_ban : float
-(** Trust increment to instantly ban the peer. *)
 
 val max_rate : float -> float
 (** Trust increment that sets a maximum rate of doing a bad thing (presuming the
@@ -60,12 +67,15 @@ end
 
 (** Instantiate the module.
     @param Peer The identifiers for peers
+    @param Now a method of getting the current time. Functored for mocking.
     @param Action Actions that affect trust
     @param Db Database to store trust data in. Functored for mocking *)
 module Make (Peer : sig
   include Hashable.S
 
   val sexp_of_t : t -> Sexp.t
+end) (Now : sig
+  val now : unit -> Time.t
 end)
 (Action : Action_intf)
 (Db : Key_value_database.S with type key := Peer.t and type value := Record.t) :
