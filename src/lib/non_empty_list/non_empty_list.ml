@@ -9,15 +9,15 @@ let singleton x = (x, [])
 
 let uncons = Fn.id
 
-let cons (x, xs) x' = (x', x :: xs)
+let cons x' (x, xs) = (x', x :: xs)
 
 let head (x, _) = x
 
 let tail (_, xs) = xs
 
-let of_list = function [] -> None | x :: xs -> Some (x, xs)
+let of_list_opt = function [] -> None | x :: xs -> Some (x, xs)
 
-let tail_opt t = of_list (tail t)
+let tail_opt t = of_list_opt (tail t)
 
 let map (x, xs) ~f = (f x, List.map ~f xs)
 
@@ -38,8 +38,6 @@ let find_map = C.find_map
 let fold = C.fold
 
 let iter = C.iter
-
-let fold_until = C.fold_until
 
 let length = C.length
 

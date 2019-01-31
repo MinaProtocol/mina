@@ -11,7 +11,7 @@ val singleton : 'a -> 'a t
 val uncons : 'a t -> 'a * 'a list
 (** Deconstruct a non-empty list into the head and tail *)
 
-val cons : 'a t -> 'a -> 'a t
+val cons : 'a -> 'a t -> 'a t
 (** Prepend a new element *)
 
 val head : 'a t -> 'a
@@ -20,7 +20,7 @@ val head : 'a t -> 'a
 val tail : 'a t -> 'a list
 (** The zero or more tail elements of the container *)
 
-val of_list : 'a list -> 'a t option
+val of_list_opt : 'a list -> 'a t option
 (** Convert a list into a non-empty-list, returning [None] if the list is
  * empty *)
 
