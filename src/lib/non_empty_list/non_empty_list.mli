@@ -17,6 +17,13 @@ val head : 'a t -> 'a
 val tail : 'a t -> 'a list
 (** The zero or more tail elements of the container *)
 
+val of_list : 'a list -> 'a t option
+(** Convert a list into a non-empty-list, returning [None] if the list is
+ * empty *)
+
+val tail_opt : 'a t -> 'a t option
+(** Get the tail as a non-empty-list *)
+
 val map : 'a t -> f:('a -> 'b) -> 'b t
 (** Apply a function to each element of the non empty list *)
 
