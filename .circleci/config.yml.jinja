@@ -130,10 +130,11 @@ jobs:
             - run:
                   name: Build OCaml
                   command: eval `opam config env` && DUNE_PROFILE={{test.config}} make build 2>&1 | tee /tmp/buildocaml.log
-                {%- for action in test.actions %}
+            {%- for action in test.actions %}
             - run:
                   name: Running test - {{ test.friendly }} | {{ action }}
-                  command: source ~/.profile && DUNE_PROFILE={{test.config}} source scripts/test_all.sh && cd src/ && {{test.env_str}} 'run_integration_test' '{{ action }}'{% endfor %}
+                  command: source ~/.profile && DUNE_PROFILE={{test.config}} source scripts/test_all.sh && cd src/ && 'run_integration_test' '{{ action }}'
+            {% endfor %}
     {%- endfor %}
 
 workflows:
