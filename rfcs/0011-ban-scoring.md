@@ -78,8 +78,8 @@ datatype:
   module Ban_score = struct
     type t =
         | Severe
-	| Moderate
-	| Trivial
+        | Moderate
+        | Trivial
   end
 ```
 A slightly finer gradation could be used, if desired. The blacklisting system
