@@ -141,14 +141,13 @@ workflows:
     coda_parallel:
         jobs:
             - lint
-            - build
             - build-macos
-            - build_withsnark_sig
-            - build_withsnark_stake
-            - build_public
-            {%- for test in tests%}
+            {%- for profile in build_profiles %}
+            - build_{{profile}}
+            {%- endfor %}
+            {%- for test in tests %}
             - test-{{test.name}}
-            {%- endfor%}
+            {%- endfor %}
             - test-withsnark
             - test-unit-test
             - tracetool

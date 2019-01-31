@@ -301,11 +301,11 @@ workflows:
     coda_parallel:
         jobs:
             - lint
-            - build
             - build-macos
-            - build_withsnark_sig
-            - build_withsnark_stake
-            - build_public
+            - build_dev
+            - build_testnet_posig
+            - build_testnet_postake
+            - build_testnet_public
             - test-fake_hash_full_test
             - test-all_sig_integration_tests
             - test-all_stake_integration_tests
