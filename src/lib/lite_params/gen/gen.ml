@@ -76,8 +76,16 @@ let protocol_state (s : Consensus.Protocol_state.value) :
     Lite_base.Protocol_state.t =
   let open Consensus in
   let consensus_state =
+    (* hack a stub for proof of stake right now so builds still work *)
     Protocol_state.consensus_state s
-    |> Option.value_exn Consensus_state.to_lite
+    |> Option.value Consensus_state.to_lite ~default:(fun _ ->
+           let open Lite_base.Consensus_state in
+           { length= Int32.of_int_exn 0
+           ; signer_public_key=
+               Lite_compat.public_key
+                 Signature_lib.(
+                   Public_key.compress @@ Public_key.of_private_key_exn
+                   @@ Private_key.create ()) } )
   in
   { Lite_base.Protocol_state.previous_state_hash=
       Lite_compat.digest
