@@ -175,9 +175,9 @@ let core () =
     plain "Harold Herbert" "Lead Designer"
       "Harold previously designed brands, products, and experiences at Hired, \
        Flipboard, Zillow, and with a range of technology companies while \
-       running an independent design studio. He believe’s that all design \
-       is experience design. Regardless of the medium, the end goal is the \
-       well being of the user."
+       running an independent design studio. He believes that all design is \
+       experience design. Regardless of the medium, the end goal is for the \
+       well-being of the user."
   and joe =
     advisor "Joseph Bonneau"
       {literal|

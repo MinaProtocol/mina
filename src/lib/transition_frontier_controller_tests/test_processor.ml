@@ -1,5 +1,4 @@
-(*
-open Core
+(* open Core
 open Async
 open Pipe_lib
 open Stubs
@@ -36,7 +35,17 @@ let%test_module "Transition_handler.Processor tests" =
         next_breadcrumb
       in
       Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = Quickcheck.random_value (gen_frontier ~logger) in
+          let%bind frontier =
+            create_root_frontier
+              ~max_length:Consensus.Mechanism.Constants.k ~logger
+          in
+          let%bind () =
+            build_frontier_randomly frontier
+              ~gen_root_breadcrumb_builder:(fun root_breadcrumb ->
+                Quickcheck_lib.gen_imperative_ktree
+                  (root_breadcrumb |> return |> Quickcheck.Generator.return)
+                  (gen_breadcrumb ~logger) )
+          in
           let time_controller = Coda_base.Block_time.Controller.create () in
           let valid_transition_reader, valid_transition_writer =
             Strict_pipe.create
@@ -101,5 +110,4 @@ let%test_module "Transition_handler.Processor tests" =
           new_frontier_size - old_frontier_size = test_size
           && Hash_set.for_all expected_state_hashes
                ~f:(Hash_set.mem all_states) )
-  end )
-*)
+  end ) *)
