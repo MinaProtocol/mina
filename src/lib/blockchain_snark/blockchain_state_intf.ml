@@ -3,7 +3,7 @@ open Snark_params
 open Tick
 
 module type S = sig
-  module Consensus_mechanism : Consensus.Mechanism.S
+  module Consensus_mechanism : Consensus.S
 
   module type Update_intf = sig
     module Checked : sig

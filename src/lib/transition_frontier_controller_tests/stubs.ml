@@ -84,7 +84,7 @@ end)
 module External_transition =
   Coda_base.External_transition.Make
     (Staged_ledger_diff)
-    (Consensus.Mechanism.Protocol_state)
+    (Consensus.Protocol_state)
 
 module Transaction = struct
   module T = struct
@@ -189,7 +189,7 @@ let gen_breadcrumb ~logger :
   let open Quickcheck.Let_syntax in
   let gen_slot_advancement = Int.gen_incl 1 10 in
   let%map make_next_consensus_state =
-    Consensus.Mechanism.For_tests.gen_consensus_state ~gen_slot_advancement
+    Consensus.For_tests.gen_consensus_state ~gen_slot_advancement
   in
   fun parent_breadcrumb_deferred ->
     let open Deferred.Let_syntax in
@@ -247,7 +247,7 @@ let gen_breadcrumb ~logger :
         ~staged_ledger_hash:next_staged_ledger_hash
     in
     let previous_state_hash =
-      Consensus.Mechanism.Protocol_state.hash previous_protocol_state
+      Consensus.Protocol_state.hash previous_protocol_state
     in
     let consensus_state =
       make_next_consensus_state ~snarked_ledger_hash:previous_ledger_hash
@@ -271,7 +271,7 @@ let gen_breadcrumb ~logger :
     let next_verified_external_transition_with_hash =
       With_hash.of_data next_verified_external_transition
         ~hash_data:
-          (Fn.compose Consensus.Mechanism.Protocol_state.hash
+          (Fn.compose Consensus.Protocol_state.hash
              External_transition.Verified.protocol_state)
     in
     match%map
@@ -295,7 +295,7 @@ let create_root_frontier ~logger : Transition_frontier.t Deferred.t =
       assert (status = `Added) ) ;
   let root_transaction_snark_scan_state = Staged_ledger.Scan_state.empty () in
   let genesis_protocol_state =
-    With_hash.data Consensus.Mechanism.genesis_protocol_state
+    With_hash.data Consensus.genesis_protocol_state
   in
   let dummy_staged_ledger_diff =
     let creator =
@@ -318,7 +318,7 @@ let create_root_frontier ~logger : Transition_frontier.t Deferred.t =
   in
   let root_transition_with_data =
     { With_hash.data= root_transition
-    ; hash= With_hash.hash Consensus.Mechanism.genesis_protocol_state }
+    ; hash= With_hash.hash Consensus.genesis_protocol_state }
   in
   let frontier =
     Transition_frontier.create ~logger

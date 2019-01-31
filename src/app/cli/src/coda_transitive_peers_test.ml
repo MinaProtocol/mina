@@ -12,9 +12,7 @@ let main () =
   let n = 3 in
   let log = Logger.create () in
   let log = Logger.child log name in
-  let proposal_interval =
-    Int64.to_int_exn Consensus.Mechanism.Constants.block_duration_ms
-  in
+  let proposal_interval = Consensus.Constants.block_window_duration_ms in
   let work_selection = Protocols.Coda_pow.Work_selection.Seq in
   Coda_processes.init () ;
   let configs =

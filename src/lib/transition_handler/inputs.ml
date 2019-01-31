@@ -8,7 +8,7 @@ module type S = sig
 
   module State_proof :
     Proof_intf
-    with type input := Consensus.Mechanism.Protocol_state.value
+    with type input := Consensus.Protocol_state.value
      and type t := Proof.t
 
   module Transition_frontier :

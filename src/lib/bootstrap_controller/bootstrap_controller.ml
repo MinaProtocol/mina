@@ -86,13 +86,12 @@ module Make (Inputs : Inputs_intf) :
 
   let worth_getting_root t candidate =
     `Keep
-    = Consensus.Mechanism.select ~logger:t.logger
+    = Consensus.select ~logger:t.logger
         ~existing:
           ( t.best_seen_transition
           |> External_transition.Proof_verified.protocol_state
-          |> Consensus.Mechanism.Protocol_state.consensus_state )
-        ~candidate:
-          (Consensus.Mechanism.Protocol_state.consensus_state candidate)
+          |> Consensus.Protocol_state.consensus_state )
+        ~candidate:(Consensus.Protocol_state.consensus_state candidate)
 
   let received_bad_proof t e =
     (* TODO: Punish *)
@@ -103,12 +102,12 @@ module Make (Inputs : Inputs_intf) :
 
   let length external_transition =
     external_transition |> External_transition.Proof_verified.protocol_state
-    |> Consensus.Mechanism.Protocol_state.consensus_state
-    |> Consensus.Mechanism.Consensus_state.length |> Coda_numbers.Length.to_int
+    |> Consensus.Protocol_state.consensus_state
+    |> Consensus.Consensus_state.length |> Coda_numbers.Length.to_int
 
   let on_transition t ~sender
       (candidate_transition : External_transition.Proof_verified.t) =
-    let module Protocol_state = Consensus.Mechanism.Protocol_state in
+    let module Protocol_state = Consensus.Protocol_state in
     let candidate_state =
       External_transition.Proof_verified.protocol_state candidate_transition
     in
@@ -170,7 +169,7 @@ module Make (Inputs : Inputs_intf) :
                     Consensus_state.length (consensus_state candidate_state))
                 ~body_hash:candidate_body_hash ;
               let ledger_hash =
-                Consensus.Mechanism.(
+                Consensus.(
                   Protocol_state.blockchain_state
                     (External_transition.Proof_verified.protocol_state
                        verified_ancestor_transition)
@@ -263,6 +262,6 @@ module Make (Inputs : Inputs_intf) :
       ~root_transition:
         (With_hash.of_data new_root
            ~hash_data:
-             (Fn.compose Consensus.Mechanism.Protocol_state.hash
+             (Fn.compose Consensus.Protocol_state.hash
                 External_transition.Verified.protocol_state))
 end
