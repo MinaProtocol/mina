@@ -78,7 +78,7 @@ builder-controller are as follows:
 [History sync](#history-sync) for catchup jobs
 
 Rationale: Without history sync, we are vulnerable to believing an invalid
-state: Certain parts of the ledger-builder state are not checked in a SNARK and
+state: Certain parts of the staged-ledger state are not checked in a SNARK and
 so we must get enough info to go back to the locked state (where we know we've
 achieved consensus).
 
@@ -91,7 +91,7 @@ masks, and [Transition frontier](#transition-frontier) for more info about how
 these masks are configured.
 
 Rationale: The frequent operation of answering sync-ledger queries no longer
-require materializing ledger-builders. We should optimize for operations that
+require materializing staged-ledgers. We should optimize for operations that
 occur frequently.
 
 3. The `Ktree.t` is mutable and exposes an $O(1)$ `lookup : State_hash.t -> node_entry` where `node_entry` contains (in our case) a `Breadcrumb.t`. We will discuss this further in [Ktree](#ktree).
@@ -141,7 +141,7 @@ the processor.
 [Ledger Catchup](#ledger-catchup) needs to add a batch of transitions all at
 once, so it shares some of the add section and constructs the underlying
 breadcrumbs in such a way that only requires adding to transition frontier's
-table and not applying an ledger-builder-diffs.
+table and not applying an staged-ledger-diffs.
 
 #### Adding to Transition Frontier
 
@@ -167,8 +167,8 @@ connected to the existing tree.
 The Transition Frontier is essentially a root `Breadcrumb.t` with some
 metadata. The root has a merkle database corresponding to the snarked ledger.
 This is needed for consensus with proof-of-stake. It then has the first mask
-layer exposing the staged-database and ledger-builder for the locked-tip. Each
-subsequent breadcrumb contains a light-weight ledger-builder with a masked
+layer exposing the staged-database and staged-ledger for the locked-tip. Each
+subsequent breadcrumb contains a light-weight staged-ledger with a masked
 merkle database built off of the breadcrumb prior. We store a hashtable of
 breadcrumb children and keep references to the root and best-tip hashes (which
 we can lookup later in the table).
@@ -176,7 +176,7 @@ we can lookup later in the table).
 It's two orders of magnitude more computationally expensive to constantly
 coalesce masked merkle databases in the worst case than to just keep them
 separated (back of napkin math). Moreover, we are able to in $O(1)$ time answer
-sync ledger queries if we have ledger builders at every position.
+sync ledger queries if we have staged ledgers at every position.
 
 <a href="ledger-catchup"></a>
 ### Ledger Catchup
@@ -208,7 +208,7 @@ ledger-builder-controller.
 `history_sync transition` asynchronously walks backwards downloading each
 external transition until either (1) it reconnects with some existing breadcrumb
 or (2) it passes the locked slot without reconnecting. In either case, we then
-walk forwards doing `Path_traversal` logic materializing masked ledger-builders
+walk forwards doing `Path_traversal` logic materializing masked staged-ledgers
 all the way up the path. The materialized breadcrumb list gets sent to the
 processor.
 
@@ -306,13 +306,13 @@ ledger-builder-controller handles incoming transitions by spawning one of two
 types of asynchronous jobs, a catchup and a path traversal. As a short-cut,
 catchup did not differentiate between the "from nothing" case and the "small
 miss" case, and was vulnerable to an attack. Path traversal was the process of
-materializing a ledger-builder along a path in the ktree. This had to be
+materializing a staged-ledger along a path in the ktree. This had to be
 asynchronous because we didn't yet have a notion of a masked ledger. The
 ledger-builder-controller kept only one async job running at a time for
 simplicity as well, and only cancelled in-progress jobs when another should
 replace the existing one. Upon the completion of a job, the
 ledger-builder-controller would replace it's ktree and update annotated tip
-entities that have materialized ledger-builders in them.
+entities that have materialized staged-ledgers in them.
 Ledger-builder-controller also handled sync-ledger answers as it had to access
 the path traversal logic and the current transition logic state.
 
