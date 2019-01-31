@@ -6,7 +6,7 @@ eval `opam config env`
 
 run_dune() {
   if [ "${DUNE_PROFILE}" = "" ]; then
-    DUNE_PROFILE=test_sigs
+    DUNE_PROFILE=test_posig
   fi
   dune $1 --profile="${DUNE_PROFILE}" ${@:2}
 }
@@ -69,13 +69,13 @@ run_all_integration_tests() {
 }
 
 run_all_sig_integration_tests() {
-    DUNE_PROFILE=test_sigs \
+    DUNE_PROFILE=test_posig \
     CODA_BLOCK_DURATION=1000 \
     run_all_integration_tests
 }
 
 run_all_stake_integration_tests() {
-    DUNE_PROFILE=test_stakes \
+    DUNE_PROFILE=test_postake \
     CODA_BLOCK_DURATION=1000 \
     CODA_K=24 \
     CODA_C=8 \
@@ -83,7 +83,7 @@ run_all_stake_integration_tests() {
 }
 
 run_epoch_stake_integration_test() {
-    DUNE_PROFILE=test_stakes \
+    DUNE_PROFILE=test_postake \
     CODA_BLOCK_DURATION=1000 \
     CODA_K=2 \
     CODA_C=2 \
