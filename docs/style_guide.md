@@ -11,7 +11,7 @@ Our style guidelines are an extension of a couple of existing style guidelines. 
 ### Mli Files
 [ocaml-mli]: #ocaml-mli
 
-A `*.mli` file should not be included for a `*.ml` file iff the `*.ml` file's automatically derived interface is different. Many `*.ml` files in our codebase consist of only signatures and a functor. In the case of those files, there is not purpose to redefining the `*.mli` file because there is no new or restricted information in that file. If a `*.ml` file contains implementations in the root structure, then a `*.mli` file should most likely be created.
+A `*.mli` file should not be included for a `*.ml` file iff the `*.ml` file's automatically derived interface is identical. Many `*.ml` files in our codebase consist of only signatures and a functor. In the case of those files, there is not purpose to redefining the `*.mli` file because there is no new or restricted information in that file. If a `*.ml` file contains implementations in the root structure, then a `*.mli` file should most likely be created.
 
 ### Modules
 [ocaml-modules]: #ocaml-modules
@@ -251,3 +251,27 @@ end
 
 `negate` is the version of the function that runs in OCaml, and `Checked.negate` is the one that runs inside of a SNARK circuit.
 
+### Polymorphic variants
+
+OCaml allows so-called polymorphic variants, with constructors marked with a backtick:
+
+```ocaml
+type truth = [ `True | `False ]
+```
+
+One advantage of such variants over ordinary algebraic datatypes is that they allow easy extensibility:
+
+```ocaml
+type uncertainty = [ truth | `Maybe ]
+```
+
+The constructors for polymorphic variants live in a global namespace, and they're not associated a unique defined type. One result is that the OCaml compiler can't check for exhaustive pattern-matching when using polymorphic variants. Their extensibility means both of these statements are correct:
+
+```ocaml
+let v1 : truth = `True
+let v2 : uncertainty = `True
+```
+
+There's an implied subtyping that may not be desired. In general, the typing of polymorphic variants is more complex than for ordinary datatype constructors.
+
+Unless there's need for extensibility, ordinary datatype constructors are usually preferred over polymorphic variants.
