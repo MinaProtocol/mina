@@ -161,7 +161,7 @@ module Types = struct
             ("Block Count", Int.to_string (f x)) :: acc )
           ~uptime_secs:(fun acc x -> ("Uptime", sprintf "%ds" (f x)) :: acc)
           ~ledger_merkle_root:(fun acc x -> ("Ledger Merkle Root", f x) :: acc)
-          ~staged_ledger_hash:(fun acc x -> ("Ledger-builder hash", f x) :: acc)
+          ~staged_ledger_hash:(fun acc x -> ("Staged-ledger hash", f x) :: acc)
           ~state_hash:(fun acc x -> ("State Hash", f x) :: acc)
           ~commit_id:(fun acc x ->
             match f x with

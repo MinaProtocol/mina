@@ -41,7 +41,7 @@ run_integration_test() {
   sleep 1
 
   run_dune exec coda -- integration-tests ${1} 2>&1 | tee test.log | ../scripts/jqproc.sh -f '.level=="Error" or .level=="Warning" or .level=="Faulty_peer" or .level=="Fatal"'
-  OUT=$?
+  OUT=${PIPESTATUS[0]}
   echo "------------------------------------------------------------------------------------------" >> test.log
   echo "${CODA_ENV} ${1}" >> test.log
 

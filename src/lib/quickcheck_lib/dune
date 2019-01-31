@@ -2,4 +2,5 @@
   (name quickcheck_lib)
   (public_name quickcheck_lib)
   (libraries core_kernel)
+  (inline_tests)
   (preprocess (pps ppx_jane)))

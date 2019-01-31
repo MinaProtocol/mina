@@ -5,10 +5,6 @@ open Protocols.Coda_transition_frontier
 open Coda_base
 open Signature_lib
 
-module Max_length = struct
-  let length = Consensus.Constants.k
-end
-
 module type Inputs_intf = sig
   module Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf
 
@@ -89,8 +85,6 @@ struct
     Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
 
   exception Already_exists of State_hash.t
-
-  let max_length = Max_length.length
 
   module Breadcrumb = struct
     (* TODO: external_transition should be type : External_transition.With_valid_protocol_state.t #1344 *)
@@ -182,13 +176,17 @@ struct
 
   type node =
     {breadcrumb: Breadcrumb.t; successor_hashes: State_hash.t list; length: int}
+  [@@deriving sexp]
 
+  (* Invariant: The path from the root to the tip inclusively, will be max_length + 1 *)
+  (* TODO: Make a test of this invariant *)
   type t =
     { root_snarked_ledger: Ledger.Db.t
     ; mutable root: State_hash.t
     ; mutable best_tip: State_hash.t
     ; logger: Logger.t
-    ; table: node State_hash.Table.t }
+    ; table: node State_hash.Table.t
+    ; max_length: int }
 
   let logger t = t.logger
 
@@ -197,7 +195,7 @@ struct
       ~(root_transition :
          (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t)
       ~root_snarked_ledger ~root_transaction_snark_scan_state
-      ~root_staged_ledger_diff =
+      ~root_staged_ledger_diff ~max_length =
     let open Consensus in
     let open Deferred.Let_syntax in
     let logger = Logger.child logger __MODULE__ in
@@ -280,7 +278,10 @@ struct
         ; root_snarked_ledger
         ; root= root_hash
         ; best_tip= root_hash
-        ; table }
+        ; table
+        ; max_length }
+
+  let max_length {max_length; _} = max_length
 
   let all_breadcrumbs t =
     List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb; _} -> breadcrumb)
@@ -336,10 +337,7 @@ struct
     then
       failwith
         "invalid call to attach_to: hash parent_node <> parent_hash node" ;
-    if
-      Hashtbl.add t.table ~key:(Breadcrumb.hash node.breadcrumb) ~data:node
-      <> `Ok
-    then
+    if Hashtbl.add t.table ~key:hash ~data:node <> `Ok then
       Logger.warn t.logger
         !"attach_node_to with breadcrumb for state %{sexp:State_hash.t} \
           already present; catchup scheduler bug?"
@@ -389,9 +387,9 @@ struct
         attach_breadcrumb_exn t breadcrumb ;
         let node = Hashtbl.find_exn t.table hash in
         (* 2.a *)
-        let distance_to_parent = root_node.length - node.length in
+        let distance_to_parent = node.length - root_node.length in
         (* 2.b *)
-        if distance_to_parent > max_length then (
+        if distance_to_parent > max_length t then (
           (* 2.b.I *)
           let new_root_hash = List.hd_exn (hash_path t node.breadcrumb) in
           (* 2.b.II *)
@@ -415,6 +413,19 @@ struct
         if node.length > best_tip_node.length then t.best_tip <- hash )
 
   let clear_paths t = Hashtbl.clear t.table
+
+  let best_tip_path_length_exn {table; root; best_tip; _} =
+    let open Option.Let_syntax in
+    let result =
+      let%bind best_tip_node = Hashtbl.find table best_tip in
+      let%map root_node = Hashtbl.find table root in
+      best_tip_node.length - root_node.length
+    in
+    result |> Option.value_exn
+
+  module For_tests = struct
+    let root_snarked_ledger {root_snarked_ledger; _} = root_snarked_ledger
+  end
 end
 
 let%test_module "Transition_frontier tests" =
