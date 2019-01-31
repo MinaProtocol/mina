@@ -65,6 +65,8 @@ end = struct
     [@@deriving sexp]
   end
 
+  module Space_partition = Parallel_scan.Space_partition
+
   module Job_view = struct
     type t = Ledger_proof_statement.t Parallel_scan.Job_view.t
     [@@deriving sexp]

@@ -587,7 +587,7 @@ module Make (Inputs : Inputs_intf) = struct
                 !"%{sexp: Peer.t} didn't find a staged_ledger_aux at \
                   staged_ledger_hash %{sexp: Staged_ledger_hash.t}"
                 peer staged_ledger_hash ;
-              Or_error.error_string "no ledger builder aux found"
+              Or_error.error_string "no staged ledger aux found"
           | Error err ->
               Logger.warn t.log
                 !"Staged_ledger_aux acquisition hit network error %s"

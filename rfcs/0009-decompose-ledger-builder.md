@@ -1,12 +1,12 @@
 ## Summary
 [summary]: #summary
 
-This RFC proposes a decoupling of the ledger builder which is will make the components of the ledger builder more composable and pave the way for properly encoding the ledger builder into the new transition frontier data structure.
+This RFC proposes a decoupling of the staged ledger which is will make the components of the staged ledger more composable and pave the way for properly encoding the staged ledger into the new transition frontier data structure.
 
 ## Motivation
 [motivation]: #motivation
 
-The ledger builder has been suffering from scope creep for some time now. As we are moving towards the new transition frontier data structure, we are already decoupling the storage mechanism for the underlying ledger for a ledger builder. This is going to have a number of difficult ramifications on the existing data structure, so now seems as good a time as any to fully decouple the ledger builder.
+The staged ledger has been suffering from scope creep for some time now. As we are moving towards the new transition frontier data structure, we are already decoupling the storage mechanism for the underlying ledger for a staged ledger. This is going to have a number of difficult ramifications on the existing data structure, so now seems as good a time as any to fully decouple the staged ledger.
 
 ## Detailed design
 [detailed-design]: #detailed-design
@@ -58,7 +58,7 @@ The `Ledger_builder` abstraction was too large in scope, which was making tight 
 
 ### `Ledger_builder` -> `Staged_ledger`
 
-`Ledger_builder` is not a very descriptive name for what the old type represented, and it is even less so now that it has been decoupled. `Staged_ledger` is a better descriptor as it represents the process of _staging_ transactions into the ledger before they are fully verified. Previously, the term "staged ledger" has been used to refer to the ledger that contains the state of the unproven transactions in the old ledger builder, so this is a change of use for the term. Now, the actual ledger that represents the sate is a `Staged_ledger.ledger`, and the type of `Staged_ledger.t` is the union of a ledger and a `Transaction_snark_scan_state`.
+`Ledger_builder` is not a very descriptive name for what the old type represented, and it is even less so now that it has been decoupled. `Staged_ledger` is a better descriptor as it represents the process of _staging_ transactions into the ledger before they are fully verified. Previously, the term "staged ledger" has been used to refer to the ledger that contains the state of the unproven transactions in the old staged ledger, so this is a change of use for the term. Now, the actual ledger that represents the sate is a `Staged_ledger.ledger`, and the type of `Staged_ledger.t` is the union of a ledger and a `Transaction_snark_scan_state`.
 
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions

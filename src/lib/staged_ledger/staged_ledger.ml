@@ -44,14 +44,13 @@ end = struct
   module Scan_state = Transaction_snark_scan_state.Make (Inputs)
 
   module Staged_ledger_error = struct
-    type partition = int * int option [@@deriving sexp]
-
     type t =
       | Bad_signature of User_command.t
       | Coinbase_error of string
       | Bad_prev_hash of Staged_ledger_hash.t * Staged_ledger_hash.t
       | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
-      | Non_zero_fee_excess of partition * Transaction.t list
+      | Non_zero_fee_excess of
+          Scan_state.Space_partition.t * Transaction.t list
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -74,8 +73,8 @@ end = struct
       | Non_zero_fee_excess (partition, txns) ->
           Format.asprintf
             !"Fee excess is non-zero for the transactions: %{sexp: \
-              Transaction.t list} and the current queue partition %{sexp: \
-              partition} \n"
+              Transaction.t list} and the current queue with slots \
+              partitioned as %{sexp: Scan_state.Space_partition.t} \n"
             txns partition
       | Unexpected e -> Error.to_string_hum e
 
@@ -564,6 +563,7 @@ end = struct
     ; user_commands_count= List.length user_commands
     ; coinbase_parts_count= List.length coinbase }
 
+  (*The total fee excess caused by any diff should be zero. In the case where the slots are split into two partitions, total fee excess of the transactions to be enqueued on each of the partitions should be zero respectively *)
   let check_zero_fee_excess scan_state data =
     let zero = Currency.Fee.Signed.zero in
     let partitions = Scan_state.partition_if_overflowing scan_state in
@@ -583,8 +583,8 @@ end = struct
           Option.bind fe' ~f:(fun f -> Currency.Fee.Signed.add f fee_excess) )
       |> to_staged_ledger_or_error
     in
+    let open Result.Let_syntax in
     let check data slots =
-      let open Result.Let_syntax in
       let%bind txns = txns_from_data data |> to_staged_ledger_or_error in
       let%bind fe = total_fee_excess txns in
       let%bind fe_no_overflow =
@@ -598,12 +598,10 @@ end = struct
       if Currency.Fee.Signed.equal fe_no_overflow zero then Ok ()
       else Error (Non_zero_fee_excess (slots, txns))
     in
-    match partitions with
-    | `One x -> check data (x, None)
-    | `Two (x, y) ->
-        Result.bind
-          (check (List.take data x) (x, Some y))
-          ~f:(fun _ -> check (List.drop data x) (x, Some y))
+    let%bind () = check (List.take data partitions.first) partitions in
+    Option.value_map ~default:(Result.return ())
+      ~f:(fun _ -> check (List.drop data partitions.first) partitions)
+      partitions.second
 
   (* N.B.: we don't expose apply_diff_unverified
      in For_tests only, we expose apply apply_unverified, which calls apply_diff_unverified *)
@@ -1133,8 +1131,9 @@ end = struct
     in
     check_constraints_and_update init_resources
 
-  let generate logger cw_seq ts_seq self partitions max_job_count
-      cur_work_count =
+  let generate logger cw_seq ts_seq self
+      (partitions : Scan_state.Space_partition.t) max_job_count cur_work_count
+      =
     let pre_diff_with_one (res : Resources.t) :
         Staged_ledger_diff.With_valid_signatures_and_proofs
         .pre_diff_with_at_most_one_coinbase =
@@ -1180,17 +1179,17 @@ end = struct
          = 0
     in
     (*Partitioning explained in PR #687 *)
-    match partitions with
-    | `One x ->
+    match partitions.second with
+    | None ->
         let res =
-          one_prediff cw_seq ts_seq self x ~add_coinbase:true max_job_count
-            cur_work_count logger
+          one_prediff cw_seq ts_seq self partitions.first ~add_coinbase:true
+            max_job_count cur_work_count logger
         in
         make_diff res None
-    | `Two (x, y) ->
+    | Some y ->
         let res =
-          one_prediff cw_seq ts_seq self x ~add_coinbase:false max_job_count
-            cur_work_count logger
+          one_prediff cw_seq ts_seq self partitions.first ~add_coinbase:false
+            max_job_count cur_work_count logger
         in
         let res1, res2 =
           match Resources.available_space res with
@@ -1222,8 +1221,8 @@ end = struct
           | _ ->
               (* Too many slots left in the first partition. Either there wasn't enough work to add transactions or there weren't enough transactions. Create a new pre_diff for just the first partition*)
               let new_res =
-                one_prediff cw_seq ts_seq self x ~add_coinbase:true
-                  max_job_count cur_work_count logger
+                one_prediff cw_seq ts_seq self partitions.first
+                  ~add_coinbase:true max_job_count cur_work_count logger
               in
               (new_res, None)
         in
@@ -1233,10 +1232,10 @@ end = struct
         in
         if coinbase_added > 0 then make_diff res1 res2
         else
-          (*Coinbase takes priority over user-commands. Create a diff in x with coinbase first and user commands if possible*)
+          (*Coinbase takes priority over user-commands. Create a diff in partitions.first with coinbase first and user commands if possible*)
           let res =
-            one_prediff cw_seq ts_seq self x ~add_coinbase:true max_job_count
-              cur_work_count logger
+            one_prediff cw_seq ts_seq self partitions.first ~add_coinbase:true
+              max_job_count cur_work_count logger
           in
           make_diff res None
 
@@ -2073,21 +2072,22 @@ let%test_module "test" =
       let initial_ledger = ref 0 in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
       let create_diff_with_non_zero_fee_excess prev_hash txns completed_works
-          partition : Test_input1.Staged_ledger_diff.t =
-        match partition with
-        | `One _ ->
+          (partition : Sl.Scan_state.Space_partition.t) :
+          Test_input1.Staged_ledger_diff.t =
+        match partition.second with
+        | None ->
             { diff=
                 ({completed_works; user_commands= txns; coinbase= Zero}, None)
             ; prev_hash
             ; creator= "C" }
-        | `Two (x, _) ->
+        | Some _ ->
             let diff : Test_input1.Staged_ledger_diff.diff =
               ( { completed_works
-                ; user_commands= List.take txns x
+                ; user_commands= List.take txns partition.first
                 ; coinbase= Zero }
               , Some
                   { completed_works= []
-                  ; user_commands= List.drop txns x
+                  ; user_commands= List.drop txns partition.first
                   ; coinbase= Zero } )
             in
             {diff; prev_hash; creator= "C"}
@@ -2103,11 +2103,6 @@ let%test_module "test" =
               in
               let partitions =
                 Sl.Scan_state.partition_if_overflowing scan_state
-              in
-              let partition_pair =
-                match partitions with
-                | `One x -> (x, None)
-                | `Two (x, y) -> (x, Some y)
               in
               let work_done =
                 Sequence.filter_map
@@ -2126,9 +2121,7 @@ let%test_module "test" =
                   partitions
               in
               match%map Sl.apply !sl diff ~logger with
-              | Error (Sl.Staged_ledger_error.Non_zero_fee_excess (p, _)) ->
-                  assert (p = partition_pair) ;
-                  assert true
+              | Error (Sl.Staged_ledger_error.Non_zero_fee_excess _) -> ()
               | Error _ -> assert false
               | Ok
                   ( `Hash_after_applying _hash

@@ -597,6 +597,10 @@ module type Transaction_snark_scan_state_intf = sig
     type t
   end
 
+  module Space_partition : sig
+    type t = {first: int; second: int option} [@@deriving sexp]
+  end
+
   module Job_view : sig
     type t [@@deriving sexp, to_yojson]
   end
@@ -654,7 +658,7 @@ module type Transaction_snark_scan_state_intf = sig
 
   val copy : t -> t
 
-  val partition_if_overflowing : t -> [`One of int | `Two of int * int]
+  val partition_if_overflowing : t -> Space_partition.t
 
   val statement_of_job : Available_job.t -> ledger_proof_statement option
 
@@ -691,7 +695,7 @@ module type Staged_ledger_base_intf = sig
 
   type transaction
 
-  (** The ledger in a ledger builder is always a mask *)
+  (** The ledger in a staged ledger is always a mask *)
   type ledger
 
   type serializable [@@deriving bin_io]
@@ -703,6 +707,10 @@ module type Staged_ledger_base_intf = sig
       type t [@@deriving sexp, to_yojson]
     end
 
+    module Space_partition : sig
+      type t = {first: int; second: int option} [@@deriving sexp]
+    end
+
     val hash : t -> staged_ledger_aux_hash
 
     val is_valid : t -> bool
@@ -711,7 +719,7 @@ module type Staged_ledger_base_intf = sig
 
     val snark_job_list_json : t -> string
 
-    val partition_if_overflowing : t -> [`One of int | `Two of int * int]
+    val partition_if_overflowing : t -> Space_partition.t
 
     val all_work_to_do : t -> statement Sequence.t Or_error.t
   end
@@ -722,7 +730,7 @@ module type Staged_ledger_base_intf = sig
       | Coinbase_error of string
       | Bad_prev_hash of staged_ledger_hash * staged_ledger_hash
       | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
-      | Non_zero_fee_excess of (int * int option) * transaction list
+      | Non_zero_fee_excess of Scan_state.Space_partition.t * transaction list
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -857,14 +865,14 @@ module type Tip_intf = sig
 
   type external_transition_verified
 
-  (* N.B.: can't derive bin_io for ledger builder containing persistent ledger *)
+  (* N.B.: can't derive bin_io for staged ledger containing persistent ledger *)
   type t =
     { state: protocol_state
     ; proof: protocol_state_proof
     ; staged_ledger: staged_ledger }
   [@@deriving sexp, fields]
 
-  (* serializer for tip components other than the persistent database in the ledger builder *)
+  (* serializer for tip components other than the persistent database in the staged ledger *)
   val bin_tip : serializable Bin_prot.Type_class.t
 
   val of_verified_transition_and_staged_ledger :

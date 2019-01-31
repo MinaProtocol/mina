@@ -588,7 +588,7 @@ module Make (Inputs : Inputs_intf) = struct
     | Some x -> Deferred.return (Ok x)
     | None ->
         Deferred.Or_error.error_string
-          "ledger builder hash not found in transition frontier"
+          "staged ledger hash not found in transition frontier"
 
   let get_ledger_by_hash tf ledger_hash =
     match
