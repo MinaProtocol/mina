@@ -310,7 +310,7 @@ end
 module Get_public_keys_with_balances = struct
   type query = unit [@@deriving bin_io]
 
-  type response = (int * string) list [@@deriving bin_io, sexp]
+  type response = (string * int) list [@@deriving bin_io, sexp]
 
   type error = unit [@@deriving bin_io]
 
