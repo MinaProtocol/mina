@@ -222,21 +222,21 @@ module Reader = struct
     (reader_a, reader_b, reader_c)
 end
 
-let%test_module _ =
+let%test_module "Strict_pipe.close" =
   ( module struct
-    let%test_unit _ =
+    let%test_unit "'close' would close a writer" =
       let _, writer = create Synchronous in
       assert (not (Writer.is_closed writer)) ;
       Writer.close writer ;
       assert (Writer.is_closed writer)
 
-    let%test_unit _ =
+    let%test_unit "'close' would close a writer" =
       let _, writer = create (Buffered (`Capacity 64, `Overflow Crash)) in
       assert (not (Writer.is_closed writer)) ;
       Writer.close writer ;
       assert (Writer.is_closed writer)
 
-    let%test_unit _ =
+    let%test_unit "'close' would close the downstream pipes linked by 'map'" =
       let input_reader, input_writer = create Synchronous in
       assert (not (Writer.is_closed input_writer)) ;
       let output_reader = Reader.map ~f:Fn.id input_reader in
@@ -245,7 +245,8 @@ let%test_module _ =
       assert (Writer.is_closed input_writer) ;
       assert (Reader.is_closed output_reader)
 
-    let%test_unit _ =
+    let%test_unit "'close' would close the downstream pipes linked by \
+                   'filter_map'" =
       let input_reader, input_writer = create Synchronous in
       assert (not (Writer.is_closed input_writer)) ;
       let output_reader =
@@ -256,7 +257,7 @@ let%test_module _ =
       assert (Writer.is_closed input_writer) ;
       assert (Reader.is_closed output_reader)
 
-    let%test_unit _ =
+    let%test_unit "'close' would close the downstream pipes linked by 'Fork'" =
       let input_reader, input_writer = create Synchronous in
       assert (not (Writer.is_closed input_writer)) ;
       let output_reader1, output_reader2 = Reader.Fork.two input_reader in
@@ -267,7 +268,8 @@ let%test_module _ =
       assert (Reader.is_closed output_reader1) ;
       assert (Reader.is_closed output_reader2)
 
-    let%test_unit _ =
+    let%test_unit "'close' would close the downstream pipes linked by \
+                   'partition_map3'" =
       let input_reader, input_writer = create Synchronous in
       assert (not (Writer.is_closed input_writer)) ;
       let output_reader1, output_reader2, output_reader3 =
@@ -282,13 +284,13 @@ let%test_module _ =
       assert (Reader.is_closed output_reader2) ;
       assert (Reader.is_closed output_reader3)
 
-    let%test_unit _ =
+    let%test_unit "'close' would close the downstream pipes linked by \
+                   'transfer'" =
       let input_reader, input_writer = create Synchronous
       and _, output_writer = create Synchronous in
       assert (not (Writer.is_closed input_writer)) ;
       assert (not (Writer.is_closed output_writer)) ;
-      transfer input_reader output_writer ~f:Fn.id
-      >>> fun () ->
+      let _ = transfer input_reader output_writer ~f:Fn.id in
       Writer.close input_writer ;
       assert (Writer.is_closed input_writer) ;
       assert (Writer.is_closed output_writer)
