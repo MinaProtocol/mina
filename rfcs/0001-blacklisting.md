@@ -9,7 +9,7 @@ Punish peers by refusing to connect to their IP when they misbehave.
 Our software receives diffs, transactions, merkle tree components, etc from
 other peers in the network. Much of this is authenticated, meaning we know what
 the resulting hash of some object must be. This happens for the `syncable_ledger`
-queries and the ledger builder aux data. When a peer sends us data that
+queries and the staged ledger aux data. When a peer sends us data that
 results in a state where the hash doesn't match, we know that the peer was
 dishonest or buggy. Some other instances of misbehavior that we want to punish
 with a ban:

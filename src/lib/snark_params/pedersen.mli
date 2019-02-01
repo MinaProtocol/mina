@@ -99,6 +99,8 @@ end)
 
     val to_affine_coordinates : t -> Field.t * Field.t
 
+    val point_near_x : Field.t -> t
+
     val zero : t
 
     val add : t -> t -> t
