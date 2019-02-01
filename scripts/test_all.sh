@@ -27,11 +27,9 @@ run_unit_tests_with_coverage() {
 run_integration_test() {
   echo "------------------------------------------------------------------------------------------"
 
-  CODA_ENV="$(env | grep '^CODA_' | xargs echo)"
-
   date
   SECONDS=0
-  echo "TESTING ${1} USING \"${CODA_ENV}\""
+  echo "TESTING ${1}"
   set +e
 
   # ugly hack to clean up dead processes
@@ -43,7 +41,7 @@ run_integration_test() {
   run_dune exec coda -- integration-tests ${1} 2>&1 | tee test.log | ../scripts/jqproc.sh -f '.level=="Error" or .level=="Warning" or .level=="Faulty_peer" or .level=="Fatal"'
   OUT=${PIPESTATUS[0]}
   echo "------------------------------------------------------------------------------------------" >> test.log
-  echo "${CODA_ENV} ${1}" >> test.log
+  echo "${1}" >> test.log
 
   echo "TESTING ${1} took ${SECONDS} seconds"
 
@@ -55,7 +53,7 @@ run_integration_test() {
     echo "RECENT OUTPUT:"
     cat test.log | run_dune exec logproc
     echo "------------------------------------------------------------------------------------------"
-    echo "FAILURE ON: ${CODA_ENV} ${1}"
+    echo "FAILURE ON: ${1}"
     exit 2
   fi
 
