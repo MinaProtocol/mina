@@ -65,6 +65,8 @@ end = struct
     [@@deriving sexp]
   end
 
+  module Space_partition = Parallel_scan.Space_partition
+
   module Job_view = struct
     type t = Ledger_proof_statement.t Parallel_scan.Job_view.t
     [@@deriving sexp]
@@ -446,8 +448,9 @@ end = struct
 
   let copy {tree; job_count} = {tree= Parallel_scan.State.copy tree; job_count}
 
-  let partition_if_overflowing t ~max_slots =
-    Parallel_scan.partition_if_overflowing t.tree ~max_slots
+  let partition_if_overflowing t =
+    let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
+    Parallel_scan.partition_if_overflowing t.tree ~max_slots:max_throughput
 
   let current_job_sequence_number {tree; _} =
     Parallel_scan.current_job_sequence_number tree
