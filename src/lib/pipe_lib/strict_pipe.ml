@@ -27,26 +27,27 @@ module Reader0 = struct
   type 't t =
     { reader: 't Pipe.Reader.t
     ; mutable has_reader: bool
-    ; mutable downstreams: downstreams
-    }
-  and downstreams = []   : downstreams
-                  | (::) : 'a t * downstreams -> downstreams
+    ; mutable downstreams: downstreams }
+
+  and downstreams =
+    | [] : downstreams
+    | ( :: ) : 'a t * downstreams -> downstreams
+
+  let rec downstreams_from_list : 'a t list -> downstreams = function
+    | [] -> []
+    | r :: rs -> r :: downstreams_from_list rs
 
   (* TODO: See #1281 *)
   let to_linear_pipe {reader= pipe; has_reader; downstreams= _} =
     {Linear_pipe.Reader.pipe; has_reader}
 
   let of_linear_pipe {Linear_pipe.Reader.pipe= reader; has_reader} =
-    {reader; has_reader; downstreams = []}
+    {reader; has_reader; downstreams= []}
 
   let assert_not_read reader =
     if reader.has_reader then raise Multiple_reads_attempted
 
-  let wrap_reader reader = {reader; has_reader= false; downstreams = []}
-
-  let rec wrap_downstreams : 't Pipe.Reader.t list -> downstreams = function
-    | []      -> []
-    | (r::rs) -> wrap_reader r :: wrap_downstreams rs
+  let wrap_reader reader = {reader; has_reader= false; downstreams= []}
 
   let enforce_single_reader reader deferred =
     assert_not_read reader ;
@@ -78,12 +79,16 @@ module Reader0 = struct
   let map reader ~f =
     assert_not_read reader ;
     reader.has_reader <- true ;
-    wrap_reader (Pipe.map reader.reader ~f)
+    let strict_reader = wrap_reader (Pipe.map reader.reader ~f) in
+    reader.downstreams <- [strict_reader] ;
+    strict_reader
 
   let filter_map reader ~f =
     assert_not_read reader ;
     reader.has_reader <- true ;
-    wrap_reader (Pipe.filter_map reader.reader ~f)
+    let strict_reader = wrap_reader (Pipe.filter_map reader.reader ~f) in
+    reader.downstreams <- [strict_reader] ;
+    strict_reader
 
   let clear t = Pipe.clear t.reader
 
@@ -131,24 +136,29 @@ module Reader0 = struct
       don't_wait_for
         (let%map () = Deferred.List.iter readers ~f:Pipe.closed in
          Pipe.close_read reader.reader) ;
-      reader.downstreams <- wrap_downstreams readers;
-      List.map readers ~f:wrap_reader
+      let strict_readers = List.map readers ~f:wrap_reader in
+      reader.downstreams <- downstreams_from_list strict_readers ;
+      strict_readers
 
     let two reader =
       match n reader 2 with [a; b] -> (a, b) | _ -> failwith "unexpected"
   end
 
   let rec close_downstreams = function
-    | []    -> ()
-    | r::rs -> Pipe.close_read r.reader; close_downstreams rs
+    | [] -> ()
+    (* The use of close_read is justified, because close_read would do
+     * everything close does, and in addition:
+     * 1. all pending flushes become determined with `Reader_closed.
+     * 2. the pipe buffer is cleared.
+     * 3. all subsequent reads will get `Eof. *)
+    | r :: rs -> Pipe.close_read r.reader ; close_downstreams rs
 end
 
 module Writer = struct
   type ('t, 'type_, 'write_return) t =
     { type_: ('type_, 'write_return) type_
     ; strict_reader: 't Reader0.t
-    ; writer: 't Pipe.Writer.t
-    }
+    ; writer: 't Pipe.Writer.t }
 
   (* TODO: See #1281 *)
   let to_linear_pipe {writer= pipe; strict_reader= _; type_= _} = pipe
@@ -171,8 +181,8 @@ module Writer = struct
           handle_overflow writer data overflow
         else Pipe.write_without_pushback writer.writer data
 
-  let close {type_ = _; strict_reader; writer} =
-    Pipe.close writer;
+  let close {type_= _; strict_reader; writer} =
+    Pipe.close writer ;
     Reader0.close_downstreams strict_reader.downstreams
 
   let is_closed {writer; _} = Pipe.is_closed writer
@@ -181,10 +191,11 @@ end
 let create type_ =
   let reader, writer = Pipe.create () in
   let strict_reader = Reader0.{reader; has_reader= false; downstreams= []} in
-  let strict_writer = Writer.{type_; strict_reader; writer}
-  in (strict_reader, strict_writer)
+  let strict_writer = Writer.{type_; strict_reader; writer} in
+  (strict_reader, strict_writer)
 
-let transfer reader {Writer.writer; _} ~f =
+let transfer reader {Writer.type_= _; strict_reader; writer} ~f =
+  Reader0.(reader.downstreams <- [strict_reader]) ;
   Reader0.enforce_single_reader reader (Pipe.transfer reader.reader writer ~f)
 
 module Reader = struct
@@ -205,6 +216,6 @@ module Reader = struct
        and () = Pipe.closed reader_b.reader
        and () = Pipe.closed reader_c.reader in
        Pipe.close_read reader.reader) ;
-    reader.downstreams <- reader_a :: reader_b :: reader_c :: [];
+    reader.downstreams <- [reader_a; reader_b; reader_c] ;
     (reader_a, reader_b, reader_c)
 end
