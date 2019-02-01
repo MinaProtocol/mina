@@ -577,9 +577,14 @@ module Vrf = struct
     let open Message in
     let open Option.Let_syntax in
     let%bind ledger =
-      if Coda_base.Frozen_ledger_hash.equal ledger_hash genesis_ledger_hash
-      then Some local_state.Local_state.genesis_epoch_ledger
-      else local_state.Local_state.last_epoch_ledger
+      let ledger =
+        if Coda_base.Frozen_ledger_hash.equal ledger_hash genesis_ledger_hash
+        then Some local_state.Local_state.genesis_epoch_ledger
+        else local_state.Local_state.last_epoch_ledger
+      in
+      (if ledger = None then
+         Logger.info "Unable to check vrf evaluation: last_epoch_ledger does not exist in local state");
+      ledger
     in
     Logger.info logger "Checking vrf evaluations at %d:%d" (Epoch.to_int epoch)
       (Epoch.Slot.to_int slot) ;
