@@ -92,6 +92,8 @@ module Reader0 = struct
 
   let clear t = Pipe.clear t.reader
 
+  let is_closed reader = Pipe.is_closed reader.reader
+
   module Merge = struct
     let iter readers ~f =
       let not_empty r = not @@ Pipe.is_empty r.reader in
@@ -219,3 +221,75 @@ module Reader = struct
     reader.downstreams <- [reader_a; reader_b; reader_c] ;
     (reader_a, reader_b, reader_c)
 end
+
+let%test_module _ =
+  ( module struct
+    let%test_unit _ =
+      let _, writer = create Synchronous in
+      assert (not (Writer.is_closed writer)) ;
+      Writer.close writer ;
+      assert (Writer.is_closed writer)
+
+    let%test_unit _ =
+      let _, writer = create (Buffered (`Capacity 64, `Overflow Crash)) in
+      assert (not (Writer.is_closed writer)) ;
+      Writer.close writer ;
+      assert (Writer.is_closed writer)
+
+    let%test_unit _ =
+      let input_reader, input_writer = create Synchronous in
+      assert (not (Writer.is_closed input_writer)) ;
+      let output_reader = Reader.map ~f:Fn.id input_reader in
+      assert (not (Reader.is_closed output_reader)) ;
+      Writer.close input_writer ;
+      assert (Writer.is_closed input_writer) ;
+      assert (Reader.is_closed output_reader)
+
+    let%test_unit _ =
+      let input_reader, input_writer = create Synchronous in
+      assert (not (Writer.is_closed input_writer)) ;
+      let output_reader =
+        Reader.filter_map ~f:(Fn.const (Some 1)) input_reader
+      in
+      assert (not (Reader.is_closed output_reader)) ;
+      Writer.close input_writer ;
+      assert (Writer.is_closed input_writer) ;
+      assert (Reader.is_closed output_reader)
+
+    let%test_unit _ =
+      let input_reader, input_writer = create Synchronous in
+      assert (not (Writer.is_closed input_writer)) ;
+      let output_reader1, output_reader2 = Reader.Fork.two input_reader in
+      assert (not (Reader.is_closed output_reader1)) ;
+      assert (not (Reader.is_closed output_reader2)) ;
+      Writer.close input_writer ;
+      assert (Writer.is_closed input_writer) ;
+      assert (Reader.is_closed output_reader1) ;
+      assert (Reader.is_closed output_reader2)
+
+    let%test_unit _ =
+      let input_reader, input_writer = create Synchronous in
+      assert (not (Writer.is_closed input_writer)) ;
+      let output_reader1, output_reader2, output_reader3 =
+        Reader.partition_map3 input_reader ~f:(fun _ -> `Fst 1)
+      in
+      assert (not (Reader.is_closed output_reader1)) ;
+      assert (not (Reader.is_closed output_reader2)) ;
+      assert (not (Reader.is_closed output_reader3)) ;
+      Writer.close input_writer ;
+      assert (Writer.is_closed input_writer) ;
+      assert (Reader.is_closed output_reader1) ;
+      assert (Reader.is_closed output_reader2) ;
+      assert (Reader.is_closed output_reader3)
+
+    let%test_unit _ =
+      let input_reader, input_writer = create Synchronous
+      and _, output_writer = create Synchronous in
+      assert (not (Writer.is_closed input_writer)) ;
+      assert (not (Writer.is_closed output_writer)) ;
+      transfer input_reader output_writer ~f:Fn.id
+      >>> fun () ->
+      Writer.close input_writer ;
+      assert (Writer.is_closed input_writer) ;
+      assert (Writer.is_closed output_writer)
+  end )
