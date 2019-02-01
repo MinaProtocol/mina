@@ -1,5 +1,5 @@
 [%%import "config/coinbase/standard.mlh"]
-[%%import "config/consensus/postake_tiny.mlh"]
+[%%import "config/consensus/postake_short.mlh"]
 [%%import "config/debug_level/logs.mlh"]
 
 [%%define fake_hash true]
