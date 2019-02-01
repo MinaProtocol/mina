@@ -151,9 +151,9 @@ To create a `Run` instance we'll need to go to [coda_lib.ml](../src/lib/coda_lib
 It's here where we can trace the path of the payment from the transaction pool forwards. Let's sketch that out before diving deeper into each of the subsystems:
 
 1. The [transaction pool](#transaction-pool) broadcasts diffs from the transaction pool through to the [network](#network)
-2. The [proposer](#proposer) reads payments from the transaction pool when it's time to make a transition from one blockchain state to another, those payments are part of a diff to update a [ledger builder](#ledger-builder) which is committed to inside the new blockchain state. [External transitions](#external-transition) are emitted.
-3. The [network](#network) and the [proposer](#proposer) feed [external transitions](#external-transition) containing information on how to update a [ledger builder](#ledger-builder) with the new payment buffered to the [ledger builder controller](#ledger-builder-controller)
-4. The [ledger builder controller](#ledger-builder-controller) figures out where this [external transition](#external-transition) fits in it's tree of possible forks. If this happens to extend our "best" path (the state upon which we will propose later) then we do an expensive materialization step to create a [tip](#tip) holding the new [ledger builder](#ledger-builder) and emit this strongest tip over the [network](#network). Healthy clients only forward tips they locally think are the strongest.
+2. The [proposer](#proposer) reads payments from the transaction pool when it's time to make a transition from one blockchain state to another, those payments are part of a diff to update a [staged-ledger](#staged-ledger) which is committed to inside the new blockchain state. [External transitions](#external-transition) are emitted.
+3. The [network](#network) and the [proposer](#proposer) feed [external transitions](#external-transition) containing information on how to update a [staged-ledger](#staged-ledger) with the new payment buffered to the [ledger builder controller](#ledger-builder-controller)
+4. The [ledger builder controller](#ledger-builder-controller) figures out where this [external transition](#external-transition) fits in it's tree of possible forks. If this happens to extend our "best" path (the state upon which we will propose later) then we do an expensive materialization step to create a [tip](#tip) holding the new [staged ledger](#staged-ledger) and emit this strongest tip over the [network](#network). Healthy clients only forward tips they locally think are the strongest.
 
 <a name="transaction-pool"></a>
 ## Transaction Pool
@@ -180,24 +180,24 @@ TODO
 
 TODO
 
-<a name="ledger-builder"></a>
-## Ledger-builder
-A ledger builder can be regarded as a "Pending accounts database" that has transactions(payments, coinbase, and proof-fees) applied for which there are no snarks available yet.
-A ledger builder consists of the accounts state (what we currently call ledger) and a data structure called [parallel_scan.ml](../src/lib/parallel_scan/parallel_scan.ml). It keeps track of all the transactions that need to be snarked (grep for `Available_job.t`) to produce a single transaction snark that certifies a set of transactions. This is exposed as Aux in the ledger builder.
+<a name="staged-ledger"></a>
+## Staged-ledger
+A staged ledger can be regarded as a "Pending accounts database" that has transactions(payments, coinbase, and proof-fees) applied for which there are no snarks available yet.
+A staged ledger consists of the accounts state (what we currently call ledger) and a data structure called [parallel_scan.ml](../src/lib/parallel_scan/parallel_scan.ml). It keeps track of all the transactions that need to be snarked (grep for `Available_job.t`) to produce a single transaction snark that certifies a set of transactions. This is exposed as Aux in the staged ledger.
 Parallel scan is a tree like structure that stores statements needed to be proved. A statement can be of applying a single transaction `Base` or of composing other statements `Merge`. Snarking of these statements is delegated to snark-workers. The snark workers submit snarks for the corresponding statements which are used by the proposer to update the parallel scan state.
 
-When the propser wins a block, the payments read from the transaction pool are sent to the ledger builder to create a diff `Staged_ledger_diff`. 
+When the propser wins a block, the payments read from the transaction pool are sent to the staged ledger to create a diff `Staged_ledger_diff`. 
 A diff consists of 
 1. Payments included in the block
 2. A list of proofs that prove some of the transactions (payments, coinbase, and proof-fees) from previous blocks
 3. Coinbase 
 
-There are two primary operations in ledger builder.
+There are two primary operations in staged ledger.
 1. Creating a diff :
     To include a payment from the transaction pool, the proposer needs to include snarks generated by its own snark-workers (or buy it from someone) which certifies some of the transactions added in previous blocks. The number of snarks needs to be twice the number of transactions being included in the block (an invariant of the aux data structure). These proofs are included in the diff along with the payments and coinbase.
     The diff is then included in the external transition and  broadcasted to the network.
 
-2. Applying a diff: Diffs from the node itself (Internal transitions) or from the network (External transitions) are then used to update the ledger builder by applying the payments to the ledger and updating the parallel scan state with the proofs. Applying a diff may produce a proof for a sequence of transactions that were included in the previous blocks.
+2. Applying a diff: Diffs from the node itself (Internal transitions) or from the network (External transitions) are then used to update the staged ledger by applying the payments to the ledger and updating the parallel scan state with the proofs. Applying a diff may produce a proof for a sequence of transactions that were included in the previous blocks.
 
 ## Ledger
 

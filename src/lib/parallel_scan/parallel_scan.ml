@@ -23,6 +23,10 @@ module Job_view = struct
   type 'a t = int * 'a node [@@deriving sexp]
 end
 
+module Space_partition = struct
+  type t = {first: int; second: int option} [@@deriving sexp]
+end
+
 module State = struct
   include State
 
@@ -619,11 +623,14 @@ let partition_if_overflowing ~max_slots state =
   let parallelism = State.parallelism state in
   let offset = parallelism - 1 in
   match State.base_none_pos state with
-  | None -> `One 0
+  | None -> {Space_partition.first= 0; second= None}
   | Some start ->
       let start_0 = start - offset in
-      if n <= parallelism - start_0 then `One n
-      else `Two (parallelism - start_0, n - (parallelism - start_0))
+      if n <= parallelism - start_0 then
+        {Space_partition.first= n; second= None}
+      else
+        { Space_partition.first= parallelism - start_0
+        ; second= Some (n - (parallelism - start_0)) }
 
 let gen :
        gen_data:'d Quickcheck.Generator.t
@@ -763,16 +770,16 @@ let%test_module "scans" =
                 @@ fill_in_completed_jobs ~state ~completed_jobs:jobs_done
               in
               let () = Or_error.ok_exn @@ enqueue_data ~state ~data in
-              match partition with
-              | `One x ->
+              match partition.second with
+              | None ->
                   let expected_base_pos =
-                    if curr_head + x = last_index + 1 then offset
-                    else curr_head + x
+                    if curr_head + partition.first = last_index + 1 then offset
+                    else curr_head + partition.first
                   in
                   assert (
                     Option.value_exn state.base_none_pos = expected_base_pos )
-              | `Two (x, y) ->
-                  assert (x + y = i) ;
+              | Some y ->
+                  assert (partition.first + y = i) ;
                   assert (Option.value_exn state.base_none_pos = y + offset) )
 
         let%test_unit "non-emitted data tracking" =

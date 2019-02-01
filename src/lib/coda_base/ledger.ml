@@ -76,7 +76,6 @@ module Any_ledger :
 module Mask :
   Merkle_mask.Masking_merkle_tree_intf.S
   with module Location = Location_at_depth
-  with module Addr = Location_at_depth.Addr
    and module Attached.Addr = Location_at_depth.Addr
   with type account := Account.t
    and type key := Public_key.Compressed.t
