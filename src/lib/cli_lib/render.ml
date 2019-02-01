@@ -46,6 +46,6 @@ module Public_key_with_balances = struct
 
   let to_text account =
     List.map account ~f:(fun (public_key, balance) ->
-        sprintf !"%s %d" public_key balance )
+        sprintf !"%s : %d" public_key balance )
     |> String.concat ~sep:"\n"
 end

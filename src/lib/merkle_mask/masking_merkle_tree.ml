@@ -427,7 +427,7 @@ struct
              | location -> raise (Location_is_not_account location) )
       |> List.sort ~compare:(fun (addr1, _) (addr2, _) ->
              Int.compare addr1 addr2 )
-      |> List.map ~f:snd
+      |> List.map ~f:(fun (_, account) -> account)
 
     let foldi_with_ignored_keys t ignored_keys ~init ~f =
       let locations_and_accounts = Location.Table.to_alist t.account_tbl in
