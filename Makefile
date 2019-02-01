@@ -67,7 +67,7 @@ dht: kademlia
 
 build: git_hooks
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && (ulimit -u 2128 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 dev: codabuilder containerstart build
@@ -235,7 +235,7 @@ test-stakes:
 
 test-withsnark: SHELL := /bin/bash
 test-withsnark:
-	source scripts/test_all.sh ; cd src; CODA_BLOCK_DURATION=30000 WITH_SNARKS=true DUNE_PROFILE=test_posig run_integration_test full-test
+	source scripts/test_all.sh ; cd src; WITH_SNARKS=true DUNE_PROFILE=test_posig run_integration_test full-test
 
 web:
 	./scripts/web.sh
