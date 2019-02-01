@@ -30,6 +30,8 @@ module type Input_intf = sig
      and type addr := L.addr
      and type merkle_path := L.path
      and type account := L.account
+     and type query := L.addr Syncable_ledger.query
+     and type answer := (L.addr, Root_hash.t, L.account) Syncable_ledger.answer
 
   module SR = SL.Responder
 end
