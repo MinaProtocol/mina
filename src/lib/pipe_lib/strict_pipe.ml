@@ -290,7 +290,7 @@ let%test_module "Strict_pipe.close" =
       and _, output_writer = create Synchronous in
       assert (not (Writer.is_closed input_writer)) ;
       assert (not (Writer.is_closed output_writer)) ;
-      let _ = transfer input_reader output_writer ~f:Fn.id in
+      let _ : unit Deferred.t = transfer input_reader output_writer ~f:Fn.id in
       Writer.close input_writer ;
       assert (Writer.is_closed input_writer) ;
       assert (Writer.is_closed output_writer)
