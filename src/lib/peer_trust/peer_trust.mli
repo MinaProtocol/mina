@@ -13,8 +13,16 @@ open Core
 module Trust_response : sig
   type t =
     | Insta_ban  (** Ban the peer immediately *)
-    | Trust_change of float
-        (** Change trust by the specified amount, positive or negative. *)
+    | Trust_increase of float  (** Increase trust by the specified amount. *)
+    | Trust_decrease of float  (** Decrease trust by the specified amount. *)
+end
+
+module Banned_status : sig
+  type t = Unbanned | Banned_until of Time.t
+end
+
+module Peer_status : sig
+  type t = {trust: float; banned: Banned_status.t}
 end
 
 (** Interface for trust-affecting actions. *)
@@ -27,7 +35,7 @@ end
 
 val max_rate : float -> float
 (** Trust increment that sets a maximum rate of doing a bad thing (presuming the
-    peer does no good things) in seconds/action. *)
+    peer does no good things) in actions/second. *)
 
 (* TODO consider deduplicating somehow, maybe with an intf.ml, or by getting rid
    of this definition entirely. *)
@@ -51,13 +59,7 @@ module type S = sig
   (** Record an action a peer took. This may result in a ban event being
       emitted *)
 
-  val lookup :
-       t
-    -> peer
-    -> [ `Unbanned of float  (** The peer isn't banned. *)
-       | `Banned of float * Time.t
-         (** The peer is banned, second parameter is the time they're banned until. *)
-       ]
+  val lookup : t -> peer -> Peer_status.t
   (** Look up the score of a peer and whether it's banned .*)
 
   val close : t -> unit

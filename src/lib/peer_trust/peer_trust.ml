@@ -1,7 +1,15 @@
 open Core
 
 module Trust_response = struct
-  type t = Insta_ban | Trust_change of float
+  type t = Insta_ban | Trust_increase of float | Trust_decrease of float
+end
+
+module Banned_status = struct
+  type t = Unbanned | Banned_until of Time.t
+end
+
+module Peer_status = struct
+  type t = {trust: float; banned: Banned_status.t}
 end
 
 module type Action_intf = sig
@@ -25,7 +33,7 @@ module type S = sig
 
   val record : t -> peer -> action -> unit
 
-  val lookup : t -> peer -> [`Unbanned of float | `Banned of float * Time.t]
+  val lookup : t -> peer -> Peer_status.t
 
   val close : t -> unit
 end
