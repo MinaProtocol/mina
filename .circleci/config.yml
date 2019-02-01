@@ -214,7 +214,7 @@ jobs:
                   command: eval `opam config env` && DUNE_PROFILE=fake_hash make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                   name: Running test - Fake Hash | full-test
-                  command: source ~/.profile && DUNE_PROFILE=fake_hash source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
+                  command: source ~/.profile && export DUNE_PROFILE=fake_hash && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
             
     test-posig_integration_tests:
         resource_class: large
@@ -231,39 +231,39 @@ jobs:
                   command: eval `opam config env` && DUNE_PROFILE=test_posig_snarkless make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                   name: Running test - Proof of Signature Tests | full-test
-                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
             
             - run:
                   name: Running test - Proof of Signature Tests | coda-peers-test
-                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-peers-test'
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-peers-test'
             
             - run:
                   name: Running test - Proof of Signature Tests | coda-transitive-peers-test
-                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-transitive-peers-test'
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-transitive-peers-test'
             
             - run:
                   name: Running test - Proof of Signature Tests | coda-block-production-test
-                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-block-production-test'
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-block-production-test'
             
             - run:
                   name: Running test - Proof of Signature Tests | coda-shared-prefix-test -who-proposes 0
-                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
             
             - run:
                   name: Running test - Proof of Signature Tests | coda-shared-prefix-test -who-proposes 1
-                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
             
             - run:
                   name: Running test - Proof of Signature Tests | coda-shared-state-test
-                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-state-test'
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-state-test'
             
             - run:
                   name: Running test - Proof of Signature Tests | coda-restart-node-test
-                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-restart-node-test'
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-restart-node-test'
             
             - run:
                   name: Running test - Proof of Signature Tests | transaction-snark-profiler -check-only
-                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless source scripts/test_all.sh && cd src/ && 'run_integration_test' 'transaction-snark-profiler -check-only'
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'transaction-snark-profiler -check-only'
             
     test-postake_integration_tests:
         resource_class: large
@@ -280,39 +280,39 @@ jobs:
                   command: eval `opam config env` && DUNE_PROFILE=test_postake_snarkless make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                   name: Running test - Proof of Stake Tests | full-test
-                  command: source ~/.profile && DUNE_PROFILE=test_postake_snarkless source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
             
             - run:
                   name: Running test - Proof of Stake Tests | coda-peers-test
-                  command: source ~/.profile && DUNE_PROFILE=test_postake_snarkless source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-peers-test'
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-peers-test'
             
             - run:
                   name: Running test - Proof of Stake Tests | coda-transitive-peers-test
-                  command: source ~/.profile && DUNE_PROFILE=test_postake_snarkless source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-transitive-peers-test'
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-transitive-peers-test'
             
             - run:
                   name: Running test - Proof of Stake Tests | coda-block-production-test
-                  command: source ~/.profile && DUNE_PROFILE=test_postake_snarkless source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-block-production-test'
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-block-production-test'
             
             - run:
                   name: Running test - Proof of Stake Tests | coda-shared-prefix-test -who-proposes 0
-                  command: source ~/.profile && DUNE_PROFILE=test_postake_snarkless source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
             
             - run:
                   name: Running test - Proof of Stake Tests | coda-shared-prefix-test -who-proposes 1
-                  command: source ~/.profile && DUNE_PROFILE=test_postake_snarkless source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
             
             - run:
                   name: Running test - Proof of Stake Tests | coda-shared-state-test
-                  command: source ~/.profile && DUNE_PROFILE=test_postake_snarkless source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-state-test'
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-state-test'
             
             - run:
                   name: Running test - Proof of Stake Tests | coda-restart-node-test
-                  command: source ~/.profile && DUNE_PROFILE=test_postake_snarkless source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-restart-node-test'
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-restart-node-test'
             
             - run:
                   name: Running test - Proof of Stake Tests | transaction-snark-profiler -check-only
-                  command: source ~/.profile && DUNE_PROFILE=test_postake_snarkless source scripts/test_all.sh && cd src/ && 'run_integration_test' 'transaction-snark-profiler -check-only'
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'transaction-snark-profiler -check-only'
             
 
 workflows:
