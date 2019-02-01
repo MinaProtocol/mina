@@ -24,19 +24,29 @@ type (_, _) type_ =
       -> ('b buffered, unit) type_
 
 module Reader0 = struct
-  type 't t = {reader: 't Pipe.Reader.t; mutable has_reader: bool}
+  type 't t =
+    { reader: 't Pipe.Reader.t
+    ; mutable has_reader: bool
+    ; mutable downstreams: downstreams
+    }
+  and downstreams = []   : downstreams
+                  | (::) : 'a t * downstreams -> downstreams
 
   (* TODO: See #1281 *)
-  let to_linear_pipe {reader= pipe; has_reader} =
+  let to_linear_pipe {reader= pipe; has_reader; downstreams= _} =
     {Linear_pipe.Reader.pipe; has_reader}
 
   let of_linear_pipe {Linear_pipe.Reader.pipe= reader; has_reader} =
-    {reader; has_reader}
+    {reader; has_reader; downstreams = []}
 
   let assert_not_read reader =
     if reader.has_reader then raise Multiple_reads_attempted
 
-  let wrap_reader reader = {reader; has_reader= false}
+  let wrap_reader reader = {reader; has_reader= false; downstreams = []}
+
+  let rec wrap_downstreams : 't Pipe.Reader.t list -> downstreams = function
+    | []      -> []
+    | (r::rs) -> wrap_reader r :: wrap_downstreams rs
 
   let enforce_single_reader reader deferred =
     assert_not_read reader ;
@@ -121,21 +131,27 @@ module Reader0 = struct
       don't_wait_for
         (let%map () = Deferred.List.iter readers ~f:Pipe.closed in
          Pipe.close_read reader.reader) ;
+      reader.downstreams <- wrap_downstreams readers;
       List.map readers ~f:wrap_reader
 
     let two reader =
       match n reader 2 with [a; b] -> (a, b) | _ -> failwith "unexpected"
   end
+
+  let rec close_downstreams = function
+    | []    -> ()
+    | r::rs -> Pipe.close_read r.reader; close_downstreams rs
 end
 
 module Writer = struct
   type ('t, 'type_, 'write_return) t =
     { type_: ('type_, 'write_return) type_
-    ; reader: 't Pipe.Reader.t
-    ; writer: 't Pipe.Writer.t }
+    ; strict_reader: 't Reader0.t
+    ; writer: 't Pipe.Writer.t
+    }
 
   (* TODO: See #1281 *)
-  let to_linear_pipe {writer= pipe; reader= _; type_= _} = pipe
+  let to_linear_pipe {writer= pipe; strict_reader= _; type_= _} = pipe
 
   let handle_overflow : type b.
       ('t, b buffered, unit) t -> 't -> b overflow_behavior -> unit =
@@ -143,7 +159,7 @@ module Writer = struct
     match overflow_behavior with
     | Crash -> raise Overflow
     | Drop_head ->
-        ignore (Pipe.read_now writer.reader) ;
+        ignore (Pipe.read_now writer.strict_reader.reader) ;
         Pipe.write_without_pushback writer.writer data
 
   let write : type type_ return. ('t, type_, return) t -> 't -> return =
@@ -151,21 +167,22 @@ module Writer = struct
     match writer.type_ with
     | Synchronous -> Pipe.write writer.writer data
     | Buffered (`Capacity capacity, `Overflow overflow) ->
-        if Pipe.length writer.reader > capacity then
+        if Pipe.length writer.strict_reader.reader > capacity then
           handle_overflow writer data overflow
         else Pipe.write_without_pushback writer.writer data
 
-  let close {writer; _} = Pipe.close writer
+  let close {type_ = _; strict_reader; writer} =
+    Pipe.close writer;
+    Reader0.close_downstreams strict_reader.downstreams
 
   let is_closed {writer; _} = Pipe.is_closed writer
 end
 
 let create type_ =
   let reader, writer = Pipe.create () in
-  let reader, writer =
-    (Reader0.{reader; has_reader= false}, Writer.{type_; reader; writer})
-  in
-  (reader, writer)
+  let strict_reader = Reader0.{reader; has_reader= false; downstreams= []} in
+  let strict_writer = Writer.{type_; strict_reader; writer}
+  in (strict_reader, strict_writer)
 
 let transfer reader {Writer.writer; _} ~f =
   Reader0.enforce_single_reader reader (Pipe.transfer reader.reader writer ~f)
@@ -188,5 +205,6 @@ module Reader = struct
        and () = Pipe.closed reader_b.reader
        and () = Pipe.closed reader_c.reader in
        Pipe.close_read reader.reader) ;
+    reader.downstreams <- reader_a :: reader_b :: reader_c :: [];
     (reader_a, reader_b, reader_c)
 end
