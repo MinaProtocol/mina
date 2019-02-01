@@ -145,7 +145,7 @@ history leading to a ban score.
 ## Prior art
 
 There is existing code in Coda to maintain a set of peers banned by IP address in
-`banlist_lib`. It will be superseded this RFC and RFC 0010 are implemented.
+`banlist_lib`. It will be superseded when this RFC and RFC 0010 are implemented.
 
 See the discussion above of how Bitcoin computes ban scores.
 
