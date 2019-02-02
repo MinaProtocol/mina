@@ -582,8 +582,10 @@ module Vrf = struct
         then Some local_state.Local_state.genesis_epoch_ledger
         else local_state.Local_state.last_epoch_ledger
       in
-      (if ledger = None then
-         Logger.info "Unable to check vrf evaluation: last_epoch_ledger does not exist in local state");
+      if ledger = None then
+        Logger.info
+          "Unable to check vrf evaluation: last_epoch_ledger does not exist \
+           in local state" ;
       ledger
     in
     Logger.info logger "Checking vrf evaluations at %d:%d" (Epoch.to_int epoch)
