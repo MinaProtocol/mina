@@ -1,3 +1,6 @@
 [submodule "src/lib/snarky"]
 	path = src/lib/snarky
 	url = ../../o1-labs/snarky
+[submodule "src/external/ppx_optcomp"]
+	path = src/external/ppx_optcomp
+	url = ../ppx_optcomp

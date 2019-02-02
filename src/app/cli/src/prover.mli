@@ -4,7 +4,7 @@ open Coda_base
 open Blockchain_snark
 
 module type S = sig
-  (* module Consensus_mechanism : Consensus.Mechanism.S
+  (* module Consensus_mechanism : Consensus.S
 
   module Blockchain :
     Blockchain.S with module Consensus_mechanism = Consensus_mechanism *)
@@ -23,9 +23,9 @@ module type S = sig
   val extend_blockchain :
        t
     -> Blockchain.t
-    -> Consensus.Mechanism.Protocol_state.value
-    -> Consensus.Mechanism.Snark_transition.value
-    -> Consensus.Mechanism.Prover_state.t
+    -> Consensus.Protocol_state.value
+    -> Consensus.Snark_transition.value
+    -> Consensus.Prover_state.t
     -> Blockchain.t Deferred.Or_error.t
 end
 

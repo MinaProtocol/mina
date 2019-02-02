@@ -43,7 +43,7 @@ module type Inputs_intf = sig
 
   module External_transition :
     External_transition.S
-    with module Protocol_state = Consensus.Mechanism.Protocol_state
+    with module Protocol_state = Consensus.Protocol_state
      and module Staged_ledger_diff := Staged_ledger_diff
 
   module Staged_ledger :
@@ -112,13 +112,11 @@ struct
           in
           let blockchain_state_ledger_hash, blockchain_staged_ledger_hash =
             let blockchain_state =
-              Consensus.Mechanism.Protocol_state.blockchain_state
+              Consensus.Protocol_state.blockchain_state
                 transition_protocol_state
             in
-            ( Consensus.Mechanism.Blockchain_state.snarked_ledger_hash
-                blockchain_state
-            , Consensus.Mechanism.Blockchain_state.staged_ledger_hash
-                blockchain_state )
+            ( Consensus.Blockchain_state.snarked_ledger_hash blockchain_state
+            , Consensus.Blockchain_state.staged_ledger_hash blockchain_state )
           in
           let%bind ( `Hash_after_applying staged_ledger_hash
                    , `Ledger_proof proof_opt
@@ -171,7 +169,7 @@ struct
     let hash {transition_with_hash; _} = With_hash.hash transition_with_hash
 
     let parent_hash {transition_with_hash; _} =
-      Consensus.Mechanism.Protocol_state.previous_state_hash
+      Consensus.Protocol_state.previous_state_hash
         (Inputs.External_transition.Verified.protocol_state
            (With_hash.data transition_with_hash))
   end
@@ -198,7 +196,7 @@ struct
          (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t)
       ~root_snarked_ledger ~root_transaction_snark_scan_state
       ~root_staged_ledger_diff ~max_length =
-    let open Consensus.Mechanism in
+    let open Consensus in
     let open Deferred.Let_syntax in
     let logger = Logger.child logger __MODULE__ in
     let root_hash = With_hash.hash root_transition in
