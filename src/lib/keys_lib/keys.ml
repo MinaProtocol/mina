@@ -7,8 +7,8 @@ module type S = sig
     type t =
       { wrap_vk: Tock.Verification_key.t
       ; prev_proof: Tock.Proof.t
-      ; prev_state: Consensus.Mechanism.Protocol_state.value
-      ; update: Consensus.Mechanism.Snark_transition.value }
+      ; prev_state: Consensus.Protocol_state.value
+      ; update: Consensus.Snark_transition.value }
   end
 
   module Wrap_prover_state : sig
@@ -30,8 +30,7 @@ module type S = sig
 
     module Prover_state = Step_prover_state
 
-    val instance_hash :
-      Consensus.Mechanism.Protocol_state.value -> Tick.Field.t
+    val instance_hash : Consensus.Protocol_state.value -> Tick.Field.t
 
     val main : Tick.Field.Var.t -> (unit, Prover_state.t) Tick.Checked.t
   end
@@ -68,7 +67,7 @@ let create () : (module S) Async.Deferred.t =
         let keys = tx_vk
       end) in
       let module B =
-        Blockchain_snark.Blockchain_transition.Make (Consensus.Mechanism) (T)
+        Blockchain_snark.Blockchain_transition.Make (Consensus) (T)
       in
       let module Step = B.Step (struct
         let keys = Tick.Keypair.create ~pk:bc_pk.step ~vk:bc_vk.step
@@ -88,8 +87,8 @@ let create () : (module S) Async.Deferred.t =
           type t =
             { wrap_vk: Tock.Verification_key.t
             ; prev_proof: Tock.Proof.t
-            ; prev_state: Consensus.Mechanism.Protocol_state.value
-            ; update: Consensus.Mechanism.Snark_transition.value }
+            ; prev_state: Consensus.Protocol_state.value
+            ; update: Consensus.Snark_transition.value }
         end
 
         module Wrap_prover_state = struct
@@ -116,8 +115,7 @@ let create () : (module S) Async.Deferred.t =
             in
             fun state ->
               Tick.Pedersen.digest_fold s
-                (State_hash.fold
-                   (Consensus.Mechanism.Protocol_state.hash state))
+                (State_hash.fold (Consensus.Protocol_state.hash state))
 
           module Verification_key = struct
             let to_bool_list =

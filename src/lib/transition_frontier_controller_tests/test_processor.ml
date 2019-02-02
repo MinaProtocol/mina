@@ -37,7 +37,7 @@ let%test_module "Transition_handler.Processor tests" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind frontier =
             create_root_frontier
-              ~max_length:Consensus.Mechanism.Constants.k ~logger
+              ~max_length:Consensus.Constants.k ~logger
           in
           let%bind () =
             build_frontier_randomly frontier

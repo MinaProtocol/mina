@@ -20,7 +20,7 @@ open Coda_base
 
 module Make (Inputs : Inputs.S) = struct
   open Inputs
-  open Consensus.Mechanism
+  open Consensus
 
   type t =
     { logger: Logger.t

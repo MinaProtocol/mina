@@ -50,7 +50,7 @@ module type Inputs_intf = sig
 
   module State_proof :
     Proof_intf
-    with type input := Consensus.Mechanism.Protocol_state.value
+    with type input := Consensus.Protocol_state.value
      and type t := Proof.t
 
   module Protocol_state_validator :
@@ -92,7 +92,7 @@ module Make (Inputs : Inputs_intf) :
   let is_transition_for_bootstrap root_state new_transition =
     let open External_transition.Verified in
     let new_state = protocol_state new_transition in
-    Consensus.Mechanism.should_bootstrap
+    Consensus.should_bootstrap
       ~existing:(External_transition.Protocol_state.consensus_state root_state)
       ~candidate:(External_transition.Protocol_state.consensus_state new_state)
 
