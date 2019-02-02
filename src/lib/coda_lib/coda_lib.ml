@@ -658,7 +658,7 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let%bind transition_frontier =
           Transition_frontier.create ~logger:config.log
-            ~max_length:Consensus.Mechanism.Constants.k
+            ~max_length:Consensus.Constants.k
             ~root_transition:
               (With_hash.of_data first_transition
                  ~hash_data:
