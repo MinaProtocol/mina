@@ -1,0 +1,3 @@
+[%%define consensus_mechanism "proof_of_signature"]
+[%%define global_signer_real true]
+[%%define k 6]

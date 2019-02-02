@@ -17,22 +17,7 @@ let key_generation = false
 
 [%%endif]
 
-module Proof_of_signature = Consensus.Proof_of_signature.Make (struct
-  module Time = Coda_base.Block_time
-
-  module Constants = struct
-    let coinbase = Currency.Amount.zero
-
-    let k = 10
-
-    let block_duration_ms = Int64.zero
-  end
-
-  module Staged_ledger_diff = Unit
-  module Genesis_ledger = Genesis_ledger
-end)
-
-module Lite_compat = Lite_compat.Make (Proof_of_signature.Blockchain_state)
+module Lite_compat = Lite_compat.Make (Consensus.Blockchain_state)
 
 let pedersen_params ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
@@ -87,12 +72,20 @@ let wrap_vk ~loc =
       (module Lite_base.Crypto_params.Tock.Groth_maller.Verification_key)
       (B64.decode [%e estring vk_base64])]
 
-let protocol_state (s : Proof_of_signature.Protocol_state.value) :
+let protocol_state (s : Consensus.Protocol_state.value) :
     Lite_base.Protocol_state.t =
-  let open Proof_of_signature in
+  let open Consensus in
   let consensus_state =
+    (* hack a stub for proof of stake right now so builds still work *)
     Protocol_state.consensus_state s
-    |> Option.value_exn Consensus_state.to_lite
+    |> Option.value Consensus_state.to_lite ~default:(fun _ ->
+           let open Lite_base.Consensus_state in
+           { length= Int32.of_int_exn 0
+           ; signer_public_key=
+               Lite_compat.public_key
+                 Signature_lib.(
+                   Public_key.compress @@ Public_key.of_private_key_exn
+                   @@ Private_key.create ()) } )
   in
   { Lite_base.Protocol_state.previous_state_hash=
       Lite_compat.digest
@@ -101,7 +94,7 @@ let protocol_state (s : Proof_of_signature.Protocol_state.value) :
   ; body=
       { blockchain_state=
           Lite_compat.blockchain_state
-            (Proof_of_signature.Protocol_state.blockchain_state s)
+            (Consensus.Protocol_state.blockchain_state s)
       ; consensus_state } }
 
 let genesis ~loc =
@@ -109,9 +102,7 @@ let genesis ~loc =
     let loc = loc
   end) in
   let open E in
-  let protocol_state =
-    protocol_state Proof_of_signature.genesis_protocol_state.data
-  in
+  let protocol_state = protocol_state Consensus.genesis_protocol_state.data in
   let ledger =
     Sparse_ledger_lib.Sparse_ledger.of_hash ~depth:0
       protocol_state.body.blockchain_state.staged_ledger_hash.ledger_hash
