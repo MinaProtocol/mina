@@ -583,7 +583,7 @@ module Vrf = struct
         else local_state.Local_state.last_epoch_ledger
       in
       if ledger = None then
-        Logger.info
+        Logger.info logger
           "Unable to check vrf evaluation: last_epoch_ledger does not exist \
            in local state" ;
       ledger
