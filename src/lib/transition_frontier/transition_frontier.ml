@@ -443,12 +443,17 @@ struct
    *   2) move the root if the path to the new node is longer than the max length
    *     a) calculate the distance from the new node to the parent
    *     b) if the distance is greater than the max length:
-   *       I  ) find the immediate successor of the old root in the path to the
-   *            longest node and make it the new root
-   *       II ) find all successors of the other immediate successors of the old root
-   *       III) remove the old root and all of the nodes found in (II) from the table
-   *       IV ) merge the old root's merkle mask into the root ledger and reparent
-   *            properly
+   *       I   ) find the immediate successor of the old root in the path to the
+   *             longest node (the heir)
+   *       II  ) get those successors as well (heir_heirs)
+   *       III ) find all successors of the other immediate successors of the
+   *             old root (bads)
+   *       IV  ) garbage collect all (root, heir, heir_heirs, bads (recursively))
+   *       V   ) commit the breadcrumb (rewires staged ledgers and updates
+   *             breadcrumbs)
+   *       VI  ) if commit has ~proof_txns; write them to snarked ledger
+   *       VII ) re-add new_root
+   *       VIII) re-add heir_heirs
    *   3) set the new node as the best tip if the new node has a greater length than
    *      the current best tip
   *)
@@ -466,34 +471,33 @@ struct
         let distance_to_parent = node.length - root_node.length in
         (* 2.b *)
         if distance_to_parent > max_length t then (
-          (* if commit has ~proof_txns; write them to snarked ledger *)
-          (* re-add root, heir-heirs *)
-          
-          (* Garbage collect root, heir, bads (recursively) , heir-heirs *)
           (* 2.b.I *)
           let heir_hash = List.hd_exn (hash_path t node.breadcrumb) in
           let heir_node = Hashtbl.find_exn t.table heir_hash in
+          (* 2.b.II *)
           let heir_heirs_nodes =
             List.map heir_node.successor_hashes ~f:(Hashtbl.find_exn t.table)
           in
+          (* 2.b.III *)
           let bad_hashes =
             List.filter root_node.successor_hashes
               ~f:(Fn.compose not (State_hash.equal heir_hash))
           in
           let bad_nodes = List.map bad_hashes ~f:(Hashtbl.find_exn t.table) in
+          (* 2.b.IV *)
           let garbage =
             (t.root :: heir_hash :: heir_node.successor_hashes)
             @ List.bind bad_hashes ~f:(successor_hashes_rec t)
           in
           List.iter garbage ~f:(Hashtbl.remove t.table) ;
-          (* commit root heir bads heir-heirs *)
+          (* 2.b.V *)
           let new_root_crumb, new_heir_heirs_crumb, proof_txns =
             Breadcrumb.commit ~root:root_node.breadcrumb
               ~heir:heir_node.breadcrumb
               ~bads:(List.map bad_nodes ~f:breadcrumb_of_node)
               ~heir_heirs:(List.map heir_heirs_nodes ~f:breadcrumb_of_node)
           in
-          (* if commit has ~proof_txns; write them to snarked ledger *)
+          (* 2.b.VI *)
           let () =
             match proof_txns with
             | Some txns ->
@@ -505,7 +509,7 @@ struct
                     |> Or_error.ok_exn |> ignore )
             | None -> ()
           in
-          (* re-add root *)
+          (* 2.b.VII *)
           let new_root_hash =
             With_hash.hash new_root_crumb.transition_with_hash
           in
@@ -516,7 +520,7 @@ struct
               { breadcrumb= new_root_crumb
               ; successor_hashes= heir_node.successor_hashes
               ; length= root_node.length - 1 } ;
-          (* re-add heir-heirs *)
+          (* 2.b.VIII *)
           List.iter2_exn new_heir_heirs_crumb heir_heirs_nodes
             ~f:(fun heir_heir_crumb old_heir_heir_node ->
               Hashtbl.add_exn t.table
