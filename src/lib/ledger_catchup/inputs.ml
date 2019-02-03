@@ -9,6 +9,7 @@ module type S = sig
     Transition_frontier_intf
     with type state_hash := State_hash.t
      and type external_transition_verified := External_transition.Verified.t
+     and type transaction := Transaction.t
      and type ledger_database := Ledger.Db.t
      and type masked_ledger := Ledger.Mask.Attached.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t

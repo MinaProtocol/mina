@@ -42,7 +42,7 @@ module Make (Inputs : Inputs.S) :
           in
           let new_breadcrumb =
             Transition_frontier.Breadcrumb.create external_transition
-              staged_ledger
+              staged_ledger (failwith "TODO")
           in
           (staged_ledger, new_breadcrumb :: acc) )
     in

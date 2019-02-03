@@ -55,12 +55,15 @@ module type Transition_frontier_base_intf = sig
 
   type staged_ledger
 
+  type transaction
+
   module Breadcrumb : sig
     type t [@@deriving sexp]
 
     val create :
          (external_transition_verified, state_hash) With_hash.t
       -> staged_ledger
+      -> transaction Non_empty_list.t option
       -> t
 
     val build :

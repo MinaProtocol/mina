@@ -19,6 +19,7 @@ module type Inputs_intf = sig
     with type state_hash := Protocol_state_hash.t
      and type external_transition_verified := External_transition.Verified.t
      and type ledger_database := Ledger_db.t
+     and type transaction := Transaction.t
      and type staged_ledger := Staged_ledger.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
