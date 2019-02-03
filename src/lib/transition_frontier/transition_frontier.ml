@@ -138,17 +138,22 @@ struct
                     (Error.of_string
                        (Inputs.Staged_ledger.Staged_ledger_error.to_string e)))
           in
-          let target_ledger_hash =
+          let target_ledger_hash, ledger_proof_txns =
             match proof_opt with
             | None ->
-                Option.value_map
-                  (Inputs.Staged_ledger.current_ledger_proof
-                     transitioned_staged_ledger)
-                  ~f:ledger_hash_from_proof
-                  ~default:
-                    (Frozen_ledger_hash.of_ledger_hash
-                       (Ledger.merkle_root Genesis_ledger.t))
-            | Some proof -> ledger_hash_from_proof proof
+                let hash =
+                  Option.value_map
+                    (Inputs.Staged_ledger.current_ledger_proof
+                       transitioned_staged_ledger)
+                    ~f:ledger_hash_from_proof
+                    ~default:
+                      (Frozen_ledger_hash.of_ledger_hash
+                         (Ledger.merkle_root Genesis_ledger.t))
+                in
+                (hash, None)
+            | Some (proof, proof_txns) ->
+                ( ledger_hash_from_proof proof
+                , Non_empty_list.of_list_opt proof_txns )
           in
           let%map transitioned_staged_ledger =
             if
@@ -168,7 +173,7 @@ struct
           in
           { transition_with_hash
           ; staged_ledger= transitioned_staged_ledger
-          ; ledger_proof_txns= failwith "TODO" } )
+          ; ledger_proof_txns } )
 
     let hash {transition_with_hash; _} = With_hash.hash transition_with_hash
 

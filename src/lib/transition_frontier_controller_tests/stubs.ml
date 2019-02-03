@@ -242,7 +242,7 @@ let gen_breadcrumb ~logger :
     in
     let next_ledger_hash =
       Option.value_map ledger_proof_opt
-        ~f:(fun proof ->
+        ~f:(fun (proof, _) ->
           Ledger_proof.statement proof |> Ledger_proof.statement_target )
         ~default:previous_ledger_hash
     in

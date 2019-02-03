@@ -388,7 +388,7 @@ end = struct
     in
     let fill_in_transaction_snark_work t
         (works : Transaction_snark_work.t list) :
-        Ledger_proof.t option Or_error.t =
+        (Ledger_proof.t * Transaction.t list) option Or_error.t =
       let%bind next_jobs =
         Parallel_scan.next_k_jobs ~state:t ~k:(total_proofs works)
       in
@@ -403,7 +403,17 @@ end = struct
         Parallel_scan.fill_in_completed_jobs ~state:t
           ~completed_jobs:scanable_work_list
       in
-      Option.map result ~f:fst
+      let really_result =
+        Option.map result ~f:(fun ((proof, _), txn_with_witnesses) ->
+            ( proof
+            , (* TODO: This type checks, but are we actually pulling the inverse txn here? *)
+              List.map txn_with_witnesses
+                ~f:(fun (txn_with_witness : Transaction_with_witness.t) ->
+                  Ledger.Undo.transaction
+                    txn_with_witness.transaction_with_info
+                  |> Or_error.ok_exn ) ) )
+      in
+      really_result
     in
     let work_count =
       List.sum

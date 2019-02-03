@@ -632,9 +632,12 @@ module type Transaction_snark_scan_state_intf = sig
        t
     -> Transaction_with_witness.t list
     -> transaction_snark_work list
-    -> ledger_proof option Or_error.t
+    -> (ledger_proof * transaction list) option Or_error.t
 
-  val latest_ledger_proof : t -> Ledger_proof_with_sok_message.t option
+  val latest_ledger_proof :
+       t
+    -> (Ledger_proof_with_sok_message.t * Transaction_with_witness.t list)
+       option
 
   val free_space : t -> int
 
@@ -770,7 +773,7 @@ module type Staged_ledger_base_intf = sig
     -> diff
     -> logger:Logger.t
     -> ( [`Hash_after_applying of staged_ledger_hash]
-         * [`Ledger_proof of ledger_proof option]
+         * [`Ledger_proof of (ledger_proof * transaction list) option]
          * [`Staged_ledger of t]
        , Staged_ledger_error.t )
        Deferred.Result.t
@@ -779,7 +782,7 @@ module type Staged_ledger_base_intf = sig
        t
     -> valid_diff
     -> ( [`Hash_after_applying of staged_ledger_hash]
-       * [`Ledger_proof of ledger_proof option]
+       * [`Ledger_proof of (ledger_proof * transaction list) option]
        * [`Staged_ledger of t] )
        Deferred.Or_error.t
 
