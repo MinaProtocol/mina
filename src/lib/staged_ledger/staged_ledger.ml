@@ -243,6 +243,8 @@ end = struct
     | Error `Empty -> `Empty
     | Error (`Error e) -> failwithf !"statement_exn: %{sexp:Error.t}" e ()
 
+  let unsafe_of_scan_state_and_ledger ~ledger ~scan_state = {ledger; scan_state}
+
   let of_scan_state_and_ledger ~snarked_ledger_hash ~ledger ~scan_state =
     let open Deferred.Or_error.Let_syntax in
     let verify_snarked_ledger t snarked_ledger_hash =

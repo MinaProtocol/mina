@@ -745,6 +745,11 @@ module type Staged_ledger_base_intf = sig
 
   val create : ledger:ledger -> t
 
+  val unsafe_of_scan_state_and_ledger :
+    ledger:ledger -> scan_state:Scan_state.t -> t
+  (** Only call this when you're sure ledger and scan_state are correct
+   * for example: when merging merkle masks *)
+
   val of_scan_state_and_ledger :
        snarked_ledger_hash:frozen_ledger_hash
     -> ledger:ledger
