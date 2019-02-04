@@ -122,8 +122,7 @@ let create () : (module S) Async.Deferred.t =
             in
             fun state ->
               Tick.Pedersen.digest_fold s
-                (State_hash.fold
-                   (Consensus_mechanism.Protocol_state.hash state))
+                (State_hash.fold (Consensus.Protocol_state.hash state))
 
           let main x =
             let there {Prover_state.wrap_vk; prev_proof; prev_state; update} =

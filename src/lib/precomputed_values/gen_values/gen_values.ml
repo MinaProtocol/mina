@@ -67,7 +67,7 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
     let tick =
       Tick.Groth16.prove
         (Tick.Groth16.Keypair.pk Keys.Step.keys)
-        (Keys.Step.input ()) prover_state Keys.Step.main base_hash
+        (Keys.Step.input ()) prover_state main base_hash
     in
     let proof = wrap base_hash tick in
     [%expr
