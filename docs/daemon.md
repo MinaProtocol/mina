@@ -21,6 +21,7 @@ command-line flags. These flags are supported in the config file:
 - `client-port` int
 - `propose` bool
 - `txn-capacity` int
+- `work-delay-factor` int
 - `rest-port` int
 - `peers` string list. This does not get overridden by `-peer` arguments.
   Instead, `-peer` arguments are added to this list.

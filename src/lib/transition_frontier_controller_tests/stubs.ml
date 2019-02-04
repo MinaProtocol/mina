@@ -3,12 +3,14 @@ open Core_kernel
 open Protocols.Coda_pow
 open Coda_base
 open Signature_lib
+
+(** [Stubs] is a set of modules used for testing different components of tfc  *)
 module Time = Coda_base.Block_time
 
 module State_proof = struct
   include Coda_base.Proof
 
-  let verify _ = failwith "STUB: state_proof"
+  let verify _ _ = return true
 end
 
 module Ledger_proof_statement = Transaction_snark.Statement
@@ -84,7 +86,7 @@ end)
 module External_transition =
   Coda_base.External_transition.Make
     (Staged_ledger_diff)
-    (Consensus.Mechanism.Protocol_state)
+    (Consensus.Protocol_state)
 
 module Transaction = struct
   module T = struct
@@ -125,6 +127,8 @@ module Staged_ledger = Staged_ledger.Make (struct
 
   module Config = struct
     let transaction_capacity_log_2 = 7
+
+    let work_delay_factor = 2
   end
 end)
 
@@ -170,7 +174,7 @@ let gen_payments ledger : User_command.With_valid_signature.t Sequence.t =
 module Blockchain_state = External_transition.Protocol_state.Blockchain_state
 module Protocol_state = External_transition.Protocol_state
 
-module Transition_frontier = Transition_frontier.Make (struct
+module Transition_frontier_inputs = struct
   module Staged_ledger_aux_hash = Staged_ledger_aux_hash
   module Ledger_proof_statement = Ledger_proof_statement
   module Ledger_proof = Ledger_proof
@@ -178,7 +182,10 @@ module Transition_frontier = Transition_frontier.Make (struct
   module Staged_ledger_diff = Staged_ledger_diff
   module External_transition = External_transition
   module Staged_ledger = Staged_ledger
-end)
+end
+
+module Transition_frontier =
+  Transition_frontier.Make (Transition_frontier_inputs)
 
 let gen_breadcrumb ~logger :
     (   Transition_frontier.Breadcrumb.t Deferred.t
@@ -187,7 +194,7 @@ let gen_breadcrumb ~logger :
   let open Quickcheck.Let_syntax in
   let gen_slot_advancement = Int.gen_incl 1 10 in
   let%map make_next_consensus_state =
-    Consensus.Mechanism.For_tests.gen_consensus_state ~gen_slot_advancement
+    Consensus.For_tests.gen_consensus_state ~gen_slot_advancement
   in
   fun parent_breadcrumb_deferred ->
     let open Deferred.Let_syntax in
@@ -231,7 +238,7 @@ let gen_breadcrumb ~logger :
     in
     let previous_ledger_hash =
       previous_protocol_state |> Protocol_state.blockchain_state
-      |> Protocol_state.Blockchain_state.ledger_hash
+      |> Protocol_state.Blockchain_state.snarked_ledger_hash
     in
     let next_ledger_hash =
       Option.value_map ledger_proof_opt
@@ -241,11 +248,11 @@ let gen_breadcrumb ~logger :
     in
     let next_blockchain_state =
       Blockchain_state.create_value ~timestamp:(Block_time.now ())
-        ~ledger_hash:next_ledger_hash
+        ~snarked_ledger_hash:next_ledger_hash
         ~staged_ledger_hash:next_staged_ledger_hash
     in
     let previous_state_hash =
-      Consensus.Mechanism.Protocol_state.hash previous_protocol_state
+      Consensus.Protocol_state.hash previous_protocol_state
     in
     let consensus_state =
       make_next_consensus_state ~snarked_ledger_hash:previous_ledger_hash
@@ -269,7 +276,7 @@ let gen_breadcrumb ~logger :
     let next_verified_external_transition_with_hash =
       With_hash.of_data next_verified_external_transition
         ~hash_data:
-          (Fn.compose Consensus.Mechanism.Protocol_state.hash
+          (Fn.compose Consensus.Protocol_state.hash
              External_transition.Verified.protocol_state)
     in
     match%map
@@ -281,7 +288,8 @@ let gen_breadcrumb ~logger :
     | Error (`Validation_error e) ->
         failwithf !"Validation Error : %{sexp:Error.t}" e ()
 
-let create_root_frontier ~logger : Transition_frontier.t Deferred.t =
+let create_root_frontier ~max_length ~logger : Transition_frontier.t Deferred.t
+    =
   let accounts = Genesis_ledger.accounts in
   let root_snarked_ledger = Coda_base.Ledger.Db.create () in
   List.iter accounts ~f:(fun (_, account) ->
@@ -293,7 +301,7 @@ let create_root_frontier ~logger : Transition_frontier.t Deferred.t =
       assert (status = `Added) ) ;
   let root_transaction_snark_scan_state = Staged_ledger.Scan_state.empty () in
   let genesis_protocol_state =
-    With_hash.data Consensus.Mechanism.genesis_protocol_state
+    With_hash.data Consensus.genesis_protocol_state
   in
   let dummy_staged_ledger_diff =
     let creator =
@@ -316,31 +324,86 @@ let create_root_frontier ~logger : Transition_frontier.t Deferred.t =
   in
   let root_transition_with_data =
     { With_hash.data= root_transition
-    ; hash= With_hash.hash Consensus.Mechanism.genesis_protocol_state }
+    ; hash= With_hash.hash Consensus.genesis_protocol_state }
   in
   let frontier =
     Transition_frontier.create ~logger
       ~root_transition:root_transition_with_data ~root_snarked_ledger
-      ~root_transaction_snark_scan_state ~root_staged_ledger_diff:None
+      ~root_transaction_snark_scan_state ~max_length
+      ~root_staged_ledger_diff:None
   in
   frontier
 
-let gen_frontier ~logger :
-    Transition_frontier.t Deferred.t Quickcheck.Generator.t =
-  let frontier_deferred = create_root_frontier ~logger in
-  let root_breadcrumb =
-    frontier_deferred |> Deferred.map ~f:Transition_frontier.root
+let build_frontier_randomly ~gen_root_breadcrumb_builder frontier :
+    unit Deferred.t =
+  let root_breadcrumb = Transition_frontier.root frontier in
+  (* HACK: This removes the overhead of having to deal with the quickcheck generator monad *)
+  let deferred_breadcrumbs =
+    gen_root_breadcrumb_builder root_breadcrumb |> Quickcheck.random_value
   in
-  let open Quickcheck.Let_syntax in
-  let%map deferred_breadcrumbs =
-    Quickcheck_lib.gen_imperative_ktree (return root_breadcrumb)
-      (gen_breadcrumb ~logger)
-  in
-  let open Deferred.Let_syntax in
-  let%bind () =
-    Deferred.List.iter deferred_breadcrumbs ~f:(fun deferred_breadcrumbs ->
-        let%map breadcrumb = deferred_breadcrumbs
-        and frontier = frontier_deferred in
-        Transition_frontier.attach_breadcrumb_exn frontier breadcrumb )
-  in
-  frontier_deferred
+  Deferred.List.iter deferred_breadcrumbs ~f:(fun deferred_breadcrumb ->
+      let%map breadcrumb = deferred_breadcrumb in
+      Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
+
+module Protocol_state_validator = Protocol_state_validator.Make (struct
+  include Transition_frontier_inputs
+  module Time = Time
+  module State_proof = State_proof
+end)
+
+module Sync_handler = Sync_handler.Make (struct
+  include Transition_frontier_inputs
+  module Transition_frontier = Transition_frontier
+end)
+
+module Network = struct
+  type t =
+    {logger: Logger.t; table: Transition_frontier.t Network_peer.Peer.Table.t}
+
+  let create ~logger = {logger; table= Network_peer.Peer.Table.create ()}
+
+  let add_exn {table; _} = Hashtbl.add_exn table
+
+  let random_peers _ = failwith "STUB: Network.random_peers"
+
+  let catchup_transition _ = failwith "STUB: Network.catchup_transition"
+
+  let get_ancestry {table; _} peer (descendent, count) =
+    (let open Option.Let_syntax in
+    let%bind frontier = Hashtbl.find table peer in
+    Sync_handler.prove_ancestry ~frontier count descendent)
+    |> Result.of_option ~error:(Error.of_string "Mock Network error")
+    |> Deferred.return
+
+  let glue_sync_ledger {table; logger} query_reader response_writer : unit =
+    Pipe_lib.Linear_pipe.iter_unordered ~max_concurrency:8 query_reader
+      ~f:(fun (ledger_hash, sync_ledger_query) ->
+        Logger.info logger
+          !"Processing ledger query : %{sexp:(Ledger.Addr.t \
+            Syncable_ledger.query)}"
+          sync_ledger_query ;
+        let answer =
+          Hashtbl.to_alist table
+          |> List.find_map ~f:(fun (peer, frontier) ->
+                 let open Option.Let_syntax in
+                 let%map answer =
+                   Sync_handler.answer_query ~frontier ledger_hash
+                     sync_ledger_query
+                 in
+                 Envelope.Incoming.wrap ~data:answer ~sender:peer )
+        in
+        match answer with
+        | None ->
+            Logger.info logger
+              !"Could not find an answer for : %{sexp:(Ledger.Addr.t \
+                Syncable_ledger.query)}"
+              sync_ledger_query ;
+            Deferred.unit
+        | Some answer ->
+            Logger.info logger
+              !"Found an answer for : %{sexp:(Ledger.Addr.t \
+                Syncable_ledger.query)}"
+              sync_ledger_query ;
+            Pipe_lib.Linear_pipe.write response_writer answer )
+    |> don't_wait_for
+end

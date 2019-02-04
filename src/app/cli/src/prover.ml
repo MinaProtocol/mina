@@ -24,13 +24,13 @@ module type S = sig
   val extend_blockchain :
        t
     -> Blockchain.t
-    -> Consensus.Mechanism.Protocol_state.value
-    -> Consensus.Mechanism.Snark_transition.value
-    -> Consensus.Mechanism.Prover_state.t
+    -> Consensus.Protocol_state.value
+    -> Consensus.Snark_transition.value
+    -> Consensus.Prover_state.t
     -> Blockchain.t Deferred.Or_error.t
 end
 
-module Consensus_mechanism = Consensus.Mechanism
+module Consensus_mechanism = Consensus
 module Blockchain = Blockchain
 
 module Worker_state = struct
@@ -61,9 +61,9 @@ module Worker_state = struct
        let module M = struct
          open Snark_params
          open Keys
-         module Consensus_mechanism = Consensus.Mechanism
+         module Consensus_mechanism = Consensus
          module Transaction_snark = Transaction_snark
-         module Blockchain_state = Blockchain_state.Make (Consensus.Mechanism)
+         module Blockchain_state = Blockchain_state.Make (Consensus)
          module State = Blockchain_state.Make_update (Transaction_snark)
 
          let wrap hash proof =
@@ -74,9 +74,8 @@ module Worker_state = struct
              (Wrap_input.of_tick_field hash)
 
          let extend_blockchain (chain : Blockchain.t)
-             (next_state : Consensus.Mechanism.Protocol_state.value)
-             (block : Consensus.Mechanism.Snark_transition.value)
-             state_for_handler =
+             (next_state : Consensus.Protocol_state.value)
+             (block : Consensus.Snark_transition.value) state_for_handler =
            let next_state_top_hash = Keys.Step.instance_hash next_state in
            let prover_state =
              { Keys.Step.Prover_state.prev_proof= chain.proof

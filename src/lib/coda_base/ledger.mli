@@ -24,7 +24,6 @@ module Any_ledger :
 module Mask :
   Merkle_mask.Masking_merkle_tree_intf.S
   with module Location = Location
-  with module Addr = Location.Addr
    and module Attached.Addr = Location.Addr
   with type account := Account.t
    and type key := Public_key.Compressed.t
@@ -49,6 +48,7 @@ module Maskable :
 include
   Merkle_mask.Maskable_merkle_tree_intf.S
   with module Location := Location
+  with module Addr = Location.Addr
   with type root_hash := Ledger_hash.t
    and type hash := Ledger_hash.t
    and type account := Account.t

@@ -4,6 +4,15 @@ open Pipe_lib
 
 let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 
+type 'addr query = What_hash of 'addr | What_contents of 'addr | Num_accounts
+[@@deriving bin_io, sexp]
+
+type ('addr, 'hash, 'account) answer =
+  | Has_hash of 'addr * 'hash
+  | Contents_are of 'addr * 'account list
+  | Num_accounts of int * 'hash
+[@@deriving bin_io, sexp]
+
 module type S = sig
   type t [@@deriving sexp]
 
@@ -23,14 +32,9 @@ module type S = sig
 
   type index = int
 
-  type answer =
-    | Has_hash of addr * hash
-    | Contents_are of addr * account list
-    | Num_accounts of int * hash
-  [@@deriving bin_io, sexp]
+  type query
 
-  type query = What_hash of addr | What_contents of addr | Num_accounts
-  [@@deriving bin_io, sexp]
+  type answer
 
   module Responder : sig
     type t
@@ -173,7 +177,11 @@ module Make
    and type root_hash := Root_hash.t
    and type addr := Addr.t
    and type merkle_path := MT.path
-   and type account := Account.t = struct
+   and type account := Account.t
+   and type query := Addr.t query
+   and type answer := (Addr.t, Hash.t, Account.t) answer = struct
+  type addr = Addr.t
+
   type diff = unit
 
   type index = int
@@ -262,16 +270,12 @@ module Make
       | _ -> false
   end
 
-  type answer =
-    | Has_hash of Addr.t * Hash.t
-    | Contents_are of Addr.t * Account.t list
-    | Num_accounts of int * Hash.t
-    (* idea: make this verifiable by including the merkle path to the rightmost account, and verify that
-       filling in empty hashes for the rest amounts to the correct hash. *)
-  [@@deriving bin_io, sexp]
+  type nonrec answer = (Addr.t, Hash.t, Account.t) answer
 
-  type query = What_hash of Addr.t | What_contents of Addr.t | Num_accounts
-  [@@deriving bin_io, sexp]
+  type nonrec query = Addr.t query
+
+  (* idea: make this verifiable by including the merkle path to the rightmost account, and verify that
+       filling in empty hashes for the rest amounts to the correct hash. *)
 
   module Responder = struct
     type t = {mt: MT.t; f: query -> unit}
@@ -474,7 +478,7 @@ module Make
             | Error e ->
                 Logger.faulty_peer t.log
                   !"Got error from when trying to add child_hash %{sexp: \
-                    Hash.t} %s %{sexp: Host_and_port.t}"
+                    Hash.t} %s %{sexp: Network_peer.Peer.t}"
                   h' (Error.to_string_hum e)
                   (Envelope.Incoming.sender env) ;
                 ()

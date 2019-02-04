@@ -13,7 +13,7 @@ module Make (Inputs : Inputs.S) :
    and type transition_frontier := Inputs.Transition_frontier.t
    and type staged_ledger := Inputs.Staged_ledger.t = struct
   open Inputs
-  open Consensus.Mechanism
+  open Consensus
 
   let validate_transition ~logger ~frontier transition_with_hash =
     let open With_hash in
@@ -35,7 +35,7 @@ module Make (Inputs : Inputs.S) :
     in
     Result.ok_if_true
       ( `Take
-      = Consensus.Mechanism.select ~logger
+      = Consensus.select ~logger
           ~existing:(consensus_state root_protocol_state)
           ~candidate:(consensus_state protocol_state) )
       ~error:
@@ -73,7 +73,7 @@ module Make (Inputs : Inputs.S) :
              | Error (`Invalid reason) ->
                  Logger.warn logger
                    !"rejecting transitions because \"%s\" -- sent by %{sexp: \
-                     Host_and_port.t}"
+                     Network_peer.Peer.t}"
                    reason
                    (Envelope.Incoming.sender transition_env) ) ))
 end

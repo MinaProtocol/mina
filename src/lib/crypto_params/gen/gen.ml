@@ -1,3 +1,6 @@
+[%%import
+"../../../config.mlh"]
+
 open Ppxlib
 open Asttypes
 open Parsetree
@@ -111,6 +114,15 @@ let compute_chunk_value ~start n =
      for each possible chunk (2 ** (size * 3) of them)
        store its value in the array
 *)
+
+[%%if
+fake_hash]
+
+(* don't bother building table *)
+let get_chunk_table () = [||]
+
+[%%else]
+
 let get_chunk_table () =
   let num_params = Array.length params_array in
   let max_chunks = num_params / Chunk.size in
@@ -126,6 +138,8 @@ let get_chunk_table () =
   in
   let result = loop ~chunk:0 [] in
   result
+
+[%%endif]
 
 (* the AST representation of the chunk table is its string serialization
    - an AST for the table itself, using string representations of

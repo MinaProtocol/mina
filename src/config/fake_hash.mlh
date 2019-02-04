@@ -1,10 +1,13 @@
+[%%import "config/coinbase/standard.mlh"]
+[%%import "config/consensus/postake_tiny.mlh"]
+[%%import "config/debug_level/logs.mlh"]
+
+[%%define fake_hash true]
+
 [%%define genesis_ledger "test"]
+[%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
+[%%define block_window_duration 2000]
+
 [%%define with_snark false]
 [%%define integration_tests true]
-[%%define debug_logs true]
-[%%define call_logger false]
 [%%define force_updates false]
-[%%define global_signer_real false]
-[%%define tracing false]
-[%%define consensus_mechanism "proof_of_signature"]
-[%%define fake_hash true]

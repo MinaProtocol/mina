@@ -121,7 +121,7 @@ module Keys = struct
 end
 
 module Make
-    (Consensus_mechanism : Consensus.Mechanism.S)
+    (Consensus_mechanism : Consensus.S)
     (T : Transaction_snark.Verification.S) =
 struct
   module Blockchain = Blockchain_state.Make (Consensus_mechanism)
@@ -267,7 +267,7 @@ end
 let constraint_system_digests () =
   let module M =
     Make
-      (Consensus.Mechanism)
+      (Consensus)
       (Transaction_snark.Verification.Make (struct
         let keys = Transaction_snark.Keys.Verification.dummy
       end))

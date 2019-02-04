@@ -15,7 +15,7 @@ module Types = struct
       let max_key_length =
         List.map ~f:(fun (s, _) -> String.length s) entries
         |> List.max_elt ~compare:Int.compare
-        |> Option.value_exn
+        |> Option.value ~default:0
       in
       let output =
         List.map entries ~f:(fun (s, x) ->
@@ -141,7 +141,7 @@ module Types = struct
       ; peers: string list
       ; user_commands_sent: int
       ; run_snark_worker: bool
-      ; proposal_interval: int
+      ; block_window_duration: int
       ; propose_pubkey: Public_key.t option
       ; histograms: Histograms.t option
       ; consensus_mechanism: string }
@@ -161,7 +161,7 @@ module Types = struct
             ("Block Count", Int.to_string (f x)) :: acc )
           ~uptime_secs:(fun acc x -> ("Uptime", sprintf "%ds" (f x)) :: acc)
           ~ledger_merkle_root:(fun acc x -> ("Ledger Merkle Root", f x) :: acc)
-          ~staged_ledger_hash:(fun acc x -> ("Ledger-builder hash", f x) :: acc)
+          ~staged_ledger_hash:(fun acc x -> ("Staged-ledger hash", f x) :: acc)
           ~state_hash:(fun acc x -> ("State Hash", f x) :: acc)
           ~commit_id:(fun acc x ->
             match f x with
@@ -180,7 +180,7 @@ module Types = struct
             ("User_commands Sent", Int.to_string (f x)) :: acc )
           ~run_snark_worker:(fun acc x ->
             ("Snark Worker Running", Bool.to_string (f x)) :: acc )
-          ~proposal_interval:(fun acc x ->
+          ~block_window_duration:(fun acc x ->
             ("Proposal Interval", Int.to_string (f x)) :: acc )
           ~propose_pubkey:(fun acc x ->
             match f x with
@@ -310,7 +310,7 @@ end
 module Get_public_keys_with_balances = struct
   type query = unit [@@deriving bin_io]
 
-  type response = (int * string) list [@@deriving bin_io, sexp]
+  type response = (string * int) list [@@deriving bin_io, sexp]
 
   type error = unit [@@deriving bin_io]
 
