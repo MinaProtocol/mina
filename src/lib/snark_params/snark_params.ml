@@ -1,4 +1,6 @@
-[%%import "../../config.mlh"]
+[%%import
+"../../config.mlh"]
+
 open Core_kernel
 open Bitstring_lib
 open Snark_bits
@@ -360,7 +362,8 @@ let embed (x : Tick.Field.t) : Tock.Field.t =
 (** enable/disable use of chunk table in Pedersen hashing *)
 let set_chunked_hashing b = Tick.Pedersen.State.set_chunked_fold b
 
-[%%inject "ledger_depth", ledger_depth]
+[%%inject
+"ledger_depth", ledger_depth]
 
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.
