@@ -124,12 +124,13 @@ struct
         Verifier.Verification_key.Precomputation.create wrap_vk
       in
       let%bind proof =
-        provide_witness Verifier.Proof.typ
-          As_prover.(
-            map get_state
-              ~f:
-                (Fn.compose Verifier.proof_of_backend_proof
-                   Prover_state.prev_proof))
+        exists Verifier.Proof.typ
+          ~compute:
+            As_prover.(
+              map get_state
+                ~f:
+                  (Fn.compose Verifier.proof_of_backend_proof
+                     Prover_state.prev_proof))
       in
       Verifier.verify wrap_vk precomp prev_top_hash proof
 
