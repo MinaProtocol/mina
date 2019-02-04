@@ -143,6 +143,8 @@ module Key = struct
     type t = Account.key [@@deriving sexp, bin_io, eq, compare, hash]
   end
 
+  let to_string = Signature_lib.Public_key.Compressed.to_base64
+
   let gen = Account.key_gen
 
   let empty = Account.empty.public_key

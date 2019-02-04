@@ -5,6 +5,8 @@ module type Key = sig
 
   val empty : t
 
+  val to_string : t -> string
+
   include Hashable.S_binable with type t := t
 
   include Comparable.S with type t := t
@@ -14,10 +16,12 @@ module type Balance = sig
   type t [@@deriving eq]
 
   val zero : t
+
+  val to_int : t -> int
 end
 
 module type Account = sig
-  type t [@@deriving bin_io, eq, sexp]
+  type t [@@deriving bin_io, eq, sexp, compare]
 
   type key
 

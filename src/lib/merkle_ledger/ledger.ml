@@ -2,11 +2,8 @@ open Core
 
 (* SOMEDAY: handle empty wallets *)
 module Make
-    (Key : Intf.Key) (Account : sig
-        type t [@@deriving sexp, bin_io]
-
-        include Intf.Account with type t := t and type key := Key.t
-    end)
+    (Key : Intf.Key)
+    (Account : Intf.Account with type key := Key.t)
     (Hash : sig
               type t [@@deriving sexp, hash, compare, bin_io]
 
