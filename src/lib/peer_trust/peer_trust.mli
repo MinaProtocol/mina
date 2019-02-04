@@ -8,6 +8,8 @@
     caller, which is coda_base. *)
 
 open Core
+open Async
+open Pipe_lib
 
 (** What we do in response to some trust-affecting action. *)
 module Trust_response : sig
@@ -17,18 +19,15 @@ module Trust_response : sig
     | Trust_decrease of float  (** Decrease trust by the specified amount. *)
 end
 
-module Banned_status : sig
-  type t = Unbanned | Banned_until of Time.t
-end
+module Banned_status : module type of Banned_status
 
-module Peer_status : sig
-  type t = {trust: float; banned: Banned_status.t}
-end
+module Peer_status : module type of Peer_status
 
 (** Interface for trust-affecting actions. *)
 module type Action_intf = sig
-  (* TODO add a show interface for logging. *)
-  type t
+  (** The type of trust-affecting actions. For the log messages to be
+      grammatical, the constructors should be past tense verbs. *)
+  type t [@@deriving sexp_of]
 
   val to_trust_response : t -> Trust_response.t
 end
@@ -53,9 +52,9 @@ module type S = sig
   val create : db_dir:string -> t
   (** Set up the trust system. *)
 
-  (* TODO pipe for ban events *)
+  val ban_pipe : t -> peer Strict_pipe.Reader.t
 
-  val record : t -> peer -> action -> unit
+  val record : t -> Logger.t -> peer -> action -> unit Deferred.t
   (** Record an action a peer took. This may result in a ban event being
       emitted *)
 
