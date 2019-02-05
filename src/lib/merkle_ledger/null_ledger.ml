@@ -71,6 +71,9 @@ end = struct
     in
     loop location
 
+  let merkle_path_full _t location =
+    failwith "merkle_path then map over adding the addl hash"
+
   let merkle_root _t = empty_hash_at_height Depth.depth
 
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)

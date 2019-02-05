@@ -25,7 +25,7 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
         | Some loc ->
             ( new_keys
             , add_path sl
-                (Ledger.merkle_path ledger loc)
+                (Ledger.merkle_path_full ledger loc)
                 key
                 (Ledger.get ledger loc |> Option.value_exn) )
         | None ->

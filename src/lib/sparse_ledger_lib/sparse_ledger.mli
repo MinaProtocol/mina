@@ -34,7 +34,7 @@ module type S = sig
   val find_index_exn : t -> key -> index
 
   val add_path :
-    t -> [`Left of hash | `Right of hash] list -> key -> account -> t
+    t -> [`Left of hash * hash | `Right of hash * hash] list -> key -> account -> t
 
   val iteri : t -> f:(index -> account -> unit) -> unit
 

@@ -36,7 +36,7 @@ module type S = sig
   val find_index_exn : t -> key -> index
 
   val add_path :
-    t -> [`Left of hash | `Right of hash] list -> key -> account -> t
+    t -> [`Left of hash * hash | `Right of hash * hash] list -> key -> account -> t
 
   val iteri : t -> f:(index -> account -> unit) -> unit
 
@@ -79,12 +79,12 @@ struct
   let add_path depth0 tree0 path0 account =
     let rec build_tree height p =
       match p with
-      | `Left h_r :: path ->
+      | `Left (h_m, h_r) :: path ->
           let l = build_tree (height - 1) path in
-          Node (Hash.merge ~height (hash l) h_r, l, Hash h_r)
-      | `Right h_l :: path ->
+          Node (h_m, l, Hash h_r)
+      | `Right (h_m, h_l) :: path ->
           let r = build_tree (height - 1) path in
-          Node (Hash.merge ~height h_l (hash r), Hash h_l, r)
+          Node (h_m, Hash h_l, r)
       | [] ->
           assert (height = -1) ;
           Account account
@@ -95,11 +95,11 @@ struct
           let t = build_tree height path in
           assert (Hash.equal h (hash t)) ;
           t
-      | Node (h, l, r), `Left h_r :: path ->
+      | Node (h, l, r), `Left (_, h_r) :: path ->
           assert (Hash.equal h_r (hash r)) ;
           let l = union (height - 1) l path in
           Node (h, l, r)
-      | Node (h, l, r), `Right h_l :: path ->
+      | Node (h, l, r), `Right (_, h_l) :: path ->
           assert (Hash.equal h_l (hash l)) ;
           let r = union (height - 1) r path in
           Node (h, l, r)

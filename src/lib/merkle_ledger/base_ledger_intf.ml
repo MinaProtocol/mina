@@ -88,6 +88,8 @@ module type S = sig
 
   val merkle_path : t -> Location.t -> Path.t
 
+  val merkle_path_full : t -> Location.t -> [`Left of hash*hash | `Right of hash * hash] list
+
   val merkle_path_at_index_exn : t -> int -> Path.t
 
   val remove_accounts_exn : t -> key list -> unit
