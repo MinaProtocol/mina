@@ -113,32 +113,53 @@ let compute_delegators self_pk ~iter_accounts =
   t
 
 module Local_state = struct
+  module Snapshot = struct
+    type t =
+      { ledger: Coda_base.Sparse_ledger.t
+      ; delegators: Currency.Balance.t Coda_base.Account.Index.Table.t }
+    [@@deriving sexp]
+
+    let create_empty () =
+      { ledger= Coda_base.Sparse_ledger.of_root Coda_base.Ledger_hash.empty_hash
+      ; delegators= Coda_base.Account.Index.Table.create () }
+  end
+
   type t =
-    { mutable last_epoch_ledger: Coda_base.Sparse_ledger.t option
-    ; mutable curr_epoch_ledger: Coda_base.Sparse_ledger.t option
-    ; mutable delegators: Currency.Balance.t Coda_base.Account.Index.Table.t
-    ; genesis_epoch_ledger: Coda_base.Sparse_ledger.t }
+    { mutable last_epoch_snapshot: Snapshot.t option
+    ; mutable curr_epoch_snapshot: Snapshot.t option
+    ; genesis_epoch_snapshot: Snapshot.t
+    ; proposer_public_key: Public_key.Compressed.t option }
   [@@deriving sexp]
 
-  let create keypair =
-    let delegators =
-      match keypair with
-      | None -> Coda_base.Account.Index.Table.create ()
-      | Some k ->
-          compute_delegators
-            (* TODO: Propagate Include_self to the right place *)
-            (`Include_self, Public_key.compress k.Keypair.public_key)
-            ~iter_accounts:(fun f ->
-              let open Coda_base in
-              Ledger.foldi ~init:() Genesis_ledger.t ~f:(fun i () acct ->
-                  f (Ledger.Addr.to_int i) acct ) )
+  let create proposer_public_key =
+    (* TODO: remove duplicated genesis ledger *)
+    let genesis_epoch_snapshot =
+      match proposer_public_key with
+      | None -> Snapshot.create_empty ()
+      | Some key ->
+          let open Snapshot in
+          let delegators =
+            compute_delegators
+              (* TODO: Propagate Include_self to the right place *)
+              (`Include_self, key)
+              ~iter_accounts:(fun f ->
+                let open Coda_base in
+                Ledger.foldi ~init:() Genesis_ledger.t ~f:(fun i () acct ->
+                    f (Ledger.Addr.to_int i) acct ) )
+          in
+          let ledger =
+            Coda_base.Sparse_ledger.of_ledger_index_subset_exn
+              (Coda_base.Ledger.Any_ledger.cast
+                 (module Coda_base.Ledger)
+                 Genesis_ledger.t)
+              (Coda_base.Account.Index.Table.keys delegators)
+          in
+          {delegators; ledger}
     in
-    { last_epoch_ledger= None
-    ; curr_epoch_ledger= None
-    ; delegators
-    ; genesis_epoch_ledger=
-        Coda_base.Sparse_ledger.of_ledger_index_subset_exn Genesis_ledger.t
-          (delegators |> Core_kernel.Int.Table.keys) }
+    { last_epoch_snapshot= None
+    ; curr_epoch_snapshot= None
+    ; genesis_epoch_snapshot
+    ; proposer_public_key }
 end
 
 module Epoch = struct
@@ -575,23 +596,25 @@ module Vrf = struct
   let check ~local_state ~epoch ~slot ~seed ~private_key ~total_stake
       ~ledger_hash ~logger =
     let open Message in
+    let open Local_state in
+    let open Snapshot in
     let open Option.Let_syntax in
-    let%bind ledger =
-      let ledger =
+    let%bind epoch_snapshot =
+      let snapshot =
         if Coda_base.Frozen_ledger_hash.equal ledger_hash genesis_ledger_hash
-        then Some local_state.Local_state.genesis_epoch_ledger
-        else local_state.Local_state.last_epoch_ledger
+        then Some local_state.Local_state.genesis_epoch_snapshot
+        else local_state.Local_state.last_epoch_snapshot
       in
-      if ledger = None then
+      if snapshot = None then
         Logger.info logger
           "Unable to check vrf evaluation: last_epoch_ledger does not exist \
            in local state" ;
-      ledger
+      snapshot
     in
     Logger.info logger "Checking vrf evaluations at %d:%d" (Epoch.to_int epoch)
       (Epoch.Slot.to_int slot) ;
     with_return (fun {return} ->
-        Hashtbl.iteri local_state.delegators
+        Hashtbl.iteri epoch_snapshot.delegators
           ~f:(fun ~key:delegator ~data:balance ->
             let vrf_result =
               T.eval ~private_key {epoch; slot; seed; delegator}
@@ -607,7 +630,8 @@ module Vrf = struct
             then
               return
                 (Some
-                   { Proposal_data.stake_proof= {private_key; delegator; ledger}
+                   { Proposal_data.stake_proof=
+                       {private_key; delegator; ledger= epoch_snapshot.ledger}
                    ; vrf_result }) ) ;
         None )
 end
@@ -1299,6 +1323,11 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
     Epoch.epoch_and_slot_of_time_exn
       (Time.of_span_since_epoch (Time.Span.of_ms now))
   in
+  Logger.info logger
+    "systime: %d, epoch-slot@systime: %d-%d, starttime@epoch@systime: %d"
+    (Int64.to_int now) (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
+    ( Int64.to_int @@ Time.Span.to_ms @@ Time.to_span_since_epoch
+    @@ Epoch.start_time epoch ) ;
   let next_slot =
     (* When we first enter an epoch, the protocol state may still be a previous
      * epoch. If that is the case, we need to select the staged vrf inputs
@@ -1335,13 +1364,15 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
         ~ledger_hash:epoch_data.ledger.hash ~logger
     in
     let rec find_winning_slot slot =
-      if UInt32.of_int (Epoch.Slot.to_int slot) >= Constants.Epoch.size then
-        None
-      else
+      if UInt32.of_int (Epoch.Slot.to_int slot) >= Constants.Epoch.size then (
+        printf !"\ndone\n%!" ; None )
+      else (
+        printf "!" ;
         match proposal_data slot with
         | None -> find_winning_slot (Epoch.Slot.succ slot)
-        | Some data -> Some (slot, data)
+        | Some data -> Some (slot, data) )
     in
+    printf !"now\n%!" ;
     find_winning_slot (Epoch.Slot.succ slot)
   in
   match next_slot with
@@ -1353,34 +1384,36 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
           |> Time.to_span_since_epoch |> Time.Span.to_ms
         , data )
   | None ->
-      Logger.info logger "No slots won in this epoch... waiting for next epoch" ;
-      `Check_again
-        (Epoch.end_time epoch |> Time.to_span_since_epoch |> Time.Span.to_ms)
+      let epoch_end_time =
+        Epoch.end_time epoch |> Time.to_span_since_epoch |> Time.Span.to_ms
+      in
+      Logger.info logger
+        "No slots won in this epoch. Waiting for next epoch, @%d"
+        (Int64.to_int epoch_end_time) ;
+      `Check_again epoch_end_time
 
 (* TODO *)
-let lock_transition ?proposer_public_key prev next ~snarked_ledger ~local_state
-    =
+let lock_transition prev next ~local_state ~snarked_ledger =
   let open Local_state in
   let open Consensus_state in
   if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
-    let ledger =
-      match snarked_ledger () with Ok l -> l | Error e -> Error.raise e
+    let epoch_snapshot =
+      Option.map local_state.proposer_public_key ~f:(fun pk ->
+          let open Local_state.Snapshot in
+          let delegators =
+            compute_delegators
+              (`Include_self, pk)
+              ~iter_accounts:(fun f ->
+                Coda_base.Ledger.Any_ledger.M.iteri snarked_ledger ~f )
+          in
+          let ledger =
+            Coda_base.Sparse_ledger.of_ledger_index_subset_exn snarked_ledger
+              (Coda_base.Account.Index.Table.keys delegators)
+          in
+          {delegators; ledger} )
     in
-    local_state.last_epoch_ledger <- local_state.curr_epoch_ledger ;
-    ( match proposer_public_key with
-    | None -> local_state.delegators <- Coda_base.Account.Index.Table.create ()
-    | Some pk ->
-        Option.iter local_state.last_epoch_ledger ~f:(fun l ->
-            local_state.delegators
-            <- compute_delegators
-                 (* TODO: Propagate Include_self to the right place *)
-                 (`Include_self, pk)
-                 ~iter_accounts:(fun f -> Coda_base.Sparse_ledger.iteri l ~f)
-        ) ) ;
-    local_state.curr_epoch_ledger
-    <- Some
-         (Coda_base.Sparse_ledger.of_ledger_index_subset_exn ledger
-            (local_state.delegators |> Core_kernel.Int.Table.keys)) )
+    local_state.last_epoch_snapshot <- local_state.curr_epoch_snapshot ;
+    local_state.curr_epoch_snapshot <- epoch_snapshot )
 
 let genesis_protocol_state =
   let consensus_state =
