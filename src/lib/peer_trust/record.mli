@@ -9,7 +9,7 @@ module type S = sig
 
   val add_trust : t -> float -> t
 
-  val to_simple : t -> Peer_status.t
+  val to_peer_status : t -> Peer_status.t
 end
 
 val decay_rate : float

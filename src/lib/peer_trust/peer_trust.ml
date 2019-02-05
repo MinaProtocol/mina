@@ -39,15 +39,14 @@ module type S = sig
   val close : t -> unit
 end
 
-module Make (Peer : sig
-  include Hashable.S
-
-  val sexp_of_t : t -> Sexp.t
-end) (Now : sig
-  val now : unit -> Time.t
-end)
-(Action : Action_intf)
-(Db : Key_value_database.S with type key := Peer.t and type value := Record.t) =
+module Make
+    (Peer : Sexpable.S) (Now : sig
+        val now : unit -> Time.t
+    end)
+    (Action : Action_intf)
+    (Db : Key_value_database.S
+          with type key := Peer.t
+           and type value := Record.t) =
 struct
   type t =
     { db: Db.t
@@ -66,8 +65,8 @@ struct
 
   let lookup {db} peer =
     match Db.get db peer with
-    | Some record -> Record_inst.to_simple record
-    | None -> Record_inst.to_simple @@ Record_inst.init ()
+    | Some record -> Record_inst.to_peer_status record
+    | None -> Record_inst.to_peer_status @@ Record_inst.init ()
 
   let close {db; bans_writer} =
     Db.close db ;
@@ -93,8 +92,8 @@ struct
           [%test_pred: Float.t] Float.is_positive incr ;
           Record_inst.add_trust old_record (-.incr)
     in
-    let simple_old = Record_inst.to_simple old_record in
-    let simple_new = Record_inst.to_simple new_record in
+    let simple_old = Record_inst.to_peer_status old_record in
+    let simple_new = Record_inst.to_peer_status new_record in
     let%map () =
       match (simple_old.banned, simple_new.banned) with
       | Unbanned, Banned_until expiration ->
@@ -191,12 +190,15 @@ let%test_module "peer_trust" =
           assert_ban_pipe [] ;
           match Peer_trust_test.lookup db 0 with
           | {trust= decayed_trust; banned= Unbanned} ->
+              (* N.b. the floating point equality operator has a built in
+                 tolerance i.e. it's approximate equality. *)
               decayed_trust =. start_trust /. 2.0
           | _ -> false )
       | _ -> false
 
     let do_constant_rate rate f =
-      (* simulate running the function at the specified rate for a week *)
+      (* Simulate running the function at the specified rate, in actions/sec,
+         for a week. *)
       let instances = Float.to_int @@ (60. *. 60. *. 24. *. 7. *. rate) in
       let rec go n =
         if n < instances then (
@@ -259,4 +261,12 @@ let%test_module "peer_trust" =
           true
       | {trust; banned= Banned_until _} -> failwith "Trust not set to -1"
       | {trust; banned= Unbanned} -> failwith "Peer not banned"
+
+    let%test "multiple peers getting banned causes multiple ban events" =
+      let db = setup_mock_db () in
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind () = Peer_trust_test.record db nolog 0 Action.Insta_ban in
+          Peer_trust_test.record db nolog 1 Action.Insta_ban ) ;
+      assert_ban_pipe [1; 0] (* Reverse order since it's a snoc list. *) ;
+      true
   end )

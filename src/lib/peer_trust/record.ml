@@ -10,7 +10,7 @@ module type S = sig
 
   val add_trust : t -> float -> t
 
-  val to_simple : t -> Peer_status.t
+  val to_peer_status : t -> Peer_status.t
 end
 
 (* Trust is conceptually multiplied by this factor every second. This value is
@@ -67,7 +67,7 @@ end) : S = struct
         else new_record.banned_until_opt ) }
 
   (** Convert the internal type to the externally visible one. *)
-  let to_simple t =
+  let to_peer_status t =
     let new_record = update t in
     match new_record.banned_until_opt with
     | None ->
