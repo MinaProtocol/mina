@@ -1364,15 +1364,13 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
         ~ledger_hash:epoch_data.ledger.hash ~logger
     in
     let rec find_winning_slot slot =
-      if UInt32.of_int (Epoch.Slot.to_int slot) >= Constants.Epoch.size then (
-        printf !"\ndone\n%!" ; None )
-      else (
-        printf "!" ;
+      if UInt32.of_int (Epoch.Slot.to_int slot) >= Constants.Epoch.size then
+        None
+      else
         match proposal_data slot with
         | None -> find_winning_slot (Epoch.Slot.succ slot)
-        | Some data -> Some (slot, data) )
+        | Some data -> Some (slot, data)
     in
-    printf !"now\n%!" ;
     find_winning_slot (Epoch.Slot.succ slot)
   in
   match next_slot with
