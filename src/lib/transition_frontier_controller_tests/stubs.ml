@@ -291,6 +291,7 @@ let gen_breadcrumb ~logger :
 let create_root_frontier ~max_length ~logger : Transition_frontier.t Deferred.t
     =
   let accounts = Genesis_ledger.accounts in
+  let _, proposer_account = List.hd_exn accounts in
   let root_snarked_ledger = Coda_base.Ledger.Db.create () in
   List.iter accounts ~f:(fun (_, account) ->
       let status, _ =
@@ -331,6 +332,9 @@ let create_root_frontier ~max_length ~logger : Transition_frontier.t Deferred.t
       ~root_transition:root_transition_with_data ~root_snarked_ledger
       ~root_transaction_snark_scan_state ~max_length
       ~root_staged_ledger_diff:None
+      ~consensus_local_state:
+        (Consensus.Local_state.create
+           (Some proposer_account.Account.public_key))
   in
   frontier
 

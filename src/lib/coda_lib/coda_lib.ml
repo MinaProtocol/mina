@@ -415,6 +415,7 @@ module type Inputs_intf = sig
      and type staged_ledger := Staged_ledger.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+     and type consensus_local_state := Consensus_mechanism.Local_state.t
 
   module Transition_router :
     Protocols.Coda_transition_frontier.Transition_router_intf
@@ -500,7 +501,8 @@ module Make (Inputs : Inputs_intf) = struct
         (External_transition.t Envelope.Incoming.t * Inputs.Time.t)
         Pipe.Writer.t
     ; time_controller: Time.Controller.t
-    ; snark_work_fee: Currency.Fee.t }
+    ; snark_work_fee: Currency.Fee.t
+    ; consensus_local_state: Consensus_mechanism.Local_state.t }
 
   let peek_frontier frontier_mvar =
     Mvar.peek frontier_mvar
@@ -611,18 +613,22 @@ module Make (Inputs : Inputs_intf) = struct
   end
 
   let start t =
-    let consensus_local_state =
-      Consensus_mechanism.Local_state.create t.propose_keypair
-    in
     Option.iter t.propose_keypair ~f:(fun keypair ->
         Proposer.run ~parent_log:t.log ~transaction_pool:t.transaction_pool
           ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
-          ~time_controller:t.time_controller ~keypair ~consensus_local_state
+          ~time_controller:t.time_controller ~keypair
+          ~consensus_local_state:t.consensus_local_state
           ~frontier_reader:t.transition_frontier
           ~transition_writer:t.proposer_transition_writer )
 
   let create (config : Config.t) =
     trace_task "coda" (fun () ->
+        let consensus_local_state =
+          Consensus_mechanism.Local_state.create
+            (Option.map config.propose_keypair ~f:(fun keypair ->
+                 let open Keypair in
+                 Public_key.compress keypair.public_key ))
+        in
         let external_transitions_reader, external_transitions_writer =
           Strict_pipe.create Synchronous
         in
@@ -670,6 +676,7 @@ module Make (Inputs : Inputs_intf) = struct
             ~root_snarked_ledger:
               (Ledger_transfer.transfer_accounts ~src:Genesis.ledger
                  ~dest:ledger_db)
+            ~consensus_local_state
         in
         let frontier_mvar = Mvar.create () in
         Mvar.set frontier_mvar transition_frontier ;
@@ -773,5 +780,6 @@ module Make (Inputs : Inputs_intf) = struct
               config.staged_ledger_transition_backup_capacity
           ; receipt_chain_database= config.receipt_chain_database
           ; snark_work_fee= config.snark_work_fee
-          ; proposer_transition_writer } )
+          ; proposer_transition_writer
+          ; consensus_local_state } )
 end

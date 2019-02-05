@@ -429,6 +429,9 @@ struct
              Int.compare addr1 addr2 )
       |> List.map ~f:(fun (_, account) -> account)
 
+    (* TODO *)
+    let iteri _t ~f:_ = failwith "iteri not implemented on masks"
+
     let foldi_with_ignored_keys t ignored_keys ~init ~f =
       let locations_and_accounts = Location.Table.to_alist t.account_tbl in
       (* parent should ignore keys in this mask *)
