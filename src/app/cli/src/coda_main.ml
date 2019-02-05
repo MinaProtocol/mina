@@ -1087,8 +1087,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let open Participating_state.Let_syntax in
     let%map accounts = get_accounts t in
     List.map accounts ~f:(fun account ->
-        ( Account.balance account |> Currency.Balance.to_int
-        , string_of_public_key account ) )
+        ( string_of_public_key account
+        , Account.balance account |> Currency.Balance.to_int ) )
 
   let is_valid_payment t (txn : User_command.t) account_opt =
     let remainder =

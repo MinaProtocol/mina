@@ -38,14 +38,14 @@ module Prove_receipt = struct
 end
 
 module Public_key_with_balances = struct
-  type t = (int * string) list [@@deriving yojson]
+  type t = (string * int) list [@@deriving yojson]
 
   type format = {accounts: t} [@@deriving yojson, fields]
 
   let to_yojson t = format_to_yojson {accounts= t}
 
-  let to_text pk_with_accounts =
-    List.map pk_with_accounts ~f:(fun (pk, account) ->
-        sprintf !"%d, %s" pk account )
-    |> String_list_formatter.to_text
+  let to_text account =
+    List.map account ~f:(fun (public_key, balance) ->
+        sprintf !"%s : %d" public_key balance )
+    |> String.concat ~sep:"\n"
 end
