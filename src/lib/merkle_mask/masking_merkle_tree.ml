@@ -451,7 +451,7 @@ struct
       in
       List.fold locations_and_accounts ~init:parent_result ~f:f'
 
-    let _foldi t ~init ~f = foldi_with_ignored_keys t Key.Set.empty ~init ~f
+    let foldi t ~init ~f = foldi_with_ignored_keys t Key.Set.empty ~init ~f
 
     (* we would want fold_until to combine results from the parent and the mask
        way (1): use the parent result as the init of the mask fold (or vice-versa)
@@ -521,15 +521,6 @@ struct
       get_or_create_account t key account
       |> Result.map_error ~f:(fun err -> raise (Error.to_exn err))
       |> Result.ok_exn
-
-    let foldi t ~init ~f =
-      (* fold over parent, then mask *)
-      let parent_result = Base.foldi (get_parent t) ~init ~f in
-      Location.Table.fold t.account_tbl ~init:parent_result
-        ~f:(fun ~key:loc ~data:acct accum ->
-          (* loc is an account location, no exception can be raised here *)
-          let addr = Location.to_path_exn loc in
-          f addr accum acct )
 
     let sexp_of_location = Location.sexp_of_t
 
