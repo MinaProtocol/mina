@@ -1285,11 +1285,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             |> Host_and_port.to_string )
     ; user_commands_sent= !txn_count
     ; run_snark_worker= run_snark_worker t
-    ; block_window_duration= Consensus.Constants.block_window_duration_ms
     ; propose_pubkey=
         Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
     ; histograms
-    ; consensus_mechanism= Consensus.name }
+    ; consensus_mechanism= Consensus.name
+    ; consensus_configuration= Consensus.Configuration.t }
 
   let get_lite_chain :
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =
