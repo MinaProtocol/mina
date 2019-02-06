@@ -78,7 +78,7 @@ module Make (Inputs : Inputs_intf) : sig
       -> sender:Network_peer.Peer.t
       -> root_sync_ledger:Inputs.Root_sync_ledger.t
       -> Inputs.External_transition.Proof_verified.t
-      -> [> `Sync | `NotSync] Deferred.t
+      -> [> `Syncing | `Ignored] Deferred.t
   end
 end = struct
   open Inputs
@@ -151,7 +151,7 @@ end = struct
     if
       done_syncing_root root_sync_ledger
       || (not @@ worth_getting_root t candidate_state)
-    then Deferred.return `Sync
+    then Deferred.return `Ignored
     else
       match%bind
         Network.get_ancestry t.network sender
@@ -159,7 +159,7 @@ end = struct
       with
       | Error e ->
           Deferred.return
-          @@ Fn.const `Sync
+          @@ Fn.const `Ignored
           @@ Logger.error t.logger
                !"Could not get the proof of ancestors from the network: %s"
                (Error.to_string_hum e)
@@ -209,8 +209,8 @@ end = struct
                   |> Frozen_ledger_hash.to_ledger_hash)
               in
               Root_sync_ledger.new_goal root_sync_ledger ledger_hash
-              |> Fn.const `Sync
-          | Error e -> received_bad_proof t e |> Fn.const `Sync )
+              |> Fn.const `Syncing
+          | Error e -> received_bad_proof t e |> Fn.const `Ignored )
 
   (* TODO: We need to do catchup jobs for all remaining transitions in the cache. 
            This will be hooked into `run` when we do this. #1326 *)
