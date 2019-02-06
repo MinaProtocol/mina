@@ -55,6 +55,8 @@ module type Transition_frontier_base_intf = sig
 
   type staged_ledger
 
+  type consensus_local_state
+
   module Breadcrumb : sig
     type t [@@deriving sexp]
 
@@ -91,6 +93,7 @@ module type Transition_frontier_base_intf = sig
     -> root_transaction_snark_scan_state:transaction_snark_scan_state
     -> root_staged_ledger_diff:staged_ledger_diff option
     -> max_length:int
+    -> consensus_local_state:consensus_local_state
     -> t Deferred.t
 
   val find_exn : t -> state_hash -> Breadcrumb.t
@@ -107,6 +110,8 @@ module type Transition_frontier_intf = sig
   exception Already_exists of state_hash
 
   val max_length : t -> int
+
+  val consensus_local_state : t -> consensus_local_state
 
   val all_breadcrumbs : t -> Breadcrumb.t list
 

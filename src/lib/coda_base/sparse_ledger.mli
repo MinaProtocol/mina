@@ -17,7 +17,7 @@ val apply_transaction_exn : t -> Transaction.t -> t
 
 val of_ledger_subset_exn : Ledger.t -> Public_key.Compressed.t list -> t
 
-val of_ledger_index_subset_exn : Ledger.t -> int list -> t
+val of_ledger_index_subset_exn : Ledger.Any_ledger.witness -> int list -> t
 
 val iteri : t -> f:(Account.Index.t -> Account.t -> unit) -> unit
 
