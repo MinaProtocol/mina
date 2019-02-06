@@ -37,8 +37,8 @@ end)
 
 let%test_module "Bootstrap Controller" =
   ( module struct
-    let%test "sync_ledger would cache transitions correctly" =
-      (* setting up test environment *)
+    let%test "`bootstrap_controller` caches all transitions it is passed \
+              through the `transition_reader` pipe" =
       let transition_graph =
         Bootstrap_controller.For_tests.Transition_cache.create ()
       in
@@ -66,7 +66,6 @@ let%test_module "Bootstrap Controller" =
             Root_sync_ledger.create ledger_db ~parent_log:logger
           in
           let parent_breadcrumb = Transition_frontier.best_tip frontier in
-          (* generating random breadcrumbs *)
           let breadcrumbs_gen =
             Quickcheck_lib.gen_imperative_list
               ( Quickcheck.Generator.return @@ Deferred.return
@@ -87,36 +86,35 @@ let%test_module "Bootstrap Controller" =
           let envelopes =
             List.map ~f:Envelope.Incoming.local input_transitions_verified
           in
-          (* setting up and writing into the pipes *)
-          let reader, writer = Pipe_lib.Strict_pipe.create Synchronous in
+          let transition_reader, transition_writer =
+            Pipe_lib.Strict_pipe.create Synchronous
+          in
           let () =
             List.iter
               ~f:(fun x ->
-                Pipe_lib.Strict_pipe.Writer.write writer x |> don't_wait_for )
+                Pipe_lib.Strict_pipe.Writer.write transition_writer x
+                |> don't_wait_for )
               (List.zip_exn
                  (List.map ~f:(fun e -> `Transition e) envelopes)
                  (List.map
                     ~f:(fun t -> `Time_received t)
                     (List.init num_breadcrumbs ~f:Fn.id)))
           in
-          (* run `sync_ledger` *)
           let run_sync =
             Bootstrap_controller.For_tests.sync_ledger bootstrap
-              ~root_sync_ledger ~transition_graph ~transition_reader:reader
+              ~root_sync_ledger ~transition_graph ~transition_reader
           in
-          let () = Pipe_lib.Strict_pipe.Writer.close writer in
+          let () = Pipe_lib.Strict_pipe.Writer.close transition_writer in
           let%bind () = run_sync in
-          (* extract saved transitions from `transition_graph` *)
           let saved_transitions_verified =
             Bootstrap_controller.For_tests.Transition_cache.data
               transition_graph
           in
-          (* compare the input transitions with saved transitions *)
-          let module Transition_set = Set.Make (External_transition.Verified) in
           assert (
-            Transition_set.equal
-              (Transition_set.of_list input_transitions_verified)
-              (Transition_set.of_list saved_transitions_verified) ) ;
+            External_transition.Verified.Set.(
+              equal
+                (of_list input_transitions_verified)
+                (of_list saved_transitions_verified)) ) ;
           Deferred.return true )
 
     let%test "sync with one node correctly" =
