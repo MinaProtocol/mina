@@ -51,7 +51,7 @@ jobs:
             - save_cache:
                   key: macos-v3-after-brew-and-opam
                   paths:
-                      - "/usr/local/Homebrew""
+                      - "/usr/local/Homebrew"
                       - "/Users/distiller/.opam"
             - run:
                   name: Build OCaml
