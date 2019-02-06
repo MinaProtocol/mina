@@ -31,11 +31,13 @@ jobs:
         working_directory: /Users/distiller/coda
         environment:
             HOMEBREW_LOGS: /Users/distiller/homebrew.log
+            OPAMYES: 1
         steps:
             - restore_cache:
                   keys:
                       - macos-v3-after-brew-and-opam
                       - macos-v3-after-brew
+                      - macos-v3
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
