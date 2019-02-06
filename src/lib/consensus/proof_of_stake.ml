@@ -1087,6 +1087,31 @@ module Blockchain_state = Coda_base.Blockchain_state.Make (Genesis_ledger)
 module Protocol_state =
   Coda_base.Protocol_state.Make (Blockchain_state) (Consensus_state)
 
+module Configuration = struct
+  type t =
+    { delta: int
+    ; k: int
+    ; c: int
+    ; c_times_k: int
+    ; slots_per_epoch: int
+    ; slot_duration: int
+    ; epoch_duration: int
+    ; acceptable_network_delay: int }
+  [@@deriving yojson, bin_io]
+
+  let t =
+    let open Constants in
+    { delta
+    ; k
+    ; c
+    ; c_times_k= c * k
+    ; slots_per_epoch= UInt32.to_int Epoch.size
+    ; slot_duration= Int64.to_int Slot.duration_ms
+    ; epoch_duration= Int64.to_int (Time.Span.to_ms Epoch.duration)
+    ; acceptable_network_delay= Int64.to_int (Time.Span.to_ms delta_duration)
+    }
+end
+
 module Prover_state = struct
   include Coda_base.Stake_proof
 
