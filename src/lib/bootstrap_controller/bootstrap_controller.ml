@@ -78,7 +78,7 @@ module Make (Inputs : Inputs_intf) : sig
       -> sender:Network_peer.Peer.t
       -> root_sync_ledger:Inputs.Root_sync_ledger.t
       -> Inputs.External_transition.Proof_verified.t
-      -> unit Deferred.t
+      -> [> `Sync | `NotSync] Deferred.t
   end
 end = struct
   open Inputs
@@ -151,7 +151,7 @@ end = struct
     if
       done_syncing_root root_sync_ledger
       || (not @@ worth_getting_root t candidate_state)
-    then Deferred.unit
+    then Deferred.return `Sync
     else
       match%bind
         Network.get_ancestry t.network sender
@@ -159,6 +159,7 @@ end = struct
       with
       | Error e ->
           Deferred.return
+          @@ Fn.const `Sync
           @@ Logger.error t.logger
                !"Could not get the proof of ancestors from the network: %s"
                (Error.to_string_hum e)
@@ -207,8 +208,9 @@ end = struct
                   |> Blockchain_state.snarked_ledger_hash
                   |> Frozen_ledger_hash.to_ledger_hash)
               in
-              Root_sync_ledger.new_goal root_sync_ledger ledger_hash |> ignore
-          | Error e -> received_bad_proof t e )
+              Root_sync_ledger.new_goal root_sync_ledger ledger_hash
+              |> Fn.const `Sync
+          | Error e -> received_bad_proof t e |> Fn.const `Sync )
 
   (* TODO: We need to do catchup jobs for all remaining transitions in the cache. 
            This will be hooked into `run` when we do this. #1326 *)
@@ -261,6 +263,7 @@ end = struct
         if worth_getting_root t protocol_state then
           on_transition t ~sender ~root_sync_ledger
             (External_transition.forget_consensus_state_verification transition)
+          |> Deferred.map ~f:(Fn.const ())
           |> don't_wait_for ;
         Deferred.unit )
     |> don't_wait_for ;

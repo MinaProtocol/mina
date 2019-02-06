@@ -95,7 +95,7 @@ let%test_module "Bootstrap Controller" =
             |> With_hash.data
             |> External_transition.forget_consensus_state_verification
           in
-          let%bind () =
+          let%bind _ =
             on_transition bootstrap ~root_sync_ledger ~sender:peer_address
               best_transition
           in
@@ -112,4 +112,74 @@ let%test_module "Bootstrap Controller" =
           && Ledger_hash.equal syncing_frontier_root_hash
                (root_hash peer_frontier)  *)
       )
+
+    let%test "`on_transition` should deny outdated transitions" =
+      let logger = Logger.create () in
+      let max_length = 4 in
+      let num_breadcrumbs = 10 in
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind syncing_frontier =
+            create_root_frontier ~max_length ~logger
+          in
+          let%bind peer_frontier = create_root_frontier ~max_length ~logger in
+          let%bind () =
+            build_frontier_randomly peer_frontier
+              ~gen_root_breadcrumb_builder:(fun root_breadcrumb ->
+                Quickcheck.Generator.with_size ~size:num_breadcrumbs
+                @@ Quickcheck_lib.gen_imperative_list
+                     (root_breadcrumb |> return |> Quickcheck.Generator.return)
+                     (gen_breadcrumb ~logger) )
+          in
+          let network = Network.create ~logger in
+          let open Transition_frontier.For_tests in
+          let open Bootstrap_controller.For_tests in
+          let root_sync_ledger =
+            Root_sync_ledger.create
+              (root_snarked_ledger syncing_frontier)
+              ~parent_log:logger
+          in
+          let query_reader = Root_sync_ledger.query_reader root_sync_ledger in
+          let answer_writer =
+            Root_sync_ledger.answer_writer root_sync_ledger
+          in
+          Network.glue_sync_ledger network query_reader answer_writer ;
+          let peer_address =
+            Network_peer.Peer.create Unix.Inet_addr.localhost
+              ~discovery_port:1337 ~communication_port:1338
+          in
+          Network.add_exn network ~key:peer_address ~data:peer_frontier ;
+          let ancestor_prover = Ancestor.Prover.create ~max_size:max_length in
+          let genesis_root =
+            Transition_frontier.root syncing_frontier
+            |> Transition_frontier.Breadcrumb.transition_with_hash
+            |> With_hash.data
+            |> External_transition.forget_consensus_state_verification
+          in
+          let bootstrap =
+            make_bootstrap ~logger ~ancestor_prover ~genesis_root ~network
+              ~max_length
+          in
+          let best_transition =
+            Transition_frontier.best_tip peer_frontier
+            |> Transition_frontier.Breadcrumb.transition_with_hash
+            |> With_hash.data
+            |> External_transition.forget_consensus_state_verification
+          in
+          let%bind should_sync =
+            on_transition bootstrap ~root_sync_ledger ~sender:peer_address
+              best_transition
+          in
+          assert (should_sync = `Sync) ;
+          let outdated_transition =
+            Transition_frontier.root peer_frontier
+            |> Transition_frontier.Breadcrumb.transition_with_hash
+            |> With_hash.data
+            |> External_transition.forget_consensus_state_verification
+          in
+          let%bind should_not_sync =
+            on_transition bootstrap ~root_sync_ledger ~sender:peer_address
+              outdated_transition
+          in
+          assert (should_not_sync = `NotSync) ;
+          Deferred.return true )
   end )
