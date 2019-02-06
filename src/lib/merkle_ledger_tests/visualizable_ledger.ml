@@ -5,16 +5,16 @@ open Async
 module type S = sig
   type addr
 
-  type tree
+  type ledger
 
   type t
 
-  (* Visualize will enumerate through all edges of a subtree with a root
+  (* Visualize will enumerate through all edges of a subtree with a
      initial_address. It will then interpret all of the edges and nodes into an
      intermediate form that will be easy to write into a dot file *)
-  val visualize : tree -> initial_address:addr -> t
+  val visualize : ledger -> initial_address:addr -> t
 
-  (* Write will transform the intermediate form generate by visualze and save
+  (* Write will transform the intermediate form generate by visualize and save
      the results into a dot file *)
   val write : path:string -> name:string -> t -> unit Deferred.t
 end
@@ -45,8 +45,8 @@ module type Inputs_intf = sig
      and type account := Account.t
 end
 
-module Make (Inputs : Inputs_intf) :
-  S with type addr := Inputs.Location.Addr.t and type tree := Inputs.Ledger.t =
+module Make (Inputs : Inputs_intf) =
+(* : S with type addr := Inputs.Location.Addr.t and type ledger := Inputs.Ledger.t *)
 struct
   open Inputs
 
@@ -55,19 +55,28 @@ struct
     include Comparator.Make (Account)
   end
 
-  type edge = Inner of (Hash.t * Hash.t) | Leaf of (Hash.t * Account.t option)
+  (* type edge = Inner of (Hash.t * Hash.t) | Leaf of (Hash.t * Account.t option) *)
 
-  type t = (string * string) list * (string * int) list
+  type ('source, 'target) edge = {source: 'source; target: 'target}
 
-  let shorten_string string = String.prefix string 8
+  type merkle_tree_edge =
+    | Inner of (Hash.t, Hash.t) edge
+    | Leaf of (Hash.t, Account.t option) edge
+
+  type pretty_format_account = {public_key: string; balance: int}
+
+  type t =
+    {edges: (string, string) edge list; accounts: pretty_format_account list}
+
+  let display_prefix_of_string string = String.prefix string 8
 
   let string_of_hash hash =
-    hash |> Hash.sexp_of_t |> Sexp.to_string |> shorten_string
+    hash |> Hash.sexp_of_t |> Sexp.to_string |> display_prefix_of_string
 
   module Addr = Location.Addr
 
   let string_of_account_key account =
-    account |> Account.public_key |> Key.to_string |> shorten_string
+    account |> Account.public_key |> Key.to_string |> display_prefix_of_string
 
   let visualize t ~(initial_address : Ledger.Addr.t) =
     let rec bfs ~edges ~accounts jobs =
@@ -86,14 +95,15 @@ struct
                   Set.add accounts new_account )
             in
             bfs
-              ~edges:(Leaf (parent_hash, account) :: edges)
+              ~edges:(Leaf {source= parent_hash; target= account} :: edges)
               ~accounts:new_accounts jobs
           else
             let current_hash = Ledger.get_inner_hash_at_addr_exn t address in
             Queue.enqueue jobs (Addr.child_exn address Direction.Left) ;
             Queue.enqueue jobs (Addr.child_exn address Direction.Right) ;
             bfs
-              ~edges:(Inner (parent_hash, current_hash) :: edges)
+              ~edges:
+                (Inner {source= parent_hash; target= current_hash} :: edges)
               ~accounts jobs
     in
     let edges, accounts =
@@ -105,32 +115,33 @@ struct
     in
     let string_edges =
       List.map edges ~f:(function
-        | Inner (source_hash, inner_hash) ->
-            (string_of_hash source_hash, string_of_hash inner_hash)
-        | Leaf (source_hash, account_option) ->
+        | Inner {source; target} ->
+            {source= string_of_hash source; target= string_of_hash target}
+        | Leaf {source= source_hash; target= account_option} ->
             let open Option.Let_syntax in
             let account_string =
               (let%map account = account_option in
                string_of_account_key account)
               |> Option.value ~default:"EMPTY_ACCOUNT"
             in
-            (string_of_hash source_hash, account_string) )
+            {source= string_of_hash source_hash; target= account_string} )
     in
     let account_nodes =
       List.map (Set.to_list accounts) ~f:(fun account ->
           let string_key = string_of_account_key account in
-          (string_key, Account.balance account |> Balance.to_int) )
+          { public_key= string_key
+          ; balance= Account.balance account |> Balance.to_int } )
     in
-    (string_edges, account_nodes)
+    {edges= string_edges; accounts= account_nodes}
 
   module Dot_writer = struct
     let wrapper ~name body = sprintf "digraph %s { \n %s\n}" name body
 
-    let write ~path ~name (edges, accounts) =
+    let write ~path ~name {edges; accounts} =
       let body =
-        List.map edges ~f:(fun (source, edge) ->
-            sprintf "\"%s\" -> \"%s\" " source edge )
-        @ List.map accounts ~f:(fun (public_key, balance) ->
+        List.map edges ~f:(fun {source; target} ->
+            sprintf "\"%s\" -> \"%s\" " source target )
+        @ List.map accounts ~f:(fun {public_key; balance} ->
               sprintf "\"%s\" [shape=record,label=\"{%s|%d}\"]" public_key
                 public_key balance )
         |> String.concat ~sep:"\n"
