@@ -12,9 +12,13 @@ module type Inputs_intf = sig
 
   module Sync_handler :
     Sync_handler_intf
-    with type hash := State_hash.t
+    with type state_hash := State_hash.t
+     and type ledger_hash := Ledger_hash.t
      and type transition_frontier := Transition_frontier.t
      and type ancestor_proof := State_body_hash.t list
+     and type external_transition := External_transition.t
+     and type syncable_ledger_query := Sync_ledger.query
+     and type syncable_ledger_answer := Sync_ledger.answer
 
   module Transition_handler :
     Transition_handler_intf
@@ -29,11 +33,14 @@ module type Inputs_intf = sig
 
   module Network :
     Network_intf
-    with type peer := Kademlia.Peer.t
+    with type peer := Network_peer.Peer.t
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
      and type ancestor_proof_input := State_hash.t * int
      and type ancestor_proof := Ancestor.Proof.t
+     and type ledger_hash := Ledger_hash.t
+     and type sync_ledger_query := Sync_ledger.query
+     and type sync_ledger_answer := Sync_ledger.answer
 
   module Catchup :
     Catchup_intf

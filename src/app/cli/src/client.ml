@@ -416,7 +416,7 @@ let dump_ledger =
       Arg_type.create (fun s ->
           Sexp.of_string_conv_exn s Staged_ledger_hash.Stable.V1.t_of_sexp )
     in
-    anon ("ledger-builder-hash" %: h)
+    anon ("staged-ledger-hash" %: h)
   in
   Command.async ~summary:"Print the ledger with given merkle root as a sexp"
     (Cli_lib.Background_daemon.init sl_hash ~f:(fun port sl_hash ->

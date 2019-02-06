@@ -23,6 +23,7 @@ module type Inputs_intf = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type masked_ledger := Masked_ledger.t
+     and type consensus_local_state := Consensus.Local_state.t
 
   module Transaction_pool :
     Coda_lib.Transaction_pool_read_intf
@@ -196,7 +197,7 @@ module Make (Inputs : Inputs_intf) :
       lift_sync (fun () ->
           let previous_ledger_hash =
             previous_protocol_state |> Protocol_state.blockchain_state
-            |> Blockchain_state.ledger_hash
+            |> Blockchain_state.snarked_ledger_hash
           in
           let next_ledger_hash =
             Option.value_map ledger_proof_opt
@@ -212,7 +213,7 @@ module Make (Inputs : Inputs_intf) :
           in
           let blockchain_state =
             Blockchain_state.create_value ~timestamp:(Time.now time_controller)
-              ~ledger_hash:next_ledger_hash
+              ~snarked_ledger_hash:next_ledger_hash
               ~staged_ledger_hash:next_staged_ledger_hash
           in
           let time =

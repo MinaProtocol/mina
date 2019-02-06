@@ -93,6 +93,11 @@ module Make (Inputs : Inputs.S) = struct
         let%map h_gamma = G2_precomputation.create vk.h_gamma
         and h = G2_precomputation.create vk.h in
         {h_gamma; h}
+
+      let create_constant (vk : (_, _, _) vk) =
+        let h_gamma = G2_precomputation.create_constant vk.h_gamma
+        and h = G2_precomputation.create_constant vk.h in
+        {h_gamma; h}
     end
   end
 

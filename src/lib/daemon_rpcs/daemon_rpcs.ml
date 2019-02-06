@@ -15,7 +15,7 @@ module Types = struct
       let max_key_length =
         List.map ~f:(fun (s, _) -> String.length s) entries
         |> List.max_elt ~compare:Int.compare
-        |> Option.value_exn
+        |> Option.value ~default:0
       in
       let output =
         List.map entries ~f:(fun (s, x) ->
@@ -161,7 +161,7 @@ module Types = struct
             ("Block Count", Int.to_string (f x)) :: acc )
           ~uptime_secs:(fun acc x -> ("Uptime", sprintf "%ds" (f x)) :: acc)
           ~ledger_merkle_root:(fun acc x -> ("Ledger Merkle Root", f x) :: acc)
-          ~staged_ledger_hash:(fun acc x -> ("Ledger-builder hash", f x) :: acc)
+          ~staged_ledger_hash:(fun acc x -> ("Staged-ledger hash", f x) :: acc)
           ~state_hash:(fun acc x -> ("State Hash", f x) :: acc)
           ~commit_id:(fun acc x ->
             match f x with
@@ -314,7 +314,7 @@ end
 module Get_public_keys_with_balances = struct
   type query = unit [@@deriving bin_io]
 
-  type response = (int * string) list [@@deriving bin_io, sexp]
+  type response = (string * int) list [@@deriving bin_io, sexp]
 
   type error = unit [@@deriving bin_io]
 

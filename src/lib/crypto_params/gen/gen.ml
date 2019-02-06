@@ -1,3 +1,6 @@
+[%%import
+"../../../config.mlh"]
+
 open Ppxlib
 open Asttypes
 open Parsetree
@@ -111,6 +114,15 @@ let compute_chunk_value ~start n =
      for each possible chunk (2 ** (size * 3) of them)
        store its value in the array
 *)
+
+[%%if
+fake_hash]
+
+(* don't bother building table *)
+let get_chunk_table () = [||]
+
+[%%else]
+
 let get_chunk_table () =
   let num_params = Array.length params_array in
   let max_chunks = num_params / Chunk.size in
@@ -126,6 +138,8 @@ let get_chunk_table () =
   in
   let result = loop ~chunk:0 [] in
   result
+
+[%%endif]
 
 (* the AST representation of the chunk table is its string serialization
    - an AST for the table itself, using string representations of
@@ -157,14 +171,26 @@ let chunk_table_structure ~loc =
 
     let chunk_table_string_opt_ref = ref (Some [%e chunk_table_ast ~loc])
 
-    let chunk_table : Chunk_table.t =
-      let chunk_table_string = Option.value_exn !chunk_table_string_opt_ref in
-      let result = Binable.of_string (module Chunk_table) chunk_table_string in
-      (* allow string to be GCed *)
-      chunk_table_string_opt_ref := None ;
-      result
+    (** dummy empty table before deserialization *)
+    let chunk_table_ref : Chunk_table.t ref = ref (Chunk_table.create [||])
 
-    let curve_points_table = chunk_table.table_data]
+    let deserialized = ref false
+
+    let deserialize () =
+      if not !deserialized then (
+        let chunk_table_string =
+          Option.value_exn !chunk_table_string_opt_ref
+        in
+        let result =
+          Binable.of_string (module Chunk_table) chunk_table_string
+        in
+        (* allow string to be GCed *)
+        chunk_table_string_opt_ref := None ;
+        chunk_table_ref := result ;
+        deserialized := true )
+
+    (** returns valid chunk table *)
+    let get_chunk_table () = deserialize () ; !chunk_table_ref.table_data]
 
 let generate_ml_file filename structure =
   let fmt = Format.formatter_of_out_channel (Out_channel.create filename) in

@@ -1,7 +1,8 @@
 open Async_kernel
-open Core_kernel
+open Core
 open Banlist_lib
 open Pipe_lib
+open Network_peer
 
 exception Child_died
 
@@ -43,8 +44,16 @@ module type Process_intf = sig
 end
 
 (* Unfortunately, `dune runtest` runs in a pwd deep inside the build
- * directory, this prefix normalizes it to working-dir *)
-let test_prefix = "../../../../"
+ * directory. This hack finds the project root by recursively looking for the
+   developer README. *)
+let get_project_root () =
+  let open Filename in
+  let rec go dir =
+    if Sys.file_exists_exn @@ dir ^ "/README-dev.md" then dir
+    else if String.equal dir "/" then failwith "couldn't find project root!"
+    else go @@ fst @@ split dir
+  in
+  go @@ realpath current_dir_name
 
 let lock_file = "kademlia.lock"
 
@@ -119,7 +128,7 @@ module Haskell_process = struct
       Logger.debug log "Args: %s\n"
         (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum) ;
       (* This is where nix dumps the haskell artifact *)
-      let kademlia_binary = "app/kademlia-haskell/result/bin/kademlia" in
+      let kademlia_binary = "src/app/kademlia-haskell/result/bin/kademlia" in
       (* This is where you'd manually install kademlia *)
       let coda_kademlia = "coda-kademlia" in
       let open Deferred.Let_syntax in
@@ -127,8 +136,7 @@ module Haskell_process = struct
         keep_trying
           [ Unix.getenv "CODA_KADEMLIA_PATH"
             |> Option.value ~default:coda_kademlia
-          ; kademlia_binary
-          ; test_prefix ^ kademlia_binary ]
+          ; get_project_root () ^ kademlia_binary ]
           ~f:(fun prog -> Process.create ~prog ~args ())
         |> Deferred.Or_error.map ~f:(fun process ->
                {failure_response= ref `Die; process; lock_path} )
@@ -462,9 +470,9 @@ let%test_module "Tests" =
         ()
 
       let create ~initial_peers:_ ~me:_ ~log:_ ~conf_dir:_ =
-        (* Try dummy, then prepend test_prefix if it's missing *)
-        keep_trying ["./dummy.sh"; test_prefix ^ "./dummy.sh"] ~f:(fun prog ->
-            Process.create ~prog ~args:[] () )
+        Process.create
+          ~prog:(get_project_root () ^ "/src/dummy.sh")
+          ~args:[] ()
 
       let output t ~log:_log =
         Pipe.map (Reader.pipe (Process.stdout t)) ~f:String.split_lines

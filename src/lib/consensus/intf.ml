@@ -11,11 +11,27 @@ module type Prover_state_intf = sig
   val handler : t -> Snark_params.Tick.Handler.t
 end
 
+(** Constants are defined with a single letter (latin or greek) based on
+ * their usage in the Ouroboros suite of papers *)
+module type Shared_constants = sig
+  val k : int
+  (** k is the number of blocks required to reach finality *)
+
+  val coinbase : Currency.Amount.t
+  (** The amount of money minted and given to the proposer whenever a block
+   * is created *)
+
+  val block_window_duration_ms : Int64.t
+  (** The window of time available to create a block *)
+end
+
 module type S = sig
+  val name : string
+
   module Local_state : sig
     type t [@@deriving sexp]
 
-    val create : Signature_lib.Keypair.t option -> t
+    val create : Signature_lib.Public_key.Compressed.t option -> t
   end
 
   module Consensus_transition_data : sig
@@ -81,11 +97,6 @@ module type S = sig
          Quickcheck.Generator.t
   end
 
-  (* TODO: this needs to be changed -- code outside consensus should not be relying on this value *)
-  val block_interval_ms : Int64.t
-
-  val configuration : (string * string) list
-
   val genesis_protocol_state :
     (Protocol_state.value, Coda_base.State_hash.t) With_hash.t
 
@@ -110,7 +121,7 @@ module type S = sig
     Consensus_state.value -> time_received:Unix_timestamp.t -> bool
   (**
    * Check that a consensus state was received at a valid time.
-   *)
+  *)
 
   val next_state_checked :
        prev_state:Protocol_state.var
@@ -123,7 +134,7 @@ module type S = sig
   (**
    * Create a constrained, checked var for the next consensus state of
    * a given consensus state and snark transition.
-   *)
+  *)
 
   val select :
        existing:Consensus_state.value
@@ -134,7 +145,7 @@ module type S = sig
    * Select between two ledger builder controller tips given the consensus
    * states for the two tips. Returns `\`Keep` if the first tip should be
    * kept, or `\`Take` if the second tip should be taken instead.
-   *)
+  *)
 
   val next_proposal :
        Unix_timestamp.t
@@ -148,22 +159,21 @@ module type S = sig
    * Determine if and when to perform the next transition proposal. Either
    * informs the callee to check again at some time in the future, or to
    * schedule a proposal at some time in the future.
-   *)
+  *)
 
   val lock_transition :
-       ?proposer_public_key:Signature_lib.Public_key.Compressed.t
+       Consensus_state.value
     -> Consensus_state.value
-    -> Consensus_state.value
-    -> snarked_ledger:(unit -> Coda_base.Ledger.t Or_error.t)
     -> local_state:Local_state.t
+    -> snarked_ledger:Coda_base.Ledger.Any_ledger.witness
     -> unit
   (**
    * A hook for managing local state when the locked tip is updated.
-   *)
+  *)
 
   val should_bootstrap :
     existing:Consensus_state.value -> candidate:Consensus_state.value -> bool
   (**
-   * Indicator of when we should bootstrap  
-   *)
+     * Indicator of when we should bootstrap  
+    *)
 end

@@ -6,7 +6,7 @@ open Tick
 open Coda_base
 open Let_syntax
 
-module Make (Consensus_mechanism : Consensus.Mechanism.S) :
+module Make (Consensus_mechanism : Consensus.S) :
   Blockchain_state_intf.S
   with module Consensus_mechanism := Consensus_mechanism = struct
   module Blockchain_state = Consensus_mechanism.Blockchain_state
@@ -63,9 +63,9 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) :
             T.verify_complete_merge
               (Snark_transition.sok_digest transition)
               ( previous_state |> Protocol_state.blockchain_state
-              |> Blockchain_state.ledger_hash )
+              |> Blockchain_state.snarked_ledger_hash )
               ( transition |> Snark_transition.blockchain_state
-              |> Blockchain_state.ledger_hash )
+              |> Blockchain_state.snarked_ledger_hash )
               supply_increase
               (As_prover.return
                  (Option.value ~default:Tock.Proof.dummy
@@ -73,9 +73,9 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) :
           and ledger_hash_didn't_change =
             Frozen_ledger_hash.equal_var
               ( previous_state |> Protocol_state.blockchain_state
-              |> Blockchain_state.ledger_hash )
+              |> Blockchain_state.snarked_ledger_hash )
               ( transition |> Snark_transition.blockchain_state
-              |> Blockchain_state.ledger_hash )
+              |> Blockchain_state.snarked_ledger_hash )
           in
           let%bind correct_snark =
             Boolean.(correct_transaction_snark || ledger_hash_didn't_change)

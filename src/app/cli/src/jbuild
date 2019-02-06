@@ -28,8 +28,10 @@
       transaction_pool
       snarky
       snark_keys
+      snark_params
       snark_pool
       precomputed_values
+      network_peer
       network_pool
       snark_worker_lib
       keys_lib

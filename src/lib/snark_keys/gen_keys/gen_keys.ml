@@ -144,7 +144,7 @@ let gen_keys () =
   let module M =
     (* TODO make toplevel library to encapsulate consensus params *)
       Blockchain_snark.Blockchain_transition.Make
-        (Consensus.Mechanism)
+        (Consensus)
         (Transaction_snark.Verification.Make (struct
           let keys = tx_keys
         end))

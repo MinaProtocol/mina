@@ -1,13 +1,8 @@
 open Core_kernel
 open Async_kernel
 open Protocols.Coda_pow
-open Protocols.Coda_transition_frontier
 open Coda_base
 open Signature_lib
-
-module Max_length = struct
-  let length = Consensus.Mechanism.blocks_till_finality
-end
 
 module type Inputs_intf = sig
   module Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf
@@ -47,7 +42,7 @@ module type Inputs_intf = sig
 
   module External_transition :
     External_transition.S
-    with module Protocol_state = Consensus.Mechanism.Protocol_state
+    with module Protocol_state = Consensus.Protocol_state
      and module Staged_ledger_diff := Staged_ledger_diff
 
   module Staged_ledger :
@@ -82,15 +77,13 @@ module Make (Inputs : Inputs_intf) :
    and type staged_ledger_diff := Inputs.Staged_ledger_diff.t
    and type staged_ledger := Inputs.Staged_ledger.t
    and type masked_ledger := Ledger.Mask.Attached.t
-   and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t =
-struct
+   and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
+   and type consensus_local_state := Consensus.Local_state.t = struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
   exception
     Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
 
   exception Already_exists of State_hash.t
-
-  let max_length = Max_length.length
 
   module Breadcrumb = struct
     (* TODO: external_transition should be type : External_transition.With_valid_protocol_state.t #1344 *)
@@ -118,12 +111,11 @@ struct
           in
           let blockchain_state_ledger_hash, blockchain_staged_ledger_hash =
             let blockchain_state =
-              Consensus.Mechanism.Protocol_state.blockchain_state
+              Consensus.Protocol_state.blockchain_state
                 transition_protocol_state
             in
-            ( Consensus.Mechanism.Blockchain_state.ledger_hash blockchain_state
-            , Consensus.Mechanism.Blockchain_state.staged_ledger_hash
-                blockchain_state )
+            ( Consensus.Blockchain_state.snarked_ledger_hash blockchain_state
+            , Consensus.Blockchain_state.staged_ledger_hash blockchain_state )
           in
           let%bind ( `Hash_after_applying staged_ledger_hash
                    , `Ledger_proof proof_opt
@@ -176,20 +168,30 @@ struct
     let hash {transition_with_hash; _} = With_hash.hash transition_with_hash
 
     let parent_hash {transition_with_hash; _} =
-      Consensus.Mechanism.Protocol_state.previous_state_hash
+      Consensus.Protocol_state.previous_state_hash
         (Inputs.External_transition.Verified.protocol_state
            (With_hash.data transition_with_hash))
+
+    let consensus_state {transition_with_hash; _} =
+      With_hash.data transition_with_hash
+      |> Inputs.External_transition.Verified.protocol_state
+      |> Consensus.Protocol_state.consensus_state
   end
 
   type node =
     {breadcrumb: Breadcrumb.t; successor_hashes: State_hash.t list; length: int}
+  [@@deriving sexp]
 
+  (* Invariant: The path from the root to the tip inclusively, will be max_length + 1 *)
+  (* TODO: Make a test of this invariant *)
   type t =
     { root_snarked_ledger: Ledger.Db.t
     ; mutable root: State_hash.t
     ; mutable best_tip: State_hash.t
     ; logger: Logger.t
-    ; table: node State_hash.Table.t }
+    ; table: node State_hash.Table.t
+    ; max_length: int
+    ; consensus_local_state: Consensus.Local_state.t }
 
   let logger t = t.logger
 
@@ -198,8 +200,8 @@ struct
       ~(root_transition :
          (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t)
       ~root_snarked_ledger ~root_transaction_snark_scan_state
-      ~root_staged_ledger_diff =
-    let open Consensus.Mechanism in
+      ~root_staged_ledger_diff ~max_length ~consensus_local_state =
+    let open Consensus in
     let open Deferred.Let_syntax in
     let logger = Logger.child logger __MODULE__ in
     let root_hash = With_hash.hash root_transition in
@@ -211,7 +213,8 @@ struct
       Protocol_state.blockchain_state root_protocol_state
     in
     let root_blockchain_state_ledger_hash, root_blockchain_staged_ledger_hash =
-      ( Protocol_state.Blockchain_state.ledger_hash root_blockchain_state
+      ( Protocol_state.Blockchain_state.snarked_ledger_hash
+          root_blockchain_state
       , Protocol_state.Blockchain_state.staged_ledger_hash
           root_blockchain_state )
     in
@@ -280,7 +283,13 @@ struct
         ; root_snarked_ledger
         ; root= root_hash
         ; best_tip= root_hash
-        ; table }
+        ; table
+        ; max_length
+        ; consensus_local_state }
+
+  let max_length {max_length; _} = max_length
+
+  let consensus_local_state {consensus_local_state; _} = consensus_local_state
 
   let all_breadcrumbs t =
     List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb; _} -> breadcrumb)
@@ -336,10 +345,7 @@ struct
     then
       failwith
         "invalid call to attach_to: hash parent_node <> parent_hash node" ;
-    if
-      Hashtbl.add t.table ~key:(Breadcrumb.hash node.breadcrumb) ~data:node
-      <> `Ok
-    then
+    if Hashtbl.add t.table ~key:hash ~data:node <> `Ok then
       Logger.warn t.logger
         !"attach_node_to with breadcrumb for state %{sexp:State_hash.t} \
           already present; catchup scheduler bug?"
@@ -375,6 +381,7 @@ struct
    *       II ) find all successors of the other immediate successors of the old root
    *       III) remove the old root and all of the nodes found in (II) from the table
    *       IV ) merge the old root's merkle mask into the root ledger
+   *       V  ) notify the consensus mechanism of the new root
    *   3) set the new node as the best tip if the new node has a greater length than
    *      the current best tip
    *)
@@ -389,9 +396,9 @@ struct
         attach_breadcrumb_exn t breadcrumb ;
         let node = Hashtbl.find_exn t.table hash in
         (* 2.a *)
-        let distance_to_parent = root_node.length - node.length in
+        let distance_to_parent = node.length - root_node.length in
         (* 2.b *)
-        if distance_to_parent > max_length then (
+        if distance_to_parent > max_length t then (
           (* 2.b.I *)
           let new_root_hash = List.hd_exn (hash_path t node.breadcrumb) in
           (* 2.b.II *)
@@ -410,11 +417,34 @@ struct
           (* 2.b.IV *)
           Ledger.Mask.Attached.commit
             (Inputs.Staged_ledger.ledger
-               (Breadcrumb.staged_ledger root_node.breadcrumb)) ) ;
+               (Breadcrumb.staged_ledger root_node.breadcrumb)) ;
+          (* 2.b.V *)
+          Consensus.lock_transition
+            (Breadcrumb.consensus_state root_node.breadcrumb)
+            (Breadcrumb.consensus_state
+               (Hashtbl.find_exn t.table new_root_hash).breadcrumb)
+            ~local_state:t.consensus_local_state
+            ~snarked_ledger:
+              (Coda_base.Ledger.Any_ledger.cast
+                 (module Coda_base.Ledger.Db)
+                 t.root_snarked_ledger) ) ;
         (* 3 *)
         if node.length > best_tip_node.length then t.best_tip <- hash )
 
   let clear_paths t = Hashtbl.clear t.table
+
+  let best_tip_path_length_exn {table; root; best_tip; _} =
+    let open Option.Let_syntax in
+    let result =
+      let%bind best_tip_node = Hashtbl.find table best_tip in
+      let%map root_node = Hashtbl.find table root in
+      best_tip_node.length - root_node.length
+    in
+    result |> Option.value_exn
+
+  module For_tests = struct
+    let root_snarked_ledger {root_snarked_ledger; _} = root_snarked_ledger
+  end
 end
 
 let%test_module "Transition_frontier tests" =

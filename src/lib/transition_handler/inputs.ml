@@ -8,7 +8,7 @@ module type S = sig
 
   module State_proof :
     Proof_intf
-    with type input := Consensus.Mechanism.Protocol_state.value
+    with type input := Consensus.Protocol_state.value
      and type t := Proof.t
 
   module Transition_frontier :
@@ -20,4 +20,5 @@ module type S = sig
      and type masked_ledger := Ledger.Mask.Attached.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+     and type consensus_local_state := Consensus.Local_state.t
 end

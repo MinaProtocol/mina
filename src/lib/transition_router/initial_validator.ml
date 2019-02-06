@@ -9,7 +9,7 @@ module type Inputs_intf = sig
 
   module State_proof :
     Proof_intf
-    with type input := Consensus.Mechanism.Protocol_state.value
+    with type input := Consensus.Protocol_state.value
      and type t := Proof.t
 
   module Time : Time_intf
@@ -23,6 +23,7 @@ module type Inputs_intf = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type masked_ledger := Coda_base.Ledger.t
+     and type consensus_local_state := Consensus.Local_state.t
 
   module Protocol_state_validator :
     Protocol_state_validator_intf
@@ -64,8 +65,8 @@ module Make (Inputs : Inputs_intf) :
             |> Writer.write valid_transition_writer
         | Error e ->
             Logger.warn logger
-              !"Got an invalid transition from peer : %{sexp:Host_and_port.t} \
-                %{sexp:Error.t}"
+              !"Got an invalid transition from peer : \
+                %{sexp:Network_peer.Peer.t} %{sexp:Error.t}"
               sender e )
     |> don't_wait_for
 end

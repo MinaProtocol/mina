@@ -1,11 +1,7 @@
-module type Inputs_intf = sig
-  module Time : Protocols.Coda_pow.Time_intf
+[%%import "../../config.mlh"]
 
-  module Genesis_ledger : sig
-    val t : Coda_base.Ledger.t
-  end
+[%%if consensus_mechanism = "proof_of_signature"]
 
-  val proposal_interval : Time.Span.t
-end
+include Intf.S
 
-module Make (Inputs : Inputs_intf) : Intf.S
+[%%endif]

@@ -76,6 +76,14 @@ module Reader : sig
 
     val two : 'a t -> 'a t * 'a t
   end
+
+  val partition_map3 :
+       'a t
+    -> f:('a -> [`Fst of 'b | `Snd of 'c | `Trd of 'd])
+    -> 'b t * 'c t * 'd t
+  (** This function would take a pipe and split the reader side into 3 ends. The
+   * `read`s to the new pipe have to be in the same order as the `write`s or else
+   * there will be a deadlock. *)
 end
 
 module Writer : sig

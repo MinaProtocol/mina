@@ -73,6 +73,8 @@ struct
 
     type root_hash = Hash.t
 
+    exception Location_is_not_account of Location.t
+
     let create () =
       failwith
         "Mask.Attached.create: cannot create an attached mask; use \
@@ -238,17 +240,20 @@ struct
           set_hash t addr hash )
 
     (* if the mask's parent sets an account, we can prune an entry in the mask if the account in the parent
-     is the same in the mask
-       *)
-    let parent_set_notify t location account =
-      match find_account t location with
-      | Some existing_account ->
-          if
-            Key.equal
-              (Account.public_key account)
-              (Account.public_key existing_account)
-          then remove_account_and_update_hashes t location
+       is the same in the mask
+     *)
+    let parent_set_notify t account =
+      match find_location t (Account.public_key account) with
       | None -> ()
+      | Some location -> (
+        match find_account t location with
+        | Some existing_account ->
+            if
+              Key.equal
+                (Account.public_key account)
+                (Account.public_key existing_account)
+            then remove_account_and_update_hashes t location
+        | None -> () )
 
     (* as for accounts, we see if we have it in the mask, else delegate to parent *)
     let get_hash t addr =
@@ -338,13 +343,17 @@ struct
         | [] -> [] )
       |> ignore
 
+    (* keys from this mask and all ancestors *)
     let keys t =
-      Location.Table.data t.account_tbl
-      |> List.map ~f:Account.public_key
-      |> Key.Set.of_list
+      let mask_keys =
+        Location.Table.data t.account_tbl
+        |> List.map ~f:Account.public_key
+        |> Key.Set.of_list
+      in
+      let parent_keys = Base.keys (get_parent t) in
+      Key.Set.union parent_keys mask_keys
 
-    let num_accounts t =
-      Key.Set.union (Base.keys (get_parent t)) (keys t) |> Key.Set.length
+    let num_accounts t = keys t |> Key.Set.length
 
     let location_of_key t key =
       let mask_result = find_location t key in
@@ -409,21 +418,19 @@ struct
       set t (Location.Account addr) account
 
     let to_list t =
-      let mask_accounts = find_all_accounts t in
-      let parent_accounts = Base.to_list (get_parent t) in
-      let mask_keys =
-        List.map mask_accounts ~f:(fun acct -> Account.public_key acct)
-      in
-      let mask_key_set = Key.Set.of_list mask_keys in
-      (* if an account is in mask and parent, favor the mask version *)
-      let not_in_mask parent_account =
-        let parent_key = Account.public_key parent_account in
-        not (Key.Set.mem mask_key_set parent_key)
-      in
-      let in_parent_not_in_mask_accounts =
-        List.filter parent_accounts ~f:not_in_mask
-      in
-      mask_accounts @ in_parent_not_in_mask_accounts
+      keys t |> Set.to_list
+      |> List.map ~f:(fun key ->
+             let location = location_of_key t key |> Option.value_exn in
+             match location with
+             | Account addr ->
+                 (Addr.to_int addr, get t location |> Option.value_exn)
+             | location -> raise (Location_is_not_account location) )
+      |> List.sort ~compare:(fun (addr1, _) (addr2, _) ->
+             Int.compare addr1 addr2 )
+      |> List.map ~f:(fun (_, account) -> account)
+
+    (* TODO *)
+    let iteri _t ~f:_ = failwith "iteri not implemented on masks"
 
     let foldi_with_ignored_keys t ignored_keys ~init ~f =
       let locations_and_accounts = Location.Table.to_alist t.account_tbl in
@@ -447,7 +454,7 @@ struct
       in
       List.fold locations_and_accounts ~init:parent_result ~f:f'
 
-    let _foldi t ~init ~f = foldi_with_ignored_keys t Key.Set.empty ~init ~f
+    let foldi t ~init ~f = foldi_with_ignored_keys t Key.Set.empty ~init ~f
 
     (* we would want fold_until to combine results from the parent and the mask
        way (1): use the parent result as the init of the mask fold (or vice-versa)
@@ -517,15 +524,6 @@ struct
       get_or_create_account t key account
       |> Result.map_error ~f:(fun err -> raise (Error.to_exn err))
       |> Result.ok_exn
-
-    let foldi t ~init ~f =
-      (* fold over parent, then mask *)
-      let parent_result = Base.foldi (get_parent t) ~init ~f in
-      Location.Table.fold t.account_tbl ~init:parent_result
-        ~f:(fun ~key:loc ~data:acct accum ->
-          (* loc is an account location, no exception can be raised here *)
-          let addr = Location.to_path_exn loc in
-          f addr accum acct )
 
     let sexp_of_location = Location.sexp_of_t
 

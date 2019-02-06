@@ -1,3 +1,6 @@
+[%%import
+"../../config.mlh"]
+
 open Core_kernel
 open Bitstring_lib
 open Snark_bits
@@ -213,6 +216,15 @@ module Tick = struct
 
     let scale = scale_field
 
+    let point_near_x x =
+      let rec go x = function
+        | Some y -> of_affine_coordinates (x, y)
+        | None ->
+            let x' = Field.(add one x) in
+            go x' (find_y x')
+      in
+      go x (find_y x)
+
     module Checked = struct
       include Snarky.Curves.Make_weierstrass_checked (Tick0) (Scalar)
                 (struct
@@ -235,7 +247,7 @@ module Tick = struct
 
     let zero_hash =
       digest_fold
-        (State.create params Curve_chunk_table.{curve_points_table})
+        (State.create params ~get_chunk_table)
         (Fold_lib.Fold.of_list [(false, false, false)])
 
     module Checked = struct
@@ -254,7 +266,6 @@ module Tick = struct
     *)
     module For_tests = struct
       open Fold_lib
-      open Tuple_lib
 
       let equal_curves c1 c2 =
         if phys_equal c1 Inner_curve.zero || phys_equal c2 Inner_curve.zero
@@ -267,23 +278,9 @@ module Tick = struct
       let equal_states s1 s2 =
         equal_curves s1.State.acc s2.State.acc
         && Int.equal s1.triples_consumed s2.triples_consumed
-        (* params, chunk_table should never be modified *)
+        (* params, chunk_tables should never be modified *)
         && phys_equal s1.params s2.params
-        && phys_equal s1.chunk_table s2.chunk_table
-
-      (* this is the old update_fold code (specialized to Inner_curve), before we added chunking *)
-      let update_fold_unchunked (t : State.t) (fold : bool Triple.t Fold.t) =
-        let params = t.params in
-        let acc, triples_consumed =
-          fold.fold ~init:(t.acc, t.triples_consumed)
-            ~f:(fun (acc, i) triple ->
-              let term =
-                Snarky.Pedersen.local_function ~negate:Inner_curve.negate
-                  params.(i) triple
-              in
-              (Inner_curve.add acc term, i + 1) )
-        in
-        {t with acc; triples_consumed}
+        && phys_equal (s1.get_chunk_table ()) (s2.get_chunk_table ())
 
       let gen_fold n =
         let gen_triple =
@@ -304,16 +301,21 @@ module Tick = struct
         in
         Fold.of_list (gen_triples n)
 
-      let initial_state =
-        State.create params Curve_chunk_table.{curve_points_table}
+      let initial_state = State.create params ~get_chunk_table
 
       let run_updates fold =
-        let result = State.update_fold initial_state fold in
-        let unchunked_result = update_fold_unchunked initial_state fold in
+        (* make sure chunk table deserialized before running test;
+           actual deserialization happens just once
+         *)
+        ignore (Crypto_params.Pedersen_chunk_table.deserialize ()) ;
+        let result = State.update_fold_chunked initial_state fold in
+        let unchunked_result =
+          State.update_fold_unchunked initial_state fold
+        in
         (result, unchunked_result)
 
       let run_hash_test n =
-        let fold = gen_fold 1 in
+        let fold = gen_fold n in
         let result, unchunked_result = run_updates fold in
         assert (equal_states result unchunked_result)
     end
@@ -357,7 +359,11 @@ let embed (x : Tick.Field.t) : Tock.Field.t =
   in
   go Tock.Field.one Tock.Field.zero 0
 
-let ledger_depth = 30
+(** enable/disable use of chunk table in Pedersen hashing *)
+let set_chunked_hashing b = Tick.Pedersen.State.set_chunked_fold b
+
+[%%inject
+"ledger_depth", ledger_depth]
 
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.

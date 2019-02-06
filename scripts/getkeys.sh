@@ -12,11 +12,12 @@ if [[ $CIRCLE_BRANCH == 'master' ]]; then
 
     # Get cached keys
     PINNED_KEY_COMMIT=temporary_hack
-    /usr/bin/gsutil cp gs://proving-keys-stable/keys-$PINNED_KEY_COMMIT.tar.bz2 /tmp/.
+    TARBALL="keys-${PINNED_KEY_COMMIT}-${DUNE_PROFILE}.tar.bz2"
+    /usr/bin/gsutil cp gs://proving-keys-stable/$TARBALL /tmp/.
 
     # Unpack keys
     sudo mkdir -p /var/lib/coda
     cd /var/lib/coda
-    sudo tar --strip-components=2 -xvf /tmp/keys-$PINNED_KEY_COMMIT.tar.bz2
-    rm /tmp/keys-$PINNED_KEY_COMMIT.tar.bz2
+    sudo tar --strip-components=2 -xvf /tmp/$TARBALL
+    rm /tmp/$TARBALL
 fi

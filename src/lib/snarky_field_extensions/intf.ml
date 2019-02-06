@@ -78,6 +78,8 @@ module type S = sig
 
   open Impl
 
+  val equal : t -> t -> (Boolean.var, _) Checked.t
+
   val assert_square : t -> t -> (unit, _) Checked.t
 
   val assert_equal : t -> t -> (unit, _) Checked.t

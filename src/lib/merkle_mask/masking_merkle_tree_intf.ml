@@ -19,7 +19,7 @@ module type S = sig
 
   module Location : Merkle_ledger.Location_intf.S
 
-  module Addr : Merkle_address.S
+  module Addr = Location.Addr
 
   val create : unit -> t
   (** create a mask with no parent *)
@@ -27,6 +27,7 @@ module type S = sig
   module Attached : sig
     include
       Base_merkle_tree_intf.S
+      with module Addr = Addr
       with module Location = Location
       with type account := account
        and type root_hash := hash
@@ -46,7 +47,7 @@ module type S = sig
     val get_parent : t -> parent
     (** get mask parent *)
 
-    val parent_set_notify : t -> location -> account -> unit
+    val parent_set_notify : t -> account -> unit
     (** called when parent sets an account; update local state *)
 
     val copy : t -> t
