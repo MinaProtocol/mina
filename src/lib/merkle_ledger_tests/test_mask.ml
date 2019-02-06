@@ -529,11 +529,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             List.iter mask_accounts ~f:(fun account ->
                 ignore @@ create_existing_account_exn attached_mask account ) ;
             let mask_sum =
-              Mask.Attached.foldi_with_ignored_keys attached_mask
-                ( Key.Set.of_list
-                @@ List.map parent_accounts ~f:(fun {Account.public_key; _} ->
-                       public_key ) )
-                ~init:0 ~f:balance_summer
+              Mask.Attached.foldi attached_mask ~init:0 ~f:balance_summer
             in
             (* sum should not include any parent balances *)
             assert (Int.equal mask_sum 0) )

@@ -16,6 +16,7 @@ module type Inputs_intf = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
+     and type consensus_local_state := Consensus.Local_state.t
 
   module Root_sync_ledger :
     Syncable_ledger.S
@@ -310,6 +311,8 @@ end = struct
            ~hash_data:
              (Fn.compose Consensus.Protocol_state.hash
                 External_transition.Verified.protocol_state))
+      ~consensus_local_state:
+        (Transition_frontier.consensus_local_state frontier)
 
   module For_tests = struct
     type nonrec t = t
