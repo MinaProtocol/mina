@@ -37,6 +37,88 @@ end)
 
 let%test_module "Bootstrap Controller" =
   ( module struct
+    let%test "sync_ledger would cache transitions correctly" =
+      (* setting up test environment *)
+      let transition_graph =
+        Bootstrap_controller.For_tests.Transition_cache.create ()
+      in
+      let max_length = 4 in
+      let num_breadcrumbs = 10 in
+      let logger = Logger.create () in
+      let network = Network.create ~logger in
+      let ancestor_prover = Ancestor.Prover.create ~max_size:max_length in
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind frontier = create_root_frontier ~max_length ~logger in
+          let genesis_root =
+            Transition_frontier.root frontier
+            |> Transition_frontier.Breadcrumb.transition_with_hash
+            |> With_hash.data
+            |> External_transition.forget_consensus_state_verification
+          in
+          let bootstrap =
+            Bootstrap_controller.For_tests.make_bootstrap ~logger
+              ~ancestor_prover ~genesis_root ~network ~max_length
+          in
+          let ledger_db =
+            Transition_frontier.For_tests.root_snarked_ledger frontier
+          in
+          let root_sync_ledger =
+            Root_sync_ledger.create ledger_db ~parent_log:logger
+          in
+          let parent_breadcrumb = Transition_frontier.best_tip frontier in
+          (* generating random breadcrumbs *)
+          let breadcrumbs_gen =
+            Quickcheck_lib.gen_imperative_list
+              ( Quickcheck.Generator.return @@ Deferred.return
+              @@ parent_breadcrumb )
+              (gen_breadcrumb ~logger)
+            |> Quickcheck.Generator.with_size ~size:num_breadcrumbs
+          in
+          let%bind breadcrumbs =
+            Deferred.all @@ Quickcheck.random_value breadcrumbs_gen
+          in
+          let input_transitions_verified =
+            List.map
+              ~f:
+                (Fn.compose With_hash.data
+                   Transition_frontier.Breadcrumb.transition_with_hash)
+              breadcrumbs
+          in
+          let envelopes =
+            List.map ~f:Envelope.Incoming.local input_transitions_verified
+          in
+          (* setting up and writing into the pipes *)
+          let reader, writer = Pipe_lib.Strict_pipe.create Synchronous in
+          let () =
+            List.iter
+              ~f:(fun x ->
+                Pipe_lib.Strict_pipe.Writer.write writer x |> don't_wait_for )
+              (List.zip_exn
+                 (List.map ~f:(fun e -> `Transition e) envelopes)
+                 (List.map
+                    ~f:(fun t -> `Time_received t)
+                    (List.init num_breadcrumbs ~f:Fn.id)))
+          in
+          (* run `sync_ledger` *)
+          let run_sync =
+            Bootstrap_controller.For_tests.sync_ledger bootstrap
+              ~root_sync_ledger ~transition_graph ~transition_reader:reader
+          in
+          let () = Pipe_lib.Strict_pipe.Writer.close writer in
+          let%bind () = run_sync in
+          (* extract saved transitions from `transition_graph` *)
+          let saved_transitions_verified =
+            Bootstrap_controller.For_tests.Transition_cache.data
+              transition_graph
+          in
+          (* compare the input transitions with saved transitions *)
+          let module Transition_set = Set.Make (External_transition.Verified) in
+          assert (
+            Transition_set.equal
+              (Transition_set.of_list input_transitions_verified)
+              (Transition_set.of_list saved_transitions_verified) ) ;
+          Deferred.return true )
+
     let%test "sync with one node correctly" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
