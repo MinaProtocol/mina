@@ -33,6 +33,11 @@ jobs:
             HOMEBREW_LOGS: /Users/distiller/homebrew.log
             OPAMYES: 1
         steps:
+            - run:
+                name: Make /nix paths
+                command: |
+                    sudo mkdir /nix
+                    sudo chown distiller /nix
             - restore_cache:
                   keys:
                       - macos-v4-after-brew-and-opam-and-nix
