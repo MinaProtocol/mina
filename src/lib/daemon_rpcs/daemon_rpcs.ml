@@ -144,7 +144,7 @@ module Types = struct
       ; propose_pubkey: Public_key.t option
       ; histograms: Histograms.t option
       ; consensus_mechanism: string
-      ; consensus_configuration: (string * string) list }
+      ; consensus_configuration: Consensus.Configuration.t }
     [@@deriving to_yojson, bin_io, fields]
 
     (* Text response *)
@@ -194,12 +194,17 @@ module Types = struct
                 ("Histograms", Histograms.to_text histograms) :: acc )
           ~consensus_mechanism:(fun acc x ->
             ("Consensus Mechanism", f x) :: acc )
-          ~consensus_configuration:(fun acc vars ->
-            let rec render = function
-              | [] -> "\n"
-              | (k, v) :: t -> sprintf "\n    %s = %s" k v ^ render t
+          ~consensus_configuration:(fun acc x ->
+            let render conf =
+              match Consensus.Configuration.to_yojson conf with
+              | `Assoc ls ->
+                  List.fold_left ls ~init:"" ~f:(fun acc (k, v) ->
+                      acc
+                      ^ sprintf "\n    %s = %s" k (Yojson.Safe.to_string v) )
+                  ^ "\n"
+              | _ -> failwith "unexpected consensus configuration json format"
             in
-            ("Consensus Configuration", render (f vars)) :: acc )
+            ("Consensus Configuration", render (f x)) :: acc )
         |> List.rev
       in
       digest_entries ~title entries
