@@ -136,7 +136,7 @@ module Haskell_process = struct
         keep_trying
           [ Unix.getenv "CODA_KADEMLIA_PATH"
             |> Option.value ~default:coda_kademlia
-          ; get_project_root () ^ kademlia_binary ]
+          ; get_project_root () ^/ kademlia_binary ]
           ~f:(fun prog -> Process.create ~prog ~args ())
         |> Deferred.Or_error.map ~f:(fun process ->
                {failure_response= ref `Die; process; lock_path} )
@@ -471,7 +471,7 @@ let%test_module "Tests" =
 
       let create ~initial_peers:_ ~me:_ ~log:_ ~conf_dir:_ =
         Process.create
-          ~prog:(get_project_root () ^ "/src/dummy.sh")
+          ~prog:(get_project_root () ^/ "src/dummy.sh")
           ~args:[] ()
 
       let output t ~log:_log =
