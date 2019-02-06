@@ -29,28 +29,29 @@ jobs:
         macos:
             xcode: "10.1.0"
         working_directory: /Users/distiller/coda
-        env:
+        environment:
             HOMEBREW_LOGS: /Users/distiller/homebrew.log
         steps:
             - restore_cache:
                   keys:
-                      - macos-v3
-                      - macos-v3-opam
+                      - macos-v3-after-brew-and-opam
+                      - macos-v3-after-brew
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Deps -- make macos-setup-download
                   command: make macos-setup-download
             - save_cache:
-                  key: macos-v3
+                  key: macos-v3-after-brew
                   paths:
                       - "/usr/local/Homebrew"
             - run:
                   name: Compile Deps -- make macos-setup-compile
                   command: make macos-setup-compile
             - save_cache:
-                  key: macos-v3-opam
+                  key: macos-v3-after-brew-and-opam
                   paths:
+                      - "/usr/local/Homebrew""
                       - "/Users/distiller/.opam"
             - run:
                   name: Build OCaml
