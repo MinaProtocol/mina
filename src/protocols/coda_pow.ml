@@ -1126,12 +1126,14 @@ module type Consensus_mechanism_intf = sig
 
   type keypair
 
+  type compressed_public_key
+
   type time
 
   module Local_state : sig
     type t [@@deriving sexp]
 
-    val create : keypair option -> t
+    val create : compressed_public_key option -> t
   end
 
   module Consensus_transition_data : sig
@@ -1480,6 +1482,7 @@ Merge Snark:
      and type user_command := User_command.t
      and type sok_digest := Sok_message.Digest.t
      and type ledger := Ledger.t
+     and type compressed_public_key := Public_key.Compressed.t
      and type keypair := Keypair.t
      and type time := Time.t
 

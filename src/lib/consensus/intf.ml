@@ -31,7 +31,7 @@ module type S = sig
   module Local_state : sig
     type t [@@deriving sexp]
 
-    val create : Signature_lib.Keypair.t option -> t
+    val create : Signature_lib.Public_key.Compressed.t option -> t
   end
 
   module Consensus_transition_data : sig
@@ -162,11 +162,10 @@ module type S = sig
   *)
 
   val lock_transition :
-       ?proposer_public_key:Signature_lib.Public_key.Compressed.t
+       Consensus_state.value
     -> Consensus_state.value
-    -> Consensus_state.value
-    -> snarked_ledger:(unit -> Coda_base.Ledger.t Or_error.t)
     -> local_state:Local_state.t
+    -> snarked_ledger:Coda_base.Ledger.Any_ledger.witness
     -> unit
   (**
    * A hook for managing local state when the locked tip is updated.

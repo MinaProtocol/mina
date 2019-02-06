@@ -301,6 +301,7 @@ module type Main_intf = sig
        and type staged_ledger := Staged_ledger.t
        and type staged_ledger_diff := Staged_ledger_diff.t
        and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+       and type consensus_local_state := Consensus.Local_state.t
   end
 
   module Config : sig
