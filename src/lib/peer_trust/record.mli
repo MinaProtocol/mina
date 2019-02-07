@@ -1,6 +1,6 @@
 open Core
 
-type t
+type t [@@deriving bin_io]
 
 module type S = sig
   val init : unit -> t

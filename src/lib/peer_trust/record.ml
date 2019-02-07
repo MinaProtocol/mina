@@ -2,6 +2,7 @@ open Core
 
 type t =
   {trust: float; trust_last_updated: Time.t; banned_until_opt: Time.t Option.t}
+[@@deriving bin_io]
 
 module type S = sig
   val init : unit -> t

@@ -39,21 +39,23 @@ module type S = sig
   val close : t -> unit
 end
 
-module Make
-    (Peer : Sexpable.S) (Now : sig
+module Make0
+    (Peer_id : Sexpable.S) (Now : sig
         val now : unit -> Time.t
     end)
-    (Action : Action_intf)
     (Db : Key_value_database.S
-          with type key := Peer.t
-           and type value := Record.t) =
+          with type key := Peer_id.t
+           and type value := Record.t)
+    (Action : Action_intf) =
 struct
   type t =
     { db: Db.t
-    ; bans_reader: Peer.t Strict_pipe.Reader.t
+    ; bans_reader: Peer_id.t Strict_pipe.Reader.t
     ; bans_writer:
-        (Peer.t, Strict_pipe.synchronous, unit Deferred.t) Strict_pipe.Writer.t
-    }
+        ( Peer_id.t
+        , Strict_pipe.synchronous
+        , unit Deferred.t )
+        Strict_pipe.Writer.t }
 
   module Record_inst = Record.Make (Now)
 
@@ -82,9 +84,6 @@ struct
     let new_record =
       match Action.to_trust_response action with
       | Insta_ban -> Record_inst.ban old_record
-      (* I don't like runtime exceptions, but the trust change constructors
-         should only be called with constant arguments, so I think any bugs
-         that trigger this will be very visible in testing. *)
       | Trust_increase incr ->
           [%test_pred: Float.t] Float.is_positive incr ;
           Record_inst.add_trust old_record incr
@@ -98,8 +97,8 @@ struct
       match (simple_old.banned, simple_new.banned) with
       | Unbanned, Banned_until expiration ->
           Logger.faulty_peer log'
-            !"Banning peer %{sexp:Peer.t} until %{sexp:Time.t} due to action \
-              %{sexp:Action.t}."
+            !"Banning peer %{sexp:Peer_id.t} until %{sexp:Time.t} due to \
+              action %{sexp:Action.t}."
             peer expiration action ;
           Strict_pipe.Writer.write bans_writer peer
       | _, _ ->
@@ -108,7 +107,7 @@ struct
             else "Decreasing"
           in
           Logger.debug log'
-            !"%s trust for peer %{sexp:Peer.t} due to action \
+            !"%s trust for peer %{sexp:Peer_id.t} due to action \
               %{sexp:Action.t}. New trust is %f."
             verb peer action simple_new.trust ;
           Deferred.unit
@@ -142,7 +141,7 @@ let%test_module "peer_trust" =
         | Big_credit -> Trust_response.Trust_increase 0.2
     end
 
-    module Peer_trust_test = Make (Int) (Mock_now) (Action) (Db)
+    module Peer_trust_test = Make0 (Int) (Mock_now) (Db) (Action)
 
     (* We want to check the output of the pipe in these tests, but it's
        synchronous, so we need to read from it in a different "thread",
@@ -271,3 +270,11 @@ let%test_module "peer_trust" =
           assert_ban_pipe [1; 0] (* Reverse order since it's a snoc list. *) ;
           true )
   end )
+
+module Make =
+  Make0
+    (Unix.Inet_addr.Blocking_sexp)
+    (struct
+      let now = Time.now
+    end)
+    (Rocksdb.Serializable.Make (Unix.Inet_addr.Blocking_sexp) (Record))

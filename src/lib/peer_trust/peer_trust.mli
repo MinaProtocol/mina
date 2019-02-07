@@ -78,12 +78,7 @@ end
     @param Now a method of getting the current time. Functored for mocking.
     @param Action Actions that affect trust
     @param Db Database to store trust data in. Functored for mocking *)
-module Make
-    (Peer : Sexpable.S) (Now : sig
-        val now : unit -> Time.t
-    end)
-    (Action : Action_intf)
-    (Db : Key_value_database.S
-          with type key := Peer.t
-           and type value := Record.t) :
-  S with type peer := Peer.t and type action := Action.t
+module Make (Action : Action_intf) :
+  S
+  with type peer := Unix.Inet_addr.Blocking_sexp.t
+   and type action := Action.t

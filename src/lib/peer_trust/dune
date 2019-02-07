@@ -3,7 +3,7 @@
   (public_name peer_trust)
   (library_flags (-linkall))
   (flags (-warn-error -27))
-  (libraries core async key_value_database logger pipe_lib)
+  (libraries core async key_value_database logger pipe_lib rocksdb)
   (inline_tests)
   (preprocess (pps ppx_jane ppx_deriving.eq bisect_ppx -conditional))
   (synopsis "Track how much we trust peers"))
