@@ -53,12 +53,13 @@ module type Inputs_intf = sig
 end
 
 module Make (Inputs : Inputs_intf) : sig
+  open Inputs
+
   include
     Bootstrap_controller_intf
-    with type network := Inputs.Network.t
-     and type transition_frontier := Inputs.Transition_frontier.t
-     and type external_transition_verified :=
-                Inputs.External_transition.Verified.t
+    with type network := Network.t
+     and type transition_frontier := Transition_frontier.t
+     and type external_transition_verified := External_transition.Verified.t
      and type ancestor_prover := Ancestor.Prover.t
      and type ledger_db := Ledger.Db.t
 
@@ -68,16 +69,36 @@ module Make (Inputs : Inputs_intf) : sig
     val make_bootstrap :
          logger:Logger.t
       -> ancestor_prover:Ancestor.Prover.t
-      -> genesis_root:Inputs.External_transition.Proof_verified.t
-      -> network:Inputs.Network.t
+      -> genesis_root:External_transition.Proof_verified.t
+      -> network:Network.t
       -> max_length:int
       -> t
 
     val on_transition :
          t
       -> sender:Network_peer.Peer.t
+      -> root_sync_ledger:Root_sync_ledger.t
+      -> External_transition.Proof_verified.t
+      -> [> `Syncing | `Ignored] Deferred.t
+
+    module Transition_cache : sig
+      include
+        Transition_cache.S
+        with type external_transition_verified :=
+                    Inputs.External_transition.Verified.t
+         and type state_hash := State_hash.t
+    end
+
+    val sync_ledger :
+         t
       -> root_sync_ledger:Inputs.Root_sync_ledger.t
-      -> Inputs.External_transition.Proof_verified.t
+      -> transition_graph:Transition_cache.t
+      -> transition_reader:( [< `Transition of Inputs.External_transition
+                                               .Verified
+                                               .t
+                                               Envelope.Incoming.t ]
+                           * [< `Time_received of 'a] )
+                           Pipe_lib.Strict_pipe.Reader.t
       -> unit Deferred.t
   end
 end = struct
@@ -91,23 +112,7 @@ end = struct
     ; network: Network.t
     ; max_length: int }
 
-  (* Cache represents a graph. The key is a State_hash, which is the node in 
-  the graph, and the value is the children transitions of the node *)
-  module Transition_cache = struct
-    type t = External_transition.Verified.t list State_hash.Table.t
-
-    let create () = State_hash.Table.create ()
-
-    let add (t : t) ~parent new_child =
-      State_hash.Table.update t parent ~f:(function
-        | None -> [new_child]
-        | Some children ->
-            if
-              List.mem children new_child
-                ~equal:External_transition.Verified.equal
-            then children
-            else new_child :: children )
-  end
+  module Transition_cache = Transition_cache.Make (Inputs)
 
   let worth_getting_root t candidate =
     `Take
@@ -151,7 +156,7 @@ end = struct
     if
       done_syncing_root root_sync_ledger
       || (not @@ worth_getting_root t candidate_state)
-    then Deferred.unit
+    then Deferred.return `Ignored
     else
       match%bind
         Network.get_ancestry t.network sender
@@ -159,6 +164,7 @@ end = struct
       with
       | Error e ->
           Deferred.return
+          @@ Fn.const `Ignored
           @@ Logger.error t.logger
                !"Could not get the proof of ancestors from the network: %s"
                (Error.to_string_hum e)
@@ -207,8 +213,9 @@ end = struct
                   |> Blockchain_state.snarked_ledger_hash
                   |> Frozen_ledger_hash.to_ledger_hash)
               in
-              Root_sync_ledger.new_goal root_sync_ledger ledger_hash |> ignore
-          | Error e -> received_bad_proof t e )
+              Root_sync_ledger.new_goal root_sync_ledger ledger_hash
+              |> Fn.const `Syncing
+          | Error e -> received_bad_proof t e |> Fn.const `Ignored )
 
   (* TODO: We need to do catchup jobs for all remaining transitions in the cache. 
            This will be hooked into `run` when we do this. #1326 *)
@@ -236,10 +243,7 @@ end = struct
     in
     dfs (Transition_frontier.find_exn frontier root_hash)
 
-  let sync_ledger t ~ledger_db ~transition_graph ~transition_reader =
-    let root_sync_ledger =
-      Root_sync_ledger.create ledger_db ~parent_log:t.logger
-    in
+  let sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader =
     let query_reader = Root_sync_ledger.query_reader root_sync_ledger in
     let response_writer = Root_sync_ledger.answer_writer root_sync_ledger in
     Network.glue_sync_ledger t.network query_reader response_writer ;
@@ -261,12 +265,9 @@ end = struct
         if worth_getting_root t protocol_state then
           on_transition t ~sender ~root_sync_ledger
             (External_transition.forget_consensus_state_verification transition)
+          |> Deferred.map ~f:(Fn.const ())
           |> don't_wait_for ;
         Deferred.unit )
-    |> don't_wait_for ;
-    let%map synced_db = Root_sync_ledger.valid_tree root_sync_ledger in
-    Root_sync_ledger.destroy root_sync_ledger ;
-    synced_db
 
   let run ~parent_log ~network ~ancestor_prover ~frontier ~ledger_db
       ~transition_reader =
@@ -289,7 +290,14 @@ end = struct
     let transition_graph = Transition_cache.create () in
     Transition_frontier.clear_paths frontier ;
     let%bind synced_db =
-      sync_ledger t ~ledger_db ~transition_graph ~transition_reader
+      let root_sync_ledger =
+        Root_sync_ledger.create ledger_db ~parent_log:t.logger
+      in
+      sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader
+      |> don't_wait_for ;
+      let%map synced_db = Root_sync_ledger.valid_tree root_sync_ledger in
+      Root_sync_ledger.destroy root_sync_ledger ;
+      synced_db
     in
     assert (Ledger.Db.(merkle_root ledger_db = merkle_root synced_db)) ;
     (* Need to coerce new_root from a proof_verified transition to a fully
@@ -322,5 +330,9 @@ end = struct
       ; max_length }
 
     let on_transition = on_transition
+
+    module Transition_cache = Transition_cache
+
+    let sync_ledger = sync_ledger
   end
 end
