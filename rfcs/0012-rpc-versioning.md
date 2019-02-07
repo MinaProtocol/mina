@@ -28,7 +28,7 @@ two ways, for queries and for broadcasting.
 
 For queries, the pattern is (simplifying somewhat):
 
-```
+```ocaml
   module Query = struct
 
     module T = struct
@@ -71,7 +71,7 @@ are the same, so we can use the identity function.
 
 For a given query, if we wish to update the protocol, we'd add:
 
-```
+```ocaml
   module V2 = struct
     module T = struct
       type query = ...
@@ -92,7 +92,7 @@ There could be additional new modules for subsequent versions. Eventually,
 versions could be pruned from the code, to encourage nodes to upgrade their
 software. When a new query version is created, the `Vn` module for the previous
 version could have a field added:
-```
+```ocaml
   let remove_this_version_after = "20200702"
 ```
 A year or so past the introduction of the new version might be a
@@ -100,7 +100,7 @@ suitable date for removing the previous version.
 
 The query modules are used in a list of "implementations". To define
 an implementation, we need a function of type:
-```
+```ocaml
   Host_and_port.t -> version:int -> T.Caller.query -> T.Callee.response option Deferred.t
 ```
 which does the work within the node to respond to the query. The host
@@ -118,7 +118,7 @@ The RPC versioning mechanism for broadcasting is similar, except that instead of
 query and response types, there is a "msg" type. The versioning module defines
 coercions
 
-```
+```ocaml
   val msg_of_caller_model : Caller.msg -> msg
   val callee_model_of_msg : msg -> Callee.msg
 ```
