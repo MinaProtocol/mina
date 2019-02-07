@@ -72,12 +72,7 @@ end
 (* FIXME The parameter docs don't render :( *)
 
 (** Instantiate the module.
-    @param Peer The identifiers for peers. N.b. this should be something that is
-    at least somewhat expensive for an attacker to change e.g. an IP, not an IP
-    and port.
-    @param Now a method of getting the current time. Functored for mocking.
-    @param Action Actions that affect trust
-    @param Db Database to store trust data in. Functored for mocking *)
+    @param Action Actions that affect trust *)
 module Make (Action : Action_intf) :
   S
   with type peer := Unix.Inet_addr.Blocking_sexp.t
