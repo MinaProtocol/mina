@@ -169,32 +169,32 @@ let%test_module "peer_trust" =
       | _ -> false
 
     let%test "Insta-bans actually do so" =
-      let db = setup_mock_db () in
       Thread_safe.block_on_async_exn (fun () ->
-          Peer_trust_test.record db nolog 0 Insta_ban ) ;
-      match Peer_trust_test.lookup db 0 with
-      | {trust= -1.0; banned= Banned_until time} ->
-          [%test_eq: Time.t] time
-          @@ Time.add !Mock_now.current_time Time.Span.day ;
-          assert_ban_pipe [0] ;
-          true
-      | _ -> false
+          let db = setup_mock_db () in
+          let%map () = Peer_trust_test.record db nolog 0 Insta_ban in
+          match Peer_trust_test.lookup db 0 with
+          | {trust= -1.0; banned= Banned_until time} ->
+              [%test_eq: Time.t] time
+              @@ Time.add !Mock_now.current_time Time.Span.day ;
+              assert_ban_pipe [0] ;
+              true
+          | _ -> false )
 
     let%test "trust decays by half in 24 hours" =
-      let db = setup_mock_db () in
       Thread_safe.block_on_async_exn (fun () ->
-          Peer_trust_test.record db nolog 0 Action.Big_credit ) ;
-      match Peer_trust_test.lookup db 0 with
-      | {trust= start_trust; banned= Unbanned} -> (
-          Mock_now.advance Time.Span.day ;
-          assert_ban_pipe [] ;
+          let db = setup_mock_db () in
+          let%map () = Peer_trust_test.record db nolog 0 Action.Big_credit in
           match Peer_trust_test.lookup db 0 with
-          | {trust= decayed_trust; banned= Unbanned} ->
-              (* N.b. the floating point equality operator has a built in
+          | {trust= start_trust; banned= Unbanned} -> (
+              Mock_now.advance Time.Span.day ;
+              assert_ban_pipe [] ;
+              match Peer_trust_test.lookup db 0 with
+              | {trust= decayed_trust; banned= Unbanned} ->
+                  (* N.b. the floating point equality operator has a built in
                  tolerance i.e. it's approximate equality. *)
-              decayed_trust =. start_trust /. 2.0
+                  decayed_trust =. start_trust /. 2.0
+              | _ -> false )
           | _ -> false )
-      | _ -> false
 
     let do_constant_rate rate f =
       (* Simulate running the function at the specified rate, in actions/sec,
@@ -214,59 +214,60 @@ let%test_module "peer_trust" =
       do_constant_rate rate (fun () -> Peer_trust_test.record db nolog 0 act)
 
     let%test "peers don't get banned for acting at the maximum rate" =
-      let db = setup_mock_db () in
       Thread_safe.block_on_async_exn (fun () ->
-          act_constant_rate db 1. Action.Slow_punish ) ;
-      match Peer_trust_test.lookup db 0 with
-      | {banned= Banned_until _} -> false
-      | {banned= Unbanned} -> assert_ban_pipe [] ; true
+          let db = setup_mock_db () in
+          let%map () = act_constant_rate db 1. Action.Slow_punish in
+          match Peer_trust_test.lookup db 0 with
+          | {banned= Banned_until _} -> false
+          | {banned= Unbanned} -> assert_ban_pipe [] ; true )
 
     let%test "peers do get banned for acting faster than the maximum rate" =
-      let db = setup_mock_db () in
       Thread_safe.block_on_async_exn (fun () ->
-          act_constant_rate db 1.1 Action.Slow_punish ) ;
-      match Peer_trust_test.lookup db 0 with
-      | {trust; banned= Banned_until _} ->
-          assert_ban_pipe [0] ;
-          true
-      | {trust; banned= Unbanned} -> false
+          let db = setup_mock_db () in
+          let%map () = act_constant_rate db 1.1 Action.Slow_punish in
+          match Peer_trust_test.lookup db 0 with
+          | {trust; banned= Banned_until _} ->
+              assert_ban_pipe [0] ;
+              true
+          | {trust; banned= Unbanned} -> false )
 
     let%test "good cancels bad" =
-      let db = setup_mock_db () in
       Thread_safe.block_on_async_exn (fun () ->
-          do_constant_rate 1.1 (fun () ->
-              let%bind () =
-                Peer_trust_test.record db nolog 0 Action.Slow_punish
-              in
-              Peer_trust_test.record db nolog 0 Action.Slow_credit ) ) ;
-      match Peer_trust_test.lookup db 0 with
-      | {trust; banned= Banned_until _} -> false
-      | {trust; banned= Unbanned} -> assert_ban_pipe [] ; true
+          let db = setup_mock_db () in
+          let%map () =
+            do_constant_rate 1.1 (fun () ->
+                let%bind () =
+                  Peer_trust_test.record db nolog 0 Action.Slow_punish
+                in
+                Peer_trust_test.record db nolog 0 Action.Slow_credit )
+          in
+          match Peer_trust_test.lookup db 0 with
+          | {trust; banned= Banned_until _} -> false
+          | {trust; banned= Unbanned} -> assert_ban_pipe [] ; true )
 
     let%test "insta-bans ignore positive trust" =
-      let db = setup_mock_db () in
       Thread_safe.block_on_async_exn (fun () ->
-          act_constant_rate db 1. Action.Big_credit ) ;
-      ( match Peer_trust_test.lookup db 0 with
-      | {trust; banned= Unbanned} ->
-          assert (trust >. 0.99) ;
-          assert_ban_pipe []
-      | {trust; banned= Banned_until _} ->
-          failwith "Peer is banned after credits" ) ;
-      Thread_safe.block_on_async_exn (fun () ->
-          Peer_trust_test.record db nolog 0 Action.Insta_ban ) ;
-      match Peer_trust_test.lookup db 0 with
-      | {trust= -1.0; banned= Banned_until _} ->
-          assert_ban_pipe [0] ;
-          true
-      | {trust; banned= Banned_until _} -> failwith "Trust not set to -1"
-      | {trust; banned= Unbanned} -> failwith "Peer not banned"
+          let db = setup_mock_db () in
+          let%bind () = act_constant_rate db 1. Action.Big_credit in
+          ( match Peer_trust_test.lookup db 0 with
+          | {trust; banned= Unbanned} ->
+              assert (trust >. 0.99) ;
+              assert_ban_pipe []
+          | {trust; banned= Banned_until _} ->
+              failwith "Peer is banned after credits" ) ;
+          let%map () = Peer_trust_test.record db nolog 0 Action.Insta_ban in
+          match Peer_trust_test.lookup db 0 with
+          | {trust= -1.0; banned= Banned_until _} ->
+              assert_ban_pipe [0] ;
+              true
+          | {trust; banned= Banned_until _} -> failwith "Trust not set to -1"
+          | {trust; banned= Unbanned} -> failwith "Peer not banned" )
 
     let%test "multiple peers getting banned causes multiple ban events" =
-      let db = setup_mock_db () in
       Thread_safe.block_on_async_exn (fun () ->
+          let db = setup_mock_db () in
           let%bind () = Peer_trust_test.record db nolog 0 Action.Insta_ban in
-          Peer_trust_test.record db nolog 1 Action.Insta_ban ) ;
-      assert_ban_pipe [1; 0] (* Reverse order since it's a snoc list. *) ;
-      true
+          let%map () = Peer_trust_test.record db nolog 1 Action.Insta_ban in
+          assert_ban_pipe [1; 0] (* Reverse order since it's a snoc list. *) ;
+          true )
   end )
