@@ -141,10 +141,10 @@ module Types = struct
       ; peers: string list
       ; user_commands_sent: int
       ; run_snark_worker: bool
-      ; block_window_duration: int
       ; propose_pubkey: Public_key.t option
       ; histograms: Histograms.t option
-      ; consensus_mechanism: string }
+      ; consensus_mechanism: string
+      ; consensus_configuration: Consensus.Configuration.t }
     [@@deriving to_yojson, bin_io, fields]
 
     (* Text response *)
@@ -180,8 +180,6 @@ module Types = struct
             ("User_commands Sent", Int.to_string (f x)) :: acc )
           ~run_snark_worker:(fun acc x ->
             ("Snark Worker Running", Bool.to_string (f x)) :: acc )
-          ~block_window_duration:(fun acc x ->
-            ("Proposal Interval", Int.to_string (f x)) :: acc )
           ~propose_pubkey:(fun acc x ->
             match f x with
             | None -> ("Proposer Running", "false") :: acc
@@ -196,6 +194,17 @@ module Types = struct
                 ("Histograms", Histograms.to_text histograms) :: acc )
           ~consensus_mechanism:(fun acc x ->
             ("Consensus Mechanism", f x) :: acc )
+          ~consensus_configuration:(fun acc x ->
+            let render conf =
+              match Consensus.Configuration.to_yojson conf with
+              | `Assoc ls ->
+                  List.fold_left ls ~init:"" ~f:(fun acc (k, v) ->
+                      acc
+                      ^ sprintf "\n    %s = %s" k (Yojson.Safe.to_string v) )
+                  ^ "\n"
+              | _ -> failwith "unexpected consensus configuration json format"
+            in
+            ("Consensus Configuration", render (f x)) :: acc )
         |> List.rev
       in
       digest_entries ~title entries
