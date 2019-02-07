@@ -16,9 +16,12 @@ As an example, the snark pool never has elements removed and requires some syste
 One way to do this would be to track a reference count for each piece of `Work` in the table of proofs, but this
 table of references probably shouldn't be part the transition frontier itself as it's completely unrelated.
 
-
 We'd like to have a way for other parts of the system to incrementally build up datastructures based on the
 breadcrumbs that are being added and removed to the frontier.
+
+Other examples of such an abstraction:
+  - managing the transaction pool
+  - tracking information for consensus optimization
 
 ## Detailed design
 
@@ -48,29 +51,26 @@ in order to keep themselves up to date.
 ## Drawbacks
 [drawbacks]: #drawbacks
 
-- This API more or less assumes that `Transition_frontier_listener_intf.t` is mutable.
-  In the case of the snark pool refcount, this seems to be alright.
-- If the `add/remove_breadcrumb` are slow, this could slow down the transition frontier.
-- Adding the calculation to the frontier itself would avoid adding an abstraction, though this listener is fairly simple as described.
+  - This API more or less assumes that `Transition_frontier_listener_intf.t` is mutable. In the case of the snark pool refcount, this seems to be alright.
+  - If the `add/remove_breadcrumb` are slow, this could slow down the transition frontier.
+  - Adding the calculation to the frontier itself would avoid adding an abstraction, though this listener is fairly simple as described.
 
 ## Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
 
-- Alternative: Calculate values on-demand by iterating over all transitions in the frontier -- this is more expensive
-- Alternative: Add incremental calculation to the transition frontier itself -- this adds unrelated complexity to the frontier code
-- This design allows for more data to be incrementally calculated based on activity in the transition frontier
+  - Alternative: Calculate values on-demand by iterating over all transitions in the frontier -- this is more expensive
+  - Alternative: Add incremental calculation to the transition frontier itself -- this adds unrelated complexity to the frontier code
+  - This design allows for more data to be incrementally calculated based on activity in the transition frontier
   while adding minimal complexity to the frontier itself.
 
 ## Prior art
 [prior-art]: #prior-art
 
-- The old `Ledger_builder_controller` was more complex than the current transition frontier design, and we'd
+  - The old `Ledger_builder_controller` was more complex than the current transition frontier design, and we'd
   like to avoid adding more complexity to this component.
 
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-- Should the listener also support a `clear/destroy` call for when the transition frontier is thrown away/reset/synced?
-  We assume that the only way to create a transition frontier is to create an empty one and then fill it by adding breadcrumbs.
-- Potentially out of scope of this listener api RFC, but in the snark pool manager, it is unclear how to obtain the
-  work from the breadcrumb, and how important it is to get all future work from a breadcrumb rather than just the available work.
+  - Should the listener also support a `clear/destroy` call for when the transition frontier is thrown away/reset/synced? We assume that the only way to create a transition frontier is to create an empty one and then fill it by adding breadcrumbs.
+  - Potentially out of scope of this listener api RFC, but in the snark pool manager, it is unclear how to obtain the work from the breadcrumb, and how important it is to get all future work from a breadcrumb rather than just the available work.
