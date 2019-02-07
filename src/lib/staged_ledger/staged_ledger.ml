@@ -187,6 +187,12 @@ end = struct
         Statement_scanner.check_invariants scan_state ~error_prefix ledger
           (Some (get_target proof))
 
+  (**Materialize the snarked ledger (with hash = ~snarked_ledger_hash) for
+   which a ledger proof was emitted last. Scan state only can only recover
+   the last snarked ledger. How does it do? Basically by keeping track of 
+   the transactions that needs to be undone in order to get to the latest snarked ledger.
+   For each level on the scan state tree, a list of transactions is stored and when a proof is emitted, the transaction list
+   corresponding to the root is discarded.*)
   let snarked_ledger :
       t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t =
    fun {ledger; scan_state; _} ~snarked_ledger_hash:expected_target ->
@@ -1189,6 +1195,14 @@ end = struct
           in
           make_diff res None
 
+  (**Creates a Staged-ledger diff that includes valid transactions and  proofs.
+    It first fetches the transaction snark work or proof bundles (in a specific order, refer FIFO in src/lib/parallel_scan.ml) that is currently available and filters valid user commands.
+    These are then checked against three main constraints:
+      1. Work constraint: If enough transaction snark work or proof bundles are included such that the number of unproven statements in the system should be less than work_capacity
+      2. Space constraint: if everything fits in the given space
+      3. Budget constraint: if the payment fees can pay for the proofs
+
+    If any of the constraints do not satisfy, then either a user command or a proof is discarded (See `check_constraints_and_update` function).*)
   let create_diff t ~self ~logger
       ~(transactions_by_fee : User_command.With_valid_signature.t Sequence.t)
       ~(get_completed_work :
