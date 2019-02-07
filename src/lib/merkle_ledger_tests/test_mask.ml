@@ -51,7 +51,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
       val with_chain :
         (Base.t -> Mask.Attached.t -> Mask.Attached.t -> 'a) -> 'a
       (** Here we provide a base ledger and two layers of attached masks
-       * one ontop another *)
+         * one ontop another *)
     end
 
     module Make (Test : Test_intf) = struct
@@ -100,6 +100,11 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         match action with
         | `Existed -> failwith "Expected to allocate a new account"
         | `Added -> location
+
+      let get_account_exn mask {Account.public_key; _} =
+        Mask.Attached.get mask
+          (Mask.Attached.location_of_key mask public_key |> Option.value_exn)
+        |> Option.value_exn
 
       let%test "parent, mask agree on set" =
         Test.with_instances (fun maskable mask ->
@@ -240,7 +245,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             (* set affects hashes along the path P from location to the root, while the Merkle path for the location
                contains the siblings of P elements; to observe a hash in the Merkle path changed by the set, choose an
                address that is a sibling of an element in P; the Merkle path for that address will include a P element
-             *)
+            *)
             let address =
               dummy_address |> Maskable.Addr.parent_exn
               |> Maskable.Addr.sibling
@@ -309,7 +314,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             (* the order of sets matters here; if we set in the mask first,
                the set in the maskable notifies the mask, which then removes
                the account, changing the Merkle root to what it was before the set
-             *)
+            *)
             Maskable.set maskable dummy_location dummy_account ;
             Mask.Attached.set attached_mask dummy_location dummy_account ;
             let mask_merkle_root = Mask.Attached.merkle_root attached_mask in
@@ -601,6 +606,29 @@ let%test_module "Test mask connected to underlying Merkle tree" =
               Int.equal parent_num_accounts (List.length accounts)
               && Int.equal parent_num_accounts mask_num_accounts_before
               && Int.equal parent_num_accounts mask_num_accounts_after ) )
+
+      let%test_unit "Mask reparenting works" =
+        Test.with_chain (fun base m1 m2 ->
+            let num_accounts = 3 in
+            let keys = Key.gen_keys num_accounts in
+            let balances =
+              Quickcheck.random_value
+                (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
+            in
+            let accounts = List.map2_exn keys balances ~f:Account.create in
+            match accounts with
+            | [a1; a2; a3] ->
+                ignore (parent_create_new_account_exn base a1) ;
+                ignore (create_new_account_exn m1 a2) ;
+                ignore (create_new_account_exn m2 a3) ;
+                (* all accounts are here *)
+                List.iter accounts ~f:(fun a ->
+                    assert (Account.equal (get_account_exn m2 a) a) ) ;
+                Maskable.reparent ~root:base ~heir:m1 ~heir_children:[m2] ;
+                (* all accounts are still here *)
+                List.iter accounts ~f:(fun a ->
+                    assert (Account.equal (get_account_exn m2 a) a) )
+            | _ -> failwith "unexpected" )
     end
 
     module type Depth_S = sig

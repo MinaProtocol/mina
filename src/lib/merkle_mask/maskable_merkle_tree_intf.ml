@@ -11,10 +11,26 @@ module type S = sig
   (* registering a mask makes it an active child of the parent Merkle tree 
      - reads to the mask that fail are delegated to the parent
      - writes to the parent notify the child mask
-   *)
+  *)
 
   val register_mask : t -> unattached_mask -> attached_mask
 
   val unregister_mask_exn : t -> attached_mask -> unattached_mask
   (** raises an exception if mask is not registered *)
+
+  val reparent :
+    root:t -> heir:attached_mask -> heir_children:attached_mask list -> unit
+  (**
+   *              o
+   *             /
+   *            /
+   *   o --- o -
+   *   ^     ^  \
+   *  root   |   \
+   *        heir  o
+   *            children
+   *
+   * reparents the [children] to [root] and unregister's [heir]. This is done
+   * inplace via mutation.
+  *)
 end

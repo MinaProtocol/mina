@@ -229,6 +229,12 @@ module type Ledger_intf = sig
   val register_mask : maskable_ledger -> unattached_mask -> attached_mask
 
   val unregister_mask_exn : maskable_ledger -> attached_mask -> unattached_mask
+
+  val reparent :
+       root:maskable_ledger
+    -> heir:attached_mask
+    -> heir_children:attached_mask list
+    -> unit
 end
 
 module Fee = struct
@@ -635,9 +641,7 @@ module type Transaction_snark_scan_state_intf = sig
     -> (ledger_proof * transaction list) option Or_error.t
 
   val latest_ledger_proof :
-       t
-    -> (Ledger_proof_with_sok_message.t * Transaction_with_witness.t list)
-       option
+    t -> (Ledger_proof_with_sok_message.t * transaction list) option
 
   val free_space : t -> int
 
@@ -748,11 +752,6 @@ module type Staged_ledger_base_intf = sig
 
   val create : ledger:ledger -> t
 
-  val unsafe_of_scan_state_and_ledger :
-    ledger:ledger -> scan_state:Scan_state.t -> t
-  (** Only call this when you're sure ledger and scan_state are correct
-   * for example: when merging merkle masks *)
-
   val of_scan_state_and_ledger :
        snarked_ledger_hash:frozen_ledger_hash
     -> ledger:ledger
@@ -761,6 +760,10 @@ module type Staged_ledger_base_intf = sig
 
   val of_serialized_and_unserialized :
     serialized:serializable -> unserialized:ledger -> t
+
+  val reparent : root:t -> heir:t -> heir_children:t list -> unit
+
+  val proof_txns : t -> transaction Non_empty_list.t option
 
   val copy : t -> t
 

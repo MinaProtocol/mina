@@ -63,4 +63,14 @@ struct
     | Some masks ->
         List.iter masks ~f:(fun mask ->
             Mask.Attached.parent_set_notify mask account )
+
+  let reparent ~root ~heir ~heir_children =
+    let heir_merkle_root = Mask.Attached.merkle_root heir in
+    let dangling_masks =
+      List.map heir_children ~f:(fun c -> Mask.Attached.unset_parent c)
+    in
+    Mask.Attached.commit heir ;
+    assert (Hash.equal (Base.merkle_root root) heir_merkle_root) ;
+    List.iter dangling_masks ~f:(fun m -> ignore (Mask.set_parent m root)) ;
+    ignore (unregister_mask_exn root heir)
 end

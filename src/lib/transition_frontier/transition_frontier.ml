@@ -77,7 +77,6 @@ module Make (Inputs : Inputs_intf) :
    and type staged_ledger_diff := Inputs.Staged_ledger_diff.t
    and type staged_ledger := Inputs.Staged_ledger.t
    and type masked_ledger := Ledger.Mask.Attached.t
-   and type transaction := Transaction.t
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
    and type consensus_local_state := Consensus.Local_state.t = struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
@@ -89,14 +88,14 @@ module Make (Inputs : Inputs_intf) :
   module Breadcrumb = struct
     (* TODO: external_transition should be type : External_transition.With_valid_protocol_state.t #1344 *)
     type t =
-      { transition_with_hash:
+      { (* Invariant: transition only mutates during a commit *)
+        mutable transition_with_hash:
           (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t
-      ; staged_ledger: Inputs.Staged_ledger.t sexp_opaque
-      ; ledger_proof_txns: Transaction.t Non_empty_list.t option }
+      ; staged_ledger: Inputs.Staged_ledger.t sexp_opaque }
     [@@deriving sexp, fields]
 
-    let create transition_with_hash staged_ledger ledger_proof_txns =
-      {transition_with_hash; staged_ledger; ledger_proof_txns}
+    let create transition_with_hash staged_ledger =
+      {transition_with_hash; staged_ledger}
 
     let build ~logger ~parent ~transition_with_hash =
       O1trace.measure "Breadcrumb.build" (fun () ->
@@ -137,22 +136,17 @@ module Make (Inputs : Inputs_intf) :
                     (Error.of_string
                        (Inputs.Staged_ledger.Staged_ledger_error.to_string e)))
           in
-          let target_ledger_hash, ledger_proof_txns =
+          let target_ledger_hash =
             match proof_opt with
             | None ->
-                let hash =
-                  Option.value_map
-                    (Inputs.Staged_ledger.current_ledger_proof
-                       transitioned_staged_ledger)
-                    ~f:ledger_hash_from_proof
-                    ~default:
-                      (Frozen_ledger_hash.of_ledger_hash
-                         (Ledger.merkle_root Genesis_ledger.t))
-                in
-                (hash, None)
-            | Some (proof, proof_txns) ->
-                ( ledger_hash_from_proof proof
-                , Non_empty_list.of_list_opt proof_txns )
+                Option.value_map
+                  (Inputs.Staged_ledger.current_ledger_proof
+                     transitioned_staged_ledger)
+                  ~f:ledger_hash_from_proof
+                  ~default:
+                    (Frozen_ledger_hash.of_ledger_hash
+                       (Ledger.merkle_root Genesis_ledger.t))
+            | Some (proof, _proof_txns) -> ledger_hash_from_proof proof
           in
           let%map transitioned_staged_ledger =
             if
@@ -170,9 +164,7 @@ module Make (Inputs : Inputs_intf) :
                          applying the diff does not match blockchain state's \
                          ledger hash and staged ledger hash resp.\n")))
           in
-          { transition_with_hash
-          ; staged_ledger= transitioned_staged_ledger
-          ; ledger_proof_txns } )
+          {transition_with_hash; staged_ledger= transitioned_staged_ledger} )
 
     let hash {transition_with_hash; _} = With_hash.hash transition_with_hash
 
@@ -180,69 +172,6 @@ module Make (Inputs : Inputs_intf) :
       Consensus.Protocol_state.previous_state_hash
         ( With_hash.data transition_with_hash
         |> Inputs.External_transition.Verified.protocol_state )
-
-    (** Given:
-     *
-     *       bads
-     *        o       o
-     *       /       /
-     *    o ---- o -
-     *  root \  heir \
-     *        o       o
-     *               heir_heirs
-     *
-     *  commit heir into root and reparent heir_heirs onto root throw away bads
-    *)
-    let commit ~root ~heir ~bads ~heir_heirs :
-        t * t list * Transaction.t Non_empty_list.t option =
-      (* We shouldn't be merging breadcrumbs if the earlier one emitted a proof
-       * it needs to be committed into the snarked ledger *)
-      assert (Option.is_some root.ledger_proof_txns) ;
-      let f = Fn.compose Inputs.Staged_ledger.ledger staged_ledger in
-      let root_ledger = f root in
-      let heir_ledger = f heir in
-      let heir_heirs_ledgers = List.map ~f heir_heirs in
-      let bads_ledgers = List.map ~f bads in
-      (* tear out the heir's heirs from the heir *)
-      let dangling_masks =
-        List.map heir_heirs_ledgers ~f:(Ledger.unregister_mask_exn heir_ledger)
-      in
-      Ledger.Mask.Attached.commit heir_ledger ;
-      (* after we commit heir ledger, root ledger should reflect the changes from heir *)
-      assert (
-        Ledger_hash.equal
-          (Ledger.merkle_root heir_ledger)
-          (Ledger.merkle_root root_ledger) ) ;
-      ignore (Ledger.unregister_mask_exn root_ledger heir_ledger) ;
-      (* heir is gone now *)
-      List.iter bads_ledgers ~f:(fun bad ->
-          ignore (Ledger.unregister_mask_exn root_ledger bad) ) ;
-      (* bads are gone now *)
-      let new_heir_heirs_ledgers =
-        List.map dangling_masks
-          ~f:((* TODO: This is O(1) right? *)
-              Ledger.register_mask root_ledger)
-      in
-      let rebuild ~old_crumb ~new_ledger ~proof_txns =
-        create old_crumb.transition_with_hash
-          (Inputs.Staged_ledger.unsafe_of_scan_state_and_ledger
-             ~ledger:new_ledger
-             ~scan_state:
-               (Inputs.Staged_ledger.scan_state old_crumb.staged_ledger))
-          proof_txns
-      in
-      (* The new root will always have cleared the proof_txns *)
-      let new_root =
-        rebuild ~old_crumb:heir ~new_ledger:root_ledger ~proof_txns:None
-      in
-      (* The new heirs keep their proof_txns *)
-      let new_heirs =
-        List.map2_exn heir_heirs new_heir_heirs_ledgers
-          ~f:(fun old_crumb new_ledger ->
-            rebuild ~old_crumb ~new_ledger
-              ~proof_txns:old_crumb.ledger_proof_txns )
-      in
-      (new_root, new_heirs, heir.ledger_proof_txns)
 
     let consensus_state {transition_with_hash; _} =
       With_hash.data transition_with_hash
@@ -347,8 +276,7 @@ module Make (Inputs : Inputs_intf) :
         in
         let root_breadcrumb =
           { Breadcrumb.transition_with_hash= root_transition
-          ; staged_ledger= root_staged_ledger
-          ; ledger_proof_txns= None }
+          ; staged_ledger= root_staged_ledger }
         in
         let root_node =
           {breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
@@ -446,23 +374,44 @@ module Make (Inputs : Inputs_intf) :
     in
     attach_node_to t ~parent_node ~node
 
+  (** Given:
+   *
+   *        o       o
+   *       /       /
+   *    o ---- o -
+   *  root \  heir \
+   *        o       o
+   *             heir_children
+   *
+   *  Delegates up to Staged_ledger reparent and makes the
+   *  root transition heir's transition. Modifications are in-place
+  *)
+  let reparent t heir_node =
+    let root_breadcrumb = (Hashtbl.find_exn t.table t.root).breadcrumb in
+    let root = root_breadcrumb |> Breadcrumb.staged_ledger in
+    let heir = heir_node.breadcrumb |> Breadcrumb.staged_ledger in
+    let heir_children =
+      List.map heir_node.successor_hashes ~f:(fun h ->
+          (Hashtbl.find_exn t.table h).breadcrumb |> Breadcrumb.staged_ledger
+      )
+    in
+    Inputs.Staged_ledger.reparent ~root ~heir ~heir_children ;
+    root_breadcrumb.transition_with_hash
+    <- heir_node.breadcrumb.transition_with_hash
+
   (* Adding a breadcrumb to the transition frontier is broken into the following steps:
    *   1) attach the breadcrumb to the transition frontier
    *   2) move the root if the path to the new node is longer than the max length
    *     a) calculate the distance from the new node to the parent
    *     b) if the distance is greater than the max length:
-   *       I   ) find the immediate successor of the old root in the path to the
+   *       I  ) find the immediate successor of the old root in the path to the
    *             longest node (the heir)
-   *       II  ) get those successors as well (heir_heirs)
-   *       III ) find all successors of the other immediate successors of the
+   *       II ) find all successors of the other immediate successors of the
    *             old root (bads)
-   *       IV  ) garbage collect all (root, heir, heir_heirs, bads (recursively))
-   *       V   ) commit the breadcrumb (rewires staged ledgers and updates
-   *             breadcrumbs)
-   *       VI  ) if commit has ~proof_txns; write them to snarked ledger
-   *       VII ) re-add new_root
-   *       VIII) re-add heir_heirs
-   *       IX  ) notify the consensus mechanism of the new root
+   *       III) garbage collect all (heir, bads (recursively), unregister bads)
+   *       IV ) reparent the breadcrumbs (rewires staged ledgers, cleans up heir)
+   *       V  ) if commit has ~proof_txns; write them to snarked ledger
+   *       VI ) notify the consensus mechanism of the new root
    *   3) set the new node as the best tip if the new node has a greater length than
    *      the current best tip
   *)
@@ -484,62 +433,57 @@ module Make (Inputs : Inputs_intf) :
           let heir_hash = List.hd_exn (hash_path t node.breadcrumb) in
           let heir_node = Hashtbl.find_exn t.table heir_hash in
           (* 2.b.II *)
-          let heir_heirs_nodes =
-            List.map heir_node.successor_hashes ~f:(Hashtbl.find_exn t.table)
-          in
-          (* 2.b.III *)
           let bad_hashes =
             List.filter root_node.successor_hashes
               ~f:(Fn.compose not (State_hash.equal heir_hash))
           in
           let bad_nodes = List.map bad_hashes ~f:(Hashtbl.find_exn t.table) in
-          (* 2.b.IV *)
+          (* 2.b.III *)
           let garbage =
             (t.root :: heir_hash :: heir_node.successor_hashes)
             @ List.bind bad_hashes ~f:(successor_hashes_rec t)
           in
           List.iter garbage ~f:(Hashtbl.remove t.table) ;
-          (* 2.b.V *)
-          let new_root_crumb, new_heir_heirs_crumb, proof_txns =
-            Breadcrumb.commit ~root:root_node.breadcrumb
-              ~heir:heir_node.breadcrumb
-              ~bads:(List.map bad_nodes ~f:breadcrumb_of_node)
-              ~heir_heirs:(List.map heir_heirs_nodes ~f:breadcrumb_of_node)
+          (* unregister bads *)
+          let root_staged_ledger =
+            Breadcrumb.staged_ledger root_node.breadcrumb
           in
-          (* 2.b.VI *)
+          let root_ledger = Inputs.Staged_ledger.ledger root_staged_ledger in
+          List.map bad_nodes ~f:breadcrumb_of_node
+          |> List.iter ~f:(fun bad ->
+                 ignore
+                   (Ledger.unregister_mask_exn root_ledger
+                      ( Breadcrumb.staged_ledger bad
+                      |> Inputs.Staged_ledger.ledger )) ) ;
+          (* 2.b.IV *)
+          reparent t heir_node ;
+          (* 2.b.V *)
+          let root_staged_ledger =
+            Breadcrumb.staged_ledger root_node.breadcrumb
+          in
           let () =
-            match proof_txns with
+            match Inputs.Staged_ledger.proof_txns root_staged_ledger with
             | Some txns ->
-                (* TODO: do these in batch! *)
+                let db = Ledger.of_database t.root_snarked_ledger in
+                let tmp_mask =
+                  Ledger.register_mask
+                    (Ledger.of_database t.root_snarked_ledger)
+                    (Ledger.Mask.create ())
+                in
                 Non_empty_list.iter txns ~f:(fun txn ->
-                    Ledger.apply_transaction
-                      (Ledger.of_database t.root_snarked_ledger)
-                      txn
-                    |> Or_error.ok_exn |> ignore )
+                    (* TODO: @cmr use the ignore-hash ledger here as well *)
+                    Ledger.apply_transaction tmp_mask txn
+                    |> Or_error.ok_exn |> ignore ) ;
+                Ledger.commit tmp_mask ;
+                ignore (Ledger.unregister_mask_exn db tmp_mask)
             | None -> ()
           in
-          (* 2.b.VII *)
           let new_root_hash =
-            With_hash.hash new_root_crumb.transition_with_hash
+            With_hash.hash root_node.breadcrumb.transition_with_hash
           in
           (* Should be the same as heir hash as we just shift everything over *)
           assert (State_hash.equal new_root_hash heir_hash) ;
-          Hashtbl.add_exn t.table ~key:new_root_hash
-            ~data:
-              { breadcrumb= new_root_crumb
-              ; successor_hashes= heir_node.successor_hashes
-              ; length= root_node.length - 1 } ;
-          (* 2.b.VIII *)
-          List.iter2_exn new_heir_heirs_crumb heir_heirs_nodes
-            ~f:(fun heir_heir_crumb old_heir_heir_node ->
-              Hashtbl.add_exn t.table
-                ~key:(With_hash.hash heir_heir_crumb.transition_with_hash)
-                ~data:
-                  { breadcrumb= heir_heir_crumb
-                  ; successor_hashes= old_heir_heir_node.successor_hashes
-                  ; length= old_heir_heir_node.length } ) ;
-          t.root <- new_root_hash ;
-          (* 2.b.IX *)
+          (* 2.b.VI *)
           Consensus.lock_transition
             (Breadcrumb.consensus_state root_node.breadcrumb)
             (Breadcrumb.consensus_state

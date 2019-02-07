@@ -381,6 +381,13 @@ end = struct
     let open Config in
     create ~transaction_capacity_log_2
 
+  let extract_txns txns_with_witnesses =
+    (* TODO: This type checks, but are we actually pulling the inverse txn here? *)
+    List.map txns_with_witnesses
+      ~f:(fun (txn_with_witness : Transaction_with_witness.t) ->
+        Ledger.Undo.transaction txn_with_witness.transaction_with_info
+        |> Or_error.ok_exn )
+
   let fill_work_and_enqueue_transactions t transactions work =
     let open Or_error.Let_syntax in
     let enqueue_transactions t transactions =
@@ -404,14 +411,8 @@ end = struct
           ~completed_jobs:scanable_work_list
       in
       let really_result =
-        Option.map result ~f:(fun ((proof, _), txn_with_witnesses) ->
-            ( proof
-            , (* TODO: This type checks, but are we actually pulling the inverse txn here? *)
-              List.map txn_with_witnesses
-                ~f:(fun (txn_with_witness : Transaction_with_witness.t) ->
-                  Ledger.Undo.transaction
-                    txn_with_witness.transaction_with_info
-                  |> Or_error.ok_exn ) ) )
+        Option.map result ~f:(fun ((proof, _), txns_with_witnesses) ->
+            (proof, extract_txns txns_with_witnesses) )
       in
       really_result
     in
@@ -440,7 +441,12 @@ end = struct
       Or_error.error_string
         "Job count exceeded work_capacity. Cannot enqueue the transactions"
 
-  let latest_ledger_proof t = Parallel_scan.last_emitted_value t.tree
+  let latest_ledger_proof t =
+    let open Option.Let_syntax in
+    let%map proof, txns_with_witnesses =
+      Parallel_scan.last_emitted_value t.tree
+    in
+    (proof, extract_txns txns_with_witnesses)
 
   let current_job_count t = t.job_count
 

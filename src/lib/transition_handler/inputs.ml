@@ -16,7 +16,6 @@ module type S = sig
     with type state_hash := State_hash.t
      and type external_transition_verified := External_transition.Verified.t
      and type ledger_database := Ledger.Db.t
-     and type transaction := Transaction.t
      and type staged_ledger := Staged_ledger.t
      and type masked_ledger := Ledger.Mask.Attached.t
      and type staged_ledger_diff := Staged_ledger_diff.t

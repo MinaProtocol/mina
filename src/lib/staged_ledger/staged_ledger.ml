@@ -120,10 +120,11 @@ end = struct
   type scan_state = Scan_state.t [@@deriving sexp, bin_io]
 
   type t =
-    { scan_state:
+    { (* Invariant: this field is only mutated during a reparent *)
+      mutable scan_state:
         scan_state
         (* Invariant: this is the ledger after having applied all the transactions in
-       the above state. *)
+         * the above state. *)
     ; ledger: Ledger.attached_mask sexp_opaque }
   [@@deriving sexp]
 
@@ -140,6 +141,15 @@ end = struct
         (Ledger.unattached_mask_of_serializable serialized_mask)
     in
     {scan_state; ledger= attached_mask}
+
+  let reparent ~root ~heir ~heir_children =
+    Ledger.reparent ~root:root.ledger ~heir:heir.ledger
+      ~heir_children:(List.map heir_children ~f:(fun c -> c.ledger)) ;
+    root.scan_state <- heir.scan_state
+
+  let proof_txns t =
+    Scan_state.latest_ledger_proof t.scan_state
+    |> Option.bind ~f:(Fn.compose Non_empty_list.of_list_opt snd)
 
   let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
 
@@ -242,8 +252,6 @@ end = struct
     | Ok s -> `Non_empty s
     | Error `Empty -> `Empty
     | Error (`Error e) -> failwithf !"statement_exn: %{sexp:Error.t}" e ()
-
-  let unsafe_of_scan_state_and_ledger ~ledger ~scan_state = {ledger; scan_state}
 
   let of_scan_state_and_ledger ~snarked_ledger_hash ~ledger ~scan_state =
     let open Deferred.Or_error.Let_syntax in
@@ -1589,6 +1597,9 @@ let%test_module "test" =
         let unregister_mask_exn _ = failwith "unimplemented"
 
         let register_mask l _m = copy l
+
+        let reparent ~root:_ ~heir:_ ~heir_children:_ =
+          failwith "unimplemented"
 
         let unattached_mask_of_serializable _ = failwith "unimplemented"
 

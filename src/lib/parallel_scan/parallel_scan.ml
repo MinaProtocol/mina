@@ -309,7 +309,7 @@ module State = struct
                 failwith
                   "Not possible, if we're emitting something, we have data"
             | last :: rest ->
-                t.acc <- (fst t.acc |> Int.( + ) 1, Some (z, last)) ;
+                t.acc <- (fst t.acc |> Int.( + ) 1, Some (z, List.rev last)) ;
                 t.other_trees_data <- List.rev rest ;
                 Ok () )
           else

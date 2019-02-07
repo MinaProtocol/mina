@@ -30,18 +30,45 @@ struct
   module Location = Location
   module Addr = Location.Addr
 
+  (** Invariant is that parent is None in unattached mask
+   * and `Some` in the attached one
+   * We can capture this with a GADT but there's some annoying
+   * issues with bin_io to do so *)
+  module Parent = struct
+    module T = struct
+      type t = Base.t option [@@deriving sexp]
+    end
+
+    include T
+
+    include Binable.Of_binable
+              (Unit)
+              (struct
+                include T
+
+                let to_binable = function
+                  | Some _ ->
+                      failwith "We can't serialize when we're an attached mask"
+                  | None -> ()
+
+                let of_binable () = None
+              end)
+  end
+
   type t =
     { uuid: Uuid.Stable.V1.t
     ; account_tbl: Account.t Location.Table.t
+    ; mutable parent: Parent.t
     ; hash_tbl: Hash.t Addr.Table.t
     ; location_tbl: Location.t Key.Table.t
     ; mutable current_location: Location.t option }
   [@@deriving sexp, bin_io]
 
-  type unattached = t
+  type unattached = t [@@deriving sexp]
 
   let create () =
     { uuid= Uuid.create ()
+    ; parent= None
     ; account_tbl= Location.Table.create ()
     ; hash_tbl= Addr.Table.create ()
     ; location_tbl= Key.Table.create ()
@@ -54,14 +81,7 @@ struct
   module Attached = struct
     type parent = Base.t [@@deriving sexp]
 
-    type t =
-      { uuid: Uuid.Stable.V1.t
-      ; parent: parent
-      ; account_tbl: Account.t Location.Table.t
-      ; hash_tbl: Hash.t Addr.Table.t
-      ; location_tbl: Location.t Key.Table.t
-      ; mutable current_location: Location.t option }
-    [@@deriving sexp]
+    type t = unattached [@@deriving sexp]
 
     module Path = Base.Path
     module Addr = Location.Addr
@@ -86,13 +106,10 @@ struct
          Mask.create and Mask.set_parent"
 
     let unset_parent t =
-      { uuid= t.uuid
-      ; account_tbl= t.account_tbl
-      ; hash_tbl= t.hash_tbl
-      ; location_tbl= t.location_tbl
-      ; current_location= t.current_location }
+      t.parent <- None ;
+      t
 
-    let get_parent t = t.parent
+    let get_parent {parent= opt; _} = Option.value_exn opt
 
     let get_uuid t = t.uuid
 
@@ -129,7 +146,7 @@ struct
 
     (* fixup_merkle_path patches a Merkle path reported by the parent, overriding
        with hashes which are stored in the mask
-     *)
+    *)
 
     let fixup_merkle_path t path address =
       let rec build_fixed_path path address accum =
@@ -176,7 +193,7 @@ struct
     (* given a Merkle path corresponding to a starting address, calculate addresses and hash
        for each node affected by the starting hash; that is, along the path from the
        account address to root
-     *)
+    *)
     let addresses_and_hashes_from_merkle_path_exn merkle_path starting_address
         starting_hash : (Addr.t * Hash.t) list =
       let get_addresses_hashes height accum node =
@@ -204,7 +221,7 @@ struct
       let account = Option.value_exn (find_account t location) in
       Location.Table.remove t.account_tbl location ;
       (* TODO : use stack database to save unused location, which can be
-        used when allocating a location
+         used when allocating a location
       *)
       Key.Table.remove t.location_tbl (Account.public_key account) ;
       (* reuse location if possible *)
@@ -225,8 +242,8 @@ struct
           set_hash t addr hash )
 
     (* a write writes only to the mask, parent is not involved
-     need to update both account and hash pieces of the mask
-       *)
+       need to update both account and hash pieces of the mask
+    *)
     let set t location account =
       set_account t location account ;
       let account_address = Location.to_path_exn location in
@@ -241,7 +258,7 @@ struct
 
     (* if the mask's parent sets an account, we can prune an entry in the mask if the account in the parent
        is the same in the mask
-     *)
+    *)
     let parent_set_notify t account =
       match find_location t (Account.public_key account) with
       | None -> ()
@@ -266,8 +283,8 @@ struct
         with _ -> None )
 
     (* batch operations
-     TODO: rely on availability of batch operations in Base for speed
-       *)
+       TODO: rely on availability of batch operations in Base for speed
+    *)
     (* NB: rocksdb does not support batch reads; should we offer this? *)
     let get_batch_exn t locations =
       List.map locations ~f:(fun location -> get t location)
@@ -296,7 +313,7 @@ struct
     (* copy tables in t; use same parent *)
     let copy t =
       { uuid= Uuid.create ()
-      ; parent= get_parent t
+      ; parent= Some (get_parent t)
       ; account_tbl= Location.Table.copy t.account_tbl
       ; location_tbl= Key.Table.copy t.location_tbl
       ; hash_tbl= Addr.Table.copy t.hash_tbl
@@ -379,7 +396,7 @@ struct
       in
       (* parent_keys not in mask, may be in parent
          mask_locations definitely in mask
-       *)
+      *)
       let parent_keys, mask_locations = loop keys [] [] in
       (* allow call to parent to raise an exception
          if raised, the parent hasn't removed any accounts,
@@ -533,13 +550,7 @@ struct
   end
 
   let set_parent t parent =
-    let attached =
-      { uuid= t.uuid
-      ; Attached.parent
-      ; account_tbl= t.account_tbl
-      ; hash_tbl= t.hash_tbl
-      ; location_tbl= t.location_tbl
-      ; current_location= t.current_location }
-    in
-    {attached with current_location= Attached.last_filled attached}
+    t.parent <- Some parent ;
+    t.current_location <- Attached.last_filled t ;
+    t
 end
