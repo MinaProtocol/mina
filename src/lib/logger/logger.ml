@@ -108,18 +108,18 @@ let null () =
 let log ~level ?loc ?(attrs = []) t fmt =
   ksprintf
     (fun message ->
-      let m : Message.t =
-        { attributes= attrs
-        ; path= t.path
-        ; pid= t.pid
-        ; host= t.host
-        ; timestamp= Time.now ()
-        ; level
-        ; message
-        ; location= loc }
-      in
       if t.null then ifprintf stdout ""
       else
+        let m : Message.t =
+          { attributes= attrs
+          ; path= t.path
+          ; pid= t.pid
+          ; host= t.host
+          ; timestamp= Time.now ()
+          ; level
+          ; message
+          ; location= loc }
+        in
         let output =
           if get_sexp_logging () then
             (* S-expression output *)
