@@ -21,9 +21,7 @@ module type Test_intf = sig
 
   module Mask :
     Merkle_mask.Masking_merkle_tree_intf.S
-    with module Addr = Location.Addr
-     and module Location = Location
-     and module Attached.Addr = Location.Addr
+    with module Location = Location
     with type account := Account.t
      and type location := Location.t
      and type key := Key.t
@@ -469,6 +467,14 @@ module Make (Test : Test_intf) = struct
         (* same number of accounts after adding them to mask *)
         assert (Int.equal (List.length parent_list) (List.length mask_list)) ;
         (* should only see the zero balances in mask list *)
+        let is_in_same_order =
+          List.for_all2_exn parent_list mask_list
+            ~f:(fun parent_account mask_account ->
+              Account.equal_key
+                (Account.public_key parent_account)
+                (Account.public_key mask_account) )
+        in
+        assert is_in_same_order ;
         assert (
           List.for_all mask_list ~f:(fun account ->
               Balance.equal (Account.balance account) Balance.zero ) ) )
@@ -610,9 +616,7 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
   module Mask :
     Merkle_mask.Masking_merkle_tree_intf.S
     with module Location = Location
-     and module Addr = Location.Addr
-     and module Attached.Addr = Location.Addr
-    with type account := Account.t
+     and type account := Account.t
      and type location := Location.t
      and type key := Key.t
      and type key_set := Key.Set.t

@@ -115,7 +115,7 @@ module Make (Inputs : Inputs.S) :
                     let verified_transition_with_hash =
                       With_hash.of_data verified_transition
                         ~hash_data:
-                          (Fn.compose Consensus.Mechanism.Protocol_state.hash
+                          (Fn.compose Consensus.Protocol_state.hash
                              External_transition.Verified.protocol_state)
                     in
                     let%map () =

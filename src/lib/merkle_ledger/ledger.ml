@@ -74,6 +74,8 @@ end = struct
     if index >= Dyn_array.length t.accounts then None
     else Some (Dyn_array.get t.accounts index |> Account.public_key)
 
+  let iteri t ~f = Dyn_array.iteri f t.accounts
+
   let foldi_with_ignored_keys t ignored_keys ~init ~f =
     Dyn_array.fold_left
       (fun (i, acc) x ->
