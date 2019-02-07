@@ -60,7 +60,16 @@ let%test_module "Bootstrap Controller" =
             Transition_frontier.best_tip_path_length_exn peer_frontier
           in
           assert (best_tip_length = max_length) ;
-          let network = Network.create ~logger in
+          let peer_address =
+            Network_peer.Peer.create Unix.Inet_addr.localhost
+              ~discovery_port:1337 ~communication_port:1338
+          in
+          let network =
+            Network.create ~logger
+              ~peers:
+                (Network_peer.Peer.Table.of_alist_exn
+                   [(peer_address, peer_frontier)])
+          in
           let open Transition_frontier.For_tests in
           let open Bootstrap_controller.For_tests in
           let root_sync_ledger =
@@ -73,11 +82,6 @@ let%test_module "Bootstrap Controller" =
             Root_sync_ledger.answer_writer root_sync_ledger
           in
           Network.glue_sync_ledger network query_reader response_writer ;
-          let peer_address =
-            Network_peer.Peer.create Unix.Inet_addr.localhost
-              ~discovery_port:1337 ~communication_port:1338
-          in
-          Network.add_exn network ~key:peer_address ~data:peer_frontier ;
           let ancestor_prover = Ancestor.Prover.create ~max_size:max_length in
           let genesis_root =
             Transition_frontier.root syncing_frontier

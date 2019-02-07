@@ -364,9 +364,7 @@ module Network = struct
   type t =
     {logger: Logger.t; table: Transition_frontier.t Network_peer.Peer.Table.t}
 
-  let create ~logger = {logger; table= Network_peer.Peer.Table.create ()}
-
-  let add_exn {table; _} = Hashtbl.add_exn table
+  let create ~logger ~peers = {logger; table= peers}
 
   let random_peers _ = failwith "STUB: Network.random_peers"
 
