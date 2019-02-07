@@ -353,6 +353,10 @@ module type Transition_frontier_controller_intf = sig
        logger:Logger.t
     -> network:network
     -> time_controller:time_controller
+    -> collected_transitions:( external_transition_verified
+                             , state_hash )
+                             With_hash.t
+                             list
     -> frontier:transition_frontier
     -> network_transition_reader:( [ `Transition of external_transition_verified
                                                     Envelope.Incoming.t ]

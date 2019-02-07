@@ -161,11 +161,12 @@ module Make (Inputs : Inputs_intf) :
       new_frontier *)
     in
     let start_transition_frontier_controller ~verified_transition_writer
-        ~clear_reader frontier =
+        ~clear_reader ~collected_transitions frontier =
       let transition_reader, transition_writer = create_bufferred_pipe () in
       let new_verified_transition_reader =
         Transition_frontier_controller.run ~logger ~network ~time_controller
-          ~frontier ~network_transition_reader:transition_reader
+          ~collected_transitions ~frontier
+          ~network_transition_reader:transition_reader
           ~proposer_transition_reader ~clear_reader
       in
       Strict_pipe.Reader.iter new_verified_transition_reader
@@ -182,7 +183,7 @@ module Make (Inputs : Inputs_intf) :
     let ( transition_frontier_controller_reader
         , transition_frontier_controller_writer ) =
       start_transition_frontier_controller ~verified_transition_writer
-        ~clear_reader
+        ~clear_reader ~collected_transitions:[]
         (Mvar.peek_exn frontier_mvar)
     in
     let controller_type =
@@ -221,7 +222,7 @@ module Make (Inputs : Inputs_intf) :
             , transition_frontier_controller_writer ) ->
             let root_state = get_root_state frontier in
             if is_transition_for_bootstrap root_state new_transition then
-              let%map new_frontier =
+              let%map new_frontier, collected_transitions =
                 clean_transition_frontier_controller_and_start_bootstrap
                   ~controller_type ~clear_writer
                   ~transition_frontier_controller_reader
@@ -230,7 +231,8 @@ module Make (Inputs : Inputs_intf) :
               in
               let reader, writer =
                 start_transition_frontier_controller
-                  ~verified_transition_writer ~clear_reader new_frontier
+                  ~verified_transition_writer ~clear_reader
+                  ~collected_transitions new_frontier
               in
               set_transition_frontier_controller_phase ~controller_type
                 new_frontier reader writer
