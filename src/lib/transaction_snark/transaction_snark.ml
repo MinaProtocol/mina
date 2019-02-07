@@ -775,7 +775,6 @@ module Verification = struct
               (As_prover.map get_proof ~f:Merge.Verifier.proof_of_backend_proof)
         in
         Merge.Verifier.verify wrap_vk wrap_precomp input proof
-        (*             (Merge.Verifier.Verification_key.Checked.constant wrap_vk) *)
       in
       result
   end
