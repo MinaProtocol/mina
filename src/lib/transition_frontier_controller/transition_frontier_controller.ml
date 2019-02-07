@@ -110,6 +110,7 @@ module Make (Inputs : Inputs_intf) :
       ~catchup_breadcrumbs_writer ;
     Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
         kill valid_transition_reader valid_transition_writer ;
+        kill primary_transition_reader primary_transition_writer ;
         kill processed_transition_reader processed_transition_writer ;
         kill catchup_job_reader catchup_job_writer ;
         kill catchup_breadcrumbs_reader catchup_breadcrumbs_writer )
