@@ -24,9 +24,7 @@ let main () =
       [largest_account_keypair.public_key]
     |> Genesis_ledger.keypair_of_account_record_exn
   in
-  let proposal_interval =
-    Int64.to_int_exn Consensus.Mechanism.Constants.block_duration_ms
-  in
+  let proposal_interval = Consensus.Constants.block_window_duration_ms in
   let n = 2 in
   let receiver_pk = Public_key.compress another_account_keypair.public_key in
   let sender_sk = largest_account_keypair.private_key in

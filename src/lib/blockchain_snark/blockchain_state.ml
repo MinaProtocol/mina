@@ -6,7 +6,7 @@ open Tick
 open Coda_base
 open Let_syntax
 
-module Make (Consensus_mechanism : Consensus.Mechanism.S) :
+module Make (Consensus_mechanism : Consensus.S) :
   Blockchain_state_intf.S
   with module Consensus_mechanism := Consensus_mechanism = struct
   module Blockchain_state = Consensus_mechanism.Blockchain_state

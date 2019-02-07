@@ -1,7 +1,6 @@
 open Core_kernel
 open Async_kernel
 open Protocols.Coda_pow
-open Protocols.Coda_transition_frontier
 open Coda_base
 open Signature_lib
 
@@ -43,7 +42,7 @@ module type Inputs_intf = sig
 
   module External_transition :
     External_transition.S
-    with module Protocol_state = Consensus.Mechanism.Protocol_state
+    with module Protocol_state = Consensus.Protocol_state
      and module Staged_ledger_diff := Staged_ledger_diff
 
   module Staged_ledger :
@@ -78,8 +77,8 @@ module Make (Inputs : Inputs_intf) :
    and type staged_ledger_diff := Inputs.Staged_ledger_diff.t
    and type staged_ledger := Inputs.Staged_ledger.t
    and type masked_ledger := Ledger.Mask.Attached.t
-   and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t =
-struct
+   and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
+   and type consensus_local_state := Consensus.Local_state.t = struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
   exception
     Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
@@ -112,13 +111,11 @@ struct
           in
           let blockchain_state_ledger_hash, blockchain_staged_ledger_hash =
             let blockchain_state =
-              Consensus.Mechanism.Protocol_state.blockchain_state
+              Consensus.Protocol_state.blockchain_state
                 transition_protocol_state
             in
-            ( Consensus.Mechanism.Blockchain_state.snarked_ledger_hash
-                blockchain_state
-            , Consensus.Mechanism.Blockchain_state.staged_ledger_hash
-                blockchain_state )
+            ( Consensus.Blockchain_state.snarked_ledger_hash blockchain_state
+            , Consensus.Blockchain_state.staged_ledger_hash blockchain_state )
           in
           let%bind ( `Hash_after_applying staged_ledger_hash
                    , `Ledger_proof proof_opt
@@ -171,9 +168,14 @@ struct
     let hash {transition_with_hash; _} = With_hash.hash transition_with_hash
 
     let parent_hash {transition_with_hash; _} =
-      Consensus.Mechanism.Protocol_state.previous_state_hash
+      Consensus.Protocol_state.previous_state_hash
         (Inputs.External_transition.Verified.protocol_state
            (With_hash.data transition_with_hash))
+
+    let consensus_state {transition_with_hash; _} =
+      With_hash.data transition_with_hash
+      |> Inputs.External_transition.Verified.protocol_state
+      |> Consensus.Protocol_state.consensus_state
   end
 
   type node =
@@ -188,7 +190,8 @@ struct
     ; mutable best_tip: State_hash.t
     ; logger: Logger.t
     ; table: node State_hash.Table.t
-    ; max_length: int }
+    ; max_length: int
+    ; consensus_local_state: Consensus.Local_state.t }
 
   let logger t = t.logger
 
@@ -197,8 +200,8 @@ struct
       ~(root_transition :
          (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t)
       ~root_snarked_ledger ~root_transaction_snark_scan_state
-      ~root_staged_ledger_diff ~max_length =
-    let open Consensus.Mechanism in
+      ~root_staged_ledger_diff ~max_length ~consensus_local_state =
+    let open Consensus in
     let open Deferred.Let_syntax in
     let logger = Logger.child logger __MODULE__ in
     let root_hash = With_hash.hash root_transition in
@@ -281,9 +284,12 @@ struct
         ; root= root_hash
         ; best_tip= root_hash
         ; table
-        ; max_length }
+        ; max_length
+        ; consensus_local_state }
 
   let max_length {max_length; _} = max_length
+
+  let consensus_local_state {consensus_local_state; _} = consensus_local_state
 
   let all_breadcrumbs t =
     List.map (Hashtbl.data t.table) ~f:(fun {breadcrumb; _} -> breadcrumb)
@@ -375,6 +381,7 @@ struct
    *       II ) find all successors of the other immediate successors of the old root
    *       III) remove the old root and all of the nodes found in (II) from the table
    *       IV ) merge the old root's merkle mask into the root ledger
+   *       V  ) notify the consensus mechanism of the new root
    *   3) set the new node as the best tip if the new node has a greater length than
    *      the current best tip
    *)
@@ -410,7 +417,17 @@ struct
           (* 2.b.IV *)
           Ledger.Mask.Attached.commit
             (Inputs.Staged_ledger.ledger
-               (Breadcrumb.staged_ledger root_node.breadcrumb)) ) ;
+               (Breadcrumb.staged_ledger root_node.breadcrumb)) ;
+          (* 2.b.V *)
+          Consensus.lock_transition
+            (Breadcrumb.consensus_state root_node.breadcrumb)
+            (Breadcrumb.consensus_state
+               (Hashtbl.find_exn t.table new_root_hash).breadcrumb)
+            ~local_state:t.consensus_local_state
+            ~snarked_ledger:
+              (Coda_base.Ledger.Any_ledger.cast
+                 (module Coda_base.Ledger.Db)
+                 t.root_snarked_ledger) ) ;
         (* 3 *)
         if node.length > best_tip_node.length then t.best_tip <- hash )
 

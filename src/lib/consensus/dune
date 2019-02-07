@@ -1,0 +1,20 @@
+(library
+  (name consensus)
+  (public_name consensus)
+  (flags (:standard -short-paths -warn-error -32))
+  (inline_tests)
+  (library_flags (-linkall))
+  (libraries
+    core_kernel
+    lite_compat
+    coda_base
+    snark_params
+    rc_pool
+    test_util
+    vrf_lib
+    unix_timestamp
+    global_signer_private_key
+    non_zero_curve_point)
+   (preprocessor_deps "../../config.mlh")
+   (preprocess (pps ppx_base ppx_let ppx_deriving.std ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky ppx_deriving_yojson bisect_ppx -conditional))
+   (synopsis "Consensus mechanisms"))

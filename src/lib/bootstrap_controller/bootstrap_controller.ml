@@ -16,6 +16,7 @@ module type Inputs_intf = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
+     and type consensus_local_state := Consensus.Local_state.t
 
   module Root_sync_ledger :
     Syncable_ledger.S
@@ -77,7 +78,7 @@ module Make (Inputs : Inputs_intf) : sig
       -> sender:Network_peer.Peer.t
       -> root_sync_ledger:Inputs.Root_sync_ledger.t
       -> Inputs.External_transition.Proof_verified.t
-      -> unit Deferred.t
+      -> [> `Syncing | `Ignored] Deferred.t
   end
 end = struct
   open Inputs
@@ -110,13 +111,12 @@ end = struct
 
   let worth_getting_root t candidate =
     `Take
-    = Consensus.Mechanism.select ~logger:t.logger
+    = Consensus.select ~logger:t.logger
         ~existing:
           ( t.best_seen_transition
           |> External_transition.Proof_verified.protocol_state
-          |> Consensus.Mechanism.Protocol_state.consensus_state )
-        ~candidate:
-          (Consensus.Mechanism.Protocol_state.consensus_state candidate)
+          |> Consensus.Protocol_state.consensus_state )
+        ~candidate:(Consensus.Protocol_state.consensus_state candidate)
 
   let received_bad_proof t e =
     (* TODO: Punish *)
@@ -127,12 +127,12 @@ end = struct
 
   let length external_transition =
     external_transition |> External_transition.Proof_verified.protocol_state
-    |> Consensus.Mechanism.Protocol_state.consensus_state
-    |> Consensus.Mechanism.Consensus_state.length |> Coda_numbers.Length.to_int
+    |> Consensus.Protocol_state.consensus_state
+    |> Consensus.Consensus_state.length |> Coda_numbers.Length.to_int
 
   let on_transition t ~sender ~root_sync_ledger
       (candidate_transition : External_transition.Proof_verified.t) =
-    let module Protocol_state = Consensus.Mechanism.Protocol_state in
+    let module Protocol_state = Consensus.Protocol_state in
     let candidate_state =
       External_transition.Proof_verified.protocol_state candidate_transition
     in
@@ -151,7 +151,7 @@ end = struct
     if
       done_syncing_root root_sync_ledger
       || (not @@ worth_getting_root t candidate_state)
-    then Deferred.unit
+    then Deferred.return `Ignored
     else
       match%bind
         Network.get_ancestry t.network sender
@@ -159,6 +159,7 @@ end = struct
       with
       | Error e ->
           Deferred.return
+          @@ Fn.const `Ignored
           @@ Logger.error t.logger
                !"Could not get the proof of ancestors from the network: %s"
                (Error.to_string_hum e)
@@ -200,15 +201,16 @@ end = struct
                     Consensus_state.length (consensus_state candidate_state))
                 ~body_hash:candidate_body_hash ;
               let ledger_hash =
-                Consensus.Mechanism.(
+                Consensus.(
                   Protocol_state.blockchain_state
                     (External_transition.Proof_verified.protocol_state
                        verified_ancestor_transition)
                   |> Blockchain_state.snarked_ledger_hash
                   |> Frozen_ledger_hash.to_ledger_hash)
               in
-              Root_sync_ledger.new_goal root_sync_ledger ledger_hash |> ignore
-          | Error e -> received_bad_proof t e )
+              Root_sync_ledger.new_goal root_sync_ledger ledger_hash
+              |> Fn.const `Syncing
+          | Error e -> received_bad_proof t e |> Fn.const `Ignored )
 
   (* TODO: We need to do catchup jobs for all remaining transitions in the cache. 
            This will be hooked into `run` when we do this. #1326 *)
@@ -261,6 +263,7 @@ end = struct
         if worth_getting_root t protocol_state then
           on_transition t ~sender ~root_sync_ledger
             (External_transition.forget_consensus_state_verification transition)
+          |> Deferred.map ~f:(Fn.const ())
           |> don't_wait_for ;
         Deferred.unit )
     |> don't_wait_for ;
@@ -304,8 +307,10 @@ end = struct
       ~root_transition:
         (With_hash.of_data new_root
            ~hash_data:
-             (Fn.compose Consensus.Mechanism.Protocol_state.hash
+             (Fn.compose Consensus.Protocol_state.hash
                 External_transition.Verified.protocol_state))
+      ~consensus_local_state:
+        (Transition_frontier.consensus_local_state frontier)
 
   module For_tests = struct
     type nonrec t = t

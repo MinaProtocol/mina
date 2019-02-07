@@ -136,6 +136,8 @@ module Make_base
 
     let keys (T ((module Base), t)) = Base.keys t
 
+    let iteri (T ((module Base), t)) = Base.iteri t
+
     (* ignored_keys must be Base.Keys.Set.t, but that isn't necessarily the same as Keys.Set.t for the
        Keys passed to this functor; as long as we use the same Keys for all ledgers, this should work
      *)

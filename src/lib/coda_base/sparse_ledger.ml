@@ -39,11 +39,13 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
         ((merkle_root sparse :> Pedersen.Digest.t) |> Ledger_hash.of_hash) ) ;
   sparse
 
-let of_ledger_index_subset_exn (ledger : Ledger.t) indexes =
-  List.fold indexes ~init:(of_ledger_root ledger) ~f:(fun acc i ->
-      let account = Ledger.get_at_index_exn ledger i in
+let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
+  List.fold indexes
+    ~init:(of_root (Ledger.Any_ledger.M.merkle_root ledger))
+    ~f:(fun acc i ->
+      let account = Ledger.Any_ledger.M.get_at_index_exn ledger i in
       add_path acc
-        (Ledger.merkle_path_at_index_exn ledger i)
+        (Ledger.Any_ledger.M.merkle_path_at_index_exn ledger i)
         account.public_key account )
 
 let%test_unit "of_ledger_subset_exn with keys that don't exist works" =

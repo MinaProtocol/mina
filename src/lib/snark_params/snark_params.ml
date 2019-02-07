@@ -1,3 +1,6 @@
+[%%import
+"../../config.mlh"]
+
 open Core_kernel
 open Bitstring_lib
 open Snark_bits
@@ -213,6 +216,15 @@ module Tick = struct
 
     let scale = scale_field
 
+    let point_near_x x =
+      let rec go x = function
+        | Some y -> of_affine_coordinates (x, y)
+        | None ->
+            let x' = Field.(add one x) in
+            go x' (find_y x')
+      in
+      go x (find_y x)
+
     module Checked = struct
       include Snarky.Curves.Make_weierstrass_checked (Tick0) (Scalar)
                 (struct
@@ -350,7 +362,8 @@ let embed (x : Tick.Field.t) : Tock.Field.t =
 (** enable/disable use of chunk table in Pedersen hashing *)
 let set_chunked_hashing b = Tick.Pedersen.State.set_chunked_fold b
 
-let ledger_depth = 30
+[%%inject
+"ledger_depth", ledger_depth]
 
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.

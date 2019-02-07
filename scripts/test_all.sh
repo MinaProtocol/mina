@@ -1,12 +1,12 @@
 #!/bin/bash
 
-set -eo pipefail
+set -exo pipefail
 
 eval `opam config env`
 
 run_dune() {
   if [ "${DUNE_PROFILE}" = "" ]; then
-    DUNE_PROFILE=test_sigs
+    DUNE_PROFILE=test_posig
   fi
   dune $1 --profile="${DUNE_PROFILE}" ${@:2}
 }
@@ -27,11 +27,9 @@ run_unit_tests_with_coverage() {
 run_integration_test() {
   echo "------------------------------------------------------------------------------------------"
 
-  CODA_ENV="$(env | grep '^CODA_' | xargs echo)"
-
   date
   SECONDS=0
-  echo "TESTING ${1} USING \"${CODA_ENV}\""
+  echo "TESTING ${1}"
   set +e
 
   # ugly hack to clean up dead processes
@@ -41,9 +39,9 @@ run_integration_test() {
   sleep 1
 
   run_dune exec coda -- integration-tests ${1} 2>&1 | tee test.log | ../scripts/jqproc.sh -f '.level=="Error" or .level=="Warning" or .level=="Faulty_peer" or .level=="Fatal"'
-  OUT=$?
+  OUT=${PIPESTATUS[0]}
   echo "------------------------------------------------------------------------------------------" >> test.log
-  echo "${CODA_ENV} ${1}" >> test.log
+  echo "${1}" >> test.log
 
   echo "TESTING ${1} took ${SECONDS} seconds"
 
@@ -55,7 +53,7 @@ run_integration_test() {
     echo "RECENT OUTPUT:"
     cat test.log | run_dune exec logproc
     echo "------------------------------------------------------------------------------------------"
-    echo "FAILURE ON: ${CODA_ENV} ${1}"
+    echo "FAILURE ON: ${1}"
     exit 2
   fi
 
@@ -69,13 +67,13 @@ run_all_integration_tests() {
 }
 
 run_all_sig_integration_tests() {
-    DUNE_PROFILE=test_sigs \
+    DUNE_PROFILE=test_posig \
     CODA_BLOCK_DURATION=1000 \
     run_all_integration_tests
 }
 
 run_all_stake_integration_tests() {
-    DUNE_PROFILE=test_stakes \
+    DUNE_PROFILE=test_postake \
     CODA_BLOCK_DURATION=1000 \
     CODA_K=24 \
     CODA_C=8 \
@@ -83,7 +81,7 @@ run_all_stake_integration_tests() {
 }
 
 run_epoch_stake_integration_test() {
-    DUNE_PROFILE=test_stakes \
+    DUNE_PROFILE=test_postake \
     CODA_BLOCK_DURATION=1000 \
     CODA_K=2 \
     CODA_C=2 \
