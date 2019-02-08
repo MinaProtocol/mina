@@ -1575,7 +1575,6 @@ let%test_module "test" =
           type t = transaction [@@deriving sexp, bin_io]
 
           module User_command = struct
-            type nonrec t = t
           end
 
           let transaction t = Ok t
@@ -1651,9 +1650,7 @@ let%test_module "test" =
       module Transaction_validator = struct
         include Ledger
 
-        let merkle_root_after_user_command_exn = failwith "unimplemented"
-
-        let apply_user_command = failwith "unimplemented"
+        let apply_user_command _l = failwith "unimplemented"
 
         let apply_transaction l txn =
           apply_transaction l txn |> Result.map ~f:(Fn.const ())
