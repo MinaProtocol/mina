@@ -79,7 +79,7 @@ module Make (Inputs : Inputs.S) = struct
 
   let cancel_child_timeout t parent_hash =
     match Hashtbl.find t.collected_transitions parent_hash with
-    | None -> Hashtbl.add_exn t.collected_transitions ~key:parent_hash ~data:[]
+    | None -> ()
     | Some children ->
         List.iter children ~f:(fun child ->
             Hashtbl.find_and_call t.timeouts (With_hash.hash child)
@@ -102,6 +102,7 @@ module Make (Inputs : Inputs.S) = struct
     Hashtbl.update t.collected_transitions parent_hash ~f:(function
       | None ->
           cancel_child_timeout t hash ;
+          Hashtbl.add_exn t.collected_transitions ~key:hash ~data:[] ;
           Hashtbl.add_exn t.timeouts ~key:parent_hash ~data:(make_timeout ()) ;
           [transition]
       | Some collected_transitions ->
@@ -114,7 +115,9 @@ module Make (Inputs : Inputs.S) = struct
                 was being watched: %{sexp: State_hash.t}"
               hash ;
             collected_transitions )
-          else transition :: collected_transitions )
+          else (
+            Hashtbl.add_exn t.collected_transitions ~key:hash ~data:[] ;
+            transition :: collected_transitions ) )
 
   let rec extract t transition =
     let successors =
