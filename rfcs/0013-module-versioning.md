@@ -97,6 +97,17 @@ take the version number and submodule to produce the complete
 module definition. Perhaps it would also take the list of
 serializations needed (often just one or two are needed).
 
+### Serialization restricted to Stable, versioned modules
+
+Serialization should be allowed only for modules following
+this discipline, including the use of the `Stable` submodule
+containing versions.
+
+An exception can be carved out for using `sexp` serialization of data
+from modules without `Stable` and versioning. That kind of
+serialization is useful for logging and other printing from within
+Coda, and is less likely to be used with other software.
+
 ### Embracing this discipline
 
 As of this writing, there are over 600 type definitions with `deriving
