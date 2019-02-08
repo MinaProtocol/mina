@@ -45,12 +45,12 @@ end
 
 (* Unfortunately, `dune runtest` runs in a pwd deep inside the build
  * directory. This hack finds the project root by recursively looking for the
-   developer README. *)
+   dune-project file. *)
 let get_project_root () =
   let open Filename in
   let rec go dir =
-    if Sys.file_exists_exn @@ dir ^ "/README-dev.md" then dir
-    else if String.equal dir "/" then failwith "couldn't find project root!"
+    if Sys.file_exists_exn @@ dir ^/ "src/dune-project" then Some dir
+    else if String.equal dir "/" then None
     else go @@ fst @@ split dir
   in
   go @@ realpath current_dir_name
@@ -134,9 +134,12 @@ module Haskell_process = struct
       let open Deferred.Let_syntax in
       match%map
         keep_trying
-          [ Unix.getenv "CODA_KADEMLIA_PATH"
-            |> Option.value ~default:coda_kademlia
-          ; get_project_root () ^/ kademlia_binary ]
+          ( ( Unix.getenv "CODA_KADEMLIA_PATH"
+            |> Option.value ~default:coda_kademlia )
+          ::
+          ( match get_project_root () with
+          | Some path -> [path ^/ kademlia_binary]
+          | None -> [] ) )
           ~f:(fun prog -> Process.create ~prog ~args ())
         |> Deferred.Or_error.map ~f:(fun process ->
                {failure_response= ref `Die; process; lock_path} )
@@ -471,7 +474,10 @@ let%test_module "Tests" =
 
       let create ~initial_peers:_ ~me:_ ~log:_ ~conf_dir:_ =
         Process.create
-          ~prog:(get_project_root () ^/ "src/dummy.sh")
+          ~prog:
+            ( match get_project_root () with
+            | Some path -> path ^/ "src/dummy.sh"
+            | None -> failwith "Can't run tests outside of source tree." )
           ~args:[] ()
 
       let output t ~log:_log =
