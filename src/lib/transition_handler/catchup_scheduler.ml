@@ -116,6 +116,7 @@ module Make (Inputs : Inputs.S) = struct
               hash ;
             collected_transitions )
           else (
+            cancel_child_timeout t hash ;
             Hashtbl.add_exn t.collected_transitions ~key:hash ~data:[] ;
             transition :: collected_transitions ) )
 
