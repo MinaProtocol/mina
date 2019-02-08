@@ -19,15 +19,16 @@ table of references probably shouldn't be part the transition frontier itself as
 We'd like to have a way for other parts of the system to incrementally build up datastructures based on the
 breadcrumbs that are being added and removed to the frontier.
 
-Other examples of such an abstraction:
+Other uses for such an abstraction:
   - managing the transaction pool
   - tracking information for consensus optimization
+  - Handling persistence for the transition frontier
 
 ## Detailed design
 
 [detailed-design]: #detailed-design
 
-This design is based on the introduction of a new signature in `Protocols.coda_transition_frontier`:
+This design is based on the introduction of a new signature in `Protocols.coda_transition_frontier` as follows.:
 ```ocaml
 module type Transition_frontier_listener_intf = sig
   type t
@@ -36,7 +37,11 @@ module type Transition_frontier_listener_intf = sig
 end
 ```
 
-The transition frontier would then expose a function for registering listeners, which it will call
+The transition frontier would then expose a function for registering listeners. We probably have to do some sort of GADT/ first-class module magic to make this work (???)
+```
+val add_frontier_listener : (module Transition_frontier_listener_intf with type t = 'a) -> 'a -> unit
+```
+The transition frontier will call `add/remove_breadcrumb` on everything in the list of registered listeners
 whenever it adds or removes a breadcrumb from the frontier (in `Transition_frontier.add_breadcrumb_exn`).
 
 In the example of the snark pool reference count, the snark pool itself could implement the `add/remove_breadcrumb` functions.
@@ -62,6 +67,8 @@ in order to keep themselves up to date.
   - Alternative: Add incremental calculation to the transition frontier itself -- this adds unrelated complexity to the frontier code
   - This design allows for more data to be incrementally calculated based on activity in the transition frontier
   while adding minimal complexity to the frontier itself.
+  
+  An alternative implementation of this "Listener" solution would have the transition frontier hold a list of listener functions that have signature `Breadcrumb.t -> unit`, so the `t` is embedded in the closure of the listener. This is much simpler from a types perspective but may be less clear/explicit.
 
 ## Prior art
 [prior-art]: #prior-art
@@ -74,3 +81,4 @@ in order to keep themselves up to date.
 
   - Should the listener also support a `clear/destroy` call for when the transition frontier is thrown away/reset/synced? We assume that the only way to create a transition frontier is to create an empty one and then fill it by adding breadcrumbs.
   - Potentially out of scope of this listener api RFC, but in the snark pool manager, it is unclear how to obtain the work from the breadcrumb, and how important it is to get all future work from a breadcrumb rather than just the available work.
+  - In the snark pool garbage collection case, do we want to remove from the pool when a breadcrumb pointing at the data leaves the transition frontier completely, or just when it ceases to be a leaf? If the latter, we may need to rethink when the `remove_breadcrumb` fires, or add a third function.
