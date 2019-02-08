@@ -70,19 +70,19 @@ module Make (Inputs : Inputs_intf) :
   let run ~logger ~network ~time_controller ~collected_transitions ~frontier
       ~network_transition_reader ~proposer_transition_reader ~clear_reader =
     let logger = Logger.child logger __MODULE__ in
-    let max_valid_transition_pipe_size = 10 in
+    let valid_transition_pipe_capacity = 10 in
     let valid_transition_reader, valid_transition_writer =
       Strict_pipe.create
         (Buffered
-           (`Capacity max_valid_transition_pipe_size, `Overflow Drop_head))
+           (`Capacity valid_transition_pipe_capacity, `Overflow Drop_head))
     in
-    let max_primary_transition_pipe_size =
-      max_valid_transition_pipe_size + List.length collected_transitions
+    let primary_transition_pipe_capacity =
+      valid_transition_pipe_capacity + List.length collected_transitions
     in
     let primary_transition_reader, primary_transition_writer =
       Strict_pipe.create
         (Buffered
-           (`Capacity max_primary_transition_pipe_size, `Overflow Drop_head))
+           (`Capacity primary_transition_pipe_capacity, `Overflow Drop_head))
     in
     let processed_transition_reader, processed_transition_writer =
       Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
@@ -96,9 +96,8 @@ module Make (Inputs : Inputs_intf) :
     Transition_handler.Validator.run ~frontier
       ~transition_reader:network_transition_reader ~valid_transition_writer
       ~logger ;
-    if not @@ List.is_empty collected_transitions then
-      List.iter collected_transitions
-        ~f:(Strict_pipe.Writer.write primary_transition_writer) ;
+    List.iter collected_transitions
+      ~f:(Strict_pipe.Writer.write primary_transition_writer) ;
     Strict_pipe.Reader.iter_without_pushback valid_transition_reader
       ~f:(Strict_pipe.Writer.write primary_transition_writer)
     |> don't_wait_for ;

@@ -333,7 +333,7 @@ module type Bootstrap_controller_intf = sig
                                              Envelope.Incoming.t ]
                          * [< `Time_received of int64] )
                          Reader.t
-    -> transition_frontier Deferred.t
+    -> (transition_frontier * external_transition_verified list) Deferred.t
 end
 
 module type Transition_frontier_controller_intf = sig
