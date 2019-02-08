@@ -1288,7 +1288,7 @@ end = struct
     O1trace.trace_event "found completed work" ;
     (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
     let valid_on_this_ledger =
-      Sequence.filter transactions_by_fee ~f:(fun t ->
+      Sequence.fold transactions_by_fee ~init:Sequence.empty ~f:(fun seq t ->
           match
             O1trace.measure "validate txn" (fun () ->
                 Transaction_validator.apply_transaction validating_ledger
@@ -1300,8 +1300,8 @@ end = struct
                   User_command.With_valid_signature.t} \n\
                   %!"
                 t ;
-              false
-          | Ok _ -> true )
+              seq
+          | Ok _ -> Sequence.append (Sequence.singleton t) seq )
     in
     let diff =
       O1trace.measure "generate diff" (fun () ->
@@ -1574,8 +1574,7 @@ let%test_module "test" =
         module Undo = struct
           type t = transaction [@@deriving sexp, bin_io]
 
-          module User_command = struct
-          end
+          module User_command = struct end
 
           let transaction t = Ok t
         end
