@@ -1656,7 +1656,7 @@ let%test_module "test" =
 
         type ledger = t
 
-        let create t = t
+        let create t = copy t
       end
 
       module Sparse_ledger = struct
