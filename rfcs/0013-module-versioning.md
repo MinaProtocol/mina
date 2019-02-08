@@ -47,41 +47,49 @@ Suppose we create a module with a name and a version:
 ```ocaml
 module Some_data = struct
 
-let name = "some_data"
+  let name = "some_data"
 
   module Stable = struct
 
     module V1 = struct
+
       let version = 1
 
       module T = struct
         type t = ... [@@deriving bin_io,sexp,yojson]
       end
 
-      type versioned =
-        { name : string
-        ; version : int
-        ; t : T.t
-        } [@@deriving bin_io,sexp,yojson]
+      module Versioned = struct
 
-      let create t =
-         { name
-         ; version
-         ; t
-         }
+        type t =
+          { name : string
+          ; version : int
+          ; t : T.t
+          } [@@deriving bin_io,sexp,yojson]
 
-      let versioned_yojson (t : T.t) =
-        yojson_of_versioned @@ create t
+        let create t =
+          { name
+          ; version
+          ; t
+          }
 
-      (* similarly for binio, sexp *)
+        let to_yojson (t : T.t) =
+          yojson_of_t @@ create t
+
+        (* similarly for binio, sexp *)
+
+      end
+    end
+  end
+end
 ```
 
-Putting the name and version in the type `versioned` means they'll be
+Putting the name and version in the type `Versioned.t` means they'll be
 in the `sexp` and `yojson` representations, allowing any software to
 detect type version changes.
 
-Note that the definition of `versioned` and the following code are
-boilerplate, and could be generated with an OCaml ppx.
+Note that the definition of `Versioned` is boilerplate, and could be
+generated with an OCaml ppx.
 
 A new version of the module `V2` consists of a new version number,
 a new submodule `T`, and the same boilerplate. A ppx could
