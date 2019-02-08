@@ -6,9 +6,19 @@ module Hashless_ledger = struct
 
   type location = Ours of Account.key | Theirs of Ledger.Location.t
 
+  let msg s =
+    s
+    ^ ": somehow we got a location that isn't present in the underlying ledger"
+
   let get t = function
-    | Ours k -> Hashtbl.find t.overlay k
-    | Theirs l -> Ledger.get t.base l
+    | Ours key -> Hashtbl.find t.overlay key
+    | Theirs loc -> (
+      match Ledger.get t.base loc with
+      | Some a -> (
+        match Hashtbl.find t.overlay (Account.public_key a) with
+        | None -> Some a
+        | s -> s )
+      | None -> failwith (msg "get") )
 
   let location_of_key t key =
     match Hashtbl.find t.overlay key with
@@ -22,10 +32,7 @@ module Hashless_ledger = struct
     | Theirs loc -> (
       match Ledger.get t.base loc with
       | Some a -> Hashtbl.set t.overlay ~key:(Account.public_key a) ~data:acct
-      | None ->
-          failwith
-            "set: somehow we got a location that isn't present in the \
-             underlying ledger" )
+      | None -> failwith (msg "set") )
 
   let get_or_create_account_exn t key account =
     match location_of_key t key with
