@@ -166,13 +166,13 @@ let core () =
     plain "Jiawei Tang" "Protocol Engineer"
       "Jiawei loves writing interpreters and type checkers. He received his \
        BS in computer science from Indiana University, and he's fascinated by \
-       categorical semantics and dependent type theory. Currently, He is \
-       implementing a toy dependent typed language, Pie"
+       categorical semantics and dependent type theory. Currently, he is \
+       implementing a toy dependently typed language called Pie."
   and avery =
     plain "Avery Morin" "Protocol Engineer"
       "Avery first encountered OCaml during his BSc in software engineering \
-       at McGill University. Since graduating, he’s been involved in the \
-       ReasonML community in his free time. He’s worked on several projects \
+       at McGill University. Since graduating, he's been involved in the \
+       ReasonML community in his free time. He's worked on several projects \
        including Reprocessing, a cross-platform port of Processing designed \
        for beginners to the language. Avery is interested in making the \
        helpful aspects of functional programming and type systems more \
