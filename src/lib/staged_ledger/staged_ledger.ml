@@ -1261,8 +1261,7 @@ end = struct
          -> Transaction_snark_work.Checked.t option) =
     let curr_hash = hash t in
     O1trace.trace_event "curr_hash" ;
-    let new_mask = Inputs.Ledger.Mask.create () in
-    let tmp_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
+    let validating_ledger = Transaction_validator.create t.ledger in
     O1trace.trace_event "done mask" ;
     let partitions = Scan_state.partition_if_overflowing t.scan_state in
     O1trace.trace_event "partitioned" ;
@@ -1285,21 +1284,24 @@ end = struct
     let max_jobs_count = Sequence.length all_work_to_do in
     O1trace.trace_event "found completed work" ;
     (*Transactions in reverse order for faster removal if there is no space when creating the diff*)
-    let transactions_rev =
-      Sequence.fold transactions_by_fee ~init:Sequence.empty ~f:(fun seq t ->
-          match Ledger.apply_transaction tmp_ledger (User_command t) with
+    let valid_on_this_ledger =
+      Sequence.filter transactions_by_fee ~f:(fun t ->
+          match
+            Transaction_validator.apply_transaction validating_ledger
+              (User_command t)
+          with
           | Error _ ->
               Logger.error logger
                 !"Invalid user command: %{sexp: \
                   User_command.With_valid_signature.t} \n\
                   %!"
                 t ;
-              seq
-          | Ok _ -> Sequence.append (Sequence.singleton t) seq )
+              false
+          | Ok _ -> true )
     in
     O1trace.trace_event "applied transactions" ;
     let diff =
-      generate logger completed_works_seq transactions_rev self partitions
+      generate logger completed_works_seq valid_on_this_ledger self partitions
         max_jobs_count unbundled_job_count
     in
     O1trace.trace_event "made diff" ;
@@ -1569,6 +1571,10 @@ let%test_module "test" =
         module Undo = struct
           type t = transaction [@@deriving sexp, bin_io]
 
+          module User_command = struct
+            type nonrec t = t
+          end
+
           let transaction t = Ok t
         end
 
@@ -1637,6 +1643,21 @@ let%test_module "test" =
           Or_error.return ()
 
         let undo t (txn : Undo.t) = undo_transaction t txn
+      end
+
+      module Transaction_validator = struct
+        include Ledger
+
+        let merkle_root_after_user_command_exn = failwith "unimplemented"
+
+        let apply_user_command = failwith "unimplemented"
+
+        let apply_transaction l txn =
+          apply_transaction l txn |> Result.map ~f:(Fn.const ())
+
+        type ledger = t
+
+        let create t = t
       end
 
       module Sparse_ledger = struct
