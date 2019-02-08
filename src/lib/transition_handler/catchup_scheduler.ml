@@ -30,11 +30,10 @@ module Make (Inputs : Inputs.S) = struct
         , synchronous
         , unit Deferred.t )
         Writer.t
-    ; timeouts:
-        ( (External_transition.Verified.t, State_hash.t) With_hash.t
-        , unit Time.Timeout.t )
-        List.Assoc.t
+    ; collected_transitions:
+        (External_transition.Verified.t, State_hash.t) With_hash.t list
         State_hash.Table.t
+    ; timeouts: unit Time.Timeout.t State_hash.Table.t
     ; breadcrumb_builder_supervisor:
         (External_transition.Verified.t, State_hash.t) With_hash.t Rose_tree.t
         list
@@ -43,6 +42,7 @@ module Make (Inputs : Inputs.S) = struct
   let create ~logger ~frontier ~time_controller ~catchup_job_writer
       ~catchup_breadcrumbs_writer =
     let logger = Logger.child logger "catchup_scheduler" in
+    let collected_transitions = State_hash.Table.create () in
     let timeouts = State_hash.Table.create () in
     let breadcrumb_builder_supervisor =
       Capped_supervisor.create ~job_capacity:5 (fun transition_branches ->
@@ -71,10 +71,23 @@ module Make (Inputs : Inputs.S) = struct
           Writer.write catchup_breadcrumbs_writer breadcrumbs )
     in
     { logger
+    ; collected_transitions
     ; time_controller
     ; catchup_job_writer
     ; timeouts
     ; breadcrumb_builder_supervisor }
+
+  let cancel_child_timeout t parent_hash =
+    match Hashtbl.find t.collected_transitions parent_hash with
+    | None -> Hashtbl.add_exn t.collected_transitions ~key:parent_hash ~data:[]
+    | Some children ->
+        List.iter children ~f:(fun child ->
+            Hashtbl.find_and_call t.timeouts (With_hash.hash child)
+              ~if_found:(fun timeout ->
+                Time.Timeout.cancel t.time_controller timeout () )
+              ~if_not_found:(const ()) ) ;
+        List.iter children
+          ~f:(Fn.compose (Hashtbl.remove t.timeouts) With_hash.hash)
 
   let watch t ~timeout_duration ~transition =
     let hash = With_hash.hash transition in
@@ -84,37 +97,47 @@ module Make (Inputs : Inputs.S) = struct
     in
     let make_timeout () =
       Time.Timeout.create t.time_controller timeout_duration ~f:(fun _ ->
-          (* it's ok to create a new thread here because the thread essentially does no work *)
           don't_wait_for (Writer.write t.catchup_job_writer transition) )
     in
-    Hashtbl.update t.timeouts parent_hash ~f:(function
-      | None -> [(transition, make_timeout ())]
-      | Some entries ->
+    Hashtbl.update t.collected_transitions parent_hash ~f:(function
+      | None ->
+          cancel_child_timeout t hash ;
+          Hashtbl.add_exn t.timeouts ~key:parent_hash ~data:(make_timeout ()) ;
+          [transition]
+      | Some collected_transitions ->
           if
-            List.exists entries ~f:(fun (trans, _) ->
-                State_hash.equal hash (With_hash.hash trans) )
+            List.exists collected_transitions ~f:(fun collected_transition ->
+                State_hash.equal hash @@ With_hash.hash collected_transition )
           then (
             Logger.info t.logger
               !"Received request to watch transition for catchup that already \
                 was being watched: %{sexp: State_hash.t}"
               hash ;
-            entries )
-          else (transition, make_timeout ()) :: entries )
+            collected_transitions )
+          else transition :: collected_transitions )
 
-  let rec extract t (transition, timeout) =
-    Time.Timeout.cancel t.time_controller timeout () ;
+  let rec extract t transition =
     let successors =
       Option.value ~default:[]
-        (Hashtbl.find t.timeouts (With_hash.hash transition))
+        (Hashtbl.find t.collected_transitions (With_hash.hash transition))
     in
     Rose_tree.T (transition, List.map successors ~f:(extract t))
 
   let notify t ~transition =
-    Option.iter
-      (Hashtbl.find t.timeouts (With_hash.hash transition))
-      ~f:(fun entries ->
-        Hashtbl.remove t.timeouts (With_hash.hash transition) ;
-        let transition_branches = List.map entries ~f:(extract t) in
+    let hash = With_hash.hash transition in
+    Hashtbl.find_and_call t.timeouts hash
+      ~if_found:(fun timeout ->
+        Time.Timeout.cancel t.time_controller timeout () )
+      ~if_not_found:(fun _ ->
+        Logger.info t.logger
+          !"Failed to find the timeout for %{sexp: State_hash.t}"
+          hash ) ;
+    Option.iter (Hashtbl.find t.collected_transitions hash)
+      ~f:(fun collected_transitions ->
+        Hashtbl.remove t.collected_transitions hash ;
+        let transition_branches =
+          List.map collected_transitions ~f:(extract t)
+        in
         Capped_supervisor.dispatch t.breadcrumb_builder_supervisor
           transition_branches )
 end
