@@ -22,13 +22,14 @@ annotation on types.
 ### Explicit versioning
 
 The `bin_io` representation and associated `bin_prot` library are
-claimed to be type-safe when used in OCaml (see
-https://github.com/janestreet/bin_prot/).  Moreover, other programming
-languages don't appear to be able to produce or consume this
-representation. Therefore, type and versioning information need not be
-stated explicitly in this representation. Nonetheless, it is still important
-to use versioning, so that a type of a particular name always has the
-same representation.
+claimed to be type-safe when used in OCaml (see 
+[Jane Street bin\_prot](https://github.com/janestreet/bin_prot/).
+Moreover, other programming languages don't appear to be able to
+produce or consume this representation. Therefore, type and versioning
+information need not be stated explicitly in this
+representation. Nonetheless, it is still important to use versioning,
+so that a type of a particular name always has the same
+representation.
 
 Many programming languages can produce and consume the `sexp` and
 `yojson` representations. Given an OCaml type, the derived
