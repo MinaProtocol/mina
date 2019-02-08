@@ -146,15 +146,40 @@ module Make (Inputs : Inputs.S) = struct
     Hashtbl.remove t.collected_transitions parent_hash ;
     List.iter children ~f:(Fn.compose (remove_tree t) With_hash.hash)
 
+  (*
+  let notify t ~transition =
+    let hash = With_hash.hash transition in 
+    if (Option.is_none @@ Hashtbl.find t.parent_root_timeouts hash) &&
+       (Option.is_some @@ Hashtbl.find t.collected_transitions hash)
+    then Logger.info t.logger !"Received notify on node that is waiting for catchup: %{sexp: State_hash.t}" hash
+    else
+      cancel_timeout t hash ;
+      Option.iter (Hashtbl.find t.collected_transitions hash)
+        ~f:(fun collected_transitions ->
+          let transition_branches = List.map collected_transitions ~f:(extract t)
+          in Capped_supervisor.dispatch t.breadcrumb_builder_supervisor transition_branches ) ;
+      remove_tree t hash
+*)
+
   let notify t ~transition =
     let hash = With_hash.hash transition in
-    cancel_timeout t hash ;
-    Option.iter (Hashtbl.find t.collected_transitions hash)
-      ~f:(fun collected_transitions ->
-        let transition_branches =
-          List.map collected_transitions ~f:(extract t)
-        in
-        Capped_supervisor.dispatch t.breadcrumb_builder_supervisor
-          transition_branches ) ;
-    remove_tree t hash
+    if
+      (Option.is_none @@ Hashtbl.find t.parent_root_timeouts hash)
+      && (Option.is_some @@ Hashtbl.find t.collected_transitions hash)
+    then
+      Or_error.errorf
+        !"Received notify on node that is waiting for catchup: %{sexp: \
+          State_hash.t}"
+        hash
+    else (
+      cancel_timeout t hash ;
+      Option.iter (Hashtbl.find t.collected_transitions hash)
+        ~f:(fun collected_transitions ->
+          let transition_branches =
+            List.map collected_transitions ~f:(extract t)
+          in
+          Capped_supervisor.dispatch t.breadcrumb_builder_supervisor
+            transition_branches ) ;
+      remove_tree t hash ;
+      Or_error.return () )
 end
