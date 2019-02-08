@@ -35,7 +35,12 @@ module Storage_locations : Intf.Storage_locations = struct
 end
 
 module Hash = struct
-  type t = Ledger_hash.t [@@deriving bin_io, sexp]
+  module T = struct
+    type t = Ledger_hash.t [@@deriving bin_io, sexp, compare, hash]
+  end
+
+  include T
+  include Hashable.Make_binable (T)
 
   let merge = Ledger_hash.merge
 

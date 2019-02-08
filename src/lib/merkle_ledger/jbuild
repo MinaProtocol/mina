@@ -16,6 +16,7 @@
     merkle_address 
     direction
     rocks
-    key_value_database))
+    key_value_database
+    empty_hashes))
   (preprocess (pps (ppx_jane ppx_deriving.eq ppx_deriving.show)))
   (synopsis "Implementation of different account databases")))

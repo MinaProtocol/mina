@@ -38,7 +38,7 @@ module type Inputs_intf = sig
     Merkle_ledger.Base_ledger_intf.S
     with module Addr = Location.Addr
      and module Location = Location
-    with type key := Key.t
+     and type key := Key.t
      and type key_set := Key.Set.t
      and type hash := Hash.t
      and type root_hash := Hash.t
@@ -65,8 +65,9 @@ struct
 
   type pretty_format_account = {public_key: string; balance: int}
 
-  type t =
-    {edges: (string, string) edge list; accounts: pretty_format_account list}
+  type node = Account of pretty_format_account | Empty_hash of string
+
+  type t = {edges: (string, string) edge list; nodes: node list}
 
   let display_prefix_of_string string = String.prefix string 8
 
@@ -78,8 +79,12 @@ struct
   let string_of_account_key account =
     account |> Account.public_key |> Key.to_string |> display_prefix_of_string
 
+  let empty_hashes =
+    Empty_hashes.cache (module Hash) ~init_hash:Hash.empty_account Ledger.depth
+    |> Immutable_array.to_list
+
   let visualize t ~(initial_address : Ledger.Addr.t) =
-    let rec bfs ~edges ~accounts jobs =
+    let rec bfs ~edges ~accounts ~seen_empty_hashes jobs =
       match Queue.dequeue jobs with
       | None -> (List.rev edges, accounts)
       | Some address ->
@@ -96,19 +101,28 @@ struct
             in
             bfs
               ~edges:(Leaf {source= parent_hash; target= account} :: edges)
-              ~accounts:new_accounts jobs
+              ~seen_empty_hashes ~accounts:new_accounts jobs
           else
             let current_hash = Ledger.get_inner_hash_at_addr_exn t address in
-            Queue.enqueue jobs (Addr.child_exn address Direction.Left) ;
-            Queue.enqueue jobs (Addr.child_exn address Direction.Right) ;
+            if
+              not
+              @@ Hash_set.mem
+                   (empty_hashes |> Hash.Hash_set.of_list)
+                   current_hash
+            then (
+              Queue.enqueue jobs (Addr.child_exn address Direction.Left) ;
+              Queue.enqueue jobs (Addr.child_exn address Direction.Right) )
+            else Hash_set.add seen_empty_hashes current_hash ;
             bfs
               ~edges:
                 (Inner {source= parent_hash; target= current_hash} :: edges)
-              ~accounts jobs
+              ~accounts ~seen_empty_hashes jobs
     in
+    let seen_empty_hashes = Hash.Hash_set.of_list [] in
     let edges, accounts =
       bfs ~edges:[]
         ~accounts:(Set.empty (module Account))
+        ~seen_empty_hashes
         (Queue.of_list
            [ Addr.child_exn initial_address Direction.Left
            ; Addr.child_exn initial_address Direction.Right ])
@@ -126,24 +140,29 @@ struct
             in
             {source= string_of_hash source_hash; target= account_string} )
     in
-    let account_nodes =
+    let nodes =
       List.map (Set.to_list accounts) ~f:(fun account ->
           let string_key = string_of_account_key account in
-          { public_key= string_key
-          ; balance= Account.balance account |> Balance.to_int } )
+          Account
+            { public_key= string_key
+            ; balance= Account.balance account |> Balance.to_int } )
+      @ List.map (seen_empty_hashes |> Hash_set.to_list) ~f:(fun hash ->
+            Empty_hash (string_of_hash hash) )
     in
-    {edges= string_edges; accounts= account_nodes}
+    {edges= string_edges; nodes}
 
   module Dot_writer = struct
     let wrapper ~name body = sprintf "digraph %s { \n %s\n}" name body
 
-    let write ~path ~name {edges; accounts} =
+    let write ~path ~name {edges; nodes} =
       let body =
         List.map edges ~f:(fun {source; target} ->
             sprintf "\"%s\" -> \"%s\" " source target )
-        @ List.map accounts ~f:(fun {public_key; balance} ->
-              sprintf "\"%s\" [shape=record,label=\"{%s|%d}\"]" public_key
-                public_key balance )
+        @ List.map nodes ~f:(function
+            | Account {public_key; balance} ->
+                sprintf "\"%s\" [shape=record,label=\"{%s|%d}\"]" public_key
+                  public_key balance
+            | Empty_hash hash -> sprintf "\"%s\" [shape=point]" hash )
         |> String.concat ~sep:"\n"
       in
       let code = wrapper ~name body in

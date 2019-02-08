@@ -33,6 +33,8 @@ end
 module type Hash = sig
   type t [@@deriving bin_io, sexp]
 
+  include Hashable_binable with type t := t
+
   type account
 
   val merge : height:int -> t -> t -> t
