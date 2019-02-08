@@ -1019,6 +1019,7 @@ module Make_coda (Init : Init_intf) = struct
     module Ledger_proof_statement = Ledger_proof_statement
     module Snark_worker = Snark_worker_lib.Prod.Worker
     module Consensus_mechanism = Consensus
+    module Transaction_validator = Transaction_validator
   end
 
   include Coda_lib.Make (Inputs)
