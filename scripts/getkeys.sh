@@ -12,7 +12,7 @@ if [[ $CIRCLE_BRANCH == 'master' ]]; then
 
     # Get cached keys
     PINNED_KEY_COMMIT=temporary_hack
-    TARBALL="keys-${PINNED_KEY_COMMIT}-${CODA_CONSENSUS}.tar.bz2"
+    TARBALL="keys-${PINNED_KEY_COMMIT}-${DUNE_PROFILE}.tar.bz2"
     /usr/bin/gsutil cp gs://proving-keys-stable/$TARBALL /tmp/.
 
     # Unpack keys

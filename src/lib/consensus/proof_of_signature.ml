@@ -150,6 +150,12 @@ end
 module Protocol_state =
   Protocol_state.Make (Blockchain_state) (Consensus_state)
 
+module Configuration = struct
+  type t = {proposal_interval: int} [@@deriving yojson, bin_io]
+
+  let t = {proposal_interval= Constants.block_window_duration_ms}
+end
+
 module Snark_transition = Coda_base.Snark_transition.Make (struct
   module Genesis_ledger = Genesis_ledger
   module Blockchain_state = Blockchain_state
@@ -240,9 +246,7 @@ let next_proposal now _state ~local_state:_ ~keypair ~logger:_ =
   in
   `Propose (proposal_time, keypair.Keypair.private_key)
 
-let lock_transition ?proposer_public_key:_ _ _ ~snarked_ledger:_ ~local_state:_
-    =
-  ()
+let lock_transition _ _ ~local_state:_ ~snarked_ledger:_ = ()
 
 let genesis_protocol_state =
   let state =

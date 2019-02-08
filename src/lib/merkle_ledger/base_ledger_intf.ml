@@ -43,6 +43,8 @@ module type S = sig
     -> f:(Addr.t -> 'accum -> account -> 'accum)
     -> 'accum
 
+  val iteri : t -> f:(index -> account -> unit) -> unit
+
   (** the set of keys are ledger elements to skip during the fold, because they're in a mask *)
 
   val foldi :
