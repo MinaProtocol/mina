@@ -119,8 +119,21 @@ embrace this discipline fully will take some effort.
 We can make awareness of the existing recommendation, or the extended
 discipline suggested here a checklist item for Github pull requests.
 
-A ppx to implement the extended disicpline will make it easier to comply
+A ppx to implement the extended discipline will make it easier to comply
 with the standard.
+
+### Syntax for ppx
+
+A use of the ppx might look like:
+
+```ocaml
+[@@versioned_module
+  (`Version 1
+  ,`Type int * string,
+  ,`Serializations [bin_io;sexp;yojson]
+  )
+]
+```
 
 ## Drawbacks
 
