@@ -91,12 +91,14 @@ output types could differ.
 There could be additional new modules for subsequent versions. Eventually,
 versions could be pruned from the code, to encourage nodes to upgrade their
 software. When a new query version is created, the `Vn` module for the previous
-version could have a field added:
+version could have an annotation:
 ```ocaml
-  let remove_this_version_after = "20200702"
+  [@@remove_after "20200702"]
 ```
-A year or so past the introduction of the new version might be a
-suitable date for removing the previous version.
+where the annotation is implemented via a ppx. Compiling after the
+given date results in a warning. A year or so past the introduction of
+the new version might be a suitable date for removing the previous
+version.
 
 The query modules are used in a list of "implementations". To define
 an implementation, we need a function of type:
