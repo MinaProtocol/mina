@@ -33,6 +33,14 @@ module Make (Inputs : Inputs.S) = struct
     ; collected_transitions:
         (External_transition.Verified.t, State_hash.t) With_hash.t list
         State_hash.Table.t
+        (* The new implementation has this new hash table storing all seen
+     * transitions. Comparing with the original implementation, this hash
+     * table has the invariant that all the transitions would appear as
+     * keys in the hash table. Note, in the original version, transition
+     * would only appear as key if it has a non-empty list of children;
+     * while now if we add a new transition without children into the hash
+     * table, we would always add it with an empty list of child associated
+     * to it. *)
     ; timeouts: unit Time.Timeout.t State_hash.Table.t
     ; breadcrumb_builder_supervisor:
         (External_transition.Verified.t, State_hash.t) With_hash.t Rose_tree.t
