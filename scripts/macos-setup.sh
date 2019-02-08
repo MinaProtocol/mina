@@ -41,7 +41,7 @@ if [[ $DOWNLOAD_THINGS == "YES" ]]; then
   fi
 
   # ocaml downloading
-  yes | opam init
+  OPAMYES=1 opam init
   eval $(opam config env)
 else
   echo 'Not running download step'
