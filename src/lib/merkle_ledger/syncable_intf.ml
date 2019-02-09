@@ -23,6 +23,8 @@ module type S = sig
 
   val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
 
+  (* Get all of the accounts that is in a subtree of the underlying merkle tree where it's root is `address`. 
+    The accounts are ordered from their address in the merkle tree *)
   val get_all_accounts_rooted_at_exn : t -> addr -> account list
 
   val merkle_root : t -> root_hash

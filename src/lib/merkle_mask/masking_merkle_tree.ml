@@ -319,34 +319,25 @@ struct
       ; hash_tbl= Addr.Table.copy t.hash_tbl
       ; current_location= t.current_location }
 
+    let last_filled t =
+      Option.value_map
+        (Base.last_filled (get_parent t))
+        ~default:t.current_location
+        ~f:(fun parent_loc ->
+          match t.current_location with
+          | None -> Some parent_loc
+          | Some our_loc -> Some (max parent_loc our_loc) )
+
     let get_all_accounts_rooted_at_exn t address =
-      (* accounts in parent and mask are not necessarily disjoint sets *)
-      let parent_accounts =
-        Base.get_all_accounts_rooted_at_exn (get_parent t) address
-      in
-      (* basically, the same code used for the database implementation *)
-      let mask_maybe_accounts =
-        let first_node, last_node = Addr.Range.subtree_range address in
-        Addr.Range.fold (first_node, last_node) ~init:[]
-          ~f:(fun bit_index acc ->
-            let account = find_account t (Location.Account bit_index) in
-            account :: acc )
-      in
-      let mask_accounts = List.rev_filter_map mask_maybe_accounts ~f:Fn.id in
-      (* Prefer the later of duplicates *)
-      let dedup_keep_latter ~equal xs =
-        let rec go acc = function
-          | [] -> List.rev acc
-          | x :: xs ->
-              if List.mem xs x ~equal then go acc xs else go (x :: acc) xs
-        in
-        go [] xs
-      in
-      (* prefer accounts from the mask if they are also in the parent *)
-      dedup_keep_latter
-        ~equal:(fun a1 a2 ->
-          Key.equal (Account.public_key a1) (Account.public_key a2) )
-        (parent_accounts @ mask_accounts)
+      Option.value_map ~default:[] (last_filled t) ~f:(fun allocation_addr ->
+          let first_addr, last_addr = Addr.Range.subtree_range address in
+          Addr.Range.fold
+            (first_addr, min last_addr (Location.to_path_exn allocation_addr))
+            ~init:[]
+            ~f:(fun bit_index acc ->
+              let queried_account = get t @@ Location.Account bit_index in
+              (queried_account |> Option.value_exn) :: acc ) )
+      |> List.rev
 
     (* set accounts in mask *)
     let set_all_accounts_rooted_at_exn t address (accounts : Account.t list) =
@@ -504,15 +495,6 @@ struct
       let a' = Location.to_path_exn a in
       let b' = Location.to_path_exn b in
       if Location.Addr.compare a' b' > 0 then a else b
-
-    let last_filled t =
-      Option.value_map
-        (Base.last_filled (get_parent t))
-        ~default:t.current_location
-        ~f:(fun parent_loc ->
-          match t.current_location with
-          | None -> Some parent_loc
-          | Some our_loc -> Some (max parent_loc our_loc) )
 
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t key account =

@@ -352,6 +352,66 @@ let%test_module "Test mask connected to underlying Merkle tree" =
                 List.equal ~equal:Account.equal accounts retrieved_accounts )
           )
 
+      let%test_unit "get_all_accounts should preserve the ordering of \
+                     accounts by location with noncontiguous updates of \
+                     accounts on the mask" =
+        (* see similar test in test_database *)
+        if Test.depth <= 8 then
+          Test.with_chain (fun _ mask1 mask2 ->
+              let num_accounts = 1 lsl Test.depth in
+              let gen_values gen list_length =
+                Quickcheck.random_value
+                  (Quickcheck.Generator.list_with_length list_length gen)
+              in
+              let public_keys = Key.gen_keys num_accounts in
+              let balances = gen_values Balance.gen num_accounts in
+              let base_accounts =
+                List.map2_exn public_keys balances
+                  ~f:(fun public_key balance ->
+                    Account.create public_key balance )
+              in
+              List.iter base_accounts ~f:(fun account ->
+                  ignore @@ create_new_account_exn mask1 account ) ;
+              let num_subset =
+                Quickcheck.random_value (Int.gen_incl 3 num_accounts)
+              in
+              let subset_indices, subset_accounts =
+                List.permute
+                  (List.mapi base_accounts ~f:(fun index account ->
+                       (index, account) ))
+                |> (Fn.flip List.take) num_subset
+                |> List.unzip
+              in
+              let subset_balances = gen_values Balance.gen num_subset in
+              let subset_updated_accounts =
+                List.map2_exn subset_accounts subset_balances
+                  ~f:(fun account balance ->
+                    let updated_account = {account with balance} in
+                    create_existing_account_exn mask2 updated_account |> ignore ;
+                    updated_account )
+              in
+              let updated_accounts_map =
+                Int.Map.of_alist_exn
+                  (List.zip_exn subset_indices subset_updated_accounts)
+              in
+              let expected_accounts =
+                List.mapi base_accounts ~f:(fun index base_account ->
+                    Option.value
+                      (Map.find updated_accounts_map index)
+                      ~default:base_account )
+              in
+              let retrieved_accounts =
+                Mask.Attached.get_all_accounts_rooted_at_exn mask2
+                  (Mask.Addr.root ())
+              in
+              assert (
+                Int.equal
+                  (List.length base_accounts)
+                  (List.length retrieved_accounts) ) ;
+              assert (
+                List.equal ~equal:Account.equal expected_accounts
+                  retrieved_accounts ) )
+
       let%test_unit "removing accounts from mask restores Merkle root" =
         Test.with_instances (fun maskable mask ->
             let attached_mask = Maskable.register_mask maskable mask in
