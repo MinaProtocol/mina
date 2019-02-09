@@ -231,7 +231,7 @@ module type Ledger_intf = sig
   val unregister_mask_exn : maskable_ledger -> attached_mask -> unattached_mask
 
   val remove_and_reparent_exn :
-    attached_mask -> children:attached_mask list -> unit
+    t -> attached_mask -> children:attached_mask list -> unit
 end
 
 module Fee = struct

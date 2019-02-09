@@ -19,7 +19,7 @@ module type S = sig
   (** raises an exception if mask is not registered *)
 
   val remove_and_reparent_exn :
-    attached_mask -> children:attached_mask list -> unit
+    t -> attached_mask -> children:attached_mask list -> unit
   (**
    *              o
    *             /

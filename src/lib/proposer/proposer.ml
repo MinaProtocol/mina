@@ -277,8 +277,9 @@ module Make (Inputs : Inputs_intf) :
           | Some frontier -> (
               let crumb = Transition_frontier.best_tip frontier in
               Logger.info logger
-                !"Begining to propose off of crumb %{sexp: Breadcrumb.t}"
+                !"Begining to propose off of crumb %{sexp: Breadcrumb.t}%!"
                 crumb ;
+              Core.printf !"%!" ;
               let previous_protocol_state, previous_protocol_state_proof =
                 let transition : External_transition.Verified.t =
                   (Breadcrumb.transition_with_hash crumb).data

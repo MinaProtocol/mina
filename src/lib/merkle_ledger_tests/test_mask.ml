@@ -52,6 +52,8 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         (Base.t -> Mask.Attached.t -> Mask.Attached.t -> 'a) -> 'a
       (** Here we provide a base ledger and two layers of attached masks
          * one ontop another *)
+
+      val packed : Mask.Attached.t -> Base.t
     end
 
     module Make (Test : Test_intf) = struct
@@ -685,7 +687,8 @@ let%test_module "Test mask connected to underlying Merkle tree" =
                 List.iter accounts ~f:(fun a ->
                     assert (Account.equal (get_account_exn m2 a) a) ) ;
                 Mask.Attached.commit m1 ;
-                Maskable.remove_and_reparent_exn m1 ~children:[m2] ;
+                Maskable.remove_and_reparent_exn (Test.packed m1) m1
+                  ~children:[m2] ;
                 (* all accounts are still here *)
                 List.iter accounts ~f:(fun a ->
                     assert (Account.equal (get_account_exn m2 a) a) )
@@ -769,6 +772,8 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             let mask2 = Mask.create () in
             let attached2 = Maskable.register_mask pack2 mask2 in
             f maskable attached1 attached2 )
+
+      let packed m = Any_base.cast (module Mask.Attached) m
     end
 
     module Make_maskable_and_mask (Depth : Depth_S) =

@@ -305,10 +305,23 @@ struct
 
     (* transfer state from mask to parent; flush local state *)
     let commit t =
+      let old_root_hash = merkle_root t in
       let account_data = Location.Table.to_alist t.account_tbl in
       Base.set_batch (get_parent t) account_data ;
       Location.Table.clear t.account_tbl ;
-      Addr.Table.clear t.hash_tbl
+      Addr.Table.clear t.hash_tbl ;
+      Debug_assert.debug_assert (fun () ->
+          [%test_result: Hash.t]
+            ~message:
+              "Merkle root after committing should be the same as the old one \
+               in the mask"
+            ~expect:old_root_hash
+            (Base.merkle_root (get_parent t)) ;
+          [%test_result: Hash.t]
+            ~message:
+              "Merkle root of the mask should delegate to the parent now"
+            ~expect:old_root_hash
+            (Base.merkle_root (get_parent t)) )
 
     (* copy tables in t; use same parent *)
     let copy t =

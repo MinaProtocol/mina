@@ -1599,7 +1599,7 @@ let%test_module "test" =
 
         let register_mask l _m = copy l
 
-        let remove_and_reparent_exn _ ~children:_ = failwith "unimplemented"
+        let remove_and_reparent_exn _ _ ~children:_ = failwith "unimplemented"
 
         let unattached_mask_of_serializable _ = failwith "unimplemented"
 

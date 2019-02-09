@@ -419,6 +419,7 @@ module Make (Inputs : Inputs_intf) :
     in
     Ledger.remove_and_reparent_exn
       (Inputs.Staged_ledger.ledger soon_to_be_root)
+      (Inputs.Staged_ledger.ledger soon_to_be_root)
       ~children ;
     Hashtbl.remove t.table t.root ;
     Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
