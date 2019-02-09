@@ -624,7 +624,8 @@ let%test_module "Test mask connected to underlying Merkle tree" =
                 (* all accounts are here *)
                 List.iter accounts ~f:(fun a ->
                     assert (Account.equal (get_account_exn m2 a) a) ) ;
-                Maskable.reparent ~root:base ~heir:m1 ~heir_children:[m2] ;
+                Mask.Attached.commit m1 ;
+                Maskable.remove_and_reparent_exn m1 ~children:[m2] ;
                 (* all accounts are still here *)
                 List.iter accounts ~f:(fun a ->
                     assert (Account.equal (get_account_exn m2 a) a) )

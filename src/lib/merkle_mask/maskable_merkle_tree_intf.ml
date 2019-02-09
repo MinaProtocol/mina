@@ -18,19 +18,19 @@ module type S = sig
   val unregister_mask_exn : t -> attached_mask -> unattached_mask
   (** raises an exception if mask is not registered *)
 
-  val reparent :
-    root:t -> heir:attached_mask -> heir_children:attached_mask list -> unit
+  val remove_and_reparent_exn :
+    attached_mask -> children:attached_mask list -> unit
   (**
    *              o
    *             /
    *            /
    *   o --- o -
    *   ^     ^  \
-   *  root   |   \
-   *        heir  o
+   *  parent |   \
+   *        mask  o
    *            children
    *
-   * reparents the [children] to [root] and unregister's [heir]. This is done
-   * inplace via mutation.
+   * removes the attached mask from the parent and attaches the children to the parent instead
+   * raises an exception the merkle roots of the mask and the parent are not the same.
   *)
 end

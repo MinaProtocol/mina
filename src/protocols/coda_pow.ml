@@ -230,11 +230,8 @@ module type Ledger_intf = sig
 
   val unregister_mask_exn : maskable_ledger -> attached_mask -> unattached_mask
 
-  val reparent :
-       root:maskable_ledger
-    -> heir:attached_mask
-    -> heir_children:attached_mask list
-    -> unit
+  val remove_and_reparent_exn :
+    attached_mask -> children:attached_mask list -> unit
 end
 
 module Fee = struct
@@ -761,7 +758,7 @@ module type Staged_ledger_base_intf = sig
   val of_serialized_and_unserialized :
     serialized:serializable -> unserialized:ledger -> t
 
-  val reparent : root:t -> heir:t -> heir_children:t list -> unit
+  val replace_ledger_exn : t -> ledger -> t
 
   val proof_txns : t -> transaction Non_empty_list.t option
 

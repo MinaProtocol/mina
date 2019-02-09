@@ -64,13 +64,13 @@ struct
         List.iter masks ~f:(fun mask ->
             Mask.Attached.parent_set_notify mask account )
 
-  let reparent ~root ~heir ~heir_children =
-    let heir_merkle_root = Mask.Attached.merkle_root heir in
+  let remove_and_reparent_exn t ~children =
+    let parent = Mask.Attached.get_parent t in
+    let merkle_root = Mask.Attached.merkle_root t in
+    assert (Hash.equal (Base.merkle_root parent) merkle_root) ;
     let dangling_masks =
-      List.map heir_children ~f:(fun c -> Mask.Attached.unset_parent c)
+      List.map children ~f:(fun c -> Mask.Attached.unset_parent c)
     in
-    Mask.Attached.commit heir ;
-    assert (Hash.equal (Base.merkle_root root) heir_merkle_root) ;
-    List.iter dangling_masks ~f:(fun m -> ignore (Mask.set_parent m root)) ;
-    ignore (unregister_mask_exn root heir)
+    List.iter dangling_masks ~f:(fun m -> ignore (Mask.set_parent m parent)) ;
+    ignore (unregister_mask_exn parent t)
 end

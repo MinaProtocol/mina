@@ -120,8 +120,7 @@ end = struct
   type scan_state = Scan_state.t [@@deriving sexp, bin_io]
 
   type t =
-    { (* Invariant: this field is only mutated during a reparent *)
-      mutable scan_state:
+    { scan_state:
         scan_state
         (* Invariant: this is the ledger after having applied all the transactions in
          * the above state. *)
@@ -141,11 +140,6 @@ end = struct
         (Ledger.unattached_mask_of_serializable serialized_mask)
     in
     {scan_state; ledger= attached_mask}
-
-  let reparent ~root ~heir ~heir_children =
-    Ledger.reparent ~root:root.ledger ~heir:heir.ledger
-      ~heir_children:(List.map heir_children ~f:(fun c -> c.ledger)) ;
-    root.scan_state <- heir.scan_state
 
   let proof_txns t =
     Scan_state.latest_ledger_proof t.scan_state
@@ -301,6 +295,13 @@ end = struct
     Option.map
       (Scan_state.latest_ledger_proof t.scan_state)
       ~f:(Fn.compose fst fst)
+
+  let replace_ledger_exn t ledger =
+    [%test_result: Ledger_hash.t]
+      ~message:"Cannot replace ledger since merkle_root differs"
+      ~expect:(Ledger.merkle_root t.ledger)
+      (Ledger.merkle_root ledger) ;
+    {t with ledger}
 
   let total_proofs (works : Transaction_snark_work.t list) =
     List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
@@ -1598,8 +1599,7 @@ let%test_module "test" =
 
         let register_mask l _m = copy l
 
-        let reparent ~root:_ ~heir:_ ~heir_children:_ =
-          failwith "unimplemented"
+        let remove_and_reparent_exn _ ~children:_ = failwith "unimplemented"
 
         let unattached_mask_of_serializable _ = failwith "unimplemented"
 

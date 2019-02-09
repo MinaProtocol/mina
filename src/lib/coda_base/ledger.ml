@@ -147,8 +147,8 @@ let register_mask t mask = Maskable.register_mask (packed t) mask
 
 let unregister_mask_exn t mask = Maskable.unregister_mask_exn (packed t) mask
 
-let reparent ~root:t ~heir ~heir_children =
-  Maskable.reparent ~root:(packed t) ~heir ~heir_children
+let remove_and_reparent_exn mask ~children =
+  Maskable.remove_and_reparent_exn mask ~children
 
 (* TODO: Implement the serialization/deserialization *)
 let unattached_mask_of_serializable _ = failwith "unimplmented"
