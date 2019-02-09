@@ -314,13 +314,16 @@ let daemon log =
          let%bind () = Async.Unix.mkdir ~p:() banlist_dir_name in
          let suspicious_dir = banlist_dir_name ^/ "suspicious" in
          let punished_dir = banlist_dir_name ^/ "banned" in
+         let trust_dir = banlist_dir_name ^/ "trust" in
          let () = Snark_params.set_chunked_hashing true in
          let%bind () = Async.Unix.mkdir ~p:() suspicious_dir in
          let%bind () = Async.Unix.mkdir ~p:() punished_dir in
+         let%bind () = Async.Unix.mkdir ~p:() trust_dir in
          let%bind () = start_tracing () in
          let banlist =
            Coda_base.Banlist.create ~suspicious_dir ~punished_dir
          in
+         let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
          let time_controller = Inputs.Time.Controller.create () in
          let net_config =
            { Inputs.Net.Config.parent_log= log
@@ -332,7 +335,7 @@ let daemon log =
                ; conf_dir
                ; initial_peers
                ; me
-               ; banlist } }
+               ; trust_system } }
          in
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
          let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
