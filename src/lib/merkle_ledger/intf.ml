@@ -17,7 +17,7 @@ module type Balance = sig
 end
 
 module type Account = sig
-  type t [@@deriving bin_io, eq, sexp]
+  type t [@@deriving bin_io, eq, sexp, compare]
 
   type key
 

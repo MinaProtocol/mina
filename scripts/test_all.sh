@@ -32,6 +32,9 @@ run_integration_test() {
   echo "TESTING ${1}"
   set +e
 
+  # wipe old config directory
+  rm -rf ~/.coda-config
+
   # ugly hack to clean up dead processes
   pkill -9 exe
   pkill -9 kademlia

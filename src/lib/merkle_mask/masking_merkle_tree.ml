@@ -311,6 +311,12 @@ struct
       Location.Table.clear t.account_tbl ;
       Addr.Table.clear t.hash_tbl ;
       Debug_assert.debug_assert (fun () ->
+          List.iter account_data ~f:(fun (loc, acc) ->
+              [%test_result: Account.t option]
+                ~message:
+                  "Accounts that were in mask are not in parent after a commit"
+                ~expect:(Some acc)
+                (Base.get (get_parent t) loc) ) ;
           [%test_result: Hash.t]
             ~message:
               "Merkle root after committing should be the same as the old one \

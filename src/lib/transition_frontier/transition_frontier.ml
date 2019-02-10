@@ -408,7 +408,19 @@ module Make (Inputs : Inputs_intf) :
           |> Inputs.Staged_ledger.ledger )
     in
     let root_ledger = Inputs.Staged_ledger.ledger root in
-    Ledger.commit (Inputs.Staged_ledger.ledger soon_to_be_root) ;
+    let soon_to_be_root_ledger = Inputs.Staged_ledger.ledger soon_to_be_root in
+    let soon_to_be_root_merkle_root =
+      Ledger.merkle_root soon_to_be_root_ledger
+    in
+    Ledger.commit soon_to_be_root_ledger ;
+    let root_ledger_merkle_root_after_commit =
+      Ledger.merkle_root root_ledger
+    in
+    [%test_result: Ledger_hash.t]
+      ~message:
+        "Merkle root of soon-to-be-root before commit, is same as root \
+         ledger's merkle root afterwards"
+      ~expect:soon_to_be_root_merkle_root root_ledger_merkle_root_after_commit ;
     let new_root =
       Breadcrumb.create soon_to_be_root_node.breadcrumb.transition_with_hash
         (Inputs.Staged_ledger.replace_ledger_exn soon_to_be_root root_ledger)
@@ -417,10 +429,8 @@ module Make (Inputs : Inputs_intf) :
     let new_root_hash =
       soon_to_be_root_node.breadcrumb.transition_with_hash.hash
     in
-    Ledger.remove_and_reparent_exn
-      (Inputs.Staged_ledger.ledger soon_to_be_root)
-      (Inputs.Staged_ledger.ledger soon_to_be_root)
-      ~children ;
+    Ledger.remove_and_reparent_exn soon_to_be_root_ledger
+      soon_to_be_root_ledger ~children ;
     Hashtbl.remove t.table t.root ;
     Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
     t.root <- new_root_hash ;
@@ -440,7 +450,8 @@ module Make (Inputs : Inputs_intf) :
    *       V   ) garbage collect the heir children and bads
    *       VI  ) grab the new root staged ledger
    *       VII ) notify the consensus mechanism of the new root
-   *       VIII) if commit has ~proof_txns; write them to snarked ledger
+   *       VIII) if commit on an heir node that just emitted proof txns then
+   *             write them to snarked ledger
    *   3) set the new node as the best tip if the new node has a greater length than
    *      the current best tip
   *)

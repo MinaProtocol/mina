@@ -49,11 +49,14 @@ let%test_module "Test mask connected to underlying Merkle tree" =
       val with_instances : (Base.t -> Mask.t -> 'a) -> 'a
 
       val with_chain :
-        (Base.t -> Mask.Attached.t -> Mask.Attached.t -> 'a) -> 'a
+           (   Base.t
+            -> mask:Mask.Attached.t
+            -> mask_as_base:Base.t
+            -> mask2:Mask.Attached.t
+            -> 'a)
+        -> 'a
       (** Here we provide a base ledger and two layers of attached masks
-         * one ontop another *)
-
-      val packed : Mask.Attached.t -> Base.t
+             * one ontop another *)
     end
 
     module Make (Test : Test_intf) = struct
@@ -102,11 +105,6 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         match action with
         | `Existed -> failwith "Expected to allocate a new account"
         | `Added -> location
-
-      let get_account_exn mask {Account.public_key; _} =
-        Mask.Attached.get mask
-          (Mask.Attached.location_of_key mask public_key |> Option.value_exn)
-        |> Option.value_exn
 
       let%test "parent, mask agree on set" =
         Test.with_instances (fun maskable mask ->
@@ -209,7 +207,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             else false )
 
       let%test_unit "commit at layer2, dumps to layer1, not in base" =
-        Test.with_chain (fun base level1 level2 ->
+        Test.with_chain (fun base ~mask:level1 ~mask_as_base:_ ~mask2:level2 ->
             Mask.Attached.set level2 dummy_location dummy_account ;
             (* verify account is in the layer2 mask *)
             assert (
@@ -359,7 +357,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
                      accounts on the mask" =
         (* see similar test in test_database *)
         if Test.depth <= 8 then
-          Test.with_chain (fun _ mask1 mask2 ->
+          Test.with_chain (fun _ ~mask:mask1 ~mask_as_base:_ ~mask2 ->
               let num_accounts = 1 lsl Test.depth in
               let gen_values gen list_length =
                 Quickcheck.random_value
@@ -670,7 +668,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
               && Int.equal parent_num_accounts mask_num_accounts_after ) )
 
       let%test_unit "Mask reparenting works" =
-        Test.with_chain (fun base m1 m2 ->
+        Test.with_chain (fun base ~mask:m1 ~mask_as_base ~mask2:m2 ->
             let num_accounts = 3 in
             let keys = Key.gen_keys num_accounts in
             let balances =
@@ -680,18 +678,30 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             let accounts = List.map2_exn keys balances ~f:Account.create in
             match accounts with
             | [a1; a2; a3] ->
-                ignore (parent_create_new_account_exn base a1) ;
-                ignore (create_new_account_exn m1 a2) ;
-                ignore (create_new_account_exn m2 a3) ;
+                let loc1 = parent_create_new_account_exn base a1 in
+                let loc2 = create_new_account_exn m1 a2 in
+                let loc3 = create_new_account_exn m2 a3 in
+                let locs = [(loc1, a1); (loc2, a2); (loc3, a3)] in
                 (* all accounts are here *)
-                List.iter accounts ~f:(fun a ->
-                    assert (Account.equal (get_account_exn m2 a) a) ) ;
+                List.iter locs ~f:(fun (loc, a) ->
+                    [%test_result: Account.t option]
+                      ~message:"All accounts are accessible from m2"
+                      ~expect:(Some a) (Mask.Attached.get m2 loc) ) ;
+                [%test_result: Account.t option] ~message:"a1 is in base"
+                  ~expect:(Some a1) (Test.Base.get base loc1) ;
                 Mask.Attached.commit m1 ;
-                Maskable.remove_and_reparent_exn (Test.packed m1) m1
-                  ~children:[m2] ;
+                [%test_result: Account.t option] ~message:"a2 is in base"
+                  ~expect:(Some a2) (Test.Base.get base loc2) ;
+                Maskable.remove_and_reparent_exn mask_as_base m1 ~children:[m2] ;
+                [%test_result: Account.t option] ~message:"a1 is in base"
+                  ~expect:(Some a1) (Test.Base.get base loc1) ;
+                [%test_result: Account.t option] ~message:"a2 is in base"
+                  ~expect:(Some a2) (Test.Base.get base loc2) ;
                 (* all accounts are still here *)
-                List.iter accounts ~f:(fun a ->
-                    assert (Account.equal (get_account_exn m2 a) a) )
+                List.iter locs ~f:(fun (loc, a) ->
+                    [%test_result: Account.t option]
+                      ~message:"All accounts are accessible from m2"
+                      ~expect:(Some a) (Mask.Attached.get m2 loc) )
             | _ -> failwith "unexpected" )
     end
 
@@ -768,12 +778,13 @@ let%test_module "Test mask connected to underlying Merkle tree" =
       let with_chain f =
         with_instances (fun maskable mask ->
             let attached1 = Maskable.register_mask maskable mask in
-            let pack2 = Any_base.cast (module Mask.Attached) attached1 in
+            let attached1_as_base =
+              Any_base.cast (module Mask.Attached) attached1
+            in
             let mask2 = Mask.create () in
-            let attached2 = Maskable.register_mask pack2 mask2 in
-            f maskable attached1 attached2 )
-
-      let packed m = Any_base.cast (module Mask.Attached) m
+            let attached2 = Maskable.register_mask attached1_as_base mask2 in
+            f maskable ~mask:attached1 ~mask_as_base:attached1_as_base
+              ~mask2:attached2 )
     end
 
     module Make_maskable_and_mask (Depth : Depth_S) =
