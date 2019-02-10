@@ -416,11 +416,11 @@ module Make (Inputs : Inputs_intf) :
               Ledger.merkle_root ledger )
       , `Mine (Ledger.merkle_root ledger) )
 
-    let rec crawl t hash =
+    let rec _crawl t hash =
       match Hashtbl.find t.table hash with
       | None -> Leaf
       | Some node ->
-          Node (summarize t node, List.map node.successor_hashes ~f:(crawl t))
+          Node (summarize t node, List.map node.successor_hashes ~f:(_crawl t))
   end
 
   (** Given:

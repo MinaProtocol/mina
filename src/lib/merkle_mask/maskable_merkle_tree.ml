@@ -47,7 +47,7 @@ struct
       val merkle_root : t -> Hash.t
     end
 
-    let rec crawl : type a. (module Crawler_intf with type t = a) -> a -> t =
+    let rec _crawl : type a. (module Crawler_intf with type t = a) -> a -> t =
      fun (module C) c ->
       let summary =
         let uuid = C.get_uuid c in
@@ -60,7 +60,7 @@ struct
       match Uuid.Table.find registered_masks (C.get_uuid c) with
       | None -> Leaf summary
       | Some masks ->
-          Node (summary, List.map masks ~f:(crawl (module Mask.Attached)))
+          Node (summary, List.map masks ~f:(_crawl (module Mask.Attached)))
   end
 
   let register_mask t mask =
