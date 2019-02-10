@@ -438,22 +438,22 @@ module Make (Inputs : Inputs_intf) :
 
   (* Adding a breadcrumb to the transition frontier is broken into the following steps:
    *   1) attach the breadcrumb to the transition frontier
-   *   2) move the root if the path to the new node is longer than the max length
-   *     a) calculate the distance from the new node to the parent
-   *     b) if the distance is greater than the max length:
+   *   2) calculate the distance from the new node to the parent and the
+   *      best tip node
+   *   3) set the new node as the best tip if the new node has a greater length than
+   *      the current best tip
+   *   4) move the root if the path to the new node is longer than the max length
    *       I   ) find the immediate successor of the old root in the path to the
    *             longest node (the heir)
    *       II  ) find all successors of the other immediate successors of the
    *             old root (bads)
    *       III ) cleanup bad node masks, but don't garbage collect yet
    *       IV  ) move_root the breadcrumbs (rewires staged ledgers, cleans up heir)
-   *       V   ) garbage collect the heir children and bads
+   *       V   ) garbage collect the bads
    *       VI  ) grab the new root staged ledger
    *       VII ) notify the consensus mechanism of the new root
    *       VIII) if commit on an heir node that just emitted proof txns then
    *             write them to snarked ledger
-   *   3) set the new node as the best tip if the new node has a greater length than
-   *      the current best tip
   *)
   let add_breadcrumb_exn t breadcrumb =
     O1trace.measure "add_breadcrumb" (fun () ->
@@ -464,23 +464,26 @@ module Make (Inputs : Inputs_intf) :
         (* 1 *)
         attach_breadcrumb_exn t breadcrumb ;
         let node = Hashtbl.find_exn t.table hash in
-        (* 2.a *)
+        (* 2 *)
         let distance_to_parent = node.length - root_node.length in
-        (* 2.b *)
         let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
         (* 3 *)
         if node.length > best_tip_node.length then t.best_tip <- hash ;
-        if distance_to_parent <= max_length t then (
-          (* 2.b.I *)
+        (* 4 *)
+        if distance_to_parent > max_length t then (
+          Core.printf
+            !"Distance to parent: %d exceeded max_lenth %d\n%!"
+            distance_to_parent (max_length t) ;
+          (* 4.I *)
           let heir_hash = List.hd_exn (hash_path t node.breadcrumb) in
           let heir_node = Hashtbl.find_exn t.table heir_hash in
-          (* 2.b.II *)
+          (* 4.II *)
           let bad_hashes =
             List.filter root_node.successor_hashes
               ~f:(Fn.compose not (State_hash.equal heir_hash))
           in
           let bad_nodes = List.map bad_hashes ~f:(Hashtbl.find_exn t.table) in
-          (* 2.b.III *)
+          (* 4.III *)
           let root_staged_ledger =
             Breadcrumb.staged_ledger root_node.breadcrumb
           in
@@ -491,19 +494,16 @@ module Make (Inputs : Inputs_intf) :
                    (Ledger.unregister_mask_exn root_ledger
                       ( Breadcrumb.staged_ledger bad
                       |> Inputs.Staged_ledger.ledger )) ) ;
-          (* 2.b.IV *)
+          (* 4.IV *)
           let new_root_node = move_root t heir_node in
-          (* 2.b.V *)
-          let garbage =
-            heir_node.successor_hashes
-            @ List.bind bad_hashes ~f:(successor_hashes_rec t)
-          in
+          (* 4.V *)
+          let garbage = List.bind bad_hashes ~f:(successor_hashes_rec t) in
           List.iter garbage ~f:(Hashtbl.remove t.table) ;
-          (* 2.b.VI *)
+          (* 4.VI *)
           let new_root_staged_ledger =
             Breadcrumb.staged_ledger new_root_node.breadcrumb
           in
-          (* 2.b.VII *)
+          (* 4.VII *)
           Consensus.lock_transition
             (Breadcrumb.consensus_state root_node.breadcrumb)
             (Breadcrumb.consensus_state new_root_node.breadcrumb)
@@ -512,7 +512,7 @@ module Make (Inputs : Inputs_intf) :
               (Coda_base.Ledger.Any_ledger.cast
                  (module Coda_base.Ledger.Db)
                  t.root_snarked_ledger) ;
-          (* 2.b.VIII *)
+          (* 4.VIII *)
           ( match
               ( Inputs.Staged_ledger.proof_txns new_root_staged_ledger
               , heir_node.breadcrumb.just_emitted_a_proof )
