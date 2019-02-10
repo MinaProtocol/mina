@@ -357,12 +357,18 @@ module Make (Inputs : Inputs_intf) :
     then
       failwith
         "invalid call to attach_to: hash parent_node <> parent_hash node" ;
-    if Hashtbl.add t.table ~key:hash ~data:node <> `Ok then
-      Logger.warn t.logger
-        !"attach_node_to with breadcrumb for state %{sexp:State_hash.t} \
-          already present; catchup scheduler bug?"
-        hash
-    else
+    (* We only want to update the parent node if we don't have a dupe *)
+    let valid = ref true in
+    Hashtbl.change t.table hash ~f:(function
+      | Some _ ->
+          Logger.warn t.logger
+            !"attach_node_to with breadcrumb for state %{sexp:State_hash.t} \
+              already present; catchup scheduler bug?"
+            hash ;
+          valid := false ;
+          None
+      | None -> Some node ) ;
+    if !valid then
       Hashtbl.set t.table
         ~key:(Breadcrumb.hash parent_node.breadcrumb)
         ~data:
@@ -383,6 +389,40 @@ module Make (Inputs : Inputs_intf) :
     in
     attach_node_to t ~parent_node ~node
 
+  (* Visualize the structure of the transition frontier or a particular node
+   * within the frontier (for debugging purposes). *)
+  module Visualize = struct
+    module Summary = struct
+      type t =
+        [`Uuid of Core.Uuid.t]
+        * [`Parent of Ledger_hash.t]
+        * [`Mine of Ledger_hash.t]
+      [@@deriving sexp_of]
+    end
+
+    type t = Leaf | Node of Summary.t * t list [@@deriving sexp_of]
+
+    let summarize t node =
+      let ledger =
+        Breadcrumb.staged_ledger node.breadcrumb |> Inputs.Staged_ledger.ledger
+      in
+      ( `Uuid (Ledger.get_uuid ledger)
+      , `Parent
+          ( try
+              Ledger.Any_ledger.M.merkle_root
+                (Ledger.Mask.Attached.get_parent ledger)
+            with _ ->
+              Logger.error t.logger "Caught an empty merkle_root" ;
+              Ledger.merkle_root ledger )
+      , `Mine (Ledger.merkle_root ledger) )
+
+    let rec crawl t hash =
+      match Hashtbl.find t.table hash with
+      | None -> Leaf
+      | Some node ->
+          Node (summarize t node, List.map node.successor_hashes ~f:(crawl t))
+  end
+
   (** Given:
    *
    *        o                   o
@@ -397,7 +437,8 @@ module Make (Inputs : Inputs_intf) :
    *  Modifications are in-place
   *)
   let move_root t soon_to_be_root_node : node =
-    let root_breadcrumb = (Hashtbl.find_exn t.table t.root).breadcrumb in
+    let root_node = Hashtbl.find_exn t.table t.root in
+    let root_breadcrumb = root_node.breadcrumb in
     let root = root_breadcrumb |> Breadcrumb.staged_ledger in
     let soon_to_be_root =
       soon_to_be_root_node.breadcrumb |> Breadcrumb.staged_ledger
@@ -471,8 +512,8 @@ module Make (Inputs : Inputs_intf) :
         if node.length > best_tip_node.length then t.best_tip <- hash ;
         (* 4 *)
         if distance_to_parent > max_length t then (
-          Core.printf
-            !"Distance to parent: %d exceeded max_lenth %d\n%!"
+          Logger.info t.logger
+            !"Distance to parent: %d exceeded max_lenth %d"
             distance_to_parent (max_length t) ;
           (* 4.I *)
           let heir_hash = List.hd_exn (hash_path t node.breadcrumb) in

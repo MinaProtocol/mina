@@ -74,6 +74,8 @@ struct
     ; location_tbl= Key.Table.create ()
     ; current_location= None }
 
+  let get_uuid {uuid; _} = uuid
+
   let with_ledger ~f =
     let mask = create () in
     f mask

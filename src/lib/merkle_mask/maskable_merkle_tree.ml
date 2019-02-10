@@ -29,8 +29,49 @@ struct
   let (registered_masks : Mask.Attached.t list Uuid.Table.t) =
     Uuid.Table.create ()
 
+  (* visualize the structure of the registered masks table (for debugging
+   * purposes) *)
+  module Visualize = struct
+    module Summary = struct
+      type t = [`Uuid of Uuid.t] * [`Hash of Hash.t] [@@deriving sexp_of]
+    end
+
+    type t = Leaf of Summary.t | Node of Summary.t * t list
+    [@@deriving sexp_of]
+
+    module type Crawler_intf = sig
+      type t
+
+      val get_uuid : t -> Uuid.t
+
+      val merkle_root : t -> Hash.t
+    end
+
+    let rec crawl : type a. (module Crawler_intf with type t = a) -> a -> t =
+     fun (module C) c ->
+      let summary =
+        let uuid = C.get_uuid c in
+        ( `Uuid uuid
+        , `Hash
+            ( try C.merkle_root c with _ ->
+                Core.printf !"CAUGHT %{sexp: Uuid.t}\n%!" uuid ;
+                Hash.empty_account ) )
+      in
+      match Uuid.Table.find registered_masks (C.get_uuid c) with
+      | None -> Leaf summary
+      | Some masks ->
+          Node (summary, List.map masks ~f:(crawl (module Mask.Attached)))
+  end
+
   let register_mask t mask =
     let attached_mask = Mask.set_parent mask t in
+    List.iter (Uuid.Table.data registered_masks) ~f:(fun ms ->
+        List.iter ms ~f:(fun m ->
+            [%test_result: bool]
+              ~message:
+                "We've already registered a mask with this UUID; you have a bug"
+              ~expect:false
+              (Uuid.equal (Mask.Attached.get_uuid m) (Mask.get_uuid mask)) ) ) ;
     (* handles cases where no entries for t, or where there are existing entries *)
     Uuid.Table.add_multi registered_masks ~key:(get_uuid t) ~data:attached_mask ;
     attached_mask
@@ -41,12 +82,14 @@ struct
     match Uuid.Table.find registered_masks t_uuid with
     | None -> failwith error_msg
     | Some masks ->
-        ( match List.findi masks ~f:(fun _ndx m -> phys_equal m mask) with
+        ( match List.find masks ~f:(fun m -> phys_equal m mask) with
         | None -> failwith error_msg
-        | Some (ndx, _mask) -> (
-            let head, tail = List.split_n masks ndx in
-            (* splice out mask *)
-            match List.take head (ndx - 1) @ tail with
+        | Some _ -> (
+            let bad, good =
+              List.partition_tf masks ~f:(fun m -> phys_equal m mask)
+            in
+            assert (List.length bad = 1) ;
+            match good with
             | [] ->
                 (* no other masks for this maskable *)
                 Uuid.Table.remove registered_masks t_uuid
