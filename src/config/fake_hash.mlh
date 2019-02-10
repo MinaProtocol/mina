@@ -1,7 +1,6 @@
 [%%import "config/ledger_depth/tiny.mlh"]
 [%%import "config/coinbase/standard.mlh"]
 [%%import "config/consensus/postake_tiny.mlh"]
-[%%import "config/debug_level/profiling.mlh"]
 
 [%%define fake_hash true]
 
