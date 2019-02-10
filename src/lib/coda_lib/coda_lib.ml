@@ -33,6 +33,8 @@ end
 module type Network_intf = sig
   type t
 
+  type consensus_state
+
   type state_with_witness
 
   type staged_ledger
@@ -107,8 +109,10 @@ module type Network_intf = sig
                                     Deferred.Or_error.t)
     -> transition_catchup:(   state_hash Envelope.Incoming.t
                            -> state_with_witness list Deferred.Option.t)
-    -> get_ancestry:(   (state_hash * int) Envelope.Incoming.t
-                     -> (state_with_witness * state_body_hash list)
+    -> get_ancestry:(   consensus_state Envelope.Incoming.t
+                     -> ( state_with_witness
+                        , state_body_hash list * state_with_witness )
+                        Proof_carrying_data.t
                         Deferred.Option.t)
     -> t Deferred.t
 end
@@ -341,22 +345,6 @@ end
 module type Inputs_intf = sig
   include Coda_pow.Inputs_intf
 
-  module Proof_carrying_state : sig
-    type t =
-      ( Consensus_mechanism.Protocol_state.value
-      , Protocol_state_proof.t )
-      Coda_pow.Proof_carrying_data.t
-    [@@deriving sexp, bin_io]
-  end
-
-  module State_with_witness :
-    State_with_witness_intf
-    with type state := Proof_carrying_state.t
-     and type ledger_hash := Ledger_hash.t
-     and type staged_ledger_transition := Staged_ledger_transition.t
-     and type staged_ledger_transition_with_valid_signatures_and_proofs :=
-                Staged_ledger_transition.With_valid_signatures_and_proofs.t
-
   module Snark_pool :
     Snark_pool_intf
     with type completed_work_statement := Transaction_snark_work.Statement.t
@@ -399,6 +387,7 @@ module type Inputs_intf = sig
      and type time := Time.t
      and type state_hash := Protocol_state_hash.t
      and type state_body_hash := State_body_hash.t
+     and type consensus_state := Consensus_mechanism.Consensus_state.value
 
   module Ledger_db : Coda_pow.Ledger_creatable_intf
 
@@ -427,6 +416,15 @@ module type Inputs_intf = sig
      and type time := Time.t
      and type network := Net.t
      and type ledger_db := Ledger_db.t
+
+  module Root_prover :
+    Protocols.Coda_transition_frontier.Root_prover_intf
+    with type state_body_hash := State_body_hash.t
+     and type transition_frontier := Transition_frontier.t
+     and type external_transition := External_transition.t
+     and type proof_verified_external_transition :=
+                External_transition.Proof_verified.t
+     and type consensus_state := Consensus_mechanism.Consensus_state.value
 
   module Proposer :
     Proposer_intf
@@ -465,11 +463,8 @@ module type Inputs_intf = sig
 
   module Sync_handler :
     Protocols.Coda_transition_frontier.Sync_handler_intf
-    with type state_hash := Protocol_state_hash.t
-     and type ledger_hash := Ledger_hash.t
+    with type ledger_hash := Ledger_hash.t
      and type transition_frontier := Transition_frontier.t
-     and type ancestor_proof := State_body_hash.t list
-     and type external_transition := External_transition.t
      and type syncable_ledger_query := Coda_base.Sync_ledger.query
      and type syncable_ledger_answer := Coda_base.Sync_ledger.answer
 end
@@ -662,9 +657,9 @@ module Make (Inputs : Inputs_intf) = struct
         let ledger_db =
           Ledger_db.create ?directory_name:config.ledger_db_location ()
         in
+        let max_length = Consensus.Constants.k in
         let%bind transition_frontier =
-          Transition_frontier.create ~logger:config.log
-            ~max_length:Consensus.Constants.k
+          Transition_frontier.create ~logger:config.log ~max_length
             ~root_transition:
               (With_hash.of_data first_transition
                  ~hash_data:
@@ -677,6 +672,9 @@ module Make (Inputs : Inputs_intf) = struct
               (Ledger_transfer.transfer_accounts ~src:Genesis.ledger
                  ~dest:ledger_db)
             ~consensus_local_state
+        in
+        let root_prover =
+          Root_prover.create ~logger:config.log ~finality_length:max_length
         in
         let frontier_mvar = Mvar.create () in
         Mvar.set frontier_mvar transition_frontier ;
@@ -714,11 +712,11 @@ module Make (Inputs : Inputs_intf) = struct
                   |> With_hash.data |> External_transition.of_verified )
                 frontier breadcrumb )
             ~get_ancestry:(fun query_env ->
-              let descendent, count = Envelope.Incoming.data query_env in
+              let consensus_state = Envelope.Incoming.data query_env in
               let result =
                 let open Option.Let_syntax in
                 let%bind frontier = Mvar.peek frontier_read_ref in
-                Sync_handler.prove_ancestry ~frontier count descendent
+                Root_prover.prove root_prover ~frontier consensus_state
               in
               Deferred.return result )
         in

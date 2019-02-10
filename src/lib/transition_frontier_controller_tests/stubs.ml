@@ -283,7 +283,12 @@ let gen_breadcrumb ~logger :
       Transition_frontier.Breadcrumb.build ~logger ~parent:parent_breadcrumb
         ~transition_with_hash:next_verified_external_transition_with_hash
     with
-    | Ok new_breadcrumb -> new_breadcrumb
+    | Ok new_breadcrumb ->
+        Logger.info logger
+          !"Producing a breadcrumb with hash : %{sexp:State_hash.t}"
+          ( Transition_frontier.Breadcrumb.transition_with_hash new_breadcrumb
+          |> With_hash.hash ) ;
+        new_breadcrumb
     | Error (`Fatal_error exn) -> raise exn
     | Error (`Validation_error e) ->
         failwithf !"Validation Error : %{sexp:Error.t}" e ()
@@ -357,14 +362,27 @@ end)
 
 module Sync_handler = Sync_handler.Make (struct
   include Transition_frontier_inputs
+  module Time = Time
   module Transition_frontier = Transition_frontier
+  module Protocol_state_validator = Protocol_state_validator
+end)
+
+module Root_prover = Root_prover.Make (struct
+  include Transition_frontier_inputs
+  module Time = Time
+  module Transition_frontier = Transition_frontier
+  module Protocol_state_validator = Protocol_state_validator
 end)
 
 module Network = struct
   type t =
-    {logger: Logger.t; table: Transition_frontier.t Network_peer.Peer.Table.t}
+    { logger: Logger.t
+    ; table: Transition_frontier.t Network_peer.Peer.Table.t
+    ; root_prover: Root_prover.t }
 
-  let create ~logger = {logger; table= Network_peer.Peer.Table.create ()}
+  let create ~logger ~max_length =
+    let root_prover = Root_prover.create ~logger ~finality_length:max_length in
+    {logger; table= Network_peer.Peer.Table.create (); root_prover}
 
   let add_exn {table; _} = Hashtbl.add_exn table
 
@@ -372,14 +390,15 @@ module Network = struct
 
   let catchup_transition _ = failwith "STUB: Network.catchup_transition"
 
-  let get_ancestry {table; _} peer (descendent, count) =
-    (let open Option.Let_syntax in
-    let%bind frontier = Hashtbl.find table peer in
-    Sync_handler.prove_ancestry ~frontier count descendent)
-    |> Result.of_option ~error:(Error.of_string "Mock Network error")
-    |> Deferred.return
+  let get_ancestry {table; root_prover; _} peer consensus_state =
+    Deferred.return
+    @@ Result.of_option
+         ~error:(Error.of_string "Peer could not produce an ancestor")
+         (let open Option.Let_syntax in
+         let%bind frontier = Hashtbl.find table peer in
+         Root_prover.prove ~frontier root_prover consensus_state)
 
-  let glue_sync_ledger {table; logger} query_reader response_writer : unit =
+  let glue_sync_ledger {table; logger; _} query_reader response_writer : unit =
     Pipe_lib.Linear_pipe.iter_unordered ~max_concurrency:8 query_reader
       ~f:(fun (ledger_hash, sync_ledger_query) ->
         Logger.info logger

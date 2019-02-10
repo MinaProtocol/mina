@@ -992,6 +992,16 @@ module type External_transition_intf = sig
     val staged_ledger_diff : t -> staged_ledger_diff
   end
 
+  module Proof_verified : sig
+    type t [@@deriving sexp, bin_io]
+
+    val protocol_state : t -> protocol_state
+
+    val protocol_state_proof : t -> protocol_state_proof
+
+    val staged_ledger_diff : t -> staged_ledger_diff
+  end
+
   val to_verified : t -> [`I_swear_this_is_safe_see_my_comment of Verified.t]
 
   val of_verified : Verified.t -> t
@@ -1290,10 +1300,6 @@ Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
 
   val prove_zk_state_valid :
     Witness.t -> new_state:protocol_state -> protocol_state_proof Deferred.t
-end
-
-module Proof_carrying_data = struct
-  type ('a, 'b) t = {data: 'a; proof: 'b} [@@deriving sexp, fields, bin_io]
 end
 
 module type Inputs_intf = sig

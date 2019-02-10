@@ -33,6 +33,8 @@ module Bootstrap_controller = Bootstrap_controller.Make (struct
   module Network = Network
   module Time = Time
   module Protocol_state_validator = Protocol_state_validator
+  module Sync_handler = Sync_handler
+  module Root_prover = Root_prover
 end)
 
 let%test_module "Bootstrap Controller" =
@@ -47,6 +49,7 @@ let%test_module "Bootstrap Controller" =
       let%bind syncing_frontier = create_root_frontier ~max_length ~logger in
       let%bind peer_frontier = create_root_frontier ~max_length ~logger in
       let%bind () =
+        (* TODO: dedup this *)
         build_frontier_randomly peer_frontier
           ~gen_root_breadcrumb_builder:(fun root_breadcrumb ->
             Quickcheck.Generator.with_size ~size:num_breadcrumbs
@@ -58,7 +61,7 @@ let%test_module "Bootstrap Controller" =
         Transition_frontier.best_tip_path_length_exn peer_frontier
       in
       assert (best_tip_length = max_length) ;
-      let network = Network.create ~logger in
+      let network = Network.create ~logger ~max_length in
       let open Transition_frontier.For_tests in
       let open Bootstrap_controller.For_tests in
       let root_sync_ledger =
@@ -74,7 +77,6 @@ let%test_module "Bootstrap Controller" =
           ~communication_port:1338
       in
       Network.add_exn network ~key:peer_address ~data:peer_frontier ;
-      let ancestor_prover = Ancestor.Prover.create ~max_size:max_length in
       let genesis_root =
         Transition_frontier.root syncing_frontier
         |> Transition_frontier.Breadcrumb.transition_with_hash
@@ -82,8 +84,7 @@ let%test_module "Bootstrap Controller" =
         |> External_transition.forget_consensus_state_verification
       in
       let bootstrap =
-        make_bootstrap ~logger ~ancestor_prover ~genesis_root ~network
-          ~max_length
+        make_bootstrap ~logger ~genesis_root ~network ~max_length
       in
       Deferred.return {root_sync_ledger; peer_frontier; peer_address; bootstrap}
 
@@ -95,8 +96,7 @@ let%test_module "Bootstrap Controller" =
       let max_length = 4 in
       let num_breadcrumbs = 10 in
       let logger = Logger.create () in
-      let network = Network.create ~logger in
-      let ancestor_prover = Ancestor.Prover.create ~max_size:max_length in
+      let network = Network.create ~logger  ~max_length in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind frontier = create_root_frontier ~max_length ~logger in
           let genesis_root =
@@ -106,8 +106,7 @@ let%test_module "Bootstrap Controller" =
             |> External_transition.forget_consensus_state_verification
           in
           let bootstrap =
-            Bootstrap_controller.For_tests.make_bootstrap ~logger
-              ~ancestor_prover ~genesis_root ~network ~max_length
+            Bootstrap_controller.For_tests.make_bootstrap ~logger ~genesis_root  ~max_length ~network
           in
           let ledger_db =
             Transition_frontier.For_tests.root_snarked_ledger frontier

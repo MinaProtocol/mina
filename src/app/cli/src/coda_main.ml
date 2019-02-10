@@ -666,41 +666,6 @@ struct
   module Private_key = Private_key
   module Keypair = Keypair
 
-  module Proof_carrying_state = struct
-    type t =
-      ( Protocol_state.value
-      , Protocol_state_proof.t )
-      Protocols.Coda_pow.Proof_carrying_data.t
-    [@@deriving sexp, bin_io]
-  end
-
-  module State_with_witness = struct
-    type t =
-      { staged_ledger_transition:
-          Staged_ledger_transition.With_valid_signatures_and_proofs.t
-      ; state: Proof_carrying_state.t }
-    [@@deriving sexp]
-
-    module Stripped = struct
-      type t =
-        { staged_ledger_transition: Staged_ledger_transition.t
-        ; state: Proof_carrying_state.t }
-    end
-
-    let strip {staged_ledger_transition; state} =
-      { Stripped.staged_ledger_transition=
-          Staged_ledger_transition.forget staged_ledger_transition
-      ; state }
-
-    let forget_witness {staged_ledger_transition; state} = state
-
-    (* TODO: How do we check this *)
-    let add_witness staged_ledger_transition state =
-      Or_error.return {staged_ledger_transition; state}
-
-    let add_witness_exn l s = add_witness l s |> Or_error.ok_exn
-  end
-
   module Genesis = struct
     let state = Consensus.genesis_protocol_state
 
@@ -821,16 +786,7 @@ struct
     module Blockchain_state = Consensus.Blockchain_state
   end)
 
-  module Sync_handler = Sync_handler.Make (struct
-    include Inputs0
-    module Staged_ledger_diff = Staged_ledger_diff
-    module Transaction_snark_work = Transaction_snark_work
-    module Syncable_ledger = Sync_ledger
-    module Ledger_proof_statement = Ledger_proof_statement
-    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-  end)
-
-  module Transition_handler = Transition_handler.Make (struct
+  module Protocol_state_validator = Protocol_state_validator.Make (struct
     include Inputs0
     module State_proof = Protocol_state_proof
     module Transaction_snark_work = Transaction_snark_work
@@ -839,7 +795,17 @@ struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
   end)
 
-  module Protocol_state_validator = Protocol_state_validator.Make (struct
+  module Sync_handler = Sync_handler.Make (struct
+    include Inputs0
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Transaction_snark_work = Transaction_snark_work
+    module Syncable_ledger = Sync_ledger
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Protocol_state_validator = Protocol_state_validator
+  end)
+
+  module Transition_handler = Transition_handler.Make (struct
     include Inputs0
     module State_proof = Protocol_state_proof
     module Transaction_snark_work = Transaction_snark_work
@@ -859,6 +825,15 @@ struct
     module Network = Net
   end)
 
+  module Root_prover = Root_prover.Make (struct
+    include Inputs0
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Transaction_snark_work = Transaction_snark_work
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Protocol_state_validator = Protocol_state_validator
+  end)
+
   module Bootstrap_controller = Bootstrap_controller.Make (struct
     include Inputs0
     module Staged_ledger_diff = Staged_ledger_diff
@@ -869,11 +844,14 @@ struct
     module Root_sync_ledger = Root_sync_ledger
     module Protocol_state_validator = Protocol_state_validator
     module Network = Net
+    module Sync_handler = Sync_handler
+    module Root_prover = Root_prover
   end)
 
   module Transition_frontier_controller =
   Transition_frontier_controller.Make (struct
     include Inputs0
+    module Protocol_state_validator = Protocol_state_validator
     module Transaction_snark_work = Transaction_snark_work
     module Syncable_ledger = Sync_ledger
     module Sync_handler = Sync_handler
