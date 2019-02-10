@@ -1,6 +1,6 @@
 (** A non-empty list that is safe by construction. *)
 
-type 'a t [@@deriving sexp, compare, eq, hash]
+type 'a t [@@deriving sexp, compare, eq, hash, bin_io]
 
 val init : 'a -> 'a list -> 'a t
 (** Create a non-empty list by proving you have a head element *)
