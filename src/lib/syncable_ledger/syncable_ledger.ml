@@ -288,7 +288,8 @@ module Make
       match q with
       | What_hash a -> Has_hash (a, MT.get_inner_hash_at_addr_exn mt a)
       | What_contents a ->
-          Contents_are (a, MT.get_all_accounts_rooted_at_exn mt a)
+          Contents_are
+            (a, List.map ~f:snd @@ MT.get_all_accounts_rooted_at_exn mt a)
       | Num_accounts ->
           let len = MT.num_accounts mt in
           let height = Int.ceil_log2 len in

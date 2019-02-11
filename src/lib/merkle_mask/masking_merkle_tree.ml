@@ -351,7 +351,7 @@ struct
             ~init:[]
             ~f:(fun bit_index acc ->
               let queried_account = get t @@ Location.Account bit_index in
-              (queried_account |> Option.value_exn) :: acc ) )
+              (bit_index, queried_account |> Option.value_exn) :: acc ) )
       |> List.rev
 
     (* set accounts in mask *)

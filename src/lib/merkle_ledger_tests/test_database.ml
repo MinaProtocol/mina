@@ -186,7 +186,10 @@ let%test_module "test functor on in memory databases" =
                        Account.gen)
                 in
                 MT.set_all_accounts_rooted_at_exn mdb address accounts ;
-                let result = MT.get_all_accounts_rooted_at_exn mdb address in
+                let result =
+                  List.map ~f:snd
+                  @@ MT.get_all_accounts_rooted_at_exn mdb address
+                in
                 assert (List.equal ~equal:Account.equal accounts result) ) )
 
       let%test_unit "create_empty doesn't modify the hash" =
@@ -278,7 +281,8 @@ let%test_module "test functor on in memory databases" =
               List.iter accounts ~f:(fun account ->
                   ignore @@ create_new_account_exn mdb account ) ;
               let retrieved_accounts =
-                MT.get_all_accounts_rooted_at_exn mdb (MT.Addr.root ())
+                List.map ~f:snd
+                @@ MT.get_all_accounts_rooted_at_exn mdb (MT.Addr.root ())
               in
               assert (List.length accounts = List.length retrieved_accounts) ;
               assert (

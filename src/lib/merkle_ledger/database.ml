@@ -309,9 +309,11 @@ module Make
     let result =
       Addr.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
           let account = get mdb (Location.Account bit_index) in
-          account :: acc )
+          (bit_index, account) :: acc )
     in
-    List.rev_filter_map result ~f:Fn.id
+    List.rev_filter_map result ~f:(function
+      | _, None -> None
+      | addr, Some account -> Some (addr, account) )
 
   let set_all_accounts_rooted_at_exn mdb address (accounts : Account.t list) =
     let first_node, last_node = Addr.Range.subtree_range address in
