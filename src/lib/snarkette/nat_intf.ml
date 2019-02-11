@@ -1,5 +1,5 @@
 module type S = sig
-  type t [@@deriving eq, bin_io, sexp]
+  type t [@@deriving eq, bin_io, sexp, compare]
 
   val of_int : int -> t
 
