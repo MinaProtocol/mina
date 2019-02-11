@@ -163,17 +163,6 @@ module Snark_transition = Coda_base.Snark_transition.Make (struct
   module Prover_state = Prover_state
 end)
 
-module For_tests = struct
-  let gen_consensus_state ~gen_slot_advancement:_ =
-    let open Consensus_state in
-    Quickcheck.Generator.return
-    @@ fun ~previous_protocol_state ~snarked_ledger_hash:_ ->
-    let prev =
-      Protocol_state.consensus_state (With_hash.data previous_protocol_state)
-    in
-    {length= Length.succ prev.length; signer_public_key= prev.signer_public_key}
-end
-
 let generate_transition ~previous_protocol_state ~blockchain_state ~time:_
     ~proposal_data ~transactions:_ ~snarked_ledger_hash:_ ~supply_increase:_
     ~logger:_ =
@@ -248,6 +237,17 @@ let next_proposal now _state ~local_state:_ ~keypair ~logger:_ =
 
 let lock_transition _ _ ~local_state:_ ~snarked_ledger:_ = ()
 
+let create_genesis_protocol_state ~blockchain_state =
+  let state =
+    Protocol_state.create_value
+      ~previous_state_hash:(Protocol_state.hash Protocol_state.negative_one)
+      ~blockchain_state
+      ~consensus_state:
+        (Consensus_state.update
+           (Protocol_state.consensus_state Protocol_state.negative_one))
+  in
+  With_hash.of_data ~hash_data:Protocol_state.hash state
+
 let genesis_protocol_state =
   let state =
     Protocol_state.create_value
@@ -259,6 +259,28 @@ let genesis_protocol_state =
            (Protocol_state.consensus_state Protocol_state.negative_one))
   in
   With_hash.of_data ~hash_data:Protocol_state.hash state
+
+module For_tests = struct
+  let gen_consensus_state ~gen_slot_advancement:_ =
+    let open Consensus_state in
+    Quickcheck.Generator.return
+    @@ fun ~previous_protocol_state ~snarked_ledger_hash:_ ->
+    let prev =
+      Protocol_state.consensus_state (With_hash.data previous_protocol_state)
+    in
+    {length= Length.succ prev.length; signer_public_key= prev.signer_public_key}
+
+  let create_genesis_protocol_state ledger =
+    let root_ledger_hash = Ledger.merkle_root ledger in
+    create_genesis_protocol_state
+      ~blockchain_state:
+        { Blockchain_state.genesis with
+          staged_ledger_hash=
+            Staged_ledger_hash.(
+              of_aux_and_ledger_hash Aux_hash.dummy root_ledger_hash)
+        ; snarked_ledger_hash=
+            Frozen_ledger_hash.of_ledger_hash root_ledger_hash }
+end
 
 let should_bootstrap ~existing:_ ~candidate:_ = false
 

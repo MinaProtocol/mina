@@ -268,7 +268,9 @@ end = struct
       Root_sync_ledger.destroy root_sync_ledger ;
       synced_db
     in
-    assert (Ledger.Db.(merkle_root ledger_db = merkle_root synced_db)) ;
+    assert (
+      Ledger.Db.(
+        Ledger_hash.equal (merkle_root ledger_db) (merkle_root synced_db)) ) ;
     (* Need to coerce new_root from a proof_verified transition to a fully
        verified transition because it will be added into transition frontier*)
     let (`I_swear_this_is_safe_see_my_comment new_root) =

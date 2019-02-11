@@ -239,17 +239,6 @@ module Make (Inputs : Inputs_intf) :
       Frozen_ledger_hash.of_ledger_hash
       @@ Ledger.merkle_root (Ledger.of_database root_snarked_ledger)
     in
-    (* Only check this case after the genesis block *)
-    if not @@ State_hash.equal genesis_protocol_state.hash root_hash then
-      [%test_result: Ledger_hash.t]
-        ~message:
-          "Staged-ledger's ledger hash different from implied merkle root of \
-           this masked ledger"
-        ~expect:
-          (Staged_ledger_hash.ledger_hash
-             (Protocol_state.Blockchain_state.staged_ledger_hash
-                root_blockchain_state))
-        (Ledger.Mask.Attached.merkle_root root_masked_ledger) ;
     match%bind
       Inputs.Staged_ledger.of_scan_state_and_ledger
         ~scan_state:root_transaction_snark_scan_state
@@ -605,6 +594,9 @@ module Make (Inputs : Inputs_intf) :
       best_tip_node.length - root_node.length
     in
     result |> Option.value_exn
+
+  let shallow_copy_root_snarked_ledger {root_snarked_ledger; _} =
+    Ledger.of_database root_snarked_ledger
 
   module For_tests = struct
     let root_snarked_ledger {root_snarked_ledger; _} = root_snarked_ledger

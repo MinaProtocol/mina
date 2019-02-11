@@ -293,12 +293,13 @@ let gen_breadcrumb ~logger :
     | Error (`Validation_error e) ->
         failwithf !"Validation Error : %{sexp:Error.t}" e ()
 
-let create_root_frontier ~max_length ~logger : Transition_frontier.t Deferred.t
-    =
-  let accounts = Genesis_ledger.accounts in
-  let _, proposer_account = List.hd_exn accounts in
+let genesis_accounts = Genesis_ledger.accounts |> List.map ~f:snd
+
+let create_root_frontier ~accounts ~logger ~max_length :
+    Transition_frontier.t Deferred.t =
+  let proposer_account = List.hd_exn accounts in
   let root_snarked_ledger = Coda_base.Ledger.Db.create () in
-  List.iter accounts ~f:(fun (_, account) ->
+  List.iter accounts ~f:(fun account ->
       let status, _ =
         Coda_base.Ledger.Db.get_or_create_account_exn root_snarked_ledger
           (Account.public_key account)
@@ -306,8 +307,9 @@ let create_root_frontier ~max_length ~logger : Transition_frontier.t Deferred.t
       in
       assert (status = `Added) ) ;
   let root_transaction_snark_scan_state = Staged_ledger.Scan_state.empty () in
-  let genesis_protocol_state =
-    With_hash.data Consensus.genesis_protocol_state
+  let genesis_protocol_state_with_hash =
+    Consensus.For_tests.create_genesis_protocol_state
+      (Ledger.of_database root_snarked_ledger)
   in
   let dummy_staged_ledger_diff =
     let creator =
@@ -324,13 +326,14 @@ let create_root_frontier ~max_length ~logger : Transition_frontier.t Deferred.t
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment root_transition) =
     External_transition.to_verified
-      (External_transition.create ~protocol_state:genesis_protocol_state
+      (External_transition.create
+         ~protocol_state:(With_hash.data genesis_protocol_state_with_hash)
          ~protocol_state_proof:Proof.dummy
          ~staged_ledger_diff:dummy_staged_ledger_diff)
   in
   let root_transition_with_data =
     { With_hash.data= root_transition
-    ; hash= With_hash.hash Consensus.genesis_protocol_state }
+    ; hash= With_hash.hash genesis_protocol_state_with_hash }
   in
   let frontier =
     Transition_frontier.create ~logger
@@ -353,6 +356,12 @@ let build_frontier_randomly ~gen_root_breadcrumb_builder frontier :
   Deferred.List.iter deferred_breadcrumbs ~f:(fun deferred_breadcrumb ->
       let%map breadcrumb = deferred_breadcrumb in
       Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
+
+let gen_linear_breadcrumbs ~logger ~size root_breadcrumb =
+  Quickcheck.Generator.with_size ~size
+  @@ Quickcheck_lib.gen_imperative_list
+       (root_breadcrumb |> return |> Quickcheck.Generator.return)
+       (gen_breadcrumb ~logger)
 
 module Protocol_state_validator = Protocol_state_validator.Make (struct
   include Transition_frontier_inputs
