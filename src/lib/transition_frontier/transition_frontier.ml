@@ -358,22 +358,20 @@ module Make (Inputs : Inputs_intf) :
       failwith
         "invalid call to attach_to: hash parent_node <> parent_hash node" ;
     (* We only want to update the parent node if we don't have a dupe *)
-    let valid = ref true in
     Hashtbl.change t.table hash ~f:(function
-      | Some _ ->
+      | Some x ->
           Logger.warn t.logger
             !"attach_node_to with breadcrumb for state %{sexp:State_hash.t} \
               already present; catchup scheduler bug?"
             hash ;
-          valid := false ;
-          None
-      | None -> Some node ) ;
-    if !valid then
-      Hashtbl.set t.table
-        ~key:(Breadcrumb.hash parent_node.breadcrumb)
-        ~data:
-          { parent_node with
-            successor_hashes= hash :: parent_node.successor_hashes }
+          Some x
+      | None ->
+          Hashtbl.set t.table
+            ~key:(Breadcrumb.hash parent_node.breadcrumb)
+            ~data:
+              { parent_node with
+                successor_hashes= hash :: parent_node.successor_hashes } ;
+          Some node )
 
   let attach_breadcrumb_exn t breadcrumb =
     let hash = Breadcrumb.hash breadcrumb in
