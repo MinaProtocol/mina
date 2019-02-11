@@ -6,7 +6,7 @@ module type S = sig
   type curve
 
   module Digest : sig
-    type t [@@deriving bin_io, sexp, eq]
+    type t [@@deriving bin_io, sexp, eq, compare]
 
     val fold_bits : t -> bool Fold.t
 
@@ -37,7 +37,7 @@ module type S = sig
 end
 
 module Make (Field : sig
-  type t [@@deriving sexp, bin_io, eq]
+  type t [@@deriving sexp, bin_io, eq, compare]
 
   val fold_bits : t -> bool Fold.t
 
@@ -54,7 +54,7 @@ end) (Curve : sig
   val negate : t -> t
 end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
   module Digest = struct
-    type t = Field.t [@@deriving sexp, bin_io, eq]
+    type t = Field.t [@@deriving sexp, bin_io, eq, compare]
 
     let fold_bits = Field.fold_bits
 
