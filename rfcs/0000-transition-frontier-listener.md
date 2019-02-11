@@ -28,47 +28,53 @@ Other uses for such an abstraction:
 
 [detailed-design]: #detailed-design
 
-This design is based on the introduction of a new signature in `Protocols.coda_transition_frontier` as follows.:
+This design is based on the introduction of the following types to `Protocols.coda_transition_frontier`:
 ```ocaml
-module type Transition_frontier_listener_intf = sig
+module type Transition_frontier_extension_intf = sig
   type t
-  val add_breadcrumb : t -> Breadcrumb.t -> unit;
-  val remove_breadcrumb : t -> Breadcrumb.t -> unit;
+  val create : unit -> t
+  val handle_diff : t -> Breadcrumb.t -> unit
+end
+
+module type Transition_frontier_diff = sig
+  type 'a t =
+    | Add of 'a
+    | Remove of 'a
+    | Set_root of 'a
+    | Destroy
+end
+
+module type Transition_frontier_extensions = sig
+  type t = 
+  { snark_pool_refcount: Snark_pool_refcount.t
+  ; transaction_pool_refcount: Transaction_pool_refcount.t
+  ; frontier_persister: Frontier_persister.t
+  ... } [@@deriving fields]
 end
 ```
 
-The transition frontier would then expose a function for registering listeners. We probably have to do some sort of GADT/ first-class module magic to make this work (???)
-```
-val add_frontier_listener : (module Transition_frontier_listener_intf with type t = 'a) -> 'a -> unit
-```
-The transition frontier will call `add/remove_breadcrumb` on everything in the list of registered listeners
+Each of the fields of `Transition_frontier_extensions.t` satisfy the `Transition_frontier_extension_intf` signature.
+The transition frontier will hold an instance of `Transition_frontier_extensions.t` and use `Transition_frontier_extensions.Fields.iter` to call `handle_diff` on all fields in 
 whenever it adds or removes a breadcrumb from the frontier (in `Transition_frontier.add_breadcrumb_exn`).
 
-In the example of the snark pool reference count, the snark pool itself could implement the `add/remove_breadcrumb` functions.
-The `add_breadcrumb` would get all the `Work` from the breadcrumb and increment the references for each of them.
-In `remove_breadcrumb`, they would be correspondingly decremented. When the reference count for a given piece of
-`Work` goes to zero, its entry in the table of snark proofs can also be removed.
-
-For other pieces of data that may need to be accessed from many components, the `Mvar` containing the transition frontier
-could be changed to contain a record with the frontier as well as several widgets that implement the "listener" signature
-in order to keep themselves up to date.
+In the example of the snark pool reference count, the snark pool would look at `Transition_frontier.t.snark_pool_refcount` to determine whether it should be storing certain proofs from snark workers. The `Add` would get all the `Work` from the breadcrumb and increment the references for each of them. When receiving `Remove`, they would be correspondingly decremented. When the reference count for a given piece of `Work` goes to zero, its entry in the table of snark proofs can also be removed.
 
 ## Drawbacks
 [drawbacks]: #drawbacks
 
-  - This API more or less assumes that `Transition_frontier_listener_intf.t` is mutable. In the case of the snark pool refcount, this seems to be alright.
+  - This API more or less assumes that `Transition_frontier_extension_intf.t` is mutable. In the case of the snark pool refcount, this seems to be alright.
   - If the `add/remove_breadcrumb` are slow, this could slow down the transition frontier.
   - Adding the calculation to the frontier itself would avoid adding an abstraction, though this listener is fairly simple as described.
 
 ## Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
 
-  - Alternative: Calculate values on-demand by iterating over all transitions in the frontier -- this is more expensive
-  - Alternative: Add incremental calculation to the transition frontier itself -- this adds unrelated complexity to the frontier code
   - This design allows for more data to be incrementally calculated based on activity in the transition frontier
   while adding minimal complexity to the frontier itself.
+  - Alternative: Calculate values on-demand by iterating over all transitions in the frontier -- this is more expensive
+  - Alternative: Add incremental calculation to the transition frontier itself -- this adds unrelated complexity to the frontier code
   
-  An alternative implementation of this "Listener" solution would have the transition frontier hold a list of listener functions that have signature `Breadcrumb.t -> unit`, so the `t` is embedded in the closure of the listener. This is much simpler from a types perspective but may be less clear/explicit.
+  An alternative implementation of this "Listener" solution would have the transition frontier hold a list of listener functions that have signature `Breadcrumb.t -> unit`, so the `t` is embedded in the closure of the listener. This is potentially simpler but less explicit.
 
 ## Prior art
 [prior-art]: #prior-art
@@ -79,6 +85,5 @@ in order to keep themselves up to date.
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-  - Should the listener also support a `clear/destroy` call for when the transition frontier is thrown away/reset/synced? We assume that the only way to create a transition frontier is to create an empty one and then fill it by adding breadcrumbs.
   - Potentially out of scope of this listener api RFC, but in the snark pool manager, it is unclear how to obtain the work from the breadcrumb, and how important it is to get all future work from a breadcrumb rather than just the available work.
-  - In the snark pool garbage collection case, do we want to remove from the pool when a breadcrumb pointing at the data leaves the transition frontier completely, or just when it ceases to be a leaf? If the latter, we may need to rethink when the `remove_breadcrumb` fires, or add a third function.
+  - In the snark pool garbage collection case, do we want to remove from the pool when a breadcrumb pointing at the data leaves the transition frontier completely, or just when it ceases to be a leaf? If the latter, we may need to rethink when the `remove_breadcrumb` fires.
