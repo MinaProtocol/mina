@@ -305,7 +305,7 @@ end = struct
     let (`I_swear_this_is_safe_see_my_comment new_root) =
       External_transition.(t.current_root |> of_proof_verified |> to_verified)
     in
-    let%bind new_frontier =
+    let%map new_frontier =
       Transition_frontier.create ~logger:parent_log
         ~root_snarked_ledger:ledger_db
         ~root_transaction_snark_scan_state:(Staged_ledger.Scan_state.empty ())
@@ -318,7 +318,7 @@ end = struct
         ~consensus_local_state:
           (Transition_frontier.consensus_local_state frontier)
     in
-    Deferred.return (new_frontier, Transition_cache.data transition_graph)
+    (new_frontier, Transition_cache.data transition_graph)
 
   module For_tests = struct
     type nonrec t = t
