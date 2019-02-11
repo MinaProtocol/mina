@@ -158,7 +158,6 @@ end
 
   let serializable_of_t _ = failwith "unimplented"
 
-
   type serializable = int [@@deriving bin_io]
 
   type unattached_mask = Mask.t
