@@ -193,6 +193,35 @@ jobs:
                   command: make publish_deb
             - store_artifacts:
                   path: /tmp/artifacts
+    build_testnet_postake_fake_hash:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+        environment:
+            DUNE_PROFILE: testnet_postake_fake_hash
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Download Stable Proving Keys
+                  command: scripts/getkeys.sh
+            - run:
+                  name: Build OCaml (sig)
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Build deb Package with keys
+                  command: make deb
+            - run:
+                  name: Build provingkeys
+                  command: make provingkeys
+            - run:
+                  name: Store Genesis keys
+                  command: make genesiskeys
+            - run:
+                  name: Upload deb to repo
+                  command: make publish_deb
+            - store_artifacts:
+                  path: /tmp/artifacts
 
     test-unit-test:
         resource_class: large
@@ -344,6 +373,7 @@ workflows:
             - build_testnet_posig
             - build_testnet_postake
             - build_testnet_public
+            - build_testnet_postake_fake_hash
             - test-fake_hash_full_test
             - test-posig_integration_tests
             - test-postake_integration_tests
