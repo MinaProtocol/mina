@@ -130,13 +130,15 @@ module Make (Inputs : Inputs_intf) :
     Broadcaster.broadcast controller_type
       (`Transition_frontier_controller (new_frontier, reader, writer))
 
-  let run ~logger ~network ~time_controller ~frontier_mvar ~ledger_db
+  let run ~logger ~network ~time_controller ~frontier_mvar ~ledger_db:_
       ~network_transition_reader ~proposer_transition_reader =
     let clean_transition_frontier_controller_and_start_bootstrap
-        ~controller_type ~clear_writer ~transition_frontier_controller_reader
-        ~transition_frontier_controller_writer ~old_frontier
+        ~controller_type:_ ~clear_writer:_
+        ~transition_frontier_controller_reader:_
+        ~transition_frontier_controller_writer:_ ~old_frontier:_
         (`Transition _incoming_transition, `Time_received _tm) =
-      _kill transition_frontier_controller_reader
+      failwith "Bootstrap is disabled as there this an infinite loop here"
+      (*_kill transition_frontier_controller_reader
         transition_frontier_controller_writer ;
       Strict_pipe.Writer.write clear_writer `Clear |> don't_wait_for ;
       let bootstrap_controller_reader, bootstrap_controller_writer =
@@ -164,7 +166,7 @@ module Make (Inputs : Inputs_intf) :
             (With_hash.of_data
                ~hash_data:
                  (Fn.compose Consensus.Protocol_state.hash
-                    External_transition.Verified.protocol_state)) )
+                    External_transition.Verified.protocol_state)) ) *)
     in
     let start_transition_frontier_controller ~verified_transition_writer
         ~clear_reader ~collected_transitions frontier =
