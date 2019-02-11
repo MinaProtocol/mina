@@ -98,6 +98,8 @@ let run_test () : unit Deferred.t =
               ~discovery_port:8001 ~communication_port:8000
         ; banlist } }
   in
+  Core.Backtrace.elide := false ;
+  Async.Scheduler.set_record_backtraces true ;
   let%bind coda =
     Main.create
       (Main.Config.make ~log ~net_config ~propose_keypair:keypair

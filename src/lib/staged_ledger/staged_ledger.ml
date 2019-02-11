@@ -123,7 +123,7 @@ end = struct
     { scan_state:
         scan_state
         (* Invariant: this is the ledger after having applied all the transactions in
-       the above state. *)
+         * the above state. *)
     ; ledger: Ledger.attached_mask sexp_opaque }
   [@@deriving sexp]
 
@@ -140,6 +140,10 @@ end = struct
         (Ledger.unattached_mask_of_serializable serialized_mask)
     in
     {scan_state; ledger= attached_mask}
+
+  let proof_txns t =
+    Scan_state.latest_ledger_proof t.scan_state
+    |> Option.bind ~f:(Fn.compose Non_empty_list.of_list_opt snd)
 
   let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
 
@@ -180,7 +184,7 @@ end = struct
 
   let scan_state {scan_state; _} = scan_state
 
-  let get_target (proof, _) =
+  let get_target ((proof, _), _) =
     let {Ledger_proof_statement.target; _} = Ledger_proof.statement proof in
     target
 
@@ -288,7 +292,16 @@ end = struct
   let create ~ledger : t = {scan_state= Scan_state.empty (); ledger}
 
   let current_ledger_proof t =
-    Option.map (Scan_state.latest_ledger_proof t.scan_state) ~f:fst
+    Option.map
+      (Scan_state.latest_ledger_proof t.scan_state)
+      ~f:(Fn.compose fst fst)
+
+  let replace_ledger_exn t ledger =
+    [%test_result: Ledger_hash.t]
+      ~message:"Cannot replace ledger since merkle_root differs"
+      ~expect:(Ledger.merkle_root t.ledger)
+      (Ledger.merkle_root ledger) ;
+    {t with ledger}
 
   let total_proofs (works : Transaction_snark_work.t list) =
     List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
@@ -1586,6 +1599,8 @@ let%test_module "test" =
 
         let register_mask l _m = copy l
 
+        let remove_and_reparent_exn _ _ ~children:_ = failwith "unimplemented"
+
         let unattached_mask_of_serializable _ = failwith "unimplemented"
 
         let serializable_of_t _ = failwith "unimplemented"
@@ -1945,7 +1960,7 @@ let%test_module "test" =
                 Option.value_map ~default:Currency.Fee.Signed.zero ledger_proof
                   ~f:(fun proof ->
                     let stmt = Test_input1.Ledger_proof.statement proof in
-                    stmt.fee_excess )
+                    (fst stmt).fee_excess )
               in
               (*fee_excess at the top should always be zero*)
               assert (
@@ -1981,7 +1996,7 @@ let%test_module "test" =
                 Option.value_map ~default:Currency.Fee.Signed.zero proof
                   ~f:(fun proof ->
                     let stmt = Test_input1.Ledger_proof.statement proof in
-                    stmt.fee_excess )
+                    (fst stmt).fee_excess )
               in
               (*fee_excess at the top should always be zero*)
               assert (
@@ -2024,7 +2039,7 @@ let%test_module "test" =
                 Option.value_map ~default:Currency.Fee.Signed.zero proof
                   ~f:(fun proof ->
                     let stmt = Test_input1.Ledger_proof.statement proof in
-                    stmt.fee_excess )
+                    (fst stmt).fee_excess )
               in
               (*fee_excess at the top should always be zero*)
               assert (
@@ -2148,7 +2163,7 @@ let%test_module "test" =
               in
               let last_snarked_ledger =
                 Option.value_map ~default:!expected_snarked_ledger
-                  ~f:(fun p -> p.target)
+                  ~f:(fun (p, _) -> p.target)
                   proof
               in
               expected_snarked_ledger := last_snarked_ledger ;
@@ -2190,7 +2205,7 @@ let%test_module "test" =
                 Option.value_map ~default:Currency.Fee.Signed.zero proof
                   ~f:(fun proof ->
                     let stmt = Test_input1.Ledger_proof.statement proof in
-                    stmt.fee_excess )
+                    (fst stmt).fee_excess )
               in
               (*fee_excess at the top should always be zero*)
               assert (
@@ -2240,7 +2255,7 @@ let%test_module "test" =
                 Option.value_map ~default:Currency.Fee.Signed.zero proof
                   ~f:(fun proof ->
                     let stmt = Test_input1.Ledger_proof.statement proof in
-                    stmt.fee_excess )
+                    (fst stmt).fee_excess )
               in
               (*fee_excess at the top should always be zero*)
               assert (
@@ -2304,7 +2319,7 @@ let%test_module "test" =
                 Option.value_map ~default:Currency.Fee.Signed.zero proof
                   ~f:(fun proof ->
                     let stmt = Test_input1.Ledger_proof.statement proof in
-                    stmt.fee_excess )
+                    (fst stmt).fee_excess )
               in
               (*fee_excess at the top should always be zero*)
               assert (
