@@ -108,17 +108,11 @@ module Make (Inputs : Inputs_intf) :
           let transition_protocol_state =
             Inputs.External_transition.Verified.protocol_state transition
           in
-          let ledger_hash_from_proof p =
-            Inputs.Ledger_proof.statement_target
-              (Inputs.Ledger_proof.statement p)
+          let blockchain_state =
+            Consensus.Protocol_state.blockchain_state transition_protocol_state
           in
-          let blockchain_state_ledger_hash, blockchain_staged_ledger_hash =
-            let blockchain_state =
-              Consensus.Protocol_state.blockchain_state
-                transition_protocol_state
-            in
-            ( Consensus.Blockchain_state.snarked_ledger_hash blockchain_state
-            , Consensus.Blockchain_state.staged_ledger_hash blockchain_state )
+          let blockchain_staged_ledger_hash =
+            Consensus.Blockchain_state.staged_ledger_hash blockchain_state
           in
           let%bind ( `Hash_after_applying staged_ledger_hash
                    , `Ledger_proof proof_opt
@@ -138,25 +132,11 @@ module Make (Inputs : Inputs_intf) :
                     (Error.of_string
                        (Inputs.Staged_ledger.Staged_ledger_error.to_string e)))
           in
-          let target_ledger_hash, just_emitted_a_proof =
-            match proof_opt with
-            | None ->
-                ( Option.value_map
-                    (Inputs.Staged_ledger.current_ledger_proof
-                       transitioned_staged_ledger)
-                    ~f:ledger_hash_from_proof
-                    ~default:
-                      (Frozen_ledger_hash.of_ledger_hash
-                         (Ledger.merkle_root Genesis_ledger.t))
-                , false )
-            | Some (proof, _proof_txns) -> (ledger_hash_from_proof proof, true)
-          in
+          let just_emitted_a_proof = Option.is_some proof_opt in
           let%map transitioned_staged_ledger =
             if
-              Frozen_ledger_hash.equal target_ledger_hash
-                blockchain_state_ledger_hash
-              && Staged_ledger_hash.equal staged_ledger_hash
-                   blockchain_staged_ledger_hash
+              Staged_ledger_hash.equal staged_ledger_hash
+                blockchain_staged_ledger_hash
             then return transitioned_staged_ledger
             else
               Deferred.return
@@ -240,17 +220,6 @@ module Make (Inputs : Inputs_intf) :
       Frozen_ledger_hash.of_ledger_hash
       @@ Ledger.merkle_root (Ledger.of_database root_snarked_ledger)
     in
-    (* Only check this case after the genesis block *)
-    if not @@ State_hash.equal genesis_protocol_state.hash root_hash then
-      [%test_result: Ledger_hash.t]
-        ~message:
-          "Staged-ledger's ledger hash different from implied merkle root of \
-           this masked ledger"
-        ~expect:
-          (Staged_ledger_hash.ledger_hash
-             (Protocol_state.Blockchain_state.staged_ledger_hash
-                root_blockchain_state))
-        (Ledger.Mask.Attached.merkle_root root_masked_ledger) ;
     match%bind
       Inputs.Staged_ledger.of_scan_state_and_ledger
         ~scan_state:root_transaction_snark_scan_state
@@ -603,6 +572,9 @@ module Make (Inputs : Inputs_intf) :
       best_tip_node.length - root_node.length
     in
     result |> Option.value_exn
+
+  let shallow_copy_root_snarked_ledger {root_snarked_ledger; _} =
+    Ledger.of_database root_snarked_ledger
 
   module For_tests = struct
     let root_snarked_ledger {root_snarked_ledger; _} = root_snarked_ledger
