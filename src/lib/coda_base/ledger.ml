@@ -35,7 +35,7 @@ module Storage_locations : Intf.Storage_locations = struct
 end
 
 module Hash = struct
-  type t = Ledger_hash.t [@@deriving bin_io, sexp]
+  type t = Ledger_hash.t [@@deriving bin_io, sexp, eq, compare]
 
   let merge = Ledger_hash.merge
 
@@ -146,6 +146,9 @@ let packed t = Any_ledger.cast (module Mask.Attached) t
 let register_mask t mask = Maskable.register_mask (packed t) mask
 
 let unregister_mask_exn t mask = Maskable.unregister_mask_exn (packed t) mask
+
+let remove_and_reparent_exn t t_as_mask ~children =
+  Maskable.remove_and_reparent_exn (packed t) t_as_mask ~children
 
 (* TODO: Implement the serialization/deserialization *)
 let unattached_mask_of_serializable _ = failwith "unimplmented"
