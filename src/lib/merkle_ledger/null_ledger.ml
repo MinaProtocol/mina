@@ -125,7 +125,7 @@ end = struct
     let last_index = Addr.to_int last_node in
     List.(
       zip_exn
-        (map ~f:Addr.of_int_exn (List.range first_index last_index))
+        (map ~f:Addr.of_int_exn (range first_index last_index))
         (init (1 lsl Addr.height addr) ~f:(Fn.const Account.empty)))
 
   let set_all_accounts_rooted_at_exn _t =
