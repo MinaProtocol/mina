@@ -248,7 +248,7 @@ module Make (Inputs : Inputs_intf) :
             ~default:
               (Frozen_ledger_hash.of_ledger_hash
                  (Ledger.merkle_root Genesis_ledger.t))
-      | Some proof -> target_hash_of_ledger_proof proof
+      | Some (proof, _) -> target_hash_of_ledger_proof proof
     in
     Deferred.return
       ( if
