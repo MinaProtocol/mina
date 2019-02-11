@@ -404,5 +404,8 @@ end = struct
     let first_index = Addr.to_int a lsl height in
     let count = min (1 lsl height) (num_accounts t - first_index) in
     let subarr = Dyn_array.sub t.accounts first_index count in
-    Dyn_array.to_list subarr
+    List.zip_exn
+      (List.map ~f:Addr.of_int_exn
+         (List.range first_index (first_index + count)))
+    @@ Dyn_array.to_list subarr
 end

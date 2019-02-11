@@ -120,7 +120,13 @@ end = struct
   let make_space_for _t _tot = ()
 
   let get_all_accounts_rooted_at_exn _t addr =
-    List.init (1 lsl Addr.height addr) ~f:(Fn.const Account.empty)
+    let first_node, last_node = Addr.Range.subtree_range addr in
+    let first_index = Addr.to_int first_node in
+    let last_index = Addr.to_int last_node in
+    List.(
+      zip_exn
+        (map ~f:Addr.of_int_exn (List.range first_index last_index))
+        (init (1 lsl Addr.height addr) ~f:(Fn.const Account.empty)))
 
   let set_all_accounts_rooted_at_exn _t =
     failwith "set_all_accounts_rooted_at_exn: null ledgers cannot be mutated"
