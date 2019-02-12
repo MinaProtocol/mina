@@ -1,5 +1,27 @@
 open Core_kernel
 
+(* Little endian *)
+let bits_to_string bits =
+  let rec make_byte offset acc i =
+    if i = 8 then Char.of_int_exn acc
+    else
+      let acc = if bits.(offset + i) then acc lor (1 lsl i) else acc in
+      make_byte offset acc (i + 1)
+  in
+  String.init (Array.length bits / 8) ~f:(fun i -> make_byte (8 * i) 0 0)
+
+let string_to_bits s =
+  Array.init
+    (8 * String.length s)
+    ~f:(fun i ->
+      let c = Char.to_int s.[i / 8] in
+      let j = i mod 8 in
+      (c lsr j) land 1 = 1 )
+
+let%test_unit "string to bits" =
+  Quickcheck.test ~trials:5 String.gen ~f:(fun s ->
+      [%test_eq: string] s (bits_to_string (string_to_bits s)) )
+
 module Make (Impl : Snarky.Snark_intf.S) = struct
   open Impl
   open Let_syntax
@@ -207,28 +229,6 @@ let%test_module "blake2-equality test" =
     let digest_length = 256
 
     module B = (val Digestif.module_of (Digestif.blake2s digest_length))
-
-    (* Little endian *)
-    let bits_to_string bits =
-      let rec make_byte offset acc i =
-        if i = 8 then Char.of_int_exn acc
-        else
-          let acc = if bits.(offset + i) then acc lor (1 lsl i) else acc in
-          make_byte offset acc (i + 1)
-      in
-      String.init (Array.length bits / 8) ~f:(fun i -> make_byte (8 * i) 0 0)
-
-    let string_to_bits s =
-      Array.init
-        (8 * String.length s)
-        ~f:(fun i ->
-          let c = Char.to_int s.[i / 8] in
-          let j = i mod 8 in
-          (c lsr j) land 1 = 1 )
-
-    let%test_unit "string to bits" =
-      Quickcheck.test ~trials:5 String.gen ~f:(fun s ->
-          [%test_eq: string] s (bits_to_string (string_to_bits s)) )
 
     let blake2_unchecked s =
       string_to_bits (B.digest_string (bits_to_string s) :> string)
