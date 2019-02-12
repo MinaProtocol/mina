@@ -37,10 +37,15 @@ module type Transition_frontier_extension_intf = sig
 end
 
 module type Transition_frontier_diff = sig
+  type 'a change = {
+    new: 'a,
+    old: 'a
+  }
+  
   type 'a t =
     | Add of 'a
-    | Remove of 'a
-    | Set_root of 'a
+    | New_root of 'a change
+    | New_best_tip of 'a change
     | Destroy
 end
 
