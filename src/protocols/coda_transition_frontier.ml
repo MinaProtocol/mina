@@ -95,7 +95,6 @@ module type Transition_frontier_base_intf = sig
     -> root_snarked_ledger:ledger_database
     -> root_transaction_snark_scan_state:transaction_snark_scan_state
     -> root_staged_ledger_diff:staged_ledger_diff option
-    -> max_length:int
     -> consensus_local_state:consensus_local_state
     -> t Deferred.t
 
@@ -112,7 +111,7 @@ module type Transition_frontier_intf = sig
 
   exception Already_exists of state_hash
 
-  val max_length : t -> int
+  val max_length : int
 
   val consensus_local_state : t -> consensus_local_state
 
@@ -306,6 +305,8 @@ end
 module type Root_prover_intf = sig
   type state_body_hash
 
+  type state_hash
+
   type transition_frontier
 
   type external_transition
@@ -314,13 +315,9 @@ module type Root_prover_intf = sig
 
   type proof_verified_external_transition
 
-  type t
-
-  val create : logger:Logger.t -> finality_length:int -> t
-
   val prove :
-       frontier:transition_frontier
-    -> t
+       logger:Logger.t
+    -> frontier:transition_frontier
     -> consensus_state
     -> ( external_transition
        , state_body_hash list * external_transition )
@@ -328,12 +325,13 @@ module type Root_prover_intf = sig
        option
 
   val verify :
-       observed_state:consensus_state
+       logger:Logger.t
+    -> observed_state:consensus_state
     -> peer_root:( external_transition
                  , state_body_hash list * external_transition )
                  Proof_carrying_data.t
-    -> t
-    -> (proof_verified_external_transition * proof_verified_external_transition)
+    -> ( (proof_verified_external_transition, state_hash) With_hash.t
+       * (proof_verified_external_transition, state_hash) With_hash.t )
        Deferred.Or_error.t
 end
 

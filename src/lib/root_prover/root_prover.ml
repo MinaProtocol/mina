@@ -37,12 +37,9 @@ module Make (Inputs : Inputs_intf) :
    and type external_transition := Inputs.External_transition.t
    and type proof_verified_external_transition :=
               Inputs.External_transition.Proof_verified.t
-   and type consensus_state := Consensus.Consensus_state.value = struct
+   and type consensus_state := Consensus.Consensus_state.value
+   and type state_hash := State_hash.t = struct
   open Inputs
-
-  type t = {logger: Logger.t; finality_length: int}
-
-  let create ~logger ~finality_length = {logger; finality_length}
 
   let hash_transition =
     Fn.compose Consensus.Protocol_state.hash External_transition.protocol_state
@@ -56,7 +53,7 @@ module Make (Inputs : Inputs_intf) :
     External_transition.(
       protocol_state transition |> Protocol_state.consensus_state)
 
-  let prove ~frontier {logger; _} seen_consensus_state :
+  let prove ~logger ~frontier seen_consensus_state :
       ( External_transition.t
       , State_body_hash.t List.t * External_transition.t )
       Proof_carrying_data.t
@@ -117,44 +114,48 @@ module Make (Inputs : Inputs_intf) :
     let open Deferred.Or_error in
     if cond then return () else error_string message
 
-  let verify ~observed_state
+  let verify ~logger ~observed_state
       ~peer_root:{Proof_carrying_data.data= root; proof= merkle_list, best_tip}
-      {logger; finality_length} :
-      ( External_transition.Proof_verified.t
-      * External_transition.Proof_verified.t )
-      Deferred.Or_error.t =
+      =
     let open Deferred.Result.Let_syntax in
-    (* This statement might see the best_tip as the best_tip *)
-    let is_peer_best_tip =
-      Consensus.select ~logger ~existing:(consensus_state best_tip)
-        ~candidate:observed_state
-      = `Keep
+    let merkle_list_length = List.length merkle_list in
+    let root_transition_with_hash =
+      With_hash.of_data root ~hash_data:hash_transition
     in
-    let merkle_path_length = List.length merkle_list in
-    let root_hash = hash_transition root in
+    let root_hash = With_hash.hash root_transition_with_hash in
     let%bind () =
       check_error
         ~message:
           (sprintf
              !"Peer should have given a proof of length %d but got %d"
-             finality_length merkle_path_length)
-        (Int.equal finality_length merkle_path_length)
+             Transition_frontier.max_length merkle_list_length)
+        (Int.equal Transition_frontier.max_length merkle_list_length)
     in
-    let best_tip_hash = hash_transition best_tip in
+    let best_tip_with_hash =
+      With_hash.of_data best_tip ~hash_data:hash_transition
+    in
+    let best_tip_hash = With_hash.hash best_tip_with_hash in
+    (* This statement might not see a peer's best_tip as the best_tip *)
+    let is_before_best_tip candidate =
+      Consensus.select ~logger ~existing:(consensus_state best_tip) ~candidate
+      = `Keep
+    in
     let%bind () =
       check_error
         ~message:
           (sprintf
              !"Peer lied about it's best tip %{sexp:State_hash.t}"
              best_tip_hash)
-        is_peer_best_tip
+        (is_before_best_tip observed_state)
     in
     let%bind () =
       check_error ~message:"Peer gave an invalid proof of it's root"
-        (verify_merkle_proof ~logger root_hash merkle_list
-           (hash_transition best_tip))
+        (verify_merkle_proof ~logger root_hash merkle_list best_tip_hash)
     in
-    Deferred.Or_error.both
-      (Protocol_state_validator.validate_proof root)
-      (Protocol_state_validator.validate_proof best_tip)
+    let%bind validated_root = Protocol_state_validator.validate_proof root in
+    let%map validated_best_tip =
+      Protocol_state_validator.validate_proof best_tip
+    in
+    ( {With_hash.data= validated_root; hash= root_hash}
+    , {With_hash.data= validated_best_tip; hash= best_tip_hash} )
 end

@@ -425,6 +425,7 @@ module type Inputs_intf = sig
      and type proof_verified_external_transition :=
                 External_transition.Proof_verified.t
      and type consensus_state := Consensus_mechanism.Consensus_state.value
+     and type state_hash := Coda_base.State_hash.t
 
   module Proposer :
     Proposer_intf
@@ -657,9 +658,8 @@ module Make (Inputs : Inputs_intf) = struct
         let ledger_db =
           Ledger_db.create ?directory_name:config.ledger_db_location ()
         in
-        let max_length = Consensus.Constants.k in
         let%bind transition_frontier =
-          Transition_frontier.create ~logger:config.log ~max_length
+          Transition_frontier.create ~logger:config.log
             ~root_transition:
               (With_hash.of_data first_transition
                  ~hash_data:
@@ -672,9 +672,6 @@ module Make (Inputs : Inputs_intf) = struct
               (Ledger_transfer.transfer_accounts ~src:Genesis.ledger
                  ~dest:ledger_db)
             ~consensus_local_state
-        in
-        let root_prover =
-          Root_prover.create ~logger:config.log ~finality_length:max_length
         in
         let frontier_mvar = Mvar.create () in
         Mvar.set frontier_mvar transition_frontier ;
@@ -716,7 +713,7 @@ module Make (Inputs : Inputs_intf) = struct
               let result =
                 let open Option.Let_syntax in
                 let%bind frontier = Mvar.peek frontier_read_ref in
-                Root_prover.prove root_prover ~frontier consensus_state
+                Root_prover.prove ~logger:config.log ~frontier consensus_state
               in
               Deferred.return result )
         in

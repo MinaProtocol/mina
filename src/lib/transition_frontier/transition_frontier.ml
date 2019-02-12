@@ -66,6 +66,8 @@ module type Inputs_intf = sig
      and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
      and type transaction := Transaction.t
      and type user_command := User_command.t
+
+  val max_length : int
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -201,7 +203,6 @@ module Make (Inputs : Inputs_intf) :
     ; mutable best_tip: State_hash.t
     ; logger: Logger.t
     ; table: node State_hash.Table.t
-    ; max_length: int
     ; consensus_local_state: Consensus.Local_state.t }
 
   let logger t = t.logger
@@ -211,7 +212,7 @@ module Make (Inputs : Inputs_intf) :
       ~(root_transition :
          (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t)
       ~root_snarked_ledger ~root_transaction_snark_scan_state
-      ~root_staged_ledger_diff ~max_length ~consensus_local_state =
+      ~root_staged_ledger_diff ~consensus_local_state =
     let open Consensus in
     let open Deferred.Let_syntax in
     let logger = Logger.child logger __MODULE__ in
@@ -296,10 +297,9 @@ module Make (Inputs : Inputs_intf) :
         ; root= root_hash
         ; best_tip= root_hash
         ; table
-        ; max_length
         ; consensus_local_state }
 
-  let max_length {max_length; _} = max_length
+  let max_length = Inputs.max_length
 
   let consensus_local_state {consensus_local_state; _} = consensus_local_state
 
@@ -511,10 +511,10 @@ module Make (Inputs : Inputs_intf) :
         (* 3 *)
         if node.length > best_tip_node.length then t.best_tip <- hash ;
         (* 4 *)
-        if distance_to_parent > max_length t then (
+        if distance_to_parent > max_length then (
           Logger.info t.logger
             !"Distance to parent: %d exceeded max_lenth %d"
-            distance_to_parent (max_length t) ;
+            distance_to_parent max_length ;
           (* 4.I *)
           let heir_hash = List.hd_exn (hash_path t node.breadcrumb) in
           let heir_node = Hashtbl.find_exn t.table heir_hash in

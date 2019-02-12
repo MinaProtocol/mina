@@ -66,6 +66,7 @@ module type Inputs_intf = sig
      and type proof_verified_external_transition :=
                 External_transition.Proof_verified.t
      and type consensus_state := Consensus.Consensus_state.value
+     and type state_hash := State_hash.t
 end
 
 module Make (Inputs : Inputs_intf) : sig
@@ -86,7 +87,6 @@ module Make (Inputs : Inputs_intf) : sig
          logger:Logger.t
       -> genesis_root:Inputs.External_transition.Proof_verified.t
       -> network:Inputs.Network.t
-      -> max_length:int
       -> t
 
     val on_transition :
@@ -123,8 +123,7 @@ end = struct
     { logger: Logger.t
     ; mutable best_seen_transition: External_transition.Proof_verified.t
     ; mutable current_root: External_transition.Proof_verified.t
-    ; network: Network.t
-    ; max_length: int }
+    ; network: Network.t }
 
   module Transition_cache = Transition_cache.Make (Inputs)
 
@@ -163,21 +162,18 @@ end = struct
                !"Could not get the proof of root from the network: %s"
                (Error.to_string_hum e)
       | Ok peer_root_with_proof -> (
-          let root_prover =
-            Root_prover.create ~logger:t.logger ~finality_length:t.max_length
-          in
           match%map
-            Root_prover.verify ~observed_state:candidate_state
-              ~peer_root:peer_root_with_proof root_prover
+            Root_prover.verify ~logger:t.logger ~observed_state:candidate_state
+              ~peer_root:peer_root_with_proof
           with
           | Ok (peer_root, peer_best_tip) ->
-              t.best_seen_transition <- peer_best_tip ;
-              t.current_root <- peer_root ;
+              t.best_seen_transition <- peer_best_tip |> With_hash.data ;
+              t.current_root <- peer_root |> With_hash.data ;
               let ledger_hash =
                 Consensus.(
                   External_transition.Protocol_state.blockchain_state
                     (External_transition.Proof_verified.protocol_state
-                       peer_root)
+                       t.current_root)
                   |> Blockchain_state.snarked_ledger_hash
                   |> Frozen_ledger_hash.to_ledger_hash)
               in
@@ -248,13 +244,11 @@ end = struct
       |> With_hash.data
       |> External_transition.forget_consensus_state_verification
     in
-    let max_length = Transition_frontier.max_length frontier in
     let t =
       { network
       ; logger
       ; best_seen_transition= initial_root_transition
-      ; current_root= initial_root_transition
-      ; max_length }
+      ; current_root= initial_root_transition }
     in
     let transition_graph = Transition_cache.create () in
     Transition_frontier.clear_paths frontier ;
@@ -277,7 +271,7 @@ end = struct
     Transition_frontier.create ~logger:parent_log
       ~root_snarked_ledger:ledger_db
       ~root_transaction_snark_scan_state:(Staged_ledger.Scan_state.empty ())
-      ~root_staged_ledger_diff:None ~max_length
+      ~root_staged_ledger_diff:None
       ~root_transition:
         (With_hash.of_data new_root
            ~hash_data:
@@ -289,12 +283,11 @@ end = struct
   module For_tests = struct
     type nonrec t = t
 
-    let make_bootstrap ~logger ~genesis_root ~network ~max_length =
+    let make_bootstrap ~logger ~genesis_root ~network =
       { logger
       ; best_seen_transition= genesis_root
       ; current_root= genesis_root
-      ; network
-      ; max_length }
+      ; network }
 
     let on_transition = on_transition
 

@@ -590,6 +590,8 @@ struct
   module External_transition =
     Coda_base.External_transition.Make (Staged_ledger_diff) (Protocol_state)
 
+  let max_length = Consensus.Constants.k
+
   module Transition_frontier = Transition_frontier.Make (struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Ledger_proof_statement = Ledger_proof_statement
@@ -598,6 +600,8 @@ struct
     module Staged_ledger_diff = Staged_ledger_diff
     module External_transition = External_transition
     module Staged_ledger = Staged_ledger
+
+    let max_length = max_length
   end)
 
   module Transaction_pool = struct
