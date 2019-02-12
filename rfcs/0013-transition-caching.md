@@ -21,6 +21,8 @@ The goal here is to introduce 2 new caches to the system: the `Invalid_transitio
 
 In order to assist in ensuring that items in the cache are properly invalidated, I recommend the introduction of a `'a Cached.t` type which will track the state of the item in one or more caches. The `Cached` module would provide an interface for performing cache related actions and would track a boolean value representing whether or not the required actions have been performed. What's special about the `'a Cached.t` type is that it will have a custom finalization handler which will throw an exception if no cache actions have been performed by the time it is garbage collected. This exception is toggled by a debug flag. When the debug flag is off, the finalization handler will nearly log a message.
 
+In the future, the bloom filter abstraction used for `Invalid_transition_cache` can be lifted to a more generic form and reused for caching all invalid network messages we receive.
+
 ## Drawbacks
 [drawbacks]: #drawbacks
 
