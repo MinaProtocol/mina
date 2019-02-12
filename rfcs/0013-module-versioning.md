@@ -95,7 +95,11 @@ A new version of the module `V2` consists of a new version number,
 a new submodule `T`, and the same boilerplate. A ppx could
 take the version number and submodule to produce the complete
 module definition. Perhaps it would also take the list of
-serializations needed (often just one or two are needed).
+serializations needed (often just one or two are needed), as
+well as other `deriving` items.
+
+It could be useful to transform data from an older version to a newer
+version. Such a transformer could be included as a ppx argument.
 
 ### Serialization restricted to Stable, versioned modules
 
@@ -129,11 +133,14 @@ A use of the ppx might look like:
 ```ocaml
 [@@versioned_module
   (`Version 1
-  ,`Type int * string,
-  ,`Serializations [bin_io;sexp;yojson]
+  ,`Type (int * string),
+  ,`Deriving [bin_io;sexp;yojson;eq]
   )
 ]
 ```
+The ppx would generate the `Version` module, as above. That module would not
+contain any special code for `eq` or other non-serialization `deriving` items,
+other than to mention them in a `deriving` annotation.
 
 ## Drawbacks
 
