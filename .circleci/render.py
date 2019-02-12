@@ -19,7 +19,7 @@ build_profiles = [
     'testnet_posig',
     'testnet_postake',
     'testnet_public',
-    'testnet_postake_fake_hash'
+    'testnet_postake_snarkless_fake_hash'
 ]
 
 tests = [

@@ -10,6 +10,6 @@
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
 [%%define block_window_duration 500]
 
-[%%define with_snark true]
+[%%define with_snark false]
 [%%define integration_tests false]
 [%%define force_updates false]
