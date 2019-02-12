@@ -26,7 +26,7 @@ module Constraints (Snarky : Snark_intf.Basic) = struct
       constraint_count t ~log:(fun ?(start = false) label count ->
           rev_events :=
             create_event label
-              ~phase:(if start then Start else End)
+              ~phase:(if start then Measure_start else Measure_end)
               ~timestamp:count
             :: !rev_events )
     in

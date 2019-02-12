@@ -22,6 +22,7 @@ enum EventKind {
     Event(String),
     Start(String),
     End,
+    TraceEnd
 }
 
 #[derive(Clone, Debug)]
@@ -69,6 +70,10 @@ named!(parse_trace_event<&[u8], TraceEvent>,
         7 => do_parse!(ns: le_u64 >> (TraceEvent {
             ns_since_epoch: ns as f64,
             data: End
+        })) |
+        8 => do_parse!(ns: le_u64 >> (TraceEvent {
+            ns_since_epoch: ns as f64,
+            data: TraceEnd
         }))
         ));
 
@@ -158,7 +163,7 @@ fn main() {
                                 cycle_start_ts = cur_ts;
                                 (cur_ts, prev_task)
                             }
-                            CycleEnd => {
+                            TraceEnd | CycleEnd => {
                                 // if the cycle is reported as ending, then whatever thread was running just finished.
                                 complete_event(&seen_tids, cur_pid, cur_ts, prev_ts, prev_task);
                                 (cur_ts, None)

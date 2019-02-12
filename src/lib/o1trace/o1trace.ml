@@ -55,9 +55,9 @@ let trace_recurring_task (name : string) (f : unit -> 'a) =
 
 let measure' wr (name : string) (f : unit -> 'a) : 'a =
   let pid = Pid.to_int (Unix.getpid ()) in
-  emit_event wr {(new_event Start) with name; pid} ;
+  emit_event wr {(new_event Measure_start) with name; pid} ;
   let res = f () in
-  emit_event wr {(new_event End) with pid} ;
+  emit_event wr {(new_event Measure_end) with pid} ;
   res
 
 let measure_impl = ref (fun _ f -> f ())
