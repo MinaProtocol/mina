@@ -2,14 +2,14 @@ open Core_kernel
 open Async_kernel
 open Protocols.Coda_pow
 open Coda_base
-open Consensus.Mechanism
+open Consensus
 
 module type Inputs_intf = sig
   include Transition_frontier.Inputs_intf
 
   module State_proof :
     Proof_intf
-    with type input := Consensus.Mechanism.Protocol_state.value
+    with type input := Consensus.Protocol_state.value
      and type t := Proof.t
 
   module Transition_frontier :
@@ -156,9 +156,8 @@ module Make (Inputs : Inputs_intf) :
       With_hash.data t |> External_transition.protocol_state
       |> Protocol_state.consensus_state
     in
-    if
-      Consensus.Mechanism.received_at_valid_time consensus_state ~time_received
-    then Ok (t, Unsafe.set_valid_time_received validation)
+    if Consensus.received_at_valid_time consensus_state ~time_received then
+      Ok (t, Unsafe.set_valid_time_received validation)
     else Error `Invalid_time_received
 
   let validate_proof (t, validation) =
@@ -192,7 +191,7 @@ module Make (Inputs : Inputs_intf) :
     let%map () =
       Result.ok_if_true
         ( `Take
-        = Consensus.Mechanism.select ~logger
+        = Consensus.select ~logger
             ~existing:(Protocol_state.consensus_state root_protocol_state)
             ~candidate:(Protocol_state.consensus_state protocol_state) )
         ~error:`Not_selected_over_frontier_root
@@ -249,7 +248,7 @@ module Make (Inputs : Inputs_intf) :
             ~default:
               (Frozen_ledger_hash.of_ledger_hash
                  (Ledger.merkle_root Genesis_ledger.t))
-      | Some proof -> target_hash_of_ledger_proof proof
+      | Some (proof, _) -> target_hash_of_ledger_proof proof
     in
     Deferred.return
       ( if

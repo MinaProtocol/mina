@@ -123,6 +123,10 @@ module Available_job : sig
   [@@deriving sexp]
 end
 
+module Space_partition : sig
+  type t = {first: int; second: int option} [@@deriving sexp]
+end
+
 module Job_view : sig
   type 'a node = Base of 'a option | Merge of 'a option * 'a option
   [@@deriving sexp]
@@ -154,15 +158,16 @@ val free_space : state:('a, 'd) State.t -> int
 val fill_in_completed_jobs :
      state:('a, 'd) State.t
   -> completed_jobs:'a State.Completed_job.t list
-  -> 'a option Or_error.t
+  -> ('a * 'd list) option Or_error.t
 (** Complete jobs needed at this state -- optionally emits the ['a] at the top
- * of the tree *)
+ * of the tree along with the ['d list] responsible for emitting the ['a]. *)
 
-val last_emitted_value : ('a, 'd) State.t -> 'a option
-(** The last ['a] we emitted from the top of the tree *)
+val last_emitted_value : ('a, 'd) State.t -> ('a * 'd list) option
+(** The last ['a] we emitted from the top of the tree and the ['d list]
+ * responsible for that ['a]. *)
 
 val partition_if_overflowing :
-  max_slots:int -> ('a, 'd) State.t -> [`One of int | `Two of int * int]
+  max_slots:int -> ('a, 'd) State.t -> Space_partition.t
 (** If there aren't enough slots for [max_slots] many ['d], then before
  * continuing onto the next virtual tree, split max_slots = (x,y) such that
  * x = number of slots till the end of the current tree and y = max_slots - x

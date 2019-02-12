@@ -30,22 +30,51 @@ struct
   module Location = Location
   module Addr = Location.Addr
 
+  (** Invariant is that parent is None in unattached mask
+   * and `Some` in the attached one
+   * We can capture this with a GADT but there's some annoying
+   * issues with bin_io to do so *)
+  module Parent = struct
+    module T = struct
+      type t = Base.t option [@@deriving sexp]
+    end
+
+    include T
+
+    include Binable.Of_binable
+              (Unit)
+              (struct
+                include T
+
+                let to_binable = function
+                  | Some _ ->
+                      failwith "We can't serialize when we're an attached mask"
+                  | None -> ()
+
+                let of_binable () = None
+              end)
+  end
+
   type t =
     { uuid: Uuid.Stable.V1.t
     ; account_tbl: Account.t Location.Table.t
+    ; mutable parent: Parent.t
     ; hash_tbl: Hash.t Addr.Table.t
     ; location_tbl: Location.t Key.Table.t
     ; mutable current_location: Location.t option }
   [@@deriving sexp, bin_io]
 
-  type unattached = t
+  type unattached = t [@@deriving sexp]
 
   let create () =
     { uuid= Uuid.create ()
+    ; parent= None
     ; account_tbl= Location.Table.create ()
     ; hash_tbl= Addr.Table.create ()
     ; location_tbl= Key.Table.create ()
     ; current_location= None }
+
+  let get_uuid {uuid; _} = uuid
 
   let with_ledger ~f =
     let mask = create () in
@@ -54,14 +83,7 @@ struct
   module Attached = struct
     type parent = Base.t [@@deriving sexp]
 
-    type t =
-      { uuid: Uuid.Stable.V1.t
-      ; parent: parent
-      ; account_tbl: Account.t Location.Table.t
-      ; hash_tbl: Hash.t Addr.Table.t
-      ; location_tbl: Location.t Key.Table.t
-      ; mutable current_location: Location.t option }
-    [@@deriving sexp]
+    type t = unattached [@@deriving sexp]
 
     module Path = Base.Path
     module Addr = Location.Addr
@@ -72,6 +94,8 @@ struct
     type path = Path.t
 
     type root_hash = Hash.t
+
+    exception Location_is_not_account of Location.t
 
     let create () =
       failwith
@@ -84,13 +108,10 @@ struct
          Mask.create and Mask.set_parent"
 
     let unset_parent t =
-      { uuid= t.uuid
-      ; account_tbl= t.account_tbl
-      ; hash_tbl= t.hash_tbl
-      ; location_tbl= t.location_tbl
-      ; current_location= t.current_location }
+      t.parent <- None ;
+      t
 
-    let get_parent t = t.parent
+    let get_parent {parent= opt; _} = Option.value_exn opt
 
     let get_uuid t = t.uuid
 
@@ -127,7 +148,7 @@ struct
 
     (* fixup_merkle_path patches a Merkle path reported by the parent, overriding
        with hashes which are stored in the mask
-     *)
+    *)
 
     let fixup_merkle_path t path address =
       let rec build_fixed_path path address accum =
@@ -174,7 +195,7 @@ struct
     (* given a Merkle path corresponding to a starting address, calculate addresses and hash
        for each node affected by the starting hash; that is, along the path from the
        account address to root
-     *)
+    *)
     let addresses_and_hashes_from_merkle_path_exn merkle_path starting_address
         starting_hash : (Addr.t * Hash.t) list =
       let get_addresses_hashes height accum node =
@@ -202,7 +223,7 @@ struct
       let account = Option.value_exn (find_account t location) in
       Location.Table.remove t.account_tbl location ;
       (* TODO : use stack database to save unused location, which can be
-        used when allocating a location
+         used when allocating a location
       *)
       Key.Table.remove t.location_tbl (Account.public_key account) ;
       (* reuse location if possible *)
@@ -223,8 +244,8 @@ struct
           set_hash t addr hash )
 
     (* a write writes only to the mask, parent is not involved
-     need to update both account and hash pieces of the mask
-       *)
+       need to update both account and hash pieces of the mask
+    *)
     let set t location account =
       set_account t location account ;
       let account_address = Location.to_path_exn location in
@@ -239,7 +260,7 @@ struct
 
     (* if the mask's parent sets an account, we can prune an entry in the mask if the account in the parent
        is the same in the mask
-     *)
+    *)
     let parent_set_notify t account =
       match find_location t (Account.public_key account) with
       | None -> ()
@@ -264,8 +285,8 @@ struct
         with _ -> None )
 
     (* batch operations
-     TODO: rely on availability of batch operations in Base for speed
-       *)
+       TODO: rely on availability of batch operations in Base for speed
+    *)
     (* NB: rocksdb does not support batch reads; should we offer this? *)
     let get_batch_exn t locations =
       List.map locations ~f:(fun location -> get t location)
@@ -286,48 +307,52 @@ struct
 
     (* transfer state from mask to parent; flush local state *)
     let commit t =
+      let old_root_hash = merkle_root t in
       let account_data = Location.Table.to_alist t.account_tbl in
       Base.set_batch (get_parent t) account_data ;
       Location.Table.clear t.account_tbl ;
-      Addr.Table.clear t.hash_tbl
+      Addr.Table.clear t.hash_tbl ;
+      Debug_assert.debug_assert (fun () ->
+          [%test_result: Hash.t]
+            ~message:
+              "Merkle root after committing should be the same as the old one \
+               in the mask"
+            ~expect:old_root_hash
+            (Base.merkle_root (get_parent t)) ;
+          [%test_result: Hash.t]
+            ~message:
+              "Merkle root of the mask should delegate to the parent now"
+            ~expect:old_root_hash
+            (Base.merkle_root (get_parent t)) )
 
     (* copy tables in t; use same parent *)
     let copy t =
       { uuid= Uuid.create ()
-      ; parent= get_parent t
+      ; parent= Some (get_parent t)
       ; account_tbl= Location.Table.copy t.account_tbl
       ; location_tbl= Key.Table.copy t.location_tbl
       ; hash_tbl= Addr.Table.copy t.hash_tbl
       ; current_location= t.current_location }
 
+    let last_filled t =
+      Option.value_map
+        (Base.last_filled (get_parent t))
+        ~default:t.current_location
+        ~f:(fun parent_loc ->
+          match t.current_location with
+          | None -> Some parent_loc
+          | Some our_loc -> Some (max parent_loc our_loc) )
+
     let get_all_accounts_rooted_at_exn t address =
-      (* accounts in parent and mask are not necessarily disjoint sets *)
-      let parent_accounts =
-        Base.get_all_accounts_rooted_at_exn (get_parent t) address
-      in
-      (* basically, the same code used for the database implementation *)
-      let mask_maybe_accounts =
-        let first_node, last_node = Addr.Range.subtree_range address in
-        Addr.Range.fold (first_node, last_node) ~init:[]
-          ~f:(fun bit_index acc ->
-            let account = find_account t (Location.Account bit_index) in
-            account :: acc )
-      in
-      let mask_accounts = List.rev_filter_map mask_maybe_accounts ~f:Fn.id in
-      (* Prefer the later of duplicates *)
-      let dedup_keep_latter ~equal xs =
-        let rec go acc = function
-          | [] -> List.rev acc
-          | x :: xs ->
-              if List.mem xs x ~equal then go acc xs else go (x :: acc) xs
-        in
-        go [] xs
-      in
-      (* prefer accounts from the mask if they are also in the parent *)
-      dedup_keep_latter
-        ~equal:(fun a1 a2 ->
-          Key.equal (Account.public_key a1) (Account.public_key a2) )
-        (parent_accounts @ mask_accounts)
+      Option.value_map ~default:[] (last_filled t) ~f:(fun allocation_addr ->
+          let first_addr, last_addr = Addr.Range.subtree_range address in
+          Addr.Range.fold
+            (first_addr, min last_addr (Location.to_path_exn allocation_addr))
+            ~init:[]
+            ~f:(fun bit_index acc ->
+              let queried_account = get t @@ Location.Account bit_index in
+              (queried_account |> Option.value_exn) :: acc ) )
+      |> List.rev
 
     (* set accounts in mask *)
     let set_all_accounts_rooted_at_exn t address (accounts : Account.t list) =
@@ -377,7 +402,7 @@ struct
       in
       (* parent_keys not in mask, may be in parent
          mask_locations definitely in mask
-       *)
+      *)
       let parent_keys, mask_locations = loop keys [] [] in
       (* allow call to parent to raise an exception
          if raised, the parent hasn't removed any accounts,
@@ -416,21 +441,19 @@ struct
       set t (Location.Account addr) account
 
     let to_list t =
-      let mask_accounts = find_all_accounts t in
-      let parent_accounts = Base.to_list (get_parent t) in
-      let mask_keys =
-        List.map mask_accounts ~f:(fun acct -> Account.public_key acct)
-      in
-      let mask_key_set = Key.Set.of_list mask_keys in
-      (* if an account is in mask and parent, favor the mask version *)
-      let not_in_mask parent_account =
-        let parent_key = Account.public_key parent_account in
-        not (Key.Set.mem mask_key_set parent_key)
-      in
-      let in_parent_not_in_mask_accounts =
-        List.filter parent_accounts ~f:not_in_mask
-      in
-      mask_accounts @ in_parent_not_in_mask_accounts
+      keys t |> Set.to_list
+      |> List.map ~f:(fun key ->
+             let location = location_of_key t key |> Option.value_exn in
+             match location with
+             | Account addr ->
+                 (Addr.to_int addr, get t location |> Option.value_exn)
+             | location -> raise (Location_is_not_account location) )
+      |> List.sort ~compare:(fun (addr1, _) (addr2, _) ->
+             Int.compare addr1 addr2 )
+      |> List.map ~f:(fun (_, account) -> account)
+
+    (* TODO *)
+    let iteri _t ~f:_ = failwith "iteri not implemented on masks"
 
     let foldi_with_ignored_keys t ignored_keys ~init ~f =
       let locations_and_accounts = Location.Table.to_alist t.account_tbl in
@@ -454,7 +477,7 @@ struct
       in
       List.fold locations_and_accounts ~init:parent_result ~f:f'
 
-    let _foldi t ~init ~f = foldi_with_ignored_keys t Key.Set.empty ~init ~f
+    let foldi t ~init ~f = foldi_with_ignored_keys t Key.Set.empty ~init ~f
 
     (* we would want fold_until to combine results from the parent and the mask
        way (1): use the parent result as the init of the mask fold (or vice-versa)
@@ -488,15 +511,6 @@ struct
       let b' = Location.to_path_exn b in
       if Location.Addr.compare a' b' > 0 then a else b
 
-    let last_filled t =
-      Option.value_map
-        (Base.last_filled (get_parent t))
-        ~default:t.current_location
-        ~f:(fun parent_loc ->
-          match t.current_location with
-          | None -> Some parent_loc
-          | Some our_loc -> Some (max parent_loc our_loc) )
-
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t key account =
       match find_location t key with
@@ -525,15 +539,6 @@ struct
       |> Result.map_error ~f:(fun err -> raise (Error.to_exn err))
       |> Result.ok_exn
 
-    let foldi t ~init ~f =
-      (* fold over parent, then mask *)
-      let parent_result = Base.foldi (get_parent t) ~init ~f in
-      Location.Table.fold t.account_tbl ~init:parent_result
-        ~f:(fun ~key:loc ~data:acct accum ->
-          (* loc is an account location, no exception can be raised here *)
-          let addr = Location.to_path_exn loc in
-          f addr accum acct )
-
     let sexp_of_location = Location.sexp_of_t
 
     let location_of_sexp = Location.t_of_sexp
@@ -542,13 +547,7 @@ struct
   end
 
   let set_parent t parent =
-    let attached =
-      { uuid= t.uuid
-      ; Attached.parent
-      ; account_tbl= t.account_tbl
-      ; hash_tbl= t.hash_tbl
-      ; location_tbl= t.location_tbl
-      ; current_location= t.current_location }
-    in
-    {attached with current_location= Attached.last_filled attached}
+    t.parent <- Some parent ;
+    t.current_location <- Attached.last_filled t ;
+    t
 end

@@ -7,22 +7,26 @@ module type S = sig
     type t =
       { wrap_vk: Tock.Verification_key.t
       ; prev_proof: Tock.Proof.t
-      ; prev_state: Consensus.Mechanism.Protocol_state.value
-      ; update: Consensus.Mechanism.Snark_transition.value }
+      ; prev_state: Consensus.Protocol_state.value
+      ; update: Consensus.Snark_transition.value }
   end
 
   module Wrap_prover_state : sig
-    type t = {proof: Tick.Proof.t}
+    type t = {proof: Tick.Groth16.Proof.t}
   end
 
   val transaction_snark_keys : Transaction_snark.Keys.Verification.t
 
   module Step : sig
-    val keys : Tick.Keypair.t
+    val keys : Tick.Groth16.Keypair.t
 
     val input :
          unit
-      -> ('a, 'b, Tick.Field.Var.t -> 'a, Tick.Field.t -> 'b) Tick.Data_spec.t
+      -> ( 'a
+         , 'b
+         , Tick.Field.Var.t -> 'a
+         , Tick.Field.t -> 'b )
+         Tick.Groth16.Data_spec.t
 
     module Verification_key : sig
       val to_bool_list : Tock.Verification_key.t -> bool list
@@ -30,8 +34,7 @@ module type S = sig
 
     module Prover_state = Step_prover_state
 
-    val instance_hash :
-      Consensus.Mechanism.Protocol_state.value -> Tick.Field.t
+    val instance_hash : Consensus.Protocol_state.value -> Tick.Field.t
 
     val main : Tick.Field.Var.t -> (unit, Prover_state.t) Tick.Checked.t
   end
@@ -68,10 +71,10 @@ let create () : (module S) Async.Deferred.t =
         let keys = tx_vk
       end) in
       let module B =
-        Blockchain_snark.Blockchain_transition.Make (Consensus.Mechanism) (T)
+        Blockchain_snark.Blockchain_transition.Make (Consensus) (T)
       in
       let module Step = B.Step (struct
-        let keys = Tick.Keypair.create ~pk:bc_pk.step ~vk:bc_vk.step
+        let keys = Tick.Groth16.Keypair.create ~pk:bc_pk.step ~vk:bc_vk.step
       end) in
       let module Wrap =
         B.Wrap (struct
@@ -88,12 +91,12 @@ let create () : (module S) Async.Deferred.t =
           type t =
             { wrap_vk: Tock.Verification_key.t
             ; prev_proof: Tock.Proof.t
-            ; prev_state: Consensus.Mechanism.Protocol_state.value
-            ; update: Consensus.Mechanism.Snark_transition.value }
+            ; prev_state: Consensus.Protocol_state.value
+            ; update: Consensus.Snark_transition.value }
         end
 
         module Wrap_prover_state = struct
-          type t = {proof: Tick.Proof.t}
+          type t = {proof: Tick.Groth16.Proof.t}
         end
 
         module Step = struct
@@ -103,6 +106,10 @@ let create () : (module S) Async.Deferred.t =
 
           module Prover_state = Step_prover_state
 
+          module Verification_key = struct
+            let to_bool_list = Snark_params.tock_vk_to_bool_list
+          end
+
           let instance_hash =
             let open Coda_base in
             let s =
@@ -110,20 +117,12 @@ let create () : (module S) Async.Deferred.t =
               Tick.Pedersen.State.update_fold
                 Hash_prefix.transition_system_snark
                 Fold.(
-                  Step.Verifier.Verification_key_data.(
-                    to_bits (full_data_of_verification_key wrap_vk))
+                  Verification_key.to_bool_list wrap_vk
                   |> of_list |> group3 ~default:false)
             in
             fun state ->
               Tick.Pedersen.digest_fold s
-                (State_hash.fold
-                   (Consensus.Mechanism.Protocol_state.hash state))
-
-          module Verification_key = struct
-            let to_bool_list =
-              let open Step.Verifier.Verification_key_data in
-              Fn.compose to_bits full_data_of_verification_key
-          end
+                (State_hash.fold (Consensus.Protocol_state.hash state))
 
           let main x =
             let there {Prover_state.wrap_vk; prev_proof; prev_state; update} =

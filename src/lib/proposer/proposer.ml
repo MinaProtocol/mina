@@ -23,6 +23,7 @@ module type Inputs_intf = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type masked_ledger := Masked_ledger.t
+     and type consensus_local_state := Consensus.Local_state.t
 
   module Transaction_pool :
     Coda_lib.Transaction_pool_read_intf
@@ -200,14 +201,15 @@ module Make (Inputs : Inputs_intf) :
           in
           let next_ledger_hash =
             Option.value_map ledger_proof_opt
-              ~f:(fun proof ->
+              ~f:(fun (proof, _) ->
                 Ledger_proof.statement proof |> Ledger_proof.statement_target
                 )
               ~default:previous_ledger_hash
           in
           let supply_increase =
             Option.value_map ledger_proof_opt
-              ~f:(fun proof -> (Ledger_proof.statement proof).supply_increase)
+              ~f:(fun (proof, _) ->
+                (Ledger_proof.statement proof).supply_increase )
               ~default:Currency.Amount.zero
           in
           let blockchain_state =
@@ -228,7 +230,7 @@ module Make (Inputs : Inputs_intf) :
                     :> User_command.t list )
                 ~snarked_ledger_hash:
                   (Option.value_map ledger_proof_opt
-                     ~default:previous_ledger_hash ~f:(fun proof ->
+                     ~default:previous_ledger_hash ~f:(fun (proof, _) ->
                        Ledger_proof.(statement proof |> statement_target) ))
                 ~supply_increase ~logger ) )
     in
@@ -237,13 +239,14 @@ module Make (Inputs : Inputs_intf) :
             let snark_transition =
               Snark_transition.create_value
                 ?sok_digest:
-                  (Option.map ledger_proof_opt ~f:(fun proof ->
+                  (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
                        Ledger_proof.sok_digest proof ))
                 ?ledger_proof:
-                  (Option.map ledger_proof_opt ~f:Ledger_proof.underlying_proof)
+                  (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
+                       Ledger_proof.underlying_proof proof ))
                 ~supply_increase:
                   (Option.value_map ~default:Currency.Amount.zero
-                     ~f:(fun proof ->
+                     ~f:(fun (proof, _) ->
                        (Ledger_proof.statement proof).supply_increase )
                      ledger_proof_opt)
                 ~blockchain_state:
@@ -274,8 +277,9 @@ module Make (Inputs : Inputs_intf) :
           | Some frontier -> (
               let crumb = Transition_frontier.best_tip frontier in
               Logger.info logger
-                !"Begining to propose off of crumb %{sexp: Breadcrumb.t}"
+                !"Begining to propose off of crumb %{sexp: Breadcrumb.t}%!"
                 crumb ;
+              Core.printf !"%!" ;
               let previous_protocol_state, previous_protocol_state_proof =
                 let transition : External_transition.Verified.t =
                   (Breadcrumb.transition_with_hash crumb).data

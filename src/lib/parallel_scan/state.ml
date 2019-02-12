@@ -45,7 +45,7 @@ type ('a, 'd) t =
   { jobs: ('a, 'd) Job.t Ring_buffer.t
   ; level_pointer: int Array.t
   ; capacity: int
-  ; mutable acc: int * 'a option
+  ; mutable acc: int * ('a * 'd list) option
   ; mutable current_data_length: int
   ; mutable base_none_pos: int option
   ; mutable recent_tree_data: 'd list sexp_opaque
@@ -88,7 +88,7 @@ let hash
     (Array.fold level_pointer ~init:"" ~f:(fun s a -> s ^ Int.to_string a)) ;
   ( match a with
   | None -> add_string "None"
-  | Some a -> add_string (a_to_string a) ) ;
+  | Some (a, _) -> add_string (a_to_string a) ) ;
   add_string (Int.to_string current_data_length) ;
   ( match x with
   | None -> add_string "None"

@@ -21,81 +21,18 @@ module type Shared_constants = sig
   (** The amount of money minted and given to the proposer whenever a block
    * is created *)
 
-  val block_duration_ms : Int64.t
+  val block_window_duration_ms : Int64.t
   (** The window of time available to create a block *)
 end
 
-module Proof_of_signature = struct
-  module Inputs = struct
-    module type S = sig
-      module Time : Protocols.Coda_pow.Time_intf
-
-      module Genesis_ledger : sig
-        val t : Coda_base.Ledger.t
-      end
-
-      module Constants : Shared_constants
-    end
-  end
-end
-
-module Proof_of_stake = struct
-  module Inputs = struct
-    module type S = sig
-      module Time : sig
-        type t
-
-        module Span : sig
-          type t
-
-          val to_ms : t -> Int64.t
-
-          val of_ms : Int64.t -> t
-
-          val ( + ) : t -> t -> t
-
-          val ( * ) : t -> t -> t
-        end
-
-        val ( < ) : t -> t -> bool
-
-        val ( >= ) : t -> t -> bool
-
-        val diff : t -> t -> Span.t
-
-        val to_span_since_epoch : t -> Span.t
-
-        val of_span_since_epoch : Span.t -> t
-
-        val add : t -> Span.t -> t
-      end
-
-      module Constants : sig
-        include Shared_constants
-
-        val genesis_state_timestamp : Time.t
-
-        val c : int
-        (** c is the number of slots after which we can be confident at least one
-         * block was produced (Note: c=8 in Ouroboros Praos papers) *)
-
-        val delta : int
-        (** delta is the network delay (as a number of slots) that we can be sure
-         * we've received a block if it was gossiped by some honest node on the
-         * network *)
-      end
-    end
-  end
-end
-
 module type S = sig
+  val name : string
+
   module Local_state : sig
     type t [@@deriving sexp]
 
-    val create : Signature_lib.Keypair.t option -> t
+    val create : Signature_lib.Public_key.Compressed.t option -> t
   end
-
-  module Constants : Shared_constants
 
   module Consensus_transition_data : sig
     type value [@@deriving bin_io, sexp]
@@ -158,6 +95,12 @@ module type S = sig
           -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
           -> Consensus_state.value)
          Quickcheck.Generator.t
+  end
+
+  module Configuration : sig
+    type t [@@deriving yojson, bin_io]
+
+    val t : t
   end
 
   val genesis_protocol_state :
@@ -225,11 +168,10 @@ module type S = sig
   *)
 
   val lock_transition :
-       ?proposer_public_key:Signature_lib.Public_key.Compressed.t
+       Consensus_state.value
     -> Consensus_state.value
-    -> Consensus_state.value
-    -> snarked_ledger:(unit -> Coda_base.Ledger.t Or_error.t)
     -> local_state:Local_state.t
+    -> snarked_ledger:Coda_base.Ledger.Any_ledger.witness
     -> unit
   (**
    * A hook for managing local state when the locked tip is updated.

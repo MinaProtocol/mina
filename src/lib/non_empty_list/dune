@@ -1,0 +1,5 @@
+(library
+  (name non_empty_list)
+  (public_name non_empty_list)
+  (libraries core_kernel)
+  (preprocess (pps ppx_jane ppx_deriving.eq)))

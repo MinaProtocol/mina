@@ -23,12 +23,16 @@ module Job_view = struct
   type 'a t = int * 'a node [@@deriving sexp]
 end
 
+module Space_partition = struct
+  type t = {first: int; second: int option} [@@deriving sexp]
+end
+
 module State = struct
   include State
 
   (* Creates state that placeholders-out all the right jobs in the right spot
    * also we need to seed the buffer with exactly one piece of work
-   *)
+  *)
   let create : type a d. parallelism_log_2:int -> (a, d) t =
    fun ~parallelism_log_2 ->
     let open Job in
@@ -120,64 +124,64 @@ module State = struct
     String.concat ~sep:"\n" (List.rev to_draw_rev)
 
   (**  A parallel scan state holds a sequence of jobs that needs to be completed.
-  *  A job can be a base job (Base d) or a merge job (Merge (a, a)).
-  *
-  *  The jobs are stored using a ring buffer impl of a breadth-first order
-  *  binary tree where the root node is at 0, it's left child is at 1, right
-  *  child at 2 and so on.
-  *
-  *  The leaves are at indices p-1 to 2p - 2 and the parent of each node is at
-  *  (node_index-1)/2. For example, with parallelism of size 8 (p=8) the tree
-  *  looks like this: (M = Merge, B = Base)
-  *
-  *                      0
-  *                      M
-  *             1                 2
-  *             M                 M
-  *         3        4        5        6
-  *         M        M        M        M
-  *      7    8   9    10  11   12  13   14
-  *      B    B   B    B   B    B   B    B
-  *
-  * When a job (base or merge) is completed, its result is put into a new merge
-  * job at it's parent index and a vacancy is created at the current job's
-  * position. New base jobs are added separately (by enqueue_data).
-  * Parallel scan starts at the root, traverses in the breadth-first order, and
-  * completes the jobs as and when they are available.
-  * When the merge job at the root node is completed, the result is returned.
-  *
-  * Think of the ring buffer's 2*n-1 elements as holding (almost) two steps of
-  * execution at parallelism of size n. Assume we're always working on the
-  * second step, and can refer to the work done at the prior step.
-  *
-  * 
-  * Example trace: Jobs buffer at some state t
-  *                      0
-  *                   M(1,8)
-  *
-  *             1                 2
-  *           M(9,12)           M(13,16)
-  *
-  *         3        4        5        6
-  *     M(17,18)  M(19,20) M(21,22)  M(23,24)
-  *
-  *      7    8   9    10  11   12  13   14
-  *     B25  B26 B27   B28 B29  B30 B31  B32
-  *
-  * After one iteration (assuming all the available jobs from state t are
-  * completed):
-  *                      0
-  *                   M(9,16)
-  *
-  *             1                 2
-  *         M(17,20)           M(21,24)
-  *
-  *        3         4        5        6
-  *     M(25,26)  M(27,28) M(29,30)  M(31,32)
-  *
-  *      7    8   9    10  11   12  13   14
-  *    B()   B() B()   B() B()  B() B()  B()
-  *
+   *  A job can be a base job (Base d) or a merge job (Merge (a, a)).
+   *
+   *  The jobs are stored using a ring buffer impl of a breadth-first order
+   *  binary tree where the root node is at 0, it's left child is at 1, right
+   *  child at 2 and so on.
+   *
+   *  The leaves are at indices p-1 to 2p - 2 and the parent of each node is at
+   *  (node_index-1)/2. For example, with parallelism of size 8 (p=8) the tree
+   *  looks like this: (M = Merge, B = Base)
+   *
+   *                      0
+   *                      M
+   *             1                 2
+   *             M                 M
+   *         3        4        5        6
+   *         M        M        M        M
+   *      7    8   9    10  11   12  13   14
+   *      B    B   B    B   B    B   B    B
+   *
+   * When a job (base or merge) is completed, its result is put into a new merge
+   * job at it's parent index and a vacancy is created at the current job's
+   * position. New base jobs are added separately (by enqueue_data).
+   * Parallel scan starts at the root, traverses in the breadth-first order, and
+   * completes the jobs as and when they are available.
+   * When the merge job at the root node is completed, the result is returned.
+   *
+   * Think of the ring buffer's 2*n-1 elements as holding (almost) two steps of
+   * execution at parallelism of size n. Assume we're always working on the
+   * second step, and can refer to the work done at the prior step.
+   *
+   * 
+   * Example trace: Jobs buffer at some state t
+   *                      0
+   *                   M(1,8)
+   *
+   *             1                 2
+   *           M(9,12)           M(13,16)
+   *
+   *         3        4        5        6
+   *     M(17,18)  M(19,20) M(21,22)  M(23,24)
+   *
+   *      7    8   9    10  11   12  13   14
+   *     B25  B26 B27   B28 B29  B30 B31  B32
+   *
+   * After one iteration (assuming all the available jobs from state t are
+   * completed):
+   *                      0
+   *                   M(9,16)
+   *
+   *             1                 2
+   *         M(17,20)           M(21,24)
+   *
+   *        3         4        5        6
+   *     M(25,26)  M(27,28) M(29,30)  M(31,32)
+   *
+   *      7    8   9    10  11   12  13   14
+   *    B()   B() B()   B() B()  B() B()  B()
+   *
   *)
 
   let dir c = if c mod 2 = 1 then `Left else `Right
@@ -195,12 +199,12 @@ module State = struct
       | _ -> false )
 
   (*Level_pointer stores a start index for each level. These are, at first, 
-  the indices of the first node on each level and get incremented when a job is 
-  completed at the specific index. The tree is still traveresed breadth-first 
-  but the order of nodes on each level is determined using the start index that 
-  is kept track of in the level_pointer. if the cur_pos is the last node on the 
-  current level then next node is the first node on the next level otherwise 
-  return the next node on the same level*)
+    the indices of the first node on each level and get incremented when a job is 
+    completed at the specific index. The tree is still traveresed breadth-first 
+    but the order of nodes on each level is determined using the start index that 
+    is kept track of in the level_pointer. if the cur_pos is the last node on the 
+    current level then next node is the first node on the next level otherwise 
+    return the next node on the same level*)
 
   let next_position_info parallelism level_pointer cur_pos =
     let levels = Int.floor_log2 parallelism + 1 in
@@ -220,9 +224,9 @@ module State = struct
     | `Next_level pos -> pos
 
   (*On each level, the jobs are completed starting from a specific index that 
-  is stored in levels_pointer. When a job at that index is completed, it points 
-  to the next job on the same level. After the last node of the level, the 
-  index is set back to first node*)
+    is stored in levels_pointer. When a job at that index is completed, it points 
+    to the next job on the same level. After the last node of the level, the 
+    index is set back to first node*)
   let incr_level_pointer t cur_pos =
     let cur_level = Int.floor_log2 (cur_pos + 1) in
     if t.level_pointer.(cur_level) = cur_pos then
@@ -300,10 +304,14 @@ module State = struct
     | true, Merge (Bcomp _), Merged z ->
         let%bind () =
           if cur_pos = 0 then (
-            t.acc <- (fst t.acc |> Int.( + ) 1, Some z) ;
-            t.other_trees_data
-            <- List.take t.other_trees_data (List.length t.other_trees_data - 1) ;
-            Ok () )
+            match List.rev t.other_trees_data with
+            | [] ->
+                failwith
+                  "Not possible, if we're emitting something, we have data"
+            | last :: rest ->
+                t.acc <- (fst t.acc |> Int.( + ) 1, Some (z, List.rev last)) ;
+                t.other_trees_data <- List.rev rest ;
+                Ok () )
           else
             let parent_pos = (cur_pos - 1) / 2 in
             let%map () = update_new_job t z (dir cur_pos) parent_pos in
@@ -586,7 +594,7 @@ let is_valid t =
 let fill_in_completed_jobs :
        state:('a, 'd) State.t
     -> completed_jobs:'a State.Completed_job.t list
-    -> 'b option Or_error.t =
+    -> ('a * 'd list) option Or_error.t =
  fun ~state ~completed_jobs ->
   let open Or_error.Let_syntax in
   let old_jobs = Ring_buffer.copy state.jobs in
@@ -619,16 +627,21 @@ let partition_if_overflowing ~max_slots state =
   let parallelism = State.parallelism state in
   let offset = parallelism - 1 in
   match State.base_none_pos state with
-  | None -> `One 0
+  | None -> {Space_partition.first= 0; second= None}
   | Some start ->
       let start_0 = start - offset in
-      if n <= parallelism - start_0 then `One n
-      else `Two (parallelism - start_0, n - (parallelism - start_0))
+      if n <= parallelism - start_0 then
+        {Space_partition.first= n; second= None}
+      else
+        { Space_partition.first= parallelism - start_0
+        ; second= Some (n - (parallelism - start_0)) }
 
 let gen :
        gen_data:'d Quickcheck.Generator.t
     -> f_job_done:(('a, 'd) Available_job.t -> 'a State.Completed_job.t)
-    -> f_acc:(int * 'a option -> 'a -> 'a option)
+    -> f_acc:(   int * ('a * 'd list) option
+              -> 'a * 'd list
+              -> ('a * 'd list) option)
     -> ('a, 'd) State.t Quickcheck.Generator.t =
  fun ~gen_data ~f_job_done ~f_acc ->
   let open Quickcheck.Generator.Let_syntax in
@@ -733,10 +746,10 @@ let%test_module "scans" =
 
     let%test_module "scan (+) over ints" =
       ( module struct
-        let f_merge_up (state : int * int64 option) x =
+        let f_merge_up (state : int * (int64 * int64 list) option) x =
           let open Option.Let_syntax in
           let%map acc = snd state in
-          Int64.( + ) acc x
+          (Int64.( + ) (fst acc) (fst x), snd acc @ snd x)
 
         let job_done (job : (Int64.t, Int64.t) Available_job.t) :
             Int64.t State.Completed_job.t =
@@ -763,16 +776,16 @@ let%test_module "scans" =
                 @@ fill_in_completed_jobs ~state ~completed_jobs:jobs_done
               in
               let () = Or_error.ok_exn @@ enqueue_data ~state ~data in
-              match partition with
-              | `One x ->
+              match partition.second with
+              | None ->
                   let expected_base_pos =
-                    if curr_head + x = last_index + 1 then offset
-                    else curr_head + x
+                    if curr_head + partition.first = last_index + 1 then offset
+                    else curr_head + partition.first
                   in
                   assert (
                     Option.value_exn state.base_none_pos = expected_base_pos )
-              | `Two (x, y) ->
-                  assert (x + y = i) ;
+              | Some y ->
+                  assert (partition.first + y = i) ;
                   assert (Option.value_exn state.base_none_pos = y + offset) )
 
         let%test_unit "non-emitted data tracking" =
@@ -813,11 +826,11 @@ let%test_module "scans" =
                     List.sum (module Int64) (current_data state) ~f:Fn.id
                   in
                   let acc =
-                    Option.value_map (snd state.acc) ~default:0
-                      ~f:Int64.to_int_exn
+                    Option.value_map (snd state.acc) ~default:(0, [])
+                      ~f:(fun (x, xs) -> (Int64.to_int_exn x, xs) )
                   in
                   let expected = !cur_value - Int64.to_int_exn acc_data in
-                  assert (acc = expected) ;
+                  assert (fst acc = expected) ;
                   assert (
                     List.length state.other_trees_data < parallelism_log_2 ) ;
                   return () ) )
@@ -861,21 +874,22 @@ let%test_module "scans" =
                     |> Deferred.List.fold ~init:v ~f:(fun v _ ->
                            match%map Linear_pipe.read (pipe s) with
                            | `Eof -> v
-                           | `Ok (Some v') -> v'
+                           | `Ok (Some (v', _)) -> v'
                            | `Ok None -> v )
                   in
                   (* after we flush intermediate work *)
                   let old_acc =
-                    State.acc s |> Option.value ~default:Int64.zero
+                    State.acc s |> Option.value ~default:Int64.(zero, [])
                   in
                   let%bind v = fill_some_zeros Int64.zero s in
                   do_one_next := true ;
                   let acc = State.acc s |> Option.value_exn in
-                  assert (acc <> old_acc) ;
+                  assert (fst acc <> fst old_acc) ;
                   (* eventually we'll emit the acc+1 element *)
                   let%map _ = fill_some_zeros v s in
                   let acc_plus_one = State.acc s |> Option.value_exn in
-                  assert (Int64.(equal acc_plus_one (acc + one))) ) )
+                  assert (Int64.(equal (fst acc_plus_one) (fst acc + one))) )
+          )
 
         let%test_unit "sequence number reset" =
           (*create jobs with unique sequence numbers starting from 1. At any point, after reset, the jobs should be labelled starting from 1. Therefore,  sum of those sequence numbers should be equal to sum of first n (number of jobs) natutal numbers*)
@@ -936,10 +950,10 @@ let%test_module "scans" =
 
     let%test_module "scan (+) over ints, map from string" =
       ( module struct
-        let f_merge_up (tuple : int * int64 option) x =
+        let f_merge_up (tuple : int * (int64 * string list) option) x =
           let open Option.Let_syntax in
           let%map acc = snd tuple in
-          Int64.( + ) acc x
+          (Int64.( + ) (fst acc) (fst x), snd acc @ snd x)
 
         let job_done (job : (Int64.t, string) Available_job.t) :
             Int64.t State.Completed_job.t =
@@ -970,7 +984,7 @@ let%test_module "scans" =
                 |> Deferred.List.fold ~init:Int64.zero ~f:(fun acc _ ->
                        match%map Linear_pipe.read result with
                        | `Eof -> acc
-                       | `Ok (Some v) -> v
+                       | `Ok (Some (v, _)) -> v
                        | `Ok None -> acc )
               in
               let expected =
@@ -983,10 +997,10 @@ let%test_module "scans" =
 
     let%test_module "scan (concat) over strings" =
       ( module struct
-        let f_merge_up (tuple : int * string option) x =
+        let f_merge_up (tuple : int * (string * string list) option) x =
           let open Option.Let_syntax in
           let%map acc = snd tuple in
-          String.( ^ ) acc x
+          (String.( ^ ) (fst acc) (fst x), snd acc @ snd x)
 
         let job_done (job : (string, string) Available_job.t) :
             string State.Completed_job.t =
@@ -1019,7 +1033,7 @@ let%test_module "scans" =
                 |> Deferred.List.fold ~init:"" ~f:(fun acc _ ->
                        match%map Linear_pipe.read result with
                        | `Eof -> acc
-                       | `Ok (Some v) -> v
+                       | `Ok (Some (v, _)) -> v
                        | `Ok None -> acc )
               in
               let expected =

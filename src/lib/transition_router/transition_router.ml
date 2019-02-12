@@ -19,6 +19,7 @@ module type Inputs_intf = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type masked_ledger := Coda_base.Ledger.t
+     and type consensus_local_state := Consensus.Local_state.t
 
   module Network :
     Network_intf
@@ -27,6 +28,9 @@ module type Inputs_intf = sig
      and type external_transition := External_transition.t
      and type ancestor_proof_input := State_hash.t * int
      and type ancestor_proof := Ancestor.Proof.t
+     and type ledger_hash := Ledger_hash.t
+     and type sync_ledger_query := Sync_ledger.query
+     and type sync_ledger_answer := Sync_ledger.answer
 
   module Transition_frontier_controller :
     Transition_frontier_controller_intf
@@ -47,7 +51,7 @@ module type Inputs_intf = sig
 
   module State_proof :
     Proof_intf
-    with type input := Consensus.Mechanism.Protocol_state.value
+    with type input := Consensus.Protocol_state.value
      and type t := Proof.t
 
   module Protocol_state_validator :
@@ -89,7 +93,7 @@ module Make (Inputs : Inputs_intf) :
   let is_transition_for_bootstrap root_state new_transition =
     let open External_transition.Verified in
     let new_state = protocol_state new_transition in
-    Consensus.Mechanism.should_bootstrap
+    Consensus.should_bootstrap
       ~existing:(External_transition.Protocol_state.consensus_state root_state)
       ~candidate:(External_transition.Protocol_state.consensus_state new_state)
 

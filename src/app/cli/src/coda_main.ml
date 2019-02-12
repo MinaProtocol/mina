@@ -282,13 +282,13 @@ module type Main_intf = sig
 
     module Internal_transition :
       Coda_base.Internal_transition.S
-      with module Snark_transition = Consensus.Mechanism.Snark_transition
-       and module Prover_state := Consensus.Mechanism.Prover_state
+      with module Snark_transition = Consensus.Snark_transition
+       and module Prover_state := Consensus.Prover_state
        and module Staged_ledger_diff := Staged_ledger_diff
 
     module External_transition :
       Coda_base.External_transition.S
-      with module Protocol_state = Consensus.Mechanism.Protocol_state
+      with module Protocol_state = Consensus.Protocol_state
        and module Staged_ledger_diff := Staged_ledger_diff
 
     module Transition_frontier :
@@ -300,6 +300,7 @@ module type Main_intf = sig
        and type staged_ledger := Staged_ledger.t
        and type staged_ledger_diff := Staged_ledger_diff.t
        and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+       and type consensus_local_state := Consensus.Local_state.t
   end
 
   module Config : sig
@@ -334,7 +335,7 @@ module type Main_intf = sig
   val best_ledger : t -> Inputs.Ledger.t Participating_state.t
 
   val best_protocol_state :
-    t -> Consensus.Mechanism.Protocol_state.value Participating_state.t
+    t -> Consensus.Protocol_state.value Participating_state.t
 
   val best_tip :
     t -> Inputs.Transition_frontier.Breadcrumb.t Participating_state.t
@@ -435,7 +436,7 @@ module Make_inputs0
 struct
   open Protocols.Coda_pow
   open Init
-  module Protocol_state = Consensus.Mechanism.Protocol_state
+  module Protocol_state = Consensus.Protocol_state
   module Protocol_state_hash = State_hash.Stable.V1
 
   module Time : Time_intf with type t = Block_time.t = Block_time
@@ -584,8 +585,8 @@ struct
   module Internal_transition =
     Coda_base.Internal_transition.Make
       (Staged_ledger_diff)
-      (Consensus.Mechanism.Snark_transition)
-      (Consensus.Mechanism.Prover_state)
+      (Consensus.Snark_transition)
+      (Consensus.Prover_state)
   module External_transition =
     Coda_base.External_transition.Make (Staged_ledger_diff) (Protocol_state)
 
@@ -701,7 +702,7 @@ struct
   end
 
   module Genesis = struct
-    let state = Consensus.Mechanism.genesis_protocol_state
+    let state = Consensus.genesis_protocol_state
 
     let ledger = Genesis_ledger.t
 
@@ -776,32 +777,17 @@ struct
            ~sender:Network_peer.Peer.local)
   end
 
-  module Sync_ledger =
-    Syncable_ledger.Make (Ledger.Addr) (Account)
-      (struct
-        include Ledger_hash
-
-        let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
-
-        let empty_account = hash_account Account.empty
-      end)
-      (struct
-        include Ledger_hash
-
-        let to_hash (h : t) =
-          Ledger_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
-      end)
-      (struct
-        include Ledger
-
-        let f = Account.hash
-      end)
-      (struct
-        let subtree_height = 3
-      end)
-
-  module Sync_root_ledger =
-    Syncable_ledger.Make (Ledger.Db.Addr) (Account)
+  module Root_sync_ledger :
+    Syncable_ledger.S
+    with type addr := Ledger.Location.Addr.t
+     and type hash := Ledger_hash.t
+     and type root_hash := Ledger_hash.t
+     and type merkle_tree := Ledger.Db.t
+     and type account := Account.t
+     and type merkle_path := Ledger.path
+     and type query := Sync_ledger.query
+     and type answer := Sync_ledger.answer =
+    Syncable_ledger.Make (Ledger.Location.Addr) (Account)
       (struct
         include Ledger_hash
 
@@ -832,7 +818,7 @@ struct
     module Staged_ledger_hash = Staged_ledger_hash
     module Ledger_hash = Ledger_hash
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Blockchain_state = Consensus.Mechanism.Blockchain_state
+    module Blockchain_state = Consensus.Blockchain_state
   end)
 
   module Sync_handler = Sync_handler.Make (struct
@@ -879,9 +865,8 @@ struct
     module Transaction_snark_work = Transaction_snark_work
     module Ledger_proof_statement = Ledger_proof_statement
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-    module Syncable_ledger = Sync_root_ledger
-    module Merkle_address = Ledger.Db.Addr
-    module Consensus_mechanism = Consensus.Mechanism
+    module Consensus_mechanism = Consensus
+    module Root_sync_ledger = Root_sync_ledger
     module Protocol_state_validator = Protocol_state_validator
     module Network = Net
   end)
@@ -892,12 +877,11 @@ struct
     module Transaction_snark_work = Transaction_snark_work
     module Syncable_ledger = Sync_ledger
     module Sync_handler = Sync_handler
-    module Merkle_address = Ledger.Addr
     module Catchup = Ledger_catchup
     module Transition_handler = Transition_handler
     module Staged_ledger_diff = Staged_ledger_diff
     module Ledger_diff = Staged_ledger_diff
-    module Consensus_mechanism = Consensus.Mechanism
+    module Consensus_mechanism = Consensus
     module Ledger_proof_statement = Ledger_proof_statement
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Network = Net
@@ -906,14 +890,13 @@ struct
   module Transition_router = Transition_router.Make (struct
     include Inputs0
     module Transaction_snark_work = Transaction_snark_work
-    module Syncable_ledger = Sync_root_ledger
+    module Syncable_ledger = Root_sync_ledger
     module Sync_handler = Sync_handler
-    module Merkle_address = Ledger.Addr
     module Catchup = Ledger_catchup
     module Transition_handler = Transition_handler
     module Staged_ledger_diff = Staged_ledger_diff
     module Ledger_diff = Staged_ledger_diff
-    module Consensus_mechanism = Consensus.Mechanism
+    module Consensus_mechanism = Consensus
     module Ledger_proof_statement = Ledger_proof_statement
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Network = Net
@@ -940,7 +923,7 @@ struct
     module Private_key = Private_key
     module Keypair = Keypair
     module Compressed_public_key = Public_key.Compressed
-    module Consensus_mechanism = Consensus.Mechanism
+    module Consensus_mechanism = Consensus
 
     module Prover = struct
       let prove ~prev_state ~prev_state_proof ~next_state
@@ -1033,7 +1016,7 @@ module Make_coda (Init : Init_intf) = struct
     module Genesis_ledger = Genesis_ledger
     module Ledger_proof_statement = Ledger_proof_statement
     module Snark_worker = Snark_worker_lib.Prod.Worker
-    module Consensus_mechanism = Consensus.Mechanism
+    module Consensus_mechanism = Consensus
   end
 
   include Coda_lib.Make (Inputs)
@@ -1055,7 +1038,7 @@ module Make_coda (Init : Init_intf) = struct
     module Genesis_ledger = Genesis_ledger
     module Ledger_proof_statement = Ledger_proof_statement
     module Snark_worker = Snark_worker_lib.Debug.Worker
-    module Consensus_mechanism = Consensus.Mechanism
+    module Consensus_mechanism = Consensus
   end
 
   include Coda_lib.Make (Inputs)
@@ -1075,7 +1058,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let ledger_proof t = staged_ledger_ledger_proof t
   end
 
-  module Lite_compat = Lite_compat.Make (Consensus.Mechanism.Blockchain_state)
+  module Lite_compat = Lite_compat.Make (Consensus.Blockchain_state)
 
   let get_account t (addr : Public_key.Compressed.t) =
     let open Participating_state.Let_syntax in
@@ -1104,8 +1087,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let open Participating_state.Let_syntax in
     let%map accounts = get_accounts t in
     List.map accounts ~f:(fun account ->
-        ( Account.balance account |> Currency.Balance.to_int
-        , string_of_public_key account ) )
+        ( string_of_public_key account
+        , Account.balance account |> Currency.Balance.to_int ) )
 
   let is_valid_payment t (txn : User_command.t) account_opt =
     let remainder =
@@ -1244,12 +1227,12 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let num_accounts = Ledger.num_accounts ledger in
     let%bind state = best_protocol_state t in
     let state_hash =
-      Consensus.Mechanism.Protocol_state.hash state
+      Consensus.Protocol_state.hash state
       |> [%sexp_of: State_hash.t] |> Sexp.to_string
     in
     let block_count =
-      state |> Consensus.Mechanism.Protocol_state.consensus_state
-      |> Consensus.Mechanism.Consensus_state.length
+      state |> Consensus.Protocol_state.consensus_state
+      |> Consensus.Consensus_state.length
     in
     let uptime_secs =
       Time_ns.diff (Time_ns.now ()) start_time
@@ -1302,16 +1285,15 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             |> Host_and_port.to_string )
     ; user_commands_sent= !txn_count
     ; run_snark_worker= run_snark_worker t
-    ; proposal_interval=
-        Int64.to_int_exn Consensus.Mechanism.Constants.block_duration_ms
     ; propose_pubkey=
         Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
     ; histograms
-    ; consensus_mechanism= Consensus.Mechanism.name }
+    ; consensus_mechanism= Consensus.name
+    ; consensus_configuration= Consensus.Configuration.t }
 
   let get_lite_chain :
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =
-    Option.map Consensus.Mechanism.Consensus_state.to_lite
+    Option.map Consensus.Consensus_state.to_lite
       ~f:(fun consensus_state_to_lite t pks ->
         let ledger = best_ledger t |> Participating_state.active_exn in
         let transition =
@@ -1341,16 +1323,15 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         let protocol_state : Lite_base.Protocol_state.t =
           { previous_state_hash=
               Lite_compat.digest
-                ( Consensus.Mechanism.Protocol_state.previous_state_hash state
+                ( Consensus.Protocol_state.previous_state_hash state
                   :> Snark_params.Tick.Pedersen.Digest.t )
           ; body=
               { blockchain_state=
                   Lite_compat.blockchain_state
-                    (Consensus.Mechanism.Protocol_state.blockchain_state state)
+                    (Consensus.Protocol_state.blockchain_state state)
               ; consensus_state=
                   consensus_state_to_lite
-                    (Consensus.Mechanism.Protocol_state.consensus_state state)
-              } }
+                    (Consensus.Protocol_state.consensus_state state) } }
         in
         let proof = Lite_compat.proof proof in
         {Lite_base.Lite_chain.proof; ledger; protocol_state} )
