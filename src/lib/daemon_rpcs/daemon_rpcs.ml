@@ -362,7 +362,7 @@ module Snark_job_list = struct
 end
 
 module Start_tracing = struct
-  type query = string [@@deriving bin_io]
+  type query = unit [@@deriving bin_io]
 
   type response = unit [@@deriving bin_io]
 
