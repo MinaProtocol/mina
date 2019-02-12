@@ -1,4 +1,4 @@
-resolver: lts-9.21
+resolver: lts-13.7
 packages:
 - '.'
 nix:
@@ -6,6 +6,6 @@ nix:
   packages: [gmp]
 extra-deps:
 - git: https://github.com/bkase/kademlia.git
-  commit: 7120bb4d28e708acd52dfd61d3dca7914fac7d7f
+  commit: e6fd924c36701fb338702a929f70f06c24f2e7e2
 flags: {}
 extra-package-dbs: []
