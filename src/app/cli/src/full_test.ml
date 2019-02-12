@@ -12,20 +12,6 @@ open O1trace
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
 [%%if
-tracing]
-
-let start_tracing () =
-  Async.Writer.open_file
-    (sprintf "/tmp/coda-profile-%d" (Unix.getpid () |> Pid.to_int))
-  >>| O1trace.start_tracing
-
-[%%else]
-
-let start_tracing () = Deferred.unit
-
-[%%endif]
-
-[%%if
 with_snark]
 
 let with_snark = true

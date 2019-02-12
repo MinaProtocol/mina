@@ -1380,7 +1380,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             Deferred.unit )
       ; implement Daemon_rpcs.Snark_job_list.rpc (fun () () ->
             return (snark_job_list_json coda |> Participating_state.active_exn)
-        ) ]
+        )
+      ; implement Daemon_rpcs.Start_tracing.rpc (fun () () ->
+            Tracing.start Config.conf_dir )
+      ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
+            Tracing.stop () ; Deferred.unit ) ]
     in
     let snark_worker_impls =
       [ implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->

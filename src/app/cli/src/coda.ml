@@ -10,11 +10,6 @@ open Coda_main
 module YJ = Yojson.Safe
 module Git_sha = Daemon_rpcs.Types.Git_sha
 
-let start_tracing () =
-  Writer.open_file
-    (sprintf "/tmp/coda-profile-%d" (Unix.getpid () |> Pid.to_int))
-  >>| O1trace.start_tracing
-
 [%%if
 fake_hash]
 
@@ -97,8 +92,7 @@ let daemon log =
        flag "sexp-logging" no_arg
          ~doc:"Use S-expressions in log output, instead of JSON"
      and enable_tracing =
-       flag "tracing" no_arg
-         ~doc:"Trace into $config-directory/$pid.trace"
+       flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -118,6 +112,7 @@ let daemon log =
            Deferred.return conf_dir )
          else Sys.home_directory () >>| compute_conf_dir
        in
+       if enable_tracing then Tracing.start conf_dir |> don't_wait_for ;
        Parallel.init_master () ;
        ignore (Logger.set_sexp_logging sexp_logging) ;
        let%bind config =
@@ -172,7 +167,6 @@ let daemon log =
        let rest_server_port =
          maybe_from_config YJ.Util.to_int_option "rest-port" rest_server_port
        in
-       let enable_tracing = maybe_from_config YJ.Util.to_bool_option "tracing" enable_tracing in
        let work_selection =
          or_from_config
            (Fn.compose Option.return
@@ -299,7 +293,6 @@ let daemon log =
          let () = Snark_params.set_chunked_hashing true in
          let%bind () = Async.Unix.mkdir ~p:() suspicious_dir in
          let%bind () = Async.Unix.mkdir ~p:() punished_dir in
-         let%bind () = start_tracing () in
          let banlist =
            Coda_base.Banlist.create ~suspicious_dir ~punished_dir
          in
