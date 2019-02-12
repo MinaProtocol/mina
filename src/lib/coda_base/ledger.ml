@@ -128,11 +128,15 @@ let of_database db =
 *)
 let create ?directory_name () = of_database (Db.create ?directory_name ())
 
-let create_ephemeral () =
+let create_ephemeral_with_base () =
   let maskable = Null.create () in
   let casted = Any_ledger.cast (module Null) maskable in
   let mask = Mask.create () in
-  Maskable.register_mask casted mask
+  (casted, Maskable.register_mask casted mask)
+
+let create_ephemeral () =
+  let _base, mask = create_ephemeral_with_base () in
+  mask
 
 let with_ledger ~f =
   let ledger = create () in
@@ -140,6 +144,16 @@ let with_ledger ~f =
     let result = f ledger in
     close ledger ; result
   with exn -> close ledger ; raise exn
+
+let with_ephemeral_ledger ~f =
+  let base_ledger, masked_ledger = create_ephemeral_with_base () in
+  try
+    let result = f masked_ledger in
+    let _ : Mask.t = Maskable.unregister_mask_exn base_ledger masked_ledger in
+    result
+  with exn ->
+    let _ : Mask.t = Maskable.unregister_mask_exn base_ledger masked_ledger in
+    raise exn
 
 let packed t = Any_ledger.cast (module Mask.Attached) t
 
