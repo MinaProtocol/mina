@@ -1,7 +1,7 @@
 open Core_kernel
 
 (* A non-empty list is a tuple of the head and the rest (as a list) *)
-type 'a t = 'a * 'a list [@@deriving sexp, compare, eq, hash]
+type 'a t = 'a * 'a list [@@deriving sexp, compare, eq, hash, bin_io]
 
 let init x xs = (x, xs)
 
