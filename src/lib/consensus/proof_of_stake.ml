@@ -11,7 +11,6 @@ open Signed
 open Unsigned
 open Coda_numbers
 open Currency
-open Sha256_lib
 open Fold_lib
 open Signature_lib
 module Time = Coda_base.Block_time
@@ -24,7 +23,7 @@ module Epoch_seed = struct
   let initial : t = of_hash Snark_params.Tick.Pedersen.zero_hash
 
   let fold_vrf_result seed vrf_result =
-    Fold.(fold seed +> Sha256.Digest.fold vrf_result)
+    Fold.(fold seed +> Random_oracle.Digest.fold vrf_result)
 
   let update seed vrf_result =
     let open Snark_params.Tick in
@@ -32,16 +31,14 @@ module Epoch_seed = struct
       (Pedersen.digest_fold Coda_base.Hash_prefix.epoch_seed
          (fold_vrf_result seed vrf_result))
 
-  let update_var (seed : var) (vrf_result : Sha256.Digest.var) :
+  let update_var (seed : var) (vrf_result : Random_oracle.Digest.Checked.t) :
       (var, _) Snark_params.Tick.Checked.t =
     let open Snark_params.Tick in
     let open Snark_params.Tick.Let_syntax in
     let%bind seed_triples = var_to_triples seed in
     let%map hash =
       Pedersen.Checked.digest_triples ~init:Coda_base.Hash_prefix.epoch_seed
-        ( seed_triples
-        @ Fold.(to_list (group3 ~default:Boolean.false_ (of_list vrf_result)))
-        )
+        (seed_triples @ Random_oracle.Digest.Checked.to_triples vrf_result)
     in
     var_of_hash_packed hash
 end
@@ -74,7 +71,8 @@ module Constants = struct
 end
 
 module Proposal_data = struct
-  type t = {stake_proof: Coda_base.Stake_proof.t; vrf_result: Sha256.Digest.t}
+  type t =
+    {stake_proof: Coda_base.Stake_proof.t; vrf_result: Random_oracle.Digest.t}
   [@@deriving bin_io]
 
   let prover_state {stake_proof; _} = stake_proof
@@ -408,11 +406,24 @@ module Vrf = struct
   end
 
   module Output = struct
-    include Sha256.Digest
+    type t = Random_oracle.Digest.t
+    [@@deriving sexp, bin_io, eq, compare, hash]
+
+    type var = Random_oracle.Digest.Checked.t
+
+    let typ = Random_oracle.Digest.typ
+
+    let fold = Random_oracle.Digest.fold
+
+    let length_in_triples = Random_oracle.Digest.length_in_triples
+
+    let gen = Random_oracle.Digest.gen
+
+    let to_string (t : t) = (t :> string)
 
     type value = t [@@deriving sexp]
 
-    let dummy = Sha256.digest_string ""
+    let dummy = Random_oracle.digest_string ""
 
     let hash msg g =
       let open Fold in
@@ -424,10 +435,11 @@ module Vrf = struct
           ( Message.fold msg
           +> Non_zero_curve_point.Compressed.fold compressed_g )
       in
-      Sha256.digest_bits
-        (Snark_params.Tick.Pedersen.Digest.Bits.to_bits digest)
+      Random_oracle.digest_field digest
 
     module Checked = struct
+      include Random_oracle.Digest.Checked
+
       let hash msg g =
         let open Snark_params.Tick.Let_syntax in
         let%bind msg_triples = Message.Checked.var_to_triples msg in
@@ -437,16 +449,9 @@ module Vrf = struct
         let%bind pedersen_digest =
           Snark_params.Tick.Pedersen.Checked.digest_triples
             ~init:Coda_base.Hash_prefix.vrf_output (msg_triples @ g_triples)
-          >>= Snark_params.Tick.Pedersen.Checked.Digest.choose_preimage
         in
-        Sha256.Checked.digest
-          (pedersen_digest :> Snark_params.Tick.Boolean.var list)
+        Random_oracle.Checked.digest_field pedersen_digest
     end
-
-    let gen =
-      let open Quickcheck.Let_syntax in
-      let%map input = String.gen in
-      Sha256.digest_string input
 
     let%test_unit "hash unchecked vs. checked equality" =
       let gen_inner_curve_point =
@@ -461,14 +466,12 @@ module Vrf = struct
       in
       Quickcheck.test ~trials:10 gen_message_and_curve_point
         ~f:
-          (Test_util.test_equal
-             ~equal:(List.equal ~equal:Bool.equal)
+          (Test_util.test_equal ~equal:Random_oracle.Digest.equal
              Snark_params.Tick.Typ.(
                Message.typ * Snark_params.Tick.Inner_curve.typ)
-             (Snark_params.Tick.Typ.list ~length:256
-                Snark_params.Tick.Boolean.typ)
+             Random_oracle.Digest.typ
              (fun (msg, g) -> Checked.hash msg g)
-             (fun (msg, g) -> Sha256_lib.Sha256.Digest.to_bits (hash msg g)))
+             (fun (msg, g) -> hash msg g))
   end
 
   module Threshold = struct
@@ -488,11 +491,11 @@ module Vrf = struct
         vrf_output * total_currency <= c * my_stake * 2^256
     *)
     let is_satisfied ~my_stake ~total_stake vrf_output =
-      of_bit_fold_lsb (Sha256.Digest.fold_bits vrf_output)
+      of_bit_fold_lsb (Random_oracle.Digest.fold_bits vrf_output)
       * of_uint64_exn (Amount.to_uint64 total_stake)
       <= shift_left
            (c * of_uint64_exn (Balance.to_uint64 my_stake))
-           Sha256.Digest.length_in_bits
+           Random_oracle.Digest.length_in_bits
 
     module Checked = struct
       (* This version can't be used right now because the field is too small. *)
@@ -506,7 +509,7 @@ module Vrf = struct
             (* someday: This should really just be a scalar multiply... *)
             constant (Field.of_int c_int) * Amount.var_to_number my_stake
           in
-          mul_pow_2 x (`Two_to_the Sha256.Digest.length_in_bits)
+          mul_pow_2 x (`Two_to_the Random_oracle.Digest.length_in_bits)
         in
         lhs <= rhs
 
@@ -625,7 +628,7 @@ module Vrf = struct
               (Balance.to_int balance)
               (Amount.to_int total_stake)
               (Bignum_bigint.of_bit_fold_lsb
-                 (Sha256.Digest.fold_bits vrf_result)) ;
+                 (Random_oracle.Digest.fold_bits vrf_result)) ;
             if Threshold.is_satisfied ~my_stake:balance ~total_stake vrf_result
             then
               return
@@ -902,7 +905,7 @@ module Consensus_state = struct
     and curr_epoch_data_triples = Epoch_data.var_to_triples curr_epoch_data in
     Length.Unpacked.var_to_triples length
     @ Length.Unpacked.var_to_triples epoch_length
-    @ Vrf.Output.var_to_triples last_vrf_output
+    @ Vrf.Output.Checked.to_triples last_vrf_output
     @ Epoch.Unpacked.var_to_triples curr_epoch
     @ Epoch.Slot.Unpacked.var_to_triples curr_slot
     @ Amount.var_to_triples total_currency
@@ -946,7 +949,7 @@ module Consensus_state = struct
       ~(previous_protocol_state_hash : Coda_base.State_hash.t)
       ~(supply_increase : Currency.Amount.t)
       ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t)
-      ~(proposer_vrf_result : Sha256.Digest.t) : value Or_error.t =
+      ~(proposer_vrf_result : Random_oracle.Digest.t) : value Or_error.t =
     let open Or_error.Let_syntax in
     let open Consensus_transition_data in
     let%map total_currency =
@@ -1264,8 +1267,8 @@ let select ~existing ~candidate ~logger =
    * which takes the new state when true. Each predicate is also decorated
    * with a string description, used for debugging messages *)
   let candidate_vrf_is_bigger =
-    let d = Fn.compose Sha256.digest_string Vrf.Output.to_string in
-    Sha256.Digest.( > )
+    let d = Fn.compose Random_oracle.digest_string Vrf.Output.to_string in
+    Random_oracle.Digest.( > )
       (d candidate.last_vrf_output)
       (d existing.last_vrf_output)
   in
