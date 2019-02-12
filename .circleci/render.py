@@ -40,6 +40,18 @@ tests = [
        'config': 'test_postake_snarkless',
        'name': 'postake_integration_tests',
        'actions': base_actions
+   },
+   {
+       'friendly': 'Full test with SNARK (sig)',
+       'config': 'test_posig',
+       'name': 'withsnark-sig',
+       'actions': ['full-test']
+   },
+   {
+       'friendly': 'Full test with SNARK (stake)',
+       'config': 'test_postake',
+       'name': 'withsnark-stake',
+       'actions': ['full-test']
    }
 ]
 
