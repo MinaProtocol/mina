@@ -79,7 +79,7 @@ module Make (Inputs : Inputs.S) :
                          | None ->
                              Deferred.Or_error.error_string "parent not found"
                        in
-                       let%bind breadcrumb =
+                       let%map breadcrumb =
                          let open Deferred.Let_syntax in
                          match%map
                            Transition_frontier.Breadcrumb.build ~logger ~parent
@@ -93,9 +93,7 @@ module Make (Inputs : Inputs.S) :
                        Transition_frontier.add_breadcrumb_exn frontier
                          breadcrumb ;
                        Writer.write processed_transition_writer transition ;
-                       Deferred.return
-                       @@ Catchup_scheduler.notify catchup_scheduler
-                            ~transition
+                       Catchup_scheduler.notify catchup_scheduler ~transition
                      with
                      | Ok () -> ()
                      | Error err ->
