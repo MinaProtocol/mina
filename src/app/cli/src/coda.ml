@@ -10,19 +10,10 @@ open Coda_main
 module YJ = Yojson.Safe
 module Git_sha = Daemon_rpcs.Types.Git_sha
 
-[%%if
-tracing]
-
 let start_tracing () =
   Writer.open_file
     (sprintf "/tmp/coda-profile-%d" (Unix.getpid () |> Pid.to_int))
   >>| O1trace.start_tracing
-
-[%%else]
-
-let start_tracing () = Deferred.unit
-
-[%%endif]
 
 [%%if
 fake_hash]
@@ -105,6 +96,9 @@ let daemon log =
      and sexp_logging =
        flag "sexp-logging" no_arg
          ~doc:"Use S-expressions in log output, instead of JSON"
+     and enable_tracing =
+       flag "tracing" no_arg
+         ~doc:"Trace into $config-directory/$pid.trace"
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -178,6 +172,7 @@ let daemon log =
        let rest_server_port =
          maybe_from_config YJ.Util.to_int_option "rest-port" rest_server_port
        in
+       let enable_tracing = maybe_from_config YJ.Util.to_bool_option "tracing" enable_tracing in
        let work_selection =
          or_from_config
            (Fn.compose Option.return

@@ -28,6 +28,8 @@ let trace_thread_switch' ~pid wr (new_ctx : Execution_context.t) =
 
 let tid = ref 1
 
+let current_wr = ref None
+
 let trace_event' wr (name : string) =
   emit_event wr {(new_event Event) with name}
 
@@ -68,6 +70,7 @@ let measure name (f : unit -> 'a) : 'a =
   (Obj.magic !measure_impl : string -> (unit -> 'a) -> 'a) name f
 
 let start_tracing wr =
+  current_wr := Some wr ;
   let pid = Unix.getpid () |> Pid.to_int in
   emit_event wr {(new_event Pid_is) with pid} ;
   Async_kernel.Tracing.fns :=
@@ -83,6 +86,18 @@ let start_tracing wr =
           {(new_event Cycle_end) with tid= sch.current_execution_context.tid}
   )
 
+let stop_tracing () =
+  Async_kernel.Tracing.fns :=
+    {trace_thread_switch= (fun _ -> ()); trace_new_thread= (fun _ _ -> ())} ;
+  (trace_event_impl := fun _ -> ()) ;
+  (measure_impl := fun _ f -> f ()) ;
+  let sch = Scheduler.t () in
+  Scheduler.set_on_end_of_cycle sch id ;
+  Option.iter !current_wr ~f:(fun wr ->
+      emit_event wr
+        {(new_event Trace_end) with tid= sch.current_execution_context.tid} ) ;
+  current_wr := None
+
 [%%else]
 
 let[@inline] measure _ f = f ()
@@ -94,5 +109,7 @@ let[@inline] trace_recurring_task _ f = f ()
 let[@inline] trace_task _ f = f ()
 
 let[@inline] start_tracing _ = ()
+
+let[@inline] stop_tracing () = ()
 
 [%%endif]
