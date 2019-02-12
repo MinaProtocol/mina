@@ -41,7 +41,7 @@ module type Time_intf = sig
   type t0 = t
 
   module Span : sig
-    type t
+    type t [@@deriving compare]
 
     val of_time_span : Core_kernel.Time.Span.t -> t
 
@@ -70,6 +70,8 @@ module type Time_intf = sig
     val peek : 'a t -> 'a option
 
     val cancel : Controller.t -> 'a t -> 'a -> unit
+
+    val remaining_time : 'a t -> Span.t
   end
 
   val to_span_since_epoch : t -> Span.t
