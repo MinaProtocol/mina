@@ -469,5 +469,8 @@ let () =
   Random.self_init () ;
   let log = Logger.create () in
   don't_wait_for (ensure_testnet_id_still_good log) ;
+  (* Turn on snark debugging in prod for now *)
+  Snark_params.Tick.set_eval_constraints true ;
+  Snark_params.Tock.set_eval_constraints true ;
   Command.run (Command.group ~summary:"Coda" (coda_commands log)) ;
   Core.exit 0

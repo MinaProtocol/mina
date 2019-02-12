@@ -229,6 +229,9 @@ module type Ledger_intf = sig
   val register_mask : maskable_ledger -> unattached_mask -> attached_mask
 
   val unregister_mask_exn : maskable_ledger -> attached_mask -> unattached_mask
+
+  val remove_and_reparent_exn :
+    t -> attached_mask -> children:attached_mask list -> unit
 end
 
 module Fee = struct
@@ -632,9 +635,10 @@ module type Transaction_snark_scan_state_intf = sig
        t
     -> Transaction_with_witness.t list
     -> transaction_snark_work list
-    -> ledger_proof option Or_error.t
+    -> (ledger_proof * transaction list) option Or_error.t
 
-  val latest_ledger_proof : t -> Ledger_proof_with_sok_message.t option
+  val latest_ledger_proof :
+    t -> (Ledger_proof_with_sok_message.t * transaction list) option
 
   val free_space : t -> int
 
@@ -754,6 +758,10 @@ module type Staged_ledger_base_intf = sig
   val of_serialized_and_unserialized :
     serialized:serializable -> unserialized:ledger -> t
 
+  val replace_ledger_exn : t -> ledger -> t
+
+  val proof_txns : t -> transaction Non_empty_list.t option
+
   val copy : t -> t
 
   val hash : t -> staged_ledger_hash
@@ -765,7 +773,7 @@ module type Staged_ledger_base_intf = sig
     -> diff
     -> logger:Logger.t
     -> ( [`Hash_after_applying of staged_ledger_hash]
-         * [`Ledger_proof of ledger_proof option]
+         * [`Ledger_proof of (ledger_proof * transaction list) option]
          * [`Staged_ledger of t]
        , Staged_ledger_error.t )
        Deferred.Result.t
@@ -774,7 +782,7 @@ module type Staged_ledger_base_intf = sig
        t
     -> valid_diff
     -> ( [`Hash_after_applying of staged_ledger_hash]
-       * [`Ledger_proof of ledger_proof option]
+       * [`Ledger_proof of (ledger_proof * transaction list) option]
        * [`Staged_ledger of t] )
        Deferred.Or_error.t
 
@@ -1288,6 +1296,25 @@ module Proof_carrying_data = struct
   type ('a, 'b) t = {data: 'a; proof: 'b} [@@deriving sexp, fields, bin_io]
 end
 
+module type Transaction_validator_intf = sig
+  type ledger
+
+  type outer_ledger
+
+  type transaction
+
+  type user_command_with_valid_signature
+
+  type ledger_hash
+
+  val create : outer_ledger -> ledger
+
+  val apply_user_command :
+    ledger -> user_command_with_valid_signature -> unit Or_error.t
+
+  val apply_transaction : ledger -> transaction -> unit Or_error.t
+end
+
 module type Inputs_intf = sig
   module Time : Time_intf
 
@@ -1500,6 +1527,14 @@ Merge Snark:
                 Consensus_mechanism.Protocol_state.value
                 * Protocol_state_proof.t
                 * Staged_ledger.serializable
+
+  module Transaction_validator :
+    Transaction_validator_intf
+    with type outer_ledger := Ledger.t
+     and type transaction := Transaction.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
+     and type ledger_hash := Ledger_hash.t
 end
 
 module Make
