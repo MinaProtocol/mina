@@ -22,7 +22,7 @@
       snark_params
       vrf_lib
       coda_base
-      sha256_lib
+      random_oracle
       fold_lib))
   (preprocess (pps (ppx_jane ppx_deriving.eq bisect_ppx -conditional)))
   (modules (integrated_test))))
