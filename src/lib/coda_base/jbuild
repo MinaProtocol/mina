@@ -14,7 +14,7 @@
       base64
       signature_lib
       test_util
-      sha256_lib
+      random_oracle
       coda_digestif
       snark_bits
       currency

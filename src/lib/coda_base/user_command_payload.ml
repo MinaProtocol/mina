@@ -36,7 +36,7 @@ module Common = struct
     in
     {fee; nonce; memo}
 
-  type var = (Currency.Fee.var, Account_nonce.Unpacked.var, Memo.var) t_
+  type var = (Currency.Fee.var, Account_nonce.Unpacked.var, Memo.Checked.t) t_
 
   let to_hlist {fee; nonce; memo} = H_list.[fee; nonce; memo]
 
@@ -54,12 +54,12 @@ module Common = struct
     let constant ({fee; nonce; memo} : t) : var =
       { fee= Currency.Fee.var_of_t fee
       ; nonce= Account_nonce.Unpacked.var_of_value nonce
-      ; memo= Memo.var_of_t memo }
+      ; memo= Memo.Checked.constant memo }
 
     let to_triples ({fee; nonce; memo} : var) =
       Currency.Fee.var_to_triples fee
       @ Account_nonce.Unpacked.var_to_triples nonce
-      @ Memo.var_to_triples memo
+      @ Memo.Checked.to_triples memo
   end
 end
 

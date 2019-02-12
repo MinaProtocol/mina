@@ -4,7 +4,6 @@ open Coda_numbers
 open Snark_params.Tick
 open Let_syntax
 open Import
-open Sha256_lib
 module Amount = Currency.Amount
 module Fee = Currency.Fee
 
