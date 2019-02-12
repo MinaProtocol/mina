@@ -33,14 +33,10 @@ module Make (Inputs : Inputs.S) = struct
     ; collected_transitions:
         (External_transition.Verified.t, State_hash.t) With_hash.t list
         State_hash.Table.t
-        (* The new implementation has this new hash table storing all seen
-     * transitions. Comparing with the original implementation, this hash
-     * table has the invariant that all the transitions would appear as
-     * keys in the hash table. Note, in the original version, transition
-     * would only appear as key if it has a non-empty list of children;
-     * while now if we add a new transition without children into the hash
-     * table, we would always add it with an empty list of child associated
-     * to it. *)
+        (* This hash table stores all seen transitions as its keys, and the
+         * values are a list of direct children of those transitions. If a
+         * transition doesn't has a child, then its corresponding value in
+         * the hash table would be empty list.*)
     ; parent_root_timeouts: unit Time.Timeout.t State_hash.Table.t
     ; breadcrumb_builder_supervisor:
         (External_transition.Verified.t, State_hash.t) With_hash.t Rose_tree.t
@@ -86,18 +82,15 @@ module Make (Inputs : Inputs.S) = struct
     ; breadcrumb_builder_supervisor }
 
   let cancel_timeout t hash =
-    Hashtbl.find_and_call t.parent_root_timeouts hash
-      ~if_found:(fun timeout ->
-        Time.Timeout.cancel t.time_controller timeout () )
-      ~if_not_found:(Fn.const ()) ;
-    Hashtbl.remove t.parent_root_timeouts hash
+    let cancel timeout = Time.Timeout.cancel t.time_controller timeout () in
+    Hashtbl.change t.parent_root_timeouts hash
+      ~f:Fn.(compose (const None) (Option.iter ~f:cancel))
 
   let cancel_child_timeout t parent_hash =
-    match Hashtbl.find t.collected_transitions parent_hash with
-    | None -> ()
-    | Some children ->
+    Option.iter (Hashtbl.find t.collected_transitions parent_hash)
+      ~f:(fun children ->
         List.iter children ~f:(fun child ->
-            cancel_timeout t (With_hash.hash child) )
+            cancel_timeout t (With_hash.hash child) ) )
 
   let watch t ~timeout_duration ~transition =
     let hash = With_hash.hash transition in
@@ -146,21 +139,6 @@ module Make (Inputs : Inputs.S) = struct
     Hashtbl.remove t.collected_transitions parent_hash ;
     List.iter children ~f:(Fn.compose (remove_tree t) With_hash.hash)
 
-  (*
-  let notify t ~transition =
-    let hash = With_hash.hash transition in 
-    if (Option.is_none @@ Hashtbl.find t.parent_root_timeouts hash) &&
-       (Option.is_some @@ Hashtbl.find t.collected_transitions hash)
-    then Logger.info t.logger !"Received notify on node that is waiting for catchup: %{sexp: State_hash.t}" hash
-    else
-      cancel_timeout t hash ;
-      Option.iter (Hashtbl.find t.collected_transitions hash)
-        ~f:(fun collected_transitions ->
-          let transition_branches = List.map collected_transitions ~f:(extract t)
-          in Capped_supervisor.dispatch t.breadcrumb_builder_supervisor transition_branches ) ;
-      remove_tree t hash
-*)
-
   let notify t ~transition =
     let hash = With_hash.hash transition in
     if
@@ -168,8 +146,8 @@ module Make (Inputs : Inputs.S) = struct
       && (Option.is_some @@ Hashtbl.find t.collected_transitions hash)
     then
       Or_error.errorf
-        !"Received notify on node that is waiting for catchup: %{sexp: \
-          State_hash.t}"
+        !"Received notification to kill catchup job on a \
+          non-parent_root_transition: %{sexp: State_hash.t}"
         hash
     else (
       cancel_timeout t hash ;
