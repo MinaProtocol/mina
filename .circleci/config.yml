@@ -205,7 +205,7 @@ jobs:
                   name: Test make test-runtest
                   command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless MYPROCS=8 make test-runtest
 
-    test-withsnark:
+    test-withsnark-sig:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
@@ -219,7 +219,7 @@ jobs:
                   name: Test make test-withsnark (sig)
                   command: source ~/.profile && DUNE_PROFILE=test_posig make test-withsnark
 
-    test-withsnark:
+    test-withsnark-stake:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
@@ -361,6 +361,7 @@ workflows:
             - test-fake_hash_full_test
             - test-posig_integration_tests
             - test-postake_integration_tests
-            - test-withsnark
+            - test-withsnark-sig
+            - test-withsnark-stake
             - test-unit-test
             - tracetool
