@@ -6,4 +6,10 @@
 # stack2nix from https://github.com/input-output-hk/stack2nix and run:
 # cd src/app/kademlia-haskell; stack2nix . > packages.nix
 
-(import ./packages.nix {}).kademlia-haskell
+# Library profiling is on by default, and approximately doubles compile time.
+# Turn it off.
+((import ./packages.nix {}).override
+  {overrides = self: super: {
+    mkDerivation = args: super.mkDerivation (args // {enableLibraryProfiling = false;});
+    };
+  }).kademlia-haskell
