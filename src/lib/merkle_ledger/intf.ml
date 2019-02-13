@@ -33,7 +33,7 @@ end
 module type Hash = sig
   type t [@@deriving bin_io, sexp]
 
-  include Hashable_binable with type t := t
+  include Hashable.S_binable with type t := t
 
   type account
 
