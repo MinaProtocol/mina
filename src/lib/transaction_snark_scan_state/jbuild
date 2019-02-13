@@ -4,7 +4,6 @@
  ((name transaction_snark_scan_state)
   (public_name transaction_snark_scan_state)
   (flags (:standard -short-paths -warn-error -58))
-  (inline_tests)
   (library_flags (-linkall))
   (libraries (pipe_lib core async async_extra sgn parallel_scan transaction_snark coda_base protocols logger ppx_deriving_yojson.runtime yojson))
   (preprocessor_deps ("../../config.mlh"))
