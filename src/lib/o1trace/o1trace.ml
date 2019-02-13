@@ -92,7 +92,7 @@ let stop_tracing () =
   (trace_event_impl := fun _ -> ()) ;
   (measure_impl := fun _ f -> f ()) ;
   let sch = Scheduler.t () in
-  Scheduler.set_on_end_of_cycle sch id ;
+  Scheduler.set_on_end_of_cycle sch Fn.id ;
   Option.iter !current_wr ~f:(fun wr ->
       emit_event wr
         {(new_event Trace_end) with tid= sch.current_execution_context.tid} ) ;
