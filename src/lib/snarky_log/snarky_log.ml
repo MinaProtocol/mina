@@ -14,7 +14,7 @@ let to_file ?buf ?len ?std filename events =
 
 module Constraints (Snarky : Snark_intf.Basic) = struct
   (** Create flamechart events for Snarky constraints.
-  
+
     This creates a chart of labels, associating each label with a 'timestamp'
     equal to the number of constraints at its start and end. *)
   open Snarky

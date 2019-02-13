@@ -90,8 +90,12 @@ module Output = struct
       | Measure_start ->
           emitk ~buf Measure_start 0 |> emiti ~buf event.timestamp
           |> emits ~buf event.name |> finish ~buf wr
-      | Measure_end -> emitk ~buf Measure_end 0 |> emiti ~buf event.timestamp |> finish ~buf wr
-      | Trace_end -> emitk ~buf Trace_end 0 |> emiti ~buf event.timestamp |> finish ~buf wr
+      | Measure_end ->
+          emitk ~buf Measure_end 0 |> emiti ~buf event.timestamp
+          |> finish ~buf wr
+      | Trace_end ->
+          emitk ~buf Trace_end 0 |> emiti ~buf event.timestamp
+          |> finish ~buf wr
   end
 
   module JSON = struct
