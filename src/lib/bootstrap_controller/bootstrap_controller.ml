@@ -121,8 +121,10 @@ end = struct
 
   type t =
     { logger: Logger.t
-    ; mutable best_seen_transition: External_transition.Proof_verified.t
-    ; mutable current_root: External_transition.Proof_verified.t
+    ; mutable best_seen_transition:
+        (External_transition.Proof_verified.t, State_hash.t) With_hash.t
+    ; mutable current_root:
+        (External_transition.Proof_verified.t, State_hash.t) With_hash.t
     ; network: Network.t }
 
   module Transition_cache = Transition_cache.Make (Inputs)
@@ -131,7 +133,7 @@ end = struct
     `Take
     = Consensus.select ~logger:t.logger
         ~existing:
-          ( t.best_seen_transition
+          ( t.best_seen_transition |> With_hash.data
           |> External_transition.Proof_verified.protocol_state
           |> Consensus.Protocol_state.consensus_state )
         ~candidate
@@ -167,15 +169,15 @@ end = struct
               ~peer_root:peer_root_with_proof
           with
           | Ok (peer_root, peer_best_tip) ->
-              t.best_seen_transition <- peer_best_tip |> With_hash.data ;
-              t.current_root <- peer_root |> With_hash.data ;
+              t.best_seen_transition <- peer_best_tip ;
+              t.current_root <- peer_root ;
               let ledger_hash =
-                Consensus.(
-                  External_transition.Protocol_state.blockchain_state
-                    (External_transition.Proof_verified.protocol_state
-                       t.current_root)
-                  |> Blockchain_state.snarked_ledger_hash
-                  |> Frozen_ledger_hash.to_ledger_hash)
+                let open External_transition in
+                t.current_root |> With_hash.data
+                |> Proof_verified.protocol_state
+                |> Protocol_state.blockchain_state
+                |> Protocol_state.Blockchain_state.snarked_ledger_hash
+                |> Frozen_ledger_hash.to_ledger_hash
               in
               Root_sync_ledger.new_goal root_sync_ledger ledger_hash
               |> Fn.const `Syncing
@@ -239,10 +241,12 @@ end = struct
   let run ~parent_log ~network ~frontier ~ledger_db ~transition_reader =
     let logger = Logger.child parent_log __MODULE__ in
     let initial_breadcrumb = Transition_frontier.root frontier in
-    let initial_root_transition =
+    let initial_root_verified_transition =
       initial_breadcrumb |> Transition_frontier.Breadcrumb.transition_with_hash
-      |> With_hash.data
-      |> External_transition.forget_consensus_state_verification
+    in
+    let initial_root_transition =
+      With_hash.map initial_root_verified_transition
+        ~f:External_transition.forget_consensus_state_verification
     in
     let t =
       { network
@@ -263,30 +267,34 @@ end = struct
       synced_db
     in
     assert (Ledger.Db.(merkle_root ledger_db = merkle_root synced_db)) ;
-    (* Need to coerce new_root from a proof_verified transition to a fully
-       verified transition because it will be added into transition frontier*)
-    let (`I_swear_this_is_safe_see_my_comment new_root) =
-      External_transition.(t.current_root |> of_proof_verified |> to_verified)
+    let new_root =
+      With_hash.map t.current_root ~f:(fun root ->
+          (* Need to coerce new_root from a proof_verified transition to a fully
+             verified transition because it will be added into transition frontier*)
+          let (`I_swear_this_is_safe_see_my_comment verified_root) =
+            External_transition.(root |> of_proof_verified |> to_verified)
+          in
+          verified_root )
     in
     Transition_frontier.create ~logger:parent_log
       ~root_snarked_ledger:ledger_db
       ~root_transaction_snark_scan_state:(Staged_ledger.Scan_state.empty ())
-      ~root_staged_ledger_diff:None
-      ~root_transition:
-        (With_hash.of_data new_root
-           ~hash_data:
-             (Fn.compose Consensus.Protocol_state.hash
-                External_transition.Verified.protocol_state))
+      ~root_staged_ledger_diff:None ~root_transition:new_root
       ~consensus_local_state:
         (Transition_frontier.consensus_local_state frontier)
 
   module For_tests = struct
     type nonrec t = t
 
+    let hash_data =
+      Fn.compose Consensus.Protocol_state.hash
+        External_transition.Proof_verified.protocol_state
+
     let make_bootstrap ~logger ~genesis_root ~network =
+      let transition = With_hash.of_data genesis_root ~hash_data in
       { logger
-      ; best_seen_transition= genesis_root
-      ; current_root= genesis_root
+      ; best_seen_transition= transition
+      ; current_root= transition
       ; network }
 
     let on_transition = on_transition
