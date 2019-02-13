@@ -1,7 +1,7 @@
 open Core
 
 (* SOMEDAY: handle empty wallets *)
-module Make0
+module Make
     (Key : Intf.Key) (Account : sig
         type t [@@deriving sexp, bin_io]
 
@@ -14,8 +14,21 @@ module Make0
             end
             with type account := Account.t) (Depth : sig
         val depth : int
-    end) =
-struct
+    end) : sig
+  include
+    Ledger_extras_intf.S
+    with type hash := Hash.t
+     and type root_hash := Hash.t
+     and type account := Account.t
+     and type key := Key.t
+     and type key_set := Key.Set.t
+
+  val create : unit -> t
+
+  module For_tests : sig
+    val get_leaf_hash_at_addr : t -> Addr.t -> Hash.t
+  end
+end = struct
   include Depth
   module Addr = Merkle_address.Make (Depth)
 
@@ -386,38 +399,19 @@ struct
           (t.tree).unset_slots <- Int.Set.remove t.tree.unset_slots new_index )
         else set_at_index_exn t new_index a )
 
-  let addr_to_location = Addr.to_int
-end
+  let location_of_addr = Addr.to_int
 
-module Make
-    (Key : Intf.Key) (Account : sig
-        type t [@@deriving sexp, bin_io]
+  include Util.Make (struct
+    module Location = Location
+    module Account = Account
+    module Addr = Addr
 
-        include Intf.Account with type t := t and type key := Key.t
-    end)
-    (Hash : sig
-              type t [@@deriving sexp, hash, compare, bin_io]
+    module Base = struct
+      type nonrec t = t
 
-              include Intf.Hash with type t := t
-            end
-            with type account := Account.t) (Depth : sig
-        val depth : int
-    end) : sig
-  include
-    Ledger_extras_intf.S
-    with type hash := Hash.t
-     and type root_hash := Hash.t
-     and type account := Account.t
-     and type key := Key.t
-     and type key_set := Key.Set.t
+      let get = get
+    end
 
-  val create : unit -> t
-
-  module For_tests : sig
-    val get_leaf_hash_at_addr : t -> Addr.t -> Hash.t
-  end
-end = struct
-  module Base = Make0 (Key) (Account) (Hash) (Depth)
-  include Base
-  include Util.Make (Base.Location) (Account) (Base.Addr) (Base)
+    let location_of_addr = location_of_addr
+  end)
 end

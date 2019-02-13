@@ -1,14 +1,21 @@
 open Core
 
-module Make0
+module Make
     (Key : Intf.Key)
     (Account : Intf.Account with type key := Key.t)
     (Hash : Intf.Hash with type account := Account.t)
     (Depth : Intf.Depth)
     (Location : Location_intf.S)
     (Kvdb : Intf.Key_value_database)
-    (Storage_locations : Intf.Storage_locations) =
-struct
+    (Storage_locations : Intf.Storage_locations) :
+  Database_intf.S
+  with module Location = Location
+   and module Addr = Location.Addr
+   and type account := Account.t
+   and type root_hash := Hash.t
+   and type hash := Hash.t
+   and type key := Key.t
+   and type key_set := Key.Set.t = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   include Depth
 
@@ -399,27 +406,19 @@ struct
     let addr = Addr.of_int_exn index in
     merkle_path_at_addr_exn t addr
 
-  let addr_to_location addr = Location.Account addr
-end
+  let location_of_addr addr = Location.Account addr
 
-module Make
-    (Key : Intf.Key)
-    (Account : Intf.Account with type key := Key.t)
-    (Hash : Intf.Hash with type account := Account.t)
-    (Depth : Intf.Depth)
-    (Location : Location_intf.S)
-    (Kvdb : Intf.Key_value_database)
-    (Storage_locations : Intf.Storage_locations) :
-  Database_intf.S
-  with module Location = Location
-   and module Addr = Location.Addr
-   and type account := Account.t
-   and type root_hash := Hash.t
-   and type hash := Hash.t
-   and type key := Key.t
-   and type key_set := Key.Set.t = struct
-  module Base =
-    Make0 (Key) (Account) (Hash) (Depth) (Location) (Kvdb) (Storage_locations)
-  include Base
-  include Util.Make (Location) (Account) (Location.Addr) (Base)
+  include Util.Make (struct
+    module Location = Location
+    module Account = Account
+    module Addr = Location.Addr
+
+    module Base = struct
+      type nonrec t = t
+
+      let get = get
+    end
+
+    let location_of_addr = location_of_addr
+  end)
 end

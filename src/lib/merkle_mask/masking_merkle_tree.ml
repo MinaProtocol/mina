@@ -80,7 +80,7 @@ struct
     let mask = create () in
     f mask
 
-  module Attached0 = struct
+  module Attached = struct
     type parent = Base.t [@@deriving sexp]
 
     type t = unattached [@@deriving sexp]
@@ -534,13 +534,21 @@ struct
 
     let depth = Base.depth
 
-    let addr_to_location addr = Location.Account addr
-  end
+    let location_of_addr addr = Location.Account addr
 
-  module Attached = struct
-    include Attached0
-    include Merkle_ledger.Util.Make (Location) (Account) (Location.Addr)
-              (Attached0)
+    include Merkle_ledger.Util.Make (struct
+      module Location = Location
+      module Account = Account
+      module Addr = Location.Addr
+
+      module Base = struct
+        type nonrec t = t
+
+        let get = get
+      end
+
+      let location_of_addr = location_of_addr
+    end)
   end
 
   let set_parent t parent =
