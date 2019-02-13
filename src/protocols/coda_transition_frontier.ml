@@ -9,6 +9,12 @@ module type Network_intf = sig
 
   type state_hash
 
+  type ledger_hash
+
+  type sync_ledger_query
+
+  type sync_ledger_answer
+
   type external_transition
 
   type ancestor_proof_input
@@ -28,6 +34,14 @@ module type Network_intf = sig
     -> peer
     -> ancestor_proof_input
     -> (external_transition * ancestor_proof) Deferred.Or_error.t
+
+  (* TODO: Change this to strict_pipe *)
+  val glue_sync_ledger :
+       t
+    -> (ledger_hash * sync_ledger_query) Pipe_lib.Linear_pipe.Reader.t
+    -> (ledger_hash * sync_ledger_answer) Envelope.Incoming.t
+       Pipe_lib.Linear_pipe.Writer.t
+    -> unit
 end
 
 module type Transition_frontier_base_intf = sig
@@ -40,6 +54,8 @@ module type Transition_frontier_base_intf = sig
   type masked_ledger
 
   type staged_ledger
+
+  type consensus_local_state
 
   module Breadcrumb : sig
     type t [@@deriving sexp]
@@ -76,6 +92,8 @@ module type Transition_frontier_base_intf = sig
     -> root_snarked_ledger:ledger_database
     -> root_transaction_snark_scan_state:transaction_snark_scan_state
     -> root_staged_ledger_diff:staged_ledger_diff option
+    -> max_length:int
+    -> consensus_local_state:consensus_local_state
     -> t Deferred.t
 
   val find_exn : t -> state_hash -> Breadcrumb.t
@@ -91,7 +109,9 @@ module type Transition_frontier_intf = sig
 
   exception Already_exists of state_hash
 
-  val max_length : int
+  val max_length : t -> int
+
+  val consensus_local_state : t -> consensus_local_state
 
   val all_breadcrumbs : t -> Breadcrumb.t list
 
@@ -115,11 +135,15 @@ module type Transition_frontier_intf = sig
 
   val iter : t -> f:(Breadcrumb.t -> unit) -> unit
 
-  val attach_breadcrumb_exn : t -> Breadcrumb.t -> unit
-
   val add_breadcrumb_exn : t -> Breadcrumb.t -> unit
 
   val clear_paths : t -> unit
+
+  val best_tip_path_length_exn : t -> int
+
+  module For_tests : sig
+    val root_snarked_ledger : t -> ledger_database
+  end
 end
 
 module type Catchup_intf = sig
@@ -261,17 +285,31 @@ module type Transition_handler_intf = sig
 end
 
 module type Sync_handler_intf = sig
-  type hash
+  type state_hash
+
+  type ledger_hash
 
   type transition_frontier
 
   type ancestor_proof
 
+  type external_transition
+
+  type syncable_ledger_query
+
+  type syncable_ledger_answer
+
   val prove_ancestry :
        frontier:transition_frontier
     -> int
-    -> hash
-    -> (hash * ancestor_proof) option
+    -> state_hash
+    -> (external_transition * ancestor_proof) option
+
+  val answer_query :
+       frontier:transition_frontier
+    -> ledger_hash
+    -> syncable_ledger_query
+    -> (ledger_hash * syncable_ledger_answer) option
 end
 
 module type Bootstrap_controller_intf = sig
@@ -295,7 +333,7 @@ module type Bootstrap_controller_intf = sig
                                              Envelope.Incoming.t ]
                          * [< `Time_received of int64] )
                          Reader.t
-    -> transition_frontier Deferred.t
+    -> (transition_frontier * external_transition_verified list) Deferred.t
 end
 
 module type Transition_frontier_controller_intf = sig
@@ -315,6 +353,10 @@ module type Transition_frontier_controller_intf = sig
        logger:Logger.t
     -> network:network
     -> time_controller:time_controller
+    -> collected_transitions:( external_transition_verified
+                             , state_hash )
+                             With_hash.t
+                             list
     -> frontier:transition_frontier
     -> network_transition_reader:( [ `Transition of external_transition_verified
                                                     Envelope.Incoming.t ]

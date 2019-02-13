@@ -28,13 +28,6 @@ module type Staged_ledger_io_intf = sig
        t
     -> staged_ledger_hash
     -> staged_ledger_aux Envelope.Incoming.t Deferred.Or_error.t
-
-  val glue_sync_ledger :
-       t
-    -> (ledger_hash * sync_ledger_query) Linear_pipe.Reader.t
-    -> (ledger_hash * sync_ledger_answer) Envelope.Incoming.t
-       Linear_pipe.Writer.t
-    -> unit
 end
 
 module type Network_intf = sig
@@ -91,15 +84,12 @@ module type Network_intf = sig
 
   val broadcast_transaction_pool_diff : t -> transaction_pool_diff -> unit
 
-  module Staged_ledger_io :
-    Staged_ledger_io_intf
-    with type net := t
-     and type staged_ledger_aux := parallel_scan_state
-     and type staged_ledger_hash := staged_ledger_hash
-     and type ledger_hash := ledger_hash
-     and type protocol_state := protocol_state
-     and type sync_ledger_query := sync_ledger_query
-     and type sync_ledger_answer := sync_ledger_answer
+  val glue_sync_ledger :
+       t
+    -> (ledger_hash * sync_ledger_query) Linear_pipe.Reader.t
+    -> (ledger_hash * sync_ledger_answer) Envelope.Incoming.t
+       Linear_pipe.Writer.t
+    -> unit
 
   module Config : sig
     type t
@@ -390,20 +380,6 @@ module type Inputs_intf = sig
                 User_command.With_valid_signature.t
      and type transaction := User_command.t
 
-  module Sync_ledger : sig
-    type query [@@deriving bin_io]
-
-    type answer [@@deriving bin_io]
-
-    module Responder : sig
-      type t
-
-      val create : Ledger.t -> (query -> unit) -> t
-
-      val answer_query : t -> query -> answer
-    end
-  end
-
   module State_body_hash : sig
     type t
   end
@@ -418,8 +394,8 @@ module type Inputs_intf = sig
      and type transaction_pool_diff := Transaction_pool.pool_diff
      and type parallel_scan_state := Staged_ledger.Scan_state.t
      and type ledger_hash := Ledger_hash.t
-     and type sync_ledger_query := Sync_ledger.query
-     and type sync_ledger_answer := Sync_ledger.answer
+     and type sync_ledger_query := Coda_base.Sync_ledger.query
+     and type sync_ledger_answer := Coda_base.Sync_ledger.answer
      and type time := Time.t
      and type state_hash := Protocol_state_hash.t
      and type state_body_hash := State_body_hash.t
@@ -439,6 +415,7 @@ module type Inputs_intf = sig
      and type staged_ledger := Staged_ledger.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+     and type consensus_local_state := Consensus_mechanism.Local_state.t
 
   module Transition_router :
     Protocols.Coda_transition_frontier.Transition_router_intf
@@ -486,13 +463,15 @@ module type Inputs_intf = sig
     val proof : Protocol_state_proof.t
   end
 
-  module Sync_handler : sig
-    val prove_ancestry :
-         frontier:Transition_frontier.t
-      -> int
-      -> Protocol_state_hash.t
-      -> (Protocol_state_hash.t * State_body_hash.t list) option
-  end
+  module Sync_handler :
+    Protocols.Coda_transition_frontier.Sync_handler_intf
+    with type state_hash := Protocol_state_hash.t
+     and type ledger_hash := Ledger_hash.t
+     and type transition_frontier := Transition_frontier.t
+     and type ancestor_proof := State_body_hash.t list
+     and type external_transition := External_transition.t
+     and type syncable_ledger_query := Coda_base.Sync_ledger.query
+     and type syncable_ledger_answer := Coda_base.Sync_ledger.answer
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -522,7 +501,8 @@ module Make (Inputs : Inputs_intf) = struct
         (External_transition.t Envelope.Incoming.t * Inputs.Time.t)
         Pipe.Writer.t
     ; time_controller: Time.Controller.t
-    ; snark_work_fee: Currency.Fee.t }
+    ; snark_work_fee: Currency.Fee.t
+    ; consensus_local_state: Consensus_mechanism.Local_state.t }
 
   let peek_frontier frontier_mvar =
     Mvar.peek frontier_mvar
@@ -588,23 +568,7 @@ module Make (Inputs : Inputs_intf) = struct
     | Some x -> Deferred.return (Ok x)
     | None ->
         Deferred.Or_error.error_string
-          "ledger builder hash not found in transition frontier"
-
-  let get_ledger_by_hash tf ledger_hash =
-    match
-      List.find_map (Transition_frontier.all_breadcrumbs tf) ~f:(fun b ->
-          let ledger =
-            Transition_frontier.Breadcrumb.staged_ledger b
-            |> Staged_ledger.ledger
-          in
-          if Ledger_hash.equal (Ledger.merkle_root ledger) ledger_hash then
-            Some ledger
-          else None )
-    with
-    | Some x -> Deferred.return (Ok x)
-    | None ->
-        Deferred.Or_error.error_string
-          "ledger hash not found in transition frontier"
+          "staged ledger hash not found in transition frontier"
 
   let seen_jobs t = t.seen_jobs
 
@@ -649,18 +613,22 @@ module Make (Inputs : Inputs_intf) = struct
   end
 
   let start t =
-    let consensus_local_state =
-      Consensus_mechanism.Local_state.create t.propose_keypair
-    in
     Option.iter t.propose_keypair ~f:(fun keypair ->
         Proposer.run ~parent_log:t.log ~transaction_pool:t.transaction_pool
           ~get_completed_work:(Snark_pool.get_completed_work t.snark_pool)
-          ~time_controller:t.time_controller ~keypair ~consensus_local_state
+          ~time_controller:t.time_controller ~keypair
+          ~consensus_local_state:t.consensus_local_state
           ~frontier_reader:t.transition_frontier
           ~transition_writer:t.proposer_transition_writer )
 
   let create (config : Config.t) =
     trace_task "coda" (fun () ->
+        let consensus_local_state =
+          Consensus_mechanism.Local_state.create
+            (Option.map config.propose_keypair ~f:(fun keypair ->
+                 let open Keypair in
+                 Public_key.compress keypair.public_key ))
+        in
         let external_transitions_reader, external_transitions_writer =
           Strict_pipe.create Synchronous
         in
@@ -696,6 +664,7 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let%bind transition_frontier =
           Transition_frontier.create ~logger:config.log
+            ~max_length:Consensus.Constants.k
             ~root_transition:
               (With_hash.of_data first_transition
                  ~hash_data:
@@ -707,6 +676,7 @@ module Make (Inputs : Inputs_intf) = struct
             ~root_snarked_ledger:
               (Ledger_transfer.transfer_accounts ~src:Genesis.ledger
                  ~dest:ledger_db)
+            ~consensus_local_state
         in
         let frontier_mvar = Mvar.create () in
         Mvar.set frontier_mvar transition_frontier ;
@@ -716,17 +686,19 @@ module Make (Inputs : Inputs_intf) = struct
             ~get_staged_ledger_aux_at_hash:(fun _hash ->
               failwith "shouldn't be necessary right now?" )
             ~answer_sync_ledger_query:(fun query_env ->
-              let open Deferred.Or_error.Let_syntax in
-              let ledger_hash, query = Envelope.Incoming.data query_env in
-              let%bind frontier =
-                Deferred.return @@ peek_frontier frontier_read_ref
+              let open Or_error.Let_syntax in
+              let result =
+                let ledger_hash, query = Envelope.Incoming.data query_env in
+                let%bind frontier = peek_frontier frontier_read_ref in
+                Sync_handler.answer_query ~frontier ledger_hash query
+                |> Result.of_option
+                     ~error:
+                       (Error.createf
+                          !"Could not answer query for ledger_hash: \
+                            %{sexp:Ledger_hash.t}"
+                          ledger_hash)
               in
-              let%map ledger = get_ledger_by_hash frontier ledger_hash in
-              let responder = Sync_ledger.Responder.create ledger ignore in
-              let answer =
-                Sync_ledger.Responder.answer_query responder query
-              in
-              (ledger_hash, answer) )
+              result |> Deferred.return )
             ~transition_catchup:(fun enveloped_hash ->
               let open Deferred.Option.Let_syntax in
               let hash = Envelope.Incoming.data enveloped_hash in
@@ -746,18 +718,7 @@ module Make (Inputs : Inputs_intf) = struct
               let result =
                 let open Option.Let_syntax in
                 let%bind frontier = Mvar.peek frontier_read_ref in
-                let%bind state_hash, proof =
-                  Sync_handler.prove_ancestry ~frontier count descendent
-                in
-                let%map transition_with_hash =
-                  Transition_frontier.find frontier state_hash
-                in
-                let external_transition =
-                  transition_with_hash
-                  |> Transition_frontier.Breadcrumb.transition_with_hash
-                  |> With_hash.data |> External_transition.of_verified
-                in
-                (external_transition, proof)
+                Sync_handler.prove_ancestry ~frontier count descendent
               in
               Deferred.return result )
         in
@@ -819,5 +780,6 @@ module Make (Inputs : Inputs_intf) = struct
               config.staged_ledger_transition_backup_capacity
           ; receipt_chain_database= config.receipt_chain_database
           ; snark_work_fee= config.snark_work_fee
-          ; proposer_transition_writer } )
+          ; proposer_transition_writer
+          ; consensus_local_state } )
 end

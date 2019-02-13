@@ -19,14 +19,17 @@ module type S = sig
 
   module Location : Merkle_ledger.Location_intf.S
 
-  module Addr : Merkle_address.S
+  module Addr = Location.Addr
 
   val create : unit -> t
   (** create a mask with no parent *)
 
+  val get_uuid : t -> Core.Uuid.t
+
   module Attached : sig
     include
       Base_merkle_tree_intf.S
+      with module Addr = Addr
       with module Location = Location
       with type account := account
        and type root_hash := hash

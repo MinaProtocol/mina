@@ -7,7 +7,7 @@ open Snark_params
 open Fold_lib
 
 module Verification
-    (Consensus_mechanism : Consensus.Mechanism.S) (Wrap : sig
+    (Consensus_mechanism : Consensus.S) (Wrap : sig
         val key : Tock.Verification_key.t
 
         val key_to_bool_list : Tock.Verification_key.t -> bool list

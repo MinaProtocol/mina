@@ -42,7 +42,7 @@ module type S = sig
 end
 
 module Make (Hash : sig
-  type t [@@deriving bin_io, eq, sexp]
+  type t [@@deriving bin_io, eq, sexp, compare]
 
   val merge : height:int -> t -> t -> t
 end) (Key : sig

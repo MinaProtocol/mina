@@ -19,6 +19,7 @@ module type Inputs_intf = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type masked_ledger := Coda_base.Ledger.t
+     and type consensus_local_state := Consensus.Local_state.t
 
   module Network :
     Network_intf
@@ -27,6 +28,9 @@ module type Inputs_intf = sig
      and type external_transition := External_transition.t
      and type ancestor_proof_input := State_hash.t * int
      and type ancestor_proof := Ancestor.Proof.t
+     and type ledger_hash := Ledger_hash.t
+     and type sync_ledger_query := Sync_ledger.query
+     and type sync_ledger_answer := Sync_ledger.answer
 
   module Transition_frontier_controller :
     Transition_frontier_controller_intf
@@ -47,7 +51,7 @@ module type Inputs_intf = sig
 
   module State_proof :
     Proof_intf
-    with type input := Consensus.Mechanism.Protocol_state.value
+    with type input := Consensus.Protocol_state.value
      and type t := Proof.t
 
   module Protocol_state_validator :
@@ -89,7 +93,7 @@ module Make (Inputs : Inputs_intf) :
   let is_transition_for_bootstrap root_state new_transition =
     let open External_transition.Verified in
     let new_state = protocol_state new_transition in
-    Consensus.Mechanism.should_bootstrap
+    Consensus.should_bootstrap
       ~existing:(External_transition.Protocol_state.consensus_state root_state)
       ~candidate:(External_transition.Protocol_state.consensus_state new_state)
 
@@ -134,34 +138,43 @@ module Make (Inputs : Inputs_intf) :
         ~transition_frontier_controller_writer:_ ~old_frontier:_
         (`Transition _incoming_transition, `Time_received _tm) =
       failwith "Bootstrap is disabled as there this an infinite loop here"
-      (*      kill transition_frontier_controller_reader
+      (*_kill transition_frontier_controller_reader
         transition_frontier_controller_writer ;
       Strict_pipe.Writer.write clear_writer `Clear |> don't_wait_for ;
       let bootstrap_controller_reader, bootstrap_controller_writer =
-        create_bufferred_pipe ()
+        Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
       in
       let root_state = get_root_state old_frontier in
-      set_bootstrap_phase ~controller_type root_state
+      _set_bootstrap_phase ~controller_type root_state
         bootstrap_controller_writer ;
       let ancestor_prover =
-        Ancestor.Prover.create ~max_size:(2 * Transition_frontier.max_length)
+        Ancestor.Prover.create
+          ~max_size:(2 * Transition_frontier.max_length old_frontier)
       in
       Strict_pipe.Writer.write bootstrap_controller_writer
-        (`Transition incoming_transition, `Time_received (to_unix_timestamp tm)) ;
-      let%map new_frontier =
+        ( `Transition _incoming_transition
+        , `Time_received (to_unix_timestamp _tm) ) ;
+      let%map new_frontier, collected_transitions =
         Bootstrap_controller.run ~parent_log:logger ~network ~ledger_db
           ~ancestor_prover ~frontier:old_frontier
           ~transition_reader:bootstrap_controller_reader
       in
-      kill bootstrap_controller_reader bootstrap_controller_writer ;
-      new_frontier *)
+      _kill bootstrap_controller_reader bootstrap_controller_writer ;
+      ( new_frontier
+      , List.map collected_transitions
+          ~f:
+            (With_hash.of_data
+               ~hash_data:
+                 (Fn.compose Consensus.Protocol_state.hash
+                    External_transition.Verified.protocol_state)) ) *)
     in
     let start_transition_frontier_controller ~verified_transition_writer
-        ~clear_reader frontier =
+        ~clear_reader ~collected_transitions frontier =
       let transition_reader, transition_writer = create_bufferred_pipe () in
       let new_verified_transition_reader =
         Transition_frontier_controller.run ~logger ~network ~time_controller
-          ~frontier ~network_transition_reader:transition_reader
+          ~collected_transitions ~frontier
+          ~network_transition_reader:transition_reader
           ~proposer_transition_reader ~clear_reader
       in
       Strict_pipe.Reader.iter new_verified_transition_reader
@@ -178,7 +191,7 @@ module Make (Inputs : Inputs_intf) :
     let ( transition_frontier_controller_reader
         , transition_frontier_controller_writer ) =
       start_transition_frontier_controller ~verified_transition_writer
-        ~clear_reader
+        ~clear_reader ~collected_transitions:[]
         (Mvar.peek_exn frontier_mvar)
     in
     let controller_type =
@@ -217,7 +230,7 @@ module Make (Inputs : Inputs_intf) :
             , transition_frontier_controller_writer ) ->
             let root_state = get_root_state frontier in
             if is_transition_for_bootstrap root_state new_transition then
-              let%map new_frontier =
+              let%map new_frontier, collected_transitions =
                 clean_transition_frontier_controller_and_start_bootstrap
                   ~controller_type ~clear_writer
                   ~transition_frontier_controller_reader
@@ -226,7 +239,8 @@ module Make (Inputs : Inputs_intf) :
               in
               let reader, writer =
                 start_transition_frontier_controller
-                  ~verified_transition_writer ~clear_reader new_frontier
+                  ~verified_transition_writer ~clear_reader
+                  ~collected_transitions new_frontier
               in
               set_transition_frontier_controller_phase ~controller_type
                 new_frontier reader writer

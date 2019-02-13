@@ -229,6 +229,9 @@ module type Ledger_intf = sig
   val register_mask : maskable_ledger -> unattached_mask -> attached_mask
 
   val unregister_mask_exn : maskable_ledger -> attached_mask -> unattached_mask
+
+  val remove_and_reparent_exn :
+    t -> attached_mask -> children:attached_mask list -> unit
 end
 
 module Fee = struct
@@ -597,6 +600,10 @@ module type Transaction_snark_scan_state_intf = sig
     type t
   end
 
+  module Space_partition : sig
+    type t = {first: int; second: int option} [@@deriving sexp]
+  end
+
   module Job_view : sig
     type t [@@deriving sexp, to_yojson]
   end
@@ -628,9 +635,10 @@ module type Transaction_snark_scan_state_intf = sig
        t
     -> Transaction_with_witness.t list
     -> transaction_snark_work list
-    -> ledger_proof option Or_error.t
+    -> (ledger_proof * transaction list) option Or_error.t
 
-  val latest_ledger_proof : t -> Ledger_proof_with_sok_message.t option
+  val latest_ledger_proof :
+    t -> (Ledger_proof_with_sok_message.t * transaction list) option
 
   val free_space : t -> int
 
@@ -654,8 +662,7 @@ module type Transaction_snark_scan_state_intf = sig
 
   val copy : t -> t
 
-  val partition_if_overflowing :
-    t -> max_slots:int -> [`One of int | `Two of int * int]
+  val partition_if_overflowing : t -> Space_partition.t
 
   val statement_of_job : Available_job.t -> ledger_proof_statement option
 
@@ -688,7 +695,11 @@ module type Staged_ledger_base_intf = sig
 
   type user_command
 
-  (** The ledger in a ledger builder is always a mask *)
+  type statement
+
+  type transaction
+
+  (** The ledger in a staged ledger is always a mask *)
   type ledger
 
   type serializable [@@deriving bin_io]
@@ -700,6 +711,10 @@ module type Staged_ledger_base_intf = sig
       type t [@@deriving sexp, to_yojson]
     end
 
+    module Space_partition : sig
+      type t = {first: int; second: int option} [@@deriving sexp]
+    end
+
     val hash : t -> staged_ledger_aux_hash
 
     val is_valid : t -> bool
@@ -707,6 +722,10 @@ module type Staged_ledger_base_intf = sig
     val empty : unit -> t
 
     val snark_job_list_json : t -> string
+
+    val partition_if_overflowing : t -> Space_partition.t
+
+    val all_work_to_do : t -> statement Sequence.t Or_error.t
   end
 
   module Staged_ledger_error : sig
@@ -715,6 +734,7 @@ module type Staged_ledger_base_intf = sig
       | Coinbase_error of string
       | Bad_prev_hash of staged_ledger_hash * staged_ledger_hash
       | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
+      | Non_zero_fee_excess of Scan_state.Space_partition.t * transaction list
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -738,6 +758,10 @@ module type Staged_ledger_base_intf = sig
   val of_serialized_and_unserialized :
     serialized:serializable -> unserialized:ledger -> t
 
+  val replace_ledger_exn : t -> ledger -> t
+
+  val proof_txns : t -> transaction Non_empty_list.t option
+
   val copy : t -> t
 
   val hash : t -> staged_ledger_hash
@@ -749,7 +773,7 @@ module type Staged_ledger_base_intf = sig
     -> diff
     -> logger:Logger.t
     -> ( [`Hash_after_applying of staged_ledger_hash]
-         * [`Ledger_proof of ledger_proof option]
+         * [`Ledger_proof of (ledger_proof * transaction list) option]
          * [`Staged_ledger of t]
        , Staged_ledger_error.t )
        Deferred.Result.t
@@ -758,7 +782,7 @@ module type Staged_ledger_base_intf = sig
        t
     -> valid_diff
     -> ( [`Hash_after_applying of staged_ledger_hash]
-       * [`Ledger_proof of ledger_proof option]
+       * [`Ledger_proof of (ledger_proof * transaction list) option]
        * [`Staged_ledger of t] )
        Deferred.Or_error.t
 
@@ -773,8 +797,6 @@ module type Staged_ledger_intf = sig
 
   type user_command_with_valid_signature
 
-  type statement
-
   type ledger_proof_statement
 
   type ledger_proof_statement_set
@@ -784,8 +806,6 @@ module type Staged_ledger_intf = sig
   type completed_work_checked
 
   type public_key
-
-  type transaction
 
   val current_ledger_proof : t -> ledger_proof option
 
@@ -853,14 +873,14 @@ module type Tip_intf = sig
 
   type external_transition_verified
 
-  (* N.B.: can't derive bin_io for ledger builder containing persistent ledger *)
+  (* N.B.: can't derive bin_io for staged ledger containing persistent ledger *)
   type t =
     { state: protocol_state
     ; proof: protocol_state_proof
     ; staged_ledger: staged_ledger }
   [@@deriving sexp, fields]
 
-  (* serializer for tip components other than the persistent database in the ledger builder *)
+  (* serializer for tip components other than the persistent database in the staged ledger *)
   val bin_tip : serializable Bin_prot.Type_class.t
 
   val of_verified_transition_and_staged_ledger :
@@ -1106,12 +1126,14 @@ module type Consensus_mechanism_intf = sig
 
   type keypair
 
+  type compressed_public_key
+
   type time
 
   module Local_state : sig
     type t [@@deriving sexp]
 
-    val create : keypair option -> t
+    val create : compressed_public_key option -> t
   end
 
   module Consensus_transition_data : sig
@@ -1272,6 +1294,25 @@ end
 
 module Proof_carrying_data = struct
   type ('a, 'b) t = {data: 'a; proof: 'b} [@@deriving sexp, fields, bin_io]
+end
+
+module type Transaction_validator_intf = sig
+  type ledger
+
+  type outer_ledger
+
+  type transaction
+
+  type user_command_with_valid_signature
+
+  type ledger_hash
+
+  val create : outer_ledger -> ledger
+
+  val apply_user_command :
+    ledger -> user_command_with_valid_signature -> unit Or_error.t
+
+  val apply_transaction : ledger -> transaction -> unit Or_error.t
 end
 
 module type Inputs_intf = sig
@@ -1460,6 +1501,7 @@ Merge Snark:
      and type user_command := User_command.t
      and type sok_digest := Sok_message.Digest.t
      and type ledger := Ledger.t
+     and type compressed_public_key := Public_key.Compressed.t
      and type keypair := Keypair.t
      and type time := Time.t
 
@@ -1485,6 +1527,14 @@ Merge Snark:
                 Consensus_mechanism.Protocol_state.value
                 * Protocol_state_proof.t
                 * Staged_ledger.serializable
+
+  module Transaction_validator :
+    Transaction_validator_intf
+    with type outer_ledger := Ledger.t
+     and type transaction := Transaction.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
+     and type ledger_hash := Ledger_hash.t
 end
 
 module Make

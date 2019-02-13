@@ -162,6 +162,21 @@ let core () =
        revolves around cryptography and privacy, particularly privacy in \
        cryptocurrencies. Rebekah holds an MSc in Information Security from \
        UCL and a BSc in Mathematics from the University of Manchester."
+  and jiawei =
+    plain "Jiawei Tang" "Protocol Engineer"
+      "Jiawei loves writing interpreters and type checkers. He received his \
+       BS in computer science from Indiana University, and he's fascinated by \
+       categorical semantics and dependent type theory. Currently, he is \
+       implementing a toy dependently typed language called Pie."
+  and avery =
+    plain "Avery Morin" "Protocol Engineer"
+      "Avery first encountered OCaml during his BSc in software engineering \
+       at McGill University. Since graduating, he's been involved in the \
+       ReasonML community in his free time. He's worked on several projects \
+       including Reprocessing, a cross-platform port of Processing designed \
+       for beginners to the language. Avery is interested in making the \
+       helpful aspects of functional programming and type systems more \
+       accessible to people who aren’t already taking advantage of them."
   and nacera =
     plain "Nacera Rodstein" "Operations Associate"
       "Nacera has had a career spanning startups, medium sized companies, and \
@@ -175,9 +190,19 @@ let core () =
     plain "Harold Herbert" "Lead Designer"
       "Harold previously designed brands, products, and experiences at Hired, \
        Flipboard, Zillow, and with a range of technology companies while \
-       running an independent design studio. He believe’s that all design \
-       is experience design. Regardless of the medium, the end goal is the \
-       well being of the user."
+       running an independent design studio. He believes that all design is \
+       experience design. Regardless of the medium, the end goal is for the \
+       well-being of the user."
+  and mahoney =
+    plain "Mahoney Turnbull" "Community Lead"
+      "Mahoney Turnbull is a passionate and globally connected community \
+       builder with a diverse background in privacy law, digital rights, \
+       startups, and decentralized ecosystems. She most recently came from \
+       ConsenSys, where she led Community and Global Engagement for Token \
+       Foundry. Before that, she worked in ten different countries in a \
+       variety of roles in the startup ecosystem. She's also involved with \
+       the Blockchain for Science Thinktank, Disruption Disciples, Google \
+       Launchpad Mentorship, Team Block Society and Women in Blockchain."
   and joe =
     advisor "Joseph Bonneau"
       {literal|
@@ -234,8 +259,11 @@ She holds a MSc from Magdalen College, Oxford, and an AB from Harvard, where she
     ; echo
     ; matthew
     ; rebekah
+    ; jiawei
+    ; avery
     ; nacera
     ; harold
+    ; mahoney
     ; joe
     ; akis
     ; benedikt

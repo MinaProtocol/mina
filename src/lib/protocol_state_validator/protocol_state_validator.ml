@@ -11,7 +11,7 @@ module type Inputs_intf = sig
 
   module State_proof :
     Proof_intf
-    with type input := Consensus.Mechanism.Protocol_state.value
+    with type input := Consensus.Protocol_state.value
      and type t := Proof.t
 end
 
@@ -52,7 +52,7 @@ module Make (Inputs : Inputs_intf) :
         External_transition.protocol_state
     in
     if
-      Consensus.Mechanism.received_at_valid_time
+      Consensus.received_at_valid_time
         (consensus_state transition)
         ~time_received
     then

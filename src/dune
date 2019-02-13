@@ -1,5 +1,25 @@
-(rule
-  (targets config.mlh)
-  (mode fallback)
-  (deps config/%{profile}.mlh)
-  (action (copy "%{deps}" config.mlh)))
+(* -*- tuareg -*- *)
+
+let rec find_all_files dirname basename =
+  let fullname = Filename.concat dirname basename in
+  if Sys.is_directory fullname then
+    Sys.readdir fullname
+    |> Array.to_list
+    |> List.map (find_all_files fullname)
+    |> List.concat
+  else
+    [fullname]
+
+let () =
+  let config_deps =
+    find_all_files "" "config"
+    |> String.concat " "
+  in
+  Jbuild_plugin.V1.send @@ "
+    (copy_files config/**.mlh)
+
+    (rule
+      (targets config.mlh)
+      (mode fallback)
+      (deps config/%{profile}.mlh "^config_deps^")
+      (action (copy config/%{profile}.mlh config.mlh)))"

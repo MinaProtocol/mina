@@ -15,7 +15,7 @@ module Make (Inputs : Inputs.S) :
    and type transition_frontier_breadcrumb :=
               Inputs.Transition_frontier.Breadcrumb.t = struct
   open Inputs
-  open Consensus.Mechanism
+  open Consensus
   module Catchup_scheduler = Catchup_scheduler.Make (Inputs)
 
   (* TODO: calculate a sensible value from postake consensus arguments *)
@@ -52,8 +52,7 @@ module Make (Inputs : Inputs.S) :
                         ~f:
                           (Rose_tree.iter
                              ~f:
-                               (Transition_frontier.attach_breadcrumb_exn
-                                  frontier)))
+                               (Transition_frontier.add_breadcrumb_exn frontier)))
                | `Valid_transition transition -> (
                  match
                    Transition_frontier.find frontier

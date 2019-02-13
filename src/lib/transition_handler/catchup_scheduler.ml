@@ -20,7 +20,7 @@ open Coda_base
 
 module Make (Inputs : Inputs.S) = struct
   open Inputs
-  open Consensus.Mechanism
+  open Consensus
 
   type t =
     { logger: Logger.t
@@ -113,6 +113,7 @@ module Make (Inputs : Inputs.S) = struct
     Option.iter
       (Hashtbl.find t.timeouts (With_hash.hash transition))
       ~f:(fun entries ->
+        Hashtbl.remove t.timeouts (With_hash.hash transition) ;
         let transition_branches = List.map entries ~f:(extract t) in
         Capped_supervisor.dispatch t.breadcrumb_builder_supervisor
           transition_branches )

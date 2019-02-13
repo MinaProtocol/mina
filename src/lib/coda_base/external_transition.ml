@@ -4,6 +4,8 @@ module type Base_intf = sig
   (* TODO: delegate forget here *)
   type t [@@deriving sexp, bin_io, compare, eq]
 
+  include Comparable.S with type t := t
+
   type protocol_state
 
   type protocol_state_proof
@@ -73,7 +75,7 @@ end)
   module Protocol_state = Protocol_state
   module Blockchain_state = Protocol_state.Blockchain_state
 
-  module T = struct
+  module T0 = struct
     type t =
       { protocol_state: Protocol_state.value
       ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
@@ -86,6 +88,11 @@ end)
 
     let equal t1 t2 =
       Protocol_state.equal_value t1.protocol_state t2.protocol_state
+  end
+
+  module T = struct
+    include T0
+    include Comparable.Make (T0)
   end
 
   include T
