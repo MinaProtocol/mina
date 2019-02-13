@@ -622,7 +622,10 @@ end = struct
      in For_tests only, we expose apply apply_unverified, which calls apply_diff_unverified *)
   let apply_diff t (sl_diff : Staged_ledger_diff.t) ~logger =
     let open Deferred.Result.Let_syntax in
-    let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
+    let max_throughput =
+      Int.pow 2
+        Transaction_snark_scan_state.Constants.transaction_capacity_log_2
+    in
     let%bind spots_available, proofs_waiting =
       let%map jobs =
         Deferred.return
@@ -1873,16 +1876,6 @@ let%test_module "test" =
           @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d ->
                 d.user_commands )
       end
-
-      module Config = struct
-        let transaction_capacity_log_2 = 7
-
-        (*This has to be a minimum of 3 for the tests to pass otherwise the assertion that the number of transactions added in every block be > 0 will not hold. With transaction_capcity_log_2 as 2, the total number of slots available are 4 and in the case of maximum  number of provers, 3 slots are needed to add one transaction. But, when slots reach the end of the tree causing them to be split into two halves, no transaction can be added in either of the halves. This causes only coinbase to be added to the tree *)
-
-        let work_delay_factor = 2
-
-        (* This essentially number of subtrees each having (2^transaction_capacity_log_2) leaves. Size of the tree is 2^(transaction_capacity_log_2, work_delay_factor). Should be atleast 2.Why? -> When there is a single slot at the end of the tree before continuing at the begining of the tree (referring to the last level), the jobs on the right side of the tree are done along with the jobs on the left (because it wasn't added until then). The root node has to wait until the right sub-tree has completed before the next round begins. By the time the right sub-tree is completed, the left tree is also ready with the proof but has to wait until the root is emitted. This won't work with our succint datastructure impl and FIFO work order.*)
-      end
     end
 
     module Sl = Make (Test_input1)
@@ -1964,7 +1957,10 @@ let%test_module "test" =
     let%test_unit "Max throughput" =
       (*Always at worst case number of provers. This is enforced by creating proof bundles *)
       let logger = Logger.create () in
-      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
+      let p =
+        Int.pow 2
+          Transaction_snark_scan_state.Constants.transaction_capacity_log_2
+      in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
@@ -2000,7 +1996,10 @@ let%test_module "test" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
+      let p =
+        Int.pow 2
+          Transaction_snark_scan_state.Constants.transaction_capacity_log_2
+      in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
@@ -2043,7 +2042,10 @@ let%test_module "test" =
       in
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
+      let p =
+        Int.pow 2
+          Transaction_snark_scan_state.Constants.transaction_capacity_log_2
+      in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
@@ -2104,7 +2106,10 @@ let%test_module "test" =
           () )
 
     let%test_unit "Invalid diff test: check zero fee excess for partitions" =
-      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
+      let p =
+        Int.pow 2
+          Transaction_snark_scan_state.Constants.transaction_capacity_log_2
+      in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
@@ -2169,7 +2174,10 @@ let%test_module "test" =
     let%test_unit "Snarked ledger" =
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
+      let p =
+        Int.pow 2
+          Transaction_snark_scan_state.Constants.transaction_capacity_log_2
+      in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
@@ -2198,7 +2206,10 @@ let%test_module "test" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
+      let p =
+        Int.pow 2
+          Transaction_snark_scan_state.Constants.transaction_capacity_log_2
+      in
       let g = Int.gen_incl 0 p in
       let initial_ledger = ref 0 in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
@@ -2245,7 +2256,10 @@ let%test_module "test" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
+      let p =
+        Int.pow 2
+          Transaction_snark_scan_state.Constants.transaction_capacity_log_2
+      in
       let g =
         Quickcheck.Generator.tuple2 (Int.gen_incl 1 p) (Int.gen_incl 0 p)
       in
@@ -2309,7 +2323,10 @@ let%test_module "test" =
       in
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 Test_input1.Config.transaction_capacity_log_2 in
+      let p =
+        Int.pow 2
+          Transaction_snark_scan_state.Constants.transaction_capacity_log_2
+      in
       let g =
         Quickcheck.Generator.tuple2 (Int.gen_incl 1 p) (Int.gen_incl 0 p)
       in

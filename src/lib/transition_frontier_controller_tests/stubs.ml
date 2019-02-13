@@ -130,12 +130,6 @@ struct
     module Account = Coda_base.Account
     module Ledger = Coda_base.Ledger
     module Sparse_ledger = Coda_base.Sparse_ledger
-
-    module Config = struct
-      let transaction_capacity_log_2 = 7
-
-      let work_delay_factor = 2
-    end
   end)
 
   (* Generate valid payments for each blockchain state by having 
