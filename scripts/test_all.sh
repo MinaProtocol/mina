@@ -17,6 +17,11 @@ run_unit_tests() {
   run_dune runtest --verbose -j${MYPROCS}
 }
 
+run_ppx_tests() {
+  date
+  make ppx_tests
+}
+
 run_unit_tests_with_coverage() {
   date
   MYPROCS=${MYPROCS:-$(nproc --all)} # Linux-specific
@@ -91,6 +96,7 @@ run_epoch_stake_integration_test() {
 main() {
   run_dune build
   run_unit_tests
+  run_ppx_tests
   run_all_sig_integration_tests
   run_all_stake_integration_tests
   # run_epoch_stake_integration_test
