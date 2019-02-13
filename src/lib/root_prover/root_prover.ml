@@ -59,6 +59,12 @@ module Make (Inputs : Inputs_intf) :
       Proof_carrying_data.t
       option =
     let open Option.Let_syntax in
+    let%bind () =
+      Option.some_if
+        ( Transition_frontier.best_tip_path_length_exn frontier
+        = Transition_frontier.max_length )
+        ()
+    in
     let best_tip_breadcrumb = Transition_frontier.best_tip frontier in
     let best_tip =
       Transition_frontier.Breadcrumb.transition_with_hash best_tip_breadcrumb
@@ -70,7 +76,7 @@ module Make (Inputs : Inputs_intf) :
       = `Keep
     in
     let%bind () = Option.some_if is_tip_better () in
-    let exclusive_transitions_path =
+    let exclusive_merkle_list =
       Transition_frontier.path_map frontier best_tip_breadcrumb
         ~f:(fun breadcrumb ->
           let transition_with_hash =
@@ -89,14 +95,14 @@ module Make (Inputs : Inputs_intf) :
     in
     Logger.info logger
       !"Produced a merkle list of %{sexp:State_body_hash.t list}"
-      exclusive_transitions_path ;
+      exclusive_merkle_list ;
     Some
       Proof_carrying_data.
         { data=
             root_with_hash |> With_hash.data |> External_transition.of_verified
-        ; proof= (exclusive_transitions_path, best_tip) }
+        ; proof= (exclusive_merkle_list, best_tip) }
 
-  let verify_merkle_proof ~logger root_state_hash merkle_list best_tip_hash =
+  let verify_merkle_list ~logger root_state_hash merkle_list best_tip_hash =
     let result_hash =
       List.fold merkle_list ~init:root_state_hash ~f:(fun acc body_hash ->
           let state_hash =
@@ -150,7 +156,7 @@ module Make (Inputs : Inputs_intf) :
     in
     let%bind () =
       check_error ~message:"Peer gave an invalid proof of it's root"
-        (verify_merkle_proof ~logger root_hash merkle_list best_tip_hash)
+        (verify_merkle_list ~logger root_hash merkle_list best_tip_hash)
     in
     let%bind validated_root = Protocol_state_validator.validate_proof root in
     let%map validated_best_tip =
