@@ -1,21 +1,14 @@
 open Core
 
-module Make
+module Make0
     (Key : Intf.Key)
     (Account : Intf.Account with type key := Key.t)
     (Hash : Intf.Hash with type account := Account.t)
     (Depth : Intf.Depth)
     (Location : Location_intf.S)
     (Kvdb : Intf.Key_value_database)
-    (Storage_locations : Intf.Storage_locations) :
-  Database_intf.S
-  with module Location = Location
-   and module Addr = Location.Addr
-   and type account := Account.t
-   and type root_hash := Hash.t
-   and type hash := Hash.t
-   and type key := Key.t
-   and type key_set := Key.Set.t = struct
+    (Storage_locations : Intf.Storage_locations) =
+struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   include Depth
 
@@ -304,17 +297,6 @@ module Make
     | None -> 0
     | Some addr -> Addr.to_int addr + 1
 
-  let get_all_accounts_rooted_at_exn mdb address =
-    let first_node, last_node = Addr.Range.subtree_range address in
-    let result =
-      Addr.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
-          let account = get mdb (Location.Account bit_index) in
-          (bit_index, account) :: acc )
-    in
-    List.rev_filter_map result ~f:(function
-      | _, None -> None
-      | addr, Some account -> Some (addr, account) )
-
   let set_all_accounts_rooted_at_exn mdb address (accounts : Account.t list) =
     let first_node, last_node = Addr.Range.subtree_range address in
     Addr.Range.fold (first_node, last_node) ~init:accounts ~f:(fun addr ->
@@ -416,4 +398,28 @@ module Make
   let merkle_path_at_index_exn t index =
     let addr = Addr.of_int_exn index in
     merkle_path_at_addr_exn t addr
+
+  let addr_to_location addr = Location.Account addr
+end
+
+module Make
+    (Key : Intf.Key)
+    (Account : Intf.Account with type key := Key.t)
+    (Hash : Intf.Hash with type account := Account.t)
+    (Depth : Intf.Depth)
+    (Location : Location_intf.S)
+    (Kvdb : Intf.Key_value_database)
+    (Storage_locations : Intf.Storage_locations) :
+  Database_intf.S
+  with module Location = Location
+   and module Addr = Location.Addr
+   and type account := Account.t
+   and type root_hash := Hash.t
+   and type hash := Hash.t
+   and type key := Key.t
+   and type key_set := Key.Set.t = struct
+  module Base =
+    Make0 (Key) (Account) (Hash) (Depth) (Location) (Kvdb) (Storage_locations)
+  include Base
+  include Util.Make (Location) (Account) (Location.Addr) (Base)
 end

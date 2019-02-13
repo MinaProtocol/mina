@@ -691,6 +691,7 @@ module Make (Inputs : Inputs_intf) = struct
                 let ledger_hash, query = Envelope.Incoming.data query_env in
                 let%bind frontier = peek_frontier frontier_read_ref in
                 Sync_handler.answer_query ~frontier ledger_hash query
+                  ~logger:config.log
                 |> Result.of_option
                      ~error:
                        (Error.createf

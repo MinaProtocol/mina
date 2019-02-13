@@ -1,7 +1,7 @@
 open Core
 
 (* SOMEDAY: handle empty wallets *)
-module Make
+module Make0
     (Key : Intf.Key) (Account : sig
         type t [@@deriving sexp, bin_io]
 
@@ -14,21 +14,8 @@ module Make
             end
             with type account := Account.t) (Depth : sig
         val depth : int
-    end) : sig
-  include
-    Ledger_extras_intf.S
-    with type hash := Hash.t
-     and type root_hash := Hash.t
-     and type account := Account.t
-     and type key := Key.t
-     and type key_set := Key.Set.t
-
-  val create : unit -> t
-
-  module For_tests : sig
-    val get_leaf_hash_at_addr : t -> Addr.t -> Hash.t
-  end
-end = struct
+    end) =
+struct
   include Depth
   module Addr = Merkle_address.Make (Depth)
 
@@ -399,13 +386,38 @@ end = struct
           (t.tree).unset_slots <- Int.Set.remove t.tree.unset_slots new_index )
         else set_at_index_exn t new_index a )
 
-  let get_all_accounts_rooted_at_exn t a =
-    let height = depth - Addr.depth a in
-    let first_index = Addr.to_int a lsl height in
-    let count = min (1 lsl height) (num_accounts t - first_index) in
-    let subarr = Dyn_array.sub t.accounts first_index count in
-    List.zip_exn
-      (List.map ~f:Addr.of_int_exn
-         (List.range first_index (first_index + count)))
-    @@ Dyn_array.to_list subarr
+  let addr_to_location = Addr.to_int
+end
+
+module Make
+    (Key : Intf.Key) (Account : sig
+        type t [@@deriving sexp, bin_io]
+
+        include Intf.Account with type t := t and type key := Key.t
+    end)
+    (Hash : sig
+              type t [@@deriving sexp, hash, compare, bin_io]
+
+              include Intf.Hash with type t := t
+            end
+            with type account := Account.t) (Depth : sig
+        val depth : int
+    end) : sig
+  include
+    Ledger_extras_intf.S
+    with type hash := Hash.t
+     and type root_hash := Hash.t
+     and type account := Account.t
+     and type key := Key.t
+     and type key_set := Key.Set.t
+
+  val create : unit -> t
+
+  module For_tests : sig
+    val get_leaf_hash_at_addr : t -> Addr.t -> Hash.t
+  end
+end = struct
+  module Base = Make0 (Key) (Account) (Hash) (Depth)
+  include Base
+  include Util.Make (Base.Location) (Account) (Base.Addr) (Base)
 end

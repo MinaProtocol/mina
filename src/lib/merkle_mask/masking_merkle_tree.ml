@@ -80,7 +80,7 @@ struct
     let mask = create () in
     f mask
 
-  module Attached = struct
+  module Attached0 = struct
     type parent = Base.t [@@deriving sexp]
 
     type t = unattached [@@deriving sexp]
@@ -343,17 +343,6 @@ struct
           | None -> Some parent_loc
           | Some our_loc -> Some (max parent_loc our_loc) )
 
-    let get_all_accounts_rooted_at_exn t address =
-      Option.value_map ~default:[] (last_filled t) ~f:(fun allocation_addr ->
-          let first_addr, last_addr = Addr.Range.subtree_range address in
-          Addr.Range.fold
-            (first_addr, min last_addr (Location.to_path_exn allocation_addr))
-            ~init:[]
-            ~f:(fun bit_index acc ->
-              let queried_account = get t @@ Location.Account bit_index in
-              (bit_index, queried_account |> Option.value_exn) :: acc ) )
-      |> List.rev
-
     (* set accounts in mask *)
     let set_all_accounts_rooted_at_exn t address (accounts : Account.t list) =
       (* basically, the same code used for the database implementation *)
@@ -544,10 +533,20 @@ struct
     let location_of_sexp = Location.t_of_sexp
 
     let depth = Base.depth
+
+    let addr_to_location addr = Location.Account addr
+  end
+
+  module Attached = struct
+    include Attached0
+    include Merkle_ledger.Util.Make (Location) (Account) (Location.Addr)
+              (Attached0)
   end
 
   let set_parent t parent =
     t.parent <- Some parent ;
     t.current_location <- Attached.last_filled t ;
     t
+
+  let addr_to_location addr = Location.Account addr
 end
