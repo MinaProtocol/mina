@@ -9,6 +9,7 @@ Checklist:
 
 - [ ] Tests were added for the new behavior
 - [ ] All tests pass (CI will check this if you didn't)
+- [ ] Serialized types are in stable-versioned modules
 - [ ] Does this close issues? List them:
 
 Closes #0000
