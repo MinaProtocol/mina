@@ -11,15 +11,15 @@ module type Network_intf = sig
 
   type ledger_hash
 
+  type consensus_state
+
   type sync_ledger_query
 
   type sync_ledger_answer
 
   type external_transition
 
-  type ancestor_proof_input
-
-  type ancestor_proof
+  type state_body_hash
 
   val random_peers : t -> int -> peer list
 
@@ -32,8 +32,11 @@ module type Network_intf = sig
   val get_ancestry :
        t
     -> peer
-    -> ancestor_proof_input
-    -> (external_transition * ancestor_proof) Deferred.Or_error.t
+    -> consensus_state
+    -> ( external_transition
+       , state_body_hash list * external_transition )
+       Proof_carrying_data.t
+       Deferred.Or_error.t
 
   (* TODO: Change this to strict_pipe *)
   val glue_sync_ledger :
@@ -92,7 +95,6 @@ module type Transition_frontier_base_intf = sig
     -> root_snarked_ledger:ledger_database
     -> root_transaction_snark_scan_state:transaction_snark_scan_state
     -> root_staged_ledger_diff:staged_ledger_diff option
-    -> max_length:int
     -> consensus_local_state:consensus_local_state
     -> t Deferred.t
 
@@ -109,7 +111,7 @@ module type Transition_frontier_intf = sig
 
   exception Already_exists of state_hash
 
-  val max_length : t -> int
+  val max_length : int
 
   val consensus_local_state : t -> consensus_local_state
 
@@ -285,31 +287,52 @@ module type Transition_handler_intf = sig
 end
 
 module type Sync_handler_intf = sig
-  type state_hash
-
   type ledger_hash
 
   type transition_frontier
 
-  type ancestor_proof
-
-  type external_transition
-
   type syncable_ledger_query
 
   type syncable_ledger_answer
-
-  val prove_ancestry :
-       frontier:transition_frontier
-    -> int
-    -> state_hash
-    -> (external_transition * ancestor_proof) option
 
   val answer_query :
        frontier:transition_frontier
     -> ledger_hash
     -> syncable_ledger_query
     -> (ledger_hash * syncable_ledger_answer) option
+end
+
+module type Root_prover_intf = sig
+  type state_body_hash
+
+  type state_hash
+
+  type transition_frontier
+
+  type external_transition
+
+  type consensus_state
+
+  type proof_verified_external_transition
+
+  val prove :
+       logger:Logger.t
+    -> frontier:transition_frontier
+    -> consensus_state
+    -> ( external_transition
+       , state_body_hash list * external_transition )
+       Proof_carrying_data.t
+       option
+
+  val verify :
+       logger:Logger.t
+    -> observed_state:consensus_state
+    -> peer_root:( external_transition
+                 , state_body_hash list * external_transition )
+                 Proof_carrying_data.t
+    -> ( (proof_verified_external_transition, state_hash) With_hash.t
+       * (proof_verified_external_transition, state_hash) With_hash.t )
+       Deferred.Or_error.t
 end
 
 module type Bootstrap_controller_intf = sig
@@ -319,14 +342,11 @@ module type Bootstrap_controller_intf = sig
 
   type external_transition_verified
 
-  type ancestor_prover
-
   type ledger_db
 
   val run :
        parent_log:Logger.t
     -> network:network
-    -> ancestor_prover:ancestor_prover
     -> frontier:transition_frontier
     -> ledger_db:ledger_db
     -> transition_reader:( [< `Transition of external_transition_verified
