@@ -54,45 +54,12 @@ module Make (Impl : Snarky.Snark_intf.S) : S with module Impl := Impl = struct
         Array.foldi arr ~init:zero ~f:(fun i acc b ->
             if b then acc lor (one lsl i) else acc ) )
 
-  let boolean_to_constant (b : Boolean.var) =
-    Option.map (Field.Var.to_constant (b :> Field.Var.t)) ~f:Field.(equal one)
-
-  let xor (b1 : Boolean.var) (b2 : Boolean.var) =
-    match (boolean_to_constant b1, boolean_to_constant b2) with
-    | Some b1, Some b2 -> return (Boolean.var_of_value (b1 <> b2))
-    | Some true, None -> return (Boolean.not b2)
-    | None, Some true -> return (Boolean.not b1)
-    | Some false, None -> return b2
-    | None, Some false -> return b1
-    | None, None ->
-        (* (1 - 2 a) (1 - 2 b) = 1 - 2 c
-           1 - 2 (a + b) + 4 a b = 1 - 2 c
-           - 2 (a + b) + 4 a b = - 2 c
-           (a + b) - 2 a b = c
-           2 a b = a + b - c
-        *)
-        with_label __LOC__
-          (let%bind res =
-             exists Boolean.typ_unchecked
-               ~compute:
-                 As_prover.(
-                   map2 ~f:( <> ) (read Boolean.typ b1) (read Boolean.typ b2))
-           in
-           let%map () =
-             let a = (b1 :> Field.Var.t) in
-             let b = (b2 :> Field.Var.t) in
-             let c = (res :> Field.Var.t) in
-             let open Field.Checked.Infix in
-             assert_r1cs (a + a) b (a + b - c)
-           in
-           res)
-
   let xor t1 t2 =
     let res = Array.create ~len:length Boolean.false_ in
     let rec go i =
       if i < 0 then return res
       else
-        let%bind ri = xor t1.(i) t2.(i) in
+        let%bind ri = Boolean.(t1.(i) lxor t2.(i)) in
         res.(i) <- ri ;
         go (i - 1)
     in
