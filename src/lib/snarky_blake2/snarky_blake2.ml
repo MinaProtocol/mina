@@ -22,7 +22,22 @@ let%test_unit "string to bits" =
   Quickcheck.test ~trials:5 String.gen ~f:(fun s ->
       [%test_eq: string] s (bits_to_string (string_to_bits s)) )
 
-module Make (Impl : Snarky.Snark_intf.S) = struct
+module type S = sig
+  module Impl : Snarky.Snark_intf.S
+
+  open Impl
+
+  val block_size_in_bits : int
+
+  val digest_length_in_bits : int
+
+  val blake2s :
+       ?personalization:string
+    -> Boolean.var array
+    -> (Boolean.var array, _) Checked.t
+end
+
+module Make (Impl : Snarky.Snark_intf.S) : S with module Impl := Impl = struct
   open Impl
   open Let_syntax
   module UInt32 = Uint32.Make (Impl)
@@ -103,6 +118,8 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     let%bind () = (v, 12) := xor v.(12) (constant tlo) in
     let%bind () = (v, 13) := xor v.(13) (constant thi) in
     let%bind () =
+      (* We only perform this step while processing the last block,
+         at which point f is always equal to Unsigned.UInt32.max_int *)
       if f then (v, 14) := xor v.(14) (constant UInt32.Unchecked.max_int)
       else return ()
     in
@@ -129,6 +146,8 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
 
   let block_size_in_bits = 512
 
+  let digest_length_in_bits = 256
+
   let pad_input bs =
     let n = Array.length bs in
     if n mod 512 = 0 then bs
@@ -143,29 +162,34 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     Array.init (n * UInt32.length_in_bits) ~f:(fun i ->
         ts.(i / UInt32.length_in_bits).(i mod UInt32.length_in_bits) )
 
-  let concat_arrays ts = Array.concat (Array.to_list ts)
-
-  let default_personalization = Array.create ~len:8 '\000'
+  let default_personalization = String.init 8 ~f:(fun _ -> '\000')
 
   let blake2s ?(personalization = default_personalization) input =
-    assert (Array.length personalization = 8) ;
+    assert (String.length personalization = 8) ;
     assert (Array.length input mod 8 = 0) ;
     let p o =
-      let c j = Char.to_int personalization.(o + j) lsl (8 * j) in
+      let c j = Char.to_int personalization.[o + j] lsl (8 * j) in
       c 0 + c 1 + c 2 + c 3
     in
     let h =
-      let ( ^ ) = ( lxor ) in
+      (* Here we xor the initial values with the parameters of the
+         hash function that we're using:
+         depth = 1
+         fanout = 1
+         digest_length = 32
+         personalization = personalization *)
       Array.map
         ~f:(Fn.compose UInt32.constant UInt32.Unchecked.of_int)
-        [| 0x6A09E667 ^ 0x01010000 ^ 32
+        [| 0x6A09E667 lxor 0x01010000 (* depth = 1, fanout = 1 *)
+           lxor 32
+           (* digest_length = 32 *)
          ; 0xBB67AE85
          ; 0x3C6EF372
          ; 0xA54FF53A
          ; 0x510E527F
          ; 0x9B05688C
-         ; 0x1F83D9AB ^ p 0
-         ; 0x5BE0CD19 ^ p 4 |]
+         ; 0x1F83D9AB lxor p 0
+         ; 0x5BE0CD19 lxor p 4 |]
     in
     let padded = pad_input input in
     let blocks : UInt32.t array array =
@@ -226,9 +250,7 @@ let%test_module "blake2-equality test" =
       let compare_a x y = if equal x y then 0 else 1 in
       [%test_eq: a] checked_result (unchecked input)
 
-    let digest_length = 256
-
-    module B = (val Digestif.module_of (Digestif.blake2s digest_length))
+    module B = (val Digestif.module_of (Digestif.blake2s digest_length_in_bits))
 
     let blake2_unchecked s =
       string_to_bits (B.digest_string (bits_to_string s) :> string)
@@ -257,7 +279,9 @@ let%test_module "blake2-equality test" =
         let%map x = String.gen_with_length n Char.gen in
         (n, string_to_bits x)
       in
-      let output_typ = Impl.Typ.array ~length:digest_length Impl.Boolean.typ in
+      let output_typ =
+        Impl.Typ.array ~length:digest_length_in_bits Impl.Boolean.typ
+      in
       Quickcheck.test ~trials:20 input ~f:(fun (n, input) ->
           let input_typ = Impl.Typ.array ~length:(8 * n) Impl.Boolean.typ in
           test_equal
