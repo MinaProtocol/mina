@@ -48,7 +48,6 @@ let run_test () : unit Deferred.t =
       let module Main = Coda_main.Make_coda (Init) in
       let module Run = Run (Config) (Main) in
       let open Main in
-      let%bind () = start_tracing () in
       let banlist_dir_name = temp_conf_dir ^/ "banlist" in
       let%bind () = Async.Unix.mkdir banlist_dir_name in
       let%bind suspicious_dir =

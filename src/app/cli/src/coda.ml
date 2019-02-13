@@ -112,7 +112,7 @@ let daemon log =
            Deferred.return conf_dir )
          else Sys.home_directory () >>| compute_conf_dir
        in
-       if enable_tracing then Tracing.start conf_dir |> don't_wait_for ;
+       if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
        Parallel.init_master () ;
        ignore (Logger.set_sexp_logging sexp_logging) ;
        let%bind config =

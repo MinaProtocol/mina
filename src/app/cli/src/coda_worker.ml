@@ -228,7 +228,6 @@ module T = struct
             ; parent_log= log
             ; banlist } }
       in
-      let%bind () = start_tracing () in
       let%bind coda =
         Main.create
           (Main.Config.make ~log ~net_config
