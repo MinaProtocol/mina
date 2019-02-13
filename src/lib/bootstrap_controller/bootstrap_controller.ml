@@ -305,17 +305,20 @@ end = struct
     let (`I_swear_this_is_safe_see_my_comment new_root) =
       External_transition.(t.current_root |> of_proof_verified |> to_verified)
     in
-    Transition_frontier.create ~logger:parent_log
-      ~root_snarked_ledger:ledger_db
-      ~root_transaction_snark_scan_state:(Staged_ledger.Scan_state.empty ())
-      ~root_staged_ledger_diff:None ~max_length
-      ~root_transition:
-        (With_hash.of_data new_root
-           ~hash_data:
-             (Fn.compose Consensus.Protocol_state.hash
-                External_transition.Verified.protocol_state))
-      ~consensus_local_state:
-        (Transition_frontier.consensus_local_state frontier)
+    let%map new_frontier =
+      Transition_frontier.create ~logger:parent_log
+        ~root_snarked_ledger:ledger_db
+        ~root_transaction_snark_scan_state:(Staged_ledger.Scan_state.empty ())
+        ~root_staged_ledger_diff:None ~max_length
+        ~root_transition:
+          (With_hash.of_data new_root
+             ~hash_data:
+               (Fn.compose Consensus.Protocol_state.hash
+                  External_transition.Verified.protocol_state))
+        ~consensus_local_state:
+          (Transition_frontier.consensus_local_state frontier)
+    in
+    (new_frontier, Transition_cache.data transition_graph)
 
   module For_tests = struct
     type nonrec t = t

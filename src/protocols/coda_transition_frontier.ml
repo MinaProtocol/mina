@@ -334,7 +334,7 @@ module type Bootstrap_controller_intf = sig
                                              Envelope.Incoming.t ]
                          * [< `Time_received of int64] )
                          Reader.t
-    -> transition_frontier Deferred.t
+    -> (transition_frontier * external_transition_verified list) Deferred.t
 end
 
 module type Transition_frontier_controller_intf = sig
@@ -354,6 +354,10 @@ module type Transition_frontier_controller_intf = sig
        logger:Logger.t
     -> network:network
     -> time_controller:time_controller
+    -> collected_transitions:( external_transition_verified
+                             , state_hash )
+                             With_hash.t
+                             list
     -> frontier:transition_frontier
     -> network_transition_reader:( [ `Transition of external_transition_verified
                                                     Envelope.Incoming.t ]

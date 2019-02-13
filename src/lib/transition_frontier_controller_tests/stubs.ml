@@ -124,6 +124,7 @@ module Staged_ledger = Staged_ledger.Make (struct
   module Account = Coda_base.Account
   module Ledger = Coda_base.Ledger
   module Sparse_ledger = Coda_base.Sparse_ledger
+  module Transaction_validator = Coda_base.Transaction_validator
 
   module Config = struct
     let transaction_capacity_log_2 = 7
@@ -132,8 +133,8 @@ module Staged_ledger = Staged_ledger.Make (struct
   end
 end)
 
-(* Generate valid payments for each blockchain state by having 
-  each user send a payment of one coin to another random 
+(* Generate valid payments for each blockchain state by having
+  each user send a payment of one coin to another random
    user if they at least one coin*)
 let gen_payments ledger : User_command.With_valid_signature.t Sequence.t =
   let accounts_with_secret_keys = Genesis_ledger.accounts in
