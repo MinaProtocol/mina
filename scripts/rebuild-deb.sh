@@ -49,7 +49,7 @@ then
     mkdir -p ${BUILDDIR}/var/lib/coda
     cp /tmp/coda_cache_dir/* ${BUILDDIR}/var/lib/coda
 else
-    # Look instead for packaged keys 
+    # Look instead for packaged keys (downloaded before build time)
     var_keys=$(shopt -s nullglob dotglob; echo /var/lib/coda/*)
     if (( ${#var_keys} ))
     then
@@ -57,7 +57,6 @@ else
 	cp /var/lib/coda/* ${BUILDDIR}/var/lib/coda
     fi
 fi
-
 
 # Bash autocompletion
 # NOTE: We do not list bash-completion as a required package,
