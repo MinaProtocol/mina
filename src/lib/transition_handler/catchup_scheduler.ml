@@ -1,16 +1,13 @@
-(**
-  * [Catchup_scheduler] defines a process which schedules catchup jobs and
-  * monitors them for invalidation. This allows the transition frontier
-  * controller to handle out of order transitions without spinning up
-  * and tearing down catchup jobs constantly. The [Catchup_scheduler] must
-  * receive notifications whenever a new transition is added to the
-  * transition frontier so that it can determine if any pending catchup
-  * jobs can be invalidated. When catchup jobs are invalidated, the
-  * catchup scheduler extracts all of the invalidated catchup jobs and
-  * spins up a process to materialize breadcrumbs from those transitions,
-  * which will write the breadcrumbs back into the processor as if
-  * catchup had successfully completed.
-  *)
+(** [Catchup_scheduler] defines a process which schedules catchup jobs and
+    monitors them for invalidation. This allows the transition frontier
+    controller to handle out of order transitions without spinning up and
+    tearing down catchup jobs constantly. The [Catchup_scheduler] must receive
+    notifications whenever a new transition is added to the transition frontier
+    so that it can determine if any pending catchup jobs can be invalidated.
+    When catchup jobs are invalidated, the catchup scheduler extracts all of
+    the invalidated catchup jobs and spins up a process to materialize
+    breadcrumbs from those transitions, which will write the breadcrumbs back
+    into the processor as if catchup had successfully completed. *)
 
 open Core_kernel
 open Async_kernel
@@ -30,20 +27,18 @@ module Make (Inputs : Inputs.S) = struct
         , synchronous
         , unit Deferred.t )
         Writer.t
-          (**
-           * `collected_transitins` stores all seen transitions as its keys, and
-           * values are a list of direct children of those transitions. The
-           * invariant is that every collected transition would appear as a key
-           * in this table. Even if a transition doesn't has a child, its corresponding
-           * value in the hash table would just be an empty list.
-           *)
+          (** `collected_transitins` stores all seen transitions as its keys,
+              and values are a list of direct children of those transitions.
+              The invariant is that every collected transition would appear as
+              a key in this table. Even if a transition doesn't has a child,
+              its corresponding value in the hash table would just be an empty
+              list. *)
     ; collected_transitions:
         (External_transition.Verified.t, State_hash.t) With_hash.t list
         State_hash.Table.t
-          (**
-           * `parent_root_timeouts` stores the timeouts for catchup job. The keys
-           * are the missing transitions, and the values are the timeouts.
-           *)
+          (** `parent_root_timeouts` stores the timeouts for catchup job. The
+              keys are the missing transitions, and the values are the
+              timeouts. *)
     ; parent_root_timeouts: unit Time.Timeout.t State_hash.Table.t
     ; breadcrumb_builder_supervisor:
         (External_transition.Verified.t, State_hash.t) With_hash.t Rose_tree.t
