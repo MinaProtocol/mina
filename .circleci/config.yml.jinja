@@ -1,6 +1,6 @@
 # WARNING: config.yml file is generated from config.yml.jinja
 ---
-version: 2
+version: 3
 jobs:
     tracetool:
         docker:
@@ -92,7 +92,7 @@ jobs:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
-                  name: Build OCaml (sig)
+                  name: Build OCaml
                   command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                   name: Build deb Package with keys

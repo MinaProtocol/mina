@@ -2,6 +2,6 @@
     (name ppx_coda)
     (public_name ppx_coda)
     (kind ppx_rewriter)
-    (libraries ppxlib)
+    (libraries ppxlib core_kernel)
     (preprocess (pps ppxlib.metaquot))
 )
