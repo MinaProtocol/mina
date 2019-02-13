@@ -112,6 +112,14 @@ from modules without `Stable` and versioning. That kind of
 serialization is useful for logging and other printing from within
 Coda, and is less likely to be used with other software.
 
+### Coordination with RPC versioning
+
+RFC 0012 indicates how to version types used with the Jane Street
+RPC mechanism. The types specified in versioned modules here can
+also be used in the query, response, and message types used for
+RPC. In that case, if a new version of a module is created, the
+RPC version should be updated at the same time.
+
 ### Embracing this discipline
 
 As of this writing, there are over 600 type definitions with `deriving
