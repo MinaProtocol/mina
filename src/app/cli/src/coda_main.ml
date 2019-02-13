@@ -547,6 +547,7 @@ struct
       module Staged_ledger_diff = Staged_ledger_diff
       module Staged_ledger_hash = Staged_ledger_hash
       module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+      module Transaction_validator = Transaction_validator
       module Config = Init
 
       let check (Transaction_snark_work.({fee; prover; proofs}) as t) stmts =
@@ -924,6 +925,7 @@ struct
     module Keypair = Keypair
     module Compressed_public_key = Public_key.Compressed
     module Consensus_mechanism = Consensus
+    module Transaction_validator = Transaction_validator
 
     module Prover = struct
       let prove ~prev_state ~prev_state_proof ~next_state
@@ -1017,6 +1019,7 @@ module Make_coda (Init : Init_intf) = struct
     module Ledger_proof_statement = Ledger_proof_statement
     module Snark_worker = Snark_worker_lib.Prod.Worker
     module Consensus_mechanism = Consensus
+    module Transaction_validator = Transaction_validator
   end
 
   include Coda_lib.Make (Inputs)
@@ -1039,6 +1042,7 @@ module Make_coda (Init : Init_intf) = struct
     module Ledger_proof_statement = Ledger_proof_statement
     module Snark_worker = Snark_worker_lib.Debug.Worker
     module Consensus_mechanism = Consensus
+    module Transaction_validator = Transaction_validator
   end
 
   include Coda_lib.Make (Inputs)
@@ -1285,11 +1289,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             |> Host_and_port.to_string )
     ; user_commands_sent= !txn_count
     ; run_snark_worker= run_snark_worker t
-    ; block_window_duration= Consensus.Constants.block_window_duration_ms
     ; propose_pubkey=
         Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
     ; histograms
-    ; consensus_mechanism= Consensus.name }
+    ; consensus_mechanism= Consensus.name
+    ; consensus_configuration= Consensus.Configuration.t }
 
   let get_lite_chain :
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =

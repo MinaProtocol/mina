@@ -48,6 +48,8 @@ let ( < ) = Big_int.lt_big_int
 
 let to_int_exn = Big_int.int_of_big_int
 
+let compare = Big_int.compare_big_int
+
 module String_hum = struct
   type nonrec t = t
 

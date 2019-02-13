@@ -34,7 +34,7 @@ module Make (Inputs : Inputs.S) :
             External_transition.Verified.staged_ledger_diff
               (With_hash.data external_transition)
           in
-          let%map _, _, `Staged_ledger staged_ledger =
+          let%map _, `Ledger_proof _res_opt, `Staged_ledger staged_ledger =
             let open Deferred.Let_syntax in
             match%map Staged_ledger.apply ~logger staged_ledger diff with
             | Ok x -> Ok x

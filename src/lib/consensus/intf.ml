@@ -97,6 +97,12 @@ module type S = sig
          Quickcheck.Generator.t
   end
 
+  module Configuration : sig
+    type t [@@deriving yojson, bin_io]
+
+    val t : t
+  end
+
   val genesis_protocol_state :
     (Protocol_state.value, Coda_base.State_hash.t) With_hash.t
 
