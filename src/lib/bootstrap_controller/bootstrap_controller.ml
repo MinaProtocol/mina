@@ -276,12 +276,15 @@ end = struct
           in
           verified_root )
     in
-    Transition_frontier.create ~logger:parent_log
-      ~root_snarked_ledger:ledger_db
-      ~root_transaction_snark_scan_state:(Staged_ledger.Scan_state.empty ())
-      ~root_staged_ledger_diff:None ~root_transition:new_root
-      ~consensus_local_state:
-        (Transition_frontier.consensus_local_state frontier)
+    let%map new_frontier =
+      Transition_frontier.create ~logger:parent_log
+        ~root_snarked_ledger:ledger_db
+        ~root_transaction_snark_scan_state:(Staged_ledger.Scan_state.empty ())
+        ~root_staged_ledger_diff:None ~root_transition:new_root
+        ~consensus_local_state:
+          (Transition_frontier.consensus_local_state frontier)
+    in
+    (new_frontier, Transition_cache.data transition_graph)
 
   module For_tests = struct
     type nonrec t = t

@@ -125,6 +125,7 @@ struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Staged_ledger_hash = Coda_base.Staged_ledger_hash
     module Transaction_snark_work = Transaction_snark_work
+    module Transaction_validator = Transaction_validator
     module Staged_ledger_diff = Staged_ledger_diff
     module Account = Coda_base.Account
     module Ledger = Coda_base.Ledger

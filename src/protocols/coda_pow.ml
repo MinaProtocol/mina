@@ -1302,6 +1302,25 @@ Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
     Witness.t -> new_state:protocol_state -> protocol_state_proof Deferred.t
 end
 
+module type Transaction_validator_intf = sig
+  type ledger
+
+  type outer_ledger
+
+  type transaction
+
+  type user_command_with_valid_signature
+
+  type ledger_hash
+
+  val create : outer_ledger -> ledger
+
+  val apply_user_command :
+    ledger -> user_command_with_valid_signature -> unit Or_error.t
+
+  val apply_transaction : ledger -> transaction -> unit Or_error.t
+end
+
 module type Inputs_intf = sig
   module Time : Time_intf
 
@@ -1514,6 +1533,14 @@ Merge Snark:
                 Consensus_mechanism.Protocol_state.value
                 * Protocol_state_proof.t
                 * Staged_ledger.serializable
+
+  module Transaction_validator :
+    Transaction_validator_intf
+    with type outer_ledger := Ledger.t
+     and type transaction := Transaction.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
+     and type ledger_hash := Ledger_hash.t
 end
 
 module Make

@@ -96,6 +96,14 @@ module type S = sig
      and type valid_user_command := User_command.With_valid_signature.t
      and type account := Account.t
 
+  module Transaction_validator :
+    Coda_pow.Transaction_validator_intf
+    with type outer_ledger := Ledger.t
+     and type transaction := Transaction.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
+     and type ledger_hash := Ledger_hash.t
+
   module Sparse_ledger : sig
     type t [@@deriving sexp, bin_io]
 
