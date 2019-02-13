@@ -8,7 +8,7 @@ open Fold_lib
 let state_hash_size_in_triples = Tick.Field.size_in_triples
 
 let tick_input () =
-  let open Tick in
+  let open Tick.Groth16 in
   Data_spec.[Field.typ]
 
 let wrap_input = Tock.Data_spec.[Wrap_input.typ]
@@ -126,15 +126,15 @@ let merge_top_hash wrap_vk_bits =
 
 module Verification_keys = struct
   type t =
-    { base: Tick.Verification_key.t
+    { base: Tick.Groth16.Verification_key.t
     ; wrap: Tock.Verification_key.t
-    ; merge: Tick.Verification_key.t }
+    ; merge: Tick.Groth16.Verification_key.t }
   [@@deriving bin_io]
 
   let dummy : t =
-    { merge= Dummy_values.Tick.verification_key
-    ; base= Dummy_values.Tick.verification_key
-    ; wrap= Dummy_values.Tock.verification_key }
+    { merge= Dummy_values.Tick.Groth16.verification_key
+    ; base= Dummy_values.Tick.Groth16.verification_key
+    ; wrap= Dummy_values.Tock.GrothMaller17.verification_key }
 end
 
 module Keys0 = struct
@@ -142,15 +142,15 @@ module Keys0 = struct
 
   module Proving = struct
     type t =
-      { base: Tick.Proving_key.t
+      { base: Tick.Groth16.Proving_key.t
       ; wrap: Tock.Proving_key.t
-      ; merge: Tick.Proving_key.t }
+      ; merge: Tick.Groth16.Proving_key.t }
     [@@deriving bin_io]
 
     let dummy =
-      { merge= Dummy_values.Tick.proving_key
-      ; base= Dummy_values.Tick.proving_key
-      ; wrap= Dummy_values.Tock.proving_key }
+      { merge= Dummy_values.Tick.Groth16.proving_key
+      ; base= Dummy_values.Tick.Groth16.proving_key
+      ; wrap= Dummy_values.Tock.GrothMaller17.proving_key }
   end
 
   module T = struct
@@ -340,7 +340,7 @@ module Base = struct
     in
     ()
 
-  let create_keys () = generate_keypair main ~exposing:(tick_input ())
+  let create_keys () = Groth16.generate_keypair main ~exposing:(tick_input ())
 
   let transaction_union_proof ~proving_key sok_digest state1 state2
       (transaction : Transaction_union.t) handler =
@@ -353,7 +353,8 @@ module Base = struct
         ~fee_excess:(Transaction_union.excess transaction)
         ~supply_increase:(Transaction_union.supply_increase transaction)
     in
-    (top_hash, prove proving_key (tick_input ()) prover_state main top_hash)
+    ( top_hash
+    , Groth16.prove proving_key (tick_input ()) prover_state main top_hash )
 
   let transaction_proof ~proving_key sok_message state1 state2 transaction
       handler =
@@ -370,10 +371,11 @@ module Base = struct
     let load =
       let open Cached.Let_syntax in
       let%map verification =
-        Cached.component ~label:"verification" ~f:Keypair.vk
-          (module Verification_key)
+        Cached.component ~label:"verification" ~f:Groth16.Keypair.vk
+          (module Groth16.Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
+        Cached.component ~label:"proving" ~f:Groth16.Keypair.pk
+          (module Groth16.Proving_key)
       in
       (verification, {proving with value= ()})
     in
@@ -382,8 +384,8 @@ module Base = struct
       ~manual_install_path:Cache_dir.manual_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
-      ~input:(lazy (constraint_system ~exposing:(tick_input ()) main))
-      ~create_env:(fun x -> Keypair.generate (Lazy.force x))
+      ~input:(lazy (Groth16.constraint_system ~exposing:(tick_input ()) main))
+      ~create_env:(fun x -> Groth16.Keypair.generate (Lazy.force x))
 end
 
 module Transition_data = struct
@@ -426,19 +428,7 @@ module Merge = struct
           ~f:(fun acc x -> Pedersen.Checked.Section.disjoint_union_exn acc x)
           ~init:s ss
 
-  module Verifier = Tick.Verifier_gadget
-
-  let check_snark ~get_proof tock_vk tock_vk_data input =
-    let%bind vk_data, result =
-      Verifier.All_in_one.check_proof tock_vk
-        ~get_vk:As_prover.(map get_state ~f:Prover_state.tock_vk)
-        ~get_proof:As_prover.(map get_state ~f:get_proof)
-        input
-    in
-    let%map () =
-      Verifier.Verification_key_data.Checked.Assert.equal vk_data tock_vk_data
-    in
-    result
+  module Verifier = Tick.Groth_maller_verifier
 
   let vk_input_offset =
     Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
@@ -475,7 +465,7 @@ module Merge = struct
      returns a bool which is true iff
      there is a snark proving making tock_vk
      accept on one of [ H(s1, s2, excess); H(s1, s2, excess, tock_vk) ] *)
-  let verify_transition tock_vk tock_vk_data tock_vk_section
+  let verify_transition tock_vk tock_vk_precomp tock_vk_section
       get_transition_data s1 s2 supply_increase fee_excess =
     let%bind is_base =
       let get_type s = get_transition_data s |> Transition_data.proof |> fst in
@@ -512,8 +502,15 @@ module Merge = struct
             ~else_:with_vk_top_hash
         >>= Wrap_input.Checked.tick_field_to_scalars )
     in
-    let get_proof s = get_transition_data s |> Transition_data.proof |> snd in
-    check_snark ~get_proof tock_vk tock_vk_data input
+    let%bind proof =
+      exists Verifier.Proof.typ
+        ~compute:
+          As_prover.(
+            map get_state ~f:(fun s ->
+                get_transition_data s |> Transition_data.proof |> snd
+                |> Verifier.proof_of_backend_proof ))
+    in
+    Verifier.verify tock_vk tock_vk_precomp input proof
 
   let state1_offset =
     Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
@@ -527,11 +524,11 @@ module Merge = struct
      verify_transition tock_vk _ s1 s2 is true
      verify_transition tock_vk _ s2 s3 is true
   *)
-  let main (top_hash : Pedersen.Checked.Digest.var) =
+  let%snarkydef main (top_hash : Pedersen.Checked.Digest.var) =
     let%bind tock_vk =
-      exists' Verifier.Verification_key.typ
-        ~f:(fun {Prover_state.tock_vk; _} ->
-          Verifier.Verification_key.of_verification_key tock_vk )
+      exists' (Verifier.Verification_key.typ ~input_size:wrap_input_size)
+        ~f:(fun {Prover_state.tock_vk; _} -> Verifier.vk_of_backend_vk tock_vk
+      )
     and s1 = exists' wrap_input_typ ~f:Prover_state.ledger_hash1
     and s2 = exists' wrap_input_typ ~f:Prover_state.ledger_hash2
     and s3 = exists' wrap_input_typ ~f:Prover_state.ledger_hash3
@@ -561,15 +558,15 @@ module Merge = struct
       let open Pedersen.Checked.Section in
       extend empty ~start:state2_offset (bits_to_triples s3)
     in
-    let tock_vk_data =
-      Verifier.Verification_key.Checked.to_full_data tock_vk
-    in
     let%bind tock_vk_section =
       let%bind bs =
-        Verifier.Verification_key_data.Checked.to_bits tock_vk_data
+        Verifier.Verification_key.(summary (summary_input tock_vk))
       in
       Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty
         ~start:vk_input_offset (bits_to_triples bs)
+    in
+    let%bind tock_vk_precomp =
+      Verifier.Verification_key.Precomputation.create tock_vk
     in
     let%bind () =
       let%bind total_fees =
@@ -593,7 +590,7 @@ module Merge = struct
         let open Pedersen.Checked.Section in
         extend empty ~start:state2_offset (bits_to_triples s2)
       in
-      verify_transition tock_vk tock_vk_data tock_vk_section
+      verify_transition tock_vk tock_vk_precomp tock_vk_section
         Prover_state.transition12 s1_section s2_section supply_increase12
         fee_excess12
     and verify_23 =
@@ -601,22 +598,23 @@ module Merge = struct
         let open Pedersen.Checked.Section in
         extend empty ~start:state1_offset (bits_to_triples s2)
       in
-      verify_transition tock_vk tock_vk_data tock_vk_section
+      verify_transition tock_vk tock_vk_precomp tock_vk_section
         Prover_state.transition23 s2_section s3_section supply_increase23
         fee_excess23
     in
     Boolean.Assert.all [verify_12; verify_23]
 
-  let create_keys () = generate_keypair ~exposing:(input ()) main
+  let create_keys () = Groth16.generate_keypair ~exposing:(input ()) main
 
   let cached =
     let load =
       let open Cached.Let_syntax in
       let%map verification =
-        Cached.component ~label:"verification" ~f:Keypair.vk
-          (module Verification_key)
+        Cached.component ~label:"verification" ~f:Groth16.Keypair.vk
+          (module Groth16.Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
+        Cached.component ~label:"proving" ~f:Groth16.Keypair.pk
+          (module Groth16.Proving_key)
       in
       (verification, {proving with value= ()})
     in
@@ -625,8 +623,8 @@ module Merge = struct
       ~manual_install_path:Cache_dir.manual_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
-      ~input:(lazy (constraint_system ~exposing:(input ()) main))
-      ~create_env:(fun x -> Keypair.generate (Lazy.force x))
+      ~input:(lazy (Groth16.constraint_system ~exposing:(input ()) main))
+      ~create_env:(fun x -> Groth16.Keypair.generate (Lazy.force x))
 end
 
 module Verification = struct
@@ -652,14 +650,7 @@ module Verification = struct
   struct
     open K
 
-    let wrap_vk = Merge.Verifier.Verification_key.of_verification_key keys.wrap
-
-    let wrap_vk_data =
-      Merge.Verifier.Verification_key_data.full_data_of_verification_key
-        keys.wrap
-
-    let wrap_vk_bits =
-      Merge.Verifier.Verification_key_data.to_bits wrap_vk_data
+    let wrap_vk_bits = Snark_params.tock_vk_to_bool_list keys.wrap
 
     (* someday: Reorganize this module so that the inputs are separated from the proof. *)
     let verify_against_digest
@@ -722,6 +713,14 @@ module Verification = struct
       We precompute the parts of the pedersen involving wrap_vk and
       Amount.Signed.zero outside the SNARK since this saves us many constraints.
     *)
+
+    let wrap_vk = Merge.Verifier.(constant_vk (vk_of_backend_vk keys.wrap))
+
+    let wrap_precomp =
+      Merge.Verifier.(
+        Verification_key.Precomputation.create_constant
+          (vk_of_backend_vk keys.wrap))
+
     let verify_complete_merge sok_digest s1 s2 supply_increase get_proof =
       let open Tick in
       let open Let_syntax in
@@ -770,44 +769,38 @@ module Verification = struct
       in
       let%bind input = Wrap_input.Checked.tick_field_to_scalars digest in
       let%map result =
-        let%bind vk_data, result =
-          Merge.Verifier.All_in_one.check_proof
-            ~get_vk:(As_prover.return keys.wrap)
-            ~get_proof
-            (Merge.Verifier.Verification_key.Checked.constant wrap_vk)
-            input
+        let%bind proof =
+          exists Merge.Verifier.Proof.typ
+            ~compute:
+              (As_prover.map get_proof ~f:Merge.Verifier.proof_of_backend_proof)
         in
-        let%map () =
-          let open Merge.Verifier.Verification_key_data.Checked in
-          Assert.equal vk_data (constant wrap_vk_data)
-        in
-        result
+        Merge.Verifier.verify wrap_vk wrap_precomp input proof
       in
       result
   end
 end
 
 module Wrap (Vk : sig
-  val merge : Tick.Verification_key.t
+  val merge : Tick.Groth16.Verification_key.t
 
-  val base : Tick.Verification_key.t
+  val base : Tick.Groth16.Verification_key.t
 end) =
 struct
   open Tock
-  module Verifier = Tock.Verifier_gadget
+  module Verifier = Tock.Groth_verifier
 
-  let merge_vk = Verifier.Verification_key.of_verification_key Vk.merge
+  let merge_vk = Verifier.vk_of_backend_vk Vk.merge
 
-  let merge_vk_data =
-    Verifier.Verification_key_data.full_data_of_verification_key Vk.merge
+  let merge_vk_precomp =
+    Verifier.Verification_key.Precomputation.create_constant merge_vk
 
-  let base_vk = Verifier.Verification_key.of_verification_key Vk.base
+  let base_vk = Verifier.vk_of_backend_vk Vk.base
 
-  let base_vk_data =
-    Verifier.Verification_key_data.full_data_of_verification_key Vk.base
+  let base_vk_precomp =
+    Verifier.Verification_key.Precomputation.create_constant base_vk
 
   module Prover_state = struct
-    type t = {proof_type: Proof_type.t; proof: Tick_backend.Proof.t}
+    type t = {proof_type: Proof_type.t; proof: Tick.Groth16.Proof.t}
     [@@deriving fields]
   end
 
@@ -819,36 +812,37 @@ struct
    there is a proof making one of [ base_vk; merge_vk ] accept (b1, b2, .., bn) *)
   let%snarkydef main (input : Wrap_input.var) =
     let open Let_syntax in
-    let%bind input = Wrap_input.Checked.to_scalar input in
+    let%bind input = with_label __LOC__ (Wrap_input.Checked.to_scalar input) in
     let%bind is_base =
       exists' Boolean.typ ~f:(fun {Prover_state.proof_type; _} ->
           Proof_type.is_base proof_type )
     in
-    let verification_key =
-      Verifier.Verification_key.Checked.if_value is_base ~then_:base_vk
-        ~else_:merge_vk
-    in
-    let%bind vk_data, result =
-      (* someday: Probably an opportunity for optimization here since
-            we are passing in one of two known verification keys. *)
+    let%bind verification_key_precomp =
       with_label __LOC__
-        (Verifier.All_in_one.check_proof verification_key
-           ~get_vk:
-             As_prover.(
-               map get_state ~f:(fun {Prover_state.proof_type; _} ->
-                   match proof_type with
-                   | `Base -> Vk.base
-                   | `Merge -> Vk.merge ))
-           ~get_proof:As_prover.(map get_state ~f:Prover_state.proof)
-           [input])
+        (Verifier.Verification_key.Precomputation.if_ is_base
+           ~then_:base_vk_precomp ~else_:merge_vk_precomp)
     in
-    let%bind () =
+    let%bind verification_key =
       with_label __LOC__
-        (Verifier.Verification_key_data.Checked.Assert.equal
-           (Verifier.Verification_key.Checked.to_full_data verification_key)
-           vk_data)
+        (Verifier.Verification_key.if_ is_base
+           ~then_:(Verifier.constant_vk base_vk)
+           ~else_:(Verifier.constant_vk merge_vk))
     in
-    Boolean.Assert.is_true result
+    let%bind result =
+      let%bind proof =
+        exists Verifier.Proof.typ
+          ~compute:
+            As_prover.(
+              map get_state
+                ~f:
+                  (Fn.compose Verifier.proof_of_backend_proof
+                     Prover_state.proof))
+      in
+      with_label __LOC__
+        (Verifier.verify verification_key verification_key_precomp [input]
+           proof)
+    in
+    with_label __LOC__ (Boolean.Assert.is_true result)
 
   let create_keys () = generate_keypair ~exposing:wrap_input main
 
@@ -982,8 +976,8 @@ struct
       ; tock_vk= keys.verification.wrap }
     in
     ( top_hash
-    , Tick.prove keys.proving.merge (tick_input ()) prover_state Merge.main
-        top_hash )
+    , Tick.Groth16.prove keys.proving.merge (tick_input ()) prover_state
+        Merge.main top_hash )
 
   let of_transaction_union sok_digest source target transaction handler =
     let top_hash, proof =
@@ -1016,13 +1010,6 @@ struct
         !"Transaction_snark.merge: t1.target <> t2.source \
           (%{sexp:Frozen_ledger_hash.t} vs %{sexp:Frozen_ledger_hash.t})"
         t1.target t2.source () ;
-    (*
-    let t1_proof_type, t1_total_fees =
-      Proof_type_with_fees.to_proof_type_and_amount t1.proof_type_with_fees
-    in
-    let t2_proof_type, t2_total_fees =
-      Proof_type_with_fees.to_proof_type_and_amount t2.proof_type_with_fees
-       in *)
     let input, proof =
       merge_proof sok_digest t1.source t1.target t2.target
         { Transition_data.proof= (t1.proof_type, t1.proof)
@@ -1088,7 +1075,7 @@ module Keys = struct
       let open Storage in
       let parent_log = Logger.create () in
       let tick_controller =
-        Controller.create ~parent_log (module Tick.Verification_key)
+        Controller.create ~parent_log (module Tick.Groth16.Verification_key)
       in
       let tock_controller =
         Controller.create ~parent_log (module Tock.Verification_key)
@@ -1122,7 +1109,7 @@ module Keys = struct
       let open Storage in
       let parent_log = Logger.create () in
       let tick_controller =
-        Controller.create ~parent_log (module Tick.Proving_key)
+        Controller.create ~parent_log (module Tick.Groth16.Proving_key)
       in
       let tock_controller =
         Controller.create ~parent_log (module Tock.Proving_key)
@@ -1175,19 +1162,19 @@ module Keys = struct
     let merge = Merge.create_keys () in
     let wrap =
       let module Wrap = Wrap (struct
-        let base = Tick.Keypair.vk base
+        let base = Tick.Groth16.Keypair.vk base
 
-        let merge = Tick.Keypair.vk merge
+        let merge = Tick.Groth16.Keypair.vk merge
       end) in
       Wrap.create_keys ()
     in
     { proving=
-        { base= Tick.Keypair.pk base
-        ; merge= Tick.Keypair.pk merge
+        { base= Tick.Groth16.Keypair.pk base
+        ; merge= Tick.Groth16.Keypair.pk merge
         ; wrap= Tock.Keypair.pk wrap }
     ; verification=
-        { base= Tick.Keypair.vk base
-        ; merge= Tick.Keypair.vk merge
+        { base= Tick.Groth16.Keypair.vk base
+        ; merge= Tick.Groth16.Keypair.vk merge
         ; wrap= Tock.Keypair.vk wrap } }
 
   let cached () =
@@ -1411,15 +1398,17 @@ let%test_module "transaction_snark" =
 
 let constraint_system_digests () =
   let module W = Wrap (struct
-    let merge = Dummy_values.Tick.verification_key
+    let merge = Dummy_values.Tick.Groth16.verification_key
 
-    let base = Dummy_values.Tick.verification_key
+    let base = Dummy_values.Tick.Groth16.verification_key
   end) in
   let digest = Tick.R1CS_constraint_system.digest in
   let digest' = Tock.R1CS_constraint_system.digest in
   [ ( "transaction-merge"
-    , digest Merge.(Tick.constraint_system ~exposing:(input ()) main) )
+    , digest Merge.(Tick.Groth16.constraint_system ~exposing:(input ()) main)
+    )
   ; ( "transaction-base"
-    , digest Base.(Tick.constraint_system ~exposing:(tick_input ()) main) )
+    , digest
+        Base.(Tick.Groth16.constraint_system ~exposing:(tick_input ()) main) )
   ; ( "transaction-wrap"
     , digest' W.(Tock.constraint_system ~exposing:wrap_input main) ) ]
