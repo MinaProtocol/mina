@@ -24,6 +24,17 @@ let start_tracing () = Deferred.unit
 
 [%%endif]
 
+[%%if
+fake_hash]
+
+let maybe_sleep s = after (Time.Span.of_sec s)
+
+[%%else]
+
+let maybe_sleep _ = Deferred.unit
+
+[%%endif]
+
 let commit_id = Option.map [%getenv "CODA_COMMIT_SHA1"] ~f:Git_sha.of_string
 
 module type Coda_intf = sig
@@ -316,7 +327,7 @@ let daemon log =
            Coda_base.Receipt_chain_database.create
              ~directory:receipt_chain_dir_name
          in
-         let%map coda =
+         let%bind coda =
            Run.create
              (Run.Config.make ~log ~net_config
                 ~run_snark_worker:(Option.is_some run_snark_worker_flag)
@@ -328,6 +339,7 @@ let daemon log =
                 ~time_controller ?propose_keypair:Config0.propose_keypair ()
                 ~banlist)
          in
+         let%map () = maybe_sleep 3. in
          M.start coda ;
          let web_service = Web_pipe.get_service () in
          Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;
