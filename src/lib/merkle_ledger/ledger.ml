@@ -399,6 +399,9 @@ end = struct
           (t.tree).unset_slots <- Int.Set.remove t.tree.unset_slots new_index )
         else set_at_index_exn t new_index a )
 
+  let set_batch_accounts _t _addresses_and_accounts =
+    failwith "unsupported implementation"
+
   let get_all_accounts_rooted_at_exn t a =
     let height = depth - Addr.depth a in
     let first_index = Addr.to_int a lsl height in

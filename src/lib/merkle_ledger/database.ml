@@ -136,6 +136,39 @@ module Make
     let locs_bufs = List.map locations_vs ~f:create_buf in
     set_raw_batch mdb locs_bufs
 
+  let rec set_hash_batch mdb locations_and_hashes =
+    let location_to_hashtbl =
+      Location.Table.of_alist_exn locations_and_hashes
+    in
+    let locations, _ = List.unzip locations_and_hashes in
+    List.iter locations ~f:(fun location -> assert (Location.is_hash location)) ;
+    set_bin_batch mdb Hash.bin_size_t Hash.bin_write_t locations_and_hashes ;
+    let _, parent_locations_and_hashes =
+      List.fold locations_and_hashes ~init:([], [])
+        ~f:(fun (processed_locations, parent_locations_and_hashes)
+           (location, hash)
+           ->
+          if List.mem processed_locations location ~equal:Location.equal then
+            (processed_locations, parent_locations_and_hashes)
+          else
+            let height = Location.height location in
+            let sibling_location = Location.sibling location in
+            let sibling_hash =
+              Option.value ~default:(get_hash mdb sibling_location)
+              @@ Hashtbl.find location_to_hashtbl sibling_location
+            in
+            let parent_hash =
+              let left_hash, right_hash =
+                Location.order_siblings location hash sibling_hash
+              in
+              Hash.merge ~height left_hash right_hash
+            in
+            ( location :: sibling_location :: processed_locations
+            , (Location.parent location, parent_hash)
+              :: parent_locations_and_hashes ) )
+    in
+    set_hash_batch mdb parent_locations_and_hashes
+
   let rec set_hash mdb location new_hash =
     assert (Location.is_hash location) ;
     set_bin mdb location Hash.bin_size_t Hash.bin_write_t new_hash ;
@@ -258,15 +291,16 @@ module Make
       (Location.Hash (Location.to_path_exn location))
       (Hash.hash_account account)
 
-  let set_batch mdb locations_accounts =
-    set_bin_batch mdb Account.bin_size_t Account.bin_write_t locations_accounts ;
-    let set_one_hash (location, account) =
-      set_hash mdb
-        (Location.Hash (Location.to_path_exn location))
-        (Hash.hash_account account)
-    in
-    (* TODO: is there something better we can do? *)
-    List.iter locations_accounts ~f:set_one_hash
+  let set_batch mdb locations_and_accounts =
+    set_bin_batch mdb Account.bin_size_t Account.bin_write_t
+      locations_and_accounts ;
+    let locations, accounts = List.unzip locations_and_accounts in
+    set_hash_batch mdb
+    @@ List.zip_exn
+         (List.map
+            ~f:(fun l -> Location.Hash (Location.to_path_exn l))
+            locations)
+         (List.map ~f:Hash.hash_account accounts)
 
   let index_of_key_exn mdb key =
     let location = location_of_key mdb key |> Option.value_exn in
@@ -322,6 +356,11 @@ module Make
           accounts
       | [] -> [] )
     |> ignore
+
+  let set_batch_accounts mdb addresses_and_accounts =
+    set_batch mdb
+    @@ List.map addresses_and_accounts ~f:(fun (addr, account) ->
+           (Location.Account addr, account) )
 
   let iteri t ~f =
     match Account_location.last_location_address t with

@@ -284,6 +284,42 @@ struct
           Some hash
         with _ -> None )
 
+    let set_hash_batch t locations_and_hashes =
+      let location_to_hashtbl =
+        Location.Table.of_alist_exn locations_and_hashes
+      in
+      List.iter locations_and_hashes ~f:(fun (location, hash) ->
+          set_hash t (Location.to_path_exn location) hash ) ;
+      let _, parent_locations_and_hashes =
+        List.fold locations_and_hashes ~init:([], [])
+          ~f:(fun (processed_locations, parent_locations_and_hashes)
+             (location, hash)
+             ->
+            if List.mem processed_locations location ~equal:Location.equal then
+              (processed_locations, parent_locations_and_hashes)
+            else
+              let height = Location.height location in
+              let sibling_location = Location.sibling location in
+              let sibling_hash =
+                Option.value
+                  ~default:
+                    (Option.value_exn
+                       (get_hash t (Location.to_path_exn sibling_location)))
+                @@ Location.Table.find location_to_hashtbl sibling_location
+              in
+              let parent_hash =
+                let left_hash, right_hash =
+                  Location.order_siblings location hash sibling_hash
+                in
+                Hash.merge ~height left_hash right_hash
+              in
+              ( location :: sibling_location :: processed_locations
+              , (Location.parent location, parent_hash)
+                :: parent_locations_and_hashes ) )
+      in
+      List.iter parent_locations_and_hashes ~f:(fun (location, hash) ->
+          set_hash t (Location.to_path_exn location) hash )
+
     (* batch operations
        TODO: rely on availability of batch operations in Base for speed
     *)
@@ -294,7 +330,11 @@ struct
     (* TODO: maybe create a new hash table from the alist, then merge *)
     let set_batch t locations_and_accounts =
       List.iter locations_and_accounts ~f:(fun (location, account) ->
-          set t location account )
+          Location.Table.set t.account_tbl ~key:location ~data:account ;
+          set_location t (Account.public_key account) location ) ;
+      let locations, accounts = List.unzip locations_and_accounts in
+      set_hash_batch t
+      @@ List.zip_exn locations (List.map ~f:Hash.hash_account accounts)
 
     (* NB: rocksdb does not support batch reads; is this needed? *)
     let get_hash_batch_exn t addrs =
@@ -365,6 +405,11 @@ struct
             tail
         | [] -> [] )
       |> ignore
+
+    let set_batch_accounts t addresses_and_accounts =
+      set_batch t
+      @@ List.map addresses_and_accounts ~f:(fun (addr, account) ->
+             (Location.Account addr, account) )
 
     (* keys from this mask and all ancestors *)
     let keys t =
