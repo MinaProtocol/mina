@@ -33,7 +33,7 @@ include
    and type Packed.var = private Tick.Field.Var.t
 
 module Span : sig
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, compare]
 
   module Stable : sig
     module V1 : sig
@@ -77,6 +77,8 @@ module Timeout : sig
   val peek : 'a t -> 'a option
 
   val cancel : Controller.t -> 'a t -> 'a -> unit
+
+  val remaining_time : 'a t -> Span.t
 end
 
 val ( < ) : t -> t -> bool

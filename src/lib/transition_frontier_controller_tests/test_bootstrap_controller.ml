@@ -1,6 +1,11 @@
 open Core
 open Async
 open Coda_base
+
+module Stubs = Stubs.Make (struct
+  let max_length = 4
+end)
+
 open Stubs
 
 module Root_sync_ledger =
@@ -33,6 +38,8 @@ module Bootstrap_controller = Bootstrap_controller.Make (struct
   module Network = Network
   module Time = Time
   module Protocol_state_validator = Protocol_state_validator
+  module Sync_handler = Sync_handler
+  module Root_prover = Root_prover
 end)
 
 let%test_module "Bootstrap Controller" =
@@ -43,13 +50,15 @@ let%test_module "Bootstrap Controller" =
       ; peer_address: Network_peer.Peer.t
       ; bootstrap: Bootstrap_controller.For_tests.t }
 
-    let setup_test_infra ~logger ~max_length ~num_breadcrumbs =
-      let%bind syncing_frontier = create_root_frontier ~max_length ~logger in
-      let%bind peer_frontier = create_root_frontier ~max_length ~logger in
+    let setup_test_infra ~logger =
+      let%bind syncing_frontier = create_root_frontier ~logger in
+      let%bind peer_frontier = create_root_frontier ~logger in
       let%bind () =
+        (* TODO: dedup this *)
         build_frontier_randomly peer_frontier
           ~gen_root_breadcrumb_builder:(fun root_breadcrumb ->
-            Quickcheck.Generator.with_size ~size:num_breadcrumbs
+            Quickcheck.Generator.with_size
+              ~size:((Transition_frontier.max_length * 2) + 2)
             @@ Quickcheck_lib.gen_imperative_list
                  (root_breadcrumb |> return |> Quickcheck.Generator.return)
                  (gen_breadcrumb ~logger) )
@@ -57,7 +66,7 @@ let%test_module "Bootstrap Controller" =
       let best_tip_length =
         Transition_frontier.best_tip_path_length_exn peer_frontier
       in
-      assert (best_tip_length = max_length) ;
+      assert (best_tip_length = Transition_frontier.max_length) ;
       let network = Network.create ~logger in
       let open Transition_frontier.For_tests in
       let open Bootstrap_controller.For_tests in
@@ -74,17 +83,13 @@ let%test_module "Bootstrap Controller" =
           ~communication_port:1338
       in
       Network.add_exn network ~key:peer_address ~data:peer_frontier ;
-      let ancestor_prover = Ancestor.Prover.create ~max_size:max_length in
       let genesis_root =
         Transition_frontier.root syncing_frontier
         |> Transition_frontier.Breadcrumb.transition_with_hash
         |> With_hash.data
         |> External_transition.forget_consensus_state_verification
       in
-      let bootstrap =
-        make_bootstrap ~logger ~ancestor_prover ~genesis_root ~network
-          ~max_length
-      in
+      let bootstrap = make_bootstrap ~logger ~genesis_root ~network in
       Deferred.return {root_sync_ledger; peer_frontier; peer_address; bootstrap}
 
     let%test "`bootstrap_controller` caches all transitions it is passed \
@@ -92,13 +97,11 @@ let%test_module "Bootstrap Controller" =
       let transition_graph =
         Bootstrap_controller.For_tests.Transition_cache.create ()
       in
-      let max_length = 4 in
-      let num_breadcrumbs = 10 in
+      let num_breadcrumbs = (Transition_frontier.max_length * 2) + 2 in
       let logger = Logger.create () in
       let network = Network.create ~logger in
-      let ancestor_prover = Ancestor.Prover.create ~max_size:max_length in
       Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = create_root_frontier ~max_length ~logger in
+          let%bind frontier = create_root_frontier ~logger in
           let genesis_root =
             Transition_frontier.root frontier
             |> Transition_frontier.Breadcrumb.transition_with_hash
@@ -106,8 +109,8 @@ let%test_module "Bootstrap Controller" =
             |> External_transition.forget_consensus_state_verification
           in
           let bootstrap =
-            Bootstrap_controller.For_tests.make_bootstrap ~logger
-              ~ancestor_prover ~genesis_root ~network ~max_length
+            Bootstrap_controller.For_tests.make_bootstrap ~logger ~genesis_root
+              ~network
           in
           let ledger_db =
             Transition_frontier.For_tests.root_snarked_ledger frontier
@@ -171,11 +174,9 @@ let%test_module "Bootstrap Controller" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
       let logger = Logger.create () in
-      let max_length = 4 in
-      let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind {root_sync_ledger; peer_frontier; peer_address; bootstrap} =
-            setup_test_infra ~logger ~max_length ~num_breadcrumbs
+            setup_test_infra ~logger
           in
           let best_transition =
             Transition_frontier.best_tip peer_frontier
@@ -203,11 +204,9 @@ let%test_module "Bootstrap Controller" =
 
     let%test "`on_transition` should deny outdated transitions" =
       let logger = Logger.create () in
-      let max_length = 4 in
-      let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind {root_sync_ledger; peer_frontier; peer_address; bootstrap} =
-            setup_test_infra ~logger ~max_length ~num_breadcrumbs
+            setup_test_infra ~logger
           in
           let best_transition =
             Transition_frontier.best_tip peer_frontier
