@@ -24,6 +24,8 @@ module type S = sig
   val create : unit -> t
   (** create a mask with no parent *)
 
+  val get_uuid : t -> Core.Uuid.t
+
   module Attached : sig
     include
       Base_merkle_tree_intf.S

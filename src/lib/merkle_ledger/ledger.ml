@@ -396,10 +396,19 @@ end = struct
           (t.tree).unset_slots <- Int.Set.remove t.tree.unset_slots new_index )
         else set_at_index_exn t new_index a )
 
-  let get_all_accounts_rooted_at_exn t a =
-    let height = depth - Addr.depth a in
-    let first_index = Addr.to_int a lsl height in
-    let count = min (1 lsl height) (num_accounts t - first_index) in
-    let subarr = Dyn_array.sub t.accounts first_index count in
-    Dyn_array.to_list subarr
+  let location_of_addr = Addr.to_int
+
+  include Util.Make (struct
+    module Location = Location
+    module Account = Account
+    module Addr = Addr
+
+    module Base = struct
+      type nonrec t = t
+
+      let get = get
+    end
+
+    let location_of_addr = location_of_addr
+  end)
 end

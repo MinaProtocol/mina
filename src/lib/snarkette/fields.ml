@@ -3,7 +3,7 @@ open Fold_lib
 open Tuple_lib
 
 module type Intf = sig
-  type t [@@deriving eq, bin_io, sexp]
+  type t [@@deriving eq, bin_io, sexp, compare]
 
   val gen : t Quickcheck.Generator.t
 
@@ -68,7 +68,7 @@ module Make_fp
     end) : Fp_intf with type nat := N.t = struct
   include Info
 
-  type t = N.t [@@deriving eq, bin_io, sexp]
+  type t = N.t [@@deriving eq, bin_io, sexp, compare]
 
   let to_bigint = Fn.id
 
@@ -200,7 +200,7 @@ end = struct
 
   type base = Fp.t
 
-  type t = Fp.t * Fp.t * Fp.t [@@deriving eq, bin_io, sexp]
+  type t = Fp.t * Fp.t * Fp.t [@@deriving eq, bin_io, sexp, compare]
 
   let gen = Quickcheck.Generator.tuple3 Fp.gen Fp.gen Fp.gen
 
@@ -275,7 +275,7 @@ module Make_fp2
 end = struct
   type base = Fp.t
 
-  type t = Fp.t * Fp.t [@@deriving eq, bin_io, sexp]
+  type t = Fp.t * Fp.t [@@deriving eq, bin_io, sexp, compare]
 
   let gen = Quickcheck.Generator.tuple2 Fp.gen Fp.gen
 
@@ -347,7 +347,7 @@ module Make_fp6
 
   val unitary_inverse : t -> t
 end = struct
-  type t = Fp3.t * Fp3.t [@@deriving eq, bin_io, sexp]
+  type t = Fp3.t * Fp3.t [@@deriving eq, bin_io, sexp, compare]
 
   type base = Fp3.t
 
