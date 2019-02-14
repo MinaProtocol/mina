@@ -39,7 +39,7 @@ module type S = sig
   module Responder : sig
     type t
 
-    val create : merkle_tree -> (query -> unit) -> t
+    val create : merkle_tree -> (query -> unit) -> parent_log:Logger.t -> t
 
     val answer_query : t -> query -> answer
   end
@@ -96,20 +96,6 @@ module type Validity_intf = sig
   val get : t -> addr -> hash' option
 
   val completely_fresh : t -> bool
-end
-
-module type Responder_intf = sig
-  type t
-
-  type merkle_tree
-
-  type query
-
-  type answer
-
-  val create : merkle_tree -> (query -> unit) -> t
-
-  val answer_query : t -> query -> answer
 end
 
 (*
@@ -278,17 +264,44 @@ module Make
        filling in empty hashes for the rest amounts to the correct hash. *)
 
   module Responder = struct
-    type t = {mt: MT.t; f: query -> unit}
+    type t = {mt: MT.t; f: query -> unit; log: Logger.t}
 
-    let create : MT.t -> (query -> unit) -> t = fun mt f -> {mt; f}
+    let create : MT.t -> (query -> unit) -> parent_log:Logger.t -> t =
+     fun mt f ~parent_log -> {mt; f; log= parent_log}
 
     let answer_query : t -> query -> answer =
-     fun {mt; f} q ->
+     fun {mt; f; log} q ->
       f q ;
       match q with
       | What_hash a -> Has_hash (a, MT.get_inner_hash_at_addr_exn mt a)
       | What_contents a ->
-          Contents_are (a, MT.get_all_accounts_rooted_at_exn mt a)
+          let addresses_and_accounts =
+            List.sort ~compare:(fun (addr1, _) (addr2, _) ->
+                Addr.compare addr1 addr2 )
+            @@ MT.get_all_accounts_rooted_at_exn mt a
+          in
+          let addresses, accounts = List.unzip addresses_and_accounts in
+          if not (List.is_empty addresses) then
+            let first_address, rest_address =
+              (List.hd_exn addresses, List.tl_exn addresses)
+            in
+            let missing_address, is_compact =
+              List.fold rest_address
+                ~init:(Addr.next first_address, true)
+                ~f:(fun (expected_address, is_compact) actual_address ->
+                  if is_compact && expected_address = Some actual_address then
+                    (Addr.next actual_address, true)
+                  else (expected_address, false) )
+            in
+            if not is_compact then
+              Logger.error log
+                !"Missing an account at address: %{sexp:Addr.t} inside the \
+                  list: %{sexp:(Addr.t * Account.t) list}"
+                (Option.value_exn missing_address)
+                addresses_and_accounts
+            else ()
+          else () ;
+          Contents_are (a, accounts)
       | Num_accounts ->
           let len = MT.num_accounts mt in
           let height = Int.ceil_log2 len in
