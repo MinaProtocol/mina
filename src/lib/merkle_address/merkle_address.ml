@@ -40,6 +40,8 @@ module type S = sig
 
   val prev : t -> t Option.t
 
+  val is_leaf : t -> bool
+
   val is_parent_of : t -> maybe_child:t -> bool
 
   val serialize : t -> Bigstring.t
@@ -178,8 +180,10 @@ end) : S = struct
 
   let parent_exn = Fn.compose Or_error.ok_exn parent
 
+  let is_leaf path = bitstring_length path >= Input.depth
+
   let child (path : t) dir : t Or_error.t =
-    if bitstring_length path >= Input.depth then
+    if is_leaf path then
       Or_error.error_string "The address length cannot be greater than depth"
     else
       let dir_bit = Direction.to_bool dir in
