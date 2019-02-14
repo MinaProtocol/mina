@@ -57,6 +57,8 @@ module Span = struct
 
   let ( + ) = UInt64.Infix.( + )
 
+  let ( - ) = UInt64.Infix.( - )
+
   let ( * ) = UInt64.Infix.( * )
 
   let ( < ) = UInt64.( < )
@@ -91,7 +93,11 @@ let to_time t =
 let now () = of_time (Time.now ())
 
 module Timeout = struct
-  type 'a t = {deferred: 'a Deferred.t; cancel: 'a -> unit}
+  type 'a t =
+    { deferred: 'a Deferred.t
+    ; cancel: 'a -> unit
+    ; start_time: Time.t
+    ; span: Span.t }
 
   let create () span ~f:action =
     let open Async_kernel.Deferred.Let_syntax in
@@ -102,13 +108,20 @@ module Timeout = struct
       >>| function None -> action (now ()) | Some x -> x
     in
     let cancel value = Ivar.fill_if_empty cancel_ivar (Some value) in
-    {deferred; cancel}
+    {deferred; cancel; start_time= Time.now (); span}
 
   let to_deferred {deferred; _} = deferred
 
   let peek {deferred; _} = Deferred.peek deferred
 
   let cancel () {cancel; _} value = cancel value
+
+  let remaining_time {deferred : _; cancel : _; start_time; span} =
+    let current_time = Time.now () in
+    let time_elapsed =
+      Span.of_time_span @@ Time.diff current_time start_time
+    in
+    Span.(span - time_elapsed)
 end
 
 let field_var_to_unpacked (x : Tick.Field.Var.t) =

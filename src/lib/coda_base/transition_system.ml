@@ -39,7 +39,7 @@ module type S = sig
 end
 
 module type Tick_keypair_intf = sig
-  val keys : Tick.Keypair.t
+  val keys : Tick.Groth16.Keypair.t
 end
 
 module type Tock_keypair_intf = sig
@@ -57,19 +57,17 @@ module Make (Digest : sig
 end)
 (System : S) =
 struct
-  let step_input () =
-    Tick.Data_spec.[Digest.Tick.Packed.typ (* H(wrap_vk, H(state)) *)
-                   ]
+  let step_input () = Tick.Groth16.Data_spec.[Tick.Groth16.Field.typ]
 
-  let step_input_size = Tick.Data_spec.size (step_input ())
+  let step_input_size = Tick.Groth16.Data_spec.size (step_input ())
 
   module Step_base = struct
     open System
 
     module Prover_state = struct
       type t =
-        { wrap_vk: Tock_backend.Verification_key.t
-        ; prev_proof: Tock_backend.Proof.t
+        { wrap_vk: Tock.Verification_key.t
+        ; prev_proof: Tock.Proof.t
         ; prev_state: State.value
         ; update: Update.value }
       [@@deriving fields]
@@ -84,15 +82,18 @@ struct
 
     let wrap_vk_typ = Typ.list ~length:wrap_vk_length Boolean.typ
 
-    module Verifier = Tick.Verifier_gadget
+    module Verifier = Tick.Groth_maller_verifier
+
+    let wrap_input_size = Tock.Data_spec.size [Wrap_input.typ]
 
     let wrap_vk_triple_length =
-      bit_length_to_triple_length
-        Verifier.Verification_key_data.full_bit_length
+      Verifier.Verification_key.summary_length_in_bits
+        ~twist_extension_degree:3 ~input_size:wrap_input_size
+      |> bit_length_to_triple_length
 
-    let hash_vk_data data =
+    let hash_vk vk =
       let%bind bs =
-        Verifier.Verification_key_data.Checked.to_bits data
+        Verifier.Verification_key.(summary (summary_input vk))
         >>| Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_
       in
       Pedersen.Checked.Section.extend
@@ -109,8 +110,7 @@ struct
       >>| Tick.Pedersen.Checked.Section.to_initial_segment_digest
       >>| Or_error.ok_exn >>| fst
 
-    let%snarkydef prev_state_valid wrap_vk_section wrap_vk wrap_vk_data
-        prev_state_hash =
+    let%snarkydef prev_state_valid wrap_vk_section wrap_vk prev_state_hash =
       let open Let_syntax in
       (* TODO: Should build compositionally on the prev_state hash (instead of converting to bits) *)
       let%bind prev_state_hash_trips =
@@ -120,17 +120,19 @@ struct
         compute_top_hash wrap_vk_section prev_state_hash_trips
         >>= Wrap_input.Checked.tick_field_to_scalars
       in
-      let%bind other_wrap_vk_data, result =
-        Verifier.All_in_one.check_proof wrap_vk
-          ~get_vk:As_prover.(map get_state ~f:Prover_state.wrap_vk)
-          ~get_proof:As_prover.(map get_state ~f:Prover_state.prev_proof)
-          prev_top_hash
+      let%bind precomp =
+        Verifier.Verification_key.Precomputation.create wrap_vk
       in
-      let%map () =
-        Verifier.Verification_key_data.Checked.Assert.equal wrap_vk_data
-          other_wrap_vk_data
+      let%bind proof =
+        exists Verifier.Proof.typ
+          ~compute:
+            As_prover.(
+              map get_state
+                ~f:
+                  (Fn.compose Verifier.proof_of_backend_proof
+                     Prover_state.prev_proof))
       in
-      result
+      Verifier.verify wrap_vk precomp prev_top_hash proof
 
     let exists' typ ~f = exists typ ~compute:As_prover.(map get_state ~f)
 
@@ -143,14 +145,11 @@ struct
           (State.Checked.update (prev_state_hash, prev_state) update)
       in
       let%bind wrap_vk =
-        exists' Verifier.Verification_key.typ
+        exists' (Verifier.Verification_key.typ ~input_size:wrap_input_size)
           ~f:(fun {Prover_state.wrap_vk; _} ->
-            Verifier.Verification_key.of_verification_key wrap_vk )
+            Verifier.vk_of_backend_vk wrap_vk )
       in
-      let wrap_vk_data =
-        Verifier.Verification_key.Checked.to_full_data wrap_vk
-      in
-      let%bind wrap_vk_section = hash_vk_data wrap_vk_data in
+      let%bind wrap_vk_section = hash_vk wrap_vk in
       let%bind () =
         with_label __LOC__
           (let%bind sh = State.Hash.var_to_triples next_state_hash in
@@ -160,7 +159,7 @@ struct
            >>= Field.Checked.Assert.equal top_hash)
       in
       let%bind prev_state_valid =
-        prev_state_valid wrap_vk_section wrap_vk wrap_vk_data prev_state_hash
+        prev_state_valid wrap_vk_section wrap_vk prev_state_hash
       in
       let%bind inductive_case_passed =
         with_label __LOC__ Boolean.(prev_state_valid && success)
@@ -176,7 +175,7 @@ struct
   end
 
   module type Step_vk_intf = sig
-    val verification_key : Tick.Verification_key.t
+    val verification_key : Tick.Groth16.Verification_key.t
   end
 
   module Wrap_base (Step_vk : Step_vk_intf) = struct
@@ -184,35 +183,43 @@ struct
 
     let input = Tock.Data_spec.[Wrap_input.typ]
 
-    module Verifier = Tock.Verifier_gadget
+    module Verifier = Tock.Groth_verifier
 
     module Prover_state = struct
-      type t = {proof: Tick_backend.Proof.t} [@@deriving fields]
+      type t = {proof: Tick.Groth16.Proof.t} [@@deriving fields]
     end
 
-    let step_vk_data =
-      Verifier.Verification_key_data.full_data_of_verification_key
-        Step_vk.verification_key
+    let step_vk = Verifier.vk_of_backend_vk Step_vk.verification_key
 
-    let step_vk_bits = Verifier.Verification_key_data.to_bits step_vk_data
+    let step_vk_precomp =
+      Verifier.Verification_key.Precomputation.create_constant step_vk
+
+    let step_vk_constant =
+      let open Verifier.Verification_key in
+      let {query_base; query; delta; alpha_beta} = step_vk in
+      { Verifier.Verification_key.query_base=
+          Inner_curve.Checked.constant query_base
+      ; query= List.map ~f:Inner_curve.Checked.constant query
+      ; delta= Pairing.G2.constant delta
+      ; alpha_beta= Pairing.Fqk.constant alpha_beta }
 
     (* TODO: Use an online verifier here *)
     let%snarkydef main (input : Wrap_input.var) =
       let open Let_syntax in
-      let%bind vk_data, result =
+      let%bind result =
         (* The use of choose_preimage here is justified since we feed it to the verifier, which doesn't
              depend on which unpacking is provided. *)
         let%bind input = Wrap_input.Checked.to_scalar input in
-        Verifier.All_in_one.check_proof
-          Verifier.Verification_key.(
-            Checked.constant (of_verification_key Step_vk.verification_key))
-          ~get_vk:(As_prover.return Step_vk.verification_key)
-          ~get_proof:As_prover.(map get_state ~f:Prover_state.proof)
-          [input]
-      in
-      let%bind () =
-        let open Verifier.Verification_key_data.Checked in
-        Assert.equal vk_data (constant step_vk_data)
+        let%bind proof =
+          exists Verifier.Proof.typ
+            ~compute:
+              As_prover.(
+                map get_state
+                  ~f:
+                    (Fn.compose Verifier.proof_of_backend_proof
+                       Prover_state.proof))
+        in
+        Verifier.verify step_vk_constant step_vk_precomp [input] proof
       in
       with_label __LOC__ (Boolean.Assert.is_true result)
   end

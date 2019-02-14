@@ -1,6 +1,6 @@
 # WARNING: config.yml file is generated from config.yml.jinja
 ---
-version: 2
+version: 3
 jobs:
     tracetool:
         docker:
@@ -38,31 +38,38 @@ jobs:
                 command: |
                     sudo mkdir /nix
                     sudo chown distiller /nix
+            - checkout
             - restore_cache:
                   keys:
-                      - macos-v4-after-brew-and-opam-and-nix
-                      - macos-v3-after-brew-and-opam
-                      - macos-v3-after-brew
-                      - macos-v3
-            - checkout
+                      - homebrew-v1-{{ checksum "scripts/macos-setup.sh" }}
+                      - homebrew-v1-
+            - restore_cache:
+                  keys:
+                      - opam-v1-{{ checksum "src/opam.export" }}
+                      - opam-v1-
+            - restore_cache:
+                  keys:
+                      - nix-v1-{{ checksum "src/app/kademlia-haskell/prefetch/kademlia1101.nix" }}
+                      - nix-v1-
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Deps -- make macos-setup-download
                   command: make macos-setup-download
-            - save_cache:
-                  key: macos-v3-after-brew
-                  paths:
-                      - "/usr/local/Homebrew"
-                      - "/Users/distiller/Library/Caches/Homebrew"
             - run:
                   name: Compile Deps -- make macos-setup-compile
                   command: make macos-setup-compile
             - save_cache:
-                  key: macos-v4-after-brew-and-opam-and-nix
+                  key: homebrew-v1-{{ checksum "scripts/macos-setup.sh" }}
                   paths:
                       - "/usr/local/Homebrew"
                       - "/Users/distiller/Library/Caches/Homebrew"
+            - save_cache:
+                  key: opam-v1-{{ checksum "src/opam.export" }}
+                  paths:
                       - "/Users/distiller/.opam"
+            - save_cache:
+                  key: nix-v1-{{ checksum "src/app/kademlia-haskell/prefetch/kademlia1101.nix" }}
+                  paths:
                       - "/nix"
             - run:
                   name: Build OCaml
@@ -83,7 +90,7 @@ jobs:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
-                  name: Build OCaml (sig)
+                  name: Build OCaml
                   command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                   name: Build deb Package with keys
@@ -112,7 +119,7 @@ jobs:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
-                  name: Build OCaml (sig)
+                  name: Build OCaml
                   command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                   name: Build deb Package with keys
@@ -141,7 +148,7 @@ jobs:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
-                  name: Build OCaml (sig)
+                  name: Build OCaml
                   command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                   name: Build deb Package with keys
@@ -170,7 +177,36 @@ jobs:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
-                  name: Build OCaml (sig)
+                  name: Build OCaml
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Build deb Package with keys
+                  command: make deb
+            - run:
+                  name: Build provingkeys
+                  command: make provingkeys
+            - run:
+                  name: Store Genesis keys
+                  command: make genesiskeys
+            - run:
+                  name: Upload deb to repo
+                  command: make publish_deb
+            - store_artifacts:
+                  path: /tmp/artifacts
+    build_testnet_postake_snarkless_fake_hash:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+        environment:
+            DUNE_PROFILE: testnet_postake_snarkless_fake_hash
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Download Stable Proving Keys
+                  command: scripts/getkeys.sh
+            - run:
+                  name: Build OCaml
                   command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                   name: Build deb Package with keys
@@ -197,20 +233,6 @@ jobs:
             - run:
                   name: Test make test-runtest
                   command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless MYPROCS=8 make test-runtest
-
-    test-withsnark:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_posig make build 2>&1 | tee /tmp/buildocaml.log
-            - run:
-                  name: Test make test-withsnark
-                  command: source ~/.profile && DUNE_PROFILE=test_posig make test-withsnark
     test-fake_hash_full_test:
         resource_class: large
         docker:
@@ -326,6 +348,40 @@ jobs:
                   name: Running test - Proof of Stake Tests | transaction-snark-profiler -check-only
                   command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'transaction-snark-profiler -check-only'
             
+    test-withsnark-sig:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Check .circleci Render
+                  command: make check-render-circleci
+            - run:
+                  name: Build OCaml
+                  command: eval `opam config env` && DUNE_PROFILE=test_posig make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Running test - Full test with SNARK (sig) | full-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
+            
+    test-withsnark-stake:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Check .circleci Render
+                  command: make check-render-circleci
+            - run:
+                  name: Build OCaml
+                  command: eval `opam config env` && DUNE_PROFILE=test_postake make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Running test - Full test with SNARK (stake) | full-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
+            
 
 workflows:
     version: 2
@@ -337,9 +393,11 @@ workflows:
             - build_testnet_posig
             - build_testnet_postake
             - build_testnet_public
+            - build_testnet_postake_snarkless_fake_hash
             - test-fake_hash_full_test
             - test-posig_integration_tests
             - test-postake_integration_tests
-            - test-withsnark
+            - test-withsnark-sig
+            - test-withsnark-stake
             - test-unit-test
             - tracetool

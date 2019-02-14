@@ -1,6 +1,5 @@
 open Core_kernel
 open Async_kernel
-open Protocols.Coda_pow
 open Protocols.Coda_transition_frontier
 open Coda_base
 open Pipe_lib
@@ -8,15 +7,10 @@ open Pipe_lib
 module type Inputs_intf = sig
   include Sync_handler.Inputs_intf
 
-  module Time : Time_intf
-
   module Sync_handler :
     Sync_handler_intf
-    with type state_hash := State_hash.t
-     and type ledger_hash := Ledger_hash.t
+    with type ledger_hash := Ledger_hash.t
      and type transition_frontier := Transition_frontier.t
-     and type ancestor_proof := State_body_hash.t list
-     and type external_transition := External_transition.t
      and type syncable_ledger_query := Sync_ledger.query
      and type syncable_ledger_answer := Sync_ledger.answer
 
@@ -36,8 +30,8 @@ module type Inputs_intf = sig
     with type peer := Network_peer.Peer.t
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
-     and type ancestor_proof_input := State_hash.t * int
-     and type ancestor_proof := Ancestor.Proof.t
+     and type consensus_state := Consensus.Consensus_state.value
+     and type state_body_hash := State_body_hash.t
      and type ledger_hash := Ledger_hash.t
      and type sync_ledger_query := Sync_ledger.query
      and type sync_ledger_answer := Sync_ledger.answer
@@ -67,11 +61,22 @@ module Make (Inputs : Inputs_intf) :
     Strict_pipe.Reader.clear reader ;
     Strict_pipe.Writer.close writer
 
-  let run ~logger ~network ~time_controller ~frontier
+  let run ~logger ~network ~time_controller ~collected_transitions ~frontier
       ~network_transition_reader ~proposer_transition_reader ~clear_reader =
     let logger = Logger.child logger __MODULE__ in
+    let valid_transition_pipe_capacity = 10 in
     let valid_transition_reader, valid_transition_writer =
-      Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
+      Strict_pipe.create
+        (Buffered
+           (`Capacity valid_transition_pipe_capacity, `Overflow Drop_head))
+    in
+    let primary_transition_pipe_capacity =
+      valid_transition_pipe_capacity + List.length collected_transitions
+    in
+    let primary_transition_reader, primary_transition_writer =
+      Strict_pipe.create
+        (Buffered
+           (`Capacity primary_transition_pipe_capacity, `Overflow Drop_head))
     in
     let processed_transition_reader, processed_transition_writer =
       Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
@@ -85,15 +90,20 @@ module Make (Inputs : Inputs_intf) :
     Transition_handler.Validator.run ~frontier
       ~transition_reader:network_transition_reader ~valid_transition_writer
       ~logger ;
+    List.iter collected_transitions
+      ~f:(Strict_pipe.Writer.write primary_transition_writer) ;
+    Strict_pipe.Reader.iter_without_pushback valid_transition_reader
+      ~f:(Strict_pipe.Writer.write primary_transition_writer)
+    |> don't_wait_for ;
     Transition_handler.Processor.run ~logger ~time_controller ~frontier
-      ~primary_transition_reader:valid_transition_reader
-      ~proposer_transition_reader ~catchup_job_writer
-      ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
-      ~processed_transition_writer ;
+      ~primary_transition_reader ~proposer_transition_reader
+      ~catchup_job_writer ~catchup_breadcrumbs_reader
+      ~catchup_breadcrumbs_writer ~processed_transition_writer ;
     Catchup.run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer ;
     Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
         kill valid_transition_reader valid_transition_writer ;
+        kill primary_transition_reader primary_transition_writer ;
         kill processed_transition_reader processed_transition_writer ;
         kill catchup_job_reader catchup_job_writer ;
         kill catchup_breadcrumbs_reader catchup_breadcrumbs_writer )

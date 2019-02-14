@@ -1,4 +1,4 @@
 [%%define debug_logs true]
 [%%define call_logger false]
-[%%define tracing false]
+[%%define tracing true]
 [%%define fake_hash false]

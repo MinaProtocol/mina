@@ -62,7 +62,9 @@ struct
     let aw = Sync_ledger.answer_writer lsync in
     let seen_queries = ref [] in
     let sr =
-      Sync_responder.create l2 (fun q -> seen_queries := q :: !seen_queries)
+      Sync_responder.create l2
+        (fun q -> seen_queries := q :: !seen_queries)
+        ~parent_log
     in
     don't_wait_for
       (Linear_pipe.iter_unordered ~max_concurrency:3 qr
@@ -97,7 +99,9 @@ struct
     let seen_queries = ref [] in
     let sr =
       ref
-      @@ Sync_responder.create l2 (fun q -> seen_queries := q :: !seen_queries)
+      @@ Sync_responder.create l2
+           (fun q -> seen_queries := q :: !seen_queries)
+           ~parent_log
     in
     let ctr = ref 0 in
     don't_wait_for
@@ -107,8 +111,9 @@ struct
              let res =
                if !ctr = (!total_queries |> Option.value_exn) / 2 then (
                  sr :=
-                   Sync_responder.create l3 (fun q ->
-                       seen_queries := q :: !seen_queries ) ;
+                   Sync_responder.create l3
+                     (fun q -> seen_queries := q :: !seen_queries)
+                     ~parent_log ;
                  desired_root := Ledger.merkle_root l3 ;
                  Sync_ledger.new_goal lsync !desired_root |> ignore ;
                  Deferred.unit )

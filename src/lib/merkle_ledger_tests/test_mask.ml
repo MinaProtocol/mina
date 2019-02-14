@@ -22,6 +22,7 @@ module type Test_intf = sig
   module Mask :
     Merkle_mask.Masking_merkle_tree_intf.S
     with module Location = Location
+     and module Attached.Addr = Location.Addr
     with type account := Account.t
      and type location := Location.t
      and type key := Key.t
@@ -44,9 +45,15 @@ module type Test_intf = sig
 
   val with_instances : (Base.t -> Mask.t -> 'a) -> 'a
 
-  val with_chain : (Base.t -> Mask.Attached.t -> Mask.Attached.t -> 'a) -> 'a
+  val with_chain :
+       (   Base.t
+        -> mask:Mask.Attached.t
+        -> mask_as_base:Base.t
+        -> mask2:Mask.Attached.t
+        -> 'a)
+    -> 'a
   (** Here we provide a base ledger and two layers of attached masks
-       * one ontop another *)
+          * one ontop another *)
 end
 
 module Make (Test : Test_intf) = struct
@@ -68,7 +75,6 @@ module Make (Test : Test_intf) = struct
 
   let dummy_account = Quickcheck.random_value Account.gen
 
-  (* TODO: These functions maybe useful *)
   let create_new_account_exn mask ({Account.public_key; _} as account) =
     let action, location =
       Mask.Attached.get_or_create_account_exn mask public_key account
@@ -96,20 +102,6 @@ module Make (Test : Test_intf) = struct
     | `Existed -> failwith "Expected to allocate a new account"
     | `Added -> location
 
-  let%test "parent, mask agree on set" =
-    Test.with_instances (fun maskable mask ->
-        let attached_mask = Maskable.register_mask maskable mask in
-        Maskable.set maskable dummy_location dummy_account ;
-        Mask.Attached.set attached_mask dummy_location dummy_account ;
-        let maskable_result = Maskable.get maskable dummy_location in
-        let mask_result = Mask.Attached.get attached_mask dummy_location in
-        Option.is_some maskable_result
-        && Option.is_some mask_result
-        &&
-        let maskable_account = Option.value_exn maskable_result in
-        let mask_account = Option.value_exn mask_result in
-        Account.equal maskable_account mask_account )
-
   let compare_maskable_mask_hashes ?(check_hash_in_mask = false) maskable mask
       addr =
     let root = Mask.Attached.Addr.root () in
@@ -128,6 +120,31 @@ module Make (Test : Test_intf) = struct
       else test_hashes_at_address (Mask.Attached.Addr.parent_exn addr)
     in
     test_hashes_at_address addr
+
+  (* try
+          let (_unattached_mask : Mask.t) =
+            Maskable.unregister_mask_exn maskable attached_mask
+          in
+          Hash.equal mask_hash maskable_hash
+          &&
+          if Mask.Addr.equal root addr then true
+          else test_hashes_at_address (Mask.Attached.Addr.parent_exn addr)
+        in
+        test_hashes_at_address addr *)
+
+  let%test "parent, mask agree on set" =
+    Test.with_instances (fun maskable mask ->
+        let attached_mask = Maskable.register_mask maskable mask in
+        Maskable.set maskable dummy_location dummy_account ;
+        Mask.Attached.set attached_mask dummy_location dummy_account ;
+        let maskable_result = Maskable.get maskable dummy_location in
+        let mask_result = Mask.Attached.get attached_mask dummy_location in
+        Option.is_some maskable_result
+        && Option.is_some mask_result
+        &&
+        let maskable_account = Option.value_exn maskable_result in
+        let mask_account = Option.value_exn mask_result in
+        Account.equal maskable_account mask_account )
 
   let%test "parent, mask agree on hashes; set in both mask and parent" =
     Test.with_instances (fun maskable mask ->
@@ -194,7 +211,7 @@ module Make (Test : Test_intf) = struct
         else false )
 
   let%test_unit "commit at layer2, dumps to layer1, not in base" =
-    Test.with_chain (fun base level1 level2 ->
+    Test.with_chain (fun base ~mask:level1 ~mask_as_base:_ ~mask2:level2 ->
         Mask.Attached.set level2 dummy_location dummy_account ;
         (* verify account is in the layer2 mask *)
         assert (
@@ -230,7 +247,7 @@ module Make (Test : Test_intf) = struct
         (* set affects hashes along the path P from location to the root, while the Merkle path for the location
                contains the siblings of P elements; to observe a hash in the Merkle path changed by the set, choose an
                address that is a sibling of an element in P; the Merkle path for that address will include a P element
-             *)
+            *)
         let address =
           dummy_address |> Maskable.Addr.parent_exn |> Maskable.Addr.sibling
         in
@@ -242,46 +259,6 @@ module Make (Test : Test_intf) = struct
           Maskable.merkle_path_at_addr_exn maskable address
         in
         mask_merkle_path = maskable_merkle_path )
-
-  let%test_unit "root hash invariant if interior changes but not accounts" =
-    if Test.depth <= 8 then
-      Test.with_instances (fun maskable mask ->
-          let attached_mask = Maskable.register_mask maskable mask in
-          Mask.Attached.set attached_mask dummy_location dummy_account ;
-          (* Make some accounts *)
-          let num_accounts = 1 lsl Test.depth in
-          let gen_values gen =
-            Quickcheck.random_value
-              (Quickcheck.Generator.list_with_length num_accounts gen)
-          in
-          let public_keys = Key.gen_keys num_accounts in
-          let balances = gen_values Balance.gen in
-          let accounts =
-            List.map2_exn public_keys balances ~f:(fun public_key balance ->
-                Account.create public_key balance )
-          in
-          List.iter accounts ~f:(fun account ->
-              ignore @@ create_new_account_exn attached_mask account ) ;
-          (* Set some inner hashes *)
-          let reset_hash_of_parent_of_index i =
-            let a1 = List.nth_exn accounts i in
-            let key = Account.public_key a1 in
-            let location =
-              Mask.Attached.location_of_key attached_mask key
-              |> Option.value_exn
-            in
-            let addr = Test.Location.to_path_exn location in
-            let parent_addr =
-              Test.Location.Addr.parent addr |> Or_error.ok_exn
-            in
-            Mask.Attached.set_inner_hash_at_addr_exn attached_mask parent_addr
-              Hash.empty_account
-          in
-          let root_hash = Mask.Attached.merkle_root attached_mask in
-          reset_hash_of_parent_of_index 0 ;
-          reset_hash_of_parent_of_index 3 ;
-          let root_hash' = Mask.Attached.merkle_root attached_mask in
-          assert (Hash.equal root_hash root_hash') )
 
   let%test "mask and parent agree on Merkle root before set" =
     Test.with_instances (fun maskable mask ->
@@ -296,7 +273,7 @@ module Make (Test : Test_intf) = struct
         (* the order of sets matters here; if we set in the mask first,
                the set in the maskable notifies the mask, which then removes
                the account, changing the Merkle root to what it was before the set
-             *)
+            *)
         Maskable.set maskable dummy_location dummy_account ;
         Mask.Attached.set attached_mask dummy_location dummy_account ;
         let mask_merkle_root = Mask.Attached.merkle_root attached_mask in
@@ -325,12 +302,72 @@ module Make (Test : Test_intf) = struct
           List.iter accounts ~f:(fun account ->
               ignore @@ create_new_account_exn attached_mask account ) ;
           let retrieved_accounts =
-            Mask.Attached.get_all_accounts_rooted_at_exn attached_mask
-              (Mask.Addr.root ())
+            List.map ~f:snd
+            @@ Mask.Attached.get_all_accounts_rooted_at_exn attached_mask
+                 (Mask.Addr.root ())
           in
           assert (List.length accounts = List.length retrieved_accounts) ;
           assert (List.equal ~equal:Account.equal accounts retrieved_accounts)
       )
+
+  let%test_unit "get_all_accounts should preserve the ordering of accounts by \
+                 location with noncontiguous updates of accounts on the mask" =
+    (* see similar test in test_database *)
+    if Test.depth <= 8 then
+      Test.with_chain (fun _ ~mask:mask1 ~mask_as_base:_ ~mask2 ->
+          let num_accounts = 1 lsl Test.depth in
+          let gen_values gen list_length =
+            Quickcheck.random_value
+              (Quickcheck.Generator.list_with_length list_length gen)
+          in
+          let public_keys = Key.gen_keys num_accounts in
+          let balances = gen_values Balance.gen num_accounts in
+          let base_accounts =
+            List.map2_exn public_keys balances ~f:(fun public_key balance ->
+                Account.create public_key balance )
+          in
+          List.iter base_accounts ~f:(fun account ->
+              ignore @@ create_new_account_exn mask1 account ) ;
+          let num_subset =
+            Quickcheck.random_value (Int.gen_incl 3 num_accounts)
+          in
+          let subset_indices, subset_accounts =
+            List.permute
+              (List.mapi base_accounts ~f:(fun index account -> (index, account)
+               ))
+            |> (Fn.flip List.take) num_subset
+            |> List.unzip
+          in
+          let subset_balances = gen_values Balance.gen num_subset in
+          let subset_updated_accounts =
+            List.map2_exn subset_accounts subset_balances
+              ~f:(fun account balance ->
+                let updated_account = {account with balance} in
+                create_existing_account_exn mask2 updated_account |> ignore ;
+                updated_account )
+          in
+          let updated_accounts_map =
+            Int.Map.of_alist_exn
+              (List.zip_exn subset_indices subset_updated_accounts)
+          in
+          let expected_accounts =
+            List.mapi base_accounts ~f:(fun index base_account ->
+                Option.value
+                  (Map.find updated_accounts_map index)
+                  ~default:base_account )
+          in
+          let retrieved_accounts =
+            List.map ~f:snd
+            @@ Mask.Attached.get_all_accounts_rooted_at_exn mask2
+                 (Mask.Addr.root ())
+          in
+          assert (
+            Int.equal
+              (List.length base_accounts)
+              (List.length retrieved_accounts) ) ;
+          assert (
+            List.equal ~equal:Account.equal expected_accounts
+              retrieved_accounts ) )
 
   let%test_unit "removing accounts from mask restores Merkle root" =
     Test.with_instances (fun maskable mask ->
@@ -506,11 +543,7 @@ module Make (Test : Test_intf) = struct
         List.iter mask_accounts ~f:(fun account ->
             ignore @@ create_existing_account_exn attached_mask account ) ;
         let mask_sum =
-          Mask.Attached.foldi_with_ignored_keys attached_mask
-            ( Key.Set.of_list
-            @@ List.map parent_accounts ~f:(fun {Account.public_key; _} ->
-                   public_key ) )
-            ~init:0 ~f:balance_summer
+          Mask.Attached.foldi attached_mask ~init:0 ~f:balance_summer
         in
         (* sum should not include any parent balances *)
         assert (Int.equal mask_sum 0) )
@@ -582,6 +615,43 @@ module Make (Test : Test_intf) = struct
           Int.equal parent_num_accounts (List.length accounts)
           && Int.equal parent_num_accounts mask_num_accounts_before
           && Int.equal parent_num_accounts mask_num_accounts_after ) )
+
+  let%test_unit "Mask reparenting works" =
+    Test.with_chain (fun base ~mask:m1 ~mask_as_base ~mask2:m2 ->
+        let num_accounts = 3 in
+        let keys = Key.gen_keys num_accounts in
+        let balances =
+          Quickcheck.random_value
+            (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
+        in
+        let accounts = List.map2_exn keys balances ~f:Account.create in
+        match accounts with
+        | [a1; a2; a3] ->
+            let loc1 = parent_create_new_account_exn base a1 in
+            let loc2 = create_new_account_exn m1 a2 in
+            let loc3 = create_new_account_exn m2 a3 in
+            let locs = [(loc1, a1); (loc2, a2); (loc3, a3)] in
+            (* all accounts are here *)
+            List.iter locs ~f:(fun (loc, a) ->
+                [%test_result: Account.t option]
+                  ~message:"All accounts are accessible from m2"
+                  ~expect:(Some a) (Mask.Attached.get m2 loc) ) ;
+            [%test_result: Account.t option] ~message:"a1 is in base"
+              ~expect:(Some a1) (Test.Base.get base loc1) ;
+            Mask.Attached.commit m1 ;
+            [%test_result: Account.t option] ~message:"a2 is in base"
+              ~expect:(Some a2) (Test.Base.get base loc2) ;
+            Maskable.remove_and_reparent_exn mask_as_base m1 ~children:[m2] ;
+            [%test_result: Account.t option] ~message:"a1 is in base"
+              ~expect:(Some a1) (Test.Base.get base loc1) ;
+            [%test_result: Account.t option] ~message:"a2 is in base"
+              ~expect:(Some a2) (Test.Base.get base loc2) ;
+            (* all accounts are still here *)
+            List.iter locs ~f:(fun (loc, a) ->
+                [%test_result: Account.t option]
+                  ~message:"All accounts are accessible from m2"
+                  ~expect:(Some a) (Mask.Attached.get m2 loc) )
+        | _ -> failwith "unexpected" )
 end
 
 module type Depth_S = sig
@@ -616,7 +686,8 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
   module Mask :
     Merkle_mask.Masking_merkle_tree_intf.S
     with module Location = Location
-     and type account := Account.t
+     and module Attached.Addr = Location.Addr
+    with type account := Account.t
      and type location := Location.t
      and type key := Key.t
      and type key_set := Key.Set.t
@@ -654,10 +725,13 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
   let with_chain f =
     with_instances (fun maskable mask ->
         let attached1 = Maskable.register_mask maskable mask in
-        let pack2 = Any_base.cast (module Mask.Attached) attached1 in
+        let attached1_as_base =
+          Any_base.cast (module Mask.Attached) attached1
+        in
         let mask2 = Mask.create () in
-        let attached2 = Maskable.register_mask pack2 mask2 in
-        f maskable attached1 attached2 )
+        let attached2 = Maskable.register_mask attached1_as_base mask2 in
+        f maskable ~mask:attached1 ~mask_as_base:attached1_as_base
+          ~mask2:attached2 )
 end
 
 module Make_maskable_and_mask (Depth : Depth_S) =

@@ -45,9 +45,9 @@ val sok_digest : t -> Sok_message.Digest.t
 module Keys : sig
   module Proving : sig
     type t =
-      { base: Tick.Proving_key.t
+      { base: Tick.Groth16.Proving_key.t
       ; wrap: Tock.Proving_key.t
-      ; merge: Tick.Proving_key.t }
+      ; merge: Tick.Groth16.Proving_key.t }
     [@@deriving bin_io]
 
     val dummy : t
@@ -59,9 +59,9 @@ module Keys : sig
 
   module Verification : sig
     type t =
-      { base: Tick.Verification_key.t
+      { base: Tick.Groth16.Verification_key.t
       ; wrap: Tock.Verification_key.t
-      ; merge: Tick.Verification_key.t }
+      ; merge: Tick.Groth16.Verification_key.t }
     [@@deriving bin_io]
 
     val dummy : t
