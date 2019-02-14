@@ -185,7 +185,7 @@ let content =
                     [ [ text
                           "Top-of-the-line laptop, $500 monitor budget and \
                            $500 peripheral budget" ] ]
-                ; Benefit.create "Time off"
+                ; Benefit.create "Time&nbsp;off"
                     [ [ text
                           "Unlimited vacation, with encouragement for \
                            employees to take off"
