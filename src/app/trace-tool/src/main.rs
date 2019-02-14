@@ -166,6 +166,11 @@ fn main() {
                             TraceEnd | CycleEnd => {
                                 // if the cycle is reported as ending, then whatever thread was running just finished.
                                 complete_event(&seen_tids, cur_pid, cur_ts, prev_ts, prev_task);
+                                if let TraceEnd = event.data {
+                                    seen_tids.clear();
+                                    recurring_map.clear();
+                                    tidmap.clear();
+                                }
                                 (cur_ts, None)
                                 //println!(r#"{{"name":"cycle end","ph":"p","ts":{},"pid":1,"tid":0,"s":"p"}},"#, cur_ts/1000);
                             }
