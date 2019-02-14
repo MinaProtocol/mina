@@ -12,7 +12,11 @@ let linkstyle = Style.(of_class "dodgerblue fw5 no-underline hover-link")
 module Title = struct
   open Html_concise
 
-  let create copy = h1 [] [text copy]
+  let create copy =
+    h1
+      [ Style.just
+          "fadedblue careers-double-line-header ttu f4 fw5 tracked-more" ]
+      [text copy]
 end
 
 module Image_grid = struct
