@@ -36,15 +36,24 @@ module Make (Inputs : Inputs_intf) :
    and type syncable_ledger_answer := Sync_ledger.answer = struct
   open Inputs
 
+  let get_breadcrumb_ledgers frontier =
+    List.map
+      (Transition_frontier.all_breadcrumbs frontier)
+      ~f:
+        (Fn.compose Staged_ledger.ledger
+           Transition_frontier.Breadcrumb.staged_ledger)
+
   let get_ledger_by_hash ~frontier ledger_hash =
-    List.find_map (Transition_frontier.all_breadcrumbs frontier) ~f:(fun b ->
-        let ledger =
-          Transition_frontier.Breadcrumb.staged_ledger b
-          |> Staged_ledger.ledger
-        in
-        if Ledger_hash.equal (Ledger.merkle_root ledger) ledger_hash then
-          Some ledger
-        else None )
+    let ledger_breadcrumbs =
+      Sequence.of_lazy
+        (lazy (Sequence.of_list @@ get_breadcrumb_ledgers frontier))
+    in
+    Sequence.append
+      (Sequence.singleton
+         (Transition_frontier.shallow_copy_root_snarked_ledger frontier))
+      ledger_breadcrumbs
+    |> Sequence.find ~f:(fun ledger ->
+           Ledger_hash.equal (Ledger.merkle_root ledger) ledger_hash )
 
   let answer_query ~frontier hash query ~logger =
     let open Option.Let_syntax in
