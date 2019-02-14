@@ -19,9 +19,14 @@ module Image_grid = struct
   let create images =
     (* On mobile a single hero (the first image) *)
     (* On desktop we grid display them *)
-    Mobile_switch.create
-      ~not_small:(div [] (Non_empty_list.to_list images))
-      ~small:(Non_empty_list.head images)
+    let images = Non_empty_list.to_list images in
+    let big_gallery =
+      let row1_imgs, row2_imgs = List.split_n images 2 in
+      let row1 = div [Style.just "careers-gallery-row1"] row1_imgs in
+      let row2 = div [Style.just "careers-gallery-row2"] row2_imgs in
+      div [] [row1; row2]
+    in
+    Mobile_switch.create ~not_small:big_gallery ~small:(List.hd_exn images)
 end
 
 module Tagline = struct
@@ -168,3 +173,4 @@ let content =
     ~body_style:(Style.of_class "bg-white")
     ~navbar:(Navbar.navbar "careers") ~page_label:"careers"
     ~show_newsletter:false ~append_footer:true content
+    ~headers:[Html.link ~href:"/static/css/careers.css"]
