@@ -136,38 +136,42 @@ module Make
     let locs_bufs = List.map locations_vs ~f:create_buf in
     set_raw_batch mdb locs_bufs
 
+  (** This function assumes that all the locations are in the same layer. *)
   let rec set_hash_batch mdb locations_and_hashes =
-    let location_to_hashtbl =
-      Location.Table.of_alist_exn locations_and_hashes
-    in
     let locations, _ = List.unzip locations_and_hashes in
-    List.iter locations ~f:(fun location -> assert (Location.is_hash location)) ;
-    set_bin_batch mdb Hash.bin_size_t Hash.bin_write_t locations_and_hashes ;
-    let _, parent_locations_and_hashes =
-      List.fold locations_and_hashes ~init:([], [])
-        ~f:(fun (processed_locations, parent_locations_and_hashes)
-           (location, hash)
-           ->
-          if List.mem processed_locations location ~equal:Location.equal then
-            (processed_locations, parent_locations_and_hashes)
-          else
-            let height = Location.height location in
-            let sibling_location = Location.sibling location in
-            let sibling_hash =
-              Option.value ~default:(get_hash mdb sibling_location)
-              @@ Hashtbl.find location_to_hashtbl sibling_location
-            in
-            let parent_hash =
-              let left_hash, right_hash =
-                Location.order_siblings location hash sibling_hash
-              in
-              Hash.merge ~height left_hash right_hash
-            in
-            ( location :: sibling_location :: processed_locations
-            , (Location.parent location, parent_hash)
-              :: parent_locations_and_hashes ) )
-    in
-    set_hash_batch mdb parent_locations_and_hashes
+    if not @@ List.is_empty locations then
+      let height = Location.height @@ List.hd_exn locations in
+      if height < Depth.depth then (
+        let location_to_hashtbl =
+          Location.Table.of_alist_exn locations_and_hashes
+        in
+        List.iter locations ~f:(fun location ->
+            assert (Location.is_hash location) ) ;
+        set_bin_batch mdb Hash.bin_size_t Hash.bin_write_t locations_and_hashes ;
+        let _, parent_locations_and_hashes =
+          List.fold locations_and_hashes ~init:([], [])
+            ~f:(fun (processed_locations, parent_locations_and_hashes)
+               (location, hash)
+               ->
+              if List.mem processed_locations location ~equal:Location.equal
+              then (processed_locations, parent_locations_and_hashes)
+              else
+                let sibling_location = Location.sibling location in
+                let sibling_hash =
+                  Option.value ~default:(get_hash mdb sibling_location)
+                  @@ Hashtbl.find location_to_hashtbl sibling_location
+                in
+                let parent_hash =
+                  let left_hash, right_hash =
+                    Location.order_siblings location hash sibling_hash
+                  in
+                  Hash.merge ~height left_hash right_hash
+                in
+                ( location :: sibling_location :: processed_locations
+                , (Location.parent location, parent_hash)
+                  :: parent_locations_and_hashes ) )
+        in
+        set_hash_batch mdb parent_locations_and_hashes )
 
   let rec set_hash mdb location new_hash =
     assert (Location.is_hash location) ;
@@ -199,9 +203,8 @@ module Make
       assert (Location.is_generic location) ;
       get_raw mdb location
 
-    (* encodes a key as a location used as a database key, so we can find the account
-       location associated with that key
-     *)
+    (* encodes a key as a location used as a database key, so we can find the
+       account location associated with that key *)
     let build_location key =
       Location.build_generic
         (Bigstring.of_string ("$" ^ Format.sprintf !"%{sexp: Key.t}" key))
@@ -370,9 +373,8 @@ module Make
         |> Sequence.iter ~f:(fun i -> f i (get_at_index_exn t i))
 
   (* TODO : if key-value store supports iteration mechanism, like RocksDB,
-     maybe use that here, instead of loading all accounts into memory
-     See Issue #1191
-  *)
+     maybe use that here, instead of loading all accounts into memory See Issue
+     #1191 *)
   let foldi_with_ignored_keys t ignored_keys ~init ~f =
     let f' index accum account = f (Addr.of_int_exn index) accum account in
     match Account_location.last_location_address t with
@@ -422,7 +424,8 @@ module Make
       in
       loop keys []
     in
-    (* N.B.: we're not using stack database here to make available newly-freed locations *)
+    (* N.B.: we're not using stack database here to make available newly-freed
+       locations *)
     List.iter keys ~f:(Account_location.delete t) ;
     List.iter locations ~f:(fun loc -> delete_raw t loc) ;
     (* recalculate hashes for each removed account *)
