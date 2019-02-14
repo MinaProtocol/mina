@@ -47,10 +47,16 @@ module Qualities = struct
 
   module Quality = struct
     let create title reason =
-      div
-        [Style.just "flex justify-between mt45"]
-        [ h2 [Style.(render h2style)] [text title]
-        ; p [Style.just "w-65 mt0 mb0 lh-copy"] reason ]
+      Mobile_switch.create
+        ~not_small:
+          (div
+             [Style.just "flex justify-between mt45"]
+             [ h2 [Style.(render (of_class "pr2" + h2style))] [text title]
+             ; p [Style.just "w-65 mt0 mb0 lh-copy"] reason ])
+        ~small:
+          (div [Style.just "mt45"]
+             [ h2 [Style.render h2style] [text title]
+             ; p [Style.just "mt3 mb0 ml15 lh-copy"] reason ])
   end
 
   let create qualities =
