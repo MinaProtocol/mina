@@ -2,6 +2,42 @@ open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
 
+module Transition_frontier_diff = struct
+  type 'a new_best_tip = {old_best_tip: 'a; new_best_tip: 'a}
+
+  type 'a new_root =
+    { old_root: 'a
+    ; new_root: 'a
+    ; added: 'a
+    ; garbage: 'a list
+    ; best_tip: 'a new_best_tip option }
+
+  type 'a t =
+    (* Added a node to the existing best tip without creating a new root *)
+    | Extend_best_tip of 'a
+    (* Added a node to the a new best tip without creating a new root *)
+    | New_best_tip of 'a new_best_tip
+    (* might not have been added to the best tip *)
+    | New_root of 'a new_root
+    | Destroy
+end
+
+module type Transition_frontier_extension_intf = sig
+  type t
+
+  type transition_frontier
+
+  type transition_frontier_breadcrumb
+
+  val create : unit -> t
+
+  val handle_diff :
+       t
+    -> transition_frontier
+    -> transition_frontier_breadcrumb Transition_frontier_diff.t
+    -> unit
+end
+
 module type Network_intf = sig
   type t
 
