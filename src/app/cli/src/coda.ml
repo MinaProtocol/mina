@@ -24,6 +24,17 @@ let start_tracing () = Deferred.unit
 
 [%%endif]
 
+[%%if
+fake_hash]
+
+let maybe_sleep s = after (Time.Span.of_sec s)
+
+[%%else]
+
+let maybe_sleep _ = Deferred.unit
+
+[%%endif]
+
 let commit_id = Option.map [%getenv "CODA_COMMIT_SHA1"] ~f:Git_sha.of_string
 
 module type Coda_intf = sig
@@ -83,18 +94,6 @@ let daemon log =
      and ip =
        flag "ip" ~doc:"IP External IP address for others to connect"
          (optional string)
-     and transaction_capacity_log_2 =
-       flag "txn-capacity"
-         ~doc:
-           "CAPACITY_LOG_2 Log of capacity of transactions per transition \
-            (default: 8)"
-         (optional int)
-     and work_delay_factor =
-       flag "work-delay-factor"
-         ~doc:
-           "DELAY_LOG_2 Log of number of block-times snark workers take to \
-            produce atleast two proofs (default:2)"
-         (optional int)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
      and snark_work_fee =
@@ -170,14 +169,6 @@ let daemon log =
        let client_port =
          or_from_config YJ.Util.to_int_option "client-port"
            ~default:Port.default_client client_port
-       in
-       let transaction_capacity_log_2 =
-         or_from_config YJ.Util.to_int_option "txn-capacity" ~default:8
-           transaction_capacity_log_2
-       in
-       let work_delay_factor =
-         or_from_config YJ.Util.to_int_option "work-delay-factor" ~default:2
-           work_delay_factor
        in
        let snark_work_fee_flag =
          Currency.Fee.of_int
@@ -283,10 +274,6 @@ let daemon log =
 
          let genesis_proof = Precomputed_values.base_proof
 
-         let transaction_capacity_log_2 = transaction_capacity_log_2
-
-         let work_delay_factor = work_delay_factor
-
          let commit_id = commit_id
 
          let work_selection = work_selection
@@ -340,7 +327,7 @@ let daemon log =
            Coda_base.Receipt_chain_database.create
              ~directory:receipt_chain_dir_name
          in
-         let%map coda =
+         let%bind coda =
            Run.create
              (Run.Config.make ~log ~net_config
                 ~run_snark_worker:(Option.is_some run_snark_worker_flag)
@@ -352,6 +339,7 @@ let daemon log =
                 ~time_controller ?propose_keypair:Config0.propose_keypair ()
                 ~banlist)
          in
+         let%map () = maybe_sleep 3. in
          M.start coda ;
          let web_service = Web_pipe.get_service () in
          Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;
@@ -469,5 +457,8 @@ let () =
   Random.self_init () ;
   let log = Logger.create () in
   don't_wait_for (ensure_testnet_id_still_good log) ;
+  (* Turn on snark debugging in prod for now *)
+  Snark_params.Tick.set_eval_constraints true ;
+  Snark_params.Tock.set_eval_constraints true ;
   Command.run (Command.group ~summary:"Coda" (coda_commands log)) ;
   Core.exit 0

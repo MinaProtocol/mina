@@ -1,6 +1,6 @@
 # WARNING: config.yml file is generated from config.yml.jinja
 ---
-version: 2
+version: 3
 jobs:
     tracetool:
         docker:
@@ -92,7 +92,7 @@ jobs:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
-                  name: Build OCaml (sig)
+                  name: Build OCaml
                   command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                   name: Build deb Package with keys
@@ -120,20 +120,6 @@ jobs:
             - run:
                   name: Test make test-runtest
                   command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless MYPROCS=8 make test-runtest
-
-    test-withsnark:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_posig make build 2>&1 | tee /tmp/buildocaml.log
-            - run:
-                  name: Test make test-withsnark
-                  command: source ~/.profile && DUNE_PROFILE=test_posig make test-withsnark
 
     {%-for test in tests%}
     test-{{test.name}}:
@@ -168,6 +154,5 @@ workflows:
             {%- for test in tests %}
             - test-{{test.name}}
             {%- endfor %}
-            - test-withsnark
             - test-unit-test
             - tracetool

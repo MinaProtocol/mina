@@ -1,0 +1,5 @@
+(library
+  (name proof_carrying_data)
+  (preprocess (pps ppx_jane))
+  (public_name proof_carrying_data)
+)
