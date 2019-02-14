@@ -299,6 +299,7 @@ module type Sync_handler_intf = sig
        frontier:transition_frontier
     -> ledger_hash
     -> syncable_ledger_query
+    -> logger:Logger.t
     -> (ledger_hash * syncable_ledger_answer) option
 end
 
