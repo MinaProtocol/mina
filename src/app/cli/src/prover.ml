@@ -1,5 +1,5 @@
-[%%import
-"../../../config.mlh"]
+(*[%%import
+"../../../config.mlh"]*)
 
 open Core
 open Async
@@ -73,6 +73,7 @@ module Worker_state = struct
              Wrap.input {Wrap.Prover_state.proof} Wrap.main
              (Wrap_input.of_tick_field hash)
 
+         (*Create a blockchain proof*)
          let extend_blockchain (chain : Blockchain.t)
              (next_state : Consensus.Protocol_state.value)
              (block : Consensus.Snark_transition.value) state_for_handler =
@@ -121,8 +122,8 @@ module Functions = struct
         let%map (module W) = Worker_state.get w in
         `Initialized )
 
-  [%%if
-  with_snark]
+  (*[%%if
+  with_snark]*)
 
   let extend_blockchain =
     create
@@ -145,7 +146,7 @@ module Functions = struct
         let%map (module W) = Worker_state.get w in
         W.verify state proof )
 
-  [%%else]
+  (*[%%else]
 
   let extend_blockchain =
     create
@@ -167,7 +168,7 @@ module Functions = struct
     create Blockchain.bin_t bin_bool (fun w {Blockchain.state; proof} ->
         Deferred.return true )
 
-  [%%endif]
+  [%%endif]*)
 end
 
 module Worker = struct

@@ -1117,6 +1117,7 @@ module Prover_state = struct
 
   let precomputed_handler = Vrf.Precomputed.handler
 
+  (*Add pending coinbase handler here*)
   let handler {delegator; ledger; private_key} : Snark_params.Tick.Handler.t =
     let ledger_handler = unstage (Coda_base.Sparse_ledger.handler ledger) in
     fun (With {request; respond} as t) ->

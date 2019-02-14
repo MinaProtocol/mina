@@ -1,5 +1,5 @@
-[%%import
-"../../../config.mlh"]
+(*[%%import
+"../../../config.mlh"]*)
 
 open Core
 open Async
@@ -11,19 +11,19 @@ open Pipe_lib
 open O1trace
 module Fee = Protocols.Coda_pow.Fee
 
-[%%if
-with_snark]
+(*[%%if
+with_snark]*)
 
 module Ledger_proof = Ledger_proof.Prod
 
-[%%else]
+(*[%%else]
 
 module Ledger_proof = struct
   module Statement = Transaction_snark.Statement
   include Ledger_proof.Debug
 end
 
-[%%endif]
+[%%endif]*)
 
 module Staged_ledger_aux_hash = struct
   include Staged_ledger_hash.Aux_hash.Stable.V1
@@ -986,8 +986,8 @@ struct
     else Some {Snark_work_lib.Work.Spec.instances; fee}
 end
 
-[%%if
-with_snark]
+(*[%%if
+with_snark]*)
 
 module Make_coda (Init : Init_intf) = struct
   module Ledger_proof_verifier = struct
@@ -1026,7 +1026,7 @@ module Make_coda (Init : Init_intf) = struct
       ~set_seen_jobs ~snark_pool t (snark_work_fee t)
 end
 
-[%%else]
+(*[%%else]
 
 module Make_coda (Init : Init_intf) = struct
   module Ledger_proof_verifier = struct
@@ -1048,7 +1048,7 @@ module Make_coda (Init : Init_intf) = struct
       ~set_seen_jobs ~snark_pool t (snark_work_fee t)
 end
 
-[%%endif]
+[%%endif]*)
 
 module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   include Program

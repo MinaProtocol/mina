@@ -31,9 +31,20 @@ module type S = sig
     val of_ledger_hash : Ledger_hash.t -> t
   end
 
+  module Pending_coinbase_hash : sig
+    type t [@@deriving sexp, bin_io]
+  end
+
+  module Pending_coinbase : sig
+    type t [@@deriving sexp, bin_io]
+
+    val merkle_root : t -> Pending_coinbase_hash.t
+  end
+
   module Ledger_proof_statement :
     Coda_pow.Ledger_proof_statement_intf
     with type ledger_hash := Frozen_ledger_hash.t
+     and type pending_coinbase_hash := Pending_coinbase_hash.t
 
   module Proof : sig
     type t

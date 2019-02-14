@@ -41,15 +41,21 @@ module Make (Inputs : Inputs.S) : sig
      and type staged_ledger_aux_hash := Inputs.Staged_ledger_aux_hash.t
      and type transaction_snark_work_statement :=
                 Inputs.Transaction_snark_work.Statement.t
+     and type pending_coinbase := Inputs.Pending_coinbase.t
 end = struct
   open Inputs
+
+  module Witness = struct
+    type t = {ledger: Sparse_ledger.t; pending_coinbases: Pending_coinbase.t}
+    [@@deriving sexp, bin_io]
+  end
 
   module Transaction_with_witness = struct
     (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
     type t =
       { transaction_with_info: Ledger.Undo.t
       ; statement: Ledger_proof_statement.t
-      ; witness: Inputs.Sparse_ledger.t }
+      ; witness: Witness.t }
     [@@deriving sexp, bin_io]
   end
 
@@ -156,15 +162,19 @@ end = struct
       {Transaction_with_witness.transaction_with_info; witness; _} =
     let open Or_error.Let_syntax in
     let source =
-      Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root witness
+      Frozen_ledger_hash.of_ledger_hash
+      @@ Sparse_ledger.merkle_root witness.ledger
     in
     let%bind transaction = Ledger.Undo.transaction transaction_with_info in
     let%bind after =
       Or_error.try_with (fun () ->
-          Sparse_ledger.apply_transaction_exn witness transaction )
+          Sparse_ledger.apply_transaction_exn witness.ledger transaction )
     in
     let target =
       Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
+    in
+    let pending_coinbase_hash =
+      Pending_coinbase.merkle_root witness.pending_coinbases
     in
     let%bind fee_excess = Transaction.fee_excess transaction in
     let%map supply_increase = Transaction.supply_increase transaction in
@@ -172,6 +182,7 @@ end = struct
     ; target
     ; fee_excess
     ; supply_increase
+    ; pending_coinbase_hash
     ; proof_type= `Base }
 
   let completed_work_to_scanable_work (job : job) (fee, current_proof, prover)
@@ -196,6 +207,7 @@ end = struct
           { Ledger_proof_statement.source= s.source
           ; target= s'.target
           ; supply_increase
+          ; pending_coinbase_hash= s'.pending_coinbase_hash
           ; fee_excess
           ; proof_type= `Merge }
         in
@@ -323,7 +335,14 @@ end = struct
               clarify_error
                 (Frozen_ledger_hash.equal hash current_ledger_hash)
                 "did not connect with snarked ledger hash" )
-      | Ok {fee_excess; source; target; supply_increase= _; proof_type= _} ->
+      | Ok
+          { fee_excess
+          ; source
+          ; target
+          ; supply_increase= _
+          ; pending_coinbase_hash= _
+          ; proof_type= _ } ->
+          (*TODO: what can be checked here about the pending coinbase hash*)
           let open Or_error.Let_syntax in
           let%map () =
             Option.value_map ~default:(Ok ()) snarked_ledger_hash
@@ -365,6 +384,7 @@ end = struct
         { Ledger_proof_statement.source= stmt1.source
         ; target= stmt2.target
         ; supply_increase
+        ; pending_coinbase_hash= stmt2.pending_coinbase_hash
         ; fee_excess
         ; proof_type= `Merge }
 

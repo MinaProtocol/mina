@@ -1840,7 +1840,7 @@ let%test_module "test" =
       end
 
       module Config = struct
-        let transaction_capacity_log_2 = 7
+        let transaction_capacity_log_2 = 3
 
         (*This has to be a minimum of 3 for the tests to pass otherwise the assertion that the number of transactions added in every block be > 0 will not hold. With transaction_capcity_log_2 as 2, the total number of slots available are 4 and in the case of maximum  number of provers, 3 slots are needed to add one transaction. But, when slots reach the end of the tree causing them to be split into two halves, no transaction can be added in either of the halves. This causes only coinbase to be added to the tree *)
 
@@ -1865,7 +1865,7 @@ let%test_module "test" =
         ; proofs= stmts
         ; prover }
 
-    let stmt_to_work_restricted work_list
+    let _stmt_to_work_restricted work_list
         (stmts : Test_input1.Transaction_snark_work.Statement.t) :
         Test_input1.Transaction_snark_work.Checked.t option =
       let prover =
@@ -1959,9 +1959,19 @@ let%test_module "test" =
               in
               assert (x > 0) ;
               let expected_value = expected_ledger x all_ts old_ledger in
-              assert (!(Sl.ledger !sl) = expected_value) ) )
+              assert (!(Sl.ledger !sl) = expected_value) ) ) ;
+      Core.printf !"%{sexp: Sl.Scan_state.t} \n %!" (Sl.scan_state !sl)
 
-    let%test_unit "Be able to include random number of user_commands" =
+    let%test_unit "Async" =
+      let x = ref 0 in
+      let _ =
+        Async.Thread_safe.block_on_async (fun () ->
+            x := 5 ;
+            Deferred.return () )
+      in
+      printf "%d\n" !x
+
+    (*    let%test_unit "Be able to include random number of user_commands" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
       let logger = Logger.create () in
@@ -2319,5 +2329,5 @@ let%test_module "test" =
               (*There are than two proof bundles. Should be able to add at least one payment. First and the second proof bundles would go for coinbase and fee_transfer resp.*)
               if j > 2 then assert (x > 0) ;
               let expected_value = expected_ledger x all_ts old_ledger in
-              if cb > 0 then assert (!(Sl.ledger !sl) = expected_value) ) )
+              if cb > 0 then assert (!(Sl.ledger !sl) = expected_value) ) )*)
   end )

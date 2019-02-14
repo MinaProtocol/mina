@@ -32,3 +32,9 @@ let epoch_seed = salt epoch_seed
 let vrf_message = salt vrf_message
 
 let vrf_output = salt vrf_output
+
+let coinbase = salt coinbase
+
+let pending_coinbases = salt pending_coinbases
+
+let coinbase_stack = salt coinbase_stack

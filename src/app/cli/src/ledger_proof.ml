@@ -32,8 +32,10 @@ module Prod :
                  ; target
                  ; supply_increase
                  ; fee_excess
+                 ; pending_coinbase
                  ; proof_type } ~sok_digest ~proof =
-    Transaction_snark.create ~source ~target ~supply_increase
+    Transaction_snark.create ~source ~target ~pending_coinbase_hash
+      ~supply_increase
       ~fee_excess:(to_signed_amount fee_excess)
       ~sok_digest ~proof ~proof_type
 end

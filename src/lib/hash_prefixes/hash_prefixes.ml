@@ -47,3 +47,9 @@ let epoch_seed = create "CodaEpochSeed"
 let vrf_message = create "CodaVrfMessage"
 
 let vrf_output = create "CodaVrfOutput"
+
+let pending_coinbases = create "PendingCoinbases"
+
+let coinbase_stack = create "CoinbaseStack"
+
+let coinbase = create "Coinbase"

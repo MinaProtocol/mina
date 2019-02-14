@@ -123,6 +123,7 @@ let create () : (module S) Async.Deferred.t =
               Fn.compose to_bits full_data_of_verification_key
           end
 
+          (*Main for blockchain snark proof*)
           let main x =
             let there {Prover_state.wrap_vk; prev_proof; prev_state; update} =
               {Step.Prover_state.wrap_vk; prev_proof; prev_state; update}

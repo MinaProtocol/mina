@@ -360,10 +360,13 @@ end
 module type Ledger_proof_statement_intf = sig
   type ledger_hash
 
+  type pending_coinbase_hash
+
   type t =
     { source: ledger_hash
     ; target: ledger_hash
     ; supply_increase: Currency.Amount.t
+    ; pending_coinbase_hash: pending_coinbase_hash
     ; fee_excess: Fee.Signed.t
     ; proof_type: [`Base | `Merge] }
   [@@deriving sexp, bin_io, compare]
@@ -581,12 +584,18 @@ module type Transaction_snark_scan_state_intf = sig
 
   type staged_ledger_aux_hash
 
+  type pending_coinbase
+
+  module Witness : sig
+    type t = {ledger: sparse_ledger; pending_coinbases: pending_coinbase}
+  end
+
   module Transaction_with_witness : sig
     (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
     type t =
       { transaction_with_info: transaction_with_info
       ; statement: ledger_proof_statement
-      ; witness: sparse_ledger }
+      ; witness: Witness.t }
   end
 
   module Ledger_proof_with_sok_message : sig
@@ -652,7 +661,7 @@ module type Transaction_snark_scan_state_intf = sig
 
   val extract_from_job :
        Available_job.t
-    -> ( transaction_with_info * ledger_proof_statement * sparse_ledger
+    -> ( transaction_with_info * ledger_proof_statement * Witness.t
        , ledger_proof * ledger_proof )
        Either.t
 
