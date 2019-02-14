@@ -1,0 +1,9 @@
+(library
+ (name file_system)
+ (public_name file_system)
+ (library_flags -linkall)
+ (libraries core async)
+ (flags :standard -short-paths -warn-error -58)
+ (preprocess
+  (pps ppx_jane))
+ (synopsis "Interface to make system calls to the Unix file system"))

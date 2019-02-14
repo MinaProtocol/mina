@@ -1,0 +1,12 @@
+(library
+ (name staged_ledger)
+ (public_name staged_ledger)
+ (library_flags -linkall)
+ (flags :standard -short-paths -warn-error -58)
+ (inline_tests)
+ (libraries core transaction_snark_scan_state sgn transaction_snark coda_base
+   protocols merkle_mask pipe_lib logger async async_extra)
+ (preprocessor_deps ../../config.mlh)
+ (preprocess
+  (pps ppx_jane ppx_deriving.eq ppx_deriving.make))
+ (synopsis "Staged Ledger updates the current ledger with new transactions"))

@@ -19,7 +19,7 @@ run_unit_tests() {
 
 run_ppx_tests() {
   date
-  make ppx_tests
+  make test-ppx
 }
 
 run_unit_tests_with_coverage() {
