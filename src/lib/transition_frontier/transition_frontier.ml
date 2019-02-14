@@ -88,6 +88,9 @@ module Make (Inputs : Inputs_intf) :
 
   let clear_paths t = Transition_frontier0.clear_paths t.frontier0
 
+  let consensus_local_state t =
+    Transition_frontier0.consensus_local_state t.frontier0
+
   let find t hash = Transition_frontier0.find t.frontier0 hash
 
   let find_exn t hash = Transition_frontier0.find_exn t.frontier0 hash
@@ -113,6 +116,4 @@ module Make (Inputs : Inputs_intf) :
   let successors t bc = Transition_frontier0.successors t.frontier0 bc
 
   let successors_rec t bc = Transition_frontier0.successors_rec t.frontier0 bc
-
-  let consensus_local_state t = Transition_frontier0.consensus_local_state t.frontier0
 end
