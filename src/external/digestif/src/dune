@@ -1,0 +1,6 @@
+(library
+ (name digestif)
+ (public_name digestif)
+ (wrapped false)
+ (flags :standard -no-keep-locs)
+ (modules_without_implementation digestif))
