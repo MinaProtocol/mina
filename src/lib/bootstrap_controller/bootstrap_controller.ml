@@ -229,7 +229,6 @@ end = struct
       ; current_root= initial_root_transition }
     in
     let transition_graph = Transition_cache.create () in
-    Transition_frontier.clear_paths frontier ;
     let%bind synced_db =
       let root_sync_ledger =
         Root_sync_ledger.create ledger_db ~parent_log:t.logger
