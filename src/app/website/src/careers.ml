@@ -171,14 +171,14 @@ let content =
                        healthcare plans with zero deductible, and 99% of \
                        vision and dental&nbsp;premiums" ]
                 ; Benefit.create "401k"
-                    ["Matching 401k contributions up to 3% of&nbsp;salary"]
+                    ["401k contribution matching up to 3% of&nbsp;salary"]
                 ; Benefit.create "Education"
                     [ "$750 annual budget for conferences of your choice (we \
                        cover company-related&nbsp;conferences)"
                     ; "Office library"
                     ; "Twice-a-week learning lunches" ]
                 ; Benefit.create "Equipment"
-                    [ "Top-of-the-line laptop + $500 monitor budget + $500 \
+                    [ "Top-of-the-line laptop, $500 monitor budget and $500 \
                        peripheral budget" ]
                 ; Benefit.create "Time off"
                     [ "Unlimited vacation, with encouragement for employees \
