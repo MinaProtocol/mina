@@ -1,0 +1,10 @@
+(library
+ (name test_util)
+ (public_name test_util)
+ (flags :standard -short-paths -warn-error -6-33-32-58)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries snark_params fold_lib core_kernel snarky)
+ (preprocess
+  (pps ppx_jane ppx_deriving.eq bisect_ppx -- -conditional))
+ (synopsis "test utils"))
