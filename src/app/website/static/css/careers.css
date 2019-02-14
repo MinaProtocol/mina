@@ -1,0 +1,36 @@
+
+.careers-gallery-row1,
+.careers-gallery-row2 {
+  display: flex;
+  justify-content: space-between;
+}
+
+
+.careers-gallery-row1 > *,
+.careers-gallery-row2 > * {
+  height: 15rem;
+  object-fit: cover;
+  box-sizing: border-box;
+  padding: .3rem;
+}
+
+.careers-gallery-row1 > *:nth-child(1) {
+  width: 35%;
+  
+}
+
+.careers-gallery-row1 > *:nth-child(2) {
+  width: 65%;
+}
+
+.careers-gallery-row2 > *:nth-child(1) {
+  width: 30%;
+}
+
+.careers-gallery-row2 > *:nth-child(2) {
+  width: 37%;
+}
+
+.careers-gallery-row2 > *:nth-child(3) {
+  width: 33%;
+}
