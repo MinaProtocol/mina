@@ -114,6 +114,13 @@ fn complete_event(
 fn main() {
     let matches = App::new("trace-tool")
         .arg(
+            Arg::with_name("dump-raw")
+                .help("dump the raw trace event debug representation and quit")
+                .short("d")
+                .long("dump-raw")
+                .takes_value(false)
+        )
+        .arg(
             Arg::with_name("input")
                 .help("file to read trace data from")
                 .multiple(true)
@@ -121,6 +128,7 @@ fn main() {
         )
         .get_matches();
     let inputs = matches.values_of("input").unwrap();
+    let dump_raw = matches.is_present("dump-raw");
     println!("[");
     let mut contents = Vec::new();
     for filename in inputs {
@@ -133,6 +141,13 @@ fn main() {
         let mut recurring_map = HashMap::<String, Tid>::new();
         let mut tidmap = HashMap::<Tid, Tid>::new();
         let mut cur_pid = 0;
+        if dump_raw {
+            let (_, events) = parse_trace_events(contents.as_ref()).expect("parsing failed");
+            for ev in events {
+                println!("{:?}", ev);
+            }
+            continue;
+        }
         match parse_trace_events(contents.as_ref()) {
             Ok((_, events)) => {
                 let prev_ts = match events.first() {
