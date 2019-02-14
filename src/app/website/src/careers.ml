@@ -7,6 +7,8 @@ let bigtext = Style.of_class "ocean f2 tracked-tightly"
 
 let h2style = Style.(of_class "fw5 mt0 mb0 ml15" + bigtext)
 
+let linkstyle = Style.(of_class "dodgerblue fw5 no-underline hover-link")
+
 module Title = struct
   open Html_concise
 
@@ -36,12 +38,16 @@ module Qualities = struct
 
   module Quality = struct
     let create title reason =
-      div []
+      div
+        [Style.just "flex justify-between mt45"]
         [ h2 [Style.(render h2style)] [text title]
-        ; p [Style.just "lh-copy"] [text reason] ]
+        ; p [Style.just "w-65 mt0 mb0 lh-copy"] reason ]
   end
 
-  let create qualities = div [] (hr [Style.render Styles.clean_hr] :: qualities)
+  let create qualities =
+    div [Style.just "mt45"]
+      [ hr [Style.(render (of_class "mt45" + Styles.clean_hr))]
+      ; div [Style.just "mt45"] qualities ]
 end
 
 module Benefits = struct
@@ -58,8 +64,8 @@ module Benefits = struct
 
   let create benefits =
     div []
-      [ hr [Style.render Styles.clean_hr]
-      ; h2 [Style.render h2style] [text "Benefits"]
+      [ hr [Style.(render (of_class "mt45" + Styles.clean_hr))]
+      ; h2 [Style.(render (of_class "mt45" + h2style))] [text "Benefits"]
       ; div [] benefits ]
 end
 
@@ -69,7 +75,7 @@ module Apply = struct
   module Role = struct
     let create name link =
       a
-        [href link; Style.just "dodgerblue fw5 f5 no-underline hover-link"]
+        [href link; Style.(render (of_class "f5" + linkstyle))]
         [text (name ^ " (San Francisco).")]
   end
 
@@ -112,17 +118,23 @@ let content =
           ; Qualities.(
               create
                 [ Quality.create "Open Source"
-                    "We passionately believe in the open-source philosophy, \
-                     and make our software free for the entire world to use.  \
-                     Take a look  →"
+                    [ text
+                        "We passionately believe in the open-source \
+                         philosophy, and make our software free for the \
+                         entire world to use."
+                    ; a
+                        [href "/static/code.html"; Style.render linkstyle]
+                        [text "Take a look  →"] ]
                 ; Quality.create "Collaboration"
-                    "The problems we face are novel and challenging, so we \
-                     take them on as a team."
+                    [ text
+                        "The problems we face are novel and challenging, so \
+                         we take them on as a team." ]
                 ; Quality.create "Inclusion"
-                    "We’re working on technologies with the potential to \
-                     reimagine social structures. We believe it’s important \
-                     to incorporate diverse perspectives from conception \
-                     through realization." ])
+                    [ text
+                        "We’re working on technologies with the potential \
+                         to reimagine social structures. We believe it’s \
+                         important to incorporate diverse perspectives from \
+                         conception through realization." ] ])
           ; Benefits.(
               create
                 [ Benefit.create "Healthcare"

@@ -295,6 +295,12 @@
 .w-55 {
   width:55%;
 }
+.w-65 {
+  width:65%;
+}
+.w-35 {
+  width:35%;
+}
 @media screen and (min-width:30em) {
   .w-45-ns {
     width:45%;
