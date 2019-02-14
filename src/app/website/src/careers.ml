@@ -62,7 +62,9 @@ module Benefits = struct
     let create category reasons =
       div
         [Style.just "flex justify-between mb4"]
-        [ h3 [Style.just "fw6 f5 ph3 mt0 mb0"] [text category]
+        [ div
+            [Style.just "flex justify-end w-30"]
+            [h3 [Style.just "fw6 f5 ph4 mt0 mb0"] [text category]]
         ; ul
             [Style.just "mt0 mb0 ph0 w-70"]
             (List.map reasons ~f:(fun r ->
