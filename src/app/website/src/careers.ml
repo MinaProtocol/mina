@@ -212,8 +212,8 @@ let content =
                     "/jobs/frontend-engineer.html"
                 ; Role.create "Protocol Reliability Engineer"
                     "/jobs/protocol-reliability-engineer.html"
-                ; Role.create "Developer Advocate"
-                    "/jobs/developer-advocate.html" ]) ] ]
+                ; Role.create "Senior Protocol Engineer"
+                    "/jobs/protocol-engineer.html" ]) ] ]
   in
   wrap_simple
     ~body_style:(Style.of_class "bg-white")
