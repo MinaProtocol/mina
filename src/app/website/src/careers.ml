@@ -59,9 +59,9 @@ module Benefits = struct
   open Html_concise
 
   module Benefit = struct
-    let create category reasons =
+    let create category ?(top_style = "mt4") reasons =
       div
-        [Style.just "flex justify-between mb4"]
+        [Style.just @@ "flex justify-between " ^ top_style]
         [ div
             [Style.just "flex justify-end w-30"]
             [h3 [Style.just "fw6 f5 ph4 mt0 mb0"] [text category]]
@@ -148,7 +148,7 @@ let content =
                          conception through&nbsp;realization." ] ])
           ; Benefits.(
               create
-                [ Benefit.create "Healthcare"
+                [ Benefit.create "Healthcare" ~top_style:""
                     [ "We cover 100% of employee premiums for platinum \
                        healthcare plans with zero deductible, and 99% of \
                        vision and dental&nbsp;premiums" ]
