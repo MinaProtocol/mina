@@ -15,7 +15,7 @@ module Title = struct
   let create copy =
     h1
       [ Style.just
-          "fadedblue careers-double-line-header ttu f4 fw5 tracked-more" ]
+          "fadedblue careers-double-line-header ttu f4 fw5 tracked-more mb4" ]
       [text copy]
 end
 
