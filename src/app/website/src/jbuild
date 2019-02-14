@@ -4,7 +4,7 @@
   ((name main)
    (public_name website_main)
    (package site)
-   (libraries (core async stationary))
+   (libraries (core async stationary non_empty_list))
    (preprocess (pps (ppx_jane)))
    (flags (-w -40 -g))
    (modes (native))

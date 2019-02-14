@@ -137,11 +137,13 @@
 .lightsilver { color: #8192a8; }
 .darksnow { color: #EFF2F7; }
 .ocean { color: #4782a0; }
+.oceanblack { color: rgb(70, 99, 131); }
 .darkocean { color: #144f6d; }
 .grass { color: #76cd87; }
 .bluesilver { color: #526e80; }
 .sky { color: #96cbec; }
 .offwhite { color: #f5f5f5; }
+
 
 .wb { word-break: break-all; }
 
@@ -188,6 +190,8 @@
   .mw65-ns { max-width: 43rem; }
 }
 
+.mw960 { max-width: 60rem; }
+.mw800 { max-width: 50rem; }
 .mw85 {max-width:80rem}
 
 .min-h7 { min-height: 48rem; }
@@ -291,6 +295,7 @@
 
 .mb45 { margin-bottom: 3rem; }
 
+
 .ml-5px {
   margin-left:-5px;
 }
@@ -336,6 +341,10 @@
 }
 .tracked-tightish {
   letter-spacing: -0.01em;
+}
+.tracked-tightly {
+  /* this is 0.4pt */
+  letter-spacing: -0.01111111em;
 }
 
 .fin-dots {
