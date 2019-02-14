@@ -68,7 +68,12 @@ end
 module Receipt = Coda_base.Receipt
 
 module Hash = struct
-  type t = Md5.t [@@deriving sexp, hash, compare, bin_io, eq]
+  module T = struct
+    type t = Md5.t [@@deriving sexp, hash, compare, bin_io, eq]
+  end
+
+  include T
+  include Hashable.Make_binable (T)
 
   (* to prevent pre-image attack,
    * important impossible to create an account such that (merge a b = hash_account account) *)
@@ -142,6 +147,8 @@ module Key = struct
   module T = struct
     type t = Account.key [@@deriving sexp, bin_io, eq, compare, hash]
   end
+
+  let to_string = Signature_lib.Public_key.Compressed.to_base64
 
   let gen = Account.key_gen
 

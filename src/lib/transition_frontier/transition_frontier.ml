@@ -562,8 +562,6 @@ module Make (Inputs : Inputs_intf) :
             ( Ledger.Db.merkle_root t.root_snarked_ledger
             |> Frozen_ledger_hash.of_ledger_hash ) ) )
 
-  let clear_paths t = Hashtbl.clear t.table
-
   let best_tip_path_length_exn {table; root; best_tip; _} =
     let open Option.Let_syntax in
     let result =
