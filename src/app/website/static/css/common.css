@@ -137,6 +137,7 @@
 .lightsilver { color: #8192a8; }
 .darksnow { color: #EFF2F7; }
 .ocean { color: #4782a0; }
+.dodgerblue { color: rgb(93, 143, 255); }
 .oceanblack { color: rgb(70, 99, 131); }
 .darkocean { color: #144f6d; }
 .grass { color: #76cd87; }
@@ -228,6 +229,13 @@
 @media screen and (min-width:80em) {
   .flex-ll { display: flex; }
   .mr4-ll { margin-right: 2rem; }
+}
+
+.mt45 {
+  margin-top: 3.5rem;
+}
+.ml15 {
+  margin-left: 0.375rem;
 }
 
 .silver-gradient {
@@ -352,7 +360,9 @@
   background-position: top;
   background-size: 0.25rem 0.125rem;
   background-repeat: repeat-x;
-}
+} 
+
+
 
 .h8th {
   height: 0.125rem;

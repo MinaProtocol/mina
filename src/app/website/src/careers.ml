@@ -5,7 +5,7 @@ open Common
 
 let bigtext = Style.of_class "ocean f2 tracked-tightly"
 
-let h2style = Style.(of_class "fw5" + bigtext)
+let h2style = Style.(of_class "fw5 mt0 mb0 ml15" + bigtext)
 
 module Title = struct
   open Html_concise
@@ -51,7 +51,7 @@ module Benefits = struct
     let create category reasons =
       div []
         [ h3 [] [text category]
-        ; ul []
+        ; ul [Style.just "mt0 mb0 ph0"]
             (List.map reasons ~f:(fun r ->
                  li [Style.just "lh-copy list"] [text r] )) ]
   end
@@ -67,13 +67,27 @@ module Apply = struct
   open Html_concise
 
   module Role = struct
-    let create name link = a [href link] [text (name ^ " (San Francisco).")]
+    let create name link =
+      a
+        [href link; Style.just "dodgerblue fw5 f5 no-underline hover-link"]
+        [text (name ^ " (San Francisco).")]
   end
 
   let create roles =
+    let apply = h2 [Style.render h2style] [text "Apply"] in
+    let positions =
+      ul [Style.just "mt0 mb0 ph0"]
+        (List.map roles ~f:(fun r -> li [Style.just "list lh-copy"] [r]))
+    in
     div []
-      [ h2 [Style.render h2style] [text "Apply"]
-      ; ul [] (List.map roles ~f:(fun r -> li [Style.just "list"] [r])) ]
+      [ hr [Style.(render (of_class "mt45" + Styles.clean_hr))]
+      ; Mobile_switch.create
+          ~not_small:
+            (div
+               [Style.just "flex justify-between mt45"]
+               [ div [Style.just "w-50"] [apply]
+               ; div [Style.just "w-50"] [positions] ])
+          ~small:(div [Style.just "mt45"] [apply; positions]) ]
 end
 
 let content =
