@@ -78,7 +78,7 @@ module Benefits = struct
         ; ul
             [Style.just "mt0 mb0 ph0 w-70"]
             (List.map reasons ~f:(fun r ->
-                 li [Style.just "lh-copy list mb0 mt0"] [text r] )) ]
+                 li [Style.just "lh-copy list mb0 mt0"] r )) ]
   end
 
   let create benefits =
@@ -156,7 +156,7 @@ let content =
                         [text "Take&nbsp;a&nbsp;look&nbsp;→"] ]
                 ; Quality.create "Collaboration"
                     [ text
-                        "The problems we face are novel and challenging, so \
+                        "The problems we face are novel and challenging and \
                          we take them on as a&nbsp;team." ]
                 ; Quality.create "Inclusion"
                     [ text
@@ -167,32 +167,42 @@ let content =
           ; Benefits.(
               create
                 [ Benefit.create "Healthcare" ~top_style:""
-                    [ "We cover 100% of employee premiums for platinum \
-                       healthcare plans with zero deductible, and 99% of \
-                       vision and dental&nbsp;premiums" ]
+                    [ [ text
+                          "We cover 100% of employee premiums for platinum \
+                           healthcare plans with zero deductible, and 99% of \
+                           vision and dental&nbsp;premiums" ] ]
                 ; Benefit.create "401k"
-                    ["401k contribution matching up to 3% of&nbsp;salary"]
+                    [ [ text
+                          "401k contribution matching up to 3% of&nbsp;salary"
+                      ] ]
                 ; Benefit.create "Education"
-                    [ "$750 annual budget for conferences of your choice (we \
-                       cover company-related&nbsp;conferences)"
-                    ; "Office library"
-                    ; "Twice-a-week learning lunches" ]
+                    [ [ text
+                          "$750 annual budget for conferences of your choice \
+                           (we cover company-related&nbsp;conferences)" ]
+                    ; [text "Office library"]
+                    ; [text "Twice-a-week learning lunches"] ]
                 ; Benefit.create "Equipment"
-                    [ "Top-of-the-line laptop, $500 monitor budget and $500 \
-                       peripheral budget" ]
+                    [ [ text
+                          "Top-of-the-line laptop, $500 monitor budget and \
+                           $500 peripheral budget" ] ]
                 ; Benefit.create "Time off"
-                    [ "Unlimited vacation, with encouragement for employees \
-                       to take off at least 14 days&nbsp;annually" ]
+                    [ [ text
+                          "Unlimited vacation, with encouragement for \
+                           employees to take off"
+                      ; span [Style.just "i"] [text "at least"]
+                      ; text "14 days&nbsp;annually" ] ]
                 ; Benefit.create "Meals"
-                    ["Healthy snacks and provided lunch twice a week"]
+                    [[text "Healthy snacks and provided lunch twice a week"]]
                 ; Benefit.create "Other"
-                    [ "Parental leave"
-                    ; "Commuting benefits"
-                    ; "Bike-friendly culture"
-                    ; "Take up to 1 day (8 hours) of paid time off per year \
-                       to volunteer for the causes closest to your&nbsp;heart"
-                    ; "We match nonprofit donations up to $500 per year"
-                    ; "...and many others!" ] ])
+                    [ [text "Parental leave"]
+                    ; [text "Commuting benefits"]
+                    ; [text "Bike-friendly culture"]
+                    ; [ text
+                          "Take up to 1 day (8 hours) of paid time off per \
+                           year to volunteer for the causes closest to \
+                           your&nbsp;heart" ]
+                    ; [text "We match nonprofit donations up to $500 per year"]
+                    ; [text "...and many others!"] ] ])
           ; Apply.(
               create
                 [ Role.create "Engineering Manager" "/jobs/product-manager.html"
