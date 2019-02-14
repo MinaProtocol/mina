@@ -343,17 +343,6 @@ struct
           | None -> Some parent_loc
           | Some our_loc -> Some (max parent_loc our_loc) )
 
-    let get_all_accounts_rooted_at_exn t address =
-      Option.value_map ~default:[] (last_filled t) ~f:(fun allocation_addr ->
-          let first_addr, last_addr = Addr.Range.subtree_range address in
-          Addr.Range.fold
-            (first_addr, min last_addr (Location.to_path_exn allocation_addr))
-            ~init:[]
-            ~f:(fun bit_index acc ->
-              let queried_account = get t @@ Location.Account bit_index in
-              (queried_account |> Option.value_exn) :: acc ) )
-      |> List.rev
-
     (* set accounts in mask *)
     let set_all_accounts_rooted_at_exn t address (accounts : Account.t list) =
       (* basically, the same code used for the database implementation *)
@@ -544,10 +533,28 @@ struct
     let location_of_sexp = Location.t_of_sexp
 
     let depth = Base.depth
+
+    let location_of_addr addr = Location.Account addr
+
+    include Merkle_ledger.Util.Make (struct
+      module Location = Location
+      module Account = Account
+      module Addr = Location.Addr
+
+      module Base = struct
+        type nonrec t = t
+
+        let get = get
+      end
+
+      let location_of_addr = location_of_addr
+    end)
   end
 
   let set_parent t parent =
     t.parent <- Some parent ;
     t.current_location <- Attached.last_filled t ;
     t
+
+  let addr_to_location addr = Location.Account addr
 end
