@@ -3,9 +3,9 @@ open Async
 open Stationary
 open Common
 
-let bigtext = Style.of_class "ocean f2 tracked-tightly"
+let bigtext = Style.of_class "ocean f2-ns tracked-tightly"
 
-let h2style = Style.(of_class "fw5 mt0 mb0 ml15" + bigtext)
+let h2style = Style.(of_class "fw5 mt0 mb0 ml15 f2" + bigtext)
 
 let linkstyle = Style.(of_class "dodgerblue fw5 no-underline hover-link")
 
@@ -35,7 +35,7 @@ module Tagline = struct
   open Html_concise
 
   let create copy =
-    p [Style.(render (of_class "lh-copy" + bigtext))] [text copy]
+    p [Style.(render (of_class "lh-copy f3" + bigtext))] [text copy]
 end
 
 module Qualities = struct
@@ -60,18 +60,22 @@ module Benefits = struct
 
   module Benefit = struct
     let create category reasons =
-      div []
-        [ h3 [] [text category]
-        ; ul [Style.just "mt0 mb0 ph0"]
+      div
+        [Style.just "flex justify-between mb4"]
+        [ h3 [Style.just "fw6 f5 ph3 mt0 mb0"] [text category]
+        ; ul
+            [Style.just "mt0 mb0 ph0 w-70"]
             (List.map reasons ~f:(fun r ->
-                 li [Style.just "lh-copy list"] [text r] )) ]
+                 li [Style.just "lh-copy list mb0 mt0"] [text r] )) ]
   end
 
   let create benefits =
     div []
       [ hr [Style.(render (of_class "mt45" + Styles.clean_hr))]
-      ; h2 [Style.(render (of_class "mt45" + h2style))] [text "Benefits"]
-      ; div [] benefits ]
+      ; div
+          [Style.just "flex justify-between mt45"]
+          [ h2 [Style.(render h2style)] [text "Benefits"]
+          ; div [Style.just "w-70 mt3"] benefits ] ]
 end
 
 module Apply = struct
@@ -119,38 +123,38 @@ let content =
           [ Tagline.create
               "We’re using cryptography and cryptocurrency to build \
                computing systems that put people back in control of their \
-               digital lives."
+               digital&nbsp;lives."
           ; Qualities.(
               create
                 [ Quality.create "Open Source"
                     [ text
                         "We passionately believe in the open-source \
                          philosophy, and make our software free for the \
-                         entire world to use."
+                         entire world to&nbsp;use."
                     ; a
                         [href "/static/code.html"; Style.render linkstyle]
-                        [text "Take a look  →"] ]
+                        [text "Take&nbsp;a&nbsp;look&nbsp;→"] ]
                 ; Quality.create "Collaboration"
                     [ text
                         "The problems we face are novel and challenging, so \
-                         we take them on as a team." ]
+                         we take them on as a&nbsp;team." ]
                 ; Quality.create "Inclusion"
                     [ text
                         "We’re working on technologies with the potential \
                          to reimagine social structures. We believe it’s \
                          important to incorporate diverse perspectives from \
-                         conception through realization." ] ])
+                         conception through&nbsp;realization." ] ])
           ; Benefits.(
               create
                 [ Benefit.create "Healthcare"
                     [ "We cover 100% of employee premiums for platinum \
                        healthcare plans with zero deductible, and 99% of \
-                       vision and dental premiums" ]
+                       vision and dental&nbsp;premiums" ]
                 ; Benefit.create "401k"
-                    ["Matching 401k contributions up to 3% of salary"]
+                    ["Matching 401k contributions up to 3% of&nbsp;salary"]
                 ; Benefit.create "Education"
                     [ "$750 annual budget for conferences of your choice (we \
-                       cover company-related conferences)"
+                       cover company-related&nbsp;conferences)"
                     ; "Office library"
                     ; "Twice-a-week learning lunches" ]
                 ; Benefit.create "Equipment"
@@ -158,7 +162,7 @@ let content =
                        peripheral budget" ]
                 ; Benefit.create "Time off"
                     [ "Unlimited vacation, with encouragement for employees \
-                       to take off at least 14 days annually" ]
+                       to take off at least 14 days&nbsp;annually" ]
                 ; Benefit.create "Meals"
                     ["Healthy snacks and provided lunch twice a week"]
                 ; Benefit.create "Other"
@@ -166,7 +170,7 @@ let content =
                     ; "Commuting benefits"
                     ; "Bike-friendly culture"
                     ; "Take up to 1 day (8 hours) of paid time off per year \
-                       to volunteer for the causes closest to your heart"
+                       to volunteer for the causes closest to your&nbsp;heart"
                     ; "We match nonprofit donations up to $500 per year"
                     ; "...and many others!" ] ])
           ; Apply.(
