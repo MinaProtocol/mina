@@ -4,13 +4,18 @@ date: 2018-01-01
 ---
 O(1) Labs is aiming to develop the first cryptocurrency protocol that can deliver on the promise of supporting real-world applications and widespread use. Our team is based in San Francisco, and we are funded by top investors (including Polychain, Metastable, Max Levchin, and Naval Ravikant).
 
+We’re working on technologies with the potential to reimagine social structures. We believe it’s important to incorporate diverse perspectives from conception through realization.
+
+We offer a competitive employee benefits package.
+
 We're developing Coda Protocol, a cryptocurrency that compresses the blockchain from hundreds of gigabytes down to the size of a few tweets. It can scale to thousands of transactions per second and millions of users while remaining so decentralized even old cellphones can act as fully verifying nodes. We're seeking a technical engineering manager who can prioritize and collaborate across diverse engineering disciplines, while remaining an empathetic and caring mentor to engineers with diverse perspectives.
 
 Engineering managers will:
 
 * Help decide who works on what and when, minimizing unnecessary process and developing nurturing environments where engineers feel empowered to contribute their best work
 * Collaborate broadly to design well-informed engineering roadmaps
-* Contribute to the project technically as well as provide impactful mentoring
+* Contribute to the project technically (as an estimated percent of time, perhaps 30% engineering and 70% management) 
+* Provide empathetic leadership and impactful mentoring
 
 This is a chance to join and guide a small, collaborative team and have a ton of independence while working on fascinating cross-disciplinary problems that span cryptography, programming languages, functional programming, networking, and traditional product engineering. We also offer competitive compensation both in salary and equity as well as top-of-the-market benefits.
 

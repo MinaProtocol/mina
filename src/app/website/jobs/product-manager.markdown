@@ -4,6 +4,10 @@ date: 2018-01-01
 ---
 O(1) Labs is aiming to develop the first cryptocurrency protocol that can deliver on the promise of supporting real-world applications and widespread use. Our team is based in San Francisco, and we are funded by top investors (including Polychain, Metastable, Max Levchin, and Naval Ravikant).
 
+We’re working on technologies with the potential to reimagine social structures. We believe it’s important to incorporate diverse perspectives from conception through realization.
+
+We offer a competitive employee benefits package.
+
 We're bringing Coda Protocol to market, a cryptocurrency that compresses the blockchain from hundreds of gigabytes down to the size of a few tweets. It can scale to thousands of transactions per second and millions of users while remaining decentralized enough for cellphones to be fully verifying nodes. We're seeking a product manager who can navigate the complex and interdisciplinary tradeoffs that come with deploying a new economic system.
 
 Product managers will:
