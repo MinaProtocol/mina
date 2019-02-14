@@ -55,10 +55,12 @@ module Make (Inputs : Inputs_intf) :
     |> Sequence.find ~f:(fun ledger ->
            Ledger_hash.equal (Ledger.merkle_root ledger) ledger_hash )
 
-  let answer_query ~frontier hash query =
+  let answer_query ~frontier hash query ~logger =
     let open Option.Let_syntax in
     let%map ledger = get_ledger_by_hash ~frontier hash in
-    let responder = Sync_ledger.Responder.create ledger ignore in
+    let responder =
+      Sync_ledger.Responder.create ledger ignore ~parent_log:logger
+    in
     let answer = Sync_ledger.Responder.answer_query responder query in
     (hash, answer)
 end
