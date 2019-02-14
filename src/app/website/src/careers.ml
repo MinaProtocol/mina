@@ -84,10 +84,16 @@ module Benefits = struct
   let create benefits =
     div []
       [ hr [Style.(render (of_class "mt45" + Styles.clean_hr))]
-      ; div
-          [Style.just "flex justify-between mt45"]
-          [ h2 [Style.(render h2style)] [text "Benefits"]
-          ; div [Style.just "w-70 mt3"] benefits ] ]
+      ; Mobile_switch.create
+          ~not_small:
+            (div
+               [Style.just "flex justify-between mt45"]
+               [ h2 [Style.(render h2style)] [text "Benefits"]
+               ; div [Style.just "w-70 mt3"] benefits ])
+          ~small:
+            (div [Style.just "mt45"]
+               [ h2 [Style.(render h2style)] [text "Benefits"]
+               ; div [Style.just "mt4 ml15 mt3"] benefits ]) ]
 end
 
 module Apply = struct
@@ -102,9 +108,8 @@ module Apply = struct
 
   let create roles =
     let apply = h2 [Style.render h2style] [text "Apply"] in
-    let positions =
-      ul [Style.just "mt0 mb0 ph0"]
-        (List.map roles ~f:(fun r -> li [Style.just "list lh-copy"] [r]))
+    let roles_content =
+      List.map roles ~f:(fun r -> li [Style.just "list lh-copy"] [r])
     in
     div []
       [ hr [Style.(render (of_class "mt45" + Styles.clean_hr))]
@@ -113,8 +118,11 @@ module Apply = struct
             (div
                [Style.just "flex justify-between mt45"]
                [ div [Style.just "w-50"] [apply]
-               ; div [Style.just "w-50"] [positions] ])
-          ~small:(div [Style.just "mt45"] [apply; positions]) ]
+               ; div [Style.just "w-50"]
+                   [ul [Style.just "mt0 mb0 ph0"] roles_content] ])
+          ~small:
+            (div [Style.just "mt45"]
+               [apply; ul [Style.just "mt4 ml15 mb0 ph0"] roles_content]) ]
 end
 
 let content =
