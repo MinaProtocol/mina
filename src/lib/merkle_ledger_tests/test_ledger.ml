@@ -325,14 +325,16 @@ let%test_module "test functor on in memory databases" =
       let l1, _ = L16.load_ledger 1026 Balance.one in
       let l2, _ = L16.load_ledger 2048 Balance.one in
       let left_subtree =
-        L16.get_all_accounts_rooted_at_exn l2
-          (L16.Addr.of_directions
-             Direction.[Left; Left; Left; Left; Left; Left])
+        List.map ~f:snd
+        @@ L16.get_all_accounts_rooted_at_exn l2
+             (L16.Addr.of_directions
+                Direction.[Left; Left; Left; Left; Left; Left])
       in
       let right_subtree =
-        L16.get_all_accounts_rooted_at_exn l2
-          (L16.Addr.of_directions
-             Direction.[Left; Left; Left; Left; Left; Right])
+        List.map ~f:snd
+        @@ L16.get_all_accounts_rooted_at_exn l2
+             (L16.Addr.of_directions
+                Direction.[Left; Left; Left; Left; Left; Right])
       in
       L16.set_all_accounts_rooted_at_exn l1
         (L16.Addr.of_directions Direction.[Left; Left; Left; Left; Left; Left])
@@ -402,7 +404,7 @@ let%test_module "test functor on in memory databases" =
       let _h = L16.get_inner_hash_at_addr_exn l2 lr in
       let copy addr =
         L16.set_all_accounts_rooted_at_exn l2 addr
-          (L16.get_all_accounts_rooted_at_exn l1 addr)
+          (List.map ~f:snd @@ L16.get_all_accounts_rooted_at_exn l1 addr)
       in
       copy rr ;
       copy rl ;

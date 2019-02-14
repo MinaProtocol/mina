@@ -83,10 +83,4 @@ module type S = sig
 
     val apply_transaction_exn : t -> Transaction.t -> t
   end
-
-  module Config : sig
-    val transaction_capacity_log_2 : int
-
-    val work_delay_factor : int
-  end
 end

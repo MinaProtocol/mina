@@ -1,6 +1,15 @@
 open Core
 open Async
 open Coda_base
+
+let num_breadcrumb_to_add = 3
+
+let max_length = num_breadcrumb_to_add + 2
+
+module Stubs = Stubs.Make (struct
+  let max_length = max_length
+end)
+
 open Stubs
 
 let%test_module "Sync_handler" =
@@ -9,11 +18,11 @@ let%test_module "Sync_handler" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
       let logger = Logger.create () in
-      let num_breadcrumb_to_add = 3 in
-      let max_length = num_breadcrumb_to_add + 2 in
       Thread_safe.block_on_async_exn (fun () ->
           Ledger.with_ephemeral_ledger ~f:(fun dest_ledger ->
-              let%bind frontier = create_root_frontier ~max_length ~logger in
+              let%bind frontier =
+                create_root_frontier ~logger Genesis_ledger.accounts
+              in
               let source_ledger =
                 Transition_frontier.For_tests.root_snarked_ledger frontier
                 |> Ledger.of_database
