@@ -410,7 +410,7 @@ struct
                    let open Option.Let_syntax in
                    let%map answer =
                      Sync_handler.answer_query ~frontier ledger_hash
-                       sync_ledger_query
+                       sync_ledger_query ~logger
                    in
                    Envelope.Incoming.wrap ~data:answer ~sender:peer )
           in
