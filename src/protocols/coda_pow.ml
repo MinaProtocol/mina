@@ -41,7 +41,7 @@ module type Time_intf = sig
   type t0 = t
 
   module Span : sig
-    type t
+    type t [@@deriving compare]
 
     val of_time_span : Core_kernel.Time.Span.t -> t
 
@@ -70,6 +70,8 @@ module type Time_intf = sig
     val peek : 'a t -> 'a option
 
     val cancel : Controller.t -> 'a t -> 'a -> unit
+
+    val remaining_time : 'a t -> Span.t
   end
 
   val to_span_since_epoch : t -> Span.t
@@ -992,6 +994,16 @@ module type External_transition_intf = sig
     val staged_ledger_diff : t -> staged_ledger_diff
   end
 
+  module Proof_verified : sig
+    type t [@@deriving sexp, bin_io]
+
+    val protocol_state : t -> protocol_state
+
+    val protocol_state_proof : t -> protocol_state_proof
+
+    val staged_ledger_diff : t -> staged_ledger_diff
+  end
+
   val to_verified : t -> [`I_swear_this_is_safe_see_my_comment of Verified.t]
 
   val of_verified : Verified.t -> t
@@ -1292,8 +1304,23 @@ Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
     Witness.t -> new_state:protocol_state -> protocol_state_proof Deferred.t
 end
 
-module Proof_carrying_data = struct
-  type ('a, 'b) t = {data: 'a; proof: 'b} [@@deriving sexp, fields, bin_io]
+module type Transaction_validator_intf = sig
+  type ledger
+
+  type outer_ledger
+
+  type transaction
+
+  type user_command_with_valid_signature
+
+  type ledger_hash
+
+  val create : outer_ledger -> ledger
+
+  val apply_user_command :
+    ledger -> user_command_with_valid_signature -> unit Or_error.t
+
+  val apply_transaction : ledger -> transaction -> unit Or_error.t
 end
 
 module type Inputs_intf = sig
@@ -1508,6 +1535,14 @@ Merge Snark:
                 Consensus_mechanism.Protocol_state.value
                 * Protocol_state_proof.t
                 * Staged_ledger.serializable
+
+  module Transaction_validator :
+    Transaction_validator_intf
+    with type outer_ledger := Ledger.t
+     and type transaction := Transaction.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
+     and type ledger_hash := Ledger_hash.t
 end
 
 module Make
