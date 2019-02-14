@@ -26,6 +26,7 @@
       dummy_values
       o1trace
       merkle_ledger
+      module_version
       snarky
       crypto_params
       async

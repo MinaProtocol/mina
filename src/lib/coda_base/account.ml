@@ -38,6 +38,8 @@ module Nonce = Account_nonce
 
 module Stable = struct
   module V1 = struct
+    let version = 1
+
     type ('pk, 'amount, 'nonce, 'receipt_chain_hash) t_ =
       { public_key: 'pk
       ; balance: 'amount
@@ -57,12 +59,29 @@ module Stable = struct
       t_
     [@@deriving sexp, bin_io, eq, hash, compare]
 
+    type latest = t
+
     (* monomorphize field selector *)
     let public_key (t : t) : key = t.public_key
+
+    let to_latest = Fn.id
   end
+
+  (* module version registration *)
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "coda_base_account"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Module_version.Registration.Make (Module_decl)
+  include Registrar.Register (V1)
 end
 
-include Stable.V1
+include Stable.Latest
 
 type var =
   ( Public_key.Compressed.var
