@@ -37,3 +37,11 @@ val start_tracing : Async.Writer.t -> unit
 
 val stop_tracing : unit -> unit
 (** Stop tracing and forget about the writer supplied to [start_tracing]. *)
+
+val forget_tid : (unit -> 'a) -> 'a
+(** Forget about the current tid and execute [f] with tid=0.
+
+This is useful, for example, when opening a writer. The writer will
+internally do a lot of work that will show up in the trace when it
+isn't necessarily desired.
+*)

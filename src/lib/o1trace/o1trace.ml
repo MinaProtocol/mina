@@ -69,6 +69,13 @@ let measure_impl = ref (fun _ f -> f ())
 let measure name (f : unit -> 'a) : 'a =
   (Obj.magic !measure_impl : string -> (unit -> 'a) -> 'a) name f
 
+let forget_tid (f : unit -> 'a) =
+  let new_ctx =
+    Execution_context.with_tid Scheduler.(t () |> current_execution_context) 0
+  in
+  let res = Scheduler.within_context new_ctx f |> Result.ok in
+  Option.value_exn res
+
 let start_tracing wr =
   current_wr := Some wr ;
   let pid = Unix.getpid () |> Pid.to_int in
@@ -111,5 +118,7 @@ let[@inline] trace_task _ f = f ()
 let[@inline] start_tracing _ = ()
 
 let[@inline] stop_tracing () = ()
+
+let[@inline] forget_tid f = f ()
 
 [%%endif]
