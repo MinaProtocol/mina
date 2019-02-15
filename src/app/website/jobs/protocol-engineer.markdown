@@ -25,6 +25,6 @@ Ideal candidates will be interested in any of:
 
 There are no hard requirements and we're more interested in learning about your individual background.
 
-If you'd be interested in talking further, please get in touch by sending an email with your resume and the subject "Engineer applicant" to [jobs@o1labs.org](mailto:jobs@o1labs.org?subject="Engineer applicant").
+If you'd be interested in talking further, please get in touch by sending an email with your resume and the subject "Engineer Applicant" to [jobs@o1labs.org](mailto:jobs@o1labs.org?subject="Engineer Applicant").
 
 We are committed to building a diverse, inclusive company. People of color, LGBTQ individuals, women, and people with disabilities are strongly encouraged to apply.
