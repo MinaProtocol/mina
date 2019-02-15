@@ -109,6 +109,12 @@
 
 .menlo { font-family:'Menlo', 'Consolas', "Liberation Mono", 'Monaco', "Lucida Console", monospace; }
 
+.aktivgroteskex {
+  font-family: aktiv-grotesk-extended, sans-serif;
+  font-weight: 500;
+  font-style: normal;
+}
+
 .f8 { font-size:0.625rem; }
 @media screen and (min-width:30em) {
   .f7-ns { font-size:0.75rem; }
@@ -368,8 +374,6 @@
   background-size: 0.25rem 0.125rem;
   background-repeat: repeat-x;
 } 
-
-
 
 .h8th {
   height: 0.125rem;

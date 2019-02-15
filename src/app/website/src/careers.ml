@@ -15,7 +15,8 @@ module Title = struct
   let create copy =
     h1
       [ Style.just
-          "fadedblue careers-double-line-header ttu f4 fw5 tracked-more mb4" ]
+          "fadedblue aktivgroteskex careers-double-line-header ttu f5 fw5 \
+           tracked-more mb4" ]
       [text copy]
 end
 
@@ -219,4 +220,6 @@ let content =
     ~body_style:(Style.of_class "bg-white")
     ~navbar:(Navbar.navbar "careers") ~page_label:"careers"
     ~show_newsletter:false ~append_footer:true content
-    ~headers:[Html.link ~href:"/static/css/careers.css"]
+    ~headers:
+      [ Html.link ~href:"/static/css/careers.css"
+      ; Html.link ~href:"https://use.typekit.net/mta7mwm.css" ]
