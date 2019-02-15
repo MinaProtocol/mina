@@ -45,6 +45,8 @@ let run_test () : unit Deferred.t =
       let%bind (module Init) =
         make_init ~should_propose:true (module Config)
       in
+      let%bind () = Async.Unix.mkdir ~p:() "/tmp/full-test-traces" in
+      let%bind () = Coda_tracing.start "/tmp/full-test-traces" in
       let module Main = Coda_main.Make_coda (Init) in
       let module Run = Run (Config) (Main) in
       let open Main in
