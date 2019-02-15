@@ -4,3 +4,6 @@
 [submodule "src/external/ppx_optcomp"]
 	path = src/external/ppx_optcomp
 	url = ../ppx_optcomp
+[submodule "src/external/async_kernel"]
+	path = src/external/async_kernel
+	url = ../async_kernel
