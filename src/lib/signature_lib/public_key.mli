@@ -63,6 +63,8 @@ module Compressed : sig
 
   val to_base64 : t -> string
 
+  val to_string : t -> string
+
   module Checked : sig
     val equal : var -> var -> (Boolean.var, _) Checked.t
 
