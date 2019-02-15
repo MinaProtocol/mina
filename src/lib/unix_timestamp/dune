@@ -1,0 +1,5 @@
+(library
+ (name unix_timestamp)
+ (public_name unix_timestamp)
+ (library_flags -linkall)
+ (libraries core_kernel))
