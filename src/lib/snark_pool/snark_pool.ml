@@ -1,4 +1,5 @@
 open Core_kernel
+open Async_kernel
 
 module Priced_proof = struct
   type ('proof, 'fee) t = {proof: 'proof; fee: 'fee}
