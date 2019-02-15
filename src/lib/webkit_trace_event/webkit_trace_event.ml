@@ -13,8 +13,9 @@ type event_kind =
   | Cycle_end
   | Pid_is
   | Event
-  | Start
-  | End
+  | Measure_start
+  | Measure_end
+  | Trace_end
 
 type event =
   { name: string
@@ -49,8 +50,9 @@ module Output = struct
         | Cycle_end -> 3
         | Pid_is -> 4
         | Event -> 5
-        | Start -> 6
-        | End -> 7
+        | Measure_start -> 6
+        | Measure_end -> 7
+        | Trace_end -> 8
       in
       Bigstring.set_uint8 buf ~pos num ;
       pos + 1
@@ -85,10 +87,15 @@ module Output = struct
       | Event ->
           emitk ~buf Event 0 |> emiti ~buf event.timestamp
           |> emits ~buf event.name |> finish ~buf wr
-      | Start ->
-          emitk ~buf Start 0 |> emiti ~buf event.timestamp
+      | Measure_start ->
+          emitk ~buf Measure_start 0 |> emiti ~buf event.timestamp
           |> emits ~buf event.name |> finish ~buf wr
-      | End -> emitk ~buf End 0 |> emiti ~buf event.timestamp |> finish ~buf wr
+      | Measure_end ->
+          emitk ~buf Measure_end 0 |> emiti ~buf event.timestamp
+          |> finish ~buf wr
+      | Trace_end ->
+          emitk ~buf Trace_end 0 |> emiti ~buf event.timestamp
+          |> finish ~buf wr
   end
 
   module JSON = struct
@@ -103,8 +110,9 @@ module Output = struct
       | Cycle_end -> `String "e" (* Async event end *)
       | Thread_switch -> `String "X"
       | Event -> `String "i"
-      | Start -> `String "B"
-      | End -> `String "E"
+      | Measure_start -> `String "B"
+      | Measure_end -> `String "E"
+      | Trace_end -> `String "e"
 
     let json_of_event {name; categories; phase; timestamp; pid; tid} =
       let categories = String.concat ~sep:"," categories in
@@ -126,7 +134,7 @@ module Output = struct
             ; ("ts", `Int timestamp)
             ; ("pid", `Int pid)
             ; ("tid", `Int tid) ]
-      | Cycle_start | Cycle_end ->
+      | Cycle_start | Cycle_end | Trace_end ->
           `Assoc
             [ ("name", `String name)
             ; ("cat", `String categories)
@@ -135,7 +143,7 @@ module Output = struct
             ; ("ts", `Int timestamp)
             ; ("pid", `Int pid)
             ; ("tid", `Int tid) ]
-      | Event | Start | End ->
+      | Event | Measure_start | Measure_end ->
           `Assoc
             [ ("name", `String name)
             ; ("cat", `String categories)
