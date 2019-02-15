@@ -38,33 +38,34 @@ module Nonce = Account_nonce
 
 module Stable = struct
   module V1 = struct
-    let version = 1
+    module T = struct
+      let version = 1
 
-    type ('pk, 'amount, 'nonce, 'receipt_chain_hash) t_ =
-      { public_key: 'pk
-      ; balance: 'amount
-      ; nonce: 'nonce
-      ; receipt_chain_hash: 'receipt_chain_hash
-      ; delegate: 'pk }
-    [@@deriving fields, sexp, bin_io, eq, compare, hash]
+      type ('pk, 'amount, 'nonce, 'receipt_chain_hash) t_ =
+        { public_key: 'pk
+        ; balance: 'amount
+        ; nonce: 'nonce
+        ; receipt_chain_hash: 'receipt_chain_hash
+        ; delegate: 'pk }
+      [@@deriving fields, sexp, bin_io, eq, compare, hash]
 
-    type key = Public_key.Compressed.Stable.V1.t
-    [@@deriving sexp, bin_io, eq, hash, compare]
+      type key = Public_key.Compressed.Stable.V1.t
+      [@@deriving sexp, bin_io, eq, hash, compare]
 
-    type t =
-      ( key
-      , Balance.Stable.V1.t
-      , Nonce.Stable.V1.t
-      , Receipt.Chain_hash.Stable.V1.t )
-      t_
-    [@@deriving sexp, bin_io, eq, hash, compare]
+      type t =
+        ( key
+        , Balance.Stable.V1.t
+        , Nonce.Stable.V1.t
+        , Receipt.Chain_hash.Stable.V1.t )
+        t_
+      [@@deriving sexp, bin_io, eq, hash, compare]
+    end
 
-    type latest = t
+    include T
+    include Module_version.Registration.Make_latest_version (T)
 
     (* monomorphize field selector *)
     let public_key (t : t) : key = t.public_key
-
-    let to_latest = Fn.id
   end
 
   (* module version registration *)
@@ -78,7 +79,7 @@ module Stable = struct
   end
 
   module Registrar = Module_version.Registration.Make (Module_decl)
-  include Registrar.Register (V1)
+  module Registered_V1 = Registrar.Register (V1)
 end
 
 include Stable.Latest
