@@ -36,7 +36,7 @@ end
      - register versioned modules
      - deserialize data to latest version
 
-   N.B.: data must be serialized using registered modules
+   data is serialized using unregistered modules
 
    see tests below for an example of usage
  *)
@@ -108,8 +108,8 @@ module Make_version (Version : Version_intf) = struct
 
      deserializing gives back just t, without the version
 
-     that allows use of a versioned module in data structures that themselves
-       derive bin_io
+     that allows use of a type from a versioned module in data structures 
+       that themselves derive bin_io
    *)
 
   let bin_read_t buf ~pos_ref =
@@ -219,4 +219,19 @@ let%test_module "Test versioned modules" =
       match Registrar.deserialize_binary_opt buf with
       | None -> false
       | Some (s', n') -> String.equal s s' && Int.equal n n'
+
+    module Client = struct
+      type t = {number: int; some: Latest.t} [@@deriving bin_io]
+    end
+
+    let%test "serialize, deserialize client type containing type from \
+              versioned module" =
+      let client : Client.t = {number= 1023; some= ("a string", 5551212)} in
+      let sz = Client.bin_size_t client in
+      let buf = Bin_prot.Common.create_buf sz in
+      ignore (Client.bin_write_t buf ~pos:0 client) ;
+      let deserialized = Client.bin_read_t ~pos_ref:(ref 0) buf in
+      Int.equal client.number deserialized.number
+      && String.equal (fst client.some) (fst deserialized.some)
+      && Int.equal (snd client.some) (snd deserialized.some)
   end )
