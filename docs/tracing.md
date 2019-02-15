@@ -15,7 +15,7 @@ Each row correponds to a "task" as created by either `O1trace.trace_task` or
 it works by doing one `trace_task` per call, and the `trace-tool` knows how
 to collapse them all into one raw.
 
-![screenshot of trace-viewer showing nested measure calls](./tracing-example.png)
+![screenshot of trace-viewer showing nested measure calls](./res/tracing-example.png)
 
 In the screenshot, the top green bar represents the root of a recurring task.
 The bars underneath it each correspond to a `measure` call - which can be nested.
