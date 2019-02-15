@@ -2,6 +2,36 @@ open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
 
+module Transition_frontier_diff = struct
+  type 'a t =
+    | Extend_best_tip of 'a
+        (** Added a node to the existing best tip without creating a new root *)
+    | New_best_tip of {old_best_tip: 'a; new_best_tip: 'a}
+        (** Added a node to the a new best tip without creating a new root *)
+    | New_root of
+        { old_root: 'a
+        ; new_root: 'a
+        ; added: 'a
+        ; garbage: 'a list
+        ; old_best_tip: 'a option }
+        (** If triggered by a new best tip, the old one will be in old_best_tip *)
+    | Destroy  (** transition_frontier was destroyed *)
+  [@@deriving sexp]
+end
+
+module type Transition_frontier_extension_intf = sig
+  type t
+
+  type input
+
+  type transition_frontier_breadcrumb
+
+  val create : input -> t
+
+  val handle_diff :
+    t -> transition_frontier_breadcrumb Transition_frontier_diff.t -> unit
+end
+
 module type Network_intf = sig
   type t
 
@@ -47,6 +77,35 @@ module type Network_intf = sig
     -> unit
 end
 
+module type Transition_frontier_Breadcrumb_intf = sig
+  type t [@@deriving sexp]
+
+  type state_hash
+
+  type staged_ledger
+
+  type external_transition_verified
+
+  val create :
+       (external_transition_verified, state_hash) With_hash.t
+    -> staged_ledger
+    -> t
+
+  val build :
+       logger:Logger.t
+    -> parent:t
+    -> transition_with_hash:( external_transition_verified
+                            , state_hash )
+                            With_hash.t
+    -> (t, [`Validation_error of Error.t | `Fatal_error of exn]) Result.t
+       Deferred.t
+
+  val transition_with_hash :
+    t -> (external_transition_verified, state_hash) With_hash.t
+
+  val staged_ledger : t -> staged_ledger
+end
+
 module type Transition_frontier_base_intf = sig
   type state_hash
 
@@ -60,34 +119,17 @@ module type Transition_frontier_base_intf = sig
 
   type consensus_local_state
 
-  module Breadcrumb : sig
-    type t [@@deriving sexp]
-
-    val create :
-         (external_transition_verified, state_hash) With_hash.t
-      -> staged_ledger
-      -> t
-
-    val build :
-         logger:Logger.t
-      -> parent:t
-      -> transition_with_hash:( external_transition_verified
-                              , state_hash )
-                              With_hash.t
-      -> (t, [`Validation_error of Error.t | `Fatal_error of exn]) Result.t
-         Deferred.t
-
-    val transition_with_hash :
-      t -> (external_transition_verified, state_hash) With_hash.t
-
-    val staged_ledger : t -> staged_ledger
-  end
-
   type ledger_database
 
   type staged_ledger_diff
 
   type t
+
+  module Breadcrumb :
+    Transition_frontier_Breadcrumb_intf
+    with type external_transition_verified := external_transition_verified
+     and type state_hash := state_hash
+     and type staged_ledger := staged_ledger
 
   val create :
        logger:Logger.t
@@ -138,8 +180,6 @@ module type Transition_frontier_intf = sig
   val iter : t -> f:(Breadcrumb.t -> unit) -> unit
 
   val add_breadcrumb_exn : t -> Breadcrumb.t -> unit
-
-  val clear_paths : t -> unit
 
   val best_tip_path_length_exn : t -> int
 

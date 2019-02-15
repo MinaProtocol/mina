@@ -36,7 +36,12 @@ end
   end
 
   module Hash = struct
-    type t = Ledger_hash.t [@@deriving bin_io, sexp, eq, compare]
+    module T = struct
+      type t = Ledger_hash.t [@@deriving bin_io, sexp, compare, hash, eq]
+    end
+
+    include T
+    include Hashable.Make_binable (T)
 
     let merge = Ledger_hash.merge
 
