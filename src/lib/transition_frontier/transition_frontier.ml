@@ -18,22 +18,6 @@ module Make (Inputs : Inputs_intf) :
    and type masked_ledger := Ledger.Mask.Attached.t
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
    and type consensus_local_state := Consensus.Local_state.t = struct
-  (* type state_hash = State_hash.t
-
-  type external_transition_verified = Inputs.External_transition.Verified.t
-
-  type ledger_database = Ledger.Db.t
-
-  type staged_ledger_diff = Inputs.Staged_ledger_diff.t
-
-  type staged_ledger = Inputs.Staged_ledger.t
-
-  type masked_ledger = Ledger.Mask.Attached.t
-
-  type transaction_snark_scan_state = Inputs.Staged_ledger.Scan_state.t
-
-  type consensus_local_state = Consensus.Local_state.t *)
-
   module Transition_frontier0 = Transition_frontier0.Make (Inputs)
 
   module Extensions = struct
