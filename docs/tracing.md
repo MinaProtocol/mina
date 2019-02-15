@@ -13,7 +13,7 @@ Then you can load the file from `chrome://tracing`.
 Each row correponds to a "task" as created by either `O1trace.trace_task` or
 `O1trace.trace_recurring_task`. A recurring task starts with `R&`. Internally
 it works by doing one `trace_task` per call, and the `trace-tool` knows how
-to collapse them all into one raw.
+to collapse them all into one row.
 
 ![screenshot of trace-viewer showing nested measure calls](./res/tracing-example.png)
 
