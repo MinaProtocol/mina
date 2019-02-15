@@ -45,8 +45,7 @@ module Transition_frontier_diff = struct
     | Destroy
 end
 ```
-
-`Transition_frontier` is split into `Transition_frontier0`, which does all core Transition_frontier logic (everything that `Transition_frontier` used to do), and a new `Transition_frontier`, which wraps `Transition_frontier0`, and adds handling for the extensions. The new `Transition_frontier` will call `handle_diff` on all extensions whenever a frontier diff event (defined above) is triggered by `add_breadcrumb_exn`.
+The `Transition_frontier` will hold a record full of extensions, and will call `handle_diff` on all extensions whenever a frontier diff event (defined above) is triggered by `add_breadcrumb_exn`, passing in the diff event.
 
 For instance, in the snark pool example, the reference count could be incremented for all Work referenced by the added breadcrumb when `Extend_best_tip` is triggered, and the reference count for the removed work could be decremented when `New_root` fires.
 
