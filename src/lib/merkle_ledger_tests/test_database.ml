@@ -63,6 +63,19 @@ let%test_module "test functor on in memory databases" =
             | Some acct, Some acct' -> Account.equal acct acct'
             | _, _ -> false )
 
+      let%test_unit "set would change the merkle root" =
+        Test.with_instance (fun mdb -> 
+          let accounts = Quickcheck.random_value (Quickcheck.Generator.list_with_length 2 Account.gen) in
+          let account0 = List.hd_exn accounts in
+          let account1 = List.hd_exn @@ List.tl_exn accounts in
+          let location = create_new_account_exn mdb account0 in
+          let merkle_root0 = MT.merkle_root mdb in
+          MT.set mdb location account1 ;
+          let merkle_root1 = MT.merkle_root mdb in
+          if (not @@ Account.equal account0 account1) then
+            assert (not @@ Hash.equal merkle_root0 merkle_root1)
+          )
+
       let dedup_accounts accounts =
         List.dedup_and_sort accounts ~compare:(fun account1 account2 ->
             Key.compare
@@ -162,6 +175,64 @@ let%test_module "test functor on in memory databases" =
                match action with
                | `Added -> ()
                | `Existed -> MT.set mdb location account )
+
+      let%test_unit "If the entire database is full, \
+                     let addresses_and_accounts = get_all_accounts_rooted_at_exn(address) in \
+                     set_batch_accounts(addresses_and_accounts) won't cause any changes" =
+        Test.with_instance (fun mdb ->
+          let max_height = Int.min MT.depth 5 in 
+          Quickcheck.test (Direction.gen_var_length_list max_height)
+            ~sexp_of:[%sexp_of: Direction.t List.t] ~f:(fun directions ->
+              let address =
+                let offset = MT.depth - max_height in
+                let padding =
+                  List.init offset ~f:(fun _ -> Direction.Left)
+                in
+                let padded_directions = List.concat [padding; directions] in
+                MT.Addr.of_directions padded_directions
+              in 
+              let old_merkle_root = MT.merkle_root mdb in
+              let addresses_and_accounts = MT.get_all_accounts_rooted_at_exn mdb address in
+              MT.set_batch_accounts mdb addresses_and_accounts ;
+              let new_merkle_root = MT.merkle_root mdb in
+              assert (Hash.equal old_merkle_root new_merkle_root)
+              ))
+
+      let%test_unit "If the entire database is full, \
+                     set_batch_accounts some_addresses_and_accounts would change the merkle root" =
+        Test.with_instance (fun mdb ->
+          let max_height = Int.min MT.depth 5 in 
+          populate_db mdb max_height ;
+          Quickcheck.test (Direction.gen_var_length_list max_height)
+            ~sexp_of:[%sexp_of: Direction.t List.t] ~f:(fun directions ->
+              let address =
+                let offset = MT.depth - max_height in 
+                let padding =
+                  List.init offset ~f:(fun _ -> Direction.Left)
+                in
+                let padded_directions = List.concat [padding; directions] in 
+                MT.Addr.of_directions padded_directions
+              in 
+              let num_accounts = 1 lsl (MT.depth - MT.Addr.depth address) in 
+              let accounts =
+                Quickcheck.random_value 
+                  (Quickcheck.Generator.list_with_length num_accounts Account.gen)
+              
+              in if not @@ List.is_empty accounts then 
+                   let old_merkle_root = MT.merkle_root mdb in
+                   let visual = Test.DB_visualizor.visualize mdb ~initial_address:(Test.Location.Addr.of_directions []) in
+                   Async.Thread_safe.block_on_async_exn (fun () ->
+                    let open Async.Deferred.Let_syntax in
+                    let%map () =
+                      Test.DB_visualizor.write visual ~name:"/Users/ghostshell/Documents/1.dot"
+                    in ()) ;
+                    MT.set_all_accounts_rooted_at_exn mdb address accounts ;
+                    let visual = Test.DB_visualizor.visualize mdb ~initial_address:(Test.Location.Addr.of_directions []) in
+                    Async.Thread_safe.block_on_async_exn (fun () ->
+                      let open Async.Deferred.Let_syntax in 
+                      let%map () =
+                        Test.DB_visualizor.write visual ~name:"/Users/ghostshell/Documents/2.dot"
+                      in ())))
 
       let%test_unit "If the entire database is full, \
                      set_all_accounts_rooted_at_exn(address,accounts);get_all_accounts_rooted_at_exn(address) \
@@ -308,6 +379,7 @@ let%test_module "test functor on in memory databases" =
             (* should see original Merkle root after removing the accounts *)
             let merkle_root2 = MT.merkle_root mdb in
             assert (Hash.equal merkle_root2 merkle_root0) )
+
 
       let%test_unit "fold over account balances" =
         Test.with_instance (fun mdb ->

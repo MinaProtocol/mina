@@ -139,15 +139,16 @@ module Make
   (** This function assumes that all the locations are in the same layer. *)
   let rec set_hash_batch mdb locations_and_hashes =
     let locations, _ = List.unzip locations_and_hashes in
+    List.iter locations ~f:(fun location -> assert (Location.is_hash location)) ;
+
+    set_bin_batch mdb Hash.bin_size_t Hash.bin_write_t locations_and_hashes ;
+
     if not @@ List.is_empty locations then
       let height = Location.height @@ List.hd_exn locations in
       if height < Depth.depth then (
         let location_to_hashtbl =
           Location.Table.of_alist_exn locations_and_hashes
-        in
-        List.iter locations ~f:(fun location ->
-            assert (Location.is_hash location) ) ;
-        set_bin_batch mdb Hash.bin_size_t Hash.bin_write_t locations_and_hashes ;
+        in  
         let _, parent_locations_and_hashes =
           List.fold locations_and_hashes ~init:([], [])
             ~f:(fun (processed_locations, parent_locations_and_hashes)
@@ -341,20 +342,16 @@ module Make
     | None -> 0
     | Some addr -> Addr.to_int addr + 1
 
-  let set_all_accounts_rooted_at_exn mdb address (accounts : Account.t list) =
-    let first_node, last_node = Addr.Range.subtree_range address in
-    Addr.Range.fold (first_node, last_node) ~init:accounts ~f:(fun addr ->
-      function
-      | account :: accounts ->
-          set mdb (Location.Account addr) account ;
-          accounts
-      | [] -> [] )
-    |> ignore
-
   let set_batch_accounts mdb addresses_and_accounts =
     set_batch mdb
     @@ List.map addresses_and_accounts ~f:(fun (addr, account) ->
            (Location.Account addr, account) )
+
+  let set_all_accounts_rooted_at_exn mdb address accounts =
+    let addresses = List.rev @@ Addr.Range.fold (Addr.Range.subtree_range address) ~init:[] ~f:(fun address addresses -> address :: addresses) in
+    let num_accounts = List.length accounts in
+    List.(zip_exn (take addresses num_accounts) accounts) |> set_batch_accounts mdb
+
 
   let iteri t ~f =
     match Account_location.last_location_address t with

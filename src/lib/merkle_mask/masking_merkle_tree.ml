@@ -286,14 +286,14 @@ struct
     (** This function assumes that all the locations are in the same layer. *)
     let rec set_hash_batch t locations_and_hashes =
       let locations, _ = List.unzip locations_and_hashes in
+      List.iter locations_and_hashes ~f:(fun (location, hash) ->
+        set_hash t (Location.to_path_exn location) hash) ;
       if not @@ List.is_empty locations then
         let height = Location.height (List.hd_exn locations) in
         if height < Base.depth then (
           let location_to_hashtbl =
             Location.Table.of_alist_exn locations_and_hashes
           in
-          List.iter locations_and_hashes ~f:(fun (location, hash) ->
-              set_hash t (Location.to_path_exn location) hash ) ;
           let _, parent_locations_and_hashes =
             List.fold locations_and_hashes ~init:([], [])
               ~f:(fun (processed_locations, parent_locations_and_hashes)
@@ -334,7 +334,7 @@ struct
           set_account t location account ) ;
       let locations, accounts = List.unzip locations_and_accounts in
       set_hash_batch t
-      @@ List.zip_exn locations (List.map ~f:Hash.hash_account accounts)
+      @@ List.zip_exn (List.map ~f:(fun l -> Location.Hash (Location.to_path_exn l)) locations) (List.map ~f:Hash.hash_account accounts)
 
     (* NB: rocksdb does not support batch reads; is this needed? *)
     let get_hash_batch_exn t addrs =
