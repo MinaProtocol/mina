@@ -7,7 +7,7 @@ quite fast, but for the most part they grow no faster than 5MB/minute.
 
 Once you have a `.trace` file, it needs to be turned into JSON for the
 Chrome trace-viewer to view. You can do this with `src/app/trace-tool`.
-Using it is simple if you have Rust installed: `cargo run --release /path/to/1234.trace > trace.json`.
+Using it is simple if you have Rust installed: `cd src/app/trace-tool; cargo run --release /path/to/1234.trace > trace.json`.
 Then you can load the file from `chrome://tracing`.
 
 Each row correponds to a "task" as created by either `O1trace.trace_task` or
