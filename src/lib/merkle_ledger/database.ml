@@ -63,17 +63,7 @@ module Make
     with exn -> close t ; raise exn
 
   let empty_hashes =
-    let empty_hashes =
-      Array.create ~len:(Depth.depth + 1) Hash.empty_account
-    in
-    let rec loop last_hash height =
-      if height <= Depth.depth then (
-        let hash = Hash.merge ~height:(height - 1) last_hash last_hash in
-        empty_hashes.(height) <- hash ;
-        loop hash (height + 1) )
-    in
-    loop Hash.empty_account 1 ;
-    Immutable_array.of_array empty_hashes
+    Empty_hashes.cache (module Hash) ~init_hash:Hash.empty_account Depth.depth
 
   let get_raw {kvdb; _} location =
     Kvdb.get kvdb ~key:(Location.serialize location)

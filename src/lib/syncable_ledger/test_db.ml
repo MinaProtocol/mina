@@ -7,7 +7,7 @@ struct
   open Merkle_ledger_tests.Test_stubs
 
   module Hash = struct
-    type t = Hash.t [@@deriving sexp, hash, compare, bin_io, eq]
+    include Hash
 
     type account = Account.t
 

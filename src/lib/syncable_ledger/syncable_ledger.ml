@@ -524,6 +524,11 @@ module Make
       | Some h' -> Root_hash.equal h h'
     in
     if not should_skip then (
+      Option.iter t.desired_root ~f:(fun root_hash ->
+          Logger.info t.log
+            !"new_goal: changing target from %{sexp:Root_hash.t} to \
+              %{sexp:Root_hash.t}"
+            root_hash h ) ;
       Ivar.fill_if_empty t.validity_listener
         (`Target_changed (t.desired_root, h)) ;
       t.validity_listener <- Ivar.create () ;

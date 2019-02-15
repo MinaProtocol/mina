@@ -49,8 +49,8 @@ jobs:
                       - opam-v1-
             - restore_cache:
                   keys:
-                      - nix-v1-{{ checksum "src/app/kademlia-haskell/prefetch/kademlia1101.nix" }}
-                      - nix-v1-
+                      - nix-v2-{{ checksum "src/app/kademlia-haskell/packages.nix" }}
+                      - nix-v2-
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Deps -- make macos-setup-download
@@ -68,7 +68,7 @@ jobs:
                   paths:
                       - "/Users/distiller/.opam"
             - save_cache:
-                  key: nix-v1-{{ checksum "src/app/kademlia-haskell/prefetch/kademlia1101.nix" }}
+                  key: nix-v2-{{ checksum "src/app/kademlia-haskell/packages.nix" }}
                   paths:
                       - "/nix"
             - run:

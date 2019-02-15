@@ -85,7 +85,7 @@ module Make (Inputs : Inputs_intf) :
   let create_bufferred_pipe () =
     Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
 
-  let _kill reader writer =
+  let kill reader writer =
     Strict_pipe.Reader.clear reader ;
     Strict_pipe.Writer.close writer
 
@@ -117,7 +117,7 @@ module Make (Inputs : Inputs_intf) :
     let get {var; _} = var
   end
 
-  let _set_bootstrap_phase ~controller_type root_state
+  let set_bootstrap_phase ~controller_type root_state
       bootstrap_controller_writer =
     assert (not @@ is_bootstrapping (Broadcaster.get controller_type)) ;
     Broadcaster.broadcast controller_type
@@ -129,43 +129,36 @@ module Make (Inputs : Inputs_intf) :
     Broadcaster.broadcast controller_type
       (`Transition_frontier_controller (new_frontier, reader, writer))
 
-  let run ~logger ~network ~time_controller ~frontier_mvar ~ledger_db:_
+  let run ~logger ~network ~time_controller ~frontier_mvar ~ledger_db
       ~network_transition_reader ~proposer_transition_reader =
     let clean_transition_frontier_controller_and_start_bootstrap
-        ~controller_type:_ ~clear_writer:_
-        ~transition_frontier_controller_reader:_
-        ~transition_frontier_controller_writer:_ ~old_frontier:_
+        ~controller_type ~clear_writer ~transition_frontier_controller_reader
+        ~transition_frontier_controller_writer ~old_frontier
         (`Transition _incoming_transition, `Time_received _tm) =
-      failwith "Bootstrap is disabled as there this an infinite loop here"
-      (*_kill transition_frontier_controller_reader
+      kill transition_frontier_controller_reader
         transition_frontier_controller_writer ;
       Strict_pipe.Writer.write clear_writer `Clear |> don't_wait_for ;
       let bootstrap_controller_reader, bootstrap_controller_writer =
         Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
       in
       let root_state = get_root_state old_frontier in
-      _set_bootstrap_phase ~controller_type root_state
+      set_bootstrap_phase ~controller_type root_state
         bootstrap_controller_writer ;
-      let ancestor_prover =
-        Ancestor.Prover.create
-          ~max_size:(2 * Transition_frontier.max_length old_frontier)
-      in
       Strict_pipe.Writer.write bootstrap_controller_writer
         ( `Transition _incoming_transition
         , `Time_received (to_unix_timestamp _tm) ) ;
       let%map new_frontier, collected_transitions =
         Bootstrap_controller.run ~parent_log:logger ~network ~ledger_db
-          ~ancestor_prover ~frontier:old_frontier
-          ~transition_reader:bootstrap_controller_reader
+          ~frontier:old_frontier ~transition_reader:bootstrap_controller_reader
       in
-      _kill bootstrap_controller_reader bootstrap_controller_writer ;
+      kill bootstrap_controller_reader bootstrap_controller_writer ;
       ( new_frontier
       , List.map collected_transitions
           ~f:
             (With_hash.of_data
                ~hash_data:
                  (Fn.compose Consensus.Protocol_state.hash
-                    External_transition.Verified.protocol_state)) ) *)
+                    External_transition.Verified.protocol_state)) )
     in
     let start_transition_frontier_controller ~verified_transition_writer
         ~clear_reader ~collected_transitions frontier =
