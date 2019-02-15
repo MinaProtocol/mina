@@ -1,7 +1,6 @@
 open Core_kernel
 open Fold_lib
 open Tuple_lib
-open Signature_lib
 open Snark_params.Tick
 
 type t = Payment | Stake_delegation | Fee_transfer | Coinbase

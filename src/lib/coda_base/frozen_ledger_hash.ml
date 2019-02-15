@@ -1,7 +1,5 @@
-open Core_kernel
 open Import
 open Snark_params
-open Snarky
 open Tick
 include Ledger_hash
 

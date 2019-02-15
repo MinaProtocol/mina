@@ -93,7 +93,7 @@ jobs:
                   command: scripts/getkeys.sh
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
                   name: Build deb Package with keys
                   command: make deb
