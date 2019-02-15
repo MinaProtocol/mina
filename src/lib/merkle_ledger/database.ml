@@ -140,15 +140,13 @@ module Make
   let rec set_hash_batch mdb locations_and_hashes =
     let locations, _ = List.unzip locations_and_hashes in
     List.iter locations ~f:(fun location -> assert (Location.is_hash location)) ;
-
     set_bin_batch mdb Hash.bin_size_t Hash.bin_write_t locations_and_hashes ;
-
     if not @@ List.is_empty locations then
       let height = Location.height @@ List.hd_exn locations in
-      if height < Depth.depth then (
+      if height < Depth.depth then
         let location_to_hashtbl =
           Location.Table.of_alist_exn locations_and_hashes
-        in  
+        in
         let _, parent_locations_and_hashes =
           List.fold locations_and_hashes ~init:([], [])
             ~f:(fun (processed_locations, parent_locations_and_hashes)
@@ -172,7 +170,7 @@ module Make
                 , (Location.parent location, parent_hash)
                   :: parent_locations_and_hashes ) )
         in
-        set_hash_batch mdb parent_locations_and_hashes )
+        set_hash_batch mdb parent_locations_and_hashes
 
   let rec set_hash mdb location new_hash =
     assert (Location.is_hash location) ;
@@ -348,10 +346,14 @@ module Make
            (Location.Account addr, account) )
 
   let set_all_accounts_rooted_at_exn mdb address accounts =
-    let addresses = List.rev @@ Addr.Range.fold (Addr.Range.subtree_range address) ~init:[] ~f:(fun address addresses -> address :: addresses) in
+    let addresses =
+      List.rev
+      @@ Addr.Range.fold (Addr.Range.subtree_range address) ~init:[]
+           ~f:(fun address addresses -> address :: addresses )
+    in
     let num_accounts = List.length accounts in
-    List.(zip_exn (take addresses num_accounts) accounts) |> set_batch_accounts mdb
-
+    List.(zip_exn (take addresses num_accounts) accounts)
+    |> set_batch_accounts mdb
 
   let iteri t ~f =
     match Account_location.last_location_address t with
