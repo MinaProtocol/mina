@@ -19,14 +19,14 @@ let%test_module "Root_prover" =
       (* Generating this many breadcrumbs will ernsure the transition_frontier to be full  *)
       let num_breadcrumbs = max_length + 2 in
       Thread_safe.block_on_async_exn (fun () ->
-          let%bind frontier = create_root_frontier ~logger in
+          let%bind frontier =
+            create_root_frontier ~logger Genesis_ledger.accounts
+          in
           let%bind () =
             build_frontier_randomly frontier
-              ~gen_root_breadcrumb_builder:(fun root_breadcrumb ->
-                Quickcheck.Generator.with_size ~size:num_breadcrumbs
-                @@ Quickcheck_lib.gen_imperative_list
-                     (root_breadcrumb |> return |> Quickcheck.Generator.return)
-                     (gen_breadcrumb ~logger) )
+              ~gen_root_breadcrumb_builder:
+                (gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
+                   ~accounts_with_secret_keys:Genesis_ledger.accounts)
           in
           let seen_transition =
             Transition_frontier.(
@@ -41,10 +41,10 @@ let%test_module "Root_prover" =
             Option.value_exn ~message:"Could not produce an ancestor proof"
               (Root_prover.prove ~logger ~frontier observed_state)
           in
-          (let open Deferred.Or_error.Let_syntax in
           let%map proof_verified_root, proof_verified_best_tip =
             Root_prover.verify ~logger ~observed_state
               ~peer_root:root_with_proof
+            |> Deferred.Or_error.ok_exn
           in
           let open Transition_frontier in
           External_transition.(
@@ -53,6 +53,5 @@ let%test_module "Root_prover" =
               (to_external_transition @@ root frontier)
             && equal
                  (of_proof_verified @@ With_hash.data proof_verified_best_tip)
-                 (to_external_transition @@ best_tip frontier)))
-          |> Deferred.Or_error.ok_exn )
+                 (to_external_transition @@ best_tip frontier)) )
   end )

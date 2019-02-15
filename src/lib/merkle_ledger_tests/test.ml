@@ -16,47 +16,6 @@ let%test_module "Database integration test" =
     module Ledger = Ledger.Make (Key) (Account) (Hash) (Depth)
     module Binary_tree = Binary_tree.Make (Account) (Hash) (Depth)
 
-    module DB_visualizor = Visualizable_ledger.Make (struct
-      include DB
-
-      type hash = Hash.t [@@deriving sexp, eq]
-
-      let max_depth = Depth.depth
-
-      let get_inner_hash_at_addr_exn db dirs =
-        get_inner_hash_at_addr_exn db (Addr.of_directions dirs)
-    end)
-
-    module Ledger_visualizor = Visualizable_ledger.Make (struct
-      include Ledger
-
-      type hash = Hash.t [@@deriving sexp, eq]
-
-      let max_depth = Depth.depth
-
-      let get_inner_hash_at_addr_exn db dirs =
-        let addr = Addr.of_directions dirs in
-        if List.length dirs = Depth.depth then
-          For_tests.get_leaf_hash_at_addr db addr
-        else get_inner_hash_at_addr_exn db addr
-    end)
-
-    module Binary_tree_visualizor = Visualizable_ledger.Make (struct
-      include Binary_tree
-
-      type hash = Hash.t [@@deriving sexp, eq]
-    end)
-
-    let check_hash (type t1 t2)
-        (module L1 : Visualizable_ledger.S
-          with type t = t1 and type hash = Hash.t)
-        (module L2 : Visualizable_ledger.S
-          with type t = t2 and type hash = Hash.t) (l1, h1) (l2, h2) =
-      if not (Hash.equal h1 h2) then
-        failwithf
-          !"\n Expected:\n%{sexp:L1.tree}\n\n\n Actual:\n%{sexp:L2.tree}"
-          (L1.to_tree l1) (L2.to_tree l2) ()
-
     let%test_unit "databases have equivalent hash values" =
       let num_accounts = (1 lsl Depth.depth) - 1 in
       let gen_non_zero_balances =
@@ -100,12 +59,6 @@ let%test_module "Database integration test" =
                       let binary_hash =
                         Binary_tree.get_inner_hash_at_addr_exn binary_tree dirs
                       in
-                      check_hash
-                        (module Binary_tree_visualizor)
-                        (module Ledger_visualizor)
-                        (binary_tree, binary_hash) (ledger, ledger_hash) ;
-                      check_hash
-                        (module Binary_tree_visualizor)
-                        (module DB_visualizor)
-                        (binary_tree, binary_hash) (db, db_hash) ) ) ) )
+                      assert (Hash.equal binary_hash ledger_hash) ;
+                      assert (Hash.equal binary_hash db_hash) ) ) ) )
   end )

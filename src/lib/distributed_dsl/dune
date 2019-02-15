@@ -1,0 +1,10 @@
+(library
+ (name distributed_dsl)
+ (public_name distributed_dsl)
+ (flags :standard -short-paths -warn-error -33-34-32-27-9-58)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries logger core pipe_lib async async_extra extlib)
+ (preprocess
+  (pps ppx_jane ppx_deriving.eq ppx_deriving.enum bisect_ppx -- -conditional))
+ (synopsis "Distributed DSL"))
