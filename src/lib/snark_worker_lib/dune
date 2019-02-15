@@ -1,0 +1,12 @@
+(library
+ (name snark_worker_lib)
+ (public_name snark_worker_lib)
+ (flags :standard -short-paths -warn-error -33-58)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core async cli_lib currency snark_work_lib coda_base
+   blockchain_snark transaction_snark keys_lib perf_histograms
+   sparse_ledger_lib)
+ (preprocess
+  (pps ppx_jane bisect_ppx -- -conditional))
+ (synopsis "Lib powering the snark_worker interactions with the daemon"))
