@@ -13,10 +13,12 @@ let main () =
   let log = Logger.create () in
   let log = Logger.child log name in
   let proposal_interval = Consensus.Constants.block_window_duration_ms in
+  let acceptable_delay = Time.Span.of_ms (proposal_interval * Consensus.Constants.delta |> Float.of_int) in
   let work_selection = Protocols.Coda_pow.Work_selection.Seq in
   Coda_processes.init () ;
   let configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
+      ~acceptable_delay
       ~snark_worker_public_keys:None ~should_propose:(Fn.const false)
       ~work_selection
   in
@@ -31,6 +33,7 @@ let main () =
   Logger.debug log !"connecting to peers %{sexp: Host_and_port.t list}\n" peers ;
   let config =
     Coda_process.local_config ~peers ~external_port ~discovery_port
+      ~acceptable_delay
       ~snark_worker_config:None ~should_propose:false ~program_dir
       ~work_selection ()
   in
