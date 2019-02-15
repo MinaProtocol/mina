@@ -1,4 +1,3 @@
-open Snark_params
 include Ledger_hash
 
 let of_ledger_hash (h : Ledger_hash.t) : t = h

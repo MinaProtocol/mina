@@ -21,7 +21,6 @@ module Merkle_tree =
           Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_
             (bs :> Boolean.var list)
         in
-        let open Let_syntax in
         (* TODO: Think about if choose_preimage_var is ok *)
         let%bind h1 = Pedersen.Checked.Digest.choose_preimage h1
         and h2 = Pedersen.Checked.Digest.choose_preimage h2 in

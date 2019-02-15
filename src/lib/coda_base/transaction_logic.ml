@@ -155,7 +155,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
     let transaction : t -> Transaction.t Or_error.t =
      fun {varying; _} ->
-      let open Or_error.Let_syntax in
       match varying with
       | User_command tr ->
           Option.value_map ~default:(Or_error.error_string "Bad signature")
