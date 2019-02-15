@@ -3,9 +3,7 @@ open Coda_base
 open Core_kernel
 open Protocols.Coda_pow
 
-module type Inputs_intf = sig
-  include Transition_frontier0.Inputs_intf
-end
+module type Inputs_intf = Transition_frontier0.Inputs_intf
 
 module Make (Inputs : Inputs_intf) :
   Transition_frontier_intf
