@@ -69,10 +69,14 @@ module Some_data = struct
 
     module Latest = V1
 
+    (* declare module *)
+
     module Module_decl = struct
       let name = "some_data"
       type latest = Latest.t
     end
+
+    (* register versions *)
 
     module Registrar = Make (Module_decl)
     module Registered_V1 = Registrar.Register (V1)
@@ -91,7 +95,7 @@ the latest module version:
 Example:
 ```ocaml
   let buf = ... in
-  ignore (Registered_Vn.bin_write_t ~pos:0 buf);
+  ignore (Registered_Vn.bin_write_t ~pos:0 buf some_Vn_value);
   match Registrar.deserialize_binary_opt buf with
    | None -> failwith "shouldn't happen"
    | Some _ -> printf "got latest version of some_Vn_value"
