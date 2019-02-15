@@ -1,8 +1,6 @@
 open Core
-open Snark_params
 open Currency
 open Signature_lib
-open Merkle_ledger
 
 module type S = sig
   type ledger

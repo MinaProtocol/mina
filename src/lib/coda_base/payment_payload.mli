@@ -2,7 +2,6 @@ open Core
 open Fold_lib
 open Tuple_lib
 open Snark_params.Tick
-open Sha256_lib
 open Import
 
 type ('pk, 'amount) t_ = {receiver: 'pk; amount: 'amount}

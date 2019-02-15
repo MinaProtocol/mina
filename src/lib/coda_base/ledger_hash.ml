@@ -4,7 +4,6 @@ open Snark_params
 open Snarky
 open Tick
 open Let_syntax
-open Currency
 open Fold_lib
 
 module Merkle_tree =
