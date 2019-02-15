@@ -85,6 +85,7 @@ jobs:
             DUNE_PROFILE: dev
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
@@ -114,6 +115,7 @@ jobs:
             DUNE_PROFILE: testnet_posig
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
@@ -143,6 +145,7 @@ jobs:
             DUNE_PROFILE: testnet_postake
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
@@ -172,6 +175,7 @@ jobs:
             DUNE_PROFILE: testnet_public
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
@@ -201,6 +205,7 @@ jobs:
             DUNE_PROFILE: testnet_postake_snarkless_fake_hash
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
