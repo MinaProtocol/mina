@@ -112,7 +112,6 @@ let daemon log =
            Deferred.return conf_dir )
          else Sys.home_directory () >>| compute_conf_dir
        in
-       if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
        Parallel.init_master () ;
        ignore (Logger.set_sexp_logging sexp_logging) ;
        let%bind config =
@@ -185,6 +184,7 @@ let daemon log =
        in
        let discovery_port = external_port + 1 in
        let%bind () = Unix.mkdir ~p:() conf_dir in
+       if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
        let%bind initial_peers_raw =
          match peers with
          | _ :: _ -> return peers
