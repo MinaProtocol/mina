@@ -8,7 +8,7 @@ let pk = Public_key.Compressed.of_base64_exn
 let sk = Private_key.of_base64_exn
 
 module type Base_intf = sig
-  val accounts : (Private_key.t option * Account.t) list
+  val accounts : (Private_key.t option * Account.Stable.Latest.t) list
 end
 
 module Make_from_base (Base : Base_intf) : Intf.S = struct

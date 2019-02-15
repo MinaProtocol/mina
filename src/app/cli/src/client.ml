@@ -424,7 +424,8 @@ let dump_ledger =
          >>| function
          | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e
          | Ok (Error e) -> printf !"Ledger not found: %{sexp:Error.t}\n" e
-         | Ok (Ok accounts) -> printf !"%{sexp:Account.t list}\n" accounts ))
+         | Ok (Ok accounts) ->
+             printf !"%{sexp:Account.Stable.Latest.t list}\n" accounts ))
 
 let constraint_system_digests =
   Command.async ~summary:"Print the md5 digest of each SNARK constraint system"

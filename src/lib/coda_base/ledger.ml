@@ -56,7 +56,7 @@ end
     with module Addr = Location_at_depth.Addr
     with type root_hash := Ledger_hash.t
      and type hash := Ledger_hash.t
-     and type account := Account.t
+     and type account := Account.Stable.Latest.t
      and type key_set := Public_key.Compressed.Set.t
      and type key := Public_key.Compressed.t =
     Database.Make (Public_key.Compressed) (Account) (Hash) (Depth)
@@ -72,7 +72,7 @@ end
   module Any_ledger :
     Merkle_ledger.Any_ledger.S
     with module Location = Location_at_depth
-    with type account := Account.t
+    with type account := Account.Stable.Latest.t
      and type key := Public_key.Compressed.t
      and type key_set := Public_key.Compressed.Set.t
      and type hash := Hash.t =
@@ -84,7 +84,7 @@ end
     Merkle_mask.Masking_merkle_tree_intf.S
     with module Location = Location_at_depth
      and module Attached.Addr = Location_at_depth.Addr
-    with type account := Account.t
+    with type account := Account.Stable.Latest.t
      and type key := Public_key.Compressed.t
      and type key_set := Public_key.Compressed.Set.t
      and type hash := Hash.t
@@ -99,7 +99,7 @@ end
     Merkle_mask.Maskable_merkle_tree_intf.S
     with module Location = Location_at_depth
     with module Addr = Location_at_depth.Addr
-    with type account := Account.t
+    with type account := Account.Stable.Latest.t
      and type key := Public_key.Compressed.t
      and type key_set := Public_key.Compressed.Set.t
      and type hash := Hash.t

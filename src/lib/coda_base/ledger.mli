@@ -9,14 +9,14 @@ module Db :
   with module Addr = Location.Addr
   with type root_hash := Ledger_hash.t
    and type hash := Ledger_hash.t
-   and type account := Account.t
+   and type account := Account.Stable.Latest.t
    and type key := Public_key.Compressed.t
    and type key_set := Public_key.Compressed.Set.t
 
 module Any_ledger :
   Merkle_ledger.Any_ledger.S
   with module Location = Location
-  with type account := Account.t
+  with type account := Account.Stable.Latest.t
    and type key := Public_key.Compressed.t
    and type key_set := Public_key.Compressed.Set.t
    and type hash := Ledger_hash.t
@@ -25,7 +25,7 @@ module Mask :
   Merkle_mask.Masking_merkle_tree_intf.S
   with module Location = Location
    and module Attached.Addr = Location.Addr
-  with type account := Account.t
+  with type account := Account.Stable.Latest.t
    and type key := Public_key.Compressed.t
    and type key_set := Public_key.Compressed.Set.t
    and type hash := Ledger_hash.t
@@ -36,7 +36,7 @@ module Maskable :
   Merkle_mask.Maskable_merkle_tree_intf.S
   with module Location = Location
   with module Addr = Location.Addr
-  with type account := Account.t
+  with type account := Account.Stable.Latest.t
    and type key := Public_key.Compressed.t
    and type key_set := Public_key.Compressed.Set.t
    and type hash := Ledger_hash.t
@@ -51,7 +51,7 @@ include
   with module Addr = Location.Addr
   with type root_hash := Ledger_hash.t
    and type hash := Ledger_hash.t
-   and type account := Account.t
+   and type account := Account.Stable.Latest.t
    and type key := Public_key.Compressed.t
    and type key_set := Public_key.Compressed.Set.t
    and type t = Mask.Attached.t
@@ -123,7 +123,8 @@ module Undo : sig
   val transaction : t -> Transaction.t Or_error.t
 end
 
-val create_new_account_exn : t -> Public_key.Compressed.t -> Account.t -> unit
+val create_new_account_exn :
+  t -> Public_key.Compressed.t -> Account.Stable.Latest.t -> unit
 
 val apply_user_command :
   t -> User_command.With_valid_signature.t -> Undo.User_command.t Or_error.t
@@ -135,6 +136,7 @@ val undo : t -> Undo.t -> unit Or_error.t
 val merkle_root_after_user_command_exn :
   t -> User_command.With_valid_signature.t -> Ledger_hash.t
 
-val create_empty : t -> Public_key.Compressed.t -> Path.t * Account.t
+val create_empty :
+  t -> Public_key.Compressed.t -> Path.t * Account.Stable.Latest.t
 
 val num_accounts : t -> int

@@ -450,7 +450,7 @@ let merkle_tree num_layers_to_show =
   let module Spec = struct
     type t =
       | Node of {pos: Pos.t; color: string}
-      | Account of {pos: Pos.t; account: Account.t}
+      | Account of {pos: Pos.t; account: Account.Stable.Latest.t}
 
     let pos = function Node {pos; _} -> pos | Account {pos; _} -> pos
   end in

@@ -141,7 +141,7 @@ module type Main_intf = sig
       val location_of_key :
         t -> Public_key.Compressed.t -> Ledger.Location.t option
 
-      val get : t -> Ledger.Location.t -> Account.t option
+      val get : t -> Ledger.Location.t -> Account.Stable.Latest.t option
 
       val merkle_path :
            t
@@ -154,12 +154,14 @@ module type Main_intf = sig
 
       val merkle_root : t -> Ledger_hash.t
 
-      val to_list : t -> Account.t list
+      val to_list : t -> Account.Stable.Latest.t list
 
       val fold_until :
            t
         -> init:'accum
-        -> f:('accum -> Account.t -> ('accum, 'stop) Base.Continue_or_stop.t)
+        -> f:(   'accum
+              -> Account.Stable.Latest.t
+              -> ('accum, 'stop) Base.Continue_or_stop.t)
         -> finish:('accum -> 'stop)
         -> 'stop
     end
@@ -351,7 +353,9 @@ module type Main_intf = sig
   val staged_ledger_ledger_proof : t -> Inputs.Ledger_proof.t option
 
   val get_ledger :
-    t -> Staged_ledger_hash.t -> Account.t list Deferred.Or_error.t
+       t
+    -> Staged_ledger_hash.t
+    -> Account.Stable.Latest.t list Deferred.Or_error.t
 
   val receipt_chain_database : t -> Receipt_chain_database.t
 end
@@ -748,7 +752,7 @@ struct
      and type hash := Ledger_hash.t
      and type root_hash := Ledger_hash.t
      and type merkle_tree := Ledger.Db.t
-     and type account := Account.t
+     and type account := Account.Stable.Latest.t
      and type merkle_path := Ledger.path
      and type query := Sync_ledger.query
      and type answer := Sync_ledger.answer =

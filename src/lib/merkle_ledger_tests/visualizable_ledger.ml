@@ -55,7 +55,7 @@ struct
     include Comparator.Make (Account)
   end
 
-  (* type edge = Inner of (Hash.t * Hash.t) | Leaf of (Hash.t * Account.t option) *)
+  (* type edge = Inner of (Hash.t * Hash.t) | Leaf of (Hash.t * Account.Stable.Latest.t option) *)
 
   type ('source, 'target) edge = {source: 'source; target: 'target}
 

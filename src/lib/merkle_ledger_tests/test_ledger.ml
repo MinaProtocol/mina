@@ -17,7 +17,7 @@ let%test_module "test functor on in memory databases" =
 
       type key_set = Key_with_gen.Set.t
 
-      type account = Account.t
+      type account = Account.Stable.Latest.t
 
       type hash = Hash.t
 

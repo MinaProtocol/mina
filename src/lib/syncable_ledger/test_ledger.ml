@@ -11,7 +11,7 @@ struct
 
     let to_hash = Fn.id
 
-    type account = Account.t
+    type account = Account.Stable.Latest.t
   end
 
   module L = struct
@@ -19,7 +19,7 @@ struct
 
     type addr = Addr.t
 
-    type account = Account.t
+    type account = Account.Stable.Latest.t
 
     type hash = Root_hash.t
 

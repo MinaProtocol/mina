@@ -16,7 +16,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         Merkle_mask.Base_merkle_tree_intf.S
         with module Addr = Location.Addr
          and module Location = Location
-         and type account := Account.t
+         and type account := Account.Stable.Latest.t
          and type root_hash := Hash.t
          and type hash := Hash.t
          and type key := Key.t
@@ -26,7 +26,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         Merkle_mask.Masking_merkle_tree_intf.S
         with module Location = Location
          and module Attached.Addr = Location.Addr
-        with type account := Account.t
+        with type account := Account.Stable.Latest.t
          and type location := Location.t
          and type key := Key.t
          and type key_set := Key.Set.t
@@ -37,7 +37,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         Merkle_mask.Maskable_merkle_tree_intf.S
         with module Location = Location
          and module Addr = Location.Addr
-        with type account := Account.t
+        with type account := Account.Stable.Latest.t
          and type key := Key.t
          and type key_set := Key.Set.t
          and type root_hash := Hash.t
@@ -686,22 +686,26 @@ let%test_module "Test mask connected to underlying Merkle tree" =
                 let locs = [(loc1, a1); (loc2, a2); (loc3, a3)] in
                 (* all accounts are here *)
                 List.iter locs ~f:(fun (loc, a) ->
-                    [%test_result: Account.t option]
+                    [%test_result: Account.Stable.Latest.t option]
                       ~message:"All accounts are accessible from m2"
                       ~expect:(Some a) (Mask.Attached.get m2 loc) ) ;
-                [%test_result: Account.t option] ~message:"a1 is in base"
-                  ~expect:(Some a1) (Test.Base.get base loc1) ;
+                [%test_result: Account.Stable.Latest.t option]
+                  ~message:"a1 is in base" ~expect:(Some a1)
+                  (Test.Base.get base loc1) ;
                 Mask.Attached.commit m1 ;
-                [%test_result: Account.t option] ~message:"a2 is in base"
-                  ~expect:(Some a2) (Test.Base.get base loc2) ;
+                [%test_result: Account.Stable.Latest.t option]
+                  ~message:"a2 is in base" ~expect:(Some a2)
+                  (Test.Base.get base loc2) ;
                 Maskable.remove_and_reparent_exn mask_as_base m1 ~children:[m2] ;
-                [%test_result: Account.t option] ~message:"a1 is in base"
-                  ~expect:(Some a1) (Test.Base.get base loc1) ;
-                [%test_result: Account.t option] ~message:"a2 is in base"
-                  ~expect:(Some a2) (Test.Base.get base loc2) ;
+                [%test_result: Account.Stable.Latest.t option]
+                  ~message:"a1 is in base" ~expect:(Some a1)
+                  (Test.Base.get base loc1) ;
+                [%test_result: Account.Stable.Latest.t option]
+                  ~message:"a2 is in base" ~expect:(Some a2)
+                  (Test.Base.get base loc2) ;
                 (* all accounts are still here *)
                 List.iter locs ~f:(fun (loc, a) ->
-                    [%test_result: Account.t option]
+                    [%test_result: Account.Stable.Latest.t option]
                       ~message:"All accounts are accessible from m2"
                       ~expect:(Some a) (Mask.Attached.get m2 loc) )
             | _ -> failwith "unexpected" )
@@ -722,7 +726,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         Merkle_ledger.Database_intf.S
         with module Location = Location
          and module Addr = Location.Addr
-         and type account := Account.t
+         and type account := Account.Stable.Latest.t
          and type root_hash := Hash.t
          and type hash := Hash.t
          and type key := Key.t
@@ -741,7 +745,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         Merkle_mask.Masking_merkle_tree_intf.S
         with module Location = Location
          and module Attached.Addr = Location.Addr
-        with type account := Account.t
+        with type account := Account.Stable.Latest.t
          and type location := Location.t
          and type key := Key.t
          and type key_set := Key.Set.t
@@ -755,7 +759,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         Merkle_mask.Maskable_merkle_tree_intf.S
         with module Addr = Location.Addr
          and module Location = Location
-        with type account := Account.t
+        with type account := Account.Stable.Latest.t
          and type key := Key.t
          and type key_set := Key.Set.t
          and type root_hash := Hash.t

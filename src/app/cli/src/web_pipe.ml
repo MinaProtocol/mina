@@ -16,7 +16,9 @@ module type Coda_intf = sig
       val fold_until :
            t
         -> init:'accum
-        -> f:('accum -> Account.t -> ('accum, 'stop) Base.Continue_or_stop.t)
+        -> f:(   'accum
+              -> Account.Stable.Latest.t
+              -> ('accum, 'stop) Base.Continue_or_stop.t)
         -> finish:('accum -> 'stop)
         -> 'stop
     end

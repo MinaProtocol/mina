@@ -46,7 +46,8 @@ end)
 let%test_module "Bootstrap Controller" =
   ( module struct
     type peer_config =
-      {num_breadcrumbs: int; accounts: (Private_key.t option * Account.t) list}
+      { num_breadcrumbs: int
+      ; accounts: (Private_key.t option * Account.Stable.Latest.t) list }
 
     type peer = {address: Network_peer.Peer.t; frontier: Transition_frontier.t}
 

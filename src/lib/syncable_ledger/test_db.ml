@@ -9,7 +9,7 @@ struct
   module Hash = struct
     include Hash
 
-    type account = Account.t
+    type account = Account.Stable.Latest.t
 
     let merge = Hash.merge
 
@@ -32,7 +32,7 @@ struct
 
     type hash = Hash.t
 
-    type account = Account.t
+    type account = Account.Stable.Latest.t
 
     type key = Location.t
 

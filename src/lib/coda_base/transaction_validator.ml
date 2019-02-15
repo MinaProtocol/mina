@@ -2,7 +2,8 @@ open Base
 open Signature_lib
 
 module Hashless_ledger = struct
-  type t = {base: Ledger.t; overlay: (Account.key, Account.t) Hashtbl.t}
+  type t =
+    {base: Ledger.t; overlay: (Account.key, Account.Stable.Latest.t) Hashtbl.t}
 
   type location = Ours of Account.key | Theirs of Ledger.Location.t
 

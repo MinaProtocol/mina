@@ -102,7 +102,7 @@ let compute_delegators self_pk ~iter_accounts =
     | `Include_self, pk -> Public_key.Compressed.equal pk pubkey
     | `Don't_include_self, _ -> false
   in
-  iter_accounts (fun i (acct : Account.t) ->
+  iter_accounts (fun i (acct : Account.Stable.Latest.t) ->
       (* TODO: The second disjunct is a hack and should be removed once the delegation
              command PR lands. *)
       if

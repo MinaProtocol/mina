@@ -10,7 +10,7 @@ let%test_module "test functor on in memory databases" =
       Merkle_ledger.Database_intf.S
       with type key := Key.t
        and type key_set := Key.Set.t
-       and type account := Account.t
+       and type account := Account.Stable.Latest.t
        and type root_hash := Hash.t
        and type hash := Hash.t
 
@@ -265,7 +265,8 @@ let%test_module "test functor on in memory databases" =
             let accounts = random_accounts max_height |> dedup_accounts in
             List.iter accounts ~f:(fun account ->
                 create_new_account_exn mdb account |> ignore ) ;
-            [%test_result: Account.t list] accounts ~expect:(MT.to_list mdb) )
+            [%test_result: Account.Stable.Latest.t list] accounts
+              ~expect:(MT.to_list mdb) )
 
       let%test_unit "Add 2^d accounts (for testing, d is small)" =
         if Test.depth <= 8 then

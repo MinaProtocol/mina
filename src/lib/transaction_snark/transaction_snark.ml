@@ -1235,7 +1235,7 @@ let%test_module "transaction_snark" =
       let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
     end
 
-    type wallet = {private_key: Private_key.t; account: Account.t}
+    type wallet = {private_key: Private_key.t; account: Account.Stable.Latest.t}
 
     let random_wallets () =
       let random_wallet () : wallet =

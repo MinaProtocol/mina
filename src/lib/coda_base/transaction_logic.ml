@@ -64,17 +64,20 @@ module type Ledger_intf = sig
 
   type location
 
-  val get : t -> location -> Account.t option
+  val get : t -> location -> Account.Stable.Latest.t option
 
   val location_of_key : t -> Account.key -> location option
 
-  val set : t -> location -> Account.t -> unit
+  val set : t -> location -> Account.Stable.Latest.t -> unit
 
   val get_or_create :
-    t -> Account.key -> Account.key list * Account.t * location
+    t -> Account.key -> Account.key list * Account.Stable.Latest.t * location
 
   val get_or_create_account_exn :
-    t -> Account.key -> Account.t -> [`Added | `Existed] * location
+       t
+    -> Account.key
+    -> Account.Stable.Latest.t
+    -> [`Added | `Existed] * location
 
   val remove_accounts_exn : t -> Account.key list -> unit
 
