@@ -448,5 +448,7 @@ let () =
   (* Turn on snark debugging in prod for now *)
   Snark_params.Tick.set_eval_constraints true ;
   Snark_params.Tock.set_eval_constraints true ;
+  Snark_params.Tick.Groth16.set_eval_constraints true ;
+  Snark_params.Tock.Groth16.set_eval_constraints true ;
   Command.run (Command.group ~summary:"Coda" (coda_commands log)) ;
   Core.exit 0
