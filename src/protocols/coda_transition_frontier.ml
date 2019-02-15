@@ -4,29 +4,31 @@ open Pipe_lib.Strict_pipe
 
 module Transition_frontier_diff = struct
   type 'a t =
-    (* Added a node to the existing best tip without creating a new root *)
     | Extend_best_tip of 'a
-    (* Added a node to the a new best tip without creating a new root *)
+        (** Added a node to the existing best tip without creating a new root *)
     | New_best_tip of {old_best_tip: 'a; new_best_tip: 'a}
-    (* If triggered by a new best tip, the old one will be in old_best_tip *)
+        (** Added a node to the a new best tip without creating a new root *)
     | New_root of
         { old_root: 'a
         ; new_root: 'a
         ; added: 'a
         ; garbage: 'a list
         ; old_best_tip: 'a option }
-    | Destroy
+        (** If triggered by a new best tip, the old one will be in old_best_tip *)
+    | Destroy  (** transition_frontier was destroyed *)
   [@@deriving sexp]
 end
 
 module type Transition_frontier_extension_intf = sig
   type t
 
+  type input
+
   type transition_frontier
 
   type transition_frontier_breadcrumb
 
-  val create : unit -> t
+  val create : input -> t
 
   val handle_diff :
        t

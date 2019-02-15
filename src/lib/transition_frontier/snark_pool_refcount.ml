@@ -23,7 +23,8 @@ module Make (Inputs : Inputs_intf) :
   S
   with type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
-              Inputs.Transition_frontier.Breadcrumb.t = struct
+              Inputs.Transition_frontier.Breadcrumb.t
+   and type input := unit = struct
   module Work = Inputs.Transaction_snark_work.Statement
 
   type t = {ref_table: int Work.Table.t}

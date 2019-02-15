@@ -501,6 +501,7 @@ module Make (Inputs : Inputs_intf) :
    *       VII ) notify the consensus mechanism of the new root
    *       VIII) if commit on an heir node that just emitted proof txns then
    *             write them to snarked ledger
+   *   5) return a diff object describing what changed (for use in updating extensions)
   *)
   let add_breadcrumb_exn t breadcrumb =
     O1trace.measure "add_breadcrumb" (fun () ->
@@ -548,6 +549,10 @@ module Make (Inputs : Inputs_intf) :
             let new_root_node = move_root t heir_node in
             (* 4.V *)
             let garbage = List.bind bad_hashes ~f:(successor_hashes_rec t) in
+            let garbage_breadcrumbs =
+              List.map garbage ~f:(fun g ->
+                  (Hashtbl.find_exn t.table g).breadcrumb )
+            in
             List.iter garbage ~f:(Hashtbl.remove t.table) ;
             (* 4.VI *)
             let new_root_staged_ledger =
@@ -603,27 +608,26 @@ module Make (Inputs : Inputs_intf) :
                    (Breadcrumb.blockchain_state new_root_node.breadcrumb))
               ( Ledger.Db.merkle_root t.root_snarked_ledger
               |> Frozen_ledger_hash.of_ledger_hash ) ;
-            Some (garbage, new_root_node) )
+            Some (garbage_breadcrumbs, new_root_node) )
           else None
         in
-        let maybe_new_best_tip_bc =
+        (* 5 *)
+        let maybe_new_best_tip_breadcrumb =
           if node.length > best_tip_node.length then
             Some best_tip_node.breadcrumb
           else None
         in
-        match (maybe_new_root, maybe_new_best_tip_bc) with
-        | Some (garbage, new_root_node), best_tip ->
+        match (maybe_new_root, maybe_new_best_tip_breadcrumb) with
+        | Some (garbage_breadcrumbs, new_root_node), best_tip ->
             Transition_frontier_diff.New_root
               { old_root= root_node.breadcrumb
               ; new_root= new_root_node.breadcrumb
               ; added= node.breadcrumb
-              ; garbage=
-                  List.map garbage ~f:(fun g ->
-                      (Hashtbl.find_exn t.table g).breadcrumb )
+              ; garbage= garbage_breadcrumbs
               ; old_best_tip= best_tip }
-        | _, Some new_best_tip_bc ->
+        | _, Some new_best_tip_breadcrumb ->
             Transition_frontier_diff.New_best_tip
-              { new_best_tip= new_best_tip_bc
+              { new_best_tip= new_best_tip_breadcrumb
               ; old_best_tip= best_tip_node.breadcrumb }
         | None, _ -> Transition_frontier_diff.Extend_best_tip node.breadcrumb
     )
