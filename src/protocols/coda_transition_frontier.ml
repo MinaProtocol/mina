@@ -16,6 +16,7 @@ module Transition_frontier_diff = struct
         ; garbage: 'a list
         ; old_best_tip: 'a option }
     | Destroy
+  [@@deriving sexp]
 end
 
 module type Transition_frontier_extension_intf = sig

@@ -9,16 +9,16 @@ end
 
 module Make (Inputs : Inputs_intf) :
   Transition_frontier_intf
-  with type state_hash = State_hash.t
-   and type external_transition_verified =
+  with type state_hash := State_hash.t
+   and type external_transition_verified :=
               Inputs.External_transition.Verified.t
-   and type ledger_database = Ledger.Db.t
-   and type staged_ledger_diff = Inputs.Staged_ledger_diff.t
-   and type staged_ledger = Inputs.Staged_ledger.t
-   and type masked_ledger = Ledger.Mask.Attached.t
-   and type transaction_snark_scan_state = Inputs.Staged_ledger.Scan_state.t
-   and type consensus_local_state = Consensus.Local_state.t = struct
-  type state_hash = State_hash.t
+   and type ledger_database := Ledger.Db.t
+   and type staged_ledger_diff := Inputs.Staged_ledger_diff.t
+   and type staged_ledger := Inputs.Staged_ledger.t
+   and type masked_ledger := Ledger.Mask.Attached.t
+   and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
+   and type consensus_local_state := Consensus.Local_state.t = struct
+  (* type state_hash = State_hash.t
 
   type external_transition_verified = Inputs.External_transition.Verified.t
 
@@ -32,15 +32,15 @@ module Make (Inputs : Inputs_intf) :
 
   type transaction_snark_scan_state = Inputs.Staged_ledger.Scan_state.t
 
-  type consensus_local_state = Consensus.Local_state.t
+  type consensus_local_state = Consensus.Local_state.t *)
 
   module Transition_frontier0 = Transition_frontier0.Make (Inputs)
 
   module Extensions = struct
-    module Snark_pool_refcount =
-      Snark_pool_refcount.Make
-        (Transition_frontier0)
-        (Inputs.Transaction_snark_work.Statement)
+    module Snark_pool_refcount = Snark_pool_refcount.Make (struct
+      include Inputs
+      module Transition_frontier = Transition_frontier0
+    end)
 
     type t = {snark_pool_refcount: Snark_pool_refcount.t} [@@deriving fields]
 
