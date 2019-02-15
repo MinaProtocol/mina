@@ -39,8 +39,7 @@ let local_configs ?proposal_interval ?(should_propose = Fn.const true) n
                     ; port= 20000 + i } ) )
         in
         Coda_process.local_config ?proposal_interval ~peers ~discovery_port
-          ~external_port ~snark_worker_config ~program_dir
-          ~acceptable_delay
+          ~external_port ~snark_worker_config ~program_dir ~acceptable_delay
           ~should_propose:(should_propose i) ~work_selection () )
   in
   configs

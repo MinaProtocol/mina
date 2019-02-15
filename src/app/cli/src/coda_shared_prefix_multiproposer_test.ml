@@ -1,4 +1,3 @@
-
 open Core
 open Async
 open Coda_worker
@@ -19,4 +18,5 @@ let main () =
 
 let command =
   let open Command.Let_syntax in
-  Command.async ~summary:"Test that workers share prefixes" (Command.Param.return main)
+  Command.async ~summary:"Test that workers share prefixes"
+    (Command.Param.return main)

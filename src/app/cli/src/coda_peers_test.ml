@@ -12,14 +12,16 @@ let main () =
   let log = Logger.create () in
   let log = Logger.child log name in
   let proposal_interval = Consensus.Constants.block_window_duration_ms in
-  let acceptable_delay = Time.Span.of_ms (proposal_interval * Consensus.Constants.delta |> Float.of_int) in
+  let acceptable_delay =
+    Time.Span.of_ms
+      (proposal_interval * Consensus.Constants.delta |> Float.of_int)
+  in
   let work_selection = Protocols.Coda_pow.Work_selection.Seq in
   Coda_processes.init () ;
   let configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
-      ~acceptable_delay
-      ~snark_worker_public_keys:None ~should_propose:(Fn.const false)
-      ~work_selection
+      ~acceptable_delay ~snark_worker_public_keys:None
+      ~should_propose:(Fn.const false) ~work_selection
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let _, _, expected_peers = Coda_processes.net_configs n in

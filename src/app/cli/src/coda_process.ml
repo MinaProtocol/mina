@@ -19,7 +19,8 @@ let spawn_exn (config : Coda_worker.Input.t) =
   return (conn, process, config)
 
 let local_config ?proposal_interval ~peers ~discovery_port ~external_port
-    ~acceptable_delay ~program_dir ~should_propose ~snark_worker_config ~work_selection () =
+    ~acceptable_delay ~program_dir ~should_propose ~snark_worker_config
+    ~work_selection () =
   let host = "127.0.0.1" in
   let conf_dir =
     Filename.temp_dir_name
