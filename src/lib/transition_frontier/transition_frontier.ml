@@ -57,9 +57,9 @@ module Make (Inputs : Inputs_intf) :
     in
     return {frontier0= f; extensions= Extensions.create ()}
 
-  let add_breadcrumb_exn t bc =
+  let add_breadcrumb_exn t breadcrumb =
     Extensions.handle_diff t.extensions t.frontier0
-      (Transition_frontier0.add_breadcrumb_exn t.frontier0 bc)
+      (Transition_frontier0.add_breadcrumb_exn t.frontier0 breadcrumb)
 
   let all_breadcrumbs t = Transition_frontier0.all_breadcrumbs t.frontier0
 
@@ -77,7 +77,8 @@ module Make (Inputs : Inputs_intf) :
 
   let find_exn t hash = Transition_frontier0.find_exn t.frontier0 hash
 
-  let hash_path t bc = Transition_frontier0.hash_path t.frontier0 bc
+  let hash_path t breadcrumb =
+    Transition_frontier0.hash_path t.frontier0 breadcrumb
 
   let iter t ~f = Transition_frontier0.iter t.frontier0 ~f
 
@@ -85,7 +86,8 @@ module Make (Inputs : Inputs_intf) :
 
   let max_length = Transition_frontier0.max_length
 
-  let path_map t bc ~f = Transition_frontier0.path_map t.frontier0 bc ~f
+  let path_map t breadcrumb ~f =
+    Transition_frontier0.path_map t.frontier0 breadcrumb ~f
 
   let root t = Transition_frontier0.root t.frontier0
 
@@ -95,7 +97,9 @@ module Make (Inputs : Inputs_intf) :
   let successor_hashes_rec t hash =
     Transition_frontier0.successor_hashes_rec t.frontier0 hash
 
-  let successors t bc = Transition_frontier0.successors t.frontier0 bc
+  let successors t breadcrumb =
+    Transition_frontier0.successors t.frontier0 breadcrumb
 
-  let successors_rec t bc = Transition_frontier0.successors_rec t.frontier0 bc
+  let successors_rec t breadcrumb =
+    Transition_frontier0.successors_rec t.frontier0 breadcrumb
 end
