@@ -6,7 +6,7 @@ include Sparse_ledger_lib.Sparse_ledger.Make
           (Ledger_hash)
           (Public_key.Compressed.Stable.V1)
           (struct
-            include Account.Stable.V1
+            include Account.Stable.Latest
 
             let hash = Fn.compose Ledger_hash.of_digest Account.digest
           end)
