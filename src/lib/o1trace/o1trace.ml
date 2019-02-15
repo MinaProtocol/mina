@@ -17,34 +17,53 @@ let timestamp () =
   Time_stamp_counter.now () |> Time_stamp_counter.to_time_ns
   |> Core.Time_ns.to_int63_ns_since_epoch |> Int63.to_int_exn
 
-let new_event (k : event_kind) : event =
-  {name= ""; categories= []; phase= k; timestamp= timestamp (); pid= 0; tid= 0}
-
-let trace_new_thread' ~pid wr (name : string) (ctx : Execution_context.t) =
-  emit_event wr {(new_event New_thread) with name; tid= ctx.tid; pid}
-
-let trace_thread_switch' ~pid wr (new_ctx : Execution_context.t) =
-  emit_event wr {(new_event Thread_switch) with tid= new_ctx.tid; pid}
-
-let tid = ref 1
-
 let current_wr = ref None
 
-let trace_event' wr (name : string) =
-  emit_event wr {(new_event Event) with name}
+let our_pid = Unix.getpid () |> Pid.to_int
 
-let trace_event_impl = ref (fun _ -> ())
+let next_tid = ref 1
 
-let trace_event name = !trace_event_impl name
+let tid_names = ref []
+
+let remember_tid name tid = tid_names := (name, tid) :: !tid_names
+
+let new_event (k : event_kind) : event =
+  { name= ""
+  ; categories= []
+  ; phase= k
+  ; timestamp= timestamp ()
+  ; pid= our_pid
+  ; tid= 0 }
+
+let log_thread_existence name tid =
+  Option.iter !current_wr ~f:(fun wr ->
+      emit_event wr {(new_event New_thread) with name; tid} )
+
+let trace_new_thread (name : string) (tid : int) =
+  remember_tid name tid ;
+  log_thread_existence name tid
+
+let trace_thread_switch (new_ctx : Execution_context.t) =
+  Option.iter !current_wr ~f:(fun wr ->
+      emit_event wr {(new_event Thread_switch) with tid= new_ctx.tid} )
+
+let () =
+  Async_kernel.Tracing.fns :=
+    { trace_thread_switch
+    ; trace_new_thread= (fun name ctx -> trace_new_thread name ctx.tid) }
+
+let trace_event (name : string) =
+  Option.iter !current_wr ~f:(fun wr ->
+      emit_event wr {(new_event Event) with name} )
 
 let trace_task (name : string) (f : unit -> 'a) =
   let new_ctx =
     Execution_context.with_tid
-      (Scheduler.current_execution_context (Scheduler.t ()))
-      !tid
+      Scheduler.(t () |> current_execution_context)
+      !next_tid
   in
-  tid := !tid + 1 ;
-  !Async_kernel.Tracing.fns.trace_new_thread name new_ctx ;
+  next_tid := !next_tid + 1 ;
+  trace_new_thread name new_ctx.tid ;
   match Scheduler.within_context new_ctx f with
   | Error () ->
       failwith "traced task failed, exception reported to parent monitor"
@@ -55,19 +74,14 @@ let trace_recurring_task (name : string) (f : unit -> 'a) =
       trace_event "started another" ;
       f () )
 
-let measure' wr (name : string) (f : unit -> 'a) : 'a =
-  let pid = Pid.to_int (Unix.getpid ()) in
-  emit_event wr {(new_event Measure_start) with name; pid} ;
-  let res = f () in
-  emit_event wr {(new_event Measure_end) with pid} ;
-  res
-
-let measure_impl = ref (fun _ f -> f ())
-
-(* the two things we set measure_impl to are fine *)
-
-let measure name (f : unit -> 'a) : 'a =
-  (Obj.magic !measure_impl : string -> (unit -> 'a) -> 'a) name f
+let measure (name : string) (f : unit -> 'a) : 'a =
+  match !current_wr with
+  | Some wr ->
+      emit_event wr {(new_event Measure_start) with name} ;
+      let res = f () in
+      emit_event wr (new_event Measure_end) ;
+      res
+  | None -> f ()
 
 let forget_tid (f : unit -> 'a) =
   let new_ctx =
@@ -78,26 +92,18 @@ let forget_tid (f : unit -> 'a) =
 
 let start_tracing wr =
   current_wr := Some wr ;
-  let pid = Unix.getpid () |> Pid.to_int in
-  emit_event wr {(new_event Pid_is) with pid} ;
-  Async_kernel.Tracing.fns :=
-    { trace_thread_switch= trace_thread_switch' wr ~pid
-    ; trace_new_thread= trace_new_thread' wr ~pid } ;
-  trace_event_impl := trace_event' wr ;
-  measure_impl := measure' wr ;
   let sch = Scheduler.t () in
   Scheduler.set_on_end_of_cycle sch (fun () ->
-      sch.cycle_started <- true ;
-      if sch.current_execution_context.tid <> 0 then
+      if not sch.cycle_started then
         emit_event wr
-          {(new_event Cycle_end) with tid= sch.current_execution_context.tid}
-  )
+          {(new_event Cycle_end) with tid= sch.current_execution_context.tid} ;
+      sch.cycle_started <- true ) ;
+  emit_event wr (new_event Pid_is) ;
+  List.iter !tid_names ~f:(fun (name, tid) -> log_thread_existence name tid) ;
+  emit_event wr
+    {(new_event Thread_switch) with tid= sch.current_execution_context.tid}
 
 let stop_tracing () =
-  Async_kernel.Tracing.fns :=
-    {trace_thread_switch= (fun _ -> ()); trace_new_thread= (fun _ _ -> ())} ;
-  (trace_event_impl := fun _ -> ()) ;
-  (measure_impl := fun _ f -> f ()) ;
   let sch = Scheduler.t () in
   Scheduler.set_on_end_of_cycle sch Fn.id ;
   Option.iter !current_wr ~f:(fun wr ->
