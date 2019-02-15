@@ -44,6 +44,9 @@ module Staged_ledger_aux_hash = struct
   let of_bytes = Staged_ledger_hash.Aux_hash.of_bytes
 end
 
+module Transaction_witness = Coda_base.Transaction_witness
+module Pending_coinbase = Coda_base.Pending_coinbase
+module Pending_coinbase_hash = Coda_base.Pending_coinbase.Hash
 module Transaction_snark_work =
   Staged_ledger.Make_completed_work (Public_key.Compressed) (Ledger_proof)
     (Ledger_proof_statement)
@@ -124,6 +127,9 @@ module Staged_ledger = Staged_ledger.Make (struct
   module Account = Coda_base.Account
   module Ledger = Coda_base.Ledger
   module Sparse_ledger = Coda_base.Sparse_ledger
+  module Pending_coinbase = Pending_coinbase
+  module Pending_coinbase_hash = Pending_coinbase.Hash
+  module Transaction_witness = Transaction_witness
 
   module Config = struct
     let transaction_capacity_log_2 = 7
@@ -182,6 +188,8 @@ module Transition_frontier_inputs = struct
   module Staged_ledger_diff = Staged_ledger_diff
   module External_transition = External_transition
   module Staged_ledger = Staged_ledger
+  module Transaction_witness = Transaction_witness
+  module Pending_coinbase_hash = Pending_coinbase.Hash
 end
 
 module Transition_frontier =
@@ -250,6 +258,7 @@ let gen_breadcrumb ~logger :
       Blockchain_state.create_value ~timestamp:(Block_time.now ())
         ~snarked_ledger_hash:next_ledger_hash
         ~staged_ledger_hash:next_staged_ledger_hash
+        ~pending_coinbase_hash:Pending_coinbase_hash.empty_hash
     in
     let previous_state_hash =
       Consensus.Protocol_state.hash previous_protocol_state

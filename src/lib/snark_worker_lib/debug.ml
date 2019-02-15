@@ -26,6 +26,8 @@ module Inputs = struct
 
   module Transaction = Coda_base.Transaction
   module Sparse_ledger = Coda_base.Sparse_ledger
+  module Pending_coinbase = Coda_base.Pending_coinbase
+  module Transaction_witness = Coda_base.Transaction_witness
 
   let perform_single () ~message s =
     Ok

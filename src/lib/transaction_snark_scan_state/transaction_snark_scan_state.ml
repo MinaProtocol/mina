@@ -42,20 +42,16 @@ module Make (Inputs : Inputs.S) : sig
      and type transaction_snark_work_statement :=
                 Inputs.Transaction_snark_work.Statement.t
      and type pending_coinbase := Inputs.Pending_coinbase.t
+     and type transaction_witness := Inputs.Transaction_witness.t
 end = struct
   open Inputs
-
-  module Witness = struct
-    type t = {ledger: Sparse_ledger.t; pending_coinbases: Pending_coinbase.t}
-    [@@deriving sexp, bin_io]
-  end
 
   module Transaction_with_witness = struct
     (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
     type t =
       { transaction_with_info: Ledger.Undo.t
       ; statement: Ledger_proof_statement.t
-      ; witness: Witness.t }
+      ; witness: Transaction_witness.t }
     [@@deriving sexp, bin_io]
   end
 

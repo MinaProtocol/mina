@@ -9,7 +9,7 @@ open Fold_lib
 open Snark_bits
 
 module Coinbase = struct
-  type t = Public_key.Compressed.t * Currency.Amount.t
+  type t = Public_key.Compressed.t * Currency.Amount.t [@@deriving sexp]
 
   let of_coinbase (cb : Coinbase.t) : t Or_error.t =
     Option.value_map cb.fee_transfer
@@ -136,8 +136,6 @@ end*)
 module Stack = struct
   include Data_hash.Make_full_size ()
 
-  type value = t
-
   let push_exn (h : t) cb : t =
     match Coinbase.of_coinbase cb with
     | Ok cb ->
@@ -148,7 +146,13 @@ module Stack = struct
         failwithf "Error adding a coinbase to the pending stack: %s"
           (Error.to_string_hum e) ()
 
-  let equal = Pedersen.Digest.equal
+  (*let equal t1 t2= Pedersen.Digest.equal (t1 :> field) (t2 :> field)*)
+  
+  (*let crypto_hash_prefix = Hash_prefix.account
+
+  let crypto_hash t = Pedersen.hash_fold crypto_hash_prefix (fold_bits t)
+
+  let digest t = Pedersen.State.digest (crypto_hash t)*)
 
   let empty =
     of_hash
@@ -200,6 +204,8 @@ module Hash = struct
       end)
       (struct
         include Stack
+
+        type value = t
 
         let hash = Checked.digest
       end)
@@ -285,10 +291,23 @@ module Hash = struct
         let%bind stack_not_there =
           Stack.Checked.equal stack' Stack.(var_of_t empty)
         in
-        let%bind new_stack =
-          Boolean.(stack_already_there && has_one_coinbase)
-        in
+        let%bind new_stack = Boolean.(stack_not_there && has_one_coinbase) in
         let%bind () = Boolean.Assert.any [stack_already_there; new_stack] in
         return new_stack )
       ~f:(fun is_empty_and_writeable x -> f ~is_empty_and_writeable x)
 end
+
+module T = struct
+  module Coinbase_stack = struct
+    include Stack
+
+    let hash (t : t) = Hash.of_digest (t :> field)
+  end
+
+  include Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Coinbase_stack)
+            (Coinbase_stack)
+
+  (*Handler goes here*)
+end
+
+include T

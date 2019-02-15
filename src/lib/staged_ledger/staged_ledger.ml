@@ -39,6 +39,7 @@ module Make (Inputs : Inputs.S) : sig
      and type ledger_proof_statement_set := Inputs.Ledger_proof_statement.Set.t
      and type transaction := Inputs.Transaction.t
      and type user_command := Inputs.User_command.t
+     and type transaction_witness := Inputs.Transaction_witness.t
 end = struct
   open Inputs
   module Scan_state = Transaction_snark_scan_state.Make (Inputs)
@@ -308,12 +309,17 @@ end = struct
     let source =
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
     in
+    let pending_coinbase_hash =
+      failwith ""
+      (*TODO:If this a transactions then push it get new merkle root (Pending_coinbase_hash.t)else the same merkle root  *)
+    in
     let%map undo = Ledger.apply_transaction ledger s in
     ( undo
     , { Ledger_proof_statement.source
       ; target= Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
       ; fee_excess
       ; supply_increase
+      ; pending_coinbase_hash
       ; proof_type= `Base } )
 
   let apply_transaction_and_get_witness ledger s =
@@ -329,9 +335,13 @@ end = struct
           in
           c.proposer :: ft_receivers
     in
-    let witness =
+    let ledger_witness =
       measure "sparse ledger" (fun () ->
           Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) )
+    in
+    let pending_coinbase_witness =
+      failwith ""
+      (*TODO: if coinbase then add update the Pending_coinbase.t*)
     in
     let%bind () = Async.Scheduler.yield () in
     let r =
@@ -342,7 +352,8 @@ end = struct
     let open Or_error.Let_syntax in
     let%map undo, statement = r in
     { Scan_state.Transaction_with_witness.transaction_with_info= undo
-    ; witness
+    ; witness=
+        {ledger= ledger_witness; pending_coinbases= pending_coinbase_witness}
     ; statement }
 
   let update_ledger_and_get_statements ledger ts =
@@ -1470,12 +1481,29 @@ let%test_module "test" =
         (*let equal t t' =  t = t'*)
       end
 
+      module Pending_coinbase_hash = struct
+        type t = string [@@deriving sexp, bin_io, compare, hash]
+
+        let gen = String.gen_with_length 756 Char.gen
+      end
+
+      module Pending_coinbase = struct
+        type t = (Compressed_public_key.t * int) list [@@deriving sexp, bin_io]
+
+        let merkle_root : t -> Pending_coinbase_hash.t =
+         fun t ->
+          List.fold t
+            ~f:(fun acc (pk, amt) -> acc ^ " " ^ pk ^ Int.to_string amt)
+            ~init:""
+      end
+
       module Ledger_proof_statement = struct
         module T = struct
           type t =
             { source: Ledger_hash.t
             ; target: Ledger_hash.t
             ; supply_increase: Currency.Amount.t
+            ; pending_coinbase_hash: Pending_coinbase_hash.t
             ; fee_excess: Fee.Signed.t
             ; proof_type: [`Base | `Merge] }
           [@@deriving sexp, bin_io, compare, hash]
@@ -1499,6 +1527,7 @@ let%test_module "test" =
             { source= s1.source
             ; target= s2.target
             ; supply_increase
+            ; pending_coinbase_hash= s2.pending_coinbase_hash
             ; fee_excess
             ; proof_type= `Merge }
         end
@@ -1511,12 +1540,18 @@ let%test_module "test" =
           let%bind source = Ledger_hash.gen
           and target = Ledger_hash.gen
           and fee_excess = Fee.Signed.gen
-          and supply_increase = Currency.Amount.gen in
+          and supply_increase = Currency.Amount.gen
+          and pending_coinbase_hash = Pending_coinbase_hash.gen in
           let%map proof_type =
             Quickcheck.Generator.bool
             >>| function true -> `Base | false -> `Merge
           in
-          {source; target; supply_increase; fee_excess; proof_type}
+          { source
+          ; target
+          ; supply_increase
+          ; fee_excess
+          ; proof_type
+          ; pending_coinbase_hash }
       end
 
       module Proof = Ledger_proof_statement
@@ -1837,6 +1872,12 @@ let%test_module "test" =
           (fst t.diff).user_commands
           @ Option.value_map (snd t.diff) ~default:[] ~f:(fun d ->
                 d.user_commands )
+      end
+
+      module Transaction_witness = struct
+        type t =
+          {ledger: Sparse_ledger.t; pending_coinbases: Pending_coinbase.t}
+        [@@deriving bin_io, sexp]
       end
 
       module Config = struct

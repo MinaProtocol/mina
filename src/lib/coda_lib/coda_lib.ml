@@ -368,7 +368,7 @@ module type Inputs_intf = sig
      and type work :=
                 ( Ledger_proof_statement.t
                 , Transaction.t
-                , Sparse_ledger.t
+                , Transaction_witness.t
                 , Ledger_proof.t )
                 Snark_work_lib.Work.Single.Spec.t
      and type snark_pool := Snark_pool.t

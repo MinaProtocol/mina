@@ -117,6 +117,11 @@ module type S = sig
     val apply_transaction_exn : t -> Transaction.t -> t
   end
 
+  module Transaction_witness :
+    Coda_pow.Transaction_witness_intf
+    with type sparse_ledger := Sparse_ledger.t
+     and type pending_coinbase := Pending_coinbase.t
+
   module Config : sig
     val transaction_capacity_log_2 : int
 

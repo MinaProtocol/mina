@@ -7,8 +7,12 @@ open Signature_lib
 module type Inputs_intf = sig
   module Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf
 
+  module Pending_coinbase_hash : Pending_coinbase_hash_intf
+
   module Ledger_proof_statement :
-    Ledger_proof_statement_intf with type ledger_hash := Frozen_ledger_hash.t
+    Ledger_proof_statement_intf
+    with type ledger_hash := Frozen_ledger_hash.t
+     and type pending_coinbase_hash := Pending_coinbase_hash.t
 
   module Ledger_proof : sig
     include
@@ -45,6 +49,11 @@ module type Inputs_intf = sig
     with module Protocol_state = Consensus.Protocol_state
      and module Staged_ledger_diff := Staged_ledger_diff
 
+  module Transaction_witness :
+    Transaction_witness_intf
+    with type sparse_ledger := Sparse_ledger.t
+     and type pending_coinbase := Pending_coinbase.t
+
   module Staged_ledger :
     Staged_ledger_intf
     with type diff := Staged_ledger_diff.t
@@ -66,6 +75,7 @@ module type Inputs_intf = sig
      and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
      and type transaction := Transaction.t
      and type user_command := User_command.t
+     and type transaction_witness := Transaction_witness.t
 end
 
 module Make (Inputs : Inputs_intf) :
