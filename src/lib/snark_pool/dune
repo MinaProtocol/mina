@@ -6,6 +6,6 @@
  (libraries core extlib protocols async coda_base dyn_array)
  (preprocess
   (pps ppx_jane ppx_deriving.eq bisect_ppx -- -conditional))
- (flags :standard -short-paths -warn-error -6-33-32-34-58)
+ (flags :standard -short-paths -warn-error -6-32-34-58)
  (synopsis
    "Snark pool manages work and snarks amongst all nodes in the network"))
