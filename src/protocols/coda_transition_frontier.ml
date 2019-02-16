@@ -57,7 +57,7 @@ module type Network_intf = sig
        t
     -> peer
     -> state_hash
-    -> external_transition list option Deferred.Or_error.t
+    -> external_transition Non_empty_list.t option Deferred.Or_error.t
 
   val get_ancestry :
        t
@@ -333,6 +333,10 @@ module type Sync_handler_intf = sig
 
   type transition_frontier
 
+  type state_hash
+
+  type external_transition
+
   type syncable_ledger_query
 
   type syncable_ledger_answer
@@ -343,6 +347,11 @@ module type Sync_handler_intf = sig
     -> syncable_ledger_query
     -> logger:Logger.t
     -> (ledger_hash * syncable_ledger_answer) option
+
+  val transition_catchup :
+       frontier:transition_frontier
+    -> state_hash
+    -> external_transition Non_empty_list.t option
 end
 
 module type Root_prover_intf = sig
