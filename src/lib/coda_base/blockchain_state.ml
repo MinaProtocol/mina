@@ -1,6 +1,4 @@
 open Core_kernel
-open Coda_numbers
-open Util
 open Snark_params
 open Tick
 open Let_syntax

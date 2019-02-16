@@ -1,6 +1,5 @@
 open Core
 open Import
-open Snark_params.Tick
 module Payload = User_command_payload
 
 type ('payload, 'pk, 'signature) t_ =
