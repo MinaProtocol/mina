@@ -75,17 +75,17 @@ module Coinbase = struct
   end
 end
 
-let coinbase_stacks = Int.ceil_log2 9
+let coinbase_stack_count = Int.ceil_log2 9
 
 module Index = struct
   include Int
 
-  let gen = Int.gen_incl 0 ((1 lsl coinbase_stacks) - 1)
+  let gen = Int.gen_incl 0 ((1 lsl coinbase_stack_count) - 1)
 
   module Vector = struct
     include Int
 
-    let length = coinbase_stacks
+    let length = coinbase_stack_count
 
     let empty = zero
 
@@ -103,36 +103,6 @@ module Index = struct
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
 end
 
-(*module Ordered_collection : sig
-  type 'a t
-
-  val update : 'a t -> ('a -> 'a) -> 'a t
-
-  val delete : 'a t -> ('a -> 'a) -> 'a t
-
-  (*create*)
-end = struct
-  type 'a t = {data: (Pedersen.Digest.t, 'a) Merkle_tree.t
-  ;delete_at: Index.t (* set empty here and *)
-  ;update_at: Index.t}
-
-  let update _ _ = failwith ""
-
-  let delete _ _ = failwith ""
-end*)
-
-(*module Stack = struct
-  type t = Pedersen.Digest.t * 
-
-  let equal = Pedersen.Digest.equal
-
-  let hash _ = failwith ""
-
-  let to_bits _ = failwith ""
-
-  let push t x = hash (to_bits t @ to_bits x)
-end*)
-
 module Stack = struct
   include Data_hash.Make_full_size ()
 
@@ -145,14 +115,6 @@ module Stack = struct
     | Error e ->
         failwithf "Error adding a coinbase to the pending stack: %s"
           (Error.to_string_hum e) ()
-
-  (*let equal t1 t2= Pedersen.Digest.equal (t1 :> field) (t2 :> field)*)
-  
-  (*let crypto_hash_prefix = Hash_prefix.account
-
-  let crypto_hash t = Pedersen.hash_fold crypto_hash_prefix (fold_bits t)
-
-  let digest t = Pedersen.State.digest (crypto_hash t)*)
 
   let empty =
     of_hash
@@ -210,7 +172,7 @@ module Hash = struct
         let hash = Checked.digest
       end)
 
-  let depth = coinbase_stacks
+  let depth = coinbase_stack_count
 
   include Data_hash.Make_full_size ()
 
@@ -237,7 +199,8 @@ module Hash = struct
     | Stack_path : Index.t -> path Request.t
     | Get_coinbase_stack : Index.t -> (Stack.t * path) Request.t
     | Set_coinbase_stack : Index.t * Stack.t -> unit Request.t
-    | Find_index_of_stack : Stack.t -> Index.t Request.t
+    | Find_index_of_newest_stack : Index.t Request.t
+    | Find_index_of_oldest_stack : Index.t Request.t
 
   let reraise_merkle_requests (With {request; respond}) =
     match request with
@@ -262,12 +225,10 @@ module Hash = struct
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the stack [f stack] at path [addr].
 *)
-  let%snarkydef modify_stack' t stack
-      ~(filter : Stack.var -> ('a, _) Checked.t) ~f =
+  let%snarkydef modify_stack' t ~(filter : Stack.var -> ('a, _) Checked.t) ~f =
     let%bind addr =
       request_witness Index.Unpacked.typ
-        As_prover.(
-          map (read Stack.typ stack) ~f:(fun s -> Find_index_of_stack s))
+        As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_newest_stack))
     in
     handle
       (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
@@ -284,17 +245,37 @@ module Hash = struct
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the stack [f stack] at path [addr].
 *)
-  let modify_stack t stack ~has_one_coinbase ~f =
-    modify_stack' t stack
-      ~filter:(fun stack' ->
-        let%bind stack_already_there = Stack.Checked.equal stack' stack in
-        let%bind stack_not_there =
-          Stack.Checked.equal stack' Stack.(var_of_t empty)
+  let update_stack t ~is_new_stack ~f =
+    modify_stack' t
+      ~filter:(fun stack ->
+        let%bind empty_stack =
+          Stack.Checked.equal stack Stack.(var_of_t empty)
         in
-        let%bind new_stack = Boolean.(stack_not_there && has_one_coinbase) in
-        let%bind () = Boolean.Assert.any [stack_already_there; new_stack] in
-        return new_stack )
-      ~f:(fun is_empty_and_writeable x -> f ~is_empty_and_writeable x)
+        let%bind new_stack = Boolean.(empty_stack && is_new_stack) in
+        let%bind yes = Boolean.(new_stack || not empty_stack) in
+        let%bind () = Boolean.Assert.is_true yes in
+        return yes )
+      ~f:(fun is_empty_or_writeable x -> f ~is_empty_or_writeable x)
+
+  let%snarkydef delete_stack t ~f =
+    let filter stack =
+      let%bind empty_stack =
+        Stack.Checked.equal stack Stack.(var_of_t empty)
+      in
+      let%bind () = Boolean.(Assert.is_true (not empty_stack)) in
+      return Boolean.(not empty_stack)
+    in
+    let%bind addr =
+      request_witness Index.Unpacked.typ
+        As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_oldest_stack))
+    in
+    handle
+      (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
+         ~f:(fun stack ->
+           let%bind x = filter stack in
+           f x stack ))
+      reraise_merkle_requests
+    >>| var_of_hash_packed
 end
 
 module T = struct
@@ -304,10 +285,62 @@ module T = struct
     let hash (t : t) = Hash.of_digest (t :> field)
   end
 
-  include Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Coinbase_stack)
-            (Coinbase_stack)
+  module Merkle_tree =
+    Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Index) (Coinbase_stack)
 
-  (*Handler goes here*)
+  type t = {tree: Merkle_tree.t; index_list: Index.t list; new_index: Index.t}
+  [@@deriving sexp, bin_io]
+
+  let create () = failwith "TODO"
+
+  let next_new_index t ~is_new:_ =
+    failwith
+      "TODO: push the current stack index to the index_list and get the new one"
+
+  let get_latest_stack t ~is_new =
+    if is_new then Some t.new_index
+      (* IMPORTANT TODO: include hash of the path*)
+    else match t.index_list with [] -> None | x :: _ -> Some x
+
+  let get_oldest_stack t = List.last t.index_list
+
+  let replace_latest_stack t stack ~is_new =
+    match t.index_list with
+    | [] -> if is_new then Some [stack] else None
+    | x :: xs -> if is_new then Some (stack :: x :: xs) else Some (stack :: xs)
+
+  let remove_oldest_stack_exn t =
+    match List.rev t with
+    | [] -> failwith "No stacks"
+    | x :: xs -> (x, List.rev xs)
+
+  let add_coinbase_exn t ~coinbase ~is_new =
+    let stack_index = Option.value_exn (get_latest_stack t ~is_new) in
+    let stack_before = Merkle_tree.get_exn t.tree stack_index in
+    let stack_after = Coinbase_stack.push_exn stack_before coinbase in
+    let t' = next_new_index t ~is_new in
+    let tree' = Merkle_tree.set_exn t.tree stack_index stack_after in
+    {t' with tree= tree'}
+
+  let remove_coinbase_stack_exn t =
+    let oldest_stack_index, remaining = remove_oldest_stack_exn t.index_list in
+    let tree' =
+      Merkle_tree.set_exn t.tree oldest_stack_index Coinbase_stack.empty
+    in
+    {t with tree= tree'; index_list= remaining}
+
+  let merkle_root t = Merkle_tree.merkle_root t.tree
+
+  let get_exn t index = Merkle_tree.get_exn t.tree index
+
+  let path_exn t index = Merkle_tree.path_exn t.tree index
+
+  let set_exn t index stack =
+    {t with tree= Merkle_tree.set_exn t.tree index stack}
+
+  let find_index_exn t = Fn.id
+
+  (*TODO should handler be here?*)
 end
 
 include T
