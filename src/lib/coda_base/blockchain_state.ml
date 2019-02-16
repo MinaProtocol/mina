@@ -87,22 +87,40 @@ module Make (Genesis_ledger : sig
 end) : S = struct
   module Stable = struct
     module V1 = struct
-      type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t_ =
-        { staged_ledger_hash: 'staged_ledger_hash
-        ; snarked_ledger_hash: 'snarked_ledger_hash
-        ; timestamp: 'time }
-      [@@deriving bin_io, sexp, fields, eq, compare, hash]
+      module T = struct
+        let version = 1
 
-      type t =
-        ( Staged_ledger_hash.Stable.V1.t
-        , Frozen_ledger_hash.Stable.V1.t
-        , Block_time.Stable.V1.t )
-        t_
-      [@@deriving bin_io, sexp, eq, compare, hash]
+        type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t_ =
+          { staged_ledger_hash: 'staged_ledger_hash
+          ; snarked_ledger_hash: 'snarked_ledger_hash
+          ; timestamp: 'time }
+        [@@deriving bin_io, sexp, fields, eq, compare, hash]
+
+        type t =
+          ( Staged_ledger_hash.Stable.V1.t
+          , Frozen_ledger_hash.Stable.V1.t
+          , Block_time.Stable.V1.t )
+          t_
+        [@@deriving bin_io, sexp, eq, compare, hash]
+      end
+
+      include T
+      include Module_version.Registration.Make_latest_version (T)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "coda_base_blockchain_state"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Module_version.Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
+  include Stable.Latest
 
   type var =
     ( Staged_ledger_hash.var
