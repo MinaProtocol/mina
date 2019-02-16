@@ -18,8 +18,8 @@ let%test_module "Sync_handler" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
       let logger = Logger.create () in
-      Thread_safe.block_on_async_exn (fun () ->
-          Ledger.with_ephemeral_ledger ~f:(fun dest_ledger ->
+      Ledger.with_ephemeral_ledger ~f:(fun dest_ledger ->
+          Thread_safe.block_on_async_exn (fun () ->
               let%bind frontier =
                 create_root_frontier ~logger Genesis_ledger.accounts
               in
