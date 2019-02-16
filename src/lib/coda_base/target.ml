@@ -59,7 +59,6 @@ module Bits =
     end)
 
 open Tick
-open Let_syntax
 
 let var_to_unpacked (x : Field.Var.t) =
   Field.Checked.unpack ~length:bit_length x

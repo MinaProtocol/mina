@@ -1,7 +1,5 @@
-open Signature_lib
 open Core_kernel
 open Snark_params.Tick
-open Tuple_lib
 open Fold_lib
 module Account_nonce = Coda_numbers.Account_nonce
 module Memo = User_command_memo
