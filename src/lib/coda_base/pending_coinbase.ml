@@ -75,7 +75,9 @@ module Coinbase = struct
   end
 end
 
-let coinbase_stack_count = Int.ceil_log2 9
+let coinbase_stacks = 9
+
+let coinbase_stack_count = Int.ceil_log2 coinbase_stacks
 
 module Index = struct
   include Int
@@ -293,9 +295,13 @@ module T = struct
 
   let create () = failwith "TODO"
 
-  let next_new_index t ~is_new:_ =
-    failwith
-      "TODO: push the current stack index to the index_list and get the new one"
+  let next_new_index t ~is_new =
+    if is_new then
+      let new_index =
+        if t.new_index = coinbase_stacks then 0 else t.new_index + 1
+      in
+      {t with index_list= new_index :: t.index_list; new_index}
+    else t
 
   let get_latest_stack t ~is_new =
     if is_new then Some t.new_index
@@ -315,7 +321,8 @@ module T = struct
     | x :: xs -> (x, List.rev xs)
 
   let add_coinbase_exn t ~coinbase ~is_new =
-    let stack_index = Option.value_exn (get_latest_stack t ~is_new) in
+    let current_stack = Option.value_exn (get_latest_stack t ~is_new) in
+    let stack_index = Merkle_tree.find_index_exn t.tree current_stack in
     let stack_before = Merkle_tree.get_exn t.tree stack_index in
     let stack_after = Coinbase_stack.push_exn stack_before coinbase in
     let t' = next_new_index t ~is_new in
@@ -323,10 +330,9 @@ module T = struct
     {t' with tree= tree'}
 
   let remove_coinbase_stack_exn t =
-    let oldest_stack_index, remaining = remove_oldest_stack_exn t.index_list in
-    let tree' =
-      Merkle_tree.set_exn t.tree oldest_stack_index Coinbase_stack.empty
-    in
+    let oldest_stack, remaining = remove_oldest_stack_exn t.index_list in
+    let stack_index = Merkle_tree.find_index_exn t.tree oldest_stack in
+    let tree' = Merkle_tree.set_exn t.tree stack_index Coinbase_stack.empty in
     {t with tree= tree'; index_list= remaining}
 
   let merkle_root t = Merkle_tree.merkle_root t.tree
@@ -338,7 +344,7 @@ module T = struct
   let set_exn t index stack =
     {t with tree= Merkle_tree.set_exn t.tree index stack}
 
-  let find_index_exn t = Fn.id
+  let find_index_exn t = Merkle_tree.find_index_exn t.tree
 
   (*TODO should handler be here?*)
 end
