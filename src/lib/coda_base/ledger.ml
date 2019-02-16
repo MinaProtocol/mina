@@ -13,19 +13,6 @@ module Ledger_inner = struct
 
   module Location_at_depth = Location0
 
-  (*
-module Key = struct
-  module T = struct
-    type t = Account.key [@@deriving sexp, bin_io, compare, hash, eq]
-  end
-
-  let empty = Account.empty.public_key
-
-  include T
-  include Hashable.Make_binable (T)
-end
-*)
-
   module Kvdb : Intf.Key_value_database = Rocksdb.Database
 
   module Storage_locations : Intf.Storage_locations = struct
