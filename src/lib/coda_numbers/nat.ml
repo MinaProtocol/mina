@@ -2,6 +2,7 @@ open Core_kernel
 open Snark_bits
 open Fold_lib
 open Tuple_lib
+open Module_version
 
 module type S = sig
   type t [@@deriving bin_io, sexp, compare, hash]
@@ -14,6 +15,8 @@ module type S = sig
     module V1 : sig
       type nonrec t = t [@@deriving bin_io, sexp, eq, compare, hash]
     end
+
+    module Latest = V1
   end
 
   val length_in_triples : int
@@ -77,12 +80,30 @@ end)
 struct
   module Stable = struct
     module V1 = struct
-      type t = N.t [@@deriving bin_io, sexp, eq, compare, hash]
+      module T = struct
+        let version = 1
+
+        type t = N.t [@@deriving bin_io, sexp, eq, compare, hash]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "nat_make"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
-  include Comparable.Make (Stable.V1)
+  include Stable.Latest
+  include Comparable.Make (Stable.Latest)
 
   include (N : module type of N with type t := t)
 
