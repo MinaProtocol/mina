@@ -77,17 +77,17 @@ end
 
 let coinbase_stacks = 9
 
-let coinbase_stack_count = Int.ceil_log2 coinbase_stacks
+let coinbase_tree_depth = Int.ceil_log2 coinbase_stacks
 
 module Index = struct
   include Int
 
-  let gen = Int.gen_incl 0 ((1 lsl coinbase_stack_count) - 1)
+  let gen = Int.gen_incl 0 ((1 lsl coinbase_tree_depth) - 1)
 
   module Vector = struct
     include Int
 
-    let length = coinbase_stack_count
+    let length = coinbase_tree_depth
 
     let empty = zero
 
@@ -174,7 +174,7 @@ module Hash = struct
         let hash = Checked.digest
       end)
 
-  let depth = coinbase_stack_count
+  let depth = coinbase_tree_depth
 
   include Data_hash.Make_full_size ()
 
@@ -293,7 +293,33 @@ module T = struct
   type t = {tree: Merkle_tree.t; index_list: Index.t list; new_index: Index.t}
   [@@deriving sexp, bin_io]
 
-  let create () = failwith "TODO"
+  let create_exn () =
+    let hash_on_level, root_hash =
+      List.fold
+        (List.init coinbase_tree_depth ~f:Fn.id)
+        ~init:([(0, Hash.empty_hash)], Hash.empty_hash)
+        ~f:(fun (hashes, cur_hash) height ->
+          let merge = Hash.merge ~height:(height + 1) cur_hash cur_hash in
+          ((height + 1, merge) :: hashes, merge) )
+    in
+    let rec create_path height path key =
+      if height > coinbase_tree_depth then path
+      else
+        let hash =
+          Option.value_exn
+            (List.Assoc.find ~equal:Int.equal hash_on_level height)
+        in
+        create_path (height + 1)
+          ((if key mod 2 = 0 then `Left hash else `Right hash) :: path)
+          (key / 2)
+    in
+    let rec go t key =
+      if key >= Int.pow 2 coinbase_tree_depth then t
+      else
+        let path = create_path 0 [] key in
+        go (Merkle_tree.add_path t path key Coinbase_stack.empty) (key + 1)
+    in
+    go (Merkle_tree.of_hash ~depth:coinbase_tree_depth root_hash) 0
 
   let next_new_index t ~is_new =
     if is_new then
