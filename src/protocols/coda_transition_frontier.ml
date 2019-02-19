@@ -4,18 +4,15 @@ open Pipe_lib.Strict_pipe
 
 module Transition_frontier_diff = struct
   type 'a t =
-    | Extend_best_tip of 'a
-        (** Added a node to the existing best tip without creating a new root *)
-    | New_best_tip of {old_best_tip: 'a; new_best_tip: 'a}
-        (** Added a node to the a new best tip without creating a new root *)
-    | New_root of
+    | New_breadcrumb of 'a
+        (** Triggered when a new breadcrumb is added without changing the root or best_tip *)
+    | New_best_tip of
         { old_root: 'a
-        ; new_root: 'a
-        ; added: 'a
-        ; garbage: 'a list
-        ; old_best_tip: 'a option }
-        (** If triggered by a new best tip, the old one will be in old_best_tip *)
-    | Destroy  (** transition_frontier was destroyed *)
+        ; new_root: 'a  (** Same as old root if the root doesn't change *)
+        ; new_best_tip: 'a
+        ; old_best_tip: 'a
+        ; garbage: 'a list }
+        (** Triggered when a new breadcrumb is added, causing a new best_tip *)
   [@@deriving sexp]
 end
 
