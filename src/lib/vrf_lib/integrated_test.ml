@@ -71,7 +71,7 @@ module Message = struct
 end
 
 module Output_hash = struct
-  type value = Random_oracle.Digest.t [@@deriving eq]
+  type value = Random_oracle.Digest.t [@@deriving eq, sexp]
 
   type var = Random_oracle.Digest.Checked.t
 
@@ -116,7 +116,8 @@ let%test_unit "eval unchecked vs. checked equality" =
   in
   Quickcheck.test ~trials:10 gen
     ~f:
-      (Test_util.test_equal ~equal:Output_hash.equal_value
+      (Tick.Test.test_equal ~sexp_of_t:[%sexp_of: Output_hash.value]
+         ~equal:Output_hash.equal_value
          Tick.Typ.(Scalar.typ * Message.typ)
          Output_hash.typ
          (fun (private_key, msg) ->

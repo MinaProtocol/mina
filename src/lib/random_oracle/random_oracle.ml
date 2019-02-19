@@ -85,9 +85,14 @@ end
 
 let digest_string s = (Blake2.digest_string s :> string)
 
-let digest_field x =
-  ( Blake2.digest_bigstring Tick_backend.Bigint.R.(to_bigstring (of_field x))
-    :> string )
+let digest_field =
+  let field_to_bits x =
+    let open Tick in
+    let n = Bigint.of_field x in
+    Array.init Field.size_in_bits ~f:(Bigint.test_bit n)
+  in
+  fun x ->
+    (digest_string (Snarky_blake2.bits_to_string (field_to_bits x)) :> string)
 
 module Checked = struct
   include Snarky_blake2.Make (Tick)
@@ -99,3 +104,18 @@ module Checked = struct
     Tick.Field.Checked.choose_preimage_var x ~length:Tick.Field.size_in_bits
     >>= digest_bits
 end
+
+let%test_unit "checked-unchecked equality" =
+  Quickcheck.test ~trials:10 (Quickcheck.Generator.list Bool.gen)
+    ~f:(fun bits ->
+      Tick.Test.test_equal ~sexp_of_t:Digest.sexp_of_t
+        (Tick.Typ.list ~length:(List.length bits) Tick.Boolean.typ)
+        Digest.typ Checked.digest_bits
+        (fun bs ->
+          digest_string (Snarky_blake2.bits_to_string (Array.of_list bs)) )
+        bits )
+
+let%test_unit "checked-unchecked field" =
+  Quickcheck.test ~trials:10 Tick.Field.gen ~f:(fun bits ->
+      Tick.Test.test_equal ~sexp_of_t:Digest.sexp_of_t Tick.Field.typ
+        Digest.typ Checked.digest_field digest_field bits )
