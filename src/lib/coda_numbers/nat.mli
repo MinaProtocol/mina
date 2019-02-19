@@ -14,6 +14,8 @@ module type S = sig
     module V1 : sig
       type nonrec t = t [@@deriving bin_io, sexp, eq, compare, hash]
     end
+
+    module Latest = V1
   end
 
   val length_in_triples : int
