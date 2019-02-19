@@ -5,7 +5,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries core fold_lib tuple_lib snark_bits sgn snark_params
-   unsigned_extended test_util codable)
+   unsigned_extended test_util codable module_version)
  (preprocess
   (pps ppx_jane ppx_deriving.std ppx_deriving_yojson bisect_ppx --
     -conditional))

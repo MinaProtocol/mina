@@ -1,13 +1,18 @@
 open Core
 open Bitstring
+open Module_version
 
 module type S = sig
   type t [@@deriving sexp, bin_io, hash, eq, compare]
 
   module Stable : sig
     module V1 : sig
+      val version : int
+
       type nonrec t = t [@@deriving sexp, bin_io, hash, eq, compare]
     end
+
+    module Latest : module type of V1
   end
 
   include Hashable.S_binable with type t := t
@@ -57,10 +62,10 @@ module type S = sig
          ?stop:[`Inclusive | `Exclusive]
       -> t
       -> init:'a
-      -> f:(Stable.V1.t -> 'a -> 'a)
+      -> f:(Stable.Latest.t -> 'a -> 'a)
       -> 'a
 
-    val subtree_range : Stable.V1.t -> t
+    val subtree_range : Stable.Latest.t -> t
   end
 
   val depth : t -> int
@@ -122,6 +127,8 @@ end) : S = struct
         slice (bitstring_of_string string) 0 length
 
       module T = struct
+        let version = 1
+
         type nonrec t = t
 
         include Binable.Of_binable (struct
@@ -156,11 +163,23 @@ end) : S = struct
       end
 
       include T
+      include Registration.Make_latest_version (T)
       include Hashable.Make_binable (T)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "merkle_address"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
+  include Stable.Latest
 
   let of_byte_string = bitstring_of_string
 

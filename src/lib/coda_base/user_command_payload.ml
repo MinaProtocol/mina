@@ -1,21 +1,40 @@
 open Core_kernel
 open Snark_params.Tick
 open Fold_lib
+open Module_version
 module Account_nonce = Coda_numbers.Account_nonce
 module Memo = User_command_memo
 
 module Common = struct
   module Stable = struct
     module V1 = struct
-      type ('fee, 'nonce, 'memo) t_ = {fee: 'fee; nonce: 'nonce; memo: 'memo}
-      [@@deriving bin_io, eq, sexp, hash, yojson]
+      module T = struct
+        let version = 1
 
-      type t = (Currency.Fee.Stable.V1.t, Account_nonce.t, Memo.t) t_
-      [@@deriving bin_io, eq, sexp, hash, yojson]
+        type ('fee, 'nonce, 'memo) t_ = {fee: 'fee; nonce: 'nonce; memo: 'memo}
+        [@@deriving bin_io, eq, sexp, hash, yojson]
+
+        type t = (Currency.Fee.Stable.V1.t, Account_nonce.t, Memo.t) t_
+        [@@deriving bin_io, eq, sexp, hash, yojson]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "user_command_payload_common"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
+  include Stable.Latest
 
   let fold ({fee; nonce; memo} : t) =
     Fold.(Currency.Fee.fold fee +> Account_nonce.fold nonce +> Memo.fold memo)
@@ -64,14 +83,32 @@ end
 module Body = struct
   module Stable = struct
     module V1 = struct
-      type t =
-        | Payment of Payment_payload.Stable.V1.t
-        | Stake_delegation of Stake_delegation.Stable.V1.t
-      [@@deriving bin_io, eq, sexp, hash, yojson]
+      module T = struct
+        let version = 1
+
+        type t =
+          | Payment of Payment_payload.Stable.V1.t
+          | Stake_delegation of Stake_delegation.Stable.V1.t
+        [@@deriving bin_io, eq, sexp, hash, yojson]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "user_command_payload_body"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
+  include Stable.Latest
 
   let max_variant_size =
     List.reduce_exn ~f:Int.max
@@ -102,15 +139,33 @@ end
 
 module Stable = struct
   module V1 = struct
-    type ('common, 'body) t_ = {common: 'common; body: 'body}
-    [@@deriving bin_io, eq, sexp, hash, yojson, compare]
+    module T = struct
+      let version = 1
 
-    type t = (Common.Stable.V1.t, Body.Stable.V1.t) t_
-    [@@deriving bin_io, eq, sexp, hash, yojson]
+      type ('common, 'body) t_ = {common: 'common; body: 'body}
+      [@@deriving bin_io, eq, sexp, hash, yojson, compare]
+
+      type t = (Common.Stable.V1.t, Body.Stable.V1.t) t_
+      [@@deriving bin_io, eq, sexp, hash, yojson]
+    end
+
+    include T
+    include Registration.Make_latest_version (T)
   end
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "user_command_payload"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
 end
 
-include Stable.V1
+include Stable.Latest
 
 let create ~fee ~nonce ~memo ~body : t = {common= {fee; nonce; memo}; body}
 
