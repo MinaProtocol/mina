@@ -11,16 +11,13 @@ module YJ = Yojson.Safe
 module Git_sha = Daemon_rpcs.Types.Git_sha
 
 [%%if
-tracing]
+fake_hash]
 
-let start_tracing () =
-  Writer.open_file
-    (sprintf "/tmp/coda-profile-%d" (Unix.getpid () |> Pid.to_int))
-  >>| O1trace.start_tracing
+let maybe_sleep s = after (Time.Span.of_sec s)
 
 [%%else]
 
-let start_tracing () = Deferred.unit
+let maybe_sleep _ = Deferred.unit
 
 [%%endif]
 
@@ -94,6 +91,8 @@ let daemon log =
      and sexp_logging =
        flag "sexp-logging" no_arg
          ~doc:"Use S-expressions in log output, instead of JSON"
+     and enable_tracing =
+       flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -185,6 +184,7 @@ let daemon log =
        in
        let discovery_port = external_port + 1 in
        let%bind () = Unix.mkdir ~p:() conf_dir in
+       if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
        let%bind initial_peers_raw =
          match peers with
          | _ :: _ -> return peers
@@ -293,7 +293,6 @@ let daemon log =
          let () = Snark_params.set_chunked_hashing true in
          let%bind () = Async.Unix.mkdir ~p:() suspicious_dir in
          let%bind () = Async.Unix.mkdir ~p:() punished_dir in
-         let%bind () = start_tracing () in
          let banlist =
            Coda_base.Banlist.create ~suspicious_dir ~punished_dir
          in
@@ -316,7 +315,7 @@ let daemon log =
            Coda_base.Receipt_chain_database.create
              ~directory:receipt_chain_dir_name
          in
-         let%map coda =
+         let%bind coda =
            Run.create
              (Run.Config.make ~log ~net_config
                 ~run_snark_worker:(Option.is_some run_snark_worker_flag)
@@ -328,6 +327,7 @@ let daemon log =
                 ~time_controller ?propose_keypair:Config0.propose_keypair ()
                 ~banlist)
          in
+         let%map () = maybe_sleep 3. in
          M.start coda ;
          let web_service = Web_pipe.get_service () in
          Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;

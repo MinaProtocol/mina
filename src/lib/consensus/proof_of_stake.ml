@@ -1135,53 +1135,6 @@ module Snark_transition = Coda_base.Snark_transition.Make (struct
   module Consensus_data = Consensus_transition_data
 end)
 
-module For_tests = struct
-  let gen_consensus_state ~(gen_slot_advancement : int Quickcheck.Generator.t)
-      :
-      (   previous_protocol_state:( Protocol_state.value
-                                  , Coda_base.State_hash.t )
-                                  With_hash.t
-       -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
-       -> Consensus_state.value)
-      Quickcheck.Generator.t =
-    let open Consensus_state in
-    let open Quickcheck.Let_syntax in
-    let open UInt32.Infix in
-    let%bind slot_advancement = gen_slot_advancement in
-    let%map proposer_vrf_result = Vrf.Output.gen in
-    fun ~(previous_protocol_state :
-           (Protocol_state.value, Coda_base.State_hash.t) With_hash.t)
-        ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t) ->
-      let prev =
-        Protocol_state.consensus_state (With_hash.data previous_protocol_state)
-      in
-      let length = Length.succ prev.length in
-      let curr_epoch, curr_slot =
-        let slot = prev.curr_slot + UInt32.of_int slot_advancement in
-        let epoch_advancement = slot / Constants.Epoch.size in
-        (prev.curr_epoch + epoch_advancement, slot mod Constants.Epoch.size)
-      in
-      let total_currency =
-        Option.value_exn (Amount.add prev.total_currency Constants.coinbase)
-      in
-      let last_epoch_data, curr_epoch_data, epoch_length =
-        Epoch_data.update_pair
-          (prev.last_epoch_data, prev.curr_epoch_data)
-          prev.epoch_length ~prev_epoch:prev.curr_epoch ~next_epoch:curr_epoch
-          ~prev_slot:prev.curr_slot
-          ~prev_protocol_state_hash:(With_hash.hash previous_protocol_state)
-          ~proposer_vrf_result ~snarked_ledger_hash ~total_currency
-      in
-      { length
-      ; epoch_length
-      ; last_vrf_output= proposer_vrf_result
-      ; total_currency
-      ; curr_epoch
-      ; curr_slot
-      ; last_epoch_data
-      ; curr_epoch_data }
-end
-
 (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
 let generate_transition ~(previous_protocol_state : Protocol_state.value)
     ~blockchain_state ~time ~proposal_data ~transactions:_ ~snarked_ledger_hash
@@ -1441,24 +1394,85 @@ let lock_transition prev next ~local_state ~snarked_ledger =
     local_state.last_epoch_snapshot <- local_state.curr_epoch_snapshot ;
     local_state.curr_epoch_snapshot <- epoch_snapshot )
 
-let genesis_protocol_state =
+let create_genesis_protocol_state consensus_transition_data blockchain_state =
   let consensus_state =
     Or_error.ok_exn
       (Consensus_state.update ~proposer_vrf_result:Vrf.Precomputed.vrf_output
          ~previous_consensus_state:
            Protocol_state.(consensus_state negative_one)
          ~previous_protocol_state_hash:Protocol_state.(hash negative_one)
-         ~consensus_transition_data:Snark_transition.(consensus_data genesis)
-         ~supply_increase:Currency.Amount.zero
+         ~consensus_transition_data ~supply_increase:Currency.Amount.zero
          ~snarked_ledger_hash:genesis_ledger_hash)
   in
   let state =
     Protocol_state.create_value
       ~previous_state_hash:Protocol_state.(hash negative_one)
-      ~blockchain_state:Snark_transition.(blockchain_state genesis)
-      ~consensus_state
+      ~blockchain_state ~consensus_state
   in
   With_hash.of_data ~hash_data:Protocol_state.hash state
+
+let genesis_protocol_state =
+  create_genesis_protocol_state
+    Snark_transition.(consensus_data genesis)
+    Snark_transition.(blockchain_state genesis)
+
+module For_tests = struct
+  let create_genesis_protocol_state ledger =
+    let consensus_data = Snark_transition.(consensus_data genesis) in
+    let root_ledger_hash = Coda_base.Ledger.merkle_root ledger in
+    create_genesis_protocol_state consensus_data
+      { Blockchain_state.genesis with
+        staged_ledger_hash=
+          Coda_base.Staged_ledger_hash.(
+            of_aux_and_ledger_hash Aux_hash.dummy root_ledger_hash)
+      ; snarked_ledger_hash=
+          Coda_base.Frozen_ledger_hash.of_ledger_hash root_ledger_hash }
+
+  let gen_consensus_state ~(gen_slot_advancement : int Quickcheck.Generator.t)
+      :
+      (   previous_protocol_state:( Protocol_state.value
+                                  , Coda_base.State_hash.t )
+                                  With_hash.t
+       -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
+       -> Consensus_state.value)
+      Quickcheck.Generator.t =
+    let open Consensus_state in
+    let open Quickcheck.Let_syntax in
+    let open UInt32.Infix in
+    let%bind slot_advancement = gen_slot_advancement in
+    let%map proposer_vrf_result = Vrf.Output.gen in
+    fun ~(previous_protocol_state :
+           (Protocol_state.value, Coda_base.State_hash.t) With_hash.t)
+        ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t) ->
+      let prev =
+        Protocol_state.consensus_state (With_hash.data previous_protocol_state)
+      in
+      let length = Length.succ prev.length in
+      let curr_epoch, curr_slot =
+        let slot = prev.curr_slot + UInt32.of_int slot_advancement in
+        let epoch_advancement = slot / Constants.Epoch.size in
+        (prev.curr_epoch + epoch_advancement, slot mod Constants.Epoch.size)
+      in
+      let total_currency =
+        Option.value_exn (Amount.add prev.total_currency Constants.coinbase)
+      in
+      let last_epoch_data, curr_epoch_data, epoch_length =
+        Epoch_data.update_pair
+          (prev.last_epoch_data, prev.curr_epoch_data)
+          prev.epoch_length ~prev_epoch:prev.curr_epoch ~next_epoch:curr_epoch
+          ~prev_slot:prev.curr_slot
+          ~prev_protocol_state_hash:(With_hash.hash previous_protocol_state)
+          ~proposer_vrf_result ~snarked_ledger_hash ~total_currency
+      in
+      { length
+      ; epoch_length
+      ; last_vrf_output= proposer_vrf_result
+      ; total_currency
+      ; curr_epoch
+      ; curr_slot
+      ; last_epoch_data
+      ; curr_epoch_data }
+end
 
 let should_bootstrap ~existing ~candidate =
   let length = Fn.compose Length.to_int Consensus_state.length in

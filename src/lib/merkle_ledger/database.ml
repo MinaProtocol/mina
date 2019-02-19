@@ -63,17 +63,7 @@ module Make
     with exn -> close t ; raise exn
 
   let empty_hashes =
-    let empty_hashes =
-      Array.create ~len:(Depth.depth + 1) Hash.empty_account
-    in
-    let rec loop last_hash height =
-      if height <= Depth.depth then (
-        let hash = Hash.merge ~height:(height - 1) last_hash last_hash in
-        empty_hashes.(height) <- hash ;
-        loop hash (height + 1) )
-    in
-    loop Hash.empty_account 1 ;
-    Immutable_array.of_array empty_hashes
+    Empty_hashes.cache (module Hash) ~init_hash:Hash.empty_account Depth.depth
 
   let get_raw {kvdb; _} location =
     Kvdb.get kvdb ~key:(Location.serialize location)
@@ -304,15 +294,6 @@ module Make
     | None -> 0
     | Some addr -> Addr.to_int addr + 1
 
-  let get_all_accounts_rooted_at_exn mdb address =
-    let first_node, last_node = Addr.Range.subtree_range address in
-    let result =
-      Addr.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
-          let account = get mdb (Location.Account bit_index) in
-          account :: acc )
-    in
-    List.rev_filter_map result ~f:Fn.id
-
   let set_all_accounts_rooted_at_exn mdb address (accounts : Account.t list) =
     let first_node, last_node = Addr.Range.subtree_range address in
     Addr.Range.fold (first_node, last_node) ~init:accounts ~f:(fun addr ->
@@ -414,4 +395,20 @@ module Make
   let merkle_path_at_index_exn t index =
     let addr = Addr.of_int_exn index in
     merkle_path_at_addr_exn t addr
+
+  let location_of_addr addr = Location.Account addr
+
+  include Util.Make (struct
+    module Location = Location
+    module Account = Account
+    module Addr = Location.Addr
+
+    module Base = struct
+      type nonrec t = t
+
+      let get = get
+    end
+
+    let location_of_addr = location_of_addr
+  end)
 end

@@ -14,7 +14,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-2d8be63fd5f75b2cafe6e85b301e526b1196cdd1
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -49,8 +49,8 @@ jobs:
                       - opam-v1-
             - restore_cache:
                   keys:
-                      - nix-v1-{{ checksum "src/app/kademlia-haskell/prefetch/kademlia1101.nix" }}
-                      - nix-v1-
+                      - nix-v2-{{ checksum "src/app/kademlia-haskell/packages.nix" }}
+                      - nix-v2-
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Deps -- make macos-setup-download
@@ -68,7 +68,7 @@ jobs:
                   paths:
                       - "/Users/distiller/.opam"
             - save_cache:
-                  key: nix-v1-{{ checksum "src/app/kademlia-haskell/prefetch/kademlia1101.nix" }}
+                  key: nix-v2-{{ checksum "src/app/kademlia-haskell/packages.nix" }}
                   paths:
                       - "/nix"
             - run:
@@ -80,18 +80,19 @@ jobs:
     build_dev:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-2d8be63fd5f75b2cafe6e85b301e526b1196cdd1
         environment:
             DUNE_PROFILE: dev
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
                   name: Build deb Package with keys
                   command: make deb
@@ -109,18 +110,19 @@ jobs:
     build_testnet_posig:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-2d8be63fd5f75b2cafe6e85b301e526b1196cdd1
         environment:
             DUNE_PROFILE: testnet_posig
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
                   name: Build deb Package with keys
                   command: make deb
@@ -138,18 +140,19 @@ jobs:
     build_testnet_postake:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-2d8be63fd5f75b2cafe6e85b301e526b1196cdd1
         environment:
             DUNE_PROFILE: testnet_postake
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
                   name: Build deb Package with keys
                   command: make deb
@@ -167,18 +170,19 @@ jobs:
     build_testnet_public:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-2d8be63fd5f75b2cafe6e85b301e526b1196cdd1
         environment:
             DUNE_PROFILE: testnet_public
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
                   name: Build deb Package with keys
                   command: make deb
@@ -196,18 +200,19 @@ jobs:
     build_testnet_postake_snarkless_fake_hash:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-2d8be63fd5f75b2cafe6e85b301e526b1196cdd1
         environment:
             DUNE_PROFILE: testnet_postake_snarkless_fake_hash
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
                   name: Build deb Package with keys
                   command: make deb
@@ -226,7 +231,7 @@ jobs:
     test-unit-test:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-2d8be63fd5f75b2cafe6e85b301e526b1196cdd1
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -236,7 +241,7 @@ jobs:
     test-fake_hash_full_test:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-2d8be63fd5f75b2cafe6e85b301e526b1196cdd1
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -253,7 +258,7 @@ jobs:
     test-posig_integration_tests:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-2d8be63fd5f75b2cafe6e85b301e526b1196cdd1
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -302,7 +307,7 @@ jobs:
     test-postake_integration_tests:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-2d8be63fd5f75b2cafe6e85b301e526b1196cdd1
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -351,7 +356,7 @@ jobs:
     test-withsnark-sig:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-2d8be63fd5f75b2cafe6e85b301e526b1196cdd1
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -368,7 +373,7 @@ jobs:
     test-withsnark-stake:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-2d8be63fd5f75b2cafe6e85b301e526b1196cdd1
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive

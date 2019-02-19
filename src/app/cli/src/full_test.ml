@@ -2,7 +2,7 @@
 "../../../config.mlh"]
 
 open Core
-open Async_kernel
+open Async
 open Coda_base
 open Coda_main
 open Signature_lib
@@ -10,20 +10,6 @@ open Pipe_lib
 open O1trace
 
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
-
-[%%if
-tracing]
-
-let start_tracing () =
-  Async.Writer.open_file
-    (sprintf "/tmp/coda-profile-%d" (Unix.getpid () |> Pid.to_int))
-  >>| O1trace.start_tracing
-
-[%%else]
-
-let start_tracing () = Deferred.unit
-
-[%%endif]
 
 [%%if
 with_snark]
@@ -59,10 +45,15 @@ let run_test () : unit Deferred.t =
       let%bind (module Init) =
         make_init ~should_propose:true (module Config)
       in
+      let%bind () =
+        if Unix.getenv "CODA_TRACING" = Some "1" then
+          let%bind () = Async.Unix.mkdir ~p:() "/tmp/full-test-traces" in
+          Coda_tracing.start "/tmp/full-test-traces"
+        else Deferred.unit
+      in
       let module Main = Coda_main.Make_coda (Init) in
       let module Run = Run (Config) (Main) in
       let open Main in
-      let%bind () = start_tracing () in
       let banlist_dir_name = temp_conf_dir ^/ "banlist" in
       let%bind () = Async.Unix.mkdir banlist_dir_name in
       let%bind suspicious_dir =
@@ -117,10 +108,10 @@ let run_test () : unit Deferred.t =
         let rec go () =
           if f coda then return ()
           else
-            let%bind () = after (Time_ns.Span.of_sec 10.) in
+            let%bind () = after (Time.Span.of_sec 10.) in
             go ()
         in
-        Deferred.any [after (Time_ns.Span.of_min timeout); go ()]
+        Deferred.any [after (Time.Span.of_min timeout); go ()]
       in
       let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
         let cond t =

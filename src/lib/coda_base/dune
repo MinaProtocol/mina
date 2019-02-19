@@ -1,0 +1,52 @@
+(library
+ (name coda_base)
+ (public_name coda_base)
+ (flags :standard -short-paths -warn-error -35-32-9-27-34-58-39)
+ (inline_tests)
+ (library_flags -linkall)
+ (libraries
+    lite_base
+    linked_tree
+    hash_prefixes
+    syncable_ledger
+    base64
+    signature_lib
+    test_util
+    random_oracle
+    coda_digestif
+    snark_bits
+    currency
+    snark_params
+    unsigned_extended
+    sparse_ledger_lib
+    protocols
+    core
+    dummy_values
+    o1trace
+    merkle_ledger
+    module_version
+    snarky crypto_params
+    async
+    async_extra
+    bignum_bigint
+    coda_numbers
+    debug_assert
+    merkle_mask
+    banlist_lib
+    receipt_chain_database_lib
+    storage
+    yojson
+    codable
+    rocksdb)
+ (preprocessor_deps ../../config.mlh)
+ (preprocess
+  (pps ppx_snarky ppx_jane ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord
+    ppx_deriving_yojson bisect_ppx -- -conditional))
+ (synopsis "Snarks and friends necessary for keypair generation"))
+
+(rule
+ (targets sample_keypairs.ml)
+ (deps
+  (:< gen/gen.exe))
+ (action
+  (run %{<} %{targets})))

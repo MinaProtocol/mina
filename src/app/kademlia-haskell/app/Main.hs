@@ -17,6 +17,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
  -}
 
+import           Control.Exception         (finally)
 import           Control.Monad             (when, foldM)
 import           Control.Monad.Random      (Rand, RandomGen, evalRand, getRandom)
 import           Data.Binary               (Binary (..), decodeOrFail, encode, getWord8,
@@ -164,7 +165,8 @@ main = do
       hFlush stdout
 
       {- Forever, once a second, check to see if anything changed, and dump it -}
-      foreverM (\oldPeers -> do
+      finally
+        (foreverM (\oldPeers -> do
         _ <- threadDelay 1000000
         currDump <- K.dumpPeers kInstance
         let currPeers = peersFromDump currDump
@@ -174,7 +176,5 @@ main = do
         when (length newDeads /= 0) $ do
           mapM_ logData $ (dumpFormat Dead) <$> newDeads
         hFlush stdout
-        return currPeers) initialPeers
-
-      {- Finally, close -}
-      K.close kInstance
+        return currPeers) initialPeers)
+        (K.close kInstance)
