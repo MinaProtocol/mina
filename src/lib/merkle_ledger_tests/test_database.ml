@@ -22,11 +22,6 @@ let%test_module "test functor on in memory databases" =
       (* module Addr : Merkle_address.S *)
       module MT : DB
 
-      module Db_visualizor :
-        Visualizable_ledger.S
-        with type addr := Location.Addr.t
-         and type ledger := MT.t
-
       val with_instance : (MT.t -> 'a) -> 'a
     end
 
@@ -291,8 +286,8 @@ let%test_module "test functor on in memory databases" =
             | `Existed, _ ->
                 failwith
                   "create_empty with empty ledger somehow already has that key?"
-            | `Added, new_loc ->
-                [%test_eq: Hash.t] start_hash (merkle_root ledger) )
+            | `Added, _ -> [%test_eq: Hash.t] start_hash (merkle_root ledger)
+        )
 
       let%test "get_at_index_exn t (index_of_key_exn t public_key) = account" =
         Test.with_instance (fun mdb ->

@@ -61,6 +61,8 @@ module type S = sig
       -> 'a
 
     val subtree_range : Stable.V1.t -> t
+
+    val subtree_range_seq : Stable.V1.t -> Stable.V1.t Sequence.t
   end
 
   val depth : t -> int
@@ -301,6 +303,19 @@ end) : S = struct
       let first_node = concat [address; zeroes_bitstring @@ height address] in
       let last_node = concat [address; ones_bitstring @@ height address] in
       (first_node, last_node)
+
+    let subtree_range_seq address =
+      let first_node, last_node = subtree_range address in
+      Sequence.unfold
+        ~init:(first_node, `Don't_stop)
+        ~f:(function
+          | _, `Stop -> None
+          | current_node, `Don't_stop ->
+              if compare current_node last_node = 0 then
+                Some (current_node, (current_node, `Stop))
+              else
+                Option.map (next current_node) ~f:(fun next_node ->
+                    (current_node, (next_node, `Don't_stop)) ))
   end
 
   let%test "the merkle root should have no path" =

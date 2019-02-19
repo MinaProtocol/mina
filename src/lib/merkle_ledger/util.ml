@@ -26,9 +26,9 @@ module Make (Inputs : Inputs_intf) : sig
 end = struct
   let get_all_accounts_rooted_at_exn t address =
     let open Inputs in
-    let first_node, last_node = Addr.Range.subtree_range address in
     let result =
-      Addr.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
+      Addr.Range.fold (Addr.Range.subtree_range address) ~init:[]
+        ~f:(fun bit_index acc ->
           let account = Base.get t (location_of_addr bit_index) in
           (bit_index, account) :: acc )
     in

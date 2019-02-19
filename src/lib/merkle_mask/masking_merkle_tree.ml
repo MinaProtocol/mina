@@ -283,11 +283,8 @@ struct
           Some hash
         with _ -> None )
 
-    (** This function assumes that all the locations are in the same layer. *)
-    let rec set_hash_batch t locations_and_hashes =
+    let rec compute_affected_locations_and_hashes t locations_and_hashes acc =
       let locations, _ = List.unzip locations_and_hashes in
-      List.iter locations_and_hashes ~f:(fun (location, hash) ->
-          set_hash t (Location.to_path_exn location) hash ) ;
       if not @@ List.is_empty locations then
         let height = Location.height (List.hd_exn locations) in
         if height < Base.depth then
@@ -320,7 +317,17 @@ struct
                   , (Location.parent location, parent_hash)
                     :: parent_locations_and_hashes ) )
           in
-          set_hash_batch t parent_locations_and_hashes
+          compute_affected_locations_and_hashes t parent_locations_and_hashes
+            (List.append parent_locations_and_hashes acc)
+        else acc
+      else acc
+
+    (** This function assumes that all the locations are in the same layer. *)
+    let set_hash_batch t locations_and_hashes =
+      List.iter
+        (compute_affected_locations_and_hashes t locations_and_hashes
+           locations_and_hashes) ~f:(fun (location, hash) ->
+          set_hash t (Location.to_path_exn location) hash )
 
     (* batch operations TODO: rely on availability of batch operations in Base
        for speed *)
@@ -387,22 +394,20 @@ struct
           | None -> Some parent_loc
           | Some our_loc -> Some (max parent_loc our_loc) )
 
-    (* set accounts in mask *)
-    let set_all_accounts_rooted_at_exn t address (accounts : Account.t list) =
-      (* basically, the same code used for the database implementation *)
-      let first_node, last_node = Addr.Range.subtree_range address in
-      Addr.Range.fold (first_node, last_node) ~init:accounts
-        ~f:(fun bit_index -> function
-        | head :: tail ->
-            set t (Location.Account bit_index) head ;
-            tail
-        | [] -> [] )
-      |> ignore
-
     let set_batch_accounts t addresses_and_accounts =
       set_batch t
       @@ List.map addresses_and_accounts ~f:(fun (addr, account) ->
              (Location.Account addr, account) )
+
+    (* set accounts in mask *)
+    let set_all_accounts_rooted_at_exn t address (accounts : Account.t list) =
+      (* basically, the same code used for the database implementation *)
+      let addresses =
+        Sequence.to_list @@ Addr.Range.subtree_range_seq address
+      in
+      let num_accounts = List.length accounts in
+      List.(zip_exn (take addresses num_accounts) accounts)
+      |> set_batch_accounts t
 
     (* keys from this mask and all ancestors *)
     let keys t =

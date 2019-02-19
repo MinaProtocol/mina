@@ -126,15 +126,12 @@ module Make
     let locs_bufs = List.map locations_vs ~f:create_buf in
     set_raw_batch mdb locs_bufs
 
-  (** This function assumes that all the locations are in the same layer. *)
-  let rec set_hash_batch mdb locations_and_hashes =
+  let rec compute_affected_locations_and_hashes mdb locations_and_hashes acc =
     let locations, _ = List.unzip locations_and_hashes in
-    List.iter locations ~f:(fun location -> assert (Location.is_hash location)) ;
-    set_bin_batch mdb Hash.bin_size_t Hash.bin_write_t locations_and_hashes ;
     if not @@ List.is_empty locations then
       let height = Location.height @@ List.hd_exn locations in
       if height < Depth.depth then
-        let location_to_hashtbl =
+        let location_to_hash_table =
           Location.Table.of_alist_exn locations_and_hashes
         in
         let _, parent_locations_and_hashes =
@@ -148,7 +145,7 @@ module Make
                 let sibling_location = Location.sibling location in
                 let sibling_hash =
                   Option.value ~default:(get_hash mdb sibling_location)
-                  @@ Hashtbl.find location_to_hashtbl sibling_location
+                  @@ Hashtbl.find location_to_hash_table sibling_location
                 in
                 let parent_hash =
                   let left_hash, right_hash =
@@ -160,22 +157,18 @@ module Make
                 , (Location.parent location, parent_hash)
                   :: parent_locations_and_hashes ) )
         in
-        set_hash_batch mdb parent_locations_and_hashes
+        compute_affected_locations_and_hashes mdb parent_locations_and_hashes
+          (List.append parent_locations_and_hashes acc)
+      else acc
+    else acc
 
-  let rec set_hash mdb location new_hash =
-    assert (Location.is_hash location) ;
-    set_bin mdb location Hash.bin_size_t Hash.bin_write_t new_hash ;
-    let height = Location.height location in
-    if height < Depth.depth then
-      let sibling_hash = get_hash mdb (Location.sibling location) in
-      let parent_hash =
-        let left_hash, right_hash =
-          Location.order_siblings location new_hash sibling_hash
-        in
-        assert (height <= Depth.depth) ;
-        Hash.merge ~height left_hash right_hash
-      in
-      set_hash mdb (Location.parent location) parent_hash
+  (** This function assumes that all the locations are in the same layer. *)
+  let set_hash_batch mdb locations_and_hashes =
+    set_bin_batch mdb Hash.bin_size_t Hash.bin_write_t
+      (compute_affected_locations_and_hashes mdb locations_and_hashes
+         locations_and_hashes)
+
+  let set_hash mdb location new_hash = set_hash_batch mdb [(location, new_hash)]
 
   let get_inner_hash_at_addr_exn mdb address =
     assert (Addr.depth address <= Depth.depth) ;
@@ -286,13 +279,10 @@ module Make
   let set_batch mdb locations_and_accounts =
     set_bin_batch mdb Account.bin_size_t Account.bin_write_t
       locations_and_accounts ;
-    let locations, accounts = List.unzip locations_and_accounts in
     set_hash_batch mdb
-    @@ List.zip_exn
-         (List.map
-            ~f:(fun l -> Location.Hash (Location.to_path_exn l))
-            locations)
-         (List.map ~f:Hash.hash_account accounts)
+    @@ List.map locations_and_accounts ~f:(fun (location, account) ->
+           ( Location.Hash (Location.to_path_exn location)
+           , Hash.hash_account account ) )
 
   let index_of_key_exn mdb key =
     let location = location_of_key mdb key |> Option.value_exn in
@@ -336,11 +326,7 @@ module Make
            (Location.Account addr, account) )
 
   let set_all_accounts_rooted_at_exn mdb address accounts =
-    let addresses =
-      List.rev
-      @@ Addr.Range.fold (Addr.Range.subtree_range address) ~init:[]
-           ~f:(fun address addresses -> address :: addresses )
-    in
+    let addresses = Sequence.to_list @@ Addr.Range.subtree_range_seq address in
     let num_accounts = List.length accounts in
     List.(zip_exn (take addresses num_accounts) accounts)
     |> set_batch_accounts mdb
