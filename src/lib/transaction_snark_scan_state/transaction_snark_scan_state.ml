@@ -153,7 +153,8 @@ end = struct
             end)
 
   (**********Helpers*************)
-
+  
+  (*TODO new_coinbase_stack:bool goes in the statement*)
   let create_expected_statement
       {Transaction_with_witness.transaction_with_info; witness; _} =
     let open Or_error.Let_syntax in
@@ -169,8 +170,18 @@ end = struct
     let target =
       Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
     in
-    let pending_coinbase_hash =
+    let pending_coinbase_before =
       Pending_coinbase.merkle_root witness.pending_coinbases
+    in
+    let%bind pending_coinbase_after =
+      match transaction with
+      | Coinbase c ->
+          Or_error.try_with (fun () ->
+              (*TODO add new tree tag to a node*)
+              Pending_coinbase.merkle_root
+                (Pending_coinbase.add_coinbase_exn witness.pending_coinbases
+                   ~coinbase:c ~on_new_tree:false) )
+      | _ -> Ok pending_coinbase_before
     in
     let%bind fee_excess = Transaction.fee_excess transaction in
     let%map supply_increase = Transaction.supply_increase transaction in
@@ -178,7 +189,8 @@ end = struct
     ; target
     ; fee_excess
     ; supply_increase
-    ; pending_coinbase_hash
+    ; pending_coinbase_before
+    ; pending_coinbase_after
     ; proof_type= `Base }
 
   let completed_work_to_scanable_work (job : job) (fee, current_proof, prover)
@@ -203,7 +215,8 @@ end = struct
           { Ledger_proof_statement.source= s.source
           ; target= s'.target
           ; supply_increase
-          ; pending_coinbase_hash= s'.pending_coinbase_hash
+          ; pending_coinbase_before= s.pending_coinbase_before
+          ; pending_coinbase_after= s'.pending_coinbase_after
           ; fee_excess
           ; proof_type= `Merge }
         in
@@ -336,7 +349,8 @@ end = struct
           ; source
           ; target
           ; supply_increase= _
-          ; pending_coinbase_hash= _
+          ; pending_coinbase_before= _
+          ; pending_coinbase_after= _ (*TODO: check pending coinbases?*)
           ; proof_type= _ } ->
           (*TODO: what can be checked here about the pending coinbase hash*)
           let open Or_error.Let_syntax in
@@ -380,7 +394,8 @@ end = struct
         { Ledger_proof_statement.source= stmt1.source
         ; target= stmt2.target
         ; supply_increase
-        ; pending_coinbase_hash= stmt2.pending_coinbase_hash
+        ; pending_coinbase_before= stmt1.pending_coinbase_before
+        ; pending_coinbase_after= stmt1.pending_coinbase_after
         ; fee_excess
         ; proof_type= `Merge }
 

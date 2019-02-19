@@ -49,6 +49,8 @@ module type S = sig
     type t
 
     type var
+
+    val singleton : Coinbase.t -> t
   end
 
   module Hash : sig
@@ -89,7 +91,7 @@ module type S = sig
 
   val create : unit -> t
 
-  val add_coinbase_exn : t -> Coinbase.t -> t
+  val add_coinbase_exn : t -> coinbase:Coinbase.t -> on_new_tree:bool -> t
 
   val remove_coinbase_stack_exn : t -> t
 

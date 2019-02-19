@@ -124,6 +124,10 @@ module Stack = struct
       |> Pedersen.State.digest )
 
   module Checked = struct
+    let push_var t coinbase : t = failwith ""
+
+    let if_ b ~then_ ~else_ s = failwith ""
+
     let equal (x : var) (y : var) =
       Field.Checked.equal (var_to_hash_packed x) (var_to_hash_packed y)
 
@@ -227,7 +231,7 @@ module Hash = struct
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the stack [f stack] at path [addr].
 *)
-  let%snarkydef modify_stack' t ~(filter : Stack.var -> ('a, _) Checked.t) ~f =
+  let%snarkydef modify_stack t ~(filter : Stack.var -> ('a, _) Checked.t) ~f =
     let%bind addr =
       request_witness Index.Unpacked.typ
         As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_newest_stack))
@@ -248,7 +252,7 @@ module Hash = struct
    which is [t] but with the stack [f stack] at path [addr].
 *)
   let update_stack t ~is_new_stack ~f =
-    modify_stack' t
+    modify_stack t
       ~filter:(fun stack ->
         let%bind empty_stack =
           Stack.Checked.equal stack Stack.(var_of_t empty)
@@ -321,37 +325,38 @@ module T = struct
     in
     go (Merkle_tree.of_hash ~depth:coinbase_tree_depth root_hash) 0
 
-  let next_new_index t ~is_new =
-    if is_new then
+  let next_new_index t ~on_new_tree =
+    if on_new_tree then
       let new_index =
         if t.new_index = coinbase_stacks then 0 else t.new_index + 1
       in
       {t with index_list= new_index :: t.index_list; new_index}
     else t
 
-  let get_latest_stack t ~is_new =
-    if is_new then Some t.new_index
+  let get_latest_stack t ~on_new_tree =
+    if on_new_tree then Some t.new_index
       (* IMPORTANT TODO: include hash of the path*)
     else match t.index_list with [] -> None | x :: _ -> Some x
 
   let get_oldest_stack t = List.last t.index_list
 
-  let replace_latest_stack t stack ~is_new =
+  let replace_latest_stack t stack ~on_new_tree =
     match t.index_list with
-    | [] -> if is_new then Some [stack] else None
-    | x :: xs -> if is_new then Some (stack :: x :: xs) else Some (stack :: xs)
+    | [] -> if on_new_tree then Some [stack] else None
+    | x :: xs ->
+        if on_new_tree then Some (stack :: x :: xs) else Some (stack :: xs)
 
   let remove_oldest_stack_exn t =
     match List.rev t with
     | [] -> failwith "No stacks"
     | x :: xs -> (x, List.rev xs)
 
-  let add_coinbase_exn t ~coinbase ~is_new =
-    let current_stack = Option.value_exn (get_latest_stack t ~is_new) in
+  let add_coinbase_exn t ~coinbase ~on_new_tree =
+    let current_stack = Option.value_exn (get_latest_stack t ~on_new_tree) in
     let stack_index = Merkle_tree.find_index_exn t.tree current_stack in
     let stack_before = Merkle_tree.get_exn t.tree stack_index in
     let stack_after = Coinbase_stack.push_exn stack_before coinbase in
-    let t' = next_new_index t ~is_new in
+    let t' = next_new_index t ~on_new_tree in
     let tree' = Merkle_tree.set_exn t.tree stack_index stack_after in
     {t' with tree= tree'}
 

@@ -11,7 +11,8 @@ module Statement : sig
     { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
     ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
     ; supply_increase: Currency.Amount.Stable.V1.t
-    ; pending_coinbase_hash: Pending_coinbase.Hash.t
+    ; pending_coinbase_before: Pending_coinbase.Hash.t
+    ; pending_coinbase_after: Pending_coinbase.Hash.t
     ; fee_excess: Currency.Fee.Signed.Stable.V1.t
     ; proof_type: Proof_type.t }
   [@@deriving sexp, bin_io, hash, compare, eq, fields]
@@ -32,7 +33,8 @@ val create :
   -> target:Frozen_ledger_hash.t
   -> proof_type:Proof_type.t
   -> supply_increase:Currency.Amount.t
-  -> pending_coinbase_hash:Pending_coinbase.Hash.t
+  -> pending_coinbase_before:Pending_coinbase.Hash.t
+  -> pending_coinbase_after:Pending_coinbase.Hash.t
   -> fee_excess:Currency.Amount.Signed.t
   -> sok_digest:Sok_message.Digest.t
   -> proof:Tock.Proof.t
@@ -117,7 +119,9 @@ val check_transaction :
      sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
-  -> pending_coinbase_hash:Pending_coinbase.Hash.t
+  -> pending_coinbase1:Coda_base.Pending_coinbase.Hash.t
+  -> pending_coinbase2:Coda_base.Pending_coinbase.Hash.t
+  -> new_coinbase_stack:bool
   -> Transaction.t
   -> Tick.Handler.t
   -> unit
@@ -126,7 +130,7 @@ val check_user_command :
      sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
-  -> pending_coinbase_hash:Pending_coinbase.Hash.t
+  -> Pending_coinbase.Hash.t
   -> User_command.With_valid_signature.t
   -> Tick.Handler.t
   -> unit
@@ -138,7 +142,8 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> pending_coinbase_hash:Pending_coinbase.Hash.t
+    -> pending_coinbase1:Coda_base.Pending_coinbase.Hash.t
+    -> pending_coinbase2:Coda_base.Pending_coinbase.Hash.t
     -> Transaction.t
     -> Tick.Handler.t
     -> t

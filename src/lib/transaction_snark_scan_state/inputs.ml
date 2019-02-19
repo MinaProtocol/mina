@@ -39,6 +39,8 @@ module type S = sig
     type t [@@deriving sexp, bin_io]
 
     val merkle_root : t -> Pending_coinbase_hash.t
+
+    val add_coinbase_exn : t -> coinbase:Coinbase.t -> on_new_tree:bool -> t
   end
 
   module Ledger_proof_statement :

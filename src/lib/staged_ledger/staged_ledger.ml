@@ -309,8 +309,10 @@ end = struct
     let source =
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
     in
-    let pending_coinbase_hash =
-      failwith ""
+    let pending_coinbase_before = failwith "in staged_ledger" in
+    let pending_coinbase_after =
+      failwith
+        "if the transaction is coinbase, add it to the pending_coinbases"
       (*TODO:If this a transactions then push it get new merkle root (Pending_coinbase_hash.t)else the same merkle root  *)
     in
     let%map undo = Ledger.apply_transaction ledger s in
@@ -319,7 +321,8 @@ end = struct
       ; target= Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
       ; fee_excess
       ; supply_increase
-      ; pending_coinbase_hash
+      ; pending_coinbase_before
+      ; pending_coinbase_after
       ; proof_type= `Base } )
 
   let apply_transaction_and_get_witness ledger s =
@@ -1488,13 +1491,20 @@ let%test_module "test" =
       end
 
       module Pending_coinbase = struct
-        type t = (Compressed_public_key.t * int) list [@@deriving sexp, bin_io]
+        type t = (Compressed_public_key.t * Currency.Amount.t) list
+        [@@deriving sexp, bin_io]
 
         let merkle_root : t -> Pending_coinbase_hash.t =
          fun t ->
           List.fold t
-            ~f:(fun acc (pk, amt) -> acc ^ " " ^ pk ^ Int.to_string amt)
+            ~f:(fun acc (pk, amt) ->
+              acc ^ " " ^ pk ^ Currency.Amount.to_string amt )
             ~init:""
+
+        let add_coinbase_exn :
+            t -> coinbase:Coinbase.t -> on_new_tree:bool -> t =
+         fun t ~coinbase ~on_new_tree:_ ->
+          (coinbase.proposer, coinbase.amount) :: t
       end
 
       module Ledger_proof_statement = struct
@@ -1503,7 +1513,8 @@ let%test_module "test" =
             { source: Ledger_hash.t
             ; target: Ledger_hash.t
             ; supply_increase: Currency.Amount.t
-            ; pending_coinbase_hash: Pending_coinbase_hash.t
+            ; pending_coinbase_before: Pending_coinbase_hash.t
+            ; pending_coinbase_after: Pending_coinbase_hash.t
             ; fee_excess: Fee.Signed.t
             ; proof_type: [`Base | `Merge] }
           [@@deriving sexp, bin_io, compare, hash]
@@ -1527,7 +1538,8 @@ let%test_module "test" =
             { source= s1.source
             ; target= s2.target
             ; supply_increase
-            ; pending_coinbase_hash= s2.pending_coinbase_hash
+            ; pending_coinbase_before= s1.pending_coinbase_before
+            ; pending_coinbase_after= s2.pending_coinbase_after
             ; fee_excess
             ; proof_type= `Merge }
         end
@@ -1541,7 +1553,8 @@ let%test_module "test" =
           and target = Ledger_hash.gen
           and fee_excess = Fee.Signed.gen
           and supply_increase = Currency.Amount.gen
-          and pending_coinbase_hash = Pending_coinbase_hash.gen in
+          and pending_coinbase_before = Pending_coinbase_hash.gen
+          and pending_coinbase_after = Pending_coinbase_hash.gen in
           let%map proof_type =
             Quickcheck.Generator.bool
             >>| function true -> `Base | false -> `Merge
@@ -1551,7 +1564,8 @@ let%test_module "test" =
           ; supply_increase
           ; fee_excess
           ; proof_type
-          ; pending_coinbase_hash }
+          ; pending_coinbase_before
+          ; pending_coinbase_after }
       end
 
       module Proof = Ledger_proof_statement

@@ -113,7 +113,8 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
               T.of_transaction ~sok_digest:Sok_message.Digest.default
                 ~source:(Sparse_ledger.merkle_root sparse_ledger)
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
-                ~pending_coinbase_hash:Pending_coinbase.Hash.empty_hash t
+                ~pending_coinbase1:Pending_coinbase.Hash.empty_hash
+                ~pending_coinbase2:Pending_coinbase.Hash.empty_hash t
                 (unstage (Sparse_ledger.handler sparse_ledger)) )
         in
         ((Time.Span.max span max_span, sparse_ledger'), proof) )
@@ -152,7 +153,9 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) =
           Transaction_snark.check_transaction ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
-            ~pending_coinbase_hash:Pending_coinbase.Hash.empty_hash t
+            ~pending_coinbase1:Pending_coinbase.Hash.empty_hash
+            ~pending_coinbase2:Pending_coinbase.Hash.empty_hash
+            ~new_coinbase_stack:false t
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
         sparse_ledger' )

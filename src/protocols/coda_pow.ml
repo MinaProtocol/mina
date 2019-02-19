@@ -389,7 +389,8 @@ module type Ledger_proof_statement_intf = sig
     { source: ledger_hash
     ; target: ledger_hash
     ; supply_increase: Currency.Amount.t
-    ; pending_coinbase_hash: pending_coinbase_hash
+    ; pending_coinbase_before: pending_coinbase_hash
+    ; pending_coinbase_after: pending_coinbase_hash
     ; fee_excess: Fee.Signed.t
     ; proof_type: [`Base | `Merge] }
   [@@deriving sexp, bin_io, compare]
