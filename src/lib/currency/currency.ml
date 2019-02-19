@@ -6,6 +6,7 @@ open Snark_bits
 open Bitstring_lib
 open Fold_lib
 open Tuple_lib
+open Module_version
 
 type uint64 = Unsigned.uint64
 
@@ -24,6 +25,8 @@ module type Basic = sig
     module V1 : sig
       type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash, yojson]
     end
+
+    module Latest = V1
   end
 
   include Bits_intf.S with type t := t
@@ -208,6 +211,8 @@ end = struct
   module Stable = struct
     module V1 = struct
       module T = struct
+        let version = 1
+
         type t = Unsigned.t [@@deriving bin_io, sexp, compare, hash]
 
         let of_int = Unsigned.of_int
@@ -216,13 +221,25 @@ end = struct
       end
 
       include T
+      include Registration.Make_latest_version (T)
       include Codable.Make_of_int (T)
       include Hashable.Make (T)
       include Comparable.Make (T)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "make_currency"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
+  include Stable.Latest
 
   let to_uint64 = Unsigned.to_uint64
 
@@ -310,17 +327,35 @@ end = struct
   module Signed = struct
     module Stable = struct
       module V1 = struct
-        type ('magnitude, 'sgn) t_ = {magnitude: 'magnitude; sgn: 'sgn}
-        [@@deriving bin_io, sexp, hash, compare, fields, eq, to_yojson]
+        module T = struct
+          let version = 1
 
-        let create ~magnitude ~sgn = {magnitude; sgn}
+          type ('magnitude, 'sgn) t_ = {magnitude: 'magnitude; sgn: 'sgn}
+          [@@deriving bin_io, sexp, hash, compare, fields, eq, to_yojson]
 
-        type t = (magnitude, Sgn.t) t_
-        [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
+          let create ~magnitude ~sgn = {magnitude; sgn}
+
+          type t = (magnitude, Sgn.t) t_
+          [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
       end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "currency_signed"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
     end
 
-    include Stable.V1
+    include Stable.Latest
 
     let zero = create ~magnitude:zero ~sgn:Sgn.Pos
 
@@ -600,7 +635,7 @@ module Amount = struct
         let length = currency_length
       end)
 
-  type amount = T.Stable.V1.t [@@deriving bin_io, sexp]
+  type amount = T.Stable.Latest.t [@@deriving bin_io, sexp]
 
   include (
     T :
