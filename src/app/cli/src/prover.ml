@@ -122,7 +122,7 @@ module Functions = struct
         `Initialized )
 
   [%%if
-  with_snark]
+  proof_level <> "none"]
 
   let extend_blockchain =
     create

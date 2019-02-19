@@ -12,7 +12,7 @@ open O1trace
 module Fee = Protocols.Coda_pow.Fee
 
 [%%if
-with_snark]
+proof_level <> "none"]
 
 module Ledger_proof = Ledger_proof.Prod
 
@@ -966,7 +966,7 @@ struct
 end
 
 [%%if
-with_snark]
+proof_level <> "none"]
 
 module Make_coda (Init : Init_intf) = struct
   module Ledger_proof_verifier = struct

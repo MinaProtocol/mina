@@ -85,7 +85,7 @@ module Worker = struct
               and type connection_state := Connection_state.t) =
     struct
       [%%if
-      with_snark]
+      proof_level <> "none"]
 
       let verify_blockchain (w : Worker_state.t) (chain : Blockchain.t) =
         let%map (module M) = Worker_state.get w in

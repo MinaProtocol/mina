@@ -9,7 +9,7 @@ open Core
 
 (* TODO: refactor to do compile time selection *)
 [%%if
-with_snark]
+proof_level <> "none"]
 
 let use_dummy_values = false
 
