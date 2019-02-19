@@ -13,7 +13,6 @@ module Transition_frontier_diff = struct
         ; old_best_tip: 'a
         ; garbage: 'a list }
         (** Triggered when a new breadcrumb is added, causing a new best_tip *)
-    | Destroy  (** Triggered when the transition_frontier is destroyed *)
   [@@deriving sexp]
 end
 
