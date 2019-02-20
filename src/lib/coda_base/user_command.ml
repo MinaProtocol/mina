@@ -16,7 +16,7 @@ module Stable = struct
         {payload: 'payload; sender: 'pk; signature: 'signature}
       [@@deriving bin_io, eq, sexp, hash, yojson]
 
-      type t = (Payload.Stable.V1.t, Public_key.t, Signature.t) t_
+      type t = (Payload.Stable.Latest.t, Public_key.t, Signature.t) t_
       [@@deriving bin_io, eq, sexp, hash, yojson]
     end
 
@@ -107,6 +107,7 @@ let%test_unit "completeness" =
 
 let%test_unit "json" =
   Quickcheck.test ~trials:20 ~sexp_of:sexp_of_t gen_test ~f:(fun t ->
-      assert (Codable.For_tests.check_encoding (module Stable.V1) ~equal t) )
+      assert (Codable.For_tests.check_encoding (module Stable.Latest) ~equal t)
+  )
 
 let check t = Option.some_if (check_signature t) t
