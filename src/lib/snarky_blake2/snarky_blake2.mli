@@ -1,3 +1,7 @@
+val bits_to_string : bool array -> string
+
+val string_to_bits : string -> bool array
+
 module type S = sig
   module Impl : Snarky.Snark_intf.S
 
