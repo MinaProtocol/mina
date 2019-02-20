@@ -126,47 +126,30 @@ module Make
     let locs_bufs = List.map locations_vs ~f:create_buf in
     set_raw_batch mdb locs_bufs
 
-  let rec compute_affected_locations_and_hashes mdb locations_and_hashes acc =
-    let locations, _ = List.unzip locations_and_hashes in
-    if not @@ List.is_empty locations then
-      let height = Location.height @@ List.hd_exn locations in
-      if height < Depth.depth then
-        let location_to_hash_table =
-          Location.Table.of_alist_exn locations_and_hashes
-        in
-        let _, parent_locations_and_hashes =
-          List.fold locations_and_hashes ~init:([], [])
-            ~f:(fun (processed_locations, parent_locations_and_hashes)
-               (location, hash)
-               ->
-              if List.mem processed_locations location ~equal:Location.equal
-              then (processed_locations, parent_locations_and_hashes)
-              else
-                let sibling_location = Location.sibling location in
-                let sibling_hash =
-                  Option.value ~default:(get_hash mdb sibling_location)
-                  @@ Hashtbl.find location_to_hash_table sibling_location
-                in
-                let parent_hash =
-                  let left_hash, right_hash =
-                    Location.order_siblings location hash sibling_hash
-                  in
-                  Hash.merge ~height left_hash right_hash
-                in
-                ( location :: sibling_location :: processed_locations
-                , (Location.parent location, parent_hash)
-                  :: parent_locations_and_hashes ) )
-        in
-        compute_affected_locations_and_hashes mdb parent_locations_and_hashes
-          (List.append parent_locations_and_hashes acc)
-      else acc
-    else acc
+  include Util.Make (struct
+    module Key = Key
+    module Location = Location
+    module Account = Account
+    module Hash = Hash
+    module Depth = Depth
 
-  (** This function assumes that all the locations are in the same layer. *)
-  let set_hash_batch mdb locations_and_hashes =
-    set_bin_batch mdb Hash.bin_size_t Hash.bin_write_t
-      (compute_affected_locations_and_hashes mdb locations_and_hashes
-         locations_and_hashes)
+    module Base = struct
+      type nonrec t = t
+
+      let get = get
+    end
+
+    let get_hash = get_hash
+
+    let location_of_addr addr = Location.Account addr
+
+    let set_raw_hash_batch mdb addresses_and_hashes =
+      set_bin_batch mdb Hash.bin_size_t Hash.bin_write_t addresses_and_hashes
+
+    let set_raw_account_batch mdb addresses_and_accounts =
+      set_bin_batch mdb Account.bin_size_t Account.bin_write_t
+        addresses_and_accounts
+  end)
 
   let set_hash mdb location new_hash = set_hash_batch mdb [(location, new_hash)]
 
@@ -276,14 +259,6 @@ module Make
       (Location.Hash (Location.to_path_exn location))
       (Hash.hash_account account)
 
-  let set_batch mdb locations_and_accounts =
-    set_bin_batch mdb Account.bin_size_t Account.bin_write_t
-      locations_and_accounts ;
-    set_hash_batch mdb
-    @@ List.map locations_and_accounts ~f:(fun (location, account) ->
-           ( Location.Hash (Location.to_path_exn location)
-           , Hash.hash_account account ) )
-
   let index_of_key_exn mdb key =
     let location = location_of_key mdb key |> Option.value_exn in
     let addr = Location.to_path_exn location in
@@ -319,17 +294,6 @@ module Make
     match Account_location.last_location_address t with
     | None -> 0
     | Some addr -> Addr.to_int addr + 1
-
-  let set_batch_accounts mdb addresses_and_accounts =
-    set_batch mdb
-    @@ List.map addresses_and_accounts ~f:(fun (addr, account) ->
-           (Location.Account addr, account) )
-
-  let set_all_accounts_rooted_at_exn mdb address accounts =
-    let addresses = Sequence.to_list @@ Addr.Range.subtree_range_seq address in
-    let num_accounts = List.length accounts in
-    List.(zip_exn (take addresses num_accounts) accounts)
-    |> set_batch_accounts mdb
 
   let iteri t ~f =
     match Account_location.last_location_address t with
@@ -422,20 +386,4 @@ module Make
   let merkle_path_at_index_exn t index =
     let addr = Addr.of_int_exn index in
     merkle_path_at_addr_exn t addr
-
-  let location_of_addr addr = Location.Account addr
-
-  include Util.Make (struct
-    module Location = Location
-    module Account = Account
-    module Addr = Location.Addr
-
-    module Base = struct
-      type nonrec t = t
-
-      let get = get
-    end
-
-    let location_of_addr = location_of_addr
-  end)
 end

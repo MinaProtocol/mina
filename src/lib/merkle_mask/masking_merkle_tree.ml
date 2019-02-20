@@ -283,69 +283,11 @@ struct
           Some hash
         with _ -> None )
 
-    let rec compute_affected_locations_and_hashes t locations_and_hashes acc =
-      let locations, _ = List.unzip locations_and_hashes in
-      if not @@ List.is_empty locations then
-        let height = Location.height (List.hd_exn locations) in
-        if height < Base.depth then
-          let location_to_hashtbl =
-            Location.Table.of_alist_exn locations_and_hashes
-          in
-          let _, parent_locations_and_hashes =
-            List.fold locations_and_hashes ~init:([], [])
-              ~f:(fun (processed_locations, parent_locations_and_hashes)
-                 (location, hash)
-                 ->
-                if List.mem processed_locations location ~equal:Location.equal
-                then (processed_locations, parent_locations_and_hashes)
-                else
-                  let sibling_location = Location.sibling location in
-                  let sibling_hash =
-                    Option.value
-                      ~default:
-                        (Option.value_exn
-                           (get_hash t (Location.to_path_exn sibling_location)))
-                    @@ Location.Table.find location_to_hashtbl sibling_location
-                  in
-                  let parent_hash =
-                    let left_hash, right_hash =
-                      Location.order_siblings location hash sibling_hash
-                    in
-                    Hash.merge ~height left_hash right_hash
-                  in
-                  ( location :: sibling_location :: processed_locations
-                  , (Location.parent location, parent_hash)
-                    :: parent_locations_and_hashes ) )
-          in
-          compute_affected_locations_and_hashes t parent_locations_and_hashes
-            (List.append parent_locations_and_hashes acc)
-        else acc
-      else acc
-
-    (** This function assumes that all the locations are in the same layer. *)
-    let set_hash_batch t locations_and_hashes =
-      List.iter
-        (compute_affected_locations_and_hashes t locations_and_hashes
-           locations_and_hashes) ~f:(fun (location, hash) ->
-          set_hash t (Location.to_path_exn location) hash )
-
     (* batch operations TODO: rely on availability of batch operations in Base
        for speed *)
     (* NB: rocksdb does not support batch reads; should we offer this? *)
     let get_batch_exn t locations =
       List.map locations ~f:(fun location -> get t location)
-
-    (* TODO: maybe create a new hash table from the alist, then merge *)
-    let set_batch t locations_and_accounts =
-      List.iter locations_and_accounts ~f:(fun (location, account) ->
-          set_account t location account ) ;
-      let locations, accounts = List.unzip locations_and_accounts in
-      set_hash_batch t
-      @@ List.zip_exn
-           (List.map
-              ~f:(fun l -> Location.Hash (Location.to_path_exn l))
-              locations)
-           (List.map ~f:Hash.hash_account accounts)
 
     (* NB: rocksdb does not support batch reads; is this needed? *)
     let get_hash_batch_exn t addrs =
@@ -393,6 +335,36 @@ struct
           match t.current_location with
           | None -> Some parent_loc
           | Some our_loc -> Some (max parent_loc our_loc) )
+
+    include Merkle_ledger.Util.Make (struct
+      module Location = Location
+      module Key = Key
+      module Account = Account
+      module Hash = Hash
+
+      module Depth = struct
+        let depth = Base.depth
+      end
+
+      module Base = struct
+        type nonrec t = t
+
+        let get = get
+      end
+
+      let location_of_addr addr = Location.Account addr
+
+      let get_hash t location =
+        Option.value_exn (get_hash t (Location.to_path_exn location))
+
+      let set_raw_hash_batch t locations_and_hashes =
+        List.iter locations_and_hashes ~f:(fun (location, hash) ->
+            set_hash t (Location.to_path_exn location) hash )
+
+      let set_raw_account_batch t locations_and_accounts =
+        List.iter locations_and_accounts ~f:(fun (location, account) ->
+            set_account t location account )
+    end)
 
     let set_batch_accounts t addresses_and_accounts =
       set_batch t
@@ -587,22 +559,6 @@ struct
     let location_of_sexp = Location.t_of_sexp
 
     let depth = Base.depth
-
-    let location_of_addr addr = Location.Account addr
-
-    include Merkle_ledger.Util.Make (struct
-      module Location = Location
-      module Account = Account
-      module Addr = Location.Addr
-
-      module Base = struct
-        type nonrec t = t
-
-        let get = get
-      end
-
-      let location_of_addr = location_of_addr
-    end)
   end
 
   let set_parent t parent =
