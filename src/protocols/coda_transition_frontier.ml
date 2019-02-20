@@ -21,12 +21,16 @@ module type Transition_frontier_extension_intf = sig
 
   type input
 
+  type view
+
   type transition_frontier_breadcrumb
 
   val create : input -> t
 
   val handle_diff :
-    t -> transition_frontier_breadcrumb Transition_frontier_diff.t -> unit
+       t
+    -> transition_frontier_breadcrumb Transition_frontier_diff.t
+    -> view option
 end
 
 module type Network_intf = sig
@@ -181,6 +185,20 @@ module type Transition_frontier_intf = sig
   val best_tip_path_length_exn : t -> int
 
   val shallow_copy_root_snarked_ledger : t -> masked_ledger
+
+  module Extensions : sig
+    module Work : sig
+      type t [@@deriving sexp, bin_io]
+
+      include Hashable.S_binable with type t := t
+    end
+
+    module Readers : sig
+      type t = {snark_pool: int Work.Table.t Pipe_lib.Broadcast_pipe.Reader.t}
+    end
+  end
+
+  val extension_pipes : t -> Extensions.Readers.t
 
   module For_tests : sig
     val root_snarked_ledger : t -> ledger_database

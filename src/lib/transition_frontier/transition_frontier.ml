@@ -105,6 +105,8 @@ module Make (Inputs : Inputs_intf) :
   end
 
   module Extensions = struct
+    module Work = Inputs.Transaction_snark_work.Statement
+
     module Snark_pool_refcount = Snark_pool_refcount.Make (struct
       include Inputs
       module Breadcrumb = Breadcrumb
@@ -112,11 +114,33 @@ module Make (Inputs : Inputs_intf) :
 
     type t = {snark_pool_refcount: Snark_pool_refcount.t} [@@deriving fields]
 
+    module Readers = struct
+      type t = {snark_pool: int Work.Table.t Pipe_lib.Broadcast_pipe.Reader.t}
+    end
+
+    module Writers = struct
+      type t = {snark_pool: int Work.Table.t Pipe_lib.Broadcast_pipe.Writer.t}
+    end
+
+    let create_pipes () =
+      let reader, writer =
+        Pipe_lib.Broadcast_pipe.create (Work.Table.create ())
+      in
+      ({Readers.snark_pool= reader}, {Writers.snark_pool= writer})
+
     let create () = {snark_pool_refcount= Snark_pool_refcount.create ()}
 
-    let handle_diff t diff =
-      let use handler field = handler (Field.get field t) diff in
-      Fields.iter ~snark_pool_refcount:(use Snark_pool_refcount.handle_diff)
+    let handle_diff t writers diff =
+      let use writer handler field =
+        match handler (Field.get field t) diff with
+        | None -> ()
+        | Some new_view ->
+            (* TODO: figure out deferred *)
+            ignore @@ Pipe_lib.Broadcast_pipe.Writer.write writer new_view
+      in
+      Fields.iter
+        ~snark_pool_refcount:
+          (use writers.Writers.snark_pool Snark_pool_refcount.handle_diff)
   end
 
   type node =
@@ -134,9 +158,13 @@ module Make (Inputs : Inputs_intf) :
     ; logger: Logger.t
     ; table: node State_hash.Table.t
     ; consensus_local_state: Consensus.Local_state.t
-    ; extensions: Extensions.t }
+    ; extensions: Extensions.t
+    ; extension_readers: Extensions.Readers.t
+    ; extension_writers: Extensions.Writers.t }
 
   let logger t = t.logger
+
+  let extension_pipes t = t.extension_readers
 
   (* TODO: load from and write to disk *)
   let create ~logger
@@ -212,13 +240,18 @@ module Make (Inputs : Inputs_intf) :
           {breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
         in
         let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
+        let extension_readers, extension_writers =
+          Extensions.create_pipes ()
+        in
         { logger
         ; root_snarked_ledger
         ; root= root_hash
         ; best_tip= root_hash
         ; table
         ; consensus_local_state
-        ; extensions= Extensions.create () }
+        ; extensions= Extensions.create ()
+        ; extension_readers
+        ; extension_writers }
 
   let max_length = Inputs.max_length
 
@@ -526,7 +559,7 @@ module Make (Inputs : Inputs_intf) :
           else ([], root_node)
         in
         (* 5 *)
-        Extensions.handle_diff t.extensions
+        Extensions.handle_diff t.extensions t.extension_writers
           ( if node.length > best_tip_node.length then
             Transition_frontier_diff.New_best_tip
               { old_root= root_node.breadcrumb
