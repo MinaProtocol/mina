@@ -434,6 +434,8 @@ let coda_commands log =
     ; (Coda_shared_state_test.name, Coda_shared_state_test.command)
     ; (Coda_transitive_peers_test.name, Coda_transitive_peers_test.command)
     ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
+    ; ( Coda_shared_prefix_multiproposer_test.name
+      , Coda_shared_prefix_multiproposer_test.command )
     ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
     ; (Coda_receipt_chain_test.name, Coda_receipt_chain_test.command)
     ; ("full-test", Full_test.command)

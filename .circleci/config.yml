@@ -353,6 +353,10 @@ jobs:
                   name: Running test - Proof of Stake Tests | transaction-snark-profiler -check-only
                   command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'transaction-snark-profiler -check-only'
             
+            - run:
+                  name: Running test - Proof of Stake Tests | coda-shared-prefix-multiproposer-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-multiproposer-test'
+            
     test-withsnark-sig:
         resource_class: large
         docker:

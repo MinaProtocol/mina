@@ -25,6 +25,10 @@ let main () =
     |> Genesis_ledger.keypair_of_account_record_exn
   in
   let proposal_interval = Consensus.Constants.block_window_duration_ms in
+  let acceptable_delay =
+    Time.Span.of_ms
+      (proposal_interval * Consensus.Constants.delta |> Float.of_int)
+  in
   let n = 2 in
   let receiver_pk = Public_key.compress another_account_keypair.public_key in
   let sender_sk = largest_account_keypair.private_key in
@@ -35,8 +39,8 @@ let main () =
   Parallel.init_master () ;
   let configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
-      ~snark_worker_public_keys:None ~should_propose:(Fn.const false)
-      ~work_selection
+      ~acceptable_delay ~snark_worker_public_keys:None
+      ~should_propose:(Fn.const false) ~work_selection
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let worker = List.hd_exn workers in
