@@ -33,6 +33,9 @@ end
 module Consensus_mechanism = Consensus
 module Blockchain = Blockchain
 
+[%%inject "proof_level",
+proof_level]
+
 module Worker_state = struct
   module type S = sig
     module Transaction_snark : Transaction_snark.Verification.S
@@ -58,7 +61,7 @@ module Worker_state = struct
        Transaction_snark.Verification.Make (struct
          let keys = Keys.transaction_snark_keys
        end) in
-       let module M = struct
+       let m = match proof_level with "full" -> (module struct
          open Snark_params
          open Keys
          module Consensus_mechanism = Consensus
@@ -100,8 +103,47 @@ module Worker_state = struct
              (Tock.Keypair.vk Wrap.keys)
              Wrap.input
              (Wrap_input.of_tick_field (Keys.Step.instance_hash state))
-       end in
-       (module M : S))
+       end : S)
+       | "check" -> (module struct
+         open Snark_params
+         open Keys
+         module Consensus_mechanism = Consensus
+         module Transaction_snark = Transaction_snark
+         module Blockchain_state = Blockchain_state.Make (Consensus)
+         module State = Blockchain_state.Make_update (Transaction_snark)
+
+         let extend_blockchain (chain : Blockchain.t)
+             (next_state : Consensus.Protocol_state.value)
+             (block : Consensus.Snark_transition.value) state_for_handler =
+           let _next_state_top_hash = Keys.Step.instance_hash next_state in
+           let _prover_state =
+             { Keys.Step.Prover_state.prev_proof= chain.proof
+             ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
+             ; prev_state= chain.state
+             ; update= block }
+           in
+           let _main x =
+             Tick.handle (Keys.Step.main x)
+               (Consensus_mechanism.Prover_state.handler state_for_handler)
+           in
+           (*
+           let _ = Tick.Groth16.check (main next_state_top_hash) prover_state in
+           *)
+           { Blockchain.state= next_state
+           ; proof= Precomputed_values.base_proof}
+
+         let verify state proof = true
+       end : S)
+       | "none" -> (module struct
+          module Transaction_snark = Transaction_snark
+          let extend_blockchain chain next_state block state_for_handler =
+            {Blockchain.proof= Precomputed_values.base_proof; state= next_state}
+
+          let verify _ _ = true
+       end : S)
+       | _ -> failwith "unknown proof_level set in compile config"
+       in
+       m)
 
   let get = Fn.id
 end
@@ -120,9 +162,6 @@ module Functions = struct
     create bin_unit [%bin_type_class: [`Initialized]] (fun w () ->
         let%map (module W) = Worker_state.get w in
         `Initialized )
-
-  [%%if
-  proof_level <> "none"]
 
   let extend_blockchain =
     create
@@ -144,30 +183,6 @@ module Functions = struct
     create Blockchain.bin_t bin_bool (fun w {Blockchain.state; proof} ->
         let%map (module W) = Worker_state.get w in
         W.verify state proof )
-
-  [%%else]
-
-  let extend_blockchain =
-    create
-      [%bin_type_class:
-        Blockchain.t
-        * Consensus_mechanism.Protocol_state.value
-        * Consensus_mechanism.Snark_transition.value
-        * Consensus_mechanism.Prover_state.t] Blockchain.bin_t
-      (fun w
-      ( {Blockchain.state= prev_state; proof= prev_proof}
-      , next_state
-      , transition
-      , prover_state )
-      ->
-        let proof = Precomputed_values.base_proof in
-        Deferred.return {Blockchain.proof; state= next_state} )
-
-  let verify_blockchain =
-    create Blockchain.bin_t bin_bool (fun w {Blockchain.state; proof} ->
-        Deferred.return true )
-
-  [%%endif]
 end
 
 module Worker = struct

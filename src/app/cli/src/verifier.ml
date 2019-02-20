@@ -62,6 +62,9 @@ module Worker_state = struct
   let get = Fn.id
 end
 
+[%%inject
+"proof_level", proof_level]
+
 module Worker = struct
   module T = struct
     module F = Rpc_parallel.Function
@@ -84,19 +87,14 @@ module Worker = struct
              with type worker_state := Worker_state.t
               and type connection_state := Connection_state.t) =
     struct
-      [%%if
-      proof_level <> "none"]
-
       let verify_blockchain (w : Worker_state.t) (chain : Blockchain.t) =
+        match proof_level with
+        | "full"
+        | "check" ->
         let%map (module M) = Worker_state.get w in
         M.verify_wrap chain.state chain.proof
-
-      [%%else]
-
-      let verify_blockchain (w : Worker_state.t) (chain : Blockchain.t) =
-        Deferred.return true
-
-      [%%endif]
+        | "none" -> Deferred.return true
+        | _ -> failwith "unknown proof_level"
 
       let verify_transaction_snark (w : Worker_state.t) (p, message) =
         let%map (module M) = Worker_state.get w in
