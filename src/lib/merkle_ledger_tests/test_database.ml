@@ -61,20 +61,6 @@ let%test_module "test functor on in memory databases" =
             | Some acct, Some acct' -> Account.equal acct acct'
             | _, _ -> false )
 
-      let%test_unit "set would change the merkle root" =
-        Test.with_instance (fun mdb ->
-            let accounts =
-              Quickcheck.random_value
-                (Quickcheck.Generator.list_with_length 2 Account.gen)
-            in
-            let account0 = List.hd_exn accounts in
-            let account1 = List.hd_exn @@ List.tl_exn accounts in
-            let location = create_new_account_exn mdb account0 in
-            let merkle_root0 = MT.merkle_root mdb in
-            MT.set mdb location account1 ;
-            let merkle_root1 = MT.merkle_root mdb in
-            assert (not @@ Hash.equal merkle_root0 merkle_root1) )
-
       let dedup_accounts accounts =
         List.dedup_and_sort accounts ~compare:(fun account1 account2 ->
             Key.compare
