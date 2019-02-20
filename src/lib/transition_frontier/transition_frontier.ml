@@ -431,7 +431,8 @@ module Make (Inputs : Inputs_intf) :
         (* 3 *)
         if node.length > best_tip_node.length then t.best_tip <- hash ;
         (* 4 *)
-        let maybe_new_root =
+        (* note: new_root_node is the same as root_node if the root didn't change *)
+        let garbage_breadcrumbs, new_root_node =
           if distance_to_parent > max_length then (
             Logger.info t.logger
               !"Distance to parent: %d exceeded max_lenth %d"
@@ -521,30 +522,19 @@ module Make (Inputs : Inputs_intf) :
                    (Breadcrumb.blockchain_state new_root_node.breadcrumb))
               ( Ledger.Db.merkle_root t.root_snarked_ledger
               |> Frozen_ledger_hash.of_ledger_hash ) ;
-            Some (garbage_breadcrumbs, new_root_node) )
-          else None
+            (garbage_breadcrumbs, new_root_node) )
+          else ([], root_node)
         in
         (* 5 *)
-        let maybe_new_best_tip_breadcrumb =
-          if node.length > best_tip_node.length then
-            Some best_tip_node.breadcrumb
-          else None
-        in
         Extensions.handle_diff t.extensions
-          ( match (maybe_new_root, maybe_new_best_tip_breadcrumb) with
-          | Some (garbage_breadcrumbs, new_root_node), best_tip ->
-              Transition_frontier_diff.New_root
-                { old_root= root_node.breadcrumb
-                ; new_root= new_root_node.breadcrumb
-                ; added= node.breadcrumb
-                ; garbage= garbage_breadcrumbs
-                ; old_best_tip= best_tip }
-          | _, Some new_best_tip_breadcrumb ->
-              Transition_frontier_diff.New_best_tip
-                { new_best_tip= new_best_tip_breadcrumb
-                ; old_best_tip= best_tip_node.breadcrumb }
-          | None, _ -> Transition_frontier_diff.Extend_best_tip node.breadcrumb
-          ) )
+          ( if node.length > best_tip_node.length then
+            Transition_frontier_diff.New_best_tip
+              { old_root= root_node.breadcrumb
+              ; new_root= new_root_node.breadcrumb
+              ; new_best_tip= node.breadcrumb
+              ; old_best_tip= best_tip_node.breadcrumb
+              ; garbage= garbage_breadcrumbs }
+          else Transition_frontier_diff.New_breadcrumb node.breadcrumb ) )
 
   let best_tip_path_length_exn {table; root; best_tip; _} =
     let open Option.Let_syntax in

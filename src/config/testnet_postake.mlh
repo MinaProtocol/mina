@@ -1,6 +1,6 @@
 [%%import "config/ledger_depth/full.mlh"]
 [%%import "config/coinbase/standard.mlh"]
-[%%import "config/consensus/postake_short.mlh"]
+[%%import "config/consensus/postake_tiny.mlh"]
 [%%import "config/scan_state/small.mlh"]
 [%%import "config/debug_level/logs.mlh"]
 
