@@ -6,7 +6,7 @@ pull_request_rules:
           - "status-success=ci/circleci: build_testnet_postake"
           - "status-success=ci/circleci: build_testnet_public"
           - "status-success=ci/circleci: lint"
-          - "status-success=ci/circleci: test-fake_hash_ufll_test"
+          - "status-success=ci/circleci: test-fake_hash_full_test"
           - "status-success=ci/circleci: test-posig_integration_tests"
           - "status-success=ci/circleci: test-postake_integration_tests"
           - "status-success=ci/circleci: test-unit-test"
