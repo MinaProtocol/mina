@@ -5,7 +5,7 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries core async coda_lib coda_base envelope protocols async_extra
-   unix_timestamp o1trace interruptible)
+   unix_timestamp o1trace interruptible shared_mvar)
  (preprocess
   (pps ppx_jane bisect_ppx -- -conditional))
  (synopsis "Coda block proposer"))

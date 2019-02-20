@@ -56,6 +56,8 @@ module Reader0 = struct
     reader.has_reader <- false ;
     result
 
+  let read t = enforce_single_reader t (Pipe.read t.reader)
+
   let fold reader ~init ~f =
     enforce_single_reader reader
       (let rec go b =
