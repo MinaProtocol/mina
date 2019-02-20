@@ -1,7 +1,7 @@
 pull_request_rules:
     - name: automatically merge approved PRs with the ready-to-merge label
       conditions:
-          - status-success="ci/circleci: build_dev"
+          - "status-success=ci/circleci: build_dev"
           - status-success="ci/circleci: build_testnet_posig"
           - status-success="ci/circleci: build_testnet_postake"
           - status-success="ci/circleci: build_testnet_public"
