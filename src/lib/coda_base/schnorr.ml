@@ -2,7 +2,6 @@ open Core_kernel
 open Snark_params
 open Fold_lib
 open Bitstring_lib
-open Sha256_lib
 
 module Message = struct
   module Scalar = Tick.Inner_curve.Scalar
@@ -25,7 +24,7 @@ module Message = struct
           User_command_payload.fold t +> group3 ~default:false (of_list nonce))
     in
     Scalar.of_bits
-      (Sha256_lib.Sha256.digest_bits (Field.unpack d) |> Sha256.Digest.to_bits)
+      (Random_oracle.digest_field d |> Random_oracle.Digest.to_bits)
 
   let () = assert Insecure.signature_hash_function
 
@@ -53,8 +52,8 @@ module Message = struct
       d
     in
     let%bind bs = Pedersen.Checked.Digest.choose_preimage digest in
-    let%map d = Sha256_lib.Sha256.Checked.digest (bs :> Boolean.var list) in
-    Bitstring.Lsb_first.of_list (d :> Boolean.var list)
+    let%map d = Random_oracle.Checked.digest_bits (bs :> Boolean.var list) in
+    Bitstring.Lsb_first.of_list (Array.to_list (d :> Boolean.var array))
 end
 
 include Signature_lib.Checked.Schnorr (Tick) (Snark_params.Tick.Inner_curve)

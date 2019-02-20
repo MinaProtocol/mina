@@ -33,7 +33,7 @@ module Common : sig
   type var =
     ( Currency.Fee.var
     , Coda_numbers.Account_nonce.Unpacked.var
-    , User_command_memo.var )
+    , User_command_memo.Checked.t )
     t_
 
   val typ : (var, t) Typ.t
