@@ -31,23 +31,23 @@ This design is based on the introduction of the following event type to `Protoco
 ```ocaml
 module Transition_frontier_diff = struct
   type 'a t =
-    (* Added a node to the existing best tip without creating a new root *)
-    | Extend_best_tip of 'a
-    (* Added a node to the a new best tip without creating a new root *)
-    | New_best_tip of {old_best_tip: 'a; new_best_tip: 'a}
-    (* If triggered by a new best tip, the old one will be in old_best_tip *)
-    | New_root of
+    | New_breadcrumb of 'a
+        (** Triggered when a new breadcrumb is added without changing the root or best_tip *)
+    | New_best_tip of
         { old_root: 'a
-        ; new_root: 'a
-        ; added: 'a
-        ; garbage: 'a list
-        ; old_best_tip: 'a option }
-    | Destroy
+        ; new_root: 'a  (** Same as old root if the root doesn't change *)
+        ; new_best_tip: 'a
+        ; old_best_tip: 'a
+        ; garbage: 'a list }
+        (** Triggered when a new breadcrumb is added, causing a new best_tip *)
+  [@@deriving sexp]
 end
 ```
-The `Transition_frontier` will hold a record full of extensions, and will call `handle_diff` on all extensions whenever a frontier diff event (defined above) is triggered by `add_breadcrumb_exn`, passing in the diff event.
+The `Transition_frontier` will hold a record full of extensions, and will call `handle_diff` on all extensions whenever a frontier diff event (defined above) is triggered by `add_breadcrumb_exn`, passing in the diff event. The lifetime of the extension is tied to the `Transition_frontier`, so when the frontier is torn down and rebuilt, so are the extensions.
 
-For instance, in the snark pool example, the reference count could be incremented for all Work referenced by the added breadcrumb when `Extend_best_tip` is triggered, and the reference count for the removed work could be decremented when `New_root` fires.
+External users of the extensions can subscribe to a version of the `Transition_frontier` `MVar` that will broadcast the creation of a new `Transition_frontier` to all listeners. When they receive a new `Transition_frontier`, they can also start reading from a `Pipe` that is exposed by whichever extension they care about.
+
+For instance, in the snark pool example, the reference count could be incremented for all Work referenced by the added breadcrumb when `Extend_best_tip` is triggered, and the reference count for the removed work could be decremented when `New_root` fires. Whenever the reference count for a piece of work goes to zero, an event gets dispatched into the Pipe for the `Snark_pool` to remove that work from the pool.
 
 ## Drawbacks
 [drawbacks]: #drawbacks
