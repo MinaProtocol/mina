@@ -461,7 +461,7 @@ struct
   end
 
   module Protocol_state_proof = struct
-    include Proof.Stable.Latest
+    include Proof.Stable.V1
 
     type input = Protocol_state.value
 
@@ -512,7 +512,7 @@ struct
     include Ledger_proof_verifier
   end
 
-  module Proof = Coda_base.Proof.Stable.Latest
+  module Proof = Coda_base.Proof.Stable.V1
   module Ledger_proof = Ledger_proof
   module Sparse_ledger = Coda_base.Sparse_ledger
 
