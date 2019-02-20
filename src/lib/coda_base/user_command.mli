@@ -16,12 +16,13 @@ module Stable : sig
       {payload: 'payload; sender: 'pk; signature: 'signature}
     [@@deriving bin_io, eq, sexp, hash, yojson]
 
-    type t =
-      (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_
+    type t = (Payload.Stable.Latest.t, Public_key.t, Signature.t) t_
     [@@deriving bin_io, eq, sexp, hash, yojson]
 
     val compare : seed:string -> t -> t -> int
   end
+
+  module Latest : module type of V1
 end
 
 val payload : t -> Payload.t
