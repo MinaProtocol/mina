@@ -129,7 +129,7 @@ module Make (Inputs : Inputs_intf) :
     Broadcaster.broadcast controller_type
       (`Transition_frontier_controller (new_frontier, reader, writer))
 
-  let peek_exn mvar = Shared_mvar.peek mvar |> Option.value_exn
+  let peek_exn mvar = Broadcast_pipe.peek mvar |> Option.value_exn
 
   let run ~logger ~network ~time_controller ~frontier_write_mvar
       ~frontier_shared_mvar ~ledger_db ~network_transition_reader

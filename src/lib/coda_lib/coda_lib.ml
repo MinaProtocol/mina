@@ -294,7 +294,7 @@ module type Proposer_intf = sig
     -> time_controller:time_controller
     -> keypair:keypair
     -> consensus_local_state:consensus_local_state
-    -> frontier_reader:transition_frontier Shared_mvar.t
+    -> frontier_reader:transition_frontier Broadcast_pipe.t
     -> transition_writer:( ( external_transition_verified
                            , state_hash )
                            With_hash.t
@@ -480,7 +480,7 @@ module Make (Inputs : Inputs_intf) = struct
         Net.t (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
-    ; transition_frontier: Transition_frontier.t Shared_mvar.t
+    ; transition_frontier: Transition_frontier.t Broadcast_pipe.t
     ; strongest_ledgers:
         (External_transition.Verified.t, Protocol_state_hash.t) With_hash.t
         Strict_pipe.Reader.t
@@ -501,7 +501,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; consensus_local_state: Consensus_mechanism.Local_state.t }
 
   let peek_frontier frontier_shared_mvar =
-    Shared_mvar.peek frontier_shared_mvar
+    Broadcast_pipe.peek frontier_shared_mvar
     |> Result.of_option
          ~error:
            (Error.of_string
@@ -514,7 +514,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let best_tip_opt t =
     let open Option.Let_syntax in
-    let%map frontier = Shared_mvar.peek t.transition_frontier in
+    let%map frontier = Broadcast_pipe.peek t.transition_frontier in
     Transition_frontier.best_tip frontier
 
   let best_staged_ledger_opt t =
@@ -676,7 +676,7 @@ module Make (Inputs : Inputs_intf) = struct
         let frontier_write_mvar = Mvar.create () in
         Mvar.set frontier_write_mvar (Some transition_frontier) ;
         let frontier_shared_mvar =
-          Shared_mvar.create (Mvar.read_only frontier_write_mvar)
+          Broadcast_pipe.create (Mvar.read_only frontier_write_mvar)
         in
         let%bind net =
           Net.create config.net_config
@@ -701,7 +701,7 @@ module Make (Inputs : Inputs_intf) = struct
               let open Deferred.Option.Let_syntax in
               let hash = Envelope.Incoming.data enveloped_hash in
               let%bind frontier =
-                Deferred.return @@ Shared_mvar.peek frontier_shared_mvar
+                Deferred.return @@ Broadcast_pipe.peek frontier_shared_mvar
               in
               let%map breadcrumb =
                 Deferred.return @@ Transition_frontier.find frontier hash
@@ -715,7 +715,7 @@ module Make (Inputs : Inputs_intf) = struct
               let consensus_state = Envelope.Incoming.data query_env in
               let result =
                 let open Option.Let_syntax in
-                let%bind frontier = Shared_mvar.peek frontier_shared_mvar in
+                let%bind frontier = Broadcast_pipe.peek frontier_shared_mvar in
                 Root_prover.prove ~logger:config.log ~frontier consensus_state
               in
               Deferred.return result )

@@ -497,7 +497,7 @@ module type Transition_router_intf = sig
     -> network:network
     -> time_controller:time_controller
     -> frontier_write_mvar:(transition_frontier option, [> write]) Mvar.t
-    -> frontier_shared_mvar:transition_frontier Shared_mvar.t
+    -> frontier_shared_mvar:transition_frontier Pipe_lib.Broadcast_pipe.t
     -> ledger_db:ledger_db
     -> network_transition_reader:( [ `Transition of external_transition
                                                     Envelope.Incoming.t ]

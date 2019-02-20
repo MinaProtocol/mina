@@ -5,6 +5,7 @@
   (libraries
     core
     async
+    pipe_lib
     transition_frontier
     transition_frontier_controller
     bootstrap_controller
