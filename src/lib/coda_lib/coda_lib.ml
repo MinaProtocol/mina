@@ -294,7 +294,7 @@ module type Proposer_intf = sig
     -> time_controller:time_controller
     -> keypair:keypair
     -> consensus_local_state:consensus_local_state
-    -> frontier_reader:transition_frontier Broadcast_pipe.t
+    -> frontier_reader:transition_frontier option Broadcast_pipe.Reader.t
     -> transition_writer:( ( external_transition_verified
                            , state_hash )
                            With_hash.t
@@ -480,7 +480,7 @@ module Make (Inputs : Inputs_intf) = struct
         Net.t (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
-    ; transition_frontier: Transition_frontier.t Broadcast_pipe.t
+    ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
     ; strongest_ledgers:
         (External_transition.Verified.t, Protocol_state_hash.t) With_hash.t
         Strict_pipe.Reader.t
@@ -501,7 +501,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; consensus_local_state: Consensus_mechanism.Local_state.t }
 
   let peek_frontier frontier_broadcast_pipe =
-    Broadcast_pipe.peek frontier_broadcast_pipe
+    Broadcast_pipe.Reader.peek frontier_broadcast_pipe
     |> Result.of_option
          ~error:
            (Error.of_string
@@ -514,7 +514,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let best_tip_opt t =
     let open Option.Let_syntax in
-    let%map frontier = Broadcast_pipe.peek t.transition_frontier in
+    let%map frontier = Broadcast_pipe.Reader.peek t.transition_frontier in
     Transition_frontier.best_tip frontier
 
   let best_staged_ledger_opt t =
@@ -673,10 +673,8 @@ module Make (Inputs : Inputs_intf) = struct
                  ~dest:ledger_db)
             ~consensus_local_state
         in
-        let frontier_write_mvar = Mvar.create () in
-        Mvar.set frontier_write_mvar (Some transition_frontier) ;
-        let frontier_broadcast_pipe =
-          Broadcast_pipe.create (Mvar.read_only frontier_write_mvar)
+        let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
+          Broadcast_pipe.create (Some transition_frontier)
         in
         let%bind net =
           Net.create config.net_config
@@ -686,7 +684,7 @@ module Make (Inputs : Inputs_intf) = struct
               let open Or_error.Let_syntax in
               let result =
                 let ledger_hash, query = Envelope.Incoming.data query_env in
-                let%bind frontier = peek_frontier frontier_broadcast_pipe in
+                let%bind frontier = peek_frontier frontier_broadcast_pipe_r in
                 Sync_handler.answer_query ~frontier ledger_hash query
                   ~logger:config.log
                 |> Result.of_option
@@ -701,7 +699,8 @@ module Make (Inputs : Inputs_intf) = struct
               let open Deferred.Option.Let_syntax in
               let hash = Envelope.Incoming.data enveloped_hash in
               let%bind frontier =
-                Deferred.return @@ Broadcast_pipe.peek frontier_broadcast_pipe
+                Deferred.return
+                @@ Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
               in
               let%map breadcrumb =
                 Deferred.return @@ Transition_frontier.find frontier hash
@@ -716,7 +715,7 @@ module Make (Inputs : Inputs_intf) = struct
               let result =
                 let open Option.Let_syntax in
                 let%bind frontier =
-                  Broadcast_pipe.peek frontier_broadcast_pipe
+                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                 in
                 Root_prover.prove ~logger:config.log ~frontier consensus_state
               in
@@ -724,8 +723,10 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let valid_transitions =
           Transition_router.run ~logger:config.log ~network:net
-            ~time_controller:config.time_controller ~frontier_write_mvar
-            ~frontier_broadcast_pipe ~ledger_db
+            ~time_controller:config.time_controller
+            ~frontier_broadcast_pipe:
+              (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
+            ~ledger_db
             ~network_transition_reader:
               (Strict_pipe.Reader.map external_transitions_reader
                  ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm) ))
@@ -770,7 +771,7 @@ module Make (Inputs : Inputs_intf) = struct
           ; net
           ; transaction_pool
           ; snark_pool
-          ; transition_frontier= frontier_broadcast_pipe
+          ; transition_frontier= frontier_broadcast_pipe_r
           ; time_controller= config.time_controller
           ; external_transitions_writer=
               Strict_pipe.Writer.to_linear_pipe external_transitions_writer

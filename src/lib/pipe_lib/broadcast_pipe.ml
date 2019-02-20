@@ -2,80 +2,81 @@ open Core_kernel
 open Async_kernel
 
 type 'a t =
-  { mvar: 'a option Mvar.Read_only.t
-  ; mutable cache: 'a option
-  ; mvar_pipe_handle: 'a option Pipe.Reader.t
+  { root_pipe:
+      ('a, Strict_pipe.synchronous, unit Deferred.t) Strict_pipe.Writer.t
+  ; mutable cache: 'a
   ; mutable reader_id: int
   ; pipes:
-      ( 'a option Strict_pipe.Reader.t
-      * ( 'a option
-        , Strict_pipe.drop_head Strict_pipe.buffered
-        , unit )
-        Strict_pipe.Writer.t )
+      ( 'a Strict_pipe.Reader.t
+      * ('a, Strict_pipe.synchronous, unit Deferred.t) Strict_pipe.Writer.t )
       Int.Table.t }
 
-let create mvar =
-  let mvar_pipe_handle = Mvar.pipe_when_ready mvar in
-  let t =
-    { mvar
-    ; cache= Mvar.peek mvar |> Option.join
-    ; mvar_pipe_handle
-    ; reader_id= 0
-    ; pipes= Int.Table.create () }
-  in
+let create a =
+  let r, w = Strict_pipe.create Strict_pipe.Synchronous in
+  let t = {root_pipe= w; cache= a; reader_id= 0; pipes= Int.Table.create ()} in
   don't_wait_for
-    (Pipe.iter_without_pushback t.mvar_pipe_handle ~f:(fun a ->
+    (Strict_pipe.Reader.iter r ~f:(fun a ->
          t.cache <- a ;
-         Int.Table.iter t.pipes ~f:(fun (_, w) -> Strict_pipe.Writer.write w a)
-     )) ;
-  t
+         Deferred.List.iter ~how:`Parallel (Int.Table.data t.pipes)
+           ~f:(fun (_, w) -> Strict_pipe.Writer.write w a ) )) ;
+  (t, t)
 
 exception Already_closed
 
 let guard_already_closed t k =
-  if Pipe.is_closed t.mvar_pipe_handle then raise Already_closed else k ()
+  if Strict_pipe.Writer.is_closed t.root_pipe then raise Already_closed
+  else k ()
 
-let peek t = guard_already_closed t (fun () -> t.cache)
+module Reader = struct
+  type nonrec 'a t = 'a t
 
-let close t =
-  guard_already_closed t (fun () ->
-      Pipe.close_read t.mvar_pipe_handle ;
-      Int.Table.iter t.pipes ~f:(fun (_, w) -> Strict_pipe.Writer.close w) ;
-      Int.Table.clear t.pipes )
+  let peek t = guard_already_closed t (fun () -> t.cache)
 
-let fresh_reader_id t =
-  t.reader_id <- t.reader_id + 1 ;
-  t.reader_id
+  let fresh_reader_id t =
+    t.reader_id <- t.reader_id + 1 ;
+    t.reader_id
 
-let prepare_pipe ~close t =
-  guard_already_closed t (fun () ->
-      let r, w =
-        Strict_pipe.create
-          (Strict_pipe.Buffered (`Capacity 3, `Overflow Strict_pipe.Drop_head))
-      in
-      let reader_id = fresh_reader_id t in
-      Int.Table.add_exn t.pipes ~key:reader_id ~data:(r, w) ;
-      don't_wait_for
-        (let%map () = close in
-         Int.Table.remove t.pipes reader_id ;
-         Strict_pipe.Writer.close w) ;
-      r )
+  let prepare_pipe t ~f =
+    guard_already_closed t (fun () ->
+        let r, w = Strict_pipe.create Strict_pipe.Synchronous in
+        let reader_id = fresh_reader_id t in
+        Int.Table.add_exn t.pipes ~key:reader_id ~data:(r, w) ;
+        let d =
+          don't_wait_for (Strict_pipe.Writer.write w (peek t)) ;
+          let%map b = f r in
+          Int.Table.remove t.pipes reader_id ;
+          b
+        in
+        (d, w) )
 
-let fold ~close t =
-  let r = prepare_pipe ~close t in
-  Strict_pipe.Reader.fold r
+  let fold t ~init ~f =
+    prepare_pipe t ~f:(fun r -> Strict_pipe.Reader.fold r ~init ~f)
 
-let fold_without_pushback ~close t =
-  let r = prepare_pipe ~close t in
-  Strict_pipe.Reader.fold_without_pushback r
+  let iter t ~f = prepare_pipe t ~f:(fun r -> Strict_pipe.Reader.iter r ~f)
+end
 
-let iter ~close t =
-  let r = prepare_pipe ~close t in
-  Strict_pipe.Reader.iter r
+module Writer = struct
+  type nonrec 'a t = 'a t
 
-let iter_without_pushback ~close t =
-  let r = prepare_pipe ~close t in
-  Strict_pipe.Reader.iter_without_pushback r
+  let write t x =
+    guard_already_closed t (fun () -> Strict_pipe.Writer.write t.root_pipe x)
+
+  let close t =
+    guard_already_closed t (fun () ->
+        Strict_pipe.Writer.close t.root_pipe ;
+        Int.Table.iter t.pipes ~f:(fun (_, w) -> Strict_pipe.Writer.close w) ;
+        Int.Table.clear t.pipes )
+end
+
+(*
+let start dir =
+  O1trace.forget_tid (fun () ->
+      Async.Writer.open_file ~append:true
+        (dir ^ "/" ^ sprintf "%d.trace" (Async.Unix.getpid () |> Pid.to_int))
+      >>| O1trace.start_tracing )
+
+let () = start "/tmp"
+*)
 
 (*
  * 1. Cached value is keeping peek working
@@ -86,51 +87,46 @@ let iter_without_pushback ~close t =
  * 6. If we close the shared_mvar, all listeners stop
 *)
 let%test_unit "listeners properly receive updates" =
-  let expect_pipe t ~close expected =
-    let%map got =
-      fold_without_pushback ~close t ~init:[] ~f:(fun acc a1 -> a1 :: acc)
-      >>| List.rev
+  Backtrace.elide := false ;
+  let expect_pipe t expected =
+    let got_rev, pipe =
+      Reader.fold t ~init:[] ~f:(fun acc a1 -> return @@ (a1 :: acc))
     in
-    [%test_result: int option list]
-      ~message:"Expected the following values from the pipe" ~expect:expected
-      got
+    let d =
+      let%map got = got_rev >>| List.rev in
+      [%test_result: int list]
+        ~message:"Expected the following values from the pipe" ~expect:expected
+        got
+    in
+    (d, pipe)
   in
   let yield () = Async.after (Time.Span.of_ms 10.) in
   Async.Thread_safe.block_on_async_exn (fun () ->
-      let mvar = Mvar.create () in
-      let initial = Some 0 in
-      Mvar.set mvar initial ;
-      let t = create (Mvar.read_only mvar) in
+      let initial = 0 in
+      let r, w = create initial in
       (*1*)
-      [%test_result: int option]
-        ~message:"Initial value not observed when peeking" ~expect:initial
-        (peek t) ;
+      [%test_result: int] ~message:"Initial value not observed when peeking"
+        ~expect:initial (Reader.peek r) ;
       (* 2-3 *)
-      let close1 = Ivar.create () in
-      let d1 = expect_pipe t ~close:(Ivar.read close1) [Some 0; Some 1] in
-      let d2 =
-        expect_pipe t ~close:(Deferred.never ()) [Some 0; Some 1; Some 2]
-      in
+      let d1, p1 = expect_pipe r [0; 1] in
+      let d2, _ = expect_pipe r [0; 1; 2] in
       don't_wait_for d1 ;
       don't_wait_for d2 ;
       let%bind () = yield () in
-      let next_value = Some 1 in
+      let next_value = 1 in
       (*3*)
-      Mvar.set mvar next_value ;
-      let%bind () = yield () in
+      let%bind () = Writer.write w next_value in
       (*4*)
-      Ivar.fill close1 () ;
+      Strict_pipe.Writer.close p1 ;
       let%bind () = yield () in
-      let next_value = Some 2 in
-      Mvar.set mvar next_value ;
+      let next_value = 2 in
+      let%bind () = Writer.write w next_value in
       let%bind () = yield () in
       (*5*)
-      [%test_result: int option]
-        ~message:"Latest value is observed when peeking" ~expect:next_value
-        (peek t) ;
+      [%test_result: int] ~message:"Latest value is observed when peeking"
+        ~expect:next_value (Reader.peek r) ;
       (*6*)
-      close t ;
-      let next_value = Some 3 in
-      Mvar.set mvar next_value ;
+      let%bind () = yield () in
+      Writer.close w ;
       let%bind () = yield () in
       Deferred.both d1 d2 >>| Fn.ignore )

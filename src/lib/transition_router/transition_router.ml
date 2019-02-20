@@ -129,11 +129,11 @@ module Make (Inputs : Inputs_intf) :
     Broadcaster.broadcast controller_type
       (`Transition_frontier_controller (new_frontier, reader, writer))
 
-  let peek_exn mvar = Broadcast_pipe.peek mvar |> Option.value_exn
+  let peek_exn p = Broadcast_pipe.Reader.peek p |> Option.value_exn
 
-  let run ~logger ~network ~time_controller ~frontier_write_mvar
-      ~frontier_broadcast_pipe ~ledger_db ~network_transition_reader
-      ~proposer_transition_reader =
+  let run ~logger ~network ~time_controller
+      ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~ledger_db
+      ~network_transition_reader ~proposer_transition_reader =
     let clean_transition_frontier_controller_and_start_bootstrap
         ~controller_type ~clear_writer ~transition_frontier_controller_reader
         ~transition_frontier_controller_writer ~old_frontier
@@ -186,20 +186,21 @@ module Make (Inputs : Inputs_intf) :
     let ( transition_frontier_controller_reader
         , transition_frontier_controller_writer ) =
       start_transition_frontier_controller ~verified_transition_writer
-        ~clear_reader ~collected_transitions:[]
-        (peek_exn frontier_broadcast_pipe)
+        ~clear_reader ~collected_transitions:[] (peek_exn frontier_r)
     in
     let controller_type =
       Broadcaster.create
         ~init:
           (`Transition_frontier_controller
-            ( peek_exn frontier_broadcast_pipe
+            ( peek_exn frontier_r
             , transition_frontier_controller_reader
             , transition_frontier_controller_writer ))
         ~f:(function
           | `Transition_frontier_controller (frontier, _, _) ->
-              Mvar.set frontier_write_mvar (Some frontier)
-          | `Bootstrap_controller (_, _) -> Mvar.set frontier_write_mvar None)
+              don't_wait_for
+                (Broadcast_pipe.Writer.write frontier_w (Some frontier))
+          | `Bootstrap_controller (_, _) ->
+              don't_wait_for (Broadcast_pipe.Writer.write frontier_w None))
     in
     let ( valid_protocol_state_transition_reader
         , valid_protocol_state_transition_writer ) =

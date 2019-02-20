@@ -1,48 +1,43 @@
+(** A broadcast_pipe allows multiple readers for a single writer without needing to fork explicitly. It is always synchronous and always has at least one value in it. *)
+
 open Async_kernel
 
-(** A broadcast_pipe allows multiple readers and is initialized from an mvar *)
-type 'a t
+exception Already_closed
 
-val create : 'a option Mvar.Read_only.t -> 'a t
-(** Share an mvar. *)
+module Reader : sig
+  (** The read side of the broadcast pipe *)
+  type 'a t
 
-val iter :
-     close:unit Deferred.t
-  -> 'a t
-  -> f:('a option -> unit Deferred.t)
-  -> unit Deferred.t
-(** Same semantics as [Strict_pipe.iter] except to close only this iteration
- * use the close [Deferred.t]. The [close] function on broadcast_pipe stops 
- * everyone. *)
+  val iter :
+       'a t
+    -> f:('a -> unit Deferred.t)
+    -> unit Deferred.t
+       * ('a, Strict_pipe.synchronous, unit Deferred.t) Strict_pipe.Writer.t
+  (** Same semantics as [Strict_pipe.iter], close the returned pipe to stop this
+   * iter. *)
 
-val iter_without_pushback :
-  close:unit Deferred.t -> 'a t -> f:('a option -> unit) -> unit Deferred.t
-(** Same semantics as [Strict_pipe.iter_without_pushback] except to close only
- * this iteration use the close [Deferred.t]. The [close] function on
- * broadcast_pipe stops everyone. *)
+  val fold :
+       'a t
+    -> init:'b
+    -> f:('b -> 'a -> 'b Deferred.t)
+    -> 'b Deferred.t
+       * ('a, Strict_pipe.synchronous, unit Deferred.t) Strict_pipe.Writer.t
+  (** Same semantics as [Strict_pipe.fold], close the returned pipe to stop this
+   * fold. *)
 
-val fold :
-     close:unit Deferred.t
-  -> 'a t
-  -> init:'b
-  -> f:('b -> 'a option -> 'b Deferred.t)
-  -> 'b Deferred.t
-(** Same semantics as [Strict_pipe.fold] except to close only this iteration
- * use the close [Deferred.t]. The [close] function on broadcast_pipe stops 
- * everyone. *)
+  val peek : 'a t -> 'a
+  (** Peek at the latest value in the pipe. *)
+end
 
-val fold_without_pushback :
-     close:unit Deferred.t
-  -> 'a t
-  -> init:'b
-  -> f:('b -> 'a option -> 'b)
-  -> 'b Deferred.t
-(** Same semantics as [Strict_pipe.fold_without_pushback] except to close only
- * this iteration use the close [Deferred.t]. The [close] function on
- * broadcast_pipe stops everyone. *)
+module Writer : sig
+  (** The write side of the broadcast pipe *)
+  type 'a t
 
-val peek : 'a t -> 'a option
-(** Peek at the value in the mvar. *)
+  val write : 'a t -> 'a -> unit Deferred.t
 
-val close : 'a t -> unit
-(** Stop listening to the underlying mvar. This cascades to all listeners *)
+  val close : 'a t -> unit
+  (** Stop listening to the underlying pipe. This cascades to all listeners *)
+end
+
+val create : 'a -> 'a Reader.t * 'a Writer.t
+(** Create a shared pipe and seed it with 'a *)
