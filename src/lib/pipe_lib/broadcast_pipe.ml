@@ -87,7 +87,6 @@ let () = start "/tmp"
  * 6. If we close the shared_mvar, all listeners stop
 *)
 let%test_unit "listeners properly receive updates" =
-  Backtrace.elide := false ;
   let expect_pipe t expected =
     let got_rev, pipe =
       Reader.fold t ~init:[] ~f:(fun acc a1 -> return @@ (a1 :: acc))
