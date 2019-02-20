@@ -13,7 +13,7 @@ module Haskell : sig
     -> me:Peer.t
     -> parent_log:Logger.t
     -> conf_dir:string
-    -> banlist:Coda_base.Banlist.t
+    -> trust_system:Coda_base.Trust_system.t
     -> t Deferred.Or_error.t
 
   val peers : t -> Peer.t list
