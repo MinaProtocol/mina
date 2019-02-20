@@ -12,7 +12,7 @@ open O1trace
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
 [%%if
-proof_level <> "none"]
+proof_level = "full"]
 
 let with_snark = true
 
