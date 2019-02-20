@@ -101,7 +101,7 @@ end = struct
       (compute_affected_locations_and_hashes t locations_and_hashes
          locations_and_hashes)
 
-  (* When we do batch on a database, we should add accounts and hashes
+  (* TODO: When we do batch on a database, we should add accounts and hashes
      simulatenously to full atomicity. We should do this in the future. *)
   let set_batch t locations_and_accounts =
     Inputs.set_raw_account_batch t locations_and_accounts ;

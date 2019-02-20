@@ -233,7 +233,8 @@ let%test_module "test functor on in memory databases" =
                   let old_addresses_and_accounts =
                     MT.get_all_accounts_rooted_at_exn mdb address
                   in
-                  (* After we do not generate duplicate accounts anymore, this should get removed *)
+                  (* TODO: After we do not generate duplicate accounts anymore,
+                     this should get removed *)
                   if
                     not
                     @@ List.equal
