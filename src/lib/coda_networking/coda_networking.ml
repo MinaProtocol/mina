@@ -124,7 +124,8 @@ struct
       module T = struct
         type query = State_hash.t Envelope.Incoming.t [@@deriving bin_io]
 
-        type response = External_transition.t list option [@@deriving bin_io]
+        type response = External_transition.t Non_empty_list.t option
+        [@@deriving bin_io]
       end
 
       module Caller = T
@@ -349,7 +350,7 @@ module Make (Inputs : Inputs_intf) = struct
          -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t)
       ~(transition_catchup :
             State_hash.t Envelope.Incoming.t
-         -> External_transition.t list option Deferred.t)
+         -> External_transition.t Non_empty_list.t option Deferred.t)
       ~(get_ancestry :
             Consensus.Consensus_state.value Envelope.Incoming.t
          -> ( External_transition.t
