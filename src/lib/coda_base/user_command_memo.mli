@@ -6,17 +6,21 @@ open Tuple_lib
 
 type t [@@deriving sexp, bin_io, eq, compare, hash, yojson]
 
-type var = Boolean.var list
+module Checked : sig
+  type unchecked = t
 
-val var_to_triples : var -> Boolean.var Triple.t list
+  type t = private Boolean.var array
 
-val typ : (var, t) Typ.t
+  val to_triples : t -> Boolean.var Triple.t list
+
+  val constant : unchecked -> t
+end
+
+val typ : (Checked.t, t) Typ.t
 
 val fold : t -> bool Triple.t Fold.t
 
 val length_in_triples : int
-
-val var_of_t : t -> var
 
 val dummy : t
 
