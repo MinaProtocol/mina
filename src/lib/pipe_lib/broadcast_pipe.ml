@@ -27,14 +27,12 @@ let create mvar =
     (Pipe.iter_without_pushback t.mvar_pipe_handle ~f:(fun a ->
          t.cache <- a ;
          Int.Table.iteri t.pipes ~f:(fun ~key ~data:(_, w) ->
-             Core.printf !"Pipe%d %{sexp: int option}\n%!" key (Obj.magic a) ;
              Strict_pipe.Writer.write w a ) )) ;
   t
 
 let peek {cache; _} = cache
 
 let close t =
-  Core.printf !"Close all\n%!" ;
   Pipe.close_read t.mvar_pipe_handle ;
   Int.Table.iter t.pipes ~f:(fun (_, w) -> Strict_pipe.Writer.close w) ;
   Int.Table.clear t.pipes
@@ -52,7 +50,6 @@ let prepare_pipe ~close t =
   Int.Table.add_exn t.pipes ~key:id ~data:(r, w) ;
   don't_wait_for
     (let%map () = close in
-     Core.printf !"Closing individual %d\n%!" id ;
      Int.Table.remove t.pipes id ;
      Strict_pipe.Writer.close w) ;
   r
