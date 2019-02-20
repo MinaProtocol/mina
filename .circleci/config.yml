@@ -85,13 +85,14 @@ jobs:
             DUNE_PROFILE: dev
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
                   name: Build deb Package with keys
                   command: make deb
@@ -114,13 +115,14 @@ jobs:
             DUNE_PROFILE: testnet_posig
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
                   name: Build deb Package with keys
                   command: make deb
@@ -143,13 +145,14 @@ jobs:
             DUNE_PROFILE: testnet_postake
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
                   name: Build deb Package with keys
                   command: make deb
@@ -172,13 +175,14 @@ jobs:
             DUNE_PROFILE: testnet_public
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
                   name: Build deb Package with keys
                   command: make deb
@@ -201,13 +205,14 @@ jobs:
             DUNE_PROFILE: testnet_postake_snarkless_fake_hash
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
                   name: Build deb Package with keys
                   command: make deb

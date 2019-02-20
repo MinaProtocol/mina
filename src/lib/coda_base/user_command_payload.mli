@@ -14,6 +14,8 @@ module Body : sig
     module V1 : sig
       type nonrec t = t [@@deriving bin_io, eq, sexp, hash, yojson]
     end
+
+    module Latest = V1
   end
 end
 
@@ -33,7 +35,7 @@ module Common : sig
   type var =
     ( Currency.Fee.var
     , Coda_numbers.Account_nonce.Unpacked.var
-    , User_command_memo.var )
+    , User_command_memo.Checked.t )
     t_
 
   val typ : (var, t) Typ.t
@@ -44,6 +46,8 @@ module Common : sig
     module V1 : sig
       type nonrec t = t [@@deriving bin_io, eq, sexp, hash]
     end
+
+    module Latest = V1
   end
 
   module Checked : sig
@@ -73,6 +77,8 @@ module Stable : sig
   module V1 : sig
     type nonrec t = t [@@deriving bin_io, eq, sexp, hash, yojson]
   end
+
+  module Latest = V1
 end
 
 val fold : t -> bool Triple.t Fold.t

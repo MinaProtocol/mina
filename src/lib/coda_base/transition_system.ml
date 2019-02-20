@@ -111,7 +111,6 @@ struct
       >>| Or_error.ok_exn >>| fst
 
     let%snarkydef prev_state_valid wrap_vk_section wrap_vk prev_state_hash =
-      let open Let_syntax in
       (* TODO: Should build compositionally on the prev_state hash (instead of converting to bits) *)
       let%bind prev_state_hash_trips =
         State.Hash.var_to_triples prev_state_hash

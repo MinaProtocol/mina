@@ -1,74 +1,9 @@
 open Core_kernel
 open Async_kernel
-open Protocols.Coda_pow
+open Protocols.Coda_transition_frontier
 open Coda_base
-open Signature_lib
 
-module type Inputs_intf = sig
-  module Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf
-
-  module Ledger_proof_statement :
-    Ledger_proof_statement_intf with type ledger_hash := Frozen_ledger_hash.t
-
-  module Ledger_proof : sig
-    include
-      Ledger_proof_intf
-      with type statement := Ledger_proof_statement.t
-       and type ledger_hash := Frozen_ledger_hash.t
-       and type proof := Proof.t
-       and type sok_digest := Sok_message.Digest.t
-
-    include Binable.S with type t := t
-
-    include Sexpable.S with type t := t
-  end
-
-  module Transaction_snark_work :
-    Transaction_snark_work_intf
-    with type proof := Ledger_proof.t
-     and type statement := Ledger_proof_statement.t
-     and type public_key := Public_key.Compressed.t
-
-  module Staged_ledger_diff :
-    Staged_ledger_diff_intf
-    with type user_command := User_command.t
-     and type user_command_with_valid_signature :=
-                User_command.With_valid_signature.t
-     and type staged_ledger_hash := Staged_ledger_hash.t
-     and type public_key := Public_key.Compressed.t
-     and type completed_work := Transaction_snark_work.t
-     and type completed_work_checked := Transaction_snark_work.Checked.t
-     and type fee_transfer_single := Fee_transfer.single
-
-  module External_transition :
-    External_transition.S
-    with module Protocol_state = Consensus.Protocol_state
-     and module Staged_ledger_diff := Staged_ledger_diff
-
-  module Staged_ledger :
-    Staged_ledger_intf
-    with type diff := Staged_ledger_diff.t
-     and type valid_diff :=
-                Staged_ledger_diff.With_valid_signatures_and_proofs.t
-     and type staged_ledger_hash := Staged_ledger_hash.t
-     and type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
-     and type ledger_hash := Ledger_hash.t
-     and type frozen_ledger_hash := Frozen_ledger_hash.t
-     and type public_key := Public_key.Compressed.t
-     and type ledger := Ledger.t
-     and type ledger_proof := Ledger_proof.t
-     and type user_command_with_valid_signature :=
-                User_command.With_valid_signature.t
-     and type statement := Transaction_snark_work.Statement.t
-     and type completed_work_checked := Transaction_snark_work.Checked.t
-     and type sparse_ledger := Sparse_ledger.t
-     and type ledger_proof_statement := Ledger_proof_statement.t
-     and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
-     and type transaction := Transaction.t
-     and type user_command := User_command.t
-
-  val max_length : int
-end
+module type Inputs_intf = Inputs.Inputs_intf
 
 module Make (Inputs : Inputs_intf) :
   Transition_frontier_intf
@@ -169,6 +104,21 @@ module Make (Inputs : Inputs_intf) :
       |> Consensus.Protocol_state.blockchain_state
   end
 
+  module Extensions = struct
+    module Snark_pool_refcount = Snark_pool_refcount.Make (struct
+      include Inputs
+      module Breadcrumb = Breadcrumb
+    end)
+
+    type t = {snark_pool_refcount: Snark_pool_refcount.t} [@@deriving fields]
+
+    let create () = {snark_pool_refcount= Snark_pool_refcount.create ()}
+
+    let handle_diff t diff =
+      let use handler field = handler (Field.get field t) diff in
+      Fields.iter ~snark_pool_refcount:(use Snark_pool_refcount.handle_diff)
+  end
+
   type node =
     {breadcrumb: Breadcrumb.t; successor_hashes: State_hash.t list; length: int}
   [@@deriving sexp]
@@ -183,7 +133,8 @@ module Make (Inputs : Inputs_intf) :
     ; mutable best_tip: State_hash.t
     ; logger: Logger.t
     ; table: node State_hash.Table.t
-    ; consensus_local_state: Consensus.Local_state.t }
+    ; consensus_local_state: Consensus.Local_state.t
+    ; extensions: Extensions.t }
 
   let logger t = t.logger
 
@@ -266,7 +217,8 @@ module Make (Inputs : Inputs_intf) :
         ; root= root_hash
         ; best_tip= root_hash
         ; table
-        ; consensus_local_state }
+        ; consensus_local_state
+        ; extensions= Extensions.create () }
 
   let max_length = Inputs.max_length
 
@@ -462,6 +414,7 @@ module Make (Inputs : Inputs_intf) :
    *       VII ) notify the consensus mechanism of the new root
    *       VIII) if commit on an heir node that just emitted proof txns then
    *             write them to snarked ledger
+   *   5) return a diff object describing what changed (for use in updating extensions)
   *)
   let add_breadcrumb_exn t breadcrumb =
     O1trace.measure "add_breadcrumb" (fun () ->
@@ -478,89 +431,110 @@ module Make (Inputs : Inputs_intf) :
         (* 3 *)
         if node.length > best_tip_node.length then t.best_tip <- hash ;
         (* 4 *)
-        if distance_to_parent > max_length then (
-          Logger.info t.logger
-            !"Distance to parent: %d exceeded max_lenth %d"
-            distance_to_parent max_length ;
-          (* 4.I *)
-          let heir_hash = List.hd_exn (hash_path t node.breadcrumb) in
-          let heir_node = Hashtbl.find_exn t.table heir_hash in
-          (* 4.II *)
-          let bad_hashes =
-            List.filter root_node.successor_hashes
-              ~f:(Fn.compose not (State_hash.equal heir_hash))
-          in
-          let bad_nodes = List.map bad_hashes ~f:(Hashtbl.find_exn t.table) in
-          (* 4.III *)
-          let root_staged_ledger =
-            Breadcrumb.staged_ledger root_node.breadcrumb
-          in
-          let root_ledger = Inputs.Staged_ledger.ledger root_staged_ledger in
-          List.map bad_nodes ~f:breadcrumb_of_node
-          |> List.iter ~f:(fun bad ->
-                 ignore
-                   (Ledger.unregister_mask_exn root_ledger
-                      ( Breadcrumb.staged_ledger bad
-                      |> Inputs.Staged_ledger.ledger )) ) ;
-          (* 4.IV *)
-          let new_root_node = move_root t heir_node in
-          (* 4.V *)
-          let garbage = List.bind bad_hashes ~f:(successor_hashes_rec t) in
-          List.iter garbage ~f:(Hashtbl.remove t.table) ;
-          (* 4.VI *)
-          let new_root_staged_ledger =
-            Breadcrumb.staged_ledger new_root_node.breadcrumb
-          in
-          (* 4.VII *)
-          Consensus.lock_transition
-            (Breadcrumb.consensus_state root_node.breadcrumb)
-            (Breadcrumb.consensus_state new_root_node.breadcrumb)
-            ~local_state:t.consensus_local_state
-            ~snarked_ledger:
-              (Coda_base.Ledger.Any_ledger.cast
-                 (module Coda_base.Ledger.Db)
-                 t.root_snarked_ledger) ;
-          (* 4.VIII *)
-          ( match
-              ( Inputs.Staged_ledger.proof_txns new_root_staged_ledger
-              , heir_node.breadcrumb.just_emitted_a_proof )
-            with
-          | Some txns, true ->
-              let proof_data =
-                Inputs.Staged_ledger.current_ledger_proof
-                  new_root_staged_ledger
-                |> Option.value_exn
-              in
-              [%test_result: Frozen_ledger_hash.t]
-                ~message:
-                  "Root snarked ledger hash should be the same as the source \
-                   hash in the proof that was just emitted"
-                ~expect:(Inputs.Ledger_proof.statement proof_data).source
-                ( Ledger.Db.merkle_root t.root_snarked_ledger
-                |> Frozen_ledger_hash.of_ledger_hash ) ;
-              let db_mask = Ledger.of_database t.root_snarked_ledger in
-              Non_empty_list.iter txns ~f:(fun txn ->
-                  (* TODO: @cmr use the ignore-hash ledger here as well *)
-                  Ledger.apply_transaction db_mask txn
-                  |> Or_error.ok_exn |> ignore ) ;
-              (* TODO: See issue #1606 to make this faster *)
-              Ledger.commit db_mask ;
-              ignore
-                (Ledger.Maskable.unregister_mask_exn
-                   (Ledger.Any_ledger.cast
-                      (module Ledger.Db)
-                      t.root_snarked_ledger)
-                   db_mask)
-          | _, false | None, _ -> () ) ;
-          [%test_result: Frozen_ledger_hash.t]
-            ~message:
-              "Root snarked ledger hash diverged from blockchain state after \
-               root transition"
-            ~expect:
-              (Consensus.Blockchain_state.snarked_ledger_hash
-                 (Breadcrumb.blockchain_state new_root_node.breadcrumb))
-            ( Ledger.Db.merkle_root t.root_snarked_ledger
-            |> Frozen_ledger_hash.of_ledger_hash ) ) )
+        (* note: new_root_node is the same as root_node if the root didn't change *)
+        let garbage_breadcrumbs, new_root_node =
+          if distance_to_parent > max_length then (
+            Logger.info t.logger
+              !"Distance to parent: %d exceeded max_lenth %d"
+              distance_to_parent max_length ;
+            (* 4.I *)
+            let heir_hash = List.hd_exn (hash_path t node.breadcrumb) in
+            let heir_node = Hashtbl.find_exn t.table heir_hash in
+            (* 4.II *)
+            let bad_hashes =
+              List.filter root_node.successor_hashes
+                ~f:(Fn.compose not (State_hash.equal heir_hash))
+            in
+            let bad_nodes =
+              List.map bad_hashes ~f:(Hashtbl.find_exn t.table)
+            in
+            (* 4.III *)
+            let root_staged_ledger =
+              Breadcrumb.staged_ledger root_node.breadcrumb
+            in
+            let root_ledger = Inputs.Staged_ledger.ledger root_staged_ledger in
+            List.map bad_nodes ~f:breadcrumb_of_node
+            |> List.iter ~f:(fun bad ->
+                   ignore
+                     (Ledger.unregister_mask_exn root_ledger
+                        ( Breadcrumb.staged_ledger bad
+                        |> Inputs.Staged_ledger.ledger )) ) ;
+            (* 4.IV *)
+            let new_root_node = move_root t heir_node in
+            (* 4.V *)
+            let garbage = List.bind bad_hashes ~f:(successor_hashes_rec t) in
+            let garbage_breadcrumbs =
+              List.map garbage ~f:(fun g ->
+                  (Hashtbl.find_exn t.table g).breadcrumb )
+            in
+            List.iter garbage ~f:(Hashtbl.remove t.table) ;
+            (* 4.VI *)
+            let new_root_staged_ledger =
+              Breadcrumb.staged_ledger new_root_node.breadcrumb
+            in
+            (* 4.VII *)
+            Consensus.lock_transition
+              (Breadcrumb.consensus_state root_node.breadcrumb)
+              (Breadcrumb.consensus_state new_root_node.breadcrumb)
+              ~local_state:t.consensus_local_state
+              ~snarked_ledger:
+                (Coda_base.Ledger.Any_ledger.cast
+                   (module Coda_base.Ledger.Db)
+                   t.root_snarked_ledger) ;
+            (* 4.VIII *)
+            ( match
+                ( Inputs.Staged_ledger.proof_txns new_root_staged_ledger
+                , heir_node.breadcrumb.just_emitted_a_proof )
+              with
+            | Some txns, true ->
+                let proof_data =
+                  Inputs.Staged_ledger.current_ledger_proof
+                    new_root_staged_ledger
+                  |> Option.value_exn
+                in
+                [%test_result: Frozen_ledger_hash.t]
+                  ~message:
+                    "Root snarked ledger hash should be the same as the \
+                     source hash in the proof that was just emitted"
+                  ~expect:(Inputs.Ledger_proof.statement proof_data).source
+                  ( Ledger.Db.merkle_root t.root_snarked_ledger
+                  |> Frozen_ledger_hash.of_ledger_hash ) ;
+                let db_mask = Ledger.of_database t.root_snarked_ledger in
+                Non_empty_list.iter txns ~f:(fun txn ->
+                    (* TODO: @cmr use the ignore-hash ledger here as well *)
+                    Ledger.apply_transaction db_mask txn
+                    |> Or_error.ok_exn |> ignore ) ;
+                (* TODO: See issue #1606 to make this faster *)
+                Ledger.commit db_mask ;
+                ignore
+                  (Ledger.Maskable.unregister_mask_exn
+                     (Ledger.Any_ledger.cast
+                        (module Ledger.Db)
+                        t.root_snarked_ledger)
+                     db_mask)
+            | _, false | None, _ -> () ) ;
+            [%test_result: Frozen_ledger_hash.t]
+              ~message:
+                "Root snarked ledger hash diverged from blockchain state \
+                 after root transition"
+              ~expect:
+                (Consensus.Blockchain_state.snarked_ledger_hash
+                   (Breadcrumb.blockchain_state new_root_node.breadcrumb))
+              ( Ledger.Db.merkle_root t.root_snarked_ledger
+              |> Frozen_ledger_hash.of_ledger_hash ) ;
+            (garbage_breadcrumbs, new_root_node) )
+          else ([], root_node)
+        in
+        (* 5 *)
+        Extensions.handle_diff t.extensions
+          ( if node.length > best_tip_node.length then
+            Transition_frontier_diff.New_best_tip
+              { old_root= root_node.breadcrumb
+              ; new_root= new_root_node.breadcrumb
+              ; new_best_tip= node.breadcrumb
+              ; old_best_tip= best_tip_node.breadcrumb
+              ; garbage= garbage_breadcrumbs }
+          else Transition_frontier_diff.New_breadcrumb node.breadcrumb ) )
 
   let best_tip_path_length_exn {table; root; best_tip; _} =
     let open Option.Let_syntax in
@@ -578,47 +552,3 @@ module Make (Inputs : Inputs_intf) :
     let root_snarked_ledger {root_snarked_ledger; _} = root_snarked_ledger
   end
 end
-
-let%test_module "Transition_frontier tests" =
-  ( module struct
-    (*
-  let%test "transitions can be added and interface will work at any point" =
-
-    let module Frontier = Make (struct
-      module State_hash = Test_mocks.Hash.Int_unchecked
-      module External_transition = Test_mocks.External_transition.T
-      module Max_length = struct
-        let length = 5
-      end
-    end) in
-    let open Frontier in
-    let t = create ~log:(Logger.create ()) in
-
-    (* test that functions that shouldn't throw exceptions don't *)
-    let interface_works () =
-      let r = root t in
-      ignore (best_tip t);
-      ignore (successor_hashes_rec r);
-      ignore (successors_rec r);
-      iter t ~f:(fun b ->
-          let h = Breadcrumb.hash b in
-          find_exn t h;
-          ignore (successor_hashes t h)
-          ignore (successors t b))
-    in
-
-    (* add a single random transition based off a random node *)
-    let add_transition () =
-      let base_hash = List.head_exn (List.shuffle (hashes t)) in
-      let trans = Quickcheck.random_value (External_transition.gen base_hash) in
-      add_exn t trans
-    in
-
-    interface_works ();
-    for i = 1 to 200 do
-      add_transition ();
-      interface_works ()
-    done
-     *)
-  
-  end )

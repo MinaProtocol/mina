@@ -1,5 +1,4 @@
 (** The trust system, instantiated with Coda-specific stuff. *)
-open Core
 
 module Actions = struct
   (* Stub actions. Will fill in later. *)
