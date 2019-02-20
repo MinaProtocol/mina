@@ -26,13 +26,13 @@ end
 [%%endif]
 
 module Staged_ledger_aux_hash = struct
-  include Staged_ledger_hash.Aux_hash.Stable.V1
+  include Staged_ledger_hash.Aux_hash.Stable.Latest
 
   let of_bytes = Staged_ledger_hash.Aux_hash.of_bytes
 end
 
 module Staged_ledger_hash = struct
-  include Staged_ledger_hash.Stable.V1
+  include Staged_ledger_hash.Stable.Latest
 
   let ledger_hash = Staged_ledger_hash.ledger_hash
 
@@ -42,7 +42,7 @@ module Staged_ledger_hash = struct
 end
 
 module Ledger_hash = struct
-  include Ledger_hash.Stable.V1
+  include Ledger_hash.Stable.Latest
 
   let of_digest = Ledger_hash.of_digest
 
@@ -56,7 +56,7 @@ module Ledger_hash = struct
 end
 
 module Frozen_ledger_hash = struct
-  include Frozen_ledger_hash.Stable.V1
+  include Frozen_ledger_hash.Stable.Latest
 
   let to_bytes = Frozen_ledger_hash.to_bytes
 
@@ -368,7 +368,7 @@ module User_command = struct
 
   let seed = Secure_random.string ()
 
-  let compare t1 t2 = User_command.Stable.V1.compare ~seed t1 t2
+  let compare t1 t2 = User_command.Stable.Latest.compare ~seed t1 t2
 
   module With_valid_signature = struct
     module T = struct
@@ -432,7 +432,7 @@ struct
   open Protocols.Coda_pow
   open Init
   module Protocol_state = Consensus.Protocol_state
-  module Protocol_state_hash = State_hash.Stable.V1
+  module Protocol_state_hash = State_hash.Stable.Latest
 
   module Time : Time_intf with type t = Block_time.t = Block_time
 
@@ -453,8 +453,8 @@ struct
       include Currency.Amount.Signed
 
       include (
-        Currency.Amount.Signed.Stable.V1 :
-          module type of Currency.Amount.Signed.Stable.V1
+        Currency.Amount.Signed.Stable.Latest :
+          module type of Currency.Amount.Signed.Stable.Latest
           with type t := t
            and type ('a, 'b) t_ := ('a, 'b) t_ )
     end
@@ -1118,7 +1118,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       (User_command)
       (Receipt.Chain_hash)
 
-  let verify_payment t log (addr : Public_key.Compressed.Stable.V1.t)
+  let verify_payment t log (addr : Public_key.Compressed.Stable.Latest.t)
       (verifying_txn : User_command.t) proof =
     let open Participating_state.Let_syntax in
     let%map account = get_account t addr in
