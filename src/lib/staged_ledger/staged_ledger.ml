@@ -303,7 +303,7 @@ end = struct
                | None -> return (Or_error.error_string "Fee overflow")
                | Some res -> res )) )
 
-  let apply_transaction_and_get_statement ledger s non_empty_stack =
+  let apply_transaction_and_get_statement ledger s _non_empty_stack =
     let open Or_error.Let_syntax in
     let%bind fee_excess = Transaction.fee_excess s
     and supply_increase = Transaction.supply_increase s in
@@ -714,7 +714,7 @@ end = struct
       | None ->
           update_ledger_and_get_statements new_ledger transactions
             ~non_empty_stack
-      | Some y ->
+      | Some _ ->
           let%bind first_part =
             update_ledger_and_get_statements new_ledger
               (List.take transactions first)
@@ -793,7 +793,8 @@ end = struct
     in
     let%map new_data =
       Deferred.Or_error.List.map transactions ~f:(fun s ->
-          let%map t = apply_transaction_and_get_witness ledger s in
+          let%map t = apply_transaction_and_get_witness ledger s false in
+          (*TODO: update this as well*)
           t )
     in
     (new_data, txn_works)

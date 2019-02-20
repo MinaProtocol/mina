@@ -69,6 +69,8 @@ module Inputs = struct
                 ~target:input.target t
                 ~pending_coinbase1:input.Statement.pending_coinbase_before
                 ~pending_coinbase2:input.Statement.pending_coinbase_after
+                ~coinbase_on_new_tree:false
+                (*TODO: get this from transition input*)
                 (unstage (Coda_base.Sparse_ledger.handler w.ledger))
               (*TODO: add handlers for all the witnesses*)
             in
