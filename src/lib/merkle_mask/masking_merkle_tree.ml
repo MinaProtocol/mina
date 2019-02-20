@@ -1,8 +1,10 @@
-(* masking_merkle_tree.ml -- implements a mask in front of a Merkle tree; see RFC 0004 and docs/specs/merkle_tree.md *)
+(* masking_merkle_tree.ml -- implements a mask in front of a Merkle tree; see
+   RFC 0004 and docs/specs/merkle_tree.md *)
 
 open Core
 
-(* builds a Merkle tree mask; it's a Merkle tree, with some additional operations *)
+(* builds a Merkle tree mask; it's a Merkle tree, with some additional
+   operations *)
 module Make
     (Key : Merkle_ledger.Intf.Key)
     (Account : Merkle_ledger.Intf.Account with type key := Key.t)
@@ -30,10 +32,9 @@ struct
   module Location = Location
   module Addr = Location.Addr
 
-  (** Invariant is that parent is None in unattached mask
-   * and `Some` in the attached one
-   * We can capture this with a GADT but there's some annoying
-   * issues with bin_io to do so *)
+  (** Invariant is that parent is None in unattached mask and `Some` in the
+      attached one. We can capture this with a GADT but there's some annoying
+      issues with bin_io to do so *)
   module Parent = struct
     module T = struct
       type t = Base.t option [@@deriving sexp]
@@ -140,15 +141,15 @@ struct
       Location.Table.set t.account_tbl ~key:location ~data:account ;
       set_location t (Account.public_key account) location
 
-    (* a read does a lookup in the account_tbl; if that fails, delegate to parent *)
+    (* a read does a lookup in the account_tbl; if that fails, delegate to
+       parent *)
     let get t location =
       match find_account t location with
       | Some account -> Some account
       | None -> Base.get (get_parent t) location
 
-    (* fixup_merkle_path patches a Merkle path reported by the parent, overriding
-       with hashes which are stored in the mask
-    *)
+    (* fixup_merkle_path patches a Merkle path reported by the parent,
+       overriding with hashes which are stored in the mask *)
 
     let fixup_merkle_path t path address =
       let rec build_fixed_path path address accum =
@@ -172,7 +173,8 @@ struct
       in
       build_fixed_path path address []
 
-    (* the following merkle_path_* functions report the Merkle path for the mask *)
+    (* the following merkle_path_* functions report the Merkle path for the
+       mask *)
 
     let merkle_path_at_addr_exn t address =
       let parent_merkle_path =
@@ -192,10 +194,9 @@ struct
       let parent_merkle_path = Base.merkle_path (get_parent t) location in
       fixup_merkle_path t parent_merkle_path address
 
-    (* given a Merkle path corresponding to a starting address, calculate addresses and hash
-       for each node affected by the starting hash; that is, along the path from the
-       account address to root
-    *)
+    (* given a Merkle path corresponding to a starting address, calculate
+       addresses and hash for each node affected by the starting hash; that is,
+       along the path from the account address to root *)
     let addresses_and_hashes_from_merkle_path_exn merkle_path starting_address
         starting_hash : (Addr.t * Hash.t) list =
       let get_addresses_hashes height accum node =
@@ -222,9 +223,8 @@ struct
       (* remove account and key from tables *)
       let account = Option.value_exn (find_account t location) in
       Location.Table.remove t.account_tbl location ;
-      (* TODO : use stack database to save unused location, which can be
-         used when allocating a location
-      *)
+      (* TODO : use stack database to save unused location, which can be used
+         when allocating a location *)
       Key.Table.remove t.location_tbl (Account.public_key account) ;
       (* reuse location if possible *)
       Option.iter t.current_location ~f:(fun curr_loc ->
@@ -243,9 +243,8 @@ struct
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
           set_hash t addr hash )
 
-    (* a write writes only to the mask, parent is not involved
-       need to update both account and hash pieces of the mask
-    *)
+    (* a write writes only to the mask, parent is not involved need to update
+       both account and hash pieces of the mask *)
     let set t location account =
       set_account t location account ;
       let account_address = Location.to_path_exn location in
@@ -258,9 +257,8 @@ struct
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
           set_hash t addr hash )
 
-    (* if the mask's parent sets an account, we can prune an entry in the mask if the account in the parent
-       is the same in the mask
-    *)
+    (* if the mask's parent sets an account, we can prune an entry in the mask
+       if the account in the parent is the same in the mask *)
     let parent_set_notify t account =
       match find_location t (Account.public_key account) with
       | None -> ()
@@ -274,7 +272,8 @@ struct
             then remove_account_and_update_hashes t location
         | None -> () )
 
-    (* as for accounts, we see if we have it in the mask, else delegate to parent *)
+    (* as for accounts, we see if we have it in the mask, else delegate to
+       parent *)
     let get_hash t addr =
       match find_hash t addr with
       | Some hash -> Some hash
@@ -284,17 +283,11 @@ struct
           Some hash
         with _ -> None )
 
-    (* batch operations
-       TODO: rely on availability of batch operations in Base for speed
-    *)
+    (* batch operations TODO: rely on availability of batch operations in Base
+       for speed *)
     (* NB: rocksdb does not support batch reads; should we offer this? *)
     let get_batch_exn t locations =
       List.map locations ~f:(fun location -> get t location)
-
-    (* TODO: maybe create a new hash table from the alist, then merge *)
-    let set_batch t locations_and_accounts =
-      List.iter locations_and_accounts ~f:(fun (location, account) ->
-          set t location account )
 
     (* NB: rocksdb does not support batch reads; is this needed? *)
     let get_hash_batch_exn t addrs =
@@ -343,17 +336,52 @@ struct
           | None -> Some parent_loc
           | Some our_loc -> Some (max parent_loc our_loc) )
 
+    include Merkle_ledger.Util.Make (struct
+      module Location = Location
+      module Key = Key
+      module Account = Account
+      module Hash = Hash
+
+      module Depth = struct
+        let depth = Base.depth
+      end
+
+      module Base = struct
+        type nonrec t = t
+
+        let get = get
+      end
+
+      let location_of_account_addr addr = Location.Account addr
+
+      let location_of_hash_addr addr = Location.Hash addr
+
+      let get_hash t location =
+        Option.value_exn (get_hash t (Location.to_path_exn location))
+
+      let set_raw_hash_batch t locations_and_hashes =
+        List.iter locations_and_hashes ~f:(fun (location, hash) ->
+            set_hash t (Location.to_path_exn location) hash )
+
+      let set_raw_account_batch t locations_and_accounts =
+        List.iter locations_and_accounts ~f:(fun (location, account) ->
+            set_account t location account )
+    end)
+
+    let set_batch_accounts t addresses_and_accounts =
+      set_batch t
+      @@ List.map addresses_and_accounts ~f:(fun (addr, account) ->
+             (Location.Account addr, account) )
+
     (* set accounts in mask *)
     let set_all_accounts_rooted_at_exn t address (accounts : Account.t list) =
       (* basically, the same code used for the database implementation *)
-      let first_node, last_node = Addr.Range.subtree_range address in
-      Addr.Range.fold (first_node, last_node) ~init:accounts
-        ~f:(fun bit_index -> function
-        | head :: tail ->
-            set t (Location.Account bit_index) head ;
-            tail
-        | [] -> [] )
-      |> ignore
+      let addresses =
+        Sequence.to_list @@ Addr.Range.subtree_range_seq address
+      in
+      let num_accounts = List.length accounts in
+      List.(zip_exn (take addresses num_accounts) accounts)
+      |> set_batch_accounts t
 
     (* keys from this mask and all ancestors *)
     let keys t =
@@ -389,17 +417,16 @@ struct
           | None -> loop rest (key :: parent_keys) mask_locations
           | Some loc -> loop rest parent_keys (loc :: mask_locations) )
       in
-      (* parent_keys not in mask, may be in parent
-         mask_locations definitely in mask
-      *)
+      (* parent_keys not in mask, may be in parent mask_locations definitely in
+         mask *)
       let parent_keys, mask_locations = loop keys [] [] in
-      (* allow call to parent to raise an exception
-         if raised, the parent hasn't removed any accounts,
-          and we don't try to remove any accounts from mask *)
+      (* allow call to parent to raise an exception if raised, the parent
+         hasn't removed any accounts, and we don't try to remove any accounts
+         from mask *)
       Base.remove_accounts_exn (get_parent t) parent_keys ;
-      (* removing accounts in parent succeeded, so proceed with removing accounts from mask
-         we sort mask locations in reverse order, potentially allowing reuse of locations
-      *)
+      (* removing accounts in parent succeeded, so proceed with removing
+         accounts from mask we sort mask locations in reverse order,
+         potentially allowing reuse of locations *)
       let rev_sorted_mask_locations =
         List.sort mask_locations ~compare:(fun loc1 loc2 ->
             let loc1 = Location.to_path_exn loc1 in
@@ -410,7 +437,7 @@ struct
         ~f:(remove_account_and_update_hashes t)
 
     (* Destroy intentionally does not commit before destroying
-     * as sometimes this is desired behavior *)
+       as sometimes this is desired behavior *)
     let close t =
       Location.Table.clear t.account_tbl ;
       Addr.Table.clear t.hash_tbl ;
@@ -469,14 +496,15 @@ struct
     let foldi t ~init ~f = foldi_with_ignored_keys t Key.Set.empty ~init ~f
 
     (* we would want fold_until to combine results from the parent and the mask
-       way (1): use the parent result as the init of the mask fold (or vice-versa)
-         the parent result may be of different type than the mask fold init, so
-         we get a less general type than the signature indicates, so compilation fails
-       way (2): make the folds independent, but there's not a specified way to combine
-         the results
-       way (3): load parent accounts into an in-memory list, merge with mask accounts, then fold;
-          this becomes intractable if the parent has a large number of entries
-    *)
+       way (1): use the parent result as the init of the mask fold (or
+         vice-versa) the parent result may be of different type than the mask
+         fold init, so we get a less general type than the signature indicates,
+         so compilation fails
+       way (2): make the folds independent, but there's not a specified way to
+         combine the results
+       way (3): load parent accounts into an in-memory list, merge with mask
+         accounts, then fold; this becomes intractable if the parent has a large
+         number of entries *)
     let fold_until _t ~init:_ ~f:_ ~finish:_ =
       failwith "fold_until: not implemented"
 
@@ -533,22 +561,6 @@ struct
     let location_of_sexp = Location.t_of_sexp
 
     let depth = Base.depth
-
-    let location_of_addr addr = Location.Account addr
-
-    include Merkle_ledger.Util.Make (struct
-      module Location = Location
-      module Account = Account
-      module Addr = Location.Addr
-
-      module Base = struct
-        type nonrec t = t
-
-        let get = get
-      end
-
-      let location_of_addr = location_of_addr
-    end)
   end
 
   let set_parent t parent =
