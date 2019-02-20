@@ -352,7 +352,9 @@ struct
         let get = get
       end
 
-      let location_of_addr addr = Location.Account addr
+      let location_of_account_addr addr = Location.Account addr
+
+      let location_of_hash_addr addr = Location.Hash addr
 
       let get_hash t location =
         Option.value_exn (get_hash t (Location.to_path_exn location))

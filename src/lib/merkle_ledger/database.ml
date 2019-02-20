@@ -141,7 +141,9 @@ module Make
 
     let get_hash = get_hash
 
-    let location_of_addr addr = Location.Account addr
+    let location_of_account_addr addr = Location.Account addr
+
+    let location_of_hash_addr addr = Location.Hash addr
 
     let set_raw_hash_batch mdb addresses_and_hashes =
       set_bin_batch mdb Hash.bin_size_t Hash.bin_write_t addresses_and_hashes

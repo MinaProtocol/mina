@@ -19,7 +19,6 @@ let%test_module "test functor on in memory databases" =
 
       module Location : Merkle_ledger.Location_intf.S
 
-      (* module Addr : Merkle_address.S *)
       module MT : DB
 
       val with_instance : (MT.t -> 'a) -> 'a
@@ -234,6 +233,7 @@ let%test_module "test functor on in memory databases" =
                   let old_addresses_and_accounts =
                     MT.get_all_accounts_rooted_at_exn mdb address
                   in
+                  (* After we do not generate duplicate accounts anymore, this should get removed *)
                   if
                     not
                     @@ List.equal
@@ -464,15 +464,6 @@ let%test_module "test functor on in memory databases" =
       let with_instance (f : MT.t -> 'a) =
         let mdb = MT.create () in
         f mdb
-
-      module Db_visualizor = Visualizable_ledger.Make (struct
-        module Key = Key
-        module Balance = Balance
-        module Account = Account
-        module Hash = Hash
-        module Ledger = MT
-        module Location = Location
-      end)
     end)
 
     module Depth_4 = struct

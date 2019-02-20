@@ -19,7 +19,9 @@ module type Inputs_intf = sig
 
   val get_hash : Base.t -> Location.t -> Hash.t
 
-  val location_of_addr : Location.Addr.t -> Location.t
+  val location_of_account_addr : Location.Addr.t -> Location.t
+
+  val location_of_hash_addr : Location.Addr.t -> Location.t
 
   val set_raw_hash_batch : Base.t -> (Location.t * Hash.t) list -> unit
 
@@ -49,7 +51,7 @@ end = struct
     let result =
       Location.Addr.Range.fold (Location.Addr.Range.subtree_range address)
         ~init:[] ~f:(fun bit_index acc ->
-          let account = Base.get t (location_of_addr bit_index) in
+          let account = Base.get t (location_of_account_addr bit_index) in
           (bit_index, account) :: acc )
     in
     List.rev_filter_map result ~f:(function
@@ -99,17 +101,19 @@ end = struct
       (compute_affected_locations_and_hashes t locations_and_hashes
          locations_and_hashes)
 
+  (* When we do batch on a database, we should add accounts and hashes
+     simulatenously to full atomicity. We should do this in the future. *)
   let set_batch t locations_and_accounts =
     Inputs.set_raw_account_batch t locations_and_accounts ;
     set_hash_batch t
     @@ List.map locations_and_accounts ~f:(fun (location, account) ->
-           ( Inputs.location_of_addr (Inputs.Location.to_path_exn location)
+           ( Inputs.location_of_hash_addr (Inputs.Location.to_path_exn location)
            , Inputs.Hash.hash_account account ) )
 
   let set_batch_accounts t addresses_and_accounts =
     set_batch t
     @@ List.map addresses_and_accounts ~f:(fun (addr, account) ->
-           (Inputs.location_of_addr addr, account) )
+           (Inputs.location_of_account_addr addr, account) )
 
   let set_all_accounts_rooted_at_exn t address accounts =
     let addresses =
