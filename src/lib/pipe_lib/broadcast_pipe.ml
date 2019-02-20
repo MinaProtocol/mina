@@ -5,7 +5,7 @@ type 'a t =
   { mvar: 'a option Mvar.Read_only.t
   ; mutable cache: 'a option
   ; mvar_pipe_handle: 'a option Pipe.Reader.t
-  ; mutable id: int
+  ; mutable reader_id: int
   ; pipes:
       ( 'a option Strict_pipe.Reader.t
       * ( 'a option
@@ -20,7 +20,7 @@ let create mvar =
     { mvar
     ; cache= Mvar.peek mvar |> Option.join
     ; mvar_pipe_handle
-    ; id= 0
+    ; reader_id= 0
     ; pipes= Int.Table.create () }
   in
   don't_wait_for
@@ -30,29 +30,36 @@ let create mvar =
      )) ;
   t
 
-let peek {cache; _} = cache
+exception Already_closed
+
+let guard_already_closed t k =
+  if Pipe.is_closed t.mvar_pipe_handle then raise Already_closed else k ()
+
+let peek t = guard_already_closed t (fun () -> t.cache)
 
 let close t =
-  Pipe.close_read t.mvar_pipe_handle ;
-  Int.Table.iter t.pipes ~f:(fun (_, w) -> Strict_pipe.Writer.close w) ;
-  Int.Table.clear t.pipes
+  guard_already_closed t (fun () ->
+      Pipe.close_read t.mvar_pipe_handle ;
+      Int.Table.iter t.pipes ~f:(fun (_, w) -> Strict_pipe.Writer.close w) ;
+      Int.Table.clear t.pipes )
 
-let fresh_id t =
-  t.id <- t.id + 1 ;
-  t.id
+let fresh_reader_id t =
+  t.reader_id <- t.reader_id + 1 ;
+  t.reader_id
 
 let prepare_pipe ~close t =
-  let r, w =
-    Strict_pipe.create
-      (Strict_pipe.Buffered (`Capacity 3, `Overflow Strict_pipe.Drop_head))
-  in
-  let id = fresh_id t in
-  Int.Table.add_exn t.pipes ~key:id ~data:(r, w) ;
-  don't_wait_for
-    (let%map () = close in
-     Int.Table.remove t.pipes id ;
-     Strict_pipe.Writer.close w) ;
-  r
+  guard_already_closed t (fun () ->
+      let r, w =
+        Strict_pipe.create
+          (Strict_pipe.Buffered (`Capacity 3, `Overflow Strict_pipe.Drop_head))
+      in
+      let reader_id = fresh_reader_id t in
+      Int.Table.add_exn t.pipes ~key:reader_id ~data:(r, w) ;
+      don't_wait_for
+        (let%map () = close in
+         Int.Table.remove t.pipes reader_id ;
+         Strict_pipe.Writer.close w) ;
+      r )
 
 let fold ~close t =
   let r = prepare_pipe ~close t in
@@ -79,8 +86,6 @@ let iter_without_pushback ~close t =
  * 6. If we close the shared_mvar, all listeners stop
 *)
 let%test_unit "listeners properly receive updates" =
-  Backtrace.elide := false ;
-  Async.Scheduler.set_record_backtraces true ;
   let expect_pipe t ~close expected =
     let%map got =
       fold_without_pushback ~close t ~init:[] ~f:(fun acc a1 -> a1 :: acc)
