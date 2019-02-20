@@ -156,6 +156,8 @@ module Make_base
     let set_all_accounts_rooted_at_exn (T ((module Base), t)) =
       Base.set_all_accounts_rooted_at_exn t
 
+    let set_batch_accounts (T ((module Base), t)) = Base.set_batch_accounts t
+
     let set_inner_hash_at_addr_exn (T ((module Base), t)) =
       Base.set_inner_hash_at_addr_exn t
 
