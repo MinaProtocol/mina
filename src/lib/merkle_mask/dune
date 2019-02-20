@@ -1,7 +1,7 @@
 (library
  (name merkle_mask)
  (public_name merkle_mask)
- (flags :standard -short-paths -warn-error -6-33-27-9-58)
+ (flags :standard -short-paths -warn-error -6-27-9-58)
  (library_flags -linkall)
  (libraries core debug_assert bitstring integers extlib immutable_array
    dyn_array merkle_ledger merkle_address)
