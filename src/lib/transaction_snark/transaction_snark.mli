@@ -144,6 +144,7 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase1:Coda_base.Pending_coinbase.Hash.t
     -> pending_coinbase2:Coda_base.Pending_coinbase.Hash.t
+    -> coinbase_on_new_tree:bool
     -> Transaction.t
     -> Tick.Handler.t
     -> t

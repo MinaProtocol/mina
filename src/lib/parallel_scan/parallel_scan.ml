@@ -271,6 +271,23 @@ module State = struct
     in
     List.rev lst
 
+  let base_jobs_on_latest_tree (state : ('a, 'd) t) : 'd list =
+    let leaves_start_at = Int.pow 2 (parallelism state) - 1 in
+    let rec go pos jobs =
+      if
+        Option.is_none state.base_none_pos
+        && pos > Option.value_exn state.base_none_pos
+      then jobs
+      else
+        let jobs =
+          match Ring_buffer.read_i state.jobs pos with
+          | Job.Base (Some (j, _)) -> j :: jobs
+          | _ -> jobs
+        in
+        go (pos + 1) jobs
+    in
+    go leaves_start_at []
+
   let update_new_job t z dir pos =
     let new_job (cur_job : ('a, 'd) Job.t) : ('a, 'd) Job.t Or_error.t =
       match (dir, cur_job) with
@@ -498,6 +515,8 @@ let enqueue_data : state:('a, 'd) State.t -> data:'d list -> unit Or_error.t =
   else (
     state.current_data_length <- state.current_data_length + List.length data ;
     State.include_many_data state data )
+
+let base_jobs_on_latest_tree = State.base_jobs_on_latest_tree
 
 let is_valid t =
   let p = State.parallelism t in

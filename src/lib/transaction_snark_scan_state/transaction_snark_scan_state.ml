@@ -51,7 +51,8 @@ end = struct
     type t =
       { transaction_with_info: Ledger.Undo.t
       ; statement: Ledger_proof_statement.t
-      ; witness: Transaction_witness.t }
+      ; witness: Transaction_witness.t
+      ; coinbase_on_new_tree: bool }
     [@@deriving sexp, bin_io]
   end
 
@@ -156,7 +157,9 @@ end = struct
   
   (*TODO new_coinbase_stack:bool goes in the statement*)
   let create_expected_statement
-      {Transaction_with_witness.transaction_with_info; witness; _} =
+      { Transaction_with_witness.transaction_with_info
+      ; witness
+      ; coinbase_on_new_tree; _ } =
     let open Or_error.Let_syntax in
     let source =
       Frozen_ledger_hash.of_ledger_hash
@@ -180,7 +183,7 @@ end = struct
               (*TODO add new tree tag to a node*)
               Pending_coinbase.merkle_root
                 (Pending_coinbase.add_coinbase_exn witness.pending_coinbases
-                   ~coinbase:c ~on_new_tree:false) )
+                   ~coinbase:c ~on_new_tree:coinbase_on_new_tree) )
       | _ -> Ok pending_coinbase_before
     in
     let%bind fee_excess = Transaction.fee_excess transaction in
@@ -472,6 +475,9 @@ end = struct
   let next_jobs t = Parallel_scan.next_jobs ~state:t.tree
 
   let next_jobs_sequence t = Parallel_scan.next_jobs_sequence ~state:t.tree
+
+  let base_jobs_on_latest_tree t =
+    Parallel_scan.base_jobs_on_latest_tree t.tree
 
   let staged_transactions t =
     List.map (Parallel_scan.current_data t.tree)

@@ -403,8 +403,8 @@ module Base = struct
   let create_keys () = generate_keypair main ~exposing:(tick_input ())
 
   let transaction_union_proof ~proving_key sok_digest state1 state2
-      pending_coinbase1 pending_coinbase2 (transaction : Transaction_union.t)
-      handler =
+      pending_coinbase1 pending_coinbase2 ~coinbase_on_new_tree
+      (transaction : Transaction_union.t) handler =
     let prover_state : Prover_state.t =
       { state1
       ; state2
@@ -412,7 +412,8 @@ module Base = struct
       ; sok_digest
       ; pending_coinbase1
       ; pending_coinbase2
-      ; new_coinbase_stack= false }
+      ; new_coinbase_stack= coinbase_on_new_tree }
+      (*TODO: rename the field to coinbase_on_new_tree*)
     in
     let main top_hash = handle (main top_hash) handler in
     let top_hash =
@@ -424,16 +425,18 @@ module Base = struct
     (top_hash, prove proving_key (tick_input ()) prover_state main top_hash)
 
   let transaction_proof ~proving_key sok_message state1 state2
-      pending_coinbase1 pending_coinbase2 transaction handler =
+      pending_coinbase1 pending_coinbase2 ~coinbase_on_new_tree transaction
+      handler =
     transaction_union_proof ~proving_key sok_message state1 state2
-      pending_coinbase1 pending_coinbase2
+      pending_coinbase1 pending_coinbase2 ~coinbase_on_new_tree
       (Transaction_union.of_transaction transaction)
       handler
 
   let fee_transfer_proof ~proving_key sok_message state1 state2 transfer
       pending_coinbase1 pending_coinbase2 handler =
     transaction_proof ~proving_key sok_message state1 state2 pending_coinbase1
-      pending_coinbase2 (Fee_transfer transfer) handler
+      pending_coinbase2 ~coinbase_on_new_tree:false (Fee_transfer transfer)
+      handler
 
   let cached =
     let load =
@@ -978,6 +981,7 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase1:Coda_base.Pending_coinbase.Hash.t
     -> pending_coinbase2:Coda_base.Pending_coinbase.Hash.t
+    -> coinbase_on_new_tree:bool
     -> Transaction.t
     -> Tick.Handler.t
     -> t
@@ -1110,10 +1114,11 @@ struct
         top_hash )
 
   let of_transaction_union sok_digest source target ~pending_coinbase1
-      ~pending_coinbase2 transaction handler =
+      ~pending_coinbase2 ~coinbase_on_new_tree transaction handler =
     let top_hash, proof =
       Base.transaction_union_proof sok_digest ~proving_key:keys.proving.base
-        source target pending_coinbase1 pending_coinbase2 transaction handler
+        source target pending_coinbase1 pending_coinbase2 ~coinbase_on_new_tree
+        transaction handler
     in
     { source
     ; sok_digest
@@ -1126,9 +1131,9 @@ struct
     ; proof= wrap `Base proof top_hash }
 
   let of_transaction ~sok_digest ~source ~target ~pending_coinbase1
-      ~pending_coinbase2 transition handler =
+      ~pending_coinbase2 ~coinbase_on_new_tree transition handler =
     of_transaction_union sok_digest source target ~pending_coinbase1
-      ~pending_coinbase2
+      ~pending_coinbase2 ~coinbase_on_new_tree
       (Transaction_union.of_transaction transition)
       handler
 
@@ -1136,14 +1141,15 @@ struct
       user_command handler =
     of_transaction ~sok_digest ~source ~target
       ~pending_coinbase1:pending_coinbase_hash
-      ~pending_coinbase2:pending_coinbase_hash (User_command user_command)
-      handler
+      ~pending_coinbase2:pending_coinbase_hash ~coinbase_on_new_tree:false
+      (User_command user_command) handler
 
   let of_fee_transfer ~sok_digest ~source ~target ~pending_coinbase_hash
       transfer handler =
     of_transaction ~sok_digest ~source ~target
       ~pending_coinbase1:pending_coinbase_hash
-      ~pending_coinbase2:pending_coinbase_hash (Fee_transfer transfer) handler
+      ~pending_coinbase2:pending_coinbase_hash ~coinbase_on_new_tree:false
+      (Fee_transfer transfer) handler
 
   let merge t1 t2 ~sok_digest =
     if not (Frozen_ledger_hash.( = ) t1.target t2.source) then

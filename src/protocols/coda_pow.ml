@@ -617,7 +617,8 @@ module type Transaction_snark_scan_state_intf = sig
     type t =
       { transaction_with_info: transaction_with_info
       ; statement: ledger_proof_statement
-      ; witness: transaction_witness }
+      ; witness: transaction_witness
+      ; coinbase_on_new_tree: bool }
   end
 
   module Ledger_proof_with_sok_message : sig
@@ -674,6 +675,8 @@ module type Transaction_snark_scan_state_intf = sig
   val next_jobs : t -> Available_job.t list Or_error.t
 
   val next_jobs_sequence : t -> Available_job.t Sequence.t Or_error.t
+
+  val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
 
   val is_valid : t -> bool
 

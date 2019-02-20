@@ -125,7 +125,8 @@ end = struct
         scan_state
         (* Invariant: this is the ledger after having applied all the transactions in
        the above state. *)
-    ; ledger: Ledger.attached_mask sexp_opaque }
+    ; ledger: Ledger.attached_mask sexp_opaque
+    (*TODO: ; pending_coinbases: Pending_coinbase.t*) }
   [@@deriving sexp]
 
   type serializable = scan_state * Ledger.serializable [@@deriving bin_io]
@@ -302,7 +303,7 @@ end = struct
                | None -> return (Or_error.error_string "Fee overflow")
                | Some res -> res )) )
 
-  let apply_transaction_and_get_statement ledger s =
+  let apply_transaction_and_get_statement ledger s non_empty_stack =
     let open Or_error.Let_syntax in
     let%bind fee_excess = Transaction.fee_excess s
     and supply_increase = Transaction.supply_increase s in
@@ -312,7 +313,10 @@ end = struct
     let pending_coinbase_before = failwith "in staged_ledger" in
     let pending_coinbase_after =
       failwith
-        "if the transaction is coinbase, add it to the pending_coinbases"
+        "if the transaction is coinbase, add it to the pending_coinbases. But \
+         create a new stack or push it to an old one? Updated later because \
+         this requires knowing if this the first coinbase in the stack. We \
+         don't want duplicate hashes since coinbases are very few"
       (*TODO:If this a transactions then push it get new merkle root (Pending_coinbase_hash.t)else the same merkle root  *)
     in
     let%map undo = Ledger.apply_transaction ledger s in
@@ -322,10 +326,12 @@ end = struct
       ; fee_excess
       ; supply_increase
       ; pending_coinbase_before
+          (*Unchanged pending_coinbase_before*)
+          (*TODO: Updated (pending_coinbase_before, pending_coinbase_after)*)
       ; pending_coinbase_after
       ; proof_type= `Base } )
 
-  let apply_transaction_and_get_witness ledger s =
+  let apply_transaction_and_get_witness ledger s non_empty_stack =
     let public_keys = function
       | Transaction.Fee_transfer t -> Fee_transfer.receivers t
       | User_command t ->
@@ -343,13 +349,13 @@ end = struct
           Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) )
     in
     let pending_coinbase_witness =
-      failwith ""
-      (*TODO: if coinbase then add update the Pending_coinbase.t*)
+      failwith "t.pending_coinbases"
+      (*TODO: if coinbase then simply get the Pending_coinbase.t*)
     in
     let%bind () = Async.Scheduler.yield () in
     let r =
       measure "apply+stmt" (fun () ->
-          apply_transaction_and_get_statement ledger s )
+          apply_transaction_and_get_statement ledger s non_empty_stack )
     in
     let%map () = Async.Scheduler.yield () in
     let open Or_error.Let_syntax in
@@ -357,14 +363,19 @@ end = struct
     { Scan_state.Transaction_with_witness.transaction_with_info= undo
     ; witness=
         {ledger= ledger_witness; pending_coinbases= pending_coinbase_witness}
-    ; statement }
+    ; statement
+    ; coinbase_on_new_tree= false }
 
-  let update_ledger_and_get_statements ledger ts =
+  (*TODO: Default value. updated after checking if a coinbase is really tyhe first one on the tree*)
+
+  let update_ledger_and_get_statements ledger ts ~non_empty_stack =
     let open Deferred.Let_syntax in
     let rec go acc = function
       | [] -> return (Ok (List.rev acc))
       | t :: ts -> (
-          match%bind apply_transaction_and_get_witness ledger t with
+          match%bind
+            apply_transaction_and_get_witness ledger t non_empty_stack
+          with
           | Error e -> return (to_staged_ledger_or_error (Error e))
           | Ok res -> go (res :: acc) ts )
     in
@@ -527,10 +538,9 @@ end = struct
       ; coinbase_parts_count: int }
   end
 
-  let apply_pre_diff ledger coinbase_parts proposer user_commands
-      completed_works =
+  let apply_pre_diff coinbase_parts proposer user_commands completed_works =
     let open Deferred.Result.Let_syntax in
-    let%bind user_commands, coinbase, transactions =
+    let%map user_commands, coinbase, transactions =
       Deferred.return
         (let open Result.Let_syntax in
         let%bind user_commands =
@@ -571,8 +581,7 @@ end = struct
         in
         (user_commands, coinbase, transactions))
     in
-    let%map new_data = update_ledger_and_get_statements ledger transactions in
-    { Prediff_info.data= new_data
+    { Prediff_info.data= transactions
     ; work= completed_works
     ; user_commands_count= List.length user_commands
     ; coinbase_parts_count= List.length coinbase }
@@ -633,25 +642,23 @@ end = struct
       , List.length jobs )
     in
     let apply_pre_diff_with_at_most_two
-        (pre_diff1 : Staged_ledger_diff.pre_diff_with_at_most_two_coinbase)
-        ledger =
+        (pre_diff1 : Staged_ledger_diff.pre_diff_with_at_most_two_coinbase) =
       let coinbase_parts =
         match pre_diff1.coinbase with
         | Zero -> `Zero
         | One x -> `One x
         | Two x -> `Two x
       in
-      apply_pre_diff ledger coinbase_parts sl_diff.creator
-        pre_diff1.user_commands pre_diff1.completed_works
+      apply_pre_diff coinbase_parts sl_diff.creator pre_diff1.user_commands
+        pre_diff1.completed_works
     in
     let apply_pre_diff_with_at_most_one
-        (pre_diff2 : Staged_ledger_diff.pre_diff_with_at_most_one_coinbase)
-        ledger =
+        (pre_diff2 : Staged_ledger_diff.pre_diff_with_at_most_one_coinbase) =
       let coinbase_added =
         match pre_diff2.coinbase with Zero -> `Zero | One x -> `One x
       in
-      apply_pre_diff ledger coinbase_added sl_diff.creator
-        pre_diff2.user_commands pre_diff2.completed_works
+      apply_pre_diff coinbase_added sl_diff.creator pre_diff2.user_commands
+        pre_diff2.completed_works
     in
     let%bind () =
       let curr_hash = hash t in
@@ -664,13 +671,11 @@ end = struct
     let new_mask = Inputs.Ledger.Mask.create () in
     let new_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
     let scan_state' = Scan_state.copy t.scan_state in
-    let%bind data, works, user_commands_count, cb_parts_count =
-      let%bind p1 =
-        apply_pre_diff_with_at_most_two (fst sl_diff.diff) new_ledger
-      in
+    let%bind transactions, works, user_commands_count, cb_parts_count =
+      let%bind p1 = apply_pre_diff_with_at_most_two (fst sl_diff.diff) in
       let%map p2 =
         Option.value_map
-          ~f:(fun d -> apply_pre_diff_with_at_most_one d new_ledger)
+          ~f:(fun d -> apply_pre_diff_with_at_most_one d)
           (snd sl_diff.diff)
           ~default:
             (Deferred.return
@@ -685,6 +690,44 @@ end = struct
       , p1.user_commands_count + p2.user_commands_count
       , p1.coinbase_parts_count + p2.coinbase_parts_count )
     in
+    let current_base_jobs = Scan_state.base_jobs_on_latest_tree scan_state' in
+    let has_coinbase ~get_transaction txns =
+      List.fold_until ~init:false txns
+        ~f:(fun acc t ->
+          match get_transaction t with
+          | Transaction.Coinbase _ -> Stop true
+          | _ -> Continue acc )
+        ~finish:Fn.id
+    in
+    let non_empty_stack =
+      has_coinbase
+        ~get_transaction:
+          (fun {Scan_state.Transaction_with_witness.transaction_with_info; _} ->
+          Or_error.ok_exn @@ Ledger.Undo.transaction transaction_with_info )
+        current_base_jobs
+    in
+    let {Scan_state.Space_partition.first; second} =
+      Scan_state.partition_if_overflowing scan_state'
+    in
+    let%bind data =
+      match second with
+      | None ->
+          update_ledger_and_get_statements new_ledger transactions
+            ~non_empty_stack
+      | Some y ->
+          let%bind first_part =
+            update_ledger_and_get_statements new_ledger
+              (List.take transactions first)
+              ~non_empty_stack
+          in
+          let%map second_part =
+            update_ledger_and_get_statements new_ledger
+              (List.drop transactions first)
+              ~non_empty_stack:false
+          in
+          first_part @ second_part
+    in
+    (*let%bind data = update_ledger_and_get_statements new_ledger transactions in*)
     let%bind () = check_completed_works scan_state' works in
     let%bind () = Deferred.return (check_zero_fee_excess scan_state' data) in
     let%bind res_opt =
