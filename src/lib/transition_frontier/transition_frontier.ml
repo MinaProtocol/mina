@@ -86,7 +86,16 @@ module Make (Inputs : Inputs_intf) :
           ; staged_ledger= transitioned_staged_ledger
           ; just_emitted_a_proof } )
 
-    let hash {transition_with_hash; _} = With_hash.hash transition_with_hash
+    let state_hash {transition_with_hash; _} =
+      With_hash.hash transition_with_hash
+
+    let equal breadcrumb1 breadcrumb2 =
+      State_hash.equal (state_hash breadcrumb1) (state_hash breadcrumb2)
+
+    let compare breadcrumb1 breadcrumb2 =
+      State_hash.compare (state_hash breadcrumb1) (state_hash breadcrumb2)
+
+    let hash = Fn.compose State_hash.hash state_hash
 
     let parent_hash {transition_with_hash; _} =
       Consensus.Protocol_state.previous_state_hash
@@ -245,9 +254,12 @@ module Make (Inputs : Inputs_intf) :
     in
     List.rev (find_path breadcrumb)
 
-  let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.hash
+  let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.state_hash
 
   let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
+
+  let fold t ~f =
+    Hashtbl.fold t.table ~f:(fun ~key:_ ~data -> f data.breadcrumb)
 
   let root t = find_exn t t.root
 
@@ -262,18 +274,93 @@ module Make (Inputs : Inputs_intf) :
         succ_hash :: successor_hashes_rec t succ_hash )
 
   let successors t breadcrumb =
-    List.map (successor_hashes t (Breadcrumb.hash breadcrumb)) ~f:(find_exn t)
+    List.map
+      (successor_hashes t (Breadcrumb.state_hash breadcrumb))
+      ~f:(find_exn t)
 
   let rec successors_rec t breadcrumb =
     List.bind (successors t breadcrumb) ~f:(fun succ ->
         succ :: successors_rec t succ )
 
+  module Visualizor = struct
+    module G = Graph.Persistent.Digraph.ConcreteBidirectional (Breadcrumb)
+    include G
+
+    let display_prefix_of_string string = String.prefix string 10
+
+    let display_field (type t) (module M : Sexpable.S with type t = t)
+        (value : t) =
+      value |> [%sexp_of: M.t] |> Sexp.to_string |> display_prefix_of_string
+
+    include Graph.Graphviz.Dot (struct
+      include G
+
+      type visual =
+        { state_hash: string
+        ; snarked_ledger_hash: string
+        ; staged_ledger_hash: string }
+      [@@deriving fields]
+
+      let graph_attributes _ = []
+
+      let get_subgraph _ = None
+
+      let default_vertex_attributes _ = [`Shape `Record]
+
+      let vertex_name breadcrumb =
+        display_field
+          (module State_hash)
+          (breadcrumb |> Breadcrumb.transition_with_hash |> With_hash.hash)
+
+      (* TODO: include length (breadcrumb), consensus_state (including epoch, length, slot) *)
+
+      let to_visual (breadcrumb : Breadcrumb.t) =
+        let state_hash = Breadcrumb.state_hash breadcrumb in
+        let blockchain_state = Breadcrumb.blockchain_state breadcrumb in
+        let snarked_ledger_hash, staged_ledger_hash =
+          Inputs.External_transition.Protocol_state.Blockchain_state.
+            ( snarked_ledger_hash blockchain_state
+            , staged_ledger_hash blockchain_state
+              |> Staged_ledger_hash.ledger_hash )
+        in
+        { state_hash= display_field (module State_hash) state_hash
+        ; snarked_ledger_hash=
+            display_field (module Frozen_ledger_hash) snarked_ledger_hash
+        ; staged_ledger_hash=
+            display_field (module Ledger_hash) staged_ledger_hash }
+
+      let vertex_attributes breadcrumb =
+        let visual = to_visual breadcrumb in
+        let conv f = sprintf !"%s:%s" (Field.name f) @@ Field.get f visual in
+        let fields =
+          Fields_of_visual.to_list ~state_hash:conv ~snarked_ledger_hash:conv
+            ~staged_ledger_hash:conv
+          |> String.concat ~sep:"|" |> sprintf "{%s}"
+        in
+        [`Label fields]
+
+      let default_edge_attributes _ = []
+
+      let edge_attributes _ = []
+    end)
+
+    let to_graph t =
+      fold t ~init:empty ~f:(fun breadcrumb graph ->
+          List.fold (successors t breadcrumb) ~init:graph ~f:(fun acc_graph ->
+              add_edge acc_graph breadcrumb ) )
+  end
+
+  let visualize ~filename t =
+    let output_channel = Out_channel.create filename in
+    let graph = Visualizor.to_graph t in
+    Visualizor.output_graph output_channel graph
+
   let attach_node_to t ~parent_node ~node =
-    let hash = Breadcrumb.hash node.breadcrumb in
+    let hash = Breadcrumb.state_hash node.breadcrumb in
     if
       not
         (State_hash.equal
-           (Breadcrumb.hash parent_node.breadcrumb)
+           (Breadcrumb.state_hash parent_node.breadcrumb)
            (Breadcrumb.parent_hash node.breadcrumb))
     then
       failwith
@@ -288,14 +375,14 @@ module Make (Inputs : Inputs_intf) :
           Some x
       | None ->
           Hashtbl.set t.table
-            ~key:(Breadcrumb.hash parent_node.breadcrumb)
+            ~key:(Breadcrumb.state_hash parent_node.breadcrumb)
             ~data:
               { parent_node with
                 successor_hashes= hash :: parent_node.successor_hashes } ;
           Some node )
 
   let attach_breadcrumb_exn t breadcrumb =
-    let hash = Breadcrumb.hash breadcrumb in
+    let hash = Breadcrumb.state_hash breadcrumb in
     let parent_hash = Breadcrumb.parent_hash breadcrumb in
     let parent_node =
       Option.value_exn
