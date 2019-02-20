@@ -24,6 +24,7 @@ module Input = struct
     ; program_dir: string
     ; external_port: int
     ; discovery_port: int
+    ; acceptable_delay: Time.Span.t
     ; peers: Host_and_port.t list }
   [@@deriving bin_io]
 end
