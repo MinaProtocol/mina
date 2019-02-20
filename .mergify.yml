@@ -1,0 +1,22 @@
+pull_request_rules:
+    - name: automatically merge approved PRs with the ready-to-merge label
+      conditions:
+          - "status-success=ci/circleci: build_dev"
+          - "status-success=ci/circleci: build_testnet_posig"
+          - "status-success=ci/circleci: build_testnet_postake"
+          - "status-success=ci/circleci: build_testnet_public"
+          - "status-success=ci/circleci: lint"
+          - "status-success=ci/circleci: test-fake_hash_full_test"
+          - "status-success=ci/circleci: test-posig_integration_tests"
+          - "status-success=ci/circleci: test-postake_integration_tests"
+          - "status-success=ci/circleci: test-unit-test"
+          - "status-success=ci/circleci: test-withsnark-sig"
+          - "status-success=ci/circleci: test-withsnark-stake"
+          - "status-success=ci/circleci: tracetool"
+          - "#approved-reviews-by>=1"
+          - label=ready-to-merge
+      actions:
+          merge:
+              method: squash
+              strict: smart
+          delete_head_branch: {}

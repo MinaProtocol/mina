@@ -13,7 +13,7 @@
  (name tests)
  (inline_tests)
  (libraries core snarky snarky_curves test_util signature_lib snark_params
-   vrf_lib coda_base sha256_lib fold_lib)
+   vrf_lib coda_base random_oracle fold_lib)
  (preprocess
   (pps ppx_jane ppx_deriving.eq bisect_ppx -- -conditional))
  (modules integrated_test))

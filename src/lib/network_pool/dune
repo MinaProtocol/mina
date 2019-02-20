@@ -6,6 +6,6 @@
  (libraries core extlib async pipe_lib snark_pool)
  (preprocess
   (pps ppx_jane ppx_deriving.eq bisect_ppx -- -conditional))
- (flags :standard -short-paths -warn-error -33-6-27-34-32-9-58)
+ (flags :standard -short-paths -warn-error -6-27-34-32-9-58)
  (synopsis
    "Network pool is an interface that processes incoming diffs and then broadcasts them"))
