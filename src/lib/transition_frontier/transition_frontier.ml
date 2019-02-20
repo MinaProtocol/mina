@@ -128,11 +128,22 @@ module Make (Inputs : Inputs_intf) :
       Fields.iter ~snark_pool_refcount:(use Snark_pool_refcount.handle_diff)
   end
 
-  type node =
-    {breadcrumb: Breadcrumb.t; successor_hashes: State_hash.t list; length: int}
-  [@@deriving sexp]
+  module Node = struct
+    type t =
+      { breadcrumb: Breadcrumb.t
+      ; successor_hashes: State_hash.t list
+      ; length: int }
+    [@@deriving sexp, fields]
 
-  let breadcrumb_of_node {breadcrumb; _} = breadcrumb
+    let equal node1 node2 = Breadcrumb.equal node1.breadcrumb node2.breadcrumb
+
+    let hash node = Breadcrumb.hash node.breadcrumb
+
+    let compare node1 node2 =
+      Breadcrumb.compare node1.breadcrumb node2.breadcrumb
+  end
+
+  let breadcrumb_of_node {Node.breadcrumb; _} = breadcrumb
 
   (* Invariant: The path from the root to the tip inclusively, will be max_length + 1 *)
   (* TODO: Make a test of this invariant *)
@@ -141,7 +152,7 @@ module Make (Inputs : Inputs_intf) :
     ; mutable root: State_hash.t
     ; mutable best_tip: State_hash.t
     ; logger: Logger.t
-    ; table: node State_hash.Table.t
+    ; table: Node.t State_hash.Table.t
     ; consensus_local_state: Consensus.Local_state.t
     ; extensions: Extensions.t }
 
@@ -218,7 +229,7 @@ module Make (Inputs : Inputs_intf) :
           ; just_emitted_a_proof= false }
         in
         let root_node =
-          {breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
+          {Node.breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
         in
         let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
         { logger
@@ -258,9 +269,6 @@ module Make (Inputs : Inputs_intf) :
 
   let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
 
-  let fold t ~f =
-    Hashtbl.fold t.table ~f:(fun ~key:_ ~data -> f data.breadcrumb)
-
   let root t = find_exn t t.root
 
   let best_tip t = find_exn t t.best_tip
@@ -282,8 +290,12 @@ module Make (Inputs : Inputs_intf) :
     List.bind (successors t breadcrumb) ~f:(fun succ ->
         succ :: successors_rec t succ )
 
+  (* Visualize the structure of the transition frontier or a particular node
+   * within the frontier (for debugging purposes). *)
   module Visualizor = struct
-    module G = Graph.Persistent.Digraph.ConcreteBidirectional (Breadcrumb)
+    let fold t ~f = Hashtbl.fold t.table ~f:(fun ~key:_ ~data -> f data)
+
+    module G = Graph.Persistent.Digraph.ConcreteBidirectional (Node)
     include G
 
     let display_prefix_of_string string = String.prefix string 10
@@ -298,7 +310,8 @@ module Make (Inputs : Inputs_intf) :
       type visual =
         { state_hash: string
         ; snarked_ledger_hash: string
-        ; staged_ledger_hash: string }
+        ; staged_ledger_hash: string
+        ; length: int }
       [@@deriving fields]
 
       let graph_attributes _ = []
@@ -307,16 +320,16 @@ module Make (Inputs : Inputs_intf) :
 
       let default_vertex_attributes _ = [`Shape `Record]
 
-      let vertex_name breadcrumb =
+      let vertex_name (node : Node.t) =
         display_field
           (module State_hash)
-          (breadcrumb |> Breadcrumb.transition_with_hash |> With_hash.hash)
+          (node.breadcrumb |> Breadcrumb.state_hash)
 
-      (* TODO: include length (breadcrumb), consensus_state (including epoch, length, slot) *)
+      (* TODO: include consensus_state (including epoch, length, slot) *)
 
-      let to_visual (breadcrumb : Breadcrumb.t) =
-        let state_hash = Breadcrumb.state_hash breadcrumb in
-        let blockchain_state = Breadcrumb.blockchain_state breadcrumb in
+      let to_visual (node : Node.t) =
+        let state_hash = Breadcrumb.state_hash node.breadcrumb in
+        let blockchain_state = Breadcrumb.blockchain_state node.breadcrumb in
         let snarked_ledger_hash, staged_ledger_hash =
           Inputs.External_transition.Protocol_state.Blockchain_state.
             ( snarked_ledger_hash blockchain_state
@@ -327,14 +340,20 @@ module Make (Inputs : Inputs_intf) :
         ; snarked_ledger_hash=
             display_field (module Frozen_ledger_hash) snarked_ledger_hash
         ; staged_ledger_hash=
-            display_field (module Ledger_hash) staged_ledger_hash }
+            display_field (module Ledger_hash) staged_ledger_hash
+        ; length= node.length }
 
       let vertex_attributes breadcrumb =
         let visual = to_visual breadcrumb in
-        let conv f = sprintf !"%s:%s" (Field.name f) @@ Field.get f visual in
+        let write_field ~f field =
+          sprintf !"%s:%s" (Field.name field) @@ f @@ Field.get field visual
+        in
+        let write_string_field = write_field ~f:Fn.id in
         let fields =
-          Fields_of_visual.to_list ~state_hash:conv ~snarked_ledger_hash:conv
-            ~staged_ledger_hash:conv
+          Fields_of_visual.to_list ~state_hash:write_string_field
+            ~snarked_ledger_hash:write_string_field
+            ~staged_ledger_hash:write_string_field
+            ~length:(write_field ~f:Int.to_string)
           |> String.concat ~sep:"|" |> sprintf "{%s}"
         in
         [`Label fields]
@@ -345,9 +364,12 @@ module Make (Inputs : Inputs_intf) :
     end)
 
     let to_graph t =
-      fold t ~init:empty ~f:(fun breadcrumb graph ->
-          List.fold (successors t breadcrumb) ~init:graph ~f:(fun acc_graph ->
-              add_edge acc_graph breadcrumb ) )
+      fold t ~init:empty ~f:(fun (node : Node.t) graph ->
+          List.fold node.successor_hashes ~init:graph
+            ~f:(fun acc_graph successor_state_hash ->
+              add_edge acc_graph node
+                ( State_hash.Table.find t.table successor_state_hash
+                |> Option.value_exn ) ) )
   end
 
   let visualize ~filename t =
@@ -355,13 +377,12 @@ module Make (Inputs : Inputs_intf) :
     let graph = Visualizor.to_graph t in
     Visualizor.output_graph output_channel graph
 
-  let attach_node_to t ~parent_node ~node =
-    let hash = Breadcrumb.state_hash node.breadcrumb in
+  let attach_node_to t ~(parent_node : Node.t) ~(node : Node.t) =
+    let hash = Breadcrumb.state_hash (Node.breadcrumb node) in
+    let parent_hash = Breadcrumb.state_hash parent_node.breadcrumb in
     if
       not
-        (State_hash.equal
-           (Breadcrumb.state_hash parent_node.breadcrumb)
-           (Breadcrumb.parent_hash node.breadcrumb))
+        (State_hash.equal parent_hash (Breadcrumb.parent_hash node.breadcrumb))
     then
       failwith
         "invalid call to attach_to: hash parent_node <> parent_hash node" ;
@@ -374,8 +395,7 @@ module Make (Inputs : Inputs_intf) :
             hash ;
           Some x
       | None ->
-          Hashtbl.set t.table
-            ~key:(Breadcrumb.state_hash parent_node.breadcrumb)
+          Hashtbl.set t.table ~key:parent_hash
             ~data:
               { parent_node with
                 successor_hashes= hash :: parent_node.successor_hashes } ;
@@ -391,43 +411,9 @@ module Make (Inputs : Inputs_intf) :
           (Error.of_exn (Parent_not_found (`Parent parent_hash, `Target hash)))
     in
     let node =
-      {breadcrumb; successor_hashes= []; length= parent_node.length + 1}
+      {Node.breadcrumb; successor_hashes= []; length= parent_node.length + 1}
     in
     attach_node_to t ~parent_node ~node
-
-  (* Visualize the structure of the transition frontier or a particular node
-   * within the frontier (for debugging purposes). *)
-  module Visualize = struct
-    module Summary = struct
-      type t =
-        [`Uuid of Core.Uuid.t]
-        * [`Parent of Ledger_hash.t]
-        * [`Mine of Ledger_hash.t]
-      [@@deriving sexp_of]
-    end
-
-    type t = Leaf | Node of Summary.t * t list [@@deriving sexp_of]
-
-    let summarize t node =
-      let ledger =
-        Breadcrumb.staged_ledger node.breadcrumb |> Inputs.Staged_ledger.ledger
-      in
-      ( `Uuid (Ledger.get_uuid ledger)
-      , `Parent
-          ( try
-              Ledger.Any_ledger.M.merkle_root
-                (Ledger.Mask.Attached.get_parent ledger)
-            with _ ->
-              Logger.error t.logger "Caught an empty merkle_root" ;
-              Ledger.merkle_root ledger )
-      , `Mine (Ledger.merkle_root ledger) )
-
-    let rec _crawl t hash =
-      match Hashtbl.find t.table hash with
-      | None -> Leaf
-      | Some node ->
-          Node (summarize t node, List.map node.successor_hashes ~f:(_crawl t))
-  end
 
   (** Given:
    *
@@ -442,7 +428,7 @@ module Make (Inputs : Inputs_intf) :
    *  modifies the heir's staged-ledger and sets the heir as the new root.
    *  Modifications are in-place
   *)
-  let move_root t soon_to_be_root_node : node =
+  let move_root t (soon_to_be_root_node : Node.t) : Node.t =
     let root_node = Hashtbl.find_exn t.table t.root in
     let root_breadcrumb = root_node.breadcrumb in
     let root = root_breadcrumb |> Breadcrumb.staged_ledger in
