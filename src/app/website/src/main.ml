@@ -456,7 +456,7 @@ let home () =
 let positions =
   [ ("Protocol Engineer", "protocol-engineer")
   ; ("Protocol Reliability Engineer", "protocol-reliability-engineer")
-  ; ("Frontend Engineer", "frontend-engineer")
+  ; ("Senior Frontend Engineer", "senior-frontend-engineer")
   ; ("Product Manager", "product-manager")
   ; ("Engineering Manager", "engineering-manager") ]
 

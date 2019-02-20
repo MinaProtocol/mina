@@ -22,6 +22,8 @@ module Stable : sig
 
     val compare : seed:string -> t -> t -> int
   end
+
+  module Latest : module type of V1
 end
 
 val payload : t -> Payload.t
