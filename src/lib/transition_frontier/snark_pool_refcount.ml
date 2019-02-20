@@ -17,13 +17,16 @@ module type S = Transition_frontier_extension_intf
 module Make (Inputs : Inputs_intf) :
   S
   with type transition_frontier_breadcrumb := Inputs.Breadcrumb.t
-   and type input := unit = struct
+   and type input := unit
+   and type view = unit = struct
   module Work = Inputs.Transaction_snark_work.Statement
 
   type t = {ref_table: int Work.Table.t}
 
+  type view = unit
+
   let create () = {ref_table= Work.Table.create ()}
 
   (* TODO: implement diff-handling functionality *)
-  let handle_diff (_t : t) _diff = ()
+  let handle_diff (_t : t) _diff = None
 end

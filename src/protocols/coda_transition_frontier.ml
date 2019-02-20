@@ -16,17 +16,28 @@ module Transition_frontier_diff = struct
   [@@deriving sexp]
 end
 
+(** An extension to the transition frontier that provides a view onto the data
+    other components can use. This is exposed through FIXME. *)
 module type Transition_frontier_extension_intf = sig
+  (** Internal state of the extension. *)
   type t
 
+  (** Data needed for setting up the extension*)
   type input
 
   type transition_frontier_breadcrumb
 
+  (** The view type we're emitting. *)
+  type view
+
   val create : input -> t
 
   val handle_diff :
-    t -> transition_frontier_breadcrumb Transition_frontier_diff.t -> unit
+       t
+    -> transition_frontier_breadcrumb Transition_frontier_diff.t
+    -> view Option.t
+  (** Handle a transition frontier diff, and return the new version of the
+      computed view, if it's updated. *)
 end
 
 module type Network_intf = sig
@@ -137,6 +148,9 @@ module type Transition_frontier_base_intf = sig
     -> consensus_local_state:consensus_local_state
     -> t Deferred.t
 
+  val close : t -> unit
+  (** Clean up internal state. *)
+
   val find_exn : t -> state_hash -> Breadcrumb.t
 
   val logger : t -> Logger.t
@@ -181,6 +195,12 @@ module type Transition_frontier_intf = sig
   val best_tip_path_length_exn : t -> int
 
   val shallow_copy_root_snarked_ledger : t -> masked_ledger
+
+  module Extensions : sig
+    type readers = {snark_pool: unit Reader.t}
+  end
+
+  val extension_pipes : t -> Extensions.readers
 
   module For_tests : sig
     val root_snarked_ledger : t -> ledger_database

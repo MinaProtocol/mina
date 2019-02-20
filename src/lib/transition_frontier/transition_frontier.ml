@@ -2,6 +2,7 @@ open Core_kernel
 open Async_kernel
 open Protocols.Coda_transition_frontier
 open Coda_base
+open Pipe_lib
 
 module type Inputs_intf = Inputs.Inputs_intf
 
@@ -114,9 +115,33 @@ module Make (Inputs : Inputs_intf) :
 
     let create () = {snark_pool_refcount= Snark_pool_refcount.create ()}
 
-    let handle_diff t diff =
-      let use handler field = handler (Field.get field t) diff in
-      Fields.iter ~snark_pool_refcount:(use Snark_pool_refcount.handle_diff)
+    type writers =
+      { snark_pool:
+          ( Snark_pool_refcount.view
+          , Strict_pipe.crash Strict_pipe.buffered
+          , unit )
+          Strict_pipe.Writer.t }
+
+    type readers = {snark_pool: unit Strict_pipe.Reader.t}
+
+    let make_pipes () : readers * writers =
+      let snark_reader, snark_writer =
+        Strict_pipe.create
+        @@ Strict_pipe.Buffered (`Capacity 3, `Overflow Strict_pipe.Crash)
+      in
+      ({snark_pool= snark_reader}, {snark_pool= snark_writer})
+
+    let close_pipes ({snark_pool} : writers) =
+      Strict_pipe.Writer.close snark_pool
+
+    let mb_write_to_pipe diff ext_t handle pipe =
+      match handle ext_t diff with
+      | None -> ()
+      | Some new_view -> Strict_pipe.Writer.write pipe new_view
+
+    let handle_diff t (pipes : writers) diff =
+      mb_write_to_pipe diff t.snark_pool_refcount
+        Snark_pool_refcount.handle_diff pipes.snark_pool
   end
 
   type node =
@@ -134,9 +159,13 @@ module Make (Inputs : Inputs_intf) :
     ; logger: Logger.t
     ; table: node State_hash.Table.t
     ; consensus_local_state: Consensus.Local_state.t
-    ; extensions: Extensions.t }
+    ; extensions: Extensions.t
+    ; extension_readers: Extensions.readers
+    ; extension_writers: Extensions.writers }
 
   let logger t = t.logger
+
+  let extension_pipes {extension_readers; _} = extension_readers
 
   (* TODO: load from and write to disk *)
   let create ~logger
@@ -212,13 +241,19 @@ module Make (Inputs : Inputs_intf) :
           {breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
         in
         let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
+        let extension_readers, extension_writers = Extensions.make_pipes () in
         { logger
         ; root_snarked_ledger
         ; root= root_hash
         ; best_tip= root_hash
         ; table
         ; consensus_local_state
-        ; extensions= Extensions.create () }
+        ; extensions= Extensions.create ()
+        ; extension_readers
+        ; extension_writers }
+
+  (* TODO call this when bootstrapping starts and frontier is destroyed! *)
+  let close {extension_writers; _} = Extensions.close_pipes extension_writers
 
   let max_length = Inputs.max_length
 
@@ -526,7 +561,7 @@ module Make (Inputs : Inputs_intf) :
           else ([], root_node)
         in
         (* 5 *)
-        Extensions.handle_diff t.extensions
+        Extensions.handle_diff t.extensions t.extension_writers
           ( if node.length > best_tip_node.length then
             Transition_frontier_diff.New_best_tip
               { old_root= root_node.breadcrumb
