@@ -126,20 +126,34 @@ module Make
     let locs_bufs = List.map locations_vs ~f:create_buf in
     set_raw_batch mdb locs_bufs
 
-  let rec set_hash mdb location new_hash =
-    assert (Location.is_hash location) ;
-    set_bin mdb location Hash.bin_size_t Hash.bin_write_t new_hash ;
-    let height = Location.height location in
-    if height < Depth.depth then
-      let sibling_hash = get_hash mdb (Location.sibling location) in
-      let parent_hash =
-        let left_hash, right_hash =
-          Location.order_siblings location new_hash sibling_hash
-        in
-        assert (height <= Depth.depth) ;
-        Hash.merge ~height left_hash right_hash
-      in
-      set_hash mdb (Location.parent location) parent_hash
+  include Util.Make (struct
+    module Key = Key
+    module Location = Location
+    module Account = Account
+    module Hash = Hash
+    module Depth = Depth
+
+    module Base = struct
+      type nonrec t = t
+
+      let get = get
+    end
+
+    let get_hash = get_hash
+
+    let location_of_account_addr addr = Location.Account addr
+
+    let location_of_hash_addr addr = Location.Hash addr
+
+    let set_raw_hash_batch mdb addresses_and_hashes =
+      set_bin_batch mdb Hash.bin_size_t Hash.bin_write_t addresses_and_hashes
+
+    let set_raw_account_batch mdb addresses_and_accounts =
+      set_bin_batch mdb Account.bin_size_t Account.bin_write_t
+        addresses_and_accounts
+  end)
+
+  let set_hash mdb location new_hash = set_hash_batch mdb [(location, new_hash)]
 
   let get_inner_hash_at_addr_exn mdb address =
     assert (Addr.depth address <= Depth.depth) ;
@@ -156,9 +170,8 @@ module Make
       assert (Location.is_generic location) ;
       get_raw mdb location
 
-    (* encodes a key as a location used as a database key, so we can find the account
-       location associated with that key
-     *)
+    (* encodes a key as a location used as a database key, so we can find the
+       account location associated with that key *)
     let build_location key =
       Location.build_generic
         (Bigstring.of_string ("$" ^ Format.sprintf !"%{sexp: Key.t}" key))
@@ -248,16 +261,6 @@ module Make
       (Location.Hash (Location.to_path_exn location))
       (Hash.hash_account account)
 
-  let set_batch mdb locations_accounts =
-    set_bin_batch mdb Account.bin_size_t Account.bin_write_t locations_accounts ;
-    let set_one_hash (location, account) =
-      set_hash mdb
-        (Location.Hash (Location.to_path_exn location))
-        (Hash.hash_account account)
-    in
-    (* TODO: is there something better we can do? *)
-    List.iter locations_accounts ~f:set_one_hash
-
   let index_of_key_exn mdb key =
     let location = location_of_key mdb key |> Option.value_exn in
     let addr = Location.to_path_exn location in
@@ -294,16 +297,6 @@ module Make
     | None -> 0
     | Some addr -> Addr.to_int addr + 1
 
-  let set_all_accounts_rooted_at_exn mdb address (accounts : Account.t list) =
-    let first_node, last_node = Addr.Range.subtree_range address in
-    Addr.Range.fold (first_node, last_node) ~init:accounts ~f:(fun addr ->
-      function
-      | account :: accounts ->
-          set mdb (Location.Account addr) account ;
-          accounts
-      | [] -> [] )
-    |> ignore
-
   let iteri t ~f =
     match Account_location.last_location_address t with
     | None -> ()
@@ -312,9 +305,8 @@ module Make
         |> Sequence.iter ~f:(fun i -> f i (get_at_index_exn t i))
 
   (* TODO : if key-value store supports iteration mechanism, like RocksDB,
-     maybe use that here, instead of loading all accounts into memory
-     See Issue #1191
-  *)
+     maybe use that here, instead of loading all accounts into memory See Issue
+     #1191 *)
   let foldi_with_ignored_keys t ignored_keys ~init ~f =
     let f' index accum account = f (Addr.of_int_exn index) accum account in
     match Account_location.last_location_address t with
@@ -364,7 +356,8 @@ module Make
       in
       loop keys []
     in
-    (* N.B.: we're not using stack database here to make available newly-freed locations *)
+    (* N.B.: we're not using stack database here to make available newly-freed
+       locations *)
     List.iter keys ~f:(Account_location.delete t) ;
     List.iter locations ~f:(fun loc -> delete_raw t loc) ;
     (* recalculate hashes for each removed account *)
@@ -395,20 +388,4 @@ module Make
   let merkle_path_at_index_exn t index =
     let addr = Addr.of_int_exn index in
     merkle_path_at_addr_exn t addr
-
-  let location_of_addr addr = Location.Account addr
-
-  include Util.Make (struct
-    module Location = Location
-    module Account = Account
-    module Addr = Location.Addr
-
-    module Base = struct
-      type nonrec t = t
-
-      let get = get
-    end
-
-    let location_of_addr = location_of_addr
-  end)
 end
