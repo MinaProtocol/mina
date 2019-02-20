@@ -26,8 +26,8 @@ let create mvar =
   don't_wait_for
     (Pipe.iter_without_pushback t.mvar_pipe_handle ~f:(fun a ->
          t.cache <- a ;
-         Int.Table.iteri t.pipes ~f:(fun ~key ~data:(_, w) ->
-             Strict_pipe.Writer.write w a ) )) ;
+         Int.Table.iter t.pipes ~f:(fun (_, w) -> Strict_pipe.Writer.write w a)
+     )) ;
   t
 
 let peek {cache; _} = cache

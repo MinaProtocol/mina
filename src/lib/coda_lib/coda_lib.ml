@@ -500,8 +500,8 @@ module Make (Inputs : Inputs_intf) = struct
     ; snark_work_fee: Currency.Fee.t
     ; consensus_local_state: Consensus_mechanism.Local_state.t }
 
-  let peek_frontier frontier_shared_mvar =
-    Broadcast_pipe.peek frontier_shared_mvar
+  let peek_frontier frontier_broadcast_pipe =
+    Broadcast_pipe.peek frontier_broadcast_pipe
     |> Result.of_option
          ~error:
            (Error.of_string
@@ -675,7 +675,7 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let frontier_write_mvar = Mvar.create () in
         Mvar.set frontier_write_mvar (Some transition_frontier) ;
-        let frontier_shared_mvar =
+        let frontier_broadcast_pipe =
           Broadcast_pipe.create (Mvar.read_only frontier_write_mvar)
         in
         let%bind net =
@@ -686,7 +686,7 @@ module Make (Inputs : Inputs_intf) = struct
               let open Or_error.Let_syntax in
               let result =
                 let ledger_hash, query = Envelope.Incoming.data query_env in
-                let%bind frontier = peek_frontier frontier_shared_mvar in
+                let%bind frontier = peek_frontier frontier_broadcast_pipe in
                 Sync_handler.answer_query ~frontier ledger_hash query
                   ~logger:config.log
                 |> Result.of_option
@@ -701,7 +701,7 @@ module Make (Inputs : Inputs_intf) = struct
               let open Deferred.Option.Let_syntax in
               let hash = Envelope.Incoming.data enveloped_hash in
               let%bind frontier =
-                Deferred.return @@ Broadcast_pipe.peek frontier_shared_mvar
+                Deferred.return @@ Broadcast_pipe.peek frontier_broadcast_pipe
               in
               let%map breadcrumb =
                 Deferred.return @@ Transition_frontier.find frontier hash
@@ -715,7 +715,9 @@ module Make (Inputs : Inputs_intf) = struct
               let consensus_state = Envelope.Incoming.data query_env in
               let result =
                 let open Option.Let_syntax in
-                let%bind frontier = Broadcast_pipe.peek frontier_shared_mvar in
+                let%bind frontier =
+                  Broadcast_pipe.peek frontier_broadcast_pipe
+                in
                 Root_prover.prove ~logger:config.log ~frontier consensus_state
               in
               Deferred.return result )
@@ -723,7 +725,7 @@ module Make (Inputs : Inputs_intf) = struct
         let valid_transitions =
           Transition_router.run ~logger:config.log ~network:net
             ~time_controller:config.time_controller ~frontier_write_mvar
-            ~frontier_shared_mvar ~ledger_db
+            ~frontier_broadcast_pipe ~ledger_db
             ~network_transition_reader:
               (Strict_pipe.Reader.map external_transitions_reader
                  ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm) ))
@@ -768,7 +770,7 @@ module Make (Inputs : Inputs_intf) = struct
           ; net
           ; transaction_pool
           ; snark_pool
-          ; transition_frontier= frontier_shared_mvar
+          ; transition_frontier= frontier_broadcast_pipe
           ; time_controller= config.time_controller
           ; external_transitions_writer=
               Strict_pipe.Writer.to_linear_pipe external_transitions_writer
