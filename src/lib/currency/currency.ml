@@ -92,6 +92,8 @@ module type Signed_intf = sig
 
       type nonrec t = t [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
     end
+
+    module Latest = V1
   end
 
   val length_in_triples : int
