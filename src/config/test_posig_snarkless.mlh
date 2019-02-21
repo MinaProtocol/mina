@@ -1,7 +1,7 @@
 [%%import "config/ledger_depth/full.mlh"]
 [%%import "config/coinbase/standard.mlh"]
 [%%import "config/consensus/posig_fake.mlh"]
-[%%import "config/scan_state/tiny.mlh"]
+[%%import "config/scan_state/small.mlh"]
 [%%import "config/debug_level/logs.mlh"]
 [%%import "config/proof_level/check.mlh"]
 
