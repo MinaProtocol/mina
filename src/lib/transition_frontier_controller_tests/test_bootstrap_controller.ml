@@ -7,7 +7,6 @@ module Stubs = Stubs.Make (struct
 end)
 
 open Stubs
-open Signature_lib
 
 module Root_sync_ledger =
   Syncable_ledger.Make (Ledger.Db.Addr) (Account)
@@ -45,71 +44,6 @@ end)
 
 let%test_module "Bootstrap Controller" =
   ( module struct
-    type peer_config =
-      {num_breadcrumbs: int; accounts: (Private_key.t option * Account.t) list}
-
-    type peer = {address: Network_peer.Peer.t; frontier: Transition_frontier.t}
-
-    type initial_network =
-      { syncing_frontier: Transition_frontier.t
-      ; peers: peer List.t
-      ; network: Network.t }
-
-    let setup_nodes ~source_accounts ~logger configs =
-      let%bind syncing_frontier =
-        create_root_frontier ~logger source_accounts
-      in
-      let init_address = 1337 in
-      let network = Network.create ~logger in
-      let%map _, peers =
-        Deferred.List.fold ~init:(init_address, []) configs
-          ~f:(fun (discovery_port, acc_peers) {num_breadcrumbs; accounts} ->
-            let%bind frontier = create_root_frontier ~logger accounts in
-            let%map () =
-              build_frontier_randomly frontier
-                ~gen_root_breadcrumb_builder:
-                  (gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
-                     ~accounts_with_secret_keys:accounts)
-            in
-            let best_tip_length =
-              Transition_frontier.best_tip_path_length_exn frontier
-            in
-            assert (best_tip_length = Transition_frontier.max_length) ;
-            let address =
-              Network_peer.Peer.create Unix.Inet_addr.localhost ~discovery_port
-                ~communication_port:(discovery_port + 1)
-            in
-            Network.add_exn network ~key:address ~data:frontier ;
-            let peer = {address; frontier} in
-            (discovery_port + 2, peer :: acc_peers) )
-      in
-      {syncing_frontier; network; peers= List.rev peers}
-
-    let setup_single_node ~source_accounts ~target_accounts ~logger
-        ~num_breadcrumbs =
-      let%map {syncing_frontier; network; peers} =
-        setup_nodes ~source_accounts ~logger
-          [{num_breadcrumbs; accounts= target_accounts}]
-      in
-      (syncing_frontier, network, List.hd_exn peers)
-
-    let send_transition ~logger ~transition_writer ~peer:{address; frontier}
-        state_hash =
-      let dummy_time = Int64.of_int 1 in
-      let transition =
-        Transition_frontier.(
-          find_exn frontier state_hash
-          |> Breadcrumb.transition_with_hash |> With_hash.data)
-      in
-      Logger.info logger
-        !"Peer %{sexp:Network_peer.Peer.t} sending %{sexp:State_hash.t}"
-        address state_hash ;
-      let enveloped_transition =
-        Envelope.Incoming.wrap ~data:transition ~sender:address
-      in
-      Pipe_lib.Strict_pipe.Writer.write transition_writer
-        (`Transition enveloped_transition, `Time_received dummy_time)
-
     let%test "`bootstrap_controller` caches all transitions it is passed \
               through the `transition_reader` pipe" =
       let transition_graph =
@@ -191,7 +125,7 @@ let%test_module "Bootstrap Controller" =
       Pipe_lib.Strict_pipe.create
         (Buffered (`Capacity 10, `Overflow Drop_head))
 
-    let get_best_tip_hash peer =
+    let get_best_tip_hash (peer : Network_builder.peer) =
       Transition_frontier.best_tip peer.frontier
       |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.hash
 
@@ -205,14 +139,15 @@ let%test_module "Bootstrap Controller" =
       let logger = Logger.create () in
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
-          let%bind syncing_frontier, network, peer =
-            setup_single_node ~logger ~num_breadcrumbs
+          let%bind syncing_frontier, peer, network =
+            Network_builder.setup_me_and_a_peer ~logger ~num_breadcrumbs
               ~source_accounts:[List.hd_exn Genesis_ledger.accounts]
               ~target_accounts:Genesis_ledger.accounts
           in
           let transition_reader, transition_writer = make_transition_pipe () in
           let best_hash = get_best_tip_hash peer in
-          send_transition ~logger ~transition_writer ~peer best_hash ;
+          Network_builder.send_transition ~logger ~transition_writer ~peer
+            best_hash ;
           let ledger_db =
             Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
           in
@@ -237,8 +172,8 @@ let%test_module "Bootstrap Controller" =
       in
       Thread_safe.block_on_async_exn (fun () ->
           let large_peer_accounts = Genesis_ledger.accounts in
-          let%bind {syncing_frontier; peers; network} =
-            setup_nodes ~source_accounts ~logger
+          let%bind {me; peers; network} =
+            Network_builder.setup ~source_accounts ~logger
               [ { num_breadcrumbs= small_peer_num_breadcrumbs
                 ; accounts= small_peer_accounts }
               ; { num_breadcrumbs= large_peer_num_breadcrumbs
@@ -249,20 +184,22 @@ let%test_module "Bootstrap Controller" =
             (List.nth_exn peers 0, List.nth_exn peers 1)
           in
           let ledger_db =
-            Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
+            Transition_frontier.For_tests.root_snarked_ledger me
           in
-          send_transition ~logger ~transition_writer ~peer:small_peer
+          Network_builder.send_transition ~logger ~transition_writer
+            ~peer:small_peer
             (get_best_tip_hash small_peer) ;
           (* Have a bit of delay when sending the more recent transition *)
           let%bind () =
             after (Core.Time.Span.of_sec 1.0)
             >>| fun () ->
-            send_transition ~logger ~transition_writer ~peer:large_peer
+            Network_builder.send_transition ~logger ~transition_writer
+              ~peer:large_peer
               (get_best_tip_hash large_peer)
           in
           let%map new_frontier, (_ : External_transition.Verified.t list) =
-            Bootstrap_controller.run ~parent_log:logger ~network
-              ~frontier:syncing_frontier ~ledger_db ~transition_reader
+            Bootstrap_controller.run ~parent_log:logger ~network ~frontier:me
+              ~ledger_db ~transition_reader
           in
           Ledger_hash.equal (root_hash new_frontier)
             (root_hash large_peer.frontier) )
@@ -271,8 +208,8 @@ let%test_module "Bootstrap Controller" =
       let logger = Logger.create () in
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
-          let%bind syncing_frontier, network, peer =
-            setup_single_node ~logger ~num_breadcrumbs
+          let%bind syncing_frontier, peer, network =
+            Network_builder.setup_me_and_a_peer ~logger ~num_breadcrumbs
               ~source_accounts:Genesis_ledger.accounts
               ~target_accounts:Genesis_ledger.accounts
           in

@@ -3,17 +3,25 @@ open Import
 open Snark_params
 open Coda_numbers
 open Tick
+open Module_version
 module Fee = Currency.Fee
 module Payload = User_command_payload
 
 module Stable = struct
   module V1 = struct
-    type ('payload, 'pk, 'signature) t_ =
-      {payload: 'payload; sender: 'pk; signature: 'signature}
-    [@@deriving bin_io, eq, sexp, hash, yojson]
+    module T = struct
+      let version = 1
 
-    type t = (Payload.Stable.V1.t, Public_key.t, Signature.t) t_
-    [@@deriving bin_io, eq, sexp, hash, yojson]
+      type ('payload, 'pk, 'signature) t_ =
+        {payload: 'payload; sender: 'pk; signature: 'signature}
+      [@@deriving bin_io, eq, sexp, hash, yojson]
+
+      type t = (Payload.Stable.Latest.t, Public_key.t, Signature.t) t_
+      [@@deriving bin_io, eq, sexp, hash, yojson]
+    end
+
+    include T
+    include Registration.Make_latest_version (T)
 
     type with_seed = string * t [@@deriving hash]
 
@@ -33,9 +41,20 @@ module Stable = struct
         let hash x = hash_with_seed (seed, x) in
         if fee_compare <> 0 then fee_compare else hash t - hash t'
   end
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "user_command"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
 end
 
-include Stable.V1
+include Stable.Latest
 
 type value = t
 
@@ -69,9 +88,9 @@ let gen ~keys ~max_amount ~max_fee =
   sign sender payload
 
 module With_valid_signature = struct
-  type t = Stable.V1.t [@@deriving sexp, eq, bin_io]
+  type t = Stable.Latest.t [@@deriving sexp, eq, bin_io]
 
-  let compare = Stable.V1.compare
+  let compare = Stable.Latest.compare
 
   let gen = gen
 end
@@ -88,6 +107,7 @@ let%test_unit "completeness" =
 
 let%test_unit "json" =
   Quickcheck.test ~trials:20 ~sexp_of:sexp_of_t gen_test ~f:(fun t ->
-      assert (Codable.For_tests.check_encoding (module Stable.V1) ~equal t) )
+      assert (Codable.For_tests.check_encoding (module Stable.Latest) ~equal t)
+  )
 
 let check t = Option.some_if (check_signature t) t

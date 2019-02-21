@@ -129,7 +129,10 @@ module Make (Inputs : Inputs_intf) :
     Broadcaster.broadcast controller_type
       (`Transition_frontier_controller (new_frontier, reader, writer))
 
-  let run ~logger ~network ~time_controller ~frontier_mvar ~ledger_db
+  let peek_exn p = Broadcast_pipe.Reader.peek p |> Option.value_exn
+
+  let run ~logger ~network ~time_controller
+      ~frontier_broadcast_pipe:(frontier_r, frontier_w) ~ledger_db
       ~network_transition_reader ~proposer_transition_reader =
     let clean_transition_frontier_controller_and_start_bootstrap
         ~controller_type ~clear_writer ~transition_frontier_controller_reader
@@ -183,25 +186,21 @@ module Make (Inputs : Inputs_intf) :
     let ( transition_frontier_controller_reader
         , transition_frontier_controller_writer ) =
       start_transition_frontier_controller ~verified_transition_writer
-        ~clear_reader ~collected_transitions:[]
-        (Mvar.peek_exn frontier_mvar)
+        ~clear_reader ~collected_transitions:[] (peek_exn frontier_r)
     in
     let controller_type =
       Broadcaster.create
         ~init:
           (`Transition_frontier_controller
-            ( Mvar.peek_exn frontier_mvar
+            ( peek_exn frontier_r
             , transition_frontier_controller_reader
             , transition_frontier_controller_writer ))
         ~f:(function
           | `Transition_frontier_controller (frontier, _, _) ->
-              assert (not @@ Mvar.is_empty frontier_mvar) ;
-              Mvar.set frontier_mvar frontier
+              don't_wait_for
+                (Broadcast_pipe.Writer.write frontier_w (Some frontier))
           | `Bootstrap_controller (_, _) ->
-              let _ : Transition_frontier.t =
-                Mvar.take_now_exn frontier_mvar
-              in
-              ())
+              don't_wait_for (Broadcast_pipe.Writer.write frontier_w None))
     in
     let ( valid_protocol_state_transition_reader
         , valid_protocol_state_transition_writer ) =

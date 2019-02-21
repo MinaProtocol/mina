@@ -1,4 +1,5 @@
 open Core
+open Module_version
 
 (* SOMEDAY: handle empty wallets *)
 module Make
@@ -47,8 +48,32 @@ end = struct
     ; mutable dirty_indices: int list }
   [@@deriving sexp, bin_io]
 
-  type t = {uuid: Uuid.Stable.V1.t; accounts: accounts; tree: tree}
-  [@@deriving sexp, bin_io]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        let version = 1
+
+        type t = {uuid: Uuid.Stable.V1.t; accounts: accounts; tree: tree}
+        [@@deriving sexp, bin_io]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "ledger"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  include Stable.Latest
 
   module C : Container.S0 with type t := t and type elt := Account.t =
   Container.Make0 (struct
@@ -396,19 +421,17 @@ end = struct
           (t.tree).unset_slots <- Int.Set.remove t.tree.unset_slots new_index )
         else set_at_index_exn t new_index a )
 
-  let location_of_addr = Addr.to_int
+  let set_batch_accounts _t _addresses_and_accounts =
+    failwith "unsupported implementation"
 
-  include Util.Make (struct
-    module Location = Location
-    module Account = Account
-    module Addr = Addr
-
-    module Base = struct
-      type nonrec t = t
-
-      let get = get
-    end
-
-    let location_of_addr = location_of_addr
-  end)
+  let get_all_accounts_rooted_at_exn t address =
+    let result =
+      Addr.Range.fold (Addr.Range.subtree_range address) ~init:[]
+        ~f:(fun bit_index acc ->
+          let account = get t (Addr.to_int bit_index) in
+          (bit_index, account) :: acc )
+    in
+    List.rev_filter_map result ~f:(function
+      | _, None -> None
+      | addr, Some account -> Some (addr, account) )
 end

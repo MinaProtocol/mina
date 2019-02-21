@@ -290,12 +290,15 @@ let daemon log =
          let%bind () = Async.Unix.mkdir ~p:() banlist_dir_name in
          let suspicious_dir = banlist_dir_name ^/ "suspicious" in
          let punished_dir = banlist_dir_name ^/ "banned" in
+         let trust_dir = banlist_dir_name ^/ "trust" in
          let () = Snark_params.set_chunked_hashing true in
          let%bind () = Async.Unix.mkdir ~p:() suspicious_dir in
          let%bind () = Async.Unix.mkdir ~p:() punished_dir in
+         let%bind () = Async.Unix.mkdir ~p:() trust_dir in
          let banlist =
            Coda_base.Banlist.create ~suspicious_dir ~punished_dir
          in
+         let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
          let time_controller = Inputs.Time.Controller.create () in
          let net_config =
            { Inputs.Net.Config.parent_log= log
@@ -307,7 +310,7 @@ let daemon log =
                ; conf_dir
                ; initial_peers
                ; me
-               ; banlist } }
+               ; trust_system } }
          in
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
          let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
@@ -402,12 +405,14 @@ let ensure_testnet_id_still_good _ = Deferred.unit
 [%%endif]
 
 [%%if
-with_snark]
+proof_level = "full"]
 
 let internal_commands =
   [(Snark_worker_lib.Intf.command_name, Snark_worker_lib.Prod.Worker.command)]
 
 [%%else]
+
+(* TODO #1698: proof_level=check *)
 
 let internal_commands =
   [(Snark_worker_lib.Intf.command_name, Snark_worker_lib.Debug.Worker.command)]
@@ -431,6 +436,8 @@ let coda_commands log =
     ; (Coda_shared_state_test.name, Coda_shared_state_test.command)
     ; (Coda_transitive_peers_test.name, Coda_transitive_peers_test.command)
     ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
+    ; ( Coda_shared_prefix_multiproposer_test.name
+      , Coda_shared_prefix_multiproposer_test.command )
     ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
     ; (Coda_receipt_chain_test.name, Coda_receipt_chain_test.command)
     ; ("full-test", Full_test.command)

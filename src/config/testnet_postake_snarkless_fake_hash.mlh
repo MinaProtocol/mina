@@ -3,6 +3,7 @@
 [%%import "config/consensus/postake_tiny.mlh"]
 [%%import "config/scan_state/small.mlh"]
 [%%import "config/debug_level/logs.mlh"]
+[%%import "config/proof_level/none.mlh"]
 
 [%%define delta 8]
 [%%define fake_hash true]
@@ -11,6 +12,5 @@
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
 [%%define block_window_duration 5000]
 
-[%%define with_snark false]
 [%%define integration_tests true]
 [%%define force_updates false]
