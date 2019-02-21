@@ -86,15 +86,19 @@ module Worker = struct
     struct
       let verify_blockchain (w : Worker_state.t) (chain : Blockchain.t) =
         match Coda_compile_config.proof_level with
-        | "full" | "check" ->
+        | "full" ->
             let%map (module M) = Worker_state.get w in
             M.verify_wrap chain.state chain.proof
-        | "none" -> Deferred.return true
+        | "check" | "none" -> Deferred.return true
         | _ -> failwith "unknown proof_level"
 
       let verify_transaction_snark (w : Worker_state.t) (p, message) =
-        let%map (module M) = Worker_state.get w in
-        M.verify_transaction_snark p ~message
+        match Coda_compile_config.proof_level with
+        | "full" ->
+            let%map (module M) = Worker_state.get w in
+            M.verify_transaction_snark p ~message
+        | "check" | "none" -> Deferred.return true
+        | _ -> failwith "unknown proof_level"
 
       let functions =
         let f (i, o, f) =
