@@ -73,12 +73,12 @@ module Make (Inputs : Inputs.S) = struct
                 ~f:(fun transition_with_hash ->
                   Transition_frontier.Breadcrumb.build ~logger
                     ~parent:(Cached.peek parent) ~transition_with_hash )
-              |> Cached.lift_deferred
+              |> Cached.sequence_deferred
             in
-            match Cached.lift_result cached_breadcrumb_result with
+            match Cached.sequence_result cached_breadcrumb_result with
             | Error (`Validation_error e) ->
                 (* TODO: Punish *)
-                Logger.error logger
+                Logger.faulty_peer logger
                   "invalid transition in catchup scheduler breadcrumb \
                    builder: %s"
                   (Error.to_string_hum e) ;

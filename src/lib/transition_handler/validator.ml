@@ -43,15 +43,21 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
            transition_with_hash)
         ~error:`Duplicate
     in
-    Result.ok_if_true
-      ( `Take
-      = Consensus.select ~logger
-          ~existing:(consensus_state root_protocol_state)
-          ~candidate:(consensus_state protocol_state) )
-      ~error:
-        (`Invalid
-          "consensus state was not selected over transition frontier root \
-           consensus state")
+    let%map () =
+      Result.ok_if_true
+        ( `Take
+        = Consensus.select ~logger
+            ~existing:(consensus_state root_protocol_state)
+            ~candidate:(consensus_state protocol_state) )
+        ~error:
+          (`Invalid
+            "consensus state was not selected over transition frontier root \
+             consensus state")
+    in
+    (* we expect this to be Ok since we just checked the cache *)
+    Unprocessed_transition_cache.register unprocessed_transition_cache
+      transition_with_hash
+    |> Or_error.ok_exn
 
   let run ~logger ~frontier ~transition_reader
       ~(valid_transition_writer :
@@ -78,23 +84,10 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                  validate_transition ~logger ~frontier
                    ~unprocessed_transition_cache transition_with_hash
                with
-             | Ok () ->
+             | Ok cached_transition ->
                  Logger.info logger
                    !"accepting transition %{sexp:State_hash.t}"
                    hash ;
-                 let cached_transition :
-                     ( ( External_transition.Verified.t
-                       , State_hash.t )
-                       With_hash.t
-                     , State_hash.t )
-                     Cached.t =
-                   (* since validate_transition checks this
-                    * cache, we can expect the call to this
-                    * function to only return Ok *)
-                   Unprocessed_transition_cache.register
-                     unprocessed_transition_cache transition_with_hash
-                   |> Or_error.ok_exn
-                 in
                  Writer.write valid_transition_writer cached_transition
              | Error `Duplicate ->
                  Logger.info logger

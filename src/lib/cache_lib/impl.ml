@@ -11,22 +11,27 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
   module rec Cache : sig
     include Intf.Cache.S with module Cached := Cached
 
+    val logger : _ t -> Logger.t
+
     val remove : 'elt t -> 'elt -> unit Or_error.t
   end = struct
     type 'a t = {name: string; set: 'a Hash_set.t; logger: Logger.t}
 
     let name {name; _} = name
 
+    let logger {logger; _} = logger
+
     let create (type elt) ~name ~logger
         (module Elt : Hash_set.Elt_plain with type t = elt) : elt t =
       let set =
         Hash_set.create ~growth_allowed:true ?size:None (module Elt) ()
       in
+      let logger = Logger.child logger ("Cache:" ^ name) in
       {name; set; logger}
 
     let register t x =
       let%map () = Hash_set.strict_add t.set x in
-      Cached.create ~logger:t.logger t x
+      Cached.create t x
 
     let mem t x = Hash_set.mem t.set x
 
@@ -36,7 +41,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
   and Cached : sig
     include Intf.Cached.S
 
-    val create : logger:Logger.t -> 'elt Cache.t -> 'elt -> ('elt, 'elt) t
+    val create : 'elt Cache.t -> 'elt -> ('elt, 'elt) t
   end = struct
     type (_, _) t =
       | Base :
@@ -47,16 +52,16 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       | Derivative :
           { original: 'a
           ; mutant: 'b
-          ; parent: ('c, 'a) t
+          ; cache: 'a Cache.t
           ; mutable consumed: bool }
           -> ('b, 'a) t
       | Phantom : 'a -> ('a, _) t
 
     let phantom x = Phantom x
 
-    let rec cache : type a b. (a, b) t -> b Cache.t = function
+    let cache : type a b. (a, b) t -> b Cache.t = function
       | Base x -> x.cache
-      | Derivative x -> cache x.parent
+      | Derivative x -> x.cache
       | Phantom _ -> failwith "cannot access cache of phantom Cached.t"
 
     let value : type a b. (a, b) t -> a = function
@@ -80,14 +85,17 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
       | Derivative x -> x.consumed <- true
       | Phantom _ -> failwith "cannot set consumption of phantom Cached.t"
 
-    let create ~logger cache data =
-      let t = Base {data; cache; consumed= false} in
+    let attach_finalizer t =
       Gc.Expert.add_finalizer (Heap_block.create_exn t) (fun block ->
           let t = Heap_block.value block in
           if not (was_consumed t) then
-            Inputs.handle_unconsumed_cache_item ~logger
+            let cache = cache t in
+            Inputs.handle_unconsumed_cache_item ~logger:(Cache.logger cache)
               ~cache_name:(Cache.name cache) ) ;
       t
+
+    let create cache data =
+      attach_finalizer (Base {data; cache; consumed= false})
 
     let assert_not_consumed t msg =
       let open Error in
@@ -103,26 +111,32 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
 
     let transform (type a b) (t : (a, b) t) ~(f : a -> 'c) : ('c, b) t =
       consume t ;
-      Derivative
-        {original= original t; mutant= f (value t); parent= t; consumed= false}
+      attach_finalizer
+        (Derivative
+           { original= original t
+           ; mutant= f (value t)
+           ; cache= cache t
+           ; consumed= false })
 
     let invalidate (type a b) (t : (a, b) t) : a Or_error.t =
       consume t ;
       let%map () = Cache.remove (cache t) (original t) in
       value t
 
-    let lift_deferred (type a b) (t : (a Deferred.t, b) t) :
+    let sequence_deferred (type a b) (t : (a Deferred.t, b) t) :
         (a, b) t Deferred.t =
       let open Deferred.Let_syntax in
       let%map x = peek t in
       transform t ~f:(Fn.const x)
 
-    let lift_result (type a b) (t : ((a, 'e) Result.t, b) t) :
+    let sequence_result (type a b) (t : ((a, 'e) Result.t, b) t) :
         ((a, b) t, 'e) Result.t =
       match peek t with
       | Ok x -> Ok (transform t ~f:(Fn.const x))
       | Error err ->
-          (* TODO: should this log something if there was an error? *)
+          Logger.error
+            (Cache.logger (cache t))
+            "Cached.sequence_result called on an already consumed Cached.t" ;
           ignore (invalidate t) ;
           Error err
   end

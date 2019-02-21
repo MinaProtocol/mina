@@ -259,7 +259,11 @@ module type Transition_handler_validator_intf = sig
     -> frontier:transition_frontier
     -> unprocessed_transition_cache:unprocessed_transition_cache
     -> (external_transition_verified, state_hash) With_hash.t
-    -> (unit, [`Duplicate | `Invalid of string]) Result.t
+    -> ( ( (external_transition_verified, state_hash) With_hash.t
+         , state_hash )
+         Cached.t
+       , [`Duplicate | `Invalid of string] )
+       Result.t
 end
 
 module type Transition_handler_processor_intf = sig

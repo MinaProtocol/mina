@@ -69,10 +69,10 @@ module Make (Inputs : Inputs.S) :
                 | Ok new_breadcrumb -> Ok new_breadcrumb
                 | Error (`Fatal_error exn) -> Or_error.of_exn exn
                 | Error (`Validation_error error) -> Error error )
-            |> Cached.lift_deferred
+            |> Cached.sequence_deferred
           in
           let open Or_error.Let_syntax in
-          let%map new_breadcrumb = Cached.lift_result cached_result in
+          let%map new_breadcrumb = Cached.sequence_result cached_result in
           (Cached.peek new_breadcrumb, new_breadcrumb :: predecessors) )
     in
     List.rev cached_breadcrumbs
@@ -100,7 +100,7 @@ module Make (Inputs : Inputs.S) :
 
   let verify_transition ~logger ~frontier ~unprocessed_transition_cache
       transition =
-    let verified_transition =
+    let cached_verified_transition =
       let open Deferred.Result.Let_syntax in
       let%bind _ : External_transition.Proof_verified.t =
         Protocol_state_validator.validate_proof transition
@@ -121,22 +121,13 @@ module Make (Inputs : Inputs.S) :
             (Fn.compose Consensus.Protocol_state.hash
                External_transition.Verified.protocol_state)
       in
-      let%map () =
-        Deferred.return
-        @@ Transition_handler_validator.validate_transition ~logger ~frontier
-             ~unprocessed_transition_cache verified_transition_with_hash
-      in
-      verified_transition_with_hash
+      Deferred.return
+      @@ Transition_handler_validator.validate_transition ~logger ~frontier
+           ~unprocessed_transition_cache verified_transition_with_hash
     in
     let open Deferred.Let_syntax in
-    match%map verified_transition with
-    | Ok verified_transition ->
-        let open Or_error.Let_syntax in
-        let%map cached =
-          Unprocessed_transition_cache.register unprocessed_transition_cache
-            verified_transition
-        in
-        Some cached
+    match%map cached_verified_transition with
+    | Ok x -> Ok (Some x)
     | Error `Duplicate ->
         Logger.info logger
           !"transition queried during ledger catchup has already been seen" ;

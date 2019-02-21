@@ -1,9 +1,9 @@
-(* This module contains the transition processor. The transition processor is
- * the thread in which transitions are attached the to the transition frontier.
+(** This module contains the transition processor. The transition processor is
+ *  the thread in which transitions are attached the to the transition frontier.
  *
- * Two types of data are handled by the transition processor: validated external transitions
- * with precomputed state hashes (via the proposer and validator pipes) and breadcrumb rose
- * trees (via the catchup pipe).
+ *  Two types of data are handled by the transition processor: validated external transitions
+ *  with precomputed state hashes (via the proposer and validator pipes) and breadcrumb rose
+ *  trees (via the catchup pipe).
  *)
 
 open Core_kernel
@@ -145,9 +145,9 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                              ~f:(fun transition_with_hash ->
                                Transition_frontier.Breadcrumb.build ~logger
                                  ~parent ~transition_with_hash )
-                           |> Cached.lift_deferred
+                           |> Cached.sequence_deferred
                          in
-                         match Cached.lift_result cached_breadcrumb with
+                         match Cached.sequence_result cached_breadcrumb with
                          | Error (`Validation_error e) ->
                              (* TODO: Punish *) Error e
                          | Error (`Fatal_error e) -> raise e
