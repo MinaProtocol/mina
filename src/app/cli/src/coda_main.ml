@@ -337,6 +337,8 @@ module type Main_intf = sig
   val best_tip :
     t -> Inputs.Transition_frontier.Breadcrumb.t Participating_state.t
 
+  val visualize_frontier : filename:string -> t -> unit Participating_state.t
+
   val peers : t -> Network_peer.Peer.t list
 
   val strongest_ledgers :
@@ -1387,7 +1389,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       ; implement Daemon_rpcs.Start_tracing.rpc (fun () () ->
             Coda_tracing.start Config_in.conf_dir )
       ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
-            Coda_tracing.stop () ; Deferred.unit ) ]
+            Coda_tracing.stop () ; Deferred.unit )
+      ; implement Daemon_rpcs.Visualize_frontier.rpc (fun () filename ->
+            return
+              ( visualize_frontier ~filename coda
+              |> Participating_state.active_exn ) ) ]
     in
     let snark_worker_impls =
       [ implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
