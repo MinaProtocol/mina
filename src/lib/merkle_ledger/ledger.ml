@@ -1,4 +1,5 @@
 open Core
+open Module_version
 
 (* SOMEDAY: handle empty wallets *)
 module Make
@@ -47,8 +48,32 @@ end = struct
     ; mutable dirty_indices: int list }
   [@@deriving sexp, bin_io]
 
-  type t = {uuid: Uuid.Stable.V1.t; accounts: accounts; tree: tree}
-  [@@deriving sexp, bin_io]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        let version = 1
+
+        type t = {uuid: Uuid.Stable.V1.t; accounts: accounts; tree: tree}
+        [@@deriving sexp, bin_io]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "ledger"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  include Stable.Latest
 
   module C : Container.S0 with type t := t and type elt := Account.t =
   Container.Make0 (struct
