@@ -10,6 +10,8 @@ module type Inputs_intf = sig
   module Sync_handler :
     Sync_handler_intf
     with type ledger_hash := Ledger_hash.t
+     and type state_hash := State_hash.t
+     and type external_transition := External_transition.t
      and type transition_frontier := Transition_frontier.t
      and type syncable_ledger_query := Sync_ledger.query
      and type syncable_ledger_answer := Sync_ledger.answer

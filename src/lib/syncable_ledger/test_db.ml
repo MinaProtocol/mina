@@ -54,6 +54,8 @@ struct
 
     let set_all_accounts_rooted_at_exn = MT.set_all_accounts_rooted_at_exn
 
+    let set_batch_accounts = MT.set_batch_accounts
+
     let get_inner_hash_at_addr_exn = MT.get_inner_hash_at_addr_exn
 
     let set_inner_hash_at_addr_exn = MT.set_inner_hash_at_addr_exn

@@ -7,7 +7,7 @@ open Parsetree
 open Core
 
 [%%if
-with_snark]
+proof_level = "full"]
 
 let key_generation = true
 

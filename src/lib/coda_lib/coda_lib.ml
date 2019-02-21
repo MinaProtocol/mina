@@ -72,7 +72,7 @@ module type Network_intf = sig
        t
     -> Network_peer.Peer.t
     -> state_hash
-    -> state_with_witness list option Or_error.t Deferred.t
+    -> state_with_witness Non_empty_list.t option Or_error.t Deferred.t
 
   val snark_pool_diffs :
     t -> snark_pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
@@ -108,7 +108,8 @@ module type Network_intf = sig
                                  -> (ledger_hash * sync_ledger_answer)
                                     Deferred.Or_error.t)
     -> transition_catchup:(   state_hash Envelope.Incoming.t
-                           -> state_with_witness list Deferred.Option.t)
+                           -> state_with_witness Non_empty_list.t
+                              Deferred.Option.t)
     -> get_ancestry:(   consensus_state Envelope.Incoming.t
                      -> ( state_with_witness
                         , state_body_hash list * state_with_witness )
@@ -294,7 +295,7 @@ module type Proposer_intf = sig
     -> time_controller:time_controller
     -> keypair:keypair
     -> consensus_local_state:consensus_local_state
-    -> frontier_reader:transition_frontier Mvar.Read_only.t
+    -> frontier_reader:transition_frontier option Broadcast_pipe.Reader.t
     -> transition_writer:( ( external_transition_verified
                            , state_hash )
                            With_hash.t
@@ -385,7 +386,7 @@ module type Inputs_intf = sig
      and type sync_ledger_query := Coda_base.Sync_ledger.query
      and type sync_ledger_answer := Coda_base.Sync_ledger.answer
      and type time := Time.t
-     and type state_hash := Protocol_state_hash.t
+     and type state_hash := Coda_base.State_hash.t
      and type state_body_hash := State_body_hash.t
      and type consensus_state := Consensus_mechanism.Consensus_state.value
 
@@ -465,6 +466,8 @@ module type Inputs_intf = sig
   module Sync_handler :
     Protocols.Coda_transition_frontier.Sync_handler_intf
     with type ledger_hash := Ledger_hash.t
+     and type state_hash := Coda_base.State_hash.t
+     and type external_transition := External_transition.t
      and type transition_frontier := Transition_frontier.t
      and type syncable_ledger_query := Coda_base.Sync_ledger.query
      and type syncable_ledger_answer := Coda_base.Sync_ledger.answer
@@ -480,7 +483,7 @@ module Make (Inputs : Inputs_intf) = struct
         Net.t (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
-    ; transition_frontier: Transition_frontier.t Mvar.Read_only.t
+    ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
     ; strongest_ledgers:
         (External_transition.Verified.t, Protocol_state_hash.t) With_hash.t
         Strict_pipe.Reader.t
@@ -500,8 +503,8 @@ module Make (Inputs : Inputs_intf) = struct
     ; snark_work_fee: Currency.Fee.t
     ; consensus_local_state: Consensus_mechanism.Local_state.t }
 
-  let peek_frontier frontier_mvar =
-    Mvar.peek frontier_mvar
+  let peek_frontier frontier_broadcast_pipe =
+    Broadcast_pipe.Reader.peek frontier_broadcast_pipe
     |> Result.of_option
          ~error:
            (Error.of_string
@@ -514,7 +517,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let best_tip_opt t =
     let open Option.Let_syntax in
-    let%map frontier = Mvar.peek t.transition_frontier in
+    let%map frontier = Broadcast_pipe.Reader.peek t.transition_frontier in
     Transition_frontier.best_tip frontier
 
   let best_staged_ledger_opt t =
@@ -673,9 +676,9 @@ module Make (Inputs : Inputs_intf) = struct
                  ~dest:ledger_db)
             ~consensus_local_state
         in
-        let frontier_mvar = Mvar.create () in
-        Mvar.set frontier_mvar transition_frontier ;
-        let frontier_read_ref = Mvar.read_only frontier_mvar in
+        let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
+          Broadcast_pipe.create (Some transition_frontier)
+        in
         let%bind net =
           Net.create config.net_config
             ~get_staged_ledger_aux_at_hash:(fun _hash ->
@@ -684,7 +687,7 @@ module Make (Inputs : Inputs_intf) = struct
               let open Or_error.Let_syntax in
               let result =
                 let ledger_hash, query = Envelope.Incoming.data query_env in
-                let%bind frontier = peek_frontier frontier_read_ref in
+                let%bind frontier = peek_frontier frontier_broadcast_pipe_r in
                 Sync_handler.answer_query ~frontier ledger_hash query
                   ~logger:config.log
                 |> Result.of_option
@@ -699,28 +702,28 @@ module Make (Inputs : Inputs_intf) = struct
               let open Deferred.Option.Let_syntax in
               let hash = Envelope.Incoming.data enveloped_hash in
               let%bind frontier =
-                Deferred.return @@ Mvar.peek frontier_read_ref
+                Deferred.return
+                @@ Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
               in
-              let%map breadcrumb =
-                Deferred.return @@ Transition_frontier.find frontier hash
-              in
-              Transition_frontier.path_map
-                ~f:(fun b ->
-                  Transition_frontier.Breadcrumb.transition_with_hash b
-                  |> With_hash.data |> External_transition.of_verified )
-                frontier breadcrumb )
+              Deferred.return @@ Sync_handler.transition_catchup ~frontier hash
+              )
             ~get_ancestry:(fun query_env ->
               let consensus_state = Envelope.Incoming.data query_env in
               let result =
                 let open Option.Let_syntax in
-                let%bind frontier = Mvar.peek frontier_read_ref in
+                let%bind frontier =
+                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                in
                 Root_prover.prove ~logger:config.log ~frontier consensus_state
               in
               Deferred.return result )
         in
         let valid_transitions =
           Transition_router.run ~logger:config.log ~network:net
-            ~time_controller:config.time_controller ~frontier_mvar ~ledger_db
+            ~time_controller:config.time_controller
+            ~frontier_broadcast_pipe:
+              (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
+            ~ledger_db
             ~network_transition_reader:
               (Strict_pipe.Reader.map external_transitions_reader
                  ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm) ))
@@ -765,7 +768,7 @@ module Make (Inputs : Inputs_intf) = struct
           ; net
           ; transaction_pool
           ; snark_pool
-          ; transition_frontier= frontier_read_ref
+          ; transition_frontier= frontier_broadcast_pipe_r
           ; time_controller= config.time_controller
           ; external_transitions_writer=
               Strict_pipe.Writer.to_linear_pipe external_transitions_writer

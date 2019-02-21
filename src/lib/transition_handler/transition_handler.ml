@@ -3,6 +3,7 @@ open Coda_base
 module Inputs = Inputs
 module Processor = Processor
 module Catchup_scheduler = Catchup_scheduler
+module Validator = Validator
 
 module Make (Inputs : Inputs.S) :
   Transition_handler_intf
