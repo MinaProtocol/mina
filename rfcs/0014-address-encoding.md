@@ -27,7 +27,9 @@ Additionally, quoting from the [Bitcoin Wiki](https://en.bitcoin.it/wiki/Base58C
 
 I recommend we follow the Bitcoin design, as laid out [here](https://en.bitcoin.it/wiki/Base58Check_encoding#Base58_symbol_chart).
 
-We should also add a unique prefix to prevent Coda from being accidentally sent to Bitcoin addresses or vice versa.
+We should also add a unique prefix to prevent Coda from being accidentally sent to Bitcoin addresses or vice versa. For example, we can add the following prefix before hashing:
+
+```hash addr = SHA256("Coda address " ^ addr)```
 
 ## Drawbacks
 [drawbacks]: #drawbacks
