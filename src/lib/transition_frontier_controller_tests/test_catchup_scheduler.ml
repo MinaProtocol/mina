@@ -132,10 +132,14 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           Catchup_scheduler.watch scheduler ~timeout_duration
             ~transition:dangling_transition ;
+          let result_ivar = Ivar.create () in
           Strict_pipe.Reader.iter_without_pushback catchup_job_reader
             ~f:(fun catchup_transition ->
-              assert (
-                State_hash.equal
-                  (With_hash.hash dangling_transition)
-                  (With_hash.hash catchup_transition) ) ) )
+              Ivar.fill result_ivar catchup_transition )
+          |> don't_wait_for ;
+          let%map catchup_transition = Ivar.read result_ivar in
+          assert (
+            State_hash.equal
+              (With_hash.hash dangling_transition)
+              (With_hash.hash catchup_transition) ) )
   end )
