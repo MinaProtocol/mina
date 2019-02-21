@@ -18,7 +18,7 @@ module Ledger_proof = Ledger_proof.Prod
 
 [%%else]
 
-(* TODO: proof_level=check *)
+(* TODO #1698: proof_level=check *)
 
 module Ledger_proof = struct
   module Statement = Transaction_snark.Statement
@@ -1010,7 +1010,7 @@ end
 
 [%%else]
 
-(* TODO: proof_level=check ledger proofs *)
+(* TODO #1698: proof_level=check ledger proofs *)
 module Make_coda (Init : Init_intf) = struct
   module Ledger_proof_verifier = struct
     let verify _ _ ~message:_ = return true
