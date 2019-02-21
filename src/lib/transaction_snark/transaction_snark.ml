@@ -256,7 +256,7 @@ module Base = struct
     let%bind pending_coinbase_root =
       let%bind _is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
       Pending_coinbase.Hash.update_stack pending_coinbase_root ~is_new_stack
-        ~f:(fun ~is_empty_or_writeable:_ stack ->
+        ~f:(fun stack ->
           (*Pending_coinbase.Stack.Checked.if_ is_coinbase ~then:(
               let%map coinbase = (sender_compressed, sender_delta ) in
               Pending_coinbase.Coinbase_stack.Checked.push_var stack coinbase)

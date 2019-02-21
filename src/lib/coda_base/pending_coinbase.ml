@@ -8,7 +8,7 @@ open Currency
 open Fold_lib
 open Snark_bits
 
-module Coinbase = struct
+module Coinbase_data = struct
   type t = Public_key.Compressed.t * Currency.Amount.t [@@deriving sexp]
 
   let of_coinbase (cb : Coinbase.t) : t Or_error.t =
@@ -109,10 +109,10 @@ module Stack = struct
   include Data_hash.Make_full_size ()
 
   let push_exn (h : t) cb : t =
-    match Coinbase.of_coinbase cb with
+    match Coinbase_data.of_coinbase cb with
     | Ok cb ->
         Pedersen.digest_fold Hash_prefix.coinbase_stack
-          Fold.(fold h +> Coinbase.fold cb)
+          Fold.(fold h +> Coinbase_data.fold cb)
         |> of_hash
     | Error e ->
         failwithf "Error adding a coinbase to the pending stack: %s"
@@ -239,8 +239,8 @@ module Hash = struct
     handle
       (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
          ~f:(fun stack ->
-           let%bind x = filter stack in
-           f x stack ))
+           let%bind () = filter stack in
+           f stack ))
       reraise_merkle_requests
     >>| var_of_hash_packed
 
@@ -259,17 +259,15 @@ module Hash = struct
         in
         let%bind new_stack = Boolean.(empty_stack && is_new_stack) in
         let%bind yes = Boolean.(new_stack || not empty_stack) in
-        let%bind () = Boolean.Assert.is_true yes in
-        return yes )
-      ~f:(fun is_empty_or_writeable x -> f ~is_empty_or_writeable x)
+        Boolean.(Assert.is_true yes) )
+      ~f:(fun x -> f x)
 
   let%snarkydef delete_stack t ~f =
     let filter stack =
       let%bind empty_stack =
         Stack.Checked.equal stack Stack.(var_of_t empty)
       in
-      let%bind () = Boolean.(Assert.is_true (not empty_stack)) in
-      return Boolean.(not empty_stack)
+      Boolean.(Assert.is_true (not empty_stack))
     in
     let%bind addr =
       request_witness Index.Unpacked.typ
@@ -278,8 +276,8 @@ module Hash = struct
     handle
       (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
          ~f:(fun stack ->
-           let%bind x = filter stack in
-           f x stack ))
+           let%bind () = filter stack in
+           f stack ))
       reraise_merkle_requests
     >>| var_of_hash_packed
 end
@@ -298,39 +296,49 @@ module T = struct
   [@@deriving sexp, bin_io]
 
   let create_exn () =
+    let init_hash = Coinbase_stack.hash Coinbase_stack.empty in
     let hash_on_level, root_hash =
       List.fold
-        (List.init coinbase_tree_depth ~f:Fn.id)
-        ~init:([(0, Hash.empty_hash)], Hash.empty_hash)
+        (List.init coinbase_tree_depth ~f:(fun i -> i + 1))
+        ~init:([(0, init_hash)], init_hash)
         ~f:(fun (hashes, cur_hash) height ->
-          let merge = Hash.merge ~height:(height + 1) cur_hash cur_hash in
-          ((height + 1, merge) :: hashes, merge) )
+          let merge = Hash.merge ~height:(height - 1) cur_hash cur_hash in
+          ((height, merge) :: hashes, merge) )
     in
+    (*Core.printf !"Depth:%d hashes: %{sexp: (int * Hash.t) list} \n" coinbase_tree_depth hash_on_level;*)
     let rec create_path height path key =
-      if height > coinbase_tree_depth then path
+      if height < 0 then path
       else
         let hash =
           Option.value_exn
             (List.Assoc.find ~equal:Int.equal hash_on_level height)
         in
-        create_path (height + 1)
+        create_path (height - 1)
           ((if key mod 2 = 0 then `Left hash else `Right hash) :: path)
           (key / 2)
     in
     let rec go t key =
-      if key >= Int.pow 2 coinbase_tree_depth then t
+      if key > Int.pow 2 coinbase_tree_depth then t
       else
-        let path = create_path 0 [] key in
+        let path = create_path (coinbase_tree_depth - 1) [] key in
+        (*List.iteri path 
+          ~f:(fun i dir ->
+            let dir, h = match dir with
+            | `Left h -> ("left "^Int.to_string i, h)
+            | `Right h -> ("right "^Int.to_string i, h) in
+            Core.printf !"%s %{sexp: Hash.t}\n"  dir h);*)
         go (Merkle_tree.add_path t path key Coinbase_stack.empty) (key + 1)
     in
-    go (Merkle_tree.of_hash ~depth:coinbase_tree_depth root_hash) 0
+    { tree= go (Merkle_tree.of_hash ~depth:coinbase_tree_depth root_hash) 0
+    ; index_list= []
+    ; new_index= 0 }
 
   let next_new_index t ~on_new_tree =
     if on_new_tree then
       let new_index =
         if t.new_index = coinbase_stacks then 0 else t.new_index + 1
       in
-      {t with index_list= new_index :: t.index_list; new_index}
+      {t with index_list= t.new_index :: t.index_list; new_index}
     else t
 
   let get_latest_stack t ~on_new_tree =
@@ -352,8 +360,8 @@ module T = struct
     | x :: xs -> (x, List.rev xs)
 
   let add_coinbase_exn t ~coinbase ~on_new_tree =
-    let current_stack = Option.value_exn (get_latest_stack t ~on_new_tree) in
-    let stack_index = Merkle_tree.find_index_exn t.tree current_stack in
+    let key = Option.value_exn (get_latest_stack t ~on_new_tree) in
+    let stack_index = Merkle_tree.find_index_exn t.tree key in
     let stack_before = Merkle_tree.get_exn t.tree stack_index in
     let stack_after = Coinbase_stack.push_exn stack_before coinbase in
     let t' = next_new_index t ~on_new_tree in
@@ -381,3 +389,21 @@ module T = struct
 end
 
 include T
+
+let%test_unit "add stack and remove stack = initial tree " =
+  let pending_coinbases = ref (create_exn ()) in
+  let coinbases_gen = List.gen_with_length 100 Coinbase.gen in
+  Quickcheck.test coinbases_gen ~trials:10 ~f:(fun cbs ->
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let is_new = ref true in
+          let init = merkle_root !pending_coinbases in
+          let after_adding =
+            List.fold cbs ~init:!pending_coinbases ~f:(fun acc coinbase ->
+                let t = add_coinbase_exn acc ~coinbase ~on_new_tree:!is_new in
+                is_new := false ;
+                t )
+          in
+          let after_del = remove_coinbase_stack_exn after_adding in
+          pending_coinbases := after_del ;
+          assert (Hash.equal (merkle_root after_del) init) ;
+          Async.Deferred.return () ) )
