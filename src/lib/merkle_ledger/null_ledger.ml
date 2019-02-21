@@ -131,6 +131,9 @@ end = struct
   let set_all_accounts_rooted_at_exn _t =
     failwith "set_all_accounts_rooted_at_exn: null ledgers cannot be mutated"
 
+  let set_batch_accounts _t =
+    failwith "set_batch_accounts: null ledgers cannot be mutated"
+
   let set_inner_hash_at_addr_exn _t =
     failwith "set_inner_hash_at_addr_exn: null ledgers cannot be mutated"
 

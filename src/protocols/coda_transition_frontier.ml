@@ -4,18 +4,15 @@ open Pipe_lib.Strict_pipe
 
 module Transition_frontier_diff = struct
   type 'a t =
-    | Extend_best_tip of 'a
-        (** Added a node to the existing best tip without creating a new root *)
-    | New_best_tip of {old_best_tip: 'a; new_best_tip: 'a}
-        (** Added a node to the a new best tip without creating a new root *)
-    | New_root of
+    | New_breadcrumb of 'a
+        (** Triggered when a new breadcrumb is added without changing the root or best_tip *)
+    | New_best_tip of
         { old_root: 'a
-        ; new_root: 'a
-        ; added: 'a
-        ; garbage: 'a list
-        ; old_best_tip: 'a option }
-        (** If triggered by a new best tip, the old one will be in old_best_tip *)
-    | Destroy  (** transition_frontier was destroyed *)
+        ; new_root: 'a  (** Same as old root if the root doesn't change *)
+        ; new_best_tip: 'a
+        ; old_best_tip: 'a
+        ; garbage: 'a list }
+        (** Triggered when a new breadcrumb is added, causing a new best_tip *)
   [@@deriving sexp]
 end
 
@@ -57,7 +54,7 @@ module type Network_intf = sig
        t
     -> peer
     -> state_hash
-    -> external_transition list option Deferred.Or_error.t
+    -> external_transition Non_empty_list.t option Deferred.Or_error.t
 
   val get_ancestry :
        t
@@ -333,6 +330,10 @@ module type Sync_handler_intf = sig
 
   type transition_frontier
 
+  type state_hash
+
+  type external_transition
+
   type syncable_ledger_query
 
   type syncable_ledger_answer
@@ -343,6 +344,11 @@ module type Sync_handler_intf = sig
     -> syncable_ledger_query
     -> logger:Logger.t
     -> (ledger_hash * syncable_ledger_answer) option
+
+  val transition_catchup :
+       frontier:transition_frontier
+    -> state_hash
+    -> external_transition Non_empty_list.t option
 end
 
 module type Root_prover_intf = sig
@@ -499,7 +505,10 @@ module type Transition_router_intf = sig
        logger:Logger.t
     -> network:network
     -> time_controller:time_controller
-    -> frontier_mvar:transition_frontier Mvar.Read_write.t
+    -> frontier_broadcast_pipe:transition_frontier option
+                               Pipe_lib.Broadcast_pipe.Reader.t
+                               * transition_frontier option
+                                 Pipe_lib.Broadcast_pipe.Writer.t
     -> ledger_db:ledger_db
     -> network_transition_reader:( [ `Transition of external_transition
                                                     Envelope.Incoming.t ]

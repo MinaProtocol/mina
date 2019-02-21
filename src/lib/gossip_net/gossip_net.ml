@@ -32,7 +32,7 @@ module type Config_intf = sig
     ; me: Peer.t
     ; conf_dir: string
     ; parent_log: Logger.t
-    ; banlist: Coda_base.Banlist.t }
+    ; trust_system: Coda_base.Trust_system.t }
   [@@deriving make]
 end
 
@@ -94,7 +94,7 @@ module Make (Message : Message_intf) :
       ; me: Peer.t
       ; conf_dir: string
       ; parent_log: Logger.t
-      ; banlist: Coda_base.Banlist.t }
+      ; trust_system: Coda_base.Trust_system.t }
     [@@deriving make]
   end
 
@@ -145,7 +145,7 @@ module Make (Message : Message_intf) :
             trace_task "membership" (fun () ->
                 Membership.connect ~initial_peers:config.initial_peers
                   ~me:config.me ~conf_dir:config.conf_dir ~parent_log:log
-                  ~banlist:config.banlist )
+                  ~trust_system:config.trust_system )
           with
           | Ok membership -> membership
           | Error e ->

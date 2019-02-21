@@ -272,7 +272,7 @@ module Make (Inputs : Inputs_intf) :
         let module Breadcrumb = Transition_frontier.Breadcrumb in
         let propose ivar proposal_data =
           let open Interruptible.Let_syntax in
-          match Mvar.peek frontier_reader with
+          match Broadcast_pipe.Reader.peek frontier_reader with
           | None -> Interruptible.return (log_bootstrap_mode ())
           | Some frontier -> (
               let crumb = Transition_frontier.best_tip frontier in
@@ -346,7 +346,7 @@ module Make (Inputs : Inputs_intf) :
         let scheduler = Singleton_scheduler.create time_controller in
         let rec check_for_proposal () =
           trace_recurring_task "check for proposal" (fun () ->
-              match Mvar.peek frontier_reader with
+              match Broadcast_pipe.Reader.peek frontier_reader with
               | None -> log_bootstrap_mode ()
               | Some transition_frontier -> (
                   let breadcrumb =
