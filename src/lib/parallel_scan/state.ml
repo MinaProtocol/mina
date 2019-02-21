@@ -12,8 +12,17 @@ module Job = struct
     | Bcomp of ('a * 'a * sequence_no)
   [@@deriving sexp, bin_io]
 
-  type ('a, 'd) t = Merge of 'a merge | Base of ('d * sequence_no) option
-  [@@deriving sexp, bin_io]
+  module Stable = struct
+    module V1 = struct
+      (* don't use version number and module registration here, because of type parameters *)
+      type ('a, 'd) t = Merge of 'a merge | Base of ('d * sequence_no) option
+      [@@deriving sexp, bin_io]
+    end
+
+    module Latest = V1
+  end
+
+  include Stable.Latest
 
   let gen a_gen d_gen =
     let open Quickcheck.Generator in
@@ -41,18 +50,27 @@ module Completed_job = struct
   type 'a t = Lifted of 'a | Merged of 'a [@@deriving bin_io, sexp]
 end
 
-type ('a, 'd) t =
-  { jobs: ('a, 'd) Job.t Ring_buffer.t
-  ; level_pointer: int Array.t
-  ; capacity: int
-  ; mutable acc: int * ('a * 'd list) option
-  ; mutable current_data_length: int
-  ; mutable base_none_pos: int option
-  ; mutable recent_tree_data: 'd list sexp_opaque
-  ; mutable other_trees_data: 'd list list sexp_opaque
-  ; stateful_work_order: int Queue.t
-  ; mutable curr_job_seq_no: int }
-[@@deriving sexp, bin_io]
+module Stable = struct
+  module V1 = struct
+    (* don't use version number and module registration here, because of type parameters *)
+    type ('a, 'd) t =
+      { jobs: ('a, 'd) Job.t Ring_buffer.t
+      ; level_pointer: int Array.t
+      ; capacity: int
+      ; mutable acc: int * ('a * 'd list) option
+      ; mutable current_data_length: int
+      ; mutable base_none_pos: int option
+      ; mutable recent_tree_data: 'd list sexp_opaque
+      ; mutable other_trees_data: 'd list list sexp_opaque
+      ; stateful_work_order: int Queue.t
+      ; mutable curr_job_seq_no: int }
+    [@@deriving sexp, bin_io]
+  end
+
+  module Latest = V1
+end
+
+include Stable.Latest
 
 module Hash = struct
   type t = Digestif.SHA256.t
