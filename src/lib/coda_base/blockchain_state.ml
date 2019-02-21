@@ -58,7 +58,9 @@ module type S = sig
 
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
-  val to_string_record : value -> string
+  type display = (string, string, string) t_ [@@deriving yojson]
+
+  val display : value -> display
 
   module Message :
     Signature_lib.Checked.Message_intf
@@ -94,7 +96,7 @@ end) : S = struct
           { staged_ledger_hash: 'staged_ledger_hash
           ; snarked_ledger_hash: 'snarked_ledger_hash
           ; timestamp: 'time }
-        [@@deriving bin_io, sexp, fields, eq, compare, hash]
+        [@@deriving bin_io, sexp, fields, eq, compare, hash, yojson]
 
         type t =
           ( Staged_ledger_hash.Stable.V1.t
@@ -185,13 +187,17 @@ end) : S = struct
       (value : t) =
     value |> [%sexp_of: M.t] |> Sexp.to_string |> prefix_string
 
-  let to_string_record t =
-    Printf.sprintf "staged_ledger_hash:%s|snarked_ledger_hash:%s|timestamp:%s"
-      ( display_field (module Ledger_hash)
-      @@ Staged_ledger_hash.ledger_hash t.staged_ledger_hash )
-      (display_field (module Frozen_ledger_hash) t.snarked_ledger_hash)
-      (Time.to_string_trimmed ~zone:Time.Zone.utc
-         (Block_time.to_time t.timestamp))
+  type display = (string, string, string) t_ [@@deriving yojson]
+
+  let display {staged_ledger_hash; snarked_ledger_hash; timestamp} =
+    { staged_ledger_hash=
+        display_field (module Ledger_hash)
+        @@ Staged_ledger_hash.ledger_hash staged_ledger_hash
+    ; snarked_ledger_hash=
+        display_field (module Frozen_ledger_hash) snarked_ledger_hash
+    ; timestamp=
+        Time.to_string_trimmed ~zone:Time.Zone.utc
+          (Block_time.to_time timestamp) }
 
   module Message = struct
     open Tick

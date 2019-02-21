@@ -290,6 +290,27 @@ module Make (Inputs : Inputs_intf) :
     List.bind (successors t breadcrumb) ~f:(fun succ ->
         succ :: successors_rec t succ )
 
+  let rec to_dot (json : Yojson.Safe.json) =
+    match json with
+    | `Int value -> Int.to_string value
+    | `String value | `Intlit value -> value
+    | `Assoc values ->
+        List.map values ~f:(fun (key, value) ->
+            match value with
+            | `Assoc subvalues ->
+                sprintf !"{%s|{%s}}" key @@ to_dot (`Assoc subvalues)
+            | subvalue -> sprintf !"%s:%s" key (to_dot subvalue) )
+        |> String.concat ~sep:"|"
+    | `List values | `Tuple values ->
+        List.map values ~f:(fun value -> to_dot value)
+        |> String.concat ~sep:"|"
+    | `Float value -> Float.to_string value
+    | `Bool value -> Bool.to_string value
+    | `Variant (key, value) ->
+        Option.value_map value ~default:key ~f:(fun some_value ->
+            sprintf !"%s:%s" key (to_dot some_value) )
+    | `Null -> "null"
+
   (* Visualize the structure of the transition frontier or a particular node
    * within the frontier (for debugging purposes). *)
   module Visualizor = struct
@@ -307,12 +328,13 @@ module Make (Inputs : Inputs_intf) :
     include Graph.Graphviz.Dot (struct
       include G
 
-      type visual =
+      type display =
         { length: int
         ; state_hash: string
-        ; blockchain_state: string
-        ; consensus_state: string }
-      [@@deriving fields]
+        ; blockchain_state:
+            Inputs.External_transition.Protocol_state.Blockchain_state.display
+        ; consensus_state: Consensus.Consensus_state.display }
+      [@@deriving fields, yojson]
 
       let graph_attributes _ = [`Rankdir `LeftToRight]
 
@@ -325,37 +347,21 @@ module Make (Inputs : Inputs_intf) :
         |> [%sexp_of: State_hash.t] |> Sexp.to_string
         |> display_prefix_of_string
 
-      let to_visual (node : Node.t) =
+      let display (node : Node.t) =
         let state_hash = Breadcrumb.state_hash node.breadcrumb in
         let blockchain_state =
           Breadcrumb.blockchain_state node.breadcrumb
-          |> Inputs.External_transition.Protocol_state.Blockchain_state
-             .to_string_record
+          |> Inputs.External_transition.Protocol_state.Blockchain_state.display
         in
         let consensus_state = Breadcrumb.consensus_state node.breadcrumb in
         { state_hash= display_field (module State_hash) state_hash
         ; blockchain_state
         ; length= node.length
-        ; consensus_state=
-            Consensus.Consensus_state.to_string_record consensus_state }
+        ; consensus_state= Consensus.Consensus_state.display consensus_state }
 
       let vertex_attributes breadcrumb =
-        let visual = to_visual breadcrumb in
-        let write_field ~f field =
-          sprintf !"%s:%s" (Field.name field) @@ f @@ Field.get field visual
-        in
-        let write_string_field = write_field ~f:Fn.id in
-        let write_object field =
-          sprintf !"{%s|{%s}}" (Field.name field) @@ Field.get field visual
-        in
-        let fields =
-          Fields_of_visual.to_list ~state_hash:write_string_field
-            ~blockchain_state:write_object
-            ~length:(write_field ~f:Int.to_string)
-            ~consensus_state:write_object
-          |> String.concat ~sep:"|"
-        in
-        [`Label fields]
+        let dot_format = to_dot @@ display_to_yojson (display breadcrumb) in
+        [`Label dot_format]
 
       let default_edge_attributes _ = []
 
