@@ -83,6 +83,14 @@ module Make (Inputs : Inputs.S) = struct
     ; parent_root_timeouts
     ; breadcrumb_builder_supervisor }
 
+  let mem t transition =
+    let parent_hash =
+      With_hash.data transition |> External_transition.Verified.protocol_state
+      |> Protocol_state.previous_state_hash
+    in
+    if Hashtbl.mem t.collected_transitions parent_hash then true
+    else Hashtbl.mem t.parent_root_timeouts parent_hash
+
   let cancel_timeout t hash =
     let remaining_time =
       Option.map
