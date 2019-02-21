@@ -192,6 +192,13 @@ embrace this discipline fully will take some effort.
 We can make awareness of the existing recommendation, or the extended
 discipline suggested here a checklist item for Github pull requests.
 
+### Type parameters
+
+The mechanism described here does not handle the case where a module type
+has parameters. Jane Street's Monad module allows using types with up to 
+five parameters through use of functors. Their approach could be used to guide 
+an implementation for module versioning.
+
 ## Drawbacks
 
 We may not need the versioning for `sexp` and `yojson`, if these representations
