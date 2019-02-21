@@ -1,7 +1,9 @@
 [%%import "config/ledger_depth/full.mlh"]
 [%%import "config/coinbase/standard.mlh"]
 [%%import "config/consensus/postake_tiny.mlh"]
-[%%import "config/debug_level/logs.mlh"]
+[%%import "config/debug_level/some.mlh"]
+
+[%%define fake_hash false]
 
 [%%define genesis_ledger "test"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]

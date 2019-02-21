@@ -1,6 +1,7 @@
 open Core
 open Async
 open Protocols.Coda_transition_frontier
+open Cache_lib
 open Pipe_lib
 open Coda_base
 
@@ -8,6 +9,8 @@ module Make (Inputs : Inputs.S) :
   Catchup_intf
   with type external_transition_verified :=
               Inputs.External_transition.Verified.t
+   and type unprocessed_transition_cache :=
+              Inputs.Unprocessed_transition_cache.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
               Inputs.Transition_frontier.Breadcrumb.t
@@ -25,33 +28,50 @@ module Make (Inputs : Inputs.S) :
   of external transitions when trying to build breadcrumb_path. Therefore, this 
   function needs to return a Deferred *)
   let construct_breadcrumb_path ~logger initial_staged_ledger
-      external_transitions =
+      cached_external_transitions =
     let open Deferred.Or_error.Let_syntax in
-    let%map _, breadcrumbs =
-      fold_result_seq external_transitions ~init:(initial_staged_ledger, [])
-        ~f:(fun (staged_ledger, acc) external_transition ->
-          let diff =
-            External_transition.Verified.staged_ledger_diff
-              (With_hash.data external_transition)
+    let%map _, cached_breadcrumbs =
+      fold_result_seq cached_external_transitions
+        ~init:(initial_staged_ledger, [])
+        ~f:(fun (staged_ledger, prev_breadcrumbs) cached_external_transition ->
+          let open Deferred.Let_syntax in
+          let%map cached_result =
+            Cached.transform cached_external_transition
+              ~f:(fun external_transition ->
+                let open Deferred.Or_error.Let_syntax in
+                let diff =
+                  External_transition.Verified.staged_ledger_diff
+                    (With_hash.data external_transition)
+                in
+                let%map _, `Ledger_proof _res_opt, `Staged_ledger staged_ledger
+                    =
+                  let open Deferred.Let_syntax in
+                  match%map Staged_ledger.apply ~logger staged_ledger diff with
+                  | Ok x -> Ok x
+                  | Error e ->
+                      Error (Staged_ledger.Staged_ledger_error.to_error e)
+                in
+                let new_breadcrumb =
+                  Transition_frontier.Breadcrumb.create external_transition
+                    staged_ledger
+                in
+                (staged_ledger, new_breadcrumb) )
+            |> Cached.lift_deferred
           in
-          let%map _, `Ledger_proof _res_opt, `Staged_ledger staged_ledger =
-            let open Deferred.Let_syntax in
-            match%map Staged_ledger.apply ~logger staged_ledger diff with
-            | Ok x -> Ok x
-            | Error e -> Error (Staged_ledger.Staged_ledger_error.to_error e)
+          let open Or_error.Let_syntax in
+          let%map cached = Cached.lift_result cached_result in
+          let staged_ledger, _ = Cached.peek cached in
+          let cached_breadcrumb =
+            Cached.transform cached ~f:(fun (_, breadcrumb) -> breadcrumb)
           in
-          let new_breadcrumb =
-            Transition_frontier.Breadcrumb.create external_transition
-              staged_ledger
-          in
-          (staged_ledger, new_breadcrumb :: acc) )
+          (staged_ledger, cached_breadcrumb :: prev_breadcrumbs) )
     in
-    List.rev breadcrumbs
+    List.rev cached_breadcrumbs
 
   let materialize_breadcrumbs ~frontier ~logger ~peer external_transitions =
     let root_transition = List.hd_exn external_transitions in
     let initial_state_hash =
-      With_hash.data root_transition
+      With_hash.data (Cached.peek root_transition)
       |> External_transition.Verified.protocol_state
       |> External_transition.Protocol_state.previous_state_hash
     in
@@ -73,7 +93,7 @@ module Make (Inputs : Inputs.S) :
           external_transitions
 
   let get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
-      ~num_peers hash =
+      ~num_peers ~unprocessed_transition_cache hash =
     let peers = Network.random_peers network num_peers in
     let open Deferred.Or_error.Let_syntax in
     Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
@@ -121,13 +141,20 @@ module Make (Inputs : Inputs.S) :
                     let%map () =
                       Deferred.return
                       @@ Transition_handler_validator.validate_transition
-                           ~logger ~frontier verified_transition_with_hash
+                           ~logger ~frontier ~unprocessed_transition_cache
+                           verified_transition_with_hash
                     in
                     verified_transition_with_hash
                   in
                   let open Deferred.Let_syntax in
                   match%map verified_transition with
-                  | Ok verified_transition -> Ok (Some verified_transition)
+                  | Ok verified_transition ->
+                      let open Or_error.Let_syntax in
+                      let%map cached =
+                        Unprocessed_transition_cache.register
+                          unprocessed_transition_cache verified_transition
+                      in
+                      Some cached
                   | Error `Duplicate ->
                       Logger.info logger
                         !"transition queried during ledger catchup has \
@@ -144,12 +171,12 @@ module Make (Inputs : Inputs.S) :
               queried_transitions_verified )
 
   let run ~logger ~network ~frontier ~catchup_job_reader
-      ~catchup_breadcrumbs_writer =
+      ~catchup_breadcrumbs_writer ~unprocessed_transition_cache =
     Strict_pipe.Reader.iter catchup_job_reader ~f:(fun transition_with_hash ->
-        let hash = With_hash.hash transition_with_hash in
+        let hash = With_hash.hash (Cached.peek transition_with_hash) in
         match%bind
           get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
-            ~num_peers:8 hash
+            ~num_peers:8 ~unprocessed_transition_cache hash
         with
         | Ok breadcrumbs ->
             Strict_pipe.Writer.write catchup_breadcrumbs_writer

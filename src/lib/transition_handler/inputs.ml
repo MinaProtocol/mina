@@ -22,3 +22,17 @@ module type S = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type consensus_local_state := Consensus.Local_state.t
 end
+
+module With_unprocessed_transition_cache = struct
+  module type S = sig
+    include S
+
+    module Unprocessed_transition_cache :
+      Cache_lib.Intf.Transmuter_cache.S
+      with module Cached := Cache_lib.Cached
+       and module Cache := Cache_lib.Cache
+       and type source =
+                  (External_transition.Verified.t, State_hash.t) With_hash.t
+       and type target = State_hash.t
+  end
+end

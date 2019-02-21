@@ -47,16 +47,55 @@ include Make_ops (struct
   module List = List
 end)
 
-module Deferred = Make_ops (struct
-  open Async_kernel
+module Deferred = struct
+  include Make_ops (struct
+    open Async_kernel
 
-  include (Deferred : Monad.S with type +'a t = 'a Deferred.t)
+    include (Deferred : Monad.S with type +'a t = 'a Deferred.t)
+
+    module List = struct
+      open Deferred.List
+
+      let iter ls ~f = iter ~how:`Sequential ls ~f
+
+      let map ls ~f = map ~how:`Sequential ls ~f
+    end
+  end)
+
+  module Or_error = Make_ops (struct
+    open Async_kernel
+
+    include (
+      Deferred.Or_error : Monad.S with type +'a t = 'a Deferred.Or_error.t )
+
+    module List = struct
+      open Deferred.Or_error.List
+
+      let iter ls ~f = iter ~how:`Sequential ls ~f
+
+      let map ls ~f = map ~how:`Sequential ls ~f
+    end
+  end)
+end
+
+module Or_error = Make_ops (struct
+  include Or_error
 
   module List = struct
-    open Deferred.List
+    open Or_error.Let_syntax
 
-    let iter ls ~f = iter ~how:`Sequential ls ~f
+    let iter ls ~f =
+      List.fold_left ls ~init:(return ()) ~f:(fun or_error x ->
+          let%bind () = or_error in
+          f x )
 
-    let map ls ~f = map ~how:`Sequential ls ~f
+    let map ls ~f =
+      let%map ls' =
+        List.fold_left ls ~init:(return []) ~f:(fun or_error x ->
+            let%bind t = or_error in
+            let%map x' = f x in
+            x' :: t )
+      in
+      List.rev ls'
   end
 end)

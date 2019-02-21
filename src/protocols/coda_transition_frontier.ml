@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Pipe_lib.Strict_pipe
+open Cache_lib
 
 module type Network_intf = sig
   type t
@@ -151,6 +152,8 @@ module type Catchup_intf = sig
 
   type external_transition_verified
 
+  type unprocessed_transition_cache
+
   type transition_frontier
 
   type transition_frontier_breadcrumb
@@ -161,15 +164,21 @@ module type Catchup_intf = sig
        logger:Logger.t
     -> network:network
     -> frontier:transition_frontier
-    -> catchup_job_reader:( external_transition_verified
+    -> catchup_job_reader:( ( external_transition_verified
+                            , state_hash )
+                            With_hash.t
                           , state_hash )
-                          With_hash.t
+                          Cached.t
                           Reader.t
-    -> catchup_breadcrumbs_writer:( transition_frontier_breadcrumb Rose_tree.t
+    -> catchup_breadcrumbs_writer:( ( transition_frontier_breadcrumb
+                                    , state_hash )
+                                    Cached.t
+                                    Rose_tree.t
                                     list
                                   , synchronous
                                   , unit Deferred.t )
                                   Writer.t
+    -> unprocessed_transition_cache:unprocessed_transition_cache
     -> unit
 end
 
@@ -179,6 +188,8 @@ module type Transition_handler_validator_intf = sig
   type state_hash
 
   type external_transition_verified
+
+  type unprocessed_transition_cache
 
   type transition_frontier
 
@@ -191,17 +202,21 @@ module type Transition_handler_validator_intf = sig
                                             Envelope.Incoming.t ]
                          * [`Time_received of time] )
                          Reader.t
-    -> valid_transition_writer:( ( external_transition_verified
+    -> valid_transition_writer:( ( ( external_transition_verified
+                                   , state_hash )
+                                   With_hash.t
                                  , state_hash )
-                                 With_hash.t
+                                 Cached.t
                                , drop_head buffered
                                , unit )
                                Writer.t
+    -> unprocessed_transition_cache:unprocessed_transition_cache
     -> unit
 
   val validate_transition :
        logger:Logger.t
     -> frontier:transition_frontier
+    -> unprocessed_transition_cache:unprocessed_transition_cache
     -> (external_transition_verified, state_hash) With_hash.t
     -> (unit, [`Duplicate | `Invalid of string]) Result.t
 end
@@ -213,6 +228,8 @@ module type Transition_handler_processor_intf = sig
 
   type external_transition_verified
 
+  type unprocessed_transition_cache
+
   type transition_frontier
 
   type transition_frontier_breadcrumb
@@ -221,24 +238,34 @@ module type Transition_handler_processor_intf = sig
        logger:Logger.t
     -> time_controller:time_controller
     -> frontier:transition_frontier
-    -> primary_transition_reader:( external_transition_verified
+    -> primary_transition_reader:( ( external_transition_verified
+                                   , state_hash )
+                                   With_hash.t
                                  , state_hash )
-                                 With_hash.t
+                                 Cached.t
                                  Reader.t
     -> proposer_transition_reader:( external_transition_verified
                                   , state_hash )
                                   With_hash.t
                                   Reader.t
-    -> catchup_job_writer:( ( external_transition_verified
+    -> catchup_job_writer:( ( ( external_transition_verified
+                              , state_hash )
+                              With_hash.t
                             , state_hash )
-                            With_hash.t
+                            Cached.t
                           , synchronous
                           , unit Deferred.t )
                           Writer.t
-    -> catchup_breadcrumbs_reader:transition_frontier_breadcrumb Rose_tree.t
+    -> catchup_breadcrumbs_reader:( transition_frontier_breadcrumb
+                                  , state_hash )
+                                  Cached.t
+                                  Rose_tree.t
                                   list
                                   Reader.t
-    -> catchup_breadcrumbs_writer:( transition_frontier_breadcrumb Rose_tree.t
+    -> catchup_breadcrumbs_writer:( ( transition_frontier_breadcrumb
+                                    , state_hash )
+                                    Cached.t
+                                    Rose_tree.t
                                     list
                                   , synchronous
                                   , unit Deferred.t )
@@ -249,7 +276,26 @@ module type Transition_handler_processor_intf = sig
                                    , drop_head buffered
                                    , unit )
                                    Writer.t
+    -> unprocessed_transition_cache:unprocessed_transition_cache
     -> unit
+end
+
+module type Unprocessed_transition_cache_intf = sig
+  type state_hash
+
+  type external_transition_verified
+
+  type t
+
+  val create : logger:Logger.t -> t
+
+  val register :
+       t
+    -> (external_transition_verified, state_hash) With_hash.t
+    -> ( (external_transition_verified, state_hash) With_hash.t
+       , state_hash )
+       Cached.t
+       Or_error.t
 end
 
 module type Transition_handler_intf = sig
@@ -267,11 +313,17 @@ module type Transition_handler_intf = sig
 
   type transition_frontier_breadcrumb
 
+  module Unprocessed_transition_cache :
+    Unprocessed_transition_cache_intf
+    with type state_hash := state_hash
+     and type external_transition_verified := external_transition_verified
+
   module Validator :
     Transition_handler_validator_intf
     with type time := time
      and type state_hash := state_hash
      and type external_transition_verified := external_transition_verified
+     and type unprocessed_transition_cache := Unprocessed_transition_cache.t
      and type transition_frontier := transition_frontier
      and type staged_ledger := staged_ledger
 
@@ -280,6 +332,7 @@ module type Transition_handler_intf = sig
     with type time_controller := time_controller
      and type external_transition_verified := external_transition_verified
      and type state_hash := state_hash
+     and type unprocessed_transition_cache := Unprocessed_transition_cache.t
      and type transition_frontier := transition_frontier
      and type transition_frontier_breadcrumb := transition_frontier_breadcrumb
 end
