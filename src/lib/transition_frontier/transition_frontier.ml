@@ -116,28 +116,24 @@ module Make (Inputs : Inputs_intf) :
     let create () = {snark_pool_refcount= Snark_pool_refcount.create ()}
 
     type writers =
-      { snark_pool:
-          ( Snark_pool_refcount.view
-          , Strict_pipe.crash Strict_pipe.buffered
-          , unit )
-          Strict_pipe.Writer.t }
+      {snark_pool: Snark_pool_refcount.view Broadcast_pipe.Writer.t}
 
-    type readers = {snark_pool: unit Strict_pipe.Reader.t}
+    type readers =
+      {snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t}
 
     let make_pipes () : readers * writers =
       let snark_reader, snark_writer =
-        Strict_pipe.create
-        @@ Strict_pipe.Buffered (`Capacity 3, `Overflow Strict_pipe.Crash)
+        Broadcast_pipe.create Snark_pool_refcount.initial_view
       in
       ({snark_pool= snark_reader}, {snark_pool= snark_writer})
 
     let close_pipes ({snark_pool} : writers) =
-      Strict_pipe.Writer.close snark_pool
+      Broadcast_pipe.Writer.close snark_pool
 
     let mb_write_to_pipe diff ext_t handle pipe =
       match handle ext_t diff with
-      | None -> ()
-      | Some new_view -> Strict_pipe.Writer.write pipe new_view
+      | None -> Deferred.unit
+      | Some new_view -> Broadcast_pipe.Writer.write pipe new_view
 
     let handle_diff t (pipes : writers) diff =
       mb_write_to_pipe diff t.snark_pool_refcount

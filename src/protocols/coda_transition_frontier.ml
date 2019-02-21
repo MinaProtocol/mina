@@ -1,6 +1,6 @@
 open Core_kernel
 open Async_kernel
-open Pipe_lib.Strict_pipe
+open Pipe_lib
 
 module Transition_frontier_diff = struct
   type 'a t =
@@ -31,6 +31,9 @@ module type Transition_frontier_extension_intf = sig
   type view
 
   val create : input -> t
+
+  val initial_view : view
+  (** The first view that is ever available. *)
 
   val handle_diff :
        t
@@ -190,14 +193,18 @@ module type Transition_frontier_intf = sig
 
   val iter : t -> f:(Breadcrumb.t -> unit) -> unit
 
-  val add_breadcrumb_exn : t -> Breadcrumb.t -> unit
+  val add_breadcrumb_exn : t -> Breadcrumb.t -> unit Deferred.t
 
   val best_tip_path_length_exn : t -> int
 
   val shallow_copy_root_snarked_ledger : t -> masked_ledger
 
   module Extensions : sig
-    type readers = {snark_pool: unit Reader.t}
+    module Snark_pool_refcount :
+      Transition_frontier_extension_intf with type view = unit
+
+    type readers =
+      {snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t}
   end
 
   val extension_pipes : t -> Extensions.readers
@@ -225,12 +232,12 @@ module type Catchup_intf = sig
     -> catchup_job_reader:( external_transition_verified
                           , state_hash )
                           With_hash.t
-                          Reader.t
+                          Strict_pipe.Reader.t
     -> catchup_breadcrumbs_writer:( transition_frontier_breadcrumb Rose_tree.t
                                     list
-                                  , synchronous
+                                  , Strict_pipe.synchronous
                                   , unit Deferred.t )
-                                  Writer.t
+                                  Strict_pipe.Writer.t
     -> unit
 end
 
@@ -251,13 +258,13 @@ module type Transition_handler_validator_intf = sig
     -> transition_reader:( [ `Transition of external_transition_verified
                                             Envelope.Incoming.t ]
                          * [`Time_received of time] )
-                         Reader.t
+                         Strict_pipe.Reader.t
     -> valid_transition_writer:( ( external_transition_verified
                                  , state_hash )
                                  With_hash.t
-                               , drop_head buffered
+                               , Strict_pipe.drop_head Strict_pipe.buffered
                                , unit )
-                               Writer.t
+                               Strict_pipe.Writer.t
     -> unit
 
   val validate_transition :
@@ -285,31 +292,31 @@ module type Transition_handler_processor_intf = sig
     -> primary_transition_reader:( external_transition_verified
                                  , state_hash )
                                  With_hash.t
-                                 Reader.t
+                                 Strict_pipe.Reader.t
     -> proposer_transition_reader:( external_transition_verified
                                   , state_hash )
                                   With_hash.t
-                                  Reader.t
+                                  Strict_pipe.Reader.t
     -> catchup_job_writer:( ( external_transition_verified
                             , state_hash )
                             With_hash.t
-                          , synchronous
+                          , Strict_pipe.synchronous
                           , unit Deferred.t )
-                          Writer.t
+                          Strict_pipe.Writer.t
     -> catchup_breadcrumbs_reader:transition_frontier_breadcrumb Rose_tree.t
                                   list
-                                  Reader.t
+                                  Strict_pipe.Reader.t
     -> catchup_breadcrumbs_writer:( transition_frontier_breadcrumb Rose_tree.t
                                     list
-                                  , synchronous
+                                  , Strict_pipe.synchronous
                                   , unit Deferred.t )
-                                  Writer.t
+                                  Strict_pipe.Writer.t
     -> processed_transition_writer:( ( external_transition_verified
                                      , state_hash )
                                      With_hash.t
-                                   , drop_head buffered
+                                   , Strict_pipe.drop_head Strict_pipe.buffered
                                    , unit )
-                                   Writer.t
+                                   Strict_pipe.Writer.t
     -> unit
 end
 
@@ -421,7 +428,7 @@ module type Bootstrap_controller_intf = sig
     -> transition_reader:( [< `Transition of external_transition_verified
                                              Envelope.Incoming.t ]
                          * [< `Time_received of int64] )
-                         Reader.t
+                         Strict_pipe.Reader.t
     -> (transition_frontier * external_transition_verified list) Deferred.t
 end
 
@@ -450,13 +457,14 @@ module type Transition_frontier_controller_intf = sig
     -> network_transition_reader:( [ `Transition of external_transition_verified
                                                     Envelope.Incoming.t ]
                                  * [`Time_received of time] )
-                                 Reader.t
+                                 Strict_pipe.Reader.t
     -> proposer_transition_reader:( external_transition_verified
                                   , state_hash )
                                   With_hash.t
-                                  Reader.t
-    -> clear_reader:[`Clear] Reader.t
-    -> (external_transition_verified, state_hash) With_hash.t Reader.t
+                                  Strict_pipe.Reader.t
+    -> clear_reader:[`Clear] Strict_pipe.Reader.t
+    -> (external_transition_verified, state_hash) With_hash.t
+       Strict_pipe.Reader.t
 end
 
 module type Protocol_state_validator_intf = sig
@@ -494,13 +502,13 @@ module type Initial_validator_intf = sig
     -> transition_reader:( [ `Transition of external_transition
                                             Envelope.Incoming.t ]
                          * [`Time_received of time] )
-                         Reader.t
+                         Strict_pipe.Reader.t
     -> valid_transition_writer:( [ `Transition of external_transition_verified
                                                   Envelope.Incoming.t ]
                                  * [`Time_received of time]
-                               , drop_head buffered
+                               , Strict_pipe.drop_head Strict_pipe.buffered
                                , unit )
-                               Writer.t
+                               Strict_pipe.Writer.t
     -> unit
 end
 
@@ -533,10 +541,11 @@ module type Transition_router_intf = sig
     -> network_transition_reader:( [ `Transition of external_transition
                                                     Envelope.Incoming.t ]
                                  * [`Time_received of time] )
-                                 Reader.t
+                                 Strict_pipe.Reader.t
     -> proposer_transition_reader:( external_transition_verified
                                   , state_hash )
                                   With_hash.t
-                                  Reader.t
-    -> (external_transition_verified, state_hash) With_hash.t Reader.t
+                                  Strict_pipe.Reader.t
+    -> (external_transition_verified, state_hash) With_hash.t
+       Strict_pipe.Reader.t
 end
