@@ -405,12 +405,14 @@ let ensure_testnet_id_still_good _ = Deferred.unit
 [%%endif]
 
 [%%if
-with_snark]
+proof_level = "full"]
 
 let internal_commands =
   [(Snark_worker_lib.Intf.command_name, Snark_worker_lib.Prod.Worker.command)]
 
 [%%else]
+
+(* TODO #1698: proof_level=check *)
 
 let internal_commands =
   [(Snark_worker_lib.Intf.command_name, Snark_worker_lib.Debug.Worker.command)]

@@ -38,7 +38,8 @@
     storage
     yojson
     codable
-    rocksdb)
+    rocksdb
+    coda_compile_config)
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_snarky ppx_jane ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord
