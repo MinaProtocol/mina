@@ -49,7 +49,7 @@ module Make (Consensus_mechanism : Consensus.S) :
       let verify_complete_merge =
         match Coda_compile_config.proof_level with
         | "full" -> T.verify_complete_merge
-        | _ -> (fun _ _ _ _ _ -> Checked.return Boolean.true_)
+        | _ -> fun _ _ _ _ _ -> Checked.return Boolean.true_
 
       let%snarkydef update
           ((previous_state_hash, previous_state) :
