@@ -17,6 +17,8 @@ module Digest : sig
     module V1 : sig
       type nonrec t = t [@@deriving sexp, bin_io, hash, compare, eq]
     end
+
+    module Latest = V1
   end
 
   module Checked : sig
