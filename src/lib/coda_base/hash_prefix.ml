@@ -33,6 +33,13 @@ let vrf_message = salt vrf_message
 
 let vrf_output = salt vrf_output
 
+let coinbase_tree_depth = 4
+
+(*TODO: put this in snark params*)
+
+let coinbase_merkle_tree =
+  Array.init coinbase_tree_depth ~f:(fun i -> salt (coinbase_merkle_tree i))
+
 let coinbase = salt coinbase
 
 let pending_coinbases = salt pending_coinbases

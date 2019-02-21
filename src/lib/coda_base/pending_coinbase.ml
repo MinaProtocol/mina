@@ -9,24 +9,27 @@ open Fold_lib
 open Snark_bits
 
 module Coinbase_data = struct
-  type t = Public_key.Compressed.t * Currency.Amount.t [@@deriving sexp]
+  type t = Public_key.Compressed.t * Amount.Signed.t [@@deriving sexp]
 
   let of_coinbase (cb : Coinbase.t) : t Or_error.t =
     Option.value_map cb.fee_transfer
-      ~default:(Ok (cb.proposer, cb.amount))
+      ~default:(Ok (cb.proposer, Amount.Signed.of_unsigned cb.amount))
       ~f:(fun (_, fee) ->
-        match Currency.Amount.sub cb.amount (Currency.Amount.of_fee fee) with
+        match Currency.Amount.sub cb.amount (Amount.of_fee fee) with
         | None -> Or_error.error_string "Coinbase underflow"
-        | Some amount -> Ok (cb.proposer, amount) )
+        | Some amount -> Ok (cb.proposer, Amount.Signed.of_unsigned amount) )
 
-  type var = Public_key.Compressed.var * Amount.var
+  type var = Public_key.Compressed.var * Amount.Signed.var
 
-  type value = Public_key.Compressed.t * Amount.t [@@deriving sexp]
+  type value = t [@@deriving sexp]
+
+  let length_in_triples =
+    Public_key.Compressed.length_in_triples + Amount.Signed.length_in_triples
 
   let typ : (var, value) Typ.t =
     let spec =
       let open Data_spec in
-      [Public_key.Compressed.typ; Amount.typ]
+      [Public_key.Compressed.typ; Amount.Signed.typ]
     in
     let of_hlist : 'a 'b. (unit, 'a -> 'b -> unit) H_list.t -> 'a * 'b =
       let open H_list in
@@ -37,7 +40,9 @@ module Coinbase_data = struct
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let var_of_t ((public_key, amount) : value) =
-    (Public_key.Compressed.var_of_t public_key, Amount.var_of_t amount)
+    ( Public_key.Compressed.var_of_t public_key
+    , Amount.Signed.Checked.of_unsigned @@ Amount.var_of_t
+      @@ Amount.Signed.magnitude amount )
 
   let var_to_triples (public_key, amount) =
     let%map public_key = Public_key.Compressed.var_to_triples public_key in
@@ -46,7 +51,7 @@ module Coinbase_data = struct
 
   let fold ((public_key, amount) : t) =
     let open Fold in
-    Public_key.Compressed.fold public_key +> Amount.fold amount
+    Public_key.Compressed.fold public_key +> Amount.Signed.fold amount
 
   let crypto_hash_prefix = Hash_prefix.coinbase
 
@@ -124,9 +129,11 @@ module Stack = struct
       |> Pedersen.State.digest )
 
   module Checked = struct
-    let push_var t coinbase : t = failwith ""
+    type t = var
 
-    let if_ b ~then_ ~else_ s = failwith ""
+    let push_var (t : t) (coinbase : Coinbase_data.var) : t = failwith "TODO"
+
+    let if_ = if_
 
     let equal (x : var) (y : var) =
       Field.Checked.equal (var_to_hash_packed x) (var_to_hash_packed y)

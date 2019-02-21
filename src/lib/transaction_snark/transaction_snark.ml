@@ -254,14 +254,14 @@ module Base = struct
     in
     let%bind sender_compressed = Public_key.compress_var sender in
     let%bind pending_coinbase_root =
-      let%bind _is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
+      let%bind is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
       Pending_coinbase.Hash.update_stack pending_coinbase_root ~is_new_stack
         ~f:(fun stack ->
-          (*Pending_coinbase.Stack.Checked.if_ is_coinbase ~then:(
-              let%map coinbase = (sender_compressed, sender_delta ) in
-              Pending_coinbase.Coinbase_stack.Checked.push_var stack coinbase)
-            ~else:*)
-          Checked.return stack )
+          Pending_coinbase.Stack.Checked.if_ is_coinbase
+            ~then_:
+              (let coinbase = (sender_compressed, sender_delta) in
+               Pending_coinbase.Coinbase_stack.Checked.push_var stack coinbase)
+            ~else_:stack )
     in
     let%bind root =
       let%bind is_fee_transfer =
@@ -393,7 +393,7 @@ module Base = struct
          let supply_increase = Amount.var_to_triples supply_increase in
          let triples =
            Sok_message.Digest.Checked.to_triples sok_digest
-           @ b1 @ b2 @ supply_increase @ fee_excess
+           @ b1 @ b2 @ supply_increase @ fee_excess @ pending_coinbase_after
          in
          Pedersen.Checked.digest_triples ~init:Hash_prefix.base_snark triples
          >>= Field.Checked.Assert.equal top_hash)
@@ -519,6 +519,7 @@ module Merge = struct
     Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
     + (2 * state_hash_size_in_triples)
     + Amount.length_in_triples + Amount.Signed.length_in_triples
+    + Pending_coinbase.Hash.length_in_triples
 
   let construct_input_checked ~prefix
       ~(sok_digest : Sok_message.Digest.Checked.t) ~state1 ~state2
@@ -1430,15 +1431,17 @@ let%test_module "transaction_snark" =
       let keys = keys
     end)
 
-    let of_user_command' sok_digest ledger user_command handler =
+    let of_user_command' sok_digest ledger user_command pending_coinbase_hash
+        handler =
       let source = Ledger.merkle_root ledger in
       let target =
         Ledger.merkle_root_after_user_command_exn ledger user_command
       in
-      of_user_command ~sok_digest ~source ~target user_command handler
+      of_user_command ~sok_digest ~source ~target ~pending_coinbase_hash
+        user_command handler
 
     (*TODO: tests*)
-    (*    let%test_unit "new_account" =
+    let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
           Ledger.with_ledger ~f:(fun ledger ->
@@ -1468,9 +1471,10 @@ let%test_module "transaction_snark" =
                 Sok_message.create ~fee:Fee.zero
                   ~prover:wallets.(1).account.public_key
               in
+              let pending_coinbase_hash = Pending_coinbase.Hash.empty_hash in
               check_user_command ~sok_message
                 ~source:(Ledger.merkle_root ledger)
-                ~target t1
+                ~target pending_coinbase_hash t1
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
     let%test "base_and_merge" =
@@ -1496,6 +1500,7 @@ let%test_module "transaction_snark" =
                      (Test_util.arbitrary_string
                         ~len:User_command_memo.max_size_in_bytes))
               in
+              let pending_coinbase_hash = Pending_coinbase.Hash.empty_hash in
               let sok_digest =
                 Sok_message.create ~fee:Fee.zero
                   ~prover:wallets.(0).account.public_key
@@ -1510,7 +1515,7 @@ let%test_module "transaction_snark" =
                      [t1; t2])
               in
               let proof12 =
-                of_user_command' sok_digest ledger t1
+                of_user_command' sok_digest ledger t1 pending_coinbase_hash
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =
@@ -1522,7 +1527,7 @@ let%test_module "transaction_snark" =
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof23 =
-                of_user_command' sok_digest ledger t2
+                of_user_command' sok_digest ledger t2 pending_coinbase_hash
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =
@@ -1552,7 +1557,7 @@ let%test_module "transaction_snark" =
                 (Wrap_input.of_tick_field
                    (merge_top_hash ~sok_digest ~state1 ~state2:state3
                       ~supply_increase:Amount.zero ~fee_excess:total_fees
-                      wrap_vk_bits)) ) )*)
+                      ~pending_coinbase_hash wrap_vk_bits)) ) )
   end )
 
 let constraint_system_digests () =
