@@ -62,9 +62,6 @@ module Worker_state = struct
   let get = Fn.id
 end
 
-[%%inject
-"proof_level", proof_level]
-
 module Worker = struct
   module T = struct
     module F = Rpc_parallel.Function
@@ -88,7 +85,7 @@ module Worker = struct
               and type connection_state := Connection_state.t) =
     struct
       let verify_blockchain (w : Worker_state.t) (chain : Blockchain.t) =
-        match proof_level with
+        match Coda_compile_config.proof_level with
         | "full"
         | "check" ->
         let%map (module M) = Worker_state.get w in

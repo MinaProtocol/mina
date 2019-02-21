@@ -9,7 +9,7 @@
    snark_params unsigned_extended sparse_ledger_lib protocols core
    dummy_values o1trace merkle_ledger module_version snarky crypto_params
    async async_extra bignum_bigint coda_numbers debug_assert merkle_mask
-   banlist_lib receipt_chain_database_lib storage yojson codable rocksdb)
+   banlist_lib receipt_chain_database_lib storage yojson codable rocksdb coda_compile_config)
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_snarky ppx_jane ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord
