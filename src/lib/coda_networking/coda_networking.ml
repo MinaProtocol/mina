@@ -124,7 +124,8 @@ struct
       module T = struct
         type query = State_hash.t Envelope.Incoming.t [@@deriving bin_io]
 
-        type response = External_transition.t list option [@@deriving bin_io]
+        type response = External_transition.t Non_empty_list.t option
+        [@@deriving bin_io]
       end
 
       module Caller = T
@@ -165,10 +166,14 @@ struct
       let name = "get_ancestry"
 
       module T = struct
-        type query = (State_hash.t * int) Envelope.Incoming.t
+        type query = Consensus.Consensus_state.value Envelope.Incoming.t
         [@@deriving bin_io, sexp]
 
-        type response = (External_transition.t * State_body_hash.t list) option
+        type response =
+          ( External_transition.t
+          , State_body_hash.t list * External_transition.t )
+          Proof_carrying_data.t
+          option
         [@@deriving bin_io]
       end
 
@@ -345,11 +350,13 @@ module Make (Inputs : Inputs_intf) = struct
          -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t)
       ~(transition_catchup :
             State_hash.t Envelope.Incoming.t
-         -> External_transition.t list option Deferred.t)
+         -> External_transition.t Non_empty_list.t option Deferred.t)
       ~(get_ancestry :
-            (State_hash.t * int) Envelope.Incoming.t
-         -> (External_transition.t * State_body_hash.t list) Deferred.Option.t)
-      =
+            Consensus.Consensus_state.value Envelope.Incoming.t
+         -> ( External_transition.t
+            , State_body_hash.t list * External_transition.t )
+            Proof_carrying_data.t
+            Deferred.Option.t) =
     let log = Logger.child config.parent_log "coda networking" in
     (* TODO: for following functions, could check that IP in _conn matches
        the sender IP in envelope, punish if mismatch due to IP forgery
@@ -473,8 +480,8 @@ module Make (Inputs : Inputs_intf) = struct
       if num_peers > max_current_peers then
         return
           (Or_error.errorf
-             !"None of randomly-chosen peers has a proof for \
-               %{sexp:Rpcs.Get_ancestry.query}"
+             !"None of randomly-chosen peers has a more preferred consensus \
+               state than %{sexp:Rpcs.Get_ancestry.query}"
              input)
       else
         let current_peers, remaining_peers = List.split_n peers num_peers in
@@ -487,8 +494,9 @@ module Make (Inputs : Inputs_intf) = struct
             | Ok (Some ancestors) -> return (Ok ancestors)
             | Ok None ->
                 Logger.info t.log
-                  !"get_ancestry returned no ancestors for non-preferred peer \
-                    %{sexp: Peer.t} on input %{sexp: Rpcs.Get_ancestry.query}"
+                  !"get_ancestry returned no root for non-preferred peer \
+                    %{sexp: Peer.t} on consensus_state %{sexp: \
+                    Rpcs.Get_ancestry.query}"
                   peer input ;
                 loop remaining_peers (2 * num_peers)
             | Error e ->

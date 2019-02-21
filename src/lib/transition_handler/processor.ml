@@ -69,7 +69,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     (* add a breadcrumb and perform post processing *)
     let add_and_finalize cached_breadcrumb =
       let open Or_error.Let_syntax in
-      let%map breadcrumb = Cached.invalidate cached_breadcrumb in
+      let%bind breadcrumb = Cached.invalidate cached_breadcrumb in
       let transition =
         Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
       in

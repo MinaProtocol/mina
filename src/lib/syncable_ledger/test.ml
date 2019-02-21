@@ -58,7 +58,9 @@ struct
     let qr = SL.query_reader lsync in
     let aw = SL.answer_writer lsync in
     let seen_queries = ref [] in
-    let sr = SR.create l2 (fun q -> seen_queries := q :: !seen_queries) in
+    let sr =
+      SR.create l2 (fun q -> seen_queries := q :: !seen_queries) ~parent_log
+    in
     don't_wait_for
       (Linear_pipe.iter_unordered ~max_concurrency:3 qr
          ~f:(fun (_hash, query) ->
@@ -91,7 +93,8 @@ struct
     let aw = SL.answer_writer lsync in
     let seen_queries = ref [] in
     let sr =
-      ref @@ SR.create l2 (fun q -> seen_queries := q :: !seen_queries)
+      ref
+      @@ SR.create l2 (fun q -> seen_queries := q :: !seen_queries) ~parent_log
     in
     let ctr = ref 0 in
     don't_wait_for
@@ -101,7 +104,9 @@ struct
              let res =
                if !ctr = (!total_queries |> Option.value_exn) / 2 then (
                  sr :=
-                   SR.create l3 (fun q -> seen_queries := q :: !seen_queries) ;
+                   SR.create l3
+                     (fun q -> seen_queries := q :: !seen_queries)
+                     ~parent_log ;
                  desired_root := L.merkle_root l3 ;
                  SL.new_goal lsync !desired_root |> ignore ;
                  Deferred.unit )

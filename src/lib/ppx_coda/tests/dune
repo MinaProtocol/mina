@@ -1,0 +1,34 @@
+;; should succeed
+
+(library
+  (name unexpired)
+  (preprocess (pps ppx_coda))
+  (modules unexpired))
+
+(library
+  (name unexpired_in_module)
+  (preprocess (pps ppx_coda))
+  (modules unexpired_in_module))
+
+;; should fail
+
+(library
+  (name expired)
+  (preprocess (pps ppx_coda))
+  (modules expired))
+
+(library
+  (name expiry_in_module)
+  (preprocess (pps ppx_coda))
+  (modules expiry_in_module))
+
+(library
+  (name expiry_invalid_date)
+  (preprocess (pps ppx_coda))
+  (modules expiry_invalid_date))
+
+(library
+  (name expiry_invalid_format)
+  (preprocess (pps ppx_coda))
+  (modules expiry_invalid_format))
+

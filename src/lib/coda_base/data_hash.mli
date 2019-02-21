@@ -24,6 +24,8 @@ module type Basic = sig
 
       include Hashable_binable with type t := t
     end
+
+    module Latest : module type of V1
   end
 
   type var

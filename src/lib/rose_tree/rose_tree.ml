@@ -10,6 +10,9 @@ let rec of_list_exn = function
   | [h] -> T (h, [])
   | h :: t -> T (h, [of_list_exn t])
 
+let rec equal ~f (T (value1, children1)) (T (value2, children2)) =
+  f value1 value2 && List.equal ~equal:(equal ~f) children1 children2
+
 module type Monad_intf = sig
   include Monad.S
 

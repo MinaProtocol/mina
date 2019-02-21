@@ -26,13 +26,13 @@ end
 [%%endif]
 
 module Staged_ledger_aux_hash = struct
-  include Staged_ledger_hash.Aux_hash.Stable.V1
+  include Staged_ledger_hash.Aux_hash.Stable.Latest
 
   let of_bytes = Staged_ledger_hash.Aux_hash.of_bytes
 end
 
 module Staged_ledger_hash = struct
-  include Staged_ledger_hash.Stable.V1
+  include Staged_ledger_hash.Stable.Latest
 
   let ledger_hash = Staged_ledger_hash.ledger_hash
 
@@ -42,7 +42,7 @@ module Staged_ledger_hash = struct
 end
 
 module Ledger_hash = struct
-  include Ledger_hash.Stable.V1
+  include Ledger_hash.Stable.Latest
 
   let of_digest = Ledger_hash.of_digest
 
@@ -56,7 +56,7 @@ module Ledger_hash = struct
 end
 
 module Frozen_ledger_hash = struct
-  include Frozen_ledger_hash.Stable.V1
+  include Frozen_ledger_hash.Stable.Latest
 
   let to_bytes = Frozen_ledger_hash.to_bytes
 
@@ -94,11 +94,6 @@ module type Config_intf = sig
   val propose_keypair : Keypair.t option
 
   val genesis_proof : Snark_params.Tock.Proof.t
-
-  val transaction_capacity_log_2 : int
-  (** Capacity of transactions per block *)
-
-  val work_delay_factor : int
 
   val commit_id : Daemon_rpcs.Types.Git_sha.t option
 
@@ -373,7 +368,7 @@ module User_command = struct
 
   let seed = Secure_random.string ()
 
-  let compare t1 t2 = User_command.Stable.V1.compare ~seed t1 t2
+  let compare t1 t2 = User_command.Stable.Latest.compare ~seed t1 t2
 
   module With_valid_signature = struct
     module T = struct
@@ -437,7 +432,7 @@ struct
   open Protocols.Coda_pow
   open Init
   module Protocol_state = Consensus.Protocol_state
-  module Protocol_state_hash = State_hash.Stable.V1
+  module Protocol_state_hash = State_hash.Stable.Latest
 
   module Time : Time_intf with type t = Block_time.t = Block_time
 
@@ -458,8 +453,8 @@ struct
       include Currency.Amount.Signed
 
       include (
-        Currency.Amount.Signed.Stable.V1 :
-          module type of Currency.Amount.Signed.Stable.V1
+        Currency.Amount.Signed.Stable.Latest :
+          module type of Currency.Amount.Signed.Stable.Latest
           with type t := t
            and type ('a, 'b) t_ := ('a, 'b) t_ )
     end
@@ -591,6 +586,8 @@ struct
   module External_transition =
     Coda_base.External_transition.Make (Staged_ledger_diff) (Protocol_state)
 
+  let max_length = Consensus.Constants.k
+
   module Transition_frontier = Transition_frontier.Make (struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Ledger_proof_statement = Ledger_proof_statement
@@ -599,6 +596,8 @@ struct
     module Staged_ledger_diff = Staged_ledger_diff
     module External_transition = External_transition
     module Staged_ledger = Staged_ledger
+
+    let max_length = max_length
   end)
 
   module Transaction_pool = struct
@@ -666,41 +665,6 @@ struct
   module Compressed_public_key = Public_key.Compressed
   module Private_key = Private_key
   module Keypair = Keypair
-
-  module Proof_carrying_state = struct
-    type t =
-      ( Protocol_state.value
-      , Protocol_state_proof.t )
-      Protocols.Coda_pow.Proof_carrying_data.t
-    [@@deriving sexp, bin_io]
-  end
-
-  module State_with_witness = struct
-    type t =
-      { staged_ledger_transition:
-          Staged_ledger_transition.With_valid_signatures_and_proofs.t
-      ; state: Proof_carrying_state.t }
-    [@@deriving sexp]
-
-    module Stripped = struct
-      type t =
-        { staged_ledger_transition: Staged_ledger_transition.t
-        ; state: Proof_carrying_state.t }
-    end
-
-    let strip {staged_ledger_transition; state} =
-      { Stripped.staged_ledger_transition=
-          Staged_ledger_transition.forget staged_ledger_transition
-      ; state }
-
-    let forget_witness {staged_ledger_transition; state} = state
-
-    (* TODO: How do we check this *)
-    let add_witness staged_ledger_transition state =
-      Or_error.return {staged_ledger_transition; state}
-
-    let add_witness_exn l s = add_witness l s |> Or_error.ok_exn
-  end
 
   module Genesis = struct
     let state = Consensus.genesis_protocol_state
@@ -822,16 +786,7 @@ struct
     module Blockchain_state = Consensus.Blockchain_state
   end)
 
-  module Sync_handler = Sync_handler.Make (struct
-    include Inputs0
-    module Staged_ledger_diff = Staged_ledger_diff
-    module Transaction_snark_work = Transaction_snark_work
-    module Syncable_ledger = Sync_ledger
-    module Ledger_proof_statement = Ledger_proof_statement
-    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
-  end)
-
-  module Transition_handler = Transition_handler.Make (struct
+  module Protocol_state_validator = Protocol_state_validator.Make (struct
     include Inputs0
     module State_proof = Protocol_state_proof
     module Transaction_snark_work = Transaction_snark_work
@@ -840,7 +795,17 @@ struct
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
   end)
 
-  module Protocol_state_validator = Protocol_state_validator.Make (struct
+  module Sync_handler = Sync_handler.Make (struct
+    include Inputs0
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Transaction_snark_work = Transaction_snark_work
+    module Syncable_ledger = Sync_ledger
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Protocol_state_validator = Protocol_state_validator
+  end)
+
+  module Transition_handler = Transition_handler.Make (struct
     include Inputs0
     module State_proof = Protocol_state_proof
     module Transaction_snark_work = Transaction_snark_work
@@ -862,6 +827,15 @@ struct
     module Network = Net
   end)
 
+  module Root_prover = Root_prover.Make (struct
+    include Inputs0
+    module Staged_ledger_diff = Staged_ledger_diff
+    module Transaction_snark_work = Transaction_snark_work
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Staged_ledger_aux_hash = Staged_ledger_aux_hash
+    module Protocol_state_validator = Protocol_state_validator
+  end)
+
   module Bootstrap_controller = Bootstrap_controller.Make (struct
     include Inputs0
     module Staged_ledger_diff = Staged_ledger_diff
@@ -872,11 +846,14 @@ struct
     module Root_sync_ledger = Root_sync_ledger
     module Protocol_state_validator = Protocol_state_validator
     module Network = Net
+    module Sync_handler = Sync_handler
+    module Root_prover = Root_prover
   end)
 
   module Transition_frontier_controller =
   Transition_frontier_controller.Make (struct
     include Inputs0
+    module Protocol_state_validator = Protocol_state_validator
     module Transaction_snark_work = Transaction_snark_work
     module Syncable_ledger = Sync_ledger
     module Sync_handler = Sync_handler
@@ -1143,7 +1120,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       (User_command)
       (Receipt.Chain_hash)
 
-  let verify_payment t log (addr : Public_key.Compressed.Stable.V1.t)
+  let verify_payment t log (addr : Public_key.Compressed.Stable.Latest.t)
       (verifying_txn : User_command.t) proof =
     let open Participating_state.Let_syntax in
     let%map account = get_account t addr in
@@ -1405,7 +1382,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             Deferred.unit )
       ; implement Daemon_rpcs.Snark_job_list.rpc (fun () () ->
             return (snark_job_list_json coda |> Participating_state.active_exn)
-        ) ]
+        )
+      ; implement Daemon_rpcs.Start_tracing.rpc (fun () () ->
+            Coda_tracing.start Config_in.conf_dir )
+      ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
+            Coda_tracing.stop () ; Deferred.unit ) ]
     in
     let snark_worker_impls =
       [ implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->

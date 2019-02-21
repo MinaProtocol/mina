@@ -1,6 +1,7 @@
 [%%import "config/ledger_depth/full.mlh"]
 [%%import "config/coinbase/standard.mlh"]
 [%%import "config/consensus/posig_fake.mlh"]
+[%%import "config/scan_state/standard.mlh"]
 [%%import "config/debug_level/some.mlh"]
 
 [%%define fake_hash false]

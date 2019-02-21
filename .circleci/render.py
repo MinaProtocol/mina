@@ -18,7 +18,8 @@ build_profiles = [
     'dev',
     'testnet_posig',
     'testnet_postake',
-    'testnet_public'
+    'testnet_public',
+    'testnet_postake_snarkless_fake_hash'
 ]
 
 tests = [
@@ -38,7 +39,7 @@ tests = [
        'friendly': 'Proof of Stake Tests',
        'config': 'test_postake_snarkless',
        'name': 'postake_integration_tests',
-       'actions': base_actions
+       'actions': base_actions + ['coda-shared-prefix-multiproposer-test']
    },
    {
        'friendly': 'Full test with SNARK (sig)',
