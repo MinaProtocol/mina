@@ -144,7 +144,7 @@ module Consensus_state = struct
         ; signer_public_key= Lite_compat.public_key signer_public_key } )
 
   let to_string_record t =
-    Printf.sprintf "{length|%s}" (Length.to_string t.length)
+    Printf.sprintf "length:%s" (Length.to_string t.length)
 end
 
 module Protocol_state =
@@ -216,10 +216,6 @@ let next_state_checked ~(prev_state : Protocol_state.var) ~prev_state_hash:_
       signer_public_key
   and success = is_transition_valid_checked block in
   (`Success success, {length; signer_public_key})
-
-let update_local_state _ ~previous_consensus_state:_ ~next_consensus_state:_
-    ~ledger:_ =
-  ()
 
 let select ~existing:Consensus_state.({length= l1; _})
     ~candidate:Consensus_state.({length= l2; _}) ~logger:_ =

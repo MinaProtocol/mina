@@ -1078,7 +1078,7 @@ module Consensus_state = struct
 
   let to_string_record t =
     Printf.sprintf
-      "{length|%s}|{epoch_length|%s}|{curr_epoch|%s}|{curr_slot|%s}|{total_currency|%s}"
+      "length:%s|epoch_length:%s|curr_epoch:%s|curr_slot:%s|total_currency:%s"
       (Length.to_string t.length)
       (Length.to_string t.epoch_length)
       (Segment_id.to_string t.curr_epoch)

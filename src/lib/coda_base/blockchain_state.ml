@@ -179,11 +179,19 @@ end) : S = struct
         @@ Ledger.merkle_root Genesis_ledger.t
     ; timestamp= Genesis_state_timestamp.value |> Block_time.of_time }
 
+  let prefix_string string = String.prefix string 10
+
+  let display_field (type t) (module M : Sexpable.S with type t = t)
+      (value : t) =
+    value |> [%sexp_of: M.t] |> Sexp.to_string |> prefix_string
+
   let to_string_record t =
-    Printf.sprintf "{staged_ledger_hash|%s}|{ledger_hash|%s}|{timestamp|%s}"
-      (Base64.encode_string (Staged_ledger_hash.to_string t.staged_ledger_hash))
-      (Base64.encode_string (Frozen_ledger_hash.to_bytes t.snarked_ledger_hash))
-      (Time.to_string (Block_time.to_time t.timestamp))
+    Printf.sprintf "staged_ledger_hash:%s|snarked_ledger_hash:%s|timestamp:%s"
+      ( display_field (module Ledger_hash)
+      @@ Staged_ledger_hash.ledger_hash t.staged_ledger_hash )
+      (display_field (module Frozen_ledger_hash) t.snarked_ledger_hash)
+      (Time.to_string_trimmed ~zone:Time.Zone.utc
+         (Block_time.to_time t.timestamp))
 
   module Message = struct
     open Tick

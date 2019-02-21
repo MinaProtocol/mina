@@ -308,40 +308,36 @@ module Make (Inputs : Inputs_intf) :
       include G
 
       type visual =
-        { state_hash: string
-        ; snarked_ledger_hash: string
-        ; staged_ledger_hash: string
-        ; length: int }
+        { length: int
+        ; state_hash: string
+        ; blockchain_state: string
+        ; consensus_state: string }
       [@@deriving fields]
 
-      let graph_attributes _ = []
+      let graph_attributes _ = [`Rankdir `LeftToRight]
 
       let get_subgraph _ = None
 
       let default_vertex_attributes _ = [`Shape `Record]
 
       let vertex_name (node : Node.t) =
-        display_field
-          (module State_hash)
-          (node.breadcrumb |> Breadcrumb.state_hash)
-
-      (* TODO: include consensus_state (including epoch, length, slot) *)
+        Breadcrumb.state_hash node.breadcrumb
+        |> [%sexp_of: State_hash.t] |> Sexp.to_string
+        |> display_prefix_of_string
 
       let to_visual (node : Node.t) =
         let state_hash = Breadcrumb.state_hash node.breadcrumb in
-        let blockchain_state = Breadcrumb.blockchain_state node.breadcrumb in
-        let snarked_ledger_hash, staged_ledger_hash =
-          Inputs.External_transition.Protocol_state.Blockchain_state.
-            ( snarked_ledger_hash blockchain_state
-            , staged_ledger_hash blockchain_state
-              |> Staged_ledger_hash.ledger_hash )
+        let blockchain_state =
+          Breadcrumb.blockchain_state node.breadcrumb
+          |> Inputs.External_transition.Protocol_state.Blockchain_state
+             .to_string_record
         in
+        let consensus_state = Breadcrumb.consensus_state node.breadcrumb in
         { state_hash= display_field (module State_hash) state_hash
-        ; snarked_ledger_hash=
-            display_field (module Frozen_ledger_hash) snarked_ledger_hash
-        ; staged_ledger_hash=
-            display_field (module Ledger_hash) staged_ledger_hash
-        ; length= node.length }
+        ; blockchain_state
+        ; length= node.length
+        ; consensus_state=
+            Consensus.Consensus_state.to_string_record consensus_state }
 
       let vertex_attributes breadcrumb =
         let visual = to_visual breadcrumb in
@@ -349,12 +345,15 @@ module Make (Inputs : Inputs_intf) :
           sprintf !"%s:%s" (Field.name field) @@ f @@ Field.get field visual
         in
         let write_string_field = write_field ~f:Fn.id in
+        let write_object field =
+          sprintf !"{%s|{%s}}" (Field.name field) @@ Field.get field visual
+        in
         let fields =
           Fields_of_visual.to_list ~state_hash:write_string_field
-            ~snarked_ledger_hash:write_string_field
-            ~staged_ledger_hash:write_string_field
+            ~blockchain_state:write_object
             ~length:(write_field ~f:Int.to_string)
-          |> String.concat ~sep:"|" |> sprintf "{%s}"
+            ~consensus_state:write_object
+          |> String.concat ~sep:"|"
         in
         [`Label fields]
 
