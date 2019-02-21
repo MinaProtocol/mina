@@ -412,7 +412,7 @@ let internal_commands =
 
 [%%else]
 
-(* TODO 1698: proof_level=check *)
+(* TODO #1698: proof_level=check *)
 
 let internal_commands =
   [(Snark_worker_lib.Intf.command_name, Snark_worker_lib.Debug.Worker.command)]
