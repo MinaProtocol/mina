@@ -135,12 +135,35 @@ module Make (Inputs : Inputs_intf) :
       ; length: int }
     [@@deriving sexp, fields]
 
+    type display =
+      { length: int
+      ; state_hash: string
+      ; blockchain_state:
+          Inputs.External_transition.Protocol_state.Blockchain_state.display
+      ; consensus_state: Consensus.Consensus_state.display }
+    [@@deriving yojson]
+
     let equal node1 node2 = Breadcrumb.equal node1.breadcrumb node2.breadcrumb
 
     let hash node = Breadcrumb.hash node.breadcrumb
 
     let compare node1 node2 =
       Breadcrumb.compare node1.breadcrumb node2.breadcrumb
+
+    let name t =
+      Visualization.display_short_sexp (module State_hash)
+      @@ Breadcrumb.state_hash t.breadcrumb
+
+    let display t =
+      let blockchain_state =
+        Breadcrumb.blockchain_state t.breadcrumb
+        |> Inputs.External_transition.Protocol_state.Blockchain_state.display
+      in
+      let consensus_state = Breadcrumb.consensus_state t.breadcrumb in
+      { state_hash= name t
+      ; blockchain_state
+      ; length= t.length
+      ; consensus_state= Consensus.Consensus_state.display consensus_state }
   end
 
   let breadcrumb_of_node {Node.breadcrumb; _} = breadcrumb
@@ -290,83 +313,12 @@ module Make (Inputs : Inputs_intf) :
     List.bind (successors t breadcrumb) ~f:(fun succ ->
         succ :: successors_rec t succ )
 
-  let rec to_dot (json : Yojson.Safe.json) =
-    match json with
-    | `Int value -> Int.to_string value
-    | `String value | `Intlit value -> value
-    | `Assoc values ->
-        List.map values ~f:(fun (key, value) ->
-            match value with
-            | `Assoc subvalues ->
-                sprintf !"{%s|{%s}}" key @@ to_dot (`Assoc subvalues)
-            | subvalue -> sprintf !"%s:%s" key (to_dot subvalue) )
-        |> String.concat ~sep:"|"
-    | `List values | `Tuple values ->
-        List.map values ~f:(fun value -> to_dot value)
-        |> String.concat ~sep:"|"
-    | `Float value -> Float.to_string value
-    | `Bool value -> Bool.to_string value
-    | `Variant (key, value) ->
-        Option.value_map value ~default:key ~f:(fun some_value ->
-            sprintf !"%s:%s" key (to_dot some_value) )
-    | `Null -> "null"
-
   (* Visualize the structure of the transition frontier or a particular node
    * within the frontier (for debugging purposes). *)
   module Visualizor = struct
     let fold t ~f = Hashtbl.fold t.table ~f:(fun ~key:_ ~data -> f data)
 
-    module G = Graph.Persistent.Digraph.ConcreteBidirectional (Node)
-    include G
-
-    let display_prefix_of_string string = String.prefix string 10
-
-    let display_field (type t) (module M : Sexpable.S with type t = t)
-        (value : t) =
-      value |> [%sexp_of: M.t] |> Sexp.to_string |> display_prefix_of_string
-
-    include Graph.Graphviz.Dot (struct
-      include G
-
-      type display =
-        { length: int
-        ; state_hash: string
-        ; blockchain_state:
-            Inputs.External_transition.Protocol_state.Blockchain_state.display
-        ; consensus_state: Consensus.Consensus_state.display }
-      [@@deriving fields, yojson]
-
-      let graph_attributes _ = [`Rankdir `LeftToRight]
-
-      let get_subgraph _ = None
-
-      let default_vertex_attributes _ = [`Shape `Record]
-
-      let vertex_name (node : Node.t) =
-        Breadcrumb.state_hash node.breadcrumb
-        |> [%sexp_of: State_hash.t] |> Sexp.to_string
-        |> display_prefix_of_string
-
-      let display (node : Node.t) =
-        let state_hash = Breadcrumb.state_hash node.breadcrumb in
-        let blockchain_state =
-          Breadcrumb.blockchain_state node.breadcrumb
-          |> Inputs.External_transition.Protocol_state.Blockchain_state.display
-        in
-        let consensus_state = Breadcrumb.consensus_state node.breadcrumb in
-        { state_hash= display_field (module State_hash) state_hash
-        ; blockchain_state
-        ; length= node.length
-        ; consensus_state= Consensus.Consensus_state.display consensus_state }
-
-      let vertex_attributes breadcrumb =
-        let dot_format = to_dot @@ display_to_yojson (display breadcrumb) in
-        [`Label dot_format]
-
-      let default_edge_attributes _ = []
-
-      let edge_attributes _ = []
-    end)
+    include Visualization.Make_ocamlgraph (Node)
 
     let to_graph t =
       fold t ~init:empty ~f:(fun (node : Node.t) graph ->

@@ -181,20 +181,16 @@ end) : S = struct
         @@ Ledger.merkle_root Genesis_ledger.t
     ; timestamp= Genesis_state_timestamp.value |> Block_time.of_time }
 
-  let prefix_string string = String.prefix string 10
-
-  let display_field (type t) (module M : Sexpable.S with type t = t)
-      (value : t) =
-    value |> [%sexp_of: M.t] |> Sexp.to_string |> prefix_string
-
   type display = (string, string, string) t_ [@@deriving yojson]
 
   let display {staged_ledger_hash; snarked_ledger_hash; timestamp} =
     { staged_ledger_hash=
-        display_field (module Ledger_hash)
+        Visualization.display_short_sexp (module Ledger_hash)
         @@ Staged_ledger_hash.ledger_hash staged_ledger_hash
     ; snarked_ledger_hash=
-        display_field (module Frozen_ledger_hash) snarked_ledger_hash
+        Visualization.display_short_sexp
+          (module Frozen_ledger_hash)
+          snarked_ledger_hash
     ; timestamp=
         Time.to_string_trimmed ~zone:Time.Zone.utc
           (Block_time.to_time timestamp) }
