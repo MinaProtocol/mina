@@ -134,11 +134,11 @@ let content =
       [ Title.create "Work with us!"
       ; Image_grid.create
           (Non_empty_list.init
-             (Image.draw "/static/img/cohn.jpg" `Free)
-             [ Image.draw "/static/img/cohn.jpg" `Free
-             ; Image.draw "/static/img/cohn.jpg" `Free
-             ; Image.draw "/static/img/cohn.jpg" `Free
-             ; Image.draw "/static/img/cohn.jpg" `Free ])
+             (Image.draw "/static/img/careers/group-outside.jpg" `Free)
+             [ Image.draw "/static/img/careers/group-in-house.jpg" `Free
+             ; Image.draw "/static/img/careers/nacera-outside.jpg" `Free
+             ; Image.draw "/static/img/careers/john-cooking.jpg" `Free
+             ; Image.draw "/static/img/careers/vanishree-talking.jpg" `Free ])
       ; div
           [Style.just "mw800 center"]
           [ Tagline.create
