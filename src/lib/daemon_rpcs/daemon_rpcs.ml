@@ -360,3 +360,25 @@ module Snark_job_list = struct
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Snark_job_list" ~version:0 ~bin_query ~bin_response
 end
+
+module Start_tracing = struct
+  type query = unit [@@deriving bin_io]
+
+  type response = unit [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Start_tracing" ~version:0 ~bin_query ~bin_response
+end
+
+module Stop_tracing = struct
+  type query = unit [@@deriving bin_io]
+
+  type response = unit [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Stop_tracing" ~version:0 ~bin_query ~bin_response
+end

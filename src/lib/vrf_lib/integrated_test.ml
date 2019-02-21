@@ -2,7 +2,6 @@ open Core_kernel
 open Snark_params
 open Fold_lib
 open Signature_lib
-open Sha256_lib
 
 module Scalar = struct
   include Tick.Inner_curve.Scalar
@@ -72,11 +71,11 @@ module Message = struct
 end
 
 module Output_hash = struct
-  type value = Sha256.Digest.t [@@deriving eq]
+  type value = Random_oracle.Digest.t [@@deriving eq, sexp]
 
-  type var = Sha256.Digest.var
+  type var = Random_oracle.Digest.Checked.t
 
-  let typ : (var, value) Snark_params.Tick.Typ.t = Sha256.Digest.typ
+  let typ : (var, value) Snark_params.Tick.Typ.t = Random_oracle.Digest.typ
 
   let hash msg g =
     let open Fold in
@@ -87,7 +86,7 @@ module Output_hash = struct
       Snark_params.Tick.Pedersen.digest_fold Coda_base.Hash_prefix.vrf_output
         (Message.fold msg +> Non_zero_curve_point.Compressed.fold compressed_g)
     in
-    Sha256.digest_bits (Snark_params.Tick.Pedersen.Digest.Bits.to_bits digest)
+    Random_oracle.digest_field digest
 
   module Checked = struct
     let hash msg g =
@@ -101,7 +100,7 @@ module Output_hash = struct
           ~init:Coda_base.Hash_prefix.vrf_output (msg_triples @ g_triples)
         >>= Snark_params.Tick.Pedersen.Checked.Digest.choose_preimage
       in
-      Sha256.Checked.digest
+      Random_oracle.Checked.digest_bits
         (pedersen_digest :> Snark_params.Tick.Boolean.var list)
   end
 end
@@ -117,7 +116,8 @@ let%test_unit "eval unchecked vs. checked equality" =
   in
   Quickcheck.test ~trials:10 gen
     ~f:
-      (Test_util.test_equal ~equal:Output_hash.equal_value
+      (Tick.Test.test_equal ~sexp_of_t:[%sexp_of: Output_hash.value]
+         ~equal:Output_hash.equal_value
          Tick.Typ.(Scalar.typ * Message.typ)
          Output_hash.typ
          (fun (private_key, msg) ->

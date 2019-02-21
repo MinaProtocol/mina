@@ -1,4 +1,4 @@
-open Async_kernel
+open Async
 open Core_kernel
 open Protocols.Coda_pow
 open Coda_base
@@ -135,28 +135,17 @@ struct
   (* Generate valid payments for each blockchain state by having 
   each user send a payment of one coin to another random 
    user if they at least one coin*)
-  let gen_payments ledger : User_command.With_valid_signature.t Sequence.t =
-    let accounts_with_secret_keys = Genesis_ledger.accounts in
+  let gen_payments accounts_with_secret_keys :
+      User_command.With_valid_signature.t Sequence.t =
     let public_keys =
       List.map accounts_with_secret_keys ~f:(fun (_, account) ->
           Account.public_key account )
     in
     Sequence.filter_map (accounts_with_secret_keys |> Sequence.of_list)
-      ~f:(fun (sender_sk, _) ->
+      ~f:(fun (sender_sk, sender_account) ->
         let open Option.Let_syntax in
         let%bind sender_sk = sender_sk in
-        let ({Keypair.public_key= sender_pk; _} as sender_keypair) =
-          Keypair.of_private_key_exn sender_sk
-        in
-        let status, sender_account_location =
-          Coda_base.Ledger.get_or_create_account_exn ledger
-            (Public_key.compress sender_pk)
-            Account.empty
-        in
-        assert (status = `Existed) ;
-        let%bind sender_account =
-          Coda_base.Ledger.get ledger sender_account_location
-        in
+        let sender_keypair = Keypair.of_private_key_exn sender_sk in
         let%bind receiver_pk = List.random_element public_keys in
         let send_amount = Currency.Amount.of_int 1 in
         let sender_account_amount =
@@ -189,7 +178,7 @@ struct
   module Transition_frontier =
     Transition_frontier.Make (Transition_frontier_inputs)
 
-  let gen_breadcrumb ~logger :
+  let gen_breadcrumb ~logger ~accounts_with_secret_keys :
       (   Transition_frontier.Breadcrumb.t Deferred.t
        -> Transition_frontier.Breadcrumb.t Deferred.t)
       Quickcheck.Generator.t =
@@ -204,12 +193,13 @@ struct
       let parent_staged_ledger =
         Transition_frontier.Breadcrumb.staged_ledger parent_breadcrumb
       in
-      let transactions =
-        gen_payments (Staged_ledger.ledger parent_staged_ledger)
+      let transactions = gen_payments accounts_with_secret_keys in
+      let _, largest_account =
+        List.max_elt accounts_with_secret_keys
+          ~compare:(fun (_, acc1) (_, acc2) -> Account.compare acc1 acc2 )
+        |> Option.value_exn
       in
-      let {Keypair.public_key= largest_account_public_key; _} =
-        Genesis_ledger.largest_account_keypair_exn ()
-      in
+      let largest_account_public_key = Account.public_key largest_account in
       let get_completed_work stmts =
         let {Keypair.public_key; _} = Keypair.create () in
         let prover = Public_key.compress public_key in
@@ -221,8 +211,8 @@ struct
       in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
-          ~self:(Public_key.compress largest_account_public_key)
-          ~transactions_by_fee:transactions ~get_completed_work
+          ~self:largest_account_public_key ~transactions_by_fee:transactions
+          ~get_completed_work
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
@@ -296,11 +286,12 @@ struct
       | Error (`Validation_error e) ->
           failwithf !"Validation Error : %{sexp:Error.t}" e ()
 
-  let create_root_frontier ~logger : Transition_frontier.t Deferred.t =
-    let accounts = Genesis_ledger.accounts in
-    let _, proposer_account = List.hd_exn accounts in
+  let create_root_frontier ~logger accounts_with_secret_keys :
+      Transition_frontier.t Deferred.t =
+    let accounts = List.map ~f:snd accounts_with_secret_keys in
+    let proposer_account = List.hd_exn accounts in
     let root_snarked_ledger = Coda_base.Ledger.Db.create () in
-    List.iter accounts ~f:(fun (_, account) ->
+    List.iter accounts ~f:(fun account ->
         let status, _ =
           Coda_base.Ledger.Db.get_or_create_account_exn root_snarked_ledger
             (Account.public_key account)
@@ -310,9 +301,24 @@ struct
     let root_transaction_snark_scan_state =
       Staged_ledger.Scan_state.empty ()
     in
-    let genesis_protocol_state =
-      With_hash.data Consensus.genesis_protocol_state
+    let genesis_protocol_state_with_hash =
+      Consensus.For_tests.create_genesis_protocol_state
+        (Ledger.of_database root_snarked_ledger)
     in
+    let genesis_protocol_state =
+      With_hash.data genesis_protocol_state_with_hash
+    in
+    let genesis_protocol_state_hash =
+      With_hash.hash genesis_protocol_state_with_hash
+    in
+    let root_ledger_hash =
+      genesis_protocol_state |> Consensus.Protocol_state.blockchain_state
+      |> Blockchain_state.snarked_ledger_hash
+      |> Frozen_ledger_hash.to_ledger_hash
+    in
+    Logger.info logger
+      !"Snarked_ledger_hash is %{sexp:Ledger_hash.t}"
+      root_ledger_hash ;
     let dummy_staged_ledger_diff =
       let creator =
         Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
@@ -333,8 +339,7 @@ struct
            ~staged_ledger_diff:dummy_staged_ledger_diff)
     in
     let root_transition_with_data =
-      { With_hash.data= root_transition
-      ; hash= With_hash.hash Consensus.genesis_protocol_state }
+      {With_hash.data= root_transition; hash= genesis_protocol_state_hash}
     in
     let frontier =
       Transition_frontier.create ~logger
@@ -356,6 +361,13 @@ struct
     Deferred.List.iter deferred_breadcrumbs ~f:(fun deferred_breadcrumb ->
         let%map breadcrumb = deferred_breadcrumb in
         Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
+
+  let gen_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys
+      root_breadcrumb =
+    Quickcheck.Generator.with_size ~size
+    @@ Quickcheck_lib.gen_imperative_list
+         (root_breadcrumb |> return |> Quickcheck.Generator.return)
+         (gen_breadcrumb ~logger ~accounts_with_secret_keys)
 
   module Protocol_state_validator = Protocol_state_validator.Make (struct
     include Transition_frontier_inputs
@@ -385,9 +397,16 @@ struct
 
     let add_exn {table; _} = Hashtbl.add_exn table
 
-    let random_peers _ = failwith "STUB: Network.random_peers"
+    let random_peers {table; _} num_peers =
+      let peers = Hashtbl.keys table in
+      List.take (List.permute peers) num_peers
 
-    let catchup_transition _ = failwith "STUB: Network.catchup_transition"
+    let catchup_transition {table; _} peer state_hash =
+      Deferred.Result.return
+      @@
+      let open Option.Let_syntax in
+      let%bind frontier = Hashtbl.find table peer in
+      Sync_handler.transition_catchup ~frontier state_hash
 
     let get_ancestry {table; logger} peer consensus_state =
       Deferred.return
@@ -397,7 +416,8 @@ struct
            let%bind frontier = Hashtbl.find table peer in
            Root_prover.prove ~logger ~frontier consensus_state)
 
-    let glue_sync_ledger {table; logger} query_reader response_writer : unit =
+    let glue_sync_ledger {table; logger; _} query_reader response_writer : unit
+        =
       Pipe_lib.Linear_pipe.iter_unordered ~max_concurrency:8 query_reader
         ~f:(fun (ledger_hash, sync_ledger_query) ->
           Logger.info logger
@@ -428,5 +448,71 @@ struct
                 sync_ledger_query ;
               Pipe_lib.Linear_pipe.write response_writer answer )
       |> don't_wait_for
+  end
+
+  module Network_builder = struct
+    type peer_config =
+      {num_breadcrumbs: int; accounts: (Private_key.t option * Account.t) list}
+
+    type peer = {address: Network_peer.Peer.t; frontier: Transition_frontier.t}
+
+    type t = {me: Transition_frontier.t; peers: peer List.t; network: Network.t}
+
+    module Constants = struct
+      let init_address = 1337
+
+      let time = Int64.of_int 1
+    end
+
+    let setup ~source_accounts ~logger configs =
+      let%bind me = create_root_frontier ~logger source_accounts in
+      let network = Network.create ~logger in
+      let%map _, peers =
+        Deferred.List.fold ~init:(Constants.init_address, []) configs
+          ~f:(fun (discovery_port, acc_peers) {num_breadcrumbs; accounts} ->
+            let%bind frontier = create_root_frontier ~logger accounts in
+            let%map () =
+              build_frontier_randomly frontier
+                ~gen_root_breadcrumb_builder:
+                  (gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
+                     ~accounts_with_secret_keys:accounts)
+            in
+            let address =
+              Network_peer.Peer.create Unix.Inet_addr.localhost ~discovery_port
+                ~communication_port:(discovery_port + 1)
+            in
+            Network.add_exn network ~key:address ~data:frontier ;
+            let peer = {address; frontier} in
+            (discovery_port + 2, peer :: acc_peers) )
+      in
+      {me; network; peers= List.rev peers}
+
+    let setup_me_and_a_peer ~source_accounts ~target_accounts ~logger
+        ~num_breadcrumbs =
+      let%map {me; network; peers} =
+        setup ~source_accounts ~logger
+          [{num_breadcrumbs; accounts= target_accounts}]
+      in
+      (me, List.hd_exn peers, network)
+
+    let send_transition ~logger ~transition_writer ~peer:{address; frontier}
+        state_hash =
+      let transition =
+        Transition_frontier.(
+          find_exn frontier state_hash
+          |> Breadcrumb.transition_with_hash |> With_hash.data)
+      in
+      Logger.info logger
+        !"Peer %{sexp:Network_peer.Peer.t} sending %{sexp:State_hash.t}"
+        address state_hash ;
+      let enveloped_transition =
+        Envelope.Incoming.wrap ~data:transition ~sender:address
+      in
+      Pipe_lib.Strict_pipe.Writer.write transition_writer
+        (`Transition enveloped_transition, `Time_received Constants.time)
+
+    let make_transition_pipe () =
+      Pipe_lib.Strict_pipe.create
+        (Buffered (`Capacity 10, `Overflow Drop_head))
   end
 end

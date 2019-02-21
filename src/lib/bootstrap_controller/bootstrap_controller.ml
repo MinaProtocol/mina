@@ -54,6 +54,8 @@ module type Inputs_intf = sig
   module Sync_handler :
     Sync_handler_intf
     with type ledger_hash := Ledger_hash.t
+     and type state_hash := State_hash.t
+     and type external_transition := External_transition.t
      and type transition_frontier := Transition_frontier.t
      and type syncable_ledger_query := Sync_ledger.query
      and type syncable_ledger_answer := Sync_ledger.answer
@@ -183,32 +185,6 @@ end = struct
               |> Fn.const `Syncing
           | Error e -> received_bad_proof t e |> Fn.const `Ignored )
 
-  (* TODO: We need to do catchup jobs for all remaining transitions in the cache. 
-           This will be hooked into `run` when we do this. #1326 *)
-  let _expand_root ~logger ~frontier root_hash cache =
-    let rec dfs parent =
-      let parent_hash =
-        With_hash.hash
-          (Transition_frontier.Breadcrumb.transition_with_hash parent)
-      in
-      match Hashtbl.find_and_remove cache parent_hash with
-      | None -> Deferred.return ()
-      | Some children ->
-          Deferred.List.iter children ~f:(fun transition_with_hash ->
-              let%bind breadcrumb =
-                match%map
-                  Transition_frontier.Breadcrumb.build ~logger ~parent
-                    ~transition_with_hash
-                with
-                | Error (`Validation_error e) -> (*TODO: Punish*) Error.raise e
-                | Error (`Fatal_error e) -> raise e
-                | Ok breadcrumb -> breadcrumb
-              in
-              Transition_frontier.add_breadcrumb_exn frontier breadcrumb ;
-              dfs breadcrumb )
-    in
-    dfs (Transition_frontier.find_exn frontier root_hash)
-
   let sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader =
     let query_reader = Root_sync_ledger.query_reader root_sync_ledger in
     let response_writer = Root_sync_ledger.answer_writer root_sync_ledger in
@@ -255,7 +231,6 @@ end = struct
       ; current_root= initial_root_transition }
     in
     let transition_graph = Transition_cache.create () in
-    Transition_frontier.clear_paths frontier ;
     let%bind synced_db =
       let root_sync_ledger =
         Root_sync_ledger.create ledger_db ~parent_log:t.logger
@@ -266,7 +241,9 @@ end = struct
       Root_sync_ledger.destroy root_sync_ledger ;
       synced_db
     in
-    assert (Ledger.Db.(merkle_root ledger_db = merkle_root synced_db)) ;
+    assert (
+      Ledger.Db.(
+        Ledger_hash.equal (merkle_root ledger_db) (merkle_root synced_db)) ) ;
     let new_root =
       With_hash.map t.current_root ~f:(fun root ->
           (* Need to coerce new_root from a proof_verified transition to a fully

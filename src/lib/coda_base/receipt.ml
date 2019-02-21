@@ -5,9 +5,9 @@ open Fold_lib
 module Chain_hash = struct
   include Data_hash.Make_full_size ()
 
-  let to_string t = Binable.to_string (module Stable.V1) t |> B64.encode
+  let to_string t = Binable.to_string (module Stable.Latest) t |> B64.encode
 
-  let of_string s = B64.decode s |> Binable.of_string (module Stable.V1)
+  let of_string s = B64.decode s |> Binable.of_string (module Stable.Latest)
 
   include Codable.Make_of_string (struct
     type nonrec t = t

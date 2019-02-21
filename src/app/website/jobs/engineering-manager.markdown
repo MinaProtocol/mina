@@ -1,6 +1,6 @@
 ---
 title: Engineering Manager
-date: 2018-01-01
+date: 2019-02-15
 ---
 O(1) Labs is aiming to develop the first cryptocurrency protocol that can deliver on the promise of supporting real-world applications and widespread use. Our team is based in San Francisco, and we are funded by top investors (including Polychain, Metastable, Max Levchin, and Naval Ravikant).
 
@@ -23,12 +23,10 @@ Ideal candidates will be interested in:
 
 * Technical leadership
 * Mentorship
-* Cryptography
-* Distributed systems
 * Functional programming
 
 There are no hard requirements and we're more interested in learning about your individual background.
 
-If you'd be interested in talking further, please get in touch by sending an email with your resume and the subject "Engineering Manager applicant" to [jobs@o1labs.org](mailto:jobs@o1labs.org?subject="Engineering Manager applicant").
+If you'd be interested in talking further, please get in touch by sending an email with your resume and the subject "Engineering Manager Applicant" to [jobs@o1labs.org](mailto:jobs@o1labs.org?subject="Engineering Manager Applicant").
 
 We are committed to building a diverse, inclusive company. People of color, LGBTQ individuals, women, and people with disabilities are strongly encouraged to apply.

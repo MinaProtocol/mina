@@ -1,0 +1,12 @@
+(library
+ (name coda_numbers)
+ (public_name coda_numbers)
+ (flags :standard -short-paths -warn-error -58)
+ (inline_tests)
+ (library_flags -linkall)
+ (libraries fold_lib tuple_lib snark_bits snark_params unsigned_extended
+   protocols core snarky crypto_params module_version)
+ (preprocess
+  (pps ppx_jane ppx_deriving.eq ppx_deriving_yojson bisect_ppx --
+    -conditional))
+ (synopsis "Snark-friendly numbers used in Coda consensus"))

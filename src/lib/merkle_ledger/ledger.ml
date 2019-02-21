@@ -2,11 +2,8 @@ open Core
 
 (* SOMEDAY: handle empty wallets *)
 module Make
-    (Key : Intf.Key) (Account : sig
-        type t [@@deriving sexp, bin_io]
-
-        include Intf.Account with type t := t and type key := Key.t
-    end)
+    (Key : Intf.Key)
+    (Account : Intf.Account with type key := Key.t)
     (Hash : sig
               type t [@@deriving sexp, hash, compare, bin_io]
 
@@ -399,19 +396,17 @@ end = struct
           (t.tree).unset_slots <- Int.Set.remove t.tree.unset_slots new_index )
         else set_at_index_exn t new_index a )
 
-  let location_of_addr = Addr.to_int
+  let set_batch_accounts _t _addresses_and_accounts =
+    failwith "unsupported implementation"
 
-  include Util.Make (struct
-    module Location = Location
-    module Account = Account
-    module Addr = Addr
-
-    module Base = struct
-      type nonrec t = t
-
-      let get = get
-    end
-
-    let location_of_addr = location_of_addr
-  end)
+  let get_all_accounts_rooted_at_exn t address =
+    let result =
+      Addr.Range.fold (Addr.Range.subtree_range address) ~init:[]
+        ~f:(fun bit_index acc ->
+          let account = get t (Addr.to_int bit_index) in
+          (bit_index, account) :: acc )
+    in
+    List.rev_filter_map result ~f:(function
+      | _, None -> None
+      | addr, Some account -> Some (addr, account) )
 end

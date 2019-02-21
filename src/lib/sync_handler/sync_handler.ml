@@ -31,20 +31,31 @@ end
 module Make (Inputs : Inputs_intf) :
   Sync_handler_intf
   with type ledger_hash := Ledger_hash.t
+   and type state_hash := State_hash.t
+   and type external_transition := Inputs.External_transition.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type syncable_ledger_query := Sync_ledger.query
    and type syncable_ledger_answer := Sync_ledger.answer = struct
   open Inputs
 
+  let get_breadcrumb_ledgers frontier =
+    List.map
+      (Transition_frontier.all_breadcrumbs frontier)
+      ~f:
+        (Fn.compose Staged_ledger.ledger
+           Transition_frontier.Breadcrumb.staged_ledger)
+
   let get_ledger_by_hash ~frontier ledger_hash =
-    List.find_map (Transition_frontier.all_breadcrumbs frontier) ~f:(fun b ->
-        let ledger =
-          Transition_frontier.Breadcrumb.staged_ledger b
-          |> Staged_ledger.ledger
-        in
-        if Ledger_hash.equal (Ledger.merkle_root ledger) ledger_hash then
-          Some ledger
-        else None )
+    let ledger_breadcrumbs =
+      Sequence.of_lazy
+        (lazy (Sequence.of_list @@ get_breadcrumb_ledgers frontier))
+    in
+    Sequence.append
+      (Sequence.singleton
+         (Transition_frontier.shallow_copy_root_snarked_ledger frontier))
+      ledger_breadcrumbs
+    |> Sequence.find ~f:(fun ledger ->
+           Ledger_hash.equal (Ledger.merkle_root ledger) ledger_hash )
 
   let answer_query ~frontier hash query ~logger =
     let open Option.Let_syntax in
@@ -54,4 +65,14 @@ module Make (Inputs : Inputs_intf) :
     in
     let answer = Sync_ledger.Responder.answer_query responder query in
     (hash, answer)
+
+  let transition_catchup ~frontier hash =
+    let open Option.Let_syntax in
+    let%bind breadcrumb = Transition_frontier.find frontier hash in
+    Transition_frontier.path_map
+      ~f:(fun b ->
+        Transition_frontier.Breadcrumb.transition_with_hash b
+        |> With_hash.data |> External_transition.of_verified )
+      frontier breadcrumb
+    |> Non_empty_list.of_list_opt
 end
