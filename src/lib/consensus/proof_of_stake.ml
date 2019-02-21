@@ -1076,14 +1076,20 @@ module Consensus_state = struct
 
   let to_lite = None
 
-  let to_string_record t =
-    Printf.sprintf
-      "{length|%s}|{epoch_length|%s}|{curr_epoch|%s}|{curr_slot|%s}|{total_currency|%s}"
-      (Length.to_string t.length)
-      (Length.to_string t.epoch_length)
-      (Segment_id.to_string t.curr_epoch)
-      (Segment_id.to_string t.curr_slot)
-      (Amount.to_string t.total_currency)
+  type display =
+    { length: int
+    ; epoch_length: int
+    ; curr_epoch: int
+    ; curr_slot: int
+    ; total_currency: int }
+  [@@deriving yojson]
+
+  let display (t : value) =
+    { length= Length.to_int t.length
+    ; epoch_length= Length.to_int t.epoch_length
+    ; curr_epoch= Segment_id.to_int t.curr_epoch
+    ; curr_slot= Segment_id.to_int t.curr_slot
+    ; total_currency= Amount.to_int t.total_currency }
 end
 
 module Blockchain_state = Coda_base.Blockchain_state.Make (Genesis_ledger)
@@ -1172,7 +1178,8 @@ let received_within_window (epoch, slot) ~time_received =
   let window_end = add window_start Constants.delta_duration in
   window_start < time_received && time_received < window_end
 
-let received_at_valid_time consensus_state ~time_received =
+let received_at_valid_time (consensus_state : Consensus_state.value)
+    ~time_received =
   let open Consensus_state in
   received_within_window
     (consensus_state.curr_epoch, consensus_state.curr_slot)
@@ -1372,7 +1379,8 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
       `Check_again epoch_end_time
 
 (* TODO *)
-let lock_transition prev next ~local_state ~snarked_ledger =
+let lock_transition (prev : Consensus_state.value)
+    (next : Consensus_state.value) ~local_state ~snarked_ledger =
   let open Local_state in
   let open Consensus_state in
   if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
@@ -1483,7 +1491,9 @@ let to_unix_timestamp recieved_time =
   |> Unix_timestamp.of_int64
 
 let%test "Receive a valid consensus_state with a bit of delay" =
-  let {Consensus_state.curr_epoch; curr_slot; _} = Consensus_state.genesis in
+  let ({curr_epoch; curr_slot; _} : Consensus_state.value) =
+    Consensus_state.genesis
+  in
   let delay = Constants.delta / 2 |> UInt32.of_int in
   let new_slot = UInt32.Infix.(curr_slot + delay) in
   let time_received = Epoch.slot_start_time curr_epoch new_slot in

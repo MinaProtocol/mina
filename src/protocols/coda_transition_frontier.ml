@@ -182,6 +182,8 @@ module type Transition_frontier_intf = sig
 
   val shallow_copy_root_snarked_ledger : t -> masked_ledger
 
+  val visualize : filename:string -> t -> unit
+
   module For_tests : sig
     val root_snarked_ledger : t -> ledger_database
   end

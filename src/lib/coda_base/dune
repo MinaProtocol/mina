@@ -39,6 +39,7 @@
     yojson
     codable
     rocksdb
+    visualization
     coda_compile_config)
  (preprocessor_deps ../../config.mlh)
  (preprocess
