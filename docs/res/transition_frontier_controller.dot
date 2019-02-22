@@ -1,22 +1,50 @@
 digraph G {
   // rankdir=LR;
+  newrank=true;
 
-  Network -> "Transition_handler.Validator" [label="transitions (overflow: drop old)",color=blue];
-  Network -> Sync_handler [label="sync queries (overflow: drop old)",color=blue];
+  Network [shape=box];
+  {Network; Transition_router; rank=source};
 
-  "transition has parent" [shape=diamond];
-  "Transition_handler.Validator" -> "Transition_handler.Processor" [label="valid transitions (overflow: drop old)",color=blue];
+  subgraph cluster_participating {
+    label="Participating";
+    "Transition_handler.Validator";
+    "Transition_handler.Processor";
+    "transition has parent" [shape=diamond];
+    {Catchup_scheduler; Catchup; rank=same};
+    Breadcrumb_builder;
+    Unprocessed_transition_cache [color=red];
+    Transition_frontier [color=red];
+  }
+
+  subgraph cluster_bootstrapping {
+    label="Bootstrapping";
+    Bootstrap_controller;
+  }
+
+  {"Transition_handler.Validator"; Bootstrap_controller; rank=same};
+
+  Network -> Transition_router [label="transitions",color=blue];
+  Transition_router -> {"Transition_handler.Validator", Bootstrap_controller}
+    [label="transitions (overflow: drop old)",color=blue];
+
+  Bootstrap_controller -> Transition_router [label="transition frontier",color=green];
+
+  "Transition_handler.Validator" -> "Transition_handler.Processor"
+    [label="transitions (overflow: drop old)",color=blue];
   "Transition_handler.Processor" -> "transition has parent";
-  "transition has parent" -> Frontier [label="yes",color=red];
-  "transition has parent" -> "Catchup.Scheduler" [label="no"];
-  "Transition_handler.Processor" -> "Catchup.Scheduler" [label="notify"];
+  "Transition_handler.Processor" -> Catchup_scheduler [label="notify"];
+  "transition has parent" -> Transition_frontier [label="yes",color=red];
+  "transition has parent" -> Catchup_scheduler [label="no"];
 
-  "after timeout" [shape=diamond];
-  "Catchup.Scheduler" -> "after timeout";
-  "after timeout" -> "Catchup.Worker" [label="catchup job (overflow: drop old)",color=blue];
-  "Catchup.Worker" -> "Transition_handler.Processor" [label="bulk breadcrumbs (overflow: blocking)",color=blue];
+  {Catchup_scheduler, Catchup} -> Breadcrumb_builder;
+  Catchup_scheduler -> Catchup [label="transition rose tree (overflow: drop old)",color=blue];
+  Breadcrumb_builder -> "Transition_handler.Processor" [label="bulk breadcrumbs (overflow: blocking",color=blue];
 
-  Frontier [shape=circle,color=red];
-  Frontier -> Sync_handler [color=red];
-  Sync_handler -> Frontier [color=red];
+  // {Catchup_scheduler, Catchup} -> "Transition_handler.Processor" [label="bulk breadcrumbs (overflow: blocking)",color=blue];
+  // Catchup_scheduler -> Catchup [label="transition rose tree (overflow: drop old)",color=blue];
+
+  "Transition_handler.Validator" -> Unprocessed_transition_cache [color=green];
+  "Transition_handler.Processor" -> Unprocessed_transition_cache [color=red];
+  Catchup_scheduler -> Unprocessed_transition_cache [color=red];
+  Catchup -> Unprocessed_transition_cache [color=red];
 }
