@@ -1,3 +1,5 @@
+open Module_version
+
 module Context = struct
   type ('message, 'pk) t = {message: 'message; public_key: 'pk}
   [@@deriving sexp]
@@ -152,28 +154,77 @@ end = struct
 
   module Evaluation = struct
     module Discrete_log_equality = struct
-      type 'scalar t_ = {c: 'scalar; s: 'scalar} [@@deriving sexp, bin_io]
+      module Stable = struct
+        module V1 = struct
+          type 'scalar t_ = {c: 'scalar; s: 'scalar} [@@deriving sexp, bin_io]
 
-      type t = Scalar.t t_ [@@deriving sexp, bin_io]
+          module T = struct
+            let version = 1
 
-      type var = Scalar.var t_
+            type t = Scalar.t t_ [@@deriving sexp, bin_io]
+          end
 
-      open Impl
+          include T
+          include Registration.Make_latest_version (T)
 
-      let typ : (var, t) Typ.t =
-        let open Snarky.H_list in
-        Typ.of_hlistable [Scalar.typ; Scalar.typ]
-          ~var_to_hlist:(fun {c; s} -> [c; s])
-          ~var_of_hlist:(fun [c; s] -> {c; s})
-          ~value_to_hlist:(fun {c; s} -> [c; s])
-          ~value_of_hlist:(fun [c; s] -> {c; s})
+          type var = Scalar.var t_
+
+          open Impl
+
+          let typ : (var, t) Typ.t =
+            let open Snarky.H_list in
+            Typ.of_hlistable [Scalar.typ; Scalar.typ]
+              ~var_to_hlist:(fun {c; s} -> [c; s])
+              ~var_of_hlist:(fun [c; s] -> {c; s})
+              ~value_to_hlist:(fun {c; s} -> [c; s])
+              ~value_of_hlist:(fun [c; s] -> {c; s})
+        end
+
+        module Latest = V1
+
+        module Module_decl = struct
+          let name = "standalone_evaluation"
+
+          type latest = Latest.t
+        end
+
+        module Registrar = Registration.Make (Module_decl)
+        module Registered_V1 = Registrar.Register (V1)
+      end
+
+      include Stable.Latest
     end
 
     type ('group, 'dleq) t_ =
       {discrete_log_equality: 'dleq; scaled_message_hash: 'group}
     [@@deriving sexp, bin_io]
 
-    type t = (Group.t, Discrete_log_equality.t) t_ [@@deriving sexp, bin_io]
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          let version = 1
+
+          type t = (Group.t, Discrete_log_equality.t) t_
+          [@@deriving sexp, bin_io]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "standalone"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    include Stable.Latest
 
     type var = (Group.var, Discrete_log_equality.var) t_
 

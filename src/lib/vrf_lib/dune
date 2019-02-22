@@ -3,7 +3,7 @@
  (public_name vrf_lib)
  (flags :standard -short-paths)
  (library_flags -linkall)
- (libraries core snarky snarky_curves test_util)
+ (libraries core snarky snarky_curves test_util module_version)
  (preprocess
   (pps ppx_jane ppx_deriving.eq))
  (modules integrated standalone)
