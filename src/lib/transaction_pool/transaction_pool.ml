@@ -87,5 +87,6 @@ struct
   end
 
   (* TODO: Actually back this by the file-system *)
-  let load ~disk_location:_ ~parent_log = return (create ~parent_log)
+  let load ~disk_location:_ ~parent_log ~frontier_broadcast_pipe:_ =
+    return (create ~parent_log)
 end

@@ -602,13 +602,14 @@ struct
 
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (User_command)
-    include Network_pool.Make (Pool) (Pool.Diff)
+    include Network_pool.Make (Pool) (Pool.Diff) (Transition_frontier)
 
     type pool_diff = Pool.Diff.t [@@deriving bin_io]
 
     (* TODO *)
-    let load ~parent_log ~disk_location:_ ~incoming_diffs =
-      return (create ~parent_log ~incoming_diffs)
+    let load ~parent_log ~disk_location:_ ~incoming_diffs
+        ~frontier_broadcast_pipe =
+      return (create ~parent_log ~incoming_diffs ~frontier_broadcast_pipe)
 
     let transactions t = Pool.transactions (pool t)
 
@@ -707,12 +708,12 @@ struct
             {fee; prover} )
     end
 
-    module Pool = Snark_pool.Make (Proof) (Fee) (Work)
+    module Pool = Snark_pool.Make (Proof) (Fee) (Work) (Transition_frontier)
     module Diff = Network_pool.Snark_pool_diff.Make (Proof) (Fee) (Work) (Pool)
 
     type pool_diff = Diff.t
 
-    include Network_pool.Make (Pool) (Diff)
+    include Network_pool.Make (Pool) (Diff) (Transition_frontier)
 
     let get_completed_work t statement =
       Option.map
@@ -721,10 +722,13 @@ struct
           Transaction_snark_work.Checked.create_unsafe
             {Transaction_snark_work.fee; proofs= proof; prover} )
 
-    let load ~parent_log ~disk_location ~incoming_diffs =
+    let load ~parent_log ~disk_location ~incoming_diffs
+        ~frontier_broadcast_pipe =
       match%map Reader.load_bin_prot disk_location Pool.bin_reader_t with
-      | Ok pool -> of_pool_and_diffs pool ~parent_log ~incoming_diffs
-      | Error _e -> create ~parent_log ~incoming_diffs
+      | Ok pool ->
+          of_pool_and_diffs pool ~parent_log ~incoming_diffs
+            ~frontier_broadcast_pipe
+      | Error _e -> create ~parent_log ~incoming_diffs ~frontier_broadcast_pipe
 
     open Snark_work_lib.Work
     open Network_pool.Snark_pool_diff

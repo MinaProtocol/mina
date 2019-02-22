@@ -6,6 +6,15 @@ module Priced_proof = struct
   [@@deriving bin_io, sexp, fields]
 end
 
+module type Transition_frontier_intf = sig
+  type t
+
+  module Extensions :
+    Protocols.Coda_transition_frontier.Transition_frontier_extensions_intf
+
+  val extension_pipes : t -> Extensions.Readers.t
+end
+
 module type S = sig
   type work
 
@@ -37,7 +46,8 @@ end) (Work : sig
   type t [@@deriving sexp, bin_io]
 
   include Hashable.S_binable with type t := t
-end) :
+end)
+(Transition_frontier : Transition_frontier_intf) :
   sig
     include S
 
@@ -91,6 +101,27 @@ let%test_module "random set test" =
       let gen = Int.gen
     end
 
+    module Mock_transition_frontier = struct
+      type t = string
+
+      let create () : t = ""
+
+      module Extensions = struct
+        module Work = Int
+
+        module Readers = struct
+          type t =
+            {snark_pool: int Work.Table.t Pipe_lib.Broadcast_pipe.Reader.t}
+        end
+      end
+
+      let extension_pipes _ =
+        let reader, _writer =
+          Pipe_lib.Broadcast_pipe.create (Extensions.Work.Table.create ())
+        in
+        {Extensions.Readers.snark_pool= reader}
+    end
+
     module Mock_work = Int
     module Mock_fee = Int
 
@@ -104,7 +135,8 @@ let%test_module "random set test" =
       let proof t = t.proof
     end
 
-    module Mock_snark_pool = Make (Mock_proof) (Mock_fee) (Mock_work)
+    module Mock_snark_pool =
+      Make (Mock_proof) (Mock_fee) (Mock_work) (Mock_transition_frontier)
 
     let gen =
       let open Quickcheck.Generator.Let_syntax in

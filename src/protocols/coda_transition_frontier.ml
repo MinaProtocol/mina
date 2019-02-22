@@ -16,7 +16,19 @@ module Transition_frontier_diff = struct
   [@@deriving sexp]
 end
 
-module type Transition_frontier_extension_intf = sig
+module type Transition_frontier_extensions_intf = sig
+  module Work : sig
+    type t [@@deriving sexp, bin_io]
+
+    include Hashable.S_binable with type t := t
+  end
+
+  module Readers : sig
+    type t = {snark_pool: int Work.Table.t Pipe_lib.Broadcast_pipe.Reader.t}
+  end
+end
+
+(* module type Transition_frontier_extension_intf = sig
   type t
 
   type input
@@ -31,7 +43,7 @@ module type Transition_frontier_extension_intf = sig
        t
     -> transition_frontier_breadcrumb Transition_frontier_diff.t
     -> view option
-end
+end *)
 
 module type Network_intf = sig
   type t
@@ -186,7 +198,7 @@ module type Transition_frontier_intf = sig
 
   val shallow_copy_root_snarked_ledger : t -> masked_ledger
 
-  module Extensions : sig
+  (* module Extensions : sig
     module Work : sig
       type t [@@deriving sexp, bin_io]
 
@@ -196,7 +208,8 @@ module type Transition_frontier_intf = sig
     module Readers : sig
       type t = {snark_pool: int Work.Table.t Pipe_lib.Broadcast_pipe.Reader.t}
     end
-  end
+  end*)
+  module Extensions : Transition_frontier_extensions_intf
 
   val extension_pipes : t -> Extensions.Readers.t
 

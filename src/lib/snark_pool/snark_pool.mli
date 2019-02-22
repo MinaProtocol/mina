@@ -36,5 +36,12 @@ end) (Work : sig
   type t [@@deriving sexp, bin_io]
 
   include Hashable.S_binable with type t := t
+end) (Transition_frontier : sig
+  type t
+
+  module Extensions :
+    Protocols.Coda_transition_frontier.Transition_frontier_extensions_intf
+
+  val extension_pipes : t -> Extensions.Readers.t
 end) :
   S with type work := Work.t and type proof := Proof.t and type fee := Fee.t

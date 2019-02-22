@@ -1,4 +1,6 @@
+(** This module keeps track of the number of references from the breadcrumbs in the transition frontier to the work they require *)
 open Protocols
+
 open Core_kernel
 open Coda_base
 open Coda_transition_frontier
@@ -13,12 +15,7 @@ module type Inputs_intf = sig
      and type staged_ledger := Staged_ledger.t
 end
 
-module Make (Inputs : Inputs_intf) :
-  Transition_frontier_extension_intf
-  with type transition_frontier_breadcrumb := Inputs.Breadcrumb.t
-   and type input := unit
-   and type view := int Inputs.Transaction_snark_work.Statement.Table.t =
-struct
+module Make (Inputs : Inputs_intf) = struct
   module Work = Inputs.Transaction_snark_work.Statement
 
   type t = int Work.Table.t
@@ -31,13 +28,21 @@ struct
     in
     Or_error.ok_exn work_to_do
 
-  let add_breadcrumb_to_ref_table table breadcrumb =
-    Sequence.iter (get_work breadcrumb) ~f:(fun work ->
-        Work.Table.change table work ~f:(function
-          | Some count -> Some (count + 1)
-          | None -> Some 1 ) )
+  (** Returns true if this update changed which elements are in the table
+  (but not if the same elements exist with a different reference count) *)
+  let add_breadcrumb_to_ref_table table breadcrumb : bool =
+    Sequence.fold ~init:false (get_work breadcrumb) ~f:(fun acc work ->
+        match Work.Table.find table work with
+        | Some count ->
+            Work.Table.set table ~key:work ~data:(count + 1) ;
+            acc || false
+        | None ->
+            Work.Table.set table ~key:work ~data:1 ;
+            acc || true )
 
-  let remove_breadcrumb_from_ref_table table breadcrumb =
+  (** Returns true if this update changed which elements are in the table
+  (but not if the same elements exist with a different reference count) *)
+  let remove_breadcrumb_from_ref_table table breadcrumb : bool =
     Sequence.fold (get_work breadcrumb) ~init:false ~f:(fun acc work ->
         match Work.Table.find table work with
         | Some 1 ->
@@ -51,19 +56,19 @@ struct
   let create () = Work.Table.create ()
 
   let handle_diff t diff =
-    match (diff : Inputs.Breadcrumb.t Transition_frontier_diff.t) with
-    | New_breadcrumb breadcrumb ->
-        add_breadcrumb_to_ref_table t breadcrumb ;
-        None
-    | New_best_tip {old_root; new_root; new_best_tip; garbage; _} ->
-        add_breadcrumb_to_ref_table t new_best_tip ;
-        let all_garbage =
-          if phys_equal old_root new_root then garbage else old_root :: garbage
-        in
-        let removed : bool =
+    if
+      match (diff : Inputs.Breadcrumb.t Transition_frontier_diff.t) with
+      | New_breadcrumb breadcrumb -> add_breadcrumb_to_ref_table t breadcrumb
+      | New_best_tip {old_root; new_root; new_best_tip; garbage; _} ->
+          let added = add_breadcrumb_to_ref_table t new_best_tip in
+          let all_garbage =
+            if phys_equal old_root new_root then garbage
+            else old_root :: garbage
+          in
           List.fold ~init:false
             ~f:(fun acc bc -> acc || remove_breadcrumb_from_ref_table t bc)
             all_garbage
-        in
-        if removed then Some t else None
+          || added
+    then Some t
+    else None
 end
