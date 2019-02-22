@@ -1,5 +1,6 @@
 open Core_kernel
 open Protocols
+open Module_version
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -45,12 +46,36 @@ end = struct
   open Inputs
 
   module Transaction_with_witness = struct
-    (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
-    type t =
-      { transaction_with_info: Ledger.Undo.t
-      ; statement: Ledger_proof_statement.t
-      ; witness: Inputs.Sparse_ledger.t }
-    [@@deriving sexp, bin_io]
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          let version = 1
+
+          (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
+          type t =
+            { transaction_with_info: Ledger.Undo.t
+            ; statement: Ledger_proof_statement.t
+            ; witness: Inputs.Sparse_ledger.t }
+          [@@deriving sexp, bin_io]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "transaction_snark_scan_state_transaction_with_witness"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    include Stable.Latest
   end
 
   module Ledger_proof_with_sok_message = struct
@@ -97,18 +122,38 @@ end = struct
     Ledger_proof_with_sok_message.t Parallel_scan.State.Completed_job.t
   [@@deriving sexp, bin_io]
 
-  module T = struct
-    type t =
-      { (*Job_count: Keeping track of the number of jobs added to the tree. Every transaction added amounts to two jobs*)
-        tree:
-          ( Ledger_proof_with_sok_message.t
-          , Transaction_with_witness.t )
-          Parallel_scan.State.t
-      ; mutable job_count: int }
-    [@@deriving sexp, bin_io]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        let version = 1
+
+        type t =
+          { (*Job_count: Keeping track of the number of jobs added to the tree. Every transaction added amounts to two jobs*)
+            tree:
+              ( Ledger_proof_with_sok_message.t
+              , Transaction_with_witness.t )
+              Parallel_scan.State.t
+          ; mutable job_count: int }
+        [@@deriving sexp, bin_io]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "transaction_snark_scan_state"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include T
+  include Stable.Latest
 
   (*Work capacity represents max number of work(currently in the tree and the ones that would arise in the future when current jobs are done) in the tree. *)
   let work_capacity () =
