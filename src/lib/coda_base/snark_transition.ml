@@ -1,4 +1,5 @@
 open Core_kernel
+open Module_version
 
 module type Consensus_data_intf = sig
   type value [@@deriving bin_io, sexp]
@@ -80,13 +81,53 @@ module Make (Inputs : Inputs_intf) :
     ; ledger_proof: Proof.t option }
   [@@deriving bin_io, sexp, fields]
 
-  type value =
-    ( Blockchain_state.value
-    , Consensus_data.value
-    , Sok_message.Digest.Stable.V1.t
-    , Currency.Amount.t )
-    t
-  [@@deriving bin_io, sexp]
+  module Value = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          let version = 1
+
+          (* "deriving" incompatible with "nonrec", break definition loop *)
+          type ( 'blockchain_state
+               , 'consensus_data
+               , 'sok_digest
+               , 'supply_increase ) tt =
+            ( 'blockchain_state
+            , 'consensus_data
+            , 'sok_digest
+            , 'supply_increase )
+            t
+          [@@deriving bin_io, sexp]
+
+          type t =
+            ( Blockchain_state.value
+            , Consensus_data.value
+            , Sok_message.Digest.Stable.V1.t
+            , Currency.Amount.t )
+            tt
+          [@@deriving bin_io, sexp]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "snark_transition_value"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    include Stable.Latest
+  end
+
+  type value = Value.t [@@deriving bin_io, sexp]
 
   type var =
     ( Blockchain_state.var
