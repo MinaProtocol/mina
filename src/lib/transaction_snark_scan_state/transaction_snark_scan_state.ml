@@ -79,7 +79,31 @@ end = struct
   end
 
   module Ledger_proof_with_sok_message = struct
-    type t = Ledger_proof.t * Sok_message.t [@@deriving sexp, bin_io]
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          let version = 1
+
+          type t = Ledger_proof.t * Sok_message.t [@@deriving sexp, bin_io]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "transaction_snark_scan_state_ledger_proof_with_sok_message"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    include Stable.Latest
   end
 
   module Available_job = struct
