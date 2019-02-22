@@ -65,8 +65,7 @@ module Make (Inputs : Inputs.S) = struct
         let branch_parent =
           Transition_frontier.find_exn frontier subtree_root_parent_hash
         in
-        Rose_tree.Deferred.fold_map subtree
-          ~init:(Cached.phantom branch_parent)
+        Rose_tree.Deferred.fold_map subtree ~init:(Cached.pure branch_parent)
           ~f:(fun parent cached_transition_with_hash ->
             let%map cached_breadcrumb_result =
               Cached.transform cached_transition_with_hash

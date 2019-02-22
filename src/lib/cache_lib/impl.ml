@@ -55,35 +55,34 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
           ; cache: 'a Cache.t
           ; mutable consumed: bool }
           -> ('b, 'a) t
-      | Phantom : 'a -> ('a, _) t
+      | Pure : 'a -> ('a, _) t
 
-    let phantom x = Phantom x
+    let pure x = Pure x
 
     let cache : type a b. (a, b) t -> b Cache.t = function
       | Base x -> x.cache
       | Derivative x -> x.cache
-      | Phantom _ -> failwith "cannot access cache of phantom Cached.t"
+      | Pure _ -> failwith "cannot access cache of phantom Cached.t"
 
     let value : type a b. (a, b) t -> a = function
       | Base x -> x.data
       | Derivative x -> x.mutant
-      | Phantom x -> x
+      | Pure x -> x
 
     let original : type a b. (a, b) t -> b = function
       | Base x -> x.data
       | Derivative x -> x.original
-      | Phantom _ -> failwith "cannot access original of phantom Cached.t"
+      | Pure _ -> failwith "cannot access original of phantom Cached.t"
 
     let was_consumed : type a b. (a, b) t -> bool = function
       | Base x -> x.consumed
       | Derivative x -> x.consumed
-      | Phantom _ ->
-          failwith "cannot determine consumption of phantom Cached.t"
+      | Pure _ -> failwith "cannot determine consumption of phantom Cached.t"
 
     let mark_consumed : type a b. (a, b) t -> unit = function
       | Base x -> x.consumed <- true
       | Derivative x -> x.consumed <- true
-      | Phantom _ -> failwith "cannot set consumption of phantom Cached.t"
+      | Pure _ -> failwith "cannot set consumption of phantom Cached.t"
 
     let attach_finalizer t =
       Gc.Expert.add_finalizer (Heap_block.create_exn t) (fun block ->
@@ -173,78 +172,106 @@ end
 
 let%test_module "cache_lib test instance" =
   ( module struct
+    let dropped_cache_items = ref 0
+
+    include Make (struct
+      let handle_unconsumed_cache_item ~logger:_ ~cache_name:_ =
+        incr dropped_cache_items
+    end)
+
+    let setup () = dropped_cache_items := 0
+
+    let with_item ~f =
+      Bytes.create 10 |> Bytes.to_string
+      |> String.map ~f:(fun _ -> Char.of_int_exn (Random.bits () land 0xff))
+      |> f
+
+    let with_cache ~logger ~f =
+      Cache.create ~name:"test" ~logger (module String) |> f
+
     let%test_unit "cached objects do not trigger unconsumption hook when \
                    invalidated" =
-      let collected = ref false in
-      let module Cache_lib = Make (struct
-        let handle_unconsumed_cache_item ~logger:_ ~cache_name:_ =
-          collected := true
-      end) in
+      setup () ;
       let logger = Logger.create () in
-      let cache =
-        Cache_lib.Cache.create ~name:"test" ~logger (module String)
-      in
-      (fun () ->
-        let x =
-          Or_error.ok_exn
-            (Cache_lib.Cache.register cache Bytes.(create 10 |> to_string))
-        in
-        ignore (Cache_lib.Cached.invalidate x) )
-        () ;
-      Gc.full_major () ;
-      assert (not !collected)
+      with_cache ~logger ~f:(fun cache ->
+          with_item ~f:(fun data ->
+              let x = Or_error.ok_exn (Cache.register cache data) in
+              ignore (Cached.invalidate x) ) ;
+          Gc.full_major () ;
+          assert (!dropped_cache_items = 0) )
 
     let%test_unit "cached objects are garbage collected independently of caches"
         =
-      let collected = ref false in
-      let module Cache_lib = Make (struct
-        let handle_unconsumed_cache_item ~logger:_ ~cache_name:_ =
-          collected := true
-      end) in
+      setup () ;
       let logger = Logger.create () in
-      let cache =
-        Cache_lib.Cache.create ~name:"test" ~logger (module String)
-      in
-      (fun () ->
-        ignore
-          (Or_error.ok_exn
-             (Cache_lib.Cache.register cache Bytes.(create 10 |> to_string)))
-        )
-        () ;
-      Gc.full_major () ;
-      assert !collected
+      with_cache ~logger ~f:(fun cache ->
+          with_item ~f:(fun data ->
+              ignore (Or_error.ok_exn (Cache.register cache data)) ) ;
+          Gc.full_major () ;
+          assert (!dropped_cache_items = 1) )
 
     let%test_unit "cached objects are garbage collected independently of data"
         =
-      let collected = ref false in
-      let module Cache_lib = Make (struct
-        let handle_unconsumed_cache_item ~logger:_ ~cache_name:_ =
-          collected := true
-      end) in
+      setup () ;
       let logger = Logger.create () in
-      let data = Bytes.(create 10 |> to_string) in
-      (fun () ->
-        let cache =
-          Cache_lib.Cache.create ~name:"test" ~logger (module String)
-        in
-        ignore (Or_error.ok_exn (Cache_lib.Cache.register cache data)) )
-        () ;
-      Gc.full_major () ;
-      assert !collected
+      with_item ~f:(fun data ->
+          with_cache ~logger ~f:(fun cache ->
+              ignore (Or_error.ok_exn (Cache.register cache data)) ) ;
+          Gc.full_major () ;
+          assert (!dropped_cache_items = 1) )
 
     let%test_unit "cached objects are not unexpectedly garbage collected" =
-      let collected = ref false in
-      let module Cache_lib = Make (struct
-        let handle_unconsumed_cache_item ~logger:_ ~cache_name:_ =
-          collected := true
-      end) in
+      setup () ;
       let logger = Logger.create () in
-      let data = Bytes.(create 10 |> to_string) in
-      let cache =
-        Cache_lib.Cache.create ~name:"test" ~logger (module String)
-      in
-      let cached = Or_error.ok_exn (Cache_lib.Cache.register cache data) in
+      with_cache ~logger ~f:(fun cache ->
+          with_item ~f:(fun data ->
+              let cached = Or_error.ok_exn (Cache.register cache data) in
+              Gc.full_major () ;
+              assert (!dropped_cache_items = 0) ;
+              ignore (Cached.invalidate cached) ) ) ;
       Gc.full_major () ;
-      assert (not !collected) ;
-      ignore (Cache_lib.Cached.invalidate cached)
+      assert (!dropped_cache_items = 0)
+
+    let%test_unit "garbage collection of derived cached objects do not \
+                   trigger unconsumption handler for parents" =
+      setup () ;
+      let logger = Logger.create () in
+      with_cache ~logger ~f:(fun cache ->
+          with_item ~f:(fun data ->
+              Cache.register cache data |> Or_error.ok_exn
+              |> Cached.transform ~f:(Fn.const 5)
+              |> Cached.transform ~f:(Fn.const ())
+              |> ignore ) ;
+          Gc.full_major () ;
+          assert (!dropped_cache_items = 1) )
+
+    let%test_unit "properly invalidated derived cached objects do not trigger \
+                   any unconsumption handler calls" =
+      setup () ;
+      let logger = Logger.create () in
+      with_cache ~logger ~f:(fun cache ->
+          with_item ~f:(fun data ->
+              Cache.register cache data |> Or_error.ok_exn
+              |> Cached.transform ~f:(Fn.const 5)
+              |> Cached.transform ~f:(Fn.const ())
+              |> Cached.invalidate |> ignore ) ;
+          Gc.full_major () ;
+          assert (!dropped_cache_items = 0) )
+
+    let%test_unit "deriving a cached object consumes it's parent, disallowing \
+                   use of it" =
+      setup () ;
+      let logger = Logger.create () in
+      with_cache ~logger ~f:(fun cache ->
+          with_item ~f:(fun data ->
+              let src = Or_error.ok_exn (Cache.register cache data) in
+              let derivation = Cached.transform src ~f:(Fn.const 5) in
+              assert (
+                try
+                  ignore (Cached.invalidate src) ;
+                  false
+                with _ -> true ) ;
+              ignore (Cached.invalidate derivation) ) ;
+          Gc.full_major () ;
+          assert (!dropped_cache_items = 0) )
   end )

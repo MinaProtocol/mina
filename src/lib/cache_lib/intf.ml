@@ -27,11 +27,11 @@ module Cached = struct
   module type S = sig
     type ('t, 'cache_t) t
 
-    val phantom : 't -> ('t, _) t
-    (** [phantom v] returns a phantom cached object with
-     *  the value of [v]. Phantom cached objects are used
+    val pure : 't -> ('t, _) t
+    (** [pure v] returns a pure cached object with
+     *  the value of [v]. Pure cached objects are used
      *  for unifying values with the [Cached.t] type for 
-     *  convenience. Phantom cached objects are not stored
+     *  convenience. Pure cached objects are not stored
      *  in a cache and cannot be consumed.
      *)
 

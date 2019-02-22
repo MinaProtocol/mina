@@ -61,7 +61,7 @@ let%test_module "Ledger catchup" =
             ~unprocessed_transition_cache ;
           let expected_breadcrumbs =
             Transition_frontier.path_map peer.frontier best_breadcrumb
-              ~f:Cache_lib.Cached.phantom
+              ~f:Cache_lib.Cached.pure
             |> Rose_tree.of_list_exn
           in
           let result_ivar = Ivar.create () in
