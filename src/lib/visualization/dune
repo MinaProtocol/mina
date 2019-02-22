@@ -1,0 +1,5 @@
+(library
+  (name visualization)
+  (public_name visualization)
+  (libraries core async ocamlgraph yojson)
+  (preprocess (pps ppx_jane ppx_deriving_yojson)))
