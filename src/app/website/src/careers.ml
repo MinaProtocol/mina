@@ -198,10 +198,7 @@ let content =
                     [ [text "Parental leave"]
                     ; [text "Commuting benefits"]
                     ; [text "Bike-friendly culture"]
-                    ; [ text
-                          "Take up to 1 day (8 hours) of paid time off per \
-                           year to volunteer for the causes closest to \
-                           your&nbsp;heart" ]
+                    ; [text "Take up to 1 day of PTO per year to volunteer"]
                     ; [text "We match nonprofit donations up to $500 per year"]
                     ; [text "...and many others!"] ] ])
           ; Apply.(
@@ -210,7 +207,7 @@ let content =
                 ; Role.create "Product Manager"
                     "/jobs/engineering-manager.html"
                 ; Role.create "Senior Frontend Engineer"
-                    "/jobs/frontend-engineer.html"
+                    "/jobs/senior-frontend-engineer.html"
                 ; Role.create "Protocol Reliability Engineer"
                     "/jobs/protocol-reliability-engineer.html"
                 ; Role.create "Senior Protocol Engineer"
