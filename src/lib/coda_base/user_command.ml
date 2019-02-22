@@ -16,7 +16,7 @@ module Stable = struct
         {payload: 'payload; sender: 'pk; signature: 'signature}
       [@@deriving bin_io, eq, sexp, hash, yojson]
 
-      type t = (Payload.Stable.Latest.t, Public_key.t, Signature.t) t_
+      type t = (Payload.Stable.V1.t, Public_key.t, Signature.t) t_
       [@@deriving bin_io, eq, sexp, hash, yojson]
     end
 
@@ -88,11 +88,35 @@ let gen ~keys ~max_amount ~max_fee =
   sign sender payload
 
 module With_valid_signature = struct
-  type t = Stable.Latest.t [@@deriving sexp, eq, bin_io]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        let version = 1
 
-  let compare = Stable.Latest.compare
+        type t = Stable.V1.t [@@deriving sexp, eq, bin_io]
+      end
 
-  let gen = gen
+      include T
+      include Registration.Make_latest_version (T)
+
+      let compare = Stable.V1.compare
+
+      let gen = gen
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "user_command_with_valid_signature"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  include Stable.Latest
 end
 
 let check_signature ({payload; sender; signature} : t) =
