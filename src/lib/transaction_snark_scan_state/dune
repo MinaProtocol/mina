@@ -5,7 +5,7 @@
  (library_flags -linkall)
  (libraries pipe_lib core async async_extra sgn parallel_scan
    transaction_snark coda_base protocols logger ppx_deriving_yojson.runtime
-   yojson)
+   yojson module_version)
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_base ppx_let ppx_sexp_conv ppx_bin_prot ppx_custom_printf
