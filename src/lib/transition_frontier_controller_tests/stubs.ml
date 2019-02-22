@@ -14,6 +14,7 @@ module State_proof = struct
 end
 
 module Ledger_proof_statement = Transaction_snark.Statement
+module Pending_coinbase_state = Transaction_snark.Pending_coinbase_state
 
 module Ledger_proof = struct
   type t = Ledger_proof_statement.t * Sok_message.Digest.Stable.V1.t
@@ -130,6 +131,7 @@ module Staged_ledger = Staged_ledger.Make (struct
   module Pending_coinbase = Pending_coinbase
   module Pending_coinbase_hash = Pending_coinbase.Hash
   module Transaction_witness = Transaction_witness
+  module Pending_coinbase_state = Pending_coinbase_state
 
   module Config = struct
     let transaction_capacity_log_2 = 7
@@ -189,7 +191,8 @@ module Transition_frontier_inputs = struct
   module External_transition = External_transition
   module Staged_ledger = Staged_ledger
   module Transaction_witness = Transaction_witness
-  module Pending_coinbase_hash = Pending_coinbase.Hash
+  module Pending_coinbase_hash = Pending_coinbase_hash
+  module Pending_coinbase_state = Pending_coinbase_state
 end
 
 module Transition_frontier =

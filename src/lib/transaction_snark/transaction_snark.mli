@@ -6,13 +6,17 @@ module Proof_type : sig
   type t = [`Merge | `Base] [@@deriving bin_io, sexp]
 end
 
+module Pending_coinbase_state : sig
+  type t = {source: Pending_coinbase.Hash.t; target: Pending_coinbase.Hash.t}
+  [@@deriving sexp, bin_io, hash, compare, eq, fields]
+end
+
 module Statement : sig
   type t =
     { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
     ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
     ; supply_increase: Currency.Amount.Stable.V1.t
-    ; pending_coinbase_before: Pending_coinbase.Hash.t
-    ; pending_coinbase_after: Pending_coinbase.Hash.t
+    ; pending_coinbase_state: Pending_coinbase_state.t
     ; fee_excess: Currency.Fee.Signed.Stable.V1.t
     ; proof_type: Proof_type.t }
   [@@deriving sexp, bin_io, hash, compare, eq, fields]
@@ -33,8 +37,7 @@ val create :
   -> target:Frozen_ledger_hash.t
   -> proof_type:Proof_type.t
   -> supply_increase:Currency.Amount.t
-  -> pending_coinbase_before:Pending_coinbase.Hash.t
-  -> pending_coinbase_after:Pending_coinbase.Hash.t
+  -> pending_coinbase_state:Pending_coinbase_state.t
   -> fee_excess:Currency.Amount.Signed.t
   -> sok_digest:Sok_message.Digest.t
   -> proof:Tock.Proof.t
@@ -119,9 +122,9 @@ val check_transaction :
      sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
-  -> pending_coinbase1:Coda_base.Pending_coinbase.Hash.t
-  -> pending_coinbase2:Coda_base.Pending_coinbase.Hash.t
+  -> pending_coinbase_state:Pending_coinbase_state.t
   -> new_coinbase_stack:bool
+  -> delete_coinbase_stack:bool
   -> Transaction.t
   -> Tick.Handler.t
   -> unit
@@ -131,6 +134,7 @@ val check_user_command :
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> Pending_coinbase.Hash.t
+  -> delete_coinbase_stack:bool
   -> User_command.With_valid_signature.t
   -> Tick.Handler.t
   -> unit
@@ -142,9 +146,9 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> pending_coinbase1:Coda_base.Pending_coinbase.Hash.t
-    -> pending_coinbase2:Coda_base.Pending_coinbase.Hash.t
+    -> pending_coinbase_state:Pending_coinbase_state.t
     -> coinbase_on_new_tree:bool
+    -> delete_coinbase_stack:bool
     -> Transaction.t
     -> Tick.Handler.t
     -> t

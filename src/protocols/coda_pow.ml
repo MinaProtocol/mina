@@ -380,17 +380,23 @@ module type Transaction_intf = sig
   val supply_increase : t -> Currency.Amount.t Or_error.t
 end
 
+module type Pending_coinbase_state_intf = sig
+  type pending_coinbase_hash
+
+  type t = {source: pending_coinbase_hash; target: pending_coinbase_hash}
+  [@@deriving sexp, bin_io, compare]
+end
+
 module type Ledger_proof_statement_intf = sig
   type ledger_hash
 
-  type pending_coinbase_hash
+  type pending_coinbase_state
 
   type t =
     { source: ledger_hash
     ; target: ledger_hash
     ; supply_increase: Currency.Amount.t
-    ; pending_coinbase_before: pending_coinbase_hash
-    ; pending_coinbase_after: pending_coinbase_hash
+    ; pending_coinbase_state: pending_coinbase_state
     ; fee_excess: Fee.Signed.t
     ; proof_type: [`Base | `Merge] }
   [@@deriving sexp, bin_io, compare]
@@ -1383,10 +1389,14 @@ module type Inputs_intf = sig
   module Sok_message :
     Sok_message_intf with type public_key_compressed := Public_key.Compressed.t
 
+  module Pending_coinbase_state :
+    Pending_coinbase_state_intf
+    with type pending_coinbase_hash := Pending_coinbase_hash.t
+
   module Ledger_proof_statement :
     Ledger_proof_statement_intf
     with type ledger_hash := Frozen_ledger_hash.t
-     and type pending_coinbase_hash := Pending_coinbase_hash.t
+     and type pending_coinbase_state := Pending_coinbase_state.t
 
   module Ledger_proof :
     Ledger_proof_intf

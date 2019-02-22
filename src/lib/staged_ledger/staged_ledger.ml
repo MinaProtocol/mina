@@ -126,7 +126,7 @@ end = struct
         (* Invariant: this is the ledger after having applied all the transactions in
        the above state. *)
     ; ledger: Ledger.attached_mask sexp_opaque
-    (*TODO: ; pending_coinbases: Pending_coinbase.t*) }
+    (*; pending_coinbases: Pending_coinbase.t*) }
   [@@deriving sexp]
 
   type serializable = scan_state * Ledger.serializable [@@deriving bin_io]
@@ -325,10 +325,10 @@ end = struct
       ; target= Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
       ; fee_excess
       ; supply_increase
-      ; pending_coinbase_before
+      ; pending_coinbase_state=
+          {source= pending_coinbase_before; target= pending_coinbase_after}
           (*Unchanged pending_coinbase_before*)
           (*TODO: Updated (pending_coinbase_before, pending_coinbase_after)*)
-      ; pending_coinbase_after
       ; proof_type= `Base } )
 
   let apply_transaction_and_get_witness ledger s non_empty_stack =
@@ -1551,14 +1551,19 @@ let%test_module "test" =
           (coinbase.proposer, coinbase.amount) :: t
       end
 
+      module Pending_coinbase_state = struct
+        type t =
+          {source: Pending_coinbase_hash.t; target: Pending_coinbase_hash.t}
+        [@@deriving sexp, bin_io, compare, hash]
+      end
+
       module Ledger_proof_statement = struct
         module T = struct
           type t =
             { source: Ledger_hash.t
             ; target: Ledger_hash.t
             ; supply_increase: Currency.Amount.t
-            ; pending_coinbase_before: Pending_coinbase_hash.t
-            ; pending_coinbase_after: Pending_coinbase_hash.t
+            ; pending_coinbase_state: Pending_coinbase_state.t
             ; fee_excess: Fee.Signed.t
             ; proof_type: [`Base | `Merge] }
           [@@deriving sexp, bin_io, compare, hash]
@@ -1582,8 +1587,10 @@ let%test_module "test" =
             { source= s1.source
             ; target= s2.target
             ; supply_increase
-            ; pending_coinbase_before= s1.pending_coinbase_before
-            ; pending_coinbase_after= s2.pending_coinbase_after
+            ; pending_coinbase_state=
+                { Pending_coinbase_state.source=
+                    s1.pending_coinbase_state.source
+                ; target= s2.pending_coinbase_state.target }
             ; fee_excess
             ; proof_type= `Merge }
         end
@@ -1608,8 +1615,9 @@ let%test_module "test" =
           ; supply_increase
           ; fee_excess
           ; proof_type
-          ; pending_coinbase_before
-          ; pending_coinbase_after }
+          ; pending_coinbase_state=
+              {source= pending_coinbase_before; target= pending_coinbase_after}
+          }
       end
 
       module Proof = Ledger_proof_statement

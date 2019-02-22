@@ -1,8 +1,8 @@
 open Core_kernel
 open Import
-open Snark_params
 open Snarky
-open Tick
+open Snark_params
+open Snark_params.Tick
 open Let_syntax
 open Currency
 open Fold_lib
@@ -46,7 +46,7 @@ module Coinbase_data = struct
 
   let var_to_triples (public_key, amount) =
     let%map public_key = Public_key.Compressed.var_to_triples public_key in
-    let amount = Amount.var_to_triples amount in
+    let amount = Amount.Signed.Checked.to_triples amount in
     public_key @ amount
 
   let fold ((public_key, amount) : t) =
@@ -131,9 +131,31 @@ module Stack = struct
   module Checked = struct
     type t = var
 
-    let push_var (t : t) (coinbase : Coinbase_data.var) : t = failwith "TODO"
+    let push_var (t : t) (coinbase : Coinbase_data.var) =
+      let init =
+        Pedersen.Checked.Section.create
+          ~acc:(`Value Hash_prefix.coinbase_stack.acc)
+          ~support:
+            (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
+      in
+      let%bind with_t =
+        let%bind bs = var_to_triples t in
+        Pedersen.Checked.Section.extend init bs
+          ~start:Hash_prefix.length_in_triples
+      in
+      let%map with_coinbase =
+        let%bind cb = Coinbase_data.var_to_triples coinbase in
+        Pedersen.Checked.Section.extend with_t cb
+          ~start:(Hash_prefix.length_in_triples + length_in_triples)
+      in
+      let digest, _ =
+        Pedersen.Checked.Section.to_initial_segment_digest_exn with_coinbase
+      in
+      var_of_hash_packed digest
 
     let if_ = if_
+
+    let empty = var_of_t empty
 
     let equal (x : var) (y : var) =
       Field.Checked.equal (var_to_hash_packed x) (var_to_hash_packed y)
@@ -238,7 +260,7 @@ module Hash = struct
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the stack [f stack] at path [addr].
 *)
-  let%snarkydef modify_stack t ~(filter : Stack.var -> ('a, _) Checked.t) ~f =
+  let%snarkydef update_stack' t ~(filter : Stack.var -> ('a, _) Checked.t) ~f =
     let%bind addr =
       request_witness Index.Unpacked.typ
         As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_newest_stack))
@@ -259,7 +281,7 @@ module Hash = struct
    which is [t] but with the stack [f stack] at path [addr].
 *)
   let update_stack t ~is_new_stack ~f =
-    modify_stack t
+    update_stack' t
       ~filter:(fun stack ->
         let%bind empty_stack =
           Stack.Checked.equal stack Stack.(var_of_t empty)

@@ -192,8 +192,9 @@ end = struct
     ; target
     ; fee_excess
     ; supply_increase
-    ; pending_coinbase_before
-    ; pending_coinbase_after
+    ; pending_coinbase_state=
+        { Pending_coinbase_state.source= pending_coinbase_before
+        ; target= pending_coinbase_after }
     ; proof_type= `Base }
 
   let completed_work_to_scanable_work (job : job) (fee, current_proof, prover)
@@ -218,8 +219,9 @@ end = struct
           { Ledger_proof_statement.source= s.source
           ; target= s'.target
           ; supply_increase
-          ; pending_coinbase_before= s.pending_coinbase_before
-          ; pending_coinbase_after= s'.pending_coinbase_after
+          ; pending_coinbase_state=
+              { source= s.pending_coinbase_state.source
+              ; target= s'.pending_coinbase_state.target }
           ; fee_excess
           ; proof_type= `Merge }
         in
@@ -352,8 +354,7 @@ end = struct
           ; source
           ; target
           ; supply_increase= _
-          ; pending_coinbase_before= _
-          ; pending_coinbase_after= _ (*TODO: check pending coinbases?*)
+          ; pending_coinbase_state= _ (*TODO: check pending coinbases?*)
           ; proof_type= _ } ->
           (*TODO: what can be checked here about the pending coinbase hash*)
           let open Or_error.Let_syntax in
@@ -397,8 +398,9 @@ end = struct
         { Ledger_proof_statement.source= stmt1.source
         ; target= stmt2.target
         ; supply_increase
-        ; pending_coinbase_before= stmt1.pending_coinbase_before
-        ; pending_coinbase_after= stmt1.pending_coinbase_after
+        ; pending_coinbase_state=
+            { source= stmt1.pending_coinbase_state.source
+            ; target= stmt2.pending_coinbase_state.target }
         ; fee_excess
         ; proof_type= `Merge }
 

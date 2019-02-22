@@ -43,10 +43,14 @@ module type S = sig
     val add_coinbase_exn : t -> coinbase:Coinbase.t -> on_new_tree:bool -> t
   end
 
+  module Pending_coinbase_state :
+    Coda_pow.Pending_coinbase_state_intf
+    with type pending_coinbase_hash := Pending_coinbase_hash.t
+
   module Ledger_proof_statement :
     Coda_pow.Ledger_proof_statement_intf
     with type ledger_hash := Frozen_ledger_hash.t
-     and type pending_coinbase_hash := Pending_coinbase_hash.t
+     and type pending_coinbase_state := Pending_coinbase_state.t
 
   module Proof : sig
     type t

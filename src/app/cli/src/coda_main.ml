@@ -394,6 +394,7 @@ end
 
 module Fee_transfer = Coda_base.Fee_transfer
 module Ledger_proof_statement = Transaction_snark.Statement
+module Pending_coinbase_state = Transaction_snark.Pending_coinbase_state
 module Transaction_snark_work =
   Staged_ledger.Make_completed_work (Public_key.Compressed) (Ledger_proof)
     (Ledger_proof_statement)
@@ -532,6 +533,7 @@ struct
 
   module Pending_coinbase_hash = Pending_coinbase.Hash
   module Pending_coinbase = Pending_coinbase
+  module Pending_coinbase_state = Pending_coinbase_state
   module Transaction_witness = Coda_base.Transaction_witness
 
   module Staged_ledger = struct
@@ -559,6 +561,7 @@ struct
       module Config = Init
       module Pending_coinbase = Pending_coinbase
       module Pending_coinbase_hash = Pending_coinbase_hash
+      module Pending_coinbase_state = Pending_coinbase_state
       module Transaction_witness = Transaction_witness
 
       let check (Transaction_snark_work.({fee; prover; proofs}) as t) stmts =
@@ -612,6 +615,7 @@ struct
     module Staged_ledger_diff = Staged_ledger_diff
     module External_transition = External_transition
     module Staged_ledger = Staged_ledger
+    module Pending_coinbase_state = Pending_coinbase_state
   end)
 
   module Transaction_pool = struct

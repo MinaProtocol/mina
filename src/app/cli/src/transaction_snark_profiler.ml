@@ -113,10 +113,11 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
               T.of_transaction ~sok_digest:Sok_message.Digest.default
                 ~source:(Sparse_ledger.merkle_root sparse_ledger)
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
-                ~pending_coinbase1:Pending_coinbase.Hash.empty_hash
-                ~pending_coinbase2:Pending_coinbase.Hash.empty_hash t
-                ~coinbase_on_new_tree:false
-                (*TODO: update this*)
+                ~pending_coinbase_state:
+                  { source= Pending_coinbase.Hash.empty_hash
+                  ; target= Pending_coinbase.Hash.empty_hash }
+                t ~coinbase_on_new_tree:false ~delete_coinbase_stack:false
+                (*TODO: test this with true values*)
                 (unstage (Sparse_ledger.handler sparse_ledger)) )
         in
         ((Time.Span.max span max_span, sparse_ledger'), proof) )
@@ -155,9 +156,11 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) =
           Transaction_snark.check_transaction ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
-            ~pending_coinbase1:Pending_coinbase.Hash.empty_hash
-            ~pending_coinbase2:Pending_coinbase.Hash.empty_hash
-            ~new_coinbase_stack:false t
+            ~pending_coinbase_state:
+              { source= Pending_coinbase.Hash.empty_hash
+              ; target= Pending_coinbase.Hash.empty_hash }
+            ~new_coinbase_stack:false ~delete_coinbase_stack:false t
+            (*TODO: add tests for coinbase here?*)
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
         sparse_ledger' )

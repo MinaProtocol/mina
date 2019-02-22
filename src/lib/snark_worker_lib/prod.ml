@@ -67,9 +67,8 @@ module Inputs = struct
             let res =
               M.of_transaction ~sok_digest ~source:input.Statement.source
                 ~target:input.target t
-                ~pending_coinbase1:input.Statement.pending_coinbase_before
-                ~pending_coinbase2:input.Statement.pending_coinbase_after
-                ~coinbase_on_new_tree:false
+                ~pending_coinbase_state:input.Statement.pending_coinbase_state
+                ~coinbase_on_new_tree:false ~delete_coinbase_stack:false
                 (*TODO: get this from transition input*)
                 (unstage (Coda_base.Sparse_ledger.handler w.ledger))
               (*TODO: add handlers for all the witnesses*)
