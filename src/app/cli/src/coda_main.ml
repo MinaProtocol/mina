@@ -12,11 +12,13 @@ open O1trace
 module Fee = Protocols.Coda_pow.Fee
 
 [%%if
-with_snark]
+proof_level = "full"]
 
 module Ledger_proof = Ledger_proof.Prod
 
 [%%else]
+
+(* TODO #1698: proof_level=check *)
 
 module Ledger_proof = struct
   module Statement = Transaction_snark.Statement
@@ -966,7 +968,7 @@ struct
 end
 
 [%%if
-with_snark]
+proof_level = "full"]
 
 module Make_coda (Init : Init_intf) = struct
   module Ledger_proof_verifier = struct
@@ -1008,6 +1010,7 @@ end
 
 [%%else]
 
+(* TODO #1698: proof_level=check ledger proofs *)
 module Make_coda (Init : Init_intf) = struct
   module Ledger_proof_verifier = struct
     let verify _ _ ~message:_ = return true
