@@ -110,11 +110,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let%bind upcoming_breadcrumbs =
             Deferred.all
-            @@ Quickcheck.random_value ~size:4
-                 (Quickcheck_lib.gen_imperative_list
-                    ( randomly_chosen_breadcrumb |> return
-                    |> Quickcheck.Generator.return )
-                    (gen_breadcrumb ~logger ~accounts_with_secret_keys))
+            @@ Quickcheck.random_value
+                 (gen_linear_breadcrumbs ~logger ~size:4
+                    ~accounts_with_secret_keys randomly_chosen_breadcrumb)
           in
           let missing_breadcrumb = List.nth_exn upcoming_breadcrumbs 0 in
           let dangling_breadcrumb1 = List.nth_exn upcoming_breadcrumbs 1 in
