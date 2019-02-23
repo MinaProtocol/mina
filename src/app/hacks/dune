@@ -1,0 +1,9 @@
+(executable
+ (name hacks)
+ (public_name hacks)
+ (package hacks)
+ (libraries core async file_system)
+ (preprocess (pps ppx_jane ppx_deriving.eq))
+ (modes native)
+ )
+
