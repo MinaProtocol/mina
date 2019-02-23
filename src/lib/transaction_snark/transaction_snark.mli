@@ -108,6 +108,7 @@ module Verification : sig
       -> Frozen_ledger_hash.var
       -> Frozen_ledger_hash.var
       -> Pending_coinbase.Stack.var
+      -> Pending_coinbase.Stack.var
       -> Currency.Amount.var
       -> (Tock.Proof.t, 's) Tick.As_prover.t
       -> (Tick.Boolean.var, 's) Tick.Checked.t
@@ -123,8 +124,6 @@ val check_transaction :
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> pending_coinbase_state:Pending_coinbase_state.t
-  -> new_coinbase_stack:bool
-  -> delete_coinbase_stack:bool
   -> Transaction.t
   -> Tick.Handler.t
   -> unit
@@ -134,7 +133,6 @@ val check_user_command :
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> Pending_coinbase.Stack.t
-  -> delete_coinbase_stack:bool
   -> User_command.With_valid_signature.t
   -> Tick.Handler.t
   -> unit
@@ -147,8 +145,6 @@ module type S = sig
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_state:Pending_coinbase_state.t
-    -> coinbase_on_new_tree:bool
-    -> delete_coinbase_stack:bool
     -> Transaction.t
     -> Tick.Handler.t
     -> t

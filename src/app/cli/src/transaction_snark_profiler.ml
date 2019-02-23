@@ -116,7 +116,8 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                 ~pending_coinbase_state:
                   { source= Pending_coinbase.Stack.empty
                   ; target= Pending_coinbase.Stack.empty }
-                t ~coinbase_on_new_tree:false ~delete_coinbase_stack:false
+                t
+                (* ~coinbase_on_new_tree:false ~delete_coinbase_stack:false*)
                 (*TODO: test this with true values*)
                 (unstage (Sparse_ledger.handler sparse_ledger)) )
         in
@@ -159,7 +160,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) =
             ~pending_coinbase_state:
               { source= Pending_coinbase.Stack.empty
               ; target= Pending_coinbase.Stack.empty }
-            ~new_coinbase_stack:false ~delete_coinbase_stack:false t
+            (*~new_coinbase_stack:false ~delete_coinbase_stack:false*) t
             (*TODO: add tests for coinbase here?*)
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
