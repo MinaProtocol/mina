@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Pipe_lib
 
 module Priced_proof = struct
   type ('proof, 'fee) t = {proof: 'proof; fee: 'fee}
@@ -22,9 +23,15 @@ module type S = sig
 
   type fee
 
+  type transition_frontier
+
   type t [@@deriving bin_io]
 
-  val create : parent_log:Logger.t -> t
+  val create :
+       parent_log:Logger.t
+    -> frontier_broadcast_pipe:transition_frontier option
+                               Broadcast_pipe.Reader.t
+    -> t
 
   val add_snark :
        t
@@ -57,7 +64,8 @@ end)
   end
   with type work := Work.t
    and type proof := Proof.t
-   and type fee := Fee.t = struct
+   and type fee := Fee.t
+   and type transition_frontier = Transition_frontier.t = struct
   module Priced_proof = struct
     type t = (Proof.t sexp_opaque, Fee.t) Priced_proof.t
     [@@deriving sexp, bin_io]
@@ -71,7 +79,29 @@ end)
 
   type t = Priced_proof.t Work.Table.t [@@deriving sexp, bin_io]
 
-  let create ~parent_log:_ = Work.Table.create ()
+  type transition_frontier = Transition_frontier.t
+
+  let create ~parent_log:_ ~frontier_broadcast_pipe =
+    let pool = Work.Table.create () in
+    let tf_deferred, _ =
+      Broadcast_pipe.Reader.iter frontier_broadcast_pipe ~f:(function
+        | Some tf ->
+            let pipe = Transition_frontier.extension_pipes tf in
+            let deferred, _ =
+              Broadcast_pipe.Reader.iter
+                pipe.Transition_frontier.Extensions.Readers.snark_pool
+                ~f:(fun refcount_table ->
+                  return
+                    (Work.Table.filter_keys_inplace pool ~f:(fun work ->
+                         Option.is_some
+                           (Transition_frontier.Extensions.Work.Table.find
+                              refcount_table work) )) )
+            in
+            deferred
+        | None -> return () )
+    in
+    Deferred.don't_wait_for tf_deferred ;
+    pool
 
   let add_snark t ~work ~proof ~fee =
     let update_and_rebroadcast () =
@@ -89,7 +119,7 @@ end)
   let remove_solved_work = Work.Table.remove
 end
 
-let%test_module "random set test" =
+(* let%test_module "random set test" =
   ( module struct
     module Mock_proof = struct
       type input = Int.t
@@ -144,7 +174,13 @@ let%test_module "random set test" =
         Quickcheck.Generator.tuple3 Mock_work.gen Mock_work.gen Mock_fee.gen
       in
       let%map sample_solved_work = Quickcheck.Generator.list (gen_entry ()) in
-      let pool = Mock_snark_pool.create ~parent_log:(Logger.create ()) in
+      let frontier_broadcast_pipe_r, _ =
+        Broadcast_pipe.create (Some (Mock_transition_frontier.create ()))
+      in
+      let pool =
+        Mock_snark_pool.create ~parent_log:(Logger.create ())
+          ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+      in
       List.iter sample_solved_work ~f:(fun (work, proof, fee) ->
           ignore (Mock_snark_pool.add_snark pool ~work ~proof ~fee) ) ;
       pool
@@ -201,4 +237,4 @@ let%test_module "random set test" =
           assert (
             {Priced_proof.fee= cheap_fee; proof= cheap_proof}
             = Option.value_exn (Mock_snark_pool.request_proof t work) ) )
-  end )
+  end ) *)

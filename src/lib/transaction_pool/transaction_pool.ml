@@ -28,6 +28,11 @@ module Make (Payment : sig
   end
 
   val check : t -> With_valid_signature.t option
+end) (Transition_frontier : sig
+  type t
+
+  module Extensions :
+    Protocols.Coda_transition_frontier.Transition_frontier_extensions_intf
 end) =
 struct
   type pool =
@@ -36,7 +41,9 @@ struct
 
   type t = {mutable pool: pool; log: Logger.t}
 
-  let create ~parent_log =
+  type transition_frontier = Transition_frontier.t
+
+  let create ~parent_log ~frontier_broadcast_pipe:_ =
     { pool=
         { heap= Fheap.create ~cmp:Payment.With_valid_signature.compare
         ; set= Payment.With_valid_signature.Set.empty }

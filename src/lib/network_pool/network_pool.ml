@@ -5,7 +5,13 @@ open Pipe_lib
 module type Pool_intf = sig
   type t
 
-  val create : parent_log:Logger.t -> t
+  type transition_frontier
+
+  val create :
+       parent_log:Logger.t
+    -> frontier_broadcast_pipe:transition_frontier option
+                               Broadcast_pipe.Reader.t
+    -> t
 end
 
 module type Transition_frontier_intf = sig
@@ -63,12 +69,11 @@ module Snark_pool_diff = Snark_pool_diff
 
 module Make
     (Pool : Pool_intf)
-    (Pool_diff : Pool_diff_intf with type pool := Pool.t)
-    (Transition_frontier : Transition_frontier_intf) :
+    (Pool_diff : Pool_diff_intf with type pool := Pool.t) :
   Network_pool_intf
   with type pool := Pool.t
    and type pool_diff := Pool_diff.t
-   and type transition_frontier := Transition_frontier.t = struct
+   and type transition_frontier := Pool.transition_frontier = struct
   type t =
     { pool: Pool.t
     ; log: Logger.t
@@ -102,11 +107,11 @@ module Make
   let create ~parent_log ~incoming_diffs ~frontier_broadcast_pipe =
     let log = Logger.child parent_log __MODULE__ in
     of_pool_and_diffs
-      (Pool.create ~parent_log:log)
+      (Pool.create ~parent_log:log ~frontier_broadcast_pipe)
       ~parent_log ~incoming_diffs ~frontier_broadcast_pipe
 end
 
-let%test_module "network pool test" =
+(* let%test_module "network pool test" =
   ( module struct
     module Mock_proof = struct
       type input = Int.t
@@ -205,4 +210,4 @@ let%test_module "network pool test" =
         Deferred.unit
       in
       verify_unsolved_work |> Async.Thread_safe.block_on_async_exn
-  end )
+  end ) *)
