@@ -149,7 +149,7 @@ module Haskell_process = struct
       with
       | Ok p ->
           (* If the Kademlia process dies, kill the parent daemon process. Fix
-           * for #550 *)
+         * for #550 *)
           Deferred.upon (Process.wait p.process) (fun code ->
               match (!(p.failure_response), code) with
               | `Ignore, _ | _, Ok () -> ()
@@ -623,53 +623,54 @@ let%test_module "Tests" =
           let%bind () = Haskell_trust.stop node in
           Haskell_trust.For_tests.node addr peers conf_dir trust_system
 
-        let%test_unit "connect with ban logic" =
-          (* This flakes 1 in 20 times, so try a couple times if it fails *)
-          run_connection_test ~f:(fun banner_conf_dir normal_conf_dir ->
-              let banner_addr = peer_of_int 0 in
-              let normal_addr = peer_of_int 1 in
-              let normal_peer = Peer.to_discovery_host_and_port normal_addr in
-              let trust_system = Trust_system.create () in
-              let%bind banner_node =
-                Haskell_trust.For_tests.node banner_addr [normal_peer]
-                  banner_conf_dir trust_system
-              and normal_node =
-                Haskell.For_tests.node normal_addr [] normal_conf_dir
-                  (create_trust_system ())
-              in
-              let%bind initial_discovered_peers =
-                Deferred.any
-                  [ Haskell_trust.first_peers banner_node
-                  ; Deferred.map (wait_sec 10.) ~f:(fun () -> []) ]
-              in
-              assert (List.length initial_discovered_peers <> 0) ;
-              trust_system :=
-                Unix.Inet_addr.Set.add !trust_system normal_addr.host ;
-              let%bind is_not_connected_to_banned_peer =
-                poll 5. ~f:(fun () ->
-                    let peers_after_ban = Haskell_trust.peers banner_node in
-                    return (List.length peers_after_ban = 0) )
-              in
-              assert is_not_connected_to_banned_peer ;
-              trust_system := Unix.Inet_addr.Set.empty ;
-              let%bind new_banner_node =
-                reset banner_node ~addr:banner_addr ~conf_dir:banner_conf_dir
-                  ~trust_system ~peers:[normal_peer]
-              in
-              let%bind is_reconnecting_to_banned_peer =
-                poll 10. ~f:(fun () ->
-                    let peers_after_reconnect =
-                      Haskell_trust.peers new_banner_node
-                    in
-                    Deferred.return
-                    @@ Option.is_some
-                         (List.find peers_after_reconnect ~f:(fun p ->
-                              p = peer_of_int 1 )) )
-              in
-              assert is_reconnecting_to_banned_peer ;
-              let%bind () = Haskell_trust.stop new_banner_node
-              and () = Haskell.stop normal_node in
-              Deferred.unit )
+        (* TODO: Re-enable #1725
+         * let%test_unit "connect with ban logic" =
+            (* This flakes 1 in 20 times, so try a couple times if it fails *)
+            run_connection_test ~f:(fun banner_conf_dir normal_conf_dir ->
+                let banner_addr = peer_of_int 0 in
+                let normal_addr = peer_of_int 1 in
+                let normal_peer = Peer.to_discovery_host_and_port normal_addr in
+                let trust_system = Trust_system.create () in
+                let%bind banner_node =
+                  Haskell_trust.For_tests.node banner_addr [normal_peer]
+                    banner_conf_dir trust_system
+                and normal_node =
+                  Haskell.For_tests.node normal_addr [] normal_conf_dir
+                    (create_trust_system ())
+                in
+                let%bind initial_discovered_peers =
+                  Deferred.any
+                    [ Haskell_trust.first_peers banner_node
+                    ; Deferred.map (wait_sec 10.) ~f:(fun () -> []) ]
+                in
+                assert (List.length initial_discovered_peers <> 0) ;
+                trust_system :=
+                  Unix.Inet_addr.Set.add !trust_system normal_addr.host ;
+                let%bind is_not_connected_to_banned_peer =
+                  poll 5. ~f:(fun () ->
+                      let peers_after_ban = Haskell_trust.peers banner_node in
+                      return (List.length peers_after_ban = 0) )
+                in
+                assert is_not_connected_to_banned_peer ;
+                trust_system := Unix.Inet_addr.Set.empty ;
+                let%bind new_banner_node =
+                  reset banner_node ~addr:banner_addr ~conf_dir:banner_conf_dir
+                    ~trust_system ~peers:[normal_peer]
+                in
+                let%bind is_reconnecting_to_banned_peer =
+                  poll 10. ~f:(fun () ->
+                      let peers_after_reconnect =
+                        Haskell_trust.peers new_banner_node
+                      in
+                      Deferred.return
+                      @@ Option.is_some
+                        (List.find peers_after_reconnect ~f:(fun p ->
+                             p = peer_of_int 1 )) )
+                in
+                assert is_reconnecting_to_banned_peer ;
+                let%bind () = Haskell_trust.stop new_banner_node
+                and () = Haskell.stop normal_node in
+                Deferred.unit ) *)
       end )
 
     let%test_unit "lockfile does not exist after connection calling stop" =
