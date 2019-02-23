@@ -22,11 +22,7 @@ module Make (Inputs : Inputs.S) = struct
   type t =
     { logger: Logger.t
     ; time_controller: Time.Controller.t
-    ; catchup_job_writer:
-        ( (External_transition.Verified.t, State_hash.t) With_hash.t
-        , synchronous
-        , unit Deferred.t )
-        Writer.t
+    ; catchup_job_writer: (State_hash.t, synchronous, unit Deferred.t) Writer.t
           (** `collected_transitins` stores all seen transitions as its keys,
               and values are a list of direct children of those transitions.
               The invariant is that every collected transition would appear as
@@ -116,7 +112,7 @@ module Make (Inputs : Inputs.S) = struct
     in
     let make_timeout duration =
       Time.Timeout.create t.time_controller duration ~f:(fun _ ->
-          don't_wait_for (Writer.write t.catchup_job_writer transition) )
+          don't_wait_for (Writer.write t.catchup_job_writer parent_hash) )
     in
     match Hashtbl.find t.collected_transitions parent_hash with
     | None ->
@@ -143,9 +139,9 @@ module Make (Inputs : Inputs.S) = struct
             hash
         else
           let _ : Time.Span.t option = cancel_timeout t hash in
-          Hashtbl.update t.collected_transitions parent_hash ~f:(function
-            | None -> failwith "this is impossible"
-            | Some sibling_transitions -> transition :: sibling_transitions ) ;
+          Hashtbl.update t.collected_transitions parent_hash
+            ~f:(fun maybe_sibling_transitions ->
+              transition :: Option.value_exn maybe_sibling_transitions ) ;
           Hashtbl.update t.collected_transitions hash ~f:(function
             | None -> []
             | Some ts -> ts )

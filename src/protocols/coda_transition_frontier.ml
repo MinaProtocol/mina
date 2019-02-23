@@ -202,10 +202,7 @@ module type Catchup_intf = sig
        logger:Logger.t
     -> network:network
     -> frontier:transition_frontier
-    -> catchup_job_reader:( external_transition_verified
-                          , state_hash )
-                          With_hash.t
-                          Reader.t
+    -> catchup_job_reader:state_hash Reader.t
     -> catchup_breadcrumbs_writer:( transition_frontier_breadcrumb Rose_tree.t
                                     list
                                   , synchronous

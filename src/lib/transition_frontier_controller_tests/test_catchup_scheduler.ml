@@ -43,72 +43,6 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       in
       frontier
 
-    let%test_unit "before the timeout expires, the missing node is received \
-                   by the scheduler, so the timeout would be canceled" =
-      let _catchup_job_reader, catchup_job_writer =
-        Strict_pipe.create Synchronous
-      in
-      let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
-        Strict_pipe.create Synchronous
-      in
-      Thread_safe.block_on_async_exn (fun () ->
-          let open Deferred.Let_syntax in
-          let%bind frontier = setup_random_frontier () in
-          let scheduler =
-            Catchup_scheduler.create ~logger ~frontier ~time_controller
-              ~catchup_job_writer ~catchup_breadcrumbs_writer
-          in
-          let randomly_chosen_breadcrumb =
-            Transition_frontier.all_breadcrumbs frontier
-            |> List.permute |> List.hd_exn
-          in
-          let%bind upcoming_breadcrumbs =
-            Deferred.all
-            @@ Quickcheck.random_value ~size:2
-                 (Quickcheck_lib.gen_imperative_list
-                    ( randomly_chosen_breadcrumb |> return
-                    |> Quickcheck.Generator.return )
-                    (gen_breadcrumb ~logger ~accounts_with_secret_keys))
-          in
-          let missing_breadcrumb = List.nth_exn upcoming_breadcrumbs 0 in
-          let missing_transition =
-            Transition_frontier.Breadcrumb.transition_with_hash
-              missing_breadcrumb
-          in
-          let dangling_breadcrumb = List.nth_exn upcoming_breadcrumbs 1 in
-          let dangling_transition =
-            Transition_frontier.Breadcrumb.transition_with_hash
-              dangling_breadcrumb
-          in
-          Catchup_scheduler.watch scheduler ~timeout_duration
-            ~transition:dangling_transition ;
-          Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb ;
-          Catchup_scheduler.notify scheduler ~transition:missing_transition
-          |> ignore ;
-          assert (Catchup_scheduler.is_empty scheduler) ;
-          let result_ivar = Ivar.create () in
-          Strict_pipe.Reader.iter_without_pushback catchup_breadcrumbs_reader
-            ~f:(fun dangling_rose_trees ->
-              Ivar.fill result_ivar dangling_rose_trees )
-          |> don't_wait_for ;
-          let%map dangling_rose_trees = Ivar.read result_ivar in
-          let received_rose_tree =
-            Rose_tree.T (missing_breadcrumb, dangling_rose_trees)
-          in
-          assert (
-            Rose_tree.equal received_rose_tree
-              (Rose_tree.of_list_exn upcoming_breadcrumbs)
-              ~f:(fun breadcrumb1 breadcrumb2 ->
-                External_transition.Verified.equal
-                  (With_hash.data
-                     (Transition_frontier.Breadcrumb.transition_with_hash
-                        breadcrumb1))
-                  (With_hash.data
-                     (Transition_frontier.Breadcrumb.transition_with_hash
-                        breadcrumb2)) ) ) ;
-          Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
-          Strict_pipe.Writer.close catchup_job_writer )
-
     let%test_unit "after the timeout expires, the missing node still doesn't \
                    show up, so the catchup job is fired" =
       let catchup_job_reader, catchup_job_writer =
@@ -130,11 +64,14 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let%bind upcoming_breadcrumbs =
             Deferred.all
-            @@ Quickcheck.random_value ~size:2
-                 (Quickcheck_lib.gen_imperative_list
-                    ( randomly_chosen_breadcrumb |> return
-                    |> Quickcheck.Generator.return )
-                    (gen_breadcrumb ~logger ~accounts_with_secret_keys))
+            @@ Quickcheck.random_value
+                 (gen_linear_breadcrumbs ~logger ~size:2
+                    ~accounts_with_secret_keys randomly_chosen_breadcrumb)
+          in
+          let missing_hash =
+            List.hd_exn upcoming_breadcrumbs
+            |> Transition_frontier.Breadcrumb.transition_with_hash
+            |> With_hash.hash
           in
           let dangling_breadcrumb = List.nth_exn upcoming_breadcrumbs 1 in
           let dangling_transition =
@@ -145,14 +82,10 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             ~transition:dangling_transition ;
           let result_ivar = Ivar.create () in
           Strict_pipe.Reader.iter_without_pushback catchup_job_reader
-            ~f:(fun catchup_transition ->
-              Ivar.fill result_ivar catchup_transition )
+            ~f:(fun catchup_hash -> Ivar.fill result_ivar catchup_hash )
           |> don't_wait_for ;
-          let%map catchup_transition = Ivar.read result_ivar in
-          assert (
-            External_transition.Verified.equal
-              (With_hash.data dangling_transition)
-              (With_hash.data catchup_transition) ) ;
+          let%map catchup_hash = Ivar.read result_ivar in
+          assert (Coda_base.State_hash.equal missing_hash catchup_hash) ;
           Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
           Strict_pipe.Writer.close catchup_job_writer )
 
@@ -178,11 +111,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let%bind upcoming_breadcrumbs =
             Deferred.all
-            @@ Quickcheck.random_value ~size:4
-                 (Quickcheck_lib.gen_imperative_list
-                    ( randomly_chosen_breadcrumb |> return
-                    |> Quickcheck.Generator.return )
-                    (gen_breadcrumb ~logger ~accounts_with_secret_keys))
+            @@ Quickcheck.random_value
+                 (gen_linear_breadcrumbs ~logger ~size:4
+                    ~accounts_with_secret_keys randomly_chosen_breadcrumb)
           in
           let missing_breadcrumb = List.nth_exn upcoming_breadcrumbs 0 in
           let dangling_breadcrumb1 = List.nth_exn upcoming_breadcrumbs 1 in
@@ -328,9 +259,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
           Strict_pipe.Writer.close catchup_job_writer )
 
-    let%test_unit "If a non-linear sequence of transitions in order and the \
-                   missing node is received before the timeout expires, the \
-                   timeout would be canceled" =
+    let%test_unit "If a non-linear sequence of transitions out of order and \
+                   the missing node is received before the timeout expires, \
+                   the timeout would be canceled" =
       let _catchup_job_reader, catchup_job_writer =
         Strict_pipe.create Synchronous
       in

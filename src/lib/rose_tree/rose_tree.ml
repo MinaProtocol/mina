@@ -13,8 +13,7 @@ let rec of_list_exn = function
 let rec equal ~f (T (value1, children1)) (T (value2, children2)) =
   f value1 value2 && List.equal ~equal:(equal ~f) children1 children2
 
-let subset ~f xs ys =
-  List.(fold xs ~init:true ~f:(fun acc x -> acc && mem ys x ~equal:f))
+let subset ~f xs ys = List.for_all xs ~f:(fun x -> List.mem ys x ~equal:f)
 
 let bag_equiv ~f xs ys = subset ~f xs ys && subset ~f ys xs
 
