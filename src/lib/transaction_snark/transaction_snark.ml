@@ -516,8 +516,9 @@ module Merge = struct
       ; transition12: Transition_data.t
       ; ledger_hash3: bool list
       ; transition23: Transition_data.t
-      ; pending_coinbase_before: bool list
-      ; pending_coinbase_after: bool list }
+      ; pending_coinbase_stack1: bool list
+      ; pending_coinbase_stack2: bool list
+      ; pending_coinbase_stack3: bool list }
     [@@deriving fields]
   end
 
@@ -558,7 +559,8 @@ module Merge = struct
 
   let construct_input_checked ~prefix
       ~(sok_digest : Sok_message.Digest.Checked.t) ~state1 ~state2
-      ~pending_coinbase_state ~supply_increase ~fee_excess ?tock_vk () =
+      ~pending_coinbase_stack1 ~pending_coinbase_stack2 ~supply_increase
+      ~fee_excess ?tock_vk () =
     let prefix_section =
       Pedersen.Checked.Section.create ~acc:prefix
         ~support:
@@ -574,7 +576,8 @@ module Merge = struct
       extend prefix_and_sok_digest
         ~start:
           ( Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
-          + state_hash_size_in_triples + state_hash_size_in_triples )
+          + (2 * state_hash_size_in_triples)
+          + (2 * Pending_coinbase.Stack.length_in_triples) )
         ( Amount.var_to_triples supply_increase
         @ Amount.Signed.Checked.to_triples fee_excess )
     in
@@ -582,7 +585,8 @@ module Merge = struct
       ( [ prefix_and_sok_digest_and_supply_increase_and_fee
         ; state1
         ; state2
-        ; pending_coinbase_state ]
+        ; pending_coinbase_stack1
+        ; pending_coinbase_stack2 ]
       @ Option.to_list tock_vk )
 
   (* spec for [verify_transition tock_vk proof_field s1 s2]:
@@ -590,7 +594,8 @@ module Merge = struct
      there is a snark proving making tock_vk
      accept on one of [ H(s1, s2, excess); H(s1, s2, excess, tock_vk) ] *)
   let verify_transition tock_vk tock_vk_data tock_vk_section
-      get_transition_data s1 s2 pending_coinbase supply_increase fee_excess =
+      get_transition_data s1 s2 ~pending_coinbase_stack1
+      ~pending_coinbase_stack2 supply_increase fee_excess =
     let%bind is_base =
       let get_type s = get_transition_data s |> Transition_data.proof |> fst in
       with_label __LOC__
@@ -608,8 +613,8 @@ module Merge = struct
              ~else_:Hash_prefix.merge_snark.acc)
       in
       construct_input_checked ~prefix ~sok_digest ~state1:s1 ~state2:s2
-        ~pending_coinbase_state:pending_coinbase ~supply_increase ~fee_excess
-        ()
+        ~pending_coinbase_stack1 ~pending_coinbase_stack2 ~supply_increase
+        ~fee_excess ()
     in
     let%bind with_vk_top_hash =
       with_label __LOC__
@@ -636,6 +641,8 @@ module Merge = struct
   let state2_offset = state1_offset + state_hash_size_in_triples
 
   let state3_offset = state2_offset + state_hash_size_in_triples
+
+  let state4_offset = state3_offset + state_hash_size_in_triples
 
   (* spec for [main top_hash]:
      constraints pass iff
@@ -667,9 +674,11 @@ module Merge = struct
         ~f:
           (Fn.compose Transition_data.supply_increase Prover_state.transition23)
     and pending_coinbase1 =
-      exists' wrap_input_typ ~f:Prover_state.pending_coinbase_before
+      exists' wrap_input_typ ~f:Prover_state.pending_coinbase_stack1
     and pending_coinbase2 =
-      exists' wrap_input_typ ~f:Prover_state.pending_coinbase_after
+      exists' wrap_input_typ ~f:Prover_state.pending_coinbase_stack2
+    and pending_coinbase3 =
+      exists' wrap_input_typ ~f:Prover_state.pending_coinbase_stack3
     in
     let bits_to_triples bits =
       Fold.(to_list (group3 ~default:Boolean.false_ (of_list bits)))
@@ -682,9 +691,17 @@ module Merge = struct
       let open Pedersen.Checked.Section in
       extend empty ~start:state2_offset (bits_to_triples s3)
     in
+    let%bind coinbase_section1 =
+      let open Pedersen.Checked.Section in
+      extend empty ~start:state3_offset (bits_to_triples pending_coinbase1)
+    in
     let%bind coinbase_section2 =
       let open Pedersen.Checked.Section in
       extend empty ~start:state3_offset (bits_to_triples pending_coinbase2)
+    in
+    let%bind coinbase_section3 =
+      let open Pedersen.Checked.Section in
+      extend empty ~start:state4_offset (bits_to_triples pending_coinbase3)
     in
     let tock_vk_data =
       Verifier.Verification_key.Checked.to_full_data tock_vk
@@ -709,7 +726,8 @@ module Merge = struct
         in
         construct_input_checked ~prefix:(`Value Hash_prefix.merge_snark.acc)
           ~sok_digest ~state1:s1_section ~state2:s3_section
-          ~pending_coinbase_state:coinbase_section2 ~supply_increase
+          ~pending_coinbase_stack1:coinbase_section1
+          ~pending_coinbase_stack2:coinbase_section3 ~supply_increase
           ~fee_excess:total_fees ~tock_vk:tock_vk_section ()
         >>| Pedersen.Checked.Section.to_initial_segment_digest_exn >>| fst
       in
@@ -719,21 +737,21 @@ module Merge = struct
         let open Pedersen.Checked.Section in
         extend empty ~start:state2_offset (bits_to_triples s2)
       in
-      let%bind coinbase_section1 =
-        let open Pedersen.Checked.Section in
-        extend empty ~start:state3_offset (bits_to_triples pending_coinbase1)
-      in
       verify_transition tock_vk tock_vk_data tock_vk_section
-        Prover_state.transition12 s1_section s2_section coinbase_section1
-        supply_increase12 fee_excess12
+        Prover_state.transition12 s1_section s2_section
+        ~pending_coinbase_stack1:coinbase_section1
+        ~pending_coinbase_stack2:coinbase_section2 supply_increase12
+        fee_excess12
     and verify_23 =
       let%bind s2_section =
         let open Pedersen.Checked.Section in
         extend empty ~start:state1_offset (bits_to_triples s2)
       in
       verify_transition tock_vk tock_vk_data tock_vk_section
-        Prover_state.transition23 s2_section s3_section coinbase_section2
-        supply_increase23 fee_excess23
+        Prover_state.transition23 s2_section s3_section
+        ~pending_coinbase_stack1:coinbase_section2
+        ~pending_coinbase_stack2:coinbase_section3 supply_increase23
+        fee_excess23
     in
     Boolean.Assert.all [verify_12; verify_23]
 
@@ -1141,9 +1159,11 @@ struct
       ; ledger_hash1= ledger_to_bits ledger_hash1
       ; ledger_hash2= ledger_to_bits ledger_hash2
       ; ledger_hash3= ledger_to_bits ledger_hash3
-      ; pending_coinbase_before=
+      ; pending_coinbase_stack1=
           coinbase_to_bits transition12.pending_coinbase_state.source
-      ; pending_coinbase_after=
+      ; pending_coinbase_stack2=
+          coinbase_to_bits transition12.pending_coinbase_state.target
+      ; pending_coinbase_stack3=
           coinbase_to_bits transition23.pending_coinbase_state.target
       ; transition12
       ; transition23
