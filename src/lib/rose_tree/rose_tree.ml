@@ -28,6 +28,8 @@ module type Ops_intf = sig
 
   val iter : 'a t -> f:('a -> unit Monad.t) -> unit Monad.t
 
+  val map : 'a t -> f:('a -> 'b Monad.t) -> 'b t Monad.t
+
   val fold_map : 'a t -> init:'b -> f:('b -> 'a -> 'b Monad.t) -> 'b t Monad.t
 end
 
@@ -38,6 +40,11 @@ struct
   let rec iter (T (base, successors)) ~f =
     let%bind () = f base in
     Monad.List.iter successors ~f:(iter ~f)
+
+  let rec map (T (base, successors)) ~f =
+    let%bind base' = f base in
+    let%map successors' = Monad.List.map successors ~f:(map ~f) in
+    T (base', successors')
 
   let rec fold_map (T (base, successors)) ~init ~f =
     let%bind base' = f init base in

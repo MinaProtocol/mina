@@ -39,8 +39,9 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     in
     let%bind () =
       Result.ok_if_true
-        (Unprocessed_transition_cache.mem unprocessed_transition_cache
-           transition_with_hash)
+        (not
+           (Unprocessed_transition_cache.mem unprocessed_transition_cache
+              transition_with_hash))
         ~error:`Duplicate
     in
     let%map () =

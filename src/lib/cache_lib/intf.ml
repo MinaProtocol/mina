@@ -97,6 +97,8 @@ module Cache = struct
      *)
 
     val mem : 'elt t -> 'elt -> bool
+
+    val to_list : 'elt t -> 'elt list
   end
 end
 

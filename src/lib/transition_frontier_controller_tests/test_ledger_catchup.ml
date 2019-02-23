@@ -31,6 +31,8 @@ end)
 let%test_module "Ledger catchup" =
   ( module struct
     let%test "catchup to a peer" =
+      Core.Backtrace.elide := false ;
+      Async.Scheduler.set_record_backtraces true ;
       let logger = Logger.create () in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind me, peer, network =
@@ -51,20 +53,16 @@ let%test_module "Ledger catchup" =
           let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
           let best_transition =
             Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
-            |> Cache_lib.Cached.pure
-            (*
             |> Transition_handler.Unprocessed_transition_cache.register
                  unprocessed_transition_cache
             |> Or_error.ok_exn
-            *)
           in
           Strict_pipe.Writer.write catchup_job_writer best_transition ;
           Ledger_catchup.run ~logger ~network ~frontier:me
             ~catchup_breadcrumbs_writer ~catchup_job_reader
             ~unprocessed_transition_cache ;
           let expected_breadcrumbs =
-            Transition_frontier.path_map peer.frontier best_breadcrumb
-              ~f:Cache_lib.Cached.pure
+            Transition_frontier.path_map peer.frontier best_breadcrumb ~f:Fn.id
             |> Rose_tree.of_list_exn
           in
           let result_ivar = Ivar.create () in
@@ -72,14 +70,17 @@ let%test_module "Ledger catchup" =
             ~f:(fun rose_tree ->
               Deferred.return @@ Ivar.fill result_ivar rose_tree )
           |> don't_wait_for ;
-          let%map catchup_breadcrumbs =
+          let%map cached_catchup_breadcrumbs =
             Ivar.read result_ivar >>| List.hd_exn
+          in
+          let catchup_breadcrumbs =
+            Rose_tree.map cached_catchup_breadcrumbs
+              ~f:(Fn.compose Or_error.ok_exn Cache_lib.Cached.invalidate)
           in
           Rose_tree.equal expected_breadcrumbs catchup_breadcrumbs
             ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->
               let to_transition b =
-                Cache_lib.Cached.peek b
-                |> Transition_frontier.Breadcrumb.transition_with_hash
+                Transition_frontier.Breadcrumb.transition_with_hash b
                 |> With_hash.data
               in
               External_transition.Verified.equal

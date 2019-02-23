@@ -28,8 +28,8 @@ module Make (Inputs : Inputs.S) :
     transition |> With_hash.data |> External_transition.Verified.protocol_state
     |> External_transition.Protocol_state.previous_state_hash
 
-  (* We would like the async scheduler to context switch between each iteration 
-  of external transitions when trying to build breadcrumb_path. Therefore, this 
+  (* We would like the async scheduler to context switch between each iteration
+  of external transitions when trying to build breadcrumb_path. Therefore, this
   function needs to return a Deferred *)
   let construct_breadcrumb_path ~logger initial_breadcrumb
       cached_external_transitions =
@@ -107,10 +107,10 @@ module Make (Inputs : Inputs.S) :
         |> Deferred.Result.map_error ~f:(fun error ->
                `Invalid (Error.to_string_hum error) )
       in
-      (* We need to coerce the transition from a proof_verified 
-        transition to a fully verified in 
-        order to add the transition to be added to the 
-        transition frontier and to be fed through the 
+      (* We need to coerce the transition from a proof_verified
+        transition to a fully verified in
+        order to add the transition to be added to the
+        transition frontier and to be fed through the
         transition_handler_validator. *)
       let (`I_swear_this_is_safe_see_my_comment verified_transition) =
         External_transition.to_verified transition

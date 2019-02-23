@@ -16,10 +16,14 @@ val equal : f:('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 
 val iter : 'a t -> f:('a -> unit) -> unit
 
+val map : 'a t -> f:('a -> 'b) -> 'b t
+
 val fold_map : 'a t -> init:'b -> f:('b -> 'a -> 'b) -> 'b t
 
 module Deferred : sig
   val iter : 'a t -> f:('a -> unit Deferred.t) -> unit Deferred.t
+
+  val map : 'a t -> f:('a -> 'b Deferred.t) -> 'b t Deferred.t
 
   val fold_map :
     'a t -> init:'b -> f:('b -> 'a -> 'b Deferred.t) -> 'b t Deferred.t
@@ -27,6 +31,9 @@ module Deferred : sig
   module Or_error : sig
     val iter :
       'a t -> f:('a -> unit Deferred.Or_error.t) -> unit Deferred.Or_error.t
+
+    val map :
+      'a t -> f:('a -> 'b Deferred.Or_error.t) -> 'b t Deferred.Or_error.t
 
     val fold_map :
          'a t
@@ -38,6 +45,8 @@ end
 
 module Or_error : sig
   val iter : 'a t -> f:('a -> unit Or_error.t) -> unit Or_error.t
+
+  val map : 'a t -> f:('a -> 'b Or_error.t) -> 'b t Or_error.t
 
   val fold_map :
     'a t -> init:'b -> f:('b -> 'a -> 'b Or_error.t) -> 'b t Or_error.t

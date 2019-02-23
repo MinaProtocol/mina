@@ -36,6 +36,8 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
     let mem t x = Hash_set.mem t.set x
 
     let remove t x = Hash_set.strict_remove t.set x
+
+    let to_list t = Hash_set.to_list t.set
   end
   
   and Cached : sig
@@ -62,7 +64,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
     let cache : type a b. (a, b) t -> b Cache.t = function
       | Base x -> x.cache
       | Derivative x -> x.cache
-      | Pure _ -> failwith "cannot access cache of phantom Cached.t"
+      | Pure _ -> failwith "cannot access cache of pure Cached.t"
 
     let value : type a b. (a, b) t -> a = function
       | Base x -> x.data
@@ -72,17 +74,17 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
     let original : type a b. (a, b) t -> b = function
       | Base x -> x.data
       | Derivative x -> x.original
-      | Pure _ -> failwith "cannot access original of phantom Cached.t"
+      | Pure _ -> failwith "cannot access original of pure Cached.t"
 
     let was_consumed : type a b. (a, b) t -> bool = function
       | Base x -> x.consumed
       | Derivative x -> x.consumed
-      | Pure _ -> failwith "cannot determine consumption of phantom Cached.t"
+      | Pure _ -> failwith "cannot determine consumption of pure Cached.t"
 
     let mark_consumed : type a b. (a, b) t -> unit = function
       | Base x -> x.consumed <- true
       | Derivative x -> x.consumed <- true
-      | Pure _ -> failwith "cannot set consumption of phantom Cached.t"
+      | Pure _ -> failwith "cannot set consumption of pure Cached.t"
 
     let attach_finalizer t =
       Gc.Expert.add_finalizer (Heap_block.create_exn t) (fun block ->
