@@ -35,6 +35,7 @@ module type Inputs_intf = sig
          prev_state:Consensus_mechanism.Protocol_state.value
       -> prev_state_proof:Protocol_state_proof.t
       -> next_state:Consensus_mechanism.Protocol_state.value
+      -> local_state:Consensus_mechanism.Local_state.t
       -> Internal_transition.t
       -> Protocol_state_proof.t Deferred.Or_error.t
   end
@@ -221,6 +222,7 @@ module Make (Inputs : Inputs_intf) :
             Time.now time_controller |> Time.to_span_since_epoch
             |> Time.Span.to_ms
           in
+          (* pull prev snarked_ledger_hash *)
           measure "consensus generate_transition" (fun () ->
               Consensus_mechanism.generate_transition ~previous_protocol_state
                 ~blockchain_state ~time ~proposal_data
@@ -228,10 +230,7 @@ module Make (Inputs : Inputs_intf) :
                   ( Staged_ledger_diff.With_valid_signatures_and_proofs
                     .user_commands diff
                     :> User_command.t list )
-                ~snarked_ledger_hash:
-                  (Option.value_map ledger_proof_opt
-                     ~default:previous_ledger_hash ~f:(fun (proof, _) ->
-                       Ledger_proof.(statement proof |> statement_target) ))
+                ~snarked_ledger_hash:previous_ledger_hash
                 ~supply_increase ~logger ) )
     in
     lift_sync (fun () ->
@@ -311,12 +310,15 @@ module Make (Inputs : Inputs_intf) :
                       measure "proving state transition valid" (fun () ->
                           Prover.prove ~prev_state:previous_protocol_state
                             ~prev_state_proof:previous_protocol_state_proof
-                            ~next_state:protocol_state internal_transition )
+                            ~next_state:protocol_state internal_transition
+                            ~local_state:consensus_local_state)
                     with
                     | Error err ->
                         Logger.error logger
                           "failed to prove generated protocol state: %s"
                           (Error.to_string_hum err) ;
+                        Logger.info logger !"XXX previous state: %{sexp:Protocol_state.value}" previous_protocol_state ;
+                        Logger.info logger !"XXX next state: %{sexp:Protocol_state.value}" protocol_state ;
                         return ()
                     | Ok protocol_state_proof ->
                         let span = Time.diff (Time.now time_controller) t0 in

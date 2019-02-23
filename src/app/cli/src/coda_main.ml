@@ -909,7 +909,7 @@ struct
     module Transaction_validator = Transaction_validator
 
     module Prover = struct
-      let prove ~prev_state ~prev_state_proof ~next_state
+      let prove ~prev_state ~prev_state_proof ~next_state ~local_state
           (transition : Internal_transition.t) =
         match Init.proposer_prover with
         | `Non_proposer -> failwith "prove: Coda not run as proposer"

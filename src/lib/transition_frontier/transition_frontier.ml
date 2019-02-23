@@ -508,6 +508,7 @@ module Make (Inputs : Inputs_intf) :
               (Breadcrumb.consensus_state root_node.breadcrumb)
               (Breadcrumb.consensus_state new_root_node.breadcrumb)
               ~local_state:t.consensus_local_state
+              ~logger:t.logger
               ~snarked_ledger:
                 (Coda_base.Ledger.Any_ledger.cast
                    (module Coda_base.Ledger.Db)

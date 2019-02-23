@@ -10,6 +10,8 @@ open Coda_main
 module YJ = Yojson.Safe
 module Git_sha = Daemon_rpcs.Types.Git_sha
 
+let _ = printf "ST: %s\n%!" (Time.now () |> Time.to_string) ;
+
 [%%if
 fake_hash]
 
@@ -458,5 +460,6 @@ let () =
   don't_wait_for (ensure_testnet_id_still_good log) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
+  printf "ED: %s\n%!" (Time.now () |> Time.to_string) ;
   Command.run (Command.group ~summary:"Coda" (coda_commands log)) ;
   Core.exit 0

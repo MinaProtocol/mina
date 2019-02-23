@@ -1312,7 +1312,7 @@ let%test_module "transaction_snark" =
               check_user_command ~sok_message
                 ~source:(Ledger.merkle_root ledger)
                 ~target t1
-                (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
+                (unstage @@ Sparse_ledger.handler sparse_ledger ~debug:false) ) )
 
     let%test "base_and_merge" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -1352,7 +1352,7 @@ let%test_module "transaction_snark" =
               in
               let proof12 =
                 of_user_command' sok_digest ledger t1
-                  (unstage @@ Sparse_ledger.handler sparse_ledger)
+                  (unstage @@ Sparse_ledger.handler sparse_ledger ~debug:false)
               in
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn sparse_ledger
@@ -1364,7 +1364,7 @@ let%test_module "transaction_snark" =
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof23 =
                 of_user_command' sok_digest ledger t2
-                  (unstage @@ Sparse_ledger.handler sparse_ledger)
+                  (unstage @@ Sparse_ledger.handler sparse_ledger ~debug:false)
               in
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn sparse_ledger

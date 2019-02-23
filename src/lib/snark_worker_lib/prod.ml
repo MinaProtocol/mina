@@ -64,7 +64,7 @@ module Inputs = struct
             let res =
               M.of_transaction ~sok_digest ~source:input.Statement.source
                 ~target:input.target t
-                (unstage (Coda_base.Sparse_ledger.handler l))
+                (unstage (Coda_base.Sparse_ledger.handler l ~debug:false))
             in
             Cache.add cache ~statement ~proof:res ;
             let total = Time.abs_diff (Time.now ()) start in

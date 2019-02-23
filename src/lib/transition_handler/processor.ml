@@ -5,6 +5,8 @@ open Pipe_lib.Strict_pipe
 open Coda_base
 open O1trace
 
+let i = ref 0
+
 module Make (Inputs : Inputs.S) :
   Transition_handler_processor_intf
   with type state_hash := State_hash.t
@@ -29,9 +31,9 @@ module Make (Inputs : Inputs.S) :
       ~proposer_transition_reader ~catchup_job_writer
       ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
       ~processed_transition_writer =
-    let logger = Logger.child logger "Transition_handler.Catchup" in
+    let cs_logger = Logger.child logger "Transition_handler.Catchup" in
     let catchup_scheduler =
-      Catchup_scheduler.create ~logger ~frontier ~time_controller
+      Catchup_scheduler.create ~logger:cs_logger ~frontier ~time_controller
         ~catchup_job_writer ~catchup_breadcrumbs_writer
     in
     ignore
@@ -92,6 +94,10 @@ module Make (Inputs : Inputs.S) :
                        in
                        Transition_frontier.add_breadcrumb_exn frontier
                          breadcrumb ;
+                       let filename = sprintf "/tmp/tf-%d-%d.dot" (Unix.getpid ()) !i in
+                       Logger.error logger "writing to %s" filename ;
+                       Transition_frontier.visualize frontier ~filename ;
+                       i := !i + 1 ;
                        Writer.write processed_transition_writer transition ;
                        Deferred.return
                        @@ Catchup_scheduler.notify catchup_scheduler

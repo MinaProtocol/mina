@@ -30,6 +30,10 @@ module type S = sig
     -> Blockchain.t Deferred.Or_error.t
 end
 
+let worker_started_tracing = ref false
+
+let start_tracing_once () = if not !worker_started_tracing then Coda_tracing.start "/tmp/worker-traces" |> don't_wait_for ; worker_started_tracing := true
+
 module Consensus_mechanism = Consensus
 module Blockchain = Blockchain
 
@@ -94,10 +98,11 @@ module Worker_state = struct
                      (Consensus_mechanism.Prover_state.handler
                         state_for_handler)
                  in
+                 start_tracing_once () ;
                  let prev_proof =
-                   Tick.Groth16.prove
+                   O1trace.measure "prove" (fun () -> Tick.Groth16.prove
                      (Tick.Groth16.Keypair.pk Keys.Step.keys)
-                     (Keys.Step.input ()) prover_state main next_state_top_hash
+                     (Keys.Step.input ()) prover_state main next_state_top_hash)
                  in
                  { Blockchain.state= next_state
                  ; proof= wrap next_state_top_hash prev_proof }
@@ -136,10 +141,11 @@ module Worker_state = struct
                      (Consensus_mechanism.Prover_state.handler
                         state_for_handler)
                  in
+                 start_tracing_once () ;
                  let _ =
-                   Tick.Groth16.check
+                   assert (O1trace.measure "check" (fun () -> Tick.Groth16.check
                      (main @@ Tick.Field.Var.constant next_state_top_hash)
-                     prover_state
+                     prover_state))
                  in
                  { Blockchain.state= next_state
                  ; proof= Precomputed_values.base_proof }

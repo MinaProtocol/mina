@@ -555,6 +555,9 @@ module Vrf = struct
         ~seed =
       let open Snark_params.Tick in
       let open Let_syntax in
+      let%bind () = exists Typ.unit ~compute:As_prover.(
+        map (read Epoch_ledger.typ epoch_ledger) ~f:(fun {hash;_} -> Core.printf !"want hash: %{sexp:Coda_base.Frozen_ledger_hash.t}%!" hash )
+        ) in
       let%bind winner_addr =
         request_witness Coda_base.Account.Index.Unpacked.typ
           (As_prover.return Winner_address)
@@ -579,7 +582,7 @@ module Vrf = struct
         Coda_base.Sparse_ledger.of_ledger_subset_exn Genesis_ledger.t [pk]
       in
       let ledger_handler =
-        unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger)
+        unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger ~debug:true)
       in
       fun (With {request; respond} as t) ->
         match request with
@@ -596,17 +599,18 @@ module Vrf = struct
         ; delegator= 0 }
   end
 
-  let check ~local_state ~epoch ~slot ~seed ~private_key ~total_stake
+  let check ~local_state ~use_curr ~epoch ~slot ~seed ~private_key ~total_stake
       ~ledger_hash ~logger =
     let open Message in
     let open Local_state in
     let open Snapshot in
     let open Option.Let_syntax in
+    (* other place where we branch to use genesis ledger vs local state. search all uses of Genesis_ledger.t *)
     let%bind epoch_snapshot =
       let snapshot =
         if Coda_base.Frozen_ledger_hash.equal ledger_hash genesis_ledger_hash
-        then Some local_state.Local_state.genesis_epoch_snapshot
-        else local_state.Local_state.last_epoch_snapshot
+        then (Logger.info logger "XXX returning genesis snapshot" ; Some local_state.Local_state.genesis_epoch_snapshot)
+        else if use_curr then (Logger.info logger "XXX curr" ; local_state.Local_state.curr_epoch_snapshot) else (Logger.info logger "XXX last" ; local_state.last_epoch_snapshot)
       in
       if snapshot = None then
         Logger.info logger
@@ -631,11 +635,12 @@ module Vrf = struct
                  (Random_oracle.Digest.fold_bits vrf_result)) ;
             if Threshold.is_satisfied ~my_stake:balance ~total_stake vrf_result
             then
+              (Logger.error logger !"XXX (local_state=%d) changing to snapshot with root hash %{sexp:Coda_base.Ledger_hash.t}" (Obj.magic local_state : int) (Coda_base.Sparse_ledger.merkle_root epoch_snapshot.ledger) ;
               return
                 (Some
                    { Proposal_data.stake_proof=
                        {private_key; delegator; ledger= epoch_snapshot.ledger}
-                   ; vrf_result }) ) ;
+                   ; vrf_result }) ) );
         None )
 end
 
@@ -746,6 +751,8 @@ module Epoch_data = struct
     let open Epoch_ledger in
     let last_data, curr_data, epoch_length =
       if next_epoch > prev_epoch then
+        (
+
         ( curr_data
         , { seed= Epoch_seed.initial
           ; ledger= {hash= snarked_ledger_hash; total_currency}
@@ -753,6 +760,7 @@ module Epoch_data = struct
           ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
           ; length= Length.of_int 1 }
         , Length.succ epoch_length )
+        )
       else (
         assert (Epoch.equal next_epoch prev_epoch) ;
         ( last_data
@@ -1127,7 +1135,7 @@ module Prover_state = struct
   let precomputed_handler = Vrf.Precomputed.handler
 
   let handler {delegator; ledger; private_key} : Snark_params.Tick.Handler.t =
-    let ledger_handler = unstage (Coda_base.Sparse_ledger.handler ledger) in
+    let ledger_handler = unstage (Coda_base.Sparse_ledger.handler ledger ~debug:true) in
     fun (With {request; respond} as t) ->
       match request with
       | Vrf.Winner_address -> respond (Provide delegator)
@@ -1347,7 +1355,7 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
     in
     let total_stake = epoch_data.ledger.total_currency in
     let proposal_data slot =
-      Vrf.check ~epoch ~slot ~seed:epoch_data.seed ~local_state
+      Vrf.check ~use_curr:(state.curr_epoch_data.length <= Length.of_int Constants.k) ~epoch ~slot ~seed:epoch_data.seed ~local_state
         ~private_key:keypair.private_key ~total_stake
         ~ledger_hash:epoch_data.ledger.hash ~logger
     in
@@ -1380,7 +1388,7 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
 
 (* TODO *)
 let lock_transition (prev : Consensus_state.value)
-    (next : Consensus_state.value) ~local_state ~snarked_ledger =
+    (next : Consensus_state.value) ~local_state ~snarked_ledger ~logger =
   let open Local_state in
   let open Consensus_state in
   if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
@@ -1399,6 +1407,12 @@ let lock_transition (prev : Consensus_state.value)
           in
           {delegators; ledger} )
     in
+    Logger.info logger !"XXX lock_transition (local_state=%d) using snarked_ledger (hash=%{sexp:Coda_base.Ledger_hash.t}), moving from %{sexp:Coda_base.Ledger_hash.t option} to %{sexp:Coda_base.Ledger_hash.t option}"
+      (Obj.magic local_state : int)
+      (Coda_base.Ledger.Any_ledger.M.merkle_root snarked_ledger)
+      (Option.map ~f:(fun {ledger;_} -> Coda_base.Sparse_ledger.merkle_root ledger) local_state.curr_epoch_snapshot)
+      (Option.map ~f:(fun {ledger;_} -> Coda_base.Sparse_ledger.merkle_root ledger) epoch_snapshot)
+      ;
     local_state.last_epoch_snapshot <- local_state.curr_epoch_snapshot ;
     local_state.curr_epoch_snapshot <- epoch_snapshot )
 

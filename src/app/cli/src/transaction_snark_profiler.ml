@@ -113,7 +113,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                 ~source:(Sparse_ledger.merkle_root sparse_ledger)
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
                 t
-                (unstage (Sparse_ledger.handler sparse_ledger)) )
+                (unstage (Sparse_ledger.handler sparse_ledger ~debug:false)) )
         in
         ((Time.Span.max span max_span, sparse_ledger'), proof) )
   in
@@ -152,7 +152,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) =
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
             t
-            (unstage (Sparse_ledger.handler sparse_ledger))
+            (unstage (Sparse_ledger.handler sparse_ledger ~debug:false))
         in
         sparse_ledger' )
   in

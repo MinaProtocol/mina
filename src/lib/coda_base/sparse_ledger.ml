@@ -146,12 +146,14 @@ let apply_transaction_exn t transition =
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Pedersen.Digest.t)
 
-let handler t =
+let handler t ~debug =
   let ledger = ref t in
+  let seen = ref false in
   let path_exn idx =
     List.map (path_exn !ledger idx) ~f:(function `Left h -> h | `Right h -> h)
   in
   stage (fun (With {request; respond}) ->
+      if debug && not !seen then (seen := true ; printf !"handling request for ledger with hash %{sexp:Ledger_hash.t}\n%!" (merkle_root !ledger) ) ;
       match request with
       | Ledger_hash.Get_element idx ->
           let elt = get_exn !ledger idx in
@@ -162,6 +164,8 @@ let handler t =
           respond (Provide path)
       | Ledger_hash.Set (idx, account) ->
           ledger := set_exn !ledger idx account ;
+          printf "Mutating a sparse ledger in a handler!\n" ;
+          seen := false ;
           respond (Provide ())
       | Ledger_hash.Find_index pk ->
           let index = find_index_exn !ledger pk in
