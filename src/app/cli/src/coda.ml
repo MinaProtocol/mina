@@ -458,5 +458,7 @@ let () =
   don't_wait_for (ensure_testnet_id_still_good log) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
+  (* Turn on async backtraces *)
+  Async.Scheduler.set_record_backtraces true ;
   Command.run (Command.group ~summary:"Coda" (coda_commands log)) ;
   Core.exit 0
