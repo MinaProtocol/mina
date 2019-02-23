@@ -9,28 +9,29 @@ module Make
     (Impl : Snarky.Snark_intf.S) (Scalar : sig
         module Stable : sig
           module V1 : sig
-            type t [@@deriving bin_io, sexp, eq]
+            type t [@@deriving bin_io, sexp]
+          end
+        end
 
-            val random : unit -> t
+        type t [@@deriving bin_io, sexp, eq]
 
-            val add : t -> t -> t
+        val random : unit -> t
 
-            val mul : t -> t -> t
+        val add : t -> t -> t
 
-            type var
+        val mul : t -> t -> t
 
-            val typ : (var, t) Impl.Typ.t
+        type var
 
-            module Checked : sig
-              open Impl
+        val typ : (var, t) Impl.Typ.t
 
-              val to_bits :
-                var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
+        module Checked : sig
+          open Impl
 
-              module Assert : sig
-                val equal : var -> var -> (unit, _) Checked.t
-              end
-            end
+          val to_bits : var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
+
+          module Assert : sig
+            val equal : var -> var -> (unit, _) Checked.t
           end
         end
     end) (Group : sig
@@ -40,7 +41,7 @@ module Make
 
       val negate : t -> t
 
-      val scale : t -> Scalar.Stable.V1.t -> t
+      val scale : t -> Scalar.t -> t
 
       val generator : t
 
@@ -85,7 +86,7 @@ module Make
       (* I believe this has to be a random oracle *)
 
       val hash_for_proof :
-        Message.t -> Group.t -> Group.t -> Group.t -> Scalar.Stable.V1.t
+        Message.t -> Group.t -> Group.t -> Group.t -> Scalar.t
 
       module Checked : sig
         val hash_for_proof :
@@ -93,7 +94,7 @@ module Make
           -> Group.var
           -> Group.var
           -> Group.var
-          -> (Scalar.Stable.V1.var, _) Impl.Checked.t
+          -> (Scalar.var, _) Impl.Checked.t
       end
     end) : sig
   module Public_key : sig
@@ -103,9 +104,9 @@ module Make
   end
 
   module Private_key : sig
-    type t = Scalar.Stable.V1.t
+    type t = Scalar.t
 
-    type var = Scalar.Stable.V1.var
+    type var = Scalar.var
   end
 
   module Context : sig
@@ -155,7 +156,7 @@ end = struct
         ~value_of_hlist:(fun [message; public_key] -> {message; public_key})
   end
 
-  module Private_key = Scalar.Stable.V1
+  module Private_key = Scalar
 
   module Evaluation = struct
     module Discrete_log_equality = struct
@@ -166,20 +167,19 @@ end = struct
           module T = struct
             let version = 1
 
-            type t = Scalar.Stable.V1.t t_ [@@deriving sexp, bin_io]
+            type t = Scalar.t t_ [@@deriving sexp, bin_io]
           end
 
           include T
           include Registration.Make_latest_version (T)
 
-          type var = Scalar.Stable.V1.var t_
+          type var = Scalar.var t_
 
           open Impl
 
           let typ : (var, t) Typ.t =
             let open Snarky.H_list in
-            Typ.of_hlistable
-              [Scalar.Stable.V1.typ; Scalar.Stable.V1.typ]
+            Typ.of_hlistable [Scalar.typ; Scalar.typ]
               ~var_to_hlist:(fun {c; s} -> [c; s])
               ~var_of_hlist:(fun [c; s] -> {c; s})
               ~value_to_hlist:(fun {c; s} -> [c; s])
@@ -251,13 +251,13 @@ end = struct
       let public_key = Group.scale Group.generator k in
       let message_hash = Message.hash_to_group message in
       let discrete_log_equality : Discrete_log_equality.t =
-        let r = Scalar.Stable.V1.random () in
+        let r = Scalar.random () in
         let c =
           Hash.hash_for_proof message public_key
             Group.(scale generator r)
             Group.(scale message_hash r)
         in
-        {c; s= Scalar.Stable.V1.(add r (mul k c))}
+        {c; s= Scalar.(add r (mul k c))}
       in
       {discrete_log_equality; scaled_message_hash= Group.scale message_hash k}
 
@@ -269,7 +269,7 @@ end = struct
       let ( * ) s g = Group.scale g s in
       let message_hash = Message.hash_to_group message in
       let dleq =
-        Scalar.Stable.V1.equal c
+        Scalar.equal c
           (Hash.hash_for_proof message public_key
              ((s * g) + (c * Group.negate public_key))
              ((s * message_hash) + (c * Group.negate scaled_message_hash)))
@@ -289,12 +289,10 @@ end = struct
             (* s * g - c * public_key *)
             let%bind sg =
               Group.Checked.scale_known shifted Group.generator
-                (Scalar.Stable.V1.Checked.to_bits s)
-                ~init:Shifted.zero
+                (Scalar.Checked.to_bits s) ~init:Shifted.zero
             in
             Group.Checked.(
-              scale shifted (negate public_key)
-                (Scalar.Stable.V1.Checked.to_bits c)
+              scale shifted (negate public_key) (Scalar.Checked.to_bits c)
                 ~init:sg)
             >>= Shifted.unshift_nonzero
           and b =
@@ -302,18 +300,16 @@ end = struct
             let%bind sx =
               let%bind message_hash = Message.Checked.hash_to_group message in
               Group.Checked.scale shifted message_hash
-                (Scalar.Stable.V1.Checked.to_bits s)
-                ~init:Shifted.zero
+                (Scalar.Checked.to_bits s) ~init:Shifted.zero
             in
             Group.Checked.(
               scale shifted
                 (negate scaled_message_hash)
-                (Scalar.Stable.V1.Checked.to_bits c)
-                ~init:sx)
+                (Scalar.Checked.to_bits c) ~init:sx)
             >>= Shifted.unshift_nonzero
           in
           Hash.Checked.hash_for_proof message public_key a b
-          >>= Scalar.Stable.V1.Checked.Assert.equal c
+          >>= Scalar.Checked.Assert.equal c
         in
         (* TODO: This could just hash (message_hash, message_hash^k) instead
           if it were cheaper *)
@@ -401,36 +397,38 @@ let%test_module "vrf-test" =
       module Stable = struct
         module V1 = struct
           include Snarky.Libsnark.Mnt6.Field
+        end
+      end
 
-          let of_bits = Other_impl.Field.project
+      include Stable.V1
 
-          include (Other_impl.Field : Sexpable.S with type t := t)
+      let of_bits = Other_impl.Field.project
 
-          include Binable.Of_sexpable (Other_impl.Field)
+      include (Other_impl.Field : Sexpable.S with type t := t)
 
-          let length_in_bits = size_in_bits
+      include Binable.Of_sexpable (Other_impl.Field)
 
-          open Impl
+      let length_in_bits = size_in_bits
 
-          type var = Boolean.var list
+      open Impl
 
-          let typ =
-            Typ.transport
-              (Typ.list ~length:size_in_bits Boolean.typ)
-              ~there:Other_impl.Field.unpack ~back:Other_impl.Field.project
+      type var = Boolean.var list
 
-          let gen : t Quickcheck.Generator.t =
-            Quickcheck.Generator.map
-              (B.gen_incl B.one B.(Other_impl.Field.size - one))
-              ~f:(fun x -> Other_impl.Bigint.(to_field (of_bignum_bigint x)))
+      let typ =
+        Typ.transport
+          (Typ.list ~length:size_in_bits Boolean.typ)
+          ~there:Other_impl.Field.unpack ~back:Other_impl.Field.project
 
-          module Checked = struct
-            let to_bits xs = Bitstring_lib.Bitstring.Lsb_first.of_list xs
+      let gen : t Quickcheck.Generator.t =
+        Quickcheck.Generator.map
+          (B.gen_incl B.one B.(Other_impl.Field.size - one))
+          ~f:(fun x -> Other_impl.Bigint.(to_field (of_bignum_bigint x)))
 
-            module Assert = struct
-              let equal a b = Bitstring_checked.Assert.equal a b
-            end
-          end
+      module Checked = struct
+        let to_bits xs = Bitstring_lib.Bitstring.Lsb_first.of_list xs
+
+        module Assert = struct
+          let equal a b = Bitstring_checked.Assert.equal a b
         end
       end
     end
@@ -478,9 +476,7 @@ let%test_module "vrf-test" =
 
       module Checked = struct
         include Snarky_curves.Make_weierstrass_checked
-                  (Snarky_field_extensions.Field_extensions.F
-                     (Impl))
-                     (Scalar.Stable.V1)
+                  (Snarky_field_extensions.Field_extensions.F (Impl)) (Scalar)
                   (struct
                     include Snarky.Libsnark.Mnt6.Group
 
@@ -537,7 +533,7 @@ let%test_module "vrf-test" =
 
       let gen =
         let open Quickcheck.Generator.Let_syntax in
-        let%map s = Scalar.Stable.V1.gen in
+        let%map s = Scalar.gen in
         scale generator s
 
       let%test_unit "inv works" =
@@ -551,12 +547,11 @@ let%test_module "vrf-test" =
 
       let%test_unit "scaling associates" =
         let open Quickcheck in
-        test ~trials:50
-          (Generator.tuple2 Scalar.Stable.V1.gen Scalar.Stable.V1.gen)
+        test ~trials:50 (Generator.tuple2 Scalar.gen Scalar.gen)
           ~f:(fun (a, b) ->
             assert (
               equal
-                (scale generator (Scalar.Stable.V1.mul a b))
+                (scale generator (Scalar.mul a b))
                 (scale (scale generator a) b) ) )
 
       module Checked = struct
@@ -655,8 +650,7 @@ let%test_module "vrf-test" =
 
       let hash_for_proof m g1 g2 g3 =
         let x = hash_bits (List.concat_map ~f:Group.to_bits [m; g1; g2; g3]) in
-        Scalar.Stable.V1.of_bits
-          (List.take (Field.unpack x) Scalar.Stable.V1.length_in_bits)
+        Scalar.of_bits (List.take (Field.unpack x) Scalar.length_in_bits)
 
       module Checked = struct
         let hash_for_proof m g1 g2 g3 =
@@ -666,7 +660,7 @@ let%test_module "vrf-test" =
           in
           hash_bits_checked bs >>= Pedersen.Digest.choose_preimage
           >>| fun xs ->
-          List.take (xs :> Boolean.var list) Scalar.Stable.V1.length_in_bits
+          List.take (xs :> Boolean.var list) Scalar.length_in_bits
       end
     end
 
@@ -675,7 +669,7 @@ let%test_module "vrf-test" =
     let%test_unit "completeness" =
       let gen =
         let open Quickcheck.Generator.Let_syntax in
-        let%map private_key = Scalar.Stable.V1.gen and message = Group.gen in
+        let%map private_key = Scalar.gen and message = Group.gen in
         (private_key, Group.(scale generator private_key), message)
       in
       Quickcheck.test gen ~trials:50 ~f:(fun (priv, public_key, message) ->
