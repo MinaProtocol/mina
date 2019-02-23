@@ -51,9 +51,12 @@ let%test_module "Ledger catchup" =
           let best_breadcrumb = Transition_frontier.best_tip peer.frontier in
           let best_transition =
             Transition_frontier.Breadcrumb.transition_with_hash best_breadcrumb
+            |> Cache_lib.Cached.pure
+            (*
             |> Transition_handler.Unprocessed_transition_cache.register
                  unprocessed_transition_cache
             |> Or_error.ok_exn
+            *)
           in
           Strict_pipe.Writer.write catchup_job_writer best_transition ;
           Ledger_catchup.run ~logger ~network ~frontier:me
