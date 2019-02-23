@@ -117,7 +117,7 @@ module Stack = struct
     match Coinbase_data.of_coinbase cb with
     | Ok cb ->
         Pedersen.digest_fold Hash_prefix.coinbase_stack
-          Fold.(fold h +> Coinbase_data.fold cb)
+          Fold.(Coinbase_data.fold cb +> fold h)
         |> of_hash
     | Error e ->
         failwithf "Error adding a coinbase to the pending stack: %s"
@@ -131,25 +131,30 @@ module Stack = struct
   module Checked = struct
     type t = var
 
-    let push_var (t : t) (coinbase : Coinbase_data.var) =
+    let push (t : t) (coinbase : Coinbase_data.var) =
+      (*Prefix+Coinbase+Current-stack*)
       let init =
         Pedersen.Checked.Section.create
           ~acc:(`Value Hash_prefix.coinbase_stack.acc)
           ~support:
             (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
       in
-      let%bind with_t =
-        let%bind bs = var_to_triples t in
+      let%bind coinbase_section =
+        let%bind bs = Coinbase_data.var_to_triples coinbase in
         Pedersen.Checked.Section.extend init bs
           ~start:Hash_prefix.length_in_triples
       in
-      let%map with_coinbase =
-        let%bind cb = Coinbase_data.var_to_triples coinbase in
-        Pedersen.Checked.Section.extend with_t cb
-          ~start:(Hash_prefix.length_in_triples + length_in_triples)
+      let%bind with_t =
+        let%bind bs = var_to_triples t in
+        Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty bs
+          ~start:
+            (Hash_prefix.length_in_triples + Coinbase_data.length_in_triples)
+      in
+      let%map s =
+        Pedersen.Checked.Section.disjoint_union_exn coinbase_section with_t
       in
       let digest, _ =
-        Pedersen.Checked.Section.to_initial_segment_digest_exn with_coinbase
+        Pedersen.Checked.Section.to_initial_segment_digest_exn s
       in
       var_of_hash_packed digest
 

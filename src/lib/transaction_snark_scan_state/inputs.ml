@@ -41,11 +41,17 @@ module type S = sig
     val merkle_root : t -> Pending_coinbase_hash.t
 
     val add_coinbase_exn : t -> coinbase:Coinbase.t -> on_new_tree:bool -> t
+
+    module Stack : sig
+      type t [@@deriving sexp, bin_io]
+
+      val push_exn : t -> Coinbase.t -> t
+    end
   end
 
   module Pending_coinbase_state :
     Coda_pow.Pending_coinbase_state_intf
-    with type pending_coinbase_hash := Pending_coinbase_hash.t
+    with type pending_coinbase_hash := Pending_coinbase.Stack.t
 
   module Ledger_proof_statement :
     Coda_pow.Ledger_proof_statement_intf
@@ -104,7 +110,7 @@ module type S = sig
   module Transaction_witness :
     Coda_pow.Transaction_witness_intf
     with type sparse_ledger := Sparse_ledger.t
-     and type pending_coinbase := Pending_coinbase.t
+     and type pending_coinbase := Pending_coinbase.Stack.t
 
   module Config : sig
     val transaction_capacity_log_2 : int

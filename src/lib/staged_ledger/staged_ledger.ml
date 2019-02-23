@@ -1471,6 +1471,13 @@ let%test_module "test" =
           if is_valid t then Ok t
           else
             Or_error.error_string "Coinbase.create: fee transfer was too high"
+
+        let to_string {proposer; amount; fee_transfer} =
+          proposer
+          ^ Currency.Amount.to_string amount
+          ^ Option.value_map ~default:""
+              ~f:(fun (p, f) -> p ^ Currency.Fee.to_string f)
+              fee_transfer
       end
 
       module Transaction = struct
@@ -1530,8 +1537,6 @@ let%test_module "test" =
 
       module Pending_coinbase_hash = struct
         type t = string [@@deriving sexp, bin_io, compare, hash]
-
-        let gen = String.gen_with_length 756 Char.gen
       end
 
       module Pending_coinbase = struct
@@ -1549,11 +1554,19 @@ let%test_module "test" =
             t -> coinbase:Coinbase.t -> on_new_tree:bool -> t =
          fun t ~coinbase ~on_new_tree:_ ->
           (coinbase.proposer, coinbase.amount) :: t
+
+        module Stack = struct
+          type t = string [@@deriving sexp, bin_io, compare, hash]
+
+          let gen = String.gen_with_length 756 Char.gen
+
+          let push_exn t c = Coinbase.to_string c ^ t
+        end
       end
 
       module Pending_coinbase_state = struct
         type t =
-          {source: Pending_coinbase_hash.t; target: Pending_coinbase_hash.t}
+          {source: Pending_coinbase.Stack.t; target: Pending_coinbase.Stack.t}
         [@@deriving sexp, bin_io, compare, hash]
       end
 
@@ -1604,8 +1617,8 @@ let%test_module "test" =
           and target = Ledger_hash.gen
           and fee_excess = Fee.Signed.gen
           and supply_increase = Currency.Amount.gen
-          and pending_coinbase_before = Pending_coinbase_hash.gen
-          and pending_coinbase_after = Pending_coinbase_hash.gen in
+          and pending_coinbase_before = Pending_coinbase.Stack.gen
+          and pending_coinbase_after = Pending_coinbase.Stack.gen in
           let%map proof_type =
             Quickcheck.Generator.bool
             >>| function true -> `Base | false -> `Merge
@@ -1942,7 +1955,7 @@ let%test_module "test" =
 
       module Transaction_witness = struct
         type t =
-          {ledger: Sparse_ledger.t; pending_coinbases: Pending_coinbase.t}
+          {ledger: Sparse_ledger.t; pending_coinbases: Pending_coinbase.Stack.t}
         [@@deriving bin_io, sexp]
       end
 

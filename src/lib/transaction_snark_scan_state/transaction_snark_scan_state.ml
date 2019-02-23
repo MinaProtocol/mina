@@ -157,9 +157,7 @@ end = struct
   
   (*TODO new_coinbase_stack:bool goes in the statement*)
   let create_expected_statement
-      { Transaction_with_witness.transaction_with_info
-      ; witness
-      ; coinbase_on_new_tree; _ } =
+      {Transaction_with_witness.transaction_with_info; witness; _} =
     let open Or_error.Let_syntax in
     let source =
       Frozen_ledger_hash.of_ledger_hash
@@ -173,17 +171,18 @@ end = struct
     let target =
       Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
     in
-    let pending_coinbase_before =
-      Pending_coinbase.merkle_root witness.pending_coinbases
-    in
+    let pending_coinbase_before = witness.pending_coinbases in
     let%bind pending_coinbase_after =
       match transaction with
       | Coinbase c ->
           Or_error.try_with (fun () ->
               (*TODO add new tree tag to a node*)
-              Pending_coinbase.merkle_root
+              (*if coinbase_on_new_tree 
+                then *)
+              Pending_coinbase.Stack.push_exn witness.pending_coinbases c )
+          (*else
                 (Pending_coinbase.add_coinbase_exn witness.pending_coinbases
-                   ~coinbase:c ~on_new_tree:coinbase_on_new_tree) )
+                   ~coinbase:c ~on_new_tree:coinbase_on_new_tree) )*)
       | _ -> Ok pending_coinbase_before
     in
     let%bind fee_excess = Transaction.fee_excess transaction in

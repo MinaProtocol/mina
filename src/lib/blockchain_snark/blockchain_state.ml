@@ -66,9 +66,7 @@ module Make (Consensus_mechanism : Consensus.S) :
               |> Blockchain_state.snarked_ledger_hash )
               ( transition |> Snark_transition.blockchain_state
               |> Blockchain_state.snarked_ledger_hash )
-              ( transition |> Snark_transition.blockchain_state
-              |> Blockchain_state.pending_coinbase_hash )
-              supply_increase
+              Pending_coinbase.Stack.Checked.empty supply_increase
               (As_prover.return
                  (Option.value ~default:Tock.Proof.dummy
                     (Snark_transition.ledger_proof transition)))

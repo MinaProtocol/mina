@@ -7,7 +7,7 @@ module Proof_type : sig
 end
 
 module Pending_coinbase_state : sig
-  type t = {source: Pending_coinbase.Hash.t; target: Pending_coinbase.Hash.t}
+  type t = {source: Pending_coinbase.Stack.t; target: Pending_coinbase.Stack.t}
   [@@deriving sexp, bin_io, hash, compare, eq, fields]
 end
 
@@ -107,7 +107,7 @@ module Verification : sig
          Sok_message.Digest.Checked.t
       -> Frozen_ledger_hash.var
       -> Frozen_ledger_hash.var
-      -> Pending_coinbase.Hash.var
+      -> Pending_coinbase.Stack.var
       -> Currency.Amount.var
       -> (Tock.Proof.t, 's) Tick.As_prover.t
       -> (Tick.Boolean.var, 's) Tick.Checked.t
@@ -133,7 +133,7 @@ val check_user_command :
      sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
-  -> Pending_coinbase.Hash.t
+  -> Pending_coinbase.Stack.t
   -> delete_coinbase_stack:bool
   -> User_command.With_valid_signature.t
   -> Tick.Handler.t
@@ -157,7 +157,7 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> pending_coinbase_hash:Pending_coinbase.Hash.t
+    -> pending_coinbase_hash:Pending_coinbase.Stack.t
     -> User_command.With_valid_signature.t
     -> Tick.Handler.t
     -> t
@@ -166,7 +166,7 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> pending_coinbase_hash:Pending_coinbase.Hash.t
+    -> pending_coinbase_hash:Pending_coinbase.Stack.t
     -> Fee_transfer.t
     -> Tick.Handler.t
     -> t

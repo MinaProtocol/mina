@@ -11,7 +11,7 @@ module type Inputs_intf = sig
 
   module Pending_coinbase_state :
     Pending_coinbase_state_intf
-    with type pending_coinbase_hash := Pending_coinbase_hash.t
+    with type pending_coinbase_hash := Pending_coinbase.Stack.t
 
   module Ledger_proof_statement :
     Ledger_proof_statement_intf
@@ -56,7 +56,7 @@ module type Inputs_intf = sig
   module Transaction_witness :
     Transaction_witness_intf
     with type sparse_ledger := Sparse_ledger.t
-     and type pending_coinbase := Pending_coinbase.t
+     and type pending_coinbase := Pending_coinbase.Stack.t
 
   module Staged_ledger :
     Staged_ledger_intf
