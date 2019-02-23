@@ -85,9 +85,11 @@ let daemon log =
      and snark_work_fee =
        flag "snark-worker-fee"
          ~doc:
-           "FEE Amount a worker wants to get compensated for generating a \
-            snark proof"
-         (optional int)
+           (Printf.sprintf
+              "FEE Amount a worker wants to get compensated for generating a \
+               snark proof (default: %d)"
+              (Currency.Fee.to_int Cli_lib.Fee.default_snark_worker))
+         (optional txn_fee)
      and sexp_logging =
        flag "sexp-logging" no_arg
          ~doc:"Use S-expressions in log output, instead of JSON"
@@ -159,9 +161,11 @@ let daemon log =
            ~default:Port.default_client client_port
        in
        let snark_work_fee_flag =
-         Currency.Fee.of_int
-           (or_from_config YJ.Util.to_int_option "snark-worker-fee" ~default:0
-              snark_work_fee)
+         let json_to_currency_fee_option json =
+           YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
+         in
+         or_from_config json_to_currency_fee_option "snark-worker-fee"
+           ~default:Cli_lib.Fee.default_snark_worker snark_work_fee
        in
        let rest_server_port =
          maybe_from_config YJ.Util.to_int_option "rest-port" rest_server_port
