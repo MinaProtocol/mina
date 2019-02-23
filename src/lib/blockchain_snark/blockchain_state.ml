@@ -53,11 +53,13 @@ module Make (Consensus_mechanism : Consensus.S) :
           ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]
           , _ )
           Tick.Checked.t =
+        (*TODO:Deeptthi: coinbase_update in transition is finally landing here. Make the Pending_coinbase delete and update requests here*)
         let supply_increase = Snark_transition.supply_increase transition in
         let%bind `Success updated_consensus_state, consensus_state =
           Consensus_mechanism.next_state_checked ~prev_state:previous_state
             ~prev_state_hash:previous_state_hash transition supply_increase
         in
+        (*TODO: Deepthi: based on the type of update, perform requests accordingly here *)
         let%bind success =
           let%bind correct_transaction_snark =
             T.verify_complete_merge
@@ -68,6 +70,7 @@ module Make (Consensus_mechanism : Consensus.S) :
               |> Blockchain_state.snarked_ledger_hash )
               Pending_coinbase.Stack.Checked.empty
               Pending_coinbase.Stack.Checked.empty supply_increase
+              (*TODO:Deepthi: get coinbase stack from the delete_stack request *)
               (As_prover.return
                  (Option.value ~default:Tock.Proof.dummy
                     (Snark_transition.ledger_proof transition)))
@@ -83,6 +86,7 @@ module Make (Consensus_mechanism : Consensus.S) :
           in
           Boolean.(correct_snark && updated_consensus_state)
         in
+        (*TODO:Deepthi: The tree hash obtained should be the same as the tree hash in the blockchain state which was computed outside checked. Success if that's true*)
         let new_state =
           Protocol_state.create_var ~previous_state_hash
             ~blockchain_state:(Snark_transition.blockchain_state transition)

@@ -78,7 +78,9 @@ module Make (Inputs : Inputs_intf) :
     ; sok_digest: 'sok_digest
     ; supply_increase: 'supply_increase
     ; ledger_proof: Proof.t option }
-  [@@deriving bin_io, sexp, fields]
+  [@@(*DeepthiTODO: add pending_coinbase action here*)
+    deriving
+    bin_io, sexp, fields]
 
   type value =
     ( Blockchain_state.value

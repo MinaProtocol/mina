@@ -138,6 +138,7 @@ struct
     let%snarkydef main (top_hash : Digest.Tick.Packed.var) =
       let%bind prev_state = exists' State.typ ~f:Prover_state.prev_state
       and update = exists' Update.typ ~f:Prover_state.update in
+      (*TODO:Deepthi: coinbase update is here *)
       let%bind prev_state_hash = State.Checked.hash prev_state in
       let%bind next_state_hash, next_state, `Success success =
         with_label __LOC__

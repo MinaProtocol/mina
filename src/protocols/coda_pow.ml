@@ -108,8 +108,12 @@ end
 module type Pending_coinbase_intf = sig
   type t
 
+  val create_exn : unit -> t
+
   module Stack : sig
     type t
+
+    val empty : t
   end
 end
 
