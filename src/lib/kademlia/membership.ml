@@ -546,15 +546,6 @@ let%test_module "Tests" =
       let open Core in
       Async.(after (Time.Span.of_sec s))
 
-    let poll wait_time ~f =
-      let rec should_continue () =
-        let%bind condition = f () in
-        if condition then Deferred.unit else wait_sec 0.5 >>= should_continue
-      in
-      Deferred.any
-        [ (should_continue () >>| fun () -> true)
-        ; (wait_sec wait_time >>| fun () -> false) ]
-
     let run_connection_test ~f =
       retry 3 (fun () ->
           Async.Thread_safe.block_on_async_exn (fun () ->
@@ -601,6 +592,17 @@ let%test_module "Tests" =
 
     let%test_module "Trust" =
       ( module struct
+        (* TODO: Re-enable #1725
+        let poll wait_time ~f =
+          let rec should_continue () =
+            let%bind condition = f () in
+            if condition then Deferred.unit else wait_sec 0.5 >>= should_continue
+          in
+          Deferred.any
+            [ (should_continue () >>| fun () -> true)
+            ; (wait_sec wait_time >>| fun () -> false) ]
+
+
         (* Mock trust system *)
         module Trust_system = struct
           type t = Unix.Inet_addr.Set.t ref
@@ -623,8 +625,7 @@ let%test_module "Tests" =
           let%bind () = Haskell_trust.stop node in
           Haskell_trust.For_tests.node addr peers conf_dir trust_system
 
-        (* TODO: Re-enable #1725
-         * let%test_unit "connect with ban logic" =
+        let%test_unit "connect with ban logic" =
             (* This flakes 1 in 20 times, so try a couple times if it fails *)
             run_connection_test ~f:(fun banner_conf_dir normal_conf_dir ->
                 let banner_addr = peer_of_int 0 in
@@ -671,6 +672,7 @@ let%test_module "Tests" =
                 let%bind () = Haskell_trust.stop new_banner_node
                 and () = Haskell.stop normal_node in
                 Deferred.unit ) *)
+      
       end )
 
     let%test_unit "lockfile does not exist after connection calling stop" =
