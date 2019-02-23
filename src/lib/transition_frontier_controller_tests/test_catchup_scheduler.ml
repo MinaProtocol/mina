@@ -281,11 +281,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let%bind upcoming_rose_tree =
             Rose_tree.Deferred.all
-            @@ Quickcheck.random_value ~size:5
-                 (Quickcheck_lib.gen_imperative_rose_tree
-                    ( randomly_chosen_breadcrumb |> return
-                    |> Quickcheck.Generator.return )
-                    (gen_breadcrumb ~logger ~accounts_with_secret_keys))
+            @@ Quickcheck.random_value
+                 (gen_nonlinear_breadcrumbs ~logger ~size:5
+                    ~accounts_with_secret_keys randomly_chosen_breadcrumb)
           in
           let upcoming_breadcrumbs = Rose_tree.flatten upcoming_rose_tree in
           let missing_breadcrumb = List.nth_exn upcoming_breadcrumbs 0 in

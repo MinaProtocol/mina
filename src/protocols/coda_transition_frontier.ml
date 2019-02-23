@@ -267,12 +267,7 @@ module type Transition_handler_processor_intf = sig
                                   , state_hash )
                                   With_hash.t
                                   Reader.t
-    -> catchup_job_writer:( ( external_transition_verified
-                            , state_hash )
-                            With_hash.t
-                          , synchronous
-                          , unit Deferred.t )
-                          Writer.t
+    -> catchup_job_writer:(state_hash, synchronous, unit Deferred.t) Writer.t
     -> catchup_breadcrumbs_reader:transition_frontier_breadcrumb Rose_tree.t
                                   list
                                   Reader.t
