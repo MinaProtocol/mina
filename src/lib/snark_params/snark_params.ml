@@ -344,16 +344,6 @@ module Tock = struct
       ; delta= Pairing.G2.constant vk.delta
       ; alpha_beta= Pairing.Fqk.constant vk.alpha_beta }
   end
-
-  module Verifier_gadget =
-    Snarky.Gm_verifier_gadget.Make (Tock0) (Tock_backend) (Tock_backend)
-      (Tick_backend)
-      (struct
-        let input_size = 1
-
-        let fqe_size_in_field_elements = 2
-      end)
-      (Inner_curve)
 end
 
 module Tick = struct
@@ -719,16 +709,6 @@ module Tick = struct
   end
 
   module Groth_verifier = Snarky_verifier.Groth.Make (Pairing)
-
-  module Verifier_gadget =
-    Snarky.Gm_verifier_gadget.Make (Tick0) (Tick_backend) (Tick_backend)
-      (Tock_backend)
-      (struct
-        let input_size = Tock0.Data_spec.(size [Wrap_input.typ])
-
-        let fqe_size_in_field_elements = 3
-      end)
-      (Inner_curve)
 end
 
 let tock_vk_to_bool_list vk =
