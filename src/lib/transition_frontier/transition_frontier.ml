@@ -115,16 +115,18 @@ module Make (Inputs : Inputs_intf) :
     type t = {snark_pool_refcount: Snark_pool_refcount.t} [@@deriving fields]
 
     module Readers = struct
-      type t = {snark_pool: int Work.Table.t Pipe_lib.Broadcast_pipe.Reader.t}
+      type t =
+        {snark_pool: (int * int Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t}
     end
 
     module Writers = struct
-      type t = {snark_pool: int Work.Table.t Pipe_lib.Broadcast_pipe.Writer.t}
+      type t =
+        {snark_pool: (int * int Work.Table.t) Pipe_lib.Broadcast_pipe.Writer.t}
     end
 
     let create_pipes () =
       let reader, writer =
-        Pipe_lib.Broadcast_pipe.create (Work.Table.create ())
+        Pipe_lib.Broadcast_pipe.create (0, Work.Table.create ())
       in
       ({Readers.snark_pool= reader}, {Writers.snark_pool= writer})
 

@@ -24,26 +24,10 @@ module type Transition_frontier_extensions_intf = sig
   end
 
   module Readers : sig
-    type t = {snark_pool: int Work.Table.t Pipe_lib.Broadcast_pipe.Reader.t}
+    type t =
+      {snark_pool: (int * int Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t}
   end
 end
-
-(* module type Transition_frontier_extension_intf = sig
-  type t
-
-  type input
-
-  type view
-
-  type transition_frontier_breadcrumb
-
-  val create : input -> t
-
-  val handle_diff :
-       t
-    -> transition_frontier_breadcrumb Transition_frontier_diff.t
-    -> view option
-end *)
 
 module type Network_intf = sig
   type t

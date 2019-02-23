@@ -14,7 +14,13 @@ module type S = sig
 
   type t [@@deriving bin_io]
 
-  val create : parent_log:Logger.t -> t
+  type transition_frontier
+
+  val create :
+       parent_log:Logger.t
+    -> frontier_broadcast_pipe:transition_frontier option
+                               Pipe_lib.Broadcast_pipe.Reader.t
+    -> t
 
   val add_snark :
        t
@@ -41,6 +47,7 @@ end) (Transition_frontier : sig
 
   module Extensions :
     Protocols.Coda_transition_frontier.Transition_frontier_extensions_intf
+    with module Work = Work
 
   val extension_pipes : t -> Extensions.Readers.t
 end) :

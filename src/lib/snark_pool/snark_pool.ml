@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Pipe_lib
 
 module Priced_proof = struct
   type ('proof, 'fee) t = {proof: 'proof; fee: 'fee}
@@ -22,9 +23,15 @@ module type S = sig
 
   type fee
 
+  type transition_frontier
+
   type t [@@deriving bin_io]
 
-  val create : parent_log:Logger.t -> t
+  val create :
+       parent_log:Logger.t
+    -> frontier_broadcast_pipe:transition_frontier option
+                               Broadcast_pipe.Reader.t
+    -> t
 
   val add_snark :
        t
@@ -47,7 +54,8 @@ end) (Work : sig
 
   include Hashable.S_binable with type t := t
 end)
-(Transition_frontier : Transition_frontier_intf) :
+(Transition_frontier : Transition_frontier_intf
+                       with module Extensions.Work = Work) :
   sig
     include S
 
@@ -57,7 +65,8 @@ end)
   end
   with type work := Work.t
    and type proof := Proof.t
-   and type fee := Fee.t = struct
+   and type fee := Fee.t
+   and type transition_frontier = Transition_frontier.t = struct
   module Priced_proof = struct
     type t = (Proof.t sexp_opaque, Fee.t) Priced_proof.t
     [@@deriving sexp, bin_io]
@@ -69,27 +78,78 @@ end)
     let fee (t : t) = t.fee
   end
 
-  type t = Priced_proof.t Work.Table.t [@@deriving sexp, bin_io]
+  type t =
+    { snark_table: Priced_proof.t Work.Table.t
+    ; mutable ref_table: int Work.Table.t option }
+  [@@deriving sexp, bin_io]
 
-  let create ~parent_log:_ = Work.Table.create ()
+  type transition_frontier = Transition_frontier.t
+
+  let removed_breadcrumb_wait = 10
+
+  let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t) =
+    let tf_deferred, _ =
+      Broadcast_pipe.Reader.iter frontier_broadcast_pipe ~f:(function
+        | Some tf ->
+            (* Start the count at the max so we flush after reconstructing the transition_frontier *)
+            let removedCounter = ref removed_breadcrumb_wait in
+            let pipe = Transition_frontier.extension_pipes tf in
+            let deferred, _ =
+              Broadcast_pipe.Reader.iter
+                pipe.Transition_frontier.Extensions.Readers.snark_pool
+                ~f:(fun (removed, refcount_table) ->
+                  t.ref_table <- Some refcount_table ;
+                  removedCounter := !removedCounter + removed ;
+                  if !removedCounter < removed_breadcrumb_wait then return ()
+                  else (
+                    removedCounter := 0 ;
+                    return
+                      (Work.Table.filter_keys_inplace t.snark_table
+                         ~f:(fun work ->
+                           Option.is_some
+                             (Transition_frontier.Extensions.Work.Table.find
+                                refcount_table work) )) ) )
+            in
+            deferred
+        | None ->
+            t.ref_table <- None ;
+            return () )
+    in
+    Deferred.don't_wait_for tf_deferred
+
+  let create ~parent_log:_ ~frontier_broadcast_pipe =
+    let t = {snark_table= Work.Table.create (); ref_table= None} in
+    listen_to_frontier_broadcast_pipe frontier_broadcast_pipe t ;
+    t
+
+  (** True when there is no active transition_frontier or
+    when the refcount for the given work is 0 *)
+  let work_is_referenced t work =
+    match t.ref_table with
+    | None -> true
+    | Some ref_table -> (
+      match Work.Table.find ref_table work with None -> true | Some _ -> true )
 
   let add_snark t ~work ~proof ~fee =
-    let update_and_rebroadcast () =
-      Hashtbl.set t ~key:work ~data:(Priced_proof.create proof fee) ;
-      `Rebroadcast
-    in
-    match Work.Table.find t work with
-    | None -> update_and_rebroadcast ()
-    | Some prev ->
-        if Fee.( < ) fee prev.fee then update_and_rebroadcast ()
-        else `Don't_rebroadcast
+    if work_is_referenced t work then
+      let update_and_rebroadcast () =
+        Hashtbl.set t.snark_table ~key:work
+          ~data:(Priced_proof.create proof fee) ;
+        `Rebroadcast
+      in
+      match Work.Table.find t.snark_table work with
+      | None -> update_and_rebroadcast ()
+      | Some prev ->
+          if Fee.( < ) fee prev.fee then update_and_rebroadcast ()
+          else `Don't_rebroadcast
+    else `Don't_rebroadcast
 
-  let request_proof t = Work.Table.find t
+  let request_proof t = Work.Table.find t.snark_table
 
-  let remove_solved_work = Work.Table.remove
+  let remove_solved_work t = Work.Table.remove t.snark_table
 end
 
-let%test_module "random set test" =
+(* let%test_module "random set test" =
   ( module struct
     module Mock_proof = struct
       type input = Int.t
@@ -144,7 +204,13 @@ let%test_module "random set test" =
         Quickcheck.Generator.tuple3 Mock_work.gen Mock_work.gen Mock_fee.gen
       in
       let%map sample_solved_work = Quickcheck.Generator.list (gen_entry ()) in
-      let pool = Mock_snark_pool.create ~parent_log:(Logger.create ()) in
+      let frontier_broadcast_pipe_r, _ =
+        Broadcast_pipe.create (Some (Mock_transition_frontier.create ()))
+      in
+      let pool =
+        Mock_snark_pool.create ~parent_log:(Logger.create ())
+          ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+      in
       List.iter sample_solved_work ~f:(fun (work, proof, fee) ->
           ignore (Mock_snark_pool.add_snark pool ~work ~proof ~fee) ) ;
       pool
@@ -201,4 +267,4 @@ let%test_module "random set test" =
           assert (
             {Priced_proof.fee= cheap_fee; proof= cheap_proof}
             = Option.value_exn (Mock_snark_pool.request_proof t work) ) )
-  end )
+  end ) *)
