@@ -300,7 +300,12 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
   let open Command.Param in
   let open Cli_lib.Arg_type in
   let amount_flag =
-    flag "fee" ~doc:"VALUE  fee you're willing to pay (default: 1)"
+    flag "fee"
+      ~doc:
+        (Printf.sprintf
+           "FEE Amount you are willing to pay to process the transaction \
+            (default: %d)"
+           (Currency.Fee.to_int Cli_lib.Fee.default_transaction))
       (optional txn_fee)
   in
   let flag =
