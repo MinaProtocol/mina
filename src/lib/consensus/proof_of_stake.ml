@@ -556,7 +556,7 @@ module Vrf = struct
       let open Snark_params.Tick in
       let open Let_syntax in
       let%bind () = exists Typ.unit ~compute:As_prover.(
-        map (read Epoch_ledger.typ epoch_ledger) ~f:(fun {hash;_} -> Core.printf !"want hash: %{sexp:Coda_base.Frozen_ledger_hash.t}%!" hash )
+        map (read Epoch_ledger.typ epoch_ledger) ~f:(fun {hash;_} -> Core.printf !"want hash: %{sexp:Coda_base.Frozen_ledger_hash.t}%!\n" hash )
         ) in
       let%bind winner_addr =
         request_witness Coda_base.Account.Index.Unpacked.typ
@@ -606,6 +606,7 @@ module Vrf = struct
     let open Snapshot in
     let open Option.Let_syntax in
     (* other place where we branch to use genesis ledger vs local state. search all uses of Genesis_ledger.t *)
+    Logger.info logger !"Vrf.check: ledger_hash=%{sexp:Coda_base.Frozen_ledger_hash.t}" ledger_hash ;
     let%bind epoch_snapshot =
       let snapshot =
         if Coda_base.Frozen_ledger_hash.equal ledger_hash genesis_ledger_hash
@@ -1343,10 +1344,10 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
       if
         Epoch.equal epoch state.curr_epoch
         || Length.equal state.epoch_length Length.zero
-      then state.last_epoch_data
+      then (Logger.info logger "XXX epoch_data=last" ; state.last_epoch_data)
         (* If we are in the next epoch, use the current epoch data. *)
       else if Epoch.equal epoch (Epoch.succ state.curr_epoch) then
-        state.curr_epoch_data
+        (Logger.info logger "XXX epoch_data=curr" ; state.curr_epoch_data)
         (* If the epoch we are in is none of the above, something is wrong. *)
       else (
         Logger.error logger
@@ -1354,6 +1355,7 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
         failwith "System time is out of sync. (hint: setup NTP if you haven't)" )
     in
     let total_stake = epoch_data.ledger.total_currency in
+    Logger.error logger !"our local state is %{sexp:Local_state.t}" local_state ;
     let proposal_data slot =
       Vrf.check ~use_curr:(state.curr_epoch_data.length <= Length.of_int Constants.k) ~epoch ~slot ~seed:epoch_data.seed ~local_state
         ~private_key:keypair.private_key ~total_stake
