@@ -44,14 +44,38 @@ module Make (Inputs : Inputs_intf) :
   let hash_transition =
     Fn.compose Consensus.Protocol_state.hash External_transition.protocol_state
 
-  let get_state_hash transition_with_hash =
-    let open External_transition in
-    transition_with_hash |> With_hash.data |> Verified.protocol_state
-    |> Protocol_state.body |> Protocol_state.Body.hash
-
   let consensus_state transition =
     External_transition.(
       protocol_state transition |> Protocol_state.consensus_state)
+
+  module Merkle_list = Merkle_list.Make (struct
+    type value = External_transition.Verified.t
+
+    type context = Transition_frontier.t
+
+    type proof_elem = State_body_hash.t
+
+    type hash = State_hash.t [@@deriving eq]
+
+    let to_proof_elem external_transition =
+      let open External_transition in
+      external_transition |> Verified.protocol_state |> Protocol_state.body
+      |> Protocol_state.Body.hash
+
+    let get_previous ~context transition =
+      let parent_hash =
+        transition |> External_transition.Verified.protocol_state
+        |> Consensus.Protocol_state.previous_state_hash
+      in
+      let open Option.Let_syntax in
+      let%map breadcrumb = Transition_frontier.find context parent_hash in
+      With_hash.data
+      @@ Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
+
+    let hash acc body_hash =
+      Protocol_state.hash ~hash_body:Fn.id
+        {previous_state_hash= acc; body= body_hash}
+  end)
 
   let prove ~logger ~frontier seen_consensus_state :
       ( External_transition.t
@@ -66,55 +90,29 @@ module Make (Inputs : Inputs_intf) :
         ()
     in
     let best_tip_breadcrumb = Transition_frontier.best_tip frontier in
-    let best_tip =
+    let best_verified_tip =
       Transition_frontier.Breadcrumb.transition_with_hash best_tip_breadcrumb
-      |> With_hash.data |> External_transition.of_verified
+      |> With_hash.data
     in
+    let best_tip = External_transition.of_verified best_verified_tip in
     let is_tip_better =
       Consensus.select ~logger ~existing:(consensus_state best_tip)
         ~candidate:seen_consensus_state
       = `Keep
     in
     let%bind () = Option.some_if is_tip_better () in
-    let exclusive_merkle_list =
-      Transition_frontier.path_map frontier best_tip_breadcrumb
-        ~f:(fun breadcrumb ->
-          let transition_with_hash =
-            Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
-          in
-          Debug_assert.debug_assert (fun () ->
-              let state_hash = With_hash.hash transition_with_hash in
-              Logger.info logger
-                !"Hash of a breadcrumb in path: %{sexp:State_hash.t}"
-                state_hash ) ;
-          get_state_hash transition_with_hash )
-    in
-    let root_with_hash =
+    let root =
       Transition_frontier.root frontier
-      |> Transition_frontier.Breadcrumb.transition_with_hash
+      |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
     in
+    let merkle_list = Merkle_list.prove ~context:frontier best_verified_tip in
     Logger.info logger
       !"Produced a merkle list of %{sexp:State_body_hash.t list}"
-      exclusive_merkle_list ;
+      merkle_list ;
     Some
       Proof_carrying_data.
-        { data=
-            root_with_hash |> With_hash.data |> External_transition.of_verified
-        ; proof= (exclusive_merkle_list, best_tip) }
-
-  let verify_merkle_list ~logger root_state_hash merkle_list best_tip_hash =
-    let result_hash =
-      List.fold merkle_list ~init:root_state_hash ~f:(fun acc body_hash ->
-          let state_hash =
-            Protocol_state.hash ~hash_body:Fn.id
-              {previous_state_hash= acc; body= body_hash}
-          in
-          Logger.info logger
-            !"State_hash produce %{sexp:State_hash.t}"
-            state_hash ;
-          state_hash )
-    in
-    State_hash.equal best_tip_hash result_hash
+        { data= root |> External_transition.of_verified
+        ; proof= (merkle_list, best_tip) }
 
   let check_error ~message cond =
     let open Deferred.Or_error in
@@ -156,7 +154,7 @@ module Make (Inputs : Inputs_intf) :
     in
     let%bind () =
       check_error ~message:"Peer gave an invalid proof of it's root"
-        (verify_merkle_list ~logger root_hash merkle_list best_tip_hash)
+        (Merkle_list.verify ~init:root_hash merkle_list best_tip_hash)
     in
     let%bind validated_root = Protocol_state_validator.validate_proof root in
     let%map validated_best_tip =
