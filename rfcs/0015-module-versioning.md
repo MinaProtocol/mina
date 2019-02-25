@@ -192,12 +192,30 @@ embrace this discipline fully will take some effort.
 We can make awareness of the existing recommendation, or the extended
 discipline suggested here a checklist item for Github pull requests.
 
+### Using versioned types in other versioned types
+
+When mentioning a versioned type in the definition of another versioned
+type, such as in a record, a specific version of the included type
+must be used. That is, do not use version `Latest`, which may refer
+to different modules over time. With this restriction in place, the
+serialization of the including type has a fixed format. Otherwise,
+multiple, incompatible serializations of the including type could be
+generated.
+
 ### Type parameters
 
 The mechanism described here does not handle the case where a module type
-has parameters. Jane Street's Monad module allows using types with up to 
-five parameters through use of functors. Their approach could be used to guide 
-an implementation for module versioning.
+has parameters. Serialization and deserialization can only be done
+when the parameters have been instantiated. The solution is to define
+a type where the parameters are known.
+
+For example, if type `my_type` takes a type parameter:
+```ocaml
+(* can use Make_version on T *)
+module T = struct
+  type t = string my_type
+end
+```
 
 ## Drawbacks
 

@@ -3,7 +3,7 @@
 [%%import "config/consensus/posig_fake.mlh"]
 [%%import "config/scan_state/small.mlh"]
 [%%import "config/debug_level/some.mlh"]
-[%%import "config/proof_level/check.mlh"]
+[%%import "config/proof_level/none.mlh"]
 
 [%%define fake_hash false]
 

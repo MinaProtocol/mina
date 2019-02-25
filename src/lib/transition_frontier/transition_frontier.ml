@@ -322,7 +322,8 @@ module Make (Inputs : Inputs_intf) :
 
     let to_graph t =
       fold t ~init:empty ~f:(fun (node : Node.t) graph ->
-          List.fold node.successor_hashes ~init:graph
+          let graph_with_node = add_vertex graph node in
+          List.fold node.successor_hashes ~init:graph_with_node
             ~f:(fun acc_graph successor_state_hash ->
               add_edge acc_graph node
                 ( State_hash.Table.find t.table successor_state_hash
