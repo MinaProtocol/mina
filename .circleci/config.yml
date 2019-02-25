@@ -1,10 +1,10 @@
 # WARNING: config.yml file is generated from config.yml.jinja
 ---
-version: 2
+version: 3
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-5b183eb006ea0bf720c8f14965c31f7890909e91
+            - image: codaprotocol/coda:toolchain-rust-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -14,7 +14,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -49,8 +49,9 @@ jobs:
                       - opam-v1-
             - restore_cache:
                   keys:
-                      - nix-v1-{{ checksum "src/app/kademlia-haskell/prefetch/kademlia1101.nix" }}
-                      - nix-v1-
+                      - nix-v3-{{ checksum "src/app/kademlia-haskell/packages.nix" }}
+                      - nix-v3-
+                      - nix-v2-		      
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Deps -- make macos-setup-download
@@ -68,7 +69,7 @@ jobs:
                   paths:
                       - "/Users/distiller/.opam"
             - save_cache:
-                  key: nix-v1-{{ checksum "src/app/kademlia-haskell/prefetch/kademlia1101.nix" }}
+                  key: nix-v3-{{ checksum "src/app/kademlia-haskell/packages.nix" }}
                   paths:
                       - "/nix"
             - run:
@@ -80,18 +81,19 @@ jobs:
     build_dev:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         environment:
             DUNE_PROFILE: dev
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
-                  name: Build OCaml (sig)
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  name: Build OCaml
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
                   name: Build deb Package with keys
                   command: make deb
@@ -109,18 +111,19 @@ jobs:
     build_testnet_posig:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         environment:
             DUNE_PROFILE: testnet_posig
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
-                  name: Build OCaml (sig)
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  name: Build OCaml
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
                   name: Build deb Package with keys
                   command: make deb
@@ -138,18 +141,19 @@ jobs:
     build_testnet_postake:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         environment:
             DUNE_PROFILE: testnet_postake
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
-                  name: Build OCaml (sig)
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  name: Build OCaml
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
                   name: Build deb Package with keys
                   command: make deb
@@ -167,18 +171,49 @@ jobs:
     build_testnet_public:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         environment:
             DUNE_PROFILE: testnet_public
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
-                  name: Build OCaml (sig)
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  name: Build OCaml
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
+            - run:
+                  name: Build deb Package with keys
+                  command: make deb
+            - run:
+                  name: Build provingkeys
+                  command: make provingkeys
+            - run:
+                  name: Store Genesis keys
+                  command: make genesiskeys
+            - run:
+                  name: Upload deb to repo
+                  command: make publish_deb
+            - store_artifacts:
+                  path: /tmp/artifacts
+    build_testnet_postake_snarkless_fake_hash:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+        environment:
+            DUNE_PROFILE: testnet_postake_snarkless_fake_hash
+        steps:
+            - checkout
+            - run: mkdir -p /tmp/artifacts
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Download Stable Proving Keys
+                  command: scripts/getkeys.sh
+            - run:
+                  name: Build OCaml
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
                   name: Build deb Package with keys
                   command: make deb
@@ -197,31 +232,17 @@ jobs:
     test-unit-test:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Test make test-runtest
                   command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless MYPROCS=8 make test-runtest
-
-    test-withsnark:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_posig make build 2>&1 | tee /tmp/buildocaml.log
-            - run:
-                  name: Test make test-withsnark
-                  command: source ~/.profile && DUNE_PROFILE=test_posig make test-withsnark
     test-fake_hash_full_test:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -238,7 +259,7 @@ jobs:
     test-posig_integration_tests:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -287,7 +308,7 @@ jobs:
     test-postake_integration_tests:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -333,6 +354,44 @@ jobs:
                   name: Running test - Proof of Stake Tests | transaction-snark-profiler -check-only
                   command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'transaction-snark-profiler -check-only'
             
+            - run:
+                  name: Running test - Proof of Stake Tests | coda-shared-prefix-multiproposer-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-multiproposer-test'
+            
+    test-withsnark-sig:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Check .circleci Render
+                  command: make check-render-circleci
+            - run:
+                  name: Build OCaml
+                  command: eval `opam config env` && DUNE_PROFILE=test_posig make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Running test - Full test with SNARK (sig) | full-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
+            
+    test-withsnark-stake:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Check .circleci Render
+                  command: make check-render-circleci
+            - run:
+                  name: Build OCaml
+                  command: eval `opam config env` && DUNE_PROFILE=test_postake make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Running test - Full test with SNARK (stake) | full-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
+            
 
 workflows:
     version: 2
@@ -344,9 +403,11 @@ workflows:
             - build_testnet_posig
             - build_testnet_postake
             - build_testnet_public
+            - build_testnet_postake_snarkless_fake_hash
             - test-fake_hash_full_test
             - test-posig_integration_tests
             - test-postake_integration_tests
-            - test-withsnark
+            - test-withsnark-sig
+            - test-withsnark-stake
             - test-unit-test
             - tracetool

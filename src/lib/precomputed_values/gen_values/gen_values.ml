@@ -9,7 +9,7 @@ open Core
 
 (* TODO: refactor to do compile time selection *)
 [%%if
-with_snark]
+proof_level = "full"]
 
 let use_dummy_values = false
 
@@ -30,7 +30,7 @@ module Dummy = struct
 
   let base_hash_expr = [%expr Snark_params.Tick.Field.zero]
 
-  let base_proof_expr = [%expr Dummy_values.Tock.proof]
+  let base_proof_expr = [%expr Dummy_values.Tock.GrothMaller17.proof]
 end
 
 module Make_real (Keys : Keys_lib.Keys.S) = struct
@@ -65,8 +65,8 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
       Tick.handle (Keys.Step.main x) Consensus.Prover_state.precomputed_handler
     in
     let tick =
-      Tick.prove
-        (Tick.Keypair.pk Keys.Step.keys)
+      Tick.Groth16.prove
+        (Tick.Groth16.Keypair.pk Keys.Step.keys)
         (Keys.Step.input ()) prover_state main base_hash
     in
     let proof = wrap base_hash tick in

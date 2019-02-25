@@ -1,13 +1,18 @@
 open Core
 open Bitstring
+open Module_version
 
 module type S = sig
   type t [@@deriving sexp, bin_io, hash, eq, compare]
 
   module Stable : sig
     module V1 : sig
+      val version : int
+
       type nonrec t = t [@@deriving sexp, bin_io, hash, eq, compare]
     end
+
+    module Latest : module type of V1
   end
 
   include Hashable.S_binable with type t := t
@@ -40,6 +45,8 @@ module type S = sig
 
   val prev : t -> t Option.t
 
+  val is_leaf : t -> bool
+
   val is_parent_of : t -> maybe_child:t -> bool
 
   val serialize : t -> Bigstring.t
@@ -55,10 +62,12 @@ module type S = sig
          ?stop:[`Inclusive | `Exclusive]
       -> t
       -> init:'a
-      -> f:(Stable.V1.t -> 'a -> 'a)
+      -> f:(Stable.Latest.t -> 'a -> 'a)
       -> 'a
 
     val subtree_range : Stable.V1.t -> t
+
+    val subtree_range_seq : Stable.V1.t -> Stable.V1.t Sequence.t
   end
 
   val depth : t -> int
@@ -120,6 +129,8 @@ end) : S = struct
         slice (bitstring_of_string string) 0 length
 
       module T = struct
+        let version = 1
+
         type nonrec t = t
 
         include Binable.Of_binable (struct
@@ -154,11 +165,23 @@ end) : S = struct
       end
 
       include T
+      include Registration.Make_latest_version (T)
       include Hashable.Make_binable (T)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "merkle_address"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
+  include Stable.Latest
 
   let of_byte_string = bitstring_of_string
 
@@ -178,8 +201,10 @@ end) : S = struct
 
   let parent_exn = Fn.compose Or_error.ok_exn parent
 
+  let is_leaf path = bitstring_length path >= Input.depth
+
   let child (path : t) dir : t Or_error.t =
-    if bitstring_length path >= Input.depth then
+    if is_leaf path then
       Or_error.error_string "The address length cannot be greater than depth"
     else
       let dir_bit = Direction.to_bool dir in
@@ -297,6 +322,19 @@ end) : S = struct
       let first_node = concat [address; zeroes_bitstring @@ height address] in
       let last_node = concat [address; ones_bitstring @@ height address] in
       (first_node, last_node)
+
+    let subtree_range_seq address =
+      let first_node, last_node = subtree_range address in
+      Sequence.unfold
+        ~init:(first_node, `Don't_stop)
+        ~f:(function
+          | _, `Stop -> None
+          | current_node, `Don't_stop ->
+              if compare current_node last_node = 0 then
+                Some (current_node, (current_node, `Stop))
+              else
+                Option.map (next current_node) ~f:(fun next_node ->
+                    (current_node, (next_node, `Don't_stop)) ))
   end
 
   let%test "the merkle root should have no path" =

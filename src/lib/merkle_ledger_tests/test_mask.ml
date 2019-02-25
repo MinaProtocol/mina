@@ -344,8 +344,9 @@ let%test_module "Test mask connected to underlying Merkle tree" =
               List.iter accounts ~f:(fun account ->
                   ignore @@ create_new_account_exn attached_mask account ) ;
               let retrieved_accounts =
-                Mask.Attached.get_all_accounts_rooted_at_exn attached_mask
-                  (Mask.Addr.root ())
+                List.map ~f:snd
+                @@ Mask.Attached.get_all_accounts_rooted_at_exn attached_mask
+                     (Mask.Addr.root ())
               in
               assert (List.length accounts = List.length retrieved_accounts) ;
               assert (
@@ -401,8 +402,9 @@ let%test_module "Test mask connected to underlying Merkle tree" =
                       ~default:base_account )
               in
               let retrieved_accounts =
-                Mask.Attached.get_all_accounts_rooted_at_exn mask2
-                  (Mask.Addr.root ())
+                List.map ~f:snd
+                @@ Mask.Attached.get_all_accounts_rooted_at_exn mask2
+                     (Mask.Addr.root ())
               in
               assert (
                 Int.equal

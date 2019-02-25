@@ -1,0 +1,7 @@
+(executables
+ (names add_numbers alternative_init async_log number_stats reverse_pipe
+   rpc_direct_pipe serve side_arg simple spawn_in_foreground stream_workers
+   worker_binprot workers_as_masters)
+ (libraries async core jane rpc_parallel sexp_app sexplib)
+ (preprocess
+  (pps ppx_jane ppxlib.runner)))

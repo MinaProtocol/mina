@@ -25,6 +25,10 @@ type (_, _) type_ =
 module Reader : sig
   type 't t
 
+  (* Using [`Eof | `Ok of 't] to mirror interface of Jane Street's Pipe read *)
+  val read : 't t -> [`Eof | `Ok of 't] Deferred.t
+  (** Read a single value from the pipe or fail if the pipe is closed *)
+
   val to_linear_pipe : 't t -> 't Linear_pipe.Reader.t
 
   val of_linear_pipe : 't Linear_pipe.Reader.t -> 't t

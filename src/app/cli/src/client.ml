@@ -300,7 +300,12 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
   let open Command.Param in
   let open Cli_lib.Arg_type in
   let amount_flag =
-    flag "fee" ~doc:"VALUE  fee you're willing to pay (default: 1)"
+    flag "fee"
+      ~doc:
+        (Printf.sprintf
+           "FEE Amount you are willing to pay to process the transaction \
+            (default: %d)"
+           (Currency.Fee.to_int Cli_lib.Fee.default_transaction))
       (optional txn_fee)
   in
   let flag =
@@ -450,6 +455,27 @@ let snark_job_list =
          | Ok str -> printf "%s" str
          | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e ))
 
+let start_tracing =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async
+    ~summary:"Tell the daemon to start tracing to $config-directory/$pid.trace"
+    (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
+         match%map dispatch Daemon_rpcs.Start_tracing.rpc () port with
+         | Ok () -> printf "Daemon started tracing!"
+         | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e ))
+
+let stop_tracing =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Tell the daemon to stop tracing"
+    (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
+         match%map dispatch Daemon_rpcs.Stop_tracing.rpc () port with
+         | Ok () -> printf "Daemon stopped printing!"
+         | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e ))
+
 let command =
   Command.group ~summary:"Lightweight client process"
     [ ("get-balance", get_balance)
@@ -466,4 +492,6 @@ let command =
     ; ("dump-ledger", dump_ledger)
     ; ("constraint-system-digests", constraint_system_digests)
     ; ("generate-keypair", generate_keypair)
+    ; ("start-tracing", start_tracing)
+    ; ("stop-tracing", stop_tracing)
     ; ("snark-job-list", snark_job_list) ]

@@ -1,5 +1,6 @@
 open Core_kernel
 open Protocols
+open Module_version
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -45,16 +46,64 @@ end = struct
   open Inputs
 
   module Transaction_with_witness = struct
-    (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
-    type t =
-      { transaction_with_info: Ledger.Undo.t
-      ; statement: Ledger_proof_statement.t
-      ; witness: Inputs.Sparse_ledger.t }
-    [@@deriving sexp, bin_io]
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          let version = 1
+
+          (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
+          type t =
+            { transaction_with_info: Ledger.Undo.t
+            ; statement: Ledger_proof_statement.t
+            ; witness: Inputs.Sparse_ledger.t }
+          [@@deriving sexp, bin_io]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "transaction_snark_scan_state_transaction_with_witness"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    include Stable.Latest
   end
 
   module Ledger_proof_with_sok_message = struct
-    type t = Ledger_proof.t * Sok_message.t [@@deriving sexp, bin_io]
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          let version = 1
+
+          type t = Ledger_proof.t * Sok_message.t [@@deriving sexp, bin_io]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "transaction_snark_scan_state_ledger_proof_with_sok_message"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    include Stable.Latest
   end
 
   module Available_job = struct
@@ -97,22 +146,42 @@ end = struct
     Ledger_proof_with_sok_message.t Parallel_scan.State.Completed_job.t
   [@@deriving sexp, bin_io]
 
-  module T = struct
-    type t =
-      { (*Job_count: Keeping track of the number of jobs added to the tree. Every transaction added amounts to two jobs*)
-        tree:
-          ( Ledger_proof_with_sok_message.t
-          , Transaction_with_witness.t )
-          Parallel_scan.State.t
-      ; mutable job_count: int }
-    [@@deriving sexp, bin_io]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        let version = 1
+
+        type t =
+          { (*Job_count: Keeping track of the number of jobs added to the tree. Every transaction added amounts to two jobs*)
+            tree:
+              ( Ledger_proof_with_sok_message.t
+              , Transaction_with_witness.t )
+              Parallel_scan.State.t
+          ; mutable job_count: int }
+        [@@deriving sexp, bin_io]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "transaction_snark_scan_state"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include T
+  include Stable.Latest
 
   (*Work capacity represents max number of work(currently in the tree and the ones that would arise in the future when current jobs are done) in the tree. *)
   let work_capacity () =
-    let open Config in
+    let open Constants in
     (*+1 because of <, +1 to give enough time to adjust the counter after proof is emitted, +1 to due to delay in proof emitting*)
     (*For Evan: Having C= 2x(txns/block * total-no-of-trees) essentially means all the trees can have full leaves without having to do any work. This doesn't work with the succinct representation and FIFO work order during when this specific edge case occurs*)
     (*Edge case:When there is a single slot at the end of the tree before continuing at the begining of the tree (referring to the last level), the jobs on the right side of the tree are done along with the jobs on the left (because it wasn't added until then). The root node has to wait until the right sub-tree has completed before the next round begins. By the time the right sub-tree is completed, the left tree is also ready with the proof but has to wait until the root is emitted. This won't work with our succint datastructure impl and FIFO work order.*)
@@ -132,9 +201,9 @@ end = struct
       ((state_hash :> string) ^ Int.to_string t.job_count)
 
   let is_valid t =
-    let k = max Config.work_delay_factor 2 in
+    let k = max Constants.work_delay_factor 2 in
     Parallel_scan.parallelism ~state:t.tree
-    = Int.pow 2 (Config.transaction_capacity_log_2 + k)
+    = Int.pow 2 (Constants.transaction_capacity_log_2 + k)
     && t.job_count < work_capacity ()
     && Parallel_scan.is_valid t.tree
 
@@ -372,13 +441,13 @@ end = struct
 
   let create ~transaction_capacity_log_2 =
     (* Transaction capacity log_2 is 1/2^work_delay_factor the capacity for work parallelism *)
-    let k = max Config.work_delay_factor 2 in
+    let k = max Constants.work_delay_factor 2 in
     { tree=
         Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + k)
     ; job_count= 0 }
 
   let empty () =
-    let open Config in
+    let open Constants in
     create ~transaction_capacity_log_2
 
   let extract_txns txns_with_witnesses =
@@ -465,7 +534,7 @@ end = struct
   let copy {tree; job_count} = {tree= Parallel_scan.State.copy tree; job_count}
 
   let partition_if_overflowing t =
-    let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
+    let max_throughput = Int.pow 2 Constants.transaction_capacity_log_2 in
     Parallel_scan.partition_if_overflowing t.tree ~max_slots:max_throughput
 
   let current_job_sequence_number {tree; _} =
@@ -498,3 +567,5 @@ end = struct
            | Some stmt -> stmt ))
       Transaction_snark_work.proofs_length
 end
+
+module Constants = Constants
