@@ -242,7 +242,7 @@ let start_checks log workers payment_reader start_reader testnet
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-let test log n should_propose snark_work_public_keys work_selection =
+let test log n proposers snark_work_public_keys work_selection =
   let log = Logger.child log "worker_testnet" in
   let proposal_interval = Consensus.Constants.block_window_duration_ms in
   let acceptable_delay =
@@ -252,8 +252,8 @@ let test log n should_propose snark_work_public_keys work_selection =
   let%bind program_dir = Unix.getcwd () in
   Coda_processes.init () ;
   let configs =
-    Coda_processes.local_configs n ~proposal_interval ~program_dir
-      ~should_propose ~acceptable_delay
+    Coda_processes.local_configs n ~proposal_interval ~program_dir ~proposers
+      ~acceptable_delay
       ~snark_worker_public_keys:(Some (List.init n snark_work_public_keys))
       ~work_selection
   in
