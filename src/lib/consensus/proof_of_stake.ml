@@ -599,26 +599,12 @@ module Vrf = struct
         ; delegator= 0 }
   end
 
-  let check ~local_state ~use_curr ~epoch ~slot ~seed ~private_key ~total_stake
-      ~ledger_hash ~logger =
+  let check ~epoch ~slot ~seed ~private_key ~total_stake
+      ~logger ~epoch_snapshot =
     let open Message in
     let open Local_state in
     let open Snapshot in
-    let open Option.Let_syntax in
     (* other place where we branch to use genesis ledger vs local state. search all uses of Genesis_ledger.t *)
-    Logger.info logger !"Vrf.check: ledger_hash=%{sexp:Coda_base.Frozen_ledger_hash.t}" ledger_hash ;
-    let%bind epoch_snapshot =
-      let snapshot =
-        if Coda_base.Frozen_ledger_hash.equal ledger_hash genesis_ledger_hash
-        then (Logger.info logger "XXX returning genesis snapshot" ; Some local_state.Local_state.genesis_epoch_snapshot)
-        else if use_curr then (Logger.info logger "XXX curr" ; local_state.Local_state.curr_epoch_snapshot) else (Logger.info logger "XXX last" ; local_state.last_epoch_snapshot)
-      in
-      if snapshot = None then
-        Logger.info logger
-          "Unable to check vrf evaluation: last_epoch_ledger does not exist \
-           in local state" ;
-      snapshot
-    in
     Logger.info logger "Checking vrf evaluations at %d:%d" (Epoch.to_int epoch)
       (Epoch.Slot.to_int slot) ;
     with_return (fun {return} ->
@@ -636,12 +622,11 @@ module Vrf = struct
                  (Random_oracle.Digest.fold_bits vrf_result)) ;
             if Threshold.is_satisfied ~my_stake:balance ~total_stake vrf_result
             then
-              (Logger.error logger !"XXX (local_state=%d) changing to snapshot with root hash %{sexp:Coda_base.Ledger_hash.t}" (Obj.magic local_state : int) (Coda_base.Sparse_ledger.merkle_root epoch_snapshot.ledger) ;
               return
                 (Some
                    { Proposal_data.stake_proof=
                        {private_key; delegator; ledger= epoch_snapshot.ledger}
-                   ; vrf_result }) ) );
+                   ; vrf_result }) );
         None )
 end
 
@@ -1003,6 +988,25 @@ module Consensus_state = struct
       let%map () = Boolean.Assert.is_true c.less_or_equal in
       c.less
     in
+    let%bind next_epoch_data_length =
+      let%bind base =
+        Field.Checked.if_ epoch_increased
+          ~then_:Field.(Var.constant zero)
+          ~else_:
+            ( Length.pack_var previous_state.curr_epoch_data.length
+              :> Field.Var.t )
+      in
+      Length.var_of_field Field.(Var.(add (constant one) base))
+    in
+    let%bind use_curr =
+      (let%bind k_as_length = Length.var_of_field (Field.Var.constant (Field.of_int Constants.k)) in
+      let%map c = Length.compare_var next_epoch_data_length k_as_length in
+      c.less)
+    in
+    let%bind last_data_for_vrf =
+      Epoch_data.if_ use_curr ~then_:previous_state.curr_epoch_data
+        ~else_:previous_state.last_epoch_data
+    in
     let%bind last_data =
       Epoch_data.if_ epoch_increased ~then_:previous_state.curr_epoch_data
         ~else_:previous_state.last_epoch_data
@@ -1011,7 +1015,7 @@ module Consensus_state = struct
       let%bind (module M) = Inner_curve.Checked.Shifted.create () in
       Vrf.Checked.check
         (module M)
-        ~epoch_ledger:last_data.ledger ~epoch:transition_data.epoch
+        ~epoch_ledger:last_data_for_vrf.ledger ~epoch:transition_data.epoch
         ~slot:transition_data.slot ~seed:last_data.seed
     in
     let%bind curr_data =
@@ -1026,15 +1030,6 @@ module Consensus_state = struct
         in
         let%bind updated = Epoch_seed.update_var base vrf_result in
         Epoch_seed.if_ in_seed_update_range ~then_:updated ~else_:base
-      and length =
-        let%bind base =
-          Field.Checked.if_ epoch_increased
-            ~then_:Field.(Var.constant zero)
-            ~else_:
-              ( Length.pack_var previous_state.curr_epoch_data.length
-                :> Field.Var.t )
-        in
-        Length.var_of_field Field.(Var.(add (constant one) base))
       and ledger =
         Epoch_ledger.if_ epoch_increased
           ~then_:
@@ -1060,7 +1055,7 @@ module Consensus_state = struct
         Coda_base.State_hash.if_ in_seed_update_range
           ~then_:previous_protocol_state_hash ~else_:base
       in
-      {Epoch_data.seed; length; ledger; start_checkpoint; lock_checkpoint}
+      {Epoch_data.seed; length= next_epoch_data_length; ledger; start_checkpoint; lock_checkpoint}
     and length = Length.increment_var previous_state.length
     (* TODO: keep track of total_currency in transaction snark. The current_slot
      * implementation would allow an adversary to make then total_currency incorrect by
@@ -1355,11 +1350,19 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
         failwith "System time is out of sync. (hint: setup NTP if you haven't)" )
     in
     let total_stake = epoch_data.ledger.total_currency in
-    Logger.error logger !"our local state is %{sexp:Local_state.t}" local_state ;
+    let ledger_hash, epoch_snapshot =
+      if Coda_base.Frozen_ledger_hash.equal epoch_data.ledger.hash genesis_ledger_hash then genesis_ledger_hash, Some local_state.Local_state.genesis_epoch_snapshot else (if state.curr_epoch_data.length <= Length.of_int Constants.k then
+      state.curr_epoch_data.ledger.hash, local_state.curr_epoch_snapshot else state.last_epoch_data.ledger.hash, local_state.last_epoch_snapshot) in
+    Logger.error logger !"XXX changing to snapshot with root hash %{sexp:Coda_base.Ledger_hash.t option} (= %{sexp:Coda_base.Frozen_ledger_hash.t}?)" (Option.map epoch_snapshot ~f:(fun e -> Coda_base.Sparse_ledger.merkle_root e.ledger) ) ledger_hash ;
+    if Option.is_none epoch_snapshot then
+      Logger.info logger
+        "Unable to check vrf evaluation: last_epoch_ledger does not exist \
+          in local state" ;
     let proposal_data slot =
-      Vrf.check ~use_curr:(state.curr_epoch_data.length <= Length.of_int Constants.k) ~epoch ~slot ~seed:epoch_data.seed ~local_state
+      Option.bind epoch_snapshot ~f:(fun epoch_snapshot -> Vrf.check ~epoch ~slot ~seed:epoch_data.seed
         ~private_key:keypair.private_key ~total_stake
-        ~ledger_hash:epoch_data.ledger.hash ~logger
+        ~epoch_snapshot
+        ~logger)
     in
     let rec find_winning_slot slot =
       if UInt32.of_int (Epoch.Slot.to_int slot) >= Constants.Epoch.size then

@@ -235,9 +235,10 @@ let daemon log =
            exit 1 )
          else Deferred.unit
        in
-       let%bind ip =
+       let ip = "127.0.0.1" in
+       (*let%bind ip =
          match ip with None -> Find_ip.find () | Some ip -> return ip
-       in
+       in*)
        let me =
          Network_peer.Peer.create
            (Unix.Inet_addr.of_string ip)
