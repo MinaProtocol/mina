@@ -117,10 +117,11 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Transition_frontier.all_breadcrumbs frontier
             |> List.permute |> List.hd_exn
           in
+          let size = 4 in
           let%bind upcoming_breadcrumbs =
             Deferred.all
             @@ Quickcheck.random_value
-                 (gen_linear_breadcrumbs ~logger ~size:4
+                 (gen_linear_breadcrumbs ~logger ~size
                     ~accounts_with_secret_keys randomly_chosen_breadcrumb)
           in
           let upcoming_transitions =
@@ -130,27 +131,18 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let missing_breadcrumb = List.hd_exn upcoming_breadcrumbs in
           let missing_transition = List.hd_exn upcoming_transitions in
           let dangling_transitions = List.tl_exn upcoming_transitions in
-          Catchup_scheduler.watch scheduler ~timeout_duration
-            ~transition:(List.nth_exn dangling_transitions 2) ;
-          assert (
-            Catchup_scheduler.has_timeout scheduler
-              (List.nth_exn dangling_transitions 2) ) ;
-          Catchup_scheduler.watch scheduler ~timeout_duration
-            ~transition:(List.nth_exn dangling_transitions 1) ;
-          assert (
-            Catchup_scheduler.has_timeout scheduler
-              (List.nth_exn dangling_transitions 1)
-            && not
-               @@ Catchup_scheduler.has_timeout scheduler
-                    (List.nth_exn dangling_transitions 2) ) ;
-          Catchup_scheduler.watch scheduler ~timeout_duration
-            ~transition:(List.nth_exn dangling_transitions 0) ;
-          assert (
-            Catchup_scheduler.has_timeout scheduler
-              (List.nth_exn dangling_transitions 0)
-            && not
-               @@ Catchup_scheduler.has_timeout scheduler
-                    (List.nth_exn dangling_transitions 1) ) ;
+          List.(
+            iteri (rev dangling_transitions) ~f:(fun i _ ->
+                Catchup_scheduler.watch scheduler ~timeout_duration
+                  ~transition:(nth_exn dangling_transitions i) ;
+                assert (
+                  Catchup_scheduler.has_timeout scheduler
+                    (nth_exn dangling_transitions i) ) ;
+                if i < size - 1 then
+                  assert (
+                    not
+                    @@ Catchup_scheduler.has_timeout scheduler
+                         (nth_exn dangling_transitions (i - 1)) ) )) ;
           Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb ;
           Catchup_scheduler.notify scheduler
             ~hash:(With_hash.hash missing_transition)
