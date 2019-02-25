@@ -13,7 +13,7 @@ module Make
           end
         end
 
-        type t [@@deriving bin_io, sexp, eq]
+        type t [@@deriving sexp, bin_io, eq]
 
         val random : unit -> t
 
@@ -396,8 +396,26 @@ let%test_module "vrf-test" =
     module Scalar = struct
       module Stable = struct
         module V1 = struct
-          include Snarky.Libsnark.Mnt6.Field
+          module T = struct
+            let version = 1
+
+            include Snarky.Libsnark.Mnt6.Field
+          end
+
+          include T
+          include Registration.Make_latest_version (T)
         end
+
+        module Latest = V1
+
+        module Module_decl = struct
+          let name = "standalone_scalar"
+
+          type latest = Latest.t
+        end
+
+        module Registrar = Registration.Make (Module_decl)
+        module Registered_V1 = Registrar.Register (V1)
       end
 
       include Stable.V1
