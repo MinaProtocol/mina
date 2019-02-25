@@ -1,7 +1,7 @@
 (executable
- (name hacks)
- (public_name hacks)
- (package hacks)
+ (name testone)
+ (public_name testone)
+ (package testone)
  (libraries core async file_system)
  (preprocess (pps ppx_jane ppx_deriving.eq))
  (modes native)

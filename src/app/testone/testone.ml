@@ -54,15 +54,9 @@ let write ?(build_dir = ".") ~loc filename =
 
 let command =
   let open Command.Let_syntax in
-  let%map_open file =
-    flag "filename" ~doc:"FILE of the test you want to run" (required file)
-  and loc = flag "-l" (optional int) ~doc:"LOCATION of file" in
-  fun () -> write ~loc file
-
-let group =
-  [("runtest", Command.async ~summary:"Run a single test on dune" command)]
+  let%map_open filename = anon ("filename" %: string)
+  and loc = anon @@ maybe @@ ("line-number" %: int) in
+  fun () -> write ~loc filename
 
 let () =
-  Command.run
-  @@ Command.group ~summary:"Various production hacks for developing on coda"
-       group
+  Command.run @@ Command.async ~summary:"Run a single test on dune" command
