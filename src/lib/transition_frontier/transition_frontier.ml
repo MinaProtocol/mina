@@ -105,6 +105,10 @@ module Make (Inputs : Inputs_intf) :
       |> Consensus.Protocol_state.blockchain_state
   end
 
+  module type Transition_frontier_extension_intf =
+    Transition_frontier_extension_intf0
+    with type transition_frontier_breadcrumb := Breadcrumb.t
+
   module Extensions = struct
     module Snark_pool_refcount = Snark_pool_refcount.Make (struct
       include Inputs
@@ -131,13 +135,18 @@ module Make (Inputs : Inputs_intf) :
       Broadcast_pipe.Writer.close snark_pool
 
     let mb_write_to_pipe diff ext_t handle pipe =
-      match handle ext_t diff with
-      | None -> Deferred.unit
-      | Some new_view -> Broadcast_pipe.Writer.write pipe new_view
+      Option.value ~default:Deferred.unit
+      @@ Option.map ~f:(Broadcast_pipe.Writer.write pipe) (handle ext_t diff)
 
     let handle_diff t (pipes : writers) diff =
-      mb_write_to_pipe diff t.snark_pool_refcount
-        Snark_pool_refcount.handle_diff pipes.snark_pool
+      let use handler pipe acc field =
+        let open Deferred.Let_syntax in
+        let%bind () = acc in
+        mb_write_to_pipe diff (Field.get field t) handler pipe
+      in
+      Fields.fold ~init:Deferred.unit
+        ~snark_pool_refcount:
+          (use Snark_pool_refcount.handle_diff pipes.snark_pool)
   end
 
   type node =

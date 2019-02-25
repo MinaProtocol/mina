@@ -12,11 +12,9 @@ module type Inputs_intf = sig
      and type staged_ledger := Staged_ledger.t
 end
 
-module type S = Transition_frontier_extension_intf
-
 module Make (Inputs : Inputs_intf) :
-  S
-  with type transition_frontier_breadcrumb = Inputs.Breadcrumb.t
+  Transition_frontier_extension_intf0
+  with type transition_frontier_breadcrumb := Inputs.Breadcrumb.t
    and type input = unit
    and type view = unit = struct
   module Work = Inputs.Transaction_snark_work.Statement
@@ -24,8 +22,6 @@ module Make (Inputs : Inputs_intf) :
   type t = {ref_table: int Work.Table.t}
 
   type input = unit
-
-  type transition_frontier_breadcrumb = Inputs.Breadcrumb.t
 
   type view = unit
 

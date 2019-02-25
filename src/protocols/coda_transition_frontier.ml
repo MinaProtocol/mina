@@ -17,8 +17,9 @@ module Transition_frontier_diff = struct
 end
 
 (** An extension to the transition frontier that provides a view onto the data
-    other components can use. This is exposed through FIXME. *)
-module type Transition_frontier_extension_intf = sig
+    other components can use. These are exposed through the broadcast pipes
+    accessible by calling extension_pipes on a Transition_frontier.t. *)
+module type Transition_frontier_extension_intf0 = sig
   (** Internal state of the extension. *)
   type t
 
@@ -198,6 +199,10 @@ module type Transition_frontier_intf = sig
   val best_tip_path_length_exn : t -> int
 
   val shallow_copy_root_snarked_ledger : t -> masked_ledger
+
+  module type Transition_frontier_extension_intf =
+    Transition_frontier_extension_intf0
+    with type transition_frontier_breadcrumb := Breadcrumb.t
 
   module Extensions : sig
     module Snark_pool_refcount :
