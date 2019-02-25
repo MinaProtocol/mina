@@ -9,20 +9,6 @@ open Coda_main
 open Signature_lib
 open Pipe_lib
 
-[%%if
-tracing]
-
-let start_tracing () =
-  Writer.open_file
-    (sprintf "/tmp/coda-profile-%d" (Unix.getpid () |> Pid.to_int))
-  >>| O1trace.start_tracing
-
-[%%else]
-
-let start_tracing () = Deferred.unit
-
-[%%endif]
-
 module Snark_worker_config = struct
   type t = {port: int; public_key: Public_key.Compressed.t} [@@deriving bin_io]
 end
@@ -38,6 +24,7 @@ module Input = struct
     ; program_dir: string
     ; external_port: int
     ; discovery_port: int
+    ; acceptable_delay: Time.Span.t
     ; peers: Host_and_port.t list }
   [@@deriving bin_io]
 end
@@ -219,6 +206,7 @@ module T = struct
         Unix.mkdtemp (banlist_dir_name ^/ "suspicious")
       in
       let%bind punished_dir = Unix.mkdtemp (banlist_dir_name ^/ "banned") in
+      let%bind trust_dir = Unix.mkdtemp (banlist_dir_name ^/ "trust") in
       let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
       let%bind () = File_system.create_dir receipt_chain_dir_name in
       let receipt_chain_database =
@@ -226,6 +214,7 @@ module T = struct
           ~directory:receipt_chain_dir_name
       in
       let banlist = Coda_base.Banlist.create ~suspicious_dir ~punished_dir in
+      let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
       let time_controller = Main.Inputs.Time.Controller.create () in
       let net_config =
         { Main.Inputs.Net.Config.parent_log= log
@@ -240,9 +229,8 @@ module T = struct
                   (Unix.Inet_addr.of_string host)
                   ~discovery_port ~communication_port:external_port
             ; parent_log= log
-            ; banlist } }
+            ; trust_system } }
       in
-      let%bind () = start_tracing () in
       let%bind coda =
         Main.create
           (Main.Config.make ~log ~net_config

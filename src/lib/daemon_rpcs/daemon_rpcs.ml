@@ -212,7 +212,7 @@ module Types = struct
 end
 
 module Send_user_command = struct
-  type query = User_command.Stable.V1.t [@@deriving bin_io]
+  type query = User_command.Stable.Latest.t [@@deriving bin_io]
 
   type response = Receipt.Chain_hash.t Or_error.t [@@deriving bin_io]
 
@@ -224,7 +224,7 @@ module Send_user_command = struct
 end
 
 module Send_user_commands = struct
-  type query = User_command.Stable.V1.t list [@@deriving bin_io]
+  type query = User_command.Stable.Latest.t list [@@deriving bin_io]
 
   type response = unit [@@deriving bin_io]
 
@@ -236,7 +236,7 @@ module Send_user_commands = struct
 end
 
 module Get_ledger = struct
-  type query = Staged_ledger_hash.Stable.V1.t [@@deriving bin_io]
+  type query = Staged_ledger_hash.Stable.Latest.t [@@deriving bin_io]
 
   type response = Account.t list Or_error.t [@@deriving bin_io]
 
@@ -247,9 +247,9 @@ module Get_ledger = struct
 end
 
 module Get_balance = struct
-  type query = Public_key.Compressed.Stable.V1.t [@@deriving bin_io]
+  type query = Public_key.Compressed.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Currency.Balance.Stable.V1.t option [@@deriving bin_io]
+  type response = Currency.Balance.Stable.Latest.t option [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -259,7 +259,7 @@ end
 
 module Verify_proof = struct
   type query =
-    Public_key.Compressed.Stable.V1.t * User_command.t * Payment_proof.t
+    Public_key.Compressed.Stable.Latest.t * User_command.t * Payment_proof.t
   [@@deriving bin_io]
 
   type response = unit Or_error.t [@@deriving bin_io]
@@ -271,7 +271,7 @@ module Verify_proof = struct
 end
 
 module Prove_receipt = struct
-  type query = Receipt.Chain_hash.t * Public_key.Compressed.Stable.V1.t
+  type query = Receipt.Chain_hash.t * Public_key.Compressed.Stable.Latest.t
   [@@deriving bin_io]
 
   type response = Payment_proof.t Or_error.t [@@deriving bin_io]
@@ -283,9 +283,9 @@ module Prove_receipt = struct
 end
 
 module Get_nonce = struct
-  type query = Public_key.Compressed.Stable.V1.t [@@deriving bin_io]
+  type query = Public_key.Compressed.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Account.Nonce.Stable.V1.t option [@@deriving bin_io]
+  type response = Account.Nonce.Stable.Latest.t option [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -359,4 +359,26 @@ module Snark_job_list = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Snark_job_list" ~version:0 ~bin_query ~bin_response
+end
+
+module Start_tracing = struct
+  type query = unit [@@deriving bin_io]
+
+  type response = unit [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Start_tracing" ~version:0 ~bin_query ~bin_response
+end
+
+module Stop_tracing = struct
+  type query = unit [@@deriving bin_io]
+
+  type response = unit [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Stop_tracing" ~version:0 ~bin_query ~bin_response
 end

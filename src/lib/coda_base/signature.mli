@@ -12,6 +12,8 @@ module Stable : sig
 
     include Codable.S with type t := t
   end
+
+  module Latest = V1
 end
 
 open Snark_params.Tick

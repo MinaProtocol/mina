@@ -11,20 +11,6 @@ module YJ = Yojson.Safe
 module Git_sha = Daemon_rpcs.Types.Git_sha
 
 [%%if
-tracing]
-
-let start_tracing () =
-  Writer.open_file
-    (sprintf "/tmp/coda-profile-%d" (Unix.getpid () |> Pid.to_int))
-  >>| O1trace.start_tracing
-
-[%%else]
-
-let start_tracing () = Deferred.unit
-
-[%%endif]
-
-[%%if
 fake_hash]
 
 let maybe_sleep s = after (Time.Span.of_sec s)
@@ -99,12 +85,16 @@ let daemon log =
      and snark_work_fee =
        flag "snark-worker-fee"
          ~doc:
-           "FEE Amount a worker wants to get compensated for generating a \
-            snark proof"
-         (optional int)
+           (Printf.sprintf
+              "FEE Amount a worker wants to get compensated for generating a \
+               snark proof (default: %d)"
+              (Currency.Fee.to_int Cli_lib.Fee.default_snark_worker))
+         (optional txn_fee)
      and sexp_logging =
        flag "sexp-logging" no_arg
          ~doc:"Use S-expressions in log output, instead of JSON"
+     and enable_tracing =
+       flag "tracing" no_arg ~doc:"Trace into $config-directory/$pid.trace"
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -171,9 +161,11 @@ let daemon log =
            ~default:Port.default_client client_port
        in
        let snark_work_fee_flag =
-         Currency.Fee.of_int
-           (or_from_config YJ.Util.to_int_option "snark-worker-fee" ~default:0
-              snark_work_fee)
+         let json_to_currency_fee_option json =
+           YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
+         in
+         or_from_config json_to_currency_fee_option "snark-worker-fee"
+           ~default:Cli_lib.Fee.default_snark_worker snark_work_fee
        in
        let rest_server_port =
          maybe_from_config YJ.Util.to_int_option "rest-port" rest_server_port
@@ -196,6 +188,7 @@ let daemon log =
        in
        let discovery_port = external_port + 1 in
        let%bind () = Unix.mkdir ~p:() conf_dir in
+       if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
        let%bind initial_peers_raw =
          match peers with
          | _ :: _ -> return peers
@@ -301,13 +294,15 @@ let daemon log =
          let%bind () = Async.Unix.mkdir ~p:() banlist_dir_name in
          let suspicious_dir = banlist_dir_name ^/ "suspicious" in
          let punished_dir = banlist_dir_name ^/ "banned" in
+         let trust_dir = banlist_dir_name ^/ "trust" in
          let () = Snark_params.set_chunked_hashing true in
          let%bind () = Async.Unix.mkdir ~p:() suspicious_dir in
          let%bind () = Async.Unix.mkdir ~p:() punished_dir in
-         let%bind () = start_tracing () in
+         let%bind () = Async.Unix.mkdir ~p:() trust_dir in
          let banlist =
            Coda_base.Banlist.create ~suspicious_dir ~punished_dir
          in
+         let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
          let time_controller = Inputs.Time.Controller.create () in
          let net_config =
            { Inputs.Net.Config.parent_log= log
@@ -319,7 +314,7 @@ let daemon log =
                ; conf_dir
                ; initial_peers
                ; me
-               ; banlist } }
+               ; trust_system } }
          in
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
          let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
@@ -414,12 +409,14 @@ let ensure_testnet_id_still_good _ = Deferred.unit
 [%%endif]
 
 [%%if
-with_snark]
+proof_level = "full"]
 
 let internal_commands =
   [(Snark_worker_lib.Intf.command_name, Snark_worker_lib.Prod.Worker.command)]
 
 [%%else]
+
+(* TODO #1698: proof_level=check *)
 
 let internal_commands =
   [(Snark_worker_lib.Intf.command_name, Snark_worker_lib.Debug.Worker.command)]
@@ -443,6 +440,8 @@ let coda_commands log =
     ; (Coda_shared_state_test.name, Coda_shared_state_test.command)
     ; (Coda_transitive_peers_test.name, Coda_transitive_peers_test.command)
     ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
+    ; ( Coda_shared_prefix_multiproposer_test.name
+      , Coda_shared_prefix_multiproposer_test.command )
     ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
     ; (Coda_receipt_chain_test.name, Coda_receipt_chain_test.command)
     ; ("full-test", Full_test.command)
@@ -458,7 +457,6 @@ let () =
   let log = Logger.create () in
   don't_wait_for (ensure_testnet_id_still_good log) ;
   (* Turn on snark debugging in prod for now *)
-  Snark_params.Tick.set_eval_constraints true ;
-  Snark_params.Tock.set_eval_constraints true ;
+  Snarky.Snark.set_eval_constraints true ;
   Command.run (Command.group ~summary:"Coda" (coda_commands log)) ;
   Core.exit 0
