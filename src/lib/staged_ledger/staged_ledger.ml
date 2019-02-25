@@ -1564,7 +1564,7 @@ let%test_module "test" =
         end
       end
 
-      module Pending_coinbase_state = struct
+      module Pending_coinbase_stack_state = struct
         type t =
           {source: Pending_coinbase.Stack.t; target: Pending_coinbase.Stack.t}
         [@@deriving sexp, bin_io, compare, hash]
@@ -1576,7 +1576,7 @@ let%test_module "test" =
             { source: Ledger_hash.t
             ; target: Ledger_hash.t
             ; supply_increase: Currency.Amount.t
-            ; pending_coinbase_state: Pending_coinbase_state.t
+            ; pending_coinbase_state: Pending_coinbase_stack_state.t
             ; fee_excess: Fee.Signed.t
             ; proof_type: [`Base | `Merge] }
           [@@deriving sexp, bin_io, compare, hash]
@@ -1601,7 +1601,7 @@ let%test_module "test" =
             ; target= s2.target
             ; supply_increase
             ; pending_coinbase_state=
-                { Pending_coinbase_state.source=
+                { Pending_coinbase_stack_state.source=
                     s1.pending_coinbase_state.source
                 ; target= s2.pending_coinbase_state.target }
             ; fee_excess

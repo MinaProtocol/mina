@@ -110,73 +110,77 @@ module Index = struct
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
 end
 
-module Stack = struct
-  include Data_hash.Make_full_size ()
+module Coinbase_collection = struct
+  module Stack = struct
+    include Data_hash.Make_full_size ()
 
-  let push_exn (h : t) cb : t =
-    match Coinbase_data.of_coinbase cb with
-    | Ok cb ->
-        Pedersen.digest_fold Hash_prefix.coinbase_stack
-          Fold.(Coinbase_data.fold cb +> fold h)
-        |> of_hash
-    | Error e ->
-        failwithf "Error adding a coinbase to the pending stack: %s"
-          (Error.to_string_hum e) ()
+    let push_exn (h : t) cb : t =
+      match Coinbase_data.of_coinbase cb with
+      | Ok cb ->
+          Pedersen.digest_fold Hash_prefix.coinbase_stack
+            Fold.(Coinbase_data.fold cb +> fold h)
+          |> of_hash
+      | Error e ->
+          failwithf "Error adding a coinbase to the pending stack: %s"
+            (Error.to_string_hum e) ()
 
-  let empty =
-    of_hash
-      ( Pedersen.(State.salt params ~get_chunk_table "CoinbaseStack")
-      |> Pedersen.State.digest )
+    let empty =
+      of_hash
+        ( Pedersen.(State.salt params ~get_chunk_table "CoinbaseStack")
+        |> Pedersen.State.digest )
 
-  module Checked = struct
-    type t = var
+    module Checked = struct
+      type t = var
 
-    let push (t : t) (coinbase : Coinbase_data.var) =
-      (*Prefix+Coinbase+Current-stack*)
-      let init =
-        Pedersen.Checked.Section.create
-          ~acc:(`Value Hash_prefix.coinbase_stack.acc)
-          ~support:
-            (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
-      in
-      let%bind coinbase_section =
-        let%bind bs = Coinbase_data.var_to_triples coinbase in
-        Pedersen.Checked.Section.extend init bs
-          ~start:Hash_prefix.length_in_triples
-      in
-      let%bind with_t =
-        let%bind bs = var_to_triples t in
-        Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty bs
-          ~start:
-            (Hash_prefix.length_in_triples + Coinbase_data.length_in_triples)
-      in
-      let%map s =
-        Pedersen.Checked.Section.disjoint_union_exn coinbase_section with_t
-      in
-      let digest, _ =
-        Pedersen.Checked.Section.to_initial_segment_digest_exn s
-      in
-      var_of_hash_packed digest
+      let push (t : t) (coinbase : Coinbase_data.var) =
+        (*Prefix+Coinbase+Current-stack*)
+        let init =
+          Pedersen.Checked.Section.create
+            ~acc:(`Value Hash_prefix.coinbase_stack.acc)
+            ~support:
+              (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
+        in
+        let%bind coinbase_section =
+          let%bind bs = Coinbase_data.var_to_triples coinbase in
+          Pedersen.Checked.Section.extend init bs
+            ~start:Hash_prefix.length_in_triples
+        in
+        let%bind with_t =
+          let%bind bs = var_to_triples t in
+          Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty bs
+            ~start:
+              (Hash_prefix.length_in_triples + Coinbase_data.length_in_triples)
+        in
+        let%map s =
+          Pedersen.Checked.Section.disjoint_union_exn coinbase_section with_t
+        in
+        let digest, _ =
+          Pedersen.Checked.Section.to_initial_segment_digest_exn s
+        in
+        var_of_hash_packed digest
 
-    let if_ = if_
+      let if_ = if_
 
-    let empty = var_of_t empty
+      let empty = var_of_t empty
 
-    let equal (x : var) (y : var) =
-      Field.Checked.equal (var_to_hash_packed x) (var_to_hash_packed y)
+      let equal (x : var) (y : var) =
+        Field.Checked.equal (var_to_hash_packed x) (var_to_hash_packed y)
 
-    let hash t =
-      var_to_triples t
-      >>= Pedersen.Checked.hash_triples ~init:Hash_prefix.coinbase_stack
+      let hash t =
+        var_to_triples t
+        >>= Pedersen.Checked.hash_triples ~init:Hash_prefix.coinbase_stack
 
-    let digest t =
-      var_to_triples t
-      >>= Pedersen.Checked.digest_triples ~init:Hash_prefix.coinbase_stack
+      let digest t =
+        var_to_triples t
+        >>= Pedersen.Checked.digest_triples ~init:Hash_prefix.coinbase_stack
+    end
   end
 end
 
 (*Pending coinbase hash*)
 module Hash = struct
+  open Coinbase_collection
+
   module Merkle_tree =
     Snarky.Merkle_tree.Checked
       (Tick)
@@ -236,7 +240,7 @@ module Hash = struct
   type path = Pedersen.Digest.t list
 
   type _ Request.t +=
-    | Stack_path : Index.t -> path Request.t
+    | Coinbase_stack_path : Index.t -> path Request.t
     | Get_coinbase_stack : Index.t -> (Stack.t * path) Request.t
     | Set_coinbase_stack : Index.t * Stack.t -> unit Request.t
     | Find_index_of_newest_stack : Index.t Request.t
@@ -244,7 +248,8 @@ module Hash = struct
 
   let reraise_merkle_requests (With {request; respond}) =
     match request with
-    | Merkle_tree.Get_path addr -> respond (Delegate (Stack_path addr))
+    | Merkle_tree.Get_path addr ->
+        respond (Delegate (Coinbase_stack_path addr))
     | Merkle_tree.Set (addr, stack) ->
         respond (Delegate (Set_coinbase_stack (addr, stack)))
     | Merkle_tree.Get_element addr ->
@@ -296,7 +301,7 @@ module Hash = struct
         Boolean.(Assert.is_true yes) )
       ~f:(fun x -> f x)
 
-  let%snarkydef delete_stack t ~f =
+  let%snarkydef delete_stack t =
     let filter stack =
       let%bind empty_stack =
         Stack.Checked.equal stack Stack.(var_of_t empty)
@@ -310,27 +315,27 @@ module Hash = struct
     handle
       (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
          ~f:(fun stack ->
-           let%bind () = filter stack in
-           f stack ))
+           let%map () = filter stack in
+           Stack.Checked.empty ))
       reraise_merkle_requests
     >>| var_of_hash_packed
 end
 
 module T = struct
-  module Coinbase_stack = struct
-    include Stack
+  module Stack = struct
+    include Coinbase_collection.Stack
 
     let hash (t : t) = Hash.of_digest (t :> field)
   end
 
   module Merkle_tree =
-    Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Index) (Coinbase_stack)
+    Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Index) (Stack)
 
   type t = {tree: Merkle_tree.t; index_list: Index.t list; new_index: Index.t}
   [@@deriving sexp, bin_io]
 
   let create_exn () =
-    let init_hash = Coinbase_stack.hash Coinbase_stack.empty in
+    let init_hash = Stack.hash Stack.empty in
     let hash_on_level, root_hash =
       List.fold
         (List.init coinbase_tree_depth ~f:(fun i -> i + 1))
@@ -361,7 +366,7 @@ module T = struct
             | `Left h -> ("left "^Int.to_string i, h)
             | `Right h -> ("right "^Int.to_string i, h) in
             Core.printf !"%s %{sexp: Hash.t}\n"  dir h);*)
-        go (Merkle_tree.add_path t path key Coinbase_stack.empty) (key + 1)
+        go (Merkle_tree.add_path t path key Stack.empty) (key + 1)
     in
     { tree= go (Merkle_tree.of_hash ~depth:coinbase_tree_depth root_hash) 0
     ; index_list= []
@@ -397,7 +402,7 @@ module T = struct
     let key = Option.value_exn (get_latest_stack t ~on_new_tree) in
     let stack_index = Merkle_tree.find_index_exn t.tree key in
     let stack_before = Merkle_tree.get_exn t.tree stack_index in
-    let stack_after = Coinbase_stack.push_exn stack_before coinbase in
+    let stack_after = Stack.push_exn stack_before coinbase in
     let t' = next_new_index t ~on_new_tree in
     let tree' = Merkle_tree.set_exn t.tree stack_index stack_after in
     {t' with tree= tree'}
@@ -405,7 +410,7 @@ module T = struct
   let remove_coinbase_stack_exn t =
     let oldest_stack, remaining = remove_oldest_stack_exn t.index_list in
     let stack_index = Merkle_tree.find_index_exn t.tree oldest_stack in
-    let tree' = Merkle_tree.set_exn t.tree stack_index Coinbase_stack.empty in
+    let tree' = Merkle_tree.set_exn t.tree stack_index Stack.empty in
     {t with tree= tree'; index_list= remaining}
 
   let merkle_root t = Merkle_tree.merkle_root t.tree

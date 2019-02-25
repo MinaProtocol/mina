@@ -57,6 +57,8 @@ module Proposal_data = struct
   let prover_state _ = ()
 end
 
+(*module Pending_coinbase_state_temp = Coda_base.Pending_coinbase_state_temp*)
+
 module Blockchain_state = Coda_base.Blockchain_state.Make (Genesis_ledger)
 module Lite_compat = Lite_compat.Make (Blockchain_state)
 

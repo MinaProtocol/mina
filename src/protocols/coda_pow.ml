@@ -388,7 +388,7 @@ module type Transaction_intf = sig
   val supply_increase : t -> Currency.Amount.t Or_error.t
 end
 
-module type Pending_coinbase_state_intf = sig
+module type Pending_coinbase_stack_state_intf = sig
   type pending_coinbase_hash
 
   type t = {source: pending_coinbase_hash; target: pending_coinbase_hash}
@@ -937,6 +937,42 @@ module type Consensus_state_intf = sig
   type var
 end
 
+module type Pending_coinbase_state_temp_intf = sig
+  type t [@@deriving sexp, bin_io]
+
+  type value
+
+  type var
+
+  type pending_coinbase_hash
+
+  type pending_coinbase_stack
+
+  module Action : sig
+    type t = Added | Updated | Deleted_added | Deleted_updated
+    [@@deriving eq, sexp, bin_io]
+
+    type var
+  end
+
+  val create_value :
+       prev_root:pending_coinbase_hash
+    -> new_root:pending_coinbase_hash
+    -> updated_stack:pending_coinbase_stack
+    -> action:Action.t
+    -> value
+
+  val new_root : value -> pending_coinbase_hash
+
+  val prev_root : value -> pending_coinbase_hash
+
+  val updated_stack : value -> pending_coinbase_stack
+
+  val action : value -> Action.t
+
+  val genesis : value
+end
+
 module type Blockchain_state_intf = sig
   type staged_ledger_hash
 
@@ -960,6 +996,8 @@ module type Blockchain_state_intf = sig
   val staged_ledger_hash : value -> staged_ledger_hash
 
   val snarked_ledger_hash : value -> frozen_ledger_hash
+
+  val pending_coinbase_hash : value -> pending_coinbase_hash
 
   val timestamp : value -> time
 end
@@ -1161,6 +1199,8 @@ module type Consensus_mechanism_intf = sig
 
   type pending_coinbase_hash
 
+  type pending_coinbase_state_temp
+
   type staged_ledger_diff
 
   type protocol_state_proof
@@ -1191,6 +1231,9 @@ module type Consensus_mechanism_intf = sig
 
   module Consensus_state : Consensus_state_intf
 
+  (*module Pending_coinbase_state_temp : Pending_coinbase_state_temp_intf
+    with type pending_coinbase_hash := pending_coinbase_hash
+     and type pending_coinbase_stack := pending_coinbase_stack*)
   module Blockchain_state :
     Blockchain_state_intf
     with type staged_ledger_hash := staged_ledger_hash
@@ -1225,6 +1268,7 @@ module type Consensus_mechanism_intf = sig
       -> supply_increase:Currency.Amount.t
       -> blockchain_state:Blockchain_state.value
       -> consensus_data:Consensus_transition_data.value
+      -> pending_coinbase_state:pending_coinbase_state_temp
       -> unit
       -> value
 
@@ -1397,14 +1441,19 @@ module type Inputs_intf = sig
   module Sok_message :
     Sok_message_intf with type public_key_compressed := Public_key.Compressed.t
 
-  module Pending_coinbase_state :
-    Pending_coinbase_state_intf
+  module Pending_coinbase_stack_state :
+    Pending_coinbase_stack_state_intf
     with type pending_coinbase_hash := Pending_coinbase.Stack.t
+
+  module Pending_coinbase_state_temp :
+    Pending_coinbase_state_temp_intf
+    with type pending_coinbase_hash := Pending_coinbase_hash.t
+     and type pending_coinbase_stack := Pending_coinbase.Stack.t
 
   module Ledger_proof_statement :
     Ledger_proof_statement_intf
     with type ledger_hash := Frozen_ledger_hash.t
-     and type pending_coinbase_state := Pending_coinbase_state.t
+     and type pending_coinbase_state := Pending_coinbase_stack_state.t
 
   module Ledger_proof :
     Ledger_proof_intf
@@ -1550,6 +1599,7 @@ Merge Snark:
      and type keypair := Keypair.t
      and type time := Time.t
      and type pending_coinbase_hash := Pending_coinbase_hash.t
+     and type pending_coinbase_state_temp := Pending_coinbase_state_temp.value
 
   module Internal_transition :
     Internal_transition_intf

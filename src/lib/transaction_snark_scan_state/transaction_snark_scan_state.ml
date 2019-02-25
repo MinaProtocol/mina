@@ -192,7 +192,7 @@ end = struct
     ; fee_excess
     ; supply_increase
     ; pending_coinbase_state=
-        { Pending_coinbase_state.source= pending_coinbase_before
+        { Pending_coinbase_stack_state.source= pending_coinbase_before
         ; target= pending_coinbase_after }
     ; proof_type= `Base }
 

@@ -9,7 +9,7 @@ open Snark_bits
 module type S = sig
   type t
 
-  module Coinbase : sig
+  module Coinbase_data : sig
     type t
 
     type var
@@ -39,7 +39,11 @@ module type S = sig
     val fold : t -> (bool * bool * bool) Fold.t
 
     module Unpacked : sig
-      type var = Boolean.var sexp_list
+      type value = t
+
+      type var
+
+      include Snarkable.S with type value := value and type var := var
     end
 
     include Bits_intf.S with type t := t
@@ -50,13 +54,34 @@ module type S = sig
 
     type var
 
-    val singleton : Coinbase.t -> t
+    val push_exn : t -> Coinbase.t -> t
+
+    val empty : t
+
+    module Checked : sig
+      type t = var
+
+      val push : t -> Coinbase_data.var -> (t, 'a) Tick0.Checked.t
+
+      val if_ :
+        Tick0.Boolean.var -> then_:t -> else_:t -> (t, 'a) Tick0.Checked.t
+
+      val empty : t
+    end
   end
 
   module Hash : sig
     include Data_hash.Full_size
 
     type path = Pedersen.Digest.t list
+
+    module Address : sig
+      type var = Boolean.var list
+
+      type value = int
+
+      val typ : depth:int -> (var, value) Typ.t
+    end
 
     type _ Request.t +=
       | Stack_path : Index.t -> path Request.t
@@ -65,7 +90,7 @@ module type S = sig
       | Find_index_of_newest_stack : Index.t Request.t
       | Find_index_of_oldest_stack : Index.t Request.t
 
-    val get : var -> Index.Unpacked.var -> (Coinbase.var, _) Checked.t
+    val get : var -> Index.Unpacked.var -> (Stack.var, _) Checked.t
 
     val merge : height:int -> t -> t -> t
 
@@ -73,20 +98,15 @@ module type S = sig
 
     val of_digest : Pedersen.Digest.t -> t
 
+    (*val get : var -> Address.var -> Stack.var*)
+
     val update_stack :
          var
       -> is_new_stack:Boolean.var
-      -> f:(   is_empty_or_writeable:Boolean.var
-            -> Stack.var
-            -> (Stack.var, 's) Checked.t)
+      -> f:(Stack.var -> (Stack.var, 's) Checked.t)
       -> (var, 's) Checked.t
 
-    val delete_stack :
-         var
-      -> f:(   is_empty_or_writeable:Boolean.var
-            -> Stack.var
-            -> (Stack.var, 's) Checked.t)
-      -> (var, 's) Checked.t
+    val delete_stack : var -> (var, 's) Checked.t
   end
 
   val create : unit -> t

@@ -1228,6 +1228,7 @@ include struct
       ~(prev_state_hash : Coda_base.State_hash.var) transition supply_increase
       =
     Consensus_state.update_var
+      (*Deepthi:some requests are done here, check how something similar can be done*)
       (Protocol_state.consensus_state prev_state)
       (Snark_transition.consensus_data transition)
       prev_state_hash ~supply_increase

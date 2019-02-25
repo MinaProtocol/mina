@@ -49,14 +49,14 @@ module type S = sig
     end
   end
 
-  module Pending_coinbase_state :
-    Coda_pow.Pending_coinbase_state_intf
+  module Pending_coinbase_stack_state :
+    Coda_pow.Pending_coinbase_stack_state_intf
     with type pending_coinbase_hash := Pending_coinbase.Stack.t
 
   module Ledger_proof_statement :
     Coda_pow.Ledger_proof_statement_intf
     with type ledger_hash := Frozen_ledger_hash.t
-     and type pending_coinbase_state := Pending_coinbase_state.t
+     and type pending_coinbase_state := Pending_coinbase_stack_state.t
 
   module Proof : sig
     type t
