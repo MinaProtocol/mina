@@ -11,6 +11,11 @@ if [[ ! "$CIRCLE_BUILD_NUM" ]]; then
 fi
 
 do_copy () {
+    # GC credentials
+    echo $JSON_GCLOUD_CREDENTIALS > google_creds.json
+    /usr/bin/gcloud auth activate-service-account --key-file=google_creds.json
+    /usr/bin/gcloud config set project $(cat google_creds.json | jq -r .project_id)
+
     SOURCES="/tmp/artifacts/buildocaml.log src/_build/default/lib/coda_base/sample_keypairs.ml /tmp/artifacts/coda.deb"
     DESTINATION="gs://network-debug/${CIRCLE_BUILD_NUM}/build/"
 
