@@ -359,7 +359,7 @@ struct
       gen_root_breadcrumb_builder root_breadcrumb |> Quickcheck.random_value
     in
     Deferred.List.iter deferred_breadcrumbs ~f:(fun deferred_breadcrumb ->
-        let%map breadcrumb = deferred_breadcrumb in
+        let%bind breadcrumb = deferred_breadcrumb in
         Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
 
   let gen_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys
