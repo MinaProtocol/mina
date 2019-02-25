@@ -17,8 +17,8 @@ let exists' typ ~f = Tick.(exists typ ~compute:As_prover.(map get_state ~f))
 
 module Input = struct
   type t =
-    { source: Frozen_ledger_hash.Stable.Latest.t
-    ; target: Frozen_ledger_hash.Stable.Latest.t
+    { source: Frozen_ledger_hash.Stable.V1.t
+    ; target: Frozen_ledger_hash.Stable.V1.t
     ; fee_excess: Currency.Amount.Signed.t }
   [@@deriving bin_io]
 end
@@ -32,10 +32,10 @@ end
 module Statement = struct
   module T = struct
     type t =
-      { source: Coda_base.Frozen_ledger_hash.Stable.Latest.t
-      ; target: Coda_base.Frozen_ledger_hash.Stable.Latest.t
-      ; supply_increase: Currency.Amount.Stable.Latest.t
-      ; fee_excess: Currency.Fee.Signed.Stable.Latest.t
+      { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
+      ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
+      ; supply_increase: Currency.Amount.Stable.V1.t
+      ; fee_excess: Currency.Fee.Signed.Stable.V1.t
       ; proof_type: Proof_type.t }
     [@@deriving sexp, bin_io, hash, compare, eq, fields]
 
@@ -73,12 +73,12 @@ module Statement = struct
 end
 
 type t =
-  { source: Frozen_ledger_hash.Stable.Latest.t
-  ; target: Frozen_ledger_hash.Stable.Latest.t
+  { source: Frozen_ledger_hash.Stable.V1.t
+  ; target: Frozen_ledger_hash.Stable.V1.t
   ; proof_type: Proof_type.t
-  ; supply_increase: Amount.Stable.Latest.t
-  ; fee_excess: Amount.Signed.Stable.Latest.t
-  ; sok_digest: Sok_message.Digest.Stable.Latest.t
+  ; supply_increase: Amount.Stable.V1.t
+  ; fee_excess: Amount.Signed.Stable.V1.t
+  ; sok_digest: Sok_message.Digest.Stable.V1.t
   ; proof: Proof.Stable.V1.t }
 [@@deriving fields, sexp, bin_io]
 
