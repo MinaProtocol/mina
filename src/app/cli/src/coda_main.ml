@@ -12,11 +12,13 @@ open O1trace
 module Fee = Protocols.Coda_pow.Fee
 
 [%%if
-with_snark]
+proof_level = "full"]
 
 module Ledger_proof = Ledger_proof.Prod
 
 [%%else]
+
+(* TODO #1698: proof_level=check *)
 
 module Ledger_proof = struct
   module Statement = Transaction_snark.Statement
@@ -334,6 +336,8 @@ module type Main_intf = sig
 
   val best_tip :
     t -> Inputs.Transition_frontier.Breadcrumb.t Participating_state.t
+
+  val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
   val peers : t -> Network_peer.Peer.t list
 
@@ -966,7 +970,7 @@ struct
 end
 
 [%%if
-with_snark]
+proof_level = "full"]
 
 module Make_coda (Init : Init_intf) = struct
   module Ledger_proof_verifier = struct
@@ -1008,6 +1012,7 @@ end
 
 [%%else]
 
+(* TODO #1698: proof_level=check ledger proofs *)
 module Make_coda (Init : Init_intf) = struct
   module Ledger_proof_verifier = struct
     let verify _ _ ~message:_ = return true
@@ -1384,7 +1389,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       ; implement Daemon_rpcs.Start_tracing.rpc (fun () () ->
             Coda_tracing.start Config_in.conf_dir )
       ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
-            Coda_tracing.stop () ; Deferred.unit ) ]
+            Coda_tracing.stop () ; Deferred.unit )
+      ; implement Daemon_rpcs.Visualize_frontier.rpc (fun () filename ->
+            return
+              ( visualize_frontier ~filename coda
+              |> Participating_state.active_exn ) ) ]
     in
     let snark_worker_impls =
       [ implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->

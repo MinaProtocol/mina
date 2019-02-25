@@ -4,6 +4,10 @@ date: 2018-01-01
 ---
 O(1) Labs is a small, well-funded startup aiming to develop the first cryptocurrency protocol that can deliver on the promise of supporting real-world applications and widespread use. Our team is based in San Francisco, and we are funded by top investors (including Polychain, Metastable, Max Levchin, and Naval Ravikant).
 
+We’re working on technologies with the potential to reimagine social structures. We believe it’s important to incorporate diverse perspectives from conception through realization.
+
+We offer a competitive employee benefits package.
+
 Cryptocurrency is a domain where correctness really counts. As such, a cornerstone of our approach is a focus on building reliable software through the use of statically-typed functional programming languages. This is reflected in our OCaml codebase and style of structuring code around DSLs, as well as in the design of the smart-contracts platform we're developing.
 
 There is no need to have prior experience in cryptography, and we're hiring engineers to work on a bunch of exciting projects including:

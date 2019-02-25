@@ -85,9 +85,11 @@ let daemon log =
      and snark_work_fee =
        flag "snark-worker-fee"
          ~doc:
-           "FEE Amount a worker wants to get compensated for generating a \
-            snark proof"
-         (optional int)
+           (Printf.sprintf
+              "FEE Amount a worker wants to get compensated for generating a \
+               snark proof (default: %d)"
+              (Currency.Fee.to_int Cli_lib.Fee.default_snark_worker))
+         (optional txn_fee)
      and sexp_logging =
        flag "sexp-logging" no_arg
          ~doc:"Use S-expressions in log output, instead of JSON"
@@ -159,9 +161,11 @@ let daemon log =
            ~default:Port.default_client client_port
        in
        let snark_work_fee_flag =
-         Currency.Fee.of_int
-           (or_from_config YJ.Util.to_int_option "snark-worker-fee" ~default:0
-              snark_work_fee)
+         let json_to_currency_fee_option json =
+           YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
+         in
+         or_from_config json_to_currency_fee_option "snark-worker-fee"
+           ~default:Cli_lib.Fee.default_snark_worker snark_work_fee
        in
        let rest_server_port =
          maybe_from_config YJ.Util.to_int_option "rest-port" rest_server_port
@@ -405,12 +409,14 @@ let ensure_testnet_id_still_good _ = Deferred.unit
 [%%endif]
 
 [%%if
-with_snark]
+proof_level = "full"]
 
 let internal_commands =
   [(Snark_worker_lib.Intf.command_name, Snark_worker_lib.Prod.Worker.command)]
 
 [%%else]
+
+(* TODO #1698: proof_level=check *)
 
 let internal_commands =
   [(Snark_worker_lib.Intf.command_name, Snark_worker_lib.Debug.Worker.command)]
@@ -451,7 +457,6 @@ let () =
   let log = Logger.create () in
   don't_wait_for (ensure_testnet_id_still_good log) ;
   (* Turn on snark debugging in prod for now *)
-  Snark_params.Tick.set_eval_constraints true ;
-  Snark_params.Tock.set_eval_constraints true ;
+  Snarky.Snark.set_eval_constraints true ;
   Command.run (Command.group ~summary:"Coda" (coda_commands log)) ;
   Core.exit 0

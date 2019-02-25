@@ -300,7 +300,12 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
   let open Command.Param in
   let open Cli_lib.Arg_type in
   let amount_flag =
-    flag "fee" ~doc:"VALUE  fee you're willing to pay (default: 1)"
+    flag "fee"
+      ~doc:
+        (Printf.sprintf
+           "FEE Amount you are willing to pay to process the transaction \
+            (default: %d)"
+           (Currency.Fee.to_int Cli_lib.Fee.default_transaction))
       (optional txn_fee)
   in
   let flag =
@@ -471,6 +476,20 @@ let stop_tracing =
          | Ok () -> printf "Daemon stopped printing!"
          | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e ))
 
+let visualize_frontier =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Produce a dot file of the transition_frontier"
+    (Cli_lib.Background_daemon.init
+       Command.Param.(anon @@ ("output-filepath" %: string))
+       ~f:(fun port filename ->
+         match%map dispatch Visualize_frontier.rpc filename port with
+         | Ok () ->
+             printf !"Successfully wrote the visual at location %s." filename
+         | Error e ->
+             printf "Could not save file: %s\n" (Error.to_string_hum e) ))
+
 let command =
   Command.group ~summary:"Lightweight client process"
     [ ("get-balance", get_balance)
@@ -489,4 +508,5 @@ let command =
     ; ("generate-keypair", generate_keypair)
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
-    ; ("snark-job-list", snark_job_list) ]
+    ; ("snark-job-list", snark_job_list)
+    ; ("visualize-frontier", visualize_frontier) ]

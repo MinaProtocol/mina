@@ -135,7 +135,7 @@ open Async
 let loc = Ppxlib.Location.none
 
 [%%if
-with_snark]
+proof_level = "full"]
 
 let gen_keys () =
   let%bind tx_keys_location, tx_keys, tx_keys_checksum =
