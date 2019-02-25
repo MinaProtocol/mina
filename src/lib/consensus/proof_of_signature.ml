@@ -161,7 +161,6 @@ module Snark_transition = Coda_base.Snark_transition.Make (struct
   module Genesis_ledger = Genesis_ledger
   module Blockchain_state = Blockchain_state
   module Consensus_data = Consensus_transition_data
-  module Prover_state = Prover_state
 end)
 
 let generate_transition ~previous_protocol_state ~blockchain_state ~time:_
