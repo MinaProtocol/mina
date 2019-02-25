@@ -75,7 +75,7 @@ module type Network_intf = sig
 end
 
 module type Transition_frontier_Breadcrumb_intf = sig
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, eq]
 
   type state_hash
 

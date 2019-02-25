@@ -43,6 +43,15 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       in
       frontier
 
+    let extract_children_from ~reader ~root =
+      let open Deferred.Let_syntax in
+      let result_ivar = Ivar.create () in
+      Strict_pipe.Reader.iter_without_pushback reader ~f:(fun children ->
+          Ivar.fill result_ivar children )
+      |> don't_wait_for ;
+      let%map children = Ivar.read result_ivar in
+      Rose_tree.T (root, children)
+
     let%test_unit "after the timeout expires, the missing node still doesn't \
                    show up, so the catchup job is fired" =
       let catchup_job_reader, catchup_job_writer =
@@ -114,67 +123,48 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
                  (gen_linear_breadcrumbs ~logger ~size:4
                     ~accounts_with_secret_keys randomly_chosen_breadcrumb)
           in
-          let missing_breadcrumb = List.nth_exn upcoming_breadcrumbs 0 in
-          let dangling_breadcrumb1 = List.nth_exn upcoming_breadcrumbs 1 in
-          let dangling_breadcrumb2 = List.nth_exn upcoming_breadcrumbs 2 in
-          let dangling_breadcrumb3 = List.nth_exn upcoming_breadcrumbs 3 in
-          let missing_transition =
-            Transition_frontier.Breadcrumb.transition_with_hash
-              missing_breadcrumb
+          let upcoming_transitions =
+            List.map ~f:Transition_frontier.Breadcrumb.transition_with_hash
+              upcoming_breadcrumbs
           in
-          let dangling_transition1 =
-            Transition_frontier.Breadcrumb.transition_with_hash
-              dangling_breadcrumb1
-          in
-          let dangling_transition2 =
-            Transition_frontier.Breadcrumb.transition_with_hash
-              dangling_breadcrumb2
-          in
-          let dangling_transition3 =
-            Transition_frontier.Breadcrumb.transition_with_hash
-              dangling_breadcrumb3
-          in
+          let missing_breadcrumb = List.hd_exn upcoming_breadcrumbs in
+          let missing_transition = List.hd_exn upcoming_transitions in
+          let dangling_transitions = List.tl_exn upcoming_transitions in
           Catchup_scheduler.watch scheduler ~timeout_duration
-            ~transition:dangling_transition3 ;
-          assert (Catchup_scheduler.has_timeout scheduler dangling_transition3) ;
-          Catchup_scheduler.watch scheduler ~timeout_duration
-            ~transition:dangling_transition2 ;
+            ~transition:(List.nth_exn dangling_transitions 2) ;
           assert (
-            Catchup_scheduler.has_timeout scheduler dangling_transition2
-            && not
-               @@ Catchup_scheduler.has_timeout scheduler dangling_transition3
-          ) ;
+            Catchup_scheduler.has_timeout scheduler
+              (List.nth_exn dangling_transitions 2) ) ;
           Catchup_scheduler.watch scheduler ~timeout_duration
-            ~transition:dangling_transition1 ;
+            ~transition:(List.nth_exn dangling_transitions 1) ;
           assert (
-            Catchup_scheduler.has_timeout scheduler dangling_transition1
+            Catchup_scheduler.has_timeout scheduler
+              (List.nth_exn dangling_transitions 1)
             && not
-               @@ Catchup_scheduler.has_timeout scheduler dangling_transition2
-          ) ;
+               @@ Catchup_scheduler.has_timeout scheduler
+                    (List.nth_exn dangling_transitions 2) ) ;
+          Catchup_scheduler.watch scheduler ~timeout_duration
+            ~transition:(List.nth_exn dangling_transitions 0) ;
+          assert (
+            Catchup_scheduler.has_timeout scheduler
+              (List.nth_exn dangling_transitions 0)
+            && not
+               @@ Catchup_scheduler.has_timeout scheduler
+                    (List.nth_exn dangling_transitions 1) ) ;
           Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb ;
-          Catchup_scheduler.notify scheduler ~transition:missing_transition
+          Catchup_scheduler.notify scheduler
+            ~hash:(With_hash.hash missing_transition)
           |> ignore ;
           assert (Catchup_scheduler.is_empty scheduler) ;
-          let result_ivar = Ivar.create () in
-          Strict_pipe.Reader.iter_without_pushback catchup_breadcrumbs_reader
-            ~f:(fun dangling_rose_trees ->
-              Ivar.fill result_ivar dangling_rose_trees )
-          |> don't_wait_for ;
-          let%map dangling_rose_trees = Ivar.read result_ivar in
-          let received_rose_tree =
-            Rose_tree.T (missing_breadcrumb, dangling_rose_trees)
+          let%map received_rose_tree =
+            extract_children_from ~reader:catchup_breadcrumbs_reader
+              ~root:missing_breadcrumb
           in
           assert (
-            Rose_tree.equal received_rose_tree
-              (Rose_tree.of_list_exn upcoming_breadcrumbs)
-              ~f:(fun breadcrumb1 breadcrumb2 ->
-                External_transition.Verified.equal
-                  (With_hash.data
-                     (Transition_frontier.Breadcrumb.transition_with_hash
-                        breadcrumb1))
-                  (With_hash.data
-                     (Transition_frontier.Breadcrumb.transition_with_hash
-                        breadcrumb2)) ) ) ;
+            List.equal
+              (Rose_tree.flatten received_rose_tree)
+              upcoming_breadcrumbs ~equal:Transition_frontier.Breadcrumb.equal
+          ) ;
           Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
           Strict_pipe.Writer.close catchup_job_writer )
 
@@ -201,48 +191,34 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let%bind upcoming_rose_tree =
             Rose_tree.Deferred.all
             @@ Quickcheck.random_value
-                 (gen_nonlinear_breadcrumbs ~logger ~size:5
-                    ~accounts_with_secret_keys randomly_chosen_breadcrumb)
+                 (gen_tree ~logger ~size:5 ~accounts_with_secret_keys
+                    randomly_chosen_breadcrumb)
           in
           let upcoming_breadcrumbs = Rose_tree.flatten upcoming_rose_tree in
-          let missing_breadcrumb = List.nth_exn upcoming_breadcrumbs 0 in
-          let missing_transition =
-            Transition_frontier.Breadcrumb.transition_with_hash
-              missing_breadcrumb
+          let upcoming_transitions =
+            List.map ~f:Transition_frontier.Breadcrumb.transition_with_hash
+              upcoming_breadcrumbs
           in
-          let dangling_breadcrumbs = List.tl_exn upcoming_breadcrumbs in
-          let dangling_transitions =
-            List.map dangling_breadcrumbs
-              ~f:Transition_frontier.Breadcrumb.transition_with_hash
-          in
+          let missing_breadcrumb = List.hd_exn upcoming_breadcrumbs in
+          let missing_transition = List.hd_exn upcoming_transitions in
+          let dangling_transitions = List.tl_exn upcoming_transitions in
           List.iter (List.permute dangling_transitions)
             ~f:(fun dangling_transition ->
               Catchup_scheduler.watch scheduler ~timeout_duration
                 ~transition:dangling_transition ) ;
           assert (not @@ Catchup_scheduler.is_empty scheduler) ;
           Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb ;
-          Catchup_scheduler.notify scheduler ~transition:missing_transition
+          Catchup_scheduler.notify scheduler
+            ~hash:(With_hash.hash missing_transition)
           |> ignore ;
           assert (Catchup_scheduler.is_empty scheduler) ;
-          let result_ivar = Ivar.create () in
-          Strict_pipe.Reader.iter_without_pushback catchup_breadcrumbs_reader
-            ~f:(fun dangling_rose_trees ->
-              Ivar.fill result_ivar dangling_rose_trees )
-          |> don't_wait_for ;
-          let%map dangling_rose_trees = Ivar.read result_ivar in
-          let received_rose_tree =
-            Rose_tree.T (missing_breadcrumb, dangling_rose_trees)
+          let%map received_rose_tree =
+            extract_children_from ~reader:catchup_breadcrumbs_reader
+              ~root:missing_breadcrumb
           in
           assert (
             Rose_tree.equiv received_rose_tree upcoming_rose_tree
-              ~f:(fun breadcrumb1 breadcrumb2 ->
-                External_transition.Verified.equal
-                  (With_hash.data
-                     (Transition_frontier.Breadcrumb.transition_with_hash
-                        breadcrumb1))
-                  (With_hash.data
-                     (Transition_frontier.Breadcrumb.transition_with_hash
-                        breadcrumb2)) ) ) ;
+              ~f:Transition_frontier.Breadcrumb.equal ) ;
           Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
           Strict_pipe.Writer.close catchup_job_writer )
   end )

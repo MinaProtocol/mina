@@ -95,7 +95,7 @@ module Make (Inputs : Inputs.S) :
                        Writer.write processed_transition_writer transition ;
                        Deferred.return
                        @@ Catchup_scheduler.notify catchup_scheduler
-                            ~transition
+                            ~hash:(With_hash.hash transition)
                      with
                      | Ok () -> ()
                      | Error err ->

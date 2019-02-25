@@ -119,9 +119,8 @@ module Make (Inputs : Inputs.S) = struct
         let remaining_time = cancel_timeout t hash in
         Hashtbl.add_exn t.collected_transitions ~key:parent_hash
           ~data:[transition] ;
-        Hashtbl.update t.collected_transitions hash ~f:(function
-          | None -> []
-          | Some ts -> ts ) ;
+        Hashtbl.update t.collected_transitions hash
+          ~f:(Option.value ~default:[]) ;
         Hashtbl.add_exn t.parent_root_timeouts ~key:parent_hash
           ~data:
             (make_timeout
@@ -139,12 +138,10 @@ module Make (Inputs : Inputs.S) = struct
             hash
         else
           let _ : Time.Span.t option = cancel_timeout t hash in
-          Hashtbl.update t.collected_transitions parent_hash
-            ~f:(fun maybe_sibling_transitions ->
-              transition :: Option.value_exn maybe_sibling_transitions ) ;
-          Hashtbl.update t.collected_transitions hash ~f:(function
-            | None -> []
-            | Some ts -> ts )
+          Hashtbl.set t.collected_transitions ~key:parent_hash
+            ~data:(transition :: sibling_transitions) ;
+          Hashtbl.update t.collected_transitions hash
+            ~f:(Option.value ~default:[])
 
   let rec extract t transition =
     let successors =
@@ -161,8 +158,7 @@ module Make (Inputs : Inputs.S) = struct
     Hashtbl.remove t.collected_transitions parent_hash ;
     List.iter children ~f:(Fn.compose (remove_tree t) With_hash.hash)
 
-  let notify t ~transition =
-    let hash = With_hash.hash transition in
+  let notify t ~hash =
     if
       (Option.is_none @@ Hashtbl.find t.parent_root_timeouts hash)
       && (Option.is_some @@ Hashtbl.find t.collected_transitions hash)
