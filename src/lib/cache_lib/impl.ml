@@ -79,7 +79,7 @@ module Make (Inputs : Inputs_intf) : Intf.Main.S = struct
     let was_consumed : type a b. (a, b) t -> bool = function
       | Base x -> x.consumed
       | Derivative x -> x.consumed
-      | Pure _ -> failwith "cannot determine consumption of pure Cached.t"
+      | Pure _ -> false
 
     let mark_consumed : type a b. (a, b) t -> unit = function
       | Base x -> x.consumed <- true
