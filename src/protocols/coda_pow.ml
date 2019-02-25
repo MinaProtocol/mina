@@ -124,6 +124,8 @@ module type Pending_coinbase_intf = sig
 
   val add_coinbase_exn : t -> coinbase:coinbase -> on_new_tree:bool -> t
 
+  val update_coinbase_stack_exn : t -> Stack.t -> new_stack:bool -> t
+
   val create_exn : unit -> t
 
   val latest_stack : t -> Stack.t option
@@ -144,7 +146,7 @@ module type Transaction_witness_intf = sig
 
   type pending_coinbase
 
-  type t = {ledger: sparse_ledger; pending_coinbases: pending_coinbase}
+  type t = {ledger: sparse_ledger (*; pending_coinbases: pending_coinbase*)}
   [@@deriving bin_io, sexp]
 end
 

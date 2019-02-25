@@ -157,7 +157,7 @@ end = struct
   
   (*TODO new_coinbase_stack:bool goes in the statement*)
   let create_expected_statement
-      {Transaction_with_witness.transaction_with_info; witness; _} =
+      {Transaction_with_witness.transaction_with_info; witness; statement; _} =
     let open Or_error.Let_syntax in
     let source =
       Frozen_ledger_hash.of_ledger_hash
@@ -171,7 +171,7 @@ end = struct
     let target =
       Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
     in
-    let pending_coinbase_before = witness.pending_coinbases in
+    (*let pending_coinbase_before = witness.pending_coinbases in
     let%bind pending_coinbase_after =
       match transaction with
       | Coinbase c ->
@@ -184,7 +184,7 @@ end = struct
                 (Pending_coinbase.add_coinbase_exn witness.pending_coinbases
                    ~coinbase:c ~on_new_tree:coinbase_on_new_tree) )*)
       | _ -> Ok pending_coinbase_before
-    in
+    in*)
     let%bind fee_excess = Transaction.fee_excess transaction in
     let%map supply_increase = Transaction.supply_increase transaction in
     { Ledger_proof_statement.source
@@ -192,8 +192,9 @@ end = struct
     ; fee_excess
     ; supply_increase
     ; pending_coinbase_state=
-        { Pending_coinbase_stack_state.source= pending_coinbase_before
-        ; target= pending_coinbase_after }
+        { Pending_coinbase_stack_state.source=
+            statement.pending_coinbase_state.source
+        ; target= statement.pending_coinbase_state.target }
     ; proof_type= `Base }
 
   let completed_work_to_scanable_work (job : job) (fee, current_proof, prover)
@@ -244,6 +245,7 @@ end = struct
   struct
     module Fold = Parallel_scan.State.Make_foldable (M)
 
+    (*TODO: fold over the pending_coinbase tree and validate the statements*)
     let scan_statement {tree; _} :
         (Ledger_proof_statement.t, [`Error of Error.t | `Empty]) Result.t M.t =
       let write_error description =

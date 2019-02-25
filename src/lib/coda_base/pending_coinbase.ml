@@ -415,6 +415,13 @@ module T = struct
     let tree' = Merkle_tree.set_exn t.tree stack_index stack_after in
     {t' with tree= tree'}
 
+  let update_coinbase_stack_exn t stack ~new_stack =
+    let key = Option.value_exn (latest_stack_key t ~on_new_tree:new_stack) in
+    let stack_index = Merkle_tree.find_index_exn t.tree key in
+    let t' = next_new_index t ~on_new_tree:new_stack in
+    let tree' = Merkle_tree.set_exn t.tree stack_index stack in
+    {t' with tree= tree'}
+
   let remove_coinbase_stack_exn t =
     let oldest_stack, remaining = remove_oldest_stack_exn t.index_list in
     let stack_index = Merkle_tree.find_index_exn t.tree oldest_stack in
