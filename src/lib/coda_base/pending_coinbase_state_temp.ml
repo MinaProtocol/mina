@@ -188,4 +188,4 @@ let genesis =
   { updated_stack= Pending_coinbase.Stack.empty
   ; prev_root= Pending_coinbase.Hash.empty_hash
   ; new_root= Pending_coinbase.Hash.empty_hash
-  ; action= Action.Added }
+  ; action= Action.Updated }

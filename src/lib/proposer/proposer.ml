@@ -172,7 +172,10 @@ module Make (Inputs : Inputs_intf) :
       ~staged_ledger ~transactions ~get_completed_work ~logger
       ~(keypair : Keypair.t) ~proposal_data =
     let open Interruptible.Let_syntax in
-    let%bind diff, next_staged_ledger_hash, ledger_proof_opt =
+    let%bind ( diff
+             , next_staged_ledger_hash
+             , ledger_proof_opt
+             , pending_coinbase_state ) =
       Interruptible.uninterruptible
         (let open Deferred.Let_syntax in
         let diff =
@@ -185,16 +188,20 @@ module Make (Inputs : Inputs_intf) :
         (*TODO: get Added stack witness tree-hash | Updated stack witness tree-hash | Deleted_and_added stack witness tree-hash | Deleted_and_updated stack witness tree-hash*)
         let%map ( `Hash_after_applying next_staged_ledger_hash
                 , `Ledger_proof ledger_proof_opt
-                , `Staged_ledger _transitioned_staged_ledger ) =
+                , `Staged_ledger _transitioned_staged_ledger
+                , `Pending_coinbase_update pending_coinbase_state ) =
           let%map or_error =
             Staged_ledger.apply_diff_unchecked staged_ledger diff
           in
           Or_error.ok_exn or_error
         in
         (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
-        (diff, next_staged_ledger_hash, ledger_proof_opt))
+        ( diff
+        , next_staged_ledger_hash
+        , ledger_proof_opt
+        , pending_coinbase_state ))
     in
-    let pending_coinbase_state =
+    (*let pending_coinbase_state =
       let updated_stack, prev_root, new_root, action =
         (*Deepthi: TODO: witness would be just the path to the stacks changing. TODO: add that*)
         match 1 with
@@ -221,7 +228,7 @@ module Make (Inputs : Inputs_intf) :
       in
       Pending_coinbase_state_temp.create_value ~updated_stack ~prev_root
         ~new_root ~action
-    in
+    in*)
     let%bind protocol_state, consensus_transition_data =
       lift_sync (fun () ->
           let previous_ledger_hash =

@@ -133,6 +133,7 @@ module Staged_ledger = Staged_ledger.Make (struct
   module Pending_coinbase_hash = Pending_coinbase.Hash
   module Transaction_witness = Transaction_witness
   module Pending_coinbase_stack_state = Pending_coinbase_stack_state
+  module Pending_coinbase_state_temp = Pending_coinbase_state_temp
 
   module Config = struct
     let transaction_capacity_log_2 = 7
@@ -236,7 +237,8 @@ let gen_breadcrumb ~logger :
     in
     let%bind ( `Hash_after_applying next_staged_ledger_hash
              , `Ledger_proof ledger_proof_opt
-             , `Staged_ledger _ ) =
+             , `Staged_ledger _
+             , `Pending_coinbase_update _ ) =
       Staged_ledger.apply_diff_unchecked parent_staged_ledger
         staged_ledger_diff
       |> Deferred.Or_error.ok_exn

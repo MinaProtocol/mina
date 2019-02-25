@@ -81,6 +81,7 @@ module type Inputs_intf = sig
      and type user_command := User_command.t
      and type transaction_witness := Transaction_witness.t
      and type pending_coinbase_collection := Pending_coinbase.t
+     and type pending_coinbase_state_temp := Pending_coinbase_state_temp.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -134,7 +135,8 @@ module Make (Inputs : Inputs_intf) :
           in
           let%bind ( `Hash_after_applying staged_ledger_hash
                    , `Ledger_proof proof_opt
-                   , `Staged_ledger transitioned_staged_ledger ) =
+                   , `Staged_ledger transitioned_staged_ledger
+                   , `Pending_coinbase_update _ ) =
             let open Deferred.Let_syntax in
             match%map
               Inputs.Staged_ledger.apply ~logger staged_ledger
@@ -277,12 +279,13 @@ module Make (Inputs : Inputs_intf) :
               | Ok
                   ( `Hash_after_applying staged_ledger_hash
                   , `Ledger_proof None
-                  , `Staged_ledger transitioned_staged_ledger ) ->
+                  , `Staged_ledger transitioned_staged_ledger
+                  , `Pending_coinbase_update _ ) ->
                   assert (
                     Staged_ledger_hash.equal root_blockchain_staged_ledger_hash
                       staged_ledger_hash ) ;
                   transitioned_staged_ledger
-              | Ok (_, `Ledger_proof (Some _), _) ->
+              | Ok (_, `Ledger_proof (Some _), _, _) ->
                   failwith
                     "Did not expect a ledger proof after applying the first \
                      diff" )

@@ -764,6 +764,8 @@ module type Staged_ledger_base_intf = sig
 
   type pending_coinbase_collection
 
+  type pending_coinbase_state_temp
+
   type serializable [@@deriving bin_io]
 
   module Scan_state : sig
@@ -836,6 +838,7 @@ module type Staged_ledger_base_intf = sig
     -> ( [`Hash_after_applying of staged_ledger_hash]
          * [`Ledger_proof of ledger_proof option]
          * [`Staged_ledger of t]
+         * [`Pending_coinbase_update of pending_coinbase_state_temp]
        , Staged_ledger_error.t )
        Deferred.Result.t
 
@@ -844,7 +847,8 @@ module type Staged_ledger_base_intf = sig
     -> valid_diff
     -> ( [`Hash_after_applying of staged_ledger_hash]
        * [`Ledger_proof of ledger_proof option]
-       * [`Staged_ledger of t] )
+       * [`Staged_ledger of t]
+       * [`Pending_coinbase_update of pending_coinbase_state_temp] )
        Deferred.Or_error.t
 
   val snarked_ledger :
@@ -959,9 +963,7 @@ end
 module type Pending_coinbase_state_temp_intf = sig
   type t [@@deriving sexp, bin_io]
 
-  type value
-
-  type var
+  type value = t
 
   type pending_coinbase_hash
 
@@ -970,8 +972,6 @@ module type Pending_coinbase_state_temp_intf = sig
   module Action : sig
     type t = Added | Updated | Deleted_added | Deleted_updated
     [@@deriving eq, sexp, bin_io]
-
-    type var
   end
 
   val create_value :
@@ -1595,6 +1595,7 @@ Merge Snark:
      and type user_command := User_command.t
      and type transaction_witness := Transaction_witness.t
      and type pending_coinbase_collection := Pending_coinbase.t
+     and type pending_coinbase_state_temp := Pending_coinbase_state_temp.t
 
   module Staged_ledger_transition :
     Staged_ledger_transition_intf

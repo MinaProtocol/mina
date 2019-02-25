@@ -41,6 +41,8 @@ module Make (Inputs : Inputs.S) : sig
      and type user_command := Inputs.User_command.t
      and type transaction_witness := Inputs.Transaction_witness.t
      and type pending_coinbase_collection := Inputs.Pending_coinbase.t
+     and type pending_coinbase_state_temp :=
+                Inputs.Pending_coinbase_state_temp.t
 end = struct
   open Inputs
   module Scan_state = Transaction_snark_scan_state.Make (Inputs)
@@ -819,6 +821,23 @@ end = struct
           eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e ) ;
       Deferred.return (to_staged_ledger_or_error r)
     in
+    let pending_coinbase_state =
+      let prev_root =
+        Pending_coinbase.merkle_root t.pending_coinbase_collection
+      in
+      let new_root =
+        Pending_coinbase.merkle_root pending_coinbase_collection_updated
+      in
+      let action =
+        match (not non_empty_stack, Option.is_none res_opt) with
+        | true, true -> Pending_coinbase_state_temp.Action.Added
+        | true, false -> Deleted_added
+        | false, true -> Updated
+        | false, false -> Deleted_updated
+      in
+      Pending_coinbase_state_temp.create_value ~prev_root ~new_root
+        ~updated_stack:updated_coinbase_stack ~action
+    in
     let%map () =
       Deferred.return
         ( verify_scan_state_after_apply new_ledger scan_state'
@@ -836,7 +855,8 @@ end = struct
     in
     ( `Hash_after_applying (hash new_staged_ledger)
     , `Ledger_proof res_opt
-    , `Staged_ledger new_staged_ledger )
+    , `Staged_ledger new_staged_ledger
+    , `Pending_coinbase_update pending_coinbase_state )
 
   let apply t witness ~logger = apply_diff t witness ~logger
 
@@ -981,9 +1001,27 @@ end = struct
       ; ledger= new_ledger
       ; pending_coinbase_collection= pending_coinbase_collection_updated }
     in
+    let pending_coinbase_state =
+      let prev_root =
+        Pending_coinbase.merkle_root t.pending_coinbase_collection
+      in
+      let new_root =
+        Pending_coinbase.merkle_root pending_coinbase_collection_updated
+      in
+      let action =
+        match (not non_empty_stack, Option.is_none res_opt) with
+        | true, true -> Pending_coinbase_state_temp.Action.Added
+        | true, false -> Deleted_added
+        | false, true -> Updated
+        | false, false -> Deleted_updated
+      in
+      Pending_coinbase_state_temp.create_value ~prev_root ~new_root
+        ~updated_stack:working_stack_updated ~action
+    in
     ( `Hash_after_applying (hash new_staged_ledger)
     , `Ledger_proof res_opt
-    , `Staged_ledger new_staged_ledger )
+    , `Staged_ledger new_staged_ledger
+    , `Pending_coinbase_update pending_coinbase_state )
 
   module Resources = struct
     module Discarded = struct
@@ -1742,6 +1780,43 @@ let%test_module "test" =
         [@@deriving sexp, bin_io, compare, hash]
       end
 
+      module Pending_coinbase_state_temp = struct
+        module Action = struct
+          type t = Added | Updated | Deleted_added | Deleted_updated
+          [@@deriving eq, sexp, bin_io]
+        end
+
+        type ('pending_coinbase_stack, 'pending_coinbase_hash, 'action) t_ =
+          { updated_stack: 'pending_coinbase_stack
+          ; prev_root: 'pending_coinbase_hash
+          ; new_root: 'pending_coinbase_hash
+          ; action: 'action }
+        [@@deriving bin_io, sexp]
+
+        type t =
+          (Pending_coinbase.Stack.t, Pending_coinbase_hash.t, Action.t) t_
+        [@@deriving bin_io, sexp]
+
+        type value = t
+
+        let new_root t = t.new_root
+
+        let prev_root t = t.prev_root
+
+        let updated_stack t = t.updated_stack
+
+        let action t = t.action
+
+        let create_value ~prev_root ~new_root ~updated_stack ~action =
+          {prev_root; new_root; updated_stack; action}
+
+        let genesis =
+          { updated_stack= Pending_coinbase.Stack.empty
+          ; prev_root= Pending_coinbase_hash.empty_hash
+          ; new_root= Pending_coinbase_hash.empty_hash
+          ; action= Action.Added }
+      end
+
       module Ledger_proof_statement = struct
         module T = struct
           type t =
@@ -2186,7 +2261,8 @@ let%test_module "test" =
       let diff' = Test_input1.Staged_ledger_diff.forget diff in
       let%map ( `Hash_after_applying hash
               , `Ledger_proof ledger_proof
-              , `Staged_ledger sl' ) =
+              , `Staged_ledger sl'
+              , `Pending_coinbase_update _ ) =
         match%map Sl.apply !sl diff' ~logger with
         | Ok x -> x
         | Error e -> Error.raise (Sl.Staged_ledger_error.to_error e)

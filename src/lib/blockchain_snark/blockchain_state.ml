@@ -105,20 +105,20 @@ module Make (Consensus_mechanism : Consensus.S) :
             let updated_stack = pending_coinbase_state.updated_stack in
             let action = pending_coinbase_state.action in
             let with_del_add () =
-              let%bind with_del =
-                Pending_coinbase.Hash.delete_stack prev_root
+              let%bind with_add =
+                Pending_coinbase.Hash.update_stack prev_root
+                  ~is_new_stack:Boolean.true_ ~f:(fun _ -> return updated_stack
+                )
               in
-              Pending_coinbase.Hash.update_stack with_del
-                ~is_new_stack:Boolean.true_ ~f:(fun _ -> return updated_stack
-              )
+              Pending_coinbase.Hash.delete_stack with_add
             in
             let with_del_update () =
-              let%bind with_del =
-                Pending_coinbase.Hash.delete_stack prev_root
+              let%bind with_add =
+                Pending_coinbase.Hash.update_stack prev_root
+                  ~is_new_stack:Boolean.false_ ~f:(fun _ ->
+                    return updated_stack )
               in
-              Pending_coinbase.Hash.update_stack with_del
-                ~is_new_stack:Boolean.false_ ~f:(fun _ -> return updated_stack
-              )
+              Pending_coinbase.Hash.delete_stack with_add
             in
             let with_add () =
               Pending_coinbase.Hash.update_stack prev_root
