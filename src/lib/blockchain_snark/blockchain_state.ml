@@ -77,7 +77,7 @@ module Make (Consensus_mechanism : Consensus.S) :
             let%bind pending_coinbase_stack_deleted =
               Pending_coinbase.Hash.get pending_coinbase_state.prev_root index
             in
-            (*T.verify_complete_merge
+            T.verify_complete_merge
               (Snark_transition.sok_digest transition)
               ( previous_state |> Protocol_state.blockchain_state
               |> Blockchain_state.snarked_ledger_hash )
@@ -88,8 +88,7 @@ module Make (Consensus_mechanism : Consensus.S) :
               (*TODO:Deepthi: get coinbase stack from the delete_stack request *)
               (As_prover.return
                  (Option.value ~default:Tock.Proof.dummy
-                    (Snark_transition.ledger_proof transition)))*)
-            return Boolean.true_
+                    (Snark_transition.ledger_proof transition)))
           and ledger_hash_didn't_change =
             Frozen_ledger_hash.equal_var
               ( previous_state |> Protocol_state.blockchain_state
