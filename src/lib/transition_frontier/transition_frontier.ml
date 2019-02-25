@@ -80,6 +80,7 @@ module type Inputs_intf = sig
      and type transaction := Transaction.t
      and type user_command := User_command.t
      and type transaction_witness := Transaction_witness.t
+     and type pending_coinbase_collection := Pending_coinbase.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -258,6 +259,7 @@ module Make (Inputs : Inputs_intf) :
         ~scan_state:root_transaction_snark_scan_state
         ~ledger:root_masked_ledger
         ~snarked_ledger_hash:root_snarked_ledger_hash
+        ~pending_coinbase_collection:(Pending_coinbase.create_exn ())
     with
     | Error e -> failwith (Error.to_string_hum e)
     | Ok pre_root_staged_ledger ->

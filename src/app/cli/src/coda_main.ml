@@ -284,6 +284,7 @@ module type Main_intf = sig
        and type transaction := Transaction.t
        and type user_command := User_command.t
        and type transaction_witness := Transaction_witness.t
+       and type pending_coinbase_collection := Pending_coinbase.t
 
     module Internal_transition :
       Coda_base.Internal_transition.S

@@ -334,6 +334,8 @@ module T = struct
   type t = {tree: Merkle_tree.t; index_list: Index.t list; new_index: Index.t}
   [@@deriving sexp, bin_io]
 
+  let copy = Fn.id
+
   let create_exn () =
     let init_hash = Stack.hash Stack.empty in
     let hash_on_level, root_hash =
@@ -380,10 +382,16 @@ module T = struct
       {t with index_list= t.new_index :: t.index_list; new_index}
     else t
 
-  let get_latest_stack t ~on_new_tree =
+  let latest_stack_key t ~on_new_tree =
     if on_new_tree then Some t.new_index
       (* IMPORTANT TODO: include hash of the path*)
     else match t.index_list with [] -> None | x :: _ -> Some x
+
+  let latest_stack t =
+    let open Option.Let_syntax in
+    let%map key = latest_stack_key t ~on_new_tree:false in
+    let index = Merkle_tree.find_index_exn t.tree key in
+    Merkle_tree.get_exn t.tree index
 
   let get_oldest_stack t = List.last t.index_list
 
@@ -399,7 +407,7 @@ module T = struct
     | x :: xs -> (x, List.rev xs)
 
   let add_coinbase_exn t ~coinbase ~on_new_tree =
-    let key = Option.value_exn (get_latest_stack t ~on_new_tree) in
+    let key = Option.value_exn (latest_stack_key t ~on_new_tree) in
     let stack_index = Merkle_tree.find_index_exn t.tree key in
     let stack_before = Merkle_tree.get_exn t.tree stack_index in
     let stack_after = Stack.push_exn stack_before coinbase in

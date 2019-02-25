@@ -289,6 +289,7 @@ module Base = struct
       in
       Pending_coinbase.Stack.Checked.if_ is_coinbase ~then_:stack'
         ~else_:pending_coinbase_stack_before
+      (*TODO:Check if the resulting hash is same as the one in the statement*)
     in
     (*let%bind pending_coinbase_root_inter =
       Pending_coinbase.Stack.delete_stack pending_coinbase_root ~f:(fun stack ->

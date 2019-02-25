@@ -106,15 +106,27 @@ module type Pending_coinbase_hash_intf = sig
 end
 
 module type Pending_coinbase_intf = sig
-  type t
+  type t [@@deriving sexp, bin_io]
 
-  val create_exn : unit -> t
+  type pending_coinbase_hash
+
+  type coinbase
 
   module Stack : sig
-    type t
+    type t [@@deriving sexp, bin_io]
+
+    val push_exn : t -> coinbase -> t
 
     val empty : t
   end
+
+  val merkle_root : t -> pending_coinbase_hash
+
+  val add_coinbase_exn : t -> coinbase:coinbase -> on_new_tree:bool -> t
+
+  val create_exn : unit -> t
+
+  val latest_stack : t -> Stack.t option
 end
 
 module type Frozen_ledger_hash_intf = sig
@@ -748,6 +760,8 @@ module type Staged_ledger_base_intf = sig
   (** The ledger in a staged ledger is always a mask *)
   type ledger
 
+  type pending_coinbase_collection
+
   type serializable [@@deriving bin_io]
 
   module Scan_state : sig
@@ -793,12 +807,15 @@ module type Staged_ledger_base_intf = sig
 
   val scan_state : t -> Scan_state.t
 
+  val pending_coinbase_collection : t -> pending_coinbase_collection
+
   val create : ledger:ledger -> t
 
   val of_scan_state_and_ledger :
        snarked_ledger_hash:frozen_ledger_hash
     -> ledger:ledger
     -> scan_state:Scan_state.t
+    -> pending_coinbase_collection:pending_coinbase_collection
     -> t Or_error.t Deferred.t
 
   val of_serialized_and_unserialized :
@@ -1432,7 +1449,10 @@ module type Inputs_intf = sig
 
   module Pending_coinbase_hash : Pending_coinbase_hash_intf
 
-  module Pending_coinbase : Pending_coinbase_intf
+  module Pending_coinbase :
+    Pending_coinbase_intf
+    with type pending_coinbase_hash := Pending_coinbase_hash.t
+     and type coinbase := Coinbase.t
 
   module Proof : sig
     type t
@@ -1572,6 +1592,7 @@ Merge Snark:
      and type transaction := Transaction.t
      and type user_command := User_command.t
      and type transaction_witness := Transaction_witness.t
+     and type pending_coinbase_collection := Pending_coinbase.t
 
   module Staged_ledger_transition :
     Staged_ledger_transition_intf

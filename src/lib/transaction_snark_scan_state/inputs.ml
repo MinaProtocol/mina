@@ -31,23 +31,12 @@ module type S = sig
     val of_ledger_hash : Ledger_hash.t -> t
   end
 
-  module Pending_coinbase_hash : sig
-    type t [@@deriving sexp, bin_io]
-  end
+  module Pending_coinbase_hash : Coda_pow.Pending_coinbase_hash_intf
 
-  module Pending_coinbase : sig
-    type t [@@deriving sexp, bin_io]
-
-    val merkle_root : t -> Pending_coinbase_hash.t
-
-    val add_coinbase_exn : t -> coinbase:Coinbase.t -> on_new_tree:bool -> t
-
-    module Stack : sig
-      type t [@@deriving sexp, bin_io]
-
-      val push_exn : t -> Coinbase.t -> t
-    end
-  end
+  module Pending_coinbase :
+    Coda_pow.Pending_coinbase_intf
+    with type pending_coinbase_hash := Pending_coinbase_hash.t
+     and type coinbase := Coinbase.t
 
   module Pending_coinbase_stack_state :
     Coda_pow.Pending_coinbase_stack_state_intf
