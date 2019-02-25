@@ -132,17 +132,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let missing_transition = List.hd_exn upcoming_transitions in
           let dangling_transitions = List.tl_exn upcoming_transitions in
           List.(
-            iteri (rev dangling_transitions) ~f:(fun i _ ->
-                Catchup_scheduler.watch scheduler ~timeout_duration
-                  ~transition:(nth_exn dangling_transitions i) ;
-                assert (
-                  Catchup_scheduler.has_timeout scheduler
-                    (nth_exn dangling_transitions i) ) ;
-                if i < size - 1 then
-                  assert (
-                    not
-                    @@ Catchup_scheduler.has_timeout scheduler
-                         (nth_exn dangling_transitions (i - 1)) ) )) ;
+            iter (rev dangling_transitions) ~f:(fun transition ->
+                Catchup_scheduler.watch scheduler ~timeout_duration ~transition ;
+                assert (Catchup_scheduler.has_timeout scheduler transition) )) ;
           Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb ;
           Catchup_scheduler.notify scheduler
             ~hash:(With_hash.hash missing_transition)
