@@ -382,3 +382,13 @@ module Stop_tracing = struct
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Stop_tracing" ~version:0 ~bin_query ~bin_response
 end
+
+module Visualize_frontier = struct
+  type query = string [@@deriving bin_io]
+
+  type response = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Visualize_frontier" ~version:0 ~bin_query
+      ~bin_response
+end
