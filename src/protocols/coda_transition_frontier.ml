@@ -236,7 +236,7 @@ module type Catchup_intf = sig
        logger:Logger.t
     -> network:network
     -> frontier:transition_frontier
-    -> catchup_job_reader:state_hash Reader.t
+    -> catchup_job_reader:state_hash Strict_pipe.Reader.t
     -> catchup_breadcrumbs_writer:( transition_frontier_breadcrumb Rose_tree.t
                                     list
                                   , Strict_pipe.synchronous
@@ -300,8 +300,11 @@ module type Transition_handler_processor_intf = sig
     -> proposer_transition_reader:( external_transition_verified
                                   , state_hash )
                                   With_hash.t
-                                  Reader.t
-    -> catchup_job_writer:(state_hash, synchronous, unit Deferred.t) Writer.t
+                                  Strict_pipe.Reader.t
+    -> catchup_job_writer:( state_hash
+                          , Strict_pipe.synchronous
+                          , unit Deferred.t )
+                          Strict_pipe.Writer.t
     -> catchup_breadcrumbs_reader:transition_frontier_breadcrumb Rose_tree.t
                                   list
                                   Strict_pipe.Reader.t

@@ -135,7 +135,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             iter (rev dangling_transitions) ~f:(fun transition ->
                 Catchup_scheduler.watch scheduler ~timeout_duration ~transition ;
                 assert (Catchup_scheduler.has_timeout scheduler transition) )) ;
-          Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb ;
+          let%bind _ : unit =
+            Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb
+          in
           Catchup_scheduler.notify scheduler
             ~hash:(With_hash.hash missing_transition)
           |> ignore ;
@@ -191,7 +193,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
               Catchup_scheduler.watch scheduler ~timeout_duration
                 ~transition:dangling_transition ) ;
           assert (not @@ Catchup_scheduler.is_empty scheduler) ;
-          Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb ;
+          let%bind _ : unit =
+            Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb
+          in
           Catchup_scheduler.notify scheduler
             ~hash:(With_hash.hash missing_transition)
           |> ignore ;
