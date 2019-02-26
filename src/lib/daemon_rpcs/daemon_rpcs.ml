@@ -239,7 +239,7 @@ end
 module Get_ledger = struct
   type query = Staged_ledger_hash.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Account.t list Or_error.t [@@deriving bin_io]
+  type response = Account.Stable.V1.t list Or_error.t [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
