@@ -143,9 +143,9 @@ module Worker_state = struct
                  in
                  start_tracing_once () ;
                  let _ =
-                   assert (O1trace.measure "check" (fun () -> Tick.Groth16.check
+                   assert (Tick.Groth16.check
                      (main @@ Tick.Field.Var.constant next_state_top_hash)
-                     prover_state))
+                     prover_state)
                  in
                  { Blockchain.state= next_state
                  ; proof= Precomputed_values.base_proof }

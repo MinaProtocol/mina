@@ -1008,8 +1008,8 @@ module Consensus_state = struct
         ~else_:previous_state.last_epoch_data
     in
     let%bind last_data =
-      Epoch_data.if_ epoch_increased ~then_:previous_state.curr_epoch_data
-        ~else_:previous_state.last_epoch_data
+      Epoch_data.if_ epoch_increased ~then_:previous_state.last_epoch_data
+        ~else_:previous_state.curr_epoch_data
     in
     let%bind threshold_satisfied, vrf_result =
       let%bind (module M) = Inner_curve.Checked.Shifted.create () in
@@ -1337,14 +1337,15 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
        * transitions), use the last epoch data.
       *)
       if
-        Epoch.equal epoch state.curr_epoch
+        (Epoch.equal epoch state.curr_epoch && state.curr_epoch_data.length >= Length.of_int Constants.k)
         || Length.equal state.epoch_length Length.zero
-      then (Logger.info logger "XXX epoch_data=last" ; state.last_epoch_data)
+      then (Logger.info logger "XXX selecting last_epoch" ; state.last_epoch_data)
         (* If we are in the next epoch, use the current epoch data. *)
-      else if Epoch.equal epoch (Epoch.succ state.curr_epoch) then
-        (Logger.info logger "XXX epoch_data=curr" ; state.curr_epoch_data)
+      else if Epoch.equal epoch (Epoch.succ state.curr_epoch) || (state.curr_epoch_data.length < Length.of_int Constants.k) then
+        (Logger.info logger "XXX selecting curr_epoch" ; state.curr_epoch_data)
         (* If the epoch we are in is none of the above, something is wrong. *)
       else (
+        (* this needs to be exapnded *)
         Logger.error logger
           "system time is out of sync with protocol state time" ;
         failwith "System time is out of sync. (hint: setup NTP if you haven't)" )

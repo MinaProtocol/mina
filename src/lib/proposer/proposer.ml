@@ -269,6 +269,7 @@ module Make (Inputs : Inputs_intf) :
              schedule event"
         in
         let module Breadcrumb = Transition_frontier.Breadcrumb in
+        let wr = Writer.open_file "/tmp/proposer-diffs" in
         let propose ivar proposal_data =
           let open Interruptible.Let_syntax in
           match Broadcast_pipe.Reader.peek frontier_reader with
@@ -303,6 +304,8 @@ module Make (Inputs : Inputs_intf) :
               match next_state_opt with
               | None -> Interruptible.return ()
               | Some (protocol_state, internal_transition) ->
+                  don't_wait_for (Deferred.map wr ~f:(fun wr -> Writer.write wr
+                  (sprintf "%s\n=======\n%!" (Core_extended.Extended_sexp.Diff.(of_sexps ~original:(Protocol_state.sexp_of_value previous_protocol_state) ~updated:(Protocol_state.sexp_of_value protocol_state) |> Option.value_map ~default:"<couldn't compute diff>" ~f:to_string))))) ;
                   Interruptible.uninterruptible
                     (let open Deferred.Let_syntax in
                     let t0 = Time.now time_controller in
