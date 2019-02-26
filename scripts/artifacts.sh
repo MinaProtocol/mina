@@ -22,7 +22,7 @@ do_copy () {
     for SOURCE in $SOURCES
     do
         echo "Copying ${SOURCE} to ${DESTINATION}"
-        gsutil cp ${SOURCE} ${DESTINATION}
+        gsutil -o GSUtil:parallel_composite_upload_threshold=100M -q cp ${SOURCE} ${DESTINATION}
     done
 }
 
