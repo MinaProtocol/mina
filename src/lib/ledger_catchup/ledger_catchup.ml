@@ -163,8 +163,7 @@ module Make (Inputs : Inputs.S) :
 
   let run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer =
-    Strict_pipe.Reader.iter catchup_job_reader ~f:(fun transition_with_hash ->
-        let hash = With_hash.hash transition_with_hash in
+    Strict_pipe.Reader.iter catchup_job_reader ~f:(fun hash ->
         match%bind
           get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
             ~num_peers:8 hash
