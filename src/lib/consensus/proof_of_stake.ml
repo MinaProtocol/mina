@@ -596,26 +596,15 @@ module Vrf = struct
         ; delegator= 0 }
   end
 
-  let check ~local_state ~epoch ~slot ~seed ~private_key ~total_stake
-      ~ledger_hash ~logger =
+  let check ~epoch ~slot ~seed ~private_key ~total_stake ~logger
+      ~epoch_snapshot =
     let open Message in
     let open Local_state in
     let open Snapshot in
     let open Option.Let_syntax in
-    let%bind epoch_snapshot =
-      let snapshot =
-        if Coda_base.Frozen_ledger_hash.equal ledger_hash genesis_ledger_hash
-        then Some local_state.Local_state.genesis_epoch_snapshot
-        else local_state.Local_state.last_epoch_snapshot
-      in
-      if snapshot = None then
-        Logger.info logger
-          "Unable to check vrf evaluation: last_epoch_ledger does not exist \
-           in local state" ;
-      snapshot
-    in
     Logger.info logger "Checking vrf evaluations at %d:%d" (Epoch.to_int epoch)
       (Epoch.Slot.to_int slot) ;
+    let%bind epoch_snapshot = epoch_snapshot in
     with_return (fun {return} ->
         Hashtbl.iteri epoch_snapshot.delegators
           ~f:(fun ~key:delegator ~data:balance ->
@@ -1346,10 +1335,32 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
         failwith "System time is out of sync. (hint: setup NTP if you haven't)" )
     in
     let total_stake = epoch_data.ledger.total_currency in
+    let epoch_snapshot =
+      let source, snapshot =
+        if
+          Coda_base.Frozen_ledger_hash.equal epoch_data.ledger.hash
+            genesis_ledger_hash
+        then ("genesis", Some local_state.Local_state.genesis_epoch_snapshot)
+        else if state.curr_epoch_data.length < Length.of_int Constants.k then
+          ("curr", local_state.curr_epoch_snapshot)
+        else ("last", local_state.Local_state.last_epoch_snapshot)
+      in
+      ( match snapshot with
+      | None ->
+          Logger.info logger
+            "Unable to check vrf evaluation: %s_epoch_ledger does not exist \
+             in local state"
+            source
+      | Some snapshot ->
+          Logger.info logger
+            !"using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
+            source
+            (Coda_base.Sparse_ledger.merkle_root snapshot.ledger) ) ;
+      snapshot
+    in
     let proposal_data slot =
-      Vrf.check ~epoch ~slot ~seed:epoch_data.seed ~local_state
-        ~private_key:keypair.private_key ~total_stake
-        ~ledger_hash:epoch_data.ledger.hash ~logger
+      Vrf.check ~epoch ~slot ~seed:epoch_data.seed ~epoch_snapshot
+        ~private_key:keypair.private_key ~total_stake ~logger
     in
     let rec find_winning_slot slot =
       if UInt32.of_int (Epoch.Slot.to_int slot) >= Constants.Epoch.size then
