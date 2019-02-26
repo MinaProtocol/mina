@@ -1215,11 +1215,11 @@ let select ~existing ~candidate ~logger =
     let msg = Printf.sprintf "(%s) && (%s)" precondition_msg choice_msg in
     log_result choice msg
   in
-  Logger.info logger "SELECTING BEST CONSENSUS STATE" ;
-  Logger.info logger
+  Logger.info logger "Selecting best consensus state" ;
+  Logger.trace logger
     !"existing consensus state: %{sexp:Consensus_state.value}"
     existing ;
-  Logger.info logger
+  Logger.trace logger
     !"candidate consensus state: %{sexp:Consensus_state.value}"
     candidate ;
   (* TODO: add fork_before_checkpoint check *)
