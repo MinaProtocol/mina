@@ -39,7 +39,13 @@ tests = [
        'friendly': 'Proof of Stake Tests',
        'config': 'test_postake_snarkless',
        'name': 'postake_integration_tests',
-       'actions': base_actions + ['coda-shared-prefix-multiproposer-test']
+       'actions': base_actions
+   },
+   {
+       'friendly': 'Proof of Stake (split stake) Tests'
+       'config': 'test_postake_split_snarkless',
+       'name': 'postake_split_integration_tests',
+       'actions': ['coda-shared-prefix-multiproposer-test']
    },
    {
        'friendly': 'Full test with SNARK (sig)',
