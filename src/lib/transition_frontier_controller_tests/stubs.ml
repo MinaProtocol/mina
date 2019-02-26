@@ -369,6 +369,12 @@ struct
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
          (gen_breadcrumb ~logger ~accounts_with_secret_keys)
 
+  let gen_tree ~logger ~size ~accounts_with_secret_keys root_breadcrumb =
+    Quickcheck.Generator.with_size ~size
+    @@ Quickcheck_lib.gen_imperative_rose_tree
+         (root_breadcrumb |> return |> Quickcheck.Generator.return)
+         (gen_breadcrumb ~logger ~accounts_with_secret_keys)
+
   module Protocol_state_validator = Protocol_state_validator.Make (struct
     include Transition_frontier_inputs
     module Time = Time
