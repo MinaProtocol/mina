@@ -198,6 +198,29 @@ module Make (Inputs : Inputs_intf) :
 
   let breadcrumb_of_node {Node.breadcrumb; _} = breadcrumb
 
+  module Root_history = struct
+    module Queue = Hash_queue.Make (State_hash)
+
+    type t = {history: Breadcrumb.t Queue.t; capacity: int}
+
+    let create capacity =
+      let history = Queue.create ~growth_allowed:false ~size:capacity () in
+      {history; capacity}
+
+    let lookup {history; _} = Queue.lookup history
+
+    let mem {history; _} = Queue.mem history
+
+    let enqueue {history; capacity} state_hash breadcrumb =
+      match Queue.enqueue history state_hash breadcrumb with
+      | `Key_already_present -> ()
+      | `Ok ->
+          if Queue.length history > capacity then
+            Queue.dequeue_exn history |> ignore
+
+    let is_empty {history; _} = Queue.is_empty history
+  end
+
   (* Invariant: The path from the root to the tip inclusively, will be max_length + 1 *)
   (* TODO: Make a test of this invariant *)
   type t =
@@ -209,7 +232,8 @@ module Make (Inputs : Inputs_intf) :
     ; consensus_local_state: Consensus.Local_state.t
     ; extensions: Extensions.t
     ; extension_readers: Extensions.readers
-    ; extension_writers: Extensions.writers }
+    ; extension_writers: Extensions.writers
+    ; root_history: Root_history.t }
 
   let logger t = t.logger
 
@@ -290,6 +314,7 @@ module Make (Inputs : Inputs_intf) :
         in
         let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
         let extension_readers, extension_writers = Extensions.make_pipes () in
+        let root_history = Root_history.create (2 * Inputs.max_length) in
         { logger
         ; root_snarked_ledger
         ; root= root_hash
@@ -298,7 +323,8 @@ module Make (Inputs : Inputs_intf) :
         ; consensus_local_state
         ; extensions= Extensions.create ()
         ; extension_readers
-        ; extension_writers }
+        ; extension_writers
+        ; root_history }
 
   (* TODO call this when bootstrapping starts and frontier is destroyed! *)
   let close {extension_writers; _} = Extensions.close_pipes extension_writers
@@ -318,6 +344,38 @@ module Make (Inputs : Inputs_intf) :
   let find_exn t hash =
     let node = Hashtbl.find_exn t.table hash in
     node.breadcrumb
+
+  let path_search t state_hash ~find ~f =
+    let open Option.Let_syntax in
+    let rec go state_hash =
+      let%map breadcrumb = find t state_hash in
+      let elem = f breadcrumb in
+      match go (Breadcrumb.parent_hash breadcrumb) with
+      | Some subresult -> Non_empty_list.cons elem subresult
+      | None -> Non_empty_list.singleton elem
+    in
+    Option.map ~f:Non_empty_list.rev (go state_hash)
+
+  let get_path_inclusively_in_root_history t state_hash ~f =
+    path_search t state_hash
+      ~find:(fun t -> Root_history.lookup t.root_history)
+      ~f
+
+  let root_history_path_map t state_hash ~f =
+    let open Option.Let_syntax in
+    match path_search t ~find ~f state_hash with
+    | None -> get_path_inclusively_in_root_history t state_hash ~f
+    | Some frontier_path ->
+        let root_history_path =
+          let%bind root_breadcrumb = find t t.root in
+          get_path_inclusively_in_root_history t
+            (Breadcrumb.parent_hash root_breadcrumb)
+            ~f
+        in
+        Some
+          (Option.value_map root_history_path ~default:frontier_path
+             ~f:(fun root_history ->
+               Non_empty_list.append root_history frontier_path ))
 
   let path_map t breadcrumb ~f =
     let rec find_path b =
@@ -485,6 +543,7 @@ module Make (Inputs : Inputs_intf) :
    *       VII ) notify the consensus mechanism of the new root
    *       VIII) if commit on an heir node that just emitted proof txns then
    *             write them to snarked ledger
+   *       XI  ) add old root to root_history
    *   5) return a diff object describing what changed (for use in updating extensions)
   *)
   let add_breadcrumb_exn t breadcrumb =
@@ -593,6 +652,10 @@ module Make (Inputs : Inputs_intf) :
                    (Breadcrumb.blockchain_state new_root_node.breadcrumb))
               ( Ledger.Db.merkle_root t.root_snarked_ledger
               |> Frozen_ledger_hash.of_ledger_hash ) ;
+            (* 4.IX *)
+            let root_breadcrumb = Node.breadcrumb root_node in
+            let root_state_hash = Breadcrumb.state_hash root_breadcrumb in
+            Root_history.enqueue t.root_history root_state_hash root_breadcrumb ;
             (garbage_breadcrumbs, new_root_node) )
           else ([], root_node)
         in
@@ -621,5 +684,11 @@ module Make (Inputs : Inputs_intf) :
 
   module For_tests = struct
     let root_snarked_ledger {root_snarked_ledger; _} = root_snarked_ledger
+
+    let root_history_mem {root_history; _} hash =
+      Root_history.mem root_history hash
+
+    let root_history_is_empty {root_history; _} =
+      Root_history.is_empty root_history
   end
 end

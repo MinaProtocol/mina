@@ -43,5 +43,9 @@ val iter : 'a t -> f:('a -> unit) -> unit
 
 val length : 'a t -> int
 
+val rev : 'a t -> 'a t
+
 val to_list : 'a t -> 'a list
 (** Note: This is O(1) not O(n) like on most container *)
+
+val append : 'a t -> 'a t -> 'a t

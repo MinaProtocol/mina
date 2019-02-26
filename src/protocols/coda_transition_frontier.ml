@@ -41,7 +41,7 @@ module type Transition_frontier_extension_intf0 = sig
     -> transition_frontier_breadcrumb Transition_frontier_diff.t
     -> view Option.t
   (** Handle a transition frontier diff, and return the new version of the
-      computed view, if it's updated. *)
+        computed view, if it's updated. *)
 end
 
 module type Network_intf = sig
@@ -184,6 +184,9 @@ module type Transition_frontier_intf = sig
 
   val find : t -> state_hash -> Breadcrumb.t option
 
+  val root_history_path_map :
+    t -> state_hash -> f:(Breadcrumb.t -> 'a) -> 'a Non_empty_list.t option
+
   val successor_hashes : t -> state_hash -> state_hash list
 
   val successor_hashes_rec : t -> state_hash -> state_hash list
@@ -218,6 +221,10 @@ module type Transition_frontier_intf = sig
 
   module For_tests : sig
     val root_snarked_ledger : t -> ledger_database
+
+    val root_history_mem : t -> state_hash -> bool
+
+    val root_history_is_empty : t -> bool
   end
 end
 
