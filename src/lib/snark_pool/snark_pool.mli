@@ -49,6 +49,6 @@ end) (Transition_frontier : sig
     Protocols.Coda_transition_frontier.Transition_frontier_extensions_intf
     with module Work = Work
 
-  val extension_pipes : t -> Extensions.Readers.t
+  val extension_pipes : t -> Extensions.readers
 end) :
   S with type work := Work.t and type proof := Proof.t and type fee := Fee.t

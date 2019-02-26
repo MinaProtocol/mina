@@ -20,7 +20,7 @@ module type Transition_frontier_intf = sig
   module Extensions :
     Protocols.Coda_transition_frontier.Transition_frontier_extensions_intf
 
-  val extension_pipes : t -> Extensions.Readers.t
+  val extension_pipes : t -> Extensions.readers
 end
 
 module type Pool_diff_intf = sig

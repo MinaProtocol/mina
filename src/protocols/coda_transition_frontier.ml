@@ -22,11 +22,9 @@ module type Transition_frontier_extensions_intf = sig
 
     include Hashable.S_binable with type t := t
   end
-  (* 
-  module Readers : sig
-    type t =
-      {snark_pool: (int * int Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t}
-  end *)
+
+  type readers =
+    {snark_pool: (int * int Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t}
 end
 
 (** An extension to the transition frontier that provides a view onto the data
