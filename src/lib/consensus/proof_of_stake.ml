@@ -998,24 +998,24 @@ module Consensus_state = struct
       in
       Length.var_of_field Field.(Var.(add (constant one) base))
     in
-    let%bind use_curr =
+    let%bind in_first_third =
       (let%bind k_as_length = Length.var_of_field (Field.Var.constant (Field.of_int Constants.k)) in
-      let%map c = Length.compare_var next_epoch_data_length k_as_length in
+      let%map c = Length.compare_var previous_state.curr_epoch_data.length k_as_length in
       c.less)
     in
-    let%bind last_data_for_vrf =
-      Epoch_data.if_ use_curr ~then_:previous_state.curr_epoch_data
-        ~else_:previous_state.last_epoch_data
-    in
+    let%bind lzero = Length.var_of_field (Field.Var.constant (Field.zero)) in
+    let%bind first_disjunct = Boolean.(not epoch_increased && not in_first_third) in
+    let%bind len_is_zero = Length.equal_var previous_state.epoch_length lzero in
+    let%bind use_last = Boolean.(first_disjunct || len_is_zero) in
     let%bind last_data =
-      Epoch_data.if_ epoch_increased ~then_:previous_state.last_epoch_data
+      Epoch_data.if_ use_last ~then_:previous_state.last_epoch_data
         ~else_:previous_state.curr_epoch_data
     in
     let%bind threshold_satisfied, vrf_result =
       let%bind (module M) = Inner_curve.Checked.Shifted.create () in
       Vrf.Checked.check
         (module M)
-        ~epoch_ledger:last_data_for_vrf.ledger ~epoch:transition_data.epoch
+        ~epoch_ledger:last_data.ledger ~epoch:transition_data.epoch
         ~slot:transition_data.slot ~seed:last_data.seed
     in
     let%bind curr_data =
