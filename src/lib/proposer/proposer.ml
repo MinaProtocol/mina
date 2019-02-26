@@ -276,7 +276,7 @@ module Make (Inputs : Inputs_intf) :
           | None -> Interruptible.return (log_bootstrap_mode ())
           | Some frontier -> (
               let crumb = Transition_frontier.best_tip frontier in
-              Logger.info logger
+              Logger.trace logger
                 !"Begining to propose off of crumb %{sexp: Breadcrumb.t}%!"
                 crumb ;
               Core.printf !"%!" ;
