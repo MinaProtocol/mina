@@ -37,8 +37,8 @@ let%test_module "Database integration test" =
                            @ List.map acc ~f:(List.cons Direction.Left)
                            @ List.map acc ~f:(List.cons Direction.Right) )
                   in
-                  List.iter accounts
-                    ~f:(fun ({Account.public_key; _} as account) ->
+                  List.iter accounts ~f:(fun account ->
+                      let public_key = Account.public_key account in
                       ignore
                       @@ DB.get_or_create_account_exn db public_key account ;
                       ignore
