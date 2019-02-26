@@ -46,6 +46,11 @@ module Make (Consensus_mechanism : Consensus.S) :
               transition consensus data is valid
               new consensus state is a function of the old consensus state
       *)
+      let verify_complete_merge =
+        match Coda_compile_config.proof_level with
+        | "full" -> T.verify_complete_merge
+        | _ -> fun _ _ _ _ _ -> Checked.return Boolean.true_
+
       let%snarkydef update
           ((previous_state_hash, previous_state) :
             State_hash.var * Protocol_state.var)
@@ -60,7 +65,7 @@ module Make (Consensus_mechanism : Consensus.S) :
         in
         let%bind success =
           let%bind correct_transaction_snark =
-            T.verify_complete_merge
+            verify_complete_merge
               (Snark_transition.sok_digest transition)
               ( previous_state |> Protocol_state.blockchain_state
               |> Blockchain_state.snarked_ledger_hash )

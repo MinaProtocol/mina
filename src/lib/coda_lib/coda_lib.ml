@@ -5,31 +5,6 @@ open Pipe_lib
 open Strict_pipe
 open O1trace
 
-module type Staged_ledger_io_intf = sig
-  type t
-
-  type net
-
-  type staged_ledger_hash
-
-  type ledger_hash
-
-  type staged_ledger_aux
-
-  type sync_ledger_query
-
-  type sync_ledger_answer
-
-  type protocol_state
-
-  val create : net -> t
-
-  val get_staged_ledger_aux_at_hash :
-       t
-    -> staged_ledger_hash
-    -> staged_ledger_aux Envelope.Incoming.t Deferred.Or_error.t
-end
-
 module type Network_intf = sig
   type t
 
@@ -171,95 +146,6 @@ module type Snark_pool_intf = sig
 
   val get_completed_work :
     t -> completed_work_statement -> completed_work_checked option
-end
-
-module type Ktree_intf = sig
-  type elem
-
-  type t [@@deriving sexp]
-
-  val gen : elem Quickcheck.Generator.t -> t Quickcheck.Generator.t
-
-  val find_map : t -> f:(elem -> 'a option) -> 'a option
-
-  val path : t -> f:(elem -> bool) -> elem list option
-
-  val singleton : elem -> t
-
-  val longest_path : t -> elem list
-
-  val add :
-    t -> elem -> parent:(elem -> bool) -> [> `Added of t | `No_parent | `Repeat]
-
-  val root : t -> elem
-end
-
-module type Ledger_builder_controller_intf = sig
-  type public_key_compressed
-
-  type staged_ledger
-
-  type staged_ledger_hash
-
-  type external_transition_verified
-
-  type ledger
-
-  type maskable_ledger
-
-  type tip
-
-  type net
-
-  type protocol_state
-
-  type consensus_local_state
-
-  type t
-
-  type sync_query
-
-  type sync_answer
-
-  type ledger_proof
-
-  type ledger_hash
-
-  module Config : sig
-    type t =
-      { parent_log: Logger.t
-      ; net_deferred: net Deferred.t
-      ; external_transitions:
-          (external_transition_verified * Unix_timestamp.t)
-          Linear_pipe.Reader.t
-      ; genesis_tip: tip
-      ; ledger: maskable_ledger
-      ; consensus_local_state: consensus_local_state
-      ; proposer_public_key: public_key_compressed option
-      ; longest_tip_location: string }
-    [@@deriving make]
-  end
-
-  val create : Config.t -> t Deferred.t
-
-  module For_tests : sig
-    val load_tip : t -> Config.t -> tip Deferred.t
-  end
-
-  val strongest_tip : t -> tip
-
-  val local_get_ledger :
-       t
-    -> staged_ledger_hash
-    -> (staged_ledger * protocol_state) Deferred.Or_error.t
-
-  val strongest_ledgers :
-    t -> (staged_ledger * external_transition_verified) Linear_pipe.Reader.t
-
-  val handle_sync_ledger_queries :
-       t
-    -> ledger_hash * sync_query
-    -> (ledger_hash * sync_answer) Deferred.Or_error.t
 end
 
 module type Proposer_intf = sig
@@ -552,6 +438,13 @@ module Make (Inputs : Inputs_intf) = struct
       f
 
   let best_tip = compose_of_option best_tip_opt
+
+  let visualize_frontier ~filename =
+    compose_of_option
+    @@ fun t ->
+    let open Option.Let_syntax in
+    let%map frontier = Broadcast_pipe.Reader.peek t.transition_frontier in
+    Transition_frontier.visualize ~filename frontier
 
   let best_staged_ledger = compose_of_option best_staged_ledger_opt
 

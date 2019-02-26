@@ -77,15 +77,13 @@ struct
 
   type t = (string, pretty_target) edge list
 
-  let display_prefix_of_string string = String.prefix string 8
-
-  let string_of_hash hash =
-    hash |> Hash.sexp_of_t |> Sexp.to_string |> display_prefix_of_string
+  let string_of_hash = Visualization.display_short_sexp (module Hash)
 
   module Addr = Location.Addr
 
   let string_of_account_key account =
-    account |> Account.public_key |> Key.to_string |> display_prefix_of_string
+    account |> Account.public_key |> Key.to_string
+    |> Visualization.display_prefix_of_string
 
   let empty_hashes =
     Empty_hashes.cache (module Hash) ~init_hash:Hash.empty_account Ledger.depth

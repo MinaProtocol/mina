@@ -15,10 +15,19 @@ module type Inputs_intf = sig
      and type staged_ledger := Staged_ledger.t
 end
 
-module Make (Inputs : Inputs_intf) = struct
+module Make (Inputs : Inputs_intf) :
+  Transition_frontier_extension_intf0
+  with type transition_frontier_breadcrumb := Inputs.Breadcrumb.t
+   and type input = unit
+   and type view = int * int Inputs.Transaction_snark_work.Statement.Table.t =
+struct
   module Work = Inputs.Transaction_snark_work.Statement
 
   type t = int Work.Table.t
+
+  type view = int * int Work.Table.t
+
+  type input = unit
 
   let get_work (breadcrumb : Inputs.Breadcrumb.t) : Work.t Sequence.t =
     let ledger = Inputs.Breadcrumb.staged_ledger breadcrumb in
@@ -54,6 +63,8 @@ module Make (Inputs : Inputs_intf) = struct
         | None -> failwith "Removed a breadcrumb we didn't know about" )
 
   let create () = Work.Table.create ()
+
+  let initial_view = (0, Work.Table.create ())
 
   let handle_diff t diff =
     let removed, added =

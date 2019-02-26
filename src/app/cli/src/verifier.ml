@@ -84,23 +84,21 @@ module Worker = struct
              with type worker_state := Worker_state.t
               and type connection_state := Connection_state.t) =
     struct
-      [%%if
-      with_snark]
-
       let verify_blockchain (w : Worker_state.t) (chain : Blockchain.t) =
-        let%map (module M) = Worker_state.get w in
-        M.verify_wrap chain.state chain.proof
-
-      [%%else]
-
-      let verify_blockchain (w : Worker_state.t) (chain : Blockchain.t) =
-        Deferred.return true
-
-      [%%endif]
+        match Coda_compile_config.proof_level with
+        | "full" ->
+            let%map (module M) = Worker_state.get w in
+            M.verify_wrap chain.state chain.proof
+        | "check" | "none" -> Deferred.return true
+        | _ -> failwith "unknown proof_level"
 
       let verify_transaction_snark (w : Worker_state.t) (p, message) =
-        let%map (module M) = Worker_state.get w in
-        M.verify_transaction_snark p ~message
+        match Coda_compile_config.proof_level with
+        | "full" ->
+            let%map (module M) = Worker_state.get w in
+            M.verify_transaction_snark p ~message
+        | "check" | "none" -> Deferred.return true
+        | _ -> failwith "unknown proof_level"
 
       let functions =
         let f (i, o, f) =
