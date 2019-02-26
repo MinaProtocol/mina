@@ -430,7 +430,7 @@ let dump_ledger =
          | Ok (Ok accounts) -> printf !"%{sexp:Account.t list}\n" accounts ))
 
 let constraint_system_digests =
-  Command.async ~summary:"Print md5 digest of each SNARK constraint"
+  Command.async ~summary:"Print MD5 digest of each SNARK constraint"
     (Command.Param.return (fun () ->
          let all =
            Transaction_snark.constraint_system_digests ()
