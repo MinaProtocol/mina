@@ -1352,8 +1352,11 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
     in
     let total_stake = epoch_data.ledger.total_currency in
     let ledger_hash, epoch_snapshot =
-      if Coda_base.Frozen_ledger_hash.equal epoch_data.ledger.hash genesis_ledger_hash then genesis_ledger_hash, Some local_state.Local_state.genesis_epoch_snapshot else (if state.curr_epoch_data.length <= Length.of_int Constants.k then
-      state.curr_epoch_data.ledger.hash, local_state.curr_epoch_snapshot else state.last_epoch_data.ledger.hash, local_state.last_epoch_snapshot) in
+      if Coda_base.Frozen_ledger_hash.equal epoch_data.ledger.hash genesis_ledger_hash
+        then genesis_ledger_hash, Some local_state.Local_state.genesis_epoch_snapshot
+        else (if state.curr_epoch_data.length <= Length.of_int Constants.k
+          then state.curr_epoch_data.ledger.hash, local_state.curr_epoch_snapshot
+          else state.last_epoch_data.ledger.hash, local_state.last_epoch_snapshot) in
     Logger.error logger !"XXX changing to snapshot with root hash %{sexp:Coda_base.Ledger_hash.t option} (= %{sexp:Coda_base.Frozen_ledger_hash.t}?)" (Option.map epoch_snapshot ~f:(fun e -> Coda_base.Sparse_ledger.merkle_root e.ledger) ) ledger_hash ;
     if Option.is_none epoch_snapshot then
       Logger.info logger
