@@ -118,15 +118,42 @@ module Make (Inputs : Inputs_intf) :
     Transition_frontier_extension_intf0
     with type transition_frontier_breadcrumb := Breadcrumb.t
 
+  let max_length = Inputs.max_length
+
   module Extensions = struct
     module Snark_pool_refcount = Snark_pool_refcount.Make (struct
       include Inputs
       module Breadcrumb = Breadcrumb
     end)
 
-    type t = {snark_pool_refcount: Snark_pool_refcount.t} [@@deriving fields]
+    module Root_history = struct
+      module Queue = Hash_queue.Make (State_hash)
 
-    let create () = {snark_pool_refcount= Snark_pool_refcount.create ()}
+      type t = {history: Breadcrumb.t Queue.t; capacity: int}
+
+      let create capacity =
+        let history = Queue.create () in
+        {history; capacity}
+
+      let lookup {history; _} = Queue.lookup history
+
+      let mem {history; _} = Queue.mem history
+
+      let enqueue {history; capacity} state_hash breadcrumb =
+        if Queue.length history >= capacity then
+          Queue.dequeue_exn history |> ignore ;
+        Queue.enqueue history state_hash breadcrumb |> ignore
+
+      let is_empty {history; _} = Queue.is_empty history
+    end
+
+    type t =
+      {root_history: Root_history.t; snark_pool_refcount: Snark_pool_refcount.t}
+    [@@deriving fields]
+
+    let create () =
+      { snark_pool_refcount= Snark_pool_refcount.create ()
+      ; root_history= Root_history.create (2 * Inputs.max_length) }
 
     type writers =
       {snark_pool: Snark_pool_refcount.view Broadcast_pipe.Writer.t}
@@ -147,13 +174,21 @@ module Make (Inputs : Inputs_intf) :
       Option.value ~default:Deferred.unit
       @@ Option.map ~f:(Broadcast_pipe.Writer.write pipe) (handle ext_t diff)
 
-    let handle_diff t (pipes : writers) diff =
+    let handle_diff t (pipes : writers)
+        (diff : Breadcrumb.t Transition_frontier_diff.t) : unit Deferred.t =
       let use handler pipe acc field =
-        let open Deferred.Let_syntax in
         let%bind () = acc in
         mb_write_to_pipe diff (Field.get field t) handler pipe
       in
-      Fields.fold ~init:Deferred.unit
+      ( match diff with
+      | Transition_frontier_diff.New_breadcrumb _ -> ()
+      | Transition_frontier_diff.New_best_tip
+          {old_root; old_root_length; new_best_tip_length; _} ->
+          if new_best_tip_length - old_root_length > max_length then
+            let root_state_hash = Breadcrumb.state_hash old_root in
+            Root_history.enqueue t.root_history root_state_hash old_root ) ;
+      Fields.fold ~init:diff
+        ~root_history:(fun _ _ -> Deferred.unit)
         ~snark_pool_refcount:
           (use Snark_pool_refcount.handle_diff pipes.snark_pool)
   end
@@ -198,29 +233,6 @@ module Make (Inputs : Inputs_intf) :
 
   let breadcrumb_of_node {Node.breadcrumb; _} = breadcrumb
 
-  module Root_history = struct
-    module Queue = Hash_queue.Make (State_hash)
-
-    type t = {history: Breadcrumb.t Queue.t; capacity: int}
-
-    let create capacity =
-      let history = Queue.create ~growth_allowed:false ~size:capacity () in
-      {history; capacity}
-
-    let lookup {history; _} = Queue.lookup history
-
-    let mem {history; _} = Queue.mem history
-
-    let enqueue {history; capacity} state_hash breadcrumb =
-      match Queue.enqueue history state_hash breadcrumb with
-      | `Key_already_present -> ()
-      | `Ok ->
-          if Queue.length history > capacity then
-            Queue.dequeue_exn history |> ignore
-
-    let is_empty {history; _} = Queue.is_empty history
-  end
-
   (* Invariant: The path from the root to the tip inclusively, will be max_length + 1 *)
   (* TODO: Make a test of this invariant *)
   type t =
@@ -232,8 +244,7 @@ module Make (Inputs : Inputs_intf) :
     ; consensus_local_state: Consensus.Local_state.t
     ; extensions: Extensions.t
     ; extension_readers: Extensions.readers
-    ; extension_writers: Extensions.writers
-    ; root_history: Root_history.t }
+    ; extension_writers: Extensions.writers }
 
   let logger t = t.logger
 
@@ -314,7 +325,6 @@ module Make (Inputs : Inputs_intf) :
         in
         let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
         let extension_readers, extension_writers = Extensions.make_pipes () in
-        let root_history = Root_history.create (2 * Inputs.max_length) in
         { logger
         ; root_snarked_ledger
         ; root= root_hash
@@ -323,13 +333,10 @@ module Make (Inputs : Inputs_intf) :
         ; consensus_local_state
         ; extensions= Extensions.create ()
         ; extension_readers
-        ; extension_writers
-        ; root_history }
+        ; extension_writers }
 
   (* TODO call this when bootstrapping starts and frontier is destroyed! *)
   let close {extension_writers; _} = Extensions.close_pipes extension_writers
-
-  let max_length = Inputs.max_length
 
   let consensus_local_state {consensus_local_state; _} = consensus_local_state
 
@@ -358,7 +365,7 @@ module Make (Inputs : Inputs_intf) :
 
   let get_path_inclusively_in_root_history t state_hash ~f =
     path_search t state_hash
-      ~find:(fun t -> Root_history.lookup t.root_history)
+      ~find:(fun t -> Extensions.Root_history.lookup t.extensions.root_history)
       ~f
 
   let root_history_path_map t state_hash ~f =
@@ -655,7 +662,8 @@ module Make (Inputs : Inputs_intf) :
             (* 4.IX *)
             let root_breadcrumb = Node.breadcrumb root_node in
             let root_state_hash = Breadcrumb.state_hash root_breadcrumb in
-            Root_history.enqueue t.root_history root_state_hash root_breadcrumb ;
+            Extensions.Root_history.enqueue t.extensions.root_history
+              root_state_hash root_breadcrumb ;
             (garbage_breadcrumbs, new_root_node) )
           else ([], root_node)
         in
@@ -664,8 +672,10 @@ module Make (Inputs : Inputs_intf) :
           ( if node.length > best_tip_node.length then
             Transition_frontier_diff.New_best_tip
               { old_root= root_node.breadcrumb
+              ; old_root_length= root_node.length
               ; new_root= new_root_node.breadcrumb
               ; new_best_tip= node.breadcrumb
+              ; new_best_tip_length= node.length
               ; old_best_tip= best_tip_node.breadcrumb
               ; garbage= garbage_breadcrumbs }
           else Transition_frontier_diff.New_breadcrumb node.breadcrumb ) )
@@ -685,10 +695,10 @@ module Make (Inputs : Inputs_intf) :
   module For_tests = struct
     let root_snarked_ledger {root_snarked_ledger; _} = root_snarked_ledger
 
-    let root_history_mem {root_history; _} hash =
-      Root_history.mem root_history hash
+    let root_history_mem {extensions; _} hash =
+      Extensions.Root_history.mem extensions.root_history hash
 
-    let root_history_is_empty {root_history; _} =
-      Root_history.is_empty root_history
+    let root_history_is_empty {extensions; _} =
+      Extensions.Root_history.is_empty extensions.root_history
   end
 end

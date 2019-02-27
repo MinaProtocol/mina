@@ -8,8 +8,10 @@ module Transition_frontier_diff = struct
         (** Triggered when a new breadcrumb is added without changing the root or best_tip *)
     | New_best_tip of
         { old_root: 'a
+        ; old_root_length: int
         ; new_root: 'a  (** Same as old root if the root doesn't change *)
         ; new_best_tip: 'a
+        ; new_best_tip_length: int
         ; old_best_tip: 'a
         ; garbage: 'a list }
         (** Triggered when a new breadcrumb is added, causing a new best_tip *)
