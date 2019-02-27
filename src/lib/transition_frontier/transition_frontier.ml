@@ -2,6 +2,7 @@ open Core_kernel
 open Async_kernel
 open Protocols.Coda_transition_frontier
 open Coda_base
+open Pipe_lib
 
 module type Inputs_intf = Inputs.Inputs_intf
 
@@ -113,6 +114,10 @@ module Make (Inputs : Inputs_intf) :
       |> Consensus.Protocol_state.blockchain_state
   end
 
+  module type Transition_frontier_extension_intf =
+    Transition_frontier_extension_intf0
+    with type transition_frontier_breadcrumb := Breadcrumb.t
+
   module Extensions = struct
     module Snark_pool_refcount = Snark_pool_refcount.Make (struct
       include Inputs
@@ -123,9 +128,34 @@ module Make (Inputs : Inputs_intf) :
 
     let create () = {snark_pool_refcount= Snark_pool_refcount.create ()}
 
-    let handle_diff t diff =
-      let use handler field = handler (Field.get field t) diff in
-      Fields.iter ~snark_pool_refcount:(use Snark_pool_refcount.handle_diff)
+    type writers =
+      {snark_pool: Snark_pool_refcount.view Broadcast_pipe.Writer.t}
+
+    type readers =
+      {snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t}
+
+    let make_pipes () : readers * writers =
+      let snark_reader, snark_writer =
+        Broadcast_pipe.create Snark_pool_refcount.initial_view
+      in
+      ({snark_pool= snark_reader}, {snark_pool= snark_writer})
+
+    let close_pipes ({snark_pool} : writers) =
+      Broadcast_pipe.Writer.close snark_pool
+
+    let mb_write_to_pipe diff ext_t handle pipe =
+      Option.value ~default:Deferred.unit
+      @@ Option.map ~f:(Broadcast_pipe.Writer.write pipe) (handle ext_t diff)
+
+    let handle_diff t (pipes : writers) diff =
+      let use handler pipe acc field =
+        let open Deferred.Let_syntax in
+        let%bind () = acc in
+        mb_write_to_pipe diff (Field.get field t) handler pipe
+      in
+      Fields.fold ~init:Deferred.unit
+        ~snark_pool_refcount:
+          (use Snark_pool_refcount.handle_diff pipes.snark_pool)
   end
 
   module Node = struct
@@ -177,9 +207,13 @@ module Make (Inputs : Inputs_intf) :
     ; logger: Logger.t
     ; table: Node.t State_hash.Table.t
     ; consensus_local_state: Consensus.Local_state.t
-    ; extensions: Extensions.t }
+    ; extensions: Extensions.t
+    ; extension_readers: Extensions.readers
+    ; extension_writers: Extensions.writers }
 
   let logger t = t.logger
+
+  let extension_pipes {extension_readers; _} = extension_readers
 
   (* TODO: load from and write to disk *)
   let create ~logger
@@ -255,13 +289,19 @@ module Make (Inputs : Inputs_intf) :
           {Node.breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
         in
         let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
+        let extension_readers, extension_writers = Extensions.make_pipes () in
         { logger
         ; root_snarked_ledger
         ; root= root_hash
         ; best_tip= root_hash
         ; table
         ; consensus_local_state
-        ; extensions= Extensions.create () }
+        ; extensions= Extensions.create ()
+        ; extension_readers
+        ; extension_writers }
+
+  (* TODO call this when bootstrapping starts and frontier is destroyed! *)
+  let close {extension_writers; _} = Extensions.close_pipes extension_writers
 
   let max_length = Inputs.max_length
 
@@ -322,7 +362,8 @@ module Make (Inputs : Inputs_intf) :
 
     let to_graph t =
       fold t ~init:empty ~f:(fun (node : Node.t) graph ->
-          List.fold node.successor_hashes ~init:graph
+          let graph_with_node = add_vertex graph node in
+          List.fold node.successor_hashes ~init:graph_with_node
             ~f:(fun acc_graph successor_state_hash ->
               add_edge acc_graph node
                 ( State_hash.Table.find t.table successor_state_hash
@@ -556,7 +597,7 @@ module Make (Inputs : Inputs_intf) :
           else ([], root_node)
         in
         (* 5 *)
-        Extensions.handle_diff t.extensions
+        Extensions.handle_diff t.extensions t.extension_writers
           ( if node.length > best_tip_node.length then
             Transition_frontier_diff.New_best_tip
               { old_root= root_node.breadcrumb

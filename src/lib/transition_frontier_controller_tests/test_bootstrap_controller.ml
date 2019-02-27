@@ -9,7 +9,7 @@ end)
 open Stubs
 
 module Root_sync_ledger =
-  Syncable_ledger.Make (Ledger.Db.Addr) (Account)
+  Syncable_ledger.Make (Ledger.Db.Addr) (Account.Stable.V1)
     (struct
       include Ledger_hash
 

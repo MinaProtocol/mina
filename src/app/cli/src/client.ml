@@ -290,7 +290,7 @@ let batch_send_payments =
       ~error:(fun e ->
         sprintf "Failed to send payments %s" (Error.to_string_hum e) )
   in
-  Command.async ~summary:"send multiple payments from a file"
+  Command.async ~summary:"Send multiple payments from a file"
     (Cli_lib.Background_daemon.init
        (Args.zip2 Cli_lib.Flag.privkey_read_path payment_path_flag)
        ~f:main)
@@ -332,9 +332,7 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
            port
            ~success:
              (Or_error.map ~f:(fun receipt_chain_hash ->
-                  sprintf
-                    "Successfully enqueued %s in pool\nReceipt_chain_hash: %s"
-                    label
+                  sprintf "Initiated %s\nReceipt chain hash: %s" label
                     (Receipt.Chain_hash.to_string receipt_chain_hash) ))
            ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e)) ))
 
@@ -344,7 +342,7 @@ let send_payment =
     let open Cli_lib.Arg_type in
     let%map_open receiver =
       flag "receiver"
-        ~doc:"PUBLICKEY Public-key address to which you want to send money"
+        ~doc:"PUBLICKEY Public key address to which you want to send money"
         (required public_key_compressed)
     and amount =
       flag "amount" ~doc:"VALUE Payment amount you want to send"
@@ -432,7 +430,7 @@ let dump_ledger =
          | Ok (Ok accounts) -> printf !"%{sexp:Account.t list}\n" accounts ))
 
 let constraint_system_digests =
-  Command.async ~summary:"Print the md5 digest of each SNARK constraint system"
+  Command.async ~summary:"Print MD5 digest of each SNARK constraint"
     (Command.Param.return (fun () ->
          let all =
            Transaction_snark.constraint_system_digests ()
@@ -459,8 +457,7 @@ let start_tracing =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   let open Command.Param in
-  Command.async
-    ~summary:"Tell the daemon to start tracing to $config-directory/$pid.trace"
+  Command.async ~summary:"Start async tracing to $config-directory/$pid.trace"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
          match%map dispatch Daemon_rpcs.Start_tracing.rpc () port with
          | Ok () -> printf "Daemon started tracing!"
@@ -470,14 +467,28 @@ let stop_tracing =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   let open Command.Param in
-  Command.async ~summary:"Tell the daemon to stop tracing"
+  Command.async ~summary:"Stop async tracing"
     (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
          match%map dispatch Daemon_rpcs.Stop_tracing.rpc () port with
          | Ok () -> printf "Daemon stopped printing!"
          | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e ))
 
+let visualize_frontier =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Produce a dot file of the transition_frontier"
+    (Cli_lib.Background_daemon.init
+       Command.Param.(anon @@ ("output-filepath" %: string))
+       ~f:(fun port filename ->
+         match%map dispatch Visualize_frontier.rpc filename port with
+         | Ok () ->
+             printf !"Successfully wrote the visual at location %s." filename
+         | Error e ->
+             printf "Could not save file: %s\n" (Error.to_string_hum e) ))
+
 let command =
-  Command.group ~summary:"Lightweight client process"
+  Command.group ~summary:"Lightweight client commands"
     [ ("get-balance", get_balance)
     ; ("get-public-keys", get_public_keys)
     ; ("prove-payment", prove_payment)
@@ -494,4 +505,5 @@ let command =
     ; ("generate-keypair", generate_keypair)
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
-    ; ("snark-job-list", snark_job_list) ]
+    ; ("snark-job-list", snark_job_list)
+    ; ("visualize-frontier", visualize_frontier) ]
