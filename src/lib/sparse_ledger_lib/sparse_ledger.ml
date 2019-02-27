@@ -46,7 +46,7 @@ end
 let of_hash ~depth h = {indexes= []; depth; tree= Hash h}
 
 module Make (Hash : sig
-  type t [@@deriving bin_io, eq, sexp]
+  type t [@@deriving bin_io, eq, sexp, compare]
 
   val merge : height:int -> t -> t -> t
 end) (Key : sig
@@ -93,7 +93,11 @@ struct
       match (tree, path) with
       | Hash h, path ->
           let t = build_tree height path in
-          assert (Hash.equal h (hash t)) ;
+          [%test_result: Hash.t]
+            ~message:
+              "Hashes in union are not equal, something is wrong with your \
+               ledger"
+            ~expect:h (hash t) ;
           t
       | Node (h, l, r), `Left h_r :: path ->
           assert (Hash.equal h_r (hash r)) ;
@@ -179,6 +183,8 @@ let%test_module "sparse-ledger-test" =
   ( module struct
     module Hash = struct
       include Md5
+
+      let compare a b = String.compare (Md5.to_hex a) (Md5.to_hex b)
 
       let merge ~height x y =
         let open Md5 in

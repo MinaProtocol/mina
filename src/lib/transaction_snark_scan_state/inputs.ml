@@ -105,10 +105,4 @@ module type S = sig
     Coda_pow.Transaction_witness_intf
     with type sparse_ledger := Sparse_ledger.t
      and type pending_coinbase := Pending_coinbase.Stack.t
-
-  module Config : sig
-    val transaction_capacity_log_2 : int
-
-    val work_delay_factor : int
-  end
 end

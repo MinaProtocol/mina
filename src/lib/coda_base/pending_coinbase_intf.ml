@@ -1,5 +1,4 @@
 open Core_kernel
-open Import
 open Snark_params
 open Snarky
 open Tick
@@ -32,11 +31,11 @@ module type S = sig
       val set : t -> t -> bool -> t
     end
 
-    val to_bits : t -> bool list
+    val _to_bits : t -> bool list
 
     val fold_bits : t -> bool Fold.t
 
-    val fold : t -> (bool * bool * bool) Fold.t
+    val _fold : t -> (bool * bool * bool) Fold.t
 
     module Unpacked : sig
       type value = t

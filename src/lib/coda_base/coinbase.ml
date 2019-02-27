@@ -1,15 +1,35 @@
 open Core
 open Import
 
-module T = struct
-  type t =
-    { proposer: Public_key.Compressed.t
-    ; amount: Currency.Amount.t
-    ; fee_transfer: Fee_transfer.single option }
-  [@@deriving sexp, bin_io, compare, eq]
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      let version = 1
+
+      type t =
+        { proposer: Public_key.Compressed.t
+        ; amount: Currency.Amount.t
+        ; fee_transfer: Fee_transfer.single option }
+      [@@deriving sexp, bin_io, compare, eq]
+    end
+
+    include T
+    include Module_version.Registration.Make_latest_version (T)
+  end
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "coda_base_coinbase"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Module_version.Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
 end
 
-include T
+include Stable.Latest
 
 let is_valid {proposer= _; amount; fee_transfer} =
   match fee_transfer with

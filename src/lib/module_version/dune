@@ -1,0 +1,6 @@
+(library
+ (name module_version)
+ (public_name module_version)
+ (preprocess (pps ppx_jane) )
+ (inline_tests)
+ (libraries bin_prot core_kernel))

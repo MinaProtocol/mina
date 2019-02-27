@@ -1,7 +1,6 @@
 open Core_kernel
 open Fold_lib
 open Tuple_lib
-open Signature_lib
 open Snark_params.Tick
 
 module type S = sig
@@ -95,8 +94,6 @@ module Action = struct
   let length_in_triples = 1
 
   module Checked = struct
-    open Let_syntax
-
     let constant t =
       let x, y = to_bits t in
       Boolean.(var_of_value x, var_of_value y)
@@ -118,8 +115,6 @@ module Action = struct
             Test_util.test_equal typ Boolean.typ checked unchecked
               (Option.value_exn (of_enum i))
           done
-
-        let one_of xs t = List.mem xs ~equal t
 
         let%test_unit "coinbase_stack_added" =
           test_predicate added (( = ) Added)

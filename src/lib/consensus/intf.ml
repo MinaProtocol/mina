@@ -45,6 +45,8 @@ module type S = sig
   module Consensus_state : sig
     type value [@@deriving hash, eq, compare, bin_io, sexp]
 
+    type display [@@deriving yojson]
+
     include Snark_params.Tick.Snarkable.S with type value := value
 
     val genesis : value
@@ -63,7 +65,7 @@ module type S = sig
 
     val to_lite : (value -> Lite_base.Consensus_state.t) option
 
-    val to_string_record : value -> string
+    val display : value -> display
   end
 
   (*module Pending_coinbase_update : Coda_base.Pending_coinbase_update.S*)
@@ -96,6 +98,10 @@ module type S = sig
           -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
           -> Consensus_state.value)
          Quickcheck.Generator.t
+
+    val create_genesis_protocol_state :
+         Coda_base.Ledger.t
+      -> (Protocol_state.value, Coda_base.State_hash.t) With_hash.t
   end
 
   module Configuration : sig

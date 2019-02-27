@@ -234,7 +234,7 @@ module Make (Inputs : Inputs_intf) :
     let%bind ( `Hash_after_applying staged_ledger_hash
              , `Ledger_proof proof_opt
              , `Staged_ledger transitioned_staged_ledger
-             , `Pending_coinbase_update _pending_coinbase_state ) =
+             , `Pending_coinbase_update _pending_coinbase_update ) =
       Staged_ledger.apply ~logger parent_staged_ledger staged_ledger_diff
       |> Deferred.Result.map_error ~f:(fun e ->
              `Staged_ledger_application_failed e )
@@ -249,7 +249,7 @@ module Make (Inputs : Inputs_intf) :
             ~default:
               (Frozen_ledger_hash.of_ledger_hash
                  (Ledger.merkle_root Genesis_ledger.t))
-      | Some proof -> target_hash_of_ledger_proof proof
+      | Some (proof, _) -> target_hash_of_ledger_proof proof
     in
     Deferred.return
       ( if

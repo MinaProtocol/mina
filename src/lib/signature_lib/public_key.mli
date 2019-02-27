@@ -12,6 +12,8 @@ module Stable : sig
   module V1 : sig
     type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
   end
+
+  module Latest = V1
 end
 
 include Comparable.S_binable with type t := t
@@ -37,6 +39,8 @@ module Compressed : sig
 
       include Codable.S with type t := t
     end
+
+    module Latest = V1
   end
 
   val gen : t Quickcheck.Generator.t
@@ -62,6 +66,8 @@ module Compressed : sig
   val of_base64_exn : string -> t
 
   val to_base64 : t -> string
+
+  val to_string : t -> string
 
   module Checked : sig
     val equal : var -> var -> (Boolean.var, _) Checked.t

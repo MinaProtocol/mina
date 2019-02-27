@@ -1,0 +1,12 @@
+(library
+ (name sgn)
+ (public_name sgn)
+ (flags :standard -short-paths -warn-error -58)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries sgn_type snark_params core_kernel ppx_deriving_yojson.runtime
+   yojson)
+ (preprocess
+  (pps ppx_jane ppx_deriving.eq bisect_ppx ppx_deriving_yojson --
+    -conditional))
+ (synopsis "sgn library"))

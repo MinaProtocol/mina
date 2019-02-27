@@ -1,16 +1,35 @@
 open Core_kernel
 open Snark_params
 open Fold_lib
+open Module_version
 
 module Stable = struct
   module V1 = struct
-    type t = Tick.Field.t * Tick.Field.t
-    [@@deriving bin_io, sexp, eq, compare, hash]
+    module T = struct
+      let version = 1
+
+      type t = Tick.Field.t * Tick.Field.t
+      [@@deriving bin_io, sexp, eq, compare, hash]
+    end
+
+    include T
+    include Registration.Make_latest_version (T)
   end
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "non_zero_curve_point"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
 end
 
-include Stable.V1
-include Comparable.Make_binable (Stable.V1)
+include Stable.Latest
+include Comparable.Make_binable (Stable.Latest)
 
 type var = Tick.Field.Var.t * Tick.Field.Var.t
 
@@ -41,11 +60,14 @@ module Compressed = struct
   module Stable = struct
     module V1 = struct
       module T = struct
+        let version = 1
+
         type t = (Field.t, bool) t_
         [@@deriving bin_io, sexp, eq, compare, hash]
       end
 
       include T
+      include Registration.Make_latest_version (T)
 
       let to_base64 t = Binable.to_string (module T) t |> B64.encode
 
@@ -59,17 +81,30 @@ module Compressed = struct
         let of_string = of_base64_exn
       end)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "non_zero_curve_point_compressed"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
-  include Comparable.Make_binable (Stable.V1)
-  include Hashable.Make_binable (Stable.V1)
+  include Stable.Latest
+  include Comparable.Make_binable (Stable.Latest)
+  include Hashable.Make_binable (Stable.Latest)
 
   let compress (x, y) : t = {x; is_odd= parity y}
 
-  let to_base64 t = Binable.to_string (module Stable.V1) t |> B64.encode
+  let to_base64 t = Binable.to_string (module Stable.Latest) t |> B64.encode
 
-  let of_base64_exn s = B64.decode s |> Binable.of_string (module Stable.V1)
+  let of_base64_exn s = B64.decode s |> Binable.of_string (module Stable.Latest)
+
+  let to_string = to_base64
 
   let empty = {x= Field.zero; is_odd= false}
 

@@ -237,14 +237,15 @@ module Make (Inputs : Inputs_intf) :
           in
           let next_ledger_hash =
             Option.value_map ledger_proof_opt
-              ~f:(fun proof ->
+              ~f:(fun (proof, _) ->
                 Ledger_proof.statement proof |> Ledger_proof.statement_target
                 )
               ~default:previous_ledger_hash
           in
           let supply_increase =
             Option.value_map ledger_proof_opt
-              ~f:(fun proof -> (Ledger_proof.statement proof).supply_increase)
+              ~f:(fun (proof, _) ->
+                (Ledger_proof.statement proof).supply_increase )
               ~default:Currency.Amount.zero
           in
           let blockchain_state =
@@ -268,7 +269,7 @@ module Make (Inputs : Inputs_intf) :
                     :> User_command.t list )
                 ~snarked_ledger_hash:
                   (Option.value_map ledger_proof_opt
-                     ~default:previous_ledger_hash ~f:(fun proof ->
+                     ~default:previous_ledger_hash ~f:(fun (proof, _) ->
                        Ledger_proof.(statement proof |> statement_target) ))
                 ~supply_increase ~logger ) )
     in
@@ -277,13 +278,14 @@ module Make (Inputs : Inputs_intf) :
             let snark_transition =
               Snark_transition.create_value
                 ?sok_digest:
-                  (Option.map ledger_proof_opt ~f:(fun proof ->
+                  (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
                        Ledger_proof.sok_digest proof ))
                 ?ledger_proof:
-                  (Option.map ledger_proof_opt ~f:Ledger_proof.underlying_proof)
+                  (Option.map ledger_proof_opt ~f:(fun (proof, _) ->
+                       Ledger_proof.underlying_proof proof ))
                 ~supply_increase:
                   (Option.value_map ~default:Currency.Amount.zero
-                     ~f:(fun proof ->
+                     ~f:(fun (proof, _) ->
                        (Ledger_proof.statement proof).supply_increase )
                      ledger_proof_opt)
                 ~blockchain_state:
@@ -310,13 +312,14 @@ module Make (Inputs : Inputs_intf) :
         let module Breadcrumb = Transition_frontier.Breadcrumb in
         let propose ivar proposal_data =
           let open Interruptible.Let_syntax in
-          match Mvar.peek frontier_reader with
+          match Broadcast_pipe.Reader.peek frontier_reader with
           | None -> Interruptible.return (log_bootstrap_mode ())
           | Some frontier -> (
               let crumb = Transition_frontier.best_tip frontier in
-              Logger.info logger
-                !"Begining to propose off of crumb %{sexp: Breadcrumb.t}"
+              Logger.trace logger
+                !"Begining to propose off of crumb %{sexp: Breadcrumb.t}%!"
                 crumb ;
+              Core.printf !"%!" ;
               let previous_protocol_state, previous_protocol_state_proof =
                 let transition : External_transition.Verified.t =
                   (Breadcrumb.transition_with_hash crumb).data
@@ -383,7 +386,7 @@ module Make (Inputs : Inputs_intf) :
         let scheduler = Singleton_scheduler.create time_controller in
         let rec check_for_proposal () =
           trace_recurring_task "check for proposal" (fun () ->
-              match Mvar.peek frontier_reader with
+              match Broadcast_pipe.Reader.peek frontier_reader with
               | None -> log_bootstrap_mode ()
               | Some transition_frontier -> (
                   let breadcrumb =

@@ -1,10 +1,10 @@
 # WARNING: config.yml file is generated from config.yml.jinja
 ---
-version: 2
+version: 3
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-5b183eb006ea0bf720c8f14965c31f7890909e91
+            - image: codaprotocol/coda:toolchain-rust-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -14,7 +14,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -38,31 +38,39 @@ jobs:
                 command: |
                     sudo mkdir /nix
                     sudo chown distiller /nix
+            - checkout
             - restore_cache:
                   keys:
-                      - macos-v4-after-brew-and-opam-and-nix
-                      - macos-v3-after-brew-and-opam
-                      - macos-v3-after-brew
-                      - macos-v3
-            - checkout
+                      - homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
+                      - homebrew-v1-
+            - restore_cache:
+                  keys:
+                      - opam-v1-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+                      - opam-v1-
+            - restore_cache:
+                  keys:
+                      - nix-v3-{{'{{'}} checksum "src/app/kademlia-haskell/packages.nix" {{'}}'}}
+                      - nix-v3-
+                      - nix-v2-
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Deps -- make macos-setup-download
                   command: make macos-setup-download
-            - save_cache:
-                  key: macos-v3-after-brew
-                  paths:
-                      - "/usr/local/Homebrew"
-                      - "/Users/distiller/Library/Caches/Homebrew"
             - run:
                   name: Compile Deps -- make macos-setup-compile
                   command: make macos-setup-compile
             - save_cache:
-                  key: macos-v4-after-brew-and-opam-and-nix
+                  key: homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
                   paths:
                       - "/usr/local/Homebrew"
                       - "/Users/distiller/Library/Caches/Homebrew"
+            - save_cache:
+                  key: opam-v1-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+                  paths:
                       - "/Users/distiller/.opam"
+            - save_cache:
+                  key: nix-v3-{{'{{'}} checksum "src/app/kademlia-haskell/packages.nix" {{'}}'}}
+                  paths:
                       - "/nix"
             - run:
                   name: Build OCaml
@@ -75,18 +83,19 @@ jobs:
     build_{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
-                  name: Build OCaml (sig)
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  name: Build OCaml
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
                   name: Build deb Package with keys
                   command: make deb
@@ -101,12 +110,15 @@ jobs:
                   command: make publish_deb
             - store_artifacts:
                   path: /tmp/artifacts
+            - run:
+                  name: Copy artifacts to Google Cloud
+                  command: scripts/artifacts.sh
     {%- endfor %}
 
     test-unit-test:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -114,25 +126,11 @@ jobs:
                   name: Test make test-runtest
                   command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless MYPROCS=8 make test-runtest
 
-    test-withsnark:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_posig make build 2>&1 | tee /tmp/buildocaml.log
-            - run:
-                  name: Test make test-withsnark
-                  command: source ~/.profile && DUNE_PROFILE=test_posig make test-withsnark
-
     {%-for test in tests%}
     test-{{test.name}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7df6b2b12bc316cb71592b12255d80e19396831e
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -161,6 +159,5 @@ workflows:
             {%- for test in tests %}
             - test-{{test.name}}
             {%- endfor %}
-            - test-withsnark
             - test-unit-test
             - tracetool

@@ -47,12 +47,10 @@ module Make (Inputs : Inputs.S) :
            trace_recurring_task "transition_handler_processor" (fun () ->
                match msg with
                | `Catchup_breadcrumbs breadcrumbs ->
-                   return
-                     (List.iter breadcrumbs
-                        ~f:
-                          (Rose_tree.iter
-                             ~f:
-                               (Transition_frontier.add_breadcrumb_exn frontier)))
+                   Deferred.List.iter breadcrumbs
+                     ~f:
+                       (Rose_tree.Deferred.iter
+                          ~f:(Transition_frontier.add_breadcrumb_exn frontier))
                | `Valid_transition transition -> (
                  match
                    Transition_frontier.find frontier
@@ -79,7 +77,7 @@ module Make (Inputs : Inputs.S) :
                          | None ->
                              Deferred.Or_error.error_string "parent not found"
                        in
-                       let%map breadcrumb =
+                       let%bind breadcrumb =
                          let open Deferred.Let_syntax in
                          match%map
                            Transition_frontier.Breadcrumb.build ~logger ~parent
@@ -90,10 +88,15 @@ module Make (Inputs : Inputs.S) :
                          | Error (`Fatal_error e) -> raise e
                          | Ok b -> Ok b
                        in
-                       Transition_frontier.add_breadcrumb_exn frontier
-                         breadcrumb ;
+                       let%bind () =
+                         Deferred.map ~f:Result.return
+                         @@ Transition_frontier.add_breadcrumb_exn frontier
+                              breadcrumb
+                       in
                        Writer.write processed_transition_writer transition ;
-                       Catchup_scheduler.notify catchup_scheduler ~transition
+                       Deferred.return
+                       @@ Catchup_scheduler.notify catchup_scheduler
+                            ~hash:(With_hash.hash transition)
                      with
                      | Ok () -> ()
                      | Error err ->

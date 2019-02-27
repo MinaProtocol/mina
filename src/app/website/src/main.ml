@@ -192,26 +192,6 @@ module Link_list = struct
                      ; maybe_second_link link_style ] ] )) ]
 end
 
-module Job_listing = struct
-  let create ~title ~jobs ~scheme =
-    let open Html_concise in
-    let content_style, title_html =
-      Important_title.(content_style title, html title)
-    in
-    let of_jobs (name, link) = (`Event name, `One (link ^ ".html"), name) in
-    let link_list =
-      [ Link_list.create ~named:"" ~orientation:`Vertical
-          (List.map jobs ~f:of_jobs) ]
-    in
-    Section.section'
-      (div [class_ "important-text"]
-         [ Mobile_switch.create
-             ~not_small:(Important_title.wrap title title_html)
-             ~small:(Important_title.center title_html)
-         ; div [class_ "ml4-ns"] link_list ])
-      scheme
-end
-
 let home () =
   let top scheme =
     Section.major_compound
@@ -456,16 +436,9 @@ let home () =
 let positions =
   [ ("Protocol Engineer", "protocol-engineer")
   ; ("Protocol Reliability Engineer", "protocol-reliability-engineer")
+  ; ("Senior Frontend Engineer", "senior-frontend-engineer")
   ; ("Product Manager", "product-manager")
   ; ("Engineering Manager", "engineering-manager") ]
-
-let jobs () =
-  let top scheme =
-    let open Html_concise in
-    Job_listing.create ~scheme ~title:(`Left "Jobs") ~jobs:positions
-  in
-  let sections = [top] in
-  wrap ~page_label:Links.(label jobs) ~fixed_footer:true sections
 
 let testnet () =
   let comic ~title ~content ~alt_content ~img () =
@@ -556,17 +529,19 @@ let load_job_posts jobs =
         Stationary.Html.to_string (Stationary.Html.load markdown)
       in
       let content = job_post name description in
-      File.of_html ~name:(file ^ ".html") content )
+      [ File.of_html ~name:(file ^ ".html") content
+      ; File.of_html_path ~name:("jobs" ^/ file ^ ".html") content ] )
 
 let site () : Site.t Deferred.t =
   let open File_system in
   let%bind position_files = load_job_posts positions in
+  let position_files = List.concat position_files in
   let%bind post = Blog_post.content "scanning_for_scans" in
   let%map home = home () in
   Site.create
     ( List.map position_files ~f:file
     @ [ file (File.of_html ~name:"index.html" home)
-      ; file (File.of_html ~name:"jobs.html" (jobs ()))
+      ; file (File.of_html ~name:"jobs.html" Careers.content)
       ; file (File.of_html ~name:"code.html" Open_source.content)
       ; file (File.of_html ~name:"testnet.html" (testnet ()))
       ; file (File.of_html ~name:"privacy.html" Privacy_policy.content)
