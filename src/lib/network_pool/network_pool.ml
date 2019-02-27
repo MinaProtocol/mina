@@ -54,16 +54,13 @@ module type Network_pool_intf = sig
     t -> pool_diff Envelope.Incoming.t -> unit Deferred.t
 end
 
-module type Transition_frontier_intf = sig
-  type t
-end
-
 module Snark_pool_diff = Snark_pool_diff
 
-module Make
-    (Transition_frontier : Transition_frontier_intf)
-    (Pool : Pool_intf with type transition_frontier := Transition_frontier.t)
-    (Pool_diff : Pool_diff_intf with type pool := Pool.t) :
+module Make (Transition_frontier : sig
+  type t
+end)
+(Pool : Pool_intf with type transition_frontier := Transition_frontier.t)
+(Pool_diff : Pool_diff_intf with type pool := Pool.t) :
   Network_pool_intf
   with type pool := Pool.t
    and type pool_diff := Pool_diff.t

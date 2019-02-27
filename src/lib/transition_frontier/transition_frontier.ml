@@ -322,7 +322,6 @@ module Make (Inputs : Inputs_intf) :
         ; extension_readers
         ; extension_writers }
 
-  (* TODO call this when bootstrapping starts and frontier is destroyed! *)
   let close {extension_writers; _} = Extensions.close_pipes extension_writers
 
   let max_length = Inputs.max_length
