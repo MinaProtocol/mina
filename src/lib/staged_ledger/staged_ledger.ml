@@ -41,8 +41,7 @@ module Make (Inputs : Inputs.S) : sig
      and type user_command := Inputs.User_command.t
      and type transaction_witness := Inputs.Transaction_witness.t
      and type pending_coinbase_collection := Inputs.Pending_coinbase.t
-     and type pending_coinbase_state_temp :=
-                Inputs.Pending_coinbase_state_temp.t
+     and type pending_coinbase_update := Inputs.Pending_coinbase_update.t
 end = struct
   open Inputs
   module Scan_state = Transaction_snark_scan_state.Make (Inputs)
@@ -423,12 +422,8 @@ end = struct
     in*)
     let%map undo, statement, updated_coinbase_stack = r in
     ( { Scan_state.Transaction_with_witness.transaction_with_info= undo
-      ; witness=
-          { ledger=
-              ledger_witness (*; pending_coinbases= pending_coinbase_witness*)
-          }
-      ; statement
-      ; coinbase_on_new_tree= false }
+      ; witness= {ledger= ledger_witness; coinbase_stack= current_stack}
+      ; statement }
     , updated_coinbase_stack )
 
   (*TODO: delete this boolean*)
@@ -443,8 +438,8 @@ end = struct
           match%bind
             apply_transaction_and_get_witness ledger coinbase_stack t
           with
-          | Ok (res, new_coinbase_stack) ->
-              go new_coinbase_stack (res :: acc) ts
+          | Ok (res, updated_coinbase_stack) ->
+              go updated_coinbase_stack (res :: acc) ts
           | Error e -> return (Error e) )
     in
     go current_stack [] ts
@@ -830,12 +825,12 @@ end = struct
       in
       let action =
         match (not non_empty_stack, Option.is_none res_opt) with
-        | true, true -> Pending_coinbase_state_temp.Action.Added
+        | true, true -> Pending_coinbase_update.Action.Added
         | true, false -> Deleted_added
         | false, true -> Updated
         | false, false -> Deleted_updated
       in
-      Pending_coinbase_state_temp.create_value ~prev_root ~new_root
+      Pending_coinbase_update.create_value ~prev_root ~new_root
         ~updated_stack:updated_coinbase_stack ~action
     in
     let%map () =
@@ -1010,12 +1005,12 @@ end = struct
       in
       let action =
         match (not non_empty_stack, Option.is_none res_opt) with
-        | true, true -> Pending_coinbase_state_temp.Action.Added
+        | true, true -> Pending_coinbase_update.Action.Added
         | true, false -> Deleted_added
         | false, true -> Updated
         | false, false -> Deleted_updated
       in
-      Pending_coinbase_state_temp.create_value ~prev_root ~new_root
+      Pending_coinbase_update.create_value ~prev_root ~new_root
         ~updated_stack:working_stack_updated ~action
     in
     ( `Hash_after_applying (hash new_staged_ledger)
@@ -1780,7 +1775,7 @@ let%test_module "test" =
         [@@deriving sexp, bin_io, compare, hash]
       end
 
-      module Pending_coinbase_state_temp = struct
+      module Pending_coinbase_update = struct
         module Action = struct
           type t = Added | Updated | Deleted_added | Deleted_updated
           [@@deriving eq, sexp, bin_io]
@@ -2202,8 +2197,7 @@ let%test_module "test" =
 
       module Transaction_witness = struct
         type t =
-          { ledger: Sparse_ledger.t
-          (*; pending_coinbases: Pending_coinbase.Stack.t*) }
+          {ledger: Sparse_ledger.t; coinbase_stack: Pending_coinbase.Stack.t}
         [@@deriving bin_io, sexp]
       end
 

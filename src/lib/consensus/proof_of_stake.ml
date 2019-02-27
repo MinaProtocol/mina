@@ -578,10 +578,16 @@ module Vrf = struct
       let ledger_handler =
         unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger)
       in
+      let pending_coinbase_handler =
+        unstage (Coda_base.Pending_coinbase.handler Pending_coinbase.create ())
+      in
       fun (With {request; respond} as t) ->
         match request with
         | Winner_address -> respond (Provide 0)
         | Private_key -> respond (Provide sk)
+        | Coda_base.Pending_coinbase.Hash.Find_index_of_newest_stack
+         |Coda_base.Pending_coinbase.Hash.Find_index_of_oldest_stack ->
+            pending_coinbase_handler t
         | _ -> ledger_handler t
 
     let vrf_output =
@@ -1118,12 +1124,19 @@ module Prover_state = struct
   let precomputed_handler = Vrf.Precomputed.handler
 
   (*Add pending coinbase handler here*)
-  let handler {delegator; ledger; private_key} : Snark_params.Tick.Handler.t =
+  let handler {delegator; ledger; private_key; pending_coinbase_collection} :
+      Snark_params.Tick.Handler.t =
     let ledger_handler = unstage (Coda_base.Sparse_ledger.handler ledger) in
+    let pending_coinbase_handler =
+      unstage (Coda_base.Pending_coinbase.handler pending_coinbase_collection)
+    in
     fun (With {request; respond} as t) ->
       match request with
       | Vrf.Winner_address -> respond (Provide delegator)
       | Vrf.Private_key -> respond (Provide private_key)
+      | Coda_base.Pending_coinbase.Hash.Find_index_of_newest_stack
+       |Coda_base.Pending_coinbase.Hash.Find_index_of_oldest_stack ->
+          pending_coinbase_handler t
       | _ -> ledger_handler t
 end
 

@@ -209,24 +209,24 @@ module Make (Inputs : Inputs_intf) :
             ( Pending_coinbase.Stack.empty
             , Pending_coinbase_hash.empty_hash
             , Pending_coinbase_hash.empty_hash
-            , Pending_coinbase_state_temp.Action.Added )
+            , Pending_coinbase_update.Action.Added )
         | 2 ->
             ( Pending_coinbase.Stack.empty
             , Pending_coinbase_hash.empty_hash
             , Pending_coinbase_hash.empty_hash
-            , Pending_coinbase_state_temp.Action.Updated )
+            , Pending_coinbase_update.Action.Updated )
         | 4 ->
             ( Pending_coinbase.Stack.empty
             , Pending_coinbase_hash.empty_hash
             , Pending_coinbase_hash.empty_hash
-            , Pending_coinbase_state_temp.Action.Deleted_added )
+            , Pending_coinbase_update.Action.Deleted_added )
         | _ ->
             ( Pending_coinbase.Stack.empty
             , Pending_coinbase_hash.empty_hash
             , Pending_coinbase_hash.empty_hash
-            , Pending_coinbase_state_temp.Action.Deleted_updated )
+            , Pending_coinbase_update.Action.Deleted_updated )
       in
-      Pending_coinbase_state_temp.create_value ~updated_stack ~prev_root
+      Pending_coinbase_update.create_value ~updated_stack ~prev_root
         ~new_root ~action
     in*)
     let%bind protocol_state, consensus_transition_data =
@@ -252,7 +252,7 @@ module Make (Inputs : Inputs_intf) :
               ~snarked_ledger_hash:next_ledger_hash
               ~staged_ledger_hash:next_staged_ledger_hash
               ~pending_coinbase_hash:
-                (Pending_coinbase_state_temp.new_root pending_coinbase_state)
+                (Pending_coinbase_update.new_root pending_coinbase_state)
             (*TODO:Deepthi: this would be the updated pending_coinbase_tree hash from coinbase_update*)
           in
           let time =

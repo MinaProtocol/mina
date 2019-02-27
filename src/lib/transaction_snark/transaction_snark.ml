@@ -169,10 +169,10 @@ let construct_input ~proof_type ~sok_digest ~state1 ~state2 ~supply_increase
     Sok_message.Digest.fold sok_digest
     +> Frozen_ledger_hash.fold state1
     +> Frozen_ledger_hash.fold state2
-    +> Amount.fold supply_increase
-    +> Amount.Signed.fold fee_excess
     +> Pending_coinbase.Stack.fold pending_coinbase_state.source
     +> Pending_coinbase.Stack.fold pending_coinbase_state.target
+    +> Amount.fold supply_increase
+    +> Amount.Signed.fold fee_excess
   in
   match proof_type with
   | `Base -> Tick.Pedersen.digest_fold Hash_prefix.base_snark fold
@@ -431,6 +431,8 @@ module Base = struct
          and b2 = Frozen_ledger_hash.var_to_triples root_after
          and sok_digest =
            exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest
+         and pending_coinbase_before =
+           Pending_coinbase.Stack.var_to_triples pending_coinbase_before
          and pending_coinbase_after =
            Pending_coinbase.Stack.var_to_triples pending_coinbase_after
          in
@@ -438,7 +440,8 @@ module Base = struct
          let supply_increase = Amount.var_to_triples supply_increase in
          let triples =
            Sok_message.Digest.Checked.to_triples sok_digest
-           @ b1 @ b2 @ supply_increase @ fee_excess @ pending_coinbase_after
+           @ b1 @ b2 @ pending_coinbase_before @ pending_coinbase_after
+           @ supply_increase @ fee_excess
          in
          Pedersen.Checked.digest_triples ~init:Hash_prefix.base_snark triples
          >>= Field.Checked.Assert.equal top_hash)
@@ -554,9 +557,10 @@ module Merge = struct
 
   let vk_input_offset =
     Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
-    + (2 * state_hash_size_in_triples)
+    + (4 * state_hash_size_in_triples)
     + Amount.length_in_triples + Amount.Signed.length_in_triples
-    + (2 * Pending_coinbase.Stack.length_in_triples)
+
+  (*+ (2 * Pending_coinbase.Stack.length_in_triples)*)
 
   let construct_input_checked ~prefix
       ~(sok_digest : Sok_message.Digest.Checked.t) ~state1 ~state2
@@ -567,21 +571,31 @@ module Merge = struct
         ~support:
           (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
     in
+    Core.printf
+      !"section1: %{sexp: Interval_union.t} \n"
+      (Pedersen.Checked.Section.support prefix_section) ;
     let%bind prefix_and_sok_digest =
       Pedersen.Checked.Section.extend prefix_section
         (Sok_message.Digest.Checked.to_triples sok_digest)
         ~start:Hash_prefix.length_in_triples
     in
+    Core.printf
+      !"section2: %{sexp: Interval_union.t} \n"
+      (Pedersen.Checked.Section.support prefix_and_sok_digest) ;
     let%bind prefix_and_sok_digest_and_supply_increase_and_fee =
       let open Pedersen.Checked.Section in
       extend prefix_and_sok_digest
         ~start:
           ( Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
-          + (2 * state_hash_size_in_triples)
-          + (2 * Pending_coinbase.Stack.length_in_triples) )
+          + (4 * state_hash_size_in_triples)
+            (*+ (2 * Pending_coinbase.Stack.length_in_triples) *) )
         ( Amount.var_to_triples supply_increase
         @ Amount.Signed.Checked.to_triples fee_excess )
     in
+    Core.printf
+      !"section3: %{sexp: Interval_union.t} \n"
+      (Pedersen.Checked.Section.support
+         prefix_and_sok_digest_and_supply_increase_and_fee) ;
     disjoint_union_sections
       ( [ prefix_and_sok_digest_and_supply_increase_and_fee
         ; state1
@@ -688,22 +702,30 @@ module Merge = struct
       let open Pedersen.Checked.Section in
       extend empty ~start:state1_offset (bits_to_triples s1)
     in
+    Core.printf
+      !"main section1: %{sexp: Interval_union.t} \n"
+      (Pedersen.Checked.Section.support s1_section) ;
     let%bind s3_section =
       let open Pedersen.Checked.Section in
       extend empty ~start:state2_offset (bits_to_triples s3)
     in
+    Core.printf
+      !"main section2: %{sexp: Interval_union.t} \n"
+      (Pedersen.Checked.Section.support s3_section) ;
     let%bind coinbase_section1 =
       let open Pedersen.Checked.Section in
       extend empty ~start:state3_offset (bits_to_triples pending_coinbase1)
     in
-    let%bind coinbase_section2 =
-      let open Pedersen.Checked.Section in
-      extend empty ~start:state3_offset (bits_to_triples pending_coinbase2)
-    in
+    Core.printf
+      !"main section3: %{sexp: Interval_union.t} \n"
+      (Pedersen.Checked.Section.support coinbase_section1) ;
     let%bind coinbase_section3 =
       let open Pedersen.Checked.Section in
       extend empty ~start:state4_offset (bits_to_triples pending_coinbase3)
     in
+    Core.printf
+      !"main section4: %{sexp: Interval_union.t} \n"
+      (Pedersen.Checked.Section.support coinbase_section3) ;
     let tock_vk_data =
       Verifier.Verification_key.Checked.to_full_data tock_vk
     in
@@ -738,6 +760,16 @@ module Merge = struct
         let open Pedersen.Checked.Section in
         extend empty ~start:state2_offset (bits_to_triples s2)
       in
+      Core.printf
+        !"main section5: %{sexp: Interval_union.t} \n"
+        (Pedersen.Checked.Section.support s2_section) ;
+      let%bind coinbase_section2 =
+        let open Pedersen.Checked.Section in
+        extend empty ~start:state4_offset (bits_to_triples pending_coinbase2)
+      in
+      Core.printf
+        !"main section6: %{sexp: Interval_union.t} \n"
+        (Pedersen.Checked.Section.support coinbase_section2) ;
       verify_transition tock_vk tock_vk_data tock_vk_section
         Prover_state.transition12 s1_section s2_section
         ~pending_coinbase_stack1:coinbase_section1
@@ -747,6 +779,10 @@ module Merge = struct
       let%bind s2_section =
         let open Pedersen.Checked.Section in
         extend empty ~start:state1_offset (bits_to_triples s2)
+      in
+      let%bind coinbase_section2 =
+        let open Pedersen.Checked.Section in
+        extend empty ~start:state3_offset (bits_to_triples pending_coinbase2)
       in
       verify_transition tock_vk tock_vk_data tock_vk_section
         Prover_state.transition23 s2_section s3_section
@@ -1379,7 +1415,7 @@ module Keys = struct
     )
 
   let create () =
-    let base = Base.create_keys () in
+    let base = Merge.create_keys () in
     let merge = Merge.create_keys () in
     let wrap =
       let module Wrap = Wrap (struct

@@ -13,8 +13,8 @@ module Make (Consensus_mechanism : Consensus.S) :
   module Protocol_state = Consensus_mechanism.Protocol_state
   module Snark_transition = Consensus_mechanism.Snark_transition
 
-  (*module Pending_coinbase_state_temp = Snark_transition.Pending_coinbase_state_temp
-  module Pending_coinbase = Pending_coinbase_state_temp.Pending_coinbase*)
+  (*module Pending_coinbase_update = Snark_transition.Pending_coinbase_update
+  module Pending_coinbase = Pending_coinbase_update.Pending_coinbase*)
 
   module type Update_intf = sig
     module Checked : sig
@@ -100,7 +100,7 @@ module Make (Consensus_mechanism : Consensus.S) :
             let prev_root =
               previous_state |> Protocol_state.blockchain_state
               |> Blockchain_state.pending_coinbase_hash
-              (*Pending_coinbase_state_temp.prev_root pending_coinbase_state*)
+              (*Pending_coinbase_update.prev_root pending_coinbase_state*)
             in
             let updated_stack = pending_coinbase_state.updated_stack in
             let action = pending_coinbase_state.action in
@@ -131,13 +131,13 @@ module Make (Consensus_mechanism : Consensus.S) :
               )
             in
             let%bind added =
-              Pending_coinbase_state_temp.Action.Checked.added action
+              Pending_coinbase_update.Action.Checked.added action
             in
             let%bind updated =
-              Pending_coinbase_state_temp.Action.Checked.updated action
+              Pending_coinbase_update.Action.Checked.updated action
             in
             let%bind del_add =
-              Pending_coinbase_state_temp.Action.Checked.deleted_added action
+              Pending_coinbase_update.Action.Checked.deleted_added action
             in
             let chain if_ b ~then_ ~else_ =
               let%bind then_ = then_ and else_ = else_ in

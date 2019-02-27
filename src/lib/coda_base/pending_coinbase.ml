@@ -393,7 +393,7 @@ module T = struct
     let index = Merkle_tree.find_index_exn t.tree key in
     Merkle_tree.get_exn t.tree index
 
-  let get_oldest_stack t = List.last t.index_list
+  let oldest_stack_key t = List.last t.index_list
 
   let replace_latest_stack t stack ~on_new_tree =
     match t.index_list with
@@ -439,7 +439,18 @@ module T = struct
 
   let find_index_exn t = Merkle_tree.find_index_exn t.tree
 
-  (*TODO should handler be here?*)
+  let handler t =
+    stage (fun (With {request; respond}) ->
+        match request with
+        | Hash.Find_index_of_newest_stack ->
+            let index = Option.value_exn (oldest_stack_key t) in
+            respond (Provide index)
+        | Hash.Find_index_of_oldest_stack ->
+            let index =
+              Option.value_exn (latest_stack_key t ~on_new_tree:false)
+            in
+            respond (Provide index)
+        | _ -> unhandled )
 end
 
 include T

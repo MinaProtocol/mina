@@ -16,7 +16,7 @@ module type Inputs_intf = sig
   module Blockchain_state : Blockchain_state.S
 
   module Consensus_data : Consensus_data_intf
-  (*module Pending_coinbase_state_temp : Pending_coinbase_state_temp.S*)
+  (*module Pending_coinbase_update : Pending_coinbase_update.S*)
 end
 
 module type S = sig
@@ -24,7 +24,7 @@ module type S = sig
 
   module Consensus_data : Consensus_data_intf
 
-  (*module Pending_coinbase_state_temp : Pending_coinbase_state_temp.S*)
+  (*module Pending_coinbase_update : Pending_coinbase_update.S*)
 
   type ( 'blockchain_state
        , 'consensus_data
@@ -38,7 +38,7 @@ module type S = sig
     , Consensus_data.value
     , Sok_message.Digest.t
     , Currency.Amount.t
-    , Pending_coinbase_state_temp.value )
+    , Pending_coinbase_update.value )
     t
   [@@deriving bin_io, sexp]
 
@@ -47,7 +47,7 @@ module type S = sig
     , Consensus_data.var
     , Sok_message.Digest.Checked.t
     , Currency.Amount.var
-    , Pending_coinbase_state_temp.var )
+    , Pending_coinbase_update.var )
     t
 
   include
@@ -59,7 +59,7 @@ module type S = sig
     -> supply_increase:Currency.Amount.t
     -> blockchain_state:Blockchain_state.value
     -> consensus_data:Consensus_data.value
-    -> pending_coinbase_state:Pending_coinbase_state_temp.value
+    -> pending_coinbase_state:Pending_coinbase_update.value
     -> unit
     -> value
 
@@ -82,7 +82,7 @@ module Make (Inputs : Inputs_intf) :
   S
   with module Blockchain_state = Inputs.Blockchain_state
    and module Consensus_data = Inputs.Consensus_data
-(*and module Pending_coinbase_state_temp = Inputs.Pending_coinbase_state_temp*) =
+(*and module Pending_coinbase_update = Inputs.Pending_coinbase_update*) =
 struct
   include Inputs
 
@@ -106,7 +106,7 @@ struct
     , Consensus_data.value
     , Sok_message.Digest.Stable.V1.t
     , Currency.Amount.t
-    , Pending_coinbase_state_temp.value )
+    , Pending_coinbase_update.value )
     t
   [@@deriving bin_io, sexp]
 
@@ -115,7 +115,7 @@ struct
     , Consensus_data.var
     , Sok_message.Digest.Checked.t
     , Currency.Amount.var
-    , Pending_coinbase_state_temp.var )
+    , Pending_coinbase_update.var )
     t
 
   let create_value ?(sok_digest = Sok_message.Digest.default) ?ledger_proof
@@ -143,7 +143,7 @@ struct
       and sok_digest = Sok_message.Digest.typ.store sok_digest
       and supply_increase = Currency.Amount.typ.store supply_increase
       and pending_coinbase_state =
-        Pending_coinbase_state_temp.typ.store pending_coinbase_state
+        Pending_coinbase_update.typ.store pending_coinbase_state
       in
       { blockchain_state
       ; consensus_data
@@ -165,7 +165,7 @@ struct
       and sok_digest = Sok_message.Digest.typ.read sok_digest
       and supply_increase = Currency.Amount.typ.read supply_increase
       and pending_coinbase_state =
-        Pending_coinbase_state_temp.typ.read pending_coinbase_state
+        Pending_coinbase_update.typ.read pending_coinbase_state
       in
       { blockchain_state
       ; consensus_data
@@ -186,7 +186,7 @@ struct
       and () = Consensus_data.typ.check consensus_data
       and () = Sok_message.Digest.typ.check sok_digest
       and () = Currency.Amount.typ.check supply_increase
-      and () = Pending_coinbase_state_temp.typ.check pending_coinbase_state in
+      and () = Pending_coinbase_update.typ.check pending_coinbase_state in
       ()
     in
     let alloc =
@@ -195,7 +195,7 @@ struct
       and consensus_data = Consensus_data.typ.alloc
       and sok_digest = Sok_message.Digest.typ.alloc
       and supply_increase = Currency.Amount.typ.alloc
-      and pending_coinbase_state = Pending_coinbase_state_temp.typ.alloc in
+      and pending_coinbase_state = Pending_coinbase_update.typ.alloc in
       { blockchain_state
       ; consensus_data
       ; sok_digest
@@ -216,5 +216,5 @@ struct
               Account.public_key
                 (List.hd_exn (Ledger.to_list Genesis_ledger.t)) }
     ; ledger_proof= None
-    ; pending_coinbase_state= Pending_coinbase_state_temp.genesis }
+    ; pending_coinbase_state= Pending_coinbase_update.genesis }
 end

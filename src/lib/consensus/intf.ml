@@ -66,7 +66,7 @@ module type S = sig
     val to_string_record : value -> string
   end
 
-  (*module Pending_coinbase_state_temp : Coda_base.Pending_coinbase_state_temp.S*)
+  (*module Pending_coinbase_update : Coda_base.Pending_coinbase_update.S*)
   module Blockchain_state : Coda_base.Blockchain_state.S
 
   module Prover_state : Prover_state_intf

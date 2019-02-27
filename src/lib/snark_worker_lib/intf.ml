@@ -62,13 +62,6 @@ module type S = sig
   module Work : sig
     open Snark_work_lib
 
-    (*TODO: this should go in sepaarte file along with the handlers *)
-    (*module Witness : sig
-      type t = 
-        {ledger: sparse_ledger
-        ; pending_coinbases: pending_coinbases
-        }
-    end*)
     module Single : sig
       module Spec : sig
         type t =

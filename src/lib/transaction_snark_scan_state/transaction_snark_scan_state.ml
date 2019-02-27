@@ -51,8 +51,7 @@ end = struct
     type t =
       { transaction_with_info: Ledger.Undo.t
       ; statement: Ledger_proof_statement.t
-      ; witness: Transaction_witness.t
-      ; coinbase_on_new_tree: bool }
+      ; witness: Transaction_witness.t }
     [@@deriving sexp, bin_io]
   end
 
@@ -157,7 +156,7 @@ end = struct
   
   (*TODO new_coinbase_stack:bool goes in the statement*)
   let create_expected_statement
-      {Transaction_with_witness.transaction_with_info; witness; statement; _} =
+      {Transaction_with_witness.transaction_with_info; witness; _} =
     let open Or_error.Let_syntax in
     let source =
       Frozen_ledger_hash.of_ledger_hash
@@ -171,20 +170,14 @@ end = struct
     let target =
       Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
     in
-    (*let pending_coinbase_before = witness.pending_coinbases in
+    let pending_coinbase_before = witness.coinbase_stack in
     let%bind pending_coinbase_after =
       match transaction with
       | Coinbase c ->
           Or_error.try_with (fun () ->
-              (*TODO add new tree tag to a node*)
-              (*if coinbase_on_new_tree 
-                then *)
-              Pending_coinbase.Stack.push_exn witness.pending_coinbases c )
-          (*else
-                (Pending_coinbase.add_coinbase_exn witness.pending_coinbases
-                   ~coinbase:c ~on_new_tree:coinbase_on_new_tree) )*)
+              Pending_coinbase.Stack.push_exn pending_coinbase_before c )
       | _ -> Ok pending_coinbase_before
-    in*)
+    in
     let%bind fee_excess = Transaction.fee_excess transaction in
     let%map supply_increase = Transaction.supply_increase transaction in
     { Ledger_proof_statement.source
@@ -192,9 +185,8 @@ end = struct
     ; fee_excess
     ; supply_increase
     ; pending_coinbase_state=
-        { Pending_coinbase_stack_state.source=
-            statement.pending_coinbase_state.source
-        ; target= statement.pending_coinbase_state.target }
+        { Pending_coinbase_stack_state.source= pending_coinbase_before
+        ; target= pending_coinbase_after }
     ; proof_type= `Base }
 
   let completed_work_to_scanable_work (job : job) (fee, current_proof, prover)
