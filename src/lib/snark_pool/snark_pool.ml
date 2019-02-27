@@ -50,7 +50,7 @@ end) (Fee : sig
 
   include Comparable.S with type t := t
 end) (Work : sig
-  type t = Transaction_snark.Statement.t list [@@deriving sexp, bin_io]
+  type t [@@deriving sexp, bin_io]
 
   include Hashable.S_binable with type t := t
 end)
@@ -146,7 +146,8 @@ end)
   let remove_solved_work t = Work.Table.remove t.snark_table
 end
 
-(* let%test_module "random set test" =
+(*
+let%test_module "random set test" =
   ( module struct
     module Mock_proof = struct
       type input = Int.t
@@ -264,4 +265,5 @@ end
           assert (
             {Priced_proof.fee= cheap_fee; proof= cheap_proof}
             = Option.value_exn (Mock_snark_pool.request_proof t work) ) )
-  end ) *)
+  end )
+*)

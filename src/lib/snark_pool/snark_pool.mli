@@ -48,7 +48,7 @@ end) (Fee : sig
 
   include Comparable.S with type t := t
 end) (Work : sig
-  type t = Transaction_snark.Statement.t list [@@deriving sexp, bin_io]
+  type t [@@deriving sexp, bin_io]
 
   include Hashable.S_binable with type t := t
 end)
