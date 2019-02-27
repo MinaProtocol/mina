@@ -68,12 +68,13 @@ end
 module Snark_pool_diff = Snark_pool_diff
 
 module Make
-    (Pool : Pool_intf)
+    (Transition_frontier : T)
+    (Pool : Pool_intf with type transition_frontier := Transition_frontier.t)
     (Pool_diff : Pool_diff_intf with type pool := Pool.t) :
   Network_pool_intf
   with type pool := Pool.t
    and type pool_diff := Pool_diff.t
-   and type transition_frontier := Pool.transition_frontier = struct
+   and type transition_frontier := Transition_frontier.t = struct
   type t =
     { pool: Pool.t
     ; log: Logger.t

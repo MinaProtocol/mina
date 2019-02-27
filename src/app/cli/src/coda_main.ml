@@ -607,7 +607,7 @@ struct
 
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (User_command) (Transition_frontier)
-    include Network_pool.Make (Pool) (Pool.Diff)
+    include Network_pool.Make (Transition_frontier) (Pool) (Pool.Diff)
 
     type pool_diff = Pool.Diff.t [@@deriving bin_io]
 
@@ -714,11 +714,14 @@ struct
     end
 
     module Pool = Snark_pool.Make (Proof) (Fee) (Work) (Transition_frontier)
-    module Diff = Network_pool.Snark_pool_diff.Make (Proof) (Fee) (Work) (Pool)
+    module Diff =
+      Network_pool.Snark_pool_diff.Make (Proof) (Fee) (Work)
+        (Transition_frontier)
+        (Pool)
 
     type pool_diff = Diff.t
 
-    include Network_pool.Make (Pool) (Diff)
+    include Network_pool.Make (Transition_frontier) (Pool) (Diff)
 
     let get_completed_work t statement =
       Option.map

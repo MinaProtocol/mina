@@ -11,10 +11,12 @@ end) (Fee : sig
 end) (Work : sig
   type t = Transaction_snark.Statement.t list [@@deriving sexp, bin_io]
 end)
+(Transition_frontier : T)
 (Pool : Snark_pool.S
         with type work := Work.t
          and type proof := Proof.t
-         and type fee := Fee.t) =
+         and type fee := Fee.t
+         and type transition_frontier := Transition_frontier.t) =
 struct
   type priced_proof = {proof: Proof.t sexp_opaque; fee: Fee.t}
   [@@deriving bin_io, sexp]

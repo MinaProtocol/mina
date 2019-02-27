@@ -54,4 +54,8 @@ end) (Work : sig
 end)
 (Transition_frontier : Transition_frontier_intf
                        with module Extensions.Work = Work) :
-  S with type work := Work.t and type proof := Proof.t and type fee := Fee.t
+  S
+  with type work := Work.t
+   and type proof := Proof.t
+   and type fee := Fee.t
+   and type transition_frontier := Transition_frontier.t

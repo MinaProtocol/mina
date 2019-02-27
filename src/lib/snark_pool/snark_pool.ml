@@ -66,7 +66,7 @@ end)
   with type work := Work.t
    and type proof := Proof.t
    and type fee := Fee.t
-   and type transition_frontier = Transition_frontier.t = struct
+   and type transition_frontier := Transition_frontier.t = struct
   module Priced_proof = struct
     type t = (Proof.t sexp_opaque, Fee.t) Priced_proof.t
     [@@deriving sexp, bin_io]
@@ -82,8 +82,6 @@ end)
     { snark_table: Priced_proof.t Work.Table.t
     ; mutable ref_table: int Work.Table.t option }
   [@@deriving sexp, bin_io]
-
-  type transition_frontier = Transition_frontier.t
 
   let removed_breadcrumb_wait = 10
 
