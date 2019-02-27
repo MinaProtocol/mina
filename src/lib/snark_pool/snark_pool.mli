@@ -5,6 +5,15 @@ module Priced_proof : sig
   [@@deriving bin_io, sexp, fields]
 end
 
+module type Transition_frontier_intf = sig
+  type t
+
+  module Extensions :
+    Protocols.Coda_transition_frontier.Transition_frontier_extensions_intf
+
+  val extension_pipes : t -> Extensions.readers
+end
+
 module type S = sig
   type work
 
@@ -39,16 +48,10 @@ end) (Fee : sig
 
   include Comparable.S with type t := t
 end) (Work : sig
-  type t [@@deriving sexp, bin_io]
+  type t = Transaction_snark.Statement.t list [@@deriving sexp, bin_io]
 
   include Hashable.S_binable with type t := t
-end) (Transition_frontier : sig
-  type t
-
-  module Extensions :
-    Protocols.Coda_transition_frontier.Transition_frontier_extensions_intf
-    with module Work = Work
-
-  val extension_pipes : t -> Extensions.readers
-end) :
+end)
+(Transition_frontier : Transition_frontier_intf
+                       with module Extensions.Work = Work) :
   S with type work := Work.t and type proof := Proof.t and type fee := Fee.t

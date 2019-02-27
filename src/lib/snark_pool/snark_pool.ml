@@ -13,7 +13,7 @@ module type Transition_frontier_intf = sig
   module Extensions :
     Protocols.Coda_transition_frontier.Transition_frontier_extensions_intf
 
-  val extension_pipes : t -> Extensions.Readers.t
+  val extension_pipes : t -> Extensions.readers
 end
 
 module type S = sig
@@ -50,7 +50,7 @@ end) (Fee : sig
 
   include Comparable.S with type t := t
 end) (Work : sig
-  type t [@@deriving sexp, bin_io]
+  type t = Transaction_snark.Statement.t list [@@deriving sexp, bin_io]
 
   include Hashable.S_binable with type t := t
 end)
@@ -96,7 +96,7 @@ end)
             let pipe = Transition_frontier.extension_pipes tf in
             let deferred, _ =
               Broadcast_pipe.Reader.iter
-                pipe.Transition_frontier.Extensions.Readers.snark_pool
+                pipe.Transition_frontier.Extensions.snark_pool
                 ~f:(fun (removed, refcount_table) ->
                   t.ref_table <- Some refcount_table ;
                   removedCounter := !removedCounter + removed ;
@@ -106,9 +106,8 @@ end)
                     return
                       (Work.Table.filter_keys_inplace t.snark_table
                          ~f:(fun work ->
-                           Option.is_some
-                             (Transition_frontier.Extensions.Work.Table.find
-                                refcount_table work) )) ) )
+                           Option.is_some (Work.Table.find refcount_table work)
+                       )) ) )
             in
             deferred
         | None ->

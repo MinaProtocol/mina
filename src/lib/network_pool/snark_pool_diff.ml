@@ -9,7 +9,7 @@ module Make (Proof : sig
 end) (Fee : sig
   type t [@@deriving bin_io, sexp]
 end) (Work : sig
-  type t [@@deriving bin_io, sexp]
+  type t = Transaction_snark.Statement.t list [@@deriving sexp, bin_io]
 end)
 (Pool : Snark_pool.S
         with type work := Work.t
