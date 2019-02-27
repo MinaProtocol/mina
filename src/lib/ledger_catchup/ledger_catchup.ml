@@ -139,28 +139,44 @@ module Make (Inputs : Inputs.S) :
         Error (Error.of_string reason)
 
   let get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
-      ~num_peers ~unprocessed_transition_cache hash =
+      ~num_peers ~unprocessed_transition_cache ~target_transition =
     let peers = Network.random_peers network num_peers in
+    let target_hash = With_hash.hash (Cached.peek target_transition) in
     let open Deferred.Or_error.Let_syntax in
     Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
-        match%bind Network.catchup_transition network peer hash with
+        match%bind Network.catchup_transition network peer target_hash with
         | None ->
             Deferred.return
             @@ Or_error.errorf
                  !"Peer %{sexp:Network_peer.Peer.t} did not have transition"
                  peer
         | Some queried_transitions ->
-            let%bind queried_transitions_verified =
-              Deferred.Or_error.List.filter_map
-                (Non_empty_list.to_list queried_transitions)
+            let last, rest =
+              Non_empty_list.(uncons @@ rev queried_transitions)
+            in
+            let rest' = List.rev rest in
+            let%bind () =
+              if
+                State_hash.equal
+                  (Consensus.Protocol_state.hash
+                     (External_transition.protocol_state last))
+                  target_hash
+              then return ()
+              else (
+                Logger.faulty_peer logger
+                  !"Peer %{sexp:Network_peer.Peer.t} returned an different \
+                    target transition than we requested"
+                  peer ;
+                Deferred.return (Error (Error.of_string "")) )
+            in
+            let%bind verified_transitions =
+              Deferred.Or_error.List.filter_map rest'
                 ~f:
                   (verify_transition ~logger ~frontier
                      ~unprocessed_transition_cache)
             in
             let%bind head_transition, tail_transitions =
-              ( match
-                  Non_empty_list.of_list_opt queried_transitions_verified
-                with
+              ( match Non_empty_list.of_list_opt verified_transitions with
               | Some result -> Ok (Non_empty_list.uncons result)
               | None ->
                   let error =
@@ -172,15 +188,15 @@ module Make (Inputs : Inputs.S) :
               |> Deferred.return
             in
             materialize_breadcrumbs ~frontier ~logger ~peer head_transition
-              tail_transitions )
+              (tail_transitions @ [target_transition]) )
 
   let run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer ~unprocessed_transition_cache =
     Strict_pipe.Reader.iter catchup_job_reader ~f:(fun transition_with_hash ->
-        let hash = With_hash.hash (Cached.peek transition_with_hash) in
         match%bind
           get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
-            ~num_peers:8 ~unprocessed_transition_cache hash
+            ~num_peers:8 ~unprocessed_transition_cache
+            ~target_transition:transition_with_hash
         with
         | Ok breadcrumbs ->
             Strict_pipe.Writer.write catchup_breadcrumbs_writer

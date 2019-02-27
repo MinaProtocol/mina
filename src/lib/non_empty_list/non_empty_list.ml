@@ -15,6 +15,12 @@ let head (x, _) = x
 
 let tail (_, xs) = xs
 
+let rev (x, xs) =
+  match List.rev (x :: xs) with
+  | [] -> failwith "refute"
+  | [x] -> (x, [])
+  | h :: t -> (h, t)
+
 let of_list_opt = function [] -> None | x :: xs -> Some (x, xs)
 
 let tail_opt t = of_list_opt (tail t)
