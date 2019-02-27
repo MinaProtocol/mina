@@ -112,7 +112,6 @@ module Make
       ~parent_log ~incoming_diffs ~frontier_broadcast_pipe
 end
 
-(*
 let%test_module "network pool test" =
   ( module struct
     module Mock_proof = struct
@@ -126,9 +125,9 @@ let%test_module "network pool test" =
     end
 
     module Mock_transition_frontier = struct
-      type t = string
+      type t = Int.t
 
-      let create () : t = ""
+      let create () : t = 0
 
       module Extensions = struct
         module Work = Int
@@ -145,16 +144,18 @@ let%test_module "network pool test" =
         {Extensions.snark_pool= reader}
     end
 
+    module Mock_fee = Int
     module Mock_work = Int
     module Mock_snark_pool =
       Snark_pool.Make (Mock_proof) (Mock_work) (Int) (Mock_transition_frontier)
     module Mock_snark_pool_diff =
-      Snark_pool_diff.Make (Mock_proof) (Mock_work) (Int) (Mock_snark_pool)
+      Snark_pool_diff.Make (Mock_proof) (Mock_fee) (Mock_work) (Int)
+        (Mock_snark_pool)
     module Mock_network_pool =
-      Make (Mock_snark_pool) (Mock_snark_pool_diff) (Mock_transition_frontier)
+      Make (Mock_transition_frontier) (Mock_snark_pool) (Mock_snark_pool_diff)
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
-                   recieved in the pool's reader" =
+                   received in the pool's reader" =
       let pool_reader, _pool_writer = Linear_pipe.create () in
       let frontier_broadcast_pipe_r, _ =
         Broadcast_pipe.create (Some (Mock_transition_frontier.create ()))
@@ -212,4 +213,3 @@ let%test_module "network pool test" =
       in
       verify_unsolved_work |> Async.Thread_safe.block_on_async_exn
   end )
-*)
