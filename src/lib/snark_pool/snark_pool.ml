@@ -146,7 +146,6 @@ end)
   let remove_solved_work t = Work.Table.remove t.snark_table
 end
 
-(*
 let%test_module "random set test" =
   ( module struct
     module Mock_proof = struct
@@ -167,17 +166,16 @@ let%test_module "random set test" =
       module Extensions = struct
         module Work = Int
 
-        module Readers = struct
-          type t =
-            {snark_pool: int Work.Table.t Pipe_lib.Broadcast_pipe.Reader.t}
-        end
+        type readers =
+          { snark_pool:
+              (int * int Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t }
       end
 
       let extension_pipes _ =
         let reader, _writer =
-          Pipe_lib.Broadcast_pipe.create (Extensions.Work.Table.create ())
+          Pipe_lib.Broadcast_pipe.create (0, Extensions.Work.Table.create ())
         in
-        {Extensions.Readers.snark_pool= reader}
+        {Extensions.snark_pool= reader}
     end
 
     module Mock_work = Int
@@ -266,4 +264,3 @@ let%test_module "random set test" =
             {Priced_proof.fee= cheap_fee; proof= cheap_proof}
             = Option.value_exn (Mock_snark_pool.request_proof t work) ) )
   end )
-*)
