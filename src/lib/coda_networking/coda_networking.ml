@@ -369,13 +369,13 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let transition_catchup_rpc _conn ~version:_ hash_in_envelope =
       Logger.info log
-        !"Peer %{sexp:Network_peer.Peer.t} sending transition_catchup"
+        !"Peer %{sexp:Network_peer.Peer.t} sent transition_catchup"
         (Envelope.Incoming.sender hash_in_envelope) ;
       transition_catchup hash_in_envelope
     in
     let get_ancestry_rpc _conn ~version:_ query_in_envelope =
       Logger.info log
-        !"Sending root proof from peer %{sexp:Network_peer.Peer.t}"
+        !"Sending root proof to peer %{sexp:Network_peer.Peer.t}"
         (Envelope.Incoming.sender query_in_envelope) ;
       get_ancestry query_in_envelope
     in
@@ -515,7 +515,7 @@ module Make (Inputs : Inputs_intf) = struct
     loop peers 1
 
   let get_ancestry t preferred_peer input =
-    O1trace.measure "get_ancestry" (fun () ->
+    O1trace.trace_recurring_task "get_ancestry" (fun () ->
         let input_in_envelope = envelope_from_me t input in
         (* try preferred_peer first *)
         let%bind ancestors_or_error =
