@@ -112,7 +112,8 @@ module Make
       ~parent_log ~incoming_diffs ~frontier_broadcast_pipe
 end
 
-(* let%test_module "network pool test" =
+(*
+let%test_module "network pool test" =
   ( module struct
     module Mock_proof = struct
       type input = Int.t
@@ -130,19 +131,18 @@ end
       let create () : t = ""
 
       module Extensions = struct
-        module Work = String
+        module Work = Int
 
-        module Readers = struct
-          type t =
-            {snark_pool: int Work.Table.t Pipe_lib.Broadcast_pipe.Reader.t}
-        end
+        type readers =
+          { snark_pool:
+              (int * int Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t }
       end
 
       let extension_pipes _ =
         let reader, _writer =
-          Pipe_lib.Broadcast_pipe.create (Extensions.Work.Table.create ())
+          Pipe_lib.Broadcast_pipe.create (0, Extensions.Work.Table.create ())
         in
-        {Extensions.Readers.snark_pool= reader}
+        {Extensions.snark_pool= reader}
     end
 
     module Mock_work = Int
@@ -211,4 +211,5 @@ end
         Deferred.unit
       in
       verify_unsolved_work |> Async.Thread_safe.block_on_async_exn
-  end ) *)
+  end )
+*)
