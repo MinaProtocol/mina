@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Pipe_lib
 
 module Priced_proof = struct
   type ('proof, 'fee) t = {proof: 'proof; fee: 'fee}
@@ -13,9 +14,15 @@ module type S = sig
 
   type fee
 
+  type transition_frontier
+
   type t [@@deriving bin_io]
 
-  val create : parent_log:Logger.t -> t
+  val create :
+       parent_log:Logger.t
+    -> frontier_broadcast_pipe:transition_frontier Option.t
+                               Broadcast_pipe.Reader.t
+    -> t
 
   val add_snark :
        t
@@ -37,9 +44,11 @@ end) (Work : sig
   type t [@@deriving sexp, bin_io]
 
   include Hashable.S_binable with type t := t
+end) (Transition_frontier : sig
+  type t
 end) :
   sig
-    include S
+    include S with type transition_frontier = Transition_frontier.t
 
     val sexp_of_t : t -> Sexp.t
 
@@ -59,9 +68,11 @@ end) :
     let fee (t : t) = t.fee
   end
 
+  type transition_frontier = Transition_frontier.t
+
   type t = Priced_proof.t Work.Table.t [@@deriving sexp, bin_io]
 
-  let create ~parent_log:_ = Work.Table.create ()
+  let create ~parent_log:_ ~frontier_broadcast_pipe:_ = Work.Table.create ()
 
   let add_snark t ~work ~proof ~fee =
     let update_and_rebroadcast () =
@@ -104,7 +115,11 @@ let%test_module "random set test" =
       let proof t = t.proof
     end
 
-    module Mock_snark_pool = Make (Mock_proof) (Mock_fee) (Mock_work)
+    module Mock_snark_pool =
+      Make (Mock_proof) (Mock_fee) (Mock_work)
+        (struct
+          type t = unit
+        end)
 
     let gen =
       let open Quickcheck.Generator.Let_syntax in
@@ -112,7 +127,10 @@ let%test_module "random set test" =
         Quickcheck.Generator.tuple3 Mock_work.gen Mock_work.gen Mock_fee.gen
       in
       let%map sample_solved_work = Quickcheck.Generator.list (gen_entry ()) in
-      let pool = Mock_snark_pool.create ~parent_log:(Logger.create ()) in
+      let pool =
+        Mock_snark_pool.create ~parent_log:(Logger.create ())
+          ~frontier_broadcast_pipe:(fst @@ Broadcast_pipe.create None)
+      in
       List.iter sample_solved_work ~f:(fun (work, proof, fee) ->
           ignore (Mock_snark_pool.add_snark pool ~work ~proof ~fee) ) ;
       pool
