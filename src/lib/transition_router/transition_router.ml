@@ -20,6 +20,7 @@ module type Inputs_intf = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type masked_ledger := Coda_base.Ledger.t
      and type consensus_local_state := Consensus.Local_state.t
+     and type user_command := User_command.t
 
   module Network :
     Network_intf
@@ -202,6 +203,7 @@ module Make (Inputs : Inputs_intf) :
               don't_wait_for
                 (Broadcast_pipe.Writer.write frontier_w (Some frontier))
           | `Bootstrap_controller (_, _) ->
+              Transition_frontier.close (peek_exn frontier_r) ;
               don't_wait_for (Broadcast_pipe.Writer.write frontier_w None))
     in
     let ( valid_protocol_state_transition_reader

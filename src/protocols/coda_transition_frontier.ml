@@ -44,6 +44,12 @@ module type Transition_frontier_extension_intf0 = sig
       computed view, if it's updated. *)
 end
 
+(** The type of the view onto the changes to the current best tip. This type
+    needs to be here to avoid dependency cycles. *)
+module Best_tip_diff_view = struct
+  type 'b t = {new_best_tip: 'b; old_best_tip: 'b}
+end
+
 module type Network_intf = sig
   type t
 
@@ -98,6 +104,8 @@ module type Transition_frontier_Breadcrumb_intf = sig
 
   type external_transition_verified
 
+  type user_command
+
   val create :
        (external_transition_verified, state_hash) With_hash.t
     -> staged_ledger
@@ -116,6 +124,8 @@ module type Transition_frontier_Breadcrumb_intf = sig
     t -> (external_transition_verified, state_hash) With_hash.t
 
   val staged_ledger : t -> staged_ledger
+
+  val to_user_commands : t -> user_command list
 end
 
 module type Transition_frontier_base_intf = sig
@@ -126,6 +136,8 @@ module type Transition_frontier_base_intf = sig
   type transaction_snark_scan_state
 
   type masked_ledger
+
+  type user_command
 
   type staged_ledger
 
@@ -142,6 +154,7 @@ module type Transition_frontier_base_intf = sig
     with type external_transition_verified := external_transition_verified
      and type state_hash := state_hash
      and type staged_ledger := staged_ledger
+     and type user_command := user_command
 
   val create :
        logger:Logger.t
@@ -208,8 +221,14 @@ module type Transition_frontier_intf = sig
     module Snark_pool_refcount :
       Transition_frontier_extension_intf with type view = unit
 
+    module Best_tip_diff :
+      Transition_frontier_extension_intf
+      with type view = Breadcrumb.t Best_tip_diff_view.t Option.t
+
     type readers =
-      {snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t}
+      { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
+      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t }
+    [@@deriving fields]
   end
 
   val extension_pipes : t -> Extensions.readers
