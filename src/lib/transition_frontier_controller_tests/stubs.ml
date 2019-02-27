@@ -133,8 +133,8 @@ struct
   end)
 
   (* Generate valid payments for each blockchain state by having 
-  each user send a payment of one coin to another random 
-   user if they at least one coin*)
+     each user send a payment of one coin to another random 
+     user if they at least one coin*)
   let gen_payments accounts_with_secret_keys :
       User_command.With_valid_signature.t Sequence.t =
     let public_keys =
@@ -394,6 +394,48 @@ struct
     module Transition_frontier = Transition_frontier
     module Protocol_state_validator = Protocol_state_validator
   end)
+
+  module Breadcrumb_visualizations = struct
+    module Graph =
+      Visualization.Make_ocamlgraph (Transition_frontier.Breadcrumb)
+
+    let visualize ~filename ~f breadcrumbs =
+      let output_channel = Out_channel.create filename in
+      let graph = f breadcrumbs in
+      Graph.output_graph output_channel graph
+
+    let graph_breadcrumb_list breadcrumbs =
+      let initial_breadcrumb, tail_breadcrumbs =
+        Non_empty_list.uncons breadcrumbs
+      in
+      let graph = Graph.add_vertex Graph.empty initial_breadcrumb in
+      let graph, _ =
+        List.fold tail_breadcrumbs ~init:(graph, initial_breadcrumb)
+          ~f:(fun (graph, prev_breadcrumb) curr_breadcrumb ->
+            let graph_with_node = Graph.add_vertex graph curr_breadcrumb in
+            ( Graph.add_edge graph_with_node prev_breadcrumb curr_breadcrumb
+            , curr_breadcrumb ) )
+      in
+      graph
+
+    let visualize_list =
+      visualize ~f:(fun breadcrumbs ->
+          breadcrumbs |> Non_empty_list.of_list_opt |> Option.value_exn
+          |> graph_breadcrumb_list )
+
+    let graph_rose_tree tree =
+      let rec go graph (Rose_tree.T (root, children)) =
+        let graph' = Graph.add_vertex graph root in
+        List.fold children ~init:graph'
+          ~f:(fun graph (T (child, grand_children)) ->
+            let graph_with_child = go graph (T (child, grand_children)) in
+            Graph.add_edge graph_with_child root child )
+      in
+      go Graph.empty tree
+
+    let visualize_rose_tree =
+      visualize ~f:(fun breadcrumbs -> graph_rose_tree breadcrumbs)
+  end
 
   module Network = struct
     type t =

@@ -49,3 +49,5 @@ val to_list : 'a t -> 'a list
 (** Note: This is O(1) not O(n) like on most container *)
 
 val append : 'a t -> 'a t -> 'a t
+
+val take : 'a t -> int -> 'a t option
