@@ -110,7 +110,7 @@ module Index = struct
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
 end
 
-module Coinbase_collection = struct
+module Coinbase_stack = struct
   module Stack = struct
     include Data_hash.Make_full_size ()
 
@@ -179,7 +179,7 @@ end
 
 (*Pending coinbase hash*)
 module Hash = struct
-  open Coinbase_collection
+  open Coinbase_stack
 
   module Merkle_tree =
     Snarky.Merkle_tree.Checked
@@ -321,7 +321,7 @@ end
 
 module T = struct
   module Stack = struct
-    include Coinbase_collection.Stack
+    include Coinbase_stack.Stack
 
     let hash (t : t) = Hash.of_digest (t :> field)
   end
@@ -360,12 +360,6 @@ module T = struct
       if key > Int.pow 2 coinbase_tree_depth then t
       else
         let path = create_path (coinbase_tree_depth - 1) [] key in
-        (*List.iteri path 
-          ~f:(fun i dir ->
-            let dir, h = match dir with
-            | `Left h -> ("left "^Int.to_string i, h)
-            | `Right h -> ("right "^Int.to_string i, h) in
-            Core.printf !"%s %{sexp: Hash.t}\n"  dir h);*)
         go (Merkle_tree.add_path t path key Stack.empty) (key + 1)
     in
     { tree= go (Merkle_tree.of_hash ~depth:coinbase_tree_depth root_hash) 0
@@ -453,10 +447,14 @@ end
 
 include T
 
-let%test_unit "add stack and remove stack = initial tree " =
+let%test_unit "add stack + remove stack = initial tree " =
   let pending_coinbases = ref (create_exn ()) in
-  let coinbases_gen = List.gen_with_length 100 Coinbase.gen in
-  Quickcheck.test coinbases_gen ~trials:10 ~f:(fun cbs ->
+  let coinbases_gen =
+    Quickcheck.Generator.tuple2
+      (List.gen_with_length 20 Coinbase.gen)
+      (Int.gen_incl 1 coinbase_stacks)
+  in
+  Quickcheck.test coinbases_gen ~trials:10 ~f:(fun (cbs, _i) ->
       Async.Thread_safe.block_on_async_exn (fun () ->
           let is_new = ref true in
           let init = merkle_root !pending_coinbases in
@@ -470,3 +468,22 @@ let%test_unit "add stack and remove stack = initial tree " =
           pending_coinbases := after_del ;
           assert (Hash.equal (merkle_root after_del) init) ;
           Async.Deferred.return () ) )
+
+let%test_unit "Checked_stack = Unchecked_stack" =
+  let open Quickcheck in
+  test ~trials:20 (Generator.tuple2 Stack.gen Coinbase.gen)
+    ~f:(fun (base, cb) ->
+      let unchecked = Stack.push_exn base cb in
+      let checked =
+        let comp =
+          let open Snark_params.Tick.Let_syntax in
+          let cb_var =
+            Coinbase_data.(var_of_t @@ Or_error.ok_exn @@ of_coinbase cb)
+          in
+          let%map res = Stack.Checked.push (Stack.var_of_t base) cb_var in
+          As_prover.read Stack.typ res
+        in
+        let (), x = Or_error.ok_exn (run_and_check comp ()) in
+        x
+      in
+      assert (Stack.equal unchecked checked) )
