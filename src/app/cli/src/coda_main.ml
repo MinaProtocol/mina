@@ -737,9 +737,7 @@ struct
           let network_pool =
             of_pool_and_diffs pool ~parent_log ~incoming_diffs
           in
-          ignore
-            (Pool.listen_to_frontier_broadcast_pipe frontier_broadcast_pipe
-               pool) ;
+          Pool.listen_to_frontier_broadcast_pipe frontier_broadcast_pipe pool ;
           network_pool
       | Error _e -> create ~parent_log ~incoming_diffs ~frontier_broadcast_pipe
 
