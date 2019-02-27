@@ -1,4 +1,5 @@
 open Core_kernel
+open Pipe_lib
 
 module Priced_proof : sig
   type ('proof, 'fee) t = {proof: 'proof; fee: 'fee}
@@ -39,6 +40,9 @@ module type S = sig
     -> [`Rebroadcast | `Don't_rebroadcast]
 
   val request_proof : t -> work -> (proof, fee) Priced_proof.t option
+
+  val listen_to_frontier_broadcast_pipe :
+    transition_frontier option Broadcast_pipe.Reader.t -> t -> unit
 end
 
 module Make (Proof : sig

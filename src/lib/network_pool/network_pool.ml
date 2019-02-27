@@ -53,8 +53,6 @@ module type Network_pool_intf = sig
        pool
     -> parent_log:Logger.t
     -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
-    -> frontier_broadcast_pipe:transition_frontier option
-                               Broadcast_pipe.Reader.t
     -> t
 
   val pool : t -> pool
@@ -95,8 +93,7 @@ module Make
           (Error.to_string_hum e) ;
         Deferred.unit
 
-  let of_pool_and_diffs pool ~parent_log ~incoming_diffs
-      ~frontier_broadcast_pipe =
+  let of_pool_and_diffs pool ~parent_log ~incoming_diffs =
     let log = Logger.child parent_log __MODULE__ in
     let read_broadcasts, write_broadcasts = Linear_pipe.create () in
     let network_pool = {pool; log; read_broadcasts; write_broadcasts} in
@@ -109,7 +106,7 @@ module Make
     let log = Logger.child parent_log __MODULE__ in
     of_pool_and_diffs
       (Pool.create ~parent_log:log ~frontier_broadcast_pipe)
-      ~parent_log ~incoming_diffs ~frontier_broadcast_pipe
+      ~parent_log ~incoming_diffs
 end
 
 let%test_module "network pool test" =

@@ -734,8 +734,13 @@ struct
         ~frontier_broadcast_pipe =
       match%map Reader.load_bin_prot disk_location Pool.bin_reader_t with
       | Ok pool ->
-          of_pool_and_diffs pool ~parent_log ~incoming_diffs
-            ~frontier_broadcast_pipe
+          let network_pool =
+            of_pool_and_diffs pool ~parent_log ~incoming_diffs
+          in
+          ignore
+            (Pool.listen_to_frontier_broadcast_pipe frontier_broadcast_pipe
+               pool) ;
+          network_pool
       | Error _e -> create ~parent_log ~incoming_diffs ~frontier_broadcast_pipe
 
     open Snark_work_lib.Work
