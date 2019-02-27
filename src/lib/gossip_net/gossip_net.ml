@@ -171,7 +171,7 @@ module Make (Message : Message_intf) :
             don't_wait_for
               (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
                  ~f:(fun m ->
-                   Logger.trace log "broadcasting message" ;
+                   (*Logger.trace log "broadcasting message" ;*)
                    broadcast_random t t.target_peer_count m )) ) ;
         let implementations =
           let implementations =

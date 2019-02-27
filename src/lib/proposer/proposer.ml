@@ -259,6 +259,7 @@ module Make (Inputs : Inputs_intf) :
 
   let run ~parent_log ~get_completed_work ~transaction_pool ~time_controller
       ~keypair ~consensus_local_state ~frontier_reader ~transition_writer =
+    let i = ref 0 in
     trace_task "proposer" (fun () ->
         let logger = Logger.child parent_log __MODULE__ in
         let log_bootstrap_mode () =
@@ -274,9 +275,9 @@ module Make (Inputs : Inputs_intf) :
           | None -> Interruptible.return (log_bootstrap_mode ())
           | Some frontier -> (
               let crumb = Transition_frontier.best_tip frontier in
-              Logger.trace logger
+              (*Logger.trace logger
                 !"Begining to propose off of crumb %{sexp: Breadcrumb.t}%!"
-                crumb ;
+                crumb ;*)
               Core.printf !"%!" ;
               let previous_protocol_state, previous_protocol_state_proof =
                 let transition : External_transition.Verified.t =
@@ -298,6 +299,10 @@ module Make (Inputs : Inputs_intf) :
                     (Transaction_pool.transactions transaction_pool)
                   ~get_completed_work ~logger ~keypair
               in
+              let filename = sprintf "/tmp/tf-%d-%d.dot" (Unix.getpid () |> Pid.to_int) !i in
+              Logger.error logger "writing to %s" filename ;
+              Transition_frontier.visualize frontier ~filename ;
+              i := !i + 1 ;
               trace_event "next state generated" ;
               match next_state_opt with
               | None -> Interruptible.return ()
@@ -306,7 +311,7 @@ module Make (Inputs : Inputs_intf) :
                     (let open Deferred.Let_syntax in
                     let t0 = Time.now time_controller in
   don't_wait_for (Deferred.map wr ~f:(fun wr -> Writer.write wr
-                  (sprintf "%s\n(about to prove)\n=======\n%!" (Core_extended.Extended_sexp.Diff.(of_sexps ~original:(Protocol_state.sexp_of_value previous_protocol_state) ~updated:(Protocol_state.sexp_of_value protocol_state) |> Option.value_map ~default:"<couldn't compute diff>" ~f:to_string))))) ;
+                  (sprintf "%s\n(about to prove, %d)\n=======\n%!" (Core_extended.Extended_sexp.Diff.(of_sexps ~original:(Protocol_state.sexp_of_value previous_protocol_state) ~updated:(Protocol_state.sexp_of_value protocol_state) |> Option.value_map ~default:"<couldn't compute diff>" ~f:to_string)) (!i - 1)))) ;
                     match%bind
                       measure "proving state transition valid" (fun () ->
                           Prover.prove ~prev_state:previous_protocol_state

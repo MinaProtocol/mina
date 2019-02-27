@@ -758,6 +758,27 @@ module Epoch_data = struct
       {curr_data with seed= curr_seed; lock_checkpoint= curr_lock_checkpoint}
     in
     (last_data, curr_data, epoch_length)
+
+  module Display = struct
+  type t =
+    { ledger: string
+    ; seed: string
+    ; start_checkpoint: string
+    ; lock_checkpoint: string
+    ; length: int
+    }[@@deriving yojson]
+
+  let display ({ledger;seed;start_checkpoint;lock_checkpoint;length}:value) : t =
+    let shs s = Coda_base.State_hash.sexp_of_t s |> Sexp.to_string_mach in
+    let ehs s = Epoch_seed.sexp_of_t s |> Sexp.to_string_mach in
+    let flhs s = Coda_base.Frozen_ledger_hash.sexp_of_t s |> Sexp.to_string_mach in
+    { ledger= ledger.hash |> flhs
+    ; seed= seed |> ehs
+    ; start_checkpoint= shs start_checkpoint
+    ; lock_checkpoint= shs lock_checkpoint
+    ; length= Length.to_int length
+    }
+  end
 end
 
 module Consensus_transition_data = struct
@@ -1070,7 +1091,9 @@ module Consensus_state = struct
     ; epoch_length: int
     ; curr_epoch: int
     ; curr_slot: int
-    ; total_currency: int }
+    ; total_currency: int
+    ; last_epoch_data: Epoch_data.Display.t
+    ; curr_epoch_data: Epoch_data.Display.t }
   [@@deriving yojson]
 
   let display (t : value) =
@@ -1078,7 +1101,9 @@ module Consensus_state = struct
     ; epoch_length= Length.to_int t.epoch_length
     ; curr_epoch= Segment_id.to_int t.curr_epoch
     ; curr_slot= Segment_id.to_int t.curr_slot
-    ; total_currency= Amount.to_int t.total_currency }
+    ; total_currency= Amount.to_int t.total_currency
+    ; last_epoch_data= Epoch_data.Display.display t.last_epoch_data
+    ; curr_epoch_data= Epoch_data.Display.display t.curr_epoch_data}
 end
 
 module Blockchain_state = Coda_base.Blockchain_state.Make (Genesis_ledger)

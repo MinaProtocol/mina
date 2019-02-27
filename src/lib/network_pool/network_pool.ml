@@ -64,7 +64,7 @@ struct
   let apply_and_broadcast t pool_diff =
     match%bind Pool_diff.apply t.pool pool_diff with
     | Ok diff' ->
-        Logger.trace t.log "Broadcasting %s" (Pool_diff.summary diff') ;
+        (* Logger.trace t.log "Broadcasting %s" (Pool_diff.summary diff') ; *)
         Linear_pipe.write t.write_broadcasts diff'
     | Error e ->
         Logger.info t.log "Pool diff apply feedback: %s"

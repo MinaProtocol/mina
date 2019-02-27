@@ -206,6 +206,7 @@ module Make (Inputs : Inputs_intf) :
     ; mutable best_tip: State_hash.t
     ; logger: Logger.t
     ; table: Node.t State_hash.Table.t
+    ; debug_garbage: Node.t State_hash.Table.t
     ; consensus_local_state: Consensus.Local_state.t
     ; extensions: Extensions.t
     ; extension_readers: Extensions.readers
@@ -295,6 +296,7 @@ module Make (Inputs : Inputs_intf) :
         ; root= root_hash
         ; best_tip= root_hash
         ; table
+        ; debug_garbage = State_hash.Table.create ()
         ; consensus_local_state
         ; extensions= Extensions.create ()
         ; extension_readers
@@ -356,7 +358,9 @@ module Make (Inputs : Inputs_intf) :
   (* Visualize the structure of the transition frontier or a particular node
    * within the frontier (for debugging purposes). *)
   module Visualizor = struct
-    let fold t ~f = Hashtbl.fold t.table ~f:(fun ~key:_ ~data -> f data)
+    let fold t ~f ~init =
+      let init = Hashtbl.fold ~init t.table ~f:(fun ~key:_ ~data -> f data) in
+      Hashtbl.fold t.debug_garbage ~f:(fun ~key:_ ~data -> f data) ~init
 
     include Visualization.Make_ocamlgraph (Node)
 
@@ -365,9 +369,11 @@ module Make (Inputs : Inputs_intf) :
           let graph_with_node = add_vertex graph node in
           List.fold node.successor_hashes ~init:graph_with_node
             ~f:(fun acc_graph successor_state_hash ->
-              add_edge acc_graph node
-                ( State_hash.Table.find t.table successor_state_hash
-                |> Option.value_exn ) ) )
+              let succ = match State_hash.Table.find t.table successor_state_hash with
+              | Some s -> s
+              | None -> State_hash.Table.find t.debug_garbage successor_state_hash |> Option.value_exn
+              in
+              add_edge acc_graph node succ))
   end
 
   let visualize ~filename t =
@@ -412,6 +418,9 @@ module Make (Inputs : Inputs_intf) :
       {Node.breadcrumb; successor_hashes= []; length= parent_node.length + 1}
     in
     attach_node_to t ~parent_node ~node
+
+  let node_garbage t sh n =
+    Hashtbl.add t.debug_garbage ~key:sh ~data:n |> ignore
 
   (** Given:
    *
@@ -463,6 +472,7 @@ module Make (Inputs : Inputs_intf) :
     Ledger.remove_and_reparent_exn soon_to_be_root_ledger
       soon_to_be_root_ledger ~children ;
     Hashtbl.remove t.table t.root ;
+    node_garbage t t.root root_node ;
     Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
     t.root <- new_root_hash ;
     new_root_node
@@ -534,13 +544,17 @@ module Make (Inputs : Inputs_intf) :
             let new_root_node = move_root t heir_node in
             (* 4.V *)
             let garbage = List.bind bad_hashes ~f:(successor_hashes_rec t) in
+            let gnodes =
+              List.map garbage ~f:(fun g ->
+                  (Hashtbl.find_exn t.table g) )
+            in
             let garbage_breadcrumbs =
               List.map garbage ~f:(fun g ->
                   (Hashtbl.find_exn t.table g).breadcrumb )
             in
-            List.iter garbage ~f:(Hashtbl.remove t.table) ;
+            List.zip_exn garbage gnodes |> List.iter ~f:(fun (sh, n) -> Hashtbl.remove t.table sh ; node_garbage t sh n) ;
             (* 4.VI *)
-            let new_root_staged_ledger =
+            let _new_root_staged_ledger =
               Breadcrumb.staged_ledger new_root_node.breadcrumb
             in
             (* 4.VII *)
@@ -555,13 +569,13 @@ module Make (Inputs : Inputs_intf) :
                ~logger:t.logger;
             (* 4.VIII *)
             ( match
-                ( Inputs.Staged_ledger.proof_txns new_root_staged_ledger
-                , heir_node.breadcrumb.just_emitted_a_proof )
+                ( Inputs.Staged_ledger.proof_txns _new_root_staged_ledger
+                ,heir_node.breadcrumb.just_emitted_a_proof)
               with
             | Some txns, true ->
                 let proof_data =
                   Inputs.Staged_ledger.current_ledger_proof
-                    new_root_staged_ledger
+                    _new_root_staged_ledger
                   |> Option.value_exn
                 in
                 [%test_result: Frozen_ledger_hash.t]

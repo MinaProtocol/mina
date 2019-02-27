@@ -419,7 +419,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   (* TODO: Have better pushback behavior *)
   let broadcast t x =
-    Logger.trace t.log !"Broadcasting %{sexp: Message.msg} over gossip net" x ;
+    (*Logger.trace t.log !"Broadcasting %{sexp: Message.msg} over gossip net" x ;*)
     Linear_pipe.write_without_pushback (Gossip_net.broadcast t.gossip_net) x
 
   let broadcast_from_me t content = broadcast t (envelope_from_me t content)
