@@ -86,9 +86,23 @@ end)
     ; mutable ref_table: int Work.Table.t option }
   [@@deriving sexp, bin_io]
 
+  (* shadow generated bin_io code so that ref table is always None when written *)
+
+  let bin_write_t buf ~pos t =
+    let t_no_ref_tbl = {t with ref_table= None} in
+    bin_write_t buf ~pos t_no_ref_tbl
+
+  let bin_writer_t = Bin_prot.Type_class.{size= bin_size_t; write= bin_write_t}
+
+  let bit_t =
+    Bin_prot.Type_class.
+      {shape= bin_shape_t; writer= bin_writer_t; reader= bin_reader_t}
+
   let removed_breadcrumb_wait = 10
 
   let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t) =
+    (* start with empty ref table *)
+    t.ref_table <- None ;
     let tf_deferred, _ =
       Broadcast_pipe.Reader.iter frontier_broadcast_pipe ~f:(function
         | Some tf ->
