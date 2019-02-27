@@ -17,15 +17,8 @@ module Make (Inputs : Inputs_intf) :
    and type masked_ledger := Ledger.Mask.Attached.t
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
    and type consensus_local_state := Consensus.Local_state.t
-   and type Extensions.Work.t = Inputs.Transaction_snark_work.Statement.t
-   and module Extensions.Work.Table = Inputs.Transaction_snark_work.Statement
-                                      .Table
-   and module Extensions.Work.Hash_set = Inputs.Transaction_snark_work
-                                         .Statement
-                                         .Hash_set
-   and module Extensions.Work.Hash_queue = Inputs.Transaction_snark_work
-                                           .Statement
-                                           .Hash_queue = struct
+   and module Extensions.Work = Inputs.Transaction_snark_work.Statement =
+struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
   exception
     Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
