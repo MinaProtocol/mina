@@ -166,6 +166,7 @@ module Make (Inputs : Inputs.S) :
 
   let run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer =
+    let logger = Logger.child logger __MODULE__ in
     Strict_pipe.Reader.iter catchup_job_reader ~f:(fun hash ->
         match%bind
           get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
