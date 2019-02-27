@@ -92,7 +92,9 @@ module type Network_intf = sig
 end
 
 module type Transition_frontier_Breadcrumb_intf = sig
-  type t [@@deriving sexp, eq]
+  type t [@@deriving sexp, eq, compare]
+
+  type display [@@deriving yojson]
 
   type state_hash
 
@@ -118,6 +120,12 @@ module type Transition_frontier_Breadcrumb_intf = sig
     t -> (external_transition_verified, state_hash) With_hash.t
 
   val staged_ledger : t -> staged_ledger
+
+  val hash : t -> int
+
+  val display : t -> display
+
+  val name : t -> string
 end
 
 module type Transition_frontier_base_intf = sig

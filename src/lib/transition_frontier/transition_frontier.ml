@@ -112,6 +112,31 @@ module Make (Inputs : Inputs_intf) :
       With_hash.data transition_with_hash
       |> Inputs.External_transition.Verified.protocol_state
       |> Consensus.Protocol_state.blockchain_state
+
+    let name t =
+      Visualization.display_short_sexp (module State_hash) @@ state_hash t
+
+    type display =
+      { state_hash: string
+      ; blockchain_state:
+          Inputs.External_transition.Protocol_state.Blockchain_state.display
+      ; consensus_state: Consensus.Consensus_state.display
+      ; parent: string }
+    [@@deriving yojson]
+
+    let display t =
+      let blockchain_state =
+        Inputs.External_transition.Protocol_state.Blockchain_state.display
+          (blockchain_state t)
+      in
+      let consensus_state = consensus_state t in
+      let parent =
+        Visualization.display_short_sexp (module State_hash) @@ parent_hash t
+      in
+      { state_hash= name t
+      ; blockchain_state
+      ; consensus_state= Consensus.Consensus_state.display consensus_state
+      ; parent }
   end
 
   module type Transition_frontier_extension_intf =
@@ -215,20 +240,13 @@ module Make (Inputs : Inputs_intf) :
     let compare node1 node2 =
       Breadcrumb.compare node1.breadcrumb node2.breadcrumb
 
-    let name t =
-      Visualization.display_short_sexp (module State_hash)
-      @@ Breadcrumb.state_hash t.breadcrumb
+    let name t = Breadcrumb.name t.breadcrumb
 
     let display t =
-      let blockchain_state =
-        Breadcrumb.blockchain_state t.breadcrumb
-        |> Inputs.External_transition.Protocol_state.Blockchain_state.display
+      let {Breadcrumb.state_hash; consensus_state; blockchain_state; _} =
+        Breadcrumb.display t.breadcrumb
       in
-      let consensus_state = Breadcrumb.consensus_state t.breadcrumb in
-      { state_hash= name t
-      ; blockchain_state
-      ; length= t.length
-      ; consensus_state= Consensus.Consensus_state.display consensus_state }
+      {state_hash; blockchain_state; length= t.length; consensus_state}
   end
 
   let breadcrumb_of_node {Node.breadcrumb; _} = breadcrumb
