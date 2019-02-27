@@ -769,11 +769,11 @@ module Epoch_data = struct
     }[@@deriving yojson]
 
   let display ({ledger;seed;start_checkpoint;lock_checkpoint;length}:value) : t =
-    let shs s = Coda_base.State_hash.sexp_of_t s |> Sexp.to_string_mach in
-    let ehs s = Epoch_seed.sexp_of_t s |> Sexp.to_string_mach in
-    let flhs s = Coda_base.Frozen_ledger_hash.sexp_of_t s |> Sexp.to_string_mach in
-    { ledger= ledger.hash |> flhs
-    ; seed= seed |> ehs
+    let shs  = Visualization.display_short_sexp (module Coda_base.State_hash) in
+    let flhs  = Visualization.display_short_sexp (module Coda_base.Frozen_ledger_hash) in
+    let ehs  = Visualization.display_short_sexp (module Epoch_seed) in
+    { ledger= flhs ledger.hash
+    ; seed= ehs seed
     ; start_checkpoint= shs start_checkpoint
     ; lock_checkpoint= shs lock_checkpoint
     ; length= Length.to_int length
