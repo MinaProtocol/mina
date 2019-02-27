@@ -132,7 +132,10 @@ module Make (Inputs : Inputs.S) :
     let peers = Network.random_peers network num_peers in
     let open Deferred.Or_error.Let_syntax in
     Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
-        match%bind Network.catchup_transition network peer hash with
+        match%bind
+          O1trace.trace_recurring_task "ledger catchup" (fun () ->
+              Network.catchup_transition network peer hash )
+        with
         | None ->
             Deferred.return
             @@ Or_error.errorf
