@@ -40,7 +40,8 @@
     codable
     rocksdb
     visualization
-    coda_compile_config)
+    coda_compile_config
+    core_extended)
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_snarky ppx_jane ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord

@@ -551,7 +551,8 @@ module Make (Inputs : Inputs_intf) :
               ~snarked_ledger:
                 (Coda_base.Ledger.Any_ledger.cast
                    (module Coda_base.Ledger.Db)
-                   t.root_snarked_ledger) ;
+                   t.root_snarked_ledger)
+               ~logger:t.logger;
             (* 4.VIII *)
             ( match
                 ( Inputs.Staged_ledger.proof_txns new_root_staged_ledger

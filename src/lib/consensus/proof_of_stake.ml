@@ -1389,11 +1389,12 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
         (Int64.to_int epoch_end_time) ;
       `Check_again epoch_end_time
 
-(* TODO *)
-let lock_transition (prev : Consensus_state.value)
-    (next : Consensus_state.value) ~local_state ~snarked_ledger =
+
+  let lock_transition (prev : Consensus_state.value)
+    (next : Consensus_state.value) ~local_state ~snarked_ledger ~logger =
   let open Local_state in
   let open Consensus_state in
+  let logger = Logger.child logger "lock_transition" in
   if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
     let epoch_snapshot =
       Option.map local_state.proposer_public_key ~f:(fun pk ->
@@ -1410,6 +1411,12 @@ let lock_transition (prev : Consensus_state.value)
           in
           {delegators; ledger} )
     in
+    Logger.info logger !"XXX with snarked_ledger (hash=%{sexp:Coda_base.Ledger_hash.t}), moving from %{sexp:Coda_base.Ledger_hash.t option} to %{sexp:Coda_base.Ledger_hash.t option} (prev was %{sexp:Coda_base.Ledger_hash.t option})"
+    (Coda_base.Ledger.Any_ledger.M.merkle_root snarked_ledger)
+      (Option.map ~f:(fun {ledger;_} -> Coda_base.Sparse_ledger.merkle_root ledger) local_state.curr_epoch_snapshot)
+      (Option.map ~f:(fun {ledger;_} -> Coda_base.Sparse_ledger.merkle_root ledger) epoch_snapshot)
+      (Option.map ~f:(fun {ledger;_} -> Coda_base.Sparse_ledger.merkle_root ledger) local_state.last_epoch_snapshot)
+      ;
     local_state.last_epoch_snapshot <- local_state.curr_epoch_snapshot ;
     local_state.curr_epoch_snapshot <- epoch_snapshot )
 

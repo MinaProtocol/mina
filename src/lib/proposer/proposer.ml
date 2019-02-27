@@ -266,6 +266,7 @@ module Make (Inputs : Inputs_intf) :
             "Bootstrapping right now. Cannot generate new blockchains or \
              schedule event"
         in
+        let wr = Async.Writer.open_file "/tmp/proposer-diffs" in
         let module Breadcrumb = Transition_frontier.Breadcrumb in
         let propose ivar proposal_data =
           let open Interruptible.Let_syntax in
@@ -304,6 +305,8 @@ module Make (Inputs : Inputs_intf) :
                   Interruptible.uninterruptible
                     (let open Deferred.Let_syntax in
                     let t0 = Time.now time_controller in
+  don't_wait_for (Deferred.map wr ~f:(fun wr -> Writer.write wr
+                  (sprintf "%s\n(about to prove)\n=======\n%!" (Core_extended.Extended_sexp.Diff.(of_sexps ~original:(Protocol_state.sexp_of_value previous_protocol_state) ~updated:(Protocol_state.sexp_of_value protocol_state) |> Option.value_map ~default:"<couldn't compute diff>" ~f:to_string))))) ;
                     match%bind
                       measure "proving state transition valid" (fun () ->
                           Prover.prove ~prev_state:previous_protocol_state

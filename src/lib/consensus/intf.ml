@@ -178,6 +178,7 @@ module type S = sig
     -> Consensus_state.value
     -> local_state:Local_state.t
     -> snarked_ledger:Coda_base.Ledger.Any_ledger.witness
+    -> logger:Logger.t
     -> unit
   (**
    * A hook for managing local state when the locked tip is updated.
@@ -186,6 +187,6 @@ module type S = sig
   val should_bootstrap :
     existing:Consensus_state.value -> candidate:Consensus_state.value -> bool
   (**
-     * Indicator of when we should bootstrap  
+     * Indicator of when we should bootstrap
     *)
 end

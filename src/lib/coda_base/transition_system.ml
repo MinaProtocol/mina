@@ -140,6 +140,8 @@ struct
 
     let exists' typ ~f = exists typ ~compute:As_prover.(map get_state ~f)
 
+    let wr = Async.Writer.open_file "/tmp/prover-diffs"
+
     let%snarkydef main (top_hash : Digest.Tick.Packed.var) =
       let%bind prev_state = exists' State.typ ~f:Prover_state.prev_state
       and update = exists' Update.typ ~f:Prover_state.update in
@@ -148,6 +150,14 @@ struct
         with_label __LOC__
           (State.Checked.update (prev_state_hash, prev_state) update)
       in
+      let%bind () = exists Typ.unit ~compute:As_prover.(
+        bind (read State.typ next_state) ~f:(fun next_state ->
+          map (read State.typ prev_state) ~f:(fun prev_state ->
+          let open Async in
+  don't_wait_for (Deferred.map wr ~f:(fun wr -> Writer.write wr
+                  (sprintf "%s\n=======\n%!" (Core_extended.Extended_sexp.Diff.(of_sexps ~original:(State.sexp_of_value prev_state) ~updated:(State.sexp_of_value next_state) |> Option.value_map ~default:"<couldn't compute diff>" ~f:to_string))))) ;
+        ))
+      ) in
       let%bind wrap_vk =
         exists' (Verifier.Verification_key.typ ~input_size:wrap_input_size)
           ~f:(fun {Prover_state.wrap_vk; _} ->
