@@ -203,9 +203,9 @@ let content =
                     ; [text "...and many others!"] ] ])
           ; Apply.(
               create
-                [ Role.create "Engineering Manager" "/jobs/product-manager.html"
-                ; Role.create "Product Manager"
+                [ Role.create "Engineering Manager"
                     "/jobs/engineering-manager.html"
+                ; Role.create "Product Manager" "/jobs/product-manager.html"
                 ; Role.create "Senior Frontend Engineer"
                     "/jobs/senior-frontend-engineer.html"
                 ; Role.create "Protocol Reliability Engineer"

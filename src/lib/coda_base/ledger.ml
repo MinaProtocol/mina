@@ -36,6 +36,16 @@ module Ledger_inner = struct
     let empty_account = hash_account Account.empty
   end
 
+  module Account = struct
+    type t = Account.Stable.V1.t [@@deriving bin_io, eq, compare, sexp]
+
+    let empty = Account.empty
+
+    let public_key = Account.public_key
+
+    let initialize = Account.initialize
+  end
+
   module Db :
     Merkle_ledger.Database_intf.S
     with module Location = Location_at_depth
