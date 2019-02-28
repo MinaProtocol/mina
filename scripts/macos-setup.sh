@@ -80,7 +80,7 @@ EOF
   building_kad=$?
   set -e
   make kademlia
-  if [[ "$CIRCLE_BUILD_NUM" && [[ "$building_kad" = 0 ]]]]; then
+  if [[ "$CIRCLE_BUILD_NUM" && "$building_kad" = 0 ]]; then
       nix copy --to s3://o1-nix-cache src/app/kademlia-haskell/result/
       # Incantation to copy build dependencies. We instantiate the nix
       # expression to a derivation, get a list of the derivations it references,
