@@ -1,12 +1,12 @@
 open Core
 
 (* This module implements a snarky function for the BG verifier. *)
-module type Inputs_intf = sig 
+module type Inputs_intf = sig
   include Inputs.S
 
-  val hash : a:G1.t -> b:G2.t -> c:G1.t -> delta_prime:G2.t -> (G1.t, _) Impl.Checked.t
+  val hash :
+    a:G1.t -> b:G2.t -> c:G1.t -> delta_prime:G2.t -> (G1.t, _) Impl.Checked.t
 end
-
 
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
@@ -15,7 +15,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   module Verification_key = struct
     type ('g1, 'g2, 'fqk) t_ =
-      {query_base: 'g1; query: 'g1 list; delta: 'g2;  alpha_beta: 'fqk}
+      {query_base: 'g1; query: 'g1 list; delta: 'g2; alpha_beta: 'fqk}
     [@@deriving fields]
 
     include Summary.Make (Inputs)
@@ -69,13 +69,15 @@ module Make (Inputs : Inputs_intf) = struct
   end
 
   module Proof = struct
-    type ('g1, 'g2) t_ = {a: 'g1; b: 'g2; c: 'g1; delta_prime : 'g2; z : 'g1} [@@deriving sexp]
+    type ('g1, 'g2) t_ = {a: 'g1; b: 'g2; c: 'g1; delta_prime: 'g2; z: 'g1}
+    [@@deriving sexp]
 
-    let to_hlist {a; b; c; delta_prime; z} = Snarky.H_list.[a; b; c; delta_prime; z]
+    let to_hlist {a; b; c; delta_prime; z} =
+      Snarky.H_list.[a; b; c; delta_prime; z]
 
     let of_hlist :
-        (unit, 'a -> 'b -> 'a -> 'b -> 'a -> unit) Snarky.H_list.t -> ('a, 'b) t_ =
-      function
+           (unit, 'a -> 'b -> 'a -> 'b -> 'a -> unit) Snarky.H_list.t
+        -> ('a, 'b) t_ = function
       | [a; b; c; delta_prime; z] -> {a; b; c; delta_prime; z}
 
     let typ =
@@ -86,17 +88,17 @@ module Make (Inputs : Inputs_intf) = struct
   end
 
   let verify (vk : (_, _, _) Verification_key.t_)
-      (vk_precomp
-       : Verification_key.Precomputation.t) inputs {Proof.a; b; c; delta_prime; z} =
+      (vk_precomp : Verification_key.Precomputation.t) inputs
+      {Proof.a; b; c; delta_prime; z} =
     let%bind acc =
       let%bind (module Shifted) = G1.Shifted.create () in
       let%bind init = Shifted.(add zero vk.query_base) in
       Checked.List.fold (List.zip_exn vk.query inputs) ~init
         ~f:(fun acc (g, input) -> G1.scale (module Shifted) g input ~init:acc
       )
-      >>= Shifted.unshift_nonzero 
+      >>= Shifted.unshift_nonzero
     in
-    let%bind delta_prime_pc = G2_precomputation.create delta_prime  in
+    let%bind delta_prime_pc = G2_precomputation.create delta_prime in
     let%bind test =
       let%bind b = G2_precomputation.create b in
       batch_miller_loop
@@ -109,25 +111,13 @@ module Make (Inputs : Inputs_intf) = struct
       >>= final_exponentiation
     in
     let%bind test2 =
-        let%bind ys = hash a b c delta_prime in
-        batch_miller_loop
-        [ (Pos, G1_precomputation.create ys, delta_prime_pc) 
-        ; (Neg, G1_precomputation.create z, vk_precomp.delta)
-        ]
-        >>= final_exponentiation
+      let%bind ys = hash a b c delta_prime in
+      batch_miller_loop
+        [ (Pos, G1_precomputation.create ys, delta_prime_pc)
+        ; (Neg, G1_precomputation.create z, vk_precomp.delta) ]
+      >>= final_exponentiation
     in
     let%bind condition_1 = Fqk.equal test vk.alpha_beta in
     let%bind condition_2 = Fqk.equal test2 Fqk.one in
-    return (condition_1 && condition_2)
-    
-    (* Fqk.equal test vk.alpha_beta && Fqk.equal test2 Fqk.one *)
-
-    
+    Boolean.(condition_1 && condition_2)
 end
-
-
-
-
-
-
-
