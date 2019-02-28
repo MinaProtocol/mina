@@ -158,6 +158,10 @@ module Make (Inputs : Inputs.S) :
               let rev_queries =
                 Non_empty_list.(to_list @@ rev queried_transitions)
               in
+              Logger.info logger
+                !"Transisitions to verify for catchup: \
+                  %{sexp:Inputs.External_transition.t Non_empty_list.t }"
+                queried_transitions ;
               take_while_map_result_rev rev_queries
                 ~f:(verify_transition ~logger ~frontier)
             in
