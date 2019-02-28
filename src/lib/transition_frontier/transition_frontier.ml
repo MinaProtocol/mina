@@ -16,7 +16,8 @@ module Make (Inputs : Inputs_intf) :
    and type staged_ledger := Inputs.Staged_ledger.t
    and type masked_ledger := Ledger.Mask.Attached.t
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
-   and type consensus_local_state := Consensus.Local_state.t = struct
+   and type consensus_local_state := Consensus.Local_state.t
+   and type user_command := User_command.t = struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
   exception
     Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
@@ -137,6 +138,12 @@ module Make (Inputs : Inputs_intf) :
       ; blockchain_state
       ; consensus_state= Consensus.Consensus_state.display consensus_state
       ; parent }
+
+    let to_user_commands
+        {transition_with_hash= {data= external_transition; _}; _} =
+      let open Inputs.External_transition.Verified in
+      let open Inputs.Staged_ledger_diff in
+      user_commands @@ staged_ledger_diff external_transition
   end
 
   module type Transition_frontier_extension_intf =
@@ -172,28 +179,40 @@ module Make (Inputs : Inputs_intf) :
       let is_empty {history; _} = Queue.is_empty history
     end
 
+    module Best_tip_diff = Best_tip_diff.Make (Breadcrumb)
+
     type t =
-      {root_history: Root_history.t; snark_pool_refcount: Snark_pool_refcount.t}
+      { root_history: Root_history.t
+      ; snark_pool_refcount: Snark_pool_refcount.t
+      ; best_tip_diff: Best_tip_diff.t }
     [@@deriving fields]
 
     let create () =
       { snark_pool_refcount= Snark_pool_refcount.create ()
+      ; best_tip_diff= Best_tip_diff.create ()
       ; root_history= Root_history.create (2 * Inputs.max_length) }
 
     type writers =
-      {snark_pool: Snark_pool_refcount.view Broadcast_pipe.Writer.t}
+      { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Writer.t
+      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Writer.t }
 
     type readers =
-      {snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t}
+      { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
+      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t }
+    [@@deriving fields]
 
     let make_pipes () : readers * writers =
       let snark_reader, snark_writer =
         Broadcast_pipe.create Snark_pool_refcount.initial_view
+      and best_tip_reader, best_tip_writer =
+        Broadcast_pipe.create Best_tip_diff.initial_view
       in
-      ({snark_pool= snark_reader}, {snark_pool= snark_writer})
+      ( {snark_pool= snark_reader; best_tip_diff= best_tip_reader}
+      , {snark_pool= snark_writer; best_tip_diff= best_tip_writer} )
 
-    let close_pipes ({snark_pool} : writers) =
-      Broadcast_pipe.Writer.close snark_pool
+    let close_pipes ({snark_pool; best_tip_diff} : writers) =
+      Broadcast_pipe.Writer.close snark_pool ;
+      Broadcast_pipe.Writer.close best_tip_diff
 
     let mb_write_to_pipe diff ext_t handle pipe =
       Option.value ~default:Deferred.unit
@@ -216,6 +235,7 @@ module Make (Inputs : Inputs_intf) :
         ~root_history:(fun _ _ -> Deferred.unit)
         ~snark_pool_refcount:
           (use Snark_pool_refcount.handle_diff pipes.snark_pool)
+        ~best_tip_diff:(use Best_tip_diff.handle_diff pipes.best_tip_diff)
   end
 
   module Node = struct
@@ -353,7 +373,6 @@ module Make (Inputs : Inputs_intf) :
         ; extension_readers
         ; extension_writers }
 
-  (* TODO call this when bootstrapping starts and frontier is destroyed! *)
   let close {extension_writers; _} = Extensions.close_pipes extension_writers
 
   let consensus_local_state {consensus_local_state; _} = consensus_local_state
