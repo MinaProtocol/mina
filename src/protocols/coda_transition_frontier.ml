@@ -8,8 +8,10 @@ module Transition_frontier_diff = struct
         (** Triggered when a new breadcrumb is added without changing the root or best_tip *)
     | New_best_tip of
         { old_root: 'a
+        ; old_root_length: int
         ; new_root: 'a  (** Same as old root if the root doesn't change *)
         ; new_best_tip: 'a
+        ; new_best_tip_length: int
         ; old_best_tip: 'a
         ; garbage: 'a list }
         (** Triggered when a new breadcrumb is added, causing a new best_tip *)
@@ -41,7 +43,7 @@ module type Transition_frontier_extension_intf0 = sig
     -> transition_frontier_breadcrumb Transition_frontier_diff.t
     -> view Option.t
   (** Handle a transition frontier diff, and return the new version of the
-      computed view, if it's updated. *)
+        computed view, if it's updated. *)
 end
 
 (** The type of the view onto the changes to the current best tip. This type
@@ -96,7 +98,9 @@ module type Network_intf = sig
 end
 
 module type Transition_frontier_Breadcrumb_intf = sig
-  type t [@@deriving sexp, eq]
+  type t [@@deriving sexp, eq, compare]
+
+  type display [@@deriving yojson]
 
   type state_hash
 
@@ -124,6 +128,12 @@ module type Transition_frontier_Breadcrumb_intf = sig
     t -> (external_transition_verified, state_hash) With_hash.t
 
   val staged_ledger : t -> staged_ledger
+
+  val hash : t -> int
+
+  val display : t -> display
+
+  val name : t -> string
 
   val to_user_commands : t -> user_command list
 end
@@ -197,6 +207,9 @@ module type Transition_frontier_intf = sig
 
   val find : t -> state_hash -> Breadcrumb.t option
 
+  val root_history_path_map :
+    t -> state_hash -> f:(Breadcrumb.t -> 'a) -> 'a Non_empty_list.t option
+
   val successor_hashes : t -> state_hash -> state_hash list
 
   val successor_hashes_rec : t -> state_hash -> state_hash list
@@ -237,6 +250,10 @@ module type Transition_frontier_intf = sig
 
   module For_tests : sig
     val root_snarked_ledger : t -> ledger_database
+
+    val root_history_mem : t -> state_hash -> bool
+
+    val root_history_is_empty : t -> bool
   end
 end
 
