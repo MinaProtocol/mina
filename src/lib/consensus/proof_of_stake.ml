@@ -1304,7 +1304,7 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
       (Time.of_span_since_epoch (Time.Span.of_ms now))
   in
   Logger.info logger
-    "systime: %d, epoch-slot@systime: %d-%d, starttime@epoch@systime: %d"
+    "systime: %d, epoch-slot@systime: %08d-%04d, starttime@epoch@systime: %d"
     (Int64.to_int now) (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
     ( Int64.to_int @@ Time.Span.to_ms @@ Time.to_span_since_epoch
     @@ Epoch.start_time epoch ) ;
