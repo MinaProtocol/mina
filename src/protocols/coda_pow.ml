@@ -123,6 +123,8 @@ module type Staged_ledger_aux_hash_intf = sig
   type t [@@deriving bin_io, sexp, eq]
 
   val of_bytes : string -> t
+
+  val to_bytes : t -> string
 end
 
 module type Staged_ledger_hash_intf = sig
@@ -837,6 +839,12 @@ module type Staged_ledger_intf = sig
        list
 
   val statement_exn : t -> [`Non_empty of ledger_proof_statement | `Empty]
+
+  val of_scan_state_and_snarked_ledger :
+       scan_state:Scan_state.t
+    -> snarked_ledger:ledger
+    -> expected_merkle_root:ledger_hash
+    -> t Or_error.t Deferred.t
 end
 
 module type Work_selector_intf = sig

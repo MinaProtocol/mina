@@ -268,6 +268,32 @@ end = struct
     in
     return t
 
+  let of_scan_state_and_snarked_ledger ~scan_state ~snarked_ledger
+      ~expected_merkle_root =
+    let open Deferred.Or_error.Let_syntax in
+    let snarked_ledger_hash =
+      Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root snarked_ledger)
+    in
+    let%bind txs =
+      List.map ~f:Ledger.Undo.transaction
+        (Scan_state.staged_transactions scan_state)
+      |> Or_error.all |> Deferred.return
+    in
+    let mask = Ledger.Mask.create () in
+    let ledger = Ledger.register_mask snarked_ledger mask in
+    let%bind () =
+      List.fold_result
+        ~f:(fun _ tx -> Ledger.apply_transaction ledger tx |> Or_error.ignore)
+        ~init:() txs
+      |> Deferred.return
+    in
+    if Ledger_hash.equal (Ledger.merkle_root ledger) expected_merkle_root then
+      of_scan_state_and_ledger ~snarked_ledger_hash ~ledger ~scan_state
+    else
+      Deferred.return
+      @@ Or_error.error_string
+           "The merkle root of the ledger doesn't match the expected one"
+
   let copy {scan_state; ledger} =
     let new_mask = Ledger.Mask.create () in
     { scan_state= Scan_state.copy scan_state
@@ -1681,6 +1707,8 @@ let%test_module "test" =
         include String
 
         let of_bytes : string -> t = fun s -> s
+
+        let to_bytes : t -> string = fun s -> s
       end
 
       module Staged_ledger_hash = struct

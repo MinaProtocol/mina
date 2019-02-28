@@ -111,7 +111,8 @@ let%test_module "Bootstrap Controller" =
               ~root_sync_ledger ~transition_graph ~transition_reader
           in
           let () = Pipe_lib.Strict_pipe.Writer.close transition_writer in
-          let%map () = run_sync in
+          let result = Mvar.create () in
+          let%map () = run_sync ~result in
           let saved_transitions_verified =
             Bootstrap_controller.For_tests.Transition_cache.data
               transition_graph
@@ -242,7 +243,7 @@ let%test_module "Bootstrap Controller" =
             Bootstrap_controller.For_tests.on_transition bootstrap
               ~root_sync_ledger ~sender:peer.address best_transition
           in
-          assert (should_sync = `Syncing) ;
+          assert (should_sync <> `Ignored) ;
           let outdated_transition =
             Transition_frontier.root peer.frontier
             |> Transition_frontier.Breadcrumb.transition_with_hash

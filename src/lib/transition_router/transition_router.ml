@@ -31,6 +31,7 @@ module type Inputs_intf = sig
      and type ledger_hash := Ledger_hash.t
      and type sync_ledger_query := Sync_ledger.query
      and type sync_ledger_answer := Sync_ledger.answer
+     and type parallel_scan_state := Staged_ledger.Scan_state.t
 
   module Transition_frontier_controller :
     Transition_frontier_controller_intf
