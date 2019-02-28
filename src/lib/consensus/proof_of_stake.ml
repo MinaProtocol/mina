@@ -994,7 +994,9 @@ module Consensus_state = struct
         ~epoch_ledger:last_data.ledger ~epoch:transition_data.epoch
         ~slot:transition_data.slot ~seed:last_data.seed
     in
-    let%bind new_total_currency = Currency.Amount.Checked.add previous_state.total_currency supply_increase in
+    let%bind new_total_currency =
+      Currency.Amount.Checked.add previous_state.total_currency supply_increase
+    in
     let%bind curr_data =
       let%map seed =
         let%bind in_seed_update_range =
@@ -1325,11 +1327,11 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
       *)
       if
         (not epoch_transitioning)
-        || Length.equal state.epoch_length Length.zero (* ??? *)
+        || Length.equal state.epoch_length Length.zero
+        (* ??? *)
       then state.last_epoch_data
         (* If we are in the next epoch, use the current epoch data. *)
-      else if epoch_transitioning then
-        state.curr_epoch_data
+      else if epoch_transitioning then state.curr_epoch_data
         (* If the epoch we are in is none of the above, something is wrong. *)
       else (
         Logger.error logger
@@ -1343,8 +1345,10 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
           Coda_base.Frozen_ledger_hash.equal epoch_data.ledger.hash
             genesis_ledger_hash
         then ("genesis", Some local_state.Local_state.genesis_epoch_snapshot)
-        else if epoch_transitioning || state.curr_epoch_data.length <= Length.of_int Constants.k then
-          ("curr", local_state.curr_epoch_snapshot)
+        else if
+          epoch_transitioning
+          || state.curr_epoch_data.length <= Length.of_int Constants.k
+        then ("curr", local_state.curr_epoch_snapshot)
         else ("last", local_state.Local_state.last_epoch_snapshot)
       in
       ( match snapshot with
