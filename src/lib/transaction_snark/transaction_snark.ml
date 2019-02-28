@@ -547,10 +547,9 @@ module Merge = struct
 
   let vk_input_offset =
     Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
-    + (4 * state_hash_size_in_triples)
+    + (2 * state_hash_size_in_triples)
     + Amount.length_in_triples + Amount.Signed.length_in_triples
-
-  (*+ (2 * Pending_coinbase.Stack.length_in_triples)*)
+    + (2 * Pending_coinbase.Stack.length_in_triples)
 
   let construct_input_checked ~prefix
       ~(sok_digest : Sok_message.Digest.Checked.t) ~state1 ~state2
@@ -577,8 +576,8 @@ module Merge = struct
       extend prefix_and_sok_digest
         ~start:
           ( Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
-          + (4 * state_hash_size_in_triples)
-            (*+ (2 * Pending_coinbase.Stack.length_in_triples) *) )
+          + (2 * state_hash_size_in_triples)
+          + (2 * Pending_coinbase.Stack.length_in_triples) )
         ( Amount.var_to_triples supply_increase
         @ Amount.Signed.Checked.to_triples fee_excess )
     in
@@ -1401,7 +1400,7 @@ module Keys = struct
     )
 
   let create () =
-    let base = Merge.create_keys () in
+    let base = Base.create_keys () in
     let merge = Merge.create_keys () in
     let wrap =
       let module Wrap = Wrap (struct
