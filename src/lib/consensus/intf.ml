@@ -166,12 +166,13 @@ module type S = sig
     -> keypair:Signature_lib.Keypair.t
     -> logger:Logger.t
     -> [ `Check_again of Unix_timestamp.t
-       | `Propose_now of Proposal_data.t
+       | `Propose_now of Unix_timestamp.t * Proposal_data.t
        | `Propose of Unix_timestamp.t * Proposal_data.t ]
   (**
    * Determine if and when to perform the next transition proposal. Either
    * informs the callee to check again at some time in the future, or to
-   * schedule a proposal at some time in the future.
+   * schedule a proposal at some time in the future, or to propose now
+   * and check again some time in the future.
   *)
 
   val lock_transition :

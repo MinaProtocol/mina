@@ -367,11 +367,11 @@ module Make (Inputs : Inputs_intf) :
                   | `Check_again time ->
                       Singleton_scheduler.schedule scheduler (time_of_ms time)
                         ~f:check_for_proposal
-                  | `Propose_now data ->
-                      Interruptible.finally
-                        (Singleton_supervisor.dispatch proposal_supervisor data)
+                  | `Propose_now (time, data) ->
+                      Singleton_supervisor.dispatch proposal_supervisor data
+                      |> ignore ;
+                      Singleton_scheduler.schedule scheduler (time_of_ms time)
                         ~f:check_for_proposal
-                      |> ignore
                   | `Propose (time, data) ->
                       Singleton_scheduler.schedule scheduler (time_of_ms time)
                         ~f:(fun () ->

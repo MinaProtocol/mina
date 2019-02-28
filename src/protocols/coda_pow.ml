@@ -1218,7 +1218,7 @@ module type Consensus_mechanism_intf = sig
     -> keypair:keypair
     -> logger:Logger.t
     -> [ `Check_again of Int64.t
-       | `Propose_now of Proposal_data.t
+       | `Propose_now of Int64.t * Proposal_data.t
        | `Propose of Int64.t * Proposal_data.t ]
 
   val select :
