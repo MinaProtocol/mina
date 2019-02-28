@@ -13,6 +13,13 @@ let rec of_list_exn = function
 let rec equal ~f (T (value1, children1)) (T (value2, children2)) =
   f value1 value2 && List.equal ~equal:(equal ~f) children1 children2
 
+let subset ~f xs ys = List.for_all xs ~f:(fun x -> List.mem ys x ~equal:f)
+
+let bag_equiv ~f xs ys = subset ~f xs ys && subset ~f ys xs
+
+let rec equiv ~f (T (x1, ts1)) (T (x2, ts2)) =
+  f x1 x2 && bag_equiv ~f:(equiv ~f) ts1 ts2
+
 module type Monad_intf = sig
   include Monad.S
 
@@ -48,7 +55,9 @@ struct
 
   let rec fold_map (T (base, successors)) ~init ~f =
     let%bind base' = f init base in
-    let%map successors' = Monad.List.map successors ~f:(fold_map ~init ~f) in
+    let%map successors' =
+      Monad.List.map successors ~f:(fold_map ~init:base' ~f)
+    in
     T (base', successors')
 end
 
@@ -57,10 +66,12 @@ include Make_ops (struct
   module List = List
 end)
 
-module Deferred = struct
-  include Make_ops (struct
-    open Async_kernel
+let rec flatten (T (x, ts)) = x :: List.concat_map ts ~f:flatten
 
+module Deferred = struct
+  open Async_kernel
+
+  include Make_ops (struct
     include (Deferred : Monad.S with type +'a t = 'a Deferred.t)
 
     module List = struct
@@ -72,9 +83,13 @@ module Deferred = struct
     end
   end)
 
-  module Or_error = Make_ops (struct
-    open Async_kernel
+  let rec all (T (x', ts')) =
+    let open Deferred.Let_syntax in
+    let%bind x = x' in
+    let%bind ts = Deferred.all @@ List.map ~f:all ts' in
+    return @@ T (x, ts)
 
+  module Or_error = Make_ops (struct
     include (
       Deferred.Or_error : Monad.S with type +'a t = 'a Deferred.Or_error.t )
 

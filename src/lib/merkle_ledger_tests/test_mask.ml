@@ -78,7 +78,8 @@ let%test_module "Test mask connected to underlying Merkle tree" =
 
       let dummy_account = Quickcheck.random_value Account.gen
 
-      let create_new_account_exn mask ({Account.public_key; _} as account) =
+      let create_new_account_exn mask account =
+        let public_key = Account.public_key account in
         let action, location =
           Mask.Attached.get_or_create_account_exn mask public_key account
         in
@@ -86,8 +87,8 @@ let%test_module "Test mask connected to underlying Merkle tree" =
         | `Existed -> failwith "Expected to allocate a new account"
         | `Added -> location
 
-      let create_existing_account_exn mask ({Account.public_key; _} as account)
-          =
+      let create_existing_account_exn mask account =
+        let public_key = Account.public_key account in
         let action, location =
           Mask.Attached.get_or_create_account_exn mask public_key account
         in
@@ -97,8 +98,8 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             location
         | `Added -> failwith "Expected to re-use an existing account"
 
-      let parent_create_new_account_exn parent
-          ({Account.public_key; _} as account) =
+      let parent_create_new_account_exn parent account =
+        let public_key = Account.public_key account in
         let action, location =
           Maskable.get_or_create_account_exn parent public_key account
         in
@@ -543,7 +544,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             (* all accounts in parent to_list *)
             let parent_list = Maskable.to_list maskable in
             let zero_balance account =
-              {account with Account.balance= Balance.zero}
+              Account.update_balance account Balance.zero
             in
             (* put same accounts in mask, but with zero balance *)
             let mask_accounts = List.map parent_accounts ~f:zero_balance in
@@ -589,7 +590,7 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             (* non-zero sum of parent account balances *)
             assert (Int.equal parent_sum 55) (* HT Gauss *) ;
             let zero_balance account =
-              {account with Account.balance= Balance.zero}
+              Account.update_balance account Balance.zero
             in
             (* put same accounts in mask, but with zero balance *)
             let mask_accounts = List.map parent_accounts ~f:zero_balance in

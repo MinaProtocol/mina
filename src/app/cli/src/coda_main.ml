@@ -756,7 +756,7 @@ struct
      and type merkle_path := Ledger.path
      and type query := Sync_ledger.query
      and type answer := Sync_ledger.answer =
-    Syncable_ledger.Make (Ledger.Location.Addr) (Account)
+    Syncable_ledger.Make (Ledger.Location.Addr) (Account.Stable.V1)
       (struct
         include Ledger_hash
 

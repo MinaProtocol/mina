@@ -32,7 +32,8 @@ let%test_module "test functor on in memory databases" =
             Quickcheck.test MT.For_tests.gen_account_location
               ~f:(fun location -> assert (MT.get mdb location = None) ) )
 
-      let create_new_account_exn mdb ({Account.public_key; _} as account) =
+      let create_new_account_exn mdb account =
+        let public_key = Account.public_key account in
         let action, location =
           MT.get_or_create_account_exn mdb public_key account
         in
@@ -122,7 +123,8 @@ let%test_module "test functor on in memory databases" =
             in
             let accounts = Quickcheck.random_value accounts_gen in
             Sequence.of_list accounts
-            |> Sequence.iter ~f:(fun ({Account.public_key; _} as account) ->
+            |> Sequence.iter ~f:(fun account ->
+                   let public_key = Account.public_key account in
                    let _, location =
                      MT.get_or_create_account_exn mdb public_key account
                    in

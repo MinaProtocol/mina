@@ -68,14 +68,21 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
     in
     (* add a breadcrumb and perform post processing *)
     let add_and_finalize cached_breadcrumb =
-      let open Or_error.Let_syntax in
-      let%bind breadcrumb = Cached.invalidate cached_breadcrumb in
+      let open Deferred.Or_error.Let_syntax in
+      let%bind breadcrumb =
+        Deferred.return (Cached.invalidate cached_breadcrumb)
+      in
       let transition =
         Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
       in
-      Transition_frontier.add_breadcrumb_exn frontier breadcrumb ;
+      let%bind () =
+        Deferred.map ~f:Result.return
+          (Transition_frontier.add_breadcrumb_exn frontier breadcrumb)
+      in
       Writer.write processed_transition_writer transition ;
-      Catchup_scheduler.notify catchup_scheduler ~transition
+      Deferred.return
+        (Catchup_scheduler.notify catchup_scheduler
+           ~hash:(With_hash.hash transition))
     in
     ignore
       (Reader.Merge.iter
@@ -96,20 +103,18 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
            trace_recurring_task "transition_handler_processor" (fun () ->
                match msg with
                | `Catchup_breadcrumbs breadcrumb_subtrees -> (
-                 match
-                   let open Or_error.Let_syntax in
-                   List.fold_left breadcrumb_subtrees ~init:(return ())
-                     ~f:(fun or_error subtree ->
-                       let%bind () = or_error in
-                       Rose_tree.Or_error.iter subtree ~f:add_and_finalize )
-                 with
-                 | Ok () -> return ()
-                 | Error err ->
-                     Logger.error logger
-                       "failed to attach all catchup breadcrumbs to \
-                        transition frontier: %s"
-                       (Error.to_string_hum err) ;
-                     return () )
+                   match%map
+                     Deferred.Or_error.List.iter breadcrumb_subtrees
+                       ~f:(fun subtree ->
+                         Rose_tree.Deferred.Or_error.iter subtree
+                           ~f:add_and_finalize )
+                   with
+                   | Ok () -> ()
+                   | Error err ->
+                       Logger.error logger
+                         "failed to attach all catchup breadcrumbs to \
+                          transition frontier: %s"
+                         (Error.to_string_hum err) )
                | `Valid_transition cached_transition -> (
                  match
                    Transition_frontier.find frontier
@@ -153,7 +158,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                          | Error (`Fatal_error e) -> raise e
                          | Ok b -> Ok b
                        in
-                       Deferred.return (add_and_finalize breadcrumb)
+                       add_and_finalize breadcrumb
                      with
                      | Ok () -> ()
                      | Error err ->

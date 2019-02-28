@@ -42,7 +42,8 @@ let%test_module "Ledger catchup" =
               ~num_breadcrumbs:(max_length / 2)
           in
           let catchup_job_reader, catchup_job_writer =
-            Network_builder.make_transition_pipe ()
+            Pipe_lib.Strict_pipe.create
+              (Buffered (`Capacity 10, `Overflow Drop_head))
           in
           let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
             Strict_pipe.create Synchronous

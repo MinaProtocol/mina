@@ -2,6 +2,7 @@ open Protocols.Coda_transition_frontier
 open Coda_base
 module Inputs = Inputs
 module Processor = Processor
+module Catchup_scheduler = Catchup_scheduler
 module Validator = Validator
 
 module Make (Inputs : Inputs.S) :
