@@ -24,6 +24,24 @@ module Make (Inputs : Inputs_intf) :
 
   exception Already_exists of State_hash.t
 
+  module Fake_db = struct
+    include Coda_base.Ledger.Db
+
+    type location = Location.t
+
+    let get_or_create ledger key =
+      let key, loc =
+        match
+          get_or_create_account_exn ledger key (Account.initialize key)
+        with
+        | `Existed, loc -> ([], loc)
+        | `Added, loc -> ([key], loc)
+      in
+      (key, get ledger loc |> Option.value_exn, loc)
+  end
+
+  module TL = Coda_base.Transaction_logic.Make (Fake_db)
+
   module Breadcrumb = struct
     (* TODO: external_transition should be type : External_transition.With_valid_protocol_state.t #1344 *)
     type t =
@@ -676,10 +694,11 @@ module Make (Inputs : Inputs_intf) :
                 let db_mask = Ledger.of_database t.root_snarked_ledger in
                 Non_empty_list.iter txns ~f:(fun txn ->
                     (* TODO: @cmr use the ignore-hash ledger here as well *)
-                    Ledger.apply_transaction db_mask txn
+                    TL.apply_transaction t.root_snarked_ledger txn
                     |> Or_error.ok_exn |> ignore ) ;
                 (* TODO: See issue #1606 to make this faster *)
-                Ledger.commit db_mask ;
+                
+                (*Ledger.commit db_mask ;*)
                 ignore
                   (Ledger.Maskable.unregister_mask_exn
                      (Ledger.Any_ledger.cast
