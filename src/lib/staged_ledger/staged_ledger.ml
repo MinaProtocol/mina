@@ -287,8 +287,12 @@ end = struct
         ~init:() txs
       |> Deferred.return
     in
-    if Ledger_hash.equal (Ledger.merkle_root ledger) expected_merkle_root then
-      of_scan_state_and_ledger ~snarked_ledger_hash ~ledger ~scan_state
+    if
+      Option.fold ~init:true
+        ~f:(fun _ merkle_root ->
+          Ledger_hash.equal (Ledger.merkle_root ledger) merkle_root )
+        expected_merkle_root
+    then of_scan_state_and_ledger ~snarked_ledger_hash ~ledger ~scan_state
     else
       Deferred.return
       @@ Or_error.error_string

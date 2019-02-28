@@ -843,7 +843,7 @@ module type Staged_ledger_intf = sig
   val of_scan_state_and_snarked_ledger :
        scan_state:Scan_state.t
     -> snarked_ledger:ledger
-    -> expected_merkle_root:ledger_hash
+    -> expected_merkle_root:ledger_hash Option.t
     -> t Or_error.t Deferred.t
 end
 

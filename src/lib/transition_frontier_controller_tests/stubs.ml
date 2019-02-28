@@ -345,11 +345,10 @@ struct
     in
     let open Deferred.Let_syntax in
     match%map
-      Staged_ledger.of_scan_state_and_ledger
-        ~snarked_ledger_hash:
-          (Frozen_ledger_hash.of_ledger_hash root_ledger_hash)
-        ~ledger:(Ledger.of_database root_snarked_ledger)
+      Staged_ledger.of_scan_state_and_snarked_ledger
         ~scan_state:root_transaction_snark_scan_state
+        ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
+        ~expected_merkle_root:None
     with
     | Ok root_staged_ledger ->
         let frontier =

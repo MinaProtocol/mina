@@ -312,7 +312,7 @@ end = struct
     match%map
       Staged_ledger.of_scan_state_and_snarked_ledger ~scan_state
         ~snarked_ledger:(Ledger.of_database ledger_db)
-        ~expected_merkle_root
+        ~expected_merkle_root:(Some expected_merkle_root)
     with
     | Ok root_staged_ledger ->
         let new_frontier =
