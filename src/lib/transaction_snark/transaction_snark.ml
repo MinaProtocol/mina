@@ -1401,7 +1401,7 @@ module Keys = struct
     )
 
   let create () =
-    let base = Merge.create_keys () in
+    let base = Base.create_keys () in
     let merge = Merge.create_keys () in
     let wrap =
       let module Wrap = Wrap (struct
