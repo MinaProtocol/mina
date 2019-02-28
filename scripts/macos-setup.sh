@@ -67,7 +67,19 @@ if [[ $COMPILE_THINGS == "YES" ]]; then
   set +u
   . ~/.nix-profile/etc/profile.d/nix.sh
   set -u
+  if [[ "$CIRCLECI_BUILD_NUM" ]]; then
+      cat > ~/.config/nix/nix.conf <<EOF
+substituters = https://cache.nixos.org s3://o1-nix-cache
+# Checking signatures is broken with S3 based Nix caches, see
+# https://github.com/NixOS/nix/issues/2024
+require-sigs = false
+EOF
+  fi
   make kademlia
+  if [[ "$CIRCLECI_BUILD_NUM" ]]; then
+      nix copy --to s3://o1-nix-cache src/app/kademlia-haskell/result/
+      nix copy --to s3://o1-nix-cache $(nix-store -r $(nix-store -q --references $(nix-instantiate src/app/kademlia-haskell/release2.nix)))
+  fi
 else
   echo 'Not running compile step.'
 fi
