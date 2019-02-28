@@ -166,6 +166,7 @@ module type S = sig
     -> keypair:Signature_lib.Keypair.t
     -> logger:Logger.t
     -> [ `Check_again of Unix_timestamp.t
+       | `Propose_now of Proposal_data.t
        | `Propose of Unix_timestamp.t * Proposal_data.t ]
   (**
    * Determine if and when to perform the next transition proposal. Either

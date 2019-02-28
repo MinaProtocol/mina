@@ -1375,16 +1375,18 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
         | None -> find_winning_slot (Epoch.Slot.succ slot)
         | Some data -> Some (slot, data)
     in
-    find_winning_slot (Epoch.Slot.succ slot)
+    find_winning_slot slot
   in
   match next_slot with
   | Some (next_slot, data) ->
       Logger.info logger "Proposing in %d slots"
         (Epoch.Slot.to_int next_slot - Epoch.Slot.to_int slot) ;
-      `Propose
-        ( Epoch.slot_start_time epoch next_slot
-          |> Time.to_span_since_epoch |> Time.Span.to_ms
-        , data )
+      if Epoch.Slot.equal slot next_slot then `Propose_now data
+      else
+        `Propose
+          ( Epoch.slot_start_time epoch next_slot
+            |> Time.to_span_since_epoch |> Time.Span.to_ms
+          , data )
   | None ->
       let epoch_end_time =
         Epoch.end_time epoch |> Time.to_span_since_epoch |> Time.Span.to_ms
