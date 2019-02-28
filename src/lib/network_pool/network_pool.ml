@@ -119,17 +119,13 @@ let%test_module "network pool test" =
 
       module Extensions = struct
         module Work = Int
-
-        type readers =
-          { snark_pool:
-              (int * int Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t }
       end
 
-      let extension_pipes _ =
+      let snark_pool_refcount_pipe _ =
         let reader, _writer =
           Pipe_lib.Broadcast_pipe.create (0, Extensions.Work.Table.create ())
         in
-        {Extensions.snark_pool= reader}
+        reader
     end
 
     module Mock_fee = Int

@@ -16,13 +16,10 @@ module type Transition_frontier_intf = sig
 
       include Hashable.S_binable with type t := t
     end
-
-    type readers =
-      { snark_pool: (int * int Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t
-      ; best_tip_diff: diff_view }
   end
 
-  val extension_pipes : t -> Extensions.readers
+  val snark_pool_refcount_pipe :
+    t -> (int * int Extensions.Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t
 end
 
 module type S = sig
@@ -117,10 +114,9 @@ end)
         | Some tf ->
             (* Start the count at the max so we flush after reconstructing the transition_frontier *)
             let removedCounter = ref removed_breadcrumb_wait in
-            let pipe = Transition_frontier.extension_pipes tf in
+            let pipe = Transition_frontier.snark_pool_refcount_pipe tf in
             let deferred, _ =
-              Broadcast_pipe.Reader.iter
-                pipe.Transition_frontier.Extensions.snark_pool
+              Broadcast_pipe.Reader.iter pipe
                 ~f:(fun (removed, refcount_table) ->
                   t.ref_table <- Some refcount_table ;
                   removedCounter := !removedCounter + removed ;
@@ -191,17 +187,13 @@ let%test_module "random set test" =
 
       module Extensions = struct
         module Work = Int
-
-        type readers =
-          { snark_pool:
-              (int * int Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t }
       end
 
-      let extension_pipes _ =
+      let snark_pool_refcount_pipe _ =
         let reader, _writer =
           Pipe_lib.Broadcast_pipe.create (0, Extensions.Work.Table.create ())
         in
-        {Extensions.snark_pool= reader}
+        reader
     end
 
     module Mock_work = Int

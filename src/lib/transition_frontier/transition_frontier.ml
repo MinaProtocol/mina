@@ -239,7 +239,11 @@ struct
 
   let logger t = t.logger
 
-  let extension_pipes {extension_readers; _} = extension_readers
+  let snark_pool_refcount_pipe {extension_readers; _} =
+    extension_readers.snark_pool
+
+  let best_tip_diff_pipe {extension_readers; _} =
+    extension_readers.best_tip_diff
 
   (* TODO: load from and write to disk *)
   let create ~logger

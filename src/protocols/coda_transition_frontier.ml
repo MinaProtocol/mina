@@ -235,12 +235,16 @@ module type Transition_frontier_intf = sig
       with type view = Breadcrumb.t Best_tip_diff_view.t Option.t
 
     type readers =
-      { snark_pool: (int * int Work.Table.t) Broadcast_pipe.Reader.t
+      { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
       ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t }
     [@@deriving fields]
   end
 
-  val extension_pipes : t -> Extensions.readers
+  val snark_pool_refcount_pipe :
+    t -> Extensions.Snark_pool_refcount.view Broadcast_pipe.Reader.t
+
+  val best_tip_diff_pipe :
+    t -> Extensions.Best_tip_diff.view Broadcast_pipe.Reader.t
 
   val visualize : filename:string -> t -> unit
 

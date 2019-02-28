@@ -15,13 +15,10 @@ module type Transition_frontier_intf = sig
 
       include Hashable.S_binable with type t := t
     end
-
-    type readers =
-      { snark_pool: (int * int Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t
-      ; best_tip_diff: diff_view }
   end
 
-  val extension_pipes : t -> Extensions.readers
+  val snark_pool_refcount_pipe :
+    t -> (int * int Extensions.Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t
 end
 
 module type S = sig
