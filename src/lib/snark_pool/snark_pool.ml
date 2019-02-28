@@ -29,7 +29,7 @@ module type S = sig
 
   val create :
        parent_log:Logger.t
-    -> frontier_broadcast_pipe:transition_frontier option
+    -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> t
 
@@ -60,7 +60,7 @@ end)
 (Transition_frontier : Transition_frontier_intf
                        with module Extensions.Work = Work) :
   sig
-    include S
+    include S with type transition_frontier = Transition_frontier.t
 
     val sexp_of_t : t -> Sexp.t
 

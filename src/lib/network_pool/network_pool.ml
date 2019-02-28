@@ -9,7 +9,7 @@ module type Pool_intf = sig
 
   val create :
        parent_log:Logger.t
-    -> frontier_broadcast_pipe:transition_frontier option
+    -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> t
 end
@@ -45,7 +45,7 @@ module type Network_pool_intf = sig
   val create :
        parent_log:Logger.t
     -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
-    -> frontier_broadcast_pipe:transition_frontier option
+    -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> t
 

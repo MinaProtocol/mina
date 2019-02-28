@@ -116,7 +116,7 @@ module type Transaction_pool_intf = sig
        parent_log:Logger.t
     -> disk_location:string
     -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
-    -> frontier_broadcast_pipe:transition_frontier option
+    -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> t Deferred.t
 
@@ -140,7 +140,7 @@ module type Snark_pool_intf = sig
        parent_log:Logger.t
     -> disk_location:string
     -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
-    -> frontier_broadcast_pipe:transition_frontier option
+    -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> t Deferred.t
 
@@ -240,15 +240,11 @@ end
 module type Inputs_intf = sig
   include Coda_pow.Inputs_intf
 
-  module State_body_hash : sig
+  module Masked_ledger : sig
     type t
   end
 
   module Ledger_db : Coda_pow.Ledger_creatable_intf
-
-  module Masked_ledger : sig
-    type t
-  end
 
   module Transition_frontier :
     Protocols.Coda_transition_frontier.Transition_frontier_intf
@@ -260,6 +256,7 @@ module type Inputs_intf = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
+     and type user_command := User_command.t
 
   module Transaction_pool :
     Transaction_pool_intf
@@ -285,6 +282,10 @@ module type Inputs_intf = sig
                 Snark_work_lib.Work.Single.Spec.t
      and type snark_pool := Snark_pool.t
      and type fee := Currency.Fee.t
+
+  module State_body_hash : sig
+    type t
+  end
 
   module Net :
     Network_intf

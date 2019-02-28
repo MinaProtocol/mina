@@ -11,9 +11,13 @@ val of_list_exn : 'a list -> 'a t
 
 val equal : f:('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 
+val equiv : f:('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+
 val iter : 'a t -> f:('a -> unit) -> unit
 
 val fold_map : 'a t -> init:'b -> f:('b -> 'a -> 'b) -> 'b t
+
+val flatten : 'a t -> 'a list
 
 module Deferred : sig
   open Async_kernel
@@ -22,4 +26,6 @@ module Deferred : sig
 
   val fold_map :
     'a t -> init:'b -> f:('b -> 'a -> 'b Deferred.t) -> 'b t Deferred.t
+
+  val all : 'a Deferred.t t -> 'a t Deferred.t
 end

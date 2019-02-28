@@ -13,6 +13,7 @@ module type Inputs_intf = sig
     with type state_hash := State_hash.t
      and type external_transition_verified := External_transition.Verified.t
      and type staged_ledger := Staged_ledger.t
+     and type user_command := User_command.t
 end
 
 module Make (Inputs : Inputs_intf) :

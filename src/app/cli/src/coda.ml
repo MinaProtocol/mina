@@ -39,7 +39,7 @@ let daemon log =
      and propose_key =
        flag "propose-key"
          ~doc:
-           "FILE Private key file for the proposing transitions \
+           "KEYFILE Private key file for the proposing transitions \
             (default:don't propose)"
          (optional file)
      and peers =
@@ -48,7 +48,8 @@ let daemon log =
            "HOST:PORT TCP daemon communications (can be given multiple times)"
          (listed peer)
      and run_snark_worker_flag =
-       flag "run-snark-worker" ~doc:"KEY Run the SNARK worker with a key"
+       flag "run-snark-worker"
+         ~doc:"PUBLICKEY Run the SNARK worker with this public key"
          (optional public_key_compressed)
      and work_selection_flag =
        flag "work-selection"

@@ -298,6 +298,7 @@ module type Main_intf = sig
        and type staged_ledger_diff := Staged_ledger_diff.t
        and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
        and type consensus_local_state := Consensus.Local_state.t
+       and type user_command := User_command.t
        and type Extensions.Work.t = Transaction_snark_work.Statement.t
   end
 
@@ -767,7 +768,7 @@ struct
      and type merkle_path := Ledger.path
      and type query := Sync_ledger.query
      and type answer := Sync_ledger.answer =
-    Syncable_ledger.Make (Ledger.Location.Addr) (Account)
+    Syncable_ledger.Make (Ledger.Location.Addr) (Account.Stable.V1)
       (struct
         include Ledger_hash
 
@@ -1410,12 +1411,13 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       [ implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
             let r = request_work coda in
             Option.iter r ~f:(fun r ->
-                Logger.info log !"Get_work: %{sexp:Snark_worker.Work.Spec.t}" r
-            ) ;
+                Logger.trace log
+                  !"Get_work: %{sexp:Snark_worker.Work.Spec.t}"
+                  r ) ;
             return r )
       ; implement Snark_worker.Rpcs.Submit_work.rpc
           (fun () (work : Snark_worker.Work.Result.t) ->
-            Logger.info log
+            Logger.trace log
               !"Submit_work: %{sexp:Snark_worker.Work.Spec.t}"
               work.spec ;
             List.iter work.metrics ~f:(fun (total, tag) ->
@@ -1498,14 +1500,14 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
                ~shutdown_on_disconnect )
     in
-    let log = Logger.child log "snark_worker" in
+    (* We want these to be printfs so we don't double encode our logs here *)
     Pipe.iter_without_pushback
       (Reader.pipe (Process.stdout p))
-      ~f:(fun s -> Logger.info log "%s" s)
+      ~f:(fun s -> printf "%s" s)
     |> don't_wait_for ;
     Pipe.iter_without_pushback
       (Reader.pipe (Process.stderr p))
-      ~f:(fun s -> Logger.error log "%s" s)
+      ~f:(fun s -> printf "%s" s)
     |> don't_wait_for ;
     Deferred.unit
 

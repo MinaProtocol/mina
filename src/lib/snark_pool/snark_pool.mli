@@ -22,14 +22,14 @@ module type S = sig
 
   type fee
 
-  type t [@@deriving bin_io]
-
   type transition_frontier
+
+  type t [@@deriving bin_io]
 
   val create :
        parent_log:Logger.t
-    -> frontier_broadcast_pipe:transition_frontier option
-                               Pipe_lib.Broadcast_pipe.Reader.t
+    -> frontier_broadcast_pipe:transition_frontier Option.t
+                               Broadcast_pipe.Reader.t
     -> t
 
   val add_snark :

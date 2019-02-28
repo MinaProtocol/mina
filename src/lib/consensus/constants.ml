@@ -37,4 +37,6 @@ consensus_mechanism = "proof_of_stake"]
 
 let delta = 1
 
+let c = 1
+
 [%%endif]

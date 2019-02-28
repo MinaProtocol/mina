@@ -22,11 +22,7 @@ module Make (Inputs : Inputs.S) = struct
   type t =
     { logger: Logger.t
     ; time_controller: Time.Controller.t
-    ; catchup_job_writer:
-        ( (External_transition.Verified.t, State_hash.t) With_hash.t
-        , synchronous
-        , unit Deferred.t )
-        Writer.t
+    ; catchup_job_writer: (State_hash.t, synchronous, unit Deferred.t) Writer.t
           (** `collected_transitins` stores all seen transitions as its keys,
               and values are a list of direct children of those transitions.
               The invariant is that every collected transition would appear as
@@ -83,6 +79,20 @@ module Make (Inputs : Inputs.S) = struct
     ; parent_root_timeouts
     ; breadcrumb_builder_supervisor }
 
+  let mem t transition =
+    Hashtbl.mem t.collected_transitions
+      ( With_hash.data transition |> External_transition.Verified.protocol_state
+      |> Protocol_state.previous_state_hash )
+
+  let has_timeout t transition =
+    Hashtbl.mem t.parent_root_timeouts
+      ( With_hash.data transition |> External_transition.Verified.protocol_state
+      |> Protocol_state.previous_state_hash )
+
+  let is_empty t =
+    Hashtbl.is_empty t.collected_transitions
+    && Hashtbl.is_empty t.parent_root_timeouts
+
   let cancel_timeout t hash =
     let remaining_time =
       Option.map
@@ -94,17 +104,6 @@ module Make (Inputs : Inputs.S) = struct
       ~f:Fn.(compose (const None) (Option.iter ~f:cancel)) ;
     remaining_time
 
-  let cancel_child_timeout t parent_hash =
-    let open Option.Let_syntax in
-    let%bind children = Hashtbl.find t.collected_transitions parent_hash in
-    let remaining_times =
-      List.(
-        filter_opt
-        @@ map children ~f:(fun child ->
-               cancel_timeout t (With_hash.hash child) ))
-    in
-    List.min_elt remaining_times ~compare:Time.Span.compare
-
   let watch t ~timeout_duration ~transition =
     let hash = With_hash.hash transition in
     let parent_hash =
@@ -113,31 +112,36 @@ module Make (Inputs : Inputs.S) = struct
     in
     let make_timeout duration =
       Time.Timeout.create t.time_controller duration ~f:(fun _ ->
-          don't_wait_for (Writer.write t.catchup_job_writer transition) )
+          don't_wait_for (Writer.write t.catchup_job_writer parent_hash) )
     in
-    Hashtbl.update t.collected_transitions parent_hash ~f:(function
-      | None ->
-          let remaining_time = cancel_child_timeout t hash in
-          Hashtbl.add_exn t.collected_transitions ~key:hash ~data:[] ;
-          Hashtbl.add_exn t.parent_root_timeouts ~key:parent_hash
-            ~data:
-              (make_timeout
-                 (Option.value remaining_time ~default:timeout_duration)) ;
-          [transition]
-      | Some sibling_transitions ->
-          if
-            List.exists sibling_transitions ~f:(fun collected_transition ->
-                State_hash.equal hash @@ With_hash.hash collected_transition )
-          then (
-            Logger.info t.logger
-              !"Received request to watch transition for catchup that already \
-                was being watched: %{sexp: State_hash.t}"
-              hash ;
-            sibling_transitions )
-          else
-            let _ : Time.Span.t option = cancel_child_timeout t hash in
-            Hashtbl.add_exn t.collected_transitions ~key:hash ~data:[] ;
-            transition :: sibling_transitions )
+    match Hashtbl.find t.collected_transitions parent_hash with
+    | None ->
+        let remaining_time = cancel_timeout t hash in
+        Hashtbl.add_exn t.collected_transitions ~key:parent_hash
+          ~data:[transition] ;
+        Hashtbl.update t.collected_transitions hash
+          ~f:(Option.value ~default:[]) ;
+        Hashtbl.add_exn t.parent_root_timeouts ~key:parent_hash
+          ~data:
+            (make_timeout
+               (Option.value remaining_time ~default:timeout_duration))
+    | Some sibling_transitions ->
+        if
+          List.exists sibling_transitions ~f:(fun sibling_transition ->
+              External_transition.Verified.equal
+                (With_hash.data transition)
+                (With_hash.data sibling_transition) )
+        then
+          Logger.info t.logger
+            !"Received request to watch transition for catchup that already \
+              was being watched: %{sexp: State_hash.t}"
+            hash
+        else
+          let _ : Time.Span.t option = cancel_timeout t hash in
+          Hashtbl.set t.collected_transitions ~key:parent_hash
+            ~data:(transition :: sibling_transitions) ;
+          Hashtbl.update t.collected_transitions hash
+            ~f:(Option.value ~default:[])
 
   let rec extract t transition =
     let successors =
@@ -154,8 +158,7 @@ module Make (Inputs : Inputs.S) = struct
     Hashtbl.remove t.collected_transitions parent_hash ;
     List.iter children ~f:(Fn.compose (remove_tree t) With_hash.hash)
 
-  let notify t ~transition =
-    let hash = With_hash.hash transition in
+  let notify t ~hash =
     if
       (Option.is_none @@ Hashtbl.find t.parent_root_timeouts hash)
       && (Option.is_some @@ Hashtbl.find t.collected_transitions hash)
