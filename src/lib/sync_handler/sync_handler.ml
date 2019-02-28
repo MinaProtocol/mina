@@ -15,6 +15,7 @@ module type Inputs_intf = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type consensus_local_state := Consensus.Local_state.t
+     and type user_command := User_command.t
 
   module Time : Protocols.Coda_pow.Time_intf
 
@@ -31,6 +32,8 @@ end
 module Make (Inputs : Inputs_intf) :
   Sync_handler_intf
   with type ledger_hash := Ledger_hash.t
+   and type state_hash := State_hash.t
+   and type external_transition := Inputs.External_transition.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type syncable_ledger_query := Sync_ledger.query
    and type syncable_ledger_answer := Sync_ledger.answer = struct
@@ -63,4 +66,14 @@ module Make (Inputs : Inputs_intf) :
     in
     let answer = Sync_ledger.Responder.answer_query responder query in
     (hash, answer)
+
+  let transition_catchup ~frontier hash =
+    let open Option.Let_syntax in
+    let%bind breadcrumb = Transition_frontier.find frontier hash in
+    Transition_frontier.path_map
+      ~f:(fun b ->
+        Transition_frontier.Breadcrumb.transition_with_hash b
+        |> With_hash.data |> External_transition.of_verified )
+      frontier breadcrumb
+    |> Non_empty_list.of_list_opt
 end

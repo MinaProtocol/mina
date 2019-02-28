@@ -12,7 +12,7 @@ open O1trace
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
 [%%if
-with_snark]
+proof_level = "full"]
 
 let with_snark = true
 
@@ -63,6 +63,8 @@ let run_test () : unit Deferred.t =
         Async.Unix.mkdtemp (banlist_dir_name ^/ "banned")
       in
       let banlist = Coda_base.Banlist.create ~suspicious_dir ~punished_dir in
+      let%bind trust_dir = Async.Unix.mkdtemp (temp_conf_dir ^/ "trust_db") in
+      let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
       let%bind receipt_chain_dir_name =
         Async.Unix.mkdtemp (temp_conf_dir ^/ "receipt_chain")
       in
@@ -83,7 +85,7 @@ let run_test () : unit Deferred.t =
             ; me=
                 Network_peer.Peer.create Unix.Inet_addr.localhost
                   ~discovery_port:8001 ~communication_port:8000
-            ; banlist } }
+            ; trust_system } }
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;

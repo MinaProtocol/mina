@@ -1,5 +1,5 @@
 open Core_kernel
-open Async_kernel
+open Pipe_lib
 
 module Priced_proof : sig
   type ('proof, 'fee) t = {proof: 'proof; fee: 'fee}
@@ -13,9 +13,15 @@ module type S = sig
 
   type fee
 
+  type transition_frontier
+
   type t [@@deriving bin_io]
 
-  val create : parent_log:Logger.t -> t
+  val create :
+       parent_log:Logger.t
+    -> frontier_broadcast_pipe:transition_frontier Option.t
+                               Broadcast_pipe.Reader.t
+    -> t
 
   val add_snark :
        t
@@ -37,5 +43,11 @@ end) (Work : sig
   type t [@@deriving sexp, bin_io]
 
   include Hashable.S_binable with type t := t
+end) (Transition_frontier : sig
+  type t
 end) :
-  S with type work := Work.t and type proof := Proof.t and type fee := Fee.t
+  S
+  with type work := Work.t
+   and type proof := Proof.t
+   and type fee := Fee.t
+   and type transition_frontier = Transition_frontier.t

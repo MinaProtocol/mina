@@ -242,7 +242,7 @@ module Fee = struct
 
     include (
       Currency.Fee.Stable.V1 :
-        module type of Currency.Fee.Stable.V1 with type t := t )
+        module type of Currency.Fee.Stable.Latest with type t := t )
   end
 
   module Signed = struct
@@ -250,7 +250,7 @@ module Fee = struct
 
     include (
       Currency.Fee.Signed.Stable.V1 :
-        module type of Currency.Fee.Signed.Stable.V1
+        module type of Currency.Fee.Signed.Stable.Latest
         with type t := t
          and type ('a, 'b) t_ := ('a, 'b) t_ )
   end

@@ -1,6 +1,5 @@
 open Core
 open Snark_params
-open Currency
 open Signature_lib
 open Merkle_ledger
 
@@ -13,19 +12,6 @@ module Ledger_inner = struct
     Merkle_ledger.Location.Make (Depth)
 
   module Location_at_depth = Location0
-
-  (*
-module Key = struct
-  module T = struct
-    type t = Account.key [@@deriving sexp, bin_io, compare, hash, eq]
-  end
-
-  let empty = Account.empty.public_key
-
-  include T
-  include Hashable.Make_binable (T)
-end
-*)
 
   module Kvdb : Intf.Key_value_database = Rocksdb.Database
 
@@ -48,6 +34,16 @@ end
     let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
     let empty_account = hash_account Account.empty
+  end
+
+  module Account = struct
+    type t = Account.Stable.V1.t [@@deriving bin_io, eq, compare, sexp]
+
+    let empty = Account.empty
+
+    let public_key = Account.public_key
+
+    let initialize = Account.initialize
   end
 
   module Db :

@@ -1,6 +1,4 @@
 open Core_kernel
-open Coda_numbers
-open Util
 open Snark_params
 open Tick
 open Let_syntax
@@ -60,7 +58,9 @@ module type S = sig
 
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
-  val to_string_record : value -> string
+  type display = (string, string, string) t_ [@@deriving yojson]
+
+  val display : value -> display
 
   module Message :
     Signature_lib.Checked.Message_intf
@@ -89,22 +89,40 @@ module Make (Genesis_ledger : sig
 end) : S = struct
   module Stable = struct
     module V1 = struct
-      type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t_ =
-        { staged_ledger_hash: 'staged_ledger_hash
-        ; snarked_ledger_hash: 'snarked_ledger_hash
-        ; timestamp: 'time }
-      [@@deriving bin_io, sexp, fields, eq, compare, hash]
+      module T = struct
+        let version = 1
 
-      type t =
-        ( Staged_ledger_hash.Stable.V1.t
-        , Frozen_ledger_hash.Stable.V1.t
-        , Block_time.Stable.V1.t )
-        t_
-      [@@deriving bin_io, sexp, eq, compare, hash]
+        type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t_ =
+          { staged_ledger_hash: 'staged_ledger_hash
+          ; snarked_ledger_hash: 'snarked_ledger_hash
+          ; timestamp: 'time }
+        [@@deriving bin_io, sexp, fields, eq, compare, hash, yojson]
+
+        type t =
+          ( Staged_ledger_hash.Stable.V1.t
+          , Frozen_ledger_hash.Stable.V1.t
+          , Block_time.Stable.V1.t )
+          t_
+        [@@deriving bin_io, sexp, eq, compare, hash]
+      end
+
+      include T
+      include Module_version.Registration.Make_latest_version (T)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "coda_base_blockchain_state"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Module_version.Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
+  include Stable.Latest
 
   type var =
     ( Staged_ledger_hash.var
@@ -163,11 +181,19 @@ end) : S = struct
         @@ Ledger.merkle_root Genesis_ledger.t
     ; timestamp= Genesis_state_timestamp.value |> Block_time.of_time }
 
-  let to_string_record t =
-    Printf.sprintf "{staged_ledger_hash|%s}|{ledger_hash|%s}|{timestamp|%s}"
-      (Base64.encode_string (Staged_ledger_hash.to_string t.staged_ledger_hash))
-      (Base64.encode_string (Frozen_ledger_hash.to_bytes t.snarked_ledger_hash))
-      (Time.to_string (Block_time.to_time t.timestamp))
+  type display = (string, string, string) t_ [@@deriving yojson]
+
+  let display {staged_ledger_hash; snarked_ledger_hash; timestamp} =
+    { staged_ledger_hash=
+        Visualization.display_short_sexp (module Ledger_hash)
+        @@ Staged_ledger_hash.ledger_hash staged_ledger_hash
+    ; snarked_ledger_hash=
+        Visualization.display_short_sexp
+          (module Frozen_ledger_hash)
+          snarked_ledger_hash
+    ; timestamp=
+        Time.to_string_trimmed ~zone:Time.Zone.utc
+          (Block_time.to_time timestamp) }
 
   module Message = struct
     open Tick

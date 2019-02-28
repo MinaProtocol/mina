@@ -24,6 +24,7 @@ module type Inputs_intf = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type masked_ledger := Masked_ledger.t
      and type consensus_local_state := Consensus.Local_state.t
+     and type user_command := User_command.t
 
   module Transaction_pool :
     Coda_lib.Transaction_pool_read_intf
@@ -272,11 +273,11 @@ module Make (Inputs : Inputs_intf) :
         let module Breadcrumb = Transition_frontier.Breadcrumb in
         let propose ivar proposal_data =
           let open Interruptible.Let_syntax in
-          match Mvar.peek frontier_reader with
+          match Broadcast_pipe.Reader.peek frontier_reader with
           | None -> Interruptible.return (log_bootstrap_mode ())
           | Some frontier -> (
               let crumb = Transition_frontier.best_tip frontier in
-              Logger.info logger
+              Logger.trace logger
                 !"Begining to propose off of crumb %{sexp: Breadcrumb.t}%!"
                 crumb ;
               Core.printf !"%!" ;
@@ -346,7 +347,7 @@ module Make (Inputs : Inputs_intf) :
         let scheduler = Singleton_scheduler.create time_controller in
         let rec check_for_proposal () =
           trace_recurring_task "check for proposal" (fun () ->
-              match Mvar.peek frontier_reader with
+              match Broadcast_pipe.Reader.peek frontier_reader with
               | None -> log_bootstrap_mode ()
               | Some transition_frontier -> (
                   let breadcrumb =

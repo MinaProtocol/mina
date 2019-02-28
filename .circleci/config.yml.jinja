@@ -4,7 +4,7 @@ version: 3
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-5b183eb006ea0bf720c8f14965c31f7890909e91
+            - image: codaprotocol/coda:toolchain-rust-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -14,7 +14,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-2d8be63fd5f75b2cafe6e85b301e526b1196cdd1
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -49,7 +49,8 @@ jobs:
                       - opam-v1-
             - restore_cache:
                   keys:
-                      - nix-v2-{{'{{'}} checksum "src/app/kademlia-haskell/packages.nix" {{'}}'}}
+                      - nix-v3-{{'{{'}} checksum "src/app/kademlia-haskell/packages.nix" {{'}}'}}
+                      - nix-v3-
                       - nix-v2-
             - run: git submodule sync && git submodule update --init --recursive
             - run:
@@ -68,7 +69,7 @@ jobs:
                   paths:
                       - "/Users/distiller/.opam"
             - save_cache:
-                  key: nix-v2-{{'{{'}} checksum "src/app/kademlia-haskell/packages.nix" {{'}}'}}
+                  key: nix-v3-{{'{{'}} checksum "src/app/kademlia-haskell/packages.nix" {{'}}'}}
                   paths:
                       - "/nix"
             - run:
@@ -82,18 +83,19 @@ jobs:
     build_{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-2d8be63fd5f75b2cafe6e85b301e526b1196cdd1
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
                   command: scripts/getkeys.sh
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
                   name: Build deb Package with keys
                   command: make deb
@@ -108,12 +110,15 @@ jobs:
                   command: make publish_deb
             - store_artifacts:
                   path: /tmp/artifacts
+            - run:
+                  name: Copy artifacts to Google Cloud
+                  command: scripts/artifacts.sh
     {%- endfor %}
 
     test-unit-test:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-2d8be63fd5f75b2cafe6e85b301e526b1196cdd1
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -125,7 +130,7 @@ jobs:
     test-{{test.name}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-2d8be63fd5f75b2cafe6e85b301e526b1196cdd1
+            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive

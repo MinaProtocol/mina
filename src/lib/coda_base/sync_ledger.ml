@@ -1,6 +1,6 @@
 open Core_kernel
 
-include Syncable_ledger.Make (Ledger.Location.Addr) (Account)
+include Syncable_ledger.Make (Ledger.Location.Addr) (Account.Stable.V1)
           (struct
             include Ledger_hash
 
@@ -24,7 +24,10 @@ include Syncable_ledger.Make (Ledger.Location.Addr) (Account)
           end)
 
 type answer =
-  (Ledger.Location.Addr.t, Ledger_hash.t, Account.t) Syncable_ledger.answer
+  ( Ledger.Location.Addr.t
+  , Ledger_hash.t
+  , Account.Stable.V1.t )
+  Syncable_ledger.answer
 [@@deriving bin_io, sexp]
 
 type query = Ledger.Location.Addr.t Syncable_ledger.query

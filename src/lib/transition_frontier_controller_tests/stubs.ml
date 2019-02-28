@@ -1,4 +1,4 @@
-open Async_kernel
+open Async
 open Core_kernel
 open Protocols.Coda_pow
 open Coda_base
@@ -359,13 +359,19 @@ struct
       gen_root_breadcrumb_builder root_breadcrumb |> Quickcheck.random_value
     in
     Deferred.List.iter deferred_breadcrumbs ~f:(fun deferred_breadcrumb ->
-        let%map breadcrumb = deferred_breadcrumb in
+        let%bind breadcrumb = deferred_breadcrumb in
         Transition_frontier.add_breadcrumb_exn frontier breadcrumb )
 
   let gen_linear_breadcrumbs ~logger ~size ~accounts_with_secret_keys
       root_breadcrumb =
     Quickcheck.Generator.with_size ~size
     @@ Quickcheck_lib.gen_imperative_list
+         (root_breadcrumb |> return |> Quickcheck.Generator.return)
+         (gen_breadcrumb ~logger ~accounts_with_secret_keys)
+
+  let gen_tree ~logger ~size ~accounts_with_secret_keys root_breadcrumb =
+    Quickcheck.Generator.with_size ~size
+    @@ Quickcheck_lib.gen_imperative_rose_tree
          (root_breadcrumb |> return |> Quickcheck.Generator.return)
          (gen_breadcrumb ~logger ~accounts_with_secret_keys)
 
@@ -395,9 +401,16 @@ struct
 
     let create ~logger ~peers = {logger; table= peers}
 
-    let random_peers _ = failwith "STUB: Network.random_peers"
+    let random_peers {table; _} num_peers =
+      let peers = Hashtbl.keys table in
+      List.take (List.permute peers) num_peers
 
-    let catchup_transition _ = failwith "STUB: Network.catchup_transition"
+    let catchup_transition {table; _} peer state_hash =
+      Deferred.Result.return
+      @@
+      let open Option.Let_syntax in
+      let%bind frontier = Hashtbl.find table peer in
+      Sync_handler.transition_catchup ~frontier state_hash
 
     let get_ancestry {table; logger} peer consensus_state =
       Deferred.return
@@ -439,5 +452,75 @@ struct
                 sync_ledger_query ;
               Pipe_lib.Linear_pipe.write response_writer answer )
       |> don't_wait_for
+  end
+
+  module Network_builder = struct
+    type peer_config =
+      {num_breadcrumbs: int; accounts: (Private_key.t option * Account.t) list}
+
+    type peer = {address: Network_peer.Peer.t; frontier: Transition_frontier.t}
+
+    type t = {me: Transition_frontier.t; peers: peer List.t; network: Network.t}
+
+    module Constants = struct
+      let init_address = 1337
+
+      let time = Int64.of_int 1
+    end
+
+    let setup ~source_accounts ~logger configs =
+      let%bind me = create_root_frontier ~logger source_accounts in
+      let%map _, peers =
+        Deferred.List.fold ~init:(Constants.init_address, []) configs
+          ~f:(fun (discovery_port, acc_peers) {num_breadcrumbs; accounts} ->
+            let%bind frontier = create_root_frontier ~logger accounts in
+            let%map () =
+              build_frontier_randomly frontier
+                ~gen_root_breadcrumb_builder:
+                  (gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
+                     ~accounts_with_secret_keys:accounts)
+            in
+            let address =
+              Network_peer.Peer.create Unix.Inet_addr.localhost ~discovery_port
+                ~communication_port:(discovery_port + 1)
+            in
+            let peer = {address; frontier} in
+            (discovery_port + 2, peer :: acc_peers) )
+      in
+      let network =
+        Network.create ~logger
+          ~peers:
+            ( List.map peers ~f:(fun {address; frontier} -> (address, frontier))
+            |> Network_peer.Peer.Table.of_alist_exn )
+      in
+      {me; network; peers= List.rev peers}
+
+    let setup_me_and_a_peer ~source_accounts ~target_accounts ~logger
+        ~num_breadcrumbs =
+      let%map {me; network; peers} =
+        setup ~source_accounts ~logger
+          [{num_breadcrumbs; accounts= target_accounts}]
+      in
+      (me, List.hd_exn peers, network)
+
+    let send_transition ~logger ~transition_writer ~peer:{address; frontier}
+        state_hash =
+      let transition =
+        Transition_frontier.(
+          find_exn frontier state_hash
+          |> Breadcrumb.transition_with_hash |> With_hash.data)
+      in
+      Logger.info logger
+        !"Peer %{sexp:Network_peer.Peer.t} sending %{sexp:State_hash.t}"
+        address state_hash ;
+      let enveloped_transition =
+        Envelope.Incoming.wrap ~data:transition ~sender:address
+      in
+      Pipe_lib.Strict_pipe.Writer.write transition_writer
+        (`Transition enveloped_transition, `Time_received Constants.time)
+
+    let make_transition_pipe () =
+      Pipe_lib.Strict_pipe.create
+        (Buffered (`Capacity 10, `Overflow Drop_head))
   end
 end

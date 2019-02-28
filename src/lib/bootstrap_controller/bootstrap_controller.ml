@@ -17,6 +17,7 @@ module type Inputs_intf = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
      and type consensus_local_state := Consensus.Local_state.t
+     and type user_command := User_command.t
 
   module Root_sync_ledger :
     Syncable_ledger.S
@@ -54,6 +55,8 @@ module type Inputs_intf = sig
   module Sync_handler :
     Sync_handler_intf
     with type ledger_hash := Ledger_hash.t
+     and type state_hash := State_hash.t
+     and type external_transition := External_transition.t
      and type transition_frontier := Transition_frontier.t
      and type syncable_ledger_query := Sync_ledger.query
      and type syncable_ledger_answer := Sync_ledger.answer
