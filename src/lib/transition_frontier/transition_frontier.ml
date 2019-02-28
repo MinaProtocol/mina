@@ -695,8 +695,6 @@ module Make (Inputs : Inputs_intf) :
                 Non_empty_list.iter txns ~f:(fun txn ->
                     (* TODO: @cmr use the ignore-hash ledger here as well *)
                     TL.apply_transaction t.root_snarked_ledger txn
-                    |> Or_error.ok_exn |> ignore ;
-                    Ledger.apply_transaction db_mask txn
                     |> Or_error.ok_exn |> ignore ) ;
                 (* TODO: See issue #1606 to make this faster *)
                 
