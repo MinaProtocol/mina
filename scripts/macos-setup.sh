@@ -67,6 +67,7 @@ if [[ $COMPILE_THINGS == "YES" ]]; then
   set +u
   . ~/.nix-profile/etc/profile.d/nix.sh
   if [[ "$CIRCLE_BUILD_NUM" ]]; then
+      mkdir -p ~/.config/nix
       cat > ~/.config/nix/nix.conf <<EOF
 substituters = https://cache.nixos.org s3://o1-nix-cache
 # Checking signatures is broken with S3 based Nix caches, see
