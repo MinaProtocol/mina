@@ -10,8 +10,17 @@ end
 module type Transition_frontier_intf = sig
   type t
 
-  module Extensions :
-    Protocols.Coda_transition_frontier.Transition_frontier_extensions_intf
+  module Extensions : sig
+    module Work : sig
+      type t [@@deriving sexp, bin_io]
+
+      include Hashable.S_binable with type t := t
+    end
+
+    type readers =
+      { snark_pool: (int * int Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t
+      ; best_tip_diff: diff_view }
+  end
 
   val extension_pipes : t -> Extensions.readers
 end

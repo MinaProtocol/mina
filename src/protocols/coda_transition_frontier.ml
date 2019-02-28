@@ -16,17 +16,6 @@ module Transition_frontier_diff = struct
   [@@deriving sexp]
 end
 
-module type Transition_frontier_extensions_intf = sig
-  module Work : sig
-    type t [@@deriving sexp, bin_io]
-
-    include Hashable.S_binable with type t := t
-  end
-
-  type readers =
-    {snark_pool: (int * int Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t}
-end
-
 (** An extension to the transition frontier that provides a view onto the data
     other components can use. These are exposed through the broadcast pipes
     accessible by calling extension_pipes on a Transition_frontier.t. *)
