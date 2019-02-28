@@ -107,7 +107,16 @@ let start_prefix_check log workers events testnet ~acceptable_delay =
      let rec go () =
        let diff = Time.diff (Time.now ()) !last_time in
        let diff = Time.Span.to_sec diff in
-       if not (diff < Time.Span.to_sec acceptable_delay +. epsilon) then (
+       if
+         not
+           ( diff
+           < Time.Span.to_sec acceptable_delay
+             +. epsilon
+             +. Int.to_float
+                  ( (Consensus.Constants.c - 1)
+                  * Consensus.Constants.block_window_duration_ms )
+                /. 1000. )
+       then (
          Logger.fatal log "no recent blocks" ;
          ignore (exit 1) ) ;
        let%bind () = after (Time.Span.of_sec 1.0) in

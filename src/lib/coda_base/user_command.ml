@@ -135,3 +135,5 @@ let%test_unit "json" =
   )
 
 let check t = Option.some_if (check_signature t) t
+
+let forget_check t = t

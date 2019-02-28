@@ -108,12 +108,16 @@ module type Transaction_pool_intf = sig
 
   type transaction
 
+  type transition_frontier
+
   val broadcasts : t -> pool_diff Linear_pipe.Reader.t
 
   val load :
        parent_log:Logger.t
     -> disk_location:string
     -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
+    -> frontier_broadcast_pipe:transition_frontier Option.t
+                               Broadcast_pipe.Reader.t
     -> t Deferred.t
 
   val add : t -> transaction -> unit Deferred.t
@@ -128,12 +132,16 @@ module type Snark_pool_intf = sig
 
   type pool_diff
 
+  type transition_frontier
+
   val broadcasts : t -> pool_diff Linear_pipe.Reader.t
 
   val load :
        parent_log:Logger.t
     -> disk_location:string
     -> incoming_diffs:pool_diff Envelope.Incoming.t Linear_pipe.Reader.t
+    -> frontier_broadcast_pipe:transition_frontier Option.t
+                               Broadcast_pipe.Reader.t
     -> t Deferred.t
 
   val get_completed_work :
@@ -232,10 +240,29 @@ end
 module type Inputs_intf = sig
   include Coda_pow.Inputs_intf
 
+  module Masked_ledger : sig
+    type t
+  end
+
+  module Ledger_db : Coda_pow.Ledger_creatable_intf
+
+  module Transition_frontier :
+    Protocols.Coda_transition_frontier.Transition_frontier_intf
+    with type state_hash := Protocol_state_hash.t
+     and type external_transition_verified := External_transition.Verified.t
+     and type ledger_database := Ledger_db.t
+     and type masked_ledger := Masked_ledger.t
+     and type staged_ledger := Staged_ledger.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
+     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
+     and type consensus_local_state := Consensus_mechanism.Local_state.t
+     and type user_command := User_command.t
+
   module Snark_pool :
     Snark_pool_intf
     with type completed_work_statement := Transaction_snark_work.Statement.t
      and type completed_work_checked := Transaction_snark_work.Checked.t
+     and type transition_frontier := Transition_frontier.t
 
   module Work_selector :
     Coda_pow.Work_selector_intf
@@ -254,6 +281,7 @@ module type Inputs_intf = sig
     with type transaction_with_valid_signature :=
                 User_command.With_valid_signature.t
      and type transaction := User_command.t
+     and type transition_frontier := Transition_frontier.t
 
   module State_body_hash : sig
     type t
@@ -275,23 +303,6 @@ module type Inputs_intf = sig
      and type state_hash := Coda_base.State_hash.t
      and type state_body_hash := State_body_hash.t
      and type consensus_state := Consensus_mechanism.Consensus_state.value
-
-  module Ledger_db : Coda_pow.Ledger_creatable_intf
-
-  module Masked_ledger : sig
-    type t
-  end
-
-  module Transition_frontier :
-    Protocols.Coda_transition_frontier.Transition_frontier_intf
-    with type state_hash := Protocol_state_hash.t
-     and type external_transition_verified := External_transition.Verified.t
-     and type ledger_database := Ledger_db.t
-     and type masked_ledger := Masked_ledger.t
-     and type staged_ledger := Staged_ledger.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type consensus_local_state := Consensus_mechanism.Local_state.t
 
   module Transition_router :
     Protocols.Coda_transition_frontier.Transition_router_intf
@@ -629,6 +640,7 @@ module Make (Inputs : Inputs_intf) = struct
           Transaction_pool.load ~parent_log:config.log
             ~disk_location:config.transaction_pool_disk_location
             ~incoming_diffs:(Net.transaction_pool_diffs net)
+            ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in
         don't_wait_for
           (Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
@@ -650,6 +662,7 @@ module Make (Inputs : Inputs_intf) = struct
           Snark_pool.load ~parent_log:config.log
             ~disk_location:config.snark_pool_disk_location
             ~incoming_diffs:(Net.snark_pool_diffs net)
+            ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in
         don't_wait_for
           (Linear_pipe.iter (Snark_pool.broadcasts snark_pool) ~f:(fun x ->

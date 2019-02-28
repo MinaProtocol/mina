@@ -28,9 +28,9 @@ module Make (Inputs : Inputs.S) :
     transition |> With_hash.data |> External_transition.Verified.protocol_state
     |> External_transition.Protocol_state.previous_state_hash
 
-  (* We would like the async scheduler to context switch between each iteration
-  of external transitions when trying to build breadcrumb_path. Therefore, this
-  function needs to return a Deferred *)
+  (* We would like the async scheduler to context switch between each iteration 
+     of external transitions when trying to build breadcrumb_path. Therefore, this 
+     function needs to return a Deferred *)
   let construct_breadcrumb_path ~logger initial_breadcrumb
       cached_external_transitions =
     let open Deferred.Or_error.Let_syntax in
@@ -77,10 +77,10 @@ module Make (Inputs : Inputs.S) :
     in
     List.rev cached_breadcrumbs
 
-  let materialize_breadcrumbs ~frontier ~logger ~peer
-      peer_child_root_transition external_transitions =
+  let materialize_breadcrumbs ~frontier ~logger ~peer foreign_transition_head
+      foreign_transition_tail =
     let initial_state_hash =
-      With_hash.data (Cached.peek peer_child_root_transition)
+      With_hash.data (Cached.peek foreign_transition_head)
       |> External_transition.Verified.protocol_state
       |> External_transition.Protocol_state.previous_state_hash
     in
@@ -96,7 +96,7 @@ module Make (Inputs : Inputs.S) :
         Deferred.return @@ Or_error.error_string message
     | Some initial_breadcrumb ->
         construct_breadcrumb_path ~logger initial_breadcrumb
-          (peer_child_root_transition :: external_transitions)
+          (foreign_transition_head :: foreign_transition_tail)
 
   let verify_transition ~logger ~frontier ~unprocessed_transition_cache
       transition =
@@ -108,10 +108,10 @@ module Make (Inputs : Inputs.S) :
                `Invalid (Error.to_string_hum error) )
       in
       (* We need to coerce the transition from a proof_verified
-        transition to a fully verified in
-        order to add the transition to be added to the
-        transition frontier and to be fed through the
-        transition_handler_validator. *)
+         transition to a fully verified in
+         order to add the transition to be added to the
+         transition frontier and to be fed through the
+         transition_handler_validator. *)
       let (`I_swear_this_is_safe_see_my_comment verified_transition) =
         External_transition.to_verified transition
       in
@@ -138,13 +138,31 @@ module Make (Inputs : Inputs.S) :
           reason ;
         Error (Error.of_string reason)
 
+  let take_while_map_result_rev ~f list =
+    let open Deferred.Or_error.Let_syntax in
+    let%map result, _ =
+      Deferred.Or_error.List.fold list ~init:([], true)
+        ~f:(fun (acc, should_continue) elem ->
+          let open Deferred.Let_syntax in
+          if not should_continue then Deferred.Or_error.return (acc, false)
+          else
+            match%bind f elem with
+            | Error e -> Deferred.return (Error e)
+            | Ok None -> Deferred.Or_error.return (acc, false)
+            | Ok (Some y) -> Deferred.Or_error.return (y :: acc, true) )
+    in
+    result
+
   let get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
       ~num_peers ~unprocessed_transition_cache ~target_transition =
     let peers = Network.random_peers network num_peers in
     let target_hash = With_hash.hash (Cached.peek target_transition) in
     let open Deferred.Or_error.Let_syntax in
     Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
-        match%bind Network.catchup_transition network peer target_hash with
+        match%bind
+          O1trace.trace_recurring_task "ledger catchup" (fun () ->
+              Network.catchup_transition network peer target_hash )
+        with
         | None ->
             Deferred.return
             @@ Or_error.errorf
@@ -154,7 +172,6 @@ module Make (Inputs : Inputs.S) :
             let last, rest =
               Non_empty_list.(uncons @@ rev queried_transitions)
             in
-            let rest' = List.rev rest in
             let%bind () =
               if
                 State_hash.equal
@@ -170,7 +187,7 @@ module Make (Inputs : Inputs.S) :
                 Deferred.return (Error (Error.of_string "")) )
             in
             let%bind verified_transitions =
-              Deferred.Or_error.List.filter_map rest'
+              take_while_map_result_rev rest
                 ~f:
                   (verify_transition ~logger ~frontier
                      ~unprocessed_transition_cache)
@@ -192,6 +209,7 @@ module Make (Inputs : Inputs.S) :
 
   let run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer ~unprocessed_transition_cache =
+    let logger = Logger.child logger __MODULE__ in
     Strict_pipe.Reader.iter catchup_job_reader ~f:(fun transition_with_hash ->
         match%bind
           get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
