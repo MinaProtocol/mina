@@ -1326,7 +1326,7 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
        * transitions), use the last epoch data.
       *)
       if
-        (Epoch.equal epoch state.curr_epoch)
+        Epoch.equal epoch state.curr_epoch
         || Length.equal state.epoch_length Length.zero
       then state.last_epoch_data
         (* If we are in the next epoch, use the current epoch data. *)
