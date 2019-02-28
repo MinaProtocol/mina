@@ -51,7 +51,7 @@ jobs:
                   keys:
                       - nix-v3-{{'{{'}} checksum "src/app/kademlia-haskell/packages.nix" {{'}}'}}
                       - nix-v3-
-                      - nix-v2-		      
+                      - nix-v2-
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Deps -- make macos-setup-download
@@ -110,6 +110,9 @@ jobs:
                   command: make publish_deb
             - store_artifacts:
                   path: /tmp/artifacts
+            - run:
+                  name: Copy artifacts to Google Cloud
+                  command: scripts/artifacts.sh
     {%- endfor %}
 
     test-unit-test:

@@ -15,6 +15,7 @@ module type S = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type staged_ledger := Staged_ledger.t
      and type consensus_local_state := Consensus.Local_state.t
+     and type user_command := User_command.t
 
   module Transition_handler_validator :
     Transition_handler_validator_intf

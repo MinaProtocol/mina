@@ -364,7 +364,7 @@ module Make (Inputs : Inputs_intf) = struct
     let log = Logger.child config.parent_log "coda networking" in
     (* TODO: for following functions, could check that IP in _conn matches
        the sender IP in envelope, punish if mismatch due to IP forgery
-     *)
+    *)
     let get_staged_ledger_aux_at_hash_rpc _conn ~version:_ hash_in_envelope =
       get_staged_ledger_aux_at_hash hash_in_envelope
     in
@@ -372,9 +372,15 @@ module Make (Inputs : Inputs_intf) = struct
       answer_sync_ledger_query query_in_envelope
     in
     let transition_catchup_rpc _conn ~version:_ hash_in_envelope =
+      Logger.info log
+        !"Peer %{sexp:Network_peer.Peer.t} sent transition_catchup"
+        (Envelope.Incoming.sender hash_in_envelope) ;
       transition_catchup hash_in_envelope
     in
     let get_ancestry_rpc _conn ~version:_ query_in_envelope =
+      Logger.info log
+        !"Sending root proof to peer %{sexp:Network_peer.Peer.t}"
+        (Envelope.Incoming.sender query_in_envelope) ;
       get_ancestry query_in_envelope
     in
     let implementations =
@@ -513,41 +519,42 @@ module Make (Inputs : Inputs_intf) = struct
     loop peers 1
 
   let get_ancestry t preferred_peer input =
-    let input_in_envelope = envelope_from_me t input in
-    (* try preferred_peer first *)
-    let%bind ancestors_or_error =
-      Gossip_net.query_peer t.gossip_net preferred_peer
-        Rpcs.Get_ancestry.dispatch_multi input_in_envelope
-    in
-    let get_random_peers () =
-      let max_peers = 15 in
-      (* 1 + 2 + 4 + 8 *)
-      let except = Peer.Hash_set.of_list [preferred_peer] in
-      random_peers_except t max_peers ~except
-    in
-    match ancestors_or_error with
-    | Ok (Some ancestors) -> return (Ok ancestors)
-    | Ok None ->
-        (* #TODO: punish *)
-        Logger.faulty_peer t.log
-          !"get_ancestry returned no ancestors for the transition sender \
-            %{sexp: Peer.t}, trying non-preferred peers"
-          preferred_peer ;
-        let peers = get_random_peers () in
-        get_ancestry_non_preferred_peers t input_in_envelope peers
-    | Error e ->
-        Logger.warn t.log
-          !"get_ancestry generated error for the transition sender %{sexp: \
-            Peer.t}: %{sexp: Error.t}; trying non-preferred peers"
-          preferred_peer e ;
-        let peers = get_random_peers () in
-        get_ancestry_non_preferred_peers t input_in_envelope peers
+    O1trace.trace_recurring_task "get_ancestry" (fun () ->
+        let input_in_envelope = envelope_from_me t input in
+        (* try preferred_peer first *)
+        let%bind ancestors_or_error =
+          Gossip_net.query_peer t.gossip_net preferred_peer
+            Rpcs.Get_ancestry.dispatch_multi input_in_envelope
+        in
+        let get_random_peers () =
+          let max_peers = 15 in
+          (* 1 + 2 + 4 + 8 *)
+          let except = Peer.Hash_set.of_list [preferred_peer] in
+          random_peers_except t max_peers ~except
+        in
+        match ancestors_or_error with
+        | Ok (Some ancestors) -> return (Ok ancestors)
+        | Ok None ->
+            (* #TODO: punish *)
+            Logger.faulty_peer t.log
+              !"get_ancestry returned no ancestors for the transition sender \
+                %{sexp: Peer.t}, trying non-preferred peers"
+              preferred_peer ;
+            let peers = get_random_peers () in
+            get_ancestry_non_preferred_peers t input_in_envelope peers
+        | Error e ->
+            Logger.warn t.log
+              !"get_ancestry generated error for the transition sender \
+                %{sexp: Peer.t}: %{sexp: Error.t}; trying non-preferred peers"
+              preferred_peer e ;
+            let peers = get_random_peers () in
+            get_ancestry_non_preferred_peers t input_in_envelope peers )
 
   (* TODO: Check whether responses are good or not. *)
   let glue_sync_ledger t query_reader response_writer =
     (* We attempt to query 3 random peers, retry_max times. We keep track
-      of the peers that couldn't answer a particular query and won't try them
-      again. *)
+       of the peers that couldn't answer a particular query and won't try them
+       again. *)
     let retry_max = 6 in
     let retry_interval = Core.Time.Span.of_ms 200. in
     let rec answer_query ctr peers_tried query =
