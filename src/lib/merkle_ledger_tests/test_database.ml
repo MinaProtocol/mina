@@ -444,10 +444,16 @@ let%test_module "test functor on in memory databases" =
       let depth = Depth.depth
 
       module Location = Merkle_ledger.Location.Make (Depth)
-      module MT =
-        Database.Make (Key) (Account) (Hash) (Depth) (Location)
-          (In_memory_kvdb)
-          (Storage_locations)
+
+      module Inputs = struct
+        include Test_stubs.Base_inputs
+        module Location = Location
+        module Kvdb = In_memory_kvdb
+        module Storage_locations = Storage_locations
+        module Depth = Depth
+      end
+
+      module MT = Database.Make (Inputs)
 
       (* TODO: maybe this function should work with dynamic modules *)
       let with_instance (f : MT.t -> 'a) =

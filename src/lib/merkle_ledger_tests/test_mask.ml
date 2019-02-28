@@ -709,6 +709,14 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
   module Location : Merkle_ledger.Location_intf.S =
     Merkle_ledger.Location.Make (Depth)
 
+  module Inputs = struct
+    include Test_stubs.Base_inputs
+    module Location = Location
+    module Kvdb = In_memory_kvdb
+    module Storage_locations = Storage_locations
+    module Depth = Depth
+  end
+
   (* underlying Merkle tree *)
   module Base_db :
     Merkle_ledger.Database_intf.S
@@ -719,12 +727,9 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
      and type hash := Hash.t
      and type key := Key.t
      and type key_set := Key.Set.t =
-    Database.Make (Key) (Account) (Hash) (Depth) (Location) (In_memory_kvdb)
-      (Storage_locations)
+    Database.Make (Inputs)
 
-  module Any_base =
-    Merkle_ledger.Any_ledger.Make_base (Key) (Account) (Hash) (Location)
-      (Depth)
+  module Any_base = Merkle_ledger.Any_ledger.Make_base (Inputs)
   module Base = Any_base.M
 
   (* the mask tree *)
@@ -737,9 +742,10 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
      and type key := Key.t
      and type key_set := Key.Set.t
      and type hash := Hash.t
-     and type parent := Base.t =
-    Merkle_mask.Masking_merkle_tree.Make (Key) (Account) (Hash) (Location)
-      (Base)
+     and type parent := Base.t = Merkle_mask.Masking_merkle_tree.Make (struct
+    include Inputs
+    module Base = Base
+  end)
 
   (* tree that can register masks *)
   module Maskable :
@@ -753,10 +759,11 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
      and type hash := Hash.t
      and type unattached_mask := Mask.t
      and type attached_mask := Mask.Attached.t
-     and type t := Base.t =
-    Merkle_mask.Maskable_merkle_tree.Make (Key) (Account) (Hash) (Location)
-      (Base)
-      (Mask)
+     and type t := Base.t = Merkle_mask.Maskable_merkle_tree.Make (struct
+    include Inputs
+    module Base = Base
+    module Mask = Mask
+  end)
 
   (* test runner *)
   let with_instances f =
