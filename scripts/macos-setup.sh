@@ -75,8 +75,12 @@ substituters = https://cache.nixos.org s3://o1-nix-cache
 require-sigs = false
 EOF
   fi
+  set +e
+  nix-build --dry-run src/app/kademlia-haskell/release2.nix 2>&1 | grep -q 'these derivations will be built'
+  building_kad=$?
+  set -e
   make kademlia
-  if [[ "$CIRCLE_BUILD_NUM" ]]; then
+  if [[ "$CIRCLE_BUILD_NUM" && [[ "$building_kad" = 0 ]]]]; then
       nix copy --to s3://o1-nix-cache src/app/kademlia-haskell/result/
       # Incantation to copy build dependencies. We instantiate the nix
       # expression to a derivation, get a list of the derivations it references,
