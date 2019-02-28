@@ -672,6 +672,8 @@ module type Transaction_snark_scan_state_intf = sig
 
   val snark_job_list_json : t -> string
 
+  val other_trees_data : t -> transaction list list
+
   val all_work_to_do :
     t -> transaction_snark_work_statement Sequence.t Or_error.t
 
@@ -763,6 +765,8 @@ module type Staged_ledger_base_intf = sig
   val replace_ledger_exn : t -> ledger -> t
 
   val proof_txns : t -> transaction Non_empty_list.t option
+
+  val other_trees_data : t -> transaction list list
 
   val copy : t -> t
 

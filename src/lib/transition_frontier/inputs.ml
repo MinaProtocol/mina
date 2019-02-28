@@ -44,8 +44,8 @@ module type Inputs_intf = sig
     with module Protocol_state = Consensus.Protocol_state
      and module Staged_ledger_diff := Staged_ledger_diff
 
-  module Staged_ledger :
-    Staged_ledger_intf
+  module Staged_ledger : sig
+    include Staged_ledger_intf
     with type diff := Staged_ledger_diff.t
      and type valid_diff :=
                 Staged_ledger_diff.With_valid_signatures_and_proofs.t
@@ -65,6 +65,9 @@ module type Inputs_intf = sig
      and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
      and type transaction := Transaction.t
      and type user_command := User_command.t
+
+     val other_trees_data : t -> Transaction.t list list
+  end
 
   val max_length : int
 end

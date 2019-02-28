@@ -193,6 +193,8 @@ module Make (Inputs : Inputs_intf) :
         (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
         (diff, next_staged_ledger_hash, ledger_proof_opt))
     in
+    Logger.trace logger !"sl: " ;
+    Logger.trace logger !"building transition with ledger proof %{sexp:(Ledger_proof.t * Transaction.t list) option}" ledger_proof_opt ;
     let%bind protocol_state, consensus_transition_data =
       lift_sync (fun () ->
           let previous_ledger_hash =

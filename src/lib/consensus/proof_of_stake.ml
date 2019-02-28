@@ -1015,6 +1015,7 @@ module Consensus_state = struct
         ~epoch_ledger:last_data.ledger ~epoch:transition_data.epoch
         ~slot:transition_data.slot ~seed:last_data.seed
     in
+    let%bind new_total_currency = Currency.Amount.Checked.add previous_state.total_currency supply_increase in
     let%bind curr_data =
       let%map seed =
         let%bind in_seed_update_range =
@@ -1039,7 +1040,7 @@ module Consensus_state = struct
       and ledger =
         Epoch_ledger.if_ epoch_increased
           ~then_:
-            { total_currency= previous_state.total_currency
+            { total_currency= new_total_currency
             ; hash= previous_blockchain_state_ledger_hash }
           ~else_:previous_state.curr_epoch_data.ledger
       and start_checkpoint =
@@ -1330,6 +1331,8 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
     (Int64.to_int now) (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
     ( Int64.to_int @@ Time.Span.to_ms @@ Time.to_span_since_epoch
     @@ Epoch.start_time epoch ) ;
+  let epoch_transitioning = Epoch.equal epoch (Epoch.succ state.curr_epoch) in
+  (*assert (epoch_transitioning || Epoch.equal epoch state.curr_epoch) ;*)
   let next_slot =
     (* When we first enter an epoch, the protocol state may still be a previous
      * epoch. If that is the case, we need to select the staged vrf inputs
@@ -1347,11 +1350,11 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
        * transitions), use the last epoch data.
       *)
       if
-        Epoch.equal epoch state.curr_epoch
-        || Length.equal state.epoch_length Length.zero
+        (not epoch_transitioning)
+        || Length.equal state.epoch_length Length.zero (* ??? *)
       then state.last_epoch_data
         (* If we are in the next epoch, use the current epoch data. *)
-      else if Epoch.equal epoch (Epoch.succ state.curr_epoch) then
+      else if epoch_transitioning then
         state.curr_epoch_data
         (* If the epoch we are in is none of the above, something is wrong. *)
       else (
@@ -1366,7 +1369,7 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
           Coda_base.Frozen_ledger_hash.equal epoch_data.ledger.hash
             genesis_ledger_hash
         then ("genesis", Some local_state.Local_state.genesis_epoch_snapshot)
-        else if state.curr_epoch_data.length < Length.of_int Constants.k then
+        else if epoch_transitioning || state.curr_epoch_data.length <= Length.of_int Constants.k then
           ("curr", local_state.curr_epoch_snapshot)
         else ("last", local_state.Local_state.last_epoch_snapshot)
       in

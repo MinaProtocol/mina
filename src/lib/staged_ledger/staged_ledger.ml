@@ -39,6 +39,8 @@ module Make (Inputs : Inputs.S) : sig
      and type ledger_proof_statement_set := Inputs.Ledger_proof_statement.Set.t
      and type transaction := Inputs.Transaction.t
      and type user_command := Inputs.User_command.t
+
+    val other_trees_data : t -> Inputs.Transaction.t list list
 end = struct
   open Inputs
   module Scan_state = Transaction_snark_scan_state.Make (Inputs)
@@ -183,6 +185,8 @@ end = struct
     List.map all_jobs_paired ~f:job_pair_to_work_spec_pair
 
   let scan_state {scan_state; _} = scan_state
+
+  let other_trees_data t = scan_state t |> Scan_state.other_trees_data
 
   let get_target ((proof, _), _) =
     let {Ledger_proof_statement.target; _} = Ledger_proof.statement proof in
@@ -695,8 +699,7 @@ end = struct
         Scan_state.fill_work_and_enqueue_transactions scan_state' data works
       in
       Or_error.iter_error r ~f:(fun e ->
-          (* TODO: Pass a logger here *)
-          eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e ) ;
+          Logger.error logger !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e) ;
       Deferred.return (to_staged_ledger_or_error r)
     in
     let%map () =

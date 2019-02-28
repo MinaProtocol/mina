@@ -5,9 +5,9 @@ open Core
 include Make (struct
   let accounts =
     let balances =
-      [ 5_000_000
-      ; 5_000_000
+      [ 10_000_000
       ; 50_000
+      ; 1_000
       ; 1_000
       ; 1_000
       ; 1_000

@@ -527,6 +527,8 @@ end = struct
 
   let next_jobs_sequence t = Parallel_scan.next_jobs_sequence ~state:t.tree
 
+  let other_trees_data t = Parallel_scan.State.other_trees_data t.tree |> List.map ~f:extract_txns
+
   let staged_transactions t =
     List.map (Parallel_scan.current_data t.tree)
       ~f:(fun (t : Transaction_with_witness.t) -> t.transaction_with_info )

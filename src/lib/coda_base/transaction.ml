@@ -6,7 +6,9 @@ type t =
   | User_command of User_command.With_valid_signature.t
   | Fee_transfer of Fee_transfer.t
   | Coinbase of Coinbase.t
-[@@deriving bin_io, sexp]
+[@@deriving bin_io, eq, sexp]
+
+let compare x y = failwith "nice try"
 
 let fee_excess = function
   | User_command t ->

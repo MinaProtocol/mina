@@ -71,6 +71,8 @@ module State : sig
    *)
   type ('a, 'd) t [@@deriving sexp, bin_io]
 
+  val other_trees_data : ('a, 'd) t -> 'd list list
+
   val fold_chronological :
     ('a, 'd) t -> init:'acc -> f:('acc -> ('a, 'd) Job.t -> 'acc) -> 'acc
   (** Fold chronologically through the state. This is not the same as iterating

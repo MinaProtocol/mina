@@ -23,6 +23,20 @@ module Make (Inputs : Inputs_intf) :
 
   exception Already_exists of State_hash.t
 
+  module Fake_db = struct
+    include Coda_base.Ledger.Db
+    type location = Location.t
+    let get_or_create ledger key =
+      let key, loc =
+        match get_or_create_account_exn ledger key (Account.initialize key) with
+        | `Existed, loc -> ([], loc)
+        | `Added, loc -> ([key], loc)
+      in
+      (key, get ledger loc |> Option.value_exn, loc)
+  end
+
+  module TL = Coda_base.Transaction_logic.Make(Fake_db)
+
   module Breadcrumb = struct
     (* TODO: external_transition should be type : External_transition.With_valid_protocol_state.t #1344 *)
     type t =
@@ -573,6 +587,17 @@ module Make (Inputs : Inputs_intf) :
                 ,heir_node.breadcrumb.just_emitted_a_proof)
               with
             | Some txns, true ->
+                (* r.other_tree_data |> last == r' |> proof_txns *)
+                [%test_result: Transaction.t list]
+                  ~equal:(List.equal ~equal:Transaction.equal)
+                  ~message:"last other trees data in old root is not proof txns in new root"
+                  ~expect:(root_staged_ledger |> Inputs.Staged_ledger.other_trees_data |> List.last_exn |> List.rev)
+                  (txns |> Non_empty_list.to_list) ;
+                (*[%test_result: int]
+                  ~message:"other_trees_data were not the same length in r and r'"
+                  ~expect:(root_staged_ledger |> Inputs.Staged_ledger.other_trees_data |> List.length)
+                  (_new_root_staged_ledger |> Inputs.Staged_ledger.other_trees_data |> List.length)
+                  ;*)
                 let proof_data =
                   Inputs.Staged_ledger.current_ledger_proof
                     _new_root_staged_ledger
@@ -585,13 +610,28 @@ module Make (Inputs : Inputs_intf) :
                   ~expect:(Inputs.Ledger_proof.statement proof_data).source
                   ( Ledger.Db.merkle_root t.root_snarked_ledger
                   |> Frozen_ledger_hash.of_ledger_hash ) ;
+
                 let db_mask = Ledger.of_database t.root_snarked_ledger in
+
                 Non_empty_list.iter txns ~f:(fun txn ->
                     (* TODO: @cmr use the ignore-hash ledger here as well *)
+                    Logger.trace t.logger !"applying %{sexp:Transaction.t} to root_snarked_ledger" txn ;
+                    TL.apply_transaction t.root_snarked_ledger txn |> Or_error.ok_exn |> ignore;
                     Ledger.apply_transaction db_mask txn
                     |> Or_error.ok_exn |> ignore ) ;
                 (* TODO: See issue #1606 to make this faster *)
-                Ledger.commit db_mask ;
+
+                (*
+                [%test_result: Frozen_ledger_hash.t]
+                  ~message:
+                    "after applying all the transactions, the mask hash wasn't the target
+                    after root transition"
+                  ~expect:(Inputs.Ledger_proof.statement proof_data).target
+                  ( Ledger.merkle_root db_mask
+                  |> Frozen_ledger_hash.of_ledger_hash ) ;
+                *)
+
+                (*Ledger.commit db_mask ;*)
                 ignore
                   (Ledger.Maskable.unregister_mask_exn
                      (Ledger.Any_ledger.cast
