@@ -133,8 +133,8 @@ struct
   end)
 
   (* Generate valid payments for each blockchain state by having 
-  each user send a payment of one coin to another random 
-   user if they at least one coin*)
+     each user send a payment of one coin to another random 
+     user if they at least one coin*)
   let gen_payments accounts_with_secret_keys :
       User_command.With_valid_signature.t Sequence.t =
     let public_keys =
@@ -395,13 +395,53 @@ struct
     module Protocol_state_validator = Protocol_state_validator
   end)
 
+  module Breadcrumb_visualizations = struct
+    module Graph =
+      Visualization.Make_ocamlgraph (Transition_frontier.Breadcrumb)
+
+    let visualize ~filename ~f breadcrumbs =
+      let output_channel = Out_channel.create filename in
+      let graph = f breadcrumbs in
+      Graph.output_graph output_channel graph
+
+    let graph_breadcrumb_list breadcrumbs =
+      let initial_breadcrumb, tail_breadcrumbs =
+        Non_empty_list.uncons breadcrumbs
+      in
+      let graph = Graph.add_vertex Graph.empty initial_breadcrumb in
+      let graph, _ =
+        List.fold tail_breadcrumbs ~init:(graph, initial_breadcrumb)
+          ~f:(fun (graph, prev_breadcrumb) curr_breadcrumb ->
+            let graph_with_node = Graph.add_vertex graph curr_breadcrumb in
+            ( Graph.add_edge graph_with_node prev_breadcrumb curr_breadcrumb
+            , curr_breadcrumb ) )
+      in
+      graph
+
+    let visualize_list =
+      visualize ~f:(fun breadcrumbs ->
+          breadcrumbs |> Non_empty_list.of_list_opt |> Option.value_exn
+          |> graph_breadcrumb_list )
+
+    let graph_rose_tree tree =
+      let rec go graph (Rose_tree.T (root, children)) =
+        let graph' = Graph.add_vertex graph root in
+        List.fold children ~init:graph'
+          ~f:(fun graph (T (child, grand_children)) ->
+            let graph_with_child = go graph (T (child, grand_children)) in
+            Graph.add_edge graph_with_child root child )
+      in
+      go Graph.empty tree
+
+    let visualize_rose_tree =
+      visualize ~f:(fun breadcrumbs -> graph_rose_tree breadcrumbs)
+  end
+
   module Network = struct
     type t =
       {logger: Logger.t; table: Transition_frontier.t Network_peer.Peer.Table.t}
 
-    let create ~logger = {logger; table= Network_peer.Peer.Table.create ()}
-
-    let add_exn {table; _} = Hashtbl.add_exn table
+    let create ~logger ~peers = {logger; table= peers}
 
     let random_peers {table; _} num_peers =
       let peers = Hashtbl.keys table in
@@ -472,7 +512,6 @@ struct
 
     let setup ~source_accounts ~logger configs =
       let%bind me = create_root_frontier ~logger source_accounts in
-      let network = Network.create ~logger in
       let%map _, peers =
         Deferred.List.fold ~init:(Constants.init_address, []) configs
           ~f:(fun (discovery_port, acc_peers) {num_breadcrumbs; accounts} ->
@@ -487,9 +526,14 @@ struct
               Network_peer.Peer.create Unix.Inet_addr.localhost ~discovery_port
                 ~communication_port:(discovery_port + 1)
             in
-            Network.add_exn network ~key:address ~data:frontier ;
             let peer = {address; frontier} in
             (discovery_port + 2, peer :: acc_peers) )
+      in
+      let network =
+        Network.create ~logger
+          ~peers:
+            ( List.map peers ~f:(fun {address; frontier} -> (address, frontier))
+            |> Network_peer.Peer.Table.of_alist_exn )
       in
       {me; network; peers= List.rev peers}
 

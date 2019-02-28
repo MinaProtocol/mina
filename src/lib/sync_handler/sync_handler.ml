@@ -67,13 +67,20 @@ module Make (Inputs : Inputs_intf) :
     let answer = Sync_ledger.Responder.answer_query responder query in
     (hash, answer)
 
-  let transition_catchup ~frontier hash =
+  let transition_catchup ~frontier state_hash =
     let open Option.Let_syntax in
-    let%bind breadcrumb = Transition_frontier.find frontier hash in
-    Transition_frontier.path_map
-      ~f:(fun b ->
-        Transition_frontier.Breadcrumb.transition_with_hash b
-        |> With_hash.data |> External_transition.of_verified )
-      frontier breadcrumb
-    |> Non_empty_list.of_list_opt
+    let%bind transitions =
+      Transition_frontier.root_history_path_map frontier
+        ~f:(fun b ->
+          Transition_frontier.Breadcrumb.transition_with_hash b
+          |> With_hash.data |> External_transition.of_verified )
+        state_hash
+    in
+    let length =
+      Int.min
+        (Non_empty_list.length transitions)
+        (2 * Transition_frontier.max_length)
+    in
+    Non_empty_list.take (Non_empty_list.rev transitions) length
+    >>| Non_empty_list.rev
 end
