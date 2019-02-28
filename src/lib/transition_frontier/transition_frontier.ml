@@ -679,17 +679,6 @@ module Make (Inputs : Inputs_intf) :
                 , heir_node.breadcrumb.just_emitted_a_proof )
               with
             | Some txns, true ->
-                (* r.other_tree_data |> last == r' |> proof_txns *)
-                [%test_result: Transaction.t list]
-                  ~equal:(List.equal ~equal:Transaction.equal)
-                  ~message:
-                    "last other trees data in old root is not proof txns in \
-                     new root"
-                  ~expect:
-                    ( root_staged_ledger
-                    |> Inputs.Staged_ledger.other_trees_data |> List.last_exn
-                    |> List.rev )
-                  (txns |> Non_empty_list.to_list) ;
                 let proof_data =
                   Inputs.Staged_ledger.current_ledger_proof
                     new_root_staged_ledger
