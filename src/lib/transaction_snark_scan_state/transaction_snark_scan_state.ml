@@ -377,7 +377,8 @@ end = struct
       | Ok (Some res) -> Ok res
       | Error e -> Error (`Error e)
 
-    let check_invariants t ~error_prefix current_ledger_hash snarked_ledger_hash =  
+    let check_invariants t ~error_prefix current_ledger_hash
+        snarked_ledger_hash =
       let clarify_error cond err =
         if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
       in
@@ -385,9 +386,7 @@ end = struct
       match%map scan_statement t with
       | Error (`Error e) -> Error e
       | Error `Empty ->
-          let current_ledger_hash =
-            current_ledger_hash
-          in
+          let current_ledger_hash = current_ledger_hash in
           Option.value_map ~default:(Ok ()) snarked_ledger_hash ~f:(fun hash ->
               clarify_error
                 (Frozen_ledger_hash.equal hash current_ledger_hash)
@@ -402,10 +401,7 @@ end = struct
                   "did not connect with snarked ledger hash" )
           and () =
             clarify_error
-              (Frozen_ledger_hash.equal
-                 current_ledger_hash
-
-                 target)
+              (Frozen_ledger_hash.equal current_ledger_hash target)
               "incorrect statement target hash"
           and () =
             clarify_error
