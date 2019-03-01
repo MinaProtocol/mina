@@ -1129,8 +1129,8 @@ end
 
 module Snark_transition = Coda_base.Snark_transition.Make (struct
   module Genesis_ledger = Genesis_ledger
-  module Blockchain_state = Blockchain_state
-  module Consensus_data = Consensus_transition_data
+  module Blockchain_state = Blockchain_state.Stable.V1
+  module Consensus_data = Consensus_transition_data.Stable.V1
 end)
 
 (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
