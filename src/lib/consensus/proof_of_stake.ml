@@ -110,56 +110,6 @@ let compute_delegators self_pk ~iter_accounts =
       else () ) ;
   t
 
-module Local_state = struct
-  module Snapshot = struct
-    type t =
-      { ledger: Coda_base.Sparse_ledger.t
-      ; delegators: Currency.Balance.t Coda_base.Account.Index.Table.t }
-    [@@deriving sexp]
-
-    let create_empty () =
-      { ledger= Coda_base.Sparse_ledger.of_root Coda_base.Ledger_hash.empty_hash
-      ; delegators= Coda_base.Account.Index.Table.create () }
-  end
-
-  type t =
-    { mutable last_epoch_snapshot: Snapshot.t option
-    ; mutable curr_epoch_snapshot: Snapshot.t option
-    ; genesis_epoch_snapshot: Snapshot.t
-    ; proposer_public_key: Public_key.Compressed.t option }
-  [@@deriving sexp]
-
-  let create proposer_public_key =
-    (* TODO: remove duplicated genesis ledger *)
-    let genesis_epoch_snapshot =
-      match proposer_public_key with
-      | None -> Snapshot.create_empty ()
-      | Some key ->
-          let open Snapshot in
-          let delegators =
-            compute_delegators
-              (* TODO: Propagate Include_self to the right place *)
-              (`Include_self, key)
-              ~iter_accounts:(fun f ->
-                let open Coda_base in
-                Ledger.foldi ~init:() Genesis_ledger.t ~f:(fun i () acct ->
-                    f (Ledger.Addr.to_int i) acct ) )
-          in
-          let ledger =
-            Coda_base.Sparse_ledger.of_ledger_index_subset_exn
-              (Coda_base.Ledger.Any_ledger.cast
-                 (module Coda_base.Ledger)
-                 Genesis_ledger.t)
-              (Coda_base.Account.Index.Table.keys delegators)
-          in
-          {delegators; ledger}
-    in
-    { last_epoch_snapshot= None
-    ; curr_epoch_snapshot= None
-    ; genesis_epoch_snapshot
-    ; proposer_public_key }
-end
-
 module Epoch = struct
   include Segment_id
 
@@ -253,6 +203,69 @@ module Epoch = struct
            Time.Span.to_ms time_since_epoch / Constants.Slot.duration_ms)
     in
     (epoch, slot)
+end
+
+module Local_state = struct
+  module Snapshot = struct
+    type t =
+      { ledger: Coda_base.Sparse_ledger.t
+      ; delegators: Currency.Balance.t Coda_base.Account.Index.Table.t }
+    [@@deriving sexp]
+
+    let create_empty () =
+      { ledger= Coda_base.Sparse_ledger.of_root Coda_base.Ledger_hash.empty_hash
+      ; delegators= Coda_base.Account.Index.Table.create () }
+  end
+
+  type t =
+    { mutable last_epoch_snapshot: Snapshot.t option
+    ; mutable curr_epoch_snapshot: Snapshot.t option
+    ; mutable last_checked_slot_and_epoch: Epoch.t * Epoch.Slot.t
+    ; genesis_epoch_snapshot: Snapshot.t
+    ; proposer_public_key: Public_key.Compressed.t option }
+  [@@deriving sexp]
+
+  let create proposer_public_key =
+    (* TODO: remove duplicated genesis ledger *)
+    let genesis_epoch_snapshot =
+      match proposer_public_key with
+      | None -> Snapshot.create_empty ()
+      | Some key ->
+          let open Snapshot in
+          let delegators =
+            compute_delegators
+              (* TODO: Propagate Include_self to the right place *)
+              (`Include_self, key)
+              ~iter_accounts:(fun f ->
+                let open Coda_base in
+                Ledger.foldi ~init:() Genesis_ledger.t ~f:(fun i () acct ->
+                    f (Ledger.Addr.to_int i) acct ) )
+          in
+          let ledger =
+            Coda_base.Sparse_ledger.of_ledger_index_subset_exn
+              (Coda_base.Ledger.Any_ledger.cast
+                 (module Coda_base.Ledger)
+                 Genesis_ledger.t)
+              (Coda_base.Account.Index.Table.keys delegators)
+          in
+          {delegators; ledger}
+    in
+    { last_epoch_snapshot= None
+    ; curr_epoch_snapshot= None
+    ; genesis_epoch_snapshot
+    ; last_checked_slot_and_epoch= (Epoch.zero, Epoch.Slot.zero)
+    ; proposer_public_key }
+
+  let seen_slot t epoch slot =
+    match
+      Tuple2.compare ~cmp1:Epoch.compare ~cmp2:Epoch.Slot.compare
+        t.last_checked_slot_and_epoch (epoch, slot)
+    with
+    | i when i >= 0 -> `Seen
+    | i when i < 0 ->
+        t.last_checked_slot_and_epoch <- (epoch, slot) ;
+        `Unseen
+    | _ -> failwith "forall x : int. x >= 0 || x < 0 is impossibly false"
 end
 
 module Epoch_ledger = struct
@@ -1371,9 +1384,12 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
       if UInt32.of_int (Epoch.Slot.to_int slot) >= Constants.Epoch.size then
         None
       else
-        match proposal_data slot with
-        | None -> find_winning_slot (Epoch.Slot.succ slot)
-        | Some data -> Some (slot, data)
+        match Local_state.seen_slot local_state epoch slot with
+        | `Seen -> find_winning_slot (Epoch.Slot.succ slot)
+        | `Unseen -> (
+          match proposal_data slot with
+          | None -> find_winning_slot (Epoch.Slot.succ slot)
+          | Some data -> Some (slot, data) )
     in
     find_winning_slot slot
   in
@@ -1382,13 +1398,12 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
   | Some (next_slot, data) ->
       Logger.info logger "Proposing in %d slots"
         (Epoch.Slot.to_int next_slot - Epoch.Slot.to_int slot) ;
-      if Epoch.Slot.equal slot next_slot then
-        `Propose_now
-          ( Epoch.slot_start_time epoch (Epoch.Slot.succ next_slot)
-            |> ms_since_epoch
-          , data )
+      if Epoch.Slot.equal slot next_slot then `Propose_now data
       else
-        `Propose (Epoch.slot_start_time epoch next_slot |> ms_since_epoch, data)
+        `Propose
+          ( Epoch.slot_start_time epoch next_slot
+            |> Time.to_span_since_epoch |> Time.Span.to_ms
+          , data )
   | None ->
       let epoch_end_time = Epoch.end_time epoch |> ms_since_epoch in
       Logger.info logger
