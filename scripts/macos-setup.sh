@@ -66,8 +66,28 @@ if [[ $COMPILE_THINGS == "YES" ]]; then
   touch ~/.profile
   set +u
   . ~/.nix-profile/etc/profile.d/nix.sh
-  set -u
+  if [[ "$CIRCLE_BUILD_NUM" ]]; then
+      mkdir -p ~/.config/nix
+      cat > ~/.config/nix/nix.conf <<EOF
+substituters = https://cache.nixos.org s3://o1-nix-cache
+# Checking signatures is broken with S3 based Nix caches, see
+# https://github.com/NixOS/nix/issues/2024
+require-sigs = false
+EOF
+  fi
+  set +e
+  nix-build --dry-run src/app/kademlia-haskell/release2.nix 2>&1 | grep -q 'these derivations will be built'
+  building_kad=$?
+  set -e
   make kademlia
+  if [[ "$CIRCLE_BUILD_NUM" && "$building_kad" = 0 ]]; then
+      nix copy --to s3://o1-nix-cache src/app/kademlia-haskell/result/
+      # Incantation to copy build dependencies. We instantiate the nix
+      # expression to a derivation, get a list of the derivations it references,
+      # and copy the outputs of those derivations to our cache.
+      nix copy --to s3://o1-nix-cache $(nix-store -r $(nix-store -q --references $(nix-instantiate src/app/kademlia-haskell/release2.nix)))
+  fi
+  set -u
 else
   echo 'Not running compile step.'
 fi
