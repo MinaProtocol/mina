@@ -222,10 +222,7 @@ module Tock = struct
 
           let one =
             let x, y = Snarkette_tock.G2.(to_affine_coordinates one) in
-            { x=
-                Fqe.conv x
-            ; y=Fqe.conv y
-            ; z= Fqe.Unchecked.one }
+            {x= Fqe.conv x; y= Fqe.conv y; z= Fqe.Unchecked.one}
         end
 
         include Snarky_curves.Make_weierstrass_checked
@@ -266,8 +263,7 @@ module Tock = struct
       module Params = struct
         include Snarkette_tock.Pairing_info
 
-        let loop_count_is_neg =
-          Snarkette_tock.Pairing_info.is_loop_count_neg
+        let loop_count_is_neg = Snarkette_tock.Pairing_info.is_loop_count_neg
       end
 
       module G2_precomputation = struct
