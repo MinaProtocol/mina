@@ -139,7 +139,7 @@ module Consensus_state = struct
 
   let length (t : value) = t.length
 
-  let time_hum (t : value) = "<posig has no notion of time>"
+  let time_hum _ = "<posig has no notion of time>"
 
   let to_lite =
     Some
