@@ -133,6 +133,7 @@ module Tock = struct
 
   module Groth16 = Snarky.Snark.Make (Tock_backend.Full.Default)
   module Fq = Snarky_field_extensions.Field_extensions.F (Tock0)
+  module Snarkette_tock = Snarkette.Mnt4_80
 
   module Inner_curve = struct
     include Tock_backend.Inner_curve
@@ -172,11 +173,14 @@ module Tock = struct
 
   module Pairing = struct
     module T = struct
+      let conv_field =
+        Fn.compose Tock0.Field.of_string Snarkette_tock.Fq.to_string
+
       module Impl = Tock0
       open Snarky_field_extensions.Field_extensions
       module Fq = Fq
 
-      let non_residue = Tock0.Field.of_int 17
+      let non_residue = conv_field Snarkette_tock.non_residue
 
       module Fqe = struct
         module Params = struct
@@ -186,6 +190,8 @@ module Tock = struct
         end
 
         include E2 (Fq) (Params)
+
+        let conv = A.map ~f:conv_field
 
         let real_part (x, _) = x
       end
@@ -215,19 +221,10 @@ module Tock = struct
                     (Coefficients)
 
           let one =
-            let open Field in
+            let x, y = Snarkette_tock.G2.(to_affine_coordinates one) in
             { x=
-                ( of_string
-                    "438374926219350099854919100077809681842783509163790991847867546339851681564223481322252708"
-                , of_string
-                    "37620953615500480110935514360923278605464476459712393277679280819942849043649216370485641"
-                )
-            ; y=
-                ( of_string
-                    "37437409008528968268352521034936931842973546441370663118543015118291998305624025037512482"
-                , of_string
-                    "424621479598893882672393190337420680597584695892317197646113820787463109735345923009077489"
-                )
+                Fqe.conv x
+            ; y=Fqe.conv y
             ; z= Fqe.Unchecked.one }
         end
 
@@ -251,14 +248,8 @@ module Tock = struct
           let mul_by_non_residue = Fqe.mul_by_primitive_element
 
           let frobenius_coeffs_c1 =
-            [| Tock0.Field.of_string "1"
-             ; Tock0.Field.of_string
-                 "7684163245453501615621351552473337069301082060976805004625011694147890954040864167002308"
-             ; Tock0.Field.of_string
-                 "475922286169261325753349249653048451545124879242694725395555128576210262817955800483758080"
-             ; Tock0.Field.of_string
-                 "468238122923807824137727898100575114475823797181717920390930116882062371863914936316755773"
-            |]
+            Array.map ~f:conv_field
+              Snarkette_tock.Fq4.Params.frobenius_coeffs_c1
         end
 
         include F4 (Fqe) (Params)
@@ -273,10 +264,10 @@ module Tock = struct
       module N = Snarkette.Mnt6_80.N
 
       module Params = struct
-        include Snarkette.Mnt4_80.Pairing_info
+        include Snarkette_tock.Pairing_info
 
         let loop_count_is_neg =
-          Snarkette.Mnt4_80.Pairing_info.is_loop_count_neg
+          Snarkette_tock.Pairing_info.is_loop_count_neg
       end
 
       module G2_precomputation = struct
@@ -565,7 +556,6 @@ module Tick = struct
                     end)
 
           let one =
-            let open Field in
             let x, y = Snarkette_tick.G2.(to_affine_coordinates one) in
             {z= Fqe.Unchecked.one; x= Fqe.conv x; y= Fqe.conv y}
         end
