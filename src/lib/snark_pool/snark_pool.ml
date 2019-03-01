@@ -147,7 +147,9 @@ end)
     match t.ref_table with
     | None -> true
     | Some ref_table -> (
-      match Work.Table.find ref_table work with None -> true | Some _ -> true )
+      match Work.Table.find ref_table work with
+      | None -> false
+      | Some _ -> true )
 
   let add_snark t ~work ~proof ~fee =
     if work_is_referenced t work then
