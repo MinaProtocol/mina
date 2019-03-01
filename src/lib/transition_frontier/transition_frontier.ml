@@ -17,7 +17,9 @@ module Make (Inputs : Inputs_intf) :
    and type masked_ledger := Ledger.Mask.Attached.t
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
    and type consensus_local_state := Consensus.Local_state.t
-   and type user_command := User_command.t = struct
+   and type user_command := User_command.t
+   and module Extensions.Work = Inputs.Transaction_snark_work.Statement =
+struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
   exception
     Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
@@ -171,6 +173,8 @@ module Make (Inputs : Inputs_intf) :
   let max_length = Inputs.max_length
 
   module Extensions = struct
+    module Work = Inputs.Transaction_snark_work.Statement
+
     module Snark_pool_refcount = Snark_pool_refcount.Make (struct
       include Inputs
       module Breadcrumb = Breadcrumb
@@ -304,7 +308,11 @@ module Make (Inputs : Inputs_intf) :
 
   let logger t = t.logger
 
-  let extension_pipes {extension_readers; _} = extension_readers
+  let snark_pool_refcount_pipe {extension_readers; _} =
+    extension_readers.snark_pool
+
+  let best_tip_diff_pipe {extension_readers; _} =
+    extension_readers.best_tip_diff
 
   (* TODO: load from and write to disk *)
   let create ~logger
@@ -694,11 +702,18 @@ module Make (Inputs : Inputs_intf) :
                 let db_mask = Ledger.of_database t.root_snarked_ledger in
                 Non_empty_list.iter txns ~f:(fun txn ->
                     (* TODO: @cmr use the ignore-hash ledger here as well *)
-                    TL.apply_transaction t.root_snarked_ledger txn
+                    Ledger.apply_transaction db_mask txn
                     |> Or_error.ok_exn |> ignore ) ;
                 (* TODO: See issue #1606 to make this faster *)
-                
-                (*Ledger.commit db_mask ;*)
+                [%test_result: Frozen_ledger_hash.t]
+                  ~message:
+                    "after applying all the transactions, the mask hash \
+                     wasn't the target\n\
+                    \                    after root transition"
+                  ~expect:(Inputs.Ledger_proof.statement proof_data).target
+                  ( Ledger.merkle_root db_mask
+                  |> Frozen_ledger_hash.of_ledger_hash ) ;
+                Ledger.commit db_mask ;
                 ignore
                   (Ledger.Maskable.unregister_mask_exn
                      (Ledger.Any_ledger.cast

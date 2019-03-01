@@ -299,6 +299,7 @@ module type Main_intf = sig
        and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
        and type consensus_local_state := Consensus.Local_state.t
        and type user_command := User_command.t
+       and type Extensions.Work.t = Transaction_snark_work.Statement.t
   end
 
   module Config : sig
@@ -714,7 +715,10 @@ struct
     end
 
     module Pool = Snark_pool.Make (Proof) (Fee) (Work) (Transition_frontier)
-    module Diff = Network_pool.Snark_pool_diff.Make (Proof) (Fee) (Work) (Pool)
+    module Diff =
+      Network_pool.Snark_pool_diff.Make (Proof) (Fee) (Work)
+        (Transition_frontier)
+        (Pool)
 
     type pool_diff = Diff.t
 
@@ -730,7 +734,12 @@ struct
     let load ~parent_log ~disk_location ~incoming_diffs
         ~frontier_broadcast_pipe =
       match%map Reader.load_bin_prot disk_location Pool.bin_reader_t with
-      | Ok pool -> of_pool_and_diffs pool ~parent_log ~incoming_diffs
+      | Ok pool ->
+          let network_pool =
+            of_pool_and_diffs pool ~parent_log ~incoming_diffs
+          in
+          Pool.listen_to_frontier_broadcast_pipe frontier_broadcast_pipe pool ;
+          network_pool
       | Error _e -> create ~parent_log ~incoming_diffs ~frontier_broadcast_pipe
 
     open Snark_work_lib.Work
@@ -826,6 +835,8 @@ struct
     module Staged_ledger_diff = Staged_ledger_diff
     module Transaction_snark_work = Transaction_snark_work
     module Transition_handler_validator = Transition_handler.Validator
+    module Unprocessed_transition_cache =
+      Transition_handler.Unprocessed_transition_cache
     module Ledger_proof_statement = Ledger_proof_statement
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Protocol_state_validator = Protocol_state_validator
