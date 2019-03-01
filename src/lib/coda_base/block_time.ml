@@ -39,7 +39,8 @@ module Controller = struct
   let create () = ()
 end
 
-include Stable.Latest
+(* DO NOT add bin_io the deriving list *)
+type t = Stable.Latest.t [@@deriving sexp, compare, eq, hash]
 
 type t0 = t
 

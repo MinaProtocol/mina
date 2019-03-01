@@ -22,13 +22,10 @@ module type Transition_frontier_intf = sig
     module Best_tip_diff : sig
       type view = Breadcrumb.t Best_tip_diff_view.t Option.t
     end
-
-    type readers
-
-    val best_tip_diff : readers -> Best_tip_diff.view Broadcast_pipe.Reader.t
   end
 
-  val extension_pipes : t -> Extensions.readers
+  val best_tip_diff_pipe :
+    t -> Extensions.Best_tip_diff.view Broadcast_pipe.Reader.t
 end
 
 (*
@@ -156,8 +153,7 @@ struct
                  <- Some
                       ( fst
                       @@ Broadcast_pipe.Reader.iter
-                           ( Transition_frontier.extension_pipes frontier
-                           |> Transition_frontier.Extensions.best_tip_diff )
+                           (Transition_frontier.best_tip_diff_pipe frontier)
                            ~f:(handle_diff t frontier) ) ;
                  Deferred.unit ) ) ;
     t
@@ -207,7 +203,8 @@ struct
   end
 
   (* TODO: Actually back this by the file-system *)
-  let load ~disk_location:_ ~parent_log = return (create ~parent_log)
+  let load ~disk_location:_ ~parent_log ~frontier_broadcast_pipe:_ =
+    return (create ~parent_log)
 end
 
 (* This test is broken because of #1748, fix it and uncomment when that's
@@ -218,47 +215,47 @@ done. *)
  *     module Mock_transition_frontier = struct
  *       module Breadcrumb = struct
  *         type t = {successors: t list; commands: int list} [@@deriving sexp]
- * 
+ *
  *         let equal b1 b2 = b1 = b2
- * 
+ *
  *         let to_user_commands {commands; _} = commands
  *       end
- * 
+ *
  *       type t =
  *         Breadcrumb.t Best_tip_diff_view.t Option.t Broadcast_pipe.Reader.t
- * 
+ *
  *       let successors _ ({successors; _} : Breadcrumb.t) = successors
- * 
+ *
  *       module Extensions = struct
  *         module Best_tip_diff = struct
  *           type view = Breadcrumb.t Best_tip_diff_view.t Option.t
  *         end
- * 
+ *
  *         type readers = Best_tip_diff.view Broadcast_pipe.Reader.t
- * 
+ *
  *         let best_tip_diff = Fn.id
  *       end
- * 
+ *
  *       let extension_pipes pipe = pipe
- * 
+ *
  *       let create () :
  *           t
  *           * Breadcrumb.t Best_tip_diff_view.t Option.t Broadcast_pipe.Writer.t
  *           =
  *         Broadcast_pipe.create None
  *     end
- * 
+ *
  *     module Test =
  *       Make (struct
  *           include Int
  *           module With_valid_signature = Int
- * 
+ *
  *           let check = Option.some
- * 
+ *
  *           let forget_check = Fn.id
  *         end)
  *         (Mock_transition_frontier)
- * 
+ *
  *     (\*   (\\* We only test the transaction removal logic here, since this whole
  *    *      module needs rewriting, it doesn't make sense to test it all. *\\)
  *    *   let%test _ =

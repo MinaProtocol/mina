@@ -71,6 +71,8 @@ include
 
 val with_ledger : f:(t -> 'a) -> 'a
 
+val with_ephemeral_ledger : f:(t -> 'a) -> 'a
+
 val create : ?directory_name:string -> unit -> t
 
 val create_ephemeral : unit -> t

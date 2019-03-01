@@ -229,11 +229,8 @@ module Make (Inputs : Inputs_intf) :
                   ( Staged_ledger_diff.With_valid_signatures_and_proofs
                     .user_commands diff
                     :> User_command.t list )
-                ~snarked_ledger_hash:
-                  (Option.value_map ledger_proof_opt
-                     ~default:previous_ledger_hash ~f:(fun (proof, _) ->
-                       Ledger_proof.(statement proof |> statement_target) ))
-                ~supply_increase ~logger ) )
+                ~snarked_ledger_hash:previous_ledger_hash ~supply_increase
+                ~logger ) )
     in
     lift_sync (fun () ->
         measure "making Snark and Internal transitions" (fun () ->
