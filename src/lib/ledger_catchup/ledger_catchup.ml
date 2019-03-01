@@ -18,67 +18,57 @@ module Make (Inputs : Inputs.S) :
    and type network := Inputs.Network.t = struct
   open Inputs
 
-  let fold_result_seq list ~init ~f =
-    Deferred.List.fold list ~init:(Ok init) ~f:(fun acc elem ->
-        match acc with
-        | Error e -> Deferred.return (Error e)
-        | Ok acc -> f acc elem )
-
   let get_previous_state_hash transition =
     transition |> With_hash.data |> External_transition.Verified.protocol_state
     |> External_transition.Protocol_state.previous_state_hash
 
-  (* We would like the async scheduler to context switch between each iteration 
+  (* We would like the async scheduler to context switch between each iteration
      of external transitions when trying to build breadcrumb_path. Therefore, this 
      function needs to return a Deferred *)
-  let construct_breadcrumb_path ~logger initial_breadcrumb
-      cached_external_transitions =
-    let open Deferred.Or_error.Let_syntax in
-    let%map _, cached_breadcrumbs =
-      fold_result_seq cached_external_transitions ~init:(initial_breadcrumb, [])
-        ~f:(fun (parent, predecessors) cached_transition_with_hash ->
-          let open Deferred.Let_syntax in
-          let%map cached_result =
-            Cached.transform cached_transition_with_hash
-              ~f:(fun transition_with_hash ->
-                let open Deferred.Or_error.Let_syntax in
-                let parent_state_hash =
-                  With_hash.hash
-                  @@ Transition_frontier.Breadcrumb.transition_with_hash parent
-                in
-                let current_state_hash = With_hash.hash transition_with_hash in
-                let%bind () =
-                  Deferred.return
-                    (Result.ok_if_true
-                       ( State_hash.equal parent_state_hash
-                       @@ get_previous_state_hash transition_with_hash )
-                       ~error:
-                         ( Error.of_string
-                         @@ sprintf
-                              !"Previous external transition hash \
-                                %{sexp:State_hash.t} does not equal to \
-                                current external_transition's parent hash \
-                                %{sexp:State_hash.t}"
-                              parent_state_hash current_state_hash ))
-                in
-                let open Deferred.Let_syntax in
-                match%map
-                  Transition_frontier.Breadcrumb.build ~logger ~parent
-                    ~transition_with_hash
-                with
-                | Ok new_breadcrumb -> Ok new_breadcrumb
-                | Error (`Fatal_error exn) -> Or_error.of_exn exn
-                | Error (`Validation_error error) -> Error error )
-            |> Cached.sequence_deferred
-          in
-          let open Or_error.Let_syntax in
-          let%map new_breadcrumb = Cached.sequence_result cached_result in
-          (Cached.peek new_breadcrumb, new_breadcrumb :: predecessors) )
-    in
-    List.rev cached_breadcrumbs
+  let construct_breadcrumb_path ~logger initial_breadcrumb tree =
+    Rose_tree.Deferred.Or_error.fold_map tree
+      ~init:(Cached.pure initial_breadcrumb)
+      ~f:(fun cached_parent_breadcrumb cached_transition_with_hash ->
+        let open Deferred.Let_syntax in
+        let%map cached_result =
+          Cached.transform cached_transition_with_hash
+            ~f:(fun transition_with_hash ->
+              let open Deferred.Or_error.Let_syntax in
+              let parent_breadcrumb = Cached.peek cached_parent_breadcrumb in
+              let parent_state_hash =
+                Transition_frontier.Breadcrumb.transition_with_hash
+                  parent_breadcrumb
+                |> With_hash.hash
+              in
+              let current_state_hash = With_hash.hash transition_with_hash in
+              let%bind () =
+                Deferred.return
+                  (Result.ok_if_true
+                     ( State_hash.equal parent_state_hash
+                     @@ get_previous_state_hash transition_with_hash )
+                     ~error:
+                       ( Error.of_string
+                       @@ sprintf
+                            !"Previous external transition hash \
+                              %{sexp:State_hash.t} does not equal to current \
+                              external_transition's parent hash \
+                              %{sexp:State_hash.t}"
+                            parent_state_hash current_state_hash ))
+              in
+              let open Deferred.Let_syntax in
+              match%map
+                Transition_frontier.Breadcrumb.build ~logger
+                  ~parent:parent_breadcrumb ~transition_with_hash
+              with
+              | Ok new_breadcrumb -> Ok new_breadcrumb
+              | Error (`Fatal_error exn) -> Or_error.of_exn exn
+              | Error (`Validation_error error) -> Error error )
+          |> Cached.sequence_deferred
+        in
+        Cached.sequence_result cached_result )
 
-  let materialize_breadcrumbs ~frontier ~logger ~peer foreign_transition_head
-      foreign_transition_tail =
+  let materialize_breadcrumbs ~frontier ~logger ~peer
+      (Rose_tree.T (foreign_transition_head, _) as tree) =
     let initial_state_hash =
       With_hash.data (Cached.peek foreign_transition_head)
       |> External_transition.Verified.protocol_state
@@ -95,8 +85,7 @@ module Make (Inputs : Inputs.S) :
         Logger.faulty_peer logger !"%s" message ;
         Deferred.return @@ Or_error.error_string message
     | Some initial_breadcrumb ->
-        construct_breadcrumb_path ~logger initial_breadcrumb
-          (foreign_transition_head :: foreign_transition_tail)
+        construct_breadcrumb_path ~logger initial_breadcrumb tree
 
   let verify_transition ~logger ~frontier ~unprocessed_transition_cache
       transition =
@@ -154,8 +143,9 @@ module Make (Inputs : Inputs.S) :
     result
 
   let get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
-      ~num_peers ~unprocessed_transition_cache ~target_transition =
+      ~num_peers ~unprocessed_transition_cache ~target_subtree =
     let peers = Network.random_peers network num_peers in
+    let (Rose_tree.T (target_transition, _)) = target_subtree in
     let target_hash = With_hash.hash (Cached.peek target_transition) in
     let open Deferred.Or_error.Let_syntax in
     Deferred.Or_error.find_map_ok peers ~f:(fun peer ->
@@ -192,33 +182,32 @@ module Make (Inputs : Inputs.S) :
                   (verify_transition ~logger ~frontier
                      ~unprocessed_transition_cache)
             in
-            let%bind head_transition, tail_transitions =
-              ( match Non_empty_list.of_list_opt verified_transitions with
-              | Some result -> Ok (Non_empty_list.uncons result)
-              | None ->
+            let%bind () =
+              Deferred.return
+                ( if List.length verified_transitions > 0 then Ok ()
+                else
                   let error =
                     "Peer should have given us some new transitions that are \
                      not in our transition frontier"
                   in
                   Logger.faulty_peer logger "%s" error ;
                   Error (Error.of_string error) )
-              |> Deferred.return
             in
-            materialize_breadcrumbs ~frontier ~logger ~peer head_transition
-              (tail_transitions @ [target_transition]) )
+            let full_subtree =
+              List.fold_right verified_transitions ~init:target_subtree
+                ~f:(fun transition acc -> Rose_tree.T (transition, [acc]) )
+            in
+            materialize_breadcrumbs ~frontier ~logger ~peer full_subtree )
 
   let run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer ~unprocessed_transition_cache =
     let logger = Logger.child logger __MODULE__ in
-    Strict_pipe.Reader.iter catchup_job_reader ~f:(fun transition_with_hash ->
+    Strict_pipe.Reader.iter catchup_job_reader ~f:(fun subtree ->
         match%bind
           get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
-            ~num_peers:8 ~unprocessed_transition_cache
-            ~target_transition:transition_with_hash
+            ~num_peers:8 ~unprocessed_transition_cache ~target_subtree:subtree
         with
-        | Ok breadcrumbs ->
-            Strict_pipe.Writer.write catchup_breadcrumbs_writer
-              [Rose_tree.of_list_exn breadcrumbs]
+        | Ok tree -> Strict_pipe.Writer.write catchup_breadcrumbs_writer [tree]
         | Error e ->
             Logger.info logger
               !"None of the peers have a transition with state hash:\n%s"

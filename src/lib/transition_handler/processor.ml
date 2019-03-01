@@ -48,6 +48,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
          ( ( (External_transition.Verified.t, State_hash.t) With_hash.t
            , State_hash.t )
            Cached.t
+           Rose_tree.t
          , synchronous
          , unit Deferred.t )
          Writer.t)

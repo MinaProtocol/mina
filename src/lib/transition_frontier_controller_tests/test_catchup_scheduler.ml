@@ -101,7 +101,11 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           Strict_pipe.Reader.iter_without_pushback catchup_job_reader
             ~f:(Ivar.fill result_ivar)
           |> don't_wait_for ;
-          let%map cached_catchup_transition = Ivar.read result_ivar in
+          let%map cached_catchup_transition =
+            match%map Ivar.read result_ivar with
+            | Rose_tree.T (t, []) -> t
+            | _ -> failwith "unexpected rose tree result"
+          in
           let catchup_parent_hash =
             Cached.peek cached_catchup_transition
             |> With_hash.data |> External_transition.Verified.protocol_state

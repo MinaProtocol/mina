@@ -27,6 +27,7 @@ module Make (Inputs : Inputs.S) = struct
         ( ( (External_transition.Verified.t, State_hash.t) With_hash.t
           , State_hash.t )
           Cached.t
+          Rose_tree.t
         , synchronous
         , unit Deferred.t )
         Writer.t
@@ -127,6 +128,23 @@ module Make (Inputs : Inputs.S) = struct
       ~f:Fn.(compose (const None) (Option.iter ~f:cancel)) ;
     remaining_time
 
+  let rec extract_subtree t cached_transition =
+    let successors =
+      Option.value ~default:[]
+        (Hashtbl.find t.collected_transitions
+           (With_hash.hash (Cached.peek cached_transition)))
+    in
+    Rose_tree.T (cached_transition, List.map successors ~f:(extract_subtree t))
+
+  let rec remove_tree t parent_hash =
+    let children =
+      Option.value ~default:[]
+        (Hashtbl.find t.collected_transitions parent_hash)
+    in
+    Hashtbl.remove t.collected_transitions parent_hash ;
+    List.iter children ~f:(fun child ->
+        remove_tree t (With_hash.hash (Cached.peek child)) )
+
   let watch t ~timeout_duration ~cached_transition =
     let hash = With_hash.hash (Cached.peek cached_transition) in
     let parent_hash =
@@ -136,9 +154,10 @@ module Make (Inputs : Inputs.S) = struct
     in
     let make_timeout duration =
       Time.Timeout.create t.time_controller duration ~f:(fun _ ->
+          let subtree = extract_subtree t cached_transition in
+          remove_tree t parent_hash ;
           (* it's ok to create a new thread here because the thread essentially does no work *)
-          don't_wait_for (Writer.write t.catchup_job_writer cached_transition)
-      )
+          don't_wait_for (Writer.write t.catchup_job_writer subtree) )
     in
     match Hashtbl.find t.collected_transitions parent_hash with
     | None ->
@@ -168,23 +187,6 @@ module Make (Inputs : Inputs.S) = struct
             ~data:(cached_transition :: cached_sibling_transitions) ;
           Hashtbl.update t.collected_transitions hash
             ~f:(Option.value ~default:[])
-
-  let rec extract_subtree t cached_transition =
-    let successors =
-      Option.value ~default:[]
-        (Hashtbl.find t.collected_transitions
-           (With_hash.hash (Cached.peek cached_transition)))
-    in
-    Rose_tree.T (cached_transition, List.map successors ~f:(extract_subtree t))
-
-  let rec remove_tree t parent_hash =
-    let children =
-      Option.value ~default:[]
-        (Hashtbl.find t.collected_transitions parent_hash)
-    in
-    Hashtbl.remove t.collected_transitions parent_hash ;
-    List.iter children ~f:(fun child ->
-        remove_tree t (With_hash.hash (Cached.peek child)) )
 
   let notify t ~hash =
     if

@@ -280,6 +280,7 @@ module type Catchup_intf = sig
                             With_hash.t
                           , state_hash )
                           Cached.t
+                          Rose_tree.t
                           Strict_pipe.Reader.t
     -> catchup_breadcrumbs_writer:( ( transition_frontier_breadcrumb
                                     , state_hash )
@@ -368,6 +369,7 @@ module type Transition_handler_processor_intf = sig
                               With_hash.t
                             , state_hash )
                             Cached.t
+                            Rose_tree.t
                           , Strict_pipe.synchronous
                           , unit Deferred.t )
                           Strict_pipe.Writer.t

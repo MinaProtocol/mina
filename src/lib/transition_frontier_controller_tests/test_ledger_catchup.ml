@@ -48,7 +48,8 @@ let%test_module "Ledger catchup" =
           unprocessed_transition_cache transition
         |> Or_error.ok_exn
       in
-      Strict_pipe.Writer.write catchup_job_writer cached_transition ;
+      Strict_pipe.Writer.write catchup_job_writer
+        (Rose_tree.T (cached_transition, [])) ;
       Ledger_catchup.run ~logger ~network ~frontier:me
         ~catchup_breadcrumbs_writer ~catchup_job_reader
         ~unprocessed_transition_cache ;
