@@ -30,6 +30,9 @@ module Stable = struct
                 let to_binable t = t
 
                 let of_binable t =
+                  (* TODO: maliciously invalid data will halt the node
+                     should this be just logged?
+                  *)
                   assert (is_valid t) ;
                   t
               end)
