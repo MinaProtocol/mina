@@ -760,8 +760,8 @@ struct
     | Some _ -> add_breadcrumb_exn t breadcrumb
     | None ->
         Logger.warn t.logger
-          !"When trying to add breadcrumb, its parent had been removed \
-            from transition frontier: %{sexp: State_hash.t}"
+          !"When trying to add breadcrumb, its parent had been removed from \
+            transition frontier: %{sexp: State_hash.t}"
           parent_hash ;
         Deferred.unit
 
