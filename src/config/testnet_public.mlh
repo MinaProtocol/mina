@@ -2,8 +2,10 @@
 [%%import "config/coinbase/standard.mlh"]
 [%%import "config/consensus/posig_fake.mlh"]
 [%%import "config/scan_state/standard.mlh"]
-[%%import "config/debug_level/logs.mlh"]
+[%%import "config/debug_level/some.mlh"]
 [%%import "config/proof_level/full.mlh"]
+
+[%%define fake_hash false]
 
 [%%define genesis_ledger "testnet_posig"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]

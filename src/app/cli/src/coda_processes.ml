@@ -17,7 +17,7 @@ let net_configs n =
   in
   (discovery_ports, external_ports, peers)
 
-let local_configs ?proposal_interval ?(should_propose = Fn.const true) n
+let local_configs ?proposal_interval ?(proposers = Fn.const None) n
     ~acceptable_delay ~program_dir ~snark_worker_public_keys ~work_selection =
   let discovery_ports, external_ports, peers = net_configs n in
   let peers = [] :: List.drop peers 1 in
@@ -40,7 +40,7 @@ let local_configs ?proposal_interval ?(should_propose = Fn.const true) n
         in
         Coda_process.local_config ?proposal_interval ~peers ~discovery_port
           ~external_port ~snark_worker_config ~program_dir ~acceptable_delay
-          ~should_propose:(should_propose i) ~work_selection () )
+          ~proposer:(proposers i) ~work_selection () )
   in
   configs
 

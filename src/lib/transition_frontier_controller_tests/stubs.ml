@@ -134,8 +134,8 @@ struct
     module Sparse_ledger = Coda_base.Sparse_ledger
   end)
 
-  (* Generate valid payments for each blockchain state by having 
-     each user send a payment of one coin to another random 
+  (* Generate valid payments for each blockchain state by having
+     each user send a payment of one coin to another random
      user if they at least one coin*)
   let gen_payments accounts_with_secret_keys :
       User_command.With_valid_signature.t Sequence.t =
