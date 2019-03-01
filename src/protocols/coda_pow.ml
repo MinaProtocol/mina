@@ -335,7 +335,7 @@ module type Coinbase_intf = sig
     { proposer: public_key
     ; amount: Currency.Amount.t
     ; fee_transfer: fee_transfer option }
-  [@@deriving sexp, bin_io, compare, eq]
+  [@@deriving sexp, compare, eq]
 
   val create :
        amount:Currency.Amount.t

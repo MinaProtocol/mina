@@ -11,7 +11,7 @@ let main () =
   let n = 2 in
   let snark_work_public_keys i = None in
   let%bind testnet =
-    Coda_worker_testnet.test log n (Fn.const true) snark_work_public_keys
+    Coda_worker_testnet.test log n Option.some snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
   in
   after (Time.Span.of_sec 30.)
