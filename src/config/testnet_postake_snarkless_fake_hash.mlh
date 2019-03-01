@@ -2,7 +2,7 @@
 [%%import "config/coinbase/standard.mlh"]
 [%%import "config/consensus/postake_tiny.mlh"]
 [%%import "config/scan_state/small.mlh"]
-[%%import "config/debug_level/logs.mlh"]
+[%%import "config/debug_level/some.mlh"]
 [%%import "config/proof_level/none.mlh"]
 
 [%%define delta 8]

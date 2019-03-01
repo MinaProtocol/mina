@@ -11,7 +11,7 @@ end)
 
 open Stubs
 
-module Transition_handler_validator = Transition_handler.Validator.Make (struct
+module Transition_handler = Transition_handler.Make (struct
   include Transition_frontier_inputs
   module Transition_frontier = Transition_frontier
   module State_proof = State_proof
@@ -24,7 +24,9 @@ module Ledger_catchup = Ledger_catchup.Make (struct
   module Transition_frontier = Transition_frontier
   module Protocol_state_validator = Protocol_state_validator
   module Network = Network
-  module Transition_handler_validator = Transition_handler_validator
+  module Unprocessed_transition_cache =
+    Transition_handler.Unprocessed_transition_cache
+  module Transition_handler_validator = Transition_handler.Validator
 end)
 
 let%test_module "Ledger catchup" =
@@ -38,14 +40,31 @@ let%test_module "Ledger catchup" =
       let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
         Strict_pipe.create Synchronous
       in
-      Strict_pipe.Writer.write catchup_job_writer (With_hash.hash transition) ;
+      let unprocessed_transition_cache =
+        Transition_handler.Unprocessed_transition_cache.create ~logger
+      in
+      let cached_transition =
+        Transition_handler.Unprocessed_transition_cache.register
+          unprocessed_transition_cache transition
+        |> Or_error.ok_exn
+      in
+      Strict_pipe.Writer.write catchup_job_writer
+        (Rose_tree.T (cached_transition, [])) ;
       Ledger_catchup.run ~logger ~network ~frontier:me
-        ~catchup_breadcrumbs_writer ~catchup_job_reader ;
+        ~catchup_breadcrumbs_writer ~catchup_job_reader
+        ~unprocessed_transition_cache ;
       let result_ivar = Ivar.create () in
+      (* TODO: expose Strict_pipe.read *)
       Strict_pipe.Reader.iter catchup_breadcrumbs_reader ~f:(fun rose_tree ->
           Deferred.return @@ Ivar.fill result_ivar rose_tree )
       |> don't_wait_for ;
-      let%map catchup_breadcrumbs = Ivar.read result_ivar >>| List.hd_exn in
+      let%map cached_catchup_breadcrumbs =
+        Ivar.read result_ivar >>| List.hd_exn
+      in
+      let catchup_breadcrumbs =
+        Rose_tree.map cached_catchup_breadcrumbs
+          ~f:(Fn.compose Or_error.ok_exn Cache_lib.Cached.invalidate)
+      in
       Rose_tree.equal expected_breadcrumbs catchup_breadcrumbs
         ~f:(fun breadcrumb_tree1 breadcrumb_tree2 ->
           let to_transition =
@@ -57,6 +76,8 @@ let%test_module "Ledger catchup" =
             (to_transition breadcrumb_tree2) )
 
     let%test "catchup to a peer" =
+      Core.Backtrace.elide := false ;
+      Async.Scheduler.set_record_backtraces true ;
       let logger = Logger.create () in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind me, peer, network =
