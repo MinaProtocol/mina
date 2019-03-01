@@ -93,16 +93,14 @@ module Make (Inputs : Inputs_intf) : sig
       -> network:Inputs.Network.t
       -> t
 
+    type syncing_data
+
     val on_transition :
          t
       -> sender:Network_peer.Peer.t
       -> root_sync_ledger:Root_sync_ledger.t
       -> External_transition.Proof_verified.t
-      -> [> `Syncing of Frozen_ledger_hash.t
-                        * Ledger_hash.t
-                        * Staged_ledger.Scan_state.t
-         | `Ignored ]
-         Deferred.t
+      -> [> `Syncing of syncing_data | `Ignored] Deferred.t
 
     module Transition_cache : sig
       include
@@ -138,6 +136,11 @@ end = struct
     ; mutable current_root:
         (External_transition.Proof_verified.t, State_hash.t) With_hash.t
     ; network: Network.t }
+
+  type syncing_data =
+    { snarked_ledger_hash: Frozen_ledger_hash.t
+    ; staged_ledger_merkle_root: Ledger_hash.t
+    ; scan_state: Staged_ledger.Scan_state.t }
 
   module Transition_cache = Transition_cache.Make (Inputs)
 
@@ -175,7 +178,7 @@ end = struct
           @@ Logger.error t.logger
                !"Could not get the proof of root from the network: %s"
                (Error.to_string_hum e)
-      | Ok (peer_root_with_proof, scan_state, merkle_root) -> (
+      | Ok (peer_root_with_proof, scan_state, staged_ledger_merkle_root) -> (
           match%map
             Root_prover.verify ~logger:t.logger ~observed_state:candidate_state
               ~peer_root:peer_root_with_proof
@@ -199,7 +202,7 @@ end = struct
                   (Staged_ledger_hash.Aux_hash.of_bytes
                      (Staged_ledger_aux_hash.to_bytes
                         (Staged_ledger.Scan_state.hash scan_state)))
-                  merkle_root
+                  staged_ledger_merkle_root
               in
               if
                 Staged_ledger_hash.equal expected_staged_ledger_hash
@@ -213,11 +216,15 @@ end = struct
                 Root_sync_ledger.new_goal root_sync_ledger
                   (Frozen_ledger_hash.to_ledger_hash snarked_ledger_hash)
                 |> Fn.const
-                   @@ `Syncing (snarked_ledger_hash, merkle_root, scan_state)
+                   @@ `Syncing
+                        { snarked_ledger_hash
+                        ; staged_ledger_merkle_root
+                        ; scan_state }
               else
+                (* TODO: punish *)
                 Fn.const `Ignored
-                @@ Logger.error t.logger
-                     !"Received wrong staged_ledger_aux from the network"
+                @@ Logger.faulty_peer t.logger
+                     "Received wrong staged_ledger_aux from the network"
           | Error e -> received_bad_proof t e |> Fn.const `Ignored )
 
   let sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader
@@ -250,17 +257,13 @@ end = struct
               (External_transition.forget_consensus_state_verification
                  transition)
           with
-          | `Syncing (snarked_ledger_hash, staged_ledger_hash, scan_state) ->
+          | `Syncing
+              {snarked_ledger_hash; staged_ledger_merkle_root; scan_state} ->
               Mvar.set result
-                (snarked_ledger_hash, staged_ledger_hash, scan_state)
+                (snarked_ledger_hash, staged_ledger_merkle_root, scan_state)
           | `Ignored -> ()
         else Deferred.unit )
 
-  (** There're various ways that this could fail, one of those is that the scan
-      state provided by the peer is incorrect, in that case, we need to punish
-      the peer node for that. This logic is not implemented here. We should
-      change the error type to be some polymorphic variant type to handle this
-      logic corrrectly. *)
   let run ~parent_log ~network ~frontier ~ledger_db ~transition_reader =
     let logger = Logger.child parent_log __MODULE__ in
     let initial_breadcrumb = Transition_frontier.root frontier in
@@ -322,15 +325,15 @@ end = struct
               (Transition_frontier.consensus_local_state frontier)
         in
         (new_frontier, Transition_cache.data transition_graph)
-    (* There're various ways that this could fail, one of those is that the
-       scan state provided by the peer is incorrect, in that case, we need to
-       punish the peer node for that. This logic is not implemented here. We
-       should change the error type to be some polymorphic variant type to
-       handle this logic corrrectly. *)
-    | Error err -> Error.raise err
+    (* TODO: punish *)
+    | Error err ->
+        Logger.faulty_peer t.logger "received faulty scan state from the peer." ;
+        Error.raise err
 
   module For_tests = struct
     type nonrec t = t
+
+    type nonrec syncing_data = syncing_data
 
     let hash_data =
       Fn.compose Consensus.Protocol_state.hash
