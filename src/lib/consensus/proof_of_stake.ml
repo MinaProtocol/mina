@@ -1079,6 +1079,9 @@ module Consensus_state = struct
 
   let length (t : value) = t.length
 
+  let time_hum (t : value) =
+    sprintf "%d:%d" (Epoch.to_int t.curr_epoch) (Epoch.Slot.to_int t.curr_slot)
+
   let to_lite = None
 
   type display =

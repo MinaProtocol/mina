@@ -63,6 +63,8 @@ module type S = sig
 
     val length : value -> Length.t
 
+    val time_hum : value -> string
+
     val to_lite : (value -> Lite_base.Consensus_state.t) option
 
     val display : value -> display

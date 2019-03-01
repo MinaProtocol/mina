@@ -1230,10 +1230,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       Consensus.Protocol_state.hash state
       |> [%sexp_of: State_hash.t] |> Sexp.to_string
     in
-    let block_count =
-      state |> Consensus.Protocol_state.consensus_state
-      |> Consensus.Consensus_state.length
-    in
+    let consensus_state = state |> Consensus.Protocol_state.consensus_state in
+    let block_count = Consensus.Consensus_state.length consensus_state in
     let uptime_secs =
       Time_ns.diff (Time_ns.now ()) start_time
       |> Time_ns.Span.to_sec |> Int.of_float
@@ -1277,6 +1275,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         staged_ledger |> Staged_ledger.hash |> Staged_ledger_hash.sexp_of_t
         |> Sexp.to_string
     ; state_hash
+    ; consensus_time_best_tip=
+        Consensus.Consensus_state.time_hum consensus_state
     ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
     ; peers=
@@ -1288,7 +1288,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; propose_pubkey=
         Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
     ; histograms
-    ; consensus_time= Consensus.time_hum (Core_kernel.Time.now ())
+    ; consensus_time_now= Consensus.time_hum (Core_kernel.Time.now ())
     ; consensus_mechanism= Consensus.name
     ; consensus_configuration= Consensus.Configuration.t }
 
