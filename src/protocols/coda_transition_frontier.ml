@@ -231,8 +231,17 @@ module type Transition_frontier_intf = sig
     with type transition_frontier_breadcrumb := Breadcrumb.t
 
   module Extensions : sig
-    module Snark_pool_refcount :
-      Transition_frontier_extension_intf with type view = unit
+    module Work : sig
+      type t [@@deriving sexp, bin_io]
+
+      include Hashable.S_binable with type t := t
+    end
+
+    module Snark_pool_refcount : sig
+      include
+        Transition_frontier_extension_intf
+        with type view = int * int Work.Table.t
+    end
 
     module Best_tip_diff :
       Transition_frontier_extension_intf
@@ -244,7 +253,11 @@ module type Transition_frontier_intf = sig
     [@@deriving fields]
   end
 
-  val extension_pipes : t -> Extensions.readers
+  val snark_pool_refcount_pipe :
+    t -> Extensions.Snark_pool_refcount.view Broadcast_pipe.Reader.t
+
+  val best_tip_diff_pipe :
+    t -> Extensions.Best_tip_diff.view Broadcast_pipe.Reader.t
 
   val visualize : filename:string -> t -> unit
 
