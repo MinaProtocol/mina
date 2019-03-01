@@ -28,7 +28,7 @@ module type S = sig
     [@@deriving sexp, bin_io]
 
     type coinbase =
-      { coinbase: Coinbase.t
+      { coinbase: Coinbase.Stable.V1.t
       ; previous_empty_accounts: Public_key.Compressed.t list }
     [@@deriving sexp, bin_io]
 
@@ -140,7 +140,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     [@@deriving sexp, bin_io]
 
     type coinbase =
-      { coinbase: Coinbase.t
+      { coinbase: Coinbase.Stable.V1.t
       ; previous_empty_accounts: Public_key.Compressed.t list }
     [@@deriving sexp, bin_io]
 

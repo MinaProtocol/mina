@@ -260,6 +260,13 @@ module type Inputs_intf = sig
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type user_command := User_command.t
 
+  module Transaction_pool :
+    Transaction_pool_intf
+    with type transaction_with_valid_signature :=
+                User_command.With_valid_signature.t
+     and type transaction := User_command.t
+     and type transition_frontier := Transition_frontier.t
+
   module Snark_pool :
     Snark_pool_intf
     with type completed_work_statement := Transaction_snark_work.Statement.t
@@ -277,13 +284,6 @@ module type Inputs_intf = sig
                 Snark_work_lib.Work.Single.Spec.t
      and type snark_pool := Snark_pool.t
      and type fee := Currency.Fee.t
-
-  module Transaction_pool :
-    Transaction_pool_intf
-    with type transaction_with_valid_signature :=
-                User_command.With_valid_signature.t
-     and type transaction := User_command.t
-     and type transition_frontier := Transition_frontier.t
 
   module State_body_hash : sig
     type t
