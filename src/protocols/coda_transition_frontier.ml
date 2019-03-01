@@ -8,8 +8,10 @@ module Transition_frontier_diff = struct
         (** Triggered when a new breadcrumb is added without changing the root or best_tip *)
     | New_best_tip of
         { old_root: 'a
+        ; old_root_length: int
         ; new_root: 'a  (** Same as old root if the root doesn't change *)
         ; new_best_tip: 'a
+        ; new_best_tip_length: int
         ; old_best_tip: 'a
         ; garbage: 'a list }
         (** Triggered when a new breadcrumb is added, causing a new best_tip *)
@@ -41,7 +43,13 @@ module type Transition_frontier_extension_intf0 = sig
     -> transition_frontier_breadcrumb Transition_frontier_diff.t
     -> view Option.t
   (** Handle a transition frontier diff, and return the new version of the
-      computed view, if it's updated. *)
+        computed view, if it's updated. *)
+end
+
+(** The type of the view onto the changes to the current best tip. This type
+    needs to be here to avoid dependency cycles. *)
+module Best_tip_diff_view = struct
+  type 'b t = {new_best_tip: 'b; old_best_tip: 'b}
 end
 
 module type Network_intf = sig
@@ -90,13 +98,17 @@ module type Network_intf = sig
 end
 
 module type Transition_frontier_Breadcrumb_intf = sig
-  type t [@@deriving sexp, eq]
+  type t [@@deriving sexp, eq, compare]
+
+  type display [@@deriving yojson]
 
   type state_hash
 
   type staged_ledger
 
   type external_transition_verified
+
+  type user_command
 
   val create :
        (external_transition_verified, state_hash) With_hash.t
@@ -116,6 +128,14 @@ module type Transition_frontier_Breadcrumb_intf = sig
     t -> (external_transition_verified, state_hash) With_hash.t
 
   val staged_ledger : t -> staged_ledger
+
+  val hash : t -> int
+
+  val display : t -> display
+
+  val name : t -> string
+
+  val to_user_commands : t -> user_command list
 end
 
 module type Transition_frontier_base_intf = sig
@@ -126,6 +146,8 @@ module type Transition_frontier_base_intf = sig
   type transaction_snark_scan_state
 
   type masked_ledger
+
+  type user_command
 
   type staged_ledger
 
@@ -142,6 +164,7 @@ module type Transition_frontier_base_intf = sig
     with type external_transition_verified := external_transition_verified
      and type state_hash := state_hash
      and type staged_ledger := staged_ledger
+     and type user_command := user_command
 
   val create :
        logger:Logger.t
@@ -184,6 +207,9 @@ module type Transition_frontier_intf = sig
 
   val find : t -> state_hash -> Breadcrumb.t option
 
+  val root_history_path_map :
+    t -> state_hash -> f:(Breadcrumb.t -> 'a) -> 'a Non_empty_list.t option
+
   val successor_hashes : t -> state_hash -> state_hash list
 
   val successor_hashes_rec : t -> state_hash -> state_hash list
@@ -205,19 +231,42 @@ module type Transition_frontier_intf = sig
     with type transition_frontier_breadcrumb := Breadcrumb.t
 
   module Extensions : sig
-    module Snark_pool_refcount :
-      Transition_frontier_extension_intf with type view = unit
+    module Work : sig
+      type t [@@deriving sexp, bin_io]
+
+      include Hashable.S_binable with type t := t
+    end
+
+    module Snark_pool_refcount : sig
+      include
+        Transition_frontier_extension_intf
+        with type view = int * int Work.Table.t
+    end
+
+    module Best_tip_diff :
+      Transition_frontier_extension_intf
+      with type view = Breadcrumb.t Best_tip_diff_view.t Option.t
 
     type readers =
-      {snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t}
+      { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
+      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t }
+    [@@deriving fields]
   end
 
-  val extension_pipes : t -> Extensions.readers
+  val snark_pool_refcount_pipe :
+    t -> Extensions.Snark_pool_refcount.view Broadcast_pipe.Reader.t
+
+  val best_tip_diff_pipe :
+    t -> Extensions.Best_tip_diff.view Broadcast_pipe.Reader.t
 
   val visualize : filename:string -> t -> unit
 
   module For_tests : sig
     val root_snarked_ledger : t -> ledger_database
+
+    val root_history_mem : t -> state_hash -> bool
+
+    val root_history_is_empty : t -> bool
   end
 end
 
