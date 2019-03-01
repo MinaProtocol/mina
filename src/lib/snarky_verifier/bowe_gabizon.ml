@@ -99,16 +99,16 @@ module Make (Inputs : Inputs_intf) = struct
       >>= Shifted.unshift_nonzero
     in
     let%bind delta_prime_pc = G2_precomputation.create delta_prime in
-    let%bind test =
+    let%bind test1 =
       let%bind b = G2_precomputation.create b in
       batch_miller_loop
-        (* This is where we use [one : G2.t] rather than gamma. *)
         [ ( Neg
           , G1_precomputation.create acc
           , G2_precomputation.create_constant G2.Unchecked.one )
         ; (Neg, G1_precomputation.create c, delta_prime_pc)
         ; (Pos, G1_precomputation.create a, b) ]
       >>= final_exponentiation
+      >>= Fqk.equal vk.alpha_beta
     in
     let%bind test2 =
       let%bind ys = hash a b c delta_prime in
@@ -116,8 +116,7 @@ module Make (Inputs : Inputs_intf) = struct
         [ (Pos, G1_precomputation.create ys, delta_prime_pc)
         ; (Neg, G1_precomputation.create z, vk_precomp.delta) ]
       >>= final_exponentiation
+      >>= Fqk.equal Fqk.one
     in
-    let%bind condition_1 = Fqk.equal test vk.alpha_beta in
-    let%bind condition_2 = Fqk.equal test2 Fqk.one in
-    Boolean.(condition_1 && condition_2)
+    Boolean.(test1 && test2)
 end
