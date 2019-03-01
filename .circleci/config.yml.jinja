@@ -12,6 +12,16 @@ jobs:
                   name: Build trace-tool
                   command: cd src/app/trace-tool && cargo build --frozen
 
+    build-wallet:
+        macos:
+            xcode: "10.1.0"
+        steps:
+            - checkout
+            - run: cd frontend/wallet && npm install
+            - run:
+                  name: Build wallet
+                  command: cd frontend/wallet && npm run build
+
     lint:
         docker:
             - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
@@ -152,3 +162,4 @@ workflows:
             {%- endfor %}
             - test-unit-test
             - tracetool
+            - build-wallet

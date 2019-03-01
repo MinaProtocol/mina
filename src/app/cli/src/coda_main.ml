@@ -27,6 +27,9 @@ end
 
 [%%endif]
 
+module Graphql_cohttp_async =
+  Graphql_cohttp.Make (Graphql_async.Schema) (Cohttp_async.Body)
+
 module Staged_ledger_aux_hash = struct
   include Staged_ledger_hash.Aux_hash.Stable.Latest
 
@@ -1464,6 +1467,26 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                   | "/status/performance" -> status `Performance
                   | _ -> route_not_found () )) )
         |> ignore ) ;
+    ignore
+    @@ trace_task "GraphQL server" (fun () ->
+           let schema =
+             Graphql_async.Schema.(
+               schema
+                 [ field "greeting" ~typ:(non_null string)
+                     ~args:Arg.[]
+                     ~resolve:(fun _ () -> "hello coda") ])
+           in
+           let callback =
+             Graphql_cohttp_async.make_callback (fun _req -> ()) schema
+           in
+           Cohttp_async.(
+             Server.create
+               ~on_handler_error:
+                 (`Call
+                   (fun net exn ->
+                     Logger.error log "%s" (Exn.to_string_mach exn) ))
+               (Tcp.Where_to_listen.bind_to Localhost (On_port 8080))
+               (fun ~body sock req -> callback () req body)) ) ;
     let where_to_listen =
       Tcp.Where_to_listen.bind_to All_addresses (On_port client_port)
     in
