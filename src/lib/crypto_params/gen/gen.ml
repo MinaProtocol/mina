@@ -116,7 +116,7 @@ let compute_chunk_value ~start n =
 *)
 
 [%%if
-fake_hash]
+defined fake_hash && fake_hash]
 
 (* don't bother building table *)
 let get_chunk_table () = [||]
