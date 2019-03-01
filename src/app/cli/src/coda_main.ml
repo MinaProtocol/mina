@@ -298,6 +298,8 @@ module type Main_intf = sig
        and type staged_ledger_diff := Staged_ledger_diff.t
        and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
        and type consensus_local_state := Consensus.Local_state.t
+       and type user_command := User_command.t
+       and type Extensions.Work.t = Transaction_snark_work.Statement.t
   end
 
   module Config : sig
@@ -605,14 +607,15 @@ struct
   end)
 
   module Transaction_pool = struct
-    module Pool = Transaction_pool.Make (User_command)
-    include Network_pool.Make (Pool) (Pool.Diff)
+    module Pool = Transaction_pool.Make (User_command) (Transition_frontier)
+    include Network_pool.Make (Transition_frontier) (Pool) (Pool.Diff)
 
     type pool_diff = Pool.Diff.t [@@deriving bin_io]
 
     (* TODO *)
-    let load ~parent_log ~disk_location:_ ~incoming_diffs =
-      return (create ~parent_log ~incoming_diffs)
+    let load ~parent_log ~disk_location:_ ~incoming_diffs
+        ~frontier_broadcast_pipe =
+      return (create ~parent_log ~incoming_diffs ~frontier_broadcast_pipe)
 
     let transactions t = Pool.transactions (pool t)
 
@@ -711,12 +714,15 @@ struct
             {fee; prover} )
     end
 
-    module Pool = Snark_pool.Make (Proof) (Fee) (Work)
-    module Diff = Network_pool.Snark_pool_diff.Make (Proof) (Fee) (Work) (Pool)
+    module Pool = Snark_pool.Make (Proof) (Fee) (Work) (Transition_frontier)
+    module Diff =
+      Network_pool.Snark_pool_diff.Make (Proof) (Fee) (Work)
+        (Transition_frontier)
+        (Pool)
 
     type pool_diff = Diff.t
 
-    include Network_pool.Make (Pool) (Diff)
+    include Network_pool.Make (Transition_frontier) (Pool) (Diff)
 
     let get_completed_work t statement =
       Option.map
@@ -725,10 +731,16 @@ struct
           Transaction_snark_work.Checked.create_unsafe
             {Transaction_snark_work.fee; proofs= proof; prover} )
 
-    let load ~parent_log ~disk_location ~incoming_diffs =
+    let load ~parent_log ~disk_location ~incoming_diffs
+        ~frontier_broadcast_pipe =
       match%map Reader.load_bin_prot disk_location Pool.bin_reader_t with
-      | Ok pool -> of_pool_and_diffs pool ~parent_log ~incoming_diffs
-      | Error _e -> create ~parent_log ~incoming_diffs
+      | Ok pool ->
+          let network_pool =
+            of_pool_and_diffs pool ~parent_log ~incoming_diffs
+          in
+          Pool.listen_to_frontier_broadcast_pipe frontier_broadcast_pipe pool ;
+          network_pool
+      | Error _e -> create ~parent_log ~incoming_diffs ~frontier_broadcast_pipe
 
     open Snark_work_lib.Work
     open Network_pool.Snark_pool_diff
@@ -756,7 +768,7 @@ struct
      and type merkle_path := Ledger.path
      and type query := Sync_ledger.query
      and type answer := Sync_ledger.answer =
-    Syncable_ledger.Make (Ledger.Location.Addr) (Account)
+    Syncable_ledger.Make (Ledger.Location.Addr) (Account.Stable.V1)
       (struct
         include Ledger_hash
 
@@ -823,6 +835,8 @@ struct
     module Staged_ledger_diff = Staged_ledger_diff
     module Transaction_snark_work = Transaction_snark_work
     module Transition_handler_validator = Transition_handler.Validator
+    module Unprocessed_transition_cache =
+      Transition_handler.Unprocessed_transition_cache
     module Ledger_proof_statement = Ledger_proof_statement
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Protocol_state_validator = Protocol_state_validator
@@ -1399,12 +1413,13 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       [ implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
             let r = request_work coda in
             Option.iter r ~f:(fun r ->
-                Logger.info log !"Get_work: %{sexp:Snark_worker.Work.Spec.t}" r
-            ) ;
+                Logger.trace log
+                  !"Get_work: %{sexp:Snark_worker.Work.Spec.t}"
+                  r ) ;
             return r )
       ; implement Snark_worker.Rpcs.Submit_work.rpc
           (fun () (work : Snark_worker.Work.Result.t) ->
-            Logger.info log
+            Logger.trace log
               !"Submit_work: %{sexp:Snark_worker.Work.Spec.t}"
               work.spec ;
             List.iter work.metrics ~f:(fun (total, tag) ->
@@ -1487,14 +1502,14 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
                ~shutdown_on_disconnect )
     in
-    let log = Logger.child log "snark_worker" in
+    (* We want these to be printfs so we don't double encode our logs here *)
     Pipe.iter_without_pushback
       (Reader.pipe (Process.stdout p))
-      ~f:(fun s -> Logger.info log "%s" s)
+      ~f:(fun s -> printf "%s" s)
     |> don't_wait_for ;
     Pipe.iter_without_pushback
       (Reader.pipe (Process.stderr p))
-      ~f:(fun s -> Logger.error log "%s" s)
+      ~f:(fun s -> printf "%s" s)
     |> don't_wait_for ;
     Deferred.unit
 

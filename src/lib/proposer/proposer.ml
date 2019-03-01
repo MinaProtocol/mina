@@ -24,6 +24,7 @@ module type Inputs_intf = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type masked_ledger := Masked_ledger.t
      and type consensus_local_state := Consensus.Local_state.t
+     and type user_command := User_command.t
 
   module Transaction_pool :
     Coda_lib.Transaction_pool_read_intf
@@ -228,11 +229,8 @@ module Make (Inputs : Inputs_intf) :
                   ( Staged_ledger_diff.With_valid_signatures_and_proofs
                     .user_commands diff
                     :> User_command.t list )
-                ~snarked_ledger_hash:
-                  (Option.value_map ledger_proof_opt
-                     ~default:previous_ledger_hash ~f:(fun (proof, _) ->
-                       Ledger_proof.(statement proof |> statement_target) ))
-                ~supply_increase ~logger ) )
+                ~snarked_ledger_hash:previous_ledger_hash ~supply_increase
+                ~logger ) )
     in
     lift_sync (fun () ->
         measure "making Snark and Internal transitions" (fun () ->
@@ -276,7 +274,7 @@ module Make (Inputs : Inputs_intf) :
           | None -> Interruptible.return (log_bootstrap_mode ())
           | Some frontier -> (
               let crumb = Transition_frontier.best_tip frontier in
-              Logger.info logger
+              Logger.trace logger
                 !"Begining to propose off of crumb %{sexp: Breadcrumb.t}%!"
                 crumb ;
               Core.printf !"%!" ;

@@ -17,7 +17,7 @@ module Input = struct
   type t =
     { host: string
     ; env: (string * string) list
-    ; should_propose: bool
+    ; proposer: int option
     ; snark_worker_config: Snark_worker_config.t option
     ; work_selection: Protocols.Coda_pow.Work_selection.t
     ; conf_dir: string
@@ -162,7 +162,7 @@ module T = struct
 
     let init_worker_state
         { host
-        ; should_propose
+        ; proposer
         ; snark_worker_config
         ; work_selection
         ; conf_dir
@@ -183,9 +183,9 @@ module T = struct
         let lbc_tree_max_depth = `Finite 50
 
         let propose_keypair =
-          if should_propose then
-            Some (Genesis_ledger.largest_account_keypair_exn ())
-          else None
+          Option.map proposer ~f:(fun i ->
+              List.nth_exn Genesis_ledger.accounts i
+              |> Genesis_ledger.keypair_of_account_record_exn )
 
         let genesis_proof = Precomputed_values.base_proof
 
@@ -197,7 +197,9 @@ module T = struct
 
         let work_selection = work_selection
       end in
-      let%bind (module Init) = make_init ~should_propose (module Config) in
+      let%bind (module Init) =
+        make_init ~should_propose:(Option.is_some proposer) (module Config)
+      in
       let module Main = Coda_main.Make_coda (Init) in
       let module Run = Run (Config) (Main) in
       let banlist_dir_name = conf_dir ^/ "banlist" in

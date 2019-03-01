@@ -2,6 +2,7 @@ open Protocols.Coda_transition_frontier
 open Coda_base
 module Inputs = Inputs
 module Processor = Processor
+module Catchup_scheduler = Catchup_scheduler
 module Validator = Validator
 
 module Make (Inputs : Inputs.S) :
@@ -15,6 +16,14 @@ module Make (Inputs : Inputs.S) :
    and type transition_frontier := Inputs.Transition_frontier.t
    and type transition_frontier_breadcrumb :=
               Inputs.Transition_frontier.Breadcrumb.t = struct
-  module Validator = Validator.Make (Inputs)
-  module Processor = Processor.Make (Inputs)
+  module Unprocessed_transition_cache =
+    Unprocessed_transition_cache.Make (Inputs)
+
+  module Full_inputs = struct
+    include Inputs
+    module Unprocessed_transition_cache = Unprocessed_transition_cache
+  end
+
+  module Processor = Processor.Make (Full_inputs)
+  module Validator = Validator.Make (Full_inputs)
 end
