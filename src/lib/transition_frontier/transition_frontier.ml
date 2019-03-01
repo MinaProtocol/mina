@@ -707,8 +707,9 @@ struct
                 (* TODO: See issue #1606 to make this faster *)
                 [%test_result: Frozen_ledger_hash.t]
                   ~message:
-                    "after applying all the transactions, the mask hash wasn't the target
-                    after root transition"
+                    "after applying all the transactions, the mask hash \
+                     wasn't the target\n\
+                    \                    after root transition"
                   ~expect:(Inputs.Ledger_proof.statement proof_data).target
                   ( Ledger.merkle_root db_mask
                   |> Frozen_ledger_hash.of_ledger_hash ) ;
