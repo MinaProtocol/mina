@@ -502,6 +502,7 @@ module Tick = struct
   end
 
   module Util = Snark_util.Make (Tick0)
+  module Snarkette_tick = Snarkette.Mnt6_80
 
   module Pairing = struct
     module T = struct
@@ -509,7 +510,10 @@ module Tick = struct
       open Snarky_field_extensions.Field_extensions
       module Fq = Fq
 
-      let non_residue = Tick0.Field.of_int 5
+      let conv_field =
+        Fn.compose Tick0.Field.of_string Snarkette_tick.Fq.to_string
+
+      let non_residue = conv_field Snarkette_tick.non_residue
 
       module Fqe = struct
         module Params = struct
@@ -518,23 +522,17 @@ module Tick = struct
           let mul_by_non_residue x = Fq.scale x non_residue
 
           let frobenius_coeffs_c1 =
-            [| Tick0.Field.of_string "1"
-             ; Tick0.Field.of_string
-                 "471738898967521029133040851318449165997304108729558973770077319830005517129946578866686956"
-             ; Tick0.Field.of_string
-                 "4183387201740296620308398334599285547820769823264541783190415909159130177461911693276180"
-            |]
+            Array.map ~f:conv_field
+              Snarkette_tick.Fq3.Params.frobenius_coeffs_c1
 
           let frobenius_coeffs_c2 =
-            [| Tick0.Field.of_string "1"
-             ; Tick0.Field.of_string
-                 "4183387201740296620308398334599285547820769823264541783190415909159130177461911693276180"
-             ; Tick0.Field.of_string
-                 "471738898967521029133040851318449165997304108729558973770077319830005517129946578866686956"
-            |]
+            Array.map ~f:conv_field
+              Snarkette_tick.Fq3.Params.frobenius_coeffs_c2
         end
 
         include F3 (Fq) (Params)
+
+        let conv = A.map ~f:conv_field
 
         let real_part (x, _, _) = x
       end
@@ -568,23 +566,8 @@ module Tick = struct
 
           let one =
             let open Field in
-            { z= Fqe.Unchecked.one
-            ; x=
-                ( of_string
-                    "421456435772811846256826561593908322288509115489119907560382401870203318738334702321297427"
-                , of_string
-                    "103072927438548502463527009961344915021167584706439945404959058962657261178393635706405114"
-                , of_string
-                    "143029172143731852627002926324735183809768363301149009204849580478324784395590388826052558"
-                )
-            ; y=
-                ( of_string
-                    "464673596668689463130099227575639512541218133445388869383893594087634649237515554342751377"
-                , of_string
-                    "100642907501977375184575075967118071807821117960152743335603284583254620685343989304941678"
-                , of_string
-                    "123019855502969896026940545715841181300275180157288044663051565390506010149881373807142903"
-                ) }
+            let x, y = Snarkette_tick.G2.(to_affine_coordinates one) in
+            {z= Fqe.Unchecked.one; x= Fqe.conv x; y= Fqe.conv y}
         end
 
         include Snarky_curves.Make_weierstrass_checked
@@ -603,14 +586,8 @@ module Tick = struct
       module Fqk = struct
         module Params = struct
           let frobenius_coeffs_c1 =
-            Array.map ~f:Tick0.Field.of_string
-              [| "1"
-               ; "471738898967521029133040851318449165997304108729558973770077319830005517129946578866686957"
-               ; "471738898967521029133040851318449165997304108729558973770077319830005517129946578866686956"
-               ; "475922286169261325753349249653048451545124878552823515553267735739164647307408490559963136"
-               ; "4183387201740296620308398334599285547820769823264541783190415909159130177461911693276180"
-               ; "4183387201740296620308398334599285547820769823264541783190415909159130177461911693276181"
-              |]
+            Array.map ~f:conv_field
+              Snarkette_tick.Fq6.Params.frobenius_coeffs_c1
         end
 
         module Fq2 =
@@ -631,13 +608,12 @@ module Tick = struct
             let twist = Fq.Unchecked.(zero, one, zero)
           end)
 
-      module N = Snarkette.Mnt6_80.N
+      module N = Snarkette_tick.N
 
       module Params = struct
-        include Snarkette.Mnt6_80.Pairing_info
+        include Snarkette_tick.Pairing_info
 
-        let loop_count_is_neg =
-          Snarkette.Mnt6_80.Pairing_info.is_loop_count_neg
+        let loop_count_is_neg = Snarkette_tick.Pairing_info.is_loop_count_neg
       end
 
       module G2_precomputation = struct
@@ -645,7 +621,8 @@ module Tick = struct
                   (struct
                     include Params
 
-                    let coeff_a = Tick0.Field.(zero, zero, of_int 11)
+                    let coeff_a =
+                      Tick0.Field.(zero, zero, G1.Unchecked.Coefficients.a)
                   end)
 
         let create_constant =

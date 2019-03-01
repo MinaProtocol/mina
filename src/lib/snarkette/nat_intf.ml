@@ -1,5 +1,9 @@
+open Core_kernel
+
 module type S = sig
   type t [@@deriving eq, bin_io, sexp, compare]
+
+  include Stringable.S with type t := t
 
   val of_int : int -> t
 
