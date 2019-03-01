@@ -139,7 +139,7 @@ let%test_module "Bootstrap Controller" =
     let%test "sync with one node correctly" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind syncing_frontier, peer, network =

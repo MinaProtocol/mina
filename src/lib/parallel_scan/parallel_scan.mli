@@ -78,6 +78,8 @@ module State : sig
    * order we expect the completed jobs to be filled in.
    *)
 
+  val transactions : ('a, 'd) t -> 'd sexp_list
+
   val copy : ('a, 'd) t -> ('a, 'd) t
 
   val visualize :

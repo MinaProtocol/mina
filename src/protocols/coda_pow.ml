@@ -626,7 +626,7 @@ module type Transaction_snark_scan_state_intf = sig
     val check_invariants :
          t
       -> error_prefix:string
-      -> ledger
+      -> frozen_ledger_hash
       -> frozen_ledger_hash sexp_option
       -> (unit, Error.t) result M.t
   end
@@ -657,6 +657,8 @@ module type Transaction_snark_scan_state_intf = sig
   val hash : t -> staged_ledger_aux_hash
 
   val staged_transactions : t -> transaction_with_info list
+
+  val all_transactions : t -> transaction_with_info list
 
   val extract_from_job :
        Available_job.t

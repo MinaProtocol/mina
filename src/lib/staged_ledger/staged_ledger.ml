@@ -260,7 +260,7 @@ end = struct
     let t = {ledger; scan_state} in
     let%bind () =
       Statement_scanner_with_proofs.check_invariants scan_state
-        ~error_prefix:"Staged_ledger.of_scan_state_and_ledger" ledger
+        ~error_prefix:"Staged_ledger.of_scan_state_and_ledger" (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
         (Some snarked_ledger_hash)
     in
     let%bind () =
@@ -270,13 +270,18 @@ end = struct
 
   let of_scan_state_and_snarked_ledger ~scan_state ~snarked_ledger
       ~expected_merkle_root =
-    let open Deferred.Or_error.Let_syntax in
+    let open Deferred.Or_error.Let_syntax in      
     let snarked_ledger_hash =
       Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root snarked_ledger)
     in
+    let%bind () = if Option.is_some expected_merkle_root
+    then Statement_scanner_with_proofs.check_invariants scan_state
+      ~error_prefix:"Staged_ledger.of_scan_state_and_snarked_ledger" (Frozen_ledger_hash.of_ledger_hash (Option.value_exn expected_merkle_root))
+      (Some (snarked_ledger_hash))
+    else return () in
     let%bind txs =
       List.map ~f:Ledger.Undo.transaction
-        (Scan_state.staged_transactions scan_state)
+        (Scan_state.all_transactions scan_state)
       |> Or_error.all |> Deferred.return
     in
     let mask = Ledger.Mask.create () in
@@ -294,9 +299,8 @@ end = struct
         expected_merkle_root
     then of_scan_state_and_ledger ~snarked_ledger_hash ~ledger ~scan_state
     else
-      Deferred.return
-      @@ Or_error.error_string
-           "The merkle root of the ledger doesn't match the expected one"
+      Deferred.Or_error.error_string
+        "The merkle root of the ledger doesn't match the expected one"
 
   let copy {scan_state; ledger} =
     let new_mask = Ledger.Mask.create () in
@@ -731,7 +735,7 @@ end = struct
     in
     let%map () =
       Deferred.return
-        ( verify_scan_state_after_apply new_ledger scan_state'
+        ( verify_scan_state_after_apply (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger)) scan_state'
         |> to_staged_ledger_or_error )
     in
     Logger.info logger
@@ -832,7 +836,7 @@ end = struct
       Or_error.ok_exn
         (Scan_state.fill_work_and_enqueue_transactions scan_state' data works)
     in
-    Or_error.ok_exn (verify_scan_state_after_apply new_ledger scan_state') ;
+    Or_error.ok_exn (verify_scan_state_after_apply (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger)) scan_state') ;
     let new_staged_ledger = {scan_state= scan_state'; ledger= new_ledger} in
     ( `Hash_after_applying (hash new_staged_ledger)
     , `Ledger_proof res_opt

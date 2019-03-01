@@ -42,7 +42,6 @@ module type Inputs_intf = sig
      and type sync_ledger_answer := Sync_ledger.answer
      and type parallel_scan_state := Staged_ledger.Scan_state.t
 
-  (* and type *)
   module Time : Time_intf
 
   module Protocol_state_validator :
