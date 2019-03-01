@@ -1,11 +1,24 @@
 open Core
 open Import
 
-type t = private
+module Stable : sig
+  module V1 : sig
+    type t = private
+      { proposer: Public_key.Compressed.t
+      ; amount: Currency.Amount.t
+      ; fee_transfer: Fee_transfer.single option }
+    [@@deriving sexp, bin_io, compare, eq]
+  end
+
+  module Latest = V1
+end
+
+(* bin_io intentionally omitted in deriving list *)
+type t = Stable.Latest.t = private
   { proposer: Public_key.Compressed.t
   ; amount: Currency.Amount.t
   ; fee_transfer: Fee_transfer.single option }
-[@@deriving sexp, bin_io, compare, eq]
+[@@deriving sexp, compare, eq]
 
 val create :
      amount:Currency.Amount.t
