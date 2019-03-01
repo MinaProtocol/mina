@@ -35,6 +35,8 @@ module type Ops_intf = sig
 
   val iter : 'a t -> f:('a -> unit Monad.t) -> unit Monad.t
 
+  val map : 'a t -> f:('a -> 'b Monad.t) -> 'b t Monad.t
+
   val fold_map : 'a t -> init:'b -> f:('b -> 'a -> 'b Monad.t) -> 'b t Monad.t
 end
 
@@ -45,6 +47,11 @@ struct
   let rec iter (T (base, successors)) ~f =
     let%bind () = f base in
     Monad.List.iter successors ~f:(iter ~f)
+
+  let rec map (T (base, successors)) ~f =
+    let%bind base' = f base in
+    let%map successors' = Monad.List.map successors ~f:(map ~f) in
+    T (base', successors')
 
   let rec fold_map (T (base, successors)) ~init ~f =
     let%bind base' = f init base in
@@ -81,4 +88,39 @@ module Deferred = struct
     let%bind x = x' in
     let%bind ts = Deferred.all @@ List.map ~f:all ts' in
     return @@ T (x, ts)
+
+  module Or_error = Make_ops (struct
+    include (
+      Deferred.Or_error : Monad.S with type +'a t = 'a Deferred.Or_error.t )
+
+    module List = struct
+      open Deferred.Or_error.List
+
+      let iter ls ~f = iter ~how:`Sequential ls ~f
+
+      let map ls ~f = map ~how:`Sequential ls ~f
+    end
+  end)
 end
+
+module Or_error = Make_ops (struct
+  include Or_error
+
+  module List = struct
+    open Or_error.Let_syntax
+
+    let iter ls ~f =
+      List.fold_left ls ~init:(return ()) ~f:(fun or_error x ->
+          let%bind () = or_error in
+          f x )
+
+    let map ls ~f =
+      let%map ls' =
+        List.fold_left ls ~init:(return []) ~f:(fun or_error x ->
+            let%bind t = or_error in
+            let%map x' = f x in
+            x' :: t )
+      in
+      List.rev ls'
+  end
+end)

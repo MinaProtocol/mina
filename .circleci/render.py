@@ -2,8 +2,7 @@
 
 import jinja2
 
-base_actions = [
-    'full-test',
+shared_integration_tests = [
     'coda-peers-test',
     'coda-transitive-peers-test',
     'coda-block-production-test',
@@ -11,8 +10,14 @@ base_actions = [
     'coda-shared-prefix-test -who-proposes 1',
     'coda-shared-state-test',
     'coda-restart-node-test',
+]
+
+non_integration_test_shared = [
+    'full-test',
     'transaction-snark-profiler -check-only'
 ]
+
+base_actions = non_integration_test_shared + shared_integration_tests
 
 build_profiles = [
     'dev',
@@ -39,7 +44,13 @@ tests = [
        'friendly': 'Proof of Stake Tests',
        'config': 'test_postake_snarkless',
        'name': 'postake_integration_tests',
-       'actions': base_actions + ['coda-shared-prefix-multiproposer-test']
+       'actions': non_integration_test_shared
+   },
+   {
+       'friendly': 'Proof of Stake (split stake) Tests',
+       'config': 'test_postake_split_snarkless',
+       'name': 'postake_split_integration_tests',
+       'actions': shared_integration_tests
    },
    {
        'friendly': 'Full test with SNARK (sig)',

@@ -20,6 +20,9 @@ val head : 'a t -> 'a
 val tail : 'a t -> 'a list
 (** The zero or more tail elements of the container *)
 
+val rev : 'a t -> 'a t
+(** The reverse ordered list *)
+
 val of_list_opt : 'a list -> 'a t option
 (** Convert a list into a non-empty-list, returning [None] if the list is
  * empty *)
@@ -42,8 +45,6 @@ val fold : 'a t -> init:'accum -> f:('accum -> 'a -> 'accum) -> 'accum
 val iter : 'a t -> f:('a -> unit) -> unit
 
 val length : 'a t -> int
-
-val rev : 'a t -> 'a t
 
 val to_list : 'a t -> 'a list
 (** Note: This is O(1) not O(n) like on most container *)
