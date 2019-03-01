@@ -4,7 +4,7 @@ version: 3
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-rust-e5d68f8d923b6bfe049a55422587bd45c573d81f
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -24,7 +24,7 @@ jobs:
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -84,7 +84,7 @@ jobs:
     build_{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
@@ -119,7 +119,7 @@ jobs:
     test-unit-test:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -131,7 +131,7 @@ jobs:
     test-{{test.name}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
