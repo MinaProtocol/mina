@@ -303,6 +303,7 @@ module Make (Inputs : Inputs_intf) :
               | None -> Interruptible.return ()
               | Some (protocol_state, internal_transition) ->
                   Debug_assert.debug_assert (fun () ->
+                      let logger = Logger.child logger "Assert_selection" in
                       [%test_result: [`Take | `Keep]]
                         (Consensus_mechanism.select
                            ~existing:
@@ -310,7 +311,7 @@ module Make (Inputs : Inputs_intf) :
                              |> Protocol_state.consensus_state )
                            ~candidate:
                              (protocol_state |> Protocol_state.consensus_state)
-                           ~logger:(Logger.child logger "Assert_selection"))
+                           ~logger)
                         ~expect:`Take
                         ~message:
                           "newly generated consensus states should be \
@@ -326,7 +327,7 @@ module Make (Inputs : Inputs_intf) :
                            ~existing:root_consensus_state
                            ~candidate:
                              (protocol_state |> Protocol_state.consensus_state)
-                           ~logger:(Logger.child logger "Assert_selection"))
+                           ~logger)
                         ~expect:`Take
                         ~message:
                           "newly generated consensus states should be \
