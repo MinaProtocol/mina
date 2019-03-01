@@ -190,4 +190,11 @@ module type S = sig
   (**
      * Indicator of when we should bootstrap
     *)
+
+  val time_hum : Time.t -> string
+  (** Return a string that tells a human what the consensus view of an instant in time is.
+    *
+    * This is mostly useful for PoStake and other consensus mechanisms that have their own
+    * notions of time.
+    *)
 end

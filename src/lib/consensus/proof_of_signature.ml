@@ -280,4 +280,6 @@ end
 
 let should_bootstrap ~existing:_ ~candidate:_ = false
 
+let time_hum now = Time.to_string now
+
 [%%endif]

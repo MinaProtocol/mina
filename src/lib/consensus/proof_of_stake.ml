@@ -1305,6 +1305,10 @@ let select ~existing ~candidate ~logger =
       log_result `Keep "no predicates were matched" ;
       `Keep
 
+let time_hum (now : Core_kernel.Time.t) =
+  let epoch, slot = Epoch.epoch_and_slot_of_time_exn (Time.of_time now) in
+  Printf.sprintf "%d:%d" (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
+
 let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
     ~logger =
   let open Consensus_state in

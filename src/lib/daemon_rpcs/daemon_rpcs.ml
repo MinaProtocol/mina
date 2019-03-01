@@ -143,6 +143,7 @@ module Types = struct
       ; run_snark_worker: bool
       ; propose_pubkey: Public_key.t option
       ; histograms: Histograms.t option
+      ; consensus_time: string
       ; consensus_mechanism: string
       ; consensus_configuration: Consensus.Configuration.t }
     [@@deriving to_yojson, bin_io, fields]
@@ -193,6 +194,7 @@ module Types = struct
             | None -> acc
             | Some histograms ->
                 ("Histograms", Histograms.to_text histograms) :: acc )
+          ~consensus_time:(fun acc x -> ("Consensus Time", f x) :: acc)
           ~consensus_mechanism:(fun acc x ->
             ("Consensus Mechanism", f x) :: acc )
           ~consensus_configuration:(fun acc x ->
