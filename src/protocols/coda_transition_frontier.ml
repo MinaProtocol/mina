@@ -116,6 +116,9 @@ module type Transition_frontier_Breadcrumb_intf = sig
     -> staged_ledger
     -> t
 
+  val copy : t -> t
+  (** The copied breadcrumb delegates to [Staged_ledger.copy], the other fields are already immutable *)
+
   val build :
        logger:Logger.t
     -> parent:t
@@ -222,6 +225,13 @@ module type Transition_frontier_intf = sig
   val iter : t -> f:(Breadcrumb.t -> unit) -> unit
 
   val add_breadcrumb_exn : t -> Breadcrumb.t -> unit Deferred.t
+  (** Adds a breadcrumb to the transition frontier or throws. It possibly
+   * triggers a root move and it triggers any extensions that are listening to
+   * events on the frontier. *)
+
+  val add_breadcrumb_if_present_exn : t -> Breadcrumb.t -> unit Deferred.t
+  (** Like add_breadcrumb_exn except it doesn't throw if the parent hash is
+   * missing from the transition frontier *)
 
   val best_tip_path_length_exn : t -> int
 

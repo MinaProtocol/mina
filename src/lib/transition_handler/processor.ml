@@ -68,7 +68,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
         ~catchup_job_writer ~catchup_breadcrumbs_writer
     in
     (* add a breadcrumb and perform post processing *)
-    let add_and_finalize cached_breadcrumb =
+    let add_and_finalize ~only_if_present cached_breadcrumb =
       let open Deferred.Or_error.Let_syntax in
       let%bind breadcrumb =
         Deferred.return (Cached.invalidate cached_breadcrumb)
@@ -76,9 +76,13 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
       let transition =
         Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
       in
+      let add_breadcrumb =
+        if only_if_present then
+          Transition_frontier.add_breadcrumb_if_present_exn
+        else Transition_frontier.add_breadcrumb_exn
+      in
       let%bind () =
-        Deferred.map ~f:Result.return
-          (Transition_frontier.add_breadcrumb_exn frontier breadcrumb)
+        Deferred.map ~f:Result.return (add_breadcrumb frontier breadcrumb)
       in
       Writer.write processed_transition_writer transition ;
       Deferred.return
@@ -107,8 +111,12 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                    match%map
                      Deferred.Or_error.List.iter breadcrumb_subtrees
                        ~f:(fun subtree ->
-                         Rose_tree.Deferred.Or_error.iter subtree
-                           ~f:add_and_finalize )
+                         Rose_tree.Deferred.Or_error.iter
+                           subtree
+                           (* It could be the case that by the time we try and
+                             * add the breadcrumb, it's no longer relevant when
+                             * we're catching up *)
+                           ~f:(add_and_finalize ~only_if_present:true) )
                    with
                    | Ok () -> ()
                    | Error err ->
@@ -159,7 +167,7 @@ module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
                          | Error (`Fatal_error e) -> raise e
                          | Ok b -> Ok b
                        in
-                       add_and_finalize breadcrumb
+                       add_and_finalize ~only_if_present:false breadcrumb
                      with
                      | Ok () -> ()
                      | Error err ->
