@@ -79,6 +79,11 @@ module State : sig
    *)
 
   val transactions : ('a, 'd) t -> 'd sexp_list
+  (** Returns a list of all the collected transactions in the scan state. The
+    * order of the transactions in the list is the same as the order when they
+    * were added. Namely the head of the list is the first transaction that
+    * was collected by the scan state.
+    *)
 
   val copy : ('a, 'd) t -> ('a, 'd) t
 

@@ -626,8 +626,8 @@ module type Transaction_snark_scan_state_intf = sig
     val check_invariants :
          t
       -> error_prefix:string
-      -> frozen_ledger_hash
-      -> frozen_ledger_hash sexp_option
+      -> ledger_hash_end:frozen_ledger_hash
+      -> ledger_hash_begin:frozen_ledger_hash sexp_option
       -> (unit, Error.t) result M.t
   end
 

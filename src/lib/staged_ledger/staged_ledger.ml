@@ -194,10 +194,12 @@ end = struct
     in
     match Scan_state.latest_ledger_proof scan_state with
     | None ->
-        Statement_scanner.check_invariants scan_state ~error_prefix ledger None
+        Statement_scanner.check_invariants scan_state ~error_prefix
+          ~ledger_hash_end:ledger ~ledger_hash_begin:None
     | Some proof ->
-        Statement_scanner.check_invariants scan_state ~error_prefix ledger
-          (Some (get_target proof))
+        Statement_scanner.check_invariants scan_state ~error_prefix
+          ~ledger_hash_end:ledger
+          ~ledger_hash_begin:(Some (get_target proof))
 
   let snarked_ledger :
       t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t =
@@ -261,8 +263,9 @@ end = struct
     let%bind () =
       Statement_scanner_with_proofs.check_invariants scan_state
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
-        (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
-        (Some snarked_ledger_hash)
+        ~ledger_hash_end:
+          (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
+        ~ledger_hash_begin:(Some snarked_ledger_hash)
     in
     let%bind () =
       Deferred.return (verify_snarked_ledger t snarked_ledger_hash)
@@ -279,9 +282,10 @@ end = struct
       if Option.is_some expected_merkle_root then
         Statement_scanner_with_proofs.check_invariants scan_state
           ~error_prefix:"Staged_ledger.of_scan_state_and_snarked_ledger"
-          (Frozen_ledger_hash.of_ledger_hash
-             (Option.value_exn expected_merkle_root))
-          (Some snarked_ledger_hash)
+          ~ledger_hash_end:
+            (Frozen_ledger_hash.of_ledger_hash
+               (Option.value_exn expected_merkle_root))
+          ~ledger_hash_begin:(Some snarked_ledger_hash)
       else return ()
     in
     let%bind txs =

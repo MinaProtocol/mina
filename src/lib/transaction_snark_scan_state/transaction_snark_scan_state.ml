@@ -377,8 +377,8 @@ end = struct
       | Ok (Some res) -> Ok res
       | Error e -> Error (`Error e)
 
-    let check_invariants t ~error_prefix current_ledger_hash
-        snarked_ledger_hash =
+    let check_invariants t ~error_prefix ~ledger_hash_end:current_ledger_hash
+        ~ledger_hash_begin:snarked_ledger_hash =
       let clarify_error cond err =
         if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
       in
