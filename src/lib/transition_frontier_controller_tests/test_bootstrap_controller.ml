@@ -51,7 +51,9 @@ let%test_module "Bootstrap Controller" =
       in
       let num_breadcrumbs = (Transition_frontier.max_length * 2) + 2 in
       let logger = Logger.create () in
-      let network = Network.create ~logger in
+      let network =
+        Network.create ~logger ~peers:(Network_peer.Peer.Table.of_alist_exn [])
+      in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind frontier =
             create_root_frontier ~logger Genesis_ledger.accounts
