@@ -36,6 +36,7 @@ module type Inputs_intf = sig
       -> prev_state_proof:Protocol_state_proof.t
       -> next_state:Consensus_mechanism.Protocol_state.value
       -> Internal_transition.t
+      -> Pending_coinbase.t
       -> Protocol_state_proof.t Deferred.Or_error.t
   end
 end
@@ -195,6 +196,7 @@ module Make (Inputs : Inputs_intf) :
           in
           Or_error.ok_exn or_error
         in
+        (*Core.printf !"pending_coinbase update: %{sexp:Pending_coinbase_update.t} \n %!" pending_coinbase_state;*)
         (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
         ( diff
         , next_staged_ledger_hash
@@ -292,13 +294,17 @@ module Make (Inputs : Inputs_intf) :
                   (Protocol_state.blockchain_state protocol_state)
                 ~consensus_data:consensus_transition_data ()
                 ~pending_coinbase_state
+              (*Deepthi: delete this from here*)
             in
             let internal_transition =
               Internal_transition.create ~snark_transition
                 ~prover_state:(Proposal_data.prover_state proposal_data)
                 ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
             in
-            Some (protocol_state, internal_transition) ) )
+            Some
+              ( protocol_state
+              , internal_transition
+              , Staged_ledger.pending_coinbase_collection staged_ledger ) ) )
 
   let run ~parent_log ~get_completed_work ~transaction_pool ~time_controller
       ~keypair ~consensus_local_state ~frontier_reader ~transition_writer =
@@ -343,7 +349,10 @@ module Make (Inputs : Inputs_intf) :
               trace_event "next state generated" ;
               match next_state_opt with
               | None -> Interruptible.return ()
-              | Some (protocol_state, internal_transition) ->
+              | Some
+                  ( protocol_state
+                  , internal_transition
+                  , pending_coinbase_witness ) ->
                   Interruptible.uninterruptible
                     (let open Deferred.Let_syntax in
                     let t0 = Time.now time_controller in
@@ -351,7 +360,8 @@ module Make (Inputs : Inputs_intf) :
                       measure "proving state transition valid" (fun () ->
                           Prover.prove ~prev_state:previous_protocol_state
                             ~prev_state_proof:previous_protocol_state_proof
-                            ~next_state:protocol_state internal_transition )
+                            ~next_state:protocol_state internal_transition
+                            pending_coinbase_witness )
                     with
                     | Error err ->
                         Logger.error logger

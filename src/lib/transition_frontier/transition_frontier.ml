@@ -35,6 +35,7 @@ module Make (Inputs : Inputs_intf) :
     let create transition_with_hash staged_ledger =
       {transition_with_hash; staged_ledger; just_emitted_a_proof= false}
 
+    (*Deepthi: Check pending_coinbase hash in trnsition is the same as the one in pending_coinbase_update*)
     let build ~logger ~parent ~transition_with_hash =
       O1trace.measure "Breadcrumb.build" (fun () ->
           let open Deferred.Result.Let_syntax in

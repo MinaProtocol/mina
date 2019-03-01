@@ -9,6 +9,27 @@ val merkle_root : t -> Ledger_hash.t
 val path_exn :
   t -> int -> [`Left of Ledger_hash.t | `Right of Ledger_hash.t] list
 
+val get_exn :
+     t
+  -> int
+  -> ( Account.key
+     , Currency.Balance.t
+     , Account.Nonce.t
+     , Receipt.Chain_hash.t )
+     Account.t_
+
+val set_exn :
+     t
+  -> int
+  -> ( Account.key
+     , Currency.Balance.t
+     , Account.Nonce.t
+     , Receipt.Chain_hash.t )
+     Account.t_
+  -> t
+
+val find_index_exn : t -> Account.key -> int
+
 val of_root : Ledger_hash.t -> t
 
 val apply_user_command_exn : t -> User_command.t -> t

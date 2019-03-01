@@ -272,11 +272,12 @@ module State = struct
     List.rev lst
 
   let base_jobs_on_latest_tree (state : ('a, 'd) t) : 'd list =
-    let leaves_start_at = Int.pow 2 (parallelism state) - 1 in
+    let leaves_start_at = parallelism state - 1 in
     let rec go pos jobs =
+      (*Get jobs from leaf-0 to the leaf at current enqueue position. The ones that are after base_pos are pending jobs from previous tree *)
       if
         Option.is_none state.base_none_pos
-        && pos > Option.value_exn state.base_none_pos
+        || pos >= Option.value_exn state.base_none_pos + 1
       then jobs
       else
         let jobs =

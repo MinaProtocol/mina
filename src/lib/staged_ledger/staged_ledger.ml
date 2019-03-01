@@ -1746,8 +1746,6 @@ let%test_module "test" =
 
         include T
 
-        let empty_hash = ""
-
         let to_bytes = Fn.id
 
         (*let gen = String.gen_with_length 756 Char.gen*)
@@ -1757,6 +1755,8 @@ let%test_module "test" =
 
       module Pending_coinbase = struct
         type t = Coinbase.t list list [@@deriving sexp, bin_io]
+
+        let empty_hash = ""
 
         let merkle_root : t -> Pending_coinbase_hash.t =
          fun t ->
@@ -1828,8 +1828,8 @@ let%test_module "test" =
 
         let genesis =
           { updated_stack= Pending_coinbase.Stack.empty
-          ; prev_root= Pending_coinbase_hash.empty_hash
-          ; new_root= Pending_coinbase_hash.empty_hash
+          ; prev_root= Pending_coinbase.empty_hash
+          ; new_root= Pending_coinbase.empty_hash
           ; action= Action.Added }
       end
 

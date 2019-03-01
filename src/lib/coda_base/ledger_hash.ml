@@ -10,11 +10,13 @@ module Merkle_tree =
   Snarky.Merkle_tree.Checked
     (Tick)
     (struct
-      type value = Pedersen.Checked.Digest.t
+      type value = Pedersen.Checked.Digest.t [@@deriving sexp]
 
       type var = Pedersen.Checked.Digest.var
 
       let typ = Pedersen.Checked.Digest.typ
+
+      let t_of_val v = v
 
       let hash ~height h1 h2 =
         let to_triples (bs : Pedersen.Checked.Digest.Unpacked.var) =

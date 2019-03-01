@@ -867,12 +867,13 @@ module Verification = struct
     (* The curve pt corresponding to
        H(merge_prefix, _digest, _, _, _, Amount.Signed.zero, wrap_vk)
     (with starting point shifted over by 2 * digest_size so that
-    this can then be used to compute H(merge_prefix, digest, s1, s2, Amount.Signed.zero, wrap_vk) *)
+    this can then be used to compute H(merge_prefix, digest, s1, s2, pending_coinbase1, pending_coinbase2, Amount.Signed.zero, wrap_vk) *)
     let merge_prefix_and_zero_and_vk_curve_pt =
       let open Tick in
       let excess_begin =
         Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
         + (2 * state_hash_size_in_triples)
+        + (2 * Pending_coinbase.Stack.length_in_triples)
         + Amount.length_in_triples
       in
       let s = {Hash_prefix.merge_snark with triples_consumed= excess_begin} in
@@ -926,9 +927,8 @@ module Verification = struct
         Pedersen.Checked.Section.extend merge_prefix_and_zero_and_vk_curve_pt
           ~start:Hash_prefix.length_in_triples
           ( Sok_message.Digest.Checked.to_triples sok_digest
-          @ s1 @ s2
-          @ Amount.var_to_triples supply_increase
-          @ pending_coinbase_before @ pending_coinbase_after )
+          @ s1 @ s2 @ pending_coinbase_before @ pending_coinbase_after
+          @ Amount.var_to_triples supply_increase )
       in
       let digest =
         let digest, `Length_in_triples n =
@@ -938,10 +938,10 @@ module Verification = struct
         let length =
           Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
           + (2 * Frozen_ledger_hash.length_in_triples)
+          + (2 * Pending_coinbase.Stack.length_in_triples)
           + Amount.length_in_triples + Amount.Signed.length_in_triples
           + Coda_base.Util.bit_length_to_triple_length
               (List.length wrap_vk_bits)
-          + (2 * Pending_coinbase.Stack.length_in_triples)
         in
         if n = length then digest
         else

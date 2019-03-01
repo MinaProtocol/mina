@@ -935,7 +935,7 @@ struct
 
     module Prover = struct
       let prove ~prev_state ~prev_state_proof ~next_state
-          (transition : Internal_transition.t) =
+          (transition : Internal_transition.t) pending_coinbase =
         match Init.proposer_prover with
         | `Non_proposer -> failwith "prove: Coda not run as proposer"
         | `Proposer prover ->
@@ -945,6 +945,7 @@ struct
               next_state
               (Internal_transition.snark_transition transition)
               (Internal_transition.prover_state transition)
+              pending_coinbase
             >>| fun {Blockchain.proof; _} -> proof
     end
   end)

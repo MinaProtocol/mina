@@ -102,8 +102,6 @@ module type Pending_coinbase_hash_intf = sig
 
   val to_bytes : t -> string
 
-  val empty_hash : t
-
   include Hashable.S_binable with type t := t
 end
 
@@ -121,6 +119,8 @@ module type Pending_coinbase_intf = sig
 
     val empty : t
   end
+
+  val empty_hash : pending_coinbase_hash
 
   val merkle_root : t -> pending_coinbase_hash
 

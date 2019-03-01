@@ -181,6 +181,6 @@ let typ : (var, t) Typ.t =
 
 let genesis =
   { updated_stack= Pending_coinbase.Stack.empty
-  ; prev_root= Pending_coinbase.Hash.empty_hash
-  ; new_root= Pending_coinbase.Hash.empty_hash
+  ; prev_root= Pending_coinbase.empty_hash
+  ; new_root= Pending_coinbase.empty_hash
   ; action= Action.Updated }

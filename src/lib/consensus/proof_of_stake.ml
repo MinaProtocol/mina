@@ -72,7 +72,9 @@ end
 
 module Proposal_data = struct
   type t =
-    {stake_proof: Coda_base.Stake_proof.t; vrf_result: Random_oracle.Digest.t}
+    { stake_proof: Coda_base.Stake_proof.t
+    ; (* pending_coinbase:Coda_base.Pending_coinbase.t;*)
+      vrf_result: Random_oracle.Digest.t }
   [@@deriving bin_io]
 
   let prover_state {stake_proof; _} = stake_proof
@@ -125,6 +127,7 @@ module Local_state = struct
   type t =
     { mutable last_epoch_snapshot: Snapshot.t option
     ; mutable curr_epoch_snapshot: Snapshot.t option
+    ; pending_coinbase_collection: Coda_base.Pending_coinbase.t
     ; genesis_epoch_snapshot: Snapshot.t
     ; proposer_public_key: Public_key.Compressed.t option }
   [@@deriving sexp]
@@ -154,9 +157,13 @@ module Local_state = struct
           in
           {delegators; ledger}
     in
+    let pending_coinbase_collection =
+      Coda_base.Pending_coinbase.create_exn ()
+    in
     { last_epoch_snapshot= None
     ; curr_epoch_snapshot= None
     ; genesis_epoch_snapshot
+    ; pending_coinbase_collection
     ; proposer_public_key }
 end
 
@@ -578,20 +585,24 @@ module Vrf = struct
       let dummy_sparse_ledger =
         Coda_base.Sparse_ledger.of_ledger_subset_exn Genesis_ledger.t [pk]
       in
-      let ledger_handler =
+      (*let ledger_handler =
         unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger)
       in
       let pending_coinbase_handler =
-        unstage (Coda_base.Pending_coinbase.handler Pending_coinbase.create ())
+        unstage (Coda_base.Pending_coinbase.handler (Coda_base.Pending_coinbase.create_exn ()))
+      in*)
+      let empty_pending_coinbase = Coda_base.Pending_coinbase.create_exn () in
+      let ledger_coinbase_handler =
+        unstage
+        @@ Coda_base.Snark_request_handler.handler
+             { Coda_base.Snark_request_handler.ledger= dummy_sparse_ledger
+             ; pending_coinbase= empty_pending_coinbase }
       in
       fun (With {request; respond} as t) ->
         match request with
         | Winner_address -> respond (Provide 0)
         | Private_key -> respond (Provide sk)
-        | Coda_base.Pending_coinbase.Hash.Find_index_of_newest_stack
-         |Coda_base.Pending_coinbase.Hash.Find_index_of_oldest_stack ->
-            pending_coinbase_handler t
-        | _ -> ledger_handler t
+        | _ -> ledger_coinbase_handler t
 
     let vrf_output =
       let _, sk = Coda_base.Sample_keypairs.keypairs.(0) in
@@ -1130,23 +1141,27 @@ end
 module Prover_state = struct
   include Coda_base.Stake_proof
 
+  (*type t = {stake_proof:Coda_base.Stake_proof.t; pending_coinbase:Cooda_base.Pending_coinbase.t}*)
+
   let precomputed_handler = Vrf.Precomputed.handler
 
   (*Add pending coinbase handler here*)
-  let handler {delegator; ledger; private_key; pending_coinbase_collection} :
+  let handler {delegator; ledger; private_key} ~pending_coinbase :
       Snark_params.Tick.Handler.t =
-    let ledger_handler = unstage (Coda_base.Sparse_ledger.handler ledger) in
+    (*let ledger_handler = unstage (Coda_base.Sparse_ledger.handler ledger) in
     let pending_coinbase_handler =
       unstage (Coda_base.Pending_coinbase.handler pending_coinbase_collection)
+    in*)
+    let ledger_coinbase_handler =
+      unstage
+      @@ Coda_base.Snark_request_handler.handler
+           {Coda_base.Snark_request_handler.ledger; pending_coinbase}
     in
     fun (With {request; respond} as t) ->
       match request with
       | Vrf.Winner_address -> respond (Provide delegator)
       | Vrf.Private_key -> respond (Provide private_key)
-      | Coda_base.Pending_coinbase.Hash.Find_index_of_newest_stack
-       |Coda_base.Pending_coinbase.Hash.Find_index_of_oldest_stack ->
-          pending_coinbase_handler t
-      | _ -> ledger_handler t
+      | _ -> ledger_coinbase_handler t
 end
 
 module Snark_transition = Coda_base.Snark_transition.Make (struct
@@ -1372,7 +1387,7 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
       else
         match proposal_data slot with
         | None -> find_winning_slot (Epoch.Slot.succ slot)
-        | Some data -> Some (slot, data)
+        | Some data (*delegator, ledger, vrf_result*) -> Some (slot, data)
     in
     find_winning_slot (Epoch.Slot.succ slot)
   in
