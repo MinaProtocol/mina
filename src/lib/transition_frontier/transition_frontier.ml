@@ -705,18 +705,11 @@ struct
                 let db_mask = Ledger.of_database t.root_snarked_ledger in
                 Non_empty_list.iter txns ~f:(fun txn ->
                     (* TODO: @cmr use the ignore-hash ledger here as well *)
-                    Ledger.apply_transaction db_mask txn
+                    TL.apply_transaction t.root_snarked_ledger txn
                     |> Or_error.ok_exn |> ignore ) ;
                 (* TODO: See issue #1606 to make this faster *)
-                [%test_result: Frozen_ledger_hash.t]
-                  ~message:
-                    "after applying all the transactions, the mask hash \
-                     wasn't the target\n\
-                    \                    after root transition"
-                  ~expect:(Inputs.Ledger_proof.statement proof_data).target
-                  ( Ledger.merkle_root db_mask
-                  |> Frozen_ledger_hash.of_ledger_hash ) ;
-                Ledger.commit db_mask ;
+                
+                (*Ledger.commit db_mask ;*)
                 ignore
                   (Ledger.Maskable.unregister_mask_exn
                      (Ledger.Any_ledger.cast
