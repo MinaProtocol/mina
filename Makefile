@@ -243,6 +243,10 @@ test-ppx:
 web:
 	./scripts/web.sh
 
+test-wallet: SHELL := /bin/bash
+test-wallet:
+	source scripts/test_all.sh ; cd src; run_wallet_test
+
 ########################################
 # Coverage testing and output
 
