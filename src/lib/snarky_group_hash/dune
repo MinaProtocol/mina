@@ -1,0 +1,8 @@
+(library
+  (name snarky_group_hash)
+  (public_name snarky_group_hash)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (libraries
+    snarky
+    snarkette
+    core_kernel ))
