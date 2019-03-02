@@ -243,8 +243,8 @@ test-ppx:
 web:
 	./scripts/web.sh
 
-test-wallet: SHELL := /bin/bash
-test-wallet:
+test-build-wallet: SHELL := /bin/bash
+test-build-wallet:
 	source scripts/test_all.sh ; cd src; run_wallet_test
 
 ########################################

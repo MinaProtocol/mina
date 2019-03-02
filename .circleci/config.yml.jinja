@@ -13,14 +13,18 @@ jobs:
                   command: cd src/app/trace-tool && cargo build --frozen
 
     build-wallet:
-        macos:
-            xcode: "10.1.0"
+        docker:
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
         steps:
             - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Check .circleci Render
+                  command: make check-render-circleci
             - run: cd frontend/wallet && npm install
             - run:
                   name: Build wallet
-                  command: cd frontend/wallet && npm run build
+                  command: eval `opam config env` && make test-wallet
 
     lint:
         docker:
