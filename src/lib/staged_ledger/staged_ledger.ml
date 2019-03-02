@@ -832,13 +832,20 @@ end = struct
           eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e ) ;
       Deferred.return (to_staged_ledger_or_error r)
     in
+    let pending_coinbase_updated' =
+      Option.value_map ~default:pending_coinbase_collection_updated res_opt
+        ~f:(fun _ ->
+          Pending_coinbase.remove_coinbase_stack_exn
+            pending_coinbase_collection_updated )
+    in
+    (*Core.printf !"root1: %{sexp:Pending_coinbase_hash.t} root2: %{sexp:Pending_coinbase_hash.t} \n %!" 
+    (Pending_coinbase.merkle_root pending_coinbase_collection_updated) (Pending_coinbase.merkle_root pending_coinbase_updated');
+    Core.printf !"Proof emitted %{sexp:bool}\n Pending coinbase before %{sexp:Pending_coinbase.t}\n inter: %{sexp:Pending_coinbase.t}\n  final: %{sexp:Pending_coinbase.t} \n %!" (Option.is_some res_opt)t.pending_coinbase_collection pending_coinbase_collection_updated pending_coinbase_updated';*)
     let pending_coinbase_state =
       let prev_root =
         Pending_coinbase.merkle_root t.pending_coinbase_collection
       in
-      let new_root =
-        Pending_coinbase.merkle_root pending_coinbase_collection_updated
-      in
+      let new_root = Pending_coinbase.merkle_root pending_coinbase_updated' in
       let action =
         match (not non_empty_stack, Option.is_none res_opt) with
         | true, true -> Pending_coinbase_update.Action.Added
@@ -862,7 +869,7 @@ end = struct
     let new_staged_ledger =
       { scan_state= scan_state'
       ; ledger= new_ledger
-      ; pending_coinbase_collection= pending_coinbase_collection_updated }
+      ; pending_coinbase_collection= pending_coinbase_updated' }
     in
     ( `Hash_after_applying (hash new_staged_ledger)
     , `Ledger_proof res_opt
@@ -1006,19 +1013,37 @@ end = struct
       Or_error.ok_exn
         (Scan_state.fill_work_and_enqueue_transactions scan_state' data works)
     in
+    let pending_coinbase_updated' =
+      Option.value_map ~default:pending_coinbase_collection_updated res_opt
+        ~f:(fun _ ->
+          Pending_coinbase.remove_coinbase_stack_exn
+            pending_coinbase_collection_updated )
+    in
+    Core.printf
+      !"root1: %{sexp:Pending_coinbase_hash.t} root2: \
+        %{sexp:Pending_coinbase_hash.t} \n\
+       \ %!"
+      (Pending_coinbase.merkle_root pending_coinbase_collection_updated)
+      (Pending_coinbase.merkle_root pending_coinbase_updated') ;
+    Core.printf
+      !"Proof emitted %{sexp:bool}\n\
+       \ Pending coinbase before %{sexp:Pending_coinbase.t}\n\
+       \ inter: %{sexp:Pending_coinbase.t}\n\
+       \  final: %{sexp:Pending_coinbase.t} \n\
+       \ %!"
+      (Option.is_some res_opt) t.pending_coinbase_collection
+      pending_coinbase_collection_updated pending_coinbase_updated' ;
     Or_error.ok_exn (verify_scan_state_after_apply new_ledger scan_state') ;
     let new_staged_ledger =
       { scan_state= scan_state'
       ; ledger= new_ledger
-      ; pending_coinbase_collection= pending_coinbase_collection_updated }
+      ; pending_coinbase_collection= pending_coinbase_updated' }
     in
     let pending_coinbase_state =
       let prev_root =
         Pending_coinbase.merkle_root t.pending_coinbase_collection
       in
-      let new_root =
-        Pending_coinbase.merkle_root pending_coinbase_collection_updated
-      in
+      let new_root = Pending_coinbase.merkle_root pending_coinbase_updated' in
       let action =
         match (not non_empty_stack, Option.is_none res_opt) with
         | true, true -> Pending_coinbase_update.Action.Added
@@ -1785,6 +1810,8 @@ let%test_module "test" =
         end
 
         let create_exn () = []
+
+        let remove_coinbase_stack_exn = Fn.id
 
         let update_coinbase_stack_exn t stack ~new_stack =
           if new_stack then stack :: t else stack :: List.tl_exn t

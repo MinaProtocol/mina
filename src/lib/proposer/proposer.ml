@@ -196,7 +196,9 @@ module Make (Inputs : Inputs_intf) :
           in
           Or_error.ok_exn or_error
         in
-        (*Core.printf !"pending_coinbase update: %{sexp:Pending_coinbase_update.t} \n %!" pending_coinbase_state;*)
+        Core.printf
+          !"pending_coinbase update: %{sexp:Pending_coinbase_update.t} \n %!"
+          pending_coinbase_state ;
         (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
         ( diff
         , next_staged_ledger_hash

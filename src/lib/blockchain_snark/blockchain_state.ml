@@ -120,33 +120,71 @@ module Make (Consensus_mechanism : Consensus.S) :
                let action = pending_coinbase_update.action in
                let with_del_add del_added =
                  with_label __LOC__
-                   (let%bind with_add =
-                      Pending_coinbase.Hash.update_stack prev_root
-                        ~update:del_added ~is_new_stack:Boolean.true_
-                        ~f:(fun _ -> return updated_stack )
+                   (let%bind () =
+                      exists Typ.unit
+                        ~compute:
+                          As_prover.(
+                            Let_syntax.(
+                              let%bind del_added =
+                                read Boolean.typ del_added
+                              in
+                              Core.printf
+                                !"del_added %{sexp:bool} \n %!"
+                                del_added ;
+                              return ()))
                     in
-                    Pending_coinbase.Hash.delete_stack with_add
-                      ~delete:del_added)
+                    Pending_coinbase.Hash.update_delete_stack
+                      ~is_new_stack:Boolean.true_ ~stack:updated_stack
+                      prev_root)
                in
                let with_del_update del_updated =
                  with_label __LOC__
-                   (let%bind with_add =
-                      Pending_coinbase.Hash.update_stack prev_root
-                        ~update:del_updated ~is_new_stack:Boolean.false_
-                        ~f:(fun _ -> return updated_stack )
+                   (let%bind () =
+                      exists Typ.unit
+                        ~compute:
+                          As_prover.(
+                            Let_syntax.(
+                              let%bind del_updated =
+                                read Boolean.typ del_updated
+                              in
+                              Core.printf
+                                !"del_updated %{sexp:bool}\n %!"
+                                del_updated ;
+                              return ()))
                     in
-                    Pending_coinbase.Hash.delete_stack with_add
-                      ~delete:del_updated)
+                    Pending_coinbase.Hash.update_delete_stack
+                      ~is_new_stack:Boolean.false_ ~stack:updated_stack
+                      prev_root)
                in
                let with_add added =
                  with_label __LOC__
-                   (Pending_coinbase.Hash.update_stack prev_root ~update:added
+                   (let%bind () =
+                      exists Typ.unit
+                        ~compute:
+                          As_prover.(
+                            Let_syntax.(
+                              let%bind added = read Boolean.typ added in
+                              Core.printf !"added %{sexp:bool} \n %!" added ;
+                              return ()))
+                    in
+                    Pending_coinbase.Hash.update_stack prev_root ~update:added
                       ~is_new_stack:Boolean.true_ ~f:(fun _ ->
                         return updated_stack ))
                in
                let with_update updated =
                  with_label __LOC__
-                   (Pending_coinbase.Hash.update_stack prev_root
+                   (let%bind () =
+                      exists Typ.unit
+                        ~compute:
+                          As_prover.(
+                            Let_syntax.(
+                              let%bind updated = read Boolean.typ updated in
+                              Core.printf
+                                !"updated %{sexp:bool} \n %!"
+                                updated ;
+                              return ()))
+                    in
+                    Pending_coinbase.Hash.update_stack prev_root
                       ~update:updated ~is_new_stack:Boolean.false_ ~f:(fun _ ->
                         return updated_stack ))
                in

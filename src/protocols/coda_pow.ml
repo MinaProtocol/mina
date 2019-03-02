@@ -128,6 +128,8 @@ module type Pending_coinbase_intf = sig
 
   val update_coinbase_stack_exn : t -> Stack.t -> new_stack:bool -> t
 
+  val remove_coinbase_stack_exn : t -> t
+
   val create_exn : unit -> t
 
   val latest_stack : t -> Stack.t option

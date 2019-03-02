@@ -213,7 +213,7 @@ module Hash = struct
       (struct
         include Stack
 
-        type value = t
+        type value = t [@@deriving sexp]
 
         let hash = Checked.digest
       end)
@@ -249,6 +249,7 @@ module Hash = struct
     | Set_coinbase_stack : index * Stack.t -> unit Request.t
     | Find_index_of_newest_stack : bool -> index Request.t
     | Find_index_of_oldest_stack : index Request.t
+    | Reset : unit Request.t
 
   let reraise_merkle_requests (With {request; respond}) =
     match request with
@@ -264,6 +265,8 @@ module Hash = struct
     handle
       (Merkle_tree.get_req ~depth (var_to_hash_packed t) addr)
       reraise_merkle_requests
+
+  let reset () = perform As_prover.(return Reset)
 
   (*
    [modify_stack t pk ~filter ~f] implements the following spec:
@@ -282,13 +285,17 @@ module Hash = struct
           map (read Boolean.typ is_new_stack) ~f:(fun s ->
               Find_index_of_newest_stack s ))
     in
-    handle
-      (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
-         ~f:(fun stack ->
-           let%bind () = filter stack in
-           f stack ))
-      reraise_merkle_requests
-    >>| var_of_hash_packed
+    let%bind updated_tree_hash =
+      handle
+        (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
+           ~f:(fun stack ->
+             let%bind () = filter stack in
+             f stack ))
+        reraise_merkle_requests
+      >>| var_of_hash_packed
+    in
+    let%map () = reset () in
+    updated_tree_hash
 
   (*
    [edit_stack t pk ~f] implements the following spec:
@@ -321,13 +328,45 @@ module Hash = struct
       request_witness Stack_pos.Unpacked.typ
         As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_oldest_stack))
     in
-    handle
-      (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
-         ~f:(fun stack ->
-           let%map () = filter stack in
-           Stack.Checked.empty ))
-      reraise_merkle_requests
-    >>| var_of_hash_packed
+    let%bind updated_tree_hash =
+      handle
+        (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
+           ~f:(fun stack ->
+             let%map () = filter stack in
+             Stack.Checked.empty ))
+        reraise_merkle_requests
+      >>| var_of_hash_packed
+    in
+    let%map () = reset () in
+    updated_tree_hash
+
+  let%snarkydef update_delete_stack t ~is_new_stack ~stack =
+    let%bind addr =
+      request_witness Stack_pos.Unpacked.typ
+        As_prover.(
+          map (read Boolean.typ is_new_stack) ~f:(fun s ->
+              Find_index_of_newest_stack s ))
+    in
+    let%bind updated_tree_hash1 =
+      handle
+        (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
+           ~f:(fun _s -> return stack ))
+        reraise_merkle_requests
+      >>| var_of_hash_packed
+    in
+    let%bind updated_tree_hash2 =
+      let%bind addr =
+        request_witness Stack_pos.Unpacked.typ
+          As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_oldest_stack))
+      in
+      handle
+        (Merkle_tree.modify_req ~depth (var_to_hash_packed updated_tree_hash1)
+           addr ~f:(fun _stack -> return Stack.Checked.empty ))
+        reraise_merkle_requests
+      >>| var_of_hash_packed
+    in
+    let%map () = reset () in
+    updated_tree_hash2
 end
 
 module T = struct
@@ -444,16 +483,18 @@ module T = struct
 
   let find_index_exn t = Merkle_tree.find_index_exn t.tree
 
+  type set_unset_tree = {mutable in_use: t; back_up: t}
+
   let handler (t : t) =
-    let pending_coinbase = ref t in
+    let pending_coinbase = {in_use= t; back_up= t} in
     let coinbase_stack_path_exn idx =
-      List.map (path_exn !pending_coinbase idx) ~f:(function
+      List.map (path_exn pending_coinbase.in_use idx) ~f:(function
         | `Left h -> h
         | `Right h -> h )
     in
     Core.printf
       !"PC merkle root: %{sexp: Hash.t} Empty stack: %{sexp:Hash.t}\n %!"
-      (merkle_root !pending_coinbase)
+      (merkle_root pending_coinbase.in_use)
       (Stack.hash Stack.empty) ;
     stage (fun (With {request; respond}) ->
         match request with
@@ -464,20 +505,22 @@ module T = struct
             respond (Provide path)
         | Hash.Find_index_of_oldest_stack ->
             let stack_pos =
-              Option.value ~default:0 (oldest_stack_key !pending_coinbase)
+              Option.value ~default:0
+                (oldest_stack_key pending_coinbase.in_use)
             in
-            let index = find_index_exn !pending_coinbase stack_pos in
+            let index = find_index_exn pending_coinbase.in_use stack_pos in
             respond (Provide index)
         | Hash.Find_index_of_newest_stack is_new_stack ->
             let stack_pos =
               Option.value ~default:0
-                (latest_stack_key !pending_coinbase ~on_new_tree:is_new_stack)
+                (latest_stack_key pending_coinbase.in_use
+                   ~on_new_tree:is_new_stack)
             in
-            let index = find_index_exn !pending_coinbase stack_pos in
+            let index = find_index_exn pending_coinbase.in_use stack_pos in
             Core.printf !"newest stack pos: %d index:%d\n %!" stack_pos index ;
             respond (Provide index)
         | Hash.Get_coinbase_stack idx ->
-            let elt = get_exn !pending_coinbase idx in
+            let elt = get_exn pending_coinbase.in_use idx in
             let path =
               (coinbase_stack_path_exn idx :> Pedersen.Digest.t list)
             in
@@ -499,7 +542,11 @@ module T = struct
           Core.printf !"implied root: %{sexp: Hash.t} \n %!" (implied_root (merkle_root !pending_coinbase) (Stack_pos.idx path);*)
             respond (Provide (elt, path))
         | Hash.Set_coinbase_stack (idx, stack) ->
-            pending_coinbase := set_exn !pending_coinbase idx stack ;
+            pending_coinbase.in_use
+            <- set_exn pending_coinbase.in_use idx stack ;
+            respond (Provide ())
+        | Hash.Reset ->
+            pending_coinbase.in_use <- pending_coinbase.back_up ;
             respond (Provide ())
         | _ -> unhandled )
 end
