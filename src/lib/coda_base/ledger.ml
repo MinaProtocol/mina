@@ -211,3 +211,57 @@ end
 
 include Ledger_inner
 include Transaction_logic.Make (Ledger_inner)
+
+let%test_unit "commiting a ledger twice" =
+  Backtrace.elide := false ;
+  let i = ref 0 in
+  let m s = sprintf "round %d: %s" !i s in
+  let apply_txns (db:Db.t) ephem txns =
+    let source = merkle_root ephem in
+    List.iter txns ~f:(fun tx -> apply_transaction ephem tx |> Or_error.ok_exn |> ignore) ;
+    let dest = merkle_root ephem in
+
+    [%test_result: Ledger_hash.t]
+      ~message:(m "db starts at same hash as ephemeral")
+      ~expect:source
+      (Db.merkle_root db)
+      ;
+
+    let db_mask = of_database db in
+    [%test_result: Ledger_hash.t]
+      ~message:(m "db mask starts at the same hash as ephemeral")
+      ~expect:source
+      (merkle_root db_mask)
+      ;
+
+    List.iter txns ~f:(fun tx -> apply_transaction db_mask tx |> Or_error.ok_exn |> ignore) ;
+
+    [%test_result: Ledger_hash.t]
+     ~message:(m "db_mask ends at same hash as ephemeral")
+     ~expect:dest
+     (merkle_root db_mask) ;
+
+     commit db_mask ;
+
+    [%test_result: Ledger_hash.t]
+      ~message:(m "db ends at same hash as ephemeral")
+      ~expect:dest
+      (Db.merkle_root db) ;
+
+     Maskable.unregister_mask_exn (Any_ledger.cast (module Db) db) db_mask |> ignore ;
+     i := !i + 1
+  in
+  File_system.with_temp_dir "twice_ledger_test" ~f:(fun directory_name ->
+    let {Keypair.public_key;_} = Keypair.create () in
+    let pubkey = Public_key.compress public_key in
+    let root_ledger = Db.create ~directory_name () in
+    let txn = Transaction.Coinbase
+      (Coinbase.create ~proposer:pubkey ~amount:(Currency.Amount.of_int 10) ~fee_transfer:None |> Or_error.ok_exn) in
+    with_ephemeral_ledger ~f:(fun ephem ->
+      let (key, account, loc) = get_or_create ephem pubkey in
+      Db.set root_ledger loc account ;
+      apply_txns root_ledger ephem [txn] ;
+      apply_txns root_ledger ephem [txn] ;
+    ) ;
+    Async.Deferred.unit
+  ) |> Fn.const |> Async.Thread_safe.block_on_async_exn
