@@ -1079,6 +1079,9 @@ module Consensus_state = struct
 
   let length (t : value) = t.length
 
+  let time_hum (t : value) =
+    sprintf "%d:%d" (Epoch.to_int t.curr_epoch) (Epoch.Slot.to_int t.curr_slot)
+
   let to_lite = None
 
   type display =
@@ -1304,6 +1307,10 @@ let select ~existing ~candidate ~logger =
   | None ->
       log_result `Keep "no predicates were matched" ;
       `Keep
+
+let time_hum (now : Core_kernel.Time.t) =
+  let epoch, slot = Epoch.epoch_and_slot_of_time_exn (Time.of_time now) in
+  Printf.sprintf "%d:%d" (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
 
 let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
     ~logger =

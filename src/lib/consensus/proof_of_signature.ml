@@ -139,6 +139,8 @@ module Consensus_state = struct
 
   let length (t : value) = t.length
 
+  let time_hum _ = "<posig has no notion of time>"
+
   let to_lite =
     Some
       (fun {length; signer_public_key} ->
@@ -279,5 +281,7 @@ module For_tests = struct
 end
 
 let should_bootstrap ~existing:_ ~candidate:_ = false
+
+let time_hum now = Core_kernel.Time.to_string now
 
 [%%endif]
