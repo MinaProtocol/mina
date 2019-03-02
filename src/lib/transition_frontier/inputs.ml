@@ -53,9 +53,7 @@ module type Inputs_intf = sig
      and module Staged_ledger_diff := Staged_ledger_diff
 
   module Transaction_witness :
-    Transaction_witness_intf
-    with type sparse_ledger := Sparse_ledger.t
-     and type pending_coinbase := Pending_coinbase.Stack.t
+    Transaction_witness_intf with type sparse_ledger := Sparse_ledger.t
 
   module Staged_ledger :
     Staged_ledger_intf

@@ -225,7 +225,7 @@ end = struct
   
   (*TODO new_coinbase_stack:bool goes in the statement*)
   let create_expected_statement
-      {Transaction_with_witness.transaction_with_info; witness; _} =
+      {Transaction_with_witness.transaction_with_info; witness; statement; _} =
     let open Or_error.Let_syntax in
     let source =
       Frozen_ledger_hash.of_ledger_hash
@@ -239,7 +239,7 @@ end = struct
     let target =
       Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
     in
-    let pending_coinbase_before = witness.coinbase_stack in
+    let pending_coinbase_before = statement.pending_coinbase_state.source in
     let%bind pending_coinbase_after =
       match transaction with
       | Coinbase c ->

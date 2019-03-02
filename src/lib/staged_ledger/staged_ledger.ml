@@ -435,7 +435,7 @@ end = struct
     in*)
     let%map undo, statement, updated_coinbase_stack = r in
     ( { Scan_state.Transaction_with_witness.transaction_with_info= undo
-      ; witness= {ledger= ledger_witness; coinbase_stack= current_stack}
+      ; witness= {ledger= ledger_witness (*; coinbase_stack= current_stack*)}
       ; statement }
     , updated_coinbase_stack )
 
@@ -2262,7 +2262,8 @@ let%test_module "test" =
 
       module Transaction_witness = struct
         type t =
-          {ledger: Sparse_ledger.t; coinbase_stack: Pending_coinbase.Stack.t}
+          { ledger: Sparse_ledger.t
+          (*; coinbase_stack: Pending_coinbase.Stack.t*) }
         [@@deriving bin_io, sexp]
       end
     end

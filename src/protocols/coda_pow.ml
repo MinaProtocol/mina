@@ -148,9 +148,7 @@ end
 module type Transaction_witness_intf = sig
   type sparse_ledger
 
-  type pending_coinbase
-
-  type t = {ledger: sparse_ledger; coinbase_stack: pending_coinbase}
+  type t = {ledger: sparse_ledger (*; coinbase_stack: pending_coinbase*)}
   [@@deriving bin_io, sexp]
 end
 
@@ -1604,9 +1602,7 @@ Merge Snark:
   end
 
   module Transaction_witness :
-    Transaction_witness_intf
-    with type sparse_ledger := Sparse_ledger.t
-     and type pending_coinbase := Pending_coinbase.Stack.t
+    Transaction_witness_intf with type sparse_ledger := Sparse_ledger.t
 
   module Staged_ledger :
     Staged_ledger_intf

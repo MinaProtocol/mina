@@ -104,5 +104,4 @@ module type S = sig
   module Transaction_witness :
     Coda_pow.Transaction_witness_intf
     with type sparse_ledger := Sparse_ledger.t
-     and type pending_coinbase := Pending_coinbase.Stack.t
 end
