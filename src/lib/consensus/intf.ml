@@ -63,6 +63,8 @@ module type S = sig
 
     val length : value -> Length.t
 
+    val time_hum : value -> string
+
     val to_lite : (value -> Lite_base.Consensus_state.t) option
 
     val display : value -> display
@@ -189,5 +191,12 @@ module type S = sig
     existing:Consensus_state.value -> candidate:Consensus_state.value -> bool
   (**
      * Indicator of when we should bootstrap
+    *)
+
+  val time_hum : Time.t -> string
+  (** Return a string that tells a human what the consensus view of an instant in time is.
+    *
+    * This is mostly useful for PoStake and other consensus mechanisms that have their own
+    * notions of time.
     *)
 end
