@@ -132,8 +132,8 @@ struct
     module Sparse_ledger = Coda_base.Sparse_ledger
   end)
 
-  (* Generate valid payments for each blockchain state by having 
-     each user send a payment of one coin to another random 
+  (* Generate valid payments for each blockchain state by having
+     each user send a payment of one coin to another random
      user if they at least one coin*)
   let gen_payments accounts_with_secret_keys :
       User_command.With_valid_signature.t Sequence.t =
@@ -441,9 +441,7 @@ struct
     type t =
       {logger: Logger.t; table: Transition_frontier.t Network_peer.Peer.Table.t}
 
-    let create ~logger = {logger; table= Network_peer.Peer.Table.create ()}
-
-    let add_exn {table; _} = Hashtbl.add_exn table
+    let create ~logger ~peers = {logger; table= peers}
 
     let random_peers {table; _} num_peers =
       let peers = Hashtbl.keys table in
@@ -514,7 +512,6 @@ struct
 
     let setup ~source_accounts ~logger configs =
       let%bind me = create_root_frontier ~logger source_accounts in
-      let network = Network.create ~logger in
       let%map _, peers =
         Deferred.List.fold ~init:(Constants.init_address, []) configs
           ~f:(fun (discovery_port, acc_peers) {num_breadcrumbs; accounts} ->
@@ -529,9 +526,14 @@ struct
               Network_peer.Peer.create Unix.Inet_addr.localhost ~discovery_port
                 ~communication_port:(discovery_port + 1)
             in
-            Network.add_exn network ~key:address ~data:frontier ;
             let peer = {address; frontier} in
             (discovery_port + 2, peer :: acc_peers) )
+      in
+      let network =
+        Network.create ~logger
+          ~peers:
+            ( List.map peers ~f:(fun {address; frontier} -> (address, frontier))
+            |> Network_peer.Peer.Table.of_alist_exn )
       in
       {me; network; peers= List.rev peers}
 

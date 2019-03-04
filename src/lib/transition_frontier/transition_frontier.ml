@@ -17,12 +17,32 @@ module Make (Inputs : Inputs_intf) :
    and type masked_ledger := Ledger.Mask.Attached.t
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
    and type consensus_local_state := Consensus.Local_state.t
-   and type user_command := User_command.t = struct
+   and type user_command := User_command.t
+   and module Extensions.Work = Inputs.Transaction_snark_work.Statement =
+struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
   exception
     Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
 
   exception Already_exists of State_hash.t
+
+  module Fake_db = struct
+    include Coda_base.Ledger.Db
+
+    type location = Location.t
+
+    let get_or_create ledger key =
+      let key, loc =
+        match
+          get_or_create_account_exn ledger key (Account.initialize key)
+        with
+        | `Existed, loc -> ([], loc)
+        | `Added, loc -> ([key], loc)
+      in
+      (key, get ledger loc |> Option.value_exn, loc)
+  end
+
+  module TL = Coda_base.Transaction_logic.Make (Fake_db)
 
   module Breadcrumb = struct
     (* TODO: external_transition should be type : External_transition.With_valid_protocol_state.t #1344 *)
@@ -35,6 +55,9 @@ module Make (Inputs : Inputs_intf) :
 
     let create transition_with_hash staged_ledger =
       {transition_with_hash; staged_ledger; just_emitted_a_proof= false}
+
+    let copy t =
+      {t with staged_ledger= Inputs.Staged_ledger.copy t.staged_ledger}
 
     let build ~logger ~parent ~transition_with_hash =
       O1trace.measure "Breadcrumb.build" (fun () ->
@@ -71,18 +94,18 @@ module Make (Inputs : Inputs_intf) :
           in
           let just_emitted_a_proof = Option.is_some proof_opt in
           let%map transitioned_staged_ledger =
-            if
-              Staged_ledger_hash.equal staged_ledger_hash
-                blockchain_staged_ledger_hash
-            then return transitioned_staged_ledger
-            else
-              Deferred.return
-                (Error
-                   (`Validation_error
-                     (Error.of_string
-                        "Snarked ledger hash and Staged ledger hash after \
-                         applying the diff does not match blockchain state's \
-                         ledger hash and staged ledger hash resp.\n")))
+            Deferred.return
+              ( if
+                Staged_ledger_hash.equal staged_ledger_hash
+                  blockchain_staged_ledger_hash
+              then Ok transitioned_staged_ledger
+              else
+                Error
+                  (`Validation_error
+                    (Error.of_string
+                       "Snarked ledger hash and Staged ledger hash after \
+                        applying the diff does not match blockchain state's \
+                        ledger hash and staged ledger hash resp.\n")) )
           in
           { transition_with_hash
           ; staged_ledger= transitioned_staged_ledger
@@ -153,6 +176,8 @@ module Make (Inputs : Inputs_intf) :
   let max_length = Inputs.max_length
 
   module Extensions = struct
+    module Work = Inputs.Transaction_snark_work.Statement
+
     module Snark_pool_refcount = Snark_pool_refcount.Make (struct
       include Inputs
       module Breadcrumb = Breadcrumb
@@ -286,7 +311,11 @@ module Make (Inputs : Inputs_intf) :
 
   let logger t = t.logger
 
-  let extension_pipes {extension_readers; _} = extension_readers
+  let snark_pool_refcount_pipe {extension_readers; _} =
+    extension_readers.snark_pool
+
+  let best_tip_diff_pipe {extension_readers; _} =
+    extension_readers.best_tip_diff
 
   (* TODO: load from and write to disk *)
   let create ~logger
@@ -676,10 +705,11 @@ module Make (Inputs : Inputs_intf) :
                 let db_mask = Ledger.of_database t.root_snarked_ledger in
                 Non_empty_list.iter txns ~f:(fun txn ->
                     (* TODO: @cmr use the ignore-hash ledger here as well *)
-                    Ledger.apply_transaction db_mask txn
+                    TL.apply_transaction t.root_snarked_ledger txn
                     |> Or_error.ok_exn |> ignore ) ;
                 (* TODO: See issue #1606 to make this faster *)
-                Ledger.commit db_mask ;
+                
+                (*Ledger.commit db_mask ;*)
                 ignore
                   (Ledger.Maskable.unregister_mask_exn
                      (Ledger.Any_ledger.cast
@@ -716,6 +746,17 @@ module Make (Inputs : Inputs_intf) :
               ; old_best_tip= best_tip_node.breadcrumb
               ; garbage= garbage_breadcrumbs }
           else Transition_frontier_diff.New_breadcrumb node.breadcrumb ) )
+
+  let add_breadcrumb_if_present_exn t breadcrumb =
+    let parent_hash = Breadcrumb.parent_hash breadcrumb in
+    match Hashtbl.find t.table parent_hash with
+    | Some _ -> add_breadcrumb_exn t breadcrumb
+    | None ->
+        Logger.warn t.logger
+          !"When trying to add breadcrumb, its parent had been removed from \
+            transition frontier: %{sexp: State_hash.t}"
+          parent_hash ;
+        Deferred.unit
 
   let best_tip_path_length_exn {table; root; best_tip; _} =
     let open Option.Let_syntax in
