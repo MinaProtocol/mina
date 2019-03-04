@@ -288,28 +288,42 @@ end = struct
           ~ledger_hash_begin:(Some snarked_ledger_hash)
       else return ()
     in
-    let%bind txs =
-      List.map ~f:Ledger.Undo.transaction
-        (Scan_state.all_transactions scan_state)
-      |> Or_error.all |> Deferred.return
-    in
-    let mask = Ledger.Mask.create () in
-    let ledger = Ledger.register_mask snarked_ledger mask in
+    let%bind txs = Scan_state.all_transactions scan_state |> Deferred.return in
+    Core.printf !" Total number of txns in scan state %n\n" (List.length txs) ;
+    Core.printf
+      !"\n\n Snarked ledger hash received %{sexp:Frozen_ledger_hash.t}\n\n"
+      snarked_ledger_hash ;
     let%bind () =
       List.fold_result
-        ~f:(fun _ tx -> Ledger.apply_transaction ledger tx |> Or_error.ignore)
+        ~f:(fun _ tx ->
+          Core.printf !"\n\nApplying Transaction %{sexp:Transaction.t}\n\n" tx ;
+          Core.printf
+            !"\n\nCurrent Merkle root %{sexp:Ledger_hash.t}\n\n"
+            (Ledger.merkle_root snarked_ledger) ;
+          Ledger.apply_transaction snarked_ledger tx |> Or_error.ignore )
         ~init:() txs
       |> Deferred.return
     in
+    Option.iter expected_merkle_root ~f:(fun merkle_root ->
+        Core.printf
+          !"\n\nExpected merkle root %{sexp:Ledger_hash.t}\n\n"
+          merkle_root ) ;
+    Core.printf
+      !"\n\nActual merkle root %{sexp:Ledger_hash.t}\n\n"
+      (Ledger.merkle_root snarked_ledger) ;
     if
       Option.fold ~init:true
         ~f:(fun _ merkle_root ->
-          Ledger_hash.equal (Ledger.merkle_root ledger) merkle_root )
+          Ledger_hash.equal (Ledger.merkle_root snarked_ledger) merkle_root )
         expected_merkle_root
-    then of_scan_state_and_ledger ~snarked_ledger_hash ~ledger ~scan_state
-    else
+    then (
+      Core.print_string "\n\n!!!Here!!!\n\n" ;
+      of_scan_state_and_ledger ~snarked_ledger_hash ~ledger:snarked_ledger
+        ~scan_state )
+    else (
+      Core.print_string "\n\n!!!Not HERE!!!\n\n" ;
       Deferred.Or_error.error_string
-        "The merkle root of the ledger doesn't match the expected one"
+        "The merkle root of the ledger doesn't match the expected one" )
 
   let copy {scan_state; ledger} =
     let new_mask = Ledger.Mask.create () in

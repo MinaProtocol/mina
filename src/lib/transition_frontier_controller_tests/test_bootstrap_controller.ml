@@ -136,6 +136,48 @@ let%test_module "Bootstrap Controller" =
       Fn.compose Ledger.Db.merkle_root
         Transition_frontier.For_tests.root_snarked_ledger
 
+    let%test_unit "of_scan_state_and_snarked_ledger works correctly" =
+      let logger = Logger.null () in
+      let num_breadcrumbs = 10 in
+      let accounts = Genesis_ledger.accounts in
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind frontier = create_root_frontier ~logger accounts in
+          let%bind () =
+            build_frontier_randomly frontier
+              ~gen_root_breadcrumb_builder:
+                (gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
+                   ~accounts_with_secret_keys:accounts)
+          in
+          Deferred.List.iter (Transition_frontier.all_breadcrumbs frontier)
+            ~f:(fun breadcrumb ->
+              let staged_ledger =
+                Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+              in
+              let expected_merkle_root =
+                Some (Staged_ledger.ledger staged_ledger |> Ledger.merkle_root)
+              in
+              let snarked_ledger_hash =
+                Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
+                |> With_hash.data
+                |> External_transition.Verified.protocol_state
+                |> Protocol_state.blockchain_state
+                |> Blockchain_state.snarked_ledger_hash
+              in
+              let snarked_ledger =
+                Staged_ledger.snarked_ledger staged_ledger ~snarked_ledger_hash
+                |> Or_error.ok_exn
+              in
+              let scan_state = Staged_ledger.scan_state staged_ledger in
+              let%map actual_staged_ledger =
+                Staged_ledger.of_scan_state_and_snarked_ledger ~scan_state
+                  ~snarked_ledger ~expected_merkle_root
+                |> Deferred.Or_error.ok_exn
+              in
+              assert (
+                Staged_ledger_hash.equal
+                  (Staged_ledger.hash staged_ledger)
+                  (Staged_ledger.hash actual_staged_ledger) ) ) )
+
     let%test "sync with one node correctly" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;

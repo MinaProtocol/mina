@@ -529,8 +529,9 @@ end = struct
 
   let all_transactions t =
     List.map ~f:(fun (t : Transaction_with_witness.t) ->
-        t.transaction_with_info )
+        t.transaction_with_info |> Ledger.Undo.transaction )
     @@ Parallel_scan.State.transactions t.tree
+    |> Or_error.all
 
   let copy {tree; job_count} = {tree= Parallel_scan.State.copy tree; job_count}
 
