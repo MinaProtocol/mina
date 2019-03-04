@@ -658,7 +658,7 @@ module type Transaction_snark_scan_state_intf = sig
 
   val staged_transactions : t -> transaction_with_info list
 
-  val all_transactions : t -> transaction_with_info list
+  val all_transactions : t -> transaction list Or_error.t
 
   val extract_from_job :
        Available_job.t
@@ -732,6 +732,8 @@ module type Staged_ledger_base_intf = sig
     val partition_if_overflowing : t -> Space_partition.t
 
     val all_work_to_do : t -> statement Sequence.t Or_error.t
+
+    val all_transactions : t -> transaction list Or_error.t
   end
 
   module Staged_ledger_error : sig
