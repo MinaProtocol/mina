@@ -340,8 +340,8 @@ struct
       Debug_assert.debug_assert (fun () ->
           [%test_result: Hash.t]
             ~message:
-              "Parent merkle root after committing should be the same as the old one \
-               in the mask"
+              "Parent merkle root after committing should be the same as the \
+               old one in the mask"
             ~expect:old_root_hash
             (Base.merkle_root (get_parent t)) ;
           [%test_result: Hash.t]
