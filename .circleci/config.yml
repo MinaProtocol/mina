@@ -67,6 +67,9 @@ jobs:
                   name: Build OCaml
                   command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log
+            - run:
                   name: Run all tests (on master)
                   command: echo "FIXME Tests not yet working on mac"
     build_dev:
@@ -89,14 +92,17 @@ jobs:
                   name: Build deb Package with keys
                   command: make deb
             - run:
-                  name: Build provingkeys
+                  name: Store Generated Proving and Verifying Keys
                   command: make provingkeys
             - run:
-                  name: Store Genesis keys
+                  name: Store Genesis Public/Private Keypairs
                   command: make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
@@ -122,14 +128,17 @@ jobs:
                   name: Build deb Package with keys
                   command: make deb
             - run:
-                  name: Build provingkeys
+                  name: Store Generated Proving and Verifying Keys
                   command: make provingkeys
             - run:
-                  name: Store Genesis keys
+                  name: Store Genesis Public/Private Keypairs
                   command: make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
@@ -155,14 +164,17 @@ jobs:
                   name: Build deb Package with keys
                   command: make deb
             - run:
-                  name: Build provingkeys
+                  name: Store Generated Proving and Verifying Keys
                   command: make provingkeys
             - run:
-                  name: Store Genesis keys
+                  name: Store Genesis Public/Private Keypairs
                   command: make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
@@ -188,14 +200,17 @@ jobs:
                   name: Build deb Package with keys
                   command: make deb
             - run:
-                  name: Build provingkeys
+                  name: Store Generated Proving and Verifying Keys
                   command: make provingkeys
             - run:
-                  name: Store Genesis keys
+                  name: Store Genesis Public/Private Keypairs
                   command: make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
@@ -221,14 +236,17 @@ jobs:
                   name: Build deb Package with keys
                   command: make deb
             - run:
-                  name: Build provingkeys
+                  name: Store Generated Proving and Verifying Keys
                   command: make provingkeys
             - run:
-                  name: Store Genesis keys
+                  name: Store Genesis Public/Private Keypairs
                   command: make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
