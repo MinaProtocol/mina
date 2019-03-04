@@ -325,10 +325,6 @@ jobs:
                   name: Running test - Proof of Signature Tests | coda-shared-state-test
                   command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-state-test'
             
-            - run:
-                  name: Running test - Proof of Signature Tests | coda-restart-node-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-restart-node-test'
-            
     test-postake_integration_tests:
         resource_class: large
         docker:
@@ -386,10 +382,6 @@ jobs:
             - run:
                   name: Running test - Proof of Stake (split stake) Tests | coda-shared-state-test
                   command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-state-test'
-            
-            - run:
-                  name: Running test - Proof of Stake (split stake) Tests | coda-restart-node-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-restart-node-test'
             
     test-withsnark-sig:
         resource_class: large
