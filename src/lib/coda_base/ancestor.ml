@@ -1,14 +1,33 @@
 open Core_kernel
+open Module_version
 
 module Input = struct
   module Stable = struct
     module V1 = struct
-      type t = {descendant: State_hash.t; generations: int}
-      [@@deriving sexp, bin_io]
+      module T = struct
+        let version = 1
+
+        type t = {descendant: State_hash.t; generations: int}
+        [@@deriving sexp, bin_io]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "ancestor"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
+  include Stable.Latest
 end
 
 module Output = State_hash
@@ -16,11 +35,29 @@ module Output = State_hash
 module Proof = struct
   module Stable = struct
     module V1 = struct
-      type t = State_body_hash.Stable.V1.t list [@@deriving bin_io]
+      module T = struct
+        let version = 1
+
+        type t = State_body_hash.Stable.V1.t list [@@deriving bin_io]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "ancestor_proof"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
+  include Stable.Latest
 end
 
 let verify =

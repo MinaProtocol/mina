@@ -41,7 +41,7 @@ module type Time_intf = sig
   type t0 = t
 
   module Span : sig
-    type t
+    type t [@@deriving compare]
 
     val of_time_span : Core_kernel.Time.Span.t -> t
 
@@ -70,6 +70,8 @@ module type Time_intf = sig
     val peek : 'a t -> 'a option
 
     val cancel : Controller.t -> 'a t -> 'a -> unit
+
+    val remaining_time : 'a t -> Span.t
   end
 
   val to_span_since_epoch : t -> Span.t
@@ -240,7 +242,7 @@ module Fee = struct
 
     include (
       Currency.Fee.Stable.V1 :
-        module type of Currency.Fee.Stable.V1 with type t := t )
+        module type of Currency.Fee.Stable.Latest with type t := t )
   end
 
   module Signed = struct
@@ -248,7 +250,7 @@ module Fee = struct
 
     include (
       Currency.Fee.Signed.Stable.V1 :
-        module type of Currency.Fee.Signed.Stable.V1
+        module type of Currency.Fee.Signed.Stable.Latest
         with type t := t
          and type ('a, 'b) t_ := ('a, 'b) t_ )
   end
@@ -333,7 +335,7 @@ module type Coinbase_intf = sig
     { proposer: public_key
     ; amount: Currency.Amount.t
     ; fee_transfer: fee_transfer option }
-  [@@deriving sexp, bin_io, compare, eq]
+  [@@deriving sexp, compare, eq]
 
   val create :
        amount:Currency.Amount.t
@@ -992,6 +994,16 @@ module type External_transition_intf = sig
     val staged_ledger_diff : t -> staged_ledger_diff
   end
 
+  module Proof_verified : sig
+    type t [@@deriving sexp, bin_io]
+
+    val protocol_state : t -> protocol_state
+
+    val protocol_state_proof : t -> protocol_state_proof
+
+    val staged_ledger_diff : t -> staged_ledger_diff
+  end
+
   val to_verified : t -> [`I_swear_this_is_safe_see_my_comment of Verified.t]
 
   val of_verified : Verified.t -> t
@@ -1205,7 +1217,9 @@ module type Consensus_mechanism_intf = sig
     -> local_state:Local_state.t
     -> keypair:keypair
     -> logger:Logger.t
-    -> [`Check_again of Int64.t | `Propose of Int64.t * Proposal_data.t]
+    -> [ `Check_again of Int64.t
+       | `Propose_now of Proposal_data.t
+       | `Propose of Int64.t * Proposal_data.t ]
 
   val select :
        existing:Consensus_state.value
@@ -1290,10 +1304,6 @@ Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
 
   val prove_zk_state_valid :
     Witness.t -> new_state:protocol_state -> protocol_state_proof Deferred.t
-end
-
-module Proof_carrying_data = struct
-  type ('a, 'b) t = {data: 'a; proof: 'b} [@@deriving sexp, fields, bin_io]
 end
 
 module type Transaction_validator_intf = sig

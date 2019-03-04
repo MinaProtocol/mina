@@ -15,12 +15,9 @@ val block_window_duration_ms : int
 val block_window_duration : Coda_base.Block_time.Span.t
 (** The window duration in which blocks are created *)
 
-[%%if consensus_mechanism = "proof_of_stake"]
-
-val c : int
-(** [c] is the number of slots in which we can probalistically expect at least 1 block *)
-
 val delta : int
 (** [delta] is the number of slots in the valid window for receiving blocks over the network *)
 
-[%%endif]
+val c : int
+(** [c] is the number of slots in which we can probalistically expect at least 1
+ * block. In sig, it's exactly 1 as blocks should be produced every slot. *)

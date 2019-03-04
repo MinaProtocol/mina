@@ -1,7 +1,30 @@
 open Core
 open Unsigned
-module Account = Coda_base.Account
 module Balance = Currency.Balance
+
+module Account = struct
+  (* want bin_io, not available with Account.t *)
+  type t = Coda_base.Account.Stable.V1.t
+  [@@deriving bin_io, sexp, eq, compare, hash]
+
+  type key = Coda_base.Account.Stable.V1.key
+  [@@deriving bin_io, sexp, eq, compare, hash]
+
+  (* use Account items needed *)
+  let empty = Coda_base.Account.empty
+
+  let public_key = Coda_base.Account.public_key
+
+  let key_gen = Coda_base.Account.key_gen
+
+  let gen = Coda_base.Account.gen
+
+  let create = Coda_base.Account.create
+
+  let balance = Coda_base.Account.balance
+
+  let update_balance t bal = {t with Coda_base.Account.balance= bal}
+end
 
 (* below are alternative modules that use strings as public keys and UInt64 as balances for
    in accounts
@@ -68,7 +91,12 @@ end
 module Receipt = Coda_base.Receipt
 
 module Hash = struct
-  type t = Md5.t [@@deriving sexp, hash, compare, bin_io, eq]
+  module T = struct
+    type t = Md5.t [@@deriving sexp, hash, compare, bin_io, eq]
+  end
+
+  include T
+  include Hashable.Make_binable (T)
 
   (* to prevent pre-image attack,
    * important impossible to create an account such that (merge a b = hash_account account) *)
@@ -142,6 +170,8 @@ module Key = struct
   module T = struct
     type t = Account.key [@@deriving sexp, bin_io, eq, compare, hash]
   end
+
+  let to_string = Signature_lib.Public_key.Compressed.to_base64
 
   let gen = Account.key_gen
 

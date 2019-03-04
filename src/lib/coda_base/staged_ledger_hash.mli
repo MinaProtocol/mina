@@ -23,6 +23,8 @@ module Stable : sig
 
     include Hashable_binable with type t := t
   end
+
+  module Latest : module type of V1
 end
 
 val dummy : t
@@ -34,6 +36,8 @@ module Aux_hash : sig
     module V1 : sig
       type nonrec t = t [@@deriving bin_io, sexp, eq, compare, hash]
     end
+
+    module Latest : module type of V1
   end
 
   val of_bytes : string -> t

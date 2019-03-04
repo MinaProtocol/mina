@@ -15,6 +15,11 @@ genesis_ledger = "test"]
 include Test_ledger
 
 [%%elif
+genesis_ledger = "test_split_two_stakers"]
+
+include Test_split_two_stakes_ledger
+
+[%%elif
 genesis_ledger = "testnet_posig"]
 
 include Testnet_posig_ledger

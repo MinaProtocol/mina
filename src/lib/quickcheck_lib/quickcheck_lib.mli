@@ -31,3 +31,9 @@ val gen_imperative_ktree :
  *  the tree. The value [p] is the geometric distribution (or "radioactive decay") probability
  *  that is determines the number of forks at each node. Sizes of forks in the tree are
  *  distributed uniformly. *)
+
+val gen_imperative_rose_tree :
+     ?p:float
+  -> 'a Generator.t
+  -> ('a -> 'a) Generator.t
+  -> 'a Rose_tree.t Generator.t

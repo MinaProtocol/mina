@@ -111,28 +111,32 @@ struct
       >>| Or_error.ok_exn >>| fst
 
     let%snarkydef prev_state_valid wrap_vk_section wrap_vk prev_state_hash =
-      let open Let_syntax in
-      (* TODO: Should build compositionally on the prev_state hash (instead of converting to bits) *)
-      let%bind prev_state_hash_trips =
-        State.Hash.var_to_triples prev_state_hash
-      in
-      let%bind prev_top_hash =
-        compute_top_hash wrap_vk_section prev_state_hash_trips
-        >>= Wrap_input.Checked.tick_field_to_scalars
-      in
-      let%bind precomp =
-        Verifier.Verification_key.Precomputation.create wrap_vk
-      in
-      let%bind proof =
-        exists Verifier.Proof.typ
-          ~compute:
-            As_prover.(
-              map get_state
-                ~f:
-                  (Fn.compose Verifier.proof_of_backend_proof
-                     Prover_state.prev_proof))
-      in
-      Verifier.verify wrap_vk precomp prev_top_hash proof
+      match Coda_compile_config.proof_level with
+      | "full" ->
+          (* TODO: Should build compositionally on the prev_state hash (instead of converting to bits) *)
+          let%bind prev_state_hash_trips =
+            State.Hash.var_to_triples prev_state_hash
+          in
+          let%bind prev_top_hash =
+            compute_top_hash wrap_vk_section prev_state_hash_trips
+            >>= Wrap_input.Checked.tick_field_to_scalars
+          in
+          let%bind precomp =
+            Verifier.Verification_key.Precomputation.create wrap_vk
+          in
+          let%bind proof =
+            exists Verifier.Proof.typ
+              ~compute:
+                As_prover.(
+                  map get_state
+                    ~f:
+                      (Fn.compose Verifier.proof_of_backend_proof
+                         Prover_state.prev_proof))
+          in
+          (* true if not with_snark *)
+          Verifier.verify wrap_vk precomp prev_top_hash proof
+      | "check" | "none" -> return Boolean.true_
+      | _ -> failwith "unknown proof_level"
 
     let exists' typ ~f = exists typ ~compute:As_prover.(map get_state ~f)
 

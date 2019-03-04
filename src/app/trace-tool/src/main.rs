@@ -22,6 +22,7 @@ enum EventKind {
     Event(String),
     Start(String),
     End,
+    TraceEnd
 }
 
 #[derive(Clone, Debug)]
@@ -69,6 +70,10 @@ named!(parse_trace_event<&[u8], TraceEvent>,
         7 => do_parse!(ns: le_u64 >> (TraceEvent {
             ns_since_epoch: ns as f64,
             data: End
+        })) |
+        8 => do_parse!(ns: le_u64 >> (TraceEvent {
+            ns_since_epoch: ns as f64,
+            data: TraceEnd
         }))
         ));
 
@@ -109,6 +114,13 @@ fn complete_event(
 fn main() {
     let matches = App::new("trace-tool")
         .arg(
+            Arg::with_name("dump-raw")
+                .help("dump the raw trace event debug representation and quit")
+                .short("d")
+                .long("dump-raw")
+                .takes_value(false)
+        )
+        .arg(
             Arg::with_name("input")
                 .help("file to read trace data from")
                 .multiple(true)
@@ -116,6 +128,7 @@ fn main() {
         )
         .get_matches();
     let inputs = matches.values_of("input").unwrap();
+    let dump_raw = matches.is_present("dump-raw");
     println!("[");
     let mut contents = Vec::new();
     for filename in inputs {
@@ -128,6 +141,13 @@ fn main() {
         let mut recurring_map = HashMap::<String, Tid>::new();
         let mut tidmap = HashMap::<Tid, Tid>::new();
         let mut cur_pid = 0;
+        if dump_raw {
+            let (_, events) = parse_trace_events(contents.as_ref()).expect("parsing failed");
+            for ev in events {
+                println!("{:?}", ev);
+            }
+            continue;
+        }
         match parse_trace_events(contents.as_ref()) {
             Ok((_, events)) => {
                 let prev_ts = match events.first() {
@@ -158,9 +178,14 @@ fn main() {
                                 cycle_start_ts = cur_ts;
                                 (cur_ts, prev_task)
                             }
-                            CycleEnd => {
+                            TraceEnd | CycleEnd => {
                                 // if the cycle is reported as ending, then whatever thread was running just finished.
                                 complete_event(&seen_tids, cur_pid, cur_ts, prev_ts, prev_task);
+                                if let TraceEnd = event.data {
+                                    seen_tids.clear();
+                                    recurring_map.clear();
+                                    tidmap.clear();
+                                }
                                 (cur_ts, None)
                                 //println!(r#"{{"name":"cycle end","ph":"p","ts":{},"pid":1,"tid":0,"s":"p"}},"#, cur_ts/1000);
                             }

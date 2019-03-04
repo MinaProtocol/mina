@@ -55,9 +55,9 @@ module Api = struct
           User_command_memo.dummy )
       t i
 
-  (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the 
-      merkle_list of receipts up to the current state of a sender's receipt_chain hash for some blockchain. 
-      However, whenever we get a new transition, the blockchain does not update and `prove_receipt` would not query 
+  (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the
+      merkle_list of receipts up to the current state of a sender's receipt_chain hash for some blockchain.
+      However, whenever we get a new transition, the blockchain does not update and `prove_receipt` would not query
       the merkle list that we are looking for *)
   let prove_receipt t i proving_receipt resulting_receipt =
     run_online_worker
@@ -68,7 +68,7 @@ module Api = struct
       t i
 end
 
-let start_prefix_check log workers events proposal_interval testnet =
+let start_prefix_check log workers events testnet ~acceptable_delay =
   let all_transitions_r, all_transitions_w = Linear_pipe.create () in
   let chains = Array.init (List.length workers) ~f:(fun i -> []) in
   let check_chains chains =
@@ -107,7 +107,15 @@ let start_prefix_check log workers events proposal_interval testnet =
      let rec go () =
        let diff = Time.diff (Time.now ()) !last_time in
        let diff = Time.Span.to_sec diff in
-       if not (diff < (Float.of_int proposal_interval /. 1000.) +. epsilon)
+       if
+         not
+           ( diff
+           < Time.Span.to_sec acceptable_delay
+             +. epsilon
+             +. Int.to_float
+                  ( (Consensus.Constants.c - 1)
+                  * Consensus.Constants.block_window_duration_ms )
+                /. 1000. )
        then (
          Logger.fatal log "no recent blocks" ;
          ignore (exit 1) ) ;
@@ -137,7 +145,7 @@ let start_prefix_check log workers events proposal_interval testnet =
     (Linear_pipe.iter events ~f:(function `Transition (i, (prev, curr)) ->
          Linear_pipe.write all_transitions_w (prev, curr, i) ))
 
-let start_payment_check log events payments workers proposal_interval testnet =
+let start_payment_check log events payments workers testnet ~acceptable_delay =
   let block_counts = Array.init (List.length workers) ~f:(fun _ -> 0) in
   let active_accounts = ref [] in
   let get_balances pk =
@@ -229,13 +237,13 @@ let events workers start_reader =
   List.iteri workers ~f:(fun i w -> don't_wait_for (connect_worker i w)) ;
   event_r
 
-let start_checks log workers proposal_interval payment_reader start_reader
-    testnet =
+let start_checks log workers payment_reader start_reader testnet
+    ~acceptable_delay =
   let event_pipe = events workers start_reader in
   let prefix_events, payment_events = Linear_pipe.fork2 event_pipe in
-  start_prefix_check log workers prefix_events proposal_interval testnet ;
-  start_payment_check log payment_events payment_reader workers
-    proposal_interval testnet
+  start_prefix_check log workers prefix_events testnet ~acceptable_delay ;
+  start_payment_check log payment_events payment_reader workers testnet
+    ~acceptable_delay
 
 (* note: this is very declarative, maybe this should be more imperative? *)
 (* next steps:
@@ -243,14 +251,18 @@ let start_checks log workers proposal_interval payment_reader start_reader
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-let test log n should_propose snark_work_public_keys work_selection =
+let test log n proposers snark_work_public_keys work_selection =
   let log = Logger.child log "worker_testnet" in
   let proposal_interval = Consensus.Constants.block_window_duration_ms in
+  let acceptable_delay =
+    Time.Span.of_ms
+      (proposal_interval * Consensus.Constants.delta |> Float.of_int)
+  in
   let%bind program_dir = Unix.getcwd () in
   Coda_processes.init () ;
   let configs =
-    Coda_processes.local_configs n ~proposal_interval ~program_dir
-      ~should_propose
+    Coda_processes.local_configs n ~proposal_interval ~program_dir ~proposers
+      ~acceptable_delay
       ~snark_worker_public_keys:(Some (List.init n snark_work_public_keys))
       ~work_selection
   in
@@ -258,6 +270,6 @@ let test log n should_propose snark_work_public_keys work_selection =
   let payment_reader, payment_writer = Linear_pipe.create () in
   let start_reader, start_writer = Linear_pipe.create () in
   let testnet = Api.create configs workers payment_writer start_writer in
-  start_checks log workers proposal_interval payment_reader start_reader
-    testnet ;
+  start_checks log workers payment_reader start_reader testnet
+    ~acceptable_delay ;
   testnet

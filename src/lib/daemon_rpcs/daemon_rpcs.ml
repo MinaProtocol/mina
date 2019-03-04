@@ -143,6 +143,8 @@ module Types = struct
       ; run_snark_worker: bool
       ; propose_pubkey: Public_key.t option
       ; histograms: Histograms.t option
+      ; consensus_time_best_tip: string
+      ; consensus_time_now: string
       ; consensus_mechanism: string
       ; consensus_configuration: Consensus.Configuration.t }
     [@@deriving to_yojson, bin_io, fields]
@@ -156,12 +158,13 @@ module Types = struct
         let f x = Field.get x s in
         Fields.fold ~init:[]
           ~num_accounts:(fun acc x ->
-            ("Number of Accounts", Int.to_string (f x)) :: acc )
+            ("Global Number of Accounts", Int.to_string (f x)) :: acc )
           ~block_count:(fun acc x ->
             ("Block Count", Int.to_string (f x)) :: acc )
-          ~uptime_secs:(fun acc x -> ("Uptime", sprintf "%ds" (f x)) :: acc)
+          ~uptime_secs:(fun acc x ->
+            ("Local Uptime", sprintf "%ds" (f x)) :: acc )
           ~ledger_merkle_root:(fun acc x -> ("Ledger Merkle Root", f x) :: acc)
-          ~staged_ledger_hash:(fun acc x -> ("Staged-ledger hash", f x) :: acc)
+          ~staged_ledger_hash:(fun acc x -> ("Staged-ledger Hash", f x) :: acc)
           ~state_hash:(fun acc x -> ("State Hash", f x) :: acc)
           ~commit_id:(fun acc x ->
             match f x with
@@ -169,7 +172,7 @@ module Types = struct
             | Some sha1 ->
                 ("Git SHA1", Git_sha.sexp_of_t sha1 |> Sexp.to_string) :: acc
             )
-          ~conf_dir:(fun acc x -> ("Configuration Dir", f x) :: acc)
+          ~conf_dir:(fun acc x -> ("Configuration Directory", f x) :: acc)
           ~peers:(fun acc x ->
             let peers = f x in
             ( "Peers"
@@ -192,6 +195,9 @@ module Types = struct
             | None -> acc
             | Some histograms ->
                 ("Histograms", Histograms.to_text histograms) :: acc )
+          ~consensus_time_best_tip:(fun acc x ->
+            ("Best Tip Consensus Time", f x) :: acc )
+          ~consensus_time_now:(fun acc x -> ("Consensus Time Now", f x) :: acc)
           ~consensus_mechanism:(fun acc x ->
             ("Consensus Mechanism", f x) :: acc )
           ~consensus_configuration:(fun acc x ->
@@ -212,7 +218,7 @@ module Types = struct
 end
 
 module Send_user_command = struct
-  type query = User_command.Stable.V1.t [@@deriving bin_io]
+  type query = User_command.Stable.Latest.t [@@deriving bin_io]
 
   type response = Receipt.Chain_hash.t Or_error.t [@@deriving bin_io]
 
@@ -224,7 +230,7 @@ module Send_user_command = struct
 end
 
 module Send_user_commands = struct
-  type query = User_command.Stable.V1.t list [@@deriving bin_io]
+  type query = User_command.Stable.Latest.t list [@@deriving bin_io]
 
   type response = unit [@@deriving bin_io]
 
@@ -236,9 +242,9 @@ module Send_user_commands = struct
 end
 
 module Get_ledger = struct
-  type query = Staged_ledger_hash.Stable.V1.t [@@deriving bin_io]
+  type query = Staged_ledger_hash.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Account.t list Or_error.t [@@deriving bin_io]
+  type response = Account.Stable.V1.t list Or_error.t [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -247,9 +253,9 @@ module Get_ledger = struct
 end
 
 module Get_balance = struct
-  type query = Public_key.Compressed.Stable.V1.t [@@deriving bin_io]
+  type query = Public_key.Compressed.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Currency.Balance.Stable.V1.t option [@@deriving bin_io]
+  type response = Currency.Balance.Stable.Latest.t option [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -259,7 +265,7 @@ end
 
 module Verify_proof = struct
   type query =
-    Public_key.Compressed.Stable.V1.t * User_command.t * Payment_proof.t
+    Public_key.Compressed.Stable.Latest.t * User_command.t * Payment_proof.t
   [@@deriving bin_io]
 
   type response = unit Or_error.t [@@deriving bin_io]
@@ -271,7 +277,7 @@ module Verify_proof = struct
 end
 
 module Prove_receipt = struct
-  type query = Receipt.Chain_hash.t * Public_key.Compressed.Stable.V1.t
+  type query = Receipt.Chain_hash.t * Public_key.Compressed.Stable.Latest.t
   [@@deriving bin_io]
 
   type response = Payment_proof.t Or_error.t [@@deriving bin_io]
@@ -283,9 +289,9 @@ module Prove_receipt = struct
 end
 
 module Get_nonce = struct
-  type query = Public_key.Compressed.Stable.V1.t [@@deriving bin_io]
+  type query = Public_key.Compressed.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Account.Nonce.Stable.V1.t option [@@deriving bin_io]
+  type response = Account.Nonce.Stable.Latest.t option [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -359,4 +365,36 @@ module Snark_job_list = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Snark_job_list" ~version:0 ~bin_query ~bin_response
+end
+
+module Start_tracing = struct
+  type query = unit [@@deriving bin_io]
+
+  type response = unit [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Start_tracing" ~version:0 ~bin_query ~bin_response
+end
+
+module Stop_tracing = struct
+  type query = unit [@@deriving bin_io]
+
+  type response = unit [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Stop_tracing" ~version:0 ~bin_query ~bin_response
+end
+
+module Visualize_frontier = struct
+  type query = string [@@deriving bin_io]
+
+  type response = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Visualize_frontier" ~version:0 ~bin_query
+      ~bin_response
 end

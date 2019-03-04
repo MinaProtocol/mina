@@ -1,0 +1,10 @@
+(library
+ (name ppx_util)
+ (public_name ppx_util)
+ (flags :standard -short-paths -warn-error -58)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core ppxlib)
+ (preprocess
+  (pps bisect_ppx ppx_jane ppxlib.metaquot ppxlib.runner -- -conditional))
+ (synopsis "PPX utilities"))

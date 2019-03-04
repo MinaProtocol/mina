@@ -24,6 +24,7 @@ module type Inputs_intf = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type masked_ledger := Masked_ledger.t
      and type consensus_local_state := Consensus.Local_state.t
+     and type user_command := User_command.t
 
   module Transaction_pool :
     Coda_lib.Transaction_pool_read_intf
@@ -228,11 +229,8 @@ module Make (Inputs : Inputs_intf) :
                   ( Staged_ledger_diff.With_valid_signatures_and_proofs
                     .user_commands diff
                     :> User_command.t list )
-                ~snarked_ledger_hash:
-                  (Option.value_map ledger_proof_opt
-                     ~default:previous_ledger_hash ~f:(fun (proof, _) ->
-                       Ledger_proof.(statement proof |> statement_target) ))
-                ~supply_increase ~logger ) )
+                ~snarked_ledger_hash:previous_ledger_hash ~supply_increase
+                ~logger ) )
     in
     lift_sync (fun () ->
         measure "making Snark and Internal transitions" (fun () ->
@@ -272,11 +270,11 @@ module Make (Inputs : Inputs_intf) :
         let module Breadcrumb = Transition_frontier.Breadcrumb in
         let propose ivar proposal_data =
           let open Interruptible.Let_syntax in
-          match Mvar.peek frontier_reader with
+          match Broadcast_pipe.Reader.peek frontier_reader with
           | None -> Interruptible.return (log_bootstrap_mode ())
           | Some frontier -> (
               let crumb = Transition_frontier.best_tip frontier in
-              Logger.info logger
+              Logger.trace logger
                 !"Begining to propose off of crumb %{sexp: Breadcrumb.t}%!"
                 crumb ;
               Core.printf !"%!" ;
@@ -304,6 +302,36 @@ module Make (Inputs : Inputs_intf) :
               match next_state_opt with
               | None -> Interruptible.return ()
               | Some (protocol_state, internal_transition) ->
+                  Debug_assert.debug_assert (fun () ->
+                      let logger = Logger.child logger "Assert_selection" in
+                      [%test_result: [`Take | `Keep]]
+                        (Consensus_mechanism.select
+                           ~existing:
+                             ( previous_protocol_state
+                             |> Protocol_state.consensus_state )
+                           ~candidate:
+                             (protocol_state |> Protocol_state.consensus_state)
+                           ~logger)
+                        ~expect:`Take
+                        ~message:
+                          "newly generated consensus states should be \
+                           selected over their parent" ;
+                      let root_consensus_state =
+                        Transition_frontier.root frontier
+                        |> (fun x -> (Breadcrumb.transition_with_hash x).data)
+                        |> External_transition.Verified.protocol_state
+                        |> Protocol_state.consensus_state
+                      in
+                      [%test_result: [`Take | `Keep]]
+                        (Consensus_mechanism.select
+                           ~existing:root_consensus_state
+                           ~candidate:
+                             (protocol_state |> Protocol_state.consensus_state)
+                           ~logger)
+                        ~expect:`Take
+                        ~message:
+                          "newly generated consensus states should be \
+                           selected over the tf root" ) ;
                   Interruptible.uninterruptible
                     (let open Deferred.Let_syntax in
                     let t0 = Time.now time_controller in
@@ -346,7 +374,7 @@ module Make (Inputs : Inputs_intf) :
         let scheduler = Singleton_scheduler.create time_controller in
         let rec check_for_proposal () =
           trace_recurring_task "check for proposal" (fun () ->
-              match Mvar.peek frontier_reader with
+              match Broadcast_pipe.Reader.peek frontier_reader with
               | None -> log_bootstrap_mode ()
               | Some transition_frontier -> (
                   let breadcrumb =
@@ -369,6 +397,11 @@ module Make (Inputs : Inputs_intf) :
                   | `Check_again time ->
                       Singleton_scheduler.schedule scheduler (time_of_ms time)
                         ~f:check_for_proposal
+                  | `Propose_now data ->
+                      Interruptible.finally
+                        (Singleton_supervisor.dispatch proposal_supervisor data)
+                        ~f:check_for_proposal
+                      |> ignore
                   | `Propose (time, data) ->
                       Singleton_scheduler.schedule scheduler (time_of_ms time)
                         ~f:(fun () ->

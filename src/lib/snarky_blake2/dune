@@ -1,0 +1,9 @@
+(library
+  (name snarky_blake2)
+  (public_name snarky_blake2)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (inline_tests)
+  (libraries
+    snarky
+    coda_digestif
+    core_kernel ))

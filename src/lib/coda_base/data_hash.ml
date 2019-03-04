@@ -7,6 +7,7 @@ open Snark_bits
 open Bitstring_lib
 open Tuple_lib
 open Fold_lib
+open Module_version
 
 module type Basic = sig
   type t = private Pedersen.Digest.t
@@ -26,6 +27,8 @@ module type Basic = sig
 
       include Hashable_binable with type t := t
     end
+
+    module Latest : module type of V1
   end
 
   type var
@@ -76,15 +79,29 @@ struct
   module Stable = struct
     module V1 = struct
       module T = struct
+        let version = 1
+
         type t = Pedersen.Digest.t [@@deriving bin_io, sexp, eq, compare, hash]
       end
 
       include T
+      include Registration.Make_latest_version (T)
       include Hashable.Make_binable (T)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "data_hash_basic"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
+  include Stable.Latest
 
   let to_bytes t =
     Fold_lib.Fold.bool_t_to_string (Fold.of_list (Field.unpack t))
