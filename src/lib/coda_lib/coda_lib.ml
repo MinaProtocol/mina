@@ -512,6 +512,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; banlist: Coda_base.Banlist.t
       ; receipt_chain_database: Coda_base.Receipt_chain_database.t
       ; snark_work_fee: Currency.Fee.t
+      ; monitor: Monitor.t option
       (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
       }
     [@@deriving make]
@@ -527,188 +528,197 @@ module Make (Inputs : Inputs_intf) = struct
           ~transition_writer:t.proposer_transition_writer )
 
   let create (config : Config.t) =
-    trace_task "coda" (fun () ->
-        let consensus_local_state =
-          Consensus_mechanism.Local_state.create
-            (Option.map config.propose_keypair ~f:(fun keypair ->
-                 let open Keypair in
-                 Public_key.compress keypair.public_key ))
-        in
-        let external_transitions_reader, external_transitions_writer =
-          Strict_pipe.create Synchronous
-        in
-        let proposer_transition_reader, proposer_transition_writer =
-          Strict_pipe.create Synchronous
-        in
-        let net_ivar = Ivar.create () in
-        let empty_diff =
-          { Staged_ledger_diff.diff=
-              ( { completed_works= []
-                ; user_commands= []
-                ; coinbase= Staged_ledger_diff.At_most_two.Zero }
-              , None )
-          ; prev_hash=
-              Staged_ledger_hash.of_aux_and_ledger_hash
-                (Staged_ledger_aux_hash.of_bytes "")
-                (Ledger.merkle_root Genesis_ledger.t)
-          ; creator=
-              Account.public_key (snd (List.hd_exn Genesis_ledger.accounts)) }
-        in
-        let genesis_protocol_state =
-          With_hash.data Consensus_mechanism.genesis_protocol_state
-        in
-        (* the genesis transition is assumed to be valid *)
-        let (`I_swear_this_is_safe_see_my_comment first_transition) =
-          External_transition.to_verified
-            (External_transition.create ~protocol_state:genesis_protocol_state
-               ~protocol_state_proof:Genesis.proof
-               ~staged_ledger_diff:empty_diff)
-        in
-        let ledger_db =
-          Ledger_db.create ?directory_name:config.ledger_db_location ()
-        in
-        let root_snarked_ledger =
-          Ledger_transfer.transfer_accounts ~src:Genesis.ledger ~dest:ledger_db
-        in
-        let snarked_ledger_hash =
-          Frozen_ledger_hash.of_ledger_hash
-          @@ Ledger.merkle_root Genesis.ledger
-        in
-        let%bind root_staged_ledger =
-          match%map
-            Staged_ledger.of_scan_state_and_ledger ~snarked_ledger_hash
-              ~ledger:Genesis.ledger
-              ~scan_state:(Staged_ledger.Scan_state.empty ())
-          with
-          | Ok staged_ledger -> staged_ledger
-          | Error err -> Error.raise err
-        in
-        let transition_frontier =
-          Transition_frontier.create ~logger:config.log
-            ~root_transition:
-              (With_hash.of_data first_transition
-                 ~hash_data:
-                   (Fn.compose Consensus_mechanism.Protocol_state.hash
-                      External_transition.Verified.protocol_state))
-            ~root_staged_ledger ~root_snarked_ledger ~consensus_local_state
-        in
-        let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
-          Broadcast_pipe.create (Some transition_frontier)
-        in
-        let%bind net =
-          Net.create config.net_config
-            ~get_staged_ledger_aux_at_hash:(fun _hash ->
-              failwith "shouldn't be necessary right now?" )
-            ~answer_sync_ledger_query:(fun query_env ->
-              let open Or_error.Let_syntax in
-              let result =
-                let ledger_hash, query = Envelope.Incoming.data query_env in
-                let%bind frontier = peek_frontier frontier_broadcast_pipe_r in
-                Sync_handler.answer_query ~frontier ledger_hash query
-                  ~logger:config.log
-                |> Result.of_option
-                     ~error:
-                       (Error.createf
-                          !"Could not answer query for ledger_hash: \
-                            %{sexp:Ledger_hash.t}"
-                          ledger_hash)
-              in
-              result |> Deferred.return )
-            ~transition_catchup:(fun enveloped_hash ->
-              let open Deferred.Option.Let_syntax in
-              let hash = Envelope.Incoming.data enveloped_hash in
-              let%bind frontier =
-                Deferred.return
-                @@ Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-              in
-              Deferred.return @@ Sync_handler.transition_catchup ~frontier hash
-              )
-            ~get_ancestry:(fun query_env ->
-              let consensus_state = Envelope.Incoming.data query_env in
-              let result =
-                let open Option.Let_syntax in
-                let%bind frontier =
-                  Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
-                in
-                let%map peer_root_with_proof =
-                  Root_prover.prove ~logger:config.log ~frontier
-                    consensus_state
-                in
-                let staged_ledger =
-                  Transition_frontier.Breadcrumb.staged_ledger
-                    (Transition_frontier.root frontier)
-                in
-                let scan_state = Staged_ledger.scan_state staged_ledger in
-                let merkle_root =
-                  Ledger.merkle_root (Staged_ledger.ledger staged_ledger)
-                in
-                (peer_root_with_proof, scan_state, merkle_root)
-              in
-              Deferred.return result )
-        in
-        let valid_transitions =
-          Transition_router.run ~logger:config.log ~network:net
-            ~time_controller:config.time_controller
-            ~frontier_broadcast_pipe:
-              (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
-            ~ledger_db
-            ~network_transition_reader:
-              (Strict_pipe.Reader.map external_transitions_reader
-                 ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm) ))
-            ~proposer_transition_reader
-        in
-        let valid_transitions_for_network, valid_transitions_for_api =
-          Strict_pipe.Reader.Fork.two valid_transitions
-        in
-        let%bind transaction_pool =
-          Transaction_pool.load ~parent_log:config.log
-            ~disk_location:config.transaction_pool_disk_location
-            ~incoming_diffs:(Net.transaction_pool_diffs net)
-            ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-        in
-        don't_wait_for
-          (Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
-             ~f:(fun x ->
-               Net.broadcast_transaction_pool_diff net x ;
-               Deferred.unit )) ;
-        Ivar.fill net_ivar net ;
-        don't_wait_for
-          (Strict_pipe.Reader.iter_without_pushback
-             valid_transitions_for_network ~f:(fun transition_with_hash ->
-               (* remove verified status for network broadcast *)
-               Net.broadcast_state net
-                 (External_transition.of_verified
-                    (With_hash.data transition_with_hash)) )) ;
-        don't_wait_for
-          (Strict_pipe.transfer (Net.states net) external_transitions_writer
-             ~f:ident) ;
-        let%bind snark_pool =
-          Snark_pool.load ~parent_log:config.log
-            ~disk_location:config.snark_pool_disk_location
-            ~incoming_diffs:(Net.snark_pool_diffs net)
-            ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
-        in
-        don't_wait_for
-          (Linear_pipe.iter (Snark_pool.broadcasts snark_pool) ~f:(fun x ->
-               Net.broadcast_snark_pool_diff net x ;
-               Deferred.unit )) ;
-        return
-          { propose_keypair= config.propose_keypair
-          ; run_snark_worker= config.run_snark_worker
-          ; net
-          ; transaction_pool
-          ; snark_pool
-          ; transition_frontier= frontier_broadcast_pipe_r
-          ; time_controller= config.time_controller
-          ; external_transitions_writer=
-              Strict_pipe.Writer.to_linear_pipe external_transitions_writer
-          ; strongest_ledgers= valid_transitions_for_api
-          ; log= config.log
-          ; seen_jobs= Work_selector.State.init
-          ; staged_ledger_transition_backup_capacity=
-              config.staged_ledger_transition_backup_capacity
-          ; receipt_chain_database= config.receipt_chain_database
-          ; snark_work_fee= config.snark_work_fee
-          ; proposer_transition_writer
-          ; consensus_local_state } )
+    let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
+    Async.Scheduler.within' ~monitor (fun () ->
+        trace_task "coda" (fun () ->
+            let consensus_local_state =
+              Consensus_mechanism.Local_state.create
+                (Option.map config.propose_keypair ~f:(fun keypair ->
+                     let open Keypair in
+                     Public_key.compress keypair.public_key ))
+            in
+            let external_transitions_reader, external_transitions_writer =
+              Strict_pipe.create Synchronous
+            in
+            let proposer_transition_reader, proposer_transition_writer =
+              Strict_pipe.create Synchronous
+            in
+            let net_ivar = Ivar.create () in
+            let empty_diff =
+              { Staged_ledger_diff.diff=
+                  ( { completed_works= []
+                    ; user_commands= []
+                    ; coinbase= Staged_ledger_diff.At_most_two.Zero }
+                  , None )
+              ; prev_hash=
+                  Staged_ledger_hash.of_aux_and_ledger_hash
+                    (Staged_ledger_aux_hash.of_bytes "")
+                    (Ledger.merkle_root Genesis_ledger.t)
+              ; creator=
+                  Account.public_key
+                    (snd (List.hd_exn Genesis_ledger.accounts)) }
+            in
+            let genesis_protocol_state =
+              With_hash.data Consensus_mechanism.genesis_protocol_state
+            in
+            (* the genesis transition is assumed to be valid *)
+            let (`I_swear_this_is_safe_see_my_comment first_transition) =
+              External_transition.to_verified
+                (External_transition.create
+                   ~protocol_state:genesis_protocol_state
+                   ~protocol_state_proof:Genesis.proof
+                   ~staged_ledger_diff:empty_diff)
+            in
+            let ledger_db =
+              Ledger_db.create ?directory_name:config.ledger_db_location ()
+            in
+            let root_snarked_ledger =
+              Ledger_transfer.transfer_accounts ~src:Genesis.ledger
+                ~dest:ledger_db
+            in
+            let snarked_ledger_hash =
+              Frozen_ledger_hash.of_ledger_hash
+              @@ Ledger.merkle_root Genesis.ledger
+            in
+            let%bind root_staged_ledger =
+              match%map
+                Staged_ledger.of_scan_state_and_ledger ~snarked_ledger_hash
+                  ~ledger:Genesis.ledger
+                  ~scan_state:(Staged_ledger.Scan_state.empty ())
+              with
+              | Ok staged_ledger -> staged_ledger
+              | Error err -> Error.raise err
+            in
+            let transition_frontier =
+              Transition_frontier.create ~logger:config.log
+                ~root_transition:
+                  (With_hash.of_data first_transition
+                     ~hash_data:
+                       (Fn.compose Consensus_mechanism.Protocol_state.hash
+                          External_transition.Verified.protocol_state))
+                ~root_staged_ledger ~root_snarked_ledger ~consensus_local_state
+            in
+            let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
+              Broadcast_pipe.create (Some transition_frontier)
+            in
+            let%bind net =
+              Net.create config.net_config
+                ~get_staged_ledger_aux_at_hash:(fun _hash ->
+                  failwith "shouldn't be necessary right now?" )
+                ~answer_sync_ledger_query:(fun query_env ->
+                  let open Or_error.Let_syntax in
+                  let result =
+                    let ledger_hash, query =
+                      Envelope.Incoming.data query_env
+                    in
+                    let%bind frontier =
+                      peek_frontier frontier_broadcast_pipe_r
+                    in
+                    Sync_handler.answer_query ~frontier ledger_hash query
+                      ~logger:config.log
+                    |> Result.of_option
+                         ~error:
+                           (Error.createf
+                              !"Could not answer query for ledger_hash: \
+                                %{sexp:Ledger_hash.t}"
+                              ledger_hash)
+                  in
+                  result |> Deferred.return )
+                ~transition_catchup:(fun enveloped_hash ->
+                  let open Deferred.Option.Let_syntax in
+                  let hash = Envelope.Incoming.data enveloped_hash in
+                  let%bind frontier =
+                    Deferred.return
+                    @@ Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                  in
+                  Deferred.return
+                  @@ Sync_handler.transition_catchup ~frontier hash )
+                ~get_ancestry:(fun query_env ->
+                  let consensus_state = Envelope.Incoming.data query_env in
+                  let result =
+                    let open Option.Let_syntax in
+                    let%bind frontier =
+                      Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
+                    in
+                    let%map peer_root_with_proof =
+                      Root_prover.prove ~logger:config.log ~frontier
+                        consensus_state
+                    in
+                    let staged_ledger =
+                      Transition_frontier.Breadcrumb.staged_ledger
+                        (Transition_frontier.root frontier)
+                    in
+                    let scan_state = Staged_ledger.scan_state staged_ledger in
+                    let merkle_root =
+                      Ledger.merkle_root (Staged_ledger.ledger staged_ledger)
+                    in
+                    (peer_root_with_proof, scan_state, merkle_root)
+                  in
+                  Deferred.return result )
+            in
+            let valid_transitions =
+              Transition_router.run ~logger:config.log ~network:net
+                ~time_controller:config.time_controller
+                ~frontier_broadcast_pipe:
+                  (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
+                ~ledger_db
+                ~network_transition_reader:
+                  (Strict_pipe.Reader.map external_transitions_reader
+                     ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm) ))
+                ~proposer_transition_reader
+            in
+            let valid_transitions_for_network, valid_transitions_for_api =
+              Strict_pipe.Reader.Fork.two valid_transitions
+            in
+            let%bind transaction_pool =
+              Transaction_pool.load ~parent_log:config.log
+                ~disk_location:config.transaction_pool_disk_location
+                ~incoming_diffs:(Net.transaction_pool_diffs net)
+                ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+            in
+            don't_wait_for
+              (Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
+                 ~f:(fun x ->
+                   Net.broadcast_transaction_pool_diff net x ;
+                   Deferred.unit )) ;
+            Ivar.fill net_ivar net ;
+            don't_wait_for
+              (Strict_pipe.Reader.iter_without_pushback
+                 valid_transitions_for_network ~f:(fun transition_with_hash ->
+                   (* remove verified status for network broadcast *)
+                   Net.broadcast_state net
+                     (External_transition.of_verified
+                        (With_hash.data transition_with_hash)) )) ;
+            don't_wait_for
+              (Strict_pipe.transfer (Net.states net)
+                 external_transitions_writer ~f:ident) ;
+            let%bind snark_pool =
+              Snark_pool.load ~parent_log:config.log
+                ~disk_location:config.snark_pool_disk_location
+                ~incoming_diffs:(Net.snark_pool_diffs net)
+                ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+            in
+            don't_wait_for
+              (Linear_pipe.iter (Snark_pool.broadcasts snark_pool) ~f:(fun x ->
+                   Net.broadcast_snark_pool_diff net x ;
+                   Deferred.unit )) ;
+            return
+              { propose_keypair= config.propose_keypair
+              ; run_snark_worker= config.run_snark_worker
+              ; net
+              ; transaction_pool
+              ; snark_pool
+              ; transition_frontier= frontier_broadcast_pipe_r
+              ; time_controller= config.time_controller
+              ; external_transitions_writer=
+                  Strict_pipe.Writer.to_linear_pipe external_transitions_writer
+              ; strongest_ledgers= valid_transitions_for_api
+              ; log= config.log
+              ; seen_jobs= Work_selector.State.init
+              ; staged_ledger_transition_backup_capacity=
+                  config.staged_ledger_transition_backup_capacity
+              ; receipt_chain_database= config.receipt_chain_database
+              ; snark_work_fee= config.snark_work_fee
+              ; proposer_transition_writer
+              ; consensus_local_state } ) )
 end

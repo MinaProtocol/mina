@@ -25,47 +25,92 @@ module Make (Inputs : Inputs.S) :
   (* We would like the async scheduler to context switch between each iteration
      of external transitions when trying to build breadcrumb_path. Therefore, this 
      function needs to return a Deferred *)
-  let construct_breadcrumb_path ~logger initial_breadcrumb tree =
-    Rose_tree.Deferred.Or_error.fold_map tree
-      ~init:(Cached.pure initial_breadcrumb)
-      ~f:(fun cached_parent_breadcrumb cached_transition_with_hash ->
-        let open Deferred.Let_syntax in
-        let%map cached_result =
-          Cached.transform cached_transition_with_hash
-            ~f:(fun transition_with_hash ->
-              let open Deferred.Or_error.Let_syntax in
-              let parent_breadcrumb = Cached.peek cached_parent_breadcrumb in
-              let parent_state_hash =
-                Transition_frontier.Breadcrumb.transition_with_hash
-                  parent_breadcrumb
-                |> With_hash.hash
-              in
-              let current_state_hash = With_hash.hash transition_with_hash in
-              let%bind () =
-                Deferred.return
-                  (Result.ok_if_true
-                     ( State_hash.equal parent_state_hash
-                     @@ get_previous_state_hash transition_with_hash )
-                     ~error:
-                       ( Error.of_string
-                       @@ sprintf
-                            !"Previous external transition hash \
-                              %{sexp:State_hash.t} does not equal to current \
-                              external_transition's parent hash \
-                              %{sexp:State_hash.t}"
-                            parent_state_hash current_state_hash ))
-              in
-              let open Deferred.Let_syntax in
-              match%map
-                Transition_frontier.Breadcrumb.build ~logger
-                  ~parent:parent_breadcrumb ~transition_with_hash
-              with
-              | Ok new_breadcrumb -> Ok new_breadcrumb
-              | Error (`Fatal_error exn) -> Or_error.of_exn exn
-              | Error (`Validation_error error) -> Error error )
-          |> Cached.sequence_deferred
-        in
-        Cached.sequence_result cached_result )
+  let construct_breadcrumb_path ~logger frontier initial_state_hash tree =
+    (* If the breadcrumb we are targetting is removed from the transition
+     * frontier while we're catching up, it means this path is not on the
+     * critical path that has been chosen in the frontier. As such, we should
+     * drop it on the floor. *)
+    let breadcrumb_if_present () =
+      match Transition_frontier.find frontier initial_state_hash with
+      | None ->
+          let msg =
+            Printf.sprintf
+              !"Transition frontier garbage already collected the parent on \
+                %{sexp: Coda_base.State_hash.t}"
+              initial_state_hash
+          in
+          Logger.error logger !"%s" msg ;
+          Or_error.error_string msg
+      | Some crumb -> Or_error.return crumb
+    in
+    let open Deferred.Or_error.Let_syntax in
+    let%map tree =
+      Rose_tree.Deferred.Or_error.fold_map tree
+        ~init:(Cached.pure `Initial)
+        ~f:
+          (fun cached_parent_breadcrumb_or_initial cached_transition_with_hash ->
+          let open Deferred.Let_syntax in
+          let%map cached_result =
+            Cached.transform cached_transition_with_hash
+              ~f:(fun transition_with_hash ->
+                let open Deferred.Or_error.Let_syntax in
+                let parent_or_initial =
+                  Cached.peek cached_parent_breadcrumb_or_initial
+                in
+                let%bind well_formed_parent =
+                  match parent_or_initial with
+                  | `Initial ->
+                      let%map crumb =
+                        breadcrumb_if_present () |> Deferred.return
+                      in
+                      (* We make a copy now so the mask can't be detached while we're
+                          * in the middle of applying it later *)
+                      crumb |> Transition_frontier.Breadcrumb.copy
+                  | `Constructed parent -> Deferred.Or_error.return parent
+                in
+                let parent_state_hash =
+                  Transition_frontier.Breadcrumb.transition_with_hash
+                    well_formed_parent
+                  |> With_hash.hash
+                in
+                let current_state_hash = With_hash.hash transition_with_hash in
+                let%bind () =
+                  Deferred.return
+                    (Result.ok_if_true
+                       ( State_hash.equal parent_state_hash
+                       @@ get_previous_state_hash transition_with_hash )
+                       ~error:
+                         ( Error.of_string
+                         @@ sprintf
+                              !"Previous external transition hash \
+                                %{sexp:State_hash.t} does not equal to \
+                                current external_transition's parent hash \
+                                %{sexp:State_hash.t}"
+                              parent_state_hash current_state_hash ))
+                in
+                let open Deferred.Let_syntax in
+                match%map
+                  Transition_frontier.Breadcrumb.build ~logger
+                    ~parent:well_formed_parent ~transition_with_hash
+                with
+                | Ok new_breadcrumb ->
+                    let open Result.Let_syntax in
+                    (* After we do a bunch of async work on what used to be our initial breacrumb
+                        * make sure it's still there, otherwise drop it on the floor *)
+                    let%map _ : Transition_frontier.Breadcrumb.t =
+                      breadcrumb_if_present ()
+                    in
+                    `Constructed new_breadcrumb
+                | Error (`Fatal_error exn) -> Or_error.of_exn exn
+                | Error (`Validation_error error) -> Error error )
+            |> Cached.sequence_deferred
+          in
+          Cached.sequence_result cached_result )
+    in
+    Rose_tree.map tree ~f:(fun c ->
+        Cached.transform c ~f:(function
+          | `Initial -> failwith "impossible"
+          | `Constructed breadcrumb -> breadcrumb ) )
 
   let materialize_breadcrumbs ~frontier ~logger ~peer
       (Rose_tree.T (foreign_transition_head, _) as tree) =
@@ -84,8 +129,8 @@ module Make (Inputs : Inputs.S) :
         in
         Logger.faulty_peer logger !"%s" message ;
         Deferred.return @@ Or_error.error_string message
-    | Some initial_breadcrumb ->
-        construct_breadcrumb_path ~logger initial_breadcrumb tree
+    | Some _ ->
+        construct_breadcrumb_path ~logger frontier initial_state_hash tree
 
   let verify_transition ~logger ~frontier ~unprocessed_transition_cache
       transition =
@@ -210,7 +255,8 @@ module Make (Inputs : Inputs.S) :
         | Ok tree -> Strict_pipe.Writer.write catchup_breadcrumbs_writer [tree]
         | Error e ->
             Logger.info logger
-              !"None of the peers have a transition with state hash:\n%s"
+              !"All peers either sent us bad data, didn't have the info, or \
+                our transition frontier moved too fast: %s"
               (Error.to_string_hum e) ;
             Deferred.unit )
     |> don't_wait_for

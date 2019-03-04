@@ -6,6 +6,7 @@
 [%%import "config/proof_level/none.mlh"]
 
 [%%define delta 8]
+[%%define cache_exceptions false]
 [%%define fake_hash true]
 
 [%%define genesis_ledger "testnet_postake"]

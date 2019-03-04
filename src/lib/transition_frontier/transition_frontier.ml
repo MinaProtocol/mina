@@ -56,6 +56,9 @@ struct
     let create transition_with_hash staged_ledger =
       {transition_with_hash; staged_ledger; just_emitted_a_proof= false}
 
+    let copy t =
+      {t with staged_ledger= Inputs.Staged_ledger.copy t.staged_ledger}
+
     let build ~logger ~parent ~transition_with_hash =
       O1trace.measure "Breadcrumb.build" (fun () ->
           let open Deferred.Result.Let_syntax in
@@ -91,18 +94,18 @@ struct
           in
           let just_emitted_a_proof = Option.is_some proof_opt in
           let%map transitioned_staged_ledger =
-            if
-              Staged_ledger_hash.equal staged_ledger_hash
-                blockchain_staged_ledger_hash
-            then return transitioned_staged_ledger
-            else
-              Deferred.return
-                (Error
-                   (`Validation_error
-                     (Error.of_string
-                        "Snarked ledger hash and Staged ledger hash after \
-                         applying the diff does not match blockchain state's \
-                         ledger hash and staged ledger hash resp.\n")))
+            Deferred.return
+              ( if
+                Staged_ledger_hash.equal staged_ledger_hash
+                  blockchain_staged_ledger_hash
+              then Ok transitioned_staged_ledger
+              else
+                Error
+                  (`Validation_error
+                    (Error.of_string
+                       "Snarked ledger hash and Staged ledger hash after \
+                        applying the diff does not match blockchain state's \
+                        ledger hash and staged ledger hash resp.\n")) )
           in
           { transition_with_hash
           ; staged_ledger= transitioned_staged_ledger
@@ -701,6 +704,17 @@ struct
               ; old_best_tip= best_tip_node.breadcrumb
               ; garbage= garbage_breadcrumbs }
           else Transition_frontier_diff.New_breadcrumb node.breadcrumb ) )
+
+  let add_breadcrumb_if_present_exn t breadcrumb =
+    let parent_hash = Breadcrumb.parent_hash breadcrumb in
+    match Hashtbl.find t.table parent_hash with
+    | Some _ -> add_breadcrumb_exn t breadcrumb
+    | None ->
+        Logger.warn t.logger
+          !"When trying to add breadcrumb, its parent had been removed from \
+            transition frontier: %{sexp: State_hash.t}"
+          parent_hash ;
+        Deferred.unit
 
   let best_tip_path_length_exn {table; root; best_tip; _} =
     let open Option.Let_syntax in

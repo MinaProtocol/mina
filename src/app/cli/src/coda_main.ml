@@ -319,7 +319,8 @@ module type Main_intf = sig
       ; time_controller: Inputs.Time.Controller.t
       ; banlist: Banlist.t
       ; receipt_chain_database: Receipt_chain_database.t
-      ; snark_work_fee: Currency.Fee.t }
+      ; snark_work_fee: Currency.Fee.t
+      ; monitor: Async.Monitor.t option }
     [@@deriving make]
   end
 
@@ -622,7 +623,7 @@ struct
     let transactions t = Pool.transactions (pool t)
 
     (* TODO: This causes the signature to get checked twice as it is checked
-   below before feeding it to add *)
+       below before feeding it to add *)
     let add t txn = apply_and_broadcast t (Envelope.Incoming.local [txn])
   end
 
@@ -1198,7 +1199,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       Payment_proof.t Deferred.Or_error.t =
     let receipt_chain_database = receipt_chain_database t in
     (* TODO: since we are making so many reads to `receipt_chain_database`,
-    reads should be async to not get IO-blocked. See #1125 *)
+       reads should be async to not get IO-blocked. See #1125 *)
     let result =
       Receipt_chain_database.prove receipt_chain_database ~proving_receipt
         ~resulting_receipt
@@ -1232,10 +1233,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       Consensus.Protocol_state.hash state
       |> [%sexp_of: State_hash.t] |> Sexp.to_string
     in
-    let block_count =
-      state |> Consensus.Protocol_state.consensus_state
-      |> Consensus.Consensus_state.length
-    in
+    let consensus_state = state |> Consensus.Protocol_state.consensus_state in
+    let block_count = Consensus.Consensus_state.length consensus_state in
     let uptime_secs =
       Time_ns.diff (Time_ns.now ()) start_time
       |> Time_ns.Span.to_sec |> Int.of_float
@@ -1279,6 +1278,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         staged_ledger |> Staged_ledger.hash |> Staged_ledger_hash.sexp_of_t
         |> Sexp.to_string
     ; state_hash
+    ; consensus_time_best_tip=
+        Consensus.Consensus_state.time_hum consensus_state
     ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
     ; peers=
@@ -1290,6 +1291,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; propose_pubkey=
         Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
     ; histograms
+    ; consensus_time_now= Consensus.time_hum (Core_kernel.Time.now ())
     ; consensus_mechanism= Consensus.name
     ; consensus_configuration= Consensus.Configuration.t }
 
@@ -1339,6 +1341,10 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
   let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
+
+  let log_shutdown ~frontier_file ~log t =
+    visualize_frontier ~filename:frontier_file t |> ignore ;
+    Logger.info log "Logging the transition_frontier at %s" frontier_file
 
   (* TODO: handle participation_status more appropriately than doing participate_exn *)
   let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda ~log
@@ -1523,4 +1529,15 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         create_snark_worker ~shutdown_on_disconnect:s ~log ~public_key
           ~client_port
         |> ignore
+
+  let handle_shutdown ~monitor ~frontier_file ~log t =
+    Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
+        log_shutdown ~frontier_file ~log t ;
+        raise exn ) ;
+    Async_unix.Signal.(
+      handle terminating ~f:(fun signal ->
+          log_shutdown ~frontier_file ~log t ;
+          Logger.info log
+            !"Coda process got interrupted by signal %{sexp:t}"
+            signal ))
 end
