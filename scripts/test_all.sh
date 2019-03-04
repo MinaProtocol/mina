@@ -93,16 +93,6 @@ run_epoch_stake_integration_test() {
     run_integration_test full-test
 }
 
-run_wallet_test() {
-    run_dune build _build/install/default/bin/coda
-    run_dune exec coda -- daemon &
-    DAEMON_PID=$!
-    sleep 30 # Give the coda process enough time to boot up
-    npm run --prefix ../frontend/wallet query || true
-    kill $DAEMON_PID
-    npm run --prefix ../frontend/wallet build
-}
-
 main() {
   run_dune build
   run_unit_tests
