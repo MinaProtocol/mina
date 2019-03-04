@@ -502,9 +502,9 @@ struct
   end
 
   let visualize ~filename t =
-    let output_channel = Out_channel.create filename in
-    let graph = Visualizor.to_graph t in
-    Visualizor.output_graph output_channel graph
+    Out_channel.with_file filename ~f:(fun output_channel ->
+        let graph = Visualizor.to_graph t in
+        Visualizor.output_graph output_channel graph )
 
   let attach_node_to t ~(parent_node : Node.t) ~(node : Node.t) =
     let hash = Breadcrumb.state_hash (Node.breadcrumb node) in

@@ -85,9 +85,9 @@ module Make (Inputs : Inputs_intf) = struct
 
   module Debug = struct
     let visualize ~filename =
-      let output_channel = Out_channel.create filename in
-      let graph = to_graph () in
-      Graphviz.output_graph output_channel graph
+      Out_channel.with_file filename ~f:(fun output_channel ->
+          let graph = to_graph () in
+          Graphviz.output_graph output_channel graph )
   end
 
   module Visualize = struct
