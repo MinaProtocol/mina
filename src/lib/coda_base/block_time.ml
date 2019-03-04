@@ -6,12 +6,31 @@ open Tick
 open Unsigned_extended
 open Snark_bits
 open Fold_lib
+open Module_version
 
 (* Milliseconds since epoch *)
 module Stable = struct
   module V1 = struct
-    type t = UInt64.t [@@deriving bin_io, sexp, compare, eq, hash]
+    module T = struct
+      let version = 1
+
+      type t = UInt64.t [@@deriving bin_io, sexp, compare, eq, hash]
+    end
+
+    include T
+    include Registration.Make_latest_version (T)
   end
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "block_time"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
 end
 
 module Controller = struct
@@ -20,7 +39,8 @@ module Controller = struct
   let create () = ()
 end
 
-include Stable.V1
+(* DO NOT add bin_io the deriving list *)
+type t = Stable.Latest.t [@@deriving sexp, compare, eq, hash]
 
 type t0 = t
 
@@ -38,11 +58,29 @@ let fold t = Fold.group3 ~default:false (Bits.fold t)
 module Span = struct
   module Stable = struct
     module V1 = struct
-      type t = UInt64.t [@@deriving bin_io, sexp, compare]
+      module T = struct
+        let version = 1
+
+        type t = UInt64.t [@@deriving bin_io, sexp, compare]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "block_time_span"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
+  include Stable.Latest
   module Bits = B.UInt64
   include B.Snarkable.UInt64 (Tick)
 

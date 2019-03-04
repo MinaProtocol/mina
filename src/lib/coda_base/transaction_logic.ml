@@ -1,8 +1,6 @@
 open Core
-open Snark_params
 open Currency
 open Signature_lib
-open Merkle_ledger
 
 module type S = sig
   type ledger
@@ -30,7 +28,7 @@ module type S = sig
     [@@deriving sexp, bin_io]
 
     type coinbase =
-      { coinbase: Coinbase.t
+      { coinbase: Coinbase.Stable.V1.t
       ; previous_empty_accounts: Public_key.Compressed.t list }
     [@@deriving sexp, bin_io]
 
@@ -142,7 +140,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     [@@deriving sexp, bin_io]
 
     type coinbase =
-      { coinbase: Coinbase.t
+      { coinbase: Coinbase.Stable.V1.t
       ; previous_empty_accounts: Public_key.Compressed.t list }
     [@@deriving sexp, bin_io]
 
@@ -157,7 +155,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
     let transaction : t -> Transaction.t Or_error.t =
      fun {varying; _} ->
-      let open Or_error.Let_syntax in
       match varying with
       | User_command tr ->
           Option.value_map ~default:(Or_error.error_string "Bad signature")

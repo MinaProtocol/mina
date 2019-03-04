@@ -75,7 +75,8 @@ module Make (Test : Test_intf) = struct
 
   let dummy_account = Quickcheck.random_value Account.gen
 
-  let create_new_account_exn mask ({Account.public_key; _} as account) =
+  let create_new_account_exn mask account =
+    let public_key = Account.public_key account in
     let action, location =
       Mask.Attached.get_or_create_account_exn mask public_key account
     in
@@ -83,7 +84,8 @@ module Make (Test : Test_intf) = struct
     | `Existed -> failwith "Expected to allocate a new account"
     | `Added -> location
 
-  let create_existing_account_exn mask ({Account.public_key; _} as account) =
+  let create_existing_account_exn mask account =
+    let public_key = Account.public_key account in
     let action, location =
       Mask.Attached.get_or_create_account_exn mask public_key account
     in
@@ -93,8 +95,8 @@ module Make (Test : Test_intf) = struct
         location
     | `Added -> failwith "Expected to re-use an existing account"
 
-  let parent_create_new_account_exn parent ({Account.public_key; _} as account)
-      =
+  let parent_create_new_account_exn parent account =
+    let public_key = Account.public_key account in
     let action, location =
       Maskable.get_or_create_account_exn parent public_key account
     in
@@ -537,7 +539,7 @@ module Make (Test : Test_intf) = struct
         (* all accounts in parent to_list *)
         let parent_list = Maskable.to_list maskable in
         let zero_balance account =
-          {account with Account.balance= Balance.zero}
+          Account.update_balance account Balance.zero
         in
         (* put same accounts in mask, but with zero balance *)
         let mask_accounts = List.map parent_accounts ~f:zero_balance in
@@ -579,7 +581,7 @@ module Make (Test : Test_intf) = struct
         (* non-zero sum of parent account balances *)
         assert (Int.equal parent_sum 55) (* HT Gauss *) ;
         let zero_balance account =
-          {account with Account.balance= Balance.zero}
+          Account.update_balance account Balance.zero
         in
         (* put same accounts in mask, but with zero balance *)
         let mask_accounts = List.map parent_accounts ~f:zero_balance in
@@ -658,43 +660,6 @@ module Make (Test : Test_intf) = struct
           Int.equal parent_num_accounts (List.length accounts)
           && Int.equal parent_num_accounts mask_num_accounts_before
           && Int.equal parent_num_accounts mask_num_accounts_after ) )
-
-  let%test_unit "Mask reparenting works" =
-    Test.with_chain (fun base ~mask:m1 ~mask_as_base ~mask2:m2 ->
-        let num_accounts = 3 in
-        let keys = Key.gen_keys num_accounts in
-        let balances =
-          Quickcheck.random_value
-            (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
-        in
-        let accounts = List.map2_exn keys balances ~f:Account.create in
-        match accounts with
-        | [a1; a2; a3] ->
-            let loc1 = parent_create_new_account_exn base a1 in
-            let loc2 = create_new_account_exn m1 a2 in
-            let loc3 = create_new_account_exn m2 a3 in
-            let locs = [(loc1, a1); (loc2, a2); (loc3, a3)] in
-            (* all accounts are here *)
-            List.iter locs ~f:(fun (loc, a) ->
-                [%test_result: Account.t option]
-                  ~message:"All accounts are accessible from m2"
-                  ~expect:(Some a) (Mask.Attached.get m2 loc) ) ;
-            [%test_result: Account.t option] ~message:"a1 is in base"
-              ~expect:(Some a1) (Test.Base.get base loc1) ;
-            Mask.Attached.commit m1 ;
-            [%test_result: Account.t option] ~message:"a2 is in base"
-              ~expect:(Some a2) (Test.Base.get base loc2) ;
-            Maskable.remove_and_reparent_exn mask_as_base m1 ~children:[m2] ;
-            [%test_result: Account.t option] ~message:"a1 is in base"
-              ~expect:(Some a1) (Test.Base.get base loc1) ;
-            [%test_result: Account.t option] ~message:"a2 is in base"
-              ~expect:(Some a2) (Test.Base.get base loc2) ;
-            (* all accounts are still here *)
-            List.iter locs ~f:(fun (loc, a) ->
-                [%test_result: Account.t option]
-                  ~message:"All accounts are accessible from m2"
-                  ~expect:(Some a) (Mask.Attached.get m2 loc) )
-        | _ -> failwith "unexpected" )
 
   let%test_unit "Mask reparenting works" =
     Test.with_chain (fun base ~mask:m1 ~mask_as_base ~mask2:m2 ->

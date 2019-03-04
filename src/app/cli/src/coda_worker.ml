@@ -9,20 +9,6 @@ open Coda_main
 open Signature_lib
 open Pipe_lib
 
-[%%if
-tracing]
-
-let start_tracing () =
-  Writer.open_file
-    (sprintf "/tmp/coda-profile-%d" (Unix.getpid () |> Pid.to_int))
-  >>| O1trace.start_tracing
-
-[%%else]
-
-let start_tracing () = Deferred.unit
-
-[%%endif]
-
 module Snark_worker_config = struct
   type t = {port: int; public_key: Public_key.Compressed.t} [@@deriving bin_io]
 end
@@ -31,13 +17,14 @@ module Input = struct
   type t =
     { host: string
     ; env: (string * string) list
-    ; should_propose: bool
+    ; proposer: int option
     ; snark_worker_config: Snark_worker_config.t option
     ; work_selection: Protocols.Coda_pow.Work_selection.t
     ; conf_dir: string
     ; program_dir: string
     ; external_port: int
     ; discovery_port: int
+    ; acceptable_delay: Time.Span.t
     ; peers: Host_and_port.t list }
   [@@deriving bin_io]
 end
@@ -175,7 +162,7 @@ module T = struct
 
     let init_worker_state
         { host
-        ; should_propose
+        ; proposer
         ; snark_worker_config
         ; work_selection
         ; conf_dir
@@ -196,9 +183,9 @@ module T = struct
         let lbc_tree_max_depth = `Finite 50
 
         let propose_keypair =
-          if should_propose then
-            Some (Genesis_ledger.largest_account_keypair_exn ())
-          else None
+          Option.map proposer ~f:(fun i ->
+              List.nth_exn Genesis_ledger.accounts i
+              |> Genesis_ledger.keypair_of_account_record_exn )
 
         let genesis_proof = Precomputed_values.base_proof
 
@@ -210,7 +197,9 @@ module T = struct
 
         let work_selection = work_selection
       end in
-      let%bind (module Init) = make_init ~should_propose (module Config) in
+      let%bind (module Init) =
+        make_init ~should_propose:(Option.is_some proposer) (module Config)
+      in
       let module Main = Coda_main.Make_coda (Init) in
       let module Run = Run (Config) (Main) in
       let banlist_dir_name = conf_dir ^/ "banlist" in
@@ -219,6 +208,7 @@ module T = struct
         Unix.mkdtemp (banlist_dir_name ^/ "suspicious")
       in
       let%bind punished_dir = Unix.mkdtemp (banlist_dir_name ^/ "banned") in
+      let%bind trust_dir = Unix.mkdtemp (banlist_dir_name ^/ "trust") in
       let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
       let%bind () = File_system.create_dir receipt_chain_dir_name in
       let receipt_chain_database =
@@ -226,6 +216,7 @@ module T = struct
           ~directory:receipt_chain_dir_name
       in
       let banlist = Coda_base.Banlist.create ~suspicious_dir ~punished_dir in
+      let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
       let time_controller = Main.Inputs.Time.Controller.create () in
       let net_config =
         { Main.Inputs.Net.Config.parent_log= log
@@ -240,9 +231,8 @@ module T = struct
                   (Unix.Inet_addr.of_string host)
                   ~discovery_port ~communication_port:external_port
             ; parent_log= log
-            ; banlist } }
+            ; trust_system } }
       in
-      let%bind () = start_tracing () in
       let%bind coda =
         Main.create
           (Main.Config.make ~log ~net_config

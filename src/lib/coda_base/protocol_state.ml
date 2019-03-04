@@ -10,6 +10,8 @@ open Coda_numbers
 module type Consensus_state_intf = sig
   type value [@@deriving hash, compare, bin_io, sexp]
 
+  type display [@@deriving yojson]
+
   include Snarkable.S with type value := value
 
   val equal_value : value -> value -> bool
@@ -27,9 +29,12 @@ module type Consensus_state_intf = sig
   val length : value -> Length.t
   (** For status *)
 
+  val time_hum : value -> string
+  (** For status *)
+
   val to_lite : (value -> Lite_base.Consensus_state.t) option
 
-  val to_string_record : value -> string
+  val display : value -> display
 end
 
 module type S = sig
@@ -89,8 +94,6 @@ module type S = sig
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
   val hash : value -> State_hash.Stable.V1.t
-
-  val to_string_record : value -> string
 end
 
 module T = struct
@@ -247,9 +250,4 @@ module Make
     ; body=
         { Body.blockchain_state= Blockchain_state.genesis
         ; consensus_state= Consensus_state.genesis } }
-
-  let to_string_record (t : value) =
-    Printf.sprintf "{blockchain|%s}|{consensus|%s}"
-      (Blockchain_state.to_string_record t.body.blockchain_state)
-      (Consensus_state.to_string_record t.body.consensus_state)
 end

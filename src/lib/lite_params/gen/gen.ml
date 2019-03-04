@@ -7,7 +7,7 @@ open Parsetree
 open Core
 
 [%%if
-with_snark]
+proof_level = "full"]
 
 let key_generation = true
 
@@ -47,7 +47,6 @@ let wrap_vk ~loc =
   let open Async in
   let%bind keys = Snark_keys.blockchain_verification () in
   let vk = keys.wrap in
-  let module V = Snark_params.Tick.Verifier_gadget in
   let vk = Lite_compat.verification_key vk in
   let vk_base64 =
     B64.encode

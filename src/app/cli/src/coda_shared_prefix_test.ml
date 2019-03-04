@@ -9,10 +9,10 @@ let main who_proposes () =
   let log = Logger.create () in
   let log = Logger.child log name in
   let n = 2 in
-  let should_propose i = i = who_proposes in
+  let proposers i = if i = who_proposes then Some i else None in
   let snark_work_public_keys i = None in
   let%bind testnet =
-    Coda_worker_testnet.test log n should_propose snark_work_public_keys
+    Coda_worker_testnet.test log n proposers snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
   in
   after (Time.Span.of_sec 30.)

@@ -10,6 +10,8 @@ module type Inputs_intf = sig
   module Sync_handler :
     Sync_handler_intf
     with type ledger_hash := Ledger_hash.t
+     and type state_hash := State_hash.t
+     and type external_transition := External_transition.t
      and type transition_frontier := Transition_frontier.t
      and type syncable_ledger_query := Sync_ledger.query
      and type syncable_ledger_answer := Sync_ledger.answer
@@ -40,6 +42,8 @@ module type Inputs_intf = sig
     Catchup_intf
     with type external_transition_verified := External_transition.Verified.t
      and type state_hash := State_hash.t
+     and type unprocessed_transition_cache :=
+                Transition_handler.Unprocessed_transition_cache.t
      and type transition_frontier := Transition_frontier.t
      and type transition_frontier_breadcrumb :=
                 Transition_frontier.Breadcrumb.t
@@ -87,20 +91,30 @@ module Make (Inputs : Inputs_intf) :
     let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
       Strict_pipe.create Synchronous
     in
-    Transition_handler.Validator.run ~frontier
+    let unprocessed_transition_cache =
+      Transition_handler.Unprocessed_transition_cache.create ~logger
+    in
+    Transition_handler.Validator.run ~logger ~frontier
       ~transition_reader:network_transition_reader ~valid_transition_writer
-      ~logger ;
-    List.iter collected_transitions
-      ~f:(Strict_pipe.Writer.write primary_transition_writer) ;
+      ~unprocessed_transition_cache ;
+    List.iter collected_transitions ~f:(fun t ->
+        (* since the cache was just built, it's safe to assume
+         * registering these will not fail, so long as there
+         * are no duplicates in the list *)
+        Transition_handler.Unprocessed_transition_cache.register
+          unprocessed_transition_cache t
+        |> Or_error.ok_exn
+        |> Strict_pipe.Writer.write primary_transition_writer ) ;
     Strict_pipe.Reader.iter_without_pushback valid_transition_reader
       ~f:(Strict_pipe.Writer.write primary_transition_writer)
     |> don't_wait_for ;
     Transition_handler.Processor.run ~logger ~time_controller ~frontier
       ~primary_transition_reader ~proposer_transition_reader
       ~catchup_job_writer ~catchup_breadcrumbs_reader
-      ~catchup_breadcrumbs_writer ~processed_transition_writer ;
+      ~catchup_breadcrumbs_writer ~processed_transition_writer
+      ~unprocessed_transition_cache ;
     Catchup.run ~logger ~network ~frontier ~catchup_job_reader
-      ~catchup_breadcrumbs_writer ;
+      ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ;
     Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
         kill valid_transition_reader valid_transition_writer ;
         kill primary_transition_reader primary_transition_writer ;

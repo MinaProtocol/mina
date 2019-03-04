@@ -12,11 +12,13 @@ open O1trace
 module Fee = Protocols.Coda_pow.Fee
 
 [%%if
-with_snark]
+proof_level = "full"]
 
 module Ledger_proof = Ledger_proof.Prod
 
 [%%else]
+
+(* TODO #1698: proof_level=check *)
 
 module Ledger_proof = struct
   module Statement = Transaction_snark.Statement
@@ -26,13 +28,13 @@ end
 [%%endif]
 
 module Staged_ledger_aux_hash = struct
-  include Staged_ledger_hash.Aux_hash.Stable.V1
+  include Staged_ledger_hash.Aux_hash.Stable.Latest
 
   let of_bytes = Staged_ledger_hash.Aux_hash.of_bytes
 end
 
 module Staged_ledger_hash = struct
-  include Staged_ledger_hash.Stable.V1
+  include Staged_ledger_hash.Stable.Latest
 
   let ledger_hash = Staged_ledger_hash.ledger_hash
 
@@ -42,7 +44,7 @@ module Staged_ledger_hash = struct
 end
 
 module Ledger_hash = struct
-  include Ledger_hash.Stable.V1
+  include Ledger_hash.Stable.Latest
 
   let of_digest = Ledger_hash.of_digest
 
@@ -56,7 +58,7 @@ module Ledger_hash = struct
 end
 
 module Frozen_ledger_hash = struct
-  include Frozen_ledger_hash.Stable.V1
+  include Frozen_ledger_hash.Stable.Latest
 
   let to_bytes = Frozen_ledger_hash.to_bytes
 
@@ -296,6 +298,8 @@ module type Main_intf = sig
        and type staged_ledger_diff := Staged_ledger_diff.t
        and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
        and type consensus_local_state := Consensus.Local_state.t
+       and type user_command := User_command.t
+       and type Extensions.Work.t = Transaction_snark_work.Statement.t
   end
 
   module Config : sig
@@ -335,6 +339,8 @@ module type Main_intf = sig
   val best_tip :
     t -> Inputs.Transition_frontier.Breadcrumb.t Participating_state.t
 
+  val visualize_frontier : filename:string -> t -> unit Participating_state.t
+
   val peers : t -> Network_peer.Peer.t list
 
   val strongest_ledgers :
@@ -368,7 +374,7 @@ module User_command = struct
 
   let seed = Secure_random.string ()
 
-  let compare t1 t2 = User_command.Stable.V1.compare ~seed t1 t2
+  let compare t1 t2 = User_command.Stable.Latest.compare ~seed t1 t2
 
   module With_valid_signature = struct
     module T = struct
@@ -432,7 +438,7 @@ struct
   open Protocols.Coda_pow
   open Init
   module Protocol_state = Consensus.Protocol_state
-  module Protocol_state_hash = State_hash.Stable.V1
+  module Protocol_state_hash = State_hash.Stable.Latest
 
   module Time : Time_intf with type t = Block_time.t = Block_time
 
@@ -453,8 +459,8 @@ struct
       include Currency.Amount.Signed
 
       include (
-        Currency.Amount.Signed.Stable.V1 :
-          module type of Currency.Amount.Signed.Stable.V1
+        Currency.Amount.Signed.Stable.Latest :
+          module type of Currency.Amount.Signed.Stable.Latest
           with type t := t
            and type ('a, 'b) t_ := ('a, 'b) t_ )
     end
@@ -601,14 +607,15 @@ struct
   end)
 
   module Transaction_pool = struct
-    module Pool = Transaction_pool.Make (User_command)
-    include Network_pool.Make (Pool) (Pool.Diff)
+    module Pool = Transaction_pool.Make (User_command) (Transition_frontier)
+    include Network_pool.Make (Transition_frontier) (Pool) (Pool.Diff)
 
     type pool_diff = Pool.Diff.t [@@deriving bin_io]
 
     (* TODO *)
-    let load ~parent_log ~disk_location:_ ~incoming_diffs =
-      return (create ~parent_log ~incoming_diffs)
+    let load ~parent_log ~disk_location:_ ~incoming_diffs
+        ~frontier_broadcast_pipe =
+      return (create ~parent_log ~incoming_diffs ~frontier_broadcast_pipe)
 
     let transactions t = Pool.transactions (pool t)
 
@@ -707,12 +714,15 @@ struct
             {fee; prover} )
     end
 
-    module Pool = Snark_pool.Make (Proof) (Fee) (Work)
-    module Diff = Network_pool.Snark_pool_diff.Make (Proof) (Fee) (Work) (Pool)
+    module Pool = Snark_pool.Make (Proof) (Fee) (Work) (Transition_frontier)
+    module Diff =
+      Network_pool.Snark_pool_diff.Make (Proof) (Fee) (Work)
+        (Transition_frontier)
+        (Pool)
 
     type pool_diff = Diff.t
 
-    include Network_pool.Make (Pool) (Diff)
+    include Network_pool.Make (Transition_frontier) (Pool) (Diff)
 
     let get_completed_work t statement =
       Option.map
@@ -721,10 +731,16 @@ struct
           Transaction_snark_work.Checked.create_unsafe
             {Transaction_snark_work.fee; proofs= proof; prover} )
 
-    let load ~parent_log ~disk_location ~incoming_diffs =
+    let load ~parent_log ~disk_location ~incoming_diffs
+        ~frontier_broadcast_pipe =
       match%map Reader.load_bin_prot disk_location Pool.bin_reader_t with
-      | Ok pool -> of_pool_and_diffs pool ~parent_log ~incoming_diffs
-      | Error _e -> create ~parent_log ~incoming_diffs
+      | Ok pool ->
+          let network_pool =
+            of_pool_and_diffs pool ~parent_log ~incoming_diffs
+          in
+          Pool.listen_to_frontier_broadcast_pipe frontier_broadcast_pipe pool ;
+          network_pool
+      | Error _e -> create ~parent_log ~incoming_diffs ~frontier_broadcast_pipe
 
     open Snark_work_lib.Work
     open Network_pool.Snark_pool_diff
@@ -752,7 +768,7 @@ struct
      and type merkle_path := Ledger.path
      and type query := Sync_ledger.query
      and type answer := Sync_ledger.answer =
-    Syncable_ledger.Make (Ledger.Location.Addr) (Account)
+    Syncable_ledger.Make (Ledger.Location.Addr) (Account.Stable.V1)
       (struct
         include Ledger_hash
 
@@ -819,6 +835,8 @@ struct
     module Staged_ledger_diff = Staged_ledger_diff
     module Transaction_snark_work = Transaction_snark_work
     module Transition_handler_validator = Transition_handler.Validator
+    module Unprocessed_transition_cache =
+      Transition_handler.Unprocessed_transition_cache
     module Ledger_proof_statement = Ledger_proof_statement
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Protocol_state_validator = Protocol_state_validator
@@ -966,7 +984,7 @@ struct
 end
 
 [%%if
-with_snark]
+proof_level = "full"]
 
 module Make_coda (Init : Init_intf) = struct
   module Ledger_proof_verifier = struct
@@ -1008,6 +1026,7 @@ end
 
 [%%else]
 
+(* TODO #1698: proof_level=check ledger proofs *)
 module Make_coda (Init : Init_intf) = struct
   module Ledger_proof_verifier = struct
     let verify _ _ ~message:_ = return true
@@ -1118,7 +1137,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       (User_command)
       (Receipt.Chain_hash)
 
-  let verify_payment t log (addr : Public_key.Compressed.Stable.V1.t)
+  let verify_payment t log (addr : Public_key.Compressed.Stable.Latest.t)
       (verifying_txn : User_command.t) proof =
     let open Participating_state.Let_syntax in
     let%map account = get_account t addr in
@@ -1211,10 +1230,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       Consensus.Protocol_state.hash state
       |> [%sexp_of: State_hash.t] |> Sexp.to_string
     in
-    let block_count =
-      state |> Consensus.Protocol_state.consensus_state
-      |> Consensus.Consensus_state.length
-    in
+    let consensus_state = state |> Consensus.Protocol_state.consensus_state in
+    let block_count = Consensus.Consensus_state.length consensus_state in
     let uptime_secs =
       Time_ns.diff (Time_ns.now ()) start_time
       |> Time_ns.Span.to_sec |> Int.of_float
@@ -1258,6 +1275,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         staged_ledger |> Staged_ledger.hash |> Staged_ledger_hash.sexp_of_t
         |> Sexp.to_string
     ; state_hash
+    ; consensus_time_best_tip=
+        Consensus.Consensus_state.time_hum consensus_state
     ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
     ; peers=
@@ -1269,6 +1288,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; propose_pubkey=
         Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
     ; histograms
+    ; consensus_time_now= Consensus.time_hum (Core_kernel.Time.now ())
     ; consensus_mechanism= Consensus.name
     ; consensus_configuration= Consensus.Configuration.t }
 
@@ -1380,18 +1400,27 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             Deferred.unit )
       ; implement Daemon_rpcs.Snark_job_list.rpc (fun () () ->
             return (snark_job_list_json coda |> Participating_state.active_exn)
-        ) ]
+        )
+      ; implement Daemon_rpcs.Start_tracing.rpc (fun () () ->
+            Coda_tracing.start Config_in.conf_dir )
+      ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
+            Coda_tracing.stop () ; Deferred.unit )
+      ; implement Daemon_rpcs.Visualize_frontier.rpc (fun () filename ->
+            return
+              ( visualize_frontier ~filename coda
+              |> Participating_state.active_exn ) ) ]
     in
     let snark_worker_impls =
       [ implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
             let r = request_work coda in
             Option.iter r ~f:(fun r ->
-                Logger.info log !"Get_work: %{sexp:Snark_worker.Work.Spec.t}" r
-            ) ;
+                Logger.trace log
+                  !"Get_work: %{sexp:Snark_worker.Work.Spec.t}"
+                  r ) ;
             return r )
       ; implement Snark_worker.Rpcs.Submit_work.rpc
           (fun () (work : Snark_worker.Work.Result.t) ->
-            Logger.info log
+            Logger.trace log
               !"Submit_work: %{sexp:Snark_worker.Work.Spec.t}"
               work.spec ;
             List.iter work.metrics ~f:(fun (total, tag) ->
@@ -1474,14 +1503,14 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
                ~shutdown_on_disconnect )
     in
-    let log = Logger.child log "snark_worker" in
+    (* We want these to be printfs so we don't double encode our logs here *)
     Pipe.iter_without_pushback
       (Reader.pipe (Process.stdout p))
-      ~f:(fun s -> Logger.info log "%s" s)
+      ~f:(fun s -> printf "%s" s)
     |> don't_wait_for ;
     Pipe.iter_without_pushback
       (Reader.pipe (Process.stderr p))
-      ~f:(fun s -> Logger.error log "%s" s)
+      ~f:(fun s -> printf "%s" s)
     |> don't_wait_for ;
     Deferred.unit
 

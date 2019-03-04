@@ -1,7 +1,5 @@
 open Core
-open Async
 open Banlist_lib.Banlist
-open Unsigned
 
 module Punishment_record = struct
   type time = Time.t

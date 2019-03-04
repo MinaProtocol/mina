@@ -242,7 +242,7 @@ module Fee = struct
 
     include (
       Currency.Fee.Stable.V1 :
-        module type of Currency.Fee.Stable.V1 with type t := t )
+        module type of Currency.Fee.Stable.Latest with type t := t )
   end
 
   module Signed = struct
@@ -250,7 +250,7 @@ module Fee = struct
 
     include (
       Currency.Fee.Signed.Stable.V1 :
-        module type of Currency.Fee.Signed.Stable.V1
+        module type of Currency.Fee.Signed.Stable.Latest
         with type t := t
          and type ('a, 'b) t_ := ('a, 'b) t_ )
   end
@@ -335,7 +335,7 @@ module type Coinbase_intf = sig
     { proposer: public_key
     ; amount: Currency.Amount.t
     ; fee_transfer: fee_transfer option }
-  [@@deriving sexp, bin_io, compare, eq]
+  [@@deriving sexp, compare, eq]
 
   val create :
        amount:Currency.Amount.t
@@ -1217,7 +1217,9 @@ module type Consensus_mechanism_intf = sig
     -> local_state:Local_state.t
     -> keypair:keypair
     -> logger:Logger.t
-    -> [`Check_again of Int64.t | `Propose of Int64.t * Proposal_data.t]
+    -> [ `Check_again of Int64.t
+       | `Propose_now of Proposal_data.t
+       | `Propose of Int64.t * Proposal_data.t ]
 
   val select :
        existing:Consensus_state.value

@@ -191,7 +191,6 @@ module Snarkable = struct
           init ~f:(fun i -> Bigint.test_bit n i)
         in
         let store t =
-          let open Store.Let_syntax in
           let rec go two_to_the_i i acc =
             if i = V.length then acc
             else

@@ -1,6 +1,5 @@
 open Core
 open Snark_params
-open Currency
 open Signature_lib
 open Merkle_ledger
 
@@ -14,19 +13,6 @@ module Ledger_inner = struct
 
   module Location_at_depth = Location0
 
-  (*
-module Key = struct
-  module T = struct
-    type t = Account.key [@@deriving sexp, bin_io, compare, hash, eq]
-  end
-
-  let empty = Account.empty.public_key
-
-  include T
-  include Hashable.Make_binable (T)
-end
-*)
-
   module Kvdb : Intf.Key_value_database = Rocksdb.Database
 
   module Storage_locations : Intf.Storage_locations = struct
@@ -36,13 +22,28 @@ end
   end
 
   module Hash = struct
-    type t = Ledger_hash.t [@@deriving bin_io, sexp, eq, compare]
+    module T = struct
+      type t = Ledger_hash.t [@@deriving bin_io, sexp, compare, hash, eq]
+    end
+
+    include T
+    include Hashable.Make_binable (T)
 
     let merge = Ledger_hash.merge
 
     let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
     let empty_account = hash_account Account.empty
+  end
+
+  module Account = struct
+    type t = Account.Stable.V1.t [@@deriving bin_io, eq, compare, sexp]
+
+    let empty = Account.empty
+
+    let public_key = Account.public_key
+
+    let initialize = Account.initialize
   end
 
   module Db :
@@ -112,15 +113,6 @@ end
 
   type maskable_ledger = t
 
-  (* Mask.Attached.create () fails, can't create an attached mask directly
-  shadow create in order to create an attached mask
-*)
-  let create ?directory_name () =
-    let maskable = Db.create ?directory_name () in
-    let casted = Any_ledger.cast (module Db) maskable in
-    let mask = Mask.create () in
-    Maskable.register_mask casted mask
-
   let of_database db =
     let casted = Any_ledger.cast (module Db) db in
     let mask = Mask.create () in
@@ -131,11 +123,15 @@ end
   *)
   let create ?directory_name () = of_database (Db.create ?directory_name ())
 
-  let create_ephemeral () =
+  let create_ephemeral_with_base () =
     let maskable = Null.create () in
     let casted = Any_ledger.cast (module Null) maskable in
     let mask = Mask.create () in
-    Maskable.register_mask casted mask
+    (casted, Maskable.register_mask casted mask)
+
+  let create_ephemeral () =
+    let _base, mask = create_ephemeral_with_base () in
+    mask
 
   let with_ledger ~f =
     let ledger = create () in
@@ -143,6 +139,20 @@ end
       let result = f ledger in
       close ledger ; result
     with exn -> close ledger ; raise exn
+
+  let with_ephemeral_ledger ~f =
+    let base_ledger, masked_ledger = create_ephemeral_with_base () in
+    try
+      let result = f masked_ledger in
+      let _ : Mask.t =
+        Maskable.unregister_mask_exn base_ledger masked_ledger
+      in
+      result
+    with exn ->
+      let _ : Mask.t =
+        Maskable.unregister_mask_exn base_ledger masked_ledger
+      in
+      raise exn
 
   let packed t = Any_ledger.cast (module Mask.Attached) t
 
