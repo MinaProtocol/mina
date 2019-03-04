@@ -492,7 +492,8 @@ module Vrf = struct
 
     let of_uint64_exn = Fn.compose of_int64_exn UInt64.to_int64
 
-    let c_int = 1
+    (* TEMPORARY HACK FOR TESTNETS: c should be 1 otherwise *)
+    let c_int = 2
 
     let c = of_int c_int
 
