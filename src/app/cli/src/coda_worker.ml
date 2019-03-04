@@ -235,7 +235,9 @@ module T = struct
       in
       let frontier_file = conf_dir ^/ "frontier.dot" in
       let monitor = Async.Monitor.create ~name:"coda" () in
-      let with_monitor f = Async.Scheduler.within' ~monitor (fun () -> f ()) in
+      let with_monitor f input =
+        Async.Scheduler.within' ~monitor (fun () -> f input)
+      in
       let%bind coda =
         Main.create
           (Main.Config.make ~log ~net_config
@@ -248,26 +250,24 @@ module T = struct
              ?propose_keypair:Config.propose_keypair () ~banlist ~monitor)
       in
       Run.handle_shutdown ~monitor ~frontier_file ~log coda ;
-      let%bind () =
+      let%map () =
         with_monitor
-        @@ fun () ->
-        return
-        @@ Option.iter snark_worker_config ~f:(fun config ->
-               let run_snark_worker = `With_public_key config.public_key in
-               Run.setup_local_server ~client_port:config.port ~coda ~log () ;
-               Run.run_snark_worker ~log ~client_port:config.port
-                 run_snark_worker )
+          (fun () ->
+            return
+            @@ Option.iter snark_worker_config ~f:(fun config ->
+                   let run_snark_worker = `With_public_key config.public_key in
+                   Run.setup_local_server ~client_port:config.port ~coda ~log
+                     () ;
+                   Run.run_snark_worker ~log ~client_port:config.port
+                     run_snark_worker ) )
+          ()
       in
-      let coda_peers () = with_monitor @@ fun () -> return (Main.peers coda) in
-      let coda_start () = with_monitor @@ fun () -> return (Main.start coda) in
+      let coda_peers () = return (Main.peers coda) in
+      let coda_start () = return (Main.start coda) in
       let coda_get_balance pk =
-        with_monitor
-        @@ fun () ->
         return (Run.get_balance coda pk |> Participating_state.active_exn)
       in
       let coda_send_payment (sk, pk, amount, fee, memo) =
-        with_monitor
-        @@ fun () ->
         let pk_of_sk sk =
           Public_key.of_private_key_exn sk |> Public_key.compress
         in
@@ -289,8 +289,6 @@ module T = struct
         receipt |> Participating_state.active_exn
       in
       let coda_prove_receipt (proving_receipt, resulting_receipt) =
-        with_monitor
-        @@ fun () ->
         match%map
           Run.prove_receipt coda ~proving_receipt ~resulting_receipt
         with
@@ -305,8 +303,6 @@ module T = struct
               e ()
       in
       let coda_strongest_ledgers () =
-        with_monitor
-        @@ fun () ->
         let r, w = Linear_pipe.create () in
         don't_wait_for
           (Strict_pipe.Reader.iter (Main.strongest_ledgers coda) ~f:(fun t ->
@@ -324,13 +320,12 @@ module T = struct
                Linear_pipe.write w (prev_state_hash, state_hash) )) ;
         return r.pipe
       in
-      return
-        { coda_peers
-        ; coda_strongest_ledgers
-        ; coda_get_balance
-        ; coda_send_payment
-        ; coda_prove_receipt
-        ; coda_start }
+      { coda_peers= with_monitor coda_peers
+      ; coda_strongest_ledgers= with_monitor coda_strongest_ledgers
+      ; coda_get_balance= with_monitor coda_get_balance
+      ; coda_send_payment= with_monitor coda_send_payment
+      ; coda_prove_receipt= with_monitor coda_prove_receipt
+      ; coda_start= with_monitor coda_start }
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end
