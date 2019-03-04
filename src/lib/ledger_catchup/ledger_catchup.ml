@@ -5,6 +5,31 @@ open Cache_lib
 open Pipe_lib
 open Coda_base
 
+(** [Ledger_catchup] is a procedure that connects a foreign external transition
+    into a transition frontier by requesting a path of external_transitions
+    from its peer. It receives the external_transition to catchup from
+    [Catchup_monitor]. With that external_transition, it will ask its peers for
+    a path of external_transitions from their root to the transition it is
+    asking for. It will then perform the following validations on each
+    external_transition:
+
+    1. The root should exist in the frontier. The frontier should not be
+    missing too many external_transitions, so the querying node should have the
+    root in its transition_frontier.
+
+    2. Each transition is checked through [Transition_processor.Validator] and
+    [Protocol_state_validator]
+
+    If any of the external_transitions is invalid, the sender is punished.
+    Otherwise, [Ledger_catchup] will build a corresponding breadcrumb path from
+    the path of external_transitions. A breadcrumb from the path is built using
+    its corresponding external_transition staged_ledger_diff and applying it to
+    its preceding breadcrumb staged_ledger to obtain its corresponding
+    staged_ledger. If there was an error in building the breadcrumbs, then
+    catchup will punish the sender for sending a faulty staged_ledger_diff.
+    After building the breadcrumb path, [Ledger_catchup] will then send it to
+    the [Processor] via writing them to catchup_breadcrumbs_writer. *)
+
 module Make (Inputs : Inputs.S) :
   Catchup_intf
   with type external_transition_verified :=
@@ -23,8 +48,8 @@ module Make (Inputs : Inputs.S) :
     |> External_transition.Protocol_state.previous_state_hash
 
   (* We would like the async scheduler to context switch between each iteration
-     of external transitions when trying to build breadcrumb_path. Therefore, this 
-     function needs to return a Deferred *)
+     of external transitions when trying to build breadcrumb_path. Therefore,
+     this function needs to return a Deferred *)
   let construct_breadcrumb_path ~logger frontier initial_state_hash tree =
     (* If the breadcrumb we are targetting is removed from the transition
      * frontier while we're catching up, it means this path is not on the
