@@ -1443,6 +1443,18 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
         trace_task "REST server" (fun () ->
+            let graphql_schema =
+              Graphql_async.Schema.(
+                schema
+                  [ field "greeting" ~typ:(non_null string)
+                      ~args:Arg.[]
+                      ~resolve:(fun _ () -> "hello coda") ])
+            in
+            let graphql_callback =
+              Graphql_cohttp_async.make_callback
+                (fun _req -> ())
+                graphql_schema
+            in
             Cohttp_async.(
               Server.create
                 ~on_handler_error:
@@ -1453,9 +1465,6 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                    (On_port rest_server_port))
                 (fun ~body _sock req ->
                   let uri = Cohttp.Request.uri req in
-                  let route_not_found () =
-                    Server.respond_string ~status:`Not_found "Route not found"
-                  in
                   let status flag =
                     Server.respond_string
                       ( get_status ~flag coda |> Participating_state.active_exn
@@ -1463,30 +1472,13 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                       |> Yojson.Safe.pretty_to_string )
                   in
                   match Uri.path uri with
+                  | "/graphql" -> graphql_callback () req body
                   | "/status" -> status `None
                   | "/status/performance" -> status `Performance
-                  | _ -> route_not_found () )) )
+                  | _ ->
+                      Server.respond_string ~status:`Not_found
+                        "Route not found" )) )
         |> ignore ) ;
-    ignore
-    @@ trace_task "GraphQL server" (fun () ->
-           let schema =
-             Graphql_async.Schema.(
-               schema
-                 [ field "greeting" ~typ:(non_null string)
-                     ~args:Arg.[]
-                     ~resolve:(fun _ () -> "hello coda") ])
-           in
-           let callback =
-             Graphql_cohttp_async.make_callback (fun _req -> ()) schema
-           in
-           Cohttp_async.(
-             Server.create
-               ~on_handler_error:
-                 (`Call
-                   (fun net exn ->
-                     Logger.error log "%s" (Exn.to_string_mach exn) ))
-               (Tcp.Where_to_listen.bind_to Localhost (On_port 8080))
-               (fun ~body sock req -> callback () req body)) ) ;
     let where_to_listen =
       Tcp.Where_to_listen.bind_to All_addresses (On_port client_port)
     in
