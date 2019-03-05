@@ -586,26 +586,34 @@ module Vrf = struct
         Coda_base.Sparse_ledger.of_ledger_subset_exn Genesis_ledger.t [pk]
       in
       let empty_pending_coinbase = Coda_base.Pending_coinbase.create_exn () in
-      (*let ledger_handler =
+      let ledger_handler =
         unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger)
       in
       let pending_coinbase_handler =
-        unstage (Coda_base.Pending_coinbase.handler (empty_pending_coinbase))
-      in*)
-      let ledger_coinbase_handler =
+        unstage (Coda_base.Pending_coinbase.handler empty_pending_coinbase)
+      in
+      (*let ledger_coinbase_handler =
         Coda_base.Snark_request_handler.handler
           { Coda_base.Snark_request_handler.ledger= dummy_sparse_ledger
           ; pending_coinbase= empty_pending_coinbase }
-      in
-      (*let handlers = Snarky.Request.Handler.(push (push fail (create_single pending_coinbase_handler)) (create_single ledger_handler))
       in*)
+      let handlers =
+        Snarky.Request.Handler.(
+          push
+            (push fail (create_single pending_coinbase_handler))
+            (create_single ledger_handler))
+      in
       fun (With {request; respond} as t) ->
         match request with
         | Winner_address -> respond (Provide 0)
         | Private_key -> respond (Provide sk)
-        | _ -> ledger_coinbase_handler t
-
-    (*Snarky.Request.Handler.run handlers ["ledger handler"; "pending coinbase handler"] t*)
+        | _ ->
+            (*ledger_coinbase_handler t*)
+            respond
+              (Provide
+                 (Snarky.Request.Handler.run handlers
+                    ["Ledger Handler"; "Pending Coinbase Handler"]
+                    request))
 
     let vrf_output =
       let _, sk = Coda_base.Sample_keypairs.keypairs.(0) in

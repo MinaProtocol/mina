@@ -232,7 +232,7 @@ end) : S = struct
     ; snarked_ledger_hash=
         Frozen_ledger_hash.of_ledger_hash
         @@ Ledger.merkle_root Genesis_ledger.t
-    ; pending_coinbase_hash= Pending_coinbase.empty_hash
+    ; pending_coinbase_hash= Pending_coinbase.empty_merkle_root
     ; timestamp= Genesis_state_timestamp.value |> Block_time.of_time }
 
   type display = (string, string, string, string) t_ [@@deriving yojson]

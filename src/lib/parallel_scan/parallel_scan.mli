@@ -203,3 +203,5 @@ val view_jobs_with_position :
   ('a, 'd) State.t -> ('a -> 'c) -> ('d -> 'c) -> 'c Job_view.t list
 
 val base_jobs_on_latest_tree : ('a, 'd) State.t -> 'd list
+
+val on_new_tree : ('a, 'd) State.t -> bool

@@ -120,19 +120,21 @@ module type Pending_coinbase_intf = sig
     val empty : t
   end
 
-  val empty_hash : pending_coinbase_hash
+  val empty_merkle_root : pending_coinbase_hash
 
   val merkle_root : t -> pending_coinbase_hash
 
-  val add_coinbase_exn : t -> coinbase:coinbase -> on_new_tree:bool -> t
+  val add_coinbase_exn : t -> coinbase:coinbase -> is_new_stack:bool -> t
 
-  val update_coinbase_stack_exn : t -> Stack.t -> new_stack:bool -> t
+  val update_coinbase_stack_exn : t -> Stack.t -> is_new_stack:bool -> t
 
   val remove_coinbase_stack_exn : t -> t
 
   val create_exn : unit -> t
 
   val latest_stack : t -> Stack.t option
+
+  val hash : t -> string
 end
 
 module type Frozen_ledger_hash_intf = sig
@@ -710,6 +712,8 @@ module type Transaction_snark_scan_state_intf = sig
   val next_jobs_sequence : t -> Available_job.t Sequence.t Or_error.t
 
   val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
+
+  val on_new_tree : t -> bool
 
   val is_valid : t -> bool
 

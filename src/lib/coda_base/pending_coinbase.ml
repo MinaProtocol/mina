@@ -8,6 +8,13 @@ open Currency
 open Fold_lib
 open Snark_bits
 
+let coinbase_tree_depth =
+  Coda_compile_config.scan_state_transaction_capacity_log_2
+  + Coda_compile_config.scan_state_work_delay_factor
+
+(*Total number of stacks*)
+let coinbase_stacks = Int.pow 2 coinbase_tree_depth
+
 module Coinbase_data = struct
   type t = Public_key.Compressed.t * Amount.Signed.t [@@deriving sexp]
 
@@ -79,10 +86,6 @@ module Coinbase_data = struct
       >>= Pedersen.Checked.digest_triples ~init:crypto_hash_prefix
   end
 end
-
-let coinbase_stacks = 9
-
-let coinbase_tree_depth = Int.ceil_log2 coinbase_stacks
 
 module Stack_pos = struct
   include Int
@@ -277,7 +280,7 @@ module Hash = struct
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the stack [f stack] at path [addr].
 *)
-  let%snarkydef update_stack' t ~is_new_stack
+  (* let%snarkydef update_stack' t ~is_new_stack
       ~(filter : Stack.var -> ('a, _) Checked.t) ~f =
     let%bind addr =
       request_witness Stack_pos.Unpacked.typ
@@ -295,17 +298,35 @@ module Hash = struct
       >>| var_of_hash_packed
     in
     let%map () = reset () in
+    updated_tree_hash*)
+  
+  (*
+   [update_stack t ~is_new_stack updtaed_stack] implements the following spec:
+   - gets the address[addr] of the latest stack or a new stack if [is_new_stack] is true
+   - finds a coinbase stack in [t] at path [addr] and replaces it with [updated_stack]
+   - returns a root [t'] of a tree of depth [depth]
+   - resets any mutation to the store
+   which is [t].
+*)
+  let update_stack' t ~is_new_stack stack =
+    let%bind addr =
+      request_witness Stack_pos.Unpacked.typ
+        As_prover.(
+          map (read Boolean.typ is_new_stack) ~f:(fun s ->
+              Find_index_of_newest_stack s ))
+    in
+    handle
+      (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr ~f:(fun _s ->
+           return stack ))
+      reraise_merkle_requests
+    >>| var_of_hash_packed
+
+  let update_stack t ~is_new_stack stack =
+    let%bind updated_tree_hash = update_stack' t ~is_new_stack stack in
+    let%map () = reset () in
     updated_tree_hash
 
-  (*
-   [edit_stack t pk ~f] implements the following spec:
-
-   - finds a coinbase stack [stack] in [t] at path [addr] OR it doesn't and is a stack with one coinbase
-   - returns a root [t'] of a tree of depth [depth]
-   which is [t] but with the stack [f stack] at path [addr].
-*)
-  let update_stack t ~update ~is_new_stack ~f =
-    update_stack' t ~is_new_stack
+  (*update_stack' t ~is_new_stack
       ~filter:(fun _stack ->
         (*let%bind empty_stack =
           Stack.Checked.equal stack Stack.(var_of_t empty)
@@ -313,35 +334,46 @@ module Hash = struct
         let%bind yes = Boolean.((is_new_stack || not empty_stack)) in*)
         (*Boolean.(Assert.is_true update) )*)
         return () )
-      ~f:(fun x -> f x)
+      ~f:(fun x -> f x)*)
+  
+  (*
+   [delete_stack t pk updtaed_stack] implements the following spec:
 
-  let%snarkydef delete_stack t ~delete =
-    let filter stack =
-      return ()
-      (*let%bind empty_stack =
-        Stack.Checked.equal stack Stack.(var_of_t empty)
-      in
-      let%bind delete = Boolean.(delete || not empty_stack) in
-      Boolean.(Assert.is_true (delete))*)
-    in
+   - gets the address[addr] of the oldest stack.
+   - finds a coinbase stack in [t] at path [addr] and replaces it with empty stack
+   - returns a root [t'] of a tree of depth [depth]
+   which is [t].
+   - resets any mutation to the store
+*)
+  let delete_stack' t =
     let%bind addr =
       request_witness Stack_pos.Unpacked.typ
         As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_oldest_stack))
     in
-    let%bind updated_tree_hash =
-      handle
-        (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
-           ~f:(fun stack ->
-             let%map () = filter stack in
-             Stack.Checked.empty ))
-        reraise_merkle_requests
-      >>| var_of_hash_packed
-    in
+    handle
+      (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
+         ~f:(fun _stack -> return Stack.Checked.empty ))
+      reraise_merkle_requests
+    >>| var_of_hash_packed
+
+  let%snarkydef delete_stack t =
+    (*let filter stack =
+      return ()
+      let%bind empty_stack =
+        Stack.Checked.equal stack Stack.(var_of_t empty)
+      in
+      let%bind delete = Boolean.(delete || not empty_stack) in
+      Boolean.(Assert.is_true (delete))
+    in*)
+    let%bind updated_tree_hash = delete_stack' t in
     let%map () = reset () in
     updated_tree_hash
 
+  (*
+   update_stack >>= delete_stack >>= reset
+*)
   let%snarkydef update_delete_stack t ~is_new_stack ~stack =
-    let%bind addr =
+    (*let%bind addr =
       request_witness Stack_pos.Unpacked.typ
         As_prover.(
           map (read Boolean.typ is_new_stack) ~f:(fun s ->
@@ -364,7 +396,9 @@ module Hash = struct
            addr ~f:(fun _stack -> return Stack.Checked.empty ))
         reraise_merkle_requests
       >>| var_of_hash_packed
-    in
+    in*)
+    let%bind updated_tree_hash = update_stack' t ~is_new_stack stack in
+    let%bind updated_tree_hash2 = delete_stack' updated_tree_hash in
     let%map () = reset () in
     updated_tree_hash2
 end
@@ -416,53 +450,53 @@ module T = struct
     ; pos_list= []
     ; new_pos= 0 }
 
-  let empty_hash = Merkle_tree.merkle_root (create_exn ()).tree
+  let merkle_root t = Merkle_tree.merkle_root t.tree
 
-  (*{tree=Merkle_tree.of_hash ~depth:coinbase_tree_depth h; pos_list=[]; new_pos=0}*)
+  let empty_merkle_root = merkle_root (create_exn ())
 
-  let next_new_index t ~on_new_tree =
-    if on_new_tree then
+  let with_next_index t ~is_new_stack =
+    if is_new_stack then
       let new_pos = if t.new_pos = coinbase_stacks then 0 else t.new_pos + 1 in
       {t with pos_list= t.new_pos :: t.pos_list; new_pos}
     else t
 
-  let latest_stack_key t ~on_new_tree =
-    if on_new_tree then Some t.new_pos
+  let latest_stack_pos t ~is_new_stack =
+    if is_new_stack then Some t.new_pos
       (* IMPORTANT TODO: include hash of the path*)
     else match t.pos_list with [] -> None | x :: _ -> Some x
 
   let latest_stack t =
     let open Option.Let_syntax in
-    let%map key = latest_stack_key t ~on_new_tree:false in
+    let%map key = latest_stack_pos t ~is_new_stack:false in
     let index = Merkle_tree.find_index_exn t.tree key in
     Merkle_tree.get_exn t.tree index
 
-  let oldest_stack_key t = List.last t.pos_list
+  let oldest_stack_pos t = List.last t.pos_list
 
-  let replace_latest_stack t stack ~on_new_tree =
+  let replace_latest_stack t stack ~is_new_stack =
     match t.pos_list with
-    | [] -> if on_new_tree then Some [stack] else None
+    | [] -> if is_new_stack then Some [stack] else None
     | x :: xs ->
-        if on_new_tree then Some (stack :: x :: xs) else Some (stack :: xs)
+        if is_new_stack then Some (stack :: x :: xs) else Some (stack :: xs)
 
   let remove_oldest_stack_exn t =
     match List.rev t with
     | [] -> failwith "No stacks"
     | x :: xs -> (x, List.rev xs)
 
-  let add_coinbase_exn t ~coinbase ~on_new_tree =
-    let key = Option.value_exn (latest_stack_key t ~on_new_tree) in
+  let add_coinbase_exn t ~coinbase ~is_new_stack =
+    let key = Option.value_exn (latest_stack_pos t ~is_new_stack) in
     let stack_index = Merkle_tree.find_index_exn t.tree key in
     let stack_before = Merkle_tree.get_exn t.tree stack_index in
     let stack_after = Stack.push_exn stack_before coinbase in
-    let t' = next_new_index t ~on_new_tree in
+    let t' = with_next_index t ~is_new_stack in
     let tree' = Merkle_tree.set_exn t.tree stack_index stack_after in
     {t' with tree= tree'}
 
-  let update_coinbase_stack_exn t stack ~new_stack =
-    let key = Option.value_exn (latest_stack_key t ~on_new_tree:new_stack) in
+  let update_coinbase_stack_exn t stack ~is_new_stack =
+    let key = Option.value_exn (latest_stack_pos t ~is_new_stack) in
     let stack_index = Merkle_tree.find_index_exn t.tree key in
-    let t' = next_new_index t ~on_new_tree:new_stack in
+    let t' = with_next_index t ~is_new_stack in
     let tree' = Merkle_tree.set_exn t.tree stack_index stack in
     {t' with tree= tree'}
 
@@ -472,7 +506,15 @@ module T = struct
     let tree' = Merkle_tree.set_exn t.tree stack_index Stack.empty in
     {t with tree= tree'; pos_list= remaining}
 
-  let merkle_root t = Merkle_tree.merkle_root t.tree
+  let hash ({tree; pos_list; new_pos} as t) =
+    let h = Digestif.SHA256.init () in
+    let h = Digestif.SHA256.feed_string h (Hash.to_bytes (merkle_root t)) in
+    let h =
+      Digestif.SHA256.feed_string h
+        (List.fold pos_list ~init:"" ~f:(fun s a -> s ^ Int.to_string a))
+    in
+    let h = Digestif.SHA256.feed_string h (Int.to_string new_pos) in
+    (Digestif.SHA256.get h :> string)
 
   let get_exn t index = Merkle_tree.get_exn t.tree index
 
@@ -506,15 +548,14 @@ module T = struct
         | Hash.Find_index_of_oldest_stack ->
             let stack_pos =
               Option.value ~default:0
-                (oldest_stack_key pending_coinbase.in_use)
+                (oldest_stack_pos pending_coinbase.in_use)
             in
             let index = find_index_exn pending_coinbase.in_use stack_pos in
             respond (Provide index)
         | Hash.Find_index_of_newest_stack is_new_stack ->
             let stack_pos =
               Option.value ~default:0
-                (latest_stack_key pending_coinbase.in_use
-                   ~on_new_tree:is_new_stack)
+                (latest_stack_pos pending_coinbase.in_use ~is_new_stack)
             in
             let index = find_index_exn pending_coinbase.in_use stack_pos in
             Core.printf !"newest stack pos: %d index:%d\n %!" stack_pos index ;
@@ -566,7 +607,7 @@ let%test_unit "add stack + remove stack = initial tree " =
           let init = merkle_root !pending_coinbases in
           let after_adding =
             List.fold cbs ~init:!pending_coinbases ~f:(fun acc coinbase ->
-                let t = add_coinbase_exn acc ~coinbase ~on_new_tree:!is_new in
+                let t = add_coinbase_exn acc ~coinbase ~is_new_stack:!is_new in
                 is_new := false ;
                 t )
           in
@@ -602,7 +643,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
         !"PC merkle root trial: %{sexp: Hash.t} \n %!"
         (merkle_root pending_coinbases) ;
       let unchecked =
-        update_coinbase_stack_exn pending_coinbases stack ~new_stack:true
+        update_coinbase_stack_exn pending_coinbases stack ~is_new_stack:true
       in
       let checked =
         let comp =
@@ -612,8 +653,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
             handle
               (Hash.update_stack
                  (Hash.var_of_t (merkle_root pending_coinbases))
-                 ~update:Boolean.true_ ~is_new_stack:Boolean.true_
-                 ~f:(fun _ -> return stack_var))
+                 ~is_new_stack:Boolean.true_ stack_var)
               (unstage (handler pending_coinbases))
           in
           As_prover.read Hash.typ res

@@ -490,6 +490,11 @@ let next_jobs_sequence :
     state:('a, 'd) State.t -> ('a, 'd) Available_job.t Sequence.t Or_error.t =
  fun ~state -> State.jobs_ready_sequence state
 
+let on_new_tree state =
+  let leaves_start_at = State.parallelism state - 1 in
+  Option.value_map ~default:false (State.base_none_pos state) ~f:(fun pos ->
+      pos = leaves_start_at )
+
 let next_k_jobs :
     state:('a, 'd) State.t -> k:int -> ('a, 'd) Available_job.t list Or_error.t
     =

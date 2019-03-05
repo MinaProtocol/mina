@@ -48,7 +48,7 @@ module Prover_state = struct
 
   let precomputed_handler _ = Snarky.Request.unhandled
 
-  let handler _ _ = Snarky.Request.unhandled
+  let handler _ ~pending_coinbase:_ _ = Snark_params.Tick.unhandled
 end
 
 module Proposal_data = struct
@@ -56,8 +56,6 @@ module Proposal_data = struct
 
   let prover_state _ = ()
 end
-
-(*module Pending_coinbase_update = Coda_base.Pending_coinbase_update*)
 
 module Blockchain_state = Coda_base.Blockchain_state.Make (Genesis_ledger)
 module Lite_compat = Lite_compat.Make (Blockchain_state)

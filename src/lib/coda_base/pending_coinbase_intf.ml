@@ -93,7 +93,7 @@ module type S = sig
 
     val merge : height:int -> t -> t -> t
 
-    val empty_hash : t
+    val empty_merkle_root : t
 
     val of_digest : Pedersen.Digest.t -> t
 
@@ -110,7 +110,7 @@ module type S = sig
 
   val create : unit -> t
 
-  val add_coinbase_exn : t -> coinbase:Coinbase.t -> on_new_tree:bool -> t
+  val add_coinbase_exn : t -> coinbase:Coinbase.t -> is_new_stack:bool -> t
 
   val remove_coinbase_stack_exn : t -> t
 

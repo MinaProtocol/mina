@@ -61,18 +61,15 @@ module Make (Consensus_mechanism : Consensus.S) :
           ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]
           , _ )
           Tick.Checked.t =
-        (*TODO:Deeptthi: coinbase_update in transition is finally landing here. Make the Pending_coinbase delete and update requests here*)
         let supply_increase = Snark_transition.supply_increase transition in
         let%bind `Success updated_consensus_state, consensus_state =
           with_label __LOC__
             (Consensus_mechanism.next_state_checked ~prev_state:previous_state
                ~prev_state_hash:previous_state_hash transition supply_increase)
         in
-        (*Core.printf !"updated_consensus %{sexp:Boolean.var}\n%!" updated_consensus_state;*)
         let pending_coinbase_update =
           Snark_transition.pending_coinbase_state transition
         in
-        (*TODO: Deepthi: based on the type of update, perform requests accordingly here *)
         let%bind success =
           let%bind correct_transaction_snark =
             let%bind index =
@@ -167,9 +164,8 @@ module Make (Consensus_mechanism : Consensus.S) :
                               Core.printf !"added %{sexp:bool} \n %!" added ;
                               return ()))
                     in
-                    Pending_coinbase.Hash.update_stack prev_root ~update:added
-                      ~is_new_stack:Boolean.true_ ~f:(fun _ ->
-                        return updated_stack ))
+                    Pending_coinbase.Hash.update_stack prev_root
+                      ~is_new_stack:Boolean.true_ updated_stack)
                in
                let with_update updated =
                  with_label __LOC__
@@ -185,8 +181,7 @@ module Make (Consensus_mechanism : Consensus.S) :
                               return ()))
                     in
                     Pending_coinbase.Hash.update_stack prev_root
-                      ~update:updated ~is_new_stack:Boolean.false_ ~f:(fun _ ->
-                        return updated_stack ))
+                      ~is_new_stack:Boolean.false_ updated_stack)
                in
                let%bind added =
                  Pending_coinbase_update.Action.Checked.added action
