@@ -60,6 +60,7 @@ In the near term, we should complete both partial and full-offline snapshotting.
 For each component, we need to:
 
 a. Properly marshall/unmarshall each piece of data.
+
 b. Put the node into what is potentially a special state using the unmarshalled
 snapshot data instead of the normal happy path of the application.
 
@@ -124,11 +125,16 @@ mistake and may waste a good amount of time while debugging.
 
 For implementation we can do the following tasks:
 
-A. Root snarked ledger (database) marshall/unmarshell
+A. Root snarked ledger (database) marshall/unmarshall
+
 B. Partial snapshot record (binable)
+
 C. Resume from partial snapshot record
+
 D. Support time offsetting
+
 E. Save/parse config.mlh to ensure no snapshot runs on a different build profile
+
 F. Test to ensure one transition is proposed successfully
 
 Gantt-ish chart (showing parallelism of tasks with rough approximations
@@ -170,8 +176,11 @@ sent to this node (despite all network activity being disable).
 For implementation we can do the following tasks:
 
 A. All of partial snapshotting
+
 B. Transition frontier persistance
+
 C. Resuming from full-offline snapshot
+
 D. Test to ensure multiple transitions are proposed successfully with new txns
 and snark works/proofs
 
