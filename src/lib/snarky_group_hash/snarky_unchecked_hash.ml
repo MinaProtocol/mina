@@ -17,7 +17,6 @@ open Core
 module Make_snarky_unchecked_hash
     (F : Snarky.Field_intf.Extended) (Params : sig
         val a : F.t
-
         val b : F.t
     end) =
 struct
@@ -33,7 +32,15 @@ struct
     include Hashable.Make (T)
   end
 
-  let n1_tuples =
+  let field_of_string s =
+    let s' =
+      if s.[0] = '-' then String.sub s ~pos:1 ~len:(String.length s - 1) else s
+    in
+    Sexp.of_string_conv_exn s' F.t_of_sexp
+
+  let field_map = List.map ~f:(fun (a, b) -> (a, field_of_string b))
+
+  let n1tbl = Hashtbl.of_alist_exn (module Hash_key) (field_map
     [ ((0, 0), "212")
     ; ((0, 1), "-208")
     ; ((3, 0), "-161568")
@@ -42,9 +49,9 @@ struct
     ; ((0, 3), "304")
     ; ((6, 0), "-92765376")
     ; ((3, 2), "-127776")
-    ; ((0, 4), "-44") ]
+    ; ((0, 4), "-44") ])
 
-  let d1_tuples =
+  let d1tbl = Hashtbl.of_alist_exn (module Hash_key) (field_map
     [ ((0, 0), "-1")
     ; ((0, 1), "5")
     ; ((3, 0), "10536")
@@ -56,9 +63,9 @@ struct
     ; ((0, 4), "-5")
     ; ((6, 1), "2108304")
     ; ((3, 3), "2904")
-    ; ((0, 5), "1") ]
+    ; ((0, 5), "1") ])
 
-  let n2_tuples =
+  let n2tbl = Hashtbl.of_alist_exn (module Hash_key) (field_map
     [ ((0, 0), "-1")
     ; ((0, 1), "6")
     ; ((3, 0), "-4356")
@@ -74,9 +81,9 @@ struct
     ; ((9, 0), "-3061257408")
     ; ((6, 2), "-6324912")
     ; ((3, 4), "-4356")
-    ; ((0, 6), "-6") ]
+    ; ((0, 6), "-6") ])
 
-  let d2_tuples =
+  let d2tbl = Hashtbl.of_alist_exn (module Hash_key) (field_map
     [ ((0, 0), "1")
     ; ((0, 1), "-4")
     ; ((3, 0), "5976")
@@ -85,9 +92,9 @@ struct
     ; ((0, 3), "-4")
     ; ((6, 0), "2108304")
     ; ((3, 2), "2904")
-    ; ((0, 4), "1") ]
+    ; ((0, 4), "1") ])
 
-  let n3_tuples =
+  let n3tbl = Hashtbl.of_alist_exn (module Hash_key) (field_map
     [ ((0, 1), "1")
     ; ((3, 0), "0")
     ; ((0, 2), "-15")
@@ -167,9 +174,9 @@ struct
     ; ((9, 10), "-61039617408")
     ; ((6, 12), "-31603264")
     ; ((3, 14), "-8712")
-    ; ((1, 16), "-1") ]
+    ; ((1, 16), "-1") ])
 
-  let d31_tuples =
+  let d31tbl = Hashtbl.of_alist_exn (module Hash_key) (field_map
     [ ((0, 0), "-1")
     ; ((0, 1), "5")
     ; ((3, 0), "10536")
@@ -181,9 +188,9 @@ struct
     ; ((0, 4), "-5")
     ; ((6, 1), "2108304")
     ; ((3, 3), "2904")
-    ; ((0, 5), "1") ]
+    ; ((0, 5), "1") ])
 
-  let d32_tuples =
+  let d32tbl = Hashtbl.of_alist_exn (module Hash_key) (field_map
     [ ((0, 0), "1")
     ; ((0, 1), "-10")
     ; ((3, 0), "12636")
@@ -219,64 +226,146 @@ struct
     ; ((9, 4), "30612574080")
     ; ((6, 6), "21083040")
     ; ((3, 8), "7260")
-    ; ((0, 10), "1") ]
-
-  let field_of_string s =
-    let s' =
-      if s.[0] = '-' then String.sub s ~pos:1 ~len:(String.length s - 1) else s
-    in
-    Sexp.of_string_conv_exn s' F.t_of_sexp
-
-  let field_map = List.map ~f:(fun (a, b) -> (a, field_of_string b))
-
-  let n1tbl = Hashtbl.of_alist_exn (module Hash_key) (field_map n1_tuples)
-
-  let d1tbl = Hashtbl.of_alist_exn (module Hash_key) (field_map d1_tuples)
-
-  let n2tbl = Hashtbl.of_alist_exn (module Hash_key) (field_map n2_tuples)
-
-  let d2tbl = Hashtbl.of_alist_exn (module Hash_key) (field_map d2_tuples)
-
-  let n3tbl = Hashtbl.of_alist_exn (module Hash_key) (field_map n3_tuples)
-
-  let d31tbl = Hashtbl.of_alist_exn (module Hash_key) (field_map d31_tuples)
-
-  let d32tbl = Hashtbl.of_alist_exn (module Hash_key) (field_map d32_tuples)
+    ; ((0, 10), "1") ])
 
   let sum (xs : F.t list) =
-    List.fold ~init:F.zero ~f:(fun x y -> F.Infix.(x + y)) xs
+    List.fold ~init:F.zero ~f:F.add xs
 
   let product (xs : F.t list) =
-    List.fold ~init:F.one ~f:(fun x y -> F.Infix.(x * y)) xs
+    List.fold ~init:F.one ~f:F.mul xs
 
-  let powers (v : F.t) (k : int) : F.t list =
+  (* for v, k, powers produces v^0, v^1, ... v^k *)
+  let powers v k =
     let rec make_powers acc prev x =
-      if x = k then acc
+      if x = k then Array.of_list_rev acc
       else
         let prev' = F.Infix.(prev * v) in
         let acc' = prev' :: acc in
         make_powers acc' prev' (x + 1)
     in
-    List.rev (make_powers [F.one] F.one 0)
+    make_powers [F.one] F.one 0
 
   (* highest power of A is 24, of B is 16 *)
   let a_powers = powers Params.a 24
 
   let b_powers = powers Params.b 16
 
-  (*
-   * Xi(t) = Ni(t)/Di(t)  for i = 1, 2, 3
+  let check x =
+    match x with
+    | Some x -> x
+    | None -> failwith "trying to mulitply by index not in powers lists"
+
+  let mul a b tbl =
+    F.Infix.(
+      Hashtbl.find_exn tbl (a, b) * a_powers.(a) * b_powers.(b))
+
+  let t_mul sum t_power t_powers =
+    F.Infix.(sum * t_powers.(t_power))
+
+  (* given j, iter_a starts with the highest value of a possible
+   * that satisfies either 2a + 3b = 3j (if in case 0)
+   * or 2a + 3b = 3j + 3 (if in case 1)
+   * then solves for b using b = 3j - 2a / 3 (if in case 0)
+   * or b = 3 + 3j - 2a / 3 (if in case 1)
+   * then we decrement a and solve for b again, until we hit a = 0
+   * and return what is accumulated (which is A^a . B^b (with y^2 = x^3 + 3A + B)
+   * pulling from the table of A and B powers) for each
+   * a, b st 2a + 3b = 3j (or each a, b st 2a + 3b = 3j + 3 if in case 1)
+   *)
+
+  let iter_a s j tbl =
+    let rec go ~a ~acc ~s ~j ~tbl =
+    (* if s = 0 then 2a + 3b = 3j -> b = 3j - 2a / 3 *)
+    (* if s = 1 then 2a + 3b = 3j + 3 -> b = 3 + 3j - 2a / 3 *)
+    let b = if s = 0 then ((3 * j) - (2 * a)) / 3 else (3 + (3 * j) - (2 * a)) / 3
+    in
+    let acc' =
+      if s = 0 && 2*a + 3*b = 3*j then F.add acc (mul a b tbl)
+      else if s = 1 && 2*a + 3*b = 3*j + 3 then F.add acc (mul a b tbl)
+      else acc
+    in
+    (* start with a_max and decrement until a = 0 *)
+    if a > 0 then
+      let a' = a - 1 in
+      go ~a:a' ~acc:acc' ~s ~j ~tbl
+    else acc'
+    in
+    (* this is defining a as the max value it can take
+     * for 2a + 3b = 3j, max_a = 3j/2,
+     * for 2a + 3b = 3j + 3, max a = (3j + 3)/2 *)
+    let a = if s = 0 then 3 * j / 2 else ((3 * j) + 3) / 2
+    in
+    go ~a ~acc:F.zero ~s ~j ~tbl
+
+  let naive_iter_a s j tbl =
+    let rec go ~a ~b ~acc ~s ~j ~tbl =
+    if s = 0 then
+    (* 2a + 3b = 3j *)
+      if 2*a + 3*b = 3*j then let acc' = F.add acc (mul a b tbl)
+                                  and a' = a and b' = b + 1 in
+                                  go ~a:a' ~b:b' ~acc:acc' ~s ~j ~tbl
+      else if b > j then let a' = a + 1 and b' = 0 in
+          go ~a:a' ~b:b' ~acc ~s ~j ~tbl
+      else if a > j then acc
+      else F.zero
+    else if s = 1 then
+    (* 2a + 3b = 3j + 3 *)
+      if 2*a + 3*b = 3*j + 3 then let acc' = F.add acc (mul a b tbl)
+                                  and a' = a and b' = b + 1 in
+                                  go ~a:a' ~b:b' ~acc:acc' ~s ~j ~tbl
+      else if b > j + 1 then let a' = a + 1 and b' = 0 in
+          go ~a:a' ~b:b' ~acc ~s ~j ~tbl
+      else if a > j then acc
+      else F.zero
+    else F.zero
+    in
+    let a = 0 and b = 0 in
+    go ~a ~b ~acc:F.zero ~s ~j ~tbl
+
+  let%test_unit "iter_a (not special case) test" =
+    Quickcheck.test Int.gen ~f:(fun j ->
+     assert (iter_a 0 j n1tbl =naive_iter_a 0 j n1tbl)
+    )
+
+  let%test_unit "iter_a (special case) test" =
+    Quickcheck.test Int.gen ~f:(fun j ->
+     assert (iter_a 1 j n1tbl =naive_iter_a 1 j n1tbl)
+    )
+
+  let iter_j s max t_powers tbl =
+    let rec go ~j ~acc ~s ~max ~t_powers ~tbl =
+      let acc' = iter_a s j tbl in
+      let acc'' = F.add acc (t_mul acc' j t_powers) in
+      if j < max then
+        let j' = j + 1 in
+        go ~j:j' ~acc:acc'' ~s ~max ~t_powers ~tbl
+      else acc''
+    in go ~j:0 ~acc:F.zero ~s ~max ~t_powers ~tbl
+
+  (* Xi(t) = Ni(t)/Di(t)  for i = 1, 2, 3
    * N1(t) = A^2 . t . sum from j = 0 to j = 4 of [
    *    sum for 2a+3b=3j of ( n1_(a,b) A^a . B^b ) . t^j ]
    * D1(t) = sum from j = 0 to j = 5 of [
    *    sum for 2a+3b=3j of ( d1_(a,b) A^a . B^b ) . t^j ]
-   *
-   * N2(t) = sum from j = 0 to j = 6 of [
+   *)
+  let make_x1 t_var =
+    let t_powers = powers t_var 15 in
+      let nt = iter_j 0 4 t_powers n1tbl in
+      let dt = iter_j 0 5 t_powers d1tbl in
+      F.Infix.(Params.a * t_mul (F.of_int 2) 1 t_powers * nt / dt)
+
+  (* N2(t) = sum from j = 0 to j = 6 of [
    *    sum for 2a+3b=3j of ( n2_(a,b) A^a . B^b ) . t^j ]
    * D2(t) = 144At . sum from j = 0 to j = 4 of [
    *    sum for 2a+3b=3j of ( d2_(a,b) A^a . B^b ) . t^j ]
-   *
-   * N3(t) = sum from j = 0 to j = 15 of [
+   *)
+  let make_x2 t_var =
+    let t_powers = powers t_var 15 in
+      let nt = iter_j 0 6 t_powers n2tbl in
+      let dt = iter_j 0 4 t_powers d2tbl in
+      F.Infix.(nt / (t_mul (F.of_int 144 * Params.a) 1 t_powers * dt))
+
+  (* N3(t) = sum from j = 0 to j = 15 of [
    *    sum for 2a+3b=3j+3 of ( n3_(a,b) A^a . B^b ) . t^j ]
    * D3(t) = A . sum from j = 0 to j = 5 of [
    *    sum for 2a+3b=3j of ( d31_(a,b) A^a . B^b ) . t^j ]
@@ -284,59 +373,11 @@ struct
    *    sum from j = 0 to j = 10 of [
    *    sum for 2a+3b=3j of ( d32_(a,b) A^a . B^b ) . t^j ]
    *)
-
-  let check x =
-    match x with
-    | Some x -> x
-    | None -> failwith "trying to mulitply by index not in powers lists"
-
-  let mul ~a ~b ~tbl =
-    F.Infix.(
-      Hashtbl.find_exn tbl (a, b)
-      * check (List.nth a_powers a)
-      * check (List.nth b_powers b))
-
-  let t_mul (sum : F.t) (t_power : int) (t_powers : F.t list) =
-    F.Infix.(sum * check (List.nth t_powers t_power))
-
-  let rec iter_a s a j acc tbl =
-    (* 2a + 3b = 3j -> b = 3j - 2a / 3 *)
-    (* 2a + 3b = 3j + 3 -> b = 3 + 3j - 2a / 3 *)
-    let b =
-      if s = 0 then ((3 * j) - (2 * a)) / 3 else (3 + (3 * j) - (2 * a)) / 3
-    in
-    let acc' = F.Infix.(acc + mul ~a ~b ~tbl) in
-    (* start with a_max and decrement until a = 0 *)
-    if a > 0 then
-      let a' = a - 1 in
-      iter_a s a' j acc' tbl
-    else acc'
-
-  let rec iter_j s j max acc t_powers tbl =
-    let a = if s = 0 then 3 * j / 2 else ((3 * j) + 3) / 2 in
-    let acc' = iter_a s a j acc tbl in
-    let acc'' = t_mul acc' j t_powers in
-    if j < max then
-      let j' = j + 1 in
-      iter_j s j' max acc'' t_powers tbl
-    else acc''
-
-  let make_sum i t_var =
+  let make_x3 t_var =
     let t_powers = powers t_var 15 in
-    let j = 0 and acc = F.zero in
-    match i with
-    | 1 ->
-        let nt = iter_j 0 j 4 acc t_powers n1tbl in
-        let dt = iter_j 0 j 5 acc t_powers d1tbl in
-        F.Infix.(Params.a * t_mul (F.of_int 2) 1 t_powers * nt / dt)
-    | 2 ->
-        let nt = iter_j 0 j 6 acc t_powers n2tbl in
-        let dt = iter_j 0 j 4 acc t_powers d2tbl in
-        F.Infix.(nt / (t_mul (F.of_int 144 * Params.a) 1 t_powers * dt))
-    | 3 ->
-        let nt = iter_j 1 j 15 acc t_powers n3tbl in
-        let dt1 = iter_j 0 j 5 acc t_powers d31tbl in
-        let dt2 = iter_j 0 j 10 acc t_powers d32tbl in
-        F.Infix.(nt / (Params.a * dt1 * dt2))
-    | _ -> failwith "i supplied that no Xi(t) exists for"
+      let nt = iter_j 1 15 t_powers n3tbl in
+      let dt1 = iter_j 0 5 t_powers d31tbl in
+      let dt2 = iter_j 0 10 t_powers d32tbl in
+      F.Infix.(nt / (Params.a * dt1 * dt2))
+
 end
