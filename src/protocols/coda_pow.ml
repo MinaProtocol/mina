@@ -113,7 +113,7 @@ module type Pending_coinbase_intf = sig
   type coinbase
 
   module Stack : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp, bin_io, eq]
 
     val push_exn : t -> coinbase -> t
 

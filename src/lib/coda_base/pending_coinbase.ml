@@ -321,7 +321,7 @@ module Hash = struct
       reraise_merkle_requests
     >>| var_of_hash_packed
 
-  let update_stack t ~is_new_stack stack =
+  let%snarkydef update_stack t ~is_new_stack stack =
     let%bind updated_tree_hash = update_stack' t ~is_new_stack stack in
     let%map () = reset () in
     updated_tree_hash

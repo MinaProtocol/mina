@@ -108,6 +108,12 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn sparse_ledger t
         in
+        let coinbase_stack_target =
+          match t with
+          | Coinbase c ->
+              Pending_coinbase.Stack.push_exn Pending_coinbase.Stack.empty c
+          | _ -> Pending_coinbase.Stack.empty
+        in
         let span, proof =
           time (fun () ->
               T.of_transaction ~sok_digest:Sok_message.Digest.default
@@ -115,10 +121,8 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
                 ~pending_coinbase_state:
                   { source= Pending_coinbase.Stack.empty
-                  ; target= Pending_coinbase.Stack.empty }
+                  ; target= coinbase_stack_target }
                 t
-                (* ~coinbase_on_new_tree:false ~delete_coinbase_stack:false*)
-                (*TODO: test this with true values*)
                 (unstage (Sparse_ledger.handler sparse_ledger)) )
         in
         ((Time.Span.max span max_span, sparse_ledger'), proof) )

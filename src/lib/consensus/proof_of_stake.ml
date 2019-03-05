@@ -603,7 +603,7 @@ module Vrf = struct
             (push fail (create_single pending_coinbase_handler))
             (create_single ledger_handler))
       in
-      fun (With {request; respond} as t) ->
+      fun (With {request; respond}) ->
         match request with
         | Winner_address -> respond (Provide 0)
         | Private_key -> respond (Provide sk)

@@ -350,8 +350,8 @@ end = struct
           (Or_error.error_string
              "No working coinbase-stack found in the collection")
 
-  let next_stack pending_coinbase_collection new_stack =
-    if new_stack then Ok Pending_coinbase.Stack.empty
+  let next_stack pending_coinbase_collection ~is_new_stack =
+    if is_new_stack then Ok Pending_coinbase.Stack.empty
     else latest_stack pending_coinbase_collection
 
   let push_coinbase_and_get_new_collection current_stack (t : Transaction.t) =
@@ -684,10 +684,11 @@ end = struct
       ~f:(fun _ -> check (List.drop data partitions.first) partitions)
       partitions.second
 
-  let working_coinbase_stack scan_state pending_coinbase_collection =
-    let open Result.Let_syntax in
-    (*let current_base_jobs = Scan_state.base_jobs_on_latest_tree scan_state in
-    let base_has_coinbase ~get_transaction txns =
+  let working_coinbase_stack scan_state ledger pending_coinbase_collection
+      transactions =
+    let open Deferred.Result.Let_syntax in
+    let current_base_jobs = Scan_state.base_jobs_on_latest_tree scan_state in
+    let coinbase_exists ~get_transaction txns =
       List.fold_until ~init:(Ok false) txns
         ~f:(fun acc t ->
           match get_transaction t with
@@ -695,20 +696,92 @@ end = struct
           | Error e -> Stop (Error e)
           | _ -> Continue acc )
         ~finish:Fn.id
+      |> Deferred.return
     in
-    let%bind non_empty_stack =
-      base_has_coinbase
+    (*let%bind  =
+      has_coinbase
         ~get_transaction:
           (fun {Scan_state.Transaction_with_witness.transaction_with_info; _} ->
           to_staged_ledger_or_error
           @@ Ledger.Undo.transaction transaction_with_info )
         current_base_jobs
     in*)
-    let is_new_stack = Scan_state.on_new_tree scan_state in
-    let%map working_stack =
-      next_stack pending_coinbase_collection is_new_stack
+    (*let has_coinbase txns =
+      List.fold_until ~init:false txns
+        ~f:(fun acc t ->
+          match t with
+          | (Transaction.Coinbase _) -> Stop true
+          | _ -> Continue acc )
+        ~finish:Fn.id
+    in *)
+    let {Scan_state.Space_partition.first; second} =
+      Scan_state.partition_if_overflowing scan_state
     in
-    (working_stack, is_new_stack)
+    let check_targets updated_stack ts =
+      if List.length ts > 0 then
+        let {Scan_state.Transaction_with_witness.statement; _} =
+          List.hd_exn (List.rev ts)
+        in
+        let target = statement.pending_coinbase_state.target in
+        assert (Pending_coinbase.Stack.equal updated_stack target)
+    in
+    Core.printf !"data length %d\n%!" (List.length transactions) ;
+    match second with
+    | None ->
+        (*let new_tree = Scan_state.on_new_tree scan_state in*)
+        let%bind coinbase_exists_on_new_tree =
+          coinbase_exists
+            ~get_transaction:
+              (fun { Scan_state.Transaction_with_witness.transaction_with_info; _
+                   } ->
+              to_staged_ledger_or_error
+              @@ Ledger.Undo.transaction transaction_with_info )
+            current_base_jobs
+        in
+        let have_data_to_enqueue = List.length transactions > 0 in
+        let is_new_stack =
+          (*new_tree || *)
+          (not coinbase_exists_on_new_tree) && have_data_to_enqueue
+        in
+        let%bind working_stack =
+          next_stack pending_coinbase_collection ~is_new_stack
+          |> Deferred.return
+        in
+        let%map data, updated_stack =
+          update_ledger_and_get_statements ledger working_stack transactions
+        in
+        (is_new_stack, data, updated_stack)
+    | Some _ ->
+        let%bind working_stack1 =
+          next_stack pending_coinbase_collection ~is_new_stack:false
+          |> Deferred.return
+        in
+        let%bind data1, updated_stack1 =
+          update_ledger_and_get_statements ledger working_stack1
+            (List.take transactions first)
+        in
+        check_targets updated_stack1 data1 ;
+        let%bind working_stack2 =
+          next_stack pending_coinbase_collection ~is_new_stack:true
+          |> Deferred.return
+        in
+        let%bind data2, updated_stack2 =
+          update_ledger_and_get_statements ledger working_stack2
+            (List.drop transactions first)
+        in
+        check_targets updated_stack2 data2 ;
+        let%map first_has_coinbase =
+          coinbase_exists
+            ~get_transaction:(fun x -> Ok x)
+            (List.take transactions first)
+        in
+        let second_has_data = List.length (List.drop transactions first) > 0 in
+        let is_new_stack, updated_stack =
+          if first_has_coinbase then (false, updated_stack1)
+          else if second_has_data then (true, updated_stack2)
+          else (false, updated_stack1)
+        in
+        (is_new_stack, data1 @ data2, updated_stack)
 
   let update_pending_coinbase_collection pending_coinbase_collection
       updated_coinbase_stack ~is_new_stack ~proof_emitted =
@@ -810,11 +883,11 @@ end = struct
       , p1.user_commands_count + p2.user_commands_count
       , p1.coinbase_parts_count + p2.coinbase_parts_count )
     in
-    let%bind working_stack, is_new_stack =
-      working_coinbase_stack scan_state' t.pending_coinbase_collection
-      |> Deferred.return
+    let%bind is_new_stack, data, updated_coinbase_stack =
+      working_coinbase_stack scan_state' new_ledger
+        t.pending_coinbase_collection transactions
     in
-    let {Scan_state.Space_partition.first; second} =
+    (*let {Scan_state.Space_partition.first; second} =
       Scan_state.partition_if_overflowing scan_state'
     in
     let%bind data, updated_coinbase_stack =
@@ -833,7 +906,7 @@ end = struct
             (*TODO: this could be true if there is no coinbase in the first section*)
           in
           (first_part @ second_part, coinbase_collection_updated)
-    in
+    in*)
     (*let%bind pending_coinbase_collection_updated =
       Or_error.try_with (fun () ->
           Pending_coinbase.update_coinbase_stack_exn
@@ -874,7 +947,7 @@ end = struct
       Pending_coinbase_update.create_value ~prev_root ~new_root
         ~updated_stack:updated_coinbase_stack ~action
     in*)
-    let%bind pending_coinbase_update, update_pending_coinbase_collection' =
+    let%bind pending_coinbase_update, updated_pending_coinbase_collection' =
       update_pending_coinbase_collection t.pending_coinbase_collection
         updated_coinbase_stack ~is_new_stack
         ~proof_emitted:(Option.is_some res_opt)
@@ -893,8 +966,9 @@ end = struct
     let new_staged_ledger =
       { scan_state= scan_state'
       ; ledger= new_ledger
-      ; pending_coinbase_collection= update_pending_coinbase_collection' }
+      ; pending_coinbase_collection= updated_pending_coinbase_collection' }
     in
+    Core.printf !"Scan state: %{sexp: scan_state} \n %!" scan_state' ;
     ( `Hash_after_applying (hash new_staged_ledger)
     , `Ledger_proof res_opt
     , `Staged_ledger new_staged_ledger
@@ -975,14 +1049,18 @@ end = struct
       in
       (data1 @ data2, work1 @ work2)
     in
-    let%bind working_stack, is_new_stack =
-      working_coinbase_stack scan_state' t.pending_coinbase_collection
-      |> Staged_ledger_error.to_or_error |> Deferred.return
+    let%bind is_new_stack, data, updated_coinbase_stack =
+      let open Deferred.Let_syntax in
+      let%bind x =
+        working_coinbase_stack scan_state' new_ledger
+          t.pending_coinbase_collection transactions
+      in
+      Staged_ledger_error.to_or_error x |> Deferred.return
     in
-    let {Scan_state.Space_partition.first; second} =
+    (*let {Scan_state.Space_partition.first; second} =
       Scan_state.partition_if_overflowing scan_state'
-    in
-    let get_data working_stack txns =
+    in*)
+    (*let get_data working_stack txns =
       let open Deferred.Let_syntax in
       let%map lst, acc =
         Deferred.List.fold txns ~init:([], working_stack)
@@ -996,10 +1074,10 @@ end = struct
       in
       Ok (List.rev lst, acc)
     in
-    let%bind data, updated_coinbase_stack =
-      match second with
-      | None -> get_data working_stack transactions
-      | Some _ ->
+    let%bind data, updated_coinbase_stack =*)
+    (*match second with
+      | None -> get_data working_stack transactions*)
+    (*| Some _ ->
           let%bind first_part, working_stack_updated' =
             get_data working_stack (List.take transactions first)
           in
@@ -1008,7 +1086,7 @@ end = struct
             (*TODO: this could be true if there is no coinbase in the first section*)
           in
           (first_part @ second_part, working_stack_updated)
-    in
+    in*)
     (*let pending_coinbase_collection_updated =
       Pending_coinbase.update_coinbase_stack_exn t.pending_coinbase_collection
         working_stack_updated ~new_stack
@@ -1792,6 +1870,9 @@ let%test_module "test" =
 
         let latest_stack t = List.hd t
 
+        let oldest_stack_exn t =
+          match List.rev t with [] -> failwith "No stack" | x :: xs -> x
+
         let add_coinbase_exn :
             t -> coinbase:Coinbase.t -> is_new_stack:bool -> t =
          fun t ~coinbase ~is_new_stack ->
@@ -1805,7 +1886,7 @@ let%test_module "test" =
             | x :: xs -> (coinbase :: x) :: xs
 
         module Stack = struct
-          type t = Coinbase.t list [@@deriving sexp, bin_io, compare, hash]
+          type t = Coinbase.t list [@@deriving sexp, bin_io, compare, hash, eq]
 
           let push_exn t c = c :: t
 
@@ -1816,10 +1897,17 @@ let%test_module "test" =
 
         let create_exn () = []
 
-        let remove_coinbase_stack_exn = Fn.id
+        let remove_coinbase_stack_exn t =
+          match List.rev t with
+          | [] -> failwith "tried to remove stack from an empty collection"
+          | x :: xs -> List.rev xs
 
         let update_coinbase_stack_exn t stack ~is_new_stack =
-          if is_new_stack then stack :: t else stack :: List.tl_exn t
+          if is_new_stack then stack :: t
+          else
+            match t with
+            | [] -> failwith "tried to update empty tree"
+            | x :: xs -> stack :: xs
       end
 
       module Pending_coinbase_stack_state = struct
@@ -2275,6 +2363,8 @@ let%test_module "test" =
 
     module Sl = Make (Test_input1)
 
+    (*open Test_input1*)
+
     let self_pk = "me"
 
     let stmt_to_work (stmts : Test_input1.Transaction_snark_work.Statement.t) :
@@ -2307,6 +2397,40 @@ let%test_module "test" =
           ; prover }
       else None
 
+    let pending_coinbase_checks sl
+        (pending_coinbase_update : Test_input1.Pending_coinbase_update.t)
+        ledger_proof =
+      Core.printf
+        !"All pending_coinbase stacks: %{sexp:Test_input1.Pending_coinbase.t} \n\
+         \ %!"
+        (Sl.pending_coinbase_collection sl) ;
+      match pending_coinbase_update.action with
+      | Test_input1.Pending_coinbase_update.Action.Deleted_added
+       |Deleted_updated ->
+          let oldest_stack =
+            Test_input1.Pending_coinbase.oldest_stack_exn
+              (Sl.pending_coinbase_collection sl)
+          in
+          let statement : Test_input1.Ledger_proof_statement.t =
+            Test_input1.Ledger_proof.statement
+              (fst @@ Option.value_exn ledger_proof)
+          in
+          let state : Test_input1.Pending_coinbase_stack_state.t =
+            statement.pending_coinbase_state
+          in
+          let stack_from_proof : Test_input1.Pending_coinbase.Stack.t =
+            state.target
+          in
+          Core.printf
+            !"Stack in sl: %{sexp:Test_input1.Pending_coinbase.Stack.t}\n\
+             \ stack from proof:%{sexp:Test_input1.Pending_coinbase.Stack.t}\n\
+             \ %!"
+            oldest_stack stack_from_proof ;
+          assert (
+            Test_input1.Pending_coinbase.Stack.equal oldest_stack
+              stack_from_proof )
+      | _ -> ()
+
     let create_and_apply sl logger txns stmt_to_work =
       let open Deferred.Let_syntax in
       let diff =
@@ -2317,11 +2441,12 @@ let%test_module "test" =
       let%map ( `Hash_after_applying hash
               , `Ledger_proof ledger_proof
               , `Staged_ledger sl'
-              , `Pending_coinbase_update _ ) =
+              , `Pending_coinbase_update pending_coinbase_update ) =
         match%map Sl.apply !sl diff' ~logger with
         | Ok x -> x
         | Error e -> Error.raise (Sl.Staged_ledger_error.to_error e)
       in
+      pending_coinbase_checks !sl pending_coinbase_update ledger_proof ;
       assert (Test_input1.Staged_ledger_hash.equal hash (Sl.hash sl')) ;
       sl := sl' ;
       (ledger_proof, diff')
