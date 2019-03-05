@@ -293,11 +293,8 @@ struct
       | Some location -> (
         match self_find_account t location with
         | Some existing_account ->
-            if
-              Key.equal
-                (Account.public_key account)
-                (Account.public_key existing_account)
-            then remove_account_and_update_hashes t location
+            if Account.equal account existing_account then
+              remove_account_and_update_hashes t location
         | None -> () )
 
     (* as for accounts, we see if we have it in the mask, else delegate to
