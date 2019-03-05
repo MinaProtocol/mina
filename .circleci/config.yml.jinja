@@ -12,9 +12,22 @@ jobs:
                   name: Build trace-tool
                   command: cd src/app/trace-tool && cargo build --frozen
 
+    build-wallet:
+        macos:
+            xcode: "10.1.0"
+        steps:
+            - checkout
+            - run: cd frontend/wallet && npm install
+            - run:
+                  name: Lint wallet
+                  command: cd frontend/wallet && npm run reformat && git diff --exit-code
+            - run:
+                  name: Build wallet
+                  command: cd frontend/wallet && npm run build
+
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -45,13 +58,8 @@ jobs:
                       - homebrew-v1-
             - restore_cache:
                   keys:
-                      - opam-v1-{{'{{'}} checksum "src/opam.export" {{'}}'}}
-                      - opam-v1-
-            - restore_cache:
-                  keys:
-                      - nix-v3-{{'{{'}} checksum "src/app/kademlia-haskell/packages.nix" {{'}}'}}
-                      - nix-v3-
-                      - nix-v2-		      
+                      - opam-v2-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+                      - opam-v2-
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Deps -- make macos-setup-download
@@ -65,16 +73,15 @@ jobs:
                       - "/usr/local/Homebrew"
                       - "/Users/distiller/Library/Caches/Homebrew"
             - save_cache:
-                  key: opam-v1-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+                  key: opam-v2-{{'{{'}} checksum "src/opam.export" {{'}}'}}
                   paths:
                       - "/Users/distiller/.opam"
-            - save_cache:
-                  key: nix-v3-{{'{{'}} checksum "src/app/kademlia-haskell/packages.nix" {{'}}'}}
-                  paths:
-                      - "/nix"
             - run:
                   name: Build OCaml
                   command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log
             - run:
                   name: Run all tests (on master)
                   command: echo "FIXME Tests not yet working on mac"
@@ -83,7 +90,7 @@ jobs:
     build_{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
@@ -100,22 +107,28 @@ jobs:
                   name: Build deb Package with keys
                   command: make deb
             - run:
-                  name: Build provingkeys
+                  name: Store Generated Proving and Verifying Keys
                   command: make provingkeys
             - run:
-                  name: Store Genesis keys
+                  name: Store Genesis Public/Private Keypairs
                   command: make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
                   path: /tmp/artifacts
+            - run:
+                  name: Copy artifacts to Google Cloud
+                  command: scripts/artifacts.sh
     {%- endfor %}
 
     test-unit-test:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -127,7 +140,7 @@ jobs:
     test-{{test.name}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -158,3 +171,4 @@ workflows:
             {%- endfor %}
             - test-unit-test
             - tracetool
+            - build-wallet

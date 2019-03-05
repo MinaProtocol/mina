@@ -2,6 +2,7 @@ open Core_kernel
 open Async_kernel
 open Protocols.Coda_transition_frontier
 open Coda_base
+open Pipe_lib
 
 module type Inputs_intf = Inputs.Inputs_intf
 
@@ -15,12 +16,33 @@ module Make (Inputs : Inputs_intf) :
    and type staged_ledger := Inputs.Staged_ledger.t
    and type masked_ledger := Ledger.Mask.Attached.t
    and type transaction_snark_scan_state := Inputs.Staged_ledger.Scan_state.t
-   and type consensus_local_state := Consensus.Local_state.t = struct
+   and type consensus_local_state := Consensus.Local_state.t
+   and type user_command := User_command.t
+   and module Extensions.Work = Inputs.Transaction_snark_work.Statement =
+struct
   (* NOTE: is Consensus_mechanism.select preferable over distance? *)
   exception
     Parent_not_found of ([`Parent of State_hash.t] * [`Target of State_hash.t])
 
   exception Already_exists of State_hash.t
+
+  module Fake_db = struct
+    include Coda_base.Ledger.Db
+
+    type location = Location.t
+
+    let get_or_create ledger key =
+      let key, loc =
+        match
+          get_or_create_account_exn ledger key (Account.initialize key)
+        with
+        | `Existed, loc -> ([], loc)
+        | `Added, loc -> ([key], loc)
+      in
+      (key, get ledger loc |> Option.value_exn, loc)
+  end
+
+  module TL = Coda_base.Transaction_logic.Make (Fake_db)
 
   module Breadcrumb = struct
     (* TODO: external_transition should be type : External_transition.With_valid_protocol_state.t #1344 *)
@@ -33,6 +55,9 @@ module Make (Inputs : Inputs_intf) :
 
     let create transition_with_hash staged_ledger =
       {transition_with_hash; staged_ledger; just_emitted_a_proof= false}
+
+    let copy t =
+      {t with staged_ledger= Inputs.Staged_ledger.copy t.staged_ledger}
 
     let build ~logger ~parent ~transition_with_hash =
       O1trace.measure "Breadcrumb.build" (fun () ->
@@ -69,18 +94,18 @@ module Make (Inputs : Inputs_intf) :
           in
           let just_emitted_a_proof = Option.is_some proof_opt in
           let%map transitioned_staged_ledger =
-            if
-              Staged_ledger_hash.equal staged_ledger_hash
-                blockchain_staged_ledger_hash
-            then return transitioned_staged_ledger
-            else
-              Deferred.return
-                (Error
-                   (`Validation_error
-                     (Error.of_string
-                        "Snarked ledger hash and Staged ledger hash after \
-                         applying the diff does not match blockchain state's \
-                         ledger hash and staged ledger hash resp.\n")))
+            Deferred.return
+              ( if
+                Staged_ledger_hash.equal staged_ledger_hash
+                  blockchain_staged_ledger_hash
+              then Ok transitioned_staged_ledger
+              else
+                Error
+                  (`Validation_error
+                    (Error.of_string
+                       "Snarked ledger hash and Staged ledger hash after \
+                        applying the diff does not match blockchain state's \
+                        ledger hash and staged ledger hash resp.\n")) )
           in
           { transition_with_hash
           ; staged_ledger= transitioned_staged_ledger
@@ -111,21 +136,131 @@ module Make (Inputs : Inputs_intf) :
       With_hash.data transition_with_hash
       |> Inputs.External_transition.Verified.protocol_state
       |> Consensus.Protocol_state.blockchain_state
+
+    let name t =
+      Visualization.display_short_sexp (module State_hash) @@ state_hash t
+
+    type display =
+      { state_hash: string
+      ; blockchain_state:
+          Inputs.External_transition.Protocol_state.Blockchain_state.display
+      ; consensus_state: Consensus.Consensus_state.display
+      ; parent: string }
+    [@@deriving yojson]
+
+    let display t =
+      let blockchain_state =
+        Inputs.External_transition.Protocol_state.Blockchain_state.display
+          (blockchain_state t)
+      in
+      let consensus_state = consensus_state t in
+      let parent =
+        Visualization.display_short_sexp (module State_hash) @@ parent_hash t
+      in
+      { state_hash= name t
+      ; blockchain_state
+      ; consensus_state= Consensus.Consensus_state.display consensus_state
+      ; parent }
+
+    let to_user_commands
+        {transition_with_hash= {data= external_transition; _}; _} =
+      let open Inputs.External_transition.Verified in
+      let open Inputs.Staged_ledger_diff in
+      user_commands @@ staged_ledger_diff external_transition
   end
 
+  module type Transition_frontier_extension_intf =
+    Transition_frontier_extension_intf0
+    with type transition_frontier_breadcrumb := Breadcrumb.t
+
+  let max_length = Inputs.max_length
+
   module Extensions = struct
+    module Work = Inputs.Transaction_snark_work.Statement
+
     module Snark_pool_refcount = Snark_pool_refcount.Make (struct
       include Inputs
       module Breadcrumb = Breadcrumb
     end)
 
-    type t = {snark_pool_refcount: Snark_pool_refcount.t} [@@deriving fields]
+    module Root_history = struct
+      module Queue = Hash_queue.Make (State_hash)
 
-    let create () = {snark_pool_refcount= Snark_pool_refcount.create ()}
+      type t = {history: Breadcrumb.t Queue.t; capacity: int}
 
-    let handle_diff t diff =
-      let use handler field = handler (Field.get field t) diff in
-      Fields.iter ~snark_pool_refcount:(use Snark_pool_refcount.handle_diff)
+      let create capacity =
+        let history = Queue.create () in
+        {history; capacity}
+
+      let lookup {history; _} = Queue.lookup history
+
+      let mem {history; _} = Queue.mem history
+
+      let enqueue {history; capacity} state_hash breadcrumb =
+        if Queue.length history >= capacity then
+          Queue.dequeue_exn history |> ignore ;
+        Queue.enqueue history state_hash breadcrumb |> ignore
+
+      let is_empty {history; _} = Queue.is_empty history
+    end
+
+    module Best_tip_diff = Best_tip_diff.Make (Breadcrumb)
+
+    type t =
+      { root_history: Root_history.t
+      ; snark_pool_refcount: Snark_pool_refcount.t
+      ; best_tip_diff: Best_tip_diff.t }
+    [@@deriving fields]
+
+    let create () =
+      { snark_pool_refcount= Snark_pool_refcount.create ()
+      ; best_tip_diff= Best_tip_diff.create ()
+      ; root_history= Root_history.create (2 * Inputs.max_length) }
+
+    type writers =
+      { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Writer.t
+      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Writer.t }
+
+    type readers =
+      { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t
+      ; best_tip_diff: Best_tip_diff.view Broadcast_pipe.Reader.t }
+    [@@deriving fields]
+
+    let make_pipes () : readers * writers =
+      let snark_reader, snark_writer =
+        Broadcast_pipe.create Snark_pool_refcount.initial_view
+      and best_tip_reader, best_tip_writer =
+        Broadcast_pipe.create Best_tip_diff.initial_view
+      in
+      ( {snark_pool= snark_reader; best_tip_diff= best_tip_reader}
+      , {snark_pool= snark_writer; best_tip_diff= best_tip_writer} )
+
+    let close_pipes ({snark_pool; best_tip_diff} : writers) =
+      Broadcast_pipe.Writer.close snark_pool ;
+      Broadcast_pipe.Writer.close best_tip_diff
+
+    let mb_write_to_pipe diff ext_t handle pipe =
+      Option.value ~default:Deferred.unit
+      @@ Option.map ~f:(Broadcast_pipe.Writer.write pipe) (handle ext_t diff)
+
+    let handle_diff t (pipes : writers)
+        (diff : Breadcrumb.t Transition_frontier_diff.t) : unit Deferred.t =
+      let use handler pipe acc field =
+        let%bind () = acc in
+        mb_write_to_pipe diff (Field.get field t) handler pipe
+      in
+      ( match diff with
+      | Transition_frontier_diff.New_breadcrumb _ -> ()
+      | Transition_frontier_diff.New_best_tip
+          {old_root; old_root_length; new_best_tip_length; _} ->
+          if new_best_tip_length - old_root_length > max_length then
+            let root_state_hash = Breadcrumb.state_hash old_root in
+            Root_history.enqueue t.root_history root_state_hash old_root ) ;
+      Fields.fold ~init:diff
+        ~root_history:(fun _ _ -> Deferred.unit)
+        ~snark_pool_refcount:
+          (use Snark_pool_refcount.handle_diff pipes.snark_pool)
+        ~best_tip_diff:(use Best_tip_diff.handle_diff pipes.best_tip_diff)
   end
 
   module Node = struct
@@ -150,20 +285,13 @@ module Make (Inputs : Inputs_intf) :
     let compare node1 node2 =
       Breadcrumb.compare node1.breadcrumb node2.breadcrumb
 
-    let name t =
-      Visualization.display_short_sexp (module State_hash)
-      @@ Breadcrumb.state_hash t.breadcrumb
+    let name t = Breadcrumb.name t.breadcrumb
 
     let display t =
-      let blockchain_state =
-        Breadcrumb.blockchain_state t.breadcrumb
-        |> Inputs.External_transition.Protocol_state.Blockchain_state.display
+      let {Breadcrumb.state_hash; consensus_state; blockchain_state; _} =
+        Breadcrumb.display t.breadcrumb
       in
-      let consensus_state = Breadcrumb.consensus_state t.breadcrumb in
-      { state_hash= name t
-      ; blockchain_state
-      ; length= t.length
-      ; consensus_state= Consensus.Consensus_state.display consensus_state }
+      {state_hash; blockchain_state; length= t.length; consensus_state}
   end
 
   let breadcrumb_of_node {Node.breadcrumb; _} = breadcrumb
@@ -177,9 +305,17 @@ module Make (Inputs : Inputs_intf) :
     ; logger: Logger.t
     ; table: Node.t State_hash.Table.t
     ; consensus_local_state: Consensus.Local_state.t
-    ; extensions: Extensions.t }
+    ; extensions: Extensions.t
+    ; extension_readers: Extensions.readers
+    ; extension_writers: Extensions.writers }
 
   let logger t = t.logger
+
+  let snark_pool_refcount_pipe {extension_readers; _} =
+    extension_readers.snark_pool
+
+  let best_tip_diff_pipe {extension_readers; _} =
+    extension_readers.best_tip_diff
 
   (* TODO: load from and write to disk *)
   let create ~logger
@@ -255,15 +391,18 @@ module Make (Inputs : Inputs_intf) :
           {Node.breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
         in
         let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
+        let extension_readers, extension_writers = Extensions.make_pipes () in
         { logger
         ; root_snarked_ledger
         ; root= root_hash
         ; best_tip= root_hash
         ; table
         ; consensus_local_state
-        ; extensions= Extensions.create () }
+        ; extensions= Extensions.create ()
+        ; extension_readers
+        ; extension_writers }
 
-  let max_length = Inputs.max_length
+  let close {extension_writers; _} = Extensions.close_pipes extension_writers
 
   let consensus_local_state {consensus_local_state; _} = consensus_local_state
 
@@ -278,6 +417,38 @@ module Make (Inputs : Inputs_intf) :
   let find_exn t hash =
     let node = Hashtbl.find_exn t.table hash in
     node.breadcrumb
+
+  let path_search t state_hash ~find ~f =
+    let open Option.Let_syntax in
+    let rec go state_hash =
+      let%map breadcrumb = find t state_hash in
+      let elem = f breadcrumb in
+      match go (Breadcrumb.parent_hash breadcrumb) with
+      | Some subresult -> Non_empty_list.cons elem subresult
+      | None -> Non_empty_list.singleton elem
+    in
+    Option.map ~f:Non_empty_list.rev (go state_hash)
+
+  let get_path_inclusively_in_root_history t state_hash ~f =
+    path_search t state_hash
+      ~find:(fun t -> Extensions.Root_history.lookup t.extensions.root_history)
+      ~f
+
+  let root_history_path_map t state_hash ~f =
+    let open Option.Let_syntax in
+    match path_search t ~find ~f state_hash with
+    | None -> get_path_inclusively_in_root_history t state_hash ~f
+    | Some frontier_path ->
+        let root_history_path =
+          let%bind root_breadcrumb = find t t.root in
+          get_path_inclusively_in_root_history t
+            (Breadcrumb.parent_hash root_breadcrumb)
+            ~f
+        in
+        Some
+          (Option.value_map root_history_path ~default:frontier_path
+             ~f:(fun root_history ->
+               Non_empty_list.append root_history frontier_path ))
 
   let path_map t breadcrumb ~f =
     let rec find_path b =
@@ -322,7 +493,8 @@ module Make (Inputs : Inputs_intf) :
 
     let to_graph t =
       fold t ~init:empty ~f:(fun (node : Node.t) graph ->
-          List.fold node.successor_hashes ~init:graph
+          let graph_with_node = add_vertex graph node in
+          List.fold node.successor_hashes ~init:graph_with_node
             ~f:(fun acc_graph successor_state_hash ->
               add_edge acc_graph node
                 ( State_hash.Table.find t.table successor_state_hash
@@ -444,6 +616,7 @@ module Make (Inputs : Inputs_intf) :
    *       VII ) notify the consensus mechanism of the new root
    *       VIII) if commit on an heir node that just emitted proof txns then
    *             write them to snarked ledger
+   *       XI  ) add old root to root_history
    *   5) return a diff object describing what changed (for use in updating extensions)
   *)
   let add_breadcrumb_exn t breadcrumb =
@@ -532,10 +705,11 @@ module Make (Inputs : Inputs_intf) :
                 let db_mask = Ledger.of_database t.root_snarked_ledger in
                 Non_empty_list.iter txns ~f:(fun txn ->
                     (* TODO: @cmr use the ignore-hash ledger here as well *)
-                    Ledger.apply_transaction db_mask txn
+                    TL.apply_transaction t.root_snarked_ledger txn
                     |> Or_error.ok_exn |> ignore ) ;
                 (* TODO: See issue #1606 to make this faster *)
-                Ledger.commit db_mask ;
+                
+                (*Ledger.commit db_mask ;*)
                 ignore
                   (Ledger.Maskable.unregister_mask_exn
                      (Ledger.Any_ledger.cast
@@ -552,19 +726,37 @@ module Make (Inputs : Inputs_intf) :
                    (Breadcrumb.blockchain_state new_root_node.breadcrumb))
               ( Ledger.Db.merkle_root t.root_snarked_ledger
               |> Frozen_ledger_hash.of_ledger_hash ) ;
+            (* 4.IX *)
+            let root_breadcrumb = Node.breadcrumb root_node in
+            let root_state_hash = Breadcrumb.state_hash root_breadcrumb in
+            Extensions.Root_history.enqueue t.extensions.root_history
+              root_state_hash root_breadcrumb ;
             (garbage_breadcrumbs, new_root_node) )
           else ([], root_node)
         in
         (* 5 *)
-        Extensions.handle_diff t.extensions
+        Extensions.handle_diff t.extensions t.extension_writers
           ( if node.length > best_tip_node.length then
             Transition_frontier_diff.New_best_tip
               { old_root= root_node.breadcrumb
+              ; old_root_length= root_node.length
               ; new_root= new_root_node.breadcrumb
               ; new_best_tip= node.breadcrumb
+              ; new_best_tip_length= node.length
               ; old_best_tip= best_tip_node.breadcrumb
               ; garbage= garbage_breadcrumbs }
           else Transition_frontier_diff.New_breadcrumb node.breadcrumb ) )
+
+  let add_breadcrumb_if_present_exn t breadcrumb =
+    let parent_hash = Breadcrumb.parent_hash breadcrumb in
+    match Hashtbl.find t.table parent_hash with
+    | Some _ -> add_breadcrumb_exn t breadcrumb
+    | None ->
+        Logger.warn t.logger
+          !"When trying to add breadcrumb, its parent had been removed from \
+            transition frontier: %{sexp: State_hash.t}"
+          parent_hash ;
+        Deferred.unit
 
   let best_tip_path_length_exn {table; root; best_tip; _} =
     let open Option.Let_syntax in
@@ -580,5 +772,11 @@ module Make (Inputs : Inputs_intf) :
 
   module For_tests = struct
     let root_snarked_ledger {root_snarked_ledger; _} = root_snarked_ledger
+
+    let root_history_mem {extensions; _} hash =
+      Extensions.Root_history.mem extensions.root_history hash
+
+    let root_history_is_empty {extensions; _} =
+      Extensions.Root_history.is_empty extensions.root_history
   end
 end

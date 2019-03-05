@@ -27,6 +27,9 @@ end
 
 [%%endif]
 
+module Graphql_cohttp_async =
+  Graphql_cohttp.Make (Graphql_async.Schema) (Cohttp_async.Body)
+
 module Staged_ledger_aux_hash = struct
   include Staged_ledger_hash.Aux_hash.Stable.Latest
 
@@ -298,6 +301,8 @@ module type Main_intf = sig
        and type staged_ledger_diff := Staged_ledger_diff.t
        and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
        and type consensus_local_state := Consensus.Local_state.t
+       and type user_command := User_command.t
+       and type Extensions.Work.t = Transaction_snark_work.Statement.t
   end
 
   module Config : sig
@@ -315,7 +320,8 @@ module type Main_intf = sig
       ; time_controller: Inputs.Time.Controller.t
       ; banlist: Banlist.t
       ; receipt_chain_database: Receipt_chain_database.t
-      ; snark_work_fee: Currency.Fee.t }
+      ; snark_work_fee: Currency.Fee.t
+      ; monitor: Async.Monitor.t option }
     [@@deriving make]
   end
 
@@ -336,6 +342,8 @@ module type Main_intf = sig
 
   val best_tip :
     t -> Inputs.Transition_frontier.Breadcrumb.t Participating_state.t
+
+  val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
   val peers : t -> Network_peer.Peer.t list
 
@@ -603,19 +611,20 @@ struct
   end)
 
   module Transaction_pool = struct
-    module Pool = Transaction_pool.Make (User_command)
-    include Network_pool.Make (Pool) (Pool.Diff)
+    module Pool = Transaction_pool.Make (User_command) (Transition_frontier)
+    include Network_pool.Make (Transition_frontier) (Pool) (Pool.Diff)
 
     type pool_diff = Pool.Diff.t [@@deriving bin_io]
 
     (* TODO *)
-    let load ~parent_log ~disk_location:_ ~incoming_diffs =
-      return (create ~parent_log ~incoming_diffs)
+    let load ~parent_log ~disk_location:_ ~incoming_diffs
+        ~frontier_broadcast_pipe =
+      return (create ~parent_log ~incoming_diffs ~frontier_broadcast_pipe)
 
     let transactions t = Pool.transactions (pool t)
 
     (* TODO: This causes the signature to get checked twice as it is checked
-   below before feeding it to add *)
+       below before feeding it to add *)
     let add t txn = apply_and_broadcast t (Envelope.Incoming.local [txn])
   end
 
@@ -709,12 +718,15 @@ struct
             {fee; prover} )
     end
 
-    module Pool = Snark_pool.Make (Proof) (Fee) (Work)
-    module Diff = Network_pool.Snark_pool_diff.Make (Proof) (Fee) (Work) (Pool)
+    module Pool = Snark_pool.Make (Proof) (Fee) (Work) (Transition_frontier)
+    module Diff =
+      Network_pool.Snark_pool_diff.Make (Proof) (Fee) (Work)
+        (Transition_frontier)
+        (Pool)
 
     type pool_diff = Diff.t
 
-    include Network_pool.Make (Pool) (Diff)
+    include Network_pool.Make (Transition_frontier) (Pool) (Diff)
 
     let get_completed_work t statement =
       Option.map
@@ -723,10 +735,16 @@ struct
           Transaction_snark_work.Checked.create_unsafe
             {Transaction_snark_work.fee; proofs= proof; prover} )
 
-    let load ~parent_log ~disk_location ~incoming_diffs =
+    let load ~parent_log ~disk_location ~incoming_diffs
+        ~frontier_broadcast_pipe =
       match%map Reader.load_bin_prot disk_location Pool.bin_reader_t with
-      | Ok pool -> of_pool_and_diffs pool ~parent_log ~incoming_diffs
-      | Error _e -> create ~parent_log ~incoming_diffs
+      | Ok pool ->
+          let network_pool =
+            of_pool_and_diffs pool ~parent_log ~incoming_diffs
+          in
+          Pool.listen_to_frontier_broadcast_pipe frontier_broadcast_pipe pool ;
+          network_pool
+      | Error _e -> create ~parent_log ~incoming_diffs ~frontier_broadcast_pipe
 
     open Snark_work_lib.Work
     open Network_pool.Snark_pool_diff
@@ -754,7 +772,7 @@ struct
      and type merkle_path := Ledger.path
      and type query := Sync_ledger.query
      and type answer := Sync_ledger.answer =
-    Syncable_ledger.Make (Ledger.Location.Addr) (Account)
+    Syncable_ledger.Make (Ledger.Location.Addr) (Account.Stable.V1)
       (struct
         include Ledger_hash
 
@@ -821,6 +839,8 @@ struct
     module Staged_ledger_diff = Staged_ledger_diff
     module Transaction_snark_work = Transaction_snark_work
     module Transition_handler_validator = Transition_handler.Validator
+    module Unprocessed_transition_cache =
+      Transition_handler.Unprocessed_transition_cache
     module Ledger_proof_statement = Ledger_proof_statement
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Protocol_state_validator = Protocol_state_validator
@@ -1180,7 +1200,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       Payment_proof.t Deferred.Or_error.t =
     let receipt_chain_database = receipt_chain_database t in
     (* TODO: since we are making so many reads to `receipt_chain_database`,
-    reads should be async to not get IO-blocked. See #1125 *)
+       reads should be async to not get IO-blocked. See #1125 *)
     let result =
       Receipt_chain_database.prove receipt_chain_database ~proving_receipt
         ~resulting_receipt
@@ -1214,10 +1234,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       Consensus.Protocol_state.hash state
       |> [%sexp_of: State_hash.t] |> Sexp.to_string
     in
-    let block_count =
-      state |> Consensus.Protocol_state.consensus_state
-      |> Consensus.Consensus_state.length
-    in
+    let consensus_state = state |> Consensus.Protocol_state.consensus_state in
+    let block_count = Consensus.Consensus_state.length consensus_state in
     let uptime_secs =
       Time_ns.diff (Time_ns.now ()) start_time
       |> Time_ns.Span.to_sec |> Int.of_float
@@ -1261,6 +1279,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         staged_ledger |> Staged_ledger.hash |> Staged_ledger_hash.sexp_of_t
         |> Sexp.to_string
     ; state_hash
+    ; consensus_time_best_tip=
+        Consensus.Consensus_state.time_hum consensus_state
     ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
     ; peers=
@@ -1272,6 +1292,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; propose_pubkey=
         Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
     ; histograms
+    ; consensus_time_now= Consensus.time_hum (Core_kernel.Time.now ())
     ; consensus_mechanism= Consensus.name
     ; consensus_configuration= Consensus.Configuration.t }
 
@@ -1321,6 +1342,10 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
   let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
+
+  let log_shutdown ~frontier_file ~log t =
+    visualize_frontier ~filename:frontier_file t |> ignore ;
+    Logger.info log "Logging the transition_frontier at %s" frontier_file
 
   (* TODO: handle participation_status more appropriately than doing participate_exn *)
   let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda ~log
@@ -1387,18 +1412,23 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       ; implement Daemon_rpcs.Start_tracing.rpc (fun () () ->
             Coda_tracing.start Config_in.conf_dir )
       ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
-            Coda_tracing.stop () ; Deferred.unit ) ]
+            Coda_tracing.stop () ; Deferred.unit )
+      ; implement Daemon_rpcs.Visualize_frontier.rpc (fun () filename ->
+            return
+              ( visualize_frontier ~filename coda
+              |> Participating_state.active_exn ) ) ]
     in
     let snark_worker_impls =
       [ implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
             let r = request_work coda in
             Option.iter r ~f:(fun r ->
-                Logger.info log !"Get_work: %{sexp:Snark_worker.Work.Spec.t}" r
-            ) ;
+                Logger.trace log
+                  !"Get_work: %{sexp:Snark_worker.Work.Spec.t}"
+                  r ) ;
             return r )
       ; implement Snark_worker.Rpcs.Submit_work.rpc
           (fun () (work : Snark_worker.Work.Result.t) ->
-            Logger.info log
+            Logger.trace log
               !"Submit_work: %{sexp:Snark_worker.Work.Spec.t}"
               work.spec ;
             List.iter work.metrics ~f:(fun (total, tag) ->
@@ -1413,6 +1443,18 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
         trace_task "REST server" (fun () ->
+            let graphql_schema =
+              Graphql_async.Schema.(
+                schema
+                  [ field "greeting" ~typ:(non_null string)
+                      ~args:Arg.[]
+                      ~resolve:(fun _ () -> "hello coda") ])
+            in
+            let graphql_callback =
+              Graphql_cohttp_async.make_callback
+                (fun _req -> ())
+                graphql_schema
+            in
             Cohttp_async.(
               Server.create
                 ~on_handler_error:
@@ -1423,9 +1465,6 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                    (On_port rest_server_port))
                 (fun ~body _sock req ->
                   let uri = Cohttp.Request.uri req in
-                  let route_not_found () =
-                    Server.respond_string ~status:`Not_found "Route not found"
-                  in
                   let status flag =
                     Server.respond_string
                       ( get_status ~flag coda |> Participating_state.active_exn
@@ -1433,9 +1472,12 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                       |> Yojson.Safe.pretty_to_string )
                   in
                   match Uri.path uri with
+                  | "/graphql" -> graphql_callback () req body
                   | "/status" -> status `None
                   | "/status/performance" -> status `Performance
-                  | _ -> route_not_found () )) )
+                  | _ ->
+                      Server.respond_string ~status:`Not_found
+                        "Route not found" )) )
         |> ignore ) ;
     let where_to_listen =
       Tcp.Where_to_listen.bind_to All_addresses (On_port client_port)
@@ -1481,14 +1523,14 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
                ~shutdown_on_disconnect )
     in
-    let log = Logger.child log "snark_worker" in
+    (* We want these to be printfs so we don't double encode our logs here *)
     Pipe.iter_without_pushback
       (Reader.pipe (Process.stdout p))
-      ~f:(fun s -> Logger.info log "%s" s)
+      ~f:(fun s -> printf "%s" s)
     |> don't_wait_for ;
     Pipe.iter_without_pushback
       (Reader.pipe (Process.stderr p))
-      ~f:(fun s -> Logger.error log "%s" s)
+      ~f:(fun s -> printf "%s" s)
     |> don't_wait_for ;
     Deferred.unit
 
@@ -1500,4 +1542,15 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         create_snark_worker ~shutdown_on_disconnect:s ~log ~public_key
           ~client_port
         |> ignore
+
+  let handle_shutdown ~monitor ~frontier_file ~log t =
+    Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
+        log_shutdown ~frontier_file ~log t ;
+        raise exn ) ;
+    Async_unix.Signal.(
+      handle terminating ~f:(fun signal ->
+          log_shutdown ~frontier_file ~log t ;
+          Logger.info log
+            !"Coda process got interrupted by signal %{sexp:t}"
+            signal ))
 end

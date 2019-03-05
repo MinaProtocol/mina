@@ -143,6 +143,8 @@ module Types = struct
       ; run_snark_worker: bool
       ; propose_pubkey: Public_key.t option
       ; histograms: Histograms.t option
+      ; consensus_time_best_tip: string
+      ; consensus_time_now: string
       ; consensus_mechanism: string
       ; consensus_configuration: Consensus.Configuration.t }
     [@@deriving to_yojson, bin_io, fields]
@@ -156,12 +158,13 @@ module Types = struct
         let f x = Field.get x s in
         Fields.fold ~init:[]
           ~num_accounts:(fun acc x ->
-            ("Number of Accounts", Int.to_string (f x)) :: acc )
+            ("Global Number of Accounts", Int.to_string (f x)) :: acc )
           ~block_count:(fun acc x ->
             ("Block Count", Int.to_string (f x)) :: acc )
-          ~uptime_secs:(fun acc x -> ("Uptime", sprintf "%ds" (f x)) :: acc)
+          ~uptime_secs:(fun acc x ->
+            ("Local Uptime", sprintf "%ds" (f x)) :: acc )
           ~ledger_merkle_root:(fun acc x -> ("Ledger Merkle Root", f x) :: acc)
-          ~staged_ledger_hash:(fun acc x -> ("Staged-ledger hash", f x) :: acc)
+          ~staged_ledger_hash:(fun acc x -> ("Staged-ledger Hash", f x) :: acc)
           ~state_hash:(fun acc x -> ("State Hash", f x) :: acc)
           ~commit_id:(fun acc x ->
             match f x with
@@ -169,7 +172,7 @@ module Types = struct
             | Some sha1 ->
                 ("Git SHA1", Git_sha.sexp_of_t sha1 |> Sexp.to_string) :: acc
             )
-          ~conf_dir:(fun acc x -> ("Configuration Dir", f x) :: acc)
+          ~conf_dir:(fun acc x -> ("Configuration Directory", f x) :: acc)
           ~peers:(fun acc x ->
             let peers = f x in
             ( "Peers"
@@ -192,6 +195,9 @@ module Types = struct
             | None -> acc
             | Some histograms ->
                 ("Histograms", Histograms.to_text histograms) :: acc )
+          ~consensus_time_best_tip:(fun acc x ->
+            ("Best Tip Consensus Time", f x) :: acc )
+          ~consensus_time_now:(fun acc x -> ("Consensus Time Now", f x) :: acc)
           ~consensus_mechanism:(fun acc x ->
             ("Consensus Mechanism", f x) :: acc )
           ~consensus_configuration:(fun acc x ->
@@ -238,7 +244,7 @@ end
 module Get_ledger = struct
   type query = Staged_ledger_hash.Stable.Latest.t [@@deriving bin_io]
 
-  type response = Account.t list Or_error.t [@@deriving bin_io]
+  type response = Account.Stable.V1.t list Or_error.t [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
@@ -381,4 +387,14 @@ module Stop_tracing = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Stop_tracing" ~version:0 ~bin_query ~bin_response
+end
+
+module Visualize_frontier = struct
+  type query = string [@@deriving bin_io]
+
+  type response = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Visualize_frontier" ~version:0 ~bin_query
+      ~bin_response
 end

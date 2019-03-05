@@ -1,0 +1,58 @@
+
+/* ==================================== */
+/* header */
+
+.careers-double-line-header {
+  text-align: center;
+}
+
+.careers-double-line-header:after,
+.careers-double-line-header:before {
+  content: " ";
+  padding-left: 3rem;
+  margin-left: .25rem;
+  margin-right: 1rem;
+  font-size: 5px;
+  vertical-align: top;
+  line-height: 1.3rem;
+  border-top: 1pt solid rgba(155, 155, 155, .3);
+  border-bottom: 1pt solid rgba(155, 155, 155, .3);
+}
+
+
+/* ==================================== */
+/* image gallery */
+
+.careers-gallery-row1,
+.careers-gallery-row2 {
+  display: flex;
+  justify-content: space-between;
+}
+
+.careers-gallery-row1 > *,
+.careers-gallery-row2 > * {
+  height: 15rem;
+  object-fit: cover;
+  box-sizing: border-box;
+  padding: .3rem;
+}
+
+.careers-gallery-row1 > *:nth-child(1) {
+  width: 35%;
+}
+
+.careers-gallery-row1 > *:nth-child(2) {
+  width: 65%;
+}
+
+.careers-gallery-row2 > *:nth-child(1) {
+  width: 30%;
+}
+
+.careers-gallery-row2 > *:nth-child(2) {
+  width: 37%;
+}
+
+.careers-gallery-row2 > *:nth-child(3) {
+  width: 33%;
+}
