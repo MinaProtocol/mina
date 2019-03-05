@@ -13,10 +13,8 @@ version much quicker to implement afterwards.
 
 [motivation]: #motivation
 
-Snaphotting the state properly will give us the ability to more easily reproduce
-errors found deeply within integration tests and live testnets. By keeping
-around enough state in memory, we can flush to disk whenever we get an exception
-and upon reload, instantly hit the error case.
+As stated above, snaphotting parts of our application state will give us a
+mechanism for more quickly reproducing edge cases and errors as they arive.
 
 There are several stages. Each of which provides a checkpoint that gives us
 useful features.
@@ -25,7 +23,7 @@ useful features.
 ### Partial Snapshotting:
 
 Snapshot enough state to be able to produce the immediate next transition, and
-then sleep and propose no more (but `coda client status` should still work).
+then halt.
 
 Why is this useful? We've wasted a lot of time waiting for the network to reach
 a certain failing block. This feature would save us time in the future. We can
@@ -48,8 +46,8 @@ Snapshot enough state to recreate a full-node that can continue from the point
 of the snapshot and can reconnect to a network of nodes.
 
 This task would require synchronizing state between nodes in a network and
-would require a significant amount of effort.
-This is out-of-scope for the near future. And out-of-scope in this RFC.
+would require a significant amount of effort until we finish implementing
+genesis. This is out-of-scope for the near future, and out-of-scope in this RFC.
 
 In the near term, we should complete both partial and full-offline snapshotting.
 
@@ -59,7 +57,7 @@ In the near term, we should complete both partial and full-offline snapshotting.
 
 For each component, we need to:
 
-a. Properly marshall/unmarshall each piece of data.
+a. Properly marshall/unmarshall/copy each piece of data.
 
 b. Put the node into what is potentially a special state using the unmarshalled
 snapshot data instead of the normal happy path of the application.
@@ -87,7 +85,7 @@ When we want to start the node from the snapshot, we need to boot it into a
 special state that will execute the proposer to generate the next state and
 transition and then stall afterwards.
 
-For marshalling and unmarshalling the data:
+For marshalling and unmarshalling and copying the data:
 
 * `bin_io` can be trivally used for (1), (3), (6)
 * With small changes, `bin_io` can be used for (5), (7), (8)
@@ -118,35 +116,35 @@ proposer writes to.
 from current time instead of using system time directly. We need this to ensure
 VRFs and slots and epochs are the same each time.
 
-4. Optionally, we can save the config.mlh used to produce the binary in the
+4. We can save the config.mlh used to produce the binary in the
 snapshotted data so we don't accidentally start a snapshot on a different build
 profile. This seems desirable as we imagine it will be quite easy to make this
-mistake and may waste a good amount of time while debugging.
+mistake and may waste a good amount of time while debugging. This can be done
+by modify the `ppx_optcomp` library.
 
 For implementation we can do the following tasks:
 
-A. Root snarked ledger (database) marshall/unmarshall
+A. Root snarked ledger (database) copy
 
 B. Partial snapshot record (binable)
 
-C. Resume from partial snapshot record
+C. Modifying `Coda_main` to load from snapshot
 
 D. Support time offsetting
 
-E. Save/parse config.mlh to ensure no snapshot runs on a different build profile
+E. `Ppx_optcomp` change to ensure hash of contents
 
 F. Test to ensure one transition is proposed successfully
 
-Gantt-ish chart (showing parallelism of tasks with rough approximations
-of length):
+Parallelism of tasks with rough approximations of length:
 
 ```
-A----------
-B----
-     C--------
-D--
-E---
-              F--
+person1: A----------
+person2: B---
+person3:     C--------
+person4: D---
+person5: E--
+person6:              F--
 ```
 
 ### Full-offline Snapshotting
@@ -179,19 +177,19 @@ A. All of partial snapshotting
 
 B. Transition frontier persistance
 
-C. Resuming from full-offline snapshot
+C. Modifying transition router and other parts of the code to properly load
+from snapshot
 
 D. Test to ensure multiple transitions are proposed successfully with new txns
 and snark works/proofs
 
-Gantt-ish chart (showing parallelism of tasks with rough approximations
-of length):
+Parallelism of tasks with rough approximations of length:
 
 ```
-A----------
-B----------
-           C---
-               D--
+group1:  A----------
+group2:  B----------
+person1:            C-----
+person2:                  D--
 ```
 
 ## Drawbacks
