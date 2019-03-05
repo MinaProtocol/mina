@@ -565,7 +565,6 @@ struct
         setup ~source_accounts ~logger
           [{num_breadcrumbs; accounts= target_accounts}]
       in
-      let {address= _; _} = List.hd_exn peers in
       (me, List.hd_exn peers, network)
 
     let send_transition ~logger ~transition_writer ~peer:{address; frontier}

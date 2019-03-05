@@ -124,6 +124,8 @@ let%test_module "Bootstrap Controller" =
               (of_list input_transitions_verified)
               (of_list saved_transitions_verified)) )
 
+    let is_syncing = function `Ignored -> false | `Syncing _ -> true
+
     let make_transition_pipe () =
       Pipe_lib.Strict_pipe.create
         (Buffered (`Capacity 10, `Overflow Drop_head))
@@ -307,7 +309,7 @@ let%test_module "Bootstrap Controller" =
             Bootstrap_controller.For_tests.on_transition bootstrap
               ~root_sync_ledger ~sender:peer.address best_transition
           in
-          assert (should_sync <> `Ignored) ;
+          assert (is_syncing should_sync) ;
           let outdated_transition =
             Transition_frontier.root peer.frontier
             |> Transition_frontier.Breadcrumb.transition_with_hash
