@@ -12,7 +12,7 @@
 
 (library
  (name test)
- (modules test test_db test_ledger)
+ (modules test)
  (inline_tests)
  (libraries core async merkle_ledger merkle_ledger_tests syncable_ledger)
  (preprocess

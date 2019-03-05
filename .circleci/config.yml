@@ -67,6 +67,9 @@ jobs:
                   name: Build OCaml
                   command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log
+            - run:
                   name: Run all tests (on master)
                   command: echo "FIXME Tests not yet working on mac"
     build_dev:
@@ -89,14 +92,17 @@ jobs:
                   name: Build deb Package with keys
                   command: make deb
             - run:
-                  name: Build provingkeys
+                  name: Store Generated Proving and Verifying Keys
                   command: make provingkeys
             - run:
-                  name: Store Genesis keys
+                  name: Store Genesis Public/Private Keypairs
                   command: make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
@@ -122,14 +128,17 @@ jobs:
                   name: Build deb Package with keys
                   command: make deb
             - run:
-                  name: Build provingkeys
+                  name: Store Generated Proving and Verifying Keys
                   command: make provingkeys
             - run:
-                  name: Store Genesis keys
+                  name: Store Genesis Public/Private Keypairs
                   command: make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
@@ -155,14 +164,17 @@ jobs:
                   name: Build deb Package with keys
                   command: make deb
             - run:
-                  name: Build provingkeys
+                  name: Store Generated Proving and Verifying Keys
                   command: make provingkeys
             - run:
-                  name: Store Genesis keys
+                  name: Store Genesis Public/Private Keypairs
                   command: make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
@@ -188,14 +200,17 @@ jobs:
                   name: Build deb Package with keys
                   command: make deb
             - run:
-                  name: Build provingkeys
+                  name: Store Generated Proving and Verifying Keys
                   command: make provingkeys
             - run:
-                  name: Store Genesis keys
+                  name: Store Genesis Public/Private Keypairs
                   command: make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
@@ -221,14 +236,17 @@ jobs:
                   name: Build deb Package with keys
                   command: make deb
             - run:
-                  name: Build provingkeys
+                  name: Store Generated Proving and Verifying Keys
                   command: make provingkeys
             - run:
-                  name: Store Genesis keys
+                  name: Store Genesis Public/Private Keypairs
                   command: make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
@@ -307,10 +325,6 @@ jobs:
                   name: Running test - Proof of Signature Tests | coda-shared-state-test
                   command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-state-test'
             
-            - run:
-                  name: Running test - Proof of Signature Tests | coda-restart-node-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-restart-node-test'
-            
     test-postake_integration_tests:
         resource_class: large
         docker:
@@ -368,10 +382,6 @@ jobs:
             - run:
                   name: Running test - Proof of Stake (split stake) Tests | coda-shared-state-test
                   command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-state-test'
-            
-            - run:
-                  name: Running test - Proof of Stake (split stake) Tests | coda-restart-node-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-restart-node-test'
             
     test-withsnark-sig:
         resource_class: large
