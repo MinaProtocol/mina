@@ -117,4 +117,24 @@ struct
     in
     ignore (unregister_mask_exn parent t_as_mask) ;
     List.iter dangling_masks ~f:(fun m -> ignore (register_mask parent m))
+
+  let batch_notify_mask_children t accounts =
+    match Uuid.Table.find registered_masks (get_uuid t) with
+    | None -> ()
+    | Some masks ->
+        List.iter masks ~f:(fun mask ->
+            List.iter accounts ~f:(fun account ->
+                Mask.Attached.parent_set_notify mask account ) )
+
+  let set_batch t locations_and_accounts =
+    Base.set_batch t locations_and_accounts ;
+    batch_notify_mask_children t (List.map locations_and_accounts ~f:snd)
+
+  let set_batch_accounts t addresses_and_accounts =
+    Base.set_batch_accounts t addresses_and_accounts ;
+    batch_notify_mask_children t (List.map addresses_and_accounts ~f:snd)
+
+  let set_all_accounts_rooted_at_exn t address accounts =
+    Base.set_all_accounts_rooted_at_exn t address accounts ;
+    batch_notify_mask_children t accounts
 end
