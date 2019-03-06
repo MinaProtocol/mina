@@ -146,18 +146,28 @@ module Root_hash = struct
   let to_hash = Fn.id
 end
 
+module Base_ledger_inputs = struct
+  include Merkle_ledger_tests.Test_stubs
+  module Root_hash = Root_hash
+end
+
 (* Testing different ledger instantiations on Syncable_ledger *)
 
 module Ledger = struct
-  module Make (Inputs : sig
+  module Make (Depth : sig
     val depth : int
   end) =
   struct
     open Merkle_ledger_tests.Test_stubs
     module Root_hash = Root_hash
 
+    module Base_ledger_inputs = struct
+      include Base_ledger_inputs
+      module Depth = Depth
+    end
+
     module Ledger = struct
-      include Merkle_ledger.Ledger.Make (Key) (Account) (Hash) (Inputs)
+      include Merkle_ledger.Ledger.Make (Base_ledger_inputs)
 
       type addr = Addr.t
 
@@ -176,12 +186,15 @@ module Ledger = struct
         (ledger, keys)
     end
 
-    module Sync_ledger =
-      Syncable_ledger.Make (Ledger.Addr) (Account) (Hash) (Root_hash) (Ledger)
-        (struct
-          let subtree_height = 3
-        end)
+    module Syncable_ledger_inputs = struct
+      module Addr = Ledger.Addr
+      module MT = Ledger
+      include Base_ledger_inputs
 
+      let subtree_height = 3
+    end
+
+    module Sync_ledger = Syncable_ledger.Make (Syncable_ledger_inputs)
     module Sync_responder = Sync_ledger.Responder
   end
 
@@ -278,11 +291,15 @@ module Db = struct
       let to_hash = Fn.id
     end
 
+    module Base_ledger_inputs = struct
+      include Base_ledger_inputs
+      module Depth = Depth
+      module Location = Merkle_ledger.Location.Make (Depth)
+      module Kvdb = In_memory_kvdb
+    end
+
     module Ledger = struct
-      include Merkle_ledger.Database.Make (Key) (Account) (Hash) (Depth)
-                (Merkle_ledger.Location.Make (Depth))
-                (In_memory_kvdb)
-                (Storage_locations)
+      include Merkle_ledger.Database.Make (Base_ledger_inputs)
 
       type hash = Hash.t
 
@@ -300,11 +317,15 @@ module Db = struct
         (ledger, keys)
     end
 
-    module Sync_ledger =
-      Syncable_ledger.Make (Ledger.Addr) (Account) (Hash) (Root_hash) (Ledger)
-        (struct
-          let subtree_height = 3
-        end)
+    module Syncable_ledger_inputs = struct
+      module Addr = Ledger.Addr
+      module MT = Ledger
+      include Base_ledger_inputs
+
+      let subtree_height = 3
+    end
+
+    module Sync_ledger = Syncable_ledger.Make (Syncable_ledger_inputs)
   end
 
   module DB3 = Make (struct
@@ -439,11 +460,15 @@ module Mask = struct
       type hash = Hash.t
     end
 
-    module Sync_ledger =
-      Syncable_ledger.Make (Ledger.Addr) (Account) (Hash) (Root_hash) (Ledger)
-        (struct
-          let subtree_height = 3
-        end)
+    module Syncable_ledger_inputs = struct
+      module Addr = Ledger.Addr
+      module MT = Ledger
+      include Base_ledger_inputs
+
+      let subtree_height = 3
+    end
+
+    module Sync_ledger = Syncable_ledger.Make (Syncable_ledger_inputs)
   end
 
   module Mask3_Layer1 = Make (struct

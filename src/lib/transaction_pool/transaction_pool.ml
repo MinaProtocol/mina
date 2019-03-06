@@ -11,16 +11,12 @@ module type Transition_frontier_intf = sig
   module Breadcrumb : sig
     type t [@@deriving sexp]
 
-    val equal : t -> t -> bool
-
     val to_user_commands : t -> user_command list
   end
 
-  val successors : t -> Breadcrumb.t -> Breadcrumb.t list
-
   module Extensions : sig
     module Best_tip_diff : sig
-      type view = Breadcrumb.t Best_tip_diff_view.t Option.t
+      type view = user_command Best_tip_diff_view.t
     end
   end
 
@@ -72,6 +68,10 @@ struct
     ; log: Logger.t
     ; mutable diff_reader: unit Deferred.t Option.t }
 
+  let add' pool txn = {heap= Fheap.add pool.heap txn; set= Set.add pool.set txn}
+
+  let add t txn = t.pool <- add' t.pool txn
+
   (* FIXME terrible hack *)
   let remove_tx t tx =
     let filter_out_tx =
@@ -88,34 +88,27 @@ struct
            User_command.With_valid_signature.Set.to_list t.pool.set
            |> filter_out_tx |> User_command.With_valid_signature.Set.of_list }
 
-  let handle_diff t frontier
-      (diff_opt : Transition_frontier.Extensions.Best_tip_diff.view) =
-    match diff_opt with
-    | None ->
-        Logger.debug t.log "Got empty best tip diff" ;
-        Deferred.unit
-    | Some {old_best_tip; new_best_tip} ->
-        if
-          List.mem
-            (Transition_frontier.successors frontier old_best_tip)
-            new_best_tip ~equal:Breadcrumb.equal
-        then (
-          let new_user_commands = Breadcrumb.to_user_commands new_best_tip in
-          Logger.trace t.log
-            !"Diff: old: %{sexp:User_command.t list} new: \
-              %{sexp:User_command.t list}"
-            (Breadcrumb.to_user_commands old_best_tip)
-            new_user_commands ;
-          List.iter new_user_commands ~f:(fun tx -> remove_tx t tx) )
-        else
-          Logger.warn t.log
-            "Got a new best tip breadcrumb that wasn't a direct descendant of \
-             the old best tip. Handling this case is unimplemented." ;
-        Logger.trace t.log
-          !"Current transaction pool: \
-            %{sexp:User_command.With_valid_signature.t list}"
-          (Fheap.to_list t.pool.heap) ;
-        Deferred.unit
+  let handle_diff t _frontier
+      ({new_user_commands; removed_user_commands} :
+        Transition_frontier.Extensions.Best_tip_diff.view) =
+    Logger.trace t.log
+      !"Diff: removed: %{sexp:User_command.t list} added: \
+        %{sexp:User_command.t list} from best tip"
+      removed_user_commands new_user_commands ;
+    List.iter removed_user_commands ~f:(fun tx ->
+        add t
+          (Option.value_exn
+             ~message:
+               "Somehow a user command from the frontier has an invalid \
+                signature"
+             (User_command.check tx)) ) ;
+    (* TODO We need to recheck validity here. Transactions from the old best
+       chain may not be valid on the new chain. *)
+    List.iter new_user_commands ~f:(fun tx -> remove_tx t tx) ;
+    Logger.trace t.log
+      !"Current pool is: %{sexp: User_command.With_valid_signature.t list}"
+    @@ Fheap.to_list t.pool.heap ;
+    Deferred.unit
 
   let create ~parent_log ~frontier_broadcast_pipe =
     let t =
@@ -154,10 +147,6 @@ struct
                        ~f:(handle_diff t frontier)) ;
                Deferred.unit )) ;
     t
-
-  let add' pool txn = {heap= Fheap.add pool.heap txn; set= Set.add pool.set txn}
-
-  let add t txn = t.pool <- add' t.pool txn
 
   let transactions t = Sequence.unfold ~init:t.pool.heap ~f:Fheap.pop
 
@@ -208,31 +197,25 @@ let%test_module _ =
   ( module struct
     module Mock_transition_frontier = struct
       module Breadcrumb = struct
-        type t = {successors: t list; commands: int list} [@@deriving sexp]
+        type t = int list [@@deriving sexp]
 
-        let equal b1 b2 = b1 = b2
-
-        let to_user_commands {commands; _} = commands
+        let to_user_commands = Fn.id
       end
 
-      type t =
-        Breadcrumb.t Best_tip_diff_view.t Option.t Broadcast_pipe.Reader.t
-
-      let successors _ ({successors; _} : Breadcrumb.t) = successors
+      type t = int Best_tip_diff_view.t Broadcast_pipe.Reader.t
 
       module Extensions = struct
         module Best_tip_diff = struct
-          type view = Breadcrumb.t Best_tip_diff_view.t Option.t
+          type view = int Best_tip_diff_view.t
         end
       end
 
       let best_tip_diff_pipe = Fn.id
 
-      let create () :
-          t
-          * Breadcrumb.t Best_tip_diff_view.t Option.t Broadcast_pipe.Writer.t
-          =
-        Broadcast_pipe.create None
+      let create () : t * int Best_tip_diff_view.t Broadcast_pipe.Writer.t =
+        Broadcast_pipe.create
+          ( {new_user_commands= []; removed_user_commands= []}
+            : int Best_tip_diff_view.t )
     end
 
     module Test =
@@ -246,47 +229,50 @@ let%test_module _ =
         end)
         (Mock_transition_frontier)
 
-    (* We only test the transaction removal logic here, since this whole
-       module needs rewriting, it doesn't make sense to test it all. *)
+    (* We only test the best tip change logic here, since this whole module
+       needs rewriting, it doesn't make sense to test it all. *)
+    let setup_test () =
+      let tf, best_tip_diff_w = Mock_transition_frontier.create () in
+      let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
+      let pool =
+        Test.create ~parent_log:(Logger.null ())
+          ~frontier_broadcast_pipe:tf_pipe_r
+      in
+      ( (fun txs ->
+          [%test_eq: int Sequence.t] (Test.transactions pool)
+          @@ Sequence.of_list txs )
+      , pool
+      , best_tip_diff_w )
+
     let%test _ =
       Thread_safe.block_on_async_exn (fun () ->
-          let tf, best_tip_diff_w = Mock_transition_frontier.create () in
-          let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
-          let pool =
-            Test.create ~parent_log:(Logger.null ())
-              ~frontier_broadcast_pipe:tf_pipe_r
-          in
-          let assert_pool_txs txs =
-            [%test_eq: int Sequence.t] (Test.transactions pool)
-            @@ Sequence.of_list txs
-          in
+          let assert_pool_txs, pool, best_tip_diff_w = setup_test () in
           assert_pool_txs [] ;
           let txs = [0; 1; 2; 3] in
           List.iter ~f:(Test.add pool) txs ;
           assert_pool_txs txs ;
-          let third_bc : Test.Breadcrumb.t =
-            {successors= []; commands= [0; 3]}
-          in
-          let second_bc : Test.Breadcrumb.t =
-            {successors= [third_bc]; commands= [2]}
-          in
-          let first_bc : Test.Breadcrumb.t =
-            {successors= [second_bc]; commands= []}
-          in
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              (Some {new_best_tip= first_bc; old_best_tip= first_bc})
-          in
-          assert_pool_txs txs ;
-          let%bind () =
-            Broadcast_pipe.Writer.write best_tip_diff_w
-              (Some {new_best_tip= second_bc; old_best_tip= first_bc})
+              {new_user_commands= [2]; removed_user_commands= []}
           in
           assert_pool_txs [0; 1; 3] ;
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              (Some {new_best_tip= third_bc; old_best_tip= second_bc})
+              {new_user_commands= [0; 3]; removed_user_commands= []}
           in
           assert_pool_txs [1] ;
+          Deferred.return true )
+
+    let%test _ =
+      Thread_safe.block_on_async_exn (fun () ->
+          let assert_pool_txs, pool, best_tip_diff_w = setup_test () in
+          assert_pool_txs [] ;
+          let txs = [0; 1; 2; 3; 4] in
+          List.iter ~f:(Test.add pool) txs ;
+          let%bind () =
+            Broadcast_pipe.Writer.write best_tip_diff_w
+              {new_user_commands= [0; 3]; removed_user_commands= [5; 6]}
+          in
+          assert_pool_txs [1; 2; 4; 5; 6] ;
           Deferred.return true )
   end )
