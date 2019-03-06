@@ -350,7 +350,7 @@ end = struct
           (Or_error.error_string
              "No working coinbase-stack found in the collection")
 
-  let next_stack pending_coinbase_collection ~is_new_stack =
+  let working_stack pending_coinbase_collection ~is_new_stack =
     if is_new_stack then Ok Pending_coinbase.Stack.empty
     else latest_stack pending_coinbase_collection
 
@@ -684,8 +684,8 @@ end = struct
       ~f:(fun _ -> check (List.drop data partitions.first) partitions)
       partitions.second
 
-  let working_coinbase_stack scan_state ledger pending_coinbase_collection
-      transactions =
+  let update_coinbase_stack_and_get_data scan_state ledger
+      pending_coinbase_collection transactions =
     let open Deferred.Result.Let_syntax in
     let coinbase_exists ~get_transaction txns =
       List.fold_until ~init:(Ok false) txns
@@ -702,6 +702,9 @@ end = struct
     in
     match second with
     | None ->
+        (*Single partition: 
+         1.Check if a new stack is required by going through the latest transactions. If any coinbases in it, then get the latest stack otheriwse create a new stack [working_stack]
+         2.create data for enqueuing into the scan state *)
         let current_base_jobs =
           Scan_state.base_jobs_on_latest_tree scan_state
         in
@@ -719,7 +722,7 @@ end = struct
           (not coinbase_exists_on_new_tree) && have_data_to_enqueue
         in
         let%bind working_stack =
-          next_stack pending_coinbase_collection ~is_new_stack
+          working_stack pending_coinbase_collection ~is_new_stack
           |> Deferred.return
         in
         let%map data, updated_stack =
@@ -727,8 +730,15 @@ end = struct
         in
         (is_new_stack, data, updated_stack)
     | Some _ ->
+        (*Two partition:
+        Assumption: Only one of the partition will have coinbase transaction(s)in it. 
+         1. Get the latest stack for coinbase in the first set of transactions
+         2. get the first set of scan_state data using the above stack
+         3. get a new stack for the second parition because the second set of transactions would start from the begining of the scan_state
+         4. get the second set of scan_state data using the new stack
+         5. return either of the stacks because only one of them would be updated as long as the assumption is true*)
         let%bind working_stack1 =
-          next_stack pending_coinbase_collection ~is_new_stack:false
+          working_stack pending_coinbase_collection ~is_new_stack:false
           |> Deferred.return
         in
         let%bind data1, updated_stack1 =
@@ -736,7 +746,7 @@ end = struct
             (List.take transactions first)
         in
         let%bind working_stack2 =
-          next_stack pending_coinbase_collection ~is_new_stack:true
+          working_stack pending_coinbase_collection ~is_new_stack:true
           |> Deferred.return
         in
         let%bind data2, updated_stack2 =
@@ -756,6 +766,7 @@ end = struct
         in
         (is_new_stack, data1 @ data2, updated_stack)
 
+  (*update the pending_coinbase tree with the updated/new stack and delete the oldest stack if a proof was emitted*)
   let update_pending_coinbase_collection pending_coinbase_collection
       updated_coinbase_stack ~is_new_stack ~proof_emitted =
     let open Result.Let_syntax in
@@ -856,7 +867,7 @@ end = struct
       , p1.coinbase_parts_count + p2.coinbase_parts_count )
     in
     let%bind is_new_stack, data, updated_coinbase_stack =
-      working_coinbase_stack scan_state' new_ledger
+      update_coinbase_stack_and_get_data scan_state' new_ledger
         t.pending_coinbase_collection transactions
     in
     let%bind () = check_completed_works scan_state' works in
@@ -976,7 +987,7 @@ end = struct
     let%bind is_new_stack, data, updated_coinbase_stack =
       let open Deferred.Let_syntax in
       let%bind x =
-        working_coinbase_stack scan_state' new_ledger
+        update_coinbase_stack_and_get_data scan_state' new_ledger
           t.pending_coinbase_collection transactions
       in
       Staged_ledger_error.to_or_error x |> Deferred.return

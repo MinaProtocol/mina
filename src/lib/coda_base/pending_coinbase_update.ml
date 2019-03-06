@@ -1,10 +1,19 @@
+(** Pending coinbase update is the information required for blockchain snark computation. It consists of 
+ 1.Action performed on the pending coinbase tree
+ 2.Hashes of the tree before and after the action was performed
+ 3.New or updated stack that consists of the latest coinbase *)
 open Core_kernel
+
 open Fold_lib
 open Tuple_lib
 open Snark_params.Tick
 
 module type S = sig
   module Action : sig
+    (** Added: A new coinbase stack added
+    * Updated: The latest coinbase stack was updated
+    * Deleted_added: A new coinbase stack was added and the oldest one was deleted
+    * Deleted_updated: The latest coinbase stack was updated and the oldest one was deleted *)
     type t = Added | Updated | Deleted_added | Deleted_updated
     [@@deriving eq, sexp, bin_io]
 
