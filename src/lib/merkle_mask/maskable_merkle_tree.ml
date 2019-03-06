@@ -2,35 +2,94 @@
 
 open Core
 
-module Make
-    (Key : Merkle_ledger.Intf.Key)
-    (Account : Merkle_ledger.Intf.Account with type key := Key.t)
-    (Hash : Merkle_ledger.Intf.Hash with type account := Account.t)
-    (Location : Merkle_ledger.Location_intf.S)
-    (Base : Base_merkle_tree_intf.S
-            with module Addr = Location.Addr
-             and module Location = Location
-             and type account := Account.t
-             and type root_hash := Hash.t
-             and type hash := Hash.t
-             and type key := Key.t
-             and type key_set := Key.Set.t)
-    (Mask : Masking_merkle_tree_intf.S
-            with module Location = Location
-             and type account := Account.t
-             and type location := Location.t
-             and type hash := Hash.t
-             and type key := Key.t
-             and type key_set := Key.Set.t
-             and type parent := Base.t) =
-struct
+module type Inputs_intf = sig
+  include Inputs_intf.S
+
+  module Mask :
+    Masking_merkle_tree_intf.S
+    with module Location = Location
+     and type account := Account.t
+     and type location := Location.t
+     and type hash := Hash.t
+     and type key := Key.t
+     and type key_set := Key.Set.t
+     and type parent := Base.t
+end
+
+module Make (Inputs : Inputs_intf) = struct
+  open Inputs
   include Base
 
   let (registered_masks : Mask.Attached.t list Uuid.Table.t) =
     Uuid.Table.create ()
 
-  (* visualize the structure of the registered masks table (for debugging
-   * purposes) *)
+  module Node = struct
+    type t = Mask.Attached.t
+
+    type display =
+      {hash: string; uuid: string; total_currency: int; num_accounts: int}
+    [@@deriving yojson]
+
+    let format_uuid mask =
+      Visualization.display_prefix_of_string @@ Uuid.to_string
+      @@ Mask.Attached.get_uuid mask
+
+    let name mask = sprintf !"\"%s \"" (format_uuid mask)
+
+    let display mask =
+      let root_hash = Mask.Attached.merkle_root mask in
+      let num_accounts = Mask.Attached.num_accounts mask in
+      let total_currency =
+        Mask.Attached.foldi mask ~init:0 ~f:(fun _ total_currency account ->
+            total_currency + (Balance.to_int @@ Account.balance account) )
+      in
+      let uuid = format_uuid mask in
+      { hash= Visualization.display_short_sexp (module Hash) root_hash
+      ; num_accounts
+      ; total_currency
+      ; uuid }
+
+    let equal mask1 mask2 =
+      let open Mask.Attached in
+      Uuid.equal (get_uuid mask1) (get_uuid mask2)
+      && Hash.equal
+           (Mask.Attached.merkle_root mask1)
+           (Mask.Attached.merkle_root mask2)
+
+    let compare mask1 mask2 =
+      let open Mask.Attached in
+      match Uuid.compare (get_uuid mask1) (get_uuid mask2) with
+      | 0 -> Hash.compare (merkle_root mask1) (merkle_root mask2)
+      | x -> x
+
+    let hash mask = Uuid.hash @@ Mask.Attached.get_uuid mask
+  end
+
+  module Graphviz = Visualization.Make_ocamlgraph (Node)
+
+  let to_graph () =
+    let masks = List.concat @@ Uuid.Table.data registered_masks in
+    let uuid_to_masks_table =
+      Uuid.Table.of_alist_exn
+        (List.map masks ~f:(fun mask -> (Mask.Attached.get_uuid mask, mask)))
+    in
+    let open Graphviz in
+    Uuid.Table.fold uuid_to_masks_table ~init:empty
+      ~f:(fun ~key:uuid ~data:mask graph ->
+        let graph_with_mask = add_vertex graph mask in
+        Uuid.Table.find registered_masks uuid
+        |> Option.value_map ~default:graph_with_mask ~f:(fun children_masks ->
+               List.fold ~init:graph_with_mask children_masks
+                 ~f:(fun graph_with_mask_and_child ->
+                   add_edge graph_with_mask_and_child mask ) ) )
+
+  module Debug = struct
+    let visualize ~filename =
+      Out_channel.with_file filename ~f:(fun output_channel ->
+          let graph = to_graph () in
+          Graphviz.output_graph output_channel graph )
+  end
+
   module Visualize = struct
     module Summary = struct
       type t = [`Uuid of Uuid.t] * [`Hash of Hash.t] [@@deriving sexp_of]
@@ -117,4 +176,24 @@ struct
     in
     ignore (unregister_mask_exn parent t_as_mask) ;
     List.iter dangling_masks ~f:(fun m -> ignore (register_mask parent m))
+
+  let batch_notify_mask_children t accounts =
+    match Uuid.Table.find registered_masks (get_uuid t) with
+    | None -> ()
+    | Some masks ->
+        List.iter masks ~f:(fun mask ->
+            List.iter accounts ~f:(fun account ->
+                Mask.Attached.parent_set_notify mask account ) )
+
+  let set_batch t locations_and_accounts =
+    Base.set_batch t locations_and_accounts ;
+    batch_notify_mask_children t (List.map locations_and_accounts ~f:snd)
+
+  let set_batch_accounts t addresses_and_accounts =
+    Base.set_batch_accounts t addresses_and_accounts ;
+    batch_notify_mask_children t (List.map addresses_and_accounts ~f:snd)
+
+  let set_all_accounts_rooted_at_exn t address accounts =
+    Base.set_all_accounts_rooted_at_exn t address accounts ;
+    batch_notify_mask_children t accounts
 end

@@ -1,0 +1,6 @@
+(library
+  (name cache_lib)
+  (public_name cache_lib)
+  (inline_tests)
+  (libraries async_kernel core_kernel logger)
+  (preprocess (pps ppx_base ppx_let ppx_custom_printf ppx_inline_test ppx_optcomp)))

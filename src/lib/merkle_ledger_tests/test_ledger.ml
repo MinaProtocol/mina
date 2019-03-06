@@ -11,7 +11,10 @@ let%test_module "test functor on in memory databases" =
     module Balance = Test_stubs.Balance
 
     module Make (Depth : Intf.Depth) = struct
-      include Ledger.Make (Key_with_gen) (Account) (Hash) (Depth)
+      include Ledger.Make (struct
+        include Test_stubs.Base_inputs
+        module Depth = Depth
+      end)
 
       type key = Key_with_gen.t
 

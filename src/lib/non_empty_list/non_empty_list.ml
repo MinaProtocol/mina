@@ -15,11 +15,15 @@ let head (x, _) = x
 
 let tail (_, xs) = xs
 
+let last (x, xs) = if List.is_empty xs then x else List.last_exn xs
+
 let of_list_opt = function [] -> None | x :: xs -> Some (x, xs)
 
 let tail_opt t = of_list_opt (tail t)
 
 let map (x, xs) ~f = (f x, List.map ~f xs)
+
+let rev (x, xs) = List.fold xs ~init:(singleton x) ~f:(Fn.flip cons)
 
 (* As the Base.Container docs state, we'll add each function from C explicitly
  * rather than including C *)
@@ -42,3 +46,10 @@ let iter = C.iter
 let length = C.length
 
 let to_list (x, xs) = x :: xs
+
+let append (x, xs) ys = (x, xs @ to_list ys)
+
+let take (x, xs) = function
+  | 0 -> None
+  | 1 -> Some (x, [])
+  | n -> Some (x, List.take xs (n - 1))

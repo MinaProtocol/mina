@@ -73,7 +73,11 @@ module Make (Inputs : Intf.Inputs_intf) :
     | Ok res -> res
 
   let main daemon_address public_key shutdown_on_disconnect =
-    let log = Logger.create () in
+    let log =
+      Logger.create ()
+      |> Fn.flip Logger.child "snark-worker"
+      |> Fn.flip Logger.child __MODULE__
+    in
     let%bind state = Worker_state.create () in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
     let rec go () =
@@ -91,7 +95,7 @@ module Make (Inputs : Intf.Inputs_intf) :
             Worker_state.worker_wait_time
             +. (0.2 *. Random.float Worker_state.worker_wait_time)
           in
-          Logger.info log "No work; waiting %.3fs" random_delay ;
+          Logger.trace log "No work; waiting %.3fs" random_delay ;
           let%bind () = wait ~sec:random_delay () in
           go ()
       | Ok (Some work) -> (
