@@ -4,8 +4,7 @@ open Tuple_lib
 open Snark_params.Tick
 
 module type S = sig
-  module Pending_coinbase : Pending_coinbase_intf.S
-
+  (*module Pending_coinbase : Pending_coinbase_intf.S*)
   module Action : sig
     type t = Added | Updated | Deleted_added | Deleted_updated
     [@@deriving eq, sexp, bin_io]
@@ -53,7 +52,7 @@ module type S = sig
   val genesis : value
 end
 
-module Pending_coinbase = Pending_coinbase
+(*module Pending_coinbase = Pending_coinbase*)
 
 module Action = struct
   type t = Added | Updated | Deleted_added | Deleted_updated
@@ -180,7 +179,8 @@ let typ : (var, t) Typ.t =
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
 let genesis =
+  let empty_coinbase_tree = Pending_coinbase.empty_merkle_root () in
   { updated_stack= Pending_coinbase.Stack.empty
-  ; prev_root= Pending_coinbase.empty_merkle_root
-  ; new_root= Pending_coinbase.empty_merkle_root
+  ; prev_root= empty_coinbase_tree
+  ; new_root= empty_coinbase_tree
   ; action= Action.Updated }

@@ -381,7 +381,7 @@ module T = struct
 
   let merkle_root t = Merkle_tree.merkle_root t.tree
 
-  let empty_merkle_root = merkle_root (create_exn ())
+  let empty_merkle_root () = merkle_root (create_exn ())
 
   let with_next_index t ~is_new_stack =
     if is_new_stack then

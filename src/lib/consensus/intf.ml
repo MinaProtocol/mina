@@ -73,7 +73,6 @@ module type S = sig
     val display : value -> display
   end
 
-  (*module Pending_coinbase_update : Coda_base.Pending_coinbase_update.S*)
   module Blockchain_state : Coda_base.Blockchain_state.S
 
   module Prover_state :

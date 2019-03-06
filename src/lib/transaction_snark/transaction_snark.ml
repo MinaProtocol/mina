@@ -454,7 +454,6 @@ module Base = struct
       pending_coinbase_state (transaction : Transaction_union.t) handler =
     let prover_state : Prover_state.t =
       {state1; state2; transaction; sok_digest; pending_coinbase_state}
-      (*TODO: rename the field to coinbase_on_new_tree*)
     in
     let main top_hash = handle (main top_hash) handler in
     let top_hash =

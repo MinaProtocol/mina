@@ -700,14 +700,6 @@ end = struct
     let {Scan_state.Space_partition.first; second} =
       Scan_state.partition_if_overflowing scan_state
     in
-    let check_targets updated_stack ts =
-      if List.length ts > 0 then
-        let {Scan_state.Transaction_with_witness.statement; _} =
-          List.hd_exn (List.rev ts)
-        in
-        let target = statement.pending_coinbase_state.target in
-        assert (Pending_coinbase.Stack.equal updated_stack target)
-    in
     match second with
     | None ->
         let current_base_jobs =
@@ -743,7 +735,6 @@ end = struct
           update_ledger_and_get_statements ledger working_stack1
             (List.take transactions first)
         in
-        check_targets updated_stack1 data1 ;
         let%bind working_stack2 =
           next_stack pending_coinbase_collection ~is_new_stack:true
           |> Deferred.return
@@ -752,7 +743,6 @@ end = struct
           update_ledger_and_get_statements ledger working_stack2
             (List.drop transactions first)
         in
-        check_targets updated_stack2 data2 ;
         let%map first_has_coinbase =
           coinbase_exists
             ~get_transaction:(fun x -> Ok x)
@@ -1733,7 +1723,7 @@ let%test_module "test" =
       module Pending_coinbase = struct
         type t = Coinbase.t list list [@@deriving sexp, bin_io]
 
-        let empty_merkle_root = ""
+        let empty_merkle_root () = ""
 
         let hash _ = ""
 
@@ -1825,9 +1815,10 @@ let%test_module "test" =
           {prev_root; new_root; updated_stack; action}
 
         let genesis =
+          let empty_coinbase_tree = Pending_coinbase.empty_merkle_root () in
           { updated_stack= Pending_coinbase.Stack.empty
-          ; prev_root= Pending_coinbase.empty_merkle_root
-          ; new_root= Pending_coinbase.empty_merkle_root
+          ; prev_root= empty_coinbase_tree
+          ; new_root= empty_coinbase_tree
           ; action= Action.Added }
       end
 

@@ -559,8 +559,6 @@ end = struct
   let base_jobs_on_latest_tree t =
     Parallel_scan.base_jobs_on_latest_tree t.tree
 
-  let on_new_tree t = Parallel_scan.on_new_tree t.tree
-
   let staged_transactions t =
     List.map (Parallel_scan.current_data t.tree)
       ~f:(fun (t : Transaction_with_witness.t) -> t.transaction_with_info )

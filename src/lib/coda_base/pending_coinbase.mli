@@ -1,13 +1,11 @@
-open Core
+include Pending_coinbase_intf.S
+(*open Core_kernel
 open Snark_params
 open Snarky
 open Tick
 open Fold_lib
 open Snark_bits
-open Signature_lib
-open Currency
 
-module type S = sig
   type t [@@deriving sexp, bin_io]
 
   module Coinbase_data : sig
@@ -17,7 +15,7 @@ module type S = sig
   end
 
   module Stack_pos : sig
-    (** Used for both numbering the stacks (as keys for the sparse ledger nodes) and the address to the nodes*)
+  (** Used for both numbering the stacks (as keys for the sparse ledger) and the address to the nodes*)
     type t
 
     include Bits_intf.S with type t := t
@@ -49,35 +47,30 @@ module type S = sig
 
       include Snarkable.S with type value := value and type var := var
     end
+
   end
 
-  (*module Coinbase_stack : sig
-    module Stack : sig
-      type t
-      type var
-      (*include Data_hash.Full_size
+  module Stack : sig
+    include Data_hash.Full_size
 
-      val push_exn : t -> Coinbase.t -> t
+    val push_exn : t -> Coinbase.t -> t
+
+    val empty : t
+
+    module Checked : sig
+      type t = var
+
+      val push : t -> Coinbase_data.var -> (t, 'a) Tick0.Checked.t
 
       val empty : t
-
-      module Checked : sig
-        type t = var
-
-        val push : t -> Coinbase_data.var -> (t, 'a) Tick0.Checked.t
-
-        val empty : t
-      end*)
     end
- end*)
+  end
 
-  module rec Hash : sig
+  module Hash : sig
     include Data_hash.Full_size
 
     type path = Pedersen.Digest.t list
 
-    (*open Coinbase_stack*)
-    
     (*module Address : sig
       type var = Boolean.var list
 
@@ -94,7 +87,7 @@ module type S = sig
       | Find_index_of_oldest_stack : Stack_pos.t Request.t
       | Reset : unit Request.t
 
-    val get : var -> Stack_pos.Unpacked.var -> (Stack.var, _) Tick.Checked.t
+    val get : var -> Stack_pos.Unpacked.var -> (Stack.var, _) Checked.t
 
     val merge : height:int -> t -> t -> t
 
@@ -105,35 +98,17 @@ module type S = sig
     (*val get : var -> Address.var -> Stack.var*)
 
     val update_stack :
-      var -> is_new_stack:Boolean.var -> Stack.var -> (var, 's) Tick.Checked.t
-
-    val delete_stack : var -> (var, 's) Tick.Checked.t
-
-    val update_delete_stack :
          var
       -> is_new_stack:Boolean.var
-      -> stack:Stack.var
-      -> (var, 's) Tick.Checked.t
-  end
-  
-  and Stack : sig
-    include Data_hash.Full_size
+      -> Stack.var
+      -> (var, 's) Checked.t
 
-    val push_exn : t -> Coinbase.t -> t
+    val delete_stack : var -> (var, 's) Checked.t
 
-    val empty : t
-
-    module Checked : sig
-      type t = var
-
-      val push : t -> Coinbase_data.var -> (t, 'a) Tick.Checked.t
-
-      val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Tick.Checked.t
-
-      val empty : t
-    end
-
-    val hash : t -> Hash.t
+    val update_delete_stack: var
+    -> is_new_stack:Boolean.var
+    -> stack:Stack.var
+    -> (var, 's) Checked.t
   end
 
   val create_exn : unit -> t
@@ -158,5 +133,4 @@ module type S = sig
 
   val update_coinbase_stack_exn : t -> Stack.t -> is_new_stack:bool -> t
 
-  val latest_stack : t -> Stack.t option
-end
+  val latest_stack : t -> Stack.t option*)

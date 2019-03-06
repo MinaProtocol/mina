@@ -16,15 +16,12 @@ module type Inputs_intf = sig
   module Blockchain_state : Blockchain_state.S
 
   module Consensus_data : Consensus_data_intf
-  (*module Pending_coinbase_update : Pending_coinbase_update.S*)
 end
 
 module type S = sig
   module Blockchain_state : Blockchain_state.S
 
   module Consensus_data : Consensus_data_intf
-
-  (*module Pending_coinbase_update : Pending_coinbase_update.S*)
 
   type ( 'blockchain_state
        , 'consensus_data

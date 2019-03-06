@@ -113,14 +113,14 @@ module type Pending_coinbase_intf = sig
   type coinbase
 
   module Stack : sig
-    type t [@@deriving sexp, bin_io, eq]
+    type t [@@deriving sexp, bin_io]
 
     val push_exn : t -> coinbase -> t
 
     val empty : t
   end
 
-  val empty_merkle_root : pending_coinbase_hash
+  val empty_merkle_root : unit -> pending_coinbase_hash
 
   val merkle_root : t -> pending_coinbase_hash
 
