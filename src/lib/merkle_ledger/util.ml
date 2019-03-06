@@ -115,33 +115,32 @@ end = struct
     |> Non_empty_list.max_elt ~compare:Int.compare
 
   let set_raw_addresses t addresses_and_accounts =
-    let nonempty_addresses_and_accounts =
-      Non_empty_list.of_list_opt addresses_and_accounts |> Option.value_exn
-    in
-    let key_locations =
-      Non_empty_list.map nonempty_addresses_and_accounts
-        ~f:(fun (address, account) ->
-          (Inputs.Account.public_key account, address) )
-    in
-    let new_last_location =
-      let current_last_index =
-        let open Option.Let_syntax in
-        let%map last_location = Inputs.Base.last_filled t in
-        Inputs.Location.Addr.to_int
-        @@ Inputs.Location.to_path_exn last_location
-      in
-      let foreign_last_index =
-        compute_last_index
-          (Non_empty_list.map nonempty_addresses_and_accounts ~f:fst)
-      in
-      let max_index_in_all_accounts =
-        Option.value_map current_last_index ~default:foreign_last_index
-          ~f:(fun max_index -> Int.max max_index foreign_last_index )
-      in
-      Inputs.Location.(Account (Addr.of_int_exn max_index_in_all_accounts))
-    in
-    let last_location = new_last_location in
-    Inputs.set_location_batch ~last_location t key_locations
+    Option.iter (Non_empty_list.of_list_opt addresses_and_accounts)
+      ~f:(fun nonempty_addresses_and_accounts ->
+        let key_locations =
+          Non_empty_list.map nonempty_addresses_and_accounts
+            ~f:(fun (address, account) ->
+              (Inputs.Account.public_key account, address) )
+        in
+        let new_last_location =
+          let current_last_index =
+            let open Option.Let_syntax in
+            let%map last_location = Inputs.Base.last_filled t in
+            Inputs.Location.Addr.to_int
+            @@ Inputs.Location.to_path_exn last_location
+          in
+          let foreign_last_index =
+            compute_last_index
+              (Non_empty_list.map nonempty_addresses_and_accounts ~f:fst)
+          in
+          let max_index_in_all_accounts =
+            Option.value_map current_last_index ~default:foreign_last_index
+              ~f:(fun max_index -> Int.max max_index foreign_last_index )
+          in
+          Inputs.Location.(Account (Addr.of_int_exn max_index_in_all_accounts))
+        in
+        let last_location = new_last_location in
+        Inputs.set_location_batch ~last_location t key_locations )
 
   (* TODO: When we do batch on a database, we should add accounts, locations and hashes
      simulatenously for full atomicity. *)

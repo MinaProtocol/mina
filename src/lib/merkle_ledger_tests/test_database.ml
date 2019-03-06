@@ -185,10 +185,9 @@ let%test_module "test functor on in memory databases" =
                 let addresses_and_accounts =
                   MT.get_all_accounts_rooted_at_exn mdb address
                 in
-                if not @@ List.is_empty addresses_and_accounts then (
-                  MT.set_batch_accounts mdb addresses_and_accounts ;
-                  let new_merkle_root = MT.merkle_root mdb in
-                  assert (Hash.equal old_merkle_root new_merkle_root) ) ) )
+                MT.set_batch_accounts mdb addresses_and_accounts ;
+                let new_merkle_root = MT.merkle_root mdb in
+                assert (Hash.equal old_merkle_root new_merkle_root) ) )
 
       let%test_unit "set_batch_accounts would change the merkle root" =
         Test.with_instance (fun mdb ->
