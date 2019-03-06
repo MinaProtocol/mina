@@ -15,6 +15,8 @@ let head (x, _) = x
 
 let tail (_, xs) = xs
 
+let last (x, xs) = if List.is_empty xs then x else List.last_exn xs
+
 let of_list_opt = function [] -> None | x :: xs -> Some (x, xs)
 
 let tail_opt t = of_list_opt (tail t)

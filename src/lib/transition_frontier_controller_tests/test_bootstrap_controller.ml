@@ -8,33 +8,21 @@ end)
 
 open Stubs
 
-module Root_sync_ledger =
-  Syncable_ledger.Make (Ledger.Db.Addr) (Account.Stable.V1)
-    (struct
-      include Ledger_hash
+module Hash = struct
+  include Ledger_hash
 
-      let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
+  let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
-      let empty_account = hash_account Account.empty
-    end)
-    (struct
-      include Ledger_hash
+  let empty_account = hash_account Account.empty
+end
 
-      let to_hash (h : t) =
-        Ledger_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
-    end)
-    (struct
-      include Ledger.Db
-    end)
-    (struct
-      let subtree_height = 3
-    end)
+module Root_sync_ledger = Sync_ledger.Db
 
 module Bootstrap_controller = Bootstrap_controller.Make (struct
   include Transition_frontier_inputs
   module Transition_frontier = Transition_frontier
   module Merkle_address = Ledger.Db.Addr
-  module Root_sync_ledger = Root_sync_ledger
+  module Root_sync_ledger = Sync_ledger.Db
   module Network = Network
   module Time = Time
   module Protocol_state_validator = Protocol_state_validator

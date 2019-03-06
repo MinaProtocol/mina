@@ -5,7 +5,10 @@ module type Inputs_intf = sig
 
   module Key : Intf.Key
 
-  module Account : Intf.Account with type key := Key.t
+  module Balance : Intf.Balance
+
+  module Account :
+    Intf.Account with type balance := Balance.t and type key := Key.t
 
   module Hash : Intf.Hash with type account := Account.t
 

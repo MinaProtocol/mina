@@ -412,9 +412,9 @@ struct
       Visualization.Make_ocamlgraph (Transition_frontier.Breadcrumb)
 
     let visualize ~filename ~f breadcrumbs =
-      let output_channel = Out_channel.create filename in
-      let graph = f breadcrumbs in
-      Graph.output_graph output_channel graph
+      Out_channel.with_file filename ~f:(fun output_channel ->
+          let graph = f breadcrumbs in
+          Graph.output_graph output_channel graph )
 
     let graph_breadcrumb_list breadcrumbs =
       let initial_breadcrumb, tail_breadcrumbs =

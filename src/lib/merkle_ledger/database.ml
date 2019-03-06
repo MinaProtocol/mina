@@ -1,22 +1,26 @@
 open Core
 
-module Make
-    (Key : Intf.Key)
-    (Account : Intf.Account with type key := Key.t)
-    (Hash : Intf.Hash with type account := Account.t)
-    (Depth : Intf.Depth)
-    (Location : Location_intf.S)
-    (Kvdb : Intf.Key_value_database)
-    (Storage_locations : Intf.Storage_locations) :
+module type Inputs_intf = sig
+  include Base_inputs_intf.S
+
+  module Location : Location_intf.S
+
+  module Kvdb : Intf.Key_value_database
+
+  module Storage_locations : Intf.Storage_locations
+end
+
+module Make (Inputs : Inputs_intf) :
   Database_intf.S
-  with module Location = Location
-   and module Addr = Location.Addr
-   and type account := Account.t
-   and type root_hash := Hash.t
-   and type hash := Hash.t
-   and type key := Key.t
-   and type key_set := Key.Set.t = struct
+  with module Location = Inputs.Location
+   and module Addr = Inputs.Location.Addr
+   and type account := Inputs.Account.t
+   and type root_hash := Inputs.Hash.t
+   and type hash := Inputs.Hash.t
+   and type key := Inputs.Key.t
+   and type key_set := Inputs.Key.Set.t = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
+  open Inputs
   include Depth
 
   let () = assert (Depth.depth < 0xfe)
@@ -225,6 +229,7 @@ module Make
 
   include Util.Make (struct
     module Key = Key
+    module Balance = Balance
     module Location = Location
     module Account = Account
     module Hash = Hash
