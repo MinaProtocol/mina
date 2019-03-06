@@ -1572,8 +1572,8 @@ let%test_module "Proof of stake tests" =
 
     let%test_unit "update, update_var agree starting from same consensus state"
         =
-      ignore
-        (let open Quickcheck.Let_syntax in
+      let gen =
+        let open Quickcheck.Let_syntax in
         (* build pieces needed to apply "update" *)
         let gen_slot_advancement = Core.Int.gen_incl 1 10 in
         let%bind make_consensus_state =
@@ -1609,8 +1609,8 @@ let%test_module "Proof of stake tests" =
           |> Or_error.ok_exn
         in
         (* build pieces needed to apply "update_var" *)
-        ignore
-          (let open Snark_params.Tick in
+        let checked_computation =
+          let open Snark_params.Tick in
           let open Let_syntax in
           (* work in Checked monad *)
           let%bind previous_state =
@@ -1631,19 +1631,32 @@ let%test_module "Proof of stake tests" =
             exists Coda_base.Frozen_ledger_hash.typ
               ~compute:(As_prover.return snarked_ledger_hash)
           in
-          let%bind `Success _, new_state_var =
+          let result =
             update_var previous_state transition_data
               previous_protocol_state_hash ~supply_increase
               ~previous_blockchain_state_ledger_hash
           in
-          let%bind new_consensus_state_var =
-            exists typ ~compute:(As_prover.return next_consensus_state)
+          let open Signature_lib in
+          let open Snark_params in
+          let ledger = Coda_base.Ledger.create () in
+          let ({public_key; private_key} : Keypair.t) = Keypair.create () in
+          let public_key_compressed = Public_key.compress public_key in
+          let sparse_ledger =
+            Coda_base.Sparse_ledger.of_ledger_subset_exn ledger
+              [public_key_compressed]
           in
-          (* please forgive use of polymorphic equality *)
-          assert (new_state_var = new_consensus_state_var) ;
-          return ()) ;
-        return ()) ;
-      ()
+          let handler =
+            Prover_state.handler
+              {delegator= 42 (* TODO *); ledger= sparse_ledger; private_key}
+          in
+          let%map `Success _, var = Tick.handle result handler in
+          As_prover.read typ var
+        in
+        (* setup handler *)
+        assert (equal_value checked_computation next_consensus_state) ;
+        return ()
+      in
+      Quickcheck.test gen ~f:(fun () -> ())
   end )
 
 [%%endif]
