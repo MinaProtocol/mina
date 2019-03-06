@@ -54,6 +54,9 @@ RUN cd /ocaml-sodium && yes | opam pin add .
 ADD /src/external/rpc_parallel /rpc_parallel
 RUN cd /rpc_parallel && yes | opam pin add .
 
+ADD /src/external/async_kernel /async_kernel
+RUN sudo rm -rf /async_kernel/.git && cd /async_kernel && yes | opam pin add .
+
 # Get coda-kademlia from packages repo
 RUN sudo apt-get install --yes apt-transport-https ca-certificates && \
       echo "deb [trusted=yes] https://packages.o1test.net unstable main" | sudo tee -a /etc/apt/sources.list.d/coda.list && \

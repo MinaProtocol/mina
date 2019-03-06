@@ -1,15 +1,35 @@
 open Core
 open Import
 
-module T = struct
-  type t =
-    { proposer: Public_key.Compressed.t
-    ; amount: Currency.Amount.t
-    ; fee_transfer: Fee_transfer.single option }
-  [@@deriving sexp, bin_io, compare, eq]
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      let version = 1
+
+      type t =
+        { proposer: Public_key.Compressed.t
+        ; amount: Currency.Amount.t
+        ; fee_transfer: Fee_transfer.single option }
+      [@@deriving sexp, bin_io, compare, eq]
+    end
+
+    include T
+    include Module_version.Registration.Make_latest_version (T)
+  end
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "coda_base_coinbase"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Module_version.Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
 end
 
-include T
+include Stable.Latest
 
 let is_valid {proposer= _; amount; fee_transfer} =
   match fee_transfer with
@@ -45,3 +65,14 @@ let supply_increase {proposer= _; amount; fee_transfer} =
 let fee_excess t =
   Or_error.map (supply_increase t) ~f:(fun _increase ->
       Currency.Fee.Signed.zero )
+
+let gen =
+  let open Quickcheck.Let_syntax in
+  let%bind proposer = Public_key.Compressed.gen in
+  let%bind amount = Currency.Amount.gen in
+  let fee =
+    Currency.Fee.gen_incl Currency.Fee.zero (Currency.Amount.to_fee amount)
+  in
+  let prover = Public_key.Compressed.gen in
+  let%map fee_transfer = Option.gen (Quickcheck.Generator.tuple2 prover fee) in
+  {proposer; amount; fee_transfer}

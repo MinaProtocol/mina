@@ -30,6 +30,8 @@ let account = create "CodaAccount"
 
 let merkle_tree i = create (Printf.sprintf "CodaMklTree%03d" i)
 
+let coinbase_merkle_tree i = create (Printf.sprintf "CodaCbMklTree%03d" i)
+
 let proof_of_work = create "CodaPoW"
 
 let merge_snark = create "CodaMergeSnark"
@@ -47,3 +49,9 @@ let epoch_seed = create "CodaEpochSeed"
 let vrf_message = create "CodaVrfMessage"
 
 let vrf_output = create "CodaVrfOutput"
+
+let pending_coinbases = create "PendingCoinbases"
+
+let coinbase_stack = create "CoinbaseStack"
+
+let coinbase = create "Coinbase"

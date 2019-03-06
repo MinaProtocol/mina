@@ -2,13 +2,21 @@ open Core_kernel
 
 (* Little endian *)
 let bits_to_string bits =
+  let n = Array.length bits in
   let rec make_byte offset acc i =
-    if i = 8 then Char.of_int_exn acc
+    let finished = i = 8 || offset + i >= n in
+    if finished then Char.of_int_exn acc
     else
       let acc = if bits.(offset + i) then acc lor (1 lsl i) else acc in
       make_byte offset acc (i + 1)
   in
-  String.init (Array.length bits / 8) ~f:(fun i -> make_byte (8 * i) 0 0)
+  let len = (n + 7) / 8 in
+  String.init len ~f:(fun i -> make_byte (8 * i) 0 0)
+
+let%test_unit "bits_to_string" =
+  [%test_eq: string]
+    (bits_to_string [|true; false|])
+    (String.of_char_list [Char.of_int_exn 1])
 
 let string_to_bits s =
   Array.init
@@ -150,7 +158,7 @@ module Make (Impl : Snarky.Snark_intf.S) : S with module Impl := Impl = struct
 
   let pad_input bs =
     let n = Array.length bs in
-    if n mod 512 = 0 then bs
+    if n mod block_size_in_bits = 0 then bs
     else
       Array.append bs
         (Array.create
@@ -166,7 +174,6 @@ module Make (Impl : Snarky.Snark_intf.S) : S with module Impl := Impl = struct
 
   let blake2s ?(personalization = default_personalization) input =
     assert (String.length personalization = 8) ;
-    assert (Array.length input mod 8 = 0) ;
     let p o =
       let c j = Char.to_int personalization.[o + j] lsl (8 * j) in
       c 0 + c 1 + c 2 + c 3
@@ -215,10 +222,11 @@ module Make (Impl : Snarky.Snark_intf.S) : S with module Impl := Impl = struct
             Unsigned.UInt64.(Infix.((of_int i + one) * of_int 64))
             false )
     in
+    let input_length_in_bytes = (Array.length input + 7) / 8 in
     let%bind () =
       compression h
         blocks.(Array.length blocks - 1)
-        (Unsigned.UInt64.of_int (Array.length input / 8))
+        (Unsigned.UInt64.of_int input_length_in_bytes)
         true
     in
     return (concat_int32s h)

@@ -48,6 +48,8 @@ module Inputs = struct
 
   module Transaction = Coda_base.Transaction
   module Sparse_ledger = Coda_base.Sparse_ledger
+  module Pending_coinbase = Coda_base.Pending_coinbase
+  module Transaction_witness = Coda_base.Transaction_witness
 
   (* TODO: Use public_key once SoK is implemented *)
   let perform_single ({m= (module M); cache} : Worker_state.t) ~message =
@@ -59,12 +61,14 @@ module Inputs = struct
       | Some proof -> Or_error.return (proof, Time.Span.zero)
       | None -> (
         match single with
-        | Work.Single.Spec.Transition (input, t, l) ->
+        | Work.Single.Spec.Transition (input, t, (w : Transaction_witness.t))
+          ->
             let start = Time.now () in
             let res =
               M.of_transaction ~sok_digest ~source:input.Statement.source
                 ~target:input.target t
-                (unstage (Coda_base.Sparse_ledger.handler l))
+                ~pending_coinbase_state:input.Statement.pending_coinbase_state
+                (unstage (Coda_base.Sparse_ledger.handler w.ledger))
             in
             Cache.add cache ~statement ~proof:res ;
             let total = Time.abs_diff (Time.now ()) start in

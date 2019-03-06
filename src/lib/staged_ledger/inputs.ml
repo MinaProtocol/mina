@@ -31,9 +31,26 @@ module type S = sig
     val of_ledger_hash : Ledger_hash.t -> t
   end
 
+  module Pending_coinbase_hash : Coda_pow.Pending_coinbase_hash_intf
+
+  module Pending_coinbase :
+    Coda_pow.Pending_coinbase_intf
+    with type pending_coinbase_hash := Pending_coinbase_hash.t
+     and type coinbase := Coinbase.t
+
+  module Pending_coinbase_stack_state :
+    Coda_pow.Pending_coinbase_stack_state_intf
+    with type pending_coinbase_hash := Pending_coinbase.Stack.t
+
+  module Pending_coinbase_update :
+    Pending_coinbase_update_intf
+    with type pending_coinbase_hash := Pending_coinbase_hash.t
+     and type pending_coinbase_stack := Pending_coinbase.Stack.t
+
   module Ledger_proof_statement :
     Coda_pow.Ledger_proof_statement_intf
     with type ledger_hash := Frozen_ledger_hash.t
+     and type pending_coinbase_state := Pending_coinbase_stack_state.t
 
   module Proof : sig
     type t
@@ -113,4 +130,8 @@ module type S = sig
 
     val apply_transaction_exn : t -> Transaction.t -> t
   end
+
+  module Transaction_witness :
+    Coda_pow.Transaction_witness_intf
+    with type sparse_ledger := Sparse_ledger.t
 end

@@ -1,6 +1,6 @@
 open Async_kernel
 open Core
-open Banlist_lib
+open Coda_base
 open Pipe_lib
 open Network_peer
 
@@ -9,14 +9,14 @@ exception Child_died
 module type S = sig
   type t
 
-  type banlist
+  type trust_system
 
   val connect :
        initial_peers:Host_and_port.t list
     -> me:Peer.t
     -> parent_log:Logger.t
     -> conf_dir:string
-    -> banlist:banlist
+    -> trust_system:trust_system
     -> t Deferred.Or_error.t
 
   val peers : t -> Peer.t list
@@ -89,20 +89,22 @@ module Haskell_process = struct
         ~args:[Pid.to_string (Process.pid process)]
         ()
     in
+    let%bind _ = Process.wait process in
     Sys.remove lock_path
 
-  let cli_format peer : string =
+  let cli_format (peer : Peer.t) : string =
     (* assertion for discovery_port = external_port - 1 *)
     assert (Int.equal (peer.Peer.discovery_port - 1) peer.communication_port) ;
     Printf.sprintf "(\"%s\", %d)"
       (Unix.Inet_addr.to_string peer.host)
       peer.discovery_port
 
-  let cli_format_initial_peer addr : string =
+  let cli_format_initial_peer (addr : Host_and_port.t) : string =
     Printf.sprintf "(\"%s\", %d)" (Host_and_port.host addr)
       (Host_and_port.port addr)
 
-  let filter_initial_peers initial_peers (me : Peer.t) =
+  let filter_initial_peers (initial_peers : Host_and_port.t list) (me : Peer.t)
+      =
     let me_host_and_discovery_port = Peer.to_discovery_host_and_port me in
     List.filter initial_peers ~f:(fun peer ->
         not (Host_and_port.equal peer me_host_and_discovery_port) )
@@ -117,7 +119,8 @@ module Haskell_process = struct
     filter_initial_peers [Peer.to_discovery_host_and_port me; other] me
     = [other]
 
-  let create ~initial_peers ~me ~log ~conf_dir =
+  let create ~(initial_peers : Host_and_port.t list) ~(me : Peer.t) ~log
+      ~conf_dir =
     let lock_path = Filename.concat conf_dir lock_file in
     let filtered_initial_peers = filter_initial_peers initial_peers me in
     let run_kademlia () =
@@ -146,7 +149,7 @@ module Haskell_process = struct
       with
       | Ok p ->
           (* If the Kademlia process dies, kill the parent daemon process. Fix
-           * for #550 *)
+         * for #550 *)
           Deferred.upon (Process.wait p.process) (fun code ->
               match (!(p.failure_response), code) with
               | `Ignore, _ | _, Ok () -> ()
@@ -237,26 +240,22 @@ module Haskell_process = struct
 end
 
 module Make
-    (P : Process_intf) (Banlist : sig
+    (P : Process_intf) (Trust_system : sig
         type t
 
-        type punishment
-
+        (* TODO punish peers from kad? *)
+        (* val record : t -> Logger.t -> Unix.Inet_addr.Blocking_sexp.t -> Trust_system.Actions.t -> unit Deferred.t *)
         val lookup :
-             t
-          -> Host_and_port.t
-          -> [ `Normal
-             | `Punished of punishment
-             | `Suspicious of Banlist.Score.t ]
+          t -> Unix.Inet_addr.Blocking_sexp.t -> Peer_trust.Peer_status.t
     end) : sig
-  include S with type banlist := Banlist.t
+  include S with type trust_system := Trust_system.t
 
   module For_tests : sig
     val node :
          Peer.t
       -> Host_and_port.t sexp_list
       -> string
-      -> Banlist.t
+      -> Trust_system.t
       -> t Deferred.t
   end
 end = struct
@@ -268,15 +267,21 @@ end = struct
     ; changes_reader: Peer.Event.t Linear_pipe.Reader.t
     ; changes_writer: Peer.Event.t Linear_pipe.Writer.t
     ; first_peers: Peer.t list Deferred.t
-    ; banlist: Banlist.t }
+    ; trust_system: Trust_system.t }
 
-  let is_banned banlist peer =
-    match Banlist.lookup banlist peer with `Punished _ -> true | _ -> false
+  let host_and_port_to_addr ({host; _} : Host_and_port.t) =
+    Unix.Inet_addr.of_string host
 
-  let live t lives =
+  let is_banned trust_system (peer : Host_and_port.t) =
+    match Trust_system.lookup trust_system (host_and_port_to_addr peer) with
+    | {banned= Banned_until _; _} -> true
+    | _ -> false
+
+  let live t (lives : (Peer.t * string) list) =
     let unbanned_lives =
       List.filter lives ~f:(fun (peer, _) ->
-          not (is_banned t.banlist (Peer.to_discovery_host_and_port peer)) )
+          not (is_banned t.trust_system (Peer.to_discovery_host_and_port peer))
+      )
     in
     List.iter unbanned_lives ~f:(fun (peer, kkey) ->
         let _ = Peer.Table.add ~key:peer ~data:kkey t.peers in
@@ -286,17 +291,18 @@ end = struct
         (Peer.Event.Connect (List.map unbanned_lives ~f:fst))
     else Deferred.unit
 
-  let dead t deads =
+  let dead t (deads : Peer.t list) =
     List.iter deads ~f:(fun peer -> Peer.Table.remove t.peers peer) ;
     if List.length deads > 0 then
       Linear_pipe.write t.changes_writer (Peer.Event.Disconnect deads)
     else Deferred.unit
 
-  let connect ~initial_peers ~me ~parent_log ~conf_dir ~banlist =
+  let connect ~(initial_peers : Host_and_port.t list) ~(me : Peer.t)
+      ~parent_log ~conf_dir ~trust_system =
     let open Deferred.Or_error.Let_syntax in
     let log = Logger.child parent_log "membership" in
     let filtered_peers =
-      List.filter initial_peers ~f:(Fn.compose not (is_banned banlist))
+      List.filter initial_peers ~f:(Fn.compose not (is_banned trust_system))
     in
     let%map p = P.create ~initial_peers:filtered_peers ~me ~log ~conf_dir in
     let peers = Peer.Table.create () in
@@ -305,7 +311,9 @@ end = struct
     let first_peers =
       Deferred.create (fun ivar -> first_peers_ivar := Some ivar)
     in
-    let t = {p; peers; changes_reader; changes_writer; first_peers; banlist} in
+    let t =
+      {p; peers; changes_reader; changes_writer; first_peers; trust_system}
+    in
     don't_wait_for
       (Pipe.iter (P.output p ~log) ~f:(fun lines ->
            let lives, deads =
@@ -358,7 +366,9 @@ end = struct
     let peers = Peer.Table.keys t.peers in
     let banned_peers, normal_peers =
       split peers
-        ~f:(Fn.compose (is_banned t.banlist) Peer.to_discovery_host_and_port)
+        ~f:
+          (Fn.compose (is_banned t.trust_system)
+             Peer.to_discovery_host_and_port)
     in
     don't_wait_for (dead t banned_peers) ;
     normal_peers
@@ -370,37 +380,29 @@ end = struct
   let stop t = P.kill t.p
 
   module For_tests = struct
-    let node me peers conf_dir banlist =
+    let node (me : Peer.t) (peers : Host_and_port.t list) conf_dir trust_system
+        =
       connect ~initial_peers:peers ~me ~parent_log:(Logger.create ()) ~conf_dir
-        ~banlist
+        ~trust_system
       >>| Or_error.ok_exn
   end
 end
 
-module Haskell = struct
-  module Banlist = struct
-    include Coda_base.Banlist
-
-    type punishment = Coda_base.Banlist.Punishment_record.t
-  end
-
-  include Make (Haskell_process) (Banlist)
-end
+module Haskell = Make (Haskell_process) (Trust_system)
 
 let%test_module "Tests" =
   ( module struct
     open Core
 
-    module Mocked_banlist = struct
+    module Mocked_trust = struct
       type t = unit
 
-      type punishment = unit
-
-      let lookup (_ : t) (_ : Host_and_port.t) = `Normal
+      let lookup (_ : t) (_ : Unix.Inet_addr.t) =
+        Peer_trust.Peer_status.{trust= 0.0; banned= Unbanned}
     end
 
     module type S_test = sig
-      include S with type banlist := unit
+      include S with type trust_system := unit
 
       val connect :
            initial_peers:Host_and_port.t list
@@ -411,9 +413,9 @@ let%test_module "Tests" =
     end
 
     module Make_test (P : Process_intf) = struct
-      include Make (P) (Mocked_banlist)
+      include Make (P) (Mocked_trust)
 
-      let connect = connect ~banlist:()
+      let connect = connect ~trust_system:()
     end
 
     let fold_membership (module M : S_test) :
@@ -544,15 +546,6 @@ let%test_module "Tests" =
       let open Core in
       Async.(after (Time.Span.of_sec s))
 
-    let poll wait_time ~f =
-      let rec should_continue () =
-        let%bind condition = f () in
-        if condition then Deferred.unit else wait_sec 0.5 >>= should_continue
-      in
-      Deferred.any
-        [ (should_continue () >>| fun () -> true)
-        ; (wait_sec wait_time >>| fun () -> false) ]
-
     let run_connection_test ~f =
       retry 3 (fun () ->
           Async.Thread_safe.block_on_async_exn (fun () ->
@@ -560,8 +553,12 @@ let%test_module "Tests" =
                   File_system.with_temp_dir (conf_dir ^ "2")
                     ~f:(fun conf_dir_2 -> f conf_dir_1 conf_dir_2 ) ) ) )
 
-    let create_banlist () =
-      Haskell.Banlist.create ~suspicious_dir:"" ~punished_dir:""
+    let get_temp_dir () =
+      let tmpdir = Filename.temp_dir "test_trust_db" "" in
+      at_exit (fun () -> Sys.command_exn @@ "rm -rf '" ^ tmpdir ^ "'") ;
+      tmpdir
+
+    let create_trust_system () = Trust_system.create ~db_dir:(get_temp_dir ())
 
     let%test_unit "connect" =
       (* This flakes 1 in 20 times, so try a couple times if it fails *)
@@ -569,11 +566,11 @@ let%test_module "Tests" =
           let open Deferred.Let_syntax in
           let%bind n0 =
             Haskell.For_tests.node (peer_of_int 0) [] conf_dir_1
-              (create_banlist ())
+              (create_trust_system ())
           and n1 =
             Haskell.For_tests.node (peer_of_int 1)
               [Peer.to_discovery_host_and_port (peer_of_int 0)]
-              conf_dir_2 (create_banlist ())
+              conf_dir_2 (create_trust_system ())
           in
           let%bind n0_peers =
             Deferred.any
@@ -593,106 +590,89 @@ let%test_module "Tests" =
           let%bind () = Haskell.stop n0 and () = Haskell.stop n1 in
           Deferred.unit )
 
-    let%test_module "Banlist" =
+    let%test_module "Trust" =
       ( module struct
-        module Score = Banlist.Score
-        module Suspicious_db =
-          Banlist.Key_value_database.Make_mock (Host_and_port) (Score)
+        (* TODO: Re-enable #1725
+        let poll wait_time ~f =
+          let rec should_continue () =
+            let%bind condition = f () in
+            if condition then Deferred.unit else wait_sec 0.5 >>= should_continue
+          in
+          Deferred.any
+            [ (should_continue () >>| fun () -> true)
+            ; (wait_sec wait_time >>| fun () -> false) ]
 
-        let ban_duration_int = 10.0
 
-        let ban_duration = Time.Span.of_sec ban_duration_int
+        (* Mock trust system *)
+        module Trust_system = struct
+          type t = Unix.Inet_addr.Set.t ref
 
-        module Punishment_record = struct
-          type time = Time.t
+          let lookup t addr =
+            if Unix.Inet_addr.Set.mem !t addr then
+              Peer_trust.Peer_status.
+                { trust= -1.
+                ; banned= Peer_trust.Banned_status.Banned_until Time.epoch }
+            else
+              Peer_trust.Peer_status.
+                {trust= 0.; banned= Peer_trust.Banned_status.Unbanned}
 
-          include Banlist.Punishment.Record.Make (struct
-            let duration = ban_duration
-          end)
+          let create () = ref Unix.Inet_addr.Set.empty
         end
 
-        module Punished_db =
-          Banlist.Punished_db.Make (Host_and_port) (Time) (Punishment_record)
-            (Banlist.Key_value_database.Make_mock
-               (Host_and_port)
-               (Punishment_record))
+        module Haskell_trust = Make (Haskell_process) (Trust_system)
 
-        let ban_threshold = 100
-
-        module Score_mechanism = struct
-          open Banlist.Offense
-
-          let score offense =
-            Banlist.Score.of_int
-              ( match offense with
-              | Failed_to_connect -> ban_threshold + 1
-              | Send_bad_hash -> ban_threshold / 2
-              | Send_bad_aux -> ban_threshold / 4 )
-        end
-
-        module Banlist = struct
-          type punishment = Punishment_record.t
-
-          include Banlist.Make (Host_and_port) (Punishment_record)
-                    (Suspicious_db)
-                    (Punished_db)
-                    (Score_mechanism)
-
-          let create () =
-            create ~ban_threshold ~suspicious_dir:"" ~punished_dir:""
-        end
-
-        module Haskell_banlist = Make (Haskell_process) (Banlist)
-
-        let reset node ~addr ~conf_dir ~banlist ~peers =
-          let%bind () = Haskell_banlist.stop node in
-          Haskell_banlist.For_tests.node addr peers conf_dir banlist
+        let reset node ~addr ~conf_dir ~trust_system ~peers =
+          let%bind () = Haskell_trust.stop node in
+          Haskell_trust.For_tests.node addr peers conf_dir trust_system
 
         let%test_unit "connect with ban logic" =
-          (* This flakes 1 in 20 times, so try a couple times if it fails *)
-          run_connection_test ~f:(fun banner_conf_dir normal_conf_dir ->
-              let banner_addr = peer_of_int 0 in
-              let normal_addr = peer_of_int 1 in
-              let normal_peer = Peer.to_discovery_host_and_port normal_addr in
-              let banlist = Banlist.create () in
-              let%bind banner_node =
-                Haskell_banlist.For_tests.node banner_addr [normal_peer]
-                  banner_conf_dir banlist
-              and normal_node =
-                Haskell.For_tests.node normal_addr [] normal_conf_dir
-                  (create_banlist ())
-              in
-              let%bind initial_discovered_peers =
-                Deferred.any
-                  [ Haskell_banlist.first_peers banner_node
-                  ; Deferred.map (wait_sec 10.) ~f:(fun () -> []) ]
-              in
-              assert (List.length initial_discovered_peers <> 0) ;
-              Banlist.ban banlist normal_peer
-                (Punishment_record.create_timeout
-                   (Score.of_int (ban_threshold + 1))) ;
-              let%bind is_not_connected_to_banned_peer =
-                poll (ban_duration_int /. 2.0) ~f:(fun () ->
-                    let peers_after_ban = Haskell_banlist.peers banner_node in
-                    return (List.length peers_after_ban = 0) )
-              in
-              assert is_not_connected_to_banned_peer ;
-              let%bind new_banner_node =
-                reset banner_node ~addr:banner_addr ~conf_dir:banner_conf_dir
-                  ~banlist ~peers:[normal_peer]
-              in
-              let%bind is_reconnecting_to_banned_peer =
-                poll (ban_duration_int /. 2.0) ~f:(fun () ->
-                    let%map peers_after_reconnect =
-                      Haskell_banlist.first_peers new_banner_node
-                    in
-                    List.length peers_after_reconnect <> 0
-                    && List.hd_exn peers_after_reconnect = peer_of_int 1 )
-              in
-              assert is_reconnecting_to_banned_peer ;
-              let%bind () = Haskell_banlist.stop new_banner_node
-              and () = Haskell.stop normal_node in
-              Deferred.unit )
+            (* This flakes 1 in 20 times, so try a couple times if it fails *)
+            run_connection_test ~f:(fun banner_conf_dir normal_conf_dir ->
+                let banner_addr = peer_of_int 0 in
+                let normal_addr = peer_of_int 1 in
+                let normal_peer = Peer.to_discovery_host_and_port normal_addr in
+                let trust_system = Trust_system.create () in
+                let%bind banner_node =
+                  Haskell_trust.For_tests.node banner_addr [normal_peer]
+                    banner_conf_dir trust_system
+                and normal_node =
+                  Haskell.For_tests.node normal_addr [] normal_conf_dir
+                    (create_trust_system ())
+                in
+                let%bind initial_discovered_peers =
+                  Deferred.any
+                    [ Haskell_trust.first_peers banner_node
+                    ; Deferred.map (wait_sec 10.) ~f:(fun () -> []) ]
+                in
+                assert (List.length initial_discovered_peers <> 0) ;
+                trust_system :=
+                  Unix.Inet_addr.Set.add !trust_system normal_addr.host ;
+                let%bind is_not_connected_to_banned_peer =
+                  poll 5. ~f:(fun () ->
+                      let peers_after_ban = Haskell_trust.peers banner_node in
+                      return (List.length peers_after_ban = 0) )
+                in
+                assert is_not_connected_to_banned_peer ;
+                trust_system := Unix.Inet_addr.Set.empty ;
+                let%bind new_banner_node =
+                  reset banner_node ~addr:banner_addr ~conf_dir:banner_conf_dir
+                    ~trust_system ~peers:[normal_peer]
+                in
+                let%bind is_reconnecting_to_banned_peer =
+                  poll 10. ~f:(fun () ->
+                      let peers_after_reconnect =
+                        Haskell_trust.peers new_banner_node
+                      in
+                      Deferred.return
+                      @@ Option.is_some
+                        (List.find peers_after_reconnect ~f:(fun p ->
+                             p = peer_of_int 1 )) )
+                in
+                assert is_reconnecting_to_banned_peer ;
+                let%bind () = Haskell_trust.stop new_banner_node
+                and () = Haskell.stop normal_node in
+                Deferred.unit ) *)
+      
       end )
 
     let%test_unit "lockfile does not exist after connection calling stop" =
@@ -702,7 +682,7 @@ let%test_module "Tests" =
           File_system.with_temp_dir conf_dir ~f:(fun temp_dir ->
               let%bind n =
                 Haskell.For_tests.node (peer_of_int 1) [] temp_dir
-                  (create_banlist ())
+                  (create_trust_system ())
               in
               let lock_path = Filename.concat temp_dir lock_file in
               let%bind yes_result = Sys.file_exists lock_path in

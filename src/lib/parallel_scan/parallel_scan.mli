@@ -201,3 +201,8 @@ val current_job_sequence_number : ('a, 'd) State.t -> int
 
 val view_jobs_with_position :
   ('a, 'd) State.t -> ('a -> 'c) -> ('d -> 'c) -> 'c Job_view.t list
+
+val base_jobs_on_latest_tree : ('a, 'd) State.t -> 'd list
+(** All the base jobs that are part of the latest tree being filled 
+ * i.e., does not include base jobs that are part of previous trees not 
+ * promoted to the merge jobs yet*)

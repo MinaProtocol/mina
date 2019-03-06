@@ -3,6 +3,7 @@ open Fold_lib
 open Tuple_lib
 open Snark_params.Tick
 open Coda_digestif
+open Module_version
 
 module Aux_hash = struct
   let length_in_bits = 256
@@ -11,11 +12,29 @@ module Aux_hash = struct
 
   module Stable = struct
     module V1 = struct
-      type t = string [@@deriving bin_io, sexp, eq, compare, hash]
+      module T = struct
+        let version = 1
+
+        type t = string [@@deriving bin_io, sexp, eq, compare, hash]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "staged_ledger_hash_aux_hash"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
+  include Stable.Latest
 
   let of_bytes = Fn.id
 
@@ -29,16 +48,30 @@ end
 module Stable = struct
   module V1 = struct
     module T = struct
+      let version = 1
+
       type t = {ledger_hash: Ledger_hash.Stable.V1.t; aux_hash: Aux_hash.t}
       [@@deriving bin_io, sexp, eq, compare, hash]
     end
 
     include T
+    include Registration.Make_latest_version (T)
     include Hashable.Make_binable (T)
   end
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "staged_ledger_hash"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
 end
 
-include Stable.V1
+include Stable.Latest
 
 let ledger_hash {ledger_hash; _} = ledger_hash
 

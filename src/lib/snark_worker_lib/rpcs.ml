@@ -9,7 +9,11 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     type query = unit [@@deriving bin_io]
 
     type response =
-      (Statement.t, Transaction.t, Sparse_ledger.t, Proof.t) Work.Single.Spec.t
+      ( Statement.t
+      , Transaction.t
+      , Transaction_witness.t
+      , Proof.t )
+      Work.Single.Spec.t
       Work.Spec.t
       option
     [@@deriving bin_io]
@@ -22,7 +26,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     type query =
       ( ( Statement.t
         , Transaction.t
-        , Sparse_ledger.t
+        , Transaction_witness.t
         , Proof.t )
         Work.Single.Spec.t
         Work.Spec.t

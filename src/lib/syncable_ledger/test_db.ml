@@ -7,7 +7,7 @@ struct
   open Merkle_ledger_tests.Test_stubs
 
   module Hash = struct
-    type t = Hash.t [@@deriving sexp, hash, compare, bin_io, eq]
+    include Hash
 
     type account = Account.t
 
@@ -53,6 +53,8 @@ struct
     let get_all_accounts_rooted_at_exn = MT.get_all_accounts_rooted_at_exn
 
     let set_all_accounts_rooted_at_exn = MT.set_all_accounts_rooted_at_exn
+
+    let set_batch_accounts = MT.set_batch_accounts
 
     let get_inner_hash_at_addr_exn = MT.get_inner_hash_at_addr_exn
 

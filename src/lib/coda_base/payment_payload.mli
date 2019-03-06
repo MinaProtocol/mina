@@ -1,7 +1,6 @@
 open Core
 open Fold_lib
 open Tuple_lib
-open Coda_numbers
 open Snark_params.Tick
 open Import
 

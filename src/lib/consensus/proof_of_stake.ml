@@ -125,6 +125,7 @@ module Local_state = struct
   type t =
     { mutable last_epoch_snapshot: Snapshot.t option
     ; mutable curr_epoch_snapshot: Snapshot.t option
+    ; pending_coinbase_collection: Coda_base.Pending_coinbase.t
     ; genesis_epoch_snapshot: Snapshot.t
     ; proposer_public_key: Public_key.Compressed.t option }
   [@@deriving sexp]
@@ -154,9 +155,13 @@ module Local_state = struct
           in
           {delegators; ledger}
     in
+    let pending_coinbase_collection =
+      Coda_base.Pending_coinbase.create_exn ()
+    in
     { last_epoch_snapshot= None
     ; curr_epoch_snapshot= None
     ; genesis_epoch_snapshot
+    ; pending_coinbase_collection
     ; proposer_public_key }
 end
 
@@ -578,14 +583,29 @@ module Vrf = struct
       let dummy_sparse_ledger =
         Coda_base.Sparse_ledger.of_ledger_subset_exn Genesis_ledger.t [pk]
       in
+      let empty_pending_coinbase = Coda_base.Pending_coinbase.create_exn () in
       let ledger_handler =
         unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger)
       in
-      fun (With {request; respond} as t) ->
+      let pending_coinbase_handler =
+        unstage (Coda_base.Pending_coinbase.handler empty_pending_coinbase)
+      in
+      let handlers =
+        Snarky.Request.Handler.(
+          push
+            (push fail (create_single pending_coinbase_handler))
+            (create_single ledger_handler))
+      in
+      fun (With {request; respond}) ->
         match request with
         | Winner_address -> respond (Provide 0)
         | Private_key -> respond (Provide sk)
-        | _ -> ledger_handler t
+        | _ ->
+            respond
+              (Provide
+                 (Snarky.Request.Handler.run handlers
+                    ["Ledger Handler"; "Pending Coinbase Handler"]
+                    request))
 
     let vrf_output =
       let _, sk = Coda_base.Sample_keypairs.keypairs.(0) in
@@ -1076,14 +1096,20 @@ module Consensus_state = struct
 
   let to_lite = None
 
-  let to_string_record t =
-    Printf.sprintf
-      "{length|%s}|{epoch_length|%s}|{curr_epoch|%s}|{curr_slot|%s}|{total_currency|%s}"
-      (Length.to_string t.length)
-      (Length.to_string t.epoch_length)
-      (Segment_id.to_string t.curr_epoch)
-      (Segment_id.to_string t.curr_slot)
-      (Amount.to_string t.total_currency)
+  type display =
+    { length: int
+    ; epoch_length: int
+    ; curr_epoch: int
+    ; curr_slot: int
+    ; total_currency: int }
+  [@@deriving yojson]
+
+  let display (t : value) =
+    { length= Length.to_int t.length
+    ; epoch_length= Length.to_int t.epoch_length
+    ; curr_epoch= Segment_id.to_int t.curr_epoch
+    ; curr_slot= Segment_id.to_int t.curr_slot
+    ; total_currency= Amount.to_int t.total_currency }
 end
 
 module Blockchain_state = Coda_base.Blockchain_state.Make (Genesis_ledger)
@@ -1120,13 +1146,28 @@ module Prover_state = struct
 
   let precomputed_handler = Vrf.Precomputed.handler
 
-  let handler {delegator; ledger; private_key} : Snark_params.Tick.Handler.t =
+  let handler {delegator; ledger; private_key} ~pending_coinbase :
+      Snark_params.Tick.Handler.t =
     let ledger_handler = unstage (Coda_base.Sparse_ledger.handler ledger) in
-    fun (With {request; respond} as t) ->
+    let pending_coinbase_handler =
+      unstage (Coda_base.Pending_coinbase.handler pending_coinbase)
+    in
+    let handlers =
+      Snarky.Request.Handler.(
+        push
+          (push fail (create_single pending_coinbase_handler))
+          (create_single ledger_handler))
+    in
+    fun (With {request; respond}) ->
       match request with
       | Vrf.Winner_address -> respond (Provide delegator)
       | Vrf.Private_key -> respond (Provide private_key)
-      | _ -> ledger_handler t
+      | _ ->
+          respond
+            (Provide
+               (Snarky.Request.Handler.run handlers
+                  ["Ledger Handler"; "Pending Coinbase Handler"]
+                  request))
 end
 
 module Snark_transition = Coda_base.Snark_transition.Make (struct
@@ -1134,53 +1175,6 @@ module Snark_transition = Coda_base.Snark_transition.Make (struct
   module Blockchain_state = Blockchain_state
   module Consensus_data = Consensus_transition_data
 end)
-
-module For_tests = struct
-  let gen_consensus_state ~(gen_slot_advancement : int Quickcheck.Generator.t)
-      :
-      (   previous_protocol_state:( Protocol_state.value
-                                  , Coda_base.State_hash.t )
-                                  With_hash.t
-       -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
-       -> Consensus_state.value)
-      Quickcheck.Generator.t =
-    let open Consensus_state in
-    let open Quickcheck.Let_syntax in
-    let open UInt32.Infix in
-    let%bind slot_advancement = gen_slot_advancement in
-    let%map proposer_vrf_result = Vrf.Output.gen in
-    fun ~(previous_protocol_state :
-           (Protocol_state.value, Coda_base.State_hash.t) With_hash.t)
-        ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t) ->
-      let prev =
-        Protocol_state.consensus_state (With_hash.data previous_protocol_state)
-      in
-      let length = Length.succ prev.length in
-      let curr_epoch, curr_slot =
-        let slot = prev.curr_slot + UInt32.of_int slot_advancement in
-        let epoch_advancement = slot / Constants.Epoch.size in
-        (prev.curr_epoch + epoch_advancement, slot mod Constants.Epoch.size)
-      in
-      let total_currency =
-        Option.value_exn (Amount.add prev.total_currency Constants.coinbase)
-      in
-      let last_epoch_data, curr_epoch_data, epoch_length =
-        Epoch_data.update_pair
-          (prev.last_epoch_data, prev.curr_epoch_data)
-          prev.epoch_length ~prev_epoch:prev.curr_epoch ~next_epoch:curr_epoch
-          ~prev_slot:prev.curr_slot
-          ~prev_protocol_state_hash:(With_hash.hash previous_protocol_state)
-          ~proposer_vrf_result ~snarked_ledger_hash ~total_currency
-      in
-      { length
-      ; epoch_length
-      ; last_vrf_output= proposer_vrf_result
-      ; total_currency
-      ; curr_epoch
-      ; curr_slot
-      ; last_epoch_data
-      ; curr_epoch_data }
-end
 
 (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
 let generate_transition ~(previous_protocol_state : Protocol_state.value)
@@ -1219,7 +1213,8 @@ let received_within_window (epoch, slot) ~time_received =
   let window_end = add window_start Constants.delta_duration in
   window_start < time_received && time_received < window_end
 
-let received_at_valid_time consensus_state ~time_received =
+let received_at_valid_time (consensus_state : Consensus_state.value)
+    ~time_received =
   let open Consensus_state in
   received_within_window
     (consensus_state.curr_epoch, consensus_state.curr_slot)
@@ -1255,11 +1250,11 @@ let select ~existing ~candidate ~logger =
     let msg = Printf.sprintf "(%s) && (%s)" precondition_msg choice_msg in
     log_result choice msg
   in
-  Logger.info logger "SELECTING BEST CONSENSUS STATE" ;
-  Logger.info logger
+  Logger.info logger "Selecting best consensus state" ;
+  Logger.trace logger
     !"existing consensus state: %{sexp:Consensus_state.value}"
     existing ;
-  Logger.info logger
+  Logger.trace logger
     !"candidate consensus state: %{sexp:Consensus_state.value}"
     candidate ;
   (* TODO: add fork_before_checkpoint check *)
@@ -1419,7 +1414,8 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
       `Check_again epoch_end_time
 
 (* TODO *)
-let lock_transition prev next ~local_state ~snarked_ledger =
+let lock_transition (prev : Consensus_state.value)
+    (next : Consensus_state.value) ~local_state ~snarked_ledger =
   let open Local_state in
   let open Consensus_state in
   if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
@@ -1441,24 +1437,85 @@ let lock_transition prev next ~local_state ~snarked_ledger =
     local_state.last_epoch_snapshot <- local_state.curr_epoch_snapshot ;
     local_state.curr_epoch_snapshot <- epoch_snapshot )
 
-let genesis_protocol_state =
+let create_genesis_protocol_state consensus_transition_data blockchain_state =
   let consensus_state =
     Or_error.ok_exn
       (Consensus_state.update ~proposer_vrf_result:Vrf.Precomputed.vrf_output
          ~previous_consensus_state:
            Protocol_state.(consensus_state negative_one)
          ~previous_protocol_state_hash:Protocol_state.(hash negative_one)
-         ~consensus_transition_data:Snark_transition.(consensus_data genesis)
-         ~supply_increase:Currency.Amount.zero
+         ~consensus_transition_data ~supply_increase:Currency.Amount.zero
          ~snarked_ledger_hash:genesis_ledger_hash)
   in
   let state =
     Protocol_state.create_value
       ~previous_state_hash:Protocol_state.(hash negative_one)
-      ~blockchain_state:Snark_transition.(blockchain_state genesis)
-      ~consensus_state
+      ~blockchain_state ~consensus_state
   in
   With_hash.of_data ~hash_data:Protocol_state.hash state
+
+let genesis_protocol_state =
+  create_genesis_protocol_state
+    Snark_transition.(consensus_data genesis)
+    Snark_transition.(blockchain_state genesis)
+
+module For_tests = struct
+  let create_genesis_protocol_state ledger =
+    let consensus_data = Snark_transition.(consensus_data genesis) in
+    let root_ledger_hash = Coda_base.Ledger.merkle_root ledger in
+    create_genesis_protocol_state consensus_data
+      { Blockchain_state.genesis with
+        staged_ledger_hash=
+          Coda_base.Staged_ledger_hash.(
+            of_aux_and_ledger_hash Aux_hash.dummy root_ledger_hash)
+      ; snarked_ledger_hash=
+          Coda_base.Frozen_ledger_hash.of_ledger_hash root_ledger_hash }
+
+  let gen_consensus_state ~(gen_slot_advancement : int Quickcheck.Generator.t)
+      :
+      (   previous_protocol_state:( Protocol_state.value
+                                  , Coda_base.State_hash.t )
+                                  With_hash.t
+       -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
+       -> Consensus_state.value)
+      Quickcheck.Generator.t =
+    let open Consensus_state in
+    let open Quickcheck.Let_syntax in
+    let open UInt32.Infix in
+    let%bind slot_advancement = gen_slot_advancement in
+    let%map proposer_vrf_result = Vrf.Output.gen in
+    fun ~(previous_protocol_state :
+           (Protocol_state.value, Coda_base.State_hash.t) With_hash.t)
+        ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t) ->
+      let prev =
+        Protocol_state.consensus_state (With_hash.data previous_protocol_state)
+      in
+      let length = Length.succ prev.length in
+      let curr_epoch, curr_slot =
+        let slot = prev.curr_slot + UInt32.of_int slot_advancement in
+        let epoch_advancement = slot / Constants.Epoch.size in
+        (prev.curr_epoch + epoch_advancement, slot mod Constants.Epoch.size)
+      in
+      let total_currency =
+        Option.value_exn (Amount.add prev.total_currency Constants.coinbase)
+      in
+      let last_epoch_data, curr_epoch_data, epoch_length =
+        Epoch_data.update_pair
+          (prev.last_epoch_data, prev.curr_epoch_data)
+          prev.epoch_length ~prev_epoch:prev.curr_epoch ~next_epoch:curr_epoch
+          ~prev_slot:prev.curr_slot
+          ~prev_protocol_state_hash:(With_hash.hash previous_protocol_state)
+          ~proposer_vrf_result ~snarked_ledger_hash ~total_currency
+      in
+      { length
+      ; epoch_length
+      ; last_vrf_output= proposer_vrf_result
+      ; total_currency
+      ; curr_epoch
+      ; curr_slot
+      ; last_epoch_data
+      ; curr_epoch_data }
+end
 
 let should_bootstrap ~existing ~candidate =
   let length = Fn.compose Length.to_int Consensus_state.length in
@@ -1469,7 +1526,9 @@ let to_unix_timestamp recieved_time =
   |> Unix_timestamp.of_int64
 
 let%test "Receive a valid consensus_state with a bit of delay" =
-  let {Consensus_state.curr_epoch; curr_slot; _} = Consensus_state.genesis in
+  let ({curr_epoch; curr_slot; _} : Consensus_state.value) =
+    Consensus_state.genesis
+  in
   let delay = Constants.delta / 2 |> UInt32.of_int in
   let new_slot = UInt32.Infix.(curr_slot + delay) in
   let time_received = Epoch.slot_start_time curr_epoch new_slot in

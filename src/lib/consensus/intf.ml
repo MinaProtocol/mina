@@ -6,9 +6,14 @@ open Coda_numbers
 module type Prover_state_intf = sig
   type t [@@deriving bin_io, sexp]
 
+  type pending_coinbase_collection
+
   val precomputed_handler : Snark_params.Tick.Handler.t
 
-  val handler : t -> Snark_params.Tick.Handler.t
+  val handler :
+       t
+    -> pending_coinbase:pending_coinbase_collection
+    -> Snark_params.Tick.Handler.t
 end
 
 (** Constants are defined with a single letter (latin or greek) based on
@@ -45,6 +50,8 @@ module type S = sig
   module Consensus_state : sig
     type value [@@deriving hash, eq, compare, bin_io, sexp]
 
+    type display [@@deriving yojson]
+
     include Snark_params.Tick.Snarkable.S with type value := value
 
     val genesis : value
@@ -63,12 +70,14 @@ module type S = sig
 
     val to_lite : (value -> Lite_base.Consensus_state.t) option
 
-    val to_string_record : value -> string
+    val display : value -> display
   end
 
   module Blockchain_state : Coda_base.Blockchain_state.S
 
-  module Prover_state : Prover_state_intf
+  module Prover_state :
+    Prover_state_intf
+    with type pending_coinbase_collection := Coda_base.Pending_coinbase.t
 
   module Protocol_state :
     Coda_base.Protocol_state.S
@@ -95,6 +104,10 @@ module type S = sig
           -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
           -> Consensus_state.value)
          Quickcheck.Generator.t
+
+    val create_genesis_protocol_state :
+         Coda_base.Ledger.t
+      -> (Protocol_state.value, Coda_base.State_hash.t) With_hash.t
   end
 
   module Configuration : sig
