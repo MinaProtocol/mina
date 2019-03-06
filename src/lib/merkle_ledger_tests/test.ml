@@ -10,10 +10,17 @@ let%test_module "Database integration test" =
     end
 
     module Location = Merkle_ledger.Location.Make (Depth)
-    module DB =
-      Database.Make (Key) (Account) (Hash) (Depth) (Location) (In_memory_kvdb)
-        (Storage_locations)
-    module Ledger = Ledger.Make (Key) (Account) (Hash) (Depth)
+
+    module Inputs = struct
+      include Test_stubs.Base_inputs
+      module Location = Location
+      module Kvdb = In_memory_kvdb
+      module Storage_locations = Storage_locations
+      module Depth = Depth
+    end
+
+    module DB = Database.Make (Inputs)
+    module Ledger = Ledger.Make (Inputs)
     module Binary_tree = Binary_tree.Make (Account) (Hash) (Depth)
 
     let%test_unit "databases have equivalent hash values" =
