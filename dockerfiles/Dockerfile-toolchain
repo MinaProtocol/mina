@@ -56,7 +56,7 @@ RUN cd /rpc_parallel && yes | opam pin add .
 
 # Source copy of rpc_parallel (modified to remove module name conflict)
 ADD /src/external/ocaml-extlib /ocaml-extlib
-RUN cd /ocaml-extlib && yes | opam pin add .
+RUN sudo rm -rf /ocaml-extlib/.git && cd /ocaml-extlib && yes | opam pin add .
 
 ADD /src/external/async_kernel /async_kernel
 RUN sudo rm -rf /async_kernel/.git && cd /async_kernel && yes | opam pin add .
