@@ -19,7 +19,8 @@ let%test_module "test functor on in memory databases" =
 
       module Location : Merkle_ledger.Location_intf.S
 
-      module MT : DB
+      module MT :
+        DB with module Location = Location and module Addr = Location.Addr
 
       val with_instance : (MT.t -> 'a) -> 'a
     end
@@ -184,9 +185,10 @@ let%test_module "test functor on in memory databases" =
                 let addresses_and_accounts =
                   MT.get_all_accounts_rooted_at_exn mdb address
                 in
-                MT.set_batch_accounts mdb addresses_and_accounts ;
-                let new_merkle_root = MT.merkle_root mdb in
-                assert (Hash.equal old_merkle_root new_merkle_root) ) )
+                if not @@ List.is_empty addresses_and_accounts then (
+                  MT.set_batch_accounts mdb addresses_and_accounts ;
+                  let new_merkle_root = MT.merkle_root mdb in
+                  assert (Hash.equal old_merkle_root new_merkle_root) ) ) )
 
       let%test_unit "set_batch_accounts would change the merkle root" =
         Test.with_instance (fun mdb ->
@@ -236,6 +238,51 @@ let%test_module "test functor on in memory databases" =
                     let new_merkle_root = MT.merkle_root mdb in
                     assert (not @@ Hash.equal old_merkle_root new_merkle_root) )
             ) )
+
+      let%test_unit "We can retrieve accounts by their by key after using \
+                     set_batch_accounts" =
+        Test.with_instance (fun mdb ->
+            (* We want to add accounts to a nonempty database *)
+            let max_height = Int.min (MT.depth - 1) 3 in
+            populate_db mdb max_height ;
+            let accounts = random_accounts max_height |> dedup_accounts in
+            let (last_location : MT.Location.t) =
+              MT.last_filled mdb |> Option.value_exn
+            in
+            let accounts_with_addresses =
+              List.folding_map accounts ~init:last_location
+                ~f:(fun prev_location account ->
+                  let location =
+                    Test.Location.next prev_location |> Option.value_exn
+                  in
+                  (location, (location |> Test.Location.to_path_exn, account))
+              )
+            in
+            MT.set_batch_accounts mdb accounts_with_addresses ;
+            List.iter accounts ~f:(fun account ->
+                let key = Account.public_key account in
+                let location =
+                  MT.location_of_key mdb key |> Option.value_exn
+                in
+                let queried_account =
+                  MT.get mdb location |> Option.value_exn
+                in
+                assert (Account.equal queried_account account) ) ;
+            let to_int =
+              Fn.compose MT.Location.Addr.to_int MT.Location.to_path_exn
+            in
+            let expected_last_location =
+              (MT.Location.Addr.to_int @@ MT.Location.to_path_exn last_location)
+              + List.length accounts
+            in
+            let actual_last_location =
+              to_int (MT.last_filled mdb |> Option.value_exn)
+            in
+            [%test_result: int] ~expect:expected_last_location
+              actual_last_location
+              ~message:
+                (sprintf "(expected_location: %i) (actual_location: %i)"
+                   expected_last_location actual_last_location) )
 
       let%test_unit "If the entire database is full, \
                      set_all_accounts_rooted_at_exn(address,accounts);get_all_accounts_rooted_at_exn(address) \

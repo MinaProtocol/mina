@@ -794,8 +794,10 @@ module type Staged_ledger_base_intf = sig
        * [`Staged_ledger of t] )
        Deferred.Or_error.t
 
-  val snarked_ledger :
-    t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t
+  module For_tests : sig
+    val snarked_ledger :
+      t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t
+  end
 end
 
 module type Staged_ledger_intf = sig

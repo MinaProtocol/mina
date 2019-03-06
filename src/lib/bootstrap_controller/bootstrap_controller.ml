@@ -313,13 +313,13 @@ end = struct
     in
     match%map
       Staged_ledger.of_scan_state_and_snarked_ledger ~scan_state
-        ~snarked_ledger:(Ledger.of_database ledger_db)
+        ~snarked_ledger:(Ledger.of_database synced_db)
         ~expected_merkle_root:(Some expected_merkle_root)
     with
     | Ok root_staged_ledger ->
         let new_frontier =
           Transition_frontier.create ~logger:parent_log
-            ~root_transition:new_root ~root_snarked_ledger:ledger_db
+            ~root_transition:new_root ~root_snarked_ledger:synced_db
             ~root_staged_ledger
             ~consensus_local_state:
               (Transition_frontier.consensus_local_state frontier)

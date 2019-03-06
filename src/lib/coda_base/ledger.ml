@@ -44,6 +44,8 @@ module Ledger_inner = struct
     let public_key = Account.public_key
 
     let initialize = Account.initialize
+
+    let balance = Account.balance
   end
 
   module Db :
@@ -110,6 +112,15 @@ module Ledger_inner = struct
       (Mask)
 
   include Mask.Attached
+
+  module Debug = Graphviz.Make (struct
+    module Key = Public_key.Compressed
+    module Balance = Currency.Balance
+    module Account = Account
+    module Hash = Hash
+    module Location = Location_at_depth
+    module Ledger = Mask.Attached
+  end)
 
   type maskable_ledger = t
 

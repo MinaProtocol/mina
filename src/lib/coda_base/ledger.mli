@@ -58,6 +58,11 @@ include
    and type attached_mask = Mask.Attached.t
    and type unattached_mask = Mask.t
 
+module Debug :
+  Merkle_ledger.Graphviz.S
+  with type addr := Location.Addr.t
+   and type ledger := Mask.Attached.t
+
 (* The maskable ledger is t = Mask.Attached.t because register/unregister
  * work off of this type *)
 type maskable_ledger = t

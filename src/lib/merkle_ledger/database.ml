@@ -126,35 +126,6 @@ module Make
     let locs_bufs = List.map locations_vs ~f:create_buf in
     set_raw_batch mdb locs_bufs
 
-  include Util.Make (struct
-    module Key = Key
-    module Location = Location
-    module Account = Account
-    module Hash = Hash
-    module Depth = Depth
-
-    module Base = struct
-      type nonrec t = t
-
-      let get = get
-    end
-
-    let get_hash = get_hash
-
-    let location_of_account_addr addr = Location.Account addr
-
-    let location_of_hash_addr addr = Location.Hash addr
-
-    let set_raw_hash_batch mdb addresses_and_hashes =
-      set_bin_batch mdb Hash.bin_size_t Hash.bin_write_t addresses_and_hashes
-
-    let set_raw_account_batch mdb addresses_and_accounts =
-      set_bin_batch mdb Account.bin_size_t Account.bin_write_t
-        addresses_and_accounts
-  end)
-
-  let set_hash mdb location new_hash = set_hash_batch mdb [(location, new_hash)]
-
   let get_inner_hash_at_addr_exn mdb address =
     assert (Addr.depth address <= Depth.depth) ;
     get_hash mdb (Location.Hash address)
@@ -180,18 +151,29 @@ module Make
       match get_generic mdb (build_location key) with
       | None -> Error Db_error.Account_location_not_found
       | Some location_bin ->
-          Location.parse location_bin
-          |> Result.map_error ~f:(fun () -> Db_error.Malformed_database)
+          let result =
+            Location.parse location_bin
+            |> Result.map_error ~f:(fun () -> Db_error.Malformed_database)
+          in
+          result
 
     let delete mdb key = delete_raw mdb (build_location key)
 
-    let set mdb key location = set_raw mdb (build_location key) location
+    let set mdb key location =
+      set_raw mdb (build_location key) (Location.serialize location)
 
-    let last_location () =
+    let set_batch mdb keys_to_locations =
+      let serialize_location (key, location) =
+        (Location.serialize @@ key, Location.serialize location)
+      in
+      let serialized = List.map keys_to_locations ~f:serialize_location in
+      Kvdb.set_batch mdb.kvdb ~key_data_pairs:serialized
+
+    let last_location_key () =
       Location.build_generic (Bigstring.of_string "last_account_location")
 
     let increment_last_account_location mdb =
-      let location = last_location () in
+      let location = last_location_key () in
       match get_generic mdb location with
       | None ->
           let first_location =
@@ -215,12 +197,11 @@ module Make
     let allocate mdb key =
       let location_result = increment_last_account_location mdb in
       Result.map location_result ~f:(fun location ->
-          set mdb key (Location.serialize location) ;
-          location )
+          set mdb key location ; location )
 
     let last_location_address mdb =
       match
-        last_location () |> get_raw mdb |> Result.of_option ~error:()
+        last_location_key () |> get_raw mdb |> Result.of_option ~error:()
         |> Result.bind ~f:Location.parse
       with
       | Error () -> None
@@ -228,7 +209,7 @@ module Make
 
     let last_location mdb =
       match
-        last_location () |> get_raw mdb |> Result.of_option ~error:()
+        last_location_key () |> get_raw mdb |> Result.of_option ~error:()
         |> Result.bind ~f:Location.parse
       with
       | Error () -> None
@@ -241,6 +222,48 @@ module Make
     | Ok location -> Some location
 
   let last_filled t = Account_location.last_location t
+
+  include Util.Make (struct
+    module Key = Key
+    module Location = Location
+    module Account = Account
+    module Hash = Hash
+    module Depth = Depth
+
+    module Base = struct
+      type nonrec t = t
+
+      let get = get
+
+      let last_filled = last_filled
+    end
+
+    let get_hash = get_hash
+
+    let location_of_account_addr addr = Location.Account addr
+
+    let location_of_hash_addr addr = Location.Hash addr
+
+    let set_raw_hash_batch mdb addresses_and_hashes =
+      set_bin_batch mdb Hash.bin_size_t Hash.bin_write_t addresses_and_hashes
+
+    let set_location_batch ~last_location mdb key_to_location_list =
+      let last_location_key_value =
+        (Account_location.last_location_key (), last_location)
+      in
+      Account_location.set_batch mdb
+        ( Non_empty_list.cons last_location_key_value
+            (Non_empty_list.map key_to_location_list ~f:(fun (key, location) ->
+                 (Account_location.build_location key, location) ))
+        |> Non_empty_list.to_list )
+
+    let set_raw_account_batch mdb
+        (addresses_and_accounts : (location * Account.t) list) =
+      set_bin_batch mdb Account.bin_size_t Account.bin_write_t
+        addresses_and_accounts
+  end)
+
+  let set_hash mdb location new_hash = set_hash_batch mdb [(location, new_hash)]
 
   module For_tests = struct
     let gen_account_location =

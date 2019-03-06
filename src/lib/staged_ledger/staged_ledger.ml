@@ -123,7 +123,7 @@ end = struct
     { scan_state:
         scan_state
         (* Invariant: this is the ledger after having applied all the transactions in
-         * the above state. *)
+     * the above state. *)
     ; ledger: Ledger.attached_mask sexp_opaque }
   [@@deriving sexp]
 
@@ -201,6 +201,7 @@ end = struct
           ~ledger_hash_end:ledger
           ~ledger_hash_begin:(Some (get_target proof))
 
+  (* TODO: Remove this. This is deprecated *)
   let snarked_ledger :
       t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t =
    fun {ledger; scan_state; _} ~snarked_ledger_hash:expected_target ->
@@ -242,6 +243,10 @@ end = struct
                 different from the one being requested ((%{sexp: \
                 Frozen_ledger_hash.t}))"
               target expected_target
+
+  module For_tests = struct
+    let snarked_ledger = snarked_ledger
+  end
 
   let statement_exn t =
     match Statement_scanner.scan_statement t.scan_state with
@@ -289,41 +294,24 @@ end = struct
       else return ()
     in
     let%bind txs = Scan_state.all_transactions scan_state |> Deferred.return in
-    Core.printf !" Total number of txns in scan state %n\n" (List.length txs) ;
-    Core.printf
-      !"\n\n Snarked ledger hash received %{sexp:Frozen_ledger_hash.t}\n\n"
-      snarked_ledger_hash ;
     let%bind () =
       List.fold_result
         ~f:(fun _ tx ->
-          Core.printf !"\n\nApplying Transaction %{sexp:Transaction.t}\n\n" tx ;
-          Core.printf
-            !"\n\nCurrent Merkle root %{sexp:Ledger_hash.t}\n\n"
-            (Ledger.merkle_root snarked_ledger) ;
           Ledger.apply_transaction snarked_ledger tx |> Or_error.ignore )
         ~init:() txs
       |> Deferred.return
     in
-    Option.iter expected_merkle_root ~f:(fun merkle_root ->
-        Core.printf
-          !"\n\nExpected merkle root %{sexp:Ledger_hash.t}\n\n"
-          merkle_root ) ;
-    Core.printf
-      !"\n\nActual merkle root %{sexp:Ledger_hash.t}\n\n"
-      (Ledger.merkle_root snarked_ledger) ;
     if
       Option.fold ~init:true
         ~f:(fun _ merkle_root ->
           Ledger_hash.equal (Ledger.merkle_root snarked_ledger) merkle_root )
         expected_merkle_root
-    then (
-      Core.print_string "\n\n!!!Here!!!\n\n" ;
+    then
       of_scan_state_and_ledger ~snarked_ledger_hash ~ledger:snarked_ledger
-        ~scan_state )
-    else (
-      Core.print_string "\n\n!!!Not HERE!!!\n\n" ;
+        ~scan_state
+    else
       Deferred.Or_error.error_string
-        "The merkle root of the ledger doesn't match the expected one" )
+        "The merkle root of the ledger doesn't match the expected one"
 
   let copy {scan_state; ledger} =
     let new_mask = Ledger.Mask.create () in
@@ -485,23 +473,23 @@ end = struct
     |> to_staged_ledger_or_error
 
   (*A Coinbase is a single transaction that accommodates the coinbase amount
-  and a fee transfer for the work required to add the coinbase. Unlike a
-  transaction, a coinbase (including the fee transfer) just requires one slot
-  in the jobs queue.
+    and a fee transfer for the work required to add the coinbase. Unlike a
+    transaction, a coinbase (including the fee transfer) just requires one slot
+    in the jobs queue.
 
-  The minimum number of slots required to add a single transaction is three (at
-  worst case number of provers: when each pair of proofs is from a different
-  prover). One slot for the transaction and two slots for fee transfers.
+    The minimum number of slots required to add a single transaction is three (at
+    worst case number of provers: when each pair of proofs is from a different
+    prover). One slot for the transaction and two slots for fee transfers.
 
-  When the diff is split into two prediffs (why? refer to #687) and if after
-  adding transactions, the first prediff has two slots remaining which cannot
-  not accommodate transactions, then those slots are filled by splitting the
-  coinbase into two parts.
-  If it has one slot, then we simply add one coinbase. It is also possible that
-  the first prediff may have no slots left after adding transactions (For
-  example, when there are three slots and
-  maximum number of provers), in which case, we simply add one coinbase as part
-  of the second prediff.
+    When the diff is split into two prediffs (why? refer to #687) and if after
+    adding transactions, the first prediff has two slots remaining which cannot
+    not accommodate transactions, then those slots are filled by splitting the
+    coinbase into two parts.
+    If it has one slot, then we simply add one coinbase. It is also possible that
+    the first prediff may have no slots left after adding transactions (For
+    example, when there are three slots and
+    maximum number of provers), in which case, we simply add one coinbase as part
+    of the second prediff.
   *)
   let create_coinbase coinbase_parts proposer =
     let open Result.Let_syntax in
@@ -634,8 +622,8 @@ end = struct
     ; coinbase_parts_count= List.length coinbase }
 
   (**The total fee excess caused by any diff should be zero. In the case where
-  the slots are split into two partitions, total fee excess of the transactions
-  to be enqueued on each of the partitions should be zero respectively *)
+     the slots are split into two partitions, total fee excess of the transactions
+     to be enqueued on each of the partitions should be zero respectively *)
   let check_zero_fee_excess scan_state data =
     let zero = Currency.Fee.Signed.zero in
     let partitions = Scan_state.partition_if_overflowing scan_state in
@@ -2261,7 +2249,7 @@ let%test_module "test" =
               expected_snarked_ledger := last_snarked_ledger ;
               let materialized_ledger =
                 Or_error.ok_exn
-                @@ Sl.snarked_ledger !sl
+                @@ Sl.For_tests.snarked_ledger !sl
                      ~snarked_ledger_hash:last_snarked_ledger
               in
               assert (!expected_snarked_ledger = !materialized_ledger) ) )

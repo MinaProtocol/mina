@@ -565,46 +565,6 @@ struct
         setup ~source_accounts ~logger
           [{num_breadcrumbs; accounts= target_accounts}]
       in
-      let {address= _; frontier} = List.hd_exn peers in
-      let breadcrumbs = Transition_frontier.all_breadcrumbs frontier in
-      List.iter breadcrumbs ~f:(fun breadcrumb ->
-          let staged_ledger =
-            Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-          in
-          let scan_state = Staged_ledger.scan_state staged_ledger in
-          let txns =
-            Staged_ledger.Scan_state.all_transactions scan_state
-            |> Or_error.ok_exn
-          in
-          let merkle_root =
-            Staged_ledger.ledger staged_ledger |> Ledger.merkle_root
-          in
-          Core.printf
-            !"\n\
-             \ \n\
-             \ %{sexp:State_hash.t}  %{sexp:Ledger_hash.t} txns in breadcrumb \
-              %i \n\
-             \ \n"
-            ( Transition_frontier.Breadcrumb.transition_with_hash breadcrumb
-            |> With_hash.hash )
-            merkle_root (List.length txns) ) ;
-      Core.printf
-        !"\n\n %{sexp:State_hash.t}  \n\n"
-        ( Transition_frontier.root frontier
-        |> Transition_frontier.Breadcrumb.transition_with_hash
-        |> With_hash.hash ) ;
-      let snarked_ledger_hash =
-        Transition_frontier.Breadcrumb.transition_with_hash
-          (Transition_frontier.root frontier)
-        |> With_hash.data |> External_transition.Verified.protocol_state
-        |> Protocol_state.blockchain_state
-        |> Blockchain_state.snarked_ledger_hash
-      in
-      Core.printf
-        !"\n\n Snarked ledger hash given : %{sexp:Frozen_ledger_hash.t} \n\n"
-        snarked_ledger_hash ;
-      (*List.iter (Transition_frontier.root frontier |> Transition_frontier.Breadcrumb.staged_ledger |> Staged_ledger.scan_state |> Staged_ledger.Scan_state.all_transactions |> Or_error.ok_exn)
-        ~f:(fun txn -> Core.printf !"\n\n %{sexp:Transaction.t} \n\n" txn) ;*)
       (me, List.hd_exn peers, network)
 
     let send_transition ~logger ~transition_writer ~peer:{address; frontier}
