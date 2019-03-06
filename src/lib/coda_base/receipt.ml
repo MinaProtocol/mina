@@ -5,9 +5,9 @@ open Fold_lib
 module Chain_hash = struct
   include Data_hash.Make_full_size ()
 
-  let to_string t = Binable.to_string (module Stable.V1) t |> B64.encode
+  let to_string t = Binable.to_string (module Stable.Latest) t |> B64.encode
 
-  let of_string s = B64.decode s |> Binable.of_string (module Stable.V1)
+  let of_string s = B64.decode s |> Binable.of_string (module Stable.Latest)
 
   include Codable.Make_of_string (struct
     type nonrec t = t
@@ -19,7 +19,8 @@ module Chain_hash = struct
 
   let empty =
     of_hash
-      (Pedersen.(State.salt params "CodaReceiptEmpty") |> Pedersen.State.digest)
+      ( Pedersen.(State.salt params ~get_chunk_table "CodaReceiptEmpty")
+      |> Pedersen.State.digest )
 
   let cons payload t =
     Pedersen.digest_fold Hash_prefix.receipt_chain
@@ -28,7 +29,7 @@ module Chain_hash = struct
 
   module Checked = struct
     let constant (t : t) =
-      var_of_hash_packed (Field.Checked.constant (t :> Field.t))
+      var_of_hash_packed (Field.Var.constant (t :> Field.t))
 
     type t = var
 

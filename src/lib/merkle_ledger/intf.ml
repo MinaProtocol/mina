@@ -1,21 +1,27 @@
 open Core
 
 module type Key = sig
-  type t [@@deriving sexp, bin_io, eq]
+  type t [@@deriving sexp, bin_io]
 
   val empty : t
 
+  val to_string : t -> string
+
   include Hashable.S_binable with type t := t
+
+  include Comparable.S with type t := t
 end
 
 module type Balance = sig
   type t [@@deriving eq]
 
   val zero : t
+
+  val to_int : t -> int
 end
 
 module type Account = sig
-  type t [@@deriving bin_io, eq]
+  type t [@@deriving bin_io, eq, sexp, compare]
 
   type key
 
@@ -25,7 +31,9 @@ module type Account = sig
 end
 
 module type Hash = sig
-  type t [@@deriving bin_io, sexp]
+  type t [@@deriving bin_io, sexp, eq, compare]
+
+  include Hashable.S_binable with type t := t
 
   type account
 
@@ -41,23 +49,20 @@ module type Depth = sig
 end
 
 module type Key_value_database = sig
-  type t
+  type t [@@deriving sexp]
 
-  val copy : t -> t
-
-  val create : directory:string -> t
+  include
+    Key_value_database.S
+    with type t := t
+     and type key := Bigstring.t
+     and type value := Bigstring.t
 
   val get_uuid : t -> Uuid.t
 
-  val destroy : t -> unit
-
-  val get : t -> key:Bigstring.t -> Bigstring.t option
-
-  val set : t -> key:Bigstring.t -> data:Bigstring.t -> unit
-
   val set_batch : t -> key_data_pairs:(Bigstring.t * Bigstring.t) list -> unit
 
-  val delete : t -> key:Bigstring.t -> unit
+  val to_alist : t -> (Bigstring.t * Bigstring.t) list
+  (* an association list, sorted by key *)
 end
 
 module type Storage_locations = sig

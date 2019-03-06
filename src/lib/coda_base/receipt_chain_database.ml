@@ -1,7 +1,5 @@
 open Core
-open Async
 open Receipt_chain_database_lib
-open Storage.Disk
 module Payment = User_command
 
 module Tree_node = struct
@@ -9,5 +7,5 @@ module Tree_node = struct
 end
 
 module Key_value_store =
-  Key_value_database.Make_mock (Receipt.Chain_hash) (Tree_node)
+  Rocksdb.Serializable.Make (Receipt.Chain_hash) (Tree_node)
 include Database.Make (Payment) (Receipt.Chain_hash) (Key_value_store)

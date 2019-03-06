@@ -34,12 +34,6 @@ module type Hash_intf = sig
 end
 
 module type Time_intf = sig
-  module Stable : sig
-    module V1 : sig
-      type t [@@deriving sexp, bin_io]
-    end
-  end
-
   module Controller : Time_controller_intf
 
   type t [@@deriving sexp]
@@ -47,7 +41,7 @@ module type Time_intf = sig
   type t0 = t
 
   module Span : sig
-    type t
+    type t [@@deriving compare]
 
     val of_time_span : Core_kernel.Time.Span.t -> t
 
@@ -76,6 +70,8 @@ module type Time_intf = sig
     val peek : 'a t -> 'a option
 
     val cancel : Controller.t -> 'a t -> 'a -> unit
+
+    val remaining_time : 'a t -> Span.t
   end
 
   val to_span_since_epoch : t -> Span.t
@@ -119,26 +115,28 @@ end
 
 module type Protocol_state_proof_intf = sig
   type t
+
+  val dummy : t
 end
 
-module type Ledger_builder_aux_hash_intf = sig
+module type Staged_ledger_aux_hash_intf = sig
   type t [@@deriving bin_io, sexp, eq]
 
   val of_bytes : string -> t
 end
 
-module type Ledger_builder_hash_intf = sig
+module type Staged_ledger_hash_intf = sig
   type t [@@deriving bin_io, sexp, eq, compare]
 
   type ledger_hash
 
-  type ledger_builder_aux_hash
+  type staged_ledger_aux_hash
 
   val ledger_hash : t -> ledger_hash
 
-  val aux_hash : t -> ledger_builder_aux_hash
+  val aux_hash : t -> staged_ledger_aux_hash
 
-  val of_aux_and_ledger_hash : ledger_builder_aux_hash -> ledger_hash -> t
+  val of_aux_and_ledger_hash : staged_ledger_aux_hash -> ledger_hash -> t
 
   include Hashable.S_binable with type t := t
 end
@@ -151,12 +149,62 @@ module type Proof_intf = sig
   val verify : t -> input -> bool Deferred.t
 end
 
+module type Mask_intf = sig
+  type t [@@deriving bin_io]
+
+  val create : unit -> t
+end
+
+module type Mask_serializable_intf = sig
+  type t
+
+  type unattached_mask
+
+  type serializable [@@deriving bin_io]
+
+  val unattached_mask_of_serializable : serializable -> unattached_mask
+
+  val serializable_of_t : t -> serializable
+end
+
+module type Ledger_creatable_intf = sig
+  type t
+
+  val create : ?directory_name:string -> unit -> t
+end
+
+module type Ledger_transfer_intf = sig
+  type src
+
+  type dest
+
+  val transfer_accounts : src:src -> dest:dest -> dest
+end
+
 module type Ledger_intf = sig
-  type t [@@deriving sexp, bin_io]
+  include Ledger_creatable_intf
+
+  module Mask : Mask_intf
+
+  type attached_mask = t
+
+  type unattached_mask = Mask.t
+
+  type maskable_ledger = t
 
   type transaction
 
+  type valid_user_command
+
+  type ledger_hash
+
   type account
+
+  (* for masks, serializable is same as t *)
+  include
+    Mask_serializable_intf
+    with type t := t
+     and type unattached_mask := unattached_mask
 
   module Undo : sig
     type t [@@deriving sexp, bin_io]
@@ -164,13 +212,11 @@ module type Ledger_intf = sig
     val transaction : t -> transaction Or_error.t
   end
 
-  type valid_user_command
-
-  type ledger_hash
-
-  val create : unit -> t
+  val create : ?directory_name:string -> unit -> t
 
   val copy : t -> t
+
+  val commit : attached_mask -> unit
 
   val num_accounts : t -> int
 
@@ -181,6 +227,13 @@ module type Ledger_intf = sig
   val apply_transaction : t -> transaction -> Undo.t Or_error.t
 
   val undo : t -> Undo.t -> unit Or_error.t
+
+  val register_mask : maskable_ledger -> unattached_mask -> attached_mask
+
+  val unregister_mask_exn : maskable_ledger -> attached_mask -> unattached_mask
+
+  val remove_and_reparent_exn :
+    t -> attached_mask -> children:attached_mask list -> unit
 end
 
 module Fee = struct
@@ -189,7 +242,7 @@ module Fee = struct
 
     include (
       Currency.Fee.Stable.V1 :
-        module type of Currency.Fee.Stable.V1 with type t := t )
+        module type of Currency.Fee.Stable.Latest with type t := t )
   end
 
   module Signed = struct
@@ -197,7 +250,7 @@ module Fee = struct
 
     include (
       Currency.Fee.Signed.Stable.V1 :
-        module type of Currency.Fee.Signed.Stable.V1
+        module type of Currency.Fee.Signed.Stable.Latest
         with type t := t
          and type ('a, 'b) t_ := ('a, 'b) t_ )
   end
@@ -212,12 +265,12 @@ module type Snark_pool_proof_intf = sig
 end
 
 module type User_command_intf = sig
-  type t [@@deriving sexp, compare, eq, bin_io]
+  type t [@@deriving sexp, eq, bin_io]
 
   type public_key
 
   module With_valid_signature : sig
-    type nonrec t = private t [@@deriving sexp, compare, eq]
+    type nonrec t = private t [@@deriving sexp, eq]
   end
 
   val check : t -> With_valid_signature.t option
@@ -264,7 +317,7 @@ module type Fee_transfer_intf = sig
 
   type public_key
 
-  type single = public_key * Fee.Unsigned.t
+  type single = public_key * Fee.Unsigned.t [@@deriving sexp, bin_io]
 
   val of_single : public_key * Fee.Unsigned.t -> t
 
@@ -282,7 +335,7 @@ module type Coinbase_intf = sig
     { proposer: public_key
     ; amount: Currency.Amount.t
     ; fee_transfer: fee_transfer option }
-  [@@deriving sexp, bin_io, compare, eq]
+  [@@deriving sexp, compare, eq]
 
   val create :
        amount:Currency.Amount.t
@@ -361,7 +414,7 @@ module Work_selection = struct
   type t = Seq | Random [@@deriving bin_io]
 end
 
-module type Completed_work_intf = sig
+module type Transaction_snark_work_intf = sig
   type proof
 
   type statement
@@ -381,10 +434,10 @@ module type Completed_work_intf = sig
   end
 
   (* TODO: The SOK message actually should bind the SNARK to
-   be in this particular bundle. The easiest way would be to
-   SOK with
-   H(all_statements_in_bundle || fee || public_key)
-*)
+     be in this particular bundle. The easiest way would be to
+     SOK with
+     H(all_statements_in_bundle || fee || public_key)
+  *)
 
   type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
   [@@deriving sexp, bin_io]
@@ -392,7 +445,8 @@ module type Completed_work_intf = sig
   type unchecked = t
 
   module Checked : sig
-    type t [@@deriving sexp, bin_io]
+    type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
+    [@@deriving sexp, bin_io]
 
     val create_unsafe : unchecked -> t
   end
@@ -402,18 +456,20 @@ module type Completed_work_intf = sig
   val proofs_length : int
 end
 
-module type Ledger_builder_diff_intf = sig
+module type Staged_ledger_diff_intf = sig
   type user_command
 
   type user_command_with_valid_signature
 
-  type ledger_builder_hash
+  type staged_ledger_hash
 
   type public_key
 
   type completed_work
 
   type completed_work_checked
+
+  type fee_transfer_single = public_key * Fee.Unsigned.t
 
   module At_most_two : sig
     type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
@@ -428,52 +484,45 @@ module type Ledger_builder_diff_intf = sig
     val increase : 'a t -> 'a list -> 'a t Or_error.t
   end
 
+  type pre_diff_with_at_most_two_coinbase =
+    { completed_works: completed_work list
+    ; user_commands: user_command list
+    ; coinbase: fee_transfer_single At_most_two.t }
+  [@@deriving sexp, bin_io]
+
+  type pre_diff_with_at_most_one_coinbase =
+    { completed_works: completed_work list
+    ; user_commands: user_command list
+    ; coinbase: fee_transfer_single At_most_one.t }
+  [@@deriving sexp, bin_io]
+
   type diff =
-    {completed_works: completed_work list; user_commands: user_command list}
+    pre_diff_with_at_most_two_coinbase
+    * pre_diff_with_at_most_one_coinbase option
   [@@deriving sexp, bin_io]
 
-  type diff_with_at_most_two_coinbase =
-    {diff: diff; coinbase_parts: completed_work At_most_two.t}
-  [@@deriving sexp, bin_io]
-
-  type diff_with_at_most_one_coinbase =
-    {diff: diff; coinbase_added: completed_work At_most_one.t}
-  [@@deriving sexp, bin_io]
-
-  type pre_diffs =
-    ( diff_with_at_most_one_coinbase
-    , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase )
-    Either.t
-  [@@deriving sexp, bin_io]
-
-  type t =
-    {pre_diffs: pre_diffs; prev_hash: ledger_builder_hash; creator: public_key}
+  type t = {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
   [@@deriving sexp, bin_io]
 
   module With_valid_signatures_and_proofs : sig
-    type diff =
+    type pre_diff_with_at_most_two_coinbase =
       { completed_works: completed_work_checked list
-      ; user_commands: user_command_with_valid_signature list }
+      ; user_commands: user_command_with_valid_signature list
+      ; coinbase: fee_transfer_single At_most_two.t }
     [@@deriving sexp]
 
-    type diff_with_at_most_two_coinbase =
-      {diff: diff; coinbase_parts: completed_work_checked At_most_two.t}
+    type pre_diff_with_at_most_one_coinbase =
+      { completed_works: completed_work_checked list
+      ; user_commands: user_command_with_valid_signature list
+      ; coinbase: fee_transfer_single At_most_one.t }
     [@@deriving sexp]
 
-    type diff_with_at_most_one_coinbase =
-      {diff: diff; coinbase_added: completed_work_checked At_most_one.t}
+    type diff =
+      pre_diff_with_at_most_two_coinbase
+      * pre_diff_with_at_most_one_coinbase option
     [@@deriving sexp]
 
-    type pre_diffs =
-      ( diff_with_at_most_one_coinbase
-      , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase )
-      Either.t
-    [@@deriving sexp]
-
-    type t =
-      { pre_diffs: pre_diffs
-      ; prev_hash: ledger_builder_hash
-      ; creator: public_key }
+    type t = {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
     [@@deriving sexp]
 
     val user_commands : t -> user_command_with_valid_signature list
@@ -484,92 +533,271 @@ module type Ledger_builder_diff_intf = sig
   val user_commands : t -> user_command list
 end
 
-module type Ledger_builder_transition_intf = sig
-  type ledger_builder
+module type Staged_ledger_transition_intf = sig
+  type staged_ledger
 
   type diff
 
   type diff_with_valid_signatures_and_proofs
 
-  type t = {old: ledger_builder; diff: diff}
+  type t = {old: staged_ledger; diff: diff}
 
   module With_valid_signatures_and_proofs : sig
-    type t = {old: ledger_builder; diff: diff_with_valid_signatures_and_proofs}
+    type t = {old: staged_ledger; diff: diff_with_valid_signatures_and_proofs}
   end
 
   val forget : With_valid_signatures_and_proofs.t -> t
 end
 
-module type Ledger_builder_base_intf = sig
+module type Monad_with_Or_error_intf = sig
+  type 'a t
+
+  include Monad.S with type 'a t := 'a t
+
+  module Or_error : sig
+    type nonrec 'a t = 'a Or_error.t t
+
+    include Monad.S with type 'a t := 'a t
+  end
+end
+
+module type Transaction_snark_scan_state_intf = sig
+  type ledger
+
+  type ledger_proof_statement
+
+  type sparse_ledger
+
+  type sok_message
+
+  type transaction
+
   type t [@@deriving sexp, bin_io]
+
+  type ledger_proof
+
+  type transaction_snark_work
+
+  type transaction_snark_work_statement
+
+  type transaction_with_info
+
+  type frozen_ledger_hash
+
+  type staged_ledger_aux_hash
+
+  module Transaction_with_witness : sig
+    (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
+    type t =
+      { transaction_with_info: transaction_with_info
+      ; statement: ledger_proof_statement
+      ; witness: sparse_ledger }
+  end
+
+  module Ledger_proof_with_sok_message : sig
+    type t = ledger_proof * sok_message
+  end
+
+  module Available_job : sig
+    type t
+  end
+
+  module Space_partition : sig
+    type t = {first: int; second: int option} [@@deriving sexp]
+  end
+
+  module Job_view : sig
+    type t [@@deriving sexp, to_yojson]
+  end
+
+  module Make_statement_scanner
+      (M : Monad_with_Or_error_intf) (Verifier : sig
+          val verify :
+               ledger_proof
+            -> ledger_proof_statement
+            -> message:sok_message
+            -> sexp_bool M.t
+      end) : sig
+    val scan_statement :
+      t -> (ledger_proof_statement, [`Empty | `Error of Error.t]) result M.t
+
+    val check_invariants :
+         t
+      -> error_prefix:string
+      -> ledger
+      -> frozen_ledger_hash sexp_option
+      -> (unit, Error.t) result M.t
+  end
+
+  val empty : unit -> t
+
+  val capacity : t -> int
+
+  val fill_work_and_enqueue_transactions :
+       t
+    -> Transaction_with_witness.t list
+    -> transaction_snark_work list
+    -> (ledger_proof * transaction list) option Or_error.t
+
+  val latest_ledger_proof :
+    t -> (Ledger_proof_with_sok_message.t * transaction list) option
+
+  val free_space : t -> int
+
+  val next_k_jobs : t -> k:int -> Available_job.t list Or_error.t
+
+  val next_jobs : t -> Available_job.t list Or_error.t
+
+  val next_jobs_sequence : t -> Available_job.t Sequence.t Or_error.t
+
+  val is_valid : t -> bool
+
+  val hash : t -> staged_ledger_aux_hash
+
+  val staged_transactions : t -> transaction_with_info list
+
+  val extract_from_job :
+       Available_job.t
+    -> ( transaction_with_info * ledger_proof_statement * sparse_ledger
+       , ledger_proof * ledger_proof )
+       Either.t
+
+  val copy : t -> t
+
+  val partition_if_overflowing : t -> Space_partition.t
+
+  val statement_of_job : Available_job.t -> ledger_proof_statement option
+
+  val current_job_sequence_number : t -> int
+
+  val snark_job_list_json : t -> string
+
+  val all_work_to_do :
+    t -> transaction_snark_work_statement Sequence.t Or_error.t
+
+  val current_job_count : t -> int
+
+  val work_capacity : unit -> int
+end
+
+module type Staged_ledger_base_intf = sig
+  type t [@@deriving sexp]
 
   type diff
 
   type valid_diff
 
-  type ledger_builder_aux_hash
+  type staged_ledger_aux_hash
 
-  type ledger_builder_hash
+  type staged_ledger_hash
 
   type frozen_ledger_hash
 
   type ledger_proof
 
+  type user_command
+
+  type statement
+
+  type transaction
+
+  (** The ledger in a staged ledger is always a mask *)
   type ledger
 
-  module Aux : sig
-    type t [@@deriving bin_io]
+  type serializable [@@deriving bin_io]
 
-    val hash : t -> ledger_builder_aux_hash
+  module Scan_state : sig
+    type t [@@deriving bin_io, sexp]
+
+    module Job_view : sig
+      type t [@@deriving sexp, to_yojson]
+    end
+
+    module Space_partition : sig
+      type t = {first: int; second: int option} [@@deriving sexp]
+    end
+
+    val hash : t -> staged_ledger_aux_hash
 
     val is_valid : t -> bool
+
+    val empty : unit -> t
+
+    val snark_job_list_json : t -> string
+
+    val partition_if_overflowing : t -> Space_partition.t
+
+    val all_work_to_do : t -> statement Sequence.t Or_error.t
+  end
+
+  module Staged_ledger_error : sig
+    type t =
+      | Bad_signature of user_command
+      | Coinbase_error of string
+      | Bad_prev_hash of staged_ledger_hash * staged_ledger_hash
+      | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
+      | Non_zero_fee_excess of Scan_state.Space_partition.t * transaction list
+      | Unexpected of Error.t
+    [@@deriving sexp]
+
+    val to_string : t -> string
+
+    val to_error : t -> Error.t
   end
 
   val ledger : t -> ledger
 
+  val scan_state : t -> Scan_state.t
+
   val create : ledger:ledger -> t
 
-  val of_aux_and_ledger :
+  val of_scan_state_and_ledger :
        snarked_ledger_hash:frozen_ledger_hash
     -> ledger:ledger
-    -> aux:Aux.t
+    -> scan_state:Scan_state.t
     -> t Or_error.t Deferred.t
+
+  val of_serialized_and_unserialized :
+    serialized:serializable -> unserialized:ledger -> t
+
+  val replace_ledger_exn : t -> ledger -> t
+
+  val proof_txns : t -> transaction Non_empty_list.t option
 
   val copy : t -> t
 
-  val hash : t -> ledger_builder_hash
+  val hash : t -> staged_ledger_hash
 
-  val aux : t -> Aux.t
+  val serializable_of_t : t -> serializable
 
   val apply :
        t
     -> diff
     -> logger:Logger.t
-    -> ( [`Hash_after_applying of ledger_builder_hash]
-       * [`Ledger_proof of ledger_proof option] )
-       Deferred.Or_error.t
+    -> ( [`Hash_after_applying of staged_ledger_hash]
+         * [`Ledger_proof of (ledger_proof * transaction list) option]
+         * [`Staged_ledger of t]
+       , Staged_ledger_error.t )
+       Deferred.Result.t
 
   val apply_diff_unchecked :
        t
     -> valid_diff
-    -> ( [`Hash_after_applying of ledger_builder_hash]
-       * [`Ledger_proof of ledger_proof option] )
-       Deferred.t
+    -> ( [`Hash_after_applying of staged_ledger_hash]
+       * [`Ledger_proof of (ledger_proof * transaction list) option]
+       * [`Staged_ledger of t] )
+       Deferred.Or_error.t
 
   val snarked_ledger :
     t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t
 end
 
-module type Ledger_builder_intf = sig
-  include Ledger_builder_base_intf
+module type Staged_ledger_intf = sig
+  include Staged_ledger_base_intf
 
   type ledger_hash
 
-  type transaction
-
   type user_command_with_valid_signature
-
-  type statement
 
   type ledger_proof_statement
 
@@ -577,11 +805,9 @@ module type Ledger_builder_intf = sig
 
   type sparse_ledger
 
-  type completed_work
+  type completed_work_checked
 
   type public_key
-
-  val ledger : t -> ledger
 
   val current_ledger_proof : t -> ledger_proof option
 
@@ -592,10 +818,10 @@ module type Ledger_builder_intf = sig
     -> self:public_key
     -> logger:Logger.t
     -> transactions_by_fee:user_command_with_valid_signature Sequence.t
-    -> get_completed_work:(statement -> completed_work option)
+    -> get_completed_work:(statement -> completed_work_checked option)
     -> valid_diff
 
-  val all_work_pairs :
+  val all_work_pairs_exn :
        t
     -> ( ( ledger_proof_statement
          , transaction
@@ -614,7 +840,7 @@ module type Ledger_builder_intf = sig
 end
 
 module type Work_selector_intf = sig
-  type ledger_builder
+  type staged_ledger
 
   type work
 
@@ -631,7 +857,7 @@ module type Work_selector_intf = sig
   val work :
        snark_pool:snark_pool
     -> fee:fee
-    -> ledger_builder
+    -> staged_ledger
     -> State.t
     -> work list * State.t
 end
@@ -641,17 +867,26 @@ module type Tip_intf = sig
 
   type protocol_state_proof
 
-  type ledger_builder
+  type staged_ledger
+
+  type serializable
 
   type external_transition
 
-  type t =
-    { protocol_state: protocol_state
-    ; proof: protocol_state_proof
-    ; ledger_builder: ledger_builder }
-  [@@deriving sexp, bin_io, fields]
+  type external_transition_verified
 
-  val of_transition_and_lb : external_transition -> ledger_builder -> t
+  (* N.B.: can't derive bin_io for staged ledger containing persistent ledger *)
+  type t =
+    { state: protocol_state
+    ; proof: protocol_state_proof
+    ; staged_ledger: staged_ledger }
+  [@@deriving sexp, fields]
+
+  (* serializer for tip components other than the persistent database in the staged ledger *)
+  val bin_tip : serializable Bin_prot.Type_class.t
+
+  val of_verified_transition_and_staged_ledger :
+    external_transition_verified -> staged_ledger -> t
 
   val copy : t -> t
 end
@@ -663,7 +898,7 @@ module type Consensus_state_intf = sig
 end
 
 module type Blockchain_state_intf = sig
-  type ledger_builder_hash
+  type staged_ledger_hash
 
   type frozen_ledger_hash
 
@@ -674,14 +909,14 @@ module type Blockchain_state_intf = sig
   type var
 
   val create_value :
-       ledger_builder_hash:ledger_builder_hash
-    -> ledger_hash:frozen_ledger_hash
+       staged_ledger_hash:staged_ledger_hash
+    -> snarked_ledger_hash:frozen_ledger_hash
     -> timestamp:time
     -> value
 
-  val ledger_builder_hash : value -> ledger_builder_hash
+  val staged_ledger_hash : value -> staged_ledger_hash
 
-  val ledger_hash : value -> frozen_ledger_hash
+  val snarked_ledger_hash : value -> frozen_ledger_hash
 
   val timestamp : value -> time
 end
@@ -715,7 +950,7 @@ end
 module type Internal_transition_intf = sig
   type snark_transition
 
-  type ledger_builder_diff
+  type staged_ledger_diff
 
   type prover_state
 
@@ -724,14 +959,14 @@ module type Internal_transition_intf = sig
   val create :
        snark_transition:snark_transition
     -> prover_state:prover_state
-    -> ledger_builder_diff:ledger_builder_diff
+    -> staged_ledger_diff:staged_ledger_diff
     -> t
 
   val snark_transition : t -> snark_transition
 
   val prover_state : t -> prover_state
 
-  val ledger_builder_diff : t -> ledger_builder_diff
+  val staged_ledger_diff : t -> staged_ledger_diff
 end
 
 module type External_transition_intf = sig
@@ -739,21 +974,147 @@ module type External_transition_intf = sig
 
   type protocol_state_proof
 
-  type ledger_builder_diff
+  type staged_ledger_diff
 
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, bin_io]
 
   val create :
        protocol_state:protocol_state
     -> protocol_state_proof:protocol_state_proof
-    -> ledger_builder_diff:ledger_builder_diff
+    -> staged_ledger_diff:staged_ledger_diff
     -> t
+
+  module Verified : sig
+    type t [@@deriving sexp, bin_io]
+
+    val protocol_state : t -> protocol_state
+
+    val protocol_state_proof : t -> protocol_state_proof
+
+    val staged_ledger_diff : t -> staged_ledger_diff
+  end
+
+  module Proof_verified : sig
+    type t [@@deriving sexp, bin_io]
+
+    val protocol_state : t -> protocol_state
+
+    val protocol_state_proof : t -> protocol_state_proof
+
+    val staged_ledger_diff : t -> staged_ledger_diff
+  end
+
+  val to_verified : t -> [`I_swear_this_is_safe_see_my_comment of Verified.t]
+
+  val of_verified : Verified.t -> t
 
   val protocol_state : t -> protocol_state
 
   val protocol_state_proof : t -> protocol_state_proof
 
-  val ledger_builder_diff : t -> ledger_builder_diff
+  val staged_ledger_diff : t -> staged_ledger_diff
+end
+
+module type External_transition_validation_intf = sig
+  type state_hash
+
+  type external_transition
+
+  type staged_ledger
+
+  type staged_ledger_error
+
+  type transition_frontier
+
+  type ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t =
+    'time_received * 'proof * 'frontier_dependencies * 'staged_ledger_diff
+    constraint 'time_received = [`Time_received] * _ Truth.t
+    constraint 'proof = [`Proof] * _ Truth.t
+    constraint 'frontier_dependencies = [`Frontier_dependencies] * _ Truth.t
+    constraint 'staged_ledger_diff = [`Staged_ledger_diff] * _ Truth.t
+
+  type 'a all =
+    ( [`Time_received] * 'a
+    , [`Proof] * 'a
+    , [`Frontier_dependencies] * 'a
+    , [`Staged_ledger_diff] * 'a )
+    t
+    constraint 'a = _ Truth.t
+
+  type fully_invalid = Truth.false_t all
+
+  type fully_valid = Truth.true_t all
+
+  type ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) with_transition =
+    (external_transition, state_hash) With_hash.t
+    * ('time_received, 'proof, 'frontier_dependencies, 'staged_ledger_diff) t
+
+  val fully_invalid : fully_invalid
+
+  val fully_valid : fully_valid
+
+  val validate_time_received :
+       ( [`Time_received] * Truth.false_t
+       , 'proof
+       , 'frontier_dependencies
+       , 'staged_ledger_diff )
+       with_transition
+    -> time_received:Unix_timestamp.t
+    -> ( ( [`Time_received] * Truth.true_t
+         , 'proof
+         , 'frontier_dependencies
+         , 'staged_ledger_diff )
+         with_transition
+       , [`Invalid_time_received] )
+       Result.t
+
+  val validate_proof :
+       ( 'time_received
+       , [`Proof] * Truth.false_t
+       , 'frontier_dependencies
+       , 'staged_ledger_diff )
+       with_transition
+    -> ( ( 'time_received
+         , [`Proof] * Truth.true_t
+         , 'frontier_dependencies
+         , 'staged_ledger_diff )
+         with_transition
+       , [`Invalid_proof] )
+       Deferred.Result.t
+
+  val validate_frontier_dependencies :
+       ( 'time_received
+       , 'proof
+       , [`Frontier_dependencies] * Truth.false_t
+       , 'staged_ledger_diff )
+       with_transition
+    -> logger:Logger.t
+    -> frontier:transition_frontier
+    -> ( ( 'time_received
+         , 'proof
+         , [`Frontier_dependencies] * Truth.true_t
+         , 'staged_ledger_diff )
+         with_transition
+       , [`Already_in_frontier | `Not_selected_over_frontier_root] )
+       Result.t
+
+  val validate_staged_ledger_diff :
+       ( 'time_received
+       , 'proof
+       , 'frontier_dependencies
+       , [`Staged_ledger_diff] * Truth.false_t )
+       with_transition
+    -> logger:Logger.t
+    -> parent_staged_ledger:staged_ledger
+    -> ( ( 'time_received
+         , 'proof
+         , 'frontier_dependencies
+         , [`Staged_ledger_diff] * Truth.true_t )
+         with_transition
+         * staged_ledger
+       , [ `Invalid_ledger_hash_after_staged_ledger_application
+         | `Staged_ledger_application_failed of staged_ledger_error ] )
+       Deferred.Result.t
 end
 
 module type Consensus_mechanism_intf = sig
@@ -763,9 +1124,9 @@ module type Consensus_mechanism_intf = sig
 
   type frozen_ledger_hash
 
-  type ledger_builder_hash
+  type staged_ledger_hash
 
-  type ledger_builder_diff
+  type staged_ledger_diff
 
   type protocol_state_proof
 
@@ -777,12 +1138,14 @@ module type Consensus_mechanism_intf = sig
 
   type keypair
 
+  type compressed_public_key
+
   type time
 
   module Local_state : sig
     type t [@@deriving sexp]
 
-    val create : keypair option -> t
+    val create : compressed_public_key option -> t
   end
 
   module Consensus_transition_data : sig
@@ -795,7 +1158,7 @@ module type Consensus_mechanism_intf = sig
 
   module Blockchain_state :
     Blockchain_state_intf
-    with type ledger_builder_hash := ledger_builder_hash
+    with type staged_ledger_hash := staged_ledger_hash
      and type frozen_ledger_hash := frozen_ledger_hash
      and type time := time
 
@@ -845,15 +1208,27 @@ module type Consensus_mechanism_intf = sig
     -> logger:Logger.t
     -> Protocol_state.value * Consensus_transition_data.value
 
+  val received_at_valid_time :
+    Consensus_state.value -> time_received:Unix_timestamp.t -> bool
+
   val next_proposal :
        Int64.t
     -> Consensus_state.value
     -> local_state:Local_state.t
     -> keypair:keypair
     -> logger:Logger.t
-    -> [`Check_again of Int64.t | `Propose of Int64.t * Proposal_data.t]
+    -> [ `Check_again of Int64.t
+       | `Propose_now of Proposal_data.t
+       | `Propose of Int64.t * Proposal_data.t ]
 
-  val genesis_protocol_state : Protocol_state.value
+  val select :
+       existing:Consensus_state.value
+    -> candidate:Consensus_state.value
+    -> logger:Logger.t
+    -> [`Keep | `Take]
+
+  val genesis_protocol_state :
+    (Protocol_state.value, protocol_state_hash) With_hash.t
 end
 
 module type Time_close_validator_intf = sig
@@ -869,12 +1244,12 @@ module type Machine_intf = sig
 
   type transition
 
-  type ledger_builder_transition
+  type staged_ledger_transition
 
   module Event : sig
     type e = Found of transition | New_state of state
 
-    type t = e * ledger_builder_transition
+    type t = e * staged_ledger_transition
   end
 
   val current_state : t -> state
@@ -931,8 +1306,23 @@ Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
     Witness.t -> new_state:protocol_state -> protocol_state_proof Deferred.t
 end
 
-module Proof_carrying_data = struct
-  type ('a, 'b) t = {data: 'a; proof: 'b} [@@deriving sexp, fields, bin_io]
+module type Transaction_validator_intf = sig
+  type ledger
+
+  type outer_ledger
+
+  type transaction
+
+  type user_command_with_valid_signature
+
+  type ledger_hash
+
+  val create : outer_ledger -> ledger
+
+  val apply_user_command :
+    ledger -> user_command_with_valid_signature -> unit Or_error.t
+
+  val apply_transaction : ledger -> transaction -> unit Or_error.t
 end
 
 module type Inputs_intf = sig
@@ -1000,17 +1390,30 @@ module type Inputs_intf = sig
      and type ledger_proof := Ledger_proof.t
      and type statement := Ledger_proof_statement.t
 
+  module Account : sig
+    type t
+
+    val public_key : t -> Public_key.Compressed.t
+  end
+
   module Ledger :
     Ledger_intf
     with type valid_user_command := User_command.With_valid_signature.t
      and type transaction := Transaction.t
      and type ledger_hash := Ledger_hash.t
+     and type account := Account.t
 
-  module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
+  module Genesis_ledger : sig
+    val t : Ledger.t
 
-  module Ledger_builder_hash :
-    Ledger_builder_hash_intf
-    with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+    val accounts : (Private_key.t option * Account.t) list
+  end
+
+  module Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf
+
+  module Staged_ledger_hash :
+    Staged_ledger_hash_intf
+    with type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
      and type ledger_hash := Ledger_hash.t
 
   (*
@@ -1043,33 +1446,34 @@ Merge Snark:
   module Time_close_validator :
     Time_close_validator_intf with type time := Time.t
 
-  module Completed_work :
-    Completed_work_intf
+  module Transaction_snark_work :
+    Transaction_snark_work_intf
     with type proof := Ledger_proof.t
      and type statement := Ledger_proof_statement.t
      and type public_key := Public_key.Compressed.t
 
-  module Ledger_builder_diff :
-    Ledger_builder_diff_intf
+  module Staged_ledger_diff :
+    Staged_ledger_diff_intf
     with type user_command := User_command.t
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
-     and type ledger_builder_hash := Ledger_builder_hash.t
+     and type staged_ledger_hash := Staged_ledger_hash.t
      and type public_key := Public_key.Compressed.t
-     and type completed_work := Completed_work.t
-     and type completed_work_checked := Completed_work.Checked.t
+     and type completed_work := Transaction_snark_work.t
+     and type completed_work_checked := Transaction_snark_work.Checked.t
+     and type fee_transfer_single := Fee_transfer.single
 
   module Sparse_ledger : sig
     type t
   end
 
-  module Ledger_builder :
-    Ledger_builder_intf
-    with type diff := Ledger_builder_diff.t
+  module Staged_ledger :
+    Staged_ledger_intf
+    with type diff := Staged_ledger_diff.t
      and type valid_diff :=
-                Ledger_builder_diff.With_valid_signatures_and_proofs.t
-     and type ledger_builder_hash := Ledger_builder_hash.t
-     and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+                Staged_ledger_diff.With_valid_signatures_and_proofs.t
+     and type staged_ledger_hash := Staged_ledger_hash.t
+     and type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
      and type ledger_hash := Ledger_hash.t
      and type frozen_ledger_hash := Frozen_ledger_hash.t
      and type public_key := Public_key.Compressed.t
@@ -1077,19 +1481,20 @@ Merge Snark:
      and type ledger_proof := Ledger_proof.t
      and type user_command_with_valid_signature :=
                 User_command.With_valid_signature.t
-     and type statement := Completed_work.Statement.t
-     and type completed_work := Completed_work.Checked.t
+     and type statement := Transaction_snark_work.Statement.t
+     and type completed_work_checked := Transaction_snark_work.Checked.t
      and type sparse_ledger := Sparse_ledger.t
      and type ledger_proof_statement := Ledger_proof_statement.t
      and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
      and type transaction := Transaction.t
+     and type user_command := User_command.t
 
-  module Ledger_builder_transition :
-    Ledger_builder_transition_intf
-    with type diff := Ledger_builder_diff.t
-     and type ledger_builder := Ledger_builder.t
+  module Staged_ledger_transition :
+    Staged_ledger_transition_intf
+    with type diff := Staged_ledger_diff.t
+     and type staged_ledger := Staged_ledger.t
      and type diff_with_valid_signatures_and_proofs :=
-                Ledger_builder_diff.With_valid_signatures_and_proofs.t
+                Staged_ledger_diff.With_valid_signatures_and_proofs.t
 
   module Protocol_state_hash : Protocol_state_hash_intf
 
@@ -1101,11 +1506,12 @@ Merge Snark:
      and type protocol_state_hash := Protocol_state_hash.t
      and type protocol_state_proof := Protocol_state_proof.t
      and type frozen_ledger_hash := Frozen_ledger_hash.t
-     and type ledger_builder_hash := Ledger_builder_hash.t
-     and type ledger_builder_diff := Ledger_builder_diff.t
+     and type staged_ledger_hash := Staged_ledger_hash.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
      and type user_command := User_command.t
      and type sok_digest := Sok_message.Digest.t
      and type ledger := Ledger.t
+     and type compressed_public_key := Public_key.Compressed.t
      and type keypair := Keypair.t
      and type time := Time.t
 
@@ -1113,20 +1519,32 @@ Merge Snark:
     Internal_transition_intf
     with type snark_transition := Consensus_mechanism.Snark_transition.value
      and type prover_state := Consensus_mechanism.Prover_state.t
-     and type ledger_builder_diff := Ledger_builder_diff.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
 
   module External_transition :
     External_transition_intf
     with type protocol_state := Consensus_mechanism.Protocol_state.value
-     and type ledger_builder_diff := Ledger_builder_diff.t
+     and type staged_ledger_diff := Staged_ledger_diff.t
      and type protocol_state_proof := Protocol_state_proof.t
 
   module Tip :
     Tip_intf
-    with type ledger_builder := Ledger_builder.t
+    with type staged_ledger := Staged_ledger.t
      and type protocol_state := Consensus_mechanism.Protocol_state.value
      and type protocol_state_proof := Protocol_state_proof.t
      and type external_transition := External_transition.t
+     and type serializable :=
+                Consensus_mechanism.Protocol_state.value
+                * Protocol_state_proof.t
+                * Staged_ledger.serializable
+
+  module Transaction_validator :
+    Transaction_validator_intf
+    with type outer_ledger := Ledger.t
+     and type transaction := Transaction.t
+     and type user_command_with_valid_signature :=
+                User_command.With_valid_signature.t
+     and type ledger_hash := Ledger_hash.t
 end
 
 module Make
@@ -1153,7 +1571,7 @@ struct
   module Event = struct
     type t =
       | Found of Internal_transition.t
-      | New_state of Proof_carrying_state.t * Ledger_builder_transition.t
+      | New_state of Proof_carrying_state.t * Staged_ledger_transition.t
   end
 
   type t = {state: Proof_carrying_state.t} [@@deriving fields]

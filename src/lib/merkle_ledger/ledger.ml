@@ -1,12 +1,10 @@
 open Core
+open Module_version
 
 (* SOMEDAY: handle empty wallets *)
 module Make
-    (Key : Intf.Key) (Account : sig
-        type t [@@deriving sexp, bin_io]
-
-        include Intf.Account with type t := t and type key := Key.t
-    end)
+    (Key : Intf.Key)
+    (Account : Intf.Account with type key := Key.t)
     (Hash : sig
               type t [@@deriving sexp, hash, compare, bin_io]
 
@@ -21,6 +19,7 @@ module Make
      and type root_hash := Hash.t
      and type account := Account.t
      and type key := Key.t
+     and type key_set := Key.Set.t
 
   val create : unit -> t
 
@@ -49,8 +48,32 @@ end = struct
     ; mutable dirty_indices: int list }
   [@@deriving sexp, bin_io]
 
-  type t = {uuid: Uuid.Stable.V1.t; accounts: accounts; tree: tree}
-  [@@deriving sexp, bin_io]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        let version = 1
+
+        type t = {uuid: Uuid.Stable.V1.t; accounts: accounts; tree: tree}
+        [@@deriving sexp, bin_io]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "ledger"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  include Stable.Latest
 
   module C : Container.S0 with type t := t and type elt := Account.t =
   Container.Make0 (struct
@@ -67,29 +90,29 @@ end = struct
 
   let fold_until = C.fold_until
 
-  let foldi t ~init ~f =
+  let keys t = C.to_list t |> List.map ~f:Account.public_key |> Key.Set.of_list
+
+  let key_of_index t index =
+    if index >= Dyn_array.length t.accounts then None
+    else Some (Dyn_array.get t.accounts index |> Account.public_key)
+
+  let iteri t ~f = Dyn_array.iteri f t.accounts
+
+  let foldi_with_ignored_keys t ignored_keys ~init ~f =
     Dyn_array.fold_left
-      (fun (i, acc) x -> (i + 1, f (Addr.of_int_exn i) acc x))
+      (fun (i, acc) x ->
+        (* won't throw exn because folding over existing indices *)
+        let key = Option.value_exn (key_of_index t i) in
+        if Key.Set.mem ignored_keys key then (i + 1, acc)
+        else (i + 1, f (Addr.of_int_exn i) acc x) )
       (0, init) t.accounts
     |> snd
+
+  let foldi t ~init ~f = foldi_with_ignored_keys t Key.Set.empty ~init ~f
 
   module Location = struct
     type t = index [@@deriving sexp, compare, hash, eq]
   end
-
-  let copy t =
-    let copy_tree tree =
-      { leafs= Key.Table.copy tree.leafs
-      ; unset_slots= tree.unset_slots
-      ; dirty= tree.dirty
-      ; syncing= false
-      ; nodes_height= tree.nodes_height
-      ; nodes= List.map tree.nodes ~f:Dyn_array.copy
-      ; dirty_indices= tree.dirty_indices }
-    in
-    { uuid= Uuid.create ()
-    ; accounts= Dyn_array.copy t.accounts
-    ; tree= copy_tree t.tree }
 
   module Path = Merkle_path.Make (Hash)
 
@@ -124,15 +147,15 @@ end = struct
         ; nodes= []
         ; dirty_indices= [] } }
 
-  let destroy _t = failwith "destroy: not implemented"
+  let with_ledger ~f =
+    let t = create () in
+    f t
+
+  let close _t = failwith "close: not implemented"
 
   let get_uuid t = t.uuid
 
   let num_accounts t = Key.Table.length t.tree.leafs
-
-  let key_of_index t index =
-    if index >= Dyn_array.length t.accounts then None
-    else Some (Dyn_array.get t.accounts index |> Account.public_key)
 
   let location_of_key t key = Hashtbl.find t.tree.leafs key
 
@@ -165,6 +188,10 @@ end = struct
     Hashtbl.set t.tree.leafs ~key ~data:merkle_index ;
     (t.tree).dirty_indices <- merkle_index :: t.tree.dirty_indices ;
     merkle_index
+
+  let last_filled t =
+    let merkle_index = Dyn_array.length t.accounts in
+    if merkle_index = 0 then None else Some merkle_index
 
   let get_or_create_account t key account =
     match location_of_key t key with
@@ -394,10 +421,17 @@ end = struct
           (t.tree).unset_slots <- Int.Set.remove t.tree.unset_slots new_index )
         else set_at_index_exn t new_index a )
 
-  let get_all_accounts_rooted_at_exn t a =
-    let height = depth - Addr.depth a in
-    let first_index = Addr.to_int a lsl height in
-    let count = min (1 lsl height) (num_accounts t - first_index) in
-    let subarr = Dyn_array.sub t.accounts first_index count in
-    Dyn_array.to_list subarr
+  let set_batch_accounts _t _addresses_and_accounts =
+    failwith "unsupported implementation"
+
+  let get_all_accounts_rooted_at_exn t address =
+    let result =
+      Addr.Range.fold (Addr.Range.subtree_range address) ~init:[]
+        ~f:(fun bit_index acc ->
+          let account = get t (Addr.to_int bit_index) in
+          (bit_index, account) :: acc )
+    in
+    List.rev_filter_map result ~f:(function
+      | _, None -> None
+      | addr, Some account -> Some (addr, account) )
 end

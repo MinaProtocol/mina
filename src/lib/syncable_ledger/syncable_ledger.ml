@@ -4,8 +4,17 @@ open Pipe_lib
 
 let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 
+type 'addr query = What_hash of 'addr | What_contents of 'addr | Num_accounts
+[@@deriving bin_io, sexp]
+
+type ('addr, 'hash, 'account) answer =
+  | Has_hash of 'addr * 'hash
+  | Contents_are of 'addr * 'account list
+  | Num_accounts of int * 'hash
+[@@deriving bin_io, sexp]
+
 module type S = sig
-  type t
+  type t [@@deriving sexp]
 
   type merkle_tree
 
@@ -23,32 +32,32 @@ module type S = sig
 
   type index = int
 
-  type answer =
-    | Has_hash of addr * hash
-    | Contents_are of addr * account list
-    | Num_accounts of int * hash
-  [@@deriving bin_io, sexp]
+  type query
 
-  type query = What_hash of addr | What_contents of addr | Num_accounts
-  [@@deriving bin_io, sexp]
+  type answer
 
   module Responder : sig
     type t
 
-    val create : merkle_tree -> (query -> unit) -> t
+    val create : merkle_tree -> (query -> unit) -> parent_log:Logger.t -> t
 
     val answer_query : t -> query -> answer
   end
 
   val create : merkle_tree -> parent_log:Logger.t -> t
 
-  val answer_writer : t -> (root_hash * answer) Linear_pipe.Writer.t
+  val answer_writer :
+    t -> (root_hash * answer) Envelope.Incoming.t Linear_pipe.Writer.t
 
   val query_reader : t -> (root_hash * query) Linear_pipe.Reader.t
 
   val destroy : t -> unit
 
-  val new_goal : t -> root_hash -> unit
+  val new_goal : t -> root_hash -> [`Repeat | `New]
+
+  val peek_valid_tree : t -> merkle_tree option
+
+  val valid_tree : t -> merkle_tree Deferred.t
 
   val wait_until_valid :
        t
@@ -87,20 +96,6 @@ module type Validity_intf = sig
   val get : t -> addr -> hash' option
 
   val completely_fresh : t -> bool
-end
-
-module type Responder_intf = sig
-  type t
-
-  type merkle_tree
-
-  type query
-
-  type answer
-
-  val create : merkle_tree -> (query -> unit) -> t
-
-  val answer_query : t -> query -> answer
 end
 
 (*
@@ -168,7 +163,11 @@ module Make
    and type root_hash := Root_hash.t
    and type addr := Addr.t
    and type merkle_path := MT.path
-   and type account := Account.t = struct
+   and type account := Account.t
+   and type query := Addr.t query
+   and type answer := (Addr.t, Hash.t, Account.t) answer = struct
+  type addr = Addr.t
+
   type diff = unit
 
   type index = int
@@ -257,29 +256,52 @@ module Make
       | _ -> false
   end
 
-  type answer =
-    | Has_hash of Addr.t * Hash.t
-    | Contents_are of Addr.t * Account.t list
-    | Num_accounts of int * Hash.t
-    (* idea: make this verifiable by including the merkle path to the rightmost account, and verify that
-       filling in empty hashes for the rest amounts to the correct hash. *)
-  [@@deriving bin_io, sexp]
+  type nonrec answer = (Addr.t, Hash.t, Account.t) answer
 
-  type query = What_hash of Addr.t | What_contents of Addr.t | Num_accounts
-  [@@deriving bin_io, sexp]
+  type nonrec query = Addr.t query
+
+  (* idea: make this verifiable by including the merkle path to the rightmost account, and verify that
+       filling in empty hashes for the rest amounts to the correct hash. *)
 
   module Responder = struct
-    type t = {mt: MT.t; f: query -> unit}
+    type t = {mt: MT.t; f: query -> unit; log: Logger.t}
 
-    let create : MT.t -> (query -> unit) -> t = fun mt f -> {mt; f}
+    let create : MT.t -> (query -> unit) -> parent_log:Logger.t -> t =
+     fun mt f ~parent_log -> {mt; f; log= parent_log}
 
     let answer_query : t -> query -> answer =
-     fun {mt; f} q ->
+     fun {mt; f; log} q ->
       f q ;
       match q with
       | What_hash a -> Has_hash (a, MT.get_inner_hash_at_addr_exn mt a)
       | What_contents a ->
-          Contents_are (a, MT.get_all_accounts_rooted_at_exn mt a)
+          let addresses_and_accounts =
+            List.sort ~compare:(fun (addr1, _) (addr2, _) ->
+                Addr.compare addr1 addr2 )
+            @@ MT.get_all_accounts_rooted_at_exn mt a
+          in
+          let addresses, accounts = List.unzip addresses_and_accounts in
+          if not (List.is_empty addresses) then
+            let first_address, rest_address =
+              (List.hd_exn addresses, List.tl_exn addresses)
+            in
+            let missing_address, is_compact =
+              List.fold rest_address
+                ~init:(Addr.next first_address, true)
+                ~f:(fun (expected_address, is_compact) actual_address ->
+                  if is_compact && expected_address = Some actual_address then
+                    (Addr.next actual_address, true)
+                  else (expected_address, false) )
+            in
+            if not is_compact then
+              Logger.error log
+                !"Missing an account at address: %{sexp:Addr.t} inside the \
+                  list: %{sexp:(Addr.t * Account.t) list}"
+                (Option.value_exn missing_address)
+                addresses_and_accounts
+            else ()
+          else () ;
+          Contents_are (a, accounts)
       | Num_accounts ->
           let len = MT.num_accounts mt in
           let height = Int.ceil_log2 len in
@@ -299,14 +321,19 @@ module Make
     ; tree: MT.t
     ; mutable validity: Valid.t
     ; log: Logger.t
-    ; answers: (Root_hash.t * answer) Linear_pipe.Reader.t
-    ; answer_writer: (Root_hash.t * answer) Linear_pipe.Writer.t
+    ; answers: (Root_hash.t * answer) Envelope.Incoming.t Linear_pipe.Reader.t
+    ; answer_writer:
+        (Root_hash.t * answer) Envelope.Incoming.t Linear_pipe.Writer.t
     ; queries: (Root_hash.t * query) Linear_pipe.Writer.t
     ; query_reader: (Root_hash.t * query) Linear_pipe.Reader.t
     ; waiting_parents: waiting Addr.Table.t
     ; waiting_content: Hash.t Addr.Table.t
     ; mutable validity_listener:
         [`Ok | `Target_changed of Root_hash.t option * Root_hash.t] Ivar.t }
+
+  let t_of_sexp _ = failwith "t_of_sexp: not implemented"
+
+  let sexp_of_t _ = failwith "sexp_of_t: not implemented"
 
   let desired_root_exn {desired_root; _} = desired_root |> Option.value_exn
 
@@ -446,7 +473,8 @@ module Make
      will stick around until the SL is destroyed, or else cause a
      node to never be verified *)
   let main_loop t =
-    let handle_answer (root_hash, a) =
+    let handle_answer env =
+      let root_hash, a = Envelope.Incoming.data env in
       Logger.trace t.log !"Handle answer for %{sexp: Root_hash.t}" root_hash ;
       if not (Root_hash.equal root_hash (desired_root_exn t)) then (
         Logger.trace t.log
@@ -462,8 +490,10 @@ module Make
             (* TODO #435: Stick this in a log, punish the sender *)
             | Error e ->
                 Logger.faulty_peer t.log
-                  !"Got error when trying to add child_hash %{sexp: Hash.t} %s"
-                  h' (Error.to_string_hum e) ;
+                  !"Got error from when trying to add child_hash %{sexp: \
+                    Hash.t} %s %{sexp: Network_peer.Peer.t}"
+                  h' (Error.to_string_hum e)
+                  (Envelope.Incoming.sender env) ;
                 ()
             | Ok (`Good children_to_verify) ->
                 (* TODO #312: Make sure we don't write too much *)
@@ -494,14 +524,32 @@ module Make
       | Some h' -> Root_hash.equal h h'
     in
     if not should_skip then (
+      Option.iter t.desired_root ~f:(fun root_hash ->
+          Logger.info t.log
+            !"new_goal: changing target from %{sexp:Root_hash.t} to \
+              %{sexp:Root_hash.t}"
+            root_hash h ) ;
       Ivar.fill_if_empty t.validity_listener
         (`Target_changed (t.desired_root, h)) ;
       t.validity_listener <- Ivar.create () ;
       t.desired_root <- Some h ;
       Valid.set t.validity (Addr.root ()) (Stale, Root_hash.to_hash h)
       |> ignore ;
-      Linear_pipe.write_without_pushback t.queries (h, Num_accounts) )
-    else Logger.info t.log "new_goal to same hash, not doing anything"
+      Linear_pipe.write_without_pushback t.queries (h, Num_accounts) ;
+      `New )
+    else (
+      Logger.info t.log "new_goal to same hash, not doing anything" ;
+      `Repeat )
+
+  let rec valid_tree t =
+    match%bind Ivar.read t.validity_listener with
+    | `Ok -> return t.tree
+    | `Target_changed _ -> valid_tree t
+
+  let peek_valid_tree t =
+    Option.bind (Ivar.peek t.validity_listener) ~f:(function
+      | `Ok -> Some t.tree
+      | `Target_changed _ -> None )
 
   let wait_until_valid t h =
     if not (Root_hash.equal h (desired_root_exn t)) then
@@ -511,7 +559,9 @@ module Make
         | `Target_changed payload -> `Target_changed payload
         | `Ok -> `Ok t.tree )
 
-  let fetch t rh = new_goal t rh ; wait_until_valid t rh
+  let fetch t rh =
+    new_goal t rh |> ignore ;
+    wait_until_valid t rh
 
   let create mt ~parent_log =
     let qr, qw = Linear_pipe.create () in

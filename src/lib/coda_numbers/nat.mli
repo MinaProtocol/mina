@@ -4,12 +4,18 @@ open Fold_lib
 open Tuple_lib
 
 module type S = sig
-  type t [@@deriving bin_io, sexp, compare, eq, hash]
+  type t [@@deriving bin_io, sexp, compare, hash]
+
+  include Comparable.S with type t := t
+
+  include Hashable.S with type t := t
 
   module Stable : sig
     module V1 : sig
       type nonrec t = t [@@deriving bin_io, sexp, eq, compare, hash]
     end
+
+    module Latest = V1
   end
 
   val length_in_triples : int

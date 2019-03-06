@@ -1,0 +1,12 @@
+(library
+ (name cli_lib)
+ (public_name cli_lib)
+ (flags :standard -short-paths -warn-error -58-39) ; 39 for ppx_deriving_yojson
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core async_unix sodium ppx_deriving_yojson.runtime yojson
+   coda_base daemon_rpcs)
+ (preprocess
+  (pps ppx_jane ppx_deriving_yojson ppx_deriving.make bisect_ppx --
+    -conditional))
+ (synopsis "Library to communicate with Coda as cli as the front-end"))

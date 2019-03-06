@@ -30,10 +30,10 @@ include
   Tick.Snarkable.Bits.Faithful
   with type Unpacked.value = t
    and type Packed.value = t
-   and type Packed.var = private Tick.Field.Checked.t
+   and type Packed.var = private Tick.Field.Var.t
 
 module Span : sig
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, compare]
 
   module Stable : sig
     module V1 : sig
@@ -77,6 +77,8 @@ module Timeout : sig
   val peek : 'a t -> 'a option
 
   val cancel : Controller.t -> 'a t -> 'a -> unit
+
+  val remaining_time : 'a t -> Span.t
 end
 
 val ( < ) : t -> t -> bool
@@ -90,7 +92,7 @@ val ( <= ) : t -> t -> bool
 val ( >= ) : t -> t -> bool
 
 val field_var_to_unpacked :
-  Tick.Field.Checked.t -> (Unpacked.var, _) Tick.Checked.t
+  Tick.Field.Var.t -> (Unpacked.var, _) Tick.Checked.t
 
 val diff_checked :
   Unpacked.var -> Unpacked.var -> (Span.Unpacked.var, _) Tick.Checked.t

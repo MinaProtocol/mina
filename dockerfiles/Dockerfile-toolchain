@@ -1,6 +1,6 @@
 FROM ocaml/opam2:debian-9-ocaml-4.07
 
-# OS package dependancies
+# OS package dependencies
 RUN sudo apt-get update && sudo apt-get install --yes \
     cmake \
     jq \
@@ -10,8 +10,6 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     libgmp-dev \
     libgmp3-dev \
     libprocps-dev \
-    librocksdb-dev \
-    librocksdb4.5 \
     libsodium-dev \
     libssl-dev \
     lsb \
@@ -23,7 +21,8 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     pkg-config \
     python-jinja2 \
     rubygems \
-    zlib1g-dev
+    zlib1g-dev \
+    libbz2-dev
 
 RUN sudo gem install deb-s3
 
@@ -33,31 +32,34 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add - && \
     sudo apt-get update -y && sudo apt-get install google-cloud-sdk -y
 
+# Source copy of rocksdb
+RUN sudo git clone https://github.com/facebook/rocksdb -b v5.17.2 /rocksdb
+# This builds and installs just the static lib for us
+RUN cd /rocksdb && sudo make static_lib PORTABLE=1 -j$(nproc) && sudo cp librocksdb.a /usr/local/lib/librocksdb_coda.a && sudo rm -rf /rocksdb && sudo strip -S /usr/local/lib/librocksdb_coda.a
+
 # Opam dependencies
 # Pull freshest repository
 RUN git -C /home/opam/opam-repository pull
 RUN opam update -y && opam upgrade -y
-# Install dune to get any external dependencies
-RUN opam depext -i dune
-# Uninstall dune, because we'll install a custom version
-RUN opam remove dune
+
+# Install other OPAM packages
 ADD /src/opam.export .
 RUN opam switch import opam.export ; rm opam.export
-
-# Source copy of dune (modified to link rocksdb for test runners)
-ADD /src/external/ocaml-dune /ocaml-dune
-RUN cd /ocaml-dune && yes | opam pin add .
 
 # Source copy of ocaml-sodium (modified for static linking)
 ADD /src/external/ocaml-sodium /ocaml-sodium
 RUN cd /ocaml-sodium && yes | opam pin add .
 
-# Source copy of ocaml-rocksdb (exposes opaque types)
-ADD /src/external/ocaml-rocksdb /ocaml-rocksdb
-RUN cd /ocaml-rocksdb && yes | opam pin add .
+# Source copy of rpc_parallel (modified for macOS support)
+ADD /src/external/rpc_parallel /rpc_parallel
+RUN cd /rpc_parallel && yes | opam pin add .
+
+ADD /src/external/async_kernel /async_kernel
+RUN sudo rm -rf /async_kernel/.git && cd /async_kernel && yes | opam pin add .
 
 # Get coda-kademlia from packages repo
 RUN sudo apt-get install --yes apt-transport-https ca-certificates && \
       echo "deb [trusted=yes] https://packages.o1test.net unstable main" | sudo tee -a /etc/apt/sources.list.d/coda.list && \
       sudo apt-get update && \
       sudo apt-get install --yes coda-kademlia
+

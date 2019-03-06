@@ -13,14 +13,18 @@ let dispatch rpc query port =
       | Error exn -> return (Or_error.of_exn exn)
       | Ok conn -> Rpc.Rpc.dispatch rpc conn query )
 
+(** Call an RPC, passing handlers for a successful call and a failing one. Note
+   that a successful *call* may have failed on the server side and returned a
+   failing result. To deal with that, the success handler returns an
+   Or_error. *)
 let dispatch_with_message rpc query port ~success ~error =
+  let fail err = eprintf "%s\n" err ; exit 1 in
   match%bind dispatch rpc query port with
-  | Ok x ->
-      printf "%s\n" (success x) ;
-      Deferred.unit
-  | Error e ->
-      eprintf "%s\n" (error e) ;
-      exit 1
+  | Ok x -> (
+    match success x with
+    | Ok res -> printf "%s\n" res ; Deferred.unit
+    | Error e -> fail (Error.to_string_hum e) )
+  | Error e -> fail (error e)
 
 let dispatch_pretty_message (type t)
     (module Print : Cli_lib.Render.Printable_intf with type t = t)
@@ -105,17 +109,13 @@ let prove_payment =
   in
   let address_flag =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
-      (required public_key)
+      (required public_key_compressed)
   in
-  Command.async ~summary:"Generate a proof of a payment as a merkle list"
+  Command.async ~summary:"Generate a proof of a sent payment"
     (Cli_lib.Background_daemon.init (Args.zip2 receipt_hash_flag address_flag)
        ~f:(fun port (receipt_chain_hash, pk) ->
-         dispatch_with_message Prove_receipt.rpc
-           (receipt_chain_hash, Public_key.compress pk)
-           port
-           ~success:(function
-             | Ok result -> Cli_lib.Render.Prove_receipt.to_text result
-             | Error e -> Error.to_string_hum e)
+         dispatch_with_message Prove_receipt.rpc (receipt_chain_hash, pk) port
+           ~success:(Or_error.map ~f:Cli_lib.Render.Prove_receipt.to_text)
            ~error:Error.to_string_hum ))
 
 let read_json filepath =
@@ -139,9 +139,9 @@ let verify_payment =
   in
   let address_flag =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
-      (required public_key)
+      (required public_key_compressed)
   in
-  Command.async ~summary:"Generate a proof of a payment as a merkle list"
+  Command.async ~summary:"Verify a proof of a sent payment"
     (Cli_lib.Background_daemon.init
        (Args.zip3 payment_path_flag proof_path_flag address_flag)
        ~f:(fun port (payment_path, proof_path, pk) ->
@@ -157,9 +157,7 @@ let verify_payment =
            and proof =
              Payment_proof.of_yojson proof_json |> to_deferred_or_error
            in
-           dispatch Verify_proof.rpc
-             (Public_key.compress pk, payment, proof)
-             port
+           dispatch Verify_proof.rpc (pk, payment, proof) port
          in
          match%map dispatch_result with
          | Ok (Ok ()) -> printf "Payment is valid on the existing blockchain!"
@@ -193,20 +191,35 @@ let get_nonce_cmd =
 let status =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
+  let open Command.Param in
+  let flag =
+    let open Command.Param in
+    return (fun a b -> (a, b))
+    <*> Cli_lib.Flag.json <*> Cli_lib.Flag.performance
+  in
   Command.async ~summary:"Get running daemon status"
-    (Cli_lib.Background_daemon.init Cli_lib.Flag.json ~f:(fun port json ->
+    (Cli_lib.Background_daemon.init flag ~f:(fun port (json, performance) ->
          dispatch_pretty_message ~json
            (module Daemon_rpcs.Types.Status)
-           Get_status.rpc () port ))
+           Get_status.rpc
+           (if performance then `Performance else `None)
+           port ))
 
 let status_clear_hist =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
+  let flag =
+    let open Command.Param in
+    return (fun a b -> (a, b))
+    <*> Cli_lib.Flag.json <*> Cli_lib.Flag.performance
+  in
   Command.async ~summary:"Clear histograms reported in status"
-    (Cli_lib.Background_daemon.init Cli_lib.Flag.json ~f:(fun port json ->
+    (Cli_lib.Background_daemon.init flag ~f:(fun port (json, performance) ->
          dispatch_pretty_message ~json
            (module Daemon_rpcs.Types.Status)
-           Clear_hist_status.rpc () port ))
+           Clear_hist_status.rpc
+           (if performance then `Performance else `None)
+           port ))
 
 let get_nonce_exn public_key port =
   match%bind get_nonce public_key port with
@@ -272,11 +285,12 @@ let batch_send_payments =
     dispatch_with_message Daemon_rpcs.Send_user_commands.rpc
       (ts :> User_command.t list)
       port
-      ~success:(fun () -> "Successfully enqueued payments in pool")
+      ~success:(fun () ->
+        Or_error.return "Successfully enqueued payments in pool" )
       ~error:(fun e ->
         sprintf "Failed to send payments %s" (Error.to_string_hum e) )
   in
-  Command.async ~summary:"send multiple payments from a file"
+  Command.async ~summary:"Send multiple payments from a file"
     (Cli_lib.Background_daemon.init
        (Args.zip2 Cli_lib.Flag.privkey_read_path payment_path_flag)
        ~f:main)
@@ -286,7 +300,12 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
   let open Command.Param in
   let open Cli_lib.Arg_type in
   let amount_flag =
-    flag "fee" ~doc:"VALUE  fee you're willing to pay (default: 1)"
+    flag "fee"
+      ~doc:
+        (Printf.sprintf
+           "FEE Amount you are willing to pay to process the transaction \
+            (default: %d)"
+           (Currency.Fee.to_int Cli_lib.Fee.default_transaction))
       (optional txn_fee)
   in
   let flag =
@@ -311,10 +330,10 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
          dispatch_with_message Daemon_rpcs.Send_user_command.rpc
            (payment :> User_command.t)
            port
-           ~success:(fun receipt_chain_hash ->
-             sprintf "Successfully enqueued %s in pool\nReceipt_chain_hash: %s"
-               label
-               (Receipt.Chain_hash.to_string receipt_chain_hash) )
+           ~success:
+             (Or_error.map ~f:(fun receipt_chain_hash ->
+                  sprintf "Initiated %s\nReceipt chain hash: %s" label
+                    (Receipt.Chain_hash.to_string receipt_chain_hash) ))
            ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e)) ))
 
 let send_payment =
@@ -323,7 +342,7 @@ let send_payment =
     let open Cli_lib.Arg_type in
     let%map_open receiver =
       flag "receiver"
-        ~doc:"PUBLICKEY Public-key address to which you want to send money"
+        ~doc:"PUBLICKEY Public key address to which you want to send money"
         (required public_key_compressed)
     and amount =
       flag "amount" ~doc:"VALUE Payment amount you want to send"
@@ -387,31 +406,89 @@ let generate_keypair =
     handle_exception_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
-    let kp = Genesis_ledger.largest_account_keypair_exn () in
+    let kp = Keypair.create () in
     let%bind () = Cli_lib.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
     printf "Public key: %s\n"
       (kp.public_key |> Public_key.compress |> Public_key.Compressed.to_base64) ;
     exit 0)
 
 let dump_ledger =
-  let lb_hash =
+  let sl_hash =
     let open Command.Param in
     let h =
       Arg_type.create (fun s ->
-          Sexp.of_string_conv_exn s Ledger_builder_hash.Stable.V1.t_of_sexp )
+          Sexp.of_string_conv_exn s Staged_ledger_hash.Stable.V1.t_of_sexp )
     in
-    anon ("ledger-builder-hash" %: h)
+    anon ("staged-ledger-hash" %: h)
   in
   Command.async ~summary:"Print the ledger with given merkle root as a sexp"
-    (Cli_lib.Background_daemon.init lb_hash ~f:(fun port lb_hash ->
-         dispatch Daemon_rpcs.Get_ledger.rpc lb_hash port
+    (Cli_lib.Background_daemon.init sl_hash ~f:(fun port sl_hash ->
+         dispatch Daemon_rpcs.Get_ledger.rpc sl_hash port
          >>| function
          | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e
          | Ok (Error e) -> printf !"Ledger not found: %{sexp:Error.t}\n" e
          | Ok (Ok accounts) -> printf !"%{sexp:Account.t list}\n" accounts ))
 
+let constraint_system_digests =
+  Command.async ~summary:"Print MD5 digest of each SNARK constraint"
+    (Command.Param.return (fun () ->
+         let all =
+           Transaction_snark.constraint_system_digests ()
+           @ Blockchain_snark.Blockchain_transition.constraint_system_digests
+               ()
+         in
+         let all =
+           List.sort (fun (k1, _) (k2, _) -> String.compare k1 k2) all
+         in
+         List.iter all ~f:(fun (k, v) -> printf "%s\t%s\n" k (Md5.to_hex v)) ;
+         Deferred.unit ))
+
+let snark_job_list =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"List of snark jobs in JSON format"
+    (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
+         match%map dispatch Daemon_rpcs.Snark_job_list.rpc () port with
+         | Ok str -> printf "%s" str
+         | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e ))
+
+let start_tracing =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Start async tracing to $config-directory/$pid.trace"
+    (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
+         match%map dispatch Daemon_rpcs.Start_tracing.rpc () port with
+         | Ok () -> printf "Daemon started tracing!"
+         | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e ))
+
+let stop_tracing =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Stop async tracing"
+    (Cli_lib.Background_daemon.init (return ()) ~f:(fun port () ->
+         match%map dispatch Daemon_rpcs.Stop_tracing.rpc () port with
+         | Ok () -> printf "Daemon stopped printing!"
+         | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e ))
+
+let visualize_frontier =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Produce a dot file of the transition_frontier"
+    (Cli_lib.Background_daemon.init
+       Command.Param.(anon @@ ("output-filepath" %: string))
+       ~f:(fun port filename ->
+         match%map dispatch Visualize_frontier.rpc filename port with
+         | Ok () ->
+             printf !"Successfully wrote the visual at location %s." filename
+         | Error e ->
+             printf "Could not save file: %s\n" (Error.to_string_hum e) ))
+
 let command =
-  Command.group ~summary:"Lightweight client process"
+  Command.group ~summary:"Lightweight client commands"
     [ ("get-balance", get_balance)
     ; ("get-public-keys", get_public_keys)
     ; ("prove-payment", prove_payment)
@@ -424,4 +501,9 @@ let command =
     ; ("wrap-key", wrap_key)
     ; ("dump-keypair", dump_keypair)
     ; ("dump-ledger", dump_ledger)
-    ; ("generate-keypair", generate_keypair) ]
+    ; ("constraint-system-digests", constraint_system_digests)
+    ; ("generate-keypair", generate_keypair)
+    ; ("start-tracing", start_tracing)
+    ; ("stop-tracing", stop_tracing)
+    ; ("snark-job-list", snark_job_list)
+    ; ("visualize-frontier", visualize_frontier) ]

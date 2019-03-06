@@ -1,9 +1,16 @@
+[%%import "config/ledger_depth/full.mlh"]
+[%%import "config/coinbase/standard.mlh"]
+[%%import "config/consensus/posig_fake.mlh"]
+[%%import "config/scan_state/standard.mlh"]
+[%%import "config/debug_level/some.mlh"]
+[%%import "config/proof_level/full.mlh"]
+
+[%%define cache_exceptions false]
+[%%define fake_hash false]
+
 [%%define genesis_ledger "testnet_posig"]
-[%%define with_snark true]
+[%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
+[%%define block_window_duration 2000]
+
 [%%define integration_tests false]
-[%%define debug_logs true]
-[%%define call_logger false]
 [%%define force_updates false]
-[%%define global_signer_real false]
-[%%define tracing false]
-[%%define consensus_mechanism "proof_of_signature"]

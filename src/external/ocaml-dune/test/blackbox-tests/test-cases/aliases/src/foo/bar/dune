@@ -1,3 +1,0 @@
-(alias
- (name x)
- (action (chdir %{workspace_root} (echo "running in bar\n"))))

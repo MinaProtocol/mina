@@ -1,214 +1,453 @@
 # WARNING: config.yml file is generated from config.yml.jinja
-version: 2
+---
+version: 3
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-20660417b41b9cdbb3cc1b2c8a419970645c3e87
+            - image: codaprotocol/coda:toolchain-rust-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
         steps:
             - checkout
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                name: Build trace-tool
-                command: cd src/app/trace-tool && cargo build --frozen
+                  name: Build trace-tool
+                  command: cd src/app/trace-tool && cargo build --frozen
 
-    build:
+    build-wallet:
+        macos:
+            xcode: "10.1.0"
+        steps:
+            - checkout
+            - run: cd frontend/wallet && npm install
+            - run:
+                  name: Lint wallet
+                  command: cd frontend/wallet && npm run reformat && git diff --exit-code
+            - run:
+                  name: Build wallet
+                  command: cd frontend/wallet && npm run build
+
+    lint:
+        docker:
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: OCamlformat (make check-format)
+                  command: eval `opam config env` && make check-format
+            - run:
+                  name: Snarky tracks master (make check-snarky-submodule)
+                  command: make check-snarky-submodule
+
+    build-macos:
+        macos:
+            xcode: "10.1.0"
+        working_directory: /Users/distiller/coda
+        environment:
+            HOMEBREW_LOGS: /Users/distiller/homebrew.log
+            OPAMYES: 1
+        steps:
+            - run:
+                name: Make /nix paths
+                command: |
+                    sudo mkdir /nix
+                    sudo chown distiller /nix
+            - checkout
+            - restore_cache:
+                  keys:
+                      - homebrew-v1-{{ checksum "scripts/macos-setup.sh" }}
+                      - homebrew-v1-
+            - restore_cache:
+                  keys:
+                      - opam-v2-{{ checksum "src/opam.export" }}
+                      - opam-v2-
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Download Deps -- make macos-setup-download
+                  command: make macos-setup-download
+            - run:
+                  name: Compile Deps -- make macos-setup-compile
+                  command: make macos-setup-compile
+            - save_cache:
+                  key: homebrew-v1-{{ checksum "scripts/macos-setup.sh" }}
+                  paths:
+                      - "/usr/local/Homebrew"
+                      - "/Users/distiller/Library/Caches/Homebrew"
+            - save_cache:
+                  key: opam-v2-{{ checksum "src/opam.export" }}
+                  paths:
+                      - "/Users/distiller/.opam"
+            - run:
+                  name: Build OCaml
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log
+            - run:
+                  name: Run all tests (on master)
+                  command: echo "FIXME Tests not yet working on mac"
+    build_dev:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-956136e7b621813f03881a1c2ab29b9ca24b539c
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
+        environment:
+            DUNE_PROFILE: dev
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                name: Lint
-                command: eval `opam config env` && make check-format
+                  name: Download Stable Proving Keys
+                  command: scripts/getkeys.sh
             - run:
-                name: Build OCaml
-                command: eval `opam config env` && DUNE_PROFILE=dev make build 2>&1 | tee /tmp/buildocaml.log
+                  name: Build OCaml
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
-                name: rm snark_params
-                command: rm -rf src/_build/default/lib/snark_params
+                  name: Build deb Package with keys
+                  command: make deb
             - run:
-                name: Build Website -- make web
-                command: make web
+                  name: Store Generated Proving and Verifying Keys
+                  command: make provingkeys
             - run:
-                name: Count OCaml Warns
-                command: ./scripts/buildwarns.py /tmp/buildocaml.log
+                  name: Store Genesis Public/Private Keypairs
+                  command: make genesiskeys
             - run:
-                name: Build deb Package
-                command: make deb
+                  name: Upload deb to repo
+                  command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
-                path: /tmp/artifacts
-
-    build_withsnark:
+                  path: /tmp/artifacts
+            - run:
+                  name: Copy artifacts to Google Cloud
+                  command: scripts/artifacts.sh
+    build_testnet_posig:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-956136e7b621813f03881a1c2ab29b9ca24b539c
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
+        environment:
+            DUNE_PROFILE: testnet_posig
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                name: Build OCaml
-                command: eval `opam config env` && DUNE_PROFILE=testnet_posig make build 2>&1 | tee /tmp/buildocaml.log
+                  name: Download Stable Proving Keys
+                  command: scripts/getkeys.sh
             - run:
-                name: Build deb Package with verification keys
-                command: make deb
+                  name: Build OCaml
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
-                name: Build provingkeys
-                command: make provingkeys
+                  name: Build deb Package with keys
+                  command: make deb
             - run:
-                name: Store Genesis keys
-                command: make genesiskeys
+                  name: Store Generated Proving and Verifying Keys
+                  command: make provingkeys
             - run:
-                name: Upload deb to repo
-                command: make publish_deb
+                  name: Store Genesis Public/Private Keypairs
+                  command: make genesiskeys
+            - run:
+                  name: Upload deb to repo
+                  command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
-                path: /tmp/artifacts
-
-    build_public:
+                  path: /tmp/artifacts
+            - run:
+                  name: Copy artifacts to Google Cloud
+                  command: scripts/artifacts.sh
+    build_testnet_postake:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-956136e7b621813f03881a1c2ab29b9ca24b539c
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
+        environment:
+            DUNE_PROFILE: testnet_postake
         steps:
             - checkout
+            - run: mkdir -p /tmp/artifacts
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                name: Build OCaml
-                command: eval `opam config env` && DUNE_PROFILE=testnet_public make build 2>&1 | tee /tmp/buildocaml.log
+                  name: Download Stable Proving Keys
+                  command: scripts/getkeys.sh
             - run:
-                name: Build deb Package with verification keys
-                command: make deb
+                  name: Build OCaml
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
             - run:
-                name: Store Genesis keys
-                command: make genesiskeys
+                  name: Build deb Package with keys
+                  command: make deb
+            - run:
+                  name: Store Generated Proving and Verifying Keys
+                  command: make provingkeys
+            - run:
+                  name: Store Genesis Public/Private Keypairs
+                  command: make genesiskeys
+            - run:
+                  name: Upload deb to repo
+                  command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
-                path: /tmp/artifacts
+                  path: /tmp/artifacts
+            - run:
+                  name: Copy artifacts to Google Cloud
+                  command: scripts/artifacts.sh
+    build_testnet_public:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
+        environment:
+            DUNE_PROFILE: testnet_public
+        steps:
+            - checkout
+            - run: mkdir -p /tmp/artifacts
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Download Stable Proving Keys
+                  command: scripts/getkeys.sh
+            - run:
+                  name: Build OCaml
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
+            - run:
+                  name: Build deb Package with keys
+                  command: make deb
+            - run:
+                  name: Store Generated Proving and Verifying Keys
+                  command: make provingkeys
+            - run:
+                  name: Store Genesis Public/Private Keypairs
+                  command: make genesiskeys
+            - run:
+                  name: Upload deb to repo
+                  command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
+            - store_artifacts:
+                  path: /tmp/artifacts
+            - run:
+                  name: Copy artifacts to Google Cloud
+                  command: scripts/artifacts.sh
+    build_testnet_postake_snarkless_fake_hash:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
+        environment:
+            DUNE_PROFILE: testnet_postake_snarkless_fake_hash
+        steps:
+            - checkout
+            - run: mkdir -p /tmp/artifacts
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Download Stable Proving Keys
+                  command: scripts/getkeys.sh
+            - run:
+                  name: Build OCaml
+                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
+            - run:
+                  name: Build deb Package with keys
+                  command: make deb
+            - run:
+                  name: Store Generated Proving and Verifying Keys
+                  command: make provingkeys
+            - run:
+                  name: Store Genesis Public/Private Keypairs
+                  command: make genesiskeys
+            - run:
+                  name: Upload deb to repo
+                  command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
+            - store_artifacts:
+                  path: /tmp/artifacts
+            - run:
+                  name: Copy artifacts to Google Cloud
+                  command: scripts/artifacts.sh
 
     test-unit-test:
-       resource_class: large
-       docker:
-       - image: codaprotocol/coda:toolchain-956136e7b621813f03881a1c2ab29b9ca24b539c
-       steps:
-           - checkout
-           - run:
-              name: Test make test-runtest
-              command: source ~/.profile && DUNE_PROFILE=test_sigs make test-runtest
-
-    test-withsnark:
         resource_class: large
         docker:
-        - image: codaprotocol/coda:toolchain-956136e7b621813f03881a1c2ab29b9ca24b539c
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
         steps:
             - checkout
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                name: Build OCaml
-                command: eval `opam config env` && DUNE_PROFILE=test_snark make build 2>&1 | tee /tmp/buildocaml.log
+                  name: Test make test-runtest
+                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless MYPROCS=8 make test-runtest
+    test-fake_hash_full_test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                name: Test make test-withsnark
-                command: source ~/.profile && DUNE_PROFILE=test_snark make test-withsnark
-
-    
-    test-all_sig_integration_tests:
-      resource_class: large
-      docker:
-      - image: codaprotocol/coda:toolchain-956136e7b621813f03881a1c2ab29b9ca24b539c
-      steps:
-          - checkout
-          - run:
-              name: Check .circleci Render
-              command: make check-render-circleci
-          - run:
-              name: Build OCaml
-              command: eval `opam config env` && DUNE_PROFILE=test_sigs make build 2>&1 | tee /tmp/buildocaml.log
+                  name: Check .circleci Render
+                  command: make check-render-circleci
+            - run:
+                  name: Build OCaml
+                  command: eval `opam config env` && DUNE_PROFILE=fake_hash make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Running test - Fake Hash | full-test
+                  command: source ~/.profile && export DUNE_PROFILE=fake_hash && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
             
-          - run:
-              name: Running test - Sig Tests | full-test
-              command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'full-test' 
-          - run:
-              name: Running test - Sig Tests | coda-peers-test
-              command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-peers-test' 
-          - run:
-              name: Running test - Sig Tests | coda-transitive-peers-test
-              command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-transitive-peers-test' 
-          - run:
-              name: Running test - Sig Tests | coda-block-production-test
-              command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-block-production-test' 
-          - run:
-              name: Running test - Sig Tests | coda-shared-prefix-test -who-proposes 0
-              command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0' 
-          - run:
-              name: Running test - Sig Tests | coda-shared-prefix-test -who-proposes 1
-              command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1' 
-          - run:
-              name: Running test - Sig Tests | coda-shared-state-test
-              command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-shared-state-test' 
-          - run:
-              name: Running test - Sig Tests | coda-restart-node-test
-              command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'coda-restart-node-test' 
-          - run:
-              name: Running test - Sig Tests | transaction-snark-profiler -check-only
-              command: source ~/.profile && DUNE_PROFILE=test_sigs source scripts/test_all.sh && cd src/ && CODA_PROPOSAL_INTERVAL=8000 'run_integration_test' 'transaction-snark-profiler -check-only' 
-      
-    test-all_stake_integration_tests:
-      resource_class: large
-      docker:
-      - image: codaprotocol/coda:toolchain-956136e7b621813f03881a1c2ab29b9ca24b539c
-      steps:
-          - checkout
-          - run:
-              name: Check .circleci Render
-              command: make check-render-circleci
-          - run:
-              name: Build OCaml
-              command: eval `opam config env` && DUNE_PROFILE=test_stakes make build 2>&1 | tee /tmp/buildocaml.log
+    test-posig_integration_tests:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Check .circleci Render
+                  command: make check-render-circleci
+            - run:
+                  name: Build OCaml
+                  command: eval `opam config env` && DUNE_PROFILE=test_posig_snarkless make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Running test - Proof of Signature Tests | full-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
             
-          - run:
-              name: Running test - Stake Tests | full-test
-              command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'full-test' 
-          - run:
-              name: Running test - Stake Tests | coda-peers-test
-              command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-peers-test' 
-          - run:
-              name: Running test - Stake Tests | coda-transitive-peers-test
-              command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-transitive-peers-test' 
-          - run:
-              name: Running test - Stake Tests | coda-block-production-test
-              command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-block-production-test' 
-          - run:
-              name: Running test - Stake Tests | coda-shared-prefix-test -who-proposes 0
-              command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0' 
-          - run:
-              name: Running test - Stake Tests | coda-shared-prefix-test -who-proposes 1
-              command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1' 
-          - run:
-              name: Running test - Stake Tests | coda-shared-state-test
-              command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-shared-state-test' 
-          - run:
-              name: Running test - Stake Tests | coda-restart-node-test
-              command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'coda-restart-node-test' 
-          - run:
-              name: Running test - Stake Tests | transaction-snark-profiler -check-only
-              command: source ~/.profile && DUNE_PROFILE=test_stakes source scripts/test_all.sh && cd src/ && CODA_SLOT_INTERVAL=8000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'transaction-snark-profiler -check-only' 
-      
+            - run:
+                  name: Running test - Proof of Signature Tests | transaction-snark-profiler -check-only
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'transaction-snark-profiler -check-only'
+            
+            - run:
+                  name: Running test - Proof of Signature Tests | coda-peers-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-peers-test'
+            
+            - run:
+                  name: Running test - Proof of Signature Tests | coda-transitive-peers-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-transitive-peers-test'
+            
+            - run:
+                  name: Running test - Proof of Signature Tests | coda-block-production-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-block-production-test'
+            
+            - run:
+                  name: Running test - Proof of Signature Tests | coda-shared-prefix-test -who-proposes 0
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
+            
+            - run:
+                  name: Running test - Proof of Signature Tests | coda-shared-prefix-test -who-proposes 1
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
+            
+            - run:
+                  name: Running test - Proof of Signature Tests | coda-shared-state-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-state-test'
+            
+    test-postake_integration_tests:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Check .circleci Render
+                  command: make check-render-circleci
+            - run:
+                  name: Build OCaml
+                  command: eval `opam config env` && DUNE_PROFILE=test_postake_snarkless make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Running test - Proof of Stake Tests | full-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
+            
+            - run:
+                  name: Running test - Proof of Stake Tests | transaction-snark-profiler -check-only
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'transaction-snark-profiler -check-only'
+            
+    test-postake_split_integration_tests:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Check .circleci Render
+                  command: make check-render-circleci
+            - run:
+                  name: Build OCaml
+                  command: eval `opam config env` && DUNE_PROFILE=test_postake_split_snarkless make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Running test - Proof of Stake (split stake) Tests | coda-peers-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-peers-test'
+            
+            - run:
+                  name: Running test - Proof of Stake (split stake) Tests | coda-transitive-peers-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-transitive-peers-test'
+            
+            - run:
+                  name: Running test - Proof of Stake (split stake) Tests | coda-block-production-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-block-production-test'
+            
+            - run:
+                  name: Running test - Proof of Stake (split stake) Tests | coda-shared-prefix-test -who-proposes 0
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
+            
+            - run:
+                  name: Running test - Proof of Stake (split stake) Tests | coda-shared-prefix-test -who-proposes 1
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
+            
+            - run:
+                  name: Running test - Proof of Stake (split stake) Tests | coda-shared-state-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-state-test'
+            
+    test-withsnark-sig:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Check .circleci Render
+                  command: make check-render-circleci
+            - run:
+                  name: Build OCaml
+                  command: eval `opam config env` && DUNE_PROFILE=test_posig make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Running test - Full test with SNARK (sig) | full-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
+            
+    test-withsnark-stake:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Check .circleci Render
+                  command: make check-render-circleci
+            - run:
+                  name: Build OCaml
+                  command: eval `opam config env` && DUNE_PROFILE=test_postake make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Running test - Full test with SNARK (stake) | full-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
+            
 
 workflows:
     version: 2
     coda_parallel:
         jobs:
-            - build
-            - build_withsnark
-            - build_public
-            
-            - test-all_sig_integration_tests
-            
-            - test-all_stake_integration_tests
-            
-            - test-withsnark
+            - lint
+            - build-macos
+            - build_dev
+            - build_testnet_posig
+            - build_testnet_postake
+            - build_testnet_public
+            - build_testnet_postake_snarkless_fake_hash
+            - test-fake_hash_full_test
+            - test-posig_integration_tests
+            - test-postake_integration_tests
+            - test-postake_split_integration_tests
+            - test-withsnark-sig
+            - test-withsnark-stake
             - test-unit-test
             - tracetool
-
-# NOTES: Save this idea for later (nightly/scheduled workflows)
-    # nightly:
-    #     triggers:
-    #         - schedule:
-    #             cron: "0 0 * * *"
-    #             filters:
-    #                 branches:
-    #                     only: master
-    #     jobs:
-    #         - build_withsnark
+            - build-wallet

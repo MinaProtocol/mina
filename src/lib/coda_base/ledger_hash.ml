@@ -4,7 +4,6 @@ open Snark_params
 open Snarky
 open Tick
 open Let_syntax
-open Currency
 open Fold_lib
 
 module Merkle_tree =
@@ -22,7 +21,6 @@ module Merkle_tree =
           Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_
             (bs :> Boolean.var list)
         in
-        let open Let_syntax in
         (* TODO: Think about if choose_preimage_var is ok *)
         let%bind h1 = Pedersen.Checked.Digest.choose_preimage h1
         and h2 = Pedersen.Checked.Digest.choose_preimage h2 in
@@ -52,9 +50,11 @@ let merge ~height (h1 : t) (h2 : t) =
        Fold.(Digest.fold (h1 :> field) +> Digest.fold (h2 :> field)))
   |> of_hash
 
+(* TODO: @ihm cryptography review *)
 let empty_hash =
-  Tick.Pedersen.digest_fold
-    (Tick.Pedersen.State.create Tick.Pedersen.params)
+  let open Tick.Pedersen in
+  digest_fold
+    (State.create params ~get_chunk_table)
     (Fold.string_triples "nothing up my sleeve")
   |> of_hash
 
@@ -70,12 +70,15 @@ type _ Request.t +=
 
 let reraise_merkle_requests (With {request; respond}) =
   match request with
-  | Merkle_tree.Get_path addr -> respond (Reraise (Get_path addr))
-  | Merkle_tree.Set (addr, account) -> respond (Reraise (Set (addr, account)))
-  | Merkle_tree.Get_element addr -> respond (Reraise (Get_element addr))
+  | Merkle_tree.Get_path addr -> respond (Delegate (Get_path addr))
+  | Merkle_tree.Set (addr, account) -> respond (Delegate (Set (addr, account)))
+  | Merkle_tree.Get_element addr -> respond (Delegate (Get_element addr))
   | _ -> unhandled
 
-let get t addr = Merkle_tree.get_req ~depth (var_to_hash_packed t) addr
+let get t addr =
+  handle
+    (Merkle_tree.get_req ~depth (var_to_hash_packed t) addr)
+    reraise_merkle_requests
 
 (*
    [modify_account t pk ~filter ~f] implements the following spec:
@@ -86,20 +89,20 @@ let get t addr = Merkle_tree.get_req ~depth (var_to_hash_packed t) addr
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the account [f account] at path [addr].
 *)
-let modify_account t pk ~(filter : Account.var -> ('a, _) Checked.t) ~f =
-  with_label __LOC__
-    (let%bind addr =
-       request_witness Account.Index.Unpacked.typ
-         As_prover.(
-           map (read Public_key.Compressed.typ pk) ~f:(fun s -> Find_index s))
-     in
-     handle
-       (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
-          ~f:(fun account ->
-            let%bind x = filter account in
-            f x account ))
-       reraise_merkle_requests
-     >>| var_of_hash_packed)
+let%snarkydef modify_account t pk ~(filter : Account.var -> ('a, _) Checked.t)
+    ~f =
+  let%bind addr =
+    request_witness Account.Index.Unpacked.typ
+      As_prover.(
+        map (read Public_key.Compressed.typ pk) ~f:(fun s -> Find_index s))
+  in
+  handle
+    (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
+       ~f:(fun account ->
+         let%bind x = filter account in
+         f x account ))
+    reraise_merkle_requests
+  >>| var_of_hash_packed
 
 (*
    [modify_account_send t pk ~f] implements the following spec:

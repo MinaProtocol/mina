@@ -1,9 +1,0 @@
-(jbuild_version 1)
-
-(library
- ((name non_zero_curve_point)
-  (public_name non_zero_curve_point)
-  (flags (:standard -short-paths))
-  (library_flags (-linkall))
-  (libraries (core_kernel snark_params fold_lib base64 codable))
-  (preprocess (pps (ppx_jane ppx_deriving.eq)))))

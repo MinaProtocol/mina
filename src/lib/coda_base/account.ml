@@ -7,6 +7,7 @@ open Let_syntax
 open Currency
 open Snark_bits
 open Fold_lib
+open Module_version
 
 module Index = struct
   include Int
@@ -36,30 +37,56 @@ end
 
 module Nonce = Account_nonce
 
+type ('pk, 'amount, 'nonce, 'receipt_chain_hash) t_ =
+  { public_key: 'pk
+  ; balance: 'amount
+  ; nonce: 'nonce
+  ; receipt_chain_hash: 'receipt_chain_hash
+  ; delegate: 'pk }
+[@@deriving fields, sexp, bin_io, eq, compare, hash]
+
 module Stable = struct
   module V1 = struct
-    type ('pk, 'amount, 'nonce, 'receipt_chain_hash) t_ =
-      { public_key: 'pk
-      ; balance: 'amount
-      ; nonce: 'nonce
-      ; receipt_chain_hash: 'receipt_chain_hash
-      ; delegate: 'pk }
-    [@@deriving fields, sexp, bin_io, eq, compare, hash]
+    module T = struct
+      let version = 1
 
-    type key = Public_key.Compressed.Stable.V1.t
-    [@@deriving sexp, bin_io, eq, hash, compare]
+      type key = Public_key.Compressed.Stable.V1.t
+      [@@deriving sexp, bin_io, eq, hash, compare]
 
-    type t =
-      ( key
-      , Balance.Stable.V1.t
-      , Nonce.Stable.V1.t
-      , Receipt.Chain_hash.Stable.V1.t )
-      t_
-    [@@deriving sexp, bin_io, eq, hash, compare]
+      type t =
+        ( key
+        , Balance.Stable.V1.t
+        , Nonce.Stable.V1.t
+        , Receipt.Chain_hash.Stable.V1.t )
+        t_
+      [@@deriving sexp, bin_io, eq, hash, compare]
+    end
+
+    include T
+    include Registration.Make_latest_version (T)
+
+    (* monomorphize field selector *)
+    let public_key (t : t) : key = t.public_key
   end
+
+  (* module version registration *)
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "coda_base_account"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
 end
 
-include Stable.V1
+(* DO NOT ADD bin_io to the list of deriving *)
+type t = Stable.Latest.t [@@deriving sexp, eq, hash, compare]
+
+type key = Stable.Latest.key
 
 type var =
   ( Public_key.Compressed.var
@@ -127,9 +154,9 @@ let fold_bits ({public_key; balance; nonce; receipt_chain_hash; delegate} : t)
   +> Receipt.Chain_hash.fold receipt_chain_hash
   +> Public_key.Compressed.fold delegate
 
-let hash_prefix = Hash_prefix.account
+let crypto_hash_prefix = Hash_prefix.account
 
-let hash t = Pedersen.hash_fold hash_prefix (fold_bits t)
+let crypto_hash t = Pedersen.hash_fold crypto_hash_prefix (fold_bits t)
 
 let empty =
   { public_key= Public_key.Compressed.empty
@@ -138,11 +165,7 @@ let empty =
   ; receipt_chain_hash= Receipt.Chain_hash.empty
   ; delegate= Public_key.Compressed.empty }
 
-let digest t = Pedersen.State.digest (hash t)
-
-let empty_hash = digest empty
-
-let pubkey t = t.public_key
+let digest t = Pedersen.State.digest (crypto_hash t)
 
 let create public_key balance =
   { public_key
@@ -159,8 +182,9 @@ let gen =
 
 module Checked = struct
   let hash t =
-    var_to_triples t >>= Pedersen.Checked.hash_triples ~init:hash_prefix
+    var_to_triples t >>= Pedersen.Checked.hash_triples ~init:crypto_hash_prefix
 
   let digest t =
-    var_to_triples t >>= Pedersen.Checked.digest_triples ~init:hash_prefix
+    var_to_triples t
+    >>= Pedersen.Checked.digest_triples ~init:crypto_hash_prefix
 end

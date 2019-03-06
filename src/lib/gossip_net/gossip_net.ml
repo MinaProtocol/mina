@@ -1,6 +1,7 @@
 open Core
 open Async
 open Pipe_lib
+open Network_peer
 open Kademlia
 open O1trace
 module Membership = Membership.Haskell
@@ -9,12 +10,18 @@ type ('q, 'r) dispatch =
   Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
 
 module type Message_intf = sig
+  type content
+
   type msg
 
   include
     Versioned_rpc.Both_convert.One_way.S
     with type callee_msg := msg
      and type caller_msg := msg
+
+  val content : msg -> content
+
+  val peer : msg -> Peer.t
 end
 
 module type Config_intf = sig
@@ -25,20 +32,30 @@ module type Config_intf = sig
     ; me: Peer.t
     ; conf_dir: string
     ; parent_log: Logger.t
-    ; banlist: Coda_base.Banlist.t }
+    ; trust_system: Coda_base.Trust_system.t }
   [@@deriving make]
 end
 
 module type S = sig
+  type content
+
   type msg
 
-  type t
+  type t =
+    { timeout: Time.Span.t
+    ; log: Logger.t
+    ; target_peer_count: int
+    ; broadcast_writer: msg Linear_pipe.Writer.t
+    ; received_reader: content Envelope.Incoming.t Strict_pipe.Reader.t
+    ; me: Peer.t
+    ; peers: Peer.Hash_set.t }
 
   module Config : Config_intf
 
-  val create : Config.t -> unit Rpc.Implementation.t list -> t Deferred.t
+  val create :
+    Config.t -> Host_and_port.t Rpc.Implementation.t list -> t Deferred.t
 
-  val received : t -> msg Linear_pipe.Reader.t
+  val received : t -> content Envelope.Incoming.t Strict_pipe.Reader.t
 
   val broadcast : t -> msg Linear_pipe.Writer.t
 
@@ -58,13 +75,15 @@ module type S = sig
     t -> int -> ('q, 'r) dispatch -> 'q -> 'r Or_error.t Deferred.t List.t
 end
 
-module Make (Message : Message_intf) : S with type msg := Message.msg = struct
+module Make (Message : Message_intf) :
+  S with type msg := Message.msg and type content := Message.content = struct
   type t =
     { timeout: Time.Span.t
     ; log: Logger.t
     ; target_peer_count: int
     ; broadcast_writer: Message.msg Linear_pipe.Writer.t
-    ; received_reader: Message.msg Linear_pipe.Reader.t
+    ; received_reader: Message.content Envelope.Incoming.t Strict_pipe.Reader.t
+    ; me: Peer.t
     ; peers: Peer.Hash_set.t }
 
   module Config = struct
@@ -75,23 +94,23 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       ; me: Peer.t
       ; conf_dir: string
       ; parent_log: Logger.t
-      ; banlist: Coda_base.Banlist.t }
+      ; trust_system: Coda_base.Trust_system.t }
     [@@deriving make]
   end
 
   (* OPTIMIZATION: use fast n choose k implementation - see python or old flow code *)
   let random_sublist xs n = List.take (List.permute xs) n
 
-  let create_connection_with_menu r w =
-    match%bind Rpc.Connection.create r w ~connection_state:(fun _ -> ()) with
+  let create_connection_with_menu peer r w =
+    match%bind Rpc.Connection.create r w ~connection_state:(fun _ -> peer) with
     | Error exn -> return (Or_error.of_exn exn)
     | Ok conn -> Versioned_rpc.Connection_with_menu.create conn
 
-  let try_call_rpc peer timeout dispatch query =
+  let try_call_rpc t peer dispatch query =
     try_with (fun () ->
         Tcp.with_connection (Tcp.Where_to_connect.of_host_and_port peer)
-          ~timeout (fun _ r w ->
-            create_connection_with_menu r w
+          ~timeout:t.timeout (fun _ r w ->
+            create_connection_with_menu peer r w
             >>=? fun conn -> dispatch conn query ) )
     >>| function
     | Ok (Ok result) -> Ok result
@@ -99,9 +118,11 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     | Error exn -> Or_error.of_exn exn
 
   let broadcast_selected t peers msg =
-    let peers = List.map peers ~f:(fun peer -> Peer.external_rpc peer) in
+    let peers =
+      List.map peers ~f:(fun peer -> Peer.to_communications_host_and_port peer)
+    in
     let send peer =
-      try_call_rpc peer t.timeout
+      try_call_rpc t peer
         (fun conn m -> return (Message.dispatch_multi conn m))
         msg
     in
@@ -115,7 +136,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     let selected_peers = random_sublist (Hash_set.to_list t.peers) n in
     broadcast_selected t selected_peers msg
 
-  let create (config : Config.t) implementations =
+  let create (config : Config.t)
+      (implementations : Host_and_port.t Rpc.Implementation.t list) =
     let log = Logger.child config.parent_log __MODULE__ in
     trace_task "gossip net" (fun () ->
         let%map membership =
@@ -123,7 +145,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
             trace_task "membership" (fun () ->
                 Membership.connect ~initial_peers:config.initial_peers
                   ~me:config.me ~conf_dir:config.conf_dir ~parent_log:log
-                  ~banlist:config.banlist )
+                  ~trust_system:config.trust_system )
           with
           | Ok membership -> membership
           | Error e ->
@@ -133,13 +155,16 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         in
         let peer_events = Membership.changes membership in
         let broadcast_reader, broadcast_writer = Linear_pipe.create () in
-        let received_reader, received_writer = Linear_pipe.create () in
+        let received_reader, received_writer =
+          Strict_pipe.create (Buffered (`Capacity 64, `Overflow Drop_head))
+        in
         let t =
           { timeout= config.timeout
           ; log
           ; target_peer_count= config.target_peer_count
           ; broadcast_writer
           ; received_reader
+          ; me= config.me
           ; peers= Peer.Hash_set.create () }
         in
         trace_task "rebroadcasting messages" (fun () ->
@@ -148,14 +173,17 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                  ~f:(fun m ->
                    Logger.trace log "broadcasting message" ;
                    broadcast_random t t.target_peer_count m )) ) ;
-        let broadcast_received_capacity = 64 in
         let implementations =
           let implementations =
             Versioned_rpc.Menu.add
-              ( Message.implement_multi (fun () ~version:_ msg ->
-                    Linear_pipe.force_write_maybe_drop_head
-                      ~capacity:broadcast_received_capacity received_writer
-                      received_reader msg )
+              ( Message.implement_multi
+                  (fun _client_host_and_port ~version:_ msg ->
+                    (* TODO: maybe check client host matches IP in msg, punish if
+                       mismatch due to forgery
+                     *)
+                    Strict_pipe.Writer.write received_writer
+                      (Envelope.Incoming.wrap ~data:(Message.content msg)
+                         ~sender:(Message.peer msg)) )
               @ implementations )
           in
           Rpc.Implementations.create_exn ~implementations
@@ -180,10 +208,15 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
              ~on_handler_error:
                (`Call
                  (fun _ exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
-             (Tcp.Where_to_listen.of_port (snd config.me))
-             (fun _ reader writer ->
+             (Tcp.Where_to_listen.of_port config.me.Peer.communication_port)
+             (fun client reader writer ->
                Rpc.Connection.server_with_close reader writer ~implementations
-                 ~connection_state:(fun _ -> ())
+                 ~connection_state:(fun _ ->
+                   (* connection state is the client's IP and ephemeral port when
+                      connecting to the server over TCP; the ephemeral port is
+                      distinct from the client's discovery and communication ports
+                    *)
+                   Socket.Address.Inet.to_host_and_port client )
                  ~on_handshake_error:
                    (`Call
                      (fun exn ->
@@ -213,8 +246,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
 
   let query_peer t (peer : Peer.t) rpc query =
     Logger.trace t.log !"Querying peer %{sexp: Peer.t}" peer ;
-    let peer = Peer.external_rpc peer in
-    try_call_rpc peer t.timeout rpc query
+    let peer = Peer.to_communications_host_and_port peer in
+    try_call_rpc t peer rpc query
 
   let query_random_peers t n rpc query =
     let peers = random_sublist (Hash_set.to_list t.peers) n in

@@ -5,7 +5,7 @@ type fee_transfer = Fee_transfer.t [@@deriving bin_io, sexp]
 type t =
   | User_command of User_command.With_valid_signature.t
   | Fee_transfer of Fee_transfer.t
-  | Coinbase of Coinbase.t
+  | Coinbase of Coinbase.Stable.V1.t
 [@@deriving bin_io, sexp]
 
 let fee_excess = function

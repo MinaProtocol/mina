@@ -36,11 +36,13 @@ module type S = sig
   val add_path :
     t -> [`Left of hash | `Right of hash] list -> key -> account -> t
 
+  val iteri : t -> f:(index -> account -> unit) -> unit
+
   val merkle_root : t -> hash
 end
 
 module Make (Hash : sig
-  type t [@@deriving bin_io, eq, sexp]
+  type t [@@deriving bin_io, eq, sexp, compare]
 
   val merge : height:int -> t -> t -> t
 end) (Key : sig

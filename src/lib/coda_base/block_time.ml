@@ -6,12 +6,31 @@ open Tick
 open Unsigned_extended
 open Snark_bits
 open Fold_lib
+open Module_version
 
 (* Milliseconds since epoch *)
 module Stable = struct
   module V1 = struct
-    type t = UInt64.t [@@deriving bin_io, sexp, compare, eq, hash]
+    module T = struct
+      let version = 1
+
+      type t = UInt64.t [@@deriving bin_io, sexp, compare, eq, hash]
+    end
+
+    include T
+    include Registration.Make_latest_version (T)
   end
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "block_time"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
 end
 
 module Controller = struct
@@ -20,7 +39,8 @@ module Controller = struct
   let create () = ()
 end
 
-include Stable.V1
+(* DO NOT add bin_io the deriving list *)
+type t = Stable.Latest.t [@@deriving sexp, compare, eq, hash]
 
 type t0 = t
 
@@ -38,11 +58,29 @@ let fold t = Fold.group3 ~default:false (Bits.fold t)
 module Span = struct
   module Stable = struct
     module V1 = struct
-      type t = UInt64.t [@@deriving bin_io, sexp, compare]
+      module T = struct
+        let version = 1
+
+        type t = UInt64.t [@@deriving bin_io, sexp, compare]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "block_time_span"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
+  include Stable.Latest
   module Bits = B.UInt64
   include B.Snarkable.UInt64 (Tick)
 
@@ -56,6 +94,8 @@ module Span = struct
   let of_ms = UInt64.of_int64
 
   let ( + ) = UInt64.Infix.( + )
+
+  let ( - ) = UInt64.Infix.( - )
 
   let ( * ) = UInt64.Infix.( * )
 
@@ -91,7 +131,11 @@ let to_time t =
 let now () = of_time (Time.now ())
 
 module Timeout = struct
-  type 'a t = {deferred: 'a Deferred.t; cancel: 'a -> unit}
+  type 'a t =
+    { deferred: 'a Deferred.t
+    ; cancel: 'a -> unit
+    ; start_time: Time.t
+    ; span: Span.t }
 
   let create () span ~f:action =
     let open Async_kernel.Deferred.Let_syntax in
@@ -102,16 +146,23 @@ module Timeout = struct
       >>| function None -> action (now ()) | Some x -> x
     in
     let cancel value = Ivar.fill_if_empty cancel_ivar (Some value) in
-    {deferred; cancel}
+    {deferred; cancel; start_time= Time.now (); span}
 
   let to_deferred {deferred; _} = deferred
 
   let peek {deferred; _} = Deferred.peek deferred
 
   let cancel () {cancel; _} value = cancel value
+
+  let remaining_time {deferred : _; cancel : _; start_time; span} =
+    let current_time = Time.now () in
+    let time_elapsed =
+      Span.of_time_span @@ Time.diff current_time start_time
+    in
+    Span.(span - time_elapsed)
 end
 
-let field_var_to_unpacked (x : Tick.Field.Checked.t) =
+let field_var_to_unpacked (x : Tick.Field.Var.t) =
   Tick.Field.Checked.unpack ~length:64 x
 
 let epoch = of_time Time.epoch
@@ -127,7 +178,7 @@ let to_span_since_epoch t = diff t epoch
 let of_span_since_epoch s = UInt64.add s epoch
 
 let diff_checked x y =
-  let pack = Tick.Field.Checked.project in
+  let pack = Tick.Field.Var.project in
   Span.unpack_var Tick.Field.Checked.Infix.(pack x - pack y)
 
 let modulus t span = UInt64.rem t span

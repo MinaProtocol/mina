@@ -1,8 +1,10 @@
-(* masking_merkle_tree.ml -- implements a mask in front of a Merkle tree; see RFC 0004 and docs/specs/merkle_tree.md *)
+(* masking_merkle_tree.ml -- implements a mask in front of a Merkle tree; see
+   RFC 0004 and docs/specs/merkle_tree.md *)
 
 open Core
 
-(* builds a Merkle tree mask; it's a Merkle tree, with some additional operations *)
+(* builds a Merkle tree mask; it's a Merkle tree, with some additional
+   operations *)
 module Make
     (Key : Merkle_ledger.Intf.Key)
     (Account : Merkle_ledger.Intf.Account with type key := Key.t)
@@ -10,8 +12,9 @@ module Make
     (Location : Merkle_ledger.Location_intf.S)
     (Base : Base_merkle_tree_intf.S
             with module Addr = Location.Addr
-            with module Location = Location
+             and module Location = Location
             with type key := Key.t
+             and type key_set := Key.Set.t
              and type hash := Hash.t
              and type root_hash := Hash.t
              and type account := Account.t) =
@@ -22,37 +25,66 @@ struct
 
   type key = Key.t
 
+  type key_set = Key.Set.t
+
   type location = Location.t
 
   module Location = Location
   module Addr = Location.Addr
 
+  (** Invariant is that parent is None in unattached mask and `Some` in the
+      attached one. We can capture this with a GADT but there's some annoying
+      issues with bin_io to do so *)
+  module Parent = struct
+    module T = struct
+      type t = Base.t option [@@deriving sexp]
+    end
+
+    include T
+
+    include Binable.Of_binable
+              (Unit)
+              (struct
+                include T
+
+                let to_binable = function
+                  | Some _ ->
+                      failwith "We can't serialize when we're an attached mask"
+                  | None -> ()
+
+                let of_binable () = None
+              end)
+  end
+
   type t =
-    { uuid: Uuid.t
+    { uuid: Uuid.Stable.V1.t
     ; account_tbl: Account.t Location.Table.t
+    ; mutable parent: Parent.t
     ; hash_tbl: Hash.t Addr.Table.t
     ; location_tbl: Location.t Key.Table.t
     ; mutable current_location: Location.t option }
+  [@@deriving sexp, bin_io]
 
-  type unattached = t
+  type unattached = t [@@deriving sexp]
 
   let create () =
     { uuid= Uuid.create ()
+    ; parent= None
     ; account_tbl= Location.Table.create ()
     ; hash_tbl= Addr.Table.create ()
     ; location_tbl= Key.Table.create ()
     ; current_location= None }
 
-  module Attached = struct
-    type parent = Base.t
+  let get_uuid {uuid; _} = uuid
 
-    type t =
-      { uuid: Uuid.t
-      ; parent: parent
-      ; account_tbl: Account.t Location.Table.t
-      ; hash_tbl: Hash.t Addr.Table.t
-      ; location_tbl: Location.t Key.Table.t
-      ; mutable current_location: Location.t option }
+  let with_ledger ~f =
+    let mask = create () in
+    f mask
+
+  module Attached = struct
+    type parent = Base.t [@@deriving sexp]
+
+    type t = unattached [@@deriving sexp]
 
     module Path = Base.Path
     module Addr = Location.Addr
@@ -64,50 +96,81 @@ struct
 
     type root_hash = Hash.t
 
+    exception Location_is_not_account of Location.t
+
     let create () =
       failwith
         "Mask.Attached.create: cannot create an attached mask; use \
          Mask.create and Mask.set_parent"
 
+    let with_ledger ~f:_ =
+      failwith
+        "Mask.Attached.with_ledger: cannot create an attached mask; use \
+         Mask.create and Mask.set_parent"
+
     let unset_parent t =
-      { uuid= t.uuid
-      ; account_tbl= t.account_tbl
-      ; hash_tbl= t.hash_tbl
-      ; location_tbl= t.location_tbl
-      ; current_location= t.current_location }
+      t.parent <- None ;
+      t
 
-    let get_parent t = t.parent
+    let assert_is_attached t =
+      match t.parent with
+      | None ->
+          failwith
+            "Dangling reference to an attached mask that has been detached"
+      | Some _ -> ()
 
-    let get_uuid t = t.uuid
+    let get_parent ({parent= opt; _} as t) =
+      assert_is_attached t ; Option.value_exn opt
+
+    let get_uuid t = assert_is_attached t ; t.uuid
 
     (* don't rely on a particular implementation *)
-    let find_hash t address = Addr.Table.find t.hash_tbl address
+    let self_find_hash t address =
+      assert_is_attached t ;
+      Addr.Table.find t.hash_tbl address
 
-    let set_hash t address hash =
+    let self_set_hash t address hash =
+      assert_is_attached t ;
       Addr.Table.set t.hash_tbl ~key:address ~data:hash
 
-    (* don't rely on a particular implementation *)
-    let find_location t public_key = Key.Table.find t.location_tbl public_key
+    let set_inner_hash_at_addr_exn t address hash =
+      assert_is_attached t ;
+      assert (Addr.depth address <= Base.depth) ;
+      self_set_hash t address hash
 
-    let set_location t public_key location =
+    (* don't rely on a particular implementation *)
+    let self_find_location t public_key =
+      assert_is_attached t ;
+      Key.Table.find t.location_tbl public_key
+
+    let self_set_location t public_key location =
+      assert_is_attached t ;
       Key.Table.set t.location_tbl ~key:public_key ~data:location
 
     (* don't rely on a particular implementation *)
-    let find_account t location = Location.Table.find t.account_tbl location
+    let self_find_account t location =
+      assert_is_attached t ;
+      Location.Table.find t.account_tbl location
 
-    let set_account t location account =
+    let self_find_all_accounts t =
+      assert_is_attached t ;
+      Location.Table.data t.account_tbl
+
+    let self_set_account t location account =
+      assert_is_attached t ;
       Location.Table.set t.account_tbl ~key:location ~data:account ;
-      set_location t (Account.public_key account) location
+      self_set_location t (Account.public_key account) location
 
-    (* a read does a lookup in the account_tbl; if that fails, delegate to parent *)
+    (* a read does a lookup in the account_tbl; if that fails, delegate to
+       parent *)
     let get t location =
-      match find_account t location with
+      assert_is_attached t ;
+      match self_find_account t location with
       | Some account -> Some account
       | None -> Base.get (get_parent t) location
 
-    (* fixup_merkle_path patches a Merkle path reported by the parent, overriding
-       with hashes which are stored in the mask
-     *)
+    (* fixup_merkle_path patches a Merkle path reported by the parent,
+       overriding with hashes which are stored in the mask *)
 
     let fixup_merkle_path t path address =
       let rec build_fixed_path path address accum =
@@ -116,7 +179,7 @@ struct
           (* first element in the path contains hash at sibling of address *)
           let curr_element = List.hd_exn path in
           let merkle_node_address = Addr.sibling address in
-          let mask_hash = find_hash t merkle_node_address in
+          let mask_hash = self_find_hash t merkle_node_address in
           let parent_hash =
             match curr_element with `Left h | `Right h -> h
           in
@@ -131,15 +194,18 @@ struct
       in
       build_fixed_path path address []
 
-    (* the following merkle_path_* functions report the Merkle path for the mask *)
+    (* the following merkle_path_* functions report the Merkle path for the
+       mask *)
 
     let merkle_path_at_addr_exn t address =
+      assert_is_attached t ;
       let parent_merkle_path =
         Base.merkle_path_at_addr_exn (get_parent t) address
       in
       fixup_merkle_path t parent_merkle_path address
 
     let merkle_path_at_index_exn t index =
+      assert_is_attached t ;
       let address = Addr.of_int_exn index in
       let parent_merkle_path =
         Base.merkle_path_at_addr_exn (get_parent t) address
@@ -147,14 +213,14 @@ struct
       fixup_merkle_path t parent_merkle_path address
 
     let merkle_path t location =
+      assert_is_attached t ;
       let address = Location.to_path_exn location in
       let parent_merkle_path = Base.merkle_path (get_parent t) location in
       fixup_merkle_path t parent_merkle_path address
 
-    (* given a Merkle path corresponding to a starting address, calculate addresses and hash
-       for each node affected by the starting hash; that is, along the path from the
-       account address to root
-     *)
+    (* given a Merkle path corresponding to a starting address, calculate
+       addresses and hash for each node affected by the starting hash; that is,
+       along the path from the account address to root *)
     let addresses_and_hashes_from_merkle_path_exn merkle_path starting_address
         starting_hash : (Addr.t * Hash.t) list =
       let get_addresses_hashes height accum node =
@@ -173,18 +239,25 @@ struct
 
     (* use mask Merkle root, if it exists, else get from parent *)
     let merkle_root t =
-      match find_hash t (Addr.root ()) with
+      assert_is_attached t ;
+      match self_find_hash t (Addr.root ()) with
       | Some hash -> hash
       | None -> Base.merkle_root (get_parent t)
 
     let remove_account_and_update_hashes t location =
+      assert_is_attached t ;
       (* remove account and key from tables *)
-      let account = Option.value_exn (find_account t location) in
+      let account = Option.value_exn (self_find_account t location) in
       Location.Table.remove t.account_tbl location ;
-      (* TODO : use stack database to save unused location, which can be
-        used when allocating a location
-      *)
+      (* TODO : use stack database to save unused location, which can be used
+         when allocating a location *)
       Key.Table.remove t.location_tbl (Account.public_key account) ;
+      (* reuse location if possible *)
+      Option.iter t.current_location ~f:(fun curr_loc ->
+          if Location.equal location curr_loc then
+            match Location.prev location with
+            | Some prev_loc -> t.current_location <- Some prev_loc
+            | None -> t.current_location <- None ) ;
       (* update hashes *)
       let account_address = Location.to_path_exn location in
       let account_hash = Hash.empty_account in
@@ -194,13 +267,13 @@ struct
           account_hash
       in
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
-          set_hash t addr hash )
+          self_set_hash t addr hash )
 
-    (* a write writes only to the mask, parent is not involved
-     need to update both account and hash pieces of the mask
-       *)
+    (* a write writes only to the mask, parent is not involved need to update
+       both account and hash pieces of the mask *)
     let set t location account =
-      set_account t location account ;
+      assert_is_attached t ;
+      self_set_account t location account ;
       let account_address = Location.to_path_exn location in
       let account_hash = Hash.hash_account account in
       let merkle_path = merkle_path t location in
@@ -209,24 +282,26 @@ struct
           account_hash
       in
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
-          set_hash t addr hash )
+          self_set_hash t addr hash )
 
-    (* if the mask's parent sets an account, we can prune an entry in the mask if the account in the parent
-     is the same in the mask
-       *)
-    let parent_set_notify t location account =
-      match find_account t location with
-      | Some existing_account ->
-          if
-            Key.equal
-              (Account.public_key account)
-              (Account.public_key existing_account)
-          then remove_account_and_update_hashes t location
+    (* if the mask's parent sets an account, we can prune an entry in the mask
+       if the account in the parent is the same in the mask *)
+    let parent_set_notify t account =
+      assert_is_attached t ;
+      match self_find_location t (Account.public_key account) with
       | None -> ()
+      | Some location -> (
+        match self_find_account t location with
+        | Some existing_account ->
+            if Account.equal account existing_account then
+              remove_account_and_update_hashes t location
+        | None -> () )
 
-    (* as for accounts, we see if we have it in the mask, else delegate to parent *)
+    (* as for accounts, we see if we have it in the mask, else delegate to
+       parent *)
     let get_hash t addr =
-      match find_hash t addr with
+      assert_is_attached t ;
+      match self_find_hash t addr with
       | Some hash -> Some hash
       | None -> (
         try
@@ -234,22 +309,18 @@ struct
           Some hash
         with _ -> None )
 
-    (* batch operations
-     TODO: rely on availability of batch operations in Base for speed
-       *)
+    (* batch operations TODO: rely on availability of batch operations in Base
+       for speed *)
     (* NB: rocksdb does not support batch reads; should we offer this? *)
     let get_batch_exn t locations =
+      assert_is_attached t ;
       List.map locations ~f:(fun location -> get t location)
-
-    (* TODO: maybe create a new hash table from the alist, then merge *)
-    let set_batch t locations_and_accounts =
-      List.iter locations_and_accounts ~f:(fun (location, account) ->
-          set t location account )
 
     (* NB: rocksdb does not support batch reads; is this needed? *)
     let get_hash_batch_exn t addrs =
+      assert_is_attached t ;
       List.map addrs ~f:(fun addr ->
-          match find_hash t addr with
+          match self_find_hash t addr with
           | Some account -> Some account
           | None -> (
             try Some (Base.get_inner_hash_at_addr_exn (get_parent t) addr)
@@ -257,130 +328,241 @@ struct
 
     (* transfer state from mask to parent; flush local state *)
     let commit t =
+      assert_is_attached t ;
+      let old_root_hash = merkle_root t in
       let account_data = Location.Table.to_alist t.account_tbl in
       Base.set_batch (get_parent t) account_data ;
       Location.Table.clear t.account_tbl ;
-      Addr.Table.clear t.hash_tbl
+      Addr.Table.clear t.hash_tbl ;
+      Debug_assert.debug_assert (fun () ->
+          [%test_result: Hash.t]
+            ~message:
+              "Parent merkle root after committing should be the same as the \
+               old one in the mask"
+            ~expect:old_root_hash
+            (Base.merkle_root (get_parent t)) ;
+          [%test_result: Hash.t]
+            ~message:
+              "Merkle root of the mask should delegate to the parent now"
+            ~expect:(merkle_root t)
+            (Base.merkle_root (get_parent t)) )
 
     (* copy tables in t; use same parent *)
     let copy t =
-      { t with
-        account_tbl= Location.Table.copy t.account_tbl
-      ; hash_tbl= Addr.Table.copy t.hash_tbl }
+      { uuid= Uuid.create ()
+      ; parent= Some (get_parent t)
+      ; account_tbl= Location.Table.copy t.account_tbl
+      ; location_tbl= Key.Table.copy t.location_tbl
+      ; hash_tbl= Addr.Table.copy t.hash_tbl
+      ; current_location= t.current_location }
 
-    let get_all_accounts_rooted_at_exn t address =
-      (* accounts in parent and mask are disjoint sets *)
-      let parent_accounts =
-        Base.get_all_accounts_rooted_at_exn (get_parent t) address
-      in
-      (* basically, the same code used for the database implementation *)
-      let mask_maybe_accounts =
-        let first_node, last_node = Addr.Range.subtree_range address in
-        Addr.Range.fold (first_node, last_node) ~init:[]
-          ~f:(fun bit_index acc ->
-            let account = find_account t (Location.Account bit_index) in
-            account :: acc )
-      in
-      let mask_accounts = List.rev_filter_map mask_maybe_accounts ~f:Fn.id in
-      mask_accounts @ parent_accounts
+    let last_filled t =
+      assert_is_attached t ;
+      Option.value_map
+        (Base.last_filled (get_parent t))
+        ~default:t.current_location
+        ~f:(fun parent_loc ->
+          match t.current_location with
+          | None -> Some parent_loc
+          | Some our_loc -> Some (max parent_loc our_loc) )
+
+    include Merkle_ledger.Util.Make (struct
+      module Location = Location
+      module Key = Key
+      module Account = Account
+      module Hash = Hash
+
+      module Depth = struct
+        let depth = Base.depth
+      end
+
+      module Base = struct
+        type nonrec t = t
+
+        let get = get
+      end
+
+      let location_of_account_addr addr = Location.Account addr
+
+      let location_of_hash_addr addr = Location.Hash addr
+
+      let get_hash t location =
+        Option.value_exn (get_hash t (Location.to_path_exn location))
+
+      let set_raw_hash_batch t locations_and_hashes =
+        List.iter locations_and_hashes ~f:(fun (location, hash) ->
+            self_set_hash t (Location.to_path_exn location) hash )
+
+      let set_raw_account_batch t locations_and_accounts =
+        List.iter locations_and_accounts ~f:(fun (location, account) ->
+            self_set_account t location account )
+    end)
+
+    let set_batch_accounts t addresses_and_accounts =
+      assert_is_attached t ;
+      set_batch t
+      @@ List.map addresses_and_accounts ~f:(fun (addr, account) ->
+             (Location.Account addr, account) )
 
     (* set accounts in mask *)
     let set_all_accounts_rooted_at_exn t address (accounts : Account.t list) =
+      assert_is_attached t ;
       (* basically, the same code used for the database implementation *)
-      let first_node, last_node = Addr.Range.subtree_range address in
-      Addr.Range.fold (first_node, last_node) ~init:accounts
-        ~f:(fun bit_index -> function
-        | head :: tail ->
-            set t (Location.Account bit_index) head ;
-            tail
-        | [] -> [] )
-      |> ignore
+      let addresses =
+        Sequence.to_list @@ Addr.Range.subtree_range_seq address
+      in
+      let num_accounts = List.length accounts in
+      List.(zip_exn (take addresses num_accounts) accounts)
+      |> set_batch_accounts t
 
-    let num_accounts t = Location.Table.length t.account_tbl
+    (* keys from this mask and all ancestors *)
+    let keys t =
+      assert_is_attached t ;
+      let mask_keys =
+        Location.Table.data t.account_tbl
+        |> List.map ~f:Account.public_key
+        |> Key.Set.of_list
+      in
+      let parent_keys = Base.keys (get_parent t) in
+      Key.Set.union parent_keys mask_keys
 
-    let location_of_key t key = find_location t key
+    let num_accounts t =
+      assert_is_attached t ;
+      keys t |> Key.Set.length
+
+    let location_of_key t key =
+      assert_is_attached t ;
+      let mask_result = self_find_location t key in
+      match mask_result with
+      | Some _ -> mask_result
+      | None -> Base.location_of_key (get_parent t) key
 
     (* not needed for in-memory mask; in the database, it's currently a NOP *)
-    let make_space_for _t _tot = failwith "make_space_for: not implemented"
-
-    let set_inner_hash_at_addr_exn t address hash =
-      assert (Addr.depth address <= Base.depth) ;
-      set_hash t address hash
+    let make_space_for t =
+      assert_is_attached t ;
+      Base.make_space_for (get_parent t)
 
     let get_inner_hash_at_addr_exn t address =
+      assert_is_attached t ;
       assert (Addr.depth address <= Base.depth) ;
       get_hash t address |> Option.value_exn
 
     let remove_accounts_exn t keys =
+      assert_is_attached t ;
       let rec loop keys parent_keys mask_locations =
         match keys with
         | [] -> (parent_keys, mask_locations)
         | key :: rest -> (
-          match find_location t key with
+          match self_find_location t key with
           | None -> loop rest (key :: parent_keys) mask_locations
           | Some loc -> loop rest parent_keys (loc :: mask_locations) )
       in
-      (* parent_keys not in mask, may be in parent
-         mask_locations definitely in mask
-       *)
+      (* parent_keys not in mask, may be in parent mask_locations definitely in
+         mask *)
       let parent_keys, mask_locations = loop keys [] [] in
-      (* allow call to parent to raise an exception
-         if raised, the parent hasn't removed any accounts,
-          and we don't try to remove any accounts from mask *)
-      Base.remove_accounts_exn t.parent parent_keys ;
-      (* removing accounts in parent succeeded, so proceed with removing accounts from mask *)
-      List.iter mask_locations ~f:(remove_account_and_update_hashes t)
+      (* allow call to parent to raise an exception if raised, the parent
+         hasn't removed any accounts, and we don't try to remove any accounts
+         from mask *)
+      Base.remove_accounts_exn (get_parent t) parent_keys ;
+      (* removing accounts in parent succeeded, so proceed with removing
+         accounts from mask we sort mask locations in reverse order,
+         potentially allowing reuse of locations *)
+      let rev_sorted_mask_locations =
+        List.sort mask_locations ~compare:(fun loc1 loc2 ->
+            let loc1 = Location.to_path_exn loc1 in
+            let loc2 = Location.to_path_exn loc2 in
+            Location.Addr.compare loc2 loc1 )
+      in
+      List.iter rev_sorted_mask_locations
+        ~f:(remove_account_and_update_hashes t)
 
-    let destroy t =
-      Location.Table.iteri t.account_tbl ~f:(fun ~key ~data:_ ->
-          Location.Table.remove t.account_tbl key ) ;
-      Addr.Table.iteri t.hash_tbl ~f:(fun ~key ~data:_ ->
-          Addr.Table.remove t.hash_tbl key ) ;
-      Base.destroy (get_parent t)
+    (* Destroy intentionally does not commit before destroying
+       as sometimes this is desired behavior *)
+    let close t =
+      assert_is_attached t ;
+      Location.Table.clear t.account_tbl ;
+      Addr.Table.clear t.hash_tbl ;
+      Key.Table.clear t.location_tbl
 
-    (* NB: relies on location_of_key, not yet implemented for mask *)
     let index_of_key_exn t key =
+      assert_is_attached t ;
       let location = location_of_key t key |> Option.value_exn in
       let addr = Location.to_path_exn location in
       Addr.to_int addr
 
     let get_at_index_exn t index =
+      assert_is_attached t ;
       let addr = Addr.of_int_exn index in
       get t (Location.Account addr) |> Option.value_exn
 
     let set_at_index_exn t index account =
+      assert_is_attached t ;
       let addr = Addr.of_int_exn index in
       set t (Location.Account addr) account
 
     let to_list t =
-      let mask_accounts = Location.Table.data t.account_tbl in
-      let parent_accounts = Base.to_list (get_parent t) in
-      mask_accounts @ parent_accounts
+      assert_is_attached t ;
+      keys t |> Set.to_list
+      |> List.map ~f:(fun key ->
+             let location = location_of_key t key |> Option.value_exn in
+             match location with
+             | Account addr ->
+                 (Addr.to_int addr, get t location |> Option.value_exn)
+             | location -> raise (Location_is_not_account location) )
+      |> List.sort ~compare:(fun (addr1, _) (addr2, _) ->
+             Int.compare addr1 addr2 )
+      |> List.map ~f:(fun (_, account) -> account)
 
-    let foldi t ~init ~f =
-      let parent_result = Base.foldi (get_parent t) ~init ~f in
+    (* TODO *)
+    let iteri _t ~f:_ = failwith "iteri not implemented on masks"
+
+    let foldi_with_ignored_keys t ignored_keys ~init ~f =
+      assert_is_attached t ;
       let locations_and_accounts = Location.Table.to_alist t.account_tbl in
+      (* parent should ignore keys in this mask *)
+      let mask_keys =
+        List.map locations_and_accounts ~f:(fun (_loc, acct) ->
+            Account.public_key acct )
+      in
+      let mask_ignored_keys = Key.Set.of_list mask_keys in
+      let all_ignored_keys = Key.Set.union ignored_keys mask_ignored_keys in
+      (* in parent, ignore any passed-in ignored keys and keys in mask *)
+      let parent_result =
+        Base.foldi_with_ignored_keys (get_parent t) all_ignored_keys ~init ~f
+      in
       let f' accum (location, account) =
-        let address = Location.to_path_exn location in
-        f address accum account
+        (* for mask, ignore just passed-in ignored keys *)
+        if Key.Set.mem ignored_keys (Account.public_key account) then accum
+        else
+          let address = Location.to_path_exn location in
+          f address accum account
       in
       List.fold locations_and_accounts ~init:parent_result ~f:f'
 
+    let foldi t ~init ~f =
+      assert_is_attached t ;
+      foldi_with_ignored_keys t Key.Set.empty ~init ~f
+
     (* we would want fold_until to combine results from the parent and the mask
-       way (1): use the parent result as the init of the mask fold (or vice-versa)
-         the parent result may be of different type than the mask fold init, so
-         we get a less general type than the signature indicates, so compilation fails
-       way (2): make the folds independent, but there's not a specified way to combine
-         the results
-    *)
+       way (1): use the parent result as the init of the mask fold (or
+         vice-versa) the parent result may be of different type than the mask
+         fold init, so we get a less general type than the signature indicates,
+         so compilation fails
+       way (2): make the folds independent, but there's not a specified way to
+         combine the results
+       way (3): load parent accounts into an in-memory list, merge with mask
+         accounts, then fold; this becomes intractable if the parent has a large
+         number of entries *)
     let fold_until _t ~init:_ ~f:_ ~finish:_ =
       failwith "fold_until: not implemented"
 
     module For_testing = struct
       let location_in_mask t location =
-        Option.is_some (find_account t location)
+        Option.is_some (self_find_account t location)
 
-      let address_in_mask t addr = Option.is_some (find_hash t addr)
+      let address_in_mask t addr = Option.is_some (self_find_hash t addr)
+
+      let current_location t = t.current_location
     end
 
     (* leftmost location *)
@@ -389,24 +571,33 @@ struct
         ( Addr.of_directions
         @@ List.init Base.depth ~f:(fun _ -> Direction.Left) )
 
+    let loc_max a b =
+      let a' = Location.to_path_exn a in
+      let b' = Location.to_path_exn b in
+      if Location.Addr.compare a' b' > 0 then a else b
+
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t key account =
-      match find_location t key with
-      | None ->
-          let maybe_location =
-            match t.current_location with
-            | None -> Some first_location
-            | Some loc -> Location.next loc
-          in
-          if not (Option.is_some maybe_location) then
-            Error
-              (Error.create "get_or_create_account: Out of leaves" ()
-                 Unit.sexp_of_t)
-          else
-            let location = Option.value_exn maybe_location in
-            set t location account ;
-            t.current_location <- Some location ;
-            Ok (`Added, location)
+      assert_is_attached t ;
+      match self_find_location t key with
+      | None -> (
+        (* not in mask, maybe in parent *)
+        match Base.location_of_key (get_parent t) key with
+        | Some location -> Ok (`Existed, location)
+        | None -> (
+            (* not in parent, create new location *)
+            let maybe_location =
+              match last_filled t with
+              | None -> Some first_location
+              | Some loc -> Location.next loc
+            in
+            match maybe_location with
+            | None -> Or_error.error_string "Db_error.Out_of_leaves"
+            | Some location ->
+                set t location account ;
+                self_set_location t key location ;
+                t.current_location <- Some location ;
+                Ok (`Added, location) ) )
       | Some location -> Ok (`Existed, location)
 
     let get_or_create_account_exn t key account =
@@ -422,10 +613,9 @@ struct
   end
 
   let set_parent t parent =
-    { uuid= t.uuid
-    ; Attached.parent
-    ; account_tbl= t.account_tbl
-    ; hash_tbl= t.hash_tbl
-    ; location_tbl= t.location_tbl
-    ; current_location= t.current_location }
+    t.parent <- Some parent ;
+    t.current_location <- Attached.last_filled t ;
+    t
+
+  let addr_to_location addr = Location.Account addr
 end

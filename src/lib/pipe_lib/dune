@@ -1,5 +1,6 @@
 (library
   (name pipe_lib)
+  (inline_tests)
   (public_name pipe_lib)
-  (libraries core_kernel async_kernel)
-  (preprocess (pps ppx_jane)))
+  (libraries core_kernel async o1trace)
+  (preprocess (pps ppx_jane ppx_deriving.make)))

@@ -1,180 +1,126 @@
 open Core_kernel
-open Protocols.Coda_pow
+open Async_kernel
+open Protocols.Coda_transition_frontier
 open Coda_base
 open Pipe_lib
 
 module type Inputs_intf = sig
-  module Consensus_mechanism :
-    Consensus_mechanism_intf with type protocol_state_hash := State_hash.t
-
-  module External_transition :
-    External_transition_intf
-    with type protocol_state := Consensus_mechanism.Protocol_state.value
-     and type ledger_builder_diff := Consensus_mechanism.ledger_builder_diff
-     and type protocol_state_proof := Consensus_mechanism.protocol_state_proof
-
-  module Merkle_address : Merkle_address.S
-
-  module Ledger_builder_diff : Ledger_builder_diff_intf
-
-  module Syncable_ledger :
-    Syncable_ledger.S
-    with type addr := Merkle_address.t
-     and type hash := Ledger_hash.t
-
-  module Key : Merkle_ledger.Intf.Key
-
-  module Account : Merkle_ledger.Intf.Account with type key := Key.t
-
-  module Location : Merkle_ledger.Location_intf.S
-
-  module Ledger_diff : sig
-    type t
-
-    val empty : t
-  end
-
-  module Any_base :
-    Merkle_mask.Base_merkle_tree_intf.S
-    with module Addr = Location.Addr
-     and module Location = Location
-     and type account := Account.t
-     and type root_hash := Ledger_hash.t
-     and type hash := Ledger_hash.t
-     and type key := Key.t
-
-  module Ledger_mask : sig
-    include
-      Merkle_mask.Masking_merkle_tree_intf.S
-      with module Addr = Location.Addr
-       and module Location = Location
-       and module Attached.Addr = Location.Addr
-       and type account := Account.t
-       and type location := Location.t
-       and type key := Key.t
-       and type hash := Ledger_hash.t
-       and type parent := Any_base.t
-
-    val merkle_root : t -> Ledger_hash.t
-
-    val apply : t -> Ledger_diff.t -> unit
-
-    val commit : t -> unit
-  end
-
-  module Ledger_database : sig
-    include
-      Merkle_ledger.Database_intf.S
-      with module Location = Location
-       and module Addr = Location.Addr
-       and type account := Account.t
-       and type root_hash := Ledger_hash.t
-       and type hash := Ledger_hash.t
-       and type key := Key.t
-
-    val derive : t -> Ledger_mask.t
-
-    (* TODO: should be Any_base.t *)
-    val of_ledger : Ledger.t -> t
-  end
-
-  module Transaction_snark_scan_state : sig
-    type t
-
-    val empty : t
-
-    module Diff : sig
-      type t
-
-      (* hack until Parallel_scan_state().Diff.t fully diverges from Ledger_builder_diff.t and is included in External_transition *)
-      val of_ledger_builder_diff : Ledger_builder_diff.t -> t
-    end
-  end
-
-  module Staged_ledger : sig
-    type t
-
-    val create :
-         transaction_snark_scan_state:Transaction_snark_scan_state.t
-      -> ledger_mask:Ledger_mask.t
-      -> t
-
-    val apply : t -> Transaction_snark_scan_state.Diff.t -> t Or_error.t
-  end
-
-  module Transition_frontier :
-    Transition_frontier_intf
-    with type external_transition := External_transition.t
-     and type state_hash := State_hash.t
-     and type ledger_database := Ledger_database.t
-     and type transaction_snark_scan_state := Transaction_snark_scan_state.t
-     and type ledger_diff := Ledger_diff.t
-     and type staged_ledger := Staged_ledger.t
-
-  type ledger_database
-
-  type transaction_snark_scan_state
-
-  type ledger_diff
-
-  type staged_ledger
-
-  module Transition_handler :
-    Transition_handler_intf
-    with type external_transition := External_transition.t
-     and type state_hash := State_hash.t
-     and type transition_frontier := Transition_frontier.t
-
-  module Catchup :
-    Catchup_intf
-    with type external_transition := External_transition.t
-     and type state_hash := State_hash.t
-     and type transition_frontier := Transition_frontier.t
+  include Sync_handler.Inputs_intf
 
   module Sync_handler :
     Sync_handler_intf
-    with type addr := Merkle_address.t
-     and type hash := State_hash.t
-     and type syncable_ledger := Syncable_ledger.t
-     and type syncable_ledger_query := Syncable_ledger.query
-     and type syncable_ledger_answer := Syncable_ledger.answer
+    with type ledger_hash := Ledger_hash.t
+     and type state_hash := State_hash.t
+     and type external_transition := External_transition.t
      and type transition_frontier := Transition_frontier.t
+     and type syncable_ledger_query := Sync_ledger.query
+     and type syncable_ledger_answer := Sync_ledger.answer
+
+  module Transition_handler :
+    Transition_handler_intf
+    with type time_controller := Time.Controller.t
+     and type external_transition_verified := External_transition.Verified.t
+     and type staged_ledger := Staged_ledger.t
+     and type state_hash := State_hash.t
+     and type transition_frontier := Transition_frontier.t
+     and type time := Time.t
+     and type transition_frontier_breadcrumb :=
+                Transition_frontier.Breadcrumb.t
+
+  module Network :
+    Network_intf
+    with type peer := Network_peer.Peer.t
+     and type state_hash := State_hash.t
+     and type external_transition := External_transition.t
+     and type consensus_state := Consensus.Consensus_state.value
+     and type state_body_hash := State_body_hash.t
+     and type ledger_hash := Ledger_hash.t
+     and type sync_ledger_query := Sync_ledger.query
+     and type sync_ledger_answer := Sync_ledger.answer
+
+  module Catchup :
+    Catchup_intf
+    with type external_transition_verified := External_transition.Verified.t
+     and type state_hash := State_hash.t
+     and type unprocessed_transition_cache :=
+                Transition_handler.Unprocessed_transition_cache.t
+     and type transition_frontier := Transition_frontier.t
+     and type transition_frontier_breadcrumb :=
+                Transition_frontier.Breadcrumb.t
+     and type network := Network.t
 end
 
 module Make (Inputs : Inputs_intf) :
   Transition_frontier_controller_intf
-  with type external_transition := Inputs.External_transition.t
-   and type syncable_ledger_query := Inputs.Syncable_ledger.query
-   and type syncable_ledger_answer := Inputs.Syncable_ledger.answer
+  with type time_controller := Inputs.Time.Controller.t
+   and type external_transition_verified :=
+              Inputs.External_transition.Verified.t
    and type transition_frontier := Inputs.Transition_frontier.t
-   and type state_hash := State_hash.t = struct
+   and type time := Inputs.Time.t
+   and type state_hash := State_hash.t
+   and type network := Inputs.Network.t = struct
   open Inputs
-  open Consensus_mechanism
 
-  let run ~genesis_transition ~transition_reader ~sync_query_reader
-      ~sync_answer_writer =
+  let kill reader writer =
+    Strict_pipe.Reader.clear reader ;
+    Strict_pipe.Writer.close writer
+
+  let run ~logger ~network ~time_controller ~collected_transitions ~frontier
+      ~network_transition_reader ~proposer_transition_reader ~clear_reader =
+    let logger = Logger.child logger __MODULE__ in
+    let valid_transition_pipe_capacity = 10 in
     let valid_transition_reader, valid_transition_writer =
+      Strict_pipe.create
+        (Buffered
+           (`Capacity valid_transition_pipe_capacity, `Overflow Drop_head))
+    in
+    let primary_transition_pipe_capacity =
+      valid_transition_pipe_capacity + List.length collected_transitions
+    in
+    let primary_transition_reader, primary_transition_writer =
+      Strict_pipe.create
+        (Buffered
+           (`Capacity primary_transition_pipe_capacity, `Overflow Drop_head))
+    in
+    let processed_transition_reader, processed_transition_writer =
       Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
     in
     let catchup_job_reader, catchup_job_writer =
-      Strict_pipe.create (Buffered (`Capacity 5, `Overflow Drop_head))
+      Strict_pipe.create Synchronous
     in
-    (* TODO: initialize transition frontier from disk *)
-    let frontier =
-      Transition_frontier.create
-        ~root_transition:
-          (With_hash.of_data genesis_transition
-             ~hash_data:
-               (Fn.compose Protocol_state.hash
-                  External_transition.protocol_state))
-        ~root_snarked_ledger:(Ledger_database.of_ledger Genesis_ledger.t)
-        ~root_transaction_snark_scan_state:Transaction_snark_scan_state.empty
-        ~root_staged_ledger_diff:Ledger_diff.empty
+    let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
+      Strict_pipe.create Synchronous
     in
-    Transition_handler.Validator.run ~transition_reader
-      ~valid_transition_writer ;
-    Transition_handler.Processor.run ~valid_transition_reader
-      ~catchup_job_writer ~frontier ;
-    Catchup.run ~catchup_job_reader ~frontier ;
-    Sync_handler.run ~sync_query_reader ~sync_answer_writer ~frontier
+    let unprocessed_transition_cache =
+      Transition_handler.Unprocessed_transition_cache.create ~logger
+    in
+    Transition_handler.Validator.run ~logger ~frontier
+      ~transition_reader:network_transition_reader ~valid_transition_writer
+      ~unprocessed_transition_cache ;
+    List.iter collected_transitions ~f:(fun t ->
+        (* since the cache was just built, it's safe to assume
+         * registering these will not fail, so long as there
+         * are no duplicates in the list *)
+        Transition_handler.Unprocessed_transition_cache.register
+          unprocessed_transition_cache t
+        |> Or_error.ok_exn
+        |> Strict_pipe.Writer.write primary_transition_writer ) ;
+    Strict_pipe.Reader.iter_without_pushback valid_transition_reader
+      ~f:(Strict_pipe.Writer.write primary_transition_writer)
+    |> don't_wait_for ;
+    Transition_handler.Processor.run ~logger ~time_controller ~frontier
+      ~primary_transition_reader ~proposer_transition_reader
+      ~catchup_job_writer ~catchup_breadcrumbs_reader
+      ~catchup_breadcrumbs_writer ~processed_transition_writer
+      ~unprocessed_transition_cache ;
+    Catchup.run ~logger ~network ~frontier ~catchup_job_reader
+      ~catchup_breadcrumbs_writer ~unprocessed_transition_cache ;
+    Strict_pipe.Reader.iter_without_pushback clear_reader ~f:(fun _ ->
+        kill valid_transition_reader valid_transition_writer ;
+        kill primary_transition_reader primary_transition_writer ;
+        kill processed_transition_reader processed_transition_writer ;
+        kill catchup_job_reader catchup_job_writer ;
+        kill catchup_breadcrumbs_reader catchup_breadcrumbs_writer )
+    |> don't_wait_for ;
+    processed_transition_reader
 end

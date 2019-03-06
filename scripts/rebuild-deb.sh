@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd $SCRIPTPATH/../src/_build
 
-PROJECT='coda'
+PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
 DATE=$(date +%Y-%m-%d)
 GITHASH=$(git rev-parse --short=8 HEAD)
 
@@ -39,14 +39,22 @@ mkdir -p ${BUILDDIR}/usr/local/bin
 cp ./default/app/cli/src/coda.exe ${BUILDDIR}/usr/local/bin/coda
 cp ./default/app/logproc/src/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
 
-# Verification keys
-if [ -d "/var/lib/coda" ]; then
+
+# Include proving/verifying
+
+# Look in tmp first (compile time generated keys)
+tmp_keys=$(shopt -s nullglob dotglob; echo /tmp/coda_cache_dir/*)
+if (( ${#tmp_keys} ))
+then
     mkdir -p ${BUILDDIR}/var/lib/coda
-    cp /var/lib/coda/*_verification ${BUILDDIR}/var/lib/coda
+    cp /tmp/coda_cache_dir/* ${BUILDDIR}/var/lib/coda
 else
-    if [ -d "/tmp/coda_cache_dir" ]; then
-        mkdir -p ${BUILDDIR}/var/lib/coda
-        cp /tmp/coda_cache_dir/*_verification ${BUILDDIR}/var/lib/coda
+    # Look instead for packaged keys (downloaded before build time)
+    var_keys=$(shopt -s nullglob dotglob; echo /var/lib/coda/*)
+    if (( ${#var_keys} ))
+    then
+	mkdir -p ${BUILDDIR}/var/lib/coda
+	cp /var/lib/coda/* ${BUILDDIR}/var/lib/coda
     fi
 fi
 

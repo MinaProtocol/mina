@@ -31,21 +31,28 @@ end
 module Prove_receipt = struct
   type t = Coda_base.Payment_proof.t [@@deriving yojson]
 
-  let to_text merkle_list =
+  let to_text proof =
     sprintf
       !"Merkle List of transactions:\n%s"
-      (to_yojson merkle_list |> Yojson.Safe.pretty_to_string)
+      (to_yojson proof |> Yojson.Safe.pretty_to_string)
 end
 
 module Public_key_with_balances = struct
-  type t = (int * string) list [@@deriving yojson]
+  module Pretty_account = struct
+    type t = string * int
 
-  type format = {accounts: t} [@@deriving yojson, fields]
+    let to_yojson (public_key, balance) =
+      Yojson.Safe.from_string (sprintf !"{\"%s\":%d}" public_key balance)
+  end
+
+  type t = Pretty_account.t list [@@deriving to_yojson]
+
+  type format = {accounts: t} [@@deriving to_yojson, fields]
 
   let to_yojson t = format_to_yojson {accounts= t}
 
-  let to_text pk_with_accounts =
-    List.map pk_with_accounts ~f:(fun (pk, account) ->
-        sprintf !"%d, %s" pk account )
-    |> String_list_formatter.to_text
+  let to_text account =
+    List.map account ~f:(fun (public_key, balance) ->
+        sprintf !"%s, %d" public_key balance )
+    |> String.concat ~sep:"\n"
 end

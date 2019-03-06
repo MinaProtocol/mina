@@ -72,7 +72,9 @@ module Icon = struct
 end
 
 module Spacing = struct
-  let side_padding = Style.of_class "ph6-l ph5-m ph4 mw9-l"
+  let side_padding ~tight =
+    if tight then Style.of_class "ph6-l ph4-m ph3 mw9-l"
+    else Style.of_class "ph6-l ph5-m ph4 mw9-l"
 end
 
 module Visibility = struct
@@ -81,6 +83,10 @@ module Visibility = struct
   let only_large = Style.of_class "dn db-l"
 
   let only_mobile = Style.of_class "db dn-ns"
+
+  let regular = Style.of_class "db dn-l"
+
+  let huge = Style.of_class "db-l dn"
 end
 
 module Mobile_switch = struct
@@ -89,6 +95,14 @@ module Mobile_switch = struct
     div []
       [ div [Style.render Visibility.no_mobile] [not_small]
       ; div [Style.render Visibility.only_mobile] [small] ]
+end
+
+module Huge_switch = struct
+  let create ~huge ~regular =
+    let open Html_concise in
+    div []
+      [ div [Style.render Visibility.regular] [regular]
+      ; div [Style.render Visibility.huge] [huge] ]
 end
 
 let title_string s = sprintf "Coda - %s" s
@@ -119,10 +133,7 @@ module Links = struct
 
   let reddit = ("Reddit", "https://reddit.com/r/coda", "reddit")
 
-  let blog =
-    ( "Blog"
-    , "https://medium.com/codaprotocol/coda-keeping-cryptocurrency-decentralized-e4b180721f42"
-    , "blog" )
+  let blog = ("Blog", "/blog/scanning_for_scans.html", "blog")
 
   let telegram = ("Telegram", "https://t.me/codaprotocol", "telegram")
 
@@ -130,13 +141,13 @@ module Links = struct
 
   let privacy = ("Privacy Policy", "/privacy.html", "privacy")
 
-  let hiring = ("We're Hiring", "jobs.html", "hiring")
+  let hiring = ("We're Hiring", "/jobs.html", "hiring")
 
-  let jobs = ("Jobs", "jobs.html", "jobs")
+  let jobs = ("Jobs", "/jobs.html", "jobs")
 
-  let testnet = ("Testnet", "testnet.html", "testnet")
+  let testnet = ("Testnet", "/testnet.html", "testnet")
 
-  let code = ("Code", "code.html", "code")
+  let code = ("Code", "/code.html", "code")
 end
 
 module Input_button = struct
@@ -242,7 +253,7 @@ module Navbar = struct
           ; hr [Style.(render (of_class "w-50-ns w-100" + Styles.clean_hr))] ]
       ]
 
-  let navbar current_page =
+  let navbar ?(tight = false) current_page =
     let open Html in
     let open Html_concise in
     let maybe_no_underline label =
@@ -258,15 +269,15 @@ module Navbar = struct
     div
       [ Style.(
           render
-            ( of_class "flex items-center mw9 mb4 mb5-m"
-            + Spacing.side_padding + top_margins )) ]
-      [ div [class_ "w-50"]
-          [anchor [] "./" [coda Style.empty] "coda-home" false]
+            ( of_class "flex items-center mw9 mb5-m"
+            + (if tight then of_class "mb3" else of_class "mb4")
+            + Spacing.side_padding ~tight
+            + top_margins )) ]
+      [ div [class_ "w-50"] [anchor [] "/" [coda Style.empty] "coda-home" false]
       ; div
           [class_ "flex justify-around w-75"]
           [ (let name, url, label = Links.blog in
-             a' ~style:Visibility.no_mobile ~open_new_tab:true url [text name]
-               label)
+             a' ~style:Visibility.no_mobile url [text name] label)
           ; (let name, url, label = Links.testnet in
              a' url [text name] label)
           ; (let name, url, label = Links.code in
@@ -362,7 +373,7 @@ module Section = struct
           ( [ Style.(
                 render
                   ( ["section-wrapper"; "pv4"; "mw9"; "center"; "bxs-bb"]
-                  + Spacing.side_padding )) ]
+                  + Spacing.side_padding ~tight:false )) ]
           @ maybe_id )
           ( match heading with
           | Some heading -> [heading; content]
@@ -655,8 +666,8 @@ let wrap_simple ~navbar ~body_style ?(extra_body = []) ?(headers = [])
   in
   node "html" [] [head; body]
 
-let wrap ?(extra_body = []) ?(headers = []) ?(fixed_footer = false) ?title
-    ~page_label sections =
+let wrap ?(tight = false) ?(extra_body = []) ?(headers = [])
+    ?(fixed_footer = false) ?title ~page_label sections =
   let reified_sections =
     List.mapi
       (sections @ [footer ~fixed:fixed_footer ~show_newsletter:true])
@@ -665,6 +676,6 @@ let wrap ?(extra_body = []) ?(headers = []) ?(fixed_footer = false) ?title
   let open Html_concise in
   wrap_simple
     ~body_style:(Style.of_class "bg-white")
-    ~navbar:(Navbar.navbar page_label) ~extra_body ~headers ~fixed_footer
-    ?title ~page_label ~append_footer:false ~show_newsletter:true
-    (div [] reified_sections)
+    ~navbar:(Navbar.navbar ~tight page_label)
+    ~extra_body ~headers ~fixed_footer ?title ~page_label ~append_footer:false
+    ~show_newsletter:true (div [] reified_sections)

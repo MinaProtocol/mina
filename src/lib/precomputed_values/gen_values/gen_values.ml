@@ -9,7 +9,7 @@ open Core
 
 (* TODO: refactor to do compile time selection *)
 [%%if
-with_snark]
+proof_level = "full"]
 
 let use_dummy_values = false
 
@@ -30,14 +30,13 @@ module Dummy = struct
 
   let base_hash_expr = [%expr Snark_params.Tick.Field.zero]
 
-  let base_proof_expr = [%expr Dummy_values.Tock.proof]
+  let base_proof_expr = [%expr Dummy_values.Tock.GrothMaller17.proof]
 end
 
 module Make_real (Keys : Keys_lib.Keys.S) = struct
   let loc = Ppxlib.Location.none
 
-  let base_hash =
-    Keys.Step.instance_hash Keys.Consensus_mechanism.genesis_protocol_state
+  let base_hash = Keys.Step.instance_hash Consensus.genesis_protocol_state.data
 
   let base_hash_expr =
     [%expr
@@ -59,13 +58,16 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
     let prover_state =
       { Keys.Step.Prover_state.prev_proof= Tock.Proof.dummy
       ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-      ; prev_state= Keys.Consensus_mechanism.Protocol_state.negative_one
-      ; update= Keys.Consensus_mechanism.Snark_transition.genesis }
+      ; prev_state= Consensus.Protocol_state.negative_one
+      ; update= Consensus.Snark_transition.genesis }
+    in
+    let main x =
+      Tick.handle (Keys.Step.main x) Consensus.Prover_state.precomputed_handler
     in
     let tick =
-      Tick.prove
-        (Tick.Keypair.pk Keys.Step.keys)
-        (Keys.Step.input ()) prover_state Keys.Step.main base_hash
+      Tick.Groth16.prove
+        (Tick.Groth16.Keypair.pk Keys.Step.keys)
+        (Keys.Step.input ()) prover_state main base_hash
     in
     let proof = wrap base_hash tick in
     [%expr
@@ -84,78 +86,7 @@ let main () =
   let%bind (module M) =
     if use_dummy_values then return (module Dummy : S)
     else
-      let module Consensus_mechanism =
-      Consensus.Proof_of_signature.Make (struct
-        module Time = Coda_base.Block_time
-        module Proof = Coda_base.Proof
-        module Genesis_ledger = Genesis_ledger
-
-        let proposal_interval = Time.Span.of_ms @@ Int64.of_int 5000
-
-        module Ledger_builder_diff = Ledger_builder.Make_diff (struct
-          open Signature_lib
-          open Coda_base
-          module Compressed_public_key = Public_key.Compressed
-
-          module User_command = struct
-            include (
-              User_command :
-                module type of User_command
-                with module With_valid_signature := User_command
-                                                    .With_valid_signature )
-
-            let receiver _ = failwith "stub"
-
-            let sender _ = failwith "stub"
-
-            let fee _ = failwith "stub"
-
-            let compare _ _ = failwith "stub"
-
-            module With_valid_signature = struct
-              include User_command.With_valid_signature
-
-              let compare _ _ = failwith "stub"
-            end
-          end
-
-          module Ledger_proof = Transaction_snark
-
-          module Completed_work = struct
-            include Ledger_builder.Make_completed_work
-                      (Compressed_public_key)
-                      (Ledger_proof)
-                      (Transaction_snark.Statement)
-
-            let check _ _ = failwith "stub"
-          end
-
-          module Ledger_hash = struct
-            include Ledger_hash.Stable.V1
-
-            let to_bytes = Ledger_hash.to_bytes
-          end
-
-          module Ledger_builder_aux_hash = struct
-            include Ledger_builder_hash.Aux_hash.Stable.V1
-
-            let of_bytes = Ledger_builder_hash.Aux_hash.of_bytes
-          end
-
-          module Ledger_builder_hash = struct
-            include Ledger_builder_hash.Stable.V1
-
-            let ledger_hash = Ledger_builder_hash.ledger_hash
-
-            let aux_hash = Ledger_builder_hash.aux_hash
-
-            let of_aux_and_ledger_hash =
-              Ledger_builder_hash.of_aux_and_ledger_hash
-          end
-        end)
-      end) in
-      let module Keys = Keys_lib.Keys.Make (Consensus_mechanism) in
-      let%map (module K) = Keys.create () in
+      let%map (module K) = Keys_lib.Keys.create () in
       (module Make_real (K) : S)
   in
   let structure =

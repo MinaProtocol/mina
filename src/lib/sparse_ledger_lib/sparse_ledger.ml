@@ -38,13 +38,15 @@ module type S = sig
   val add_path :
     t -> [`Left of hash | `Right of hash] list -> key -> account -> t
 
+  val iteri : t -> f:(index -> account -> unit) -> unit
+
   val merkle_root : t -> hash
 end
 
 let of_hash ~depth h = {indexes= []; depth; tree= Hash h}
 
 module Make (Hash : sig
-  type t [@@deriving bin_io, eq, sexp]
+  type t [@@deriving bin_io, eq, sexp, compare]
 
   val merge : height:int -> t -> t -> t
 end) (Key : sig
@@ -91,7 +93,11 @@ struct
       match (tree, path) with
       | Hash h, path ->
           let t = build_tree height path in
-          assert (Hash.equal h (hash t)) ;
+          [%test_result: Hash.t]
+            ~message:
+              "Hashes in union are not equal, something is wrong with your \
+               ledger"
+            ~expect:h (hash t) ;
           t
       | Node (h, l, r), `Left h_r :: path ->
           assert (Hash.equal h_r (hash r)) ;
@@ -117,6 +123,17 @@ struct
     { t with
       tree= add_path t.depth t.tree path account
     ; indexes= (key, index) :: t.indexes }
+
+  let iteri t ~f =
+    let rec go acc i tree ~f =
+      match tree with
+      | Account a -> f acc a
+      | Hash _ -> ()
+      | Node (_, l, r) ->
+          go acc (i - 1) l ~f ;
+          go (acc + (1 lsl i)) (i - 1) r ~f
+    in
+    go 0 t.depth t.tree ~f
 
   let ith_bit idx i = (idx lsr i) land 1 = 1
 
@@ -166,6 +183,8 @@ let%test_module "sparse-ledger-test" =
   ( module struct
     module Hash = struct
       include Md5
+
+      let compare a b = String.compare (Md5.to_hex a) (Md5.to_hex b)
 
       let merge ~height x y =
         let open Md5 in

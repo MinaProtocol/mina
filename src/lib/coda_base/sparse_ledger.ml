@@ -2,12 +2,11 @@ open Core
 open Import
 open Snark_params.Tick
 
-include Sparse_ledger_lib.Sparse_ledger.Make (struct
-            include Ledger_hash
-          end)
+include Sparse_ledger_lib.Sparse_ledger.Make
+          (Ledger_hash)
           (Public_key.Compressed.Stable.V1)
           (struct
-            include Account.Stable.V1
+            include Account.Stable.Latest
 
             let hash = Fn.compose Ledger_hash.of_digest Account.digest
           end)
@@ -17,7 +16,8 @@ let of_root (h : Ledger_hash.t) =
 
 let of_ledger_root ledger = of_root (Ledger.merkle_root ledger)
 
-let of_ledger_subset_exn (ledger : Ledger.t) keys =
+let of_ledger_subset_exn (oledger : Ledger.t) keys =
+  let ledger = Ledger.copy oledger in
   let new_keys, sparse =
     List.fold keys
       ~f:(fun (new_keys, sl) key ->
@@ -33,19 +33,19 @@ let of_ledger_subset_exn (ledger : Ledger.t) keys =
             (key :: new_keys, add_path sl path key acct) )
       ~init:([], of_ledger_root ledger)
   in
-  O1trace.measure "remove accounts exn" (fun () ->
-      Ledger.remove_accounts_exn ledger new_keys ) ;
   Debug_assert.debug_assert (fun () ->
       [%test_eq: Ledger_hash.t]
         (Ledger.merkle_root ledger)
         ((merkle_root sparse :> Pedersen.Digest.t) |> Ledger_hash.of_hash) ) ;
   sparse
 
-let of_ledger_index_subset_exn (ledger : Ledger.t) indexes =
-  List.fold indexes ~init:(of_ledger_root ledger) ~f:(fun acc i ->
-      let account = Ledger.get_at_index_exn ledger i in
+let of_ledger_index_subset_exn (ledger : Ledger.Any_ledger.witness) indexes =
+  List.fold indexes
+    ~init:(of_root (Ledger.Any_ledger.M.merkle_root ledger))
+    ~f:(fun acc i ->
+      let account = Ledger.Any_ledger.M.get_at_index_exn ledger i in
       add_path acc
-        (Ledger.merkle_path_at_index_exn ledger i)
+        (Ledger.Any_ledger.M.merkle_path_at_index_exn ledger i)
         account.public_key account )
 
 let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
@@ -53,13 +53,13 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
     let privkey = Private_key.create () in
     (privkey, Public_key.of_private_key_exn privkey |> Public_key.compress)
   in
-  let ledger = Ledger.create () in
-  let _, pub1 = keygen () in
-  let _, pub2 = keygen () in
-  let sl = of_ledger_subset_exn ledger [pub1; pub2] in
-  [%test_eq: Ledger_hash.t]
-    (Ledger.merkle_root ledger)
-    ((merkle_root sl :> Pedersen.Digest.t) |> Ledger_hash.of_hash)
+  Ledger.with_ledger ~f:(fun ledger ->
+      let _, pub1 = keygen () in
+      let _, pub2 = keygen () in
+      let sl = of_ledger_subset_exn ledger [pub1; pub2] in
+      [%test_eq: Ledger_hash.t]
+        (Ledger.merkle_root ledger)
+        ((merkle_root sl :> Pedersen.Digest.t) |> Ledger_hash.of_hash) )
 
 let get_or_initialize_exn public_key t idx =
   let account = get_exn t idx in

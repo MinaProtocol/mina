@@ -14,9 +14,9 @@ module type S = sig
   end
 
   type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
-  [@@deriving sexp, compare, hash, eq]
+  [@@deriving eq, sexp, bin_io, hash, compare]
 
-  include Hashable.S with type t := t
+  include Hashable.S_binable with type t := t
 
   val is_generic : t -> bool
 
@@ -43,6 +43,8 @@ module type S = sig
   val parent : t -> t
 
   val next : t -> t Option.t
+
+  val prev : t -> t Option.t
 
   val sibling : t -> t
 

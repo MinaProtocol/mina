@@ -1,0 +1,5 @@
+(library
+  (name network_peer)
+  (public_name network_peer)
+  (libraries core module_version)
+  (preprocess (pps ppx_jane)))

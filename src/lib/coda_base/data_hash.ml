@@ -7,6 +7,7 @@ open Snark_bits
 open Bitstring_lib
 open Tuple_lib
 open Fold_lib
+open Module_version
 
 module type Basic = sig
   type t = private Pedersen.Digest.t
@@ -26,6 +27,8 @@ module type Basic = sig
 
       include Hashable_binable with type t := t
     end
+
+    module Latest : module type of V1
   end
 
   type var
@@ -46,7 +49,7 @@ module type Basic = sig
 
   include Bits_intf.S with type t := t
 
-  include Hashable.S with type t := t
+  include Hashable_binable with type t := t
 
   val fold : t -> bool Triple.t Fold.t
 end
@@ -76,15 +79,29 @@ struct
   module Stable = struct
     module V1 = struct
       module T = struct
+        let version = 1
+
         type t = Pedersen.Digest.t [@@deriving bin_io, sexp, eq, compare, hash]
       end
 
       include T
+      include Registration.Make_latest_version (T)
       include Hashable.Make_binable (T)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "data_hash_basic"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
+  include Stable.Latest
 
   let to_bytes t =
     Fold_lib.Fold.bool_t_to_string (Fold.of_list (Field.unpack t))
@@ -113,7 +130,7 @@ struct
 
   let var_of_t t =
     let n = Bigint.of_field t in
-    { digest= Field.Checked.constant t
+    { digest= Field.Var.constant t
     ; bits=
         Some
           (Bitstring.Lsb_first.of_list
@@ -136,14 +153,13 @@ struct
       >>| fun x -> (x :> Boolean.var list)
     else Field.Checked.unpack ~length:length_in_bits
 
-  let var_to_bits t =
-    with_label __LOC__
-      ( match t.bits with
-      | Some bits -> return (bits :> Boolean.var list)
-      | None ->
-          let%map bits = unpack t.digest in
-          t.bits <- Some (Bitstring.Lsb_first.of_list bits) ;
-          bits )
+  let%snarkydef var_to_bits t =
+    match t.bits with
+    | Some bits -> return (bits :> Boolean.var list)
+    | None ->
+        let%map bits = unpack t.digest in
+        t.bits <- Some (Bitstring.Lsb_first.of_list bits) ;
+        bits
 
   let var_to_triples t =
     var_to_bits t >>| Bitstring.pad_to_triple_list ~default:Boolean.false_
@@ -167,8 +183,7 @@ struct
           go (i - 1) (b :: acc)
       in
       let%map bits = go (Field.size_in_bits - 1) [] in
-      { bits= Some bits
-      ; digest= Field.Checked.project (bits :> Boolean.var list) }
+      {bits= Some bits; digest= Field.Var.project (bits :> Boolean.var list)}
     in
     let read (t : var) = Field.typ.read t.digest in
     let alloc =
@@ -180,8 +195,7 @@ struct
           go (i - 1) (b :: acc)
       in
       let%map bits = go (Field.size_in_bits - 1) [] in
-      { bits= Some bits
-      ; digest= Field.Checked.project (bits :> Boolean.var list) }
+      {bits= Some bits; digest= Field.Var.project (bits :> Boolean.var list)}
     in
     let check {bits; _} =
       Checked.List.iter

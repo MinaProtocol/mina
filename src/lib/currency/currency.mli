@@ -21,6 +21,8 @@ module type Basic = sig
     module V1 : sig
       type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash, yojson]
     end
+
+    module Latest = V1
   end
 
   include Bits_intf.S with type t := t
@@ -103,7 +105,8 @@ module type Signed_intf = sig
 
   type ('magnitude, 'sgn) t_
 
-  type t = (magnitude, Sgn.t) t_ [@@deriving sexp, hash, bin_io, compare, eq]
+  type t = (magnitude, Sgn.t) t_
+  [@@deriving sexp, hash, bin_io, compare, eq, to_yojson]
 
   val gen : t Quickcheck.Generator.t
 
@@ -111,8 +114,10 @@ module type Signed_intf = sig
     module V1 : sig
       type nonrec ('magnitude, 'sgn) t_ = ('magnitude, 'sgn) t_
 
-      type nonrec t = t [@@deriving bin_io, sexp, hash, compare, eq]
+      type nonrec t = t [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
     end
+
+    module Latest = V1
   end
 
   val length_in_triples : int
@@ -154,7 +159,7 @@ module type Signed_intf = sig
 
     val ( + ) : var -> var -> (var, _) Checked.t
 
-    val to_field_var : var -> (Field.var, _) Checked.t
+    val to_field_var : var -> (Field.Var.t, _) Checked.t
 
     val cswap :
          Boolean.var

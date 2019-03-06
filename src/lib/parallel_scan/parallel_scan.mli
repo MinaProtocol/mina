@@ -31,6 +31,7 @@
  *)
 
 open Core_kernel
+open Coda_digestif
 
 (** A ring-buffer that backs our state *)
 module Ring_buffer : sig
@@ -43,11 +44,19 @@ end
 
 module State : sig
   module Job : sig
-    (** An incomplete job -- base may contain data ['d], merge contains zero or
-     * more ['a] work.
+    (** An incomplete job -- base may contain data ['d], merge can have zero components, one component (either the left or the right), or two components in which case there is an integer (sequence_no) representing a set of (completed)jobs in a sequence of (completed)jobs created.
      *)
-    type ('a, 'd) t = Merge of 'a option * 'a option | Base of 'd option
-    [@@deriving bin_io, sexp]
+    type sequence_no = int [@@deriving sexp, bin_io]
+
+    type 'a merge =
+      | Empty
+      | Lcomp of 'a
+      | Rcomp of 'a
+      | Bcomp of ('a * 'a * sequence_no)
+    [@@deriving sexp, bin_io]
+
+    type ('a, 'd) t = Merge of 'a merge | Base of ('d * sequence_no) option
+    [@@deriving sexp, bin_io]
   end
 
   module Completed_job : sig
@@ -77,11 +86,11 @@ module State : sig
    * helpful for debugging. [visualize state ~draw_a:(Fn.const "A") ~draw_d:(Fn.const "D")]
    * creates a tree that looks like this:
    *
-                                                            (_,_)                                                             
-                            (A,A)                                                           (_,_)                             
-            (_,_)                           (A,A)                           (_,_)              
-      _             (_,_)           (A,A)           (_,_)      
-   _       _     (_,_)   (A,A)   (_,_)  
+                                                            (_,_)
+                            (A,A)                                                           (_,_)
+            (_,_)                           (A,A)                           (_,_)
+      _             (_,_)           (A,A)           (_,_)
+   _       _     (_,_)   (A,A)   (_,_)
  D   _   _  (_,_(A,A(_,_
 D D _ _ (_(A(_
    *)
@@ -108,7 +117,21 @@ end
 module Available_job : sig
   (** An available job is an incomplete job that has enough information for one
    * to process it into a completed job *)
-  type ('a, 'd) t = Base of 'd | Merge of 'a * 'a [@@deriving sexp]
+  type sequence_no = int [@@deriving sexp]
+
+  type ('a, 'd) t = Base of 'd * sequence_no | Merge of 'a * 'a * sequence_no
+  [@@deriving sexp]
+end
+
+module Space_partition : sig
+  type t = {first: int; second: int option} [@@deriving sexp]
+end
+
+module Job_view : sig
+  type 'a node = Base of 'a option | Merge of 'a option * 'a option
+  [@@deriving sexp]
+
+  type 'a t = int * 'a node [@@deriving sexp]
 end
 
 val start : parallelism_log_2:int -> ('a, 'd) State.t
@@ -118,11 +141,12 @@ val next_k_jobs :
   state:('a, 'd) State.t -> k:int -> ('a, 'd) Available_job.t list Or_error.t
 (** Get the next k available jobs *)
 
-val next_jobs : state:('a, 'd) State.t -> ('a, 'd) Available_job.t list
+val next_jobs :
+  state:('a, 'd) State.t -> ('a, 'd) Available_job.t list Or_error.t
 (** Get all the available jobs *)
 
 val next_jobs_sequence :
-  state:('a, 'd) State.t -> ('a, 'd) Available_job.t Sequence.t
+  state:('a, 'd) State.t -> ('a, 'd) Available_job.t Sequence.t Or_error.t
 (** Get all the available jobs as a sequence *)
 
 val enqueue_data : state:('a, 'd) State.t -> data:'d list -> unit Or_error.t
@@ -134,15 +158,16 @@ val free_space : state:('a, 'd) State.t -> int
 val fill_in_completed_jobs :
      state:('a, 'd) State.t
   -> completed_jobs:'a State.Completed_job.t list
-  -> 'a option Or_error.t
+  -> ('a * 'd list) option Or_error.t
 (** Complete jobs needed at this state -- optionally emits the ['a] at the top
- * of the tree *)
+ * of the tree along with the ['d list] responsible for emitting the ['a]. *)
 
-val last_emitted_value : ('a, 'd) State.t -> 'a option
-(** The last ['a] we emitted from the top of the tree *)
+val last_emitted_value : ('a, 'd) State.t -> ('a * 'd list) option
+(** The last ['a] we emitted from the top of the tree and the ['d list]
+ * responsible for that ['a]. *)
 
 val partition_if_overflowing :
-  max_slots:int -> ('a, 'd) State.t -> [`One of int | `Two of int * int]
+  max_slots:int -> ('a, 'd) State.t -> Space_partition.t
 (** If there aren't enough slots for [max_slots] many ['d], then before
  * continuing onto the next virtual tree, split max_slots = (x,y) such that
  * x = number of slots till the end of the current tree and y = max_slots - x
@@ -165,3 +190,14 @@ val is_valid : ('a, 'd) State.t -> bool
 val current_data : ('a, 'd) State.t -> 'd list
 (** The data ['d] that is pending and would be returned by available [Base]
  * jobs *)
+
+val update_curr_job_seq_no : ('a, 'd) State.t -> unit Or_error.t
+
+(*Update the current job sequence number by 1. All the completed jobs created will have the current job sequence number*)
+
+val current_job_sequence_number : ('a, 'd) State.t -> int
+
+(*Get the current job sequence number *)
+
+val view_jobs_with_position :
+  ('a, 'd) State.t -> ('a -> 'c) -> ('d -> 'c) -> 'c Job_view.t list

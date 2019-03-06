@@ -1,29 +1,47 @@
 open Core_kernel
 open Snark_params
 open Fold_lib
+open Module_version
 
 module Stable = struct
   module V1 = struct
-    type t = Tick.Field.t * Tick.Field.t
-    [@@deriving bin_io, sexp, eq, compare, hash]
+    module T = struct
+      let version = 1
+
+      type t = Tick.Field.t * Tick.Field.t
+      [@@deriving bin_io, sexp, eq, compare, hash]
+    end
+
+    include T
+    include Registration.Make_latest_version (T)
   end
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "non_zero_curve_point"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
 end
 
-include Stable.V1
-include Comparable.Make_binable (Stable.V1)
+include Stable.Latest
+include Comparable.Make_binable (Stable.Latest)
 
-type var = Tick.Field.var * Tick.Field.var
+type var = Tick.Field.Var.t * Tick.Field.Var.t
 
-let var_of_t (x, y) =
-  (Tick.Field.Checked.constant x, Tick.Field.Checked.constant y)
+let var_of_t (x, y) = (Tick.Field.Var.constant x, Tick.Field.Var.constant y)
 
 let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
 
 let ( = ) = equal
 
-let of_inner_curve_exn = Tick.Inner_curve.to_coords
+let of_inner_curve_exn = Tick.Inner_curve.to_affine_coordinates
 
-let to_inner_curve = Tick.Inner_curve.of_coords
+let to_inner_curve = Tick.Inner_curve.of_affine_coordinates
 
 let gen : t Quickcheck.Generator.t =
   Quickcheck.Generator.filter_map Tick.Field.gen ~f:(fun x ->
@@ -42,11 +60,14 @@ module Compressed = struct
   module Stable = struct
     module V1 = struct
       module T = struct
+        let version = 1
+
         type t = (Field.t, bool) t_
         [@@deriving bin_io, sexp, eq, compare, hash]
       end
 
       include T
+      include Registration.Make_latest_version (T)
 
       let to_base64 t = Binable.to_string (module T) t |> B64.encode
 
@@ -60,17 +81,30 @@ module Compressed = struct
         let of_string = of_base64_exn
       end)
     end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "non_zero_curve_point_compressed"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.V1
-  include Comparable.Make_binable (Stable.V1)
-  include Hashable.Make_binable (Stable.V1)
+  include Stable.Latest
+  include Comparable.Make_binable (Stable.Latest)
+  include Hashable.Make_binable (Stable.Latest)
 
   let compress (x, y) : t = {x; is_odd= parity y}
 
-  let to_base64 t = Binable.to_string (module Stable.V1) t |> B64.encode
+  let to_base64 t = Binable.to_string (module Stable.Latest) t |> B64.encode
 
-  let of_base64_exn s = B64.decode s |> Binable.of_string (module Stable.V1)
+  let of_base64_exn s = B64.decode s |> Binable.of_string (module Stable.Latest)
+
+  let to_string = to_base64
 
   let empty = {x= Field.zero; is_odd= false}
 
@@ -83,7 +117,7 @@ module Compressed = struct
 
   let length_in_triples = bit_length_to_triple_length (1 + Field.size_in_bits)
 
-  type var = (Field.var, Boolean.var) t_
+  type var = (Field.Var.t, Boolean.var) t_
 
   let to_hlist {x; is_odd} = Snarky.H_list.[x; is_odd]
 
@@ -97,7 +131,7 @@ module Compressed = struct
       ~value_of_hlist:of_hlist
 
   let var_of_t ({x; is_odd} : t) : var =
-    {x= Field.Checked.constant x; is_odd= Boolean.var_of_value is_odd}
+    {x= Field.Var.constant x; is_odd= Boolean.var_of_value is_odd}
 
   let assert_equal (t1 : var) (t2 : var) =
     let open Let_syntax in
@@ -160,9 +194,10 @@ let parity_var y =
 
 let decompress_var ({x; is_odd} as c : Compressed.var) =
   let%bind y =
-    provide_witness Typ.field
-      As_prover.(
-        map (read Compressed.typ c) ~f:(fun c -> snd (decompress_exn c)))
+    exists Typ.field
+      ~compute:
+        As_prover.(
+          map (read Compressed.typ c) ~f:(fun c -> snd (decompress_exn c)))
   in
   let%map () = Inner_curve.Checked.Assert.on_curve (x, y)
   and () = parity_var y >>= Boolean.Assert.(( = ) is_odd) in
@@ -170,10 +205,9 @@ let decompress_var ({x; is_odd} as c : Compressed.var) =
 
 let compress : t -> Compressed.t = Compressed.compress
 
-let compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
-  with_label __LOC__
-    (let%map is_odd = parity_var y in
-     {Compressed.x; is_odd})
+let%snarkydef compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
+  let%map is_odd = parity_var y in
+  {Compressed.x; is_odd}
 
 let of_bigstring bs =
   let open Or_error.Let_syntax in

@@ -9,6 +9,8 @@ module type S = sig
 
   type key
 
+  type key_set
+
   type index = int
 
   (* no deriving, purposely; signatures that include this one may add deriving *)
@@ -32,6 +34,18 @@ module type S = sig
      and type t := t
 
   val to_list : t -> account list
+  (** list of accounts, in increasing order of their storage locations *)
+
+  val foldi_with_ignored_keys :
+       t
+    -> key_set
+    -> init:'accum
+    -> f:(Addr.t -> 'accum -> account -> 'accum)
+    -> 'accum
+
+  val iteri : t -> f:(index -> account -> unit) -> unit
+
+  (** the set of keys are ledger elements to skip during the fold, because they're in a mask *)
 
   val foldi :
     t -> init:'accum -> f:(Addr.t -> 'accum -> account -> 'accum) -> 'accum
@@ -43,6 +57,9 @@ module type S = sig
     -> finish:('accum -> 'stop)
     -> 'stop
 
+  val keys : t -> key_set
+  (** set of public keys associated with accounts *)
+
   val location_of_key : t -> key -> Location.t option
 
   val get_or_create_account :
@@ -51,7 +68,9 @@ module type S = sig
   val get_or_create_account_exn :
     t -> key -> account -> [`Added | `Existed] * Location.t
 
-  val destroy : t -> unit
+  val close : t -> unit
+
+  val last_filled : t -> Location.t option
 
   val get_uuid : t -> Uuid.t
 
@@ -74,6 +93,4 @@ module type S = sig
   val merkle_path_at_index_exn : t -> int -> Path.t
 
   val remove_accounts_exn : t -> key list -> unit
-
-  val copy : t -> t
 end

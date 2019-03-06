@@ -1,14 +1,33 @@
 open Core_kernel
 open Snark_params
 open Snark_bits
+open Module_version
 
 module Stable = struct
   module V1 = struct
-    type t = Tick.Field.t [@@deriving bin_io, sexp, eq, compare]
+    module T = struct
+      let version = 1
+
+      type t = Tick.Field.t [@@deriving bin_io, sexp, eq, compare]
+    end
+
+    include T
+    include Registration.Make_latest_version (T)
   end
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "target"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
 end
 
-include Stable.V1
+include Stable.Latest
 module Field = Tick.Field
 module Bigint = Tick_backend.Bigint.R
 
@@ -20,7 +39,7 @@ let max_bigint =
 
 let max = Bigint.to_field max_bigint
 
-let constant = Tick.Field.Checked.constant
+let constant = Tick.Field.Var.constant
 
 let of_field x =
   assert (Bigint.compare (Bigint.of_field x) max_bigint <= 0) ;
@@ -59,7 +78,6 @@ module Bits =
     end)
 
 open Tick
-open Let_syntax
 
-let var_to_unpacked (x : Field.Checked.t) =
+let var_to_unpacked (x : Field.Var.t) =
   Field.Checked.unpack ~length:bit_length x

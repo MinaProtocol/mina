@@ -25,8 +25,7 @@ end
 
 module Worker_state = struct
   module type S = sig
-    val verify_wrap :
-      Consensus.Mechanism.Protocol_state.value -> Tock.Proof.t -> bool
+    val verify_wrap : Consensus.Protocol_state.value -> Tock.Proof.t -> bool
 
     val verify_transaction_snark :
       Transaction_snark.t -> message:Sok_message.t -> bool
@@ -43,16 +42,14 @@ module Worker_state = struct
        let module T = Transaction_snark.Verification.Make (struct
          let keys = tx_vk
        end) in
-       let module B = Blockchain_transition.Make (Consensus.Mechanism) (T) in
+       let module B = Blockchain_transition.Make (Consensus) (T) in
        let module U =
          Blockchain_snark_utils.Verification
-           (Consensus.Mechanism)
+           (Consensus)
            (struct
              let key = bc_vk.wrap
 
-             let key_to_bool_list =
-               let open B.Step_base.Verifier.Verification_key_data in
-               Fn.compose to_bits full_data_of_verification_key
+             let key_to_bool_list = Snark_params.tock_vk_to_bool_list
            end)
        in
        let module M = struct
@@ -87,23 +84,21 @@ module Worker = struct
              with type worker_state := Worker_state.t
               and type connection_state := Connection_state.t) =
     struct
-      [%%if
-      with_snark]
-
       let verify_blockchain (w : Worker_state.t) (chain : Blockchain.t) =
-        let%map (module M) = Worker_state.get w in
-        M.verify_wrap chain.state chain.proof
-
-      [%%else]
-
-      let verify_blockchain (w : Worker_state.t) (chain : Blockchain.t) =
-        Deferred.return true
-
-      [%%endif]
+        match Coda_compile_config.proof_level with
+        | "full" ->
+            let%map (module M) = Worker_state.get w in
+            M.verify_wrap chain.state chain.proof
+        | "check" | "none" -> Deferred.return true
+        | _ -> failwith "unknown proof_level"
 
       let verify_transaction_snark (w : Worker_state.t) (p, message) =
-        let%map (module M) = Worker_state.get w in
-        M.verify_transaction_snark p ~message
+        match Coda_compile_config.proof_level with
+        | "full" ->
+            let%map (module M) = Worker_state.get w in
+            M.verify_transaction_snark p ~message
+        | "check" | "none" -> Deferred.return true
+        | _ -> failwith "unknown proof_level"
 
       let functions =
         let f (i, o, f) =

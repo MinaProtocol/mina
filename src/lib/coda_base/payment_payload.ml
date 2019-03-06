@@ -1,24 +1,41 @@
 open Core
 open Fold_lib
-open Coda_numbers
 open Snark_params.Tick
 open Let_syntax
 open Import
-open Sha256_lib
+open Module_version
 module Amount = Currency.Amount
 module Fee = Currency.Fee
 
 module Stable = struct
   module V1 = struct
-    type ('pk, 'amount) t_ = {receiver: 'pk; amount: 'amount}
-    [@@deriving bin_io, eq, sexp, hash, compare, yojson]
+    module T = struct
+      let version = 1
 
-    type t = (Public_key.Compressed.Stable.V1.t, Amount.Stable.V1.t) t_
-    [@@deriving bin_io, eq, sexp, hash, compare, yojson]
+      type ('pk, 'amount) t_ = {receiver: 'pk; amount: 'amount}
+      [@@deriving bin_io, eq, sexp, hash, compare, yojson]
+
+      type t = (Public_key.Compressed.Stable.V1.t, Amount.Stable.V1.t) t_
+      [@@deriving bin_io, eq, sexp, hash, compare, yojson]
+    end
+
+    include T
+    include Registration.Make_latest_version (T)
   end
+
+  module Latest = V1
+
+  module Module_decl = struct
+    let name = "payment_payload"
+
+    type latest = Latest.t
+  end
+
+  module Registrar = Registration.Make (Module_decl)
+  module Registered_V1 = Registrar.Register (V1)
 end
 
-include Stable.V1
+include Stable.Latest
 
 let dummy = {receiver= Public_key.Compressed.empty; amount= Amount.zero}
 
@@ -44,11 +61,10 @@ let fold {receiver; amount} =
 (* TODO: This could be a bit more efficient by packing across triples,
    but I think the added confusion-possibility
    is not worth it. *)
-let var_to_triples {receiver; amount} =
-  with_label __LOC__
-    (let%map receiver = Public_key.Compressed.var_to_triples receiver in
-     let amount = Amount.var_to_triples amount in
-     receiver @ amount)
+let%snarkydef var_to_triples {receiver; amount} =
+  let%map receiver = Public_key.Compressed.var_to_triples receiver in
+  let amount = Amount.var_to_triples amount in
+  receiver @ amount
 
 let length_in_triples =
   Public_key.Compressed.length_in_triples + Amount.length_in_triples

@@ -24,6 +24,8 @@ module type Basic = sig
 
       include Hashable_binable with type t := t
     end
+
+    module Latest : module type of V1
   end
 
   type var
@@ -44,7 +46,7 @@ module type Basic = sig
 
   include Bits_intf.S with type t := t
 
-  include Hashable.S with type t := t
+  include Hashable_binable with type t := t
 
   val fold : t -> bool Triple.t Fold.t
 end

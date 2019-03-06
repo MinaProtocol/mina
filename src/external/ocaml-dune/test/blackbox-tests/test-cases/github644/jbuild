@@ -1,4 +1,0 @@
-(library
- ((name foo)
-  (inline_tests)
-  (preprocess (pps (ppx_that_doesn't_exist)))))

@@ -1,4 +1,4 @@
-FROM codaprotocol/coda:toolchain-956136e7b621813f03881a1c2ab29b9ca24b539c
+FROM codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
 
 ENV OPAM_DIR             "/home/opam/.opam/4.07"
 ENV PATH                 "${OPAM_DIR}/bin:$PATH"
@@ -29,5 +29,3 @@ RUN USER=opam && \
 
 USER opam:opam
 ENTRYPOINT ["fixuid"]
-
-

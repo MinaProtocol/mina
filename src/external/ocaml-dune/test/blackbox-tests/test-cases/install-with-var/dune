@@ -1,4 +1,0 @@
-(install
- (section man)
- (files (a-man-page.1 as a-man-page.%{context_name}.1) another-man-page.3)
-)

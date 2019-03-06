@@ -24,16 +24,17 @@ module Keys = struct
       Md5.digest_string
         ("Blockchain_transition_proving" ^ Md5.to_hex step ^ Md5.to_hex wrap)
 
-    type t = {step: Tick.Proving_key.t; wrap: Tock.Proving_key.t}
+    type t = {step: Tick.Groth16.Proving_key.t; wrap: Tock.Proving_key.t}
 
     let dummy =
-      {step= Dummy_values.Tick.proving_key; wrap= Dummy_values.Tock.proving_key}
+      { step= Dummy_values.Tick.Groth16.proving_key
+      ; wrap= Dummy_values.Tock.GrothMaller17.proving_key }
 
     let load ({step; wrap} : Location.t) =
       let open Storage in
       let parent_log = Logger.create () in
       let tick_controller =
-        Controller.create ~parent_log (module Tick.Proving_key)
+        Controller.create ~parent_log (module Tick.Groth16.Proving_key)
       in
       let tock_controller =
         Controller.create ~parent_log (module Tock.Proving_key)
@@ -61,17 +62,18 @@ module Keys = struct
         ( "Blockchain_transition_verification" ^ Md5.to_hex step
         ^ Md5.to_hex wrap )
 
-    type t = {step: Tick.Verification_key.t; wrap: Tock.Verification_key.t}
+    type t =
+      {step: Tick.Groth16.Verification_key.t; wrap: Tock.Verification_key.t}
 
     let dummy =
-      { step= Dummy_values.Tick.verification_key
-      ; wrap= Dummy_values.Tock.verification_key }
+      { step= Dummy_values.Tick.Groth16.verification_key
+      ; wrap= Dummy_values.Tock.GrothMaller17.verification_key }
 
     let load ({step; wrap} : Location.t) =
       let open Storage in
       let parent_log = Logger.create () in
       let tick_controller =
-        Controller.create ~parent_log (module Tick.Verification_key)
+        Controller.create ~parent_log (module Tick.Groth16.Verification_key)
       in
       let tock_controller =
         Controller.create ~parent_log (module Tock.Verification_key)
@@ -119,7 +121,7 @@ module Keys = struct
 end
 
 module Make
-    (Consensus_mechanism : Consensus.Mechanism.S)
+    (Consensus_mechanism : Consensus.S)
     (T : Transaction_snark.Verification.S) =
 struct
   module Blockchain = Blockchain_state.Make (Consensus_mechanism)
@@ -199,7 +201,7 @@ struct
 
     let step_cached =
       let load =
-        let open Tick in
+        let open Tick.Groth16 in
         let open Cached.Let_syntax in
         let%map verification =
           Cached.component ~label:"verification" ~f:Keypair.vk
@@ -214,9 +216,10 @@ struct
         ~manual_install_path:Cache_dir.manual_install_path
         ~digest_input:
           (Fn.compose Md5.to_hex Tick.R1CS_constraint_system.digest)
-        ~create_env:Tick.Keypair.generate
+        ~create_env:Tick.Groth16.Keypair.generate
         ~input:
-          (Tick.constraint_system ~exposing:(Step_base.input ()) Step_base.main)
+          (Tick.Groth16.constraint_system ~exposing:(Step_base.input ())
+             Step_base.main)
 
     let cached () =
       let paths = Fn.compose Cache_dir.possible_paths Filename.basename in
@@ -260,3 +263,23 @@ struct
       (location, t, checksum)
   end
 end
+
+let constraint_system_digests () =
+  let module M =
+    Make
+      (Consensus)
+      (Transaction_snark.Verification.Make (struct
+        let keys = Transaction_snark.Keys.Verification.dummy
+      end))
+  in
+  let module W = M.Wrap_base (struct
+    let verification_key = Dummy_values.Tick.Groth16.verification_key
+  end) in
+  let digest = Tick.R1CS_constraint_system.digest in
+  let digest' = Tock.R1CS_constraint_system.digest in
+  [ ( "blockchain-step"
+    , digest
+        M.Step_base.(Tick.Groth16.constraint_system ~exposing:(input ()) main)
+    )
+  ; ("blockchain-wrap", digest' W.(Tock.constraint_system ~exposing:input main))
+  ]

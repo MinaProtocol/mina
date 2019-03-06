@@ -12,15 +12,17 @@ let main () =
   let n = 3 in
   let log = Logger.create () in
   let log = Logger.child log name in
-  let proposal_interval =
-    Int64.to_int_exn Consensus.Mechanism.block_interval_ms
+  let proposal_interval = Consensus.Constants.block_window_duration_ms in
+  let acceptable_delay =
+    Time.Span.of_ms
+      (proposal_interval * Consensus.Constants.delta |> Float.of_int)
   in
   let work_selection = Protocols.Coda_pow.Work_selection.Seq in
   Coda_processes.init () ;
   let configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
-      ~snark_worker_public_keys:None ~should_propose:(Fn.const false)
-      ~work_selection
+      ~acceptable_delay ~snark_worker_public_keys:None
+      ~proposers:(Fn.const None) ~work_selection
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let discovery_ports, external_ports, peers =
@@ -33,19 +35,21 @@ let main () =
   Logger.debug log !"connecting to peers %{sexp: Host_and_port.t list}\n" peers ;
   let config =
     Coda_process.local_config ~peers ~external_port ~discovery_port
-      ~snark_worker_config:None ~should_propose:false ~program_dir
+      ~acceptable_delay ~snark_worker_config:None ~proposer:None ~program_dir
       ~work_selection ()
   in
   let%bind worker = Coda_process.spawn_exn config in
   let%bind _ = after (Time.Span.of_sec 10.) in
   let%map peers = Coda_process.peers_exn worker in
   Logger.debug log
-    !"got peers %{sexp: Kademlia.Peer.t list} %{sexp: Host_and_port.t list}\n"
+    !"got peers %{sexp: Network_peer.Peer.t list} %{sexp: Host_and_port.t list}\n"
     peers expected_peers ;
   let module S = Host_and_port.Set in
   assert (
-    S.equal (S.of_list (peers |> List.map ~f:fst)) (S.of_list expected_peers)
-  )
+    S.equal
+      (S.of_list
+         (peers |> List.map ~f:Network_peer.Peer.to_discovery_host_and_port))
+      (S.of_list expected_peers) )
 
 let command =
   Command.async

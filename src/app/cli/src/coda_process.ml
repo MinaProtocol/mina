@@ -19,7 +19,8 @@ let spawn_exn (config : Coda_worker.Input.t) =
   return (conn, process, config)
 
 let local_config ?proposal_interval ~peers ~discovery_port ~external_port
-    ~program_dir ~should_propose ~snark_worker_config ~work_selection () =
+    ~acceptable_delay ~program_dir ~proposer ~snark_worker_config
+    ~work_selection () =
   let host = "127.0.0.1" in
   let conf_dir =
     Filename.temp_dir_name
@@ -28,18 +29,20 @@ let local_config ?proposal_interval ~peers ~discovery_port ~external_port
   let config =
     { Coda_worker.Input.host
     ; env=
-        (* FIXME #1089: what about all the PoS env vars? Shouldn't we just inherit? *)
-        Option.map proposal_interval ~f:(fun interval ->
-            [ ("CODA_PROPOSAL_INTERVAL", Int.to_string interval)
-            ; ("CODA_SLOT_INTERVAL", Int.to_string interval) ] )
-        |> Option.value ~default:[]
-    ; should_propose
+        Core.Unix.environment () |> Array.to_list
+        |> List.filter_map
+             ~f:
+               (Fn.compose
+                  (function [a; b] -> Some (a, b) | _ -> None)
+                  (String.split ~on:'='))
+    ; proposer
     ; external_port
     ; snark_worker_config
     ; work_selection
     ; peers
     ; conf_dir
     ; program_dir
+    ; acceptable_delay
     ; discovery_port }
   in
   config
@@ -70,3 +73,6 @@ let strongest_ledgers_exn (conn, proc, _) =
       ~f:Coda_worker.functions.strongest_ledgers ~arg:()
   in
   Linear_pipe.wrap_reader r
+
+let start_exn (conn, proc, _) =
+  Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.start ~arg:()

@@ -73,7 +73,11 @@ module Make (Inputs : Intf.Inputs_intf) :
     | Ok res -> res
 
   let main daemon_address public_key shutdown_on_disconnect =
-    let log = Logger.create () in
+    let log =
+      Logger.create ()
+      |> Fn.flip Logger.child "snark-worker"
+      |> Fn.flip Logger.child __MODULE__
+    in
     let%bind state = Worker_state.create () in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
     let rec go () =
@@ -82,17 +86,20 @@ module Make (Inputs : Intf.Inputs_intf) :
         let%bind () = wait () in
         go ()
       in
-      Logger.info log "Asking for work again..." ;
       match%bind
         dispatch Rpcs.Get_work.rpc shutdown_on_disconnect () daemon_address
       with
       | Error e -> log_and_retry "getting work" e
       | Ok None ->
-          Logger.info log "No work; waiting a few seconds before retrying" ;
-          let%bind () = wait ~sec:Worker_state.worker_wait_time () in
+          let random_delay =
+            Worker_state.worker_wait_time
+            +. (0.2 *. Random.float Worker_state.worker_wait_time)
+          in
+          Logger.trace log "No work; waiting %.3fs" random_delay ;
+          let%bind () = wait ~sec:random_delay () in
           go ()
       | Ok (Some work) -> (
-          Logger.info log "Got some work\n" ;
+          Logger.info log !"Received work." ;
           match perform state public_key work with
           | Error e -> log_and_retry "performing work" e
           | Ok result -> (

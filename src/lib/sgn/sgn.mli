@@ -1,13 +1,14 @@
 open Core_kernel
 open Snark_params.Tick
 
-type t = Pos | Neg [@@deriving sexp, bin_io, hash, compare, eq]
+type t = Sgn_type.Sgn.t = Pos | Neg
+[@@deriving sexp, bin_io, hash, compare, eq, to_yojson]
 
 val to_field : t -> Field.t
 
 val gen : t Quickcheck.Generator.t
 
-type var = private Field.Checked.t
+type var = private Field.Var.t
 
 val typ : (var, t) Typ.t
 
