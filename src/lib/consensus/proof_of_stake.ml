@@ -1638,22 +1638,38 @@ let%test_module "Proof of stake tests" =
           in
           let open Signature_lib in
           let open Snark_params in
-          let ledger = Coda_base.Ledger.create () in
+          let open Coda_base in
+          (* setup handler *)
+          let ledger = Ledger.create () in
           let ({public_key; private_key} : Keypair.t) = Keypair.create () in
           let public_key_compressed = Public_key.compress public_key in
+          let account =
+            Account.create public_key_compressed (Currency.Balance.of_int 42)
+          in
+          ignore
+            (Ledger.get_or_create_account_exn ledger public_key_compressed
+               account) ;
+          let location =
+            Option.value_exn
+              (Ledger.location_of_key ledger public_key_compressed)
+          in
+          let delegator =
+            location |> Ledger.Location.to_path_exn |> Ledger.Addr.to_int
+          in
           let sparse_ledger =
-            Coda_base.Sparse_ledger.of_ledger_subset_exn ledger
-              [public_key_compressed]
+            Sparse_ledger.of_ledger_subset_exn ledger [public_key_compressed]
           in
           let handler =
-            Prover_state.handler
-              {delegator= 42 (* TODO *); ledger= sparse_ledger; private_key}
+            Prover_state.handler {delegator; ledger= sparse_ledger; private_key}
           in
           let%map `Success _, var = Tick.handle result handler in
           As_prover.read typ var
         in
-        (* setup handler *)
-        assert (equal_value checked_computation next_consensus_state) ;
+        let (), checked_value =
+          Or_error.ok_exn
+          @@ Snark_params.Tick.run_and_check checked_computation ()
+        in
+        assert (equal_value checked_value next_consensus_state) ;
         return ()
       in
       Quickcheck.test gen ~f:(fun () -> ())
