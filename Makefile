@@ -194,10 +194,10 @@ provingkeys:
 	mkdir -p /tmp/artifacts ; \
 	cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
 
-
 genesiskeys:
 	@mkdir -p /tmp/artifacts
 	@cp src/_build/default/lib/coda_base/sample_keypairs.ml /tmp/artifacts/.
+	@cp src/_build/default/lib/coda_base/sample_keypairs.json /tmp/artifacts/.
 
 codaslim:
 	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
