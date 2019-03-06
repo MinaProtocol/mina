@@ -27,14 +27,14 @@ This design attempts to address each of these issues in turn. If done correctly,
 
 ```json
 {
-  timestamp: timestamp,
-  level: level,
-  source: {
-    module: string,
-    location: string
+  "timestamp": timestamp,
+  "level": level,
+  "source": {
+    "module": string,
+    "location": string
   },
-  message: format_string,
-  metadata: {{...}}
+  "message": format_string,
+  "metadata": {{...}}
 }
 ```
 
@@ -74,15 +74,15 @@ which would produce a log like (where the `<>`'s are replaced)
 
 ```json
 {
-  timestamp: <now>,
-  level: "error",
-  source: {
-    module: "<__MODULE__>",
-    location: "<__loc__>"
+  "timestamp": <now>,
+  "level": "error",
+  "source": {
+    "module": "<__MODULE__>",
+    "location": "<__loc__>"
   },
-  message: "Error adding breadcrumb $breadcrumb to transition frontier: <err>",
-  metadata: {
-    breadcrumb: {<breadcrumb...>},
+  "message": "Error adding breadcrumb $breadcrumb to transition frontier: <err>",
+  "metadata": {
+    "breadcrumb": {<breadcrumb...>},
     <context...>
   }
 }
