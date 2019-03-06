@@ -65,7 +65,7 @@ kademlia:
 # Alias
 dht: kademlia
 
-build: git_hooks
+build: git_hooks reformat-diff
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && (ulimit -u 2128 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
 	$(info Build complete)
@@ -77,6 +77,9 @@ dev: codabuilder containerstart build
 
 reformat: git_hooks
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
+
+reformat-diff: git_hooks
+	ocamlformat --inplace $(shell git diff --name-only HEAD | grep '.mli\?$$' | while IFS= read -r f; do stat "$$f" &>/dev/null && echo "$$f"; done)
 
 check-format:
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
