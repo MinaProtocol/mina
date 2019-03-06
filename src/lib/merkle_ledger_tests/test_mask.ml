@@ -699,7 +699,7 @@ module Make (Test : Test_intf) = struct
         | _ -> failwith "unexpected" )
 
   let%test_unit "setting an account in the parent doesn't remove the masked \
-                 copy if the mask is still dirty for that accountThe par" =
+                 copy if the mask is still dirty for that account" =
     Test.with_instances (fun maskable mask ->
         let attached_mask = Maskable.register_mask maskable mask in
         let k = Key.gen_keys 1 |> List.hd_exn in
