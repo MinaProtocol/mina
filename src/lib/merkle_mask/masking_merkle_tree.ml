@@ -114,47 +114,47 @@ module Make (Inputs : Inputs_intf.S) = struct
     let get_uuid t = assert_is_attached t ; t.uuid
 
     (* don't rely on a particular implementation *)
-    let find_hash t address =
+    let self_find_hash t address =
       assert_is_attached t ;
       Addr.Table.find t.hash_tbl address
 
-    let set_hash t address hash =
+    let self_set_hash t address hash =
       assert_is_attached t ;
       Addr.Table.set t.hash_tbl ~key:address ~data:hash
 
     let set_inner_hash_at_addr_exn t address hash =
       assert_is_attached t ;
       assert (Addr.depth address <= Base.depth) ;
-      set_hash t address hash
+      self_set_hash t address hash
 
     (* don't rely on a particular implementation *)
-    let find_location t public_key =
+    let self_find_location t public_key =
       assert_is_attached t ;
       Key.Table.find t.location_tbl public_key
 
-    let set_location t public_key location =
+    let self_set_location t public_key location =
       assert_is_attached t ;
       Key.Table.set t.location_tbl ~key:public_key ~data:location
 
     (* don't rely on a particular implementation *)
-    let find_account t location =
+    let self_find_account t location =
       assert_is_attached t ;
       Location.Table.find t.account_tbl location
 
-    let find_all_accounts t =
+    let self_find_all_accounts t =
       assert_is_attached t ;
       Location.Table.data t.account_tbl
 
-    let set_account t location account =
+    let self_set_account t location account =
       assert_is_attached t ;
       Location.Table.set t.account_tbl ~key:location ~data:account ;
-      set_location t (Account.public_key account) location
+      self_set_location t (Account.public_key account) location
 
     (* a read does a lookup in the account_tbl; if that fails, delegate to
        parent *)
     let get t location =
       assert_is_attached t ;
-      match find_account t location with
+      match self_find_account t location with
       | Some account -> Some account
       | None -> Base.get (get_parent t) location
 
@@ -168,7 +168,7 @@ module Make (Inputs : Inputs_intf.S) = struct
           (* first element in the path contains hash at sibling of address *)
           let curr_element = List.hd_exn path in
           let merkle_node_address = Addr.sibling address in
-          let mask_hash = find_hash t merkle_node_address in
+          let mask_hash = self_find_hash t merkle_node_address in
           let parent_hash =
             match curr_element with `Left h | `Right h -> h
           in
@@ -229,14 +229,14 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* use mask Merkle root, if it exists, else get from parent *)
     let merkle_root t =
       assert_is_attached t ;
-      match find_hash t (Addr.root ()) with
+      match self_find_hash t (Addr.root ()) with
       | Some hash -> hash
       | None -> Base.merkle_root (get_parent t)
 
     let remove_account_and_update_hashes t location =
       assert_is_attached t ;
       (* remove account and key from tables *)
-      let account = Option.value_exn (find_account t location) in
+      let account = Option.value_exn (self_find_account t location) in
       Location.Table.remove t.account_tbl location ;
       (* TODO : use stack database to save unused location, which can be used
          when allocating a location *)
@@ -256,13 +256,13 @@ module Make (Inputs : Inputs_intf.S) = struct
           account_hash
       in
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
-          set_hash t addr hash )
+          self_set_hash t addr hash )
 
     (* a write writes only to the mask, parent is not involved need to update
        both account and hash pieces of the mask *)
     let set t location account =
       assert_is_attached t ;
-      set_account t location account ;
+      self_set_account t location account ;
       let account_address = Location.to_path_exn location in
       let account_hash = Hash.hash_account account in
       let merkle_path = merkle_path t location in
@@ -271,29 +271,26 @@ module Make (Inputs : Inputs_intf.S) = struct
           account_hash
       in
       List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
-          set_hash t addr hash )
+          self_set_hash t addr hash )
 
     (* if the mask's parent sets an account, we can prune an entry in the mask
        if the account in the parent is the same in the mask *)
     let parent_set_notify t account =
       assert_is_attached t ;
-      match find_location t (Account.public_key account) with
+      match self_find_location t (Account.public_key account) with
       | None -> ()
       | Some location -> (
-        match find_account t location with
+        match self_find_account t location with
         | Some existing_account ->
-            if
-              Key.equal
-                (Account.public_key account)
-                (Account.public_key existing_account)
-            then remove_account_and_update_hashes t location
+            if Account.equal account existing_account then
+              remove_account_and_update_hashes t location
         | None -> () )
 
     (* as for accounts, we see if we have it in the mask, else delegate to
        parent *)
     let get_hash t addr =
       assert_is_attached t ;
-      match find_hash t addr with
+      match self_find_hash t addr with
       | Some hash -> Some hash
       | None -> (
         try
@@ -312,7 +309,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     let get_hash_batch_exn t addrs =
       assert_is_attached t ;
       List.map addrs ~f:(fun addr ->
-          match find_hash t addr with
+          match self_find_hash t addr with
           | Some account -> Some account
           | None -> (
             try Some (Base.get_inner_hash_at_addr_exn (get_parent t) addr)
@@ -384,11 +381,11 @@ module Make (Inputs : Inputs_intf.S) = struct
 
       let set_raw_hash_batch t locations_and_hashes =
         List.iter locations_and_hashes ~f:(fun (location, hash) ->
-            set_hash t (Location.to_path_exn location) hash )
+            self_set_hash t (Location.to_path_exn location) hash )
 
       let set_raw_account_batch t locations_and_accounts =
         List.iter locations_and_accounts ~f:(fun (location, account) ->
-            set_account t location account )
+            self_set_account t location account )
     end)
 
     let set_batch_accounts t addresses_and_accounts =
@@ -425,7 +422,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let location_of_key t key =
       assert_is_attached t ;
-      let mask_result = find_location t key in
+      let mask_result = self_find_location t key in
       match mask_result with
       | Some _ -> mask_result
       | None -> Base.location_of_key (get_parent t) key
@@ -446,7 +443,7 @@ module Make (Inputs : Inputs_intf.S) = struct
         match keys with
         | [] -> (parent_keys, mask_locations)
         | key :: rest -> (
-          match find_location t key with
+          match self_find_location t key with
           | None -> loop rest (key :: parent_keys) mask_locations
           | Some loc -> loop rest parent_keys (loc :: mask_locations) )
       in
@@ -551,9 +548,9 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     module For_testing = struct
       let location_in_mask t location =
-        Option.is_some (find_account t location)
+        Option.is_some (self_find_account t location)
 
-      let address_in_mask t addr = Option.is_some (find_hash t addr)
+      let address_in_mask t addr = Option.is_some (self_find_hash t addr)
 
       let current_location t = t.current_location
     end
@@ -572,7 +569,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     (* NB: updates the mutable current_location field in t *)
     let get_or_create_account t key account =
       assert_is_attached t ;
-      match find_location t key with
+      match self_find_location t key with
       | None -> (
         (* not in mask, maybe in parent *)
         match Base.location_of_key (get_parent t) key with
@@ -588,7 +585,7 @@ module Make (Inputs : Inputs_intf.S) = struct
             | None -> Or_error.error_string "Db_error.Out_of_leaves"
             | Some location ->
                 set t location account ;
-                set_location t key location ;
+                self_set_location t key location ;
                 t.current_location <- Some location ;
                 Ok (`Added, location) ) )
       | Some location -> Ok (`Existed, location)

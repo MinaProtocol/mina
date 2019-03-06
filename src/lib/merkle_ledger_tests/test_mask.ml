@@ -697,6 +697,21 @@ module Make (Test : Test_intf) = struct
                   ~message:"All accounts are accessible from m2"
                   ~expect:(Some a) (Mask.Attached.get m2 loc) )
         | _ -> failwith "unexpected" )
+
+  let%test_unit "setting an account in the parent doesn't remove the masked \
+                 copy if the mask is still dirty for that account" =
+    Test.with_instances (fun maskable mask ->
+        let attached_mask = Maskable.register_mask maskable mask in
+        let k = Key.gen_keys 1 |> List.hd_exn in
+        let acct1 = Account.create k (Balance.of_int 10) in
+        let loc =
+          snd (Mask.Attached.get_or_create_account_exn attached_mask k acct1)
+        in
+        let acct2 = Account.create k (Balance.of_int 5) in
+        Maskable.set maskable loc acct2 ;
+        [%test_result: Account.t]
+          ~message:"account in mask should be unchanged" ~expect:acct1
+          (Mask.Attached.get attached_mask loc |> Option.value_exn) )
 end
 
 module type Depth_S = sig
