@@ -560,17 +560,11 @@ module Merge = struct
         ~support:
           (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
     in
-    Core.printf
-      !"section1: %{sexp: Interval_union.t} \n"
-      (Pedersen.Checked.Section.support prefix_section) ;
     let%bind prefix_and_sok_digest =
       Pedersen.Checked.Section.extend prefix_section
         (Sok_message.Digest.Checked.to_triples sok_digest)
         ~start:Hash_prefix.length_in_triples
     in
-    Core.printf
-      !"section2: %{sexp: Interval_union.t} \n"
-      (Pedersen.Checked.Section.support prefix_and_sok_digest) ;
     let%bind prefix_and_sok_digest_and_supply_increase_and_fee =
       let open Pedersen.Checked.Section in
       extend prefix_and_sok_digest
@@ -581,10 +575,6 @@ module Merge = struct
         ( Amount.var_to_triples supply_increase
         @ Amount.Signed.Checked.to_triples fee_excess )
     in
-    Core.printf
-      !"section3: %{sexp: Interval_union.t} \n"
-      (Pedersen.Checked.Section.support
-         prefix_and_sok_digest_and_supply_increase_and_fee) ;
     disjoint_union_sections
       ( [ prefix_and_sok_digest_and_supply_increase_and_fee
         ; state1
@@ -698,30 +688,18 @@ module Merge = struct
       let open Pedersen.Checked.Section in
       extend empty ~start:state1_offset (bits_to_triples s1)
     in
-    Core.printf
-      !"main section1: %{sexp: Interval_union.t} \n"
-      (Pedersen.Checked.Section.support s1_section) ;
     let%bind s3_section =
       let open Pedersen.Checked.Section in
       extend empty ~start:state2_offset (bits_to_triples s3)
     in
-    Core.printf
-      !"main section2: %{sexp: Interval_union.t} \n"
-      (Pedersen.Checked.Section.support s3_section) ;
     let%bind coinbase_section1 =
       let open Pedersen.Checked.Section in
       extend empty ~start:state3_offset (bits_to_triples pending_coinbase1)
     in
-    Core.printf
-      !"main section3: %{sexp: Interval_union.t} \n"
-      (Pedersen.Checked.Section.support coinbase_section1) ;
     let%bind coinbase_section3 =
       let open Pedersen.Checked.Section in
       extend empty ~start:state4_offset (bits_to_triples pending_coinbase3)
     in
-    Core.printf
-      !"main section4: %{sexp: Interval_union.t} \n"
-      (Pedersen.Checked.Section.support coinbase_section3) ;
     let%bind tock_vk_section =
       let%bind bs =
         Verifier.Verification_key.(summary (summary_input tock_vk))
@@ -756,16 +734,10 @@ module Merge = struct
         let open Pedersen.Checked.Section in
         extend empty ~start:state2_offset (bits_to_triples s2)
       in
-      Core.printf
-        !"main section5: %{sexp: Interval_union.t} \n"
-        (Pedersen.Checked.Section.support s2_section) ;
       let%bind coinbase_section2 =
         let open Pedersen.Checked.Section in
         extend empty ~start:state4_offset (bits_to_triples pending_coinbase2)
       in
-      Core.printf
-        !"main section6: %{sexp: Interval_union.t} \n"
-        (Pedersen.Checked.Section.support coinbase_section2) ;
       verify_transition tock_vk tock_vk_precomp tock_vk_section
         Prover_state.transition12 s1_section s2_section
         ~pending_coinbase_stack1:coinbase_section1

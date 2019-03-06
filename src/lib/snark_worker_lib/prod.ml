@@ -68,10 +68,7 @@ module Inputs = struct
               M.of_transaction ~sok_digest ~source:input.Statement.source
                 ~target:input.target t
                 ~pending_coinbase_state:input.Statement.pending_coinbase_state
-                (*~coinbase_on_new_tree:false ~delete_coinbase_stack:false*)
-                (*TODO: get this from transition input*)
                 (unstage (Coda_base.Sparse_ledger.handler w.ledger))
-              (*TODO: add handlers for all the witnesses*)
             in
             Cache.add cache ~statement ~proof:res ;
             let total = Time.abs_diff (Time.now ()) start in

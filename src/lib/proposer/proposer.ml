@@ -186,7 +186,6 @@ module Make (Inputs : Inputs_intf) :
                 ~logger ~transactions_by_fee:transactions ~get_completed_work
           )
         in
-        (*TODO: get Added stack witness tree-hash | Updated stack witness tree-hash | Deleted_and_added stack witness tree-hash | Deleted_and_updated stack witness tree-hash*)
         let%map ( `Hash_after_applying next_staged_ledger_hash
                 , `Ledger_proof ledger_proof_opt
                 , `Staged_ledger _transitioned_staged_ledger
@@ -196,43 +195,12 @@ module Make (Inputs : Inputs_intf) :
           in
           Or_error.ok_exn or_error
         in
-        Core.printf
-          !"pending_coinbase update: %{sexp:Pending_coinbase_update.t} \n %!"
-          pending_coinbase_state ;
         (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
         ( diff
         , next_staged_ledger_hash
         , ledger_proof_opt
         , pending_coinbase_state ))
     in
-    (*let pending_coinbase_state =
-      let updated_stack, prev_root, new_root, action =
-        (*Deepthi: TODO: witness would be just the path to the stacks changing. TODO: add that*)
-        match 1 with
-        | 1 ->
-            ( Pending_coinbase.Stack.empty
-            , Pending_coinbase_hash.empty_hash
-            , Pending_coinbase_hash.empty_hash
-            , Pending_coinbase_update.Action.Added )
-        | 2 ->
-            ( Pending_coinbase.Stack.empty
-            , Pending_coinbase_hash.empty_hash
-            , Pending_coinbase_hash.empty_hash
-            , Pending_coinbase_update.Action.Updated )
-        | 4 ->
-            ( Pending_coinbase.Stack.empty
-            , Pending_coinbase_hash.empty_hash
-            , Pending_coinbase_hash.empty_hash
-            , Pending_coinbase_update.Action.Deleted_added )
-        | _ ->
-            ( Pending_coinbase.Stack.empty
-            , Pending_coinbase_hash.empty_hash
-            , Pending_coinbase_hash.empty_hash
-            , Pending_coinbase_update.Action.Deleted_updated )
-      in
-      Pending_coinbase_update.create_value ~updated_stack ~prev_root
-        ~new_root ~action
-    in*)
     let%bind protocol_state, consensus_transition_data =
       lift_sync (fun () ->
           let previous_ledger_hash =
@@ -258,7 +226,6 @@ module Make (Inputs : Inputs_intf) :
               ~staged_ledger_hash:next_staged_ledger_hash
               ~pending_coinbase_hash:
                 (Pending_coinbase_update.new_root pending_coinbase_state)
-            (*TODO:Deepthi: this would be the updated pending_coinbase_tree hash from coinbase_update*)
           in
           let time =
             Time.now time_controller |> Time.to_span_since_epoch
@@ -296,7 +263,6 @@ module Make (Inputs : Inputs_intf) :
                   (Protocol_state.blockchain_state protocol_state)
                 ~consensus_data:consensus_transition_data ()
                 ~pending_coinbase_state
-              (*Deepthi: delete this from here*)
             in
             let internal_transition =
               Internal_transition.create ~snark_transition

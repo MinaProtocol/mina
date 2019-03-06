@@ -100,19 +100,20 @@ module type S = sig
     (*val get : var -> Address.var -> Stack.var*)
 
     val update_stack :
-         var
-      -> is_new_stack:Boolean.var
-      -> f:(Stack.var -> (Stack.var, 's) Checked.t)
-      -> (var, 's) Checked.t
+      var -> is_new_stack:Boolean.var -> Stack.var -> (var, 's) Checked.t
 
     val delete_stack : var -> (var, 's) Checked.t
   end
 
   val create : unit -> t
 
+  val update_coinbase_stack_exn : t -> Stack.t -> is_new_stack:bool -> t
+
   val add_coinbase_exn : t -> coinbase:Coinbase.t -> is_new_stack:bool -> t
 
   val remove_coinbase_stack_exn : t -> t
+
+  val latest_stack : t -> Stack.t option
 
   val merkle_root : t -> Hash.t
 

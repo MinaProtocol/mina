@@ -133,8 +133,6 @@ module type Pending_coinbase_intf = sig
   val create_exn : unit -> t
 
   val latest_stack : t -> Stack.t option
-
-  val hash : t -> string
 end
 
 module type Frozen_ledger_hash_intf = sig
@@ -712,8 +710,6 @@ module type Transaction_snark_scan_state_intf = sig
   val next_jobs_sequence : t -> Available_job.t Sequence.t Or_error.t
 
   val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
-
-  val on_new_tree : t -> bool
 
   val is_valid : t -> bool
 

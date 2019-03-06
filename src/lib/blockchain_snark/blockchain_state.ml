@@ -13,9 +13,6 @@ module Make (Consensus_mechanism : Consensus.S) :
   module Protocol_state = Consensus_mechanism.Protocol_state
   module Snark_transition = Consensus_mechanism.Snark_transition
 
-  (*module Pending_coinbase_update = Snark_transition.Pending_coinbase_update
-  module Pending_coinbase = Pending_coinbase_update.Pending_coinbase*)
-
   module type Update_intf = sig
     module Checked : sig
       val update :
@@ -72,17 +69,15 @@ module Make (Consensus_mechanism : Consensus.S) :
         in
         let%bind success =
           let%bind correct_transaction_snark =
-            let%bind index =
-              with_label __LOC__
-                (request_witness Pending_coinbase.Stack_pos.Unpacked.typ
-                   As_prover.(
-                     map (return ()) ~f:(fun _ ->
-                         Pending_coinbase.Hash.Find_index_of_oldest_stack )))
+            let%bind index_oldest_coinbase_stack =
+              request_witness Pending_coinbase.Stack_pos.Unpacked.typ
+                As_prover.(
+                  map (return ()) ~f:(fun _ ->
+                      Pending_coinbase.Hash.Find_index_of_oldest_stack ))
             in
             let%bind pending_coinbase_stack_deleted =
-              with_label __LOC__
-                (Pending_coinbase.Hash.get pending_coinbase_update.prev_root
-                   index)
+              Pending_coinbase.Hash.get pending_coinbase_update.prev_root
+                index_oldest_coinbase_stack
             in
             with_label __LOC__
               (verify_complete_merge
@@ -93,7 +88,6 @@ module Make (Consensus_mechanism : Consensus.S) :
                  |> Blockchain_state.snarked_ledger_hash )
                  Pending_coinbase.Stack.Checked.empty
                  pending_coinbase_stack_deleted supply_increase
-                 (*TODO:Deepthi: get coinbase stack from the delete_stack request *)
                  (As_prover.return
                     (Option.value ~default:Tock.Proof.dummy
                        (Snark_transition.ledger_proof transition))))
@@ -106,132 +100,57 @@ module Make (Consensus_mechanism : Consensus.S) :
                  |> Blockchain_state.snarked_ledger_hash ))
           in
           let%bind new_pending_coinbase_hash =
-            with_label __LOC__
-              (let prev_root =
-                 previous_state |> Protocol_state.blockchain_state
-                 |> Blockchain_state.pending_coinbase_hash
-                 (*Pending_coinbase_update.prev_root pending_coinbase_state*)
-               in
-               let _prev_root' = pending_coinbase_update.prev_root in
-               let updated_stack = pending_coinbase_update.updated_stack in
-               let action = pending_coinbase_update.action in
-               let with_del_add del_added =
-                 with_label __LOC__
-                   (let%bind () =
-                      exists Typ.unit
-                        ~compute:
-                          As_prover.(
-                            Let_syntax.(
-                              let%bind del_added =
-                                read Boolean.typ del_added
-                              in
-                              Core.printf
-                                !"del_added %{sexp:bool} \n %!"
-                                del_added ;
-                              return ()))
-                    in
-                    Pending_coinbase.Hash.update_delete_stack
-                      ~is_new_stack:Boolean.true_ ~stack:updated_stack
-                      prev_root)
-               in
-               let with_del_update del_updated =
-                 with_label __LOC__
-                   (let%bind () =
-                      exists Typ.unit
-                        ~compute:
-                          As_prover.(
-                            Let_syntax.(
-                              let%bind del_updated =
-                                read Boolean.typ del_updated
-                              in
-                              Core.printf
-                                !"del_updated %{sexp:bool}\n %!"
-                                del_updated ;
-                              return ()))
-                    in
-                    Pending_coinbase.Hash.update_delete_stack
-                      ~is_new_stack:Boolean.false_ ~stack:updated_stack
-                      prev_root)
-               in
-               let with_add added =
-                 with_label __LOC__
-                   (let%bind () =
-                      exists Typ.unit
-                        ~compute:
-                          As_prover.(
-                            Let_syntax.(
-                              let%bind added = read Boolean.typ added in
-                              Core.printf !"added %{sexp:bool} \n %!" added ;
-                              return ()))
-                    in
-                    Pending_coinbase.Hash.update_stack prev_root
-                      ~is_new_stack:Boolean.true_ updated_stack)
-               in
-               let with_update updated =
-                 with_label __LOC__
-                   (let%bind () =
-                      exists Typ.unit
-                        ~compute:
-                          As_prover.(
-                            Let_syntax.(
-                              let%bind updated = read Boolean.typ updated in
-                              Core.printf
-                                !"updated %{sexp:bool} \n %!"
-                                updated ;
-                              return ()))
-                    in
-                    Pending_coinbase.Hash.update_stack prev_root
-                      ~is_new_stack:Boolean.false_ updated_stack)
-               in
-               let%bind added =
-                 Pending_coinbase_update.Action.Checked.added action
-               in
-               let%bind updated =
-                 Pending_coinbase_update.Action.Checked.updated action
-               in
-               let%bind del_add =
-                 Pending_coinbase_update.Action.Checked.deleted_added action
-               in
-               let%bind del_updated =
-                 Pending_coinbase_update.Action.Checked.deleted_updated action
-               in
-               let%bind () =
-                 exists Typ.unit
-                   ~compute:
-                     As_prover.(
-                       Let_syntax.(
-                         let%bind added = read Boolean.typ added in
-                         let%bind updated = read Boolean.typ updated in
-                         let%bind del_add = read Boolean.typ del_add in
-                         let%bind _stack' =
-                           read Pending_coinbase.Stack.typ updated_stack
-                         in
-                         Core.printf
-                           !"stack added :%{sexp:bool} updated: %{sexp:bool} \
-                             del_add: %{sexp:bool} updating_stack\n\
-                            \ %!"
-                           added updated del_add ;
-                         return ()))
-               in
-               let chain if_ b ~then_ ~else_ =
-                 let%bind then_ = then_ and else_ = else_ in
-                 if_ b ~then_ ~else_
-               in
-               chain Pending_coinbase.Hash.if_ added ~then_:(with_add added)
-                 ~else_:
-                   (chain Pending_coinbase.Hash.if_ updated
-                      ~then_:(with_update updated)
-                      ~else_:
-                        (chain Pending_coinbase.Hash.if_ del_add
-                           ~then_:(with_del_add del_add)
-                           ~else_:(with_del_update del_updated))))
+            let prev_root =
+              previous_state |> Protocol_state.blockchain_state
+              |> Blockchain_state.pending_coinbase_hash
+            in
+            let _prev_root' = pending_coinbase_update.prev_root in
+            let updated_stack = pending_coinbase_update.updated_stack in
+            let action = pending_coinbase_update.action in
+            let with_del_add del_added =
+              Pending_coinbase.Hash.update_delete_stack
+                ~is_new_stack:Boolean.true_ ~stack:updated_stack prev_root
+            in
+            let with_del_update del_updated =
+              Pending_coinbase.Hash.update_delete_stack
+                ~is_new_stack:Boolean.false_ ~stack:updated_stack prev_root
+            in
+            let with_add added =
+              Pending_coinbase.Hash.update_stack prev_root
+                ~is_new_stack:Boolean.true_ updated_stack
+            in
+            let with_update updated =
+              Pending_coinbase.Hash.update_stack prev_root
+                ~is_new_stack:Boolean.false_ updated_stack
+            in
+            let%bind added =
+              Pending_coinbase_update.Action.Checked.added action
+            in
+            let%bind updated =
+              Pending_coinbase_update.Action.Checked.updated action
+            in
+            let%bind del_add =
+              Pending_coinbase_update.Action.Checked.deleted_added action
+            in
+            let%bind del_updated =
+              Pending_coinbase_update.Action.Checked.deleted_updated action
+            in
+            let chain if_ b ~then_ ~else_ =
+              let%bind then_ = then_ and else_ = else_ in
+              if_ b ~then_ ~else_
+            in
+            chain Pending_coinbase.Hash.if_ added ~then_:(with_add added)
+              ~else_:
+                (chain Pending_coinbase.Hash.if_ updated
+                   ~then_:(with_update updated)
+                   ~else_:
+                     (chain Pending_coinbase.Hash.if_ del_add
+                        ~then_:(with_del_add del_add)
+                        ~else_:(with_del_update del_updated)))
           in
-          (*The tree hash obtained should be the same as the tree hash in the blockchain state which was computed outside checked. Success if that's true*)
           let%bind correct_coinbase_status =
-            with_label __LOC__
-              (let new_root = pending_coinbase_update.new_root in
-               Pending_coinbase.Hash.equal_var new_pending_coinbase_hash
-                 new_root)
+            let new_root = pending_coinbase_update.new_root in
+            Pending_coinbase.Hash.equal_var new_pending_coinbase_hash new_root
           in
           let%bind correct_snark =
             Boolean.(correct_transaction_snark || ledger_hash_didn't_change)

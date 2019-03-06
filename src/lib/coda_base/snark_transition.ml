@@ -97,9 +97,7 @@ struct
     ; supply_increase: 'supply_increase
     ; ledger_proof: Proof.t option
     ; pending_coinbase_state: 'pending_coinbase_state }
-  [@@(*DeepthiTODO: add pending_coinbase action here*)
-    deriving
-    bin_io, sexp, fields]
+  [@@deriving bin_io, sexp, fields]
 
   type value =
     ( Blockchain_state.value
