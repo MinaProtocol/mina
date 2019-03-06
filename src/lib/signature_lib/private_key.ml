@@ -22,6 +22,7 @@ let of_bigstring_exn = Binable.of_bigstring (module T)
 
 let to_bigstring = Binable.to_bigstring (module T)
 
-let to_base64 t = to_bigstring t |> Bigstring.to_string |> B64.encode
+let to_base64 t = to_bigstring t |> Bigstring.to_string |> Base64.encode_string
 
-let of_base64_exn s = B64.decode s |> Bigstring.of_string |> of_bigstring_exn
+let of_base64_exn s =
+  Base64.decode_exn s |> Bigstring.of_string |> of_bigstring_exn
