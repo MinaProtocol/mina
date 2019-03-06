@@ -325,8 +325,8 @@ end = struct
               (Transition_frontier.consensus_local_state frontier)
         in
         (new_frontier, Transition_cache.data transition_graph)
-    (* TODO: punish *)
     | Error err ->
+        (* TODO: punish *)
         Logger.faulty_peer t.logger "received faulty scan state from the peer." ;
         Error.raise err
 

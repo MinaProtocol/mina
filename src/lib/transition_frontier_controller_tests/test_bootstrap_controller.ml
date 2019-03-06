@@ -138,7 +138,8 @@ let%test_module "Bootstrap Controller" =
       Fn.compose Ledger.Db.merkle_root
         Transition_frontier.For_tests.root_snarked_ledger
 
-    let%test_unit "of_scan_state_and_snarked_ledger works correctly" =
+    let%test_unit "reconstruct staged_ledgers using \
+                   of_scan_state_and_snarked_ledger" =
       let logger = Logger.create () in
       let num_breadcrumbs = 10 in
       let accounts = Genesis_ledger.accounts in
@@ -172,33 +173,6 @@ let%test_module "Bootstrap Controller" =
                   (Staged_ledger.hash staged_ledger)
                   (Staged_ledger.hash actual_staged_ledger) ) ) )
 
-    let%test "reconstruct the staged ledger correct when sync with one node" =
-      Backtrace.elide := false ;
-      Printexc.record_backtrace true ;
-      let logger = Logger.create () in
-      let num_breadcrumbs = 10 in
-      Thread_safe.block_on_async_exn (fun () ->
-          let%bind syncing_frontier, peer, network =
-            Network_builder.setup_me_and_a_peer ~logger ~num_breadcrumbs
-              ~source_accounts:Genesis_ledger.accounts
-              ~target_accounts:Genesis_ledger.accounts
-          in
-          let transition_reader, transition_writer = make_transition_pipe () in
-          let best_hash = get_best_tip_hash peer in
-          Network_builder.send_transition ~logger ~transition_writer ~peer
-            best_hash ;
-          let ledger_db =
-            Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
-          in
-          let%map new_frontier, (_ : External_transition.Verified.t list) =
-            Bootstrap_controller.run ~parent_log:logger ~network
-              ~frontier:syncing_frontier ~ledger_db ~transition_reader
-          in
-          Ledger_hash.equal (root_hash new_frontier) (root_hash peer.frontier)
-      )
-
-    (* The test would produce some "location not found" error, need to be fixed
-
     let%test "sync with one node correctly" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
@@ -223,7 +197,6 @@ let%test_module "Bootstrap Controller" =
           in
           Ledger_hash.equal (root_hash new_frontier) (root_hash peer.frontier)
       )
-*)
 
     let%test "if we see a new transition that is better than the transition \
               that we are syncing from, than we should retarget our root" =
