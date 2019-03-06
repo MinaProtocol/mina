@@ -99,7 +99,6 @@ let rec pair_up = function
 
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
-(*TODO: test coinbase as well*)
 let profile (module T : Transaction_snark.S) sparse_ledger0
     (transitions : Transaction.t list) =
   let (base_proof_time, _), base_proofs =
@@ -164,8 +163,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) =
             ~pending_coinbase_state:
               { source= Pending_coinbase.Stack.empty
               ; target= Pending_coinbase.Stack.empty }
-            (*~new_coinbase_stack:false ~delete_coinbase_stack:false*) t
-            (*TODO: add tests for coinbase here?*)
+            t
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
         sparse_ledger' )

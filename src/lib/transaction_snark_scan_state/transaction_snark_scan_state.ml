@@ -222,8 +222,7 @@ end = struct
             end)
 
   (**********Helpers*************)
-  
-  (*TODO new_coinbase_stack:bool goes in the statement*)
+
   let create_expected_statement
       {Transaction_with_witness.transaction_with_info; witness; statement; _} =
     let open Or_error.Let_syntax in
@@ -306,7 +305,7 @@ end = struct
   struct
     module Fold = Parallel_scan.State.Make_foldable (M)
 
-    (*TODO: fold over the pending_coinbase tree and validate the statements*)
+    (*TODO: fold over the pending_coinbase tree and validate the statements?*)
     let scan_statement {tree; _} :
         (Ledger_proof_statement.t, [`Error of Error.t | `Empty]) Result.t M.t =
       let write_error description =
@@ -418,7 +417,6 @@ end = struct
           ; supply_increase= _
           ; pending_coinbase_state= _ (*TODO: check pending coinbases?*)
           ; proof_type= _ } ->
-          (*TODO: what can be checked here about the pending coinbase hash*)
           let open Or_error.Let_syntax in
           let%map () =
             Option.value_map ~default:(Ok ()) snarked_ledger_hash

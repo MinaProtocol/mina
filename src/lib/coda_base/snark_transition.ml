@@ -78,9 +78,7 @@ end
 module Make (Inputs : Inputs_intf) :
   S
   with module Blockchain_state = Inputs.Blockchain_state
-   and module Consensus_data = Inputs.Consensus_data
-(*and module Pending_coinbase_update = Inputs.Pending_coinbase_update*) =
-struct
+   and module Consensus_data = Inputs.Consensus_data = struct
   include Inputs
 
   type ( 'blockchain_state

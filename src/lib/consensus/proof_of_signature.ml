@@ -48,7 +48,7 @@ module Prover_state = struct
 
   let precomputed_handler _ = Snarky.Request.unhandled
 
-  let handler _ ~pending_coinbase:_ _ = Snark_params.Tick.unhandled
+  let handler _ ~pending_coinbase:_ _ = Snarky.Request.unhandled
 end
 
 module Proposal_data = struct

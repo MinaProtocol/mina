@@ -125,7 +125,6 @@ module Local_state = struct
   type t =
     { mutable last_epoch_snapshot: Snapshot.t option
     ; mutable curr_epoch_snapshot: Snapshot.t option
-    ; pending_coinbase_collection: Coda_base.Pending_coinbase.t
     ; genesis_epoch_snapshot: Snapshot.t
     ; proposer_public_key: Public_key.Compressed.t option }
   [@@deriving sexp]
@@ -155,13 +154,9 @@ module Local_state = struct
           in
           {delegators; ledger}
     in
-    let pending_coinbase_collection =
-      Coda_base.Pending_coinbase.create_exn ()
-    in
     { last_epoch_snapshot= None
     ; curr_epoch_snapshot= None
     ; genesis_epoch_snapshot
-    ; pending_coinbase_collection
     ; proposer_public_key }
 end
 

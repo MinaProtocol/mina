@@ -4,7 +4,6 @@ open Tuple_lib
 open Snark_params.Tick
 
 module type S = sig
-  (*module Pending_coinbase : Pending_coinbase_intf.S*)
   module Action : sig
     type t = Added | Updated | Deleted_added | Deleted_updated
     [@@deriving eq, sexp, bin_io]

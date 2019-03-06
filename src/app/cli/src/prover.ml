@@ -1,5 +1,5 @@
-(*[%%import
-"../../../config.mlh"]*)
+[%%import
+"../../../config.mlh"]
 
 open Core
 open Async

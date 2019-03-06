@@ -38,7 +38,8 @@ let coinbase_tree_depth = 4
 (*TODO: put this in snark params*)
 
 let coinbase_merkle_tree =
-  Array.init coinbase_tree_depth ~f:(fun i -> salt (coinbase_merkle_tree i))
+  Array.init Snark_params.pending_coinbase_depth ~f:(fun i ->
+      salt (coinbase_merkle_tree i) )
 
 let coinbase = salt coinbase
 

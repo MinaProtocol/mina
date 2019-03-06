@@ -1703,8 +1703,6 @@ let%test_module "test" =
         include Ledger_hash
 
         let of_ledger_hash = Fn.id
-
-        (*let equal t t' =  t = t'*)
       end
 
       module Pending_coinbase_hash = struct
@@ -1715,8 +1713,6 @@ let%test_module "test" =
         include T
 
         let to_bytes = Fn.id
-
-        (*let gen = String.gen_with_length 756 Char.gen*)
 
         include Hashable.Make_binable (T)
       end
@@ -2212,33 +2208,29 @@ let%test_module "test" =
       end
 
       module Transaction_witness = struct
-        type t =
-          { ledger: Sparse_ledger.t
-          (*; coinbase_stack: Pending_coinbase.Stack.t*) }
-        [@@deriving bin_io, sexp]
+        type t = {ledger: Sparse_ledger.t} [@@deriving bin_io, sexp]
       end
     end
 
     module Sl = Make (Test_input1)
-
-    (*open Test_input1*)
+    open Test_input1
 
     let self_pk = "me"
 
-    let stmt_to_work (stmts : Test_input1.Transaction_snark_work.Statement.t) :
-        Test_input1.Transaction_snark_work.Checked.t option =
+    let stmt_to_work (stmts : Transaction_snark_work.Statement.t) :
+        Transaction_snark_work.Checked.t option =
       let prover =
         List.fold stmts ~init:"P" ~f:(fun p stmt ->
             p ^ Int.to_string stmt.target )
       in
       Some
-        { Test_input1.Transaction_snark_work.Checked.fee= Fee.Unsigned.of_int 1
+        { Transaction_snark_work.Checked.fee= Fee.Unsigned.of_int 1
         ; proofs= stmts
         ; prover }
 
     let stmt_to_work_restricted work_list
-        (stmts : Test_input1.Transaction_snark_work.Statement.t) :
-        Test_input1.Transaction_snark_work.Checked.t option =
+        (stmts : Transaction_snark_work.Statement.t) :
+        Transaction_snark_work.Checked.t option =
       let prover =
         List.fold stmts ~init:"P" ~f:(fun p stmt ->
             p ^ Int.to_string stmt.target )
@@ -2246,38 +2238,30 @@ let%test_module "test" =
       if
         Option.is_some
           (List.find work_list ~f:(fun s ->
-               Test_input1.Transaction_snark_work.Statement.equal s stmts ))
+               Transaction_snark_work.Statement.equal s stmts ))
       then
         Some
-          { Test_input1.Transaction_snark_work.Checked.fee=
-              Fee.Unsigned.of_int 1
+          { Transaction_snark_work.Checked.fee= Fee.Unsigned.of_int 1
           ; proofs= stmts
           ; prover }
       else None
 
     let pending_coinbase_checks sl
-        (pending_coinbase_update : Test_input1.Pending_coinbase_update.t)
-        ledger_proof =
+        (pending_coinbase_update : Pending_coinbase_update.t) ledger_proof =
       match pending_coinbase_update.action with
-      | Test_input1.Pending_coinbase_update.Action.Deleted_added
-       |Deleted_updated ->
+      | Pending_coinbase_update.Action.Deleted_added | Deleted_updated ->
           let oldest_stack =
-            Test_input1.Pending_coinbase.oldest_stack_exn
+            Pending_coinbase.oldest_stack_exn
               (Sl.pending_coinbase_collection sl)
           in
-          let statement : Test_input1.Ledger_proof_statement.t =
-            Test_input1.Ledger_proof.statement
-              (fst @@ Option.value_exn ledger_proof)
+          let statement : Ledger_proof_statement.t =
+            Ledger_proof.statement (fst @@ Option.value_exn ledger_proof)
           in
-          let state : Test_input1.Pending_coinbase_stack_state.t =
+          let state : Pending_coinbase_stack_state.t =
             statement.pending_coinbase_state
           in
-          let stack_from_proof : Test_input1.Pending_coinbase.Stack.t =
-            state.target
-          in
-          assert (
-            Test_input1.Pending_coinbase.Stack.equal oldest_stack
-              stack_from_proof )
+          let stack_from_proof : Pending_coinbase.Stack.t = state.target in
+          assert (Pending_coinbase.Stack.equal oldest_stack stack_from_proof)
       | _ -> ()
 
     let create_and_apply sl logger txns stmt_to_work =
@@ -2286,7 +2270,7 @@ let%test_module "test" =
         Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work
       in
-      let diff' = Test_input1.Staged_ledger_diff.forget diff in
+      let diff' = Staged_ledger_diff.forget diff in
       let%map ( `Hash_after_applying hash
               , `Ledger_proof ledger_proof
               , `Staged_ledger sl'
@@ -2296,22 +2280,22 @@ let%test_module "test" =
         | Error e -> Error.raise (Sl.Staged_ledger_error.to_error e)
       in
       pending_coinbase_checks !sl pending_coinbase_update ledger_proof ;
-      assert (Test_input1.Staged_ledger_hash.equal hash (Sl.hash sl')) ;
+      assert (Staged_ledger_hash.equal hash (Sl.hash sl')) ;
       sl := sl' ;
       (ledger_proof, diff')
 
     let txns n f g = List.zip_exn (List.init n ~f) (List.init n ~f:g)
 
     let coinbase_added_first_prediff = function
-      | Test_input1.Staged_ledger_diff.At_most_two.Zero -> 0
+      | Staged_ledger_diff.At_most_two.Zero -> 0
       | One _ -> 1
       | _ -> 2
 
     let coinbase_added_second_prediff = function
-      | Test_input1.Staged_ledger_diff.At_most_one.Zero -> 0
+      | Staged_ledger_diff.At_most_one.Zero -> 0
       | _ -> 1
 
-    let coinbase_added (sl_diff : Test_input1.Staged_ledger_diff.t) =
+    let coinbase_added (sl_diff : Staged_ledger_diff.t) =
       coinbase_added_first_prediff (fst sl_diff.diff).coinbase
       + Option.value_map ~default:0 (snd sl_diff.diff) ~f:(fun d ->
             coinbase_added_second_prediff d.coinbase )
@@ -2345,7 +2329,7 @@ let%test_module "test" =
               let fee_excess =
                 Option.value_map ~default:Currency.Fee.Signed.zero ledger_proof
                   ~f:(fun proof ->
-                    let stmt = Test_input1.Ledger_proof.statement proof in
+                    let stmt = Ledger_proof.statement proof in
                     (fst stmt).fee_excess )
               in
               (*fee_excess at the top should always be zero*)
@@ -2355,9 +2339,7 @@ let%test_module "test" =
               let cb = coinbase_added diff in
               (*At worst case number of provers coinbase should not be split more than two times*)
               assert (cb > 0 && cb < 3) ;
-              let x =
-                List.length (Test_input1.Staged_ledger_diff.user_commands diff)
-              in
+              let x = List.length (Staged_ledger_diff.user_commands diff) in
               assert (x > 0) ;
               let expected_value = expected_ledger x all_ts old_ledger in
               assert (!(Sl.ledger !sl) = expected_value) ) )
@@ -2384,7 +2366,7 @@ let%test_module "test" =
               let fee_excess =
                 Option.value_map ~default:Currency.Fee.Signed.zero proof
                   ~f:(fun proof ->
-                    let stmt = Test_input1.Ledger_proof.statement proof in
+                    let stmt = Ledger_proof.statement proof in
                     (fst stmt).fee_excess )
               in
               (*fee_excess at the top should always be zero*)
@@ -2394,19 +2376,16 @@ let%test_module "test" =
               let cb = coinbase_added diff in
               (*At worst case number of provers coinbase should not be split more than two times*)
               assert (cb > 0 && cb < 3) ;
-              let x =
-                List.length (Test_input1.Staged_ledger_diff.user_commands diff)
-              in
+              let x = List.length (Staged_ledger_diff.user_commands diff) in
               let expected_value = expected_ledger x all_ts old_ledger in
               assert (!(Sl.ledger !sl) = expected_value) ) )
 
     let%test_unit "Be able to include random number of user_commands (One \
                    prover)" =
-      let get_work (stmts : Test_input1.Transaction_snark_work.Statement.t) :
-          Test_input1.Transaction_snark_work.Checked.t option =
+      let get_work (stmts : Transaction_snark_work.Statement.t) :
+          Transaction_snark_work.Checked.t option =
         Some
-          { Test_input1.Transaction_snark_work.Checked.fee=
-              Fee.Unsigned.of_int 1
+          { Transaction_snark_work.Checked.fee= Fee.Unsigned.of_int 1
           ; proofs= stmts
           ; prover= "P" }
       in
@@ -2430,7 +2409,7 @@ let%test_module "test" =
               let fee_excess =
                 Option.value_map ~default:Currency.Fee.Signed.zero proof
                   ~f:(fun proof ->
-                    let stmt = Test_input1.Ledger_proof.statement proof in
+                    let stmt = Ledger_proof.statement proof in
                     (fst stmt).fee_excess )
               in
               (*fee_excess at the top should always be zero*)
@@ -2440,9 +2419,7 @@ let%test_module "test" =
               let cb = coinbase_added diff in
               (*With just one prover, coinbase should never be split*)
               assert (cb = 1) ;
-              let x =
-                List.length (Test_input1.Staged_ledger_diff.user_commands diff)
-              in
+              let x = List.length (Staged_ledger_diff.user_commands diff) in
               let expected_value = expected_ledger x all_ts old_ledger in
               assert (!(Sl.ledger !sl) = expected_value) ) )
 
@@ -2450,11 +2427,10 @@ let%test_module "test" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           (*Always at worst case number of provers*)
           Backtrace.elide := false ;
-          let get_work (stmts : Test_input1.Transaction_snark_work.Statement.t)
-              : Test_input1.Transaction_snark_work.Checked.t option =
+          let get_work (stmts : Transaction_snark_work.Statement.t) :
+              Transaction_snark_work.Checked.t option =
             Some
-              { Test_input1.Transaction_snark_work.Checked.fee=
-                  Fee.Unsigned.zero
+              { Transaction_snark_work.Checked.fee= Fee.Unsigned.zero
               ; proofs= stmts
               ; prover= "P" }
           in
@@ -2484,8 +2460,8 @@ let%test_module "test" =
       let initial_ledger = ref 0 in
       let sl = ref (Sl.create ~ledger:initial_ledger) in
       let create_diff_with_non_zero_fee_excess prev_hash txns completed_works
-          (partition : Sl.Scan_state.Space_partition.t) :
-          Test_input1.Staged_ledger_diff.t =
+          (partition : Sl.Scan_state.Space_partition.t) : Staged_ledger_diff.t
+          =
         match partition.second with
         | None ->
             { diff=
@@ -2493,7 +2469,7 @@ let%test_module "test" =
             ; prev_hash
             ; creator= "C" }
         | Some _ ->
-            let diff : Test_input1.Staged_ledger_diff.diff =
+            let diff : Staged_ledger_diff.diff =
               ( { completed_works
                 ; user_commands= List.take txns partition.first
                 ; coinbase= Zero }
@@ -2520,8 +2496,7 @@ let%test_module "test" =
                 Sequence.filter_map
                   ~f:(fun stmts ->
                     Some
-                      { Test_input1.Transaction_snark_work.Checked.fee=
-                          Fee.Unsigned.zero
+                      { Transaction_snark_work.Checked.fee= Fee.Unsigned.zero
                       ; proofs= stmts
                       ; prover= "P" } )
                   work
@@ -2588,8 +2563,7 @@ let%test_module "test" =
           Async.Thread_safe.block_on_async_exn (fun () ->
               let old_ledger = !(Sl.ledger !sl) in
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
-              let work_list :
-                  Test_input1.Transaction_snark_work.Statement.t list =
+              let work_list : Transaction_snark_work.Statement.t list =
                 let spec_list = Sl.all_work_pairs_exn !sl in
                 List.map spec_list ~f:(fun (s1, s2_opt) ->
                     let stmt1 = Snark_work_lib.Work.Single.Spec.statement s1 in
@@ -2606,7 +2580,7 @@ let%test_module "test" =
               let fee_excess =
                 Option.value_map ~default:Currency.Fee.Signed.zero proof
                   ~f:(fun proof ->
-                    let stmt = Test_input1.Ledger_proof.statement proof in
+                    let stmt = Ledger_proof.statement proof in
                     (fst stmt).fee_excess )
               in
               (*fee_excess at the top should always be zero*)
@@ -2616,9 +2590,7 @@ let%test_module "test" =
               let cb = coinbase_added diff in
               (*coinbase is zero only when there are no proofs created*)
               if i > 0 then assert (cb > 0 && cb < 3) ;
-              let x =
-                List.length (Test_input1.Staged_ledger_diff.user_commands diff)
-              in
+              let x = List.length (Staged_ledger_diff.user_commands diff) in
               let expected_value = expected_ledger x all_ts old_ledger in
               if cb > 0 then assert (!(Sl.ledger !sl) = expected_value) ) )
 
@@ -2641,8 +2613,7 @@ let%test_module "test" =
               let old_ledger = !(Sl.ledger !sl) in
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let ts = List.take all_ts i in
-              let work_list :
-                  Test_input1.Transaction_snark_work.Statement.t list =
+              let work_list : Transaction_snark_work.Statement.t list =
                 let spec_list = Sl.all_work_pairs_exn !sl in
                 List.map spec_list ~f:(fun (s1, s2_opt) ->
                     let stmt1 = Snark_work_lib.Work.Single.Spec.statement s1 in
@@ -2659,7 +2630,7 @@ let%test_module "test" =
               let fee_excess =
                 Option.value_map ~default:Currency.Fee.Signed.zero proof
                   ~f:(fun proof ->
-                    let stmt = Test_input1.Ledger_proof.statement proof in
+                    let stmt = Ledger_proof.statement proof in
                     (fst stmt).fee_excess )
               in
               (*fee_excess at the top should always be zero*)
@@ -2669,25 +2640,21 @@ let%test_module "test" =
               let cb = coinbase_added diff in
               (*coinbase is zero only when there are no proofs created*)
               if j > 0 then assert (cb > 0 && cb < 3) ;
-              let x =
-                List.length (Test_input1.Staged_ledger_diff.user_commands diff)
-              in
+              let x = List.length (Staged_ledger_diff.user_commands diff) in
               let expected_value = expected_ledger x all_ts old_ledger in
               if cb > 0 then assert (!(Sl.ledger !sl) = expected_value) ) )
 
     let%test_unit "Random number of user_commands-random number of proofs-one \
                    prover)" =
-      let get_work work_list
-          (stmts : Test_input1.Transaction_snark_work.Statement.t) :
-          Test_input1.Transaction_snark_work.Checked.t option =
+      let get_work work_list (stmts : Transaction_snark_work.Statement.t) :
+          Transaction_snark_work.Checked.t option =
         if
           Option.is_some
             (List.find work_list ~f:(fun s ->
-                 Test_input1.Transaction_snark_work.Statement.equal s stmts ))
+                 Transaction_snark_work.Statement.equal s stmts ))
         then
           Some
-            { Test_input1.Transaction_snark_work.Checked.fee=
-                Fee.Unsigned.of_int 1
+            { Transaction_snark_work.Checked.fee= Fee.Unsigned.of_int 1
             ; proofs= stmts
             ; prover= "P" }
         else None
@@ -2708,8 +2675,7 @@ let%test_module "test" =
               let old_ledger = !(Sl.ledger !sl) in
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let ts = List.take all_ts i in
-              let work_list :
-                  Test_input1.Transaction_snark_work.Statement.t list =
+              let work_list : Transaction_snark_work.Statement.t list =
                 let spec_list = Sl.all_work_pairs_exn !sl in
                 List.map spec_list ~f:(fun (s1, s2_opt) ->
                     let stmt1 = Snark_work_lib.Work.Single.Spec.statement s1 in
@@ -2726,7 +2692,7 @@ let%test_module "test" =
               let fee_excess =
                 Option.value_map ~default:Currency.Fee.Signed.zero proof
                   ~f:(fun proof ->
-                    let stmt = Test_input1.Ledger_proof.statement proof in
+                    let stmt = Ledger_proof.statement proof in
                     (fst stmt).fee_excess )
               in
               (*fee_excess at the top should always be zero*)
@@ -2736,9 +2702,7 @@ let%test_module "test" =
               let cb = coinbase_added diff in
               (*With just one prover, coinbase should never be split*)
               if j > 0 then assert (cb = 1) ;
-              let x =
-                List.length (Test_input1.Staged_ledger_diff.user_commands diff)
-              in
+              let x = List.length (Staged_ledger_diff.user_commands diff) in
               (*There are than two proof bundles. Should be able to add at least one payment. First and the second proof bundles would go for coinbase and fee_transfer resp.*)
               if j > 2 then assert (x > 0) ;
               let expected_value = expected_ledger x all_ts old_ledger in

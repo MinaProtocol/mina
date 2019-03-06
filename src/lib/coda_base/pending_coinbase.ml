@@ -8,9 +8,10 @@ open Currency
 open Fold_lib
 open Snark_bits
 
-let coinbase_tree_depth =
-  Coda_compile_config.scan_state_transaction_capacity_log_2
-  + Coda_compile_config.scan_state_work_delay_factor
+let coinbase_tree_depth = Snark_params.pending_coinbase_depth
+
+(*Coda_compile_config.scan_state_transaction_capacity_log_2
+  + Coda_compile_config.scan_state_work_delay_factor*)
 
 (*Total number of stacks*)
 let coinbase_stacks = Int.pow 2 coinbase_tree_depth
@@ -28,7 +29,7 @@ module Coinbase_data = struct
 
   type var = Public_key.Compressed.var * Amount.Signed.var
 
-  type value = t [@@deriving sexp]
+  type value = t
 
   let length_in_triples =
     Public_key.Compressed.length_in_triples + Amount.Signed.length_in_triples
@@ -225,7 +226,7 @@ module T = struct
       Snarky.Merkle_tree.Checked
         (Tick)
         (struct
-          type value = Pedersen.Checked.Digest.t [@@deriving sexp]
+          type value = Pedersen.Checked.Digest.t
 
           type var = Pedersen.Checked.Digest.var
 

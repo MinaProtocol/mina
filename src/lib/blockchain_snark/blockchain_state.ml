@@ -60,9 +60,8 @@ module Make (Consensus_mechanism : Consensus.S) :
           Tick.Checked.t =
         let supply_increase = Snark_transition.supply_increase transition in
         let%bind `Success updated_consensus_state, consensus_state =
-          with_label __LOC__
-            (Consensus_mechanism.next_state_checked ~prev_state:previous_state
-               ~prev_state_hash:previous_state_hash transition supply_increase)
+          Consensus_mechanism.next_state_checked ~prev_state:previous_state
+            ~prev_state_hash:previous_state_hash transition supply_increase
         in
         let pending_coinbase_update =
           Snark_transition.pending_coinbase_state transition
@@ -79,32 +78,29 @@ module Make (Consensus_mechanism : Consensus.S) :
               Pending_coinbase.Checked.get pending_coinbase_update.prev_root
                 index_oldest_coinbase_stack
             in
-            with_label __LOC__
-              (verify_complete_merge
-                 (Snark_transition.sok_digest transition)
-                 ( previous_state |> Protocol_state.blockchain_state
-                 |> Blockchain_state.snarked_ledger_hash )
-                 ( transition |> Snark_transition.blockchain_state
-                 |> Blockchain_state.snarked_ledger_hash )
-                 Pending_coinbase.Stack.Checked.empty
-                 pending_coinbase_stack_deleted supply_increase
-                 (As_prover.return
-                    (Option.value ~default:Tock.Proof.dummy
-                       (Snark_transition.ledger_proof transition))))
+            verify_complete_merge
+              (Snark_transition.sok_digest transition)
+              ( previous_state |> Protocol_state.blockchain_state
+              |> Blockchain_state.snarked_ledger_hash )
+              ( transition |> Snark_transition.blockchain_state
+              |> Blockchain_state.snarked_ledger_hash )
+              Pending_coinbase.Stack.Checked.empty
+              pending_coinbase_stack_deleted supply_increase
+              (As_prover.return
+                 (Option.value ~default:Tock.Proof.dummy
+                    (Snark_transition.ledger_proof transition)))
           and ledger_hash_didn't_change =
-            with_label __LOC__
-              (Frozen_ledger_hash.equal_var
-                 ( previous_state |> Protocol_state.blockchain_state
-                 |> Blockchain_state.snarked_ledger_hash )
-                 ( transition |> Snark_transition.blockchain_state
-                 |> Blockchain_state.snarked_ledger_hash ))
+            Frozen_ledger_hash.equal_var
+              ( previous_state |> Protocol_state.blockchain_state
+              |> Blockchain_state.snarked_ledger_hash )
+              ( transition |> Snark_transition.blockchain_state
+              |> Blockchain_state.snarked_ledger_hash )
           in
           let%bind new_pending_coinbase_hash =
             let prev_root =
               previous_state |> Protocol_state.blockchain_state
               |> Blockchain_state.pending_coinbase_hash
             in
-            let _prev_root' = pending_coinbase_update.prev_root in
             let updated_stack = pending_coinbase_update.updated_stack in
             let action = pending_coinbase_update.action in
             let with_del_add del_added =

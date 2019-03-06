@@ -16,8 +16,6 @@ module Merkle_tree =
 
       let typ = Pedersen.Checked.Digest.typ
 
-      let t_of_val v = v
-
       let hash ~height h1 h2 =
         let to_triples (bs : Pedersen.Checked.Digest.Unpacked.var) =
           Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_
