@@ -1,13 +1,14 @@
 ## Summary
 [summary]: #summary
 
-This RFC provides information on taking state snapshots. These snapshots would
-give us a mechanism for more quickly reproducing edge cases and errors as they
-arise. Snapshots can be broken into three projects: Partial and full-offline
-snapshots (covered here in detail), and full-online snapshots which is
-out-of-scope for now. Partial snapshotting can be done first and in parallel
-with implementation of transition frontier persistance to make the full-offline
-version much quicker to implement afterwards.
+This RFC provides information on taking snapshots of enough of state such that
+we can resume proposer execution after a restart. These snapshots would give us
+a mechanism for more quickly reproducing edge cases and errors as they arise.
+Snapshots can be broken into three projects: Partial and full-offline snapshots
+(covered here in detail), and full-online snapshots which is out-of-scope for
+now. Partial snapshotting can be done first and in parallel with implementation
+of transition frontier persistance to make the full-offline version much quicker
+to implement afterwards.
 
 ## Motivation
 
@@ -22,8 +23,8 @@ useful features.
 [partial]: #partial
 ### Partial Snapshotting:
 
-Snapshot enough state to be able to produce the immediate next transition, and
-then halt.
+Snapshot enough state to be able to produce the immediate next transition (aka
+proposing), and then halt.
 
 Why is this useful? We've wasted a lot of time waiting for the network to reach
 a certain failing block. This feature would save us time in the future. We can
@@ -37,13 +38,15 @@ Snapshot enough state to recreate a full-node that can continue from the point
 of the snapshot to produce more than just one more transition.
 
 Why is this useful? Sometimes we need more context than the exact block that
-fails. This would give us that context.
+fails. This would give us that context. For example, maybe we need to reproduce
+a few transitions via our proposer before reproducing a bug.
 
 [full-online]: #full-online
 ### Full-online Snapshotting
 
 Snapshot enough state to recreate a full-node that can continue from the point
-of the snapshot and can reconnect to a network of nodes.
+of the snapshot and can reconnect to a network of nodes. Sometimes we actually
+do need this to reproduce certain classes of errors.
 
 This task would require synchronizing state between nodes in a network and
 would require a significant amount of effort until we finish implementing
@@ -69,6 +72,10 @@ We can make a record with all the information we need to store called
 in some form or another which will be determined in implementation or
 described below.
 
+Note that for the purposes of this RFC, snapshot efficiency is of no concern.
+Optimizing for code-complexity and shorter implementation time is preferred. We
+can revisit efficiency at a later point in time.
+
 The following is what is believed to be an exhaustive list of the pieces of
 state needed for partial snapshotting support:
 
@@ -87,8 +94,8 @@ transition and then stall afterwards.
 
 For marshalling and unmarshalling and copying the data:
 
-* `bin_io` can be trivally used for (1), (3), (6)
-* With small changes, `bin_io` can be used for (5), (7), (8)
+* `bin_io`/`yojson` can be trivally used for (1), (3), (6)
+* With small changes, `bin_io`/`yojson` can be used for (5), (7), (8)
 * Snapshotting the database state (2) will be tricky: We'll want to copy the
 folder that the RocksDB database is stored in, but can we do this safely without
 closing the database? Will we have to worry about races, or since OCaml is
@@ -159,8 +166,9 @@ state needed for full-offline snapshotting:
 
 For marshalling and unmarshalling of the data:
 
-We can rely on https://github.com/CodaProtocol/coda/pull/1779 (which should be
-worked on in parallel of partial snapshotting above).
+We can rely on
+[Transition Frontier Persistance](https://github.com/CodaProtocol/coda/pull/1779)
+(which should be worked on in parallel of partial snapshotting above).
 
 To load the snapshot record (in addition to the above):
 
@@ -196,7 +204,7 @@ person2:                  D--
 [drawbacks]: #drawbacks
 
 * These tasks would take quite a bit of effort to complete
-* The snapshotting system itself will be complex enough to have it's own bugs
+* The snapshotting system itself will be complex enough to have its own bugs
 
 ## Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
