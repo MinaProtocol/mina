@@ -186,43 +186,6 @@ end
 
 (*Pending coinbase hash*)
 module Hash = struct
-  open Coinbase_stack
-
-  module Merkle_tree =
-    Snarky.Merkle_tree.Checked
-      (Tick)
-      (struct
-        type value = Pedersen.Checked.Digest.t [@@deriving sexp]
-
-        type var = Pedersen.Checked.Digest.var
-
-        let typ = Pedersen.Checked.Digest.typ
-
-        let hash ~height h1 h2 =
-          let to_triples (bs : Pedersen.Checked.Digest.Unpacked.var) =
-            Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_
-              (bs :> Boolean.var list)
-          in
-          let%bind h1 = Pedersen.Checked.Digest.choose_preimage h1
-          and h2 = Pedersen.Checked.Digest.choose_preimage h2 in
-          Pedersen.Checked.digest_triples
-            ~init:Hash_prefix.coinbase_merkle_tree.(height)
-            (to_triples h1 @ to_triples h2)
-
-        let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
-
-        let if_ = Field.Checked.if_
-      end)
-      (struct
-        include Stack
-
-        type value = t [@@deriving sexp]
-
-        let hash = Checked.digest
-      end)
-
-  let depth = coinbase_tree_depth
-
   include Data_hash.Make_full_size ()
 
   let merge ~height (h1 : t) (h2 : t) =
@@ -241,95 +204,6 @@ module Hash = struct
     |> of_hash
 
   let of_digest = Fn.compose Fn.id of_hash
-
-  type path = Pedersen.Digest.t list
-
-  type index = int
-
-  type _ Request.t +=
-    | Coinbase_stack_path : index -> path Request.t
-    | Get_coinbase_stack : index -> (Stack.t * path) Request.t
-    | Set_coinbase_stack : index * Stack.t -> unit Request.t
-    | Find_index_of_newest_stack : bool -> index Request.t
-    | Find_index_of_oldest_stack : index Request.t
-    | Reset : unit Request.t
-
-  let reraise_merkle_requests (With {request; respond}) =
-    match request with
-    | Merkle_tree.Get_path addr ->
-        respond (Delegate (Coinbase_stack_path addr))
-    | Merkle_tree.Set (addr, stack) ->
-        respond (Delegate (Set_coinbase_stack (addr, stack)))
-    | Merkle_tree.Get_element addr ->
-        respond (Delegate (Get_coinbase_stack addr))
-    | _ -> unhandled
-
-  let get t addr =
-    handle
-      (Merkle_tree.get_req ~depth (var_to_hash_packed t) addr)
-      reraise_merkle_requests
-
-  let reset () = perform As_prover.(return Reset)
-
-  (*
-   [update_stack t ~is_new_stack updtaed_stack] implements the following spec:
-   - gets the address[addr] of the latest stack or a new stack if [is_new_stack] is true
-   - finds a coinbase stack in [t] at path [addr] and replaces it with [updated_stack]
-   - returns a root [t'] of a tree of depth [depth]
-   - resets any mutation to the store
-   which is [t].
-*)
-  let update_stack' t ~is_new_stack stack =
-    let%bind addr =
-      request_witness Stack_pos.Unpacked.typ
-        As_prover.(
-          map (read Boolean.typ is_new_stack) ~f:(fun s ->
-              Find_index_of_newest_stack s ))
-    in
-    handle
-      (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr ~f:(fun _s ->
-           return stack ))
-      reraise_merkle_requests
-    >>| var_of_hash_packed
-
-  let%snarkydef update_stack t ~is_new_stack stack =
-    let%bind updated_tree_hash = update_stack' t ~is_new_stack stack in
-    let%map () = reset () in
-    updated_tree_hash
-
-  (*
-   [delete_stack t pk updtaed_stack] implements the following spec:
-
-   - gets the address[addr] of the oldest stack.
-   - finds a coinbase stack in [t] at path [addr] and replaces it with empty stack
-   - returns a root [t'] of a tree of depth [depth]
-   which is [t].
-   - resets any mutation to the store
-*)
-  let delete_stack' t =
-    let%bind addr =
-      request_witness Stack_pos.Unpacked.typ
-        As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_oldest_stack))
-    in
-    handle
-      (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
-         ~f:(fun _stack -> return Stack.Checked.empty ))
-      reraise_merkle_requests
-    >>| var_of_hash_packed
-
-  let%snarkydef delete_stack t =
-    let%bind updated_tree_hash = delete_stack' t in
-    let%map () = reset () in
-    updated_tree_hash
-
-  (*
-   update_stack >>= delete_stack >>= reset
-*)
-  let%snarkydef update_delete_stack t ~is_new_stack ~stack =
-    let%bind updated_tree_hash = update_stack' t ~is_new_stack stack in
-    let%bind updated_tree_hash2 = delete_stack' updated_tree_hash in
-    let%map () = reset () in
-    updated_tree_hash2
 end
 
 module T = struct
@@ -341,6 +215,117 @@ module T = struct
 
   module Merkle_tree =
     Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Stack_pos) (Stack)
+
+  module Checked = struct
+    open Coinbase_stack
+
+    type var = Hash.var
+
+    module Merkle_tree =
+      Snarky.Merkle_tree.Checked
+        (Tick)
+        (struct
+          type value = Pedersen.Checked.Digest.t [@@deriving sexp]
+
+          type var = Pedersen.Checked.Digest.var
+
+          let typ = Pedersen.Checked.Digest.typ
+
+          let hash ~height h1 h2 =
+            let to_triples (bs : Pedersen.Checked.Digest.Unpacked.var) =
+              Bitstring_lib.Bitstring.pad_to_triple_list
+                ~default:Boolean.false_
+                (bs :> Boolean.var list)
+            in
+            let%bind h1 = Pedersen.Checked.Digest.choose_preimage h1
+            and h2 = Pedersen.Checked.Digest.choose_preimage h2 in
+            Pedersen.Checked.digest_triples
+              ~init:Hash_prefix.coinbase_merkle_tree.(height)
+              (to_triples h1 @ to_triples h2)
+
+          let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
+
+          let if_ = Field.Checked.if_
+        end)
+        (struct
+          include Stack
+
+          type value = t [@@deriving sexp]
+
+          let hash = Checked.digest
+        end)
+
+    let depth = coinbase_tree_depth
+
+    type path = Pedersen.Digest.t list
+
+    type index = int
+
+    type _ Request.t +=
+      | Coinbase_stack_path : index -> path Request.t
+      | Get_coinbase_stack : index -> (Stack.t * path) Request.t
+      | Set_coinbase_stack : index * Stack.t -> unit Request.t
+      | Find_index_of_newest_stack : bool -> index Request.t
+      | Find_index_of_oldest_stack : index Request.t
+      | Reset : unit Request.t
+
+    let reraise_merkle_requests (With {request; respond}) =
+      match request with
+      | Merkle_tree.Get_path addr ->
+          respond (Delegate (Coinbase_stack_path addr))
+      | Merkle_tree.Set (addr, stack) ->
+          respond (Delegate (Set_coinbase_stack (addr, stack)))
+      | Merkle_tree.Get_element addr ->
+          respond (Delegate (Get_coinbase_stack addr))
+      | _ -> unhandled
+
+    let get t addr =
+      handle
+        (Merkle_tree.get_req ~depth (Hash.var_to_hash_packed t) addr)
+        reraise_merkle_requests
+
+    let reset () = perform As_prover.(return Reset)
+
+    let update_stack' t ~is_new_stack stack =
+      let%bind addr =
+        request_witness Stack_pos.Unpacked.typ
+          As_prover.(
+            map (read Boolean.typ is_new_stack) ~f:(fun s ->
+                Find_index_of_newest_stack s ))
+      in
+      handle
+        (Merkle_tree.modify_req ~depth (Hash.var_to_hash_packed t) addr
+           ~f:(fun _s -> return stack ))
+        reraise_merkle_requests
+      >>| Hash.var_of_hash_packed
+
+    let%snarkydef update_stack t ~is_new_stack stack =
+      let%bind updated_tree_hash = update_stack' t ~is_new_stack stack in
+      let%map () = reset () in
+      updated_tree_hash
+
+    let delete_stack' t =
+      let%bind addr =
+        request_witness Stack_pos.Unpacked.typ
+          As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_oldest_stack))
+      in
+      handle
+        (Merkle_tree.modify_req ~depth (Hash.var_to_hash_packed t) addr
+           ~f:(fun _stack -> return Stack.Checked.empty ))
+        reraise_merkle_requests
+      >>| Hash.var_of_hash_packed
+
+    let%snarkydef delete_stack t =
+      let%bind updated_tree_hash = delete_stack' t in
+      let%map () = reset () in
+      updated_tree_hash
+
+    let%snarkydef update_delete_stack t ~is_new_stack ~stack =
+      let%bind updated_tree_hash = update_stack' t ~is_new_stack stack in
+      let%bind updated_tree_hash2 = delete_stack' updated_tree_hash in
+      let%map () = reset () in
+      updated_tree_hash2
+  end
 
   type t =
     {tree: Merkle_tree.t; pos_list: Stack_pos.t list; new_pos: Stack_pos.t}
@@ -465,36 +450,36 @@ module T = struct
     in
     stage (fun (With {request; respond}) ->
         match request with
-        | Hash.Coinbase_stack_path idx ->
+        | Checked.Coinbase_stack_path idx ->
             let path =
               (coinbase_stack_path_exn idx :> Pedersen.Digest.t list)
             in
             respond (Provide path)
-        | Hash.Find_index_of_oldest_stack ->
+        | Checked.Find_index_of_oldest_stack ->
             let stack_pos =
               Option.value ~default:0
                 (oldest_stack_pos pending_coinbase.in_use)
             in
             let index = find_index_exn pending_coinbase.in_use stack_pos in
             respond (Provide index)
-        | Hash.Find_index_of_newest_stack is_new_stack ->
+        | Checked.Find_index_of_newest_stack is_new_stack ->
             let stack_pos =
               Option.value ~default:0
                 (latest_stack_pos pending_coinbase.in_use ~is_new_stack)
             in
             let index = find_index_exn pending_coinbase.in_use stack_pos in
             respond (Provide index)
-        | Hash.Get_coinbase_stack idx ->
+        | Checked.Get_coinbase_stack idx ->
             let elt = get_exn pending_coinbase.in_use idx in
             let path =
               (coinbase_stack_path_exn idx :> Pedersen.Digest.t list)
             in
             respond (Provide (elt, path))
-        | Hash.Set_coinbase_stack (idx, stack) ->
+        | Checked.Set_coinbase_stack (idx, stack) ->
             pending_coinbase.in_use
             <- set_exn pending_coinbase.in_use idx stack ;
             respond (Provide ())
-        | Hash.Reset ->
+        | Checked.Reset ->
             pending_coinbase.in_use <- pending_coinbase.back_up ;
             respond (Provide ())
         | _ -> unhandled )
@@ -556,7 +541,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
           let stack_var = Stack.(var_of_t stack) in
           let%map res =
             handle
-              (Hash.update_stack
+              (Checked.update_stack
                  (Hash.var_of_t (merkle_root pending_coinbases))
                  ~is_new_stack:Boolean.true_ stack_var)
               (unstage (handler pending_coinbases))

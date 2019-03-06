@@ -72,9 +72,7 @@ end
 
 module Proposal_data = struct
   type t =
-    { stake_proof: Coda_base.Stake_proof.t
-    ; (* pending_coinbase:Coda_base.Pending_coinbase.t;*)
-      vrf_result: Random_oracle.Digest.t }
+    {stake_proof: Coda_base.Stake_proof.t; vrf_result: Random_oracle.Digest.t}
   [@@deriving bin_io]
 
   let prover_state {stake_proof; _} = stake_proof
@@ -592,11 +590,6 @@ module Vrf = struct
       let pending_coinbase_handler =
         unstage (Coda_base.Pending_coinbase.handler empty_pending_coinbase)
       in
-      (*let ledger_coinbase_handler =
-        Coda_base.Snark_request_handler.handler
-          { Coda_base.Snark_request_handler.ledger= dummy_sparse_ledger
-          ; pending_coinbase= empty_pending_coinbase }
-      in*)
       let handlers =
         Snarky.Request.Handler.(
           push
@@ -608,7 +601,6 @@ module Vrf = struct
         | Winner_address -> respond (Provide 0)
         | Private_key -> respond (Provide sk)
         | _ ->
-            (*ledger_coinbase_handler t*)
             respond
               (Provide
                  (Snarky.Request.Handler.run handlers
@@ -1152,26 +1144,30 @@ end
 module Prover_state = struct
   include Coda_base.Stake_proof
 
-  (*type t = {stake_proof:Coda_base.Stake_proof.t; pending_coinbase:Cooda_base.Pending_coinbase.t}*)
-
   let precomputed_handler = Vrf.Precomputed.handler
 
-  (*Add pending coinbase handler here*)
   let handler {delegator; ledger; private_key} ~pending_coinbase :
       Snark_params.Tick.Handler.t =
-    (*let ledger_handler = unstage (Coda_base.Sparse_ledger.handler ledger) in
+    let ledger_handler = unstage (Coda_base.Sparse_ledger.handler ledger) in
     let pending_coinbase_handler =
-      unstage (Coda_base.Pending_coinbase.handler pending_coinbase_collection)
-    in*)
-    let ledger_coinbase_handler =
-      Coda_base.Snark_request_handler.handler
-        {Coda_base.Snark_request_handler.ledger; pending_coinbase}
+      unstage (Coda_base.Pending_coinbase.handler pending_coinbase)
     in
-    fun (With {request; respond} as t) ->
+    let handlers =
+      Snarky.Request.Handler.(
+        push
+          (push fail (create_single pending_coinbase_handler))
+          (create_single ledger_handler))
+    in
+    fun (With {request; respond}) ->
       match request with
       | Vrf.Winner_address -> respond (Provide delegator)
       | Vrf.Private_key -> respond (Provide private_key)
-      | _ -> ledger_coinbase_handler t
+      | _ ->
+          respond
+            (Provide
+               (Snarky.Request.Handler.run handlers
+                  ["Ledger Handler"; "Pending Coinbase Handler"]
+                  request))
 end
 
 module Snark_transition = Coda_base.Snark_transition.Make (struct
@@ -1396,7 +1392,7 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
       else
         match proposal_data slot with
         | None -> find_winning_slot (Epoch.Slot.succ slot)
-        | Some data (*delegator, ledger, vrf_result*) -> Some (slot, data)
+        | Some data -> Some (slot, data)
     in
     find_winning_slot (Epoch.Slot.succ slot)
   in

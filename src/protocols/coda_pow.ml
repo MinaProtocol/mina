@@ -124,8 +124,6 @@ module type Pending_coinbase_intf = sig
 
   val merkle_root : t -> pending_coinbase_hash
 
-  val add_coinbase_exn : t -> coinbase:coinbase -> is_new_stack:bool -> t
-
   val update_coinbase_stack_exn : t -> Stack.t -> is_new_stack:bool -> t
 
   val remove_coinbase_stack_exn : t -> t

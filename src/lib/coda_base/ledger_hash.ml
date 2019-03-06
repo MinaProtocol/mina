@@ -10,7 +10,7 @@ module Merkle_tree =
   Snarky.Merkle_tree.Checked
     (Tick)
     (struct
-      type value = Pedersen.Checked.Digest.t [@@deriving sexp]
+      type value = Pedersen.Checked.Digest.t
 
       type var = Pedersen.Checked.Digest.var
 

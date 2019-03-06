@@ -73,10 +73,10 @@ module Make (Consensus_mechanism : Consensus.S) :
               request_witness Pending_coinbase.Stack_pos.Unpacked.typ
                 As_prover.(
                   map (return ()) ~f:(fun _ ->
-                      Pending_coinbase.Hash.Find_index_of_oldest_stack ))
+                      Pending_coinbase.Checked.Find_index_of_oldest_stack ))
             in
             let%bind pending_coinbase_stack_deleted =
-              Pending_coinbase.Hash.get pending_coinbase_update.prev_root
+              Pending_coinbase.Checked.get pending_coinbase_update.prev_root
                 index_oldest_coinbase_stack
             in
             with_label __LOC__
@@ -108,19 +108,19 @@ module Make (Consensus_mechanism : Consensus.S) :
             let updated_stack = pending_coinbase_update.updated_stack in
             let action = pending_coinbase_update.action in
             let with_del_add del_added =
-              Pending_coinbase.Hash.update_delete_stack
+              Pending_coinbase.Checked.update_delete_stack
                 ~is_new_stack:Boolean.true_ ~stack:updated_stack prev_root
             in
             let with_del_update del_updated =
-              Pending_coinbase.Hash.update_delete_stack
+              Pending_coinbase.Checked.update_delete_stack
                 ~is_new_stack:Boolean.false_ ~stack:updated_stack prev_root
             in
             let with_add added =
-              Pending_coinbase.Hash.update_stack prev_root
+              Pending_coinbase.Checked.update_stack prev_root
                 ~is_new_stack:Boolean.true_ updated_stack
             in
             let with_update updated =
-              Pending_coinbase.Hash.update_stack prev_root
+              Pending_coinbase.Checked.update_stack prev_root
                 ~is_new_stack:Boolean.false_ updated_stack
             in
             let%bind added =

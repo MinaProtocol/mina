@@ -892,6 +892,7 @@ end = struct
       ; ledger= new_ledger
       ; pending_coinbase_collection= updated_pending_coinbase_collection' }
     in
+    Core.printf !"Scan state:%{sexp: scan_state} \n %!" scan_state' ;
     ( `Hash_after_applying (hash new_staged_ledger)
     , `Ledger_proof res_opt
     , `Staged_ledger new_staged_ledger
@@ -1740,18 +1741,6 @@ let%test_module "test" =
 
         let oldest_stack_exn t =
           match List.rev t with [] -> failwith "No stack" | x :: xs -> x
-
-        let add_coinbase_exn :
-            t -> coinbase:Coinbase.t -> is_new_stack:bool -> t =
-         fun t ~coinbase ~is_new_stack ->
-          if is_new_stack then [coinbase] :: t
-          else
-            match t with
-            | [] ->
-                failwith
-                  "tried to update an empty collection when it is not a new \
-                   stack"
-            | x :: xs -> (coinbase :: x) :: xs
 
         module Stack = struct
           type t = Coinbase.t list [@@deriving sexp, bin_io, compare, hash, eq]
