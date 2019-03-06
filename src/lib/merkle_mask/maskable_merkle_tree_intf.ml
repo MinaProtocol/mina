@@ -33,4 +33,8 @@ module type S = sig
    * removes the attached mask from the parent and attaches the children to the parent instead
    * raises an exception the merkle roots of the mask and the parent are not the same.
   *)
+
+  module Debug : sig
+    val visualize : filename:string -> unit
+  end
 end

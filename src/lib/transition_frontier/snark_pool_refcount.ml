@@ -72,8 +72,12 @@ struct
       match (diff : Inputs.Breadcrumb.t Transition_frontier_diff.t) with
       | New_breadcrumb breadcrumb ->
           (0, add_breadcrumb_to_ref_table t breadcrumb)
-      | New_best_tip {old_root; new_root; new_best_tip; garbage; _} ->
-          let added = add_breadcrumb_to_ref_table t new_best_tip in
+      | New_best_tip {old_root; new_root; added_to_best_tip_path; garbage; _}
+        ->
+          let added =
+            add_breadcrumb_to_ref_table t
+            @@ Non_empty_list.last added_to_best_tip_path
+          in
           let all_garbage =
             if phys_equal old_root new_root then garbage
             else old_root :: garbage

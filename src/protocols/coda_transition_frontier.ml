@@ -11,9 +11,9 @@ module Transition_frontier_diff = struct
         { old_root: 'a
         ; old_root_length: int
         ; new_root: 'a  (** Same as old root if the root doesn't change *)
-        ; new_best_tip: 'a
+        ; added_to_best_tip_path: 'a Non_empty_list.t (* oldest first *)
         ; new_best_tip_length: int
-        ; old_best_tip: 'a
+        ; removed_from_best_tip_path: 'a list (* also oldest first *)
         ; garbage: 'a list }
         (** Triggered when a new breadcrumb is added, causing a new best_tip *)
   [@@deriving sexp]
@@ -50,7 +50,7 @@ end
 (** The type of the view onto the changes to the current best tip. This type
     needs to be here to avoid dependency cycles. *)
 module Best_tip_diff_view = struct
-  type 'b t = {new_best_tip: 'b; old_best_tip: 'b}
+  type 'b t = {new_user_commands: 'b list; removed_user_commands: 'b list}
 end
 
 module type Network_intf = sig
@@ -259,7 +259,7 @@ module type Transition_frontier_intf = sig
 
     module Best_tip_diff :
       Transition_frontier_extension_intf
-      with type view = Breadcrumb.t Best_tip_diff_view.t Option.t
+      with type view = user_command Best_tip_diff_view.t
 
     type readers =
       { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t

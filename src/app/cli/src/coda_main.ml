@@ -764,38 +764,7 @@ struct
            ~sender:Network_peer.Peer.local)
   end
 
-  module Root_sync_ledger :
-    Syncable_ledger.S
-    with type addr := Ledger.Location.Addr.t
-     and type hash := Ledger_hash.t
-     and type root_hash := Ledger_hash.t
-     and type merkle_tree := Ledger.Db.t
-     and type account := Account.t
-     and type merkle_path := Ledger.path
-     and type query := Sync_ledger.query
-     and type answer := Sync_ledger.answer =
-    Syncable_ledger.Make (Ledger.Location.Addr) (Account.Stable.V1)
-      (struct
-        include Ledger_hash
-
-        let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
-
-        let empty_account = hash_account Account.empty
-      end)
-      (struct
-        include Ledger_hash
-
-        let to_hash (h : t) =
-          Ledger_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
-      end)
-      (struct
-        include Ledger.Db
-
-        let f = Account.hash
-      end)
-      (struct
-        let subtree_height = 3
-      end)
+  module Root_sync_ledger = Sync_ledger.Db
 
   module Net = Coda_networking.Make (struct
     include Inputs0
