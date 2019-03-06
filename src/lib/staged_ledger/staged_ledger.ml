@@ -280,18 +280,9 @@ end = struct
   let of_scan_state_and_snarked_ledger ~scan_state ~snarked_ledger
       ~expected_merkle_root =
     let open Deferred.Or_error.Let_syntax in
-    let snarked_ledger_hash =
-      Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root snarked_ledger)
-    in
-    let%bind () =
-      if Option.is_some expected_merkle_root then
-        Statement_scanner_with_proofs.check_invariants scan_state
-          ~error_prefix:"Staged_ledger.of_scan_state_and_snarked_ledger"
-          ~ledger_hash_end:
-            (Frozen_ledger_hash.of_ledger_hash
-               (Option.value_exn expected_merkle_root))
-          ~ledger_hash_begin:(Some snarked_ledger_hash)
-      else return ()
+    let snarked_ledger_hash = Ledger.merkle_root snarked_ledger in
+    let snarked_frozen_ledger_hash =
+      Frozen_ledger_hash.of_ledger_hash snarked_ledger_hash
     in
     let%bind txs = Scan_state.all_transactions scan_state |> Deferred.return in
     let%bind () =
@@ -301,17 +292,18 @@ end = struct
         ~init:() txs
       |> Deferred.return
     in
-    if
-      Option.fold ~init:true
-        ~f:(fun _ merkle_root ->
-          Ledger_hash.equal (Ledger.merkle_root snarked_ledger) merkle_root )
-        expected_merkle_root
-    then
-      of_scan_state_and_ledger ~snarked_ledger_hash ~ledger:snarked_ledger
-        ~scan_state
-    else
-      Deferred.Or_error.error_string
-        "The merkle root of the ledger doesn't match the expected one"
+    let%bind () =
+      Deferred.return
+      @@ Result.ok_if_true
+           (Ledger_hash.equal expected_merkle_root snarked_ledger_hash)
+           ~error:
+             (Error.createf
+                !"Mismatching merkle root Expected:%{sexp:Ledger_hash.t} \
+                  Got:%{sexp:Ledger_hash.t}"
+                expected_merkle_root snarked_ledger_hash)
+    in
+    of_scan_state_and_ledger ~snarked_ledger_hash:snarked_frozen_ledger_hash
+      ~ledger:snarked_ledger ~scan_state
 
   let copy {scan_state; ledger} =
     let new_mask = Ledger.Mask.create () in

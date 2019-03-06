@@ -157,7 +157,7 @@ let%test_module "Bootstrap Controller" =
                 Transition_frontier.Breadcrumb.staged_ledger breadcrumb
               in
               let expected_merkle_root =
-                Some (Staged_ledger.ledger staged_ledger |> Ledger.merkle_root)
+                Staged_ledger.ledger staged_ledger |> Ledger.merkle_root
               in
               let snarked_ledger =
                 Transition_frontier.shallow_copy_root_snarked_ledger frontier
