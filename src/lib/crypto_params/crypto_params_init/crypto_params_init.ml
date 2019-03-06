@@ -1,24 +1,14 @@
 module Tick_backend = struct
   module Full = Snarky.Backends.Mnt4
   include Full.GM
-
-  module Inner_curve = struct
-    include Snarky.Libsnark.Mnt6.G1
-    include Snarky.Libsnark.Curves.Mnt6.G1
-  end
-
+  module Inner_curve = Snarky.Libsnark.Mnt6.G1
   module Inner_twisted_curve = Snarky.Libsnark.Mnt6.G2
 end
 
 module Tock_backend = struct
   module Full = Snarky.Backends.Mnt6
   include Full.GM
-
-  module Inner_curve = struct
-    include Snarky.Libsnark.Mnt4.G1
-    include Snarky.Libsnark.Curves.Mnt4.G1
-  end
-
+  module Inner_curve = Snarky.Libsnark.Mnt4.G1
   module Inner_twisted_curve = Snarky.Libsnark.Mnt4.G2
 end
 
