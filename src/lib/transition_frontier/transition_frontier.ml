@@ -598,6 +598,48 @@ struct
     t.root <- new_root_hash ;
     new_root_node
 
+  (* Get the breadcrumbs that are on bc1's path but not bc2's, and vice versa.
+     Ordered oldest to newest.
+  *)
+  let get_path_diff t (bc1 : Breadcrumb.t) (bc2 : Breadcrumb.t) :
+      Breadcrumb.t list * Breadcrumb.t list =
+    let common_ancestor =
+      if Breadcrumb.equal bc1 bc2 then Breadcrumb.state_hash bc1
+      else
+        let rec go ancestors1 ancestors2 sh1 sh2 =
+          if Hash_set.mem ancestors1 sh2 then sh2
+          else if Hash_set.mem ancestors2 sh1 then sh1
+          else
+            let parent_unless_root h =
+              if State_hash.equal h t.root then h
+              else find_exn t h |> Breadcrumb.parent_hash
+            in
+            Hash_set.add ancestors1 sh1 ;
+            Hash_set.add ancestors2 sh2 ;
+            go ancestors1 ancestors2 (parent_unless_root sh1)
+              (parent_unless_root sh2)
+        in
+        go
+          (Hash_set.create (module State_hash) ())
+          (Hash_set.create (module State_hash) ())
+          (Breadcrumb.state_hash bc1)
+          (Breadcrumb.state_hash bc2)
+    in
+    (* Find the breadcrumbs connecting bc1 and bc2, excluding bc1. Precondition:
+       bc1 is an ancestor of bc2. *)
+    let path_from_to bc1 bc2 =
+      let rec go cursor acc =
+        if Breadcrumb.equal cursor bc1 then acc
+        else go (find_exn t @@ Breadcrumb.parent_hash cursor) (cursor :: acc)
+      in
+      go bc2 []
+    in
+    Logger.debug t.logger
+      !"Common ancestor: %{sexp: State_hash.t}"
+      common_ancestor ;
+    ( path_from_to (find_exn t common_ancestor) bc1
+    , path_from_to (find_exn t common_ancestor) bc2 )
+
   (* Adding a breadcrumb to the transition frontier is broken into the following steps:
    *   1) attach the breadcrumb to the transition frontier
    *   2) calculate the distance from the new node to the parent and the
@@ -632,7 +674,16 @@ struct
         let distance_to_parent = node.length - root_node.length in
         let best_tip_node = Hashtbl.find_exn t.table t.best_tip in
         (* 3 *)
-        if node.length > best_tip_node.length then t.best_tip <- hash ;
+        let added_to_best_tip_path, removed_from_best_tip_path =
+          if node.length > best_tip_node.length then (
+            t.best_tip <- hash ;
+            get_path_diff t breadcrumb best_tip_node.breadcrumb )
+          else ([], [])
+        in
+        Logger.debug t.logger
+          !"added: %{sexp: Breadcrumb.t list} removed: %{sexp: Breadcrumb.t \
+            list}"
+          added_to_best_tip_path removed_from_best_tip_path ;
         (* 4 *)
         (* note: new_root_node is the same as root_node if the root didn't change *)
         let garbage_breadcrumbs, new_root_node =
@@ -741,9 +792,11 @@ struct
               { old_root= root_node.breadcrumb
               ; old_root_length= root_node.length
               ; new_root= new_root_node.breadcrumb
-              ; new_best_tip= node.breadcrumb
+              ; added_to_best_tip_path=
+                  Non_empty_list.of_list_opt added_to_best_tip_path
+                  |> Option.value_exn
               ; new_best_tip_length= node.length
-              ; old_best_tip= best_tip_node.breadcrumb
+              ; removed_from_best_tip_path
               ; garbage= garbage_breadcrumbs }
           else Transition_frontier_diff.New_breadcrumb node.breadcrumb ) )
 
