@@ -293,14 +293,15 @@ end = struct
       |> Deferred.return
     in
     let%bind () =
+      let staged_ledger_hash = Ledger.merkle_root snarked_ledger in
       Deferred.return
       @@ Result.ok_if_true
-           (Ledger_hash.equal expected_merkle_root snarked_ledger_hash)
+           (Ledger_hash.equal expected_merkle_root staged_ledger_hash)
            ~error:
              (Error.createf
                 !"Mismatching merkle root Expected:%{sexp:Ledger_hash.t} \
                   Got:%{sexp:Ledger_hash.t}"
-                expected_merkle_root snarked_ledger_hash)
+                expected_merkle_root staged_ledger_hash)
     in
     of_scan_state_and_ledger ~snarked_ledger_hash:snarked_frozen_ledger_hash
       ~ledger:snarked_ledger ~scan_state
