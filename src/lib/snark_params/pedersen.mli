@@ -40,6 +40,9 @@ module type S = sig
     type t = curve array
   end
 
+  val local_function :
+    negate:('a -> 'a) -> add:('a -> 'a -> 'a) -> bool Triple.t -> 'a -> 'a
+
   module State : sig
     type t
 

@@ -42,6 +42,9 @@ module type S = sig
     type t = curve array
   end
 
+  val local_function :
+    negate:('a -> 'a) -> add:('a -> 'a -> 'a) -> bool Triple.t -> 'a -> 'a
+
   module State : sig
     type t
 
@@ -117,6 +120,17 @@ module Make (Inputs : Pedersen_inputs_intf.S) :
   module Params = struct
     type t = Curve.t array
   end
+
+  let local_function ~negate ~add (b0, b1, sign) c =
+    let ( + ) = add in
+    let x =
+      match Four.of_bits_lsb (b0, b1) with
+      | Zero -> c
+      | One -> c + c
+      | Two -> c + c + c
+      | Three -> c + c + c + c
+    in
+    if sign then negate x else x
 
   module State = struct
     [%%if
@@ -198,17 +212,6 @@ module Make (Inputs : Pedersen_inputs_intf.S) :
       end in
       let x = F.random () in
       [%test_eq: F.t] F.(mul (of_int 16) x) (sixteen_times ~add:F.add x)
-
-    let local_function ~negate ~add (sign, b0, b1) c =
-      let ( + ) = add in
-      let x =
-        match Four.of_bits_lsb (b0, b1) with
-        | Zero -> c
-        | One -> c + c
-        | Two -> c + c + c
-        | Three -> c + c + c + c
-      in
-      if sign then negate x else x
 
     let update ~(scale : int -> Scalar_field.t -> Curve.t) (t : t) triple =
       let term =

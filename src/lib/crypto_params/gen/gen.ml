@@ -67,13 +67,11 @@ let params_for_prover =
     let gg = Group.double g in
     (g, gg, Group.add g gg, Group.double gg)
   in
-  List.map params ~f:(fun x ->
-      let rec go pt acc i =
-        if i = scalar_size_in_triples then List.rev acc
-        else go (sixteen_times pt) (powers pt :: acc) (i + 1)
-      in
-      go x [] 0 )
-  |> List.concat
+  let open Sequence in
+  concat_map (of_list params) ~f:(fun x ->
+      unfold ~init:x ~f:(fun g -> Some (powers g, sixteen_times g))
+      |> Fn.flip take scalar_size_in_triples )
+  |> to_list
 
 let params_array = Array.of_list params
 

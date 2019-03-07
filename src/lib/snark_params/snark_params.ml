@@ -7,6 +7,8 @@ open Snark_bits
 module Tick_backend = Crypto_params.Tick_backend
 module Tock_backend = Crypto_params.Tock_backend
 
+let () = Snarky.Snark.set_eval_constraints true
+
 module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
   open Impl
 
@@ -364,6 +366,8 @@ module Tick = struct
   module Inner_curve = struct
     include Crypto_params.Tick_backend.Inner_curve
 
+    let compare x y = if equal x y then 0 else 1
+
     include Sexpable.Of_sexpable (struct
                 type t = Field.t * Field.t [@@deriving sexp]
               end)
@@ -508,6 +512,65 @@ module Tick = struct
 
     let%test_unit "hash large number of chunks plus 2" =
       For_tests.run_hash_test ((scalar_chunk_size * 10) + 2)
+
+    let%test_unit "checked correct on single triple" =
+      let open Quickcheck in
+      let trip f x = f x x x in
+      test
+        Generator.(trip tuple3 bool)
+        ~f:(fun t ->
+          let typ_in = trip Typ.tuple3 Boolean.typ in
+          try
+            Test.test_equal ~sexp_of_t:Digest.sexp_of_t ~equal:Digest.equal
+              typ_in Checked.Digest.typ
+              (fun t -> Checked.digest_triples ~init:(State.create ()) [t])
+              (fun t ->
+                Snarky.Pedersen.local_function ~negate:Inner_curve.negate
+                  Crypto_params.Pedersen_params.params_for_prover.(0)
+                  t
+                |> Inner_curve.to_affine_coordinates |> fst )
+              t
+          with e ->
+            eprintf !"Failed on %{sexp:bool Tuple_lib.Triple.t}\n%!" t ;
+            raise e )
+
+    let%test_unit "local functions agree" =
+      let open Quickcheck in
+      let trip f x = f x x x in
+      test
+        Generator.(trip tuple3 bool)
+        ~f:(fun t ->
+          try
+            [%test_eq: Inner_curve.t]
+              (Snarky.Pedersen.local_function ~negate:Inner_curve.negate
+                 Crypto_params.Pedersen_params.params_for_prover.(0)
+                 t)
+              (local_function ~negate:Inner_curve.negate ~add:Inner_curve.add t
+                 Crypto_params.Pedersen_params.params.(0))
+          with e ->
+            eprintf !"Failed on %{sexp:bool Tuple_lib.Triple.t}\n%!" t ;
+            raise e )
+
+    let%test_unit "checked-unchecked equivalence" =
+      let open Quickcheck in
+      State.set_chunked_fold true ;
+      let trip f x = f x x x in
+      test
+        Generator.(list_with_length 1 (trip tuple3 bool))
+        ~f:(fun ts ->
+          let typ_in =
+            Typ.list ~length:(List.length ts) (trip Typ.tuple3 Boolean.typ)
+          in
+          try
+            Test.test_equal ~sexp_of_t:Digest.sexp_of_t ~equal:Digest.equal
+              typ_in Checked.Digest.typ
+              (Checked.digest_triples ~init:(State.create ()))
+              (fun xs ->
+                digest_fold (State.create ()) (Fold_lib.Fold.of_list xs) )
+              ts
+          with e ->
+            eprintf !"Failed on %{sexp:bool Tuple_lib.Triple.t list}\n%!" ts ;
+            raise e )
   end
 
   module Util = Snark_util.Make (Tick0)
