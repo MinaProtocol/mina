@@ -146,8 +146,7 @@ end
 module type Transaction_witness_intf = sig
   type sparse_ledger
 
-  type t = {ledger: sparse_ledger (*; coinbase_stack: pending_coinbase*)}
-  [@@deriving bin_io, sexp]
+  type t = {ledger: sparse_ledger} [@@deriving bin_io, sexp]
 end
 
 module type Protocol_state_hash_intf = sig
@@ -1267,9 +1266,6 @@ module type Consensus_mechanism_intf = sig
 
   module Consensus_state : Consensus_state_intf
 
-  (*module Pending_coinbase_update : Pending_coinbase_update_intf
-    with type pending_coinbase_hash := pending_coinbase_hash
-     and type pending_coinbase_stack := pending_coinbase_stack*)
   module Blockchain_state :
     Blockchain_state_intf
     with type staged_ledger_hash := staged_ledger_hash

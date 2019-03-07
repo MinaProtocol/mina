@@ -46,8 +46,6 @@ module type S = sig
       val set : t -> t -> bool -> t
     end
 
-    (*val to_bits : t -> bool list*)
-
     val fold_bits : t -> bool Fold.t
 
     val fold : t -> (bool * bool * bool) Fold.t

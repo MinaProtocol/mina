@@ -93,7 +93,6 @@ module Make (Blockchain_state : Coda_base.Blockchain_state.S) = struct
     ; aux_hash= Coda_base.Staged_ledger_hash.(Aux_hash.to_bytes (aux_hash h))
     }
 
-  (*TODO: make changes to the lite version*)
   let blockchain_state
       ({ staged_ledger_hash= lbh
        ; snarked_ledger_hash= lh

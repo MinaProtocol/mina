@@ -60,8 +60,6 @@ module type S = sig
   val genesis : value
 end
 
-(*module Pending_coinbase = Pending_coinbase*)
-
 module Action = struct
   type t = Added | Updated | Deleted_added | Deleted_updated
   [@@deriving enum, eq, sexp, bin_io]

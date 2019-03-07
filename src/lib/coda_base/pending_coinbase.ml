@@ -10,9 +10,6 @@ open Snark_bits
 
 let coinbase_tree_depth = Snark_params.pending_coinbase_depth
 
-(*Coda_compile_config.scan_state_transaction_capacity_log_2
-  + Coda_compile_config.scan_state_work_delay_factor*)
-
 (*Total number of stacks*)
 let coinbase_stacks = Int.pow 2 coinbase_tree_depth
 

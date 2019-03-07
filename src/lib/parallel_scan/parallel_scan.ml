@@ -278,7 +278,6 @@ module State = struct
       if
         Option.is_none state.base_none_pos
         || pos >= Option.value_exn state.base_none_pos
-        (*+ 1*)
       then jobs
       else
         let jobs =
