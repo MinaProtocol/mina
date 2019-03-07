@@ -3,7 +3,7 @@
 ## Summary
 [summary]: #summary
 
-This RFC proposes a new system for persisting the transition frontier's state to the filesystem effeciently.
+This RFC proposes a new system for persisting the transition frontier's state to the filesystem efficiently.
 
 ## Motivation
 [motivation]: #motivation
@@ -104,7 +104,7 @@ The primary drawback to this system is that it creates additional complexity in 
 ## Prior art
 [prior-art]: #prior-art
 
-In the past, before we replaced the Ledger Builder Controller with the Transition Frontier, we would `bin_io` the entire Ledger Builder Controller out to the filesystem on ever update. This was slow and wasteful and would have needed to be replaced anyway.
+In the past, before we replaced the Ledger Builder Controller with the Transition Frontier, we would `bin_io` the entire Ledger Builder Controller out to the filesystem on every update. This was slow and wasteful and would have needed to be replaced anyway.
 
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
