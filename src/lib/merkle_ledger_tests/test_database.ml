@@ -19,7 +19,8 @@ let%test_module "test functor on in memory databases" =
 
       module Location : Merkle_ledger.Location_intf.S
 
-      module MT : DB
+      module MT :
+        DB with module Location = Location and module Addr = Location.Addr
 
       val with_instance : (MT.t -> 'a) -> 'a
     end
@@ -237,6 +238,51 @@ let%test_module "test functor on in memory databases" =
                     assert (not @@ Hash.equal old_merkle_root new_merkle_root) )
             ) )
 
+      let%test_unit "We can retrieve accounts by their by key after using \
+                     set_batch_accounts" =
+        Test.with_instance (fun mdb ->
+            (* We want to add accounts to a nonempty database *)
+            let max_height = Int.min (MT.depth - 1) 3 in
+            populate_db mdb max_height ;
+            let accounts = random_accounts max_height |> dedup_accounts in
+            let (last_location : MT.Location.t) =
+              MT.last_filled mdb |> Option.value_exn
+            in
+            let accounts_with_addresses =
+              List.folding_map accounts ~init:last_location
+                ~f:(fun prev_location account ->
+                  let location =
+                    Test.Location.next prev_location |> Option.value_exn
+                  in
+                  (location, (location |> Test.Location.to_path_exn, account))
+              )
+            in
+            MT.set_batch_accounts mdb accounts_with_addresses ;
+            List.iter accounts ~f:(fun account ->
+                let key = Account.public_key account in
+                let location =
+                  MT.location_of_key mdb key |> Option.value_exn
+                in
+                let queried_account =
+                  MT.get mdb location |> Option.value_exn
+                in
+                assert (Account.equal queried_account account) ) ;
+            let to_int =
+              Fn.compose MT.Location.Addr.to_int MT.Location.to_path_exn
+            in
+            let expected_last_location =
+              (MT.Location.Addr.to_int @@ MT.Location.to_path_exn last_location)
+              + List.length accounts
+            in
+            let actual_last_location =
+              to_int (MT.last_filled mdb |> Option.value_exn)
+            in
+            [%test_result: int] ~expect:expected_last_location
+              actual_last_location
+              ~message:
+                (sprintf "(expected_location: %i) (actual_location: %i)"
+                   expected_last_location actual_last_location) )
+
       let%test_unit "If the entire database is full, \
                      set_all_accounts_rooted_at_exn(address,accounts);get_all_accounts_rooted_at_exn(address) \
                      = accounts" =
@@ -444,10 +490,16 @@ let%test_module "test functor on in memory databases" =
       let depth = Depth.depth
 
       module Location = Merkle_ledger.Location.Make (Depth)
-      module MT =
-        Database.Make (Key) (Account) (Hash) (Depth) (Location)
-          (In_memory_kvdb)
-          (Storage_locations)
+
+      module Inputs = struct
+        include Test_stubs.Base_inputs
+        module Location = Location
+        module Kvdb = In_memory_kvdb
+        module Storage_locations = Storage_locations
+        module Depth = Depth
+      end
+
+      module MT = Database.Make (Inputs)
 
       (* TODO: maybe this function should work with dynamic modules *)
       let with_instance (f : MT.t -> 'a) =

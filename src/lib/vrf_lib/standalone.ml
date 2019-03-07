@@ -372,40 +372,6 @@ let%test_module "vrf-test" =
       end
     end
 
-    (*
-    module Scalar =
-      Bigint_scalar (Impl)
-        (struct
-          let modulus =
-            Bigint.of_string
-              "4252498232415687930110553454452223399041429939925660931491171303058234989338533"
-
-          let random () = Bigint.random modulus
-        end)
-
-    module Curve =
-      Snarky.Curves.Edwards.Make (Impl) (Scalar)
-        (struct
-          let d = Impl.Field.of_int 20
-
-          let cofactor =
-            Bigint.(of_int 8 * of_int 5 * of_int 7 * of_int 399699743)
-
-          let order = Scalar.modulus
-
-          let generator =
-            let conv =
-              Fn.compose
-                Impl.Bigint.(Fn.compose to_field of_bignum_bigint)
-                Bigint.of_string
-            in
-            ( conv
-                "327139552581206216694048482879340715614392408122535065054918285794885302348678908604813232"
-            , conv
-                "269570906944652130755537879906638127626718348459103982395416666003851617088183934285066554"
-            )
-        end) *)
-
     module Curve = struct
       open Impl
 
@@ -421,7 +387,7 @@ let%test_module "vrf-test" =
 
                     let scale = scale_field
                   end)
-                  (Snarky.Libsnark.Curves.Mnt6.G1.Coefficients)
+                  (Snarky.Libsnark.Mnt6.G1.Coefficients)
 
         let add_known_unsafe t x = add_unsafe t (constant x)
       end
