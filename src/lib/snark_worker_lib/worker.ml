@@ -111,11 +111,12 @@ module Make (Inputs : Intf.Inputs_intf) :
           Logger.info log !"Received work." ;
           match perform state public_key work with
           | Error e -> log_and_retry "performing work" e
-          | Ok (result, metrics) -> (
+          | Ok result -> (
               match%bind
                 Logger.info log !"Submitting work." ;
-                dispatch Rpcs.Submit_work.rpc shutdown_on_disconnect
-                  (result, metrics) daemon_address
+                metrics_to_strings result.metrics log ;
+                dispatch Rpcs.Submit_work.rpc shutdown_on_disconnect result
+                  daemon_address
               with
               | Error e -> log_and_retry "submitting work" e
               | Ok () -> go () ) )
