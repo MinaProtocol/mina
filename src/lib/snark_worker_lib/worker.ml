@@ -72,6 +72,14 @@ module Make (Inputs : Intf.Inputs_intf) :
         else Or_error.of_exn exn
     | Ok res -> res
 
+  let metrics_to_strings metrics log =
+    List.iter metrics ~f:(fun (total, tag) ->
+        match tag with
+        | `Merge ->
+            Logger.info log !"Merge Proof %s" (Time.Span.to_string total)
+        | `Transition ->
+            Logger.info log !"Base Proof %s" (Time.Span.to_string total) )
+
   let main daemon_address public_key shutdown_on_disconnect =
     let log =
       Logger.create ()
@@ -103,11 +111,11 @@ module Make (Inputs : Intf.Inputs_intf) :
           Logger.info log !"Received work." ;
           match perform state public_key work with
           | Error e -> log_and_retry "performing work" e
-          | Ok result -> (
+          | Ok (result, metrics) -> (
               match%bind
                 Logger.info log !"Submitting work." ;
-                dispatch Rpcs.Submit_work.rpc shutdown_on_disconnect result
-                  daemon_address
+                dispatch Rpcs.Submit_work.rpc shutdown_on_disconnect
+                  (result, metrics) daemon_address
               with
               | Error e -> log_and_retry "submitting work" e
               | Ok () -> go () ) )
