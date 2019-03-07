@@ -46,9 +46,12 @@ end
 module Prover_state = struct
   include Unit
 
-  let precomputed_handler _ = Snarky.Request.unhandled
+  let precomputed_handler =
+    unstage
+      (Coda_base.Pending_coinbase.handler @@ Pending_coinbase.create_exn ())
 
-  let handler _ ~pending_coinbase:_ _ = Snarky.Request.unhandled
+  let handler () ~pending_coinbase =
+    unstage (Coda_base.Pending_coinbase.handler pending_coinbase)
 end
 
 module Proposal_data = struct
