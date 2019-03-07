@@ -170,9 +170,11 @@ struct
         [@@deriving bin_io, sexp]
 
         type response =
-          ( External_transition.t
-          , State_body_hash.t list * External_transition.t )
-          Proof_carrying_data.t
+          ( ( External_transition.t
+            , State_body_hash.t list * External_transition.t )
+            Proof_carrying_data.t
+          * Staged_ledger_aux.t
+          * Ledger_hash.t )
           option
         [@@deriving bin_io]
       end
@@ -353,9 +355,11 @@ module Make (Inputs : Inputs_intf) = struct
          -> External_transition.t Non_empty_list.t option Deferred.t)
       ~(get_ancestry :
             Consensus.Consensus_state.value Envelope.Incoming.t
-         -> ( External_transition.t
-            , State_body_hash.t list * External_transition.t )
-            Proof_carrying_data.t
+         -> ( ( External_transition.t
+              , State_body_hash.t list * External_transition.t )
+              Proof_carrying_data.t
+            * Staged_ledger_aux.t
+            * Ledger_hash.t )
             Deferred.Option.t) =
     let log = Logger.child config.parent_log "coda networking" in
     (* TODO: for following functions, could check that IP in _conn matches

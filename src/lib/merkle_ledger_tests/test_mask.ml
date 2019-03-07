@@ -697,6 +697,21 @@ module Make (Test : Test_intf) = struct
                   ~message:"All accounts are accessible from m2"
                   ~expect:(Some a) (Mask.Attached.get m2 loc) )
         | _ -> failwith "unexpected" )
+
+  let%test_unit "setting an account in the parent doesn't remove the masked \
+                 copy if the mask is still dirty for that account" =
+    Test.with_instances (fun maskable mask ->
+        let attached_mask = Maskable.register_mask maskable mask in
+        let k = Key.gen_keys 1 |> List.hd_exn in
+        let acct1 = Account.create k (Balance.of_int 10) in
+        let loc =
+          snd (Mask.Attached.get_or_create_account_exn attached_mask k acct1)
+        in
+        let acct2 = Account.create k (Balance.of_int 5) in
+        Maskable.set maskable loc acct2 ;
+        [%test_result: Account.t]
+          ~message:"account in mask should be unchanged" ~expect:acct1
+          (Mask.Attached.get attached_mask loc |> Option.value_exn) )
 end
 
 module type Depth_S = sig
@@ -709,6 +724,14 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
   module Location : Merkle_ledger.Location_intf.S =
     Merkle_ledger.Location.Make (Depth)
 
+  module Inputs = struct
+    include Test_stubs.Base_inputs
+    module Location = Location
+    module Kvdb = In_memory_kvdb
+    module Storage_locations = Storage_locations
+    module Depth = Depth
+  end
+
   (* underlying Merkle tree *)
   module Base_db :
     Merkle_ledger.Database_intf.S
@@ -719,12 +742,9 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
      and type hash := Hash.t
      and type key := Key.t
      and type key_set := Key.Set.t =
-    Database.Make (Key) (Account) (Hash) (Depth) (Location) (In_memory_kvdb)
-      (Storage_locations)
+    Database.Make (Inputs)
 
-  module Any_base =
-    Merkle_ledger.Any_ledger.Make_base (Key) (Account) (Hash) (Location)
-      (Depth)
+  module Any_base = Merkle_ledger.Any_ledger.Make_base (Inputs)
   module Base = Any_base.M
 
   (* the mask tree *)
@@ -737,9 +757,10 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
      and type key := Key.t
      and type key_set := Key.Set.t
      and type hash := Hash.t
-     and type parent := Base.t =
-    Merkle_mask.Masking_merkle_tree.Make (Key) (Account) (Hash) (Location)
-      (Base)
+     and type parent := Base.t = Merkle_mask.Masking_merkle_tree.Make (struct
+    include Inputs
+    module Base = Base
+  end)
 
   (* tree that can register masks *)
   module Maskable :
@@ -753,10 +774,11 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
      and type hash := Hash.t
      and type unattached_mask := Mask.t
      and type attached_mask := Mask.Attached.t
-     and type t := Base.t =
-    Merkle_mask.Maskable_merkle_tree.Make (Key) (Account) (Hash) (Location)
-      (Base)
-      (Mask)
+     and type t := Base.t = Merkle_mask.Maskable_merkle_tree.Make (struct
+    include Inputs
+    module Base = Base
+    module Mask = Mask
+  end)
 
   (* test runner *)
   let with_instances f =

@@ -11,9 +11,9 @@ module Transition_frontier_diff = struct
         { old_root: 'a
         ; old_root_length: int
         ; new_root: 'a  (** Same as old root if the root doesn't change *)
-        ; new_best_tip: 'a
+        ; added_to_best_tip_path: 'a Non_empty_list.t (* oldest first *)
         ; new_best_tip_length: int
-        ; old_best_tip: 'a
+        ; removed_from_best_tip_path: 'a list (* also oldest first *)
         ; garbage: 'a list }
         (** Triggered when a new breadcrumb is added, causing a new best_tip *)
   [@@deriving sexp]
@@ -50,7 +50,7 @@ end
 (** The type of the view onto the changes to the current best tip. This type
     needs to be here to avoid dependency cycles. *)
 module Best_tip_diff_view = struct
-  type 'b t = {new_best_tip: 'b; old_best_tip: 'b}
+  type 'b t = {new_user_commands: 'b list; removed_user_commands: 'b list}
 end
 
 module type Network_intf = sig
@@ -72,6 +72,8 @@ module type Network_intf = sig
 
   type state_body_hash
 
+  type parallel_scan_state
+
   val random_peers : t -> int -> peer list
 
   val catchup_transition :
@@ -84,9 +86,11 @@ module type Network_intf = sig
        t
     -> peer
     -> consensus_state
-    -> ( external_transition
-       , state_body_hash list * external_transition )
-       Proof_carrying_data.t
+    -> ( ( external_transition
+         , state_body_hash list * external_transition )
+         Proof_carrying_data.t
+       * parallel_scan_state
+       * ledger_hash )
        Deferred.Or_error.t
 
   (* TODO: Change this to strict_pipe *)
@@ -174,10 +178,9 @@ module type Transition_frontier_base_intf = sig
        logger:Logger.t
     -> root_transition:(external_transition_verified, state_hash) With_hash.t
     -> root_snarked_ledger:ledger_database
-    -> root_transaction_snark_scan_state:transaction_snark_scan_state
-    -> root_staged_ledger_diff:staged_ledger_diff option
+    -> root_staged_ledger:staged_ledger
     -> consensus_local_state:consensus_local_state
-    -> t Deferred.t
+    -> t
 
   val close : t -> unit
   (** Clean up internal state. *)
@@ -256,7 +259,7 @@ module type Transition_frontier_intf = sig
 
     module Best_tip_diff :
       Transition_frontier_extension_intf
-      with type view = Breadcrumb.t Best_tip_diff_view.t Option.t
+      with type view = user_command Best_tip_diff_view.t
 
     type readers =
       { snark_pool: Snark_pool_refcount.view Broadcast_pipe.Reader.t

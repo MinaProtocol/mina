@@ -1,7 +1,6 @@
 open Core
 open Fold_lib
 open Snark_params.Tick
-open Let_syntax
 open Import
 open Module_version
 module Amount = Currency.Amount
