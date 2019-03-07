@@ -6,7 +6,9 @@ The operations on the merkle tree of coinbase stacks include:
 
 A stack can be either be created or modified by pushing a coinbase on to it.
 
-This module also provides an interface for the checked computations required required to prove it in snark*)
+This module also provides an interface for the checked computations required required to prove it in snark
+
+Stack operations are done for transaction snarks and tree operations are done for the blockchain snark*)
 
 open Core
 open Snark_params
