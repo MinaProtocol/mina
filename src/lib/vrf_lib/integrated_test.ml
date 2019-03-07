@@ -63,7 +63,6 @@ module Message = struct
 
     let hash_to_group msg =
       let open Snark_params.Tick in
-      let open Snark_params.Tick.Let_syntax in
       let%bind msg_triples = var_to_triples msg in
       Pedersen.Checked.hash_triples ~init:Coda_base.Hash_prefix.vrf_message
         msg_triples
@@ -90,7 +89,7 @@ module Output_hash = struct
 
   module Checked = struct
     let hash msg g =
-      let open Snark_params.Tick.Let_syntax in
+      let open Snark_params.Tick.Checked in
       let%bind msg_triples = Message.Checked.var_to_triples msg in
       let%bind g_triples =
         Non_zero_curve_point.(compress_var g >>= Compressed.var_to_triples)
@@ -121,7 +120,7 @@ let%test_unit "eval unchecked vs. checked equality" =
          Tick.Typ.(Scalar.typ * Message.typ)
          Output_hash.typ
          (fun (private_key, msg) ->
-           let open Tick.Let_syntax in
+           let open Tick.Checked in
            let%bind (module Shifted) = Group.Checked.Shifted.create () in
            Vrf.Checked.eval (module Shifted) ~private_key msg )
          (fun (private_key, msg) -> Vrf.eval ~private_key msg))
