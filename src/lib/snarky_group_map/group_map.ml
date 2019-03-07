@@ -14,17 +14,39 @@
 
 open Core
 
-module Make_snarky_unchecked_hash
-    (F : Snarky.Field_intf.Extended) (Params : sig
+(* Let's call this group_map *)
+
+module type Field_intf = sig
+  type t
+  val (+) : t -> t -> t
+  val ( * ) : t -> t -> t
+  val ( / ) : t -> t -> t
+  val equal : t -> t -> bool
+  val t_of_sexp: Sexp.t -> t
+  val sexp_of_t: t -> Sexp.t
+  val of_int: int -> t
+  val one : t
+  val zero : t
+  val negate : t -> t
+  val sqrt : t -> t
+end
+
+module Intf(F : Field_intf) = struct
+  module type S = sig
+    val to_group : F.t -> F.t * F.t
+  end
+end
+
+module Make_group_map
+    (F : Field_intf)
+    (Params : sig
         val a : F.t
         val b : F.t
-    end) =
+    end) : Intf(F).S =
 struct
   module Hash_key = struct
     module T = struct
-      type t = int * int [@@deriving compare, hash, sexp]
-
-      let equal = ( = )
+      type t = int * int [@@deriving compare, hash, sexp, eq]
     end
 
     include T
@@ -33,10 +55,10 @@ struct
   end
 
   let field_of_string s =
-    let s' =
-      if s.[0] = '-' then String.sub s ~pos:1 ~len:(String.length s - 1) else s
-    in
-    Sexp.of_string_conv_exn s' F.t_of_sexp
+    if s.[0] = '-' then
+      let s' = String.sub s ~pos:1 ~len:(String.length s - 1)
+      in F.negate (Sexp.of_string_conv_exn s' F.t_of_sexp)
+    else Sexp.of_string_conv_exn s F.t_of_sexp
 
   let field_map = List.map ~f:(fun (a, b) -> (a, field_of_string b))
 
@@ -229,26 +251,21 @@ struct
     ; ((0, 10), "1") ])
 
   let sum (xs : F.t list) =
-    List.fold ~init:F.zero ~f:F.add xs
+    List.fold ~init:F.zero ~f:F.(+) xs
 
   let product (xs : F.t list) =
-    List.fold ~init:F.one ~f:F.mul xs
+    List.fold ~init:F.one ~f:F.( * ) xs
 
   (* for v, k, powers produces v^0, v^1, ... v^k *)
   let powers v k =
     let rec make_powers acc prev x =
       if x = k then Array.of_list_rev acc
       else
-        let prev' = F.Infix.(prev * v) in
+        let prev' = F.(prev * v) in
         let acc' = prev' :: acc in
         make_powers acc' prev' (x + 1)
     in
     make_powers [F.one] F.one 0
-
-  (* highest power of A is 24, of B is 16 *)
-  let a_powers = powers Params.a 24
-
-  let b_powers = powers Params.b 16
 
   let check x =
     match x with
@@ -256,11 +273,14 @@ struct
     | None -> failwith "trying to mulitply by index not in powers lists"
 
   let mul a b tbl =
-    F.Infix.(
-      Hashtbl.find_exn tbl (a, b) * a_powers.(a) * b_powers.(b))
+  (* highest power of A is 24, of B is 16 *)
+  let a_powers = powers Params.a 24
+      and b_powers = powers Params.b 16 in
+    F.(
+      (Hashtbl.find_exn tbl (a, b)) * a_powers.(a) * b_powers.(b))
 
   let t_mul sum t_power t_powers =
-    F.Infix.(sum * t_powers.(t_power))
+    F.(sum * t_powers.(t_power))
 
   (* given j, iter_a starts with the highest value of a possible
    * that satisfies either 2a + 3b = 3j (if in case 0)
@@ -275,16 +295,21 @@ struct
 
   let iter_a s j tbl =
     let rec go ~a ~acc ~s ~j ~tbl =
+        printf "j: %d\n%!" j;
+        printf "a: %d\n%!" a;
     (* if s = 0 then 2a + 3b = 3j -> b = 3j - 2a / 3 *)
     (* if s = 1 then 2a + 3b = 3j + 3 -> b = 3 + 3j - 2a / 3 *)
-    let b = if s = 0 then ((3 * j) - (2 * a)) / 3 else (3 + (3 * j) - (2 * a)) / 3
+        let b = if s = 0 then ((3 * j) - (2 * a)) / 3
+          else if s = 1 then (3 + (3 * j) - (2 * a)) / 3
+          else failwith "case that doesn't exist specified"
     in
     let acc' =
-      if s = 0 && 2*a + 3*b = 3*j then F.add acc (mul a b tbl)
-      else if s = 1 && 2*a + 3*b = 3*j + 3 then F.add acc (mul a b tbl)
+      if s = 0 && 2*a + 3*b = 3*j then F.(+) acc (mul a b tbl)
+      else if s = 1 && 2*a + 3*b = 3*j + 3 then F.(+) acc (mul a b tbl)
       else acc
     in
     (* start with a_max and decrement until a = 0 *)
+    printf "b: %d\n%!" b;
     if a > 0 then
       let a' = a - 1 in
       go ~a:a' ~acc:acc' ~s ~j ~tbl
@@ -293,49 +318,66 @@ struct
     (* this is defining a as the max value it can take
      * for 2a + 3b = 3j, max_a = 3j/2,
      * for 2a + 3b = 3j + 3, max a = (3j + 3)/2 *)
-    let a = if s = 0 then 3 * j / 2 else ((3 * j) + 3) / 2
+    let a = if s = 0 then (3 * j) / 2
+      else if s = 1 then ((3 * j) + 3) / 2
+      else failwith "case that doesn't exist specified"
     in
     go ~a ~acc:F.zero ~s ~j ~tbl
 
   let naive_iter_a s j tbl =
     let rec go ~a ~b ~acc ~s ~j ~tbl =
+        printf "j: %d\n%!" j;
+        printf "a: %d\n%!" a;
+        printf "b: %d\n%!" b;
     if s = 0 then
     (* 2a + 3b = 3j *)
-      if 2*a + 3*b = 3*j then let acc' = F.add acc (mul a b tbl)
+      if 2*a + 3*b = 3*j then let acc' = F.(+) acc (mul a b tbl)
                                   and a' = a and b' = b + 1 in
+                                  printf "yes\n%!";
                                   go ~a:a' ~b:b' ~acc:acc' ~s ~j ~tbl
       else if b > j then let a' = a + 1 and b' = 0 in
           go ~a:a' ~b:b' ~acc ~s ~j ~tbl
-      else if a > j then acc
-      else F.zero
+      else if 2*a > 3*j then acc
+      else let a' = a and b' = b + 1 in
+          go ~a:a' ~b:b' ~acc ~s ~j ~tbl
     else if s = 1 then
     (* 2a + 3b = 3j + 3 *)
-      if 2*a + 3*b = 3*j + 3 then let acc' = F.add acc (mul a b tbl)
+      if 2*a + 3*b = 3*j + 3 then let acc' = F.(+) acc (mul a b tbl)
                                   and a' = a and b' = b + 1 in
+                                  printf "yes\n%!";
                                   go ~a:a' ~b:b' ~acc:acc' ~s ~j ~tbl
-      else if b > j + 1 then let a' = a + 1 and b' = 0 in
+      else if b > (j + 1) then let a' = a + 1 and b' = 0 in
           go ~a:a' ~b:b' ~acc ~s ~j ~tbl
-      else if a > j then acc
-      else F.zero
+      else if 2*a > 3*j + 3 then acc
+      else let a' = a and b' = b + 1 in
+          go ~a:a' ~b:b' ~acc ~s ~j ~tbl
     else F.zero
     in
     let a = 0 and b = 0 in
     go ~a ~b ~acc:F.zero ~s ~j ~tbl
 
   let%test_unit "iter_a (not special case) test" =
-    Quickcheck.test Int.gen ~f:(fun j ->
-     assert (iter_a 0 j n1tbl =naive_iter_a 0 j n1tbl)
+    Quickcheck.test ~trials:2 Int.gen ~f:(fun j ->
+        let a = iter_a 0 (j mod 4) n1tbl
+        and b = naive_iter_a 0 (j mod 4) n1tbl in
+        printf "iter_a: %s\n%!" (Sexp.to_string (F.sexp_of_t a));
+        printf "naive_iter_a: %s\n%!" (Sexp.to_string (F.sexp_of_t b));
+     assert (F.equal a b)
     )
 
   let%test_unit "iter_a (special case) test" =
-    Quickcheck.test Int.gen ~f:(fun j ->
-     assert (iter_a 1 j n1tbl =naive_iter_a 1 j n1tbl)
+    Quickcheck.test ~trials:2 Int.gen ~f:(fun j ->
+        let a = iter_a 1 (j mod 4) n1tbl
+        and b = naive_iter_a 1 (j mod 4) n1tbl in
+        printf "iter_a: %s\n%!" (Sexp.to_string (F.sexp_of_t a));
+        printf "naive_iter_a: %s\n%!" (Sexp.to_string (F.sexp_of_t b));
+     assert (F.equal a b)
     )
 
   let iter_j s max t_powers tbl =
     let rec go ~j ~acc ~s ~max ~t_powers ~tbl =
       let acc' = iter_a s j tbl in
-      let acc'' = F.add acc (t_mul acc' j t_powers) in
+      let acc'' = F.(+) acc (t_mul acc' j t_powers) in
       if j < max then
         let j' = j + 1 in
         go ~j:j' ~acc:acc'' ~s ~max ~t_powers ~tbl
@@ -348,22 +390,22 @@ struct
    * D1(t) = sum from j = 0 to j = 5 of [
    *    sum for 2a+3b=3j of ( d1_(a,b) A^a . B^b ) . t^j ]
    *)
-  let make_x1 t_var =
-    let t_powers = powers t_var 15 in
+  let make_x1 tvar =
+    let t_powers = powers tvar 15 in
       let nt = iter_j 0 4 t_powers n1tbl in
       let dt = iter_j 0 5 t_powers d1tbl in
-      F.Infix.(Params.a * t_mul (F.of_int 2) 1 t_powers * nt / dt)
+      F.(Params.a * t_mul (F.of_int 2) 1 t_powers * nt / dt)
 
   (* N2(t) = sum from j = 0 to j = 6 of [
    *    sum for 2a+3b=3j of ( n2_(a,b) A^a . B^b ) . t^j ]
    * D2(t) = 144At . sum from j = 0 to j = 4 of [
    *    sum for 2a+3b=3j of ( d2_(a,b) A^a . B^b ) . t^j ]
    *)
-  let make_x2 t_var =
-    let t_powers = powers t_var 15 in
+  let make_x2 tvar =
+    let t_powers = powers tvar 15 in
       let nt = iter_j 0 6 t_powers n2tbl in
       let dt = iter_j 0 4 t_powers d2tbl in
-      F.Infix.(nt / (t_mul (F.of_int 144 * Params.a) 1 t_powers * dt))
+      F.(nt / (t_mul (F.of_int 144 * Params.a) 1 t_powers * dt))
 
   (* N3(t) = sum from j = 0 to j = 15 of [
    *    sum for 2a+3b=3j+3 of ( n3_(a,b) A^a . B^b ) . t^j ]
@@ -373,11 +415,20 @@ struct
    *    sum from j = 0 to j = 10 of [
    *    sum for 2a+3b=3j of ( d32_(a,b) A^a . B^b ) . t^j ]
    *)
-  let make_x3 t_var =
-    let t_powers = powers t_var 15 in
+  let make_x3 tvar =
+    let t_powers = powers tvar 15 in
       let nt = iter_j 1 15 t_powers n3tbl in
       let dt1 = iter_j 0 5 t_powers d31tbl in
       let dt2 = iter_j 0 10 t_powers d32tbl in
-      F.Infix.(nt / (Params.a * dt1 * dt2))
+      F.(nt / (Params.a * dt1 * dt2))
 
+  let to_group tvar =
+    let a = make_x1 tvar in
+    F.sqrt
 end
+
+let%test_unit "foo" =
+  let module S = Snarky.Snark.Make(Snarky.Backends.Mnt4.Default) in
+  let module M = Make_group_map(S.Field 
+                                  S.Field.Infix)(Snarky.Libsnark.Curves.Mnt4.G1.Coefficients) in
+  ()
