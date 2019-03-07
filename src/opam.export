@@ -15,7 +15,6 @@ roots: [
   "camlp4.4.07+1"
   "cohttp-async.1.2.0"
   "depext.transition"
-  "extlib.1.7.5"
   "graphql-async.0.9.0"
   "graphql-cohttp.0.8.0"
   "js_of_ocaml.3.3.0"
