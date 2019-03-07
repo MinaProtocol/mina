@@ -221,7 +221,7 @@ end = struct
                         ; staged_ledger_merkle_root
                         ; scan_state }
               else (
-                (* TODO: punish *)
+                (* TODO: punish! *)
                 Logger.faulty_peer t.logger
                   "Received wrong staged_ledger_aux from the network" ;
                 `Ignored )
