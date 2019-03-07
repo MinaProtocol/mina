@@ -144,7 +144,7 @@ module Make (Inputs : Pedersen_inputs_intf.S) :
     let update_fold (t : t) (fold : bool Triple.t Fold.t) =
       O1trace.measure "pedersen fold" (fun () ->
           let params = Inputs.params in
-          let max_num_params = Array.length params in
+          let max_num_params = scalar_size_in_triples * Array.length params in
           (* As much space as we could need: we can only have up to [length params] triples before we overflow that, and each triple is packed into a single byte *)
           let bs = Bigstring.init max_num_params ~f:(fun _ -> '0') in
           let triples_consumed_here =

@@ -5,12 +5,6 @@ open Snark_bits
 open Fold_lib
 open Tuple_lib
 
-[%%if fake_hash]
-
-open Coda_digestif
-
-[%%endif]
-
 module type S = sig
   type curve
 

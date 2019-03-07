@@ -513,6 +513,9 @@ module Tick = struct
     let%test_unit "hash large number of chunks plus 2" =
       For_tests.run_hash_test ((scalar_chunk_size * 10) + 2)
 
+    [%%if
+    not fake_hash]
+
     let%test_unit "checked correct on single triple" =
       let open Quickcheck in
       let trip f x = f x x x in
@@ -571,6 +574,8 @@ module Tick = struct
           with e ->
             eprintf !"Failed on %{sexp:bool Tuple_lib.Triple.t list}\n%!" ts ;
             raise e )
+
+    [%%endif]
   end
 
   module Util = Snark_util.Make (Tick0)
