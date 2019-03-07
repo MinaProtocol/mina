@@ -99,7 +99,7 @@ module Make (Consensus_mechanism : Consensus.S) :
         in
         let%map state_hash =
           Pedersen.Checked.Section.create
-            ~acc:(`Value Hash_prefix.protocol_state.acc)
+            ~acc:(`Value (Pedersen.State.acc Hash_prefix.protocol_state))
             ~support:
               (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
           |> Pedersen.Checked.Section.disjoint_union_exn state_partial

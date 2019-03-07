@@ -98,7 +98,8 @@ struct
       in
       Pedersen.Checked.Section.extend
         (Pedersen.Checked.Section.create
-           ~acc:(`Value Hash_prefix.transition_system_snark.acc)
+           ~acc:
+             (`Value (Pedersen.State.acc Hash_prefix.transition_system_snark))
            ~support:
              (Interval_union.of_interval (0, Hash_prefix.length_in_triples)))
         ~start:Hash_prefix.length_in_triples bs

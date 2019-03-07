@@ -408,20 +408,30 @@ module Tick = struct
 
   module Pedersen = struct
     include Crypto_params.Pedersen_params
-    include Crypto_params.Pedersen_chunk_table
-    include Pedersen.Make (Field) (Bigint) (Inner_curve)
+
+    include Pedersen.Make (struct
+      module Field = Field
+      module Bigint = Bigint
+      module Scalar_field = Tock.Field
+      module Curve = Inner_curve
+
+      let params = Crypto_params.Pedersen_params.params
+
+      let window_tables = Crypto_params.Pedersen_window_tables.window_tables
+    end)
 
     let zero_hash =
-      digest_fold
-        (State.create params ~get_chunk_table)
+      digest_fold (State.create ())
         (Fold_lib.Fold.of_list [(false, false, false)])
 
     module Checked = struct
       include Snarky.Pedersen.Make (Tick0) (Inner_curve)
-                (Crypto_params.Pedersen_params)
+                (struct
+                  let params = Crypto_params.Pedersen_params.params_for_prover
+                end)
 
       let hash_triples ts ~(init : State.t) =
-        hash ts ~init:(init.triples_consumed, `Value init.acc)
+        hash ts ~init:(State.triples_consumed init, `Value (State.acc init))
 
       let digest_triples ts ~init =
         Checked.map (hash_triples ts ~init) ~f:digest
@@ -442,11 +452,8 @@ module Tick = struct
           Field.equal c1_x c2_x && Field.equal c1_y c2_y
 
       let equal_states s1 s2 =
-        equal_curves s1.State.acc s2.State.acc
-        && Int.equal s1.triples_consumed s2.triples_consumed
-        (* params, chunk_tables should never be modified *)
-        && phys_equal s1.params s2.params
-        && phys_equal (s1.get_chunk_table ()) (s2.get_chunk_table ())
+        equal_curves (State.acc s1) (State.acc s2)
+        && Int.equal (State.triples_consumed s1) (State.triples_consumed s2)
 
       let gen_fold n =
         let gen_triple =
@@ -467,13 +474,13 @@ module Tick = struct
         in
         Fold.of_list (gen_triples n)
 
-      let initial_state = State.create params ~get_chunk_table
+      let initial_state = State.create ()
 
       let run_updates fold =
-        (* make sure chunk table deserialized before running test;
+        (* make sure window table deserialized before running test;
            actual deserialization happens just once
          *)
-        ignore (Crypto_params.Pedersen_chunk_table.deserialize ()) ;
+        ignore (Lazy.force Crypto_params.Pedersen_window_tables.window_tables) ;
         let result = State.update_fold_chunked initial_state fold in
         let unchunked_result =
           State.update_fold_unchunked initial_state fold
@@ -488,17 +495,19 @@ module Tick = struct
 
     let%test_unit "hash one triple" = For_tests.run_hash_test 1
 
+    let scalar_chunk_size = Tock.Field.size_in_bits / 4
+
     let%test_unit "hash small number of chunks" =
-      For_tests.run_hash_test (Chunked_triples.Chunk.size * 25)
+      For_tests.run_hash_test scalar_chunk_size
 
     let%test_unit "hash small number of chunks plus 1" =
-      For_tests.run_hash_test ((Chunked_triples.Chunk.size * 25) + 1)
+      For_tests.run_hash_test (scalar_chunk_size + 1)
 
     let%test_unit "hash large number of chunks" =
-      For_tests.run_hash_test (Chunked_triples.Chunk.size * 250)
+      For_tests.run_hash_test (scalar_chunk_size * 10)
 
     let%test_unit "hash large number of chunks plus 2" =
-      For_tests.run_hash_test ((Chunked_triples.Chunk.size * 250) + 2)
+      For_tests.run_hash_test ((scalar_chunk_size * 10) + 2)
   end
 
   module Util = Snark_util.Make (Tick0)

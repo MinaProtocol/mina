@@ -29,7 +29,8 @@ module Message = struct
 
   let%snarkydef hash_checked t ~nonce =
     let init =
-      Pedersen.Checked.Section.create ~acc:(`Value Hash_prefix.signature.acc)
+      Pedersen.Checked.Section.create
+        ~acc:(`Value (Pedersen.State.acc Hash_prefix.signature))
         ~support:
           (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
     in
