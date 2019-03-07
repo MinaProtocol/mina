@@ -7,3 +7,6 @@
 [submodule "src/external/async_kernel"]
 	path = src/external/async_kernel
 	url = ../async_kernel
+[submodule "src/external/ocaml-extlib"]
+	path = src/external/ocaml-extlib
+	url = git@github.com:CodaProtocol/ocaml-extlib.git
