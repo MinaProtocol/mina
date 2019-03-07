@@ -21,7 +21,7 @@ module type Message_intf = sig
 
   val content : msg -> content
 
-  val peer : msg -> Peer.t
+  val sender : msg -> Envelope.Sender.t
 end
 
 module type Config_intf = sig
@@ -179,11 +179,11 @@ module Make (Message : Message_intf) :
               ( Message.implement_multi
                   (fun _client_host_and_port ~version:_ msg ->
                     (* TODO: maybe check client host matches IP in msg, punish if
-                       mismatch due to forgery
+                        mismatch due to forgery
                      *)
                     Strict_pipe.Writer.write received_writer
                       (Envelope.Incoming.wrap ~data:(Message.content msg)
-                         ~sender:(Message.peer msg)) )
+                         ~sender:(Message.sender msg)) )
               @ implementations )
           in
           Rpc.Implementations.create_exn ~implementations
@@ -213,9 +213,9 @@ module Make (Message : Message_intf) :
                Rpc.Connection.server_with_close reader writer ~implementations
                  ~connection_state:(fun _ ->
                    (* connection state is the client's IP and ephemeral port when
-                      connecting to the server over TCP; the ephemeral port is
-                      distinct from the client's discovery and communication ports
-                    *)
+                 connecting to the server over TCP; the ephemeral port is
+                 distinct from the client's discovery and communication ports
+              *)
                    Socket.Address.Inet.to_host_and_port client )
                  ~on_handshake_error:
                    (`Call

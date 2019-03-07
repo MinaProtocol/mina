@@ -239,7 +239,7 @@ struct
 
       let content = Envelope.Incoming.data
 
-      let peer = Envelope.Incoming.sender
+      let sender = Envelope.Incoming.sender
     end
 
     let name = "message"
@@ -369,13 +369,13 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let transition_catchup_rpc _conn ~version:_ hash_in_envelope =
       Logger.info log
-        !"Peer %{sexp:Network_peer.Peer.t} sent transition_catchup"
+        !"Peer %{sexp:Envelope.Sender.t} sent transition_catchup"
         (Envelope.Incoming.sender hash_in_envelope) ;
       transition_catchup hash_in_envelope
     in
     let get_ancestry_rpc _conn ~version:_ query_in_envelope =
       Logger.info log
-        !"Sending root proof to peer %{sexp:Network_peer.Peer.t}"
+        !"Sending root proof to peer %{sexp:Envelope.Sender.t}"
         (Envelope.Incoming.sender query_in_envelope) ;
       get_ancestry query_in_envelope
     in
@@ -421,7 +421,8 @@ module Make (Inputs : Inputs_intf) = struct
   (* wrap data in envelope, with "me" in the gossip net as the sender *)
   let envelope_from_me t data =
     let me = (gossip_net t).me in
-    Envelope.Incoming.wrap ~data ~sender:me
+    (* this envelope is remote me, because we're sending it over the network *)
+    Envelope.Incoming.wrap ~data ~sender:(Envelope.Sender.Remote me)
 
   (* TODO: Have better pushback behavior *)
   let broadcast t x =
@@ -577,7 +578,9 @@ module Make (Inputs : Inputs_intf) = struct
                   !"Received answer from peer %{sexp: Peer.t} on ledger_hash \
                     %{sexp: Ledger_hash.t}"
                   peer (fst answer) ;
-                Some (Envelope.Incoming.wrap ~data:answer ~sender:peer)
+                Some
+                  (Envelope.Incoming.wrap ~data:answer
+                     ~sender:(Envelope.Sender.Remote peer))
             | Ok (Error e) ->
                 Logger.info t.log "Rpc error: %s" (Error.to_string_mach e) ;
                 Hash_set.add peers_tried peer ;
