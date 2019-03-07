@@ -1570,109 +1570,97 @@ let%test_module "Proof of stake tests" =
   ( module struct
     open Consensus_state
 
-    let%test_unit "update, update_var agree starting from same consensus state"
-        =
-      let gen =
-        let open Quickcheck.Let_syntax in
-        (* build pieces needed to apply "update" *)
-        let gen_slot_advancement = Core.Int.gen_incl 1 10 in
-        let%bind make_consensus_state =
-          For_tests.gen_consensus_state ~gen_slot_advancement
-        in
-        let previous_protocol_state = genesis_protocol_state in
-        let snarked_ledger_hash =
-          previous_protocol_state |> With_hash.data
-          |> Protocol_state.blockchain_state
-          |> Protocol_state.Blockchain_state.snarked_ledger_hash
-        in
-        let previous_consensus_state =
-          make_consensus_state ~snarked_ledger_hash ~previous_protocol_state
-        in
-        let epoch, slot =
-          Epoch.epoch_and_slot_of_time_exn
-            (Time.of_time (Core_kernel.Time.now ()))
-        in
-        let consensus_transition_data : Consensus_transition_data.value =
-          {epoch; slot}
-        in
-        let previous_protocol_state_hash =
-          With_hash.hash previous_protocol_state
-        in
-        let supply_increase = Currency.Amount.of_int 42 in
-        let proposer_vrf_result =
-          Random_oracle.Digest.of_string "proposer VRF result"
-        in
-        let next_consensus_state =
-          update ~previous_consensus_state ~consensus_transition_data
-            ~previous_protocol_state_hash ~supply_increase ~snarked_ledger_hash
-            ~proposer_vrf_result
-          |> Or_error.ok_exn
-        in
-        (* build pieces needed to apply "update_var" *)
-        let checked_computation =
-          let open Snark_params.Tick in
-          let open Let_syntax in
-          (* work in Checked monad *)
-          let%bind previous_state =
-            exists typ ~compute:(As_prover.return previous_consensus_state)
-          in
-          let%bind transition_data =
-            exists Consensus_transition_data.typ
-              ~compute:(As_prover.return consensus_transition_data)
-          in
-          let%bind previous_protocol_state_hash =
-            exists Coda_base.State_hash.typ
-              ~compute:(As_prover.return previous_protocol_state_hash)
-          in
-          let%bind supply_increase =
-            exists Amount.typ ~compute:(As_prover.return supply_increase)
-          in
-          let%bind previous_blockchain_state_ledger_hash =
-            exists Coda_base.Frozen_ledger_hash.typ
-              ~compute:(As_prover.return snarked_ledger_hash)
-          in
-          let result =
-            update_var previous_state transition_data
-              previous_protocol_state_hash ~supply_increase
-              ~previous_blockchain_state_ledger_hash
-          in
-          let open Signature_lib in
-          let open Snark_params in
-          let open Coda_base in
-          (* setup handler *)
-          let ledger = Ledger.create () in
-          let ({public_key; private_key} : Keypair.t) = Keypair.create () in
-          let public_key_compressed = Public_key.compress public_key in
-          let account =
-            Account.create public_key_compressed (Currency.Balance.of_int 42)
-          in
-          ignore
-            (Ledger.get_or_create_account_exn ledger public_key_compressed
-               account) ;
-          let location =
-            Option.value_exn
-              (Ledger.location_of_key ledger public_key_compressed)
-          in
-          let delegator =
-            location |> Ledger.Location.to_path_exn |> Ledger.Addr.to_int
-          in
-          let sparse_ledger =
-            Sparse_ledger.of_ledger_subset_exn ledger [public_key_compressed]
-          in
-          let handler =
-            Prover_state.handler {delegator; ledger= sparse_ledger; private_key}
-          in
-          let%map `Success _, var = Tick.handle result handler in
-          As_prover.read typ var
-        in
-        let (), checked_value =
-          Or_error.ok_exn
-          @@ Snark_params.Tick.run_and_check checked_computation ()
-        in
-        assert (equal_value checked_value next_consensus_state) ;
-        return ()
+    let%test_unit "update, update_var agree starting from same genesis state" =
+      (* build pieces needed to apply "update" *)
+      let previous_protocol_state = genesis_protocol_state in
+      let snarked_ledger_hash =
+        previous_protocol_state |> With_hash.data
+        |> Protocol_state.blockchain_state
+        |> Protocol_state.Blockchain_state.snarked_ledger_hash
       in
-      Quickcheck.test gen ~f:(fun () -> ())
+      let previous_consensus_state = genesis in
+      let epoch, slot =
+        Epoch.epoch_and_slot_of_time_exn
+          (Time.of_time (Core_kernel.Time.now ()))
+      in
+      let consensus_transition_data : Consensus_transition_data.value =
+        {epoch; slot}
+      in
+      let previous_protocol_state_hash =
+        With_hash.hash previous_protocol_state
+      in
+      let supply_increase = Currency.Amount.of_int 42 in
+      let proposer_vrf_result =
+        Random_oracle.Digest.of_string "proposer VRF result"
+      in
+      let next_consensus_state =
+        update ~previous_consensus_state ~consensus_transition_data
+          ~previous_protocol_state_hash ~supply_increase ~snarked_ledger_hash
+          ~proposer_vrf_result
+        |> Or_error.ok_exn
+      in
+      (* build pieces needed to apply "update_var" *)
+      let checked_computation =
+        let open Snark_params.Tick in
+        let open Let_syntax in
+        (* work in Checked monad *)
+        let%bind previous_state =
+          exists typ ~compute:(As_prover.return previous_consensus_state)
+        in
+        let%bind transition_data =
+          exists Consensus_transition_data.typ
+            ~compute:(As_prover.return consensus_transition_data)
+        in
+        let%bind previous_protocol_state_hash =
+          exists Coda_base.State_hash.typ
+            ~compute:(As_prover.return previous_protocol_state_hash)
+        in
+        let%bind supply_increase =
+          exists Amount.typ ~compute:(As_prover.return supply_increase)
+        in
+        let%bind previous_blockchain_state_ledger_hash =
+          exists Coda_base.Frozen_ledger_hash.typ
+            ~compute:(As_prover.return snarked_ledger_hash)
+        in
+        let result =
+          update_var previous_state transition_data
+            previous_protocol_state_hash ~supply_increase
+            ~previous_blockchain_state_ledger_hash
+        in
+        let open Signature_lib in
+        let open Snark_params in
+        let open Coda_base in
+        (* setup handler *)
+        let ledger_data = Genesis_ledger.t in
+        let ledger = Ledger.Any_ledger.cast (module Ledger) ledger_data in
+        (* choose arbitrary account *)
+        let maybe_sk, account = Genesis_ledger.largest_account_exn () in
+        let private_key = Option.value_exn maybe_sk in
+        let public_key = Account.public_key account in
+        let location = Ledger.Any_ledger.M.location_of_key ledger public_key in
+        let delegator =
+          Option.value_exn location |> Ledger.Any_ledger.M.Location.to_path_exn
+          |> Ledger.Addr.to_int
+        in
+        let indices =
+          Ledger.Any_ledger.M.foldi ~init:[] ledger ~f:(fun i accum _acct ->
+              Ledger.Any_ledger.M.Addr.to_int i :: accum )
+        in
+        let sparse_ledger =
+          Sparse_ledger.of_ledger_index_subset_exn ledger indices
+        in
+        let handler =
+          Prover_state.handler {delegator; ledger= sparse_ledger; private_key}
+        in
+        let%map `Success _, var = Tick.handle result handler in
+        As_prover.read typ var
+      in
+      let (), checked_value =
+        Or_error.ok_exn
+        @@ Snark_params.Tick.run_and_check checked_computation ()
+      in
+      assert (equal_value checked_value next_consensus_state) ;
+      ()
   end )
 
 [%%endif]
