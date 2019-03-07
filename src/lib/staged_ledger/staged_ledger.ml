@@ -902,7 +902,6 @@ end = struct
       ; ledger= new_ledger
       ; pending_coinbase_collection= updated_pending_coinbase_collection' }
     in
-    Core.printf !"Scan state:%{sexp: scan_state} \n %!" scan_state' ;
     ( `Hash_after_applying (hash new_staged_ledger)
     , `Ledger_proof res_opt
     , `Staged_ledger new_staged_ledger
