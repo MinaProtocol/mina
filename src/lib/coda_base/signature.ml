@@ -10,9 +10,9 @@ module Stable = struct
       [@@deriving sexp, eq, compare, hash, bin_io]
     end
 
-    let to_base64 t = Binable.to_string (module T) t |> B64.encode
+    let to_base64 t = Binable.to_string (module T) t |> Base64.encode_string
 
-    let of_base64_exn s = B64.decode s |> Binable.of_string (module T)
+    let of_base64_exn s = Base64.decode_exn s |> Binable.of_string (module T)
 
     include T
     include Registration.Make_latest_version (T)

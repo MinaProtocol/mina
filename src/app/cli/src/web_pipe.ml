@@ -40,7 +40,7 @@ module type Coda_intf = sig
        Strict_pipe.Reader.t
 end
 
-let to_base64 m x = B64.encode (Binable.to_string m x)
+let to_base64 m x = Base64.encode_string (Binable.to_string m x)
 
 module Storage (Bin : Binable.S) = struct
   let store location data =
@@ -144,7 +144,7 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
         Strict_pipe.Reader.iter (Program.strongest_ledgers coda) ~f:(fun _ ->
             Writer.save (path ^/ "chain")
               ~contents:
-                (B64.encode
+                (Base64.encode_string
                    (Binable.to_string
                       (module Lite_base.Lite_chain)
                       (get_lite_chain coda

@@ -29,6 +29,9 @@ module type Consensus_state_intf = sig
   val length : value -> Length.t
   (** For status *)
 
+  val time_hum : value -> string
+  (** For status *)
+
   val to_lite : (value -> Lite_base.Consensus_state.t) option
 
   val display : value -> display
@@ -160,7 +163,6 @@ module Make
       |> State_body_hash.of_hash
 
     let var_to_triples {blockchain_state; consensus_state} =
-      let open Let_syntax in
       let%map blockchain_state =
         Blockchain_state.var_to_triples blockchain_state
       and consensus_state = Consensus_state.var_to_triples consensus_state in

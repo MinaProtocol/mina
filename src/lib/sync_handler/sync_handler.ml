@@ -15,6 +15,7 @@ module type Inputs_intf = sig
      and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type consensus_local_state := Consensus.Local_state.t
+     and type user_command := User_command.t
 
   module Time : Protocols.Coda_pow.Time_intf
 
@@ -61,18 +62,25 @@ module Make (Inputs : Inputs_intf) :
     let open Option.Let_syntax in
     let%map ledger = get_ledger_by_hash ~frontier hash in
     let responder =
-      Sync_ledger.Responder.create ledger ignore ~parent_log:logger
+      Sync_ledger.Mask.Responder.create ledger ignore ~parent_log:logger
     in
-    let answer = Sync_ledger.Responder.answer_query responder query in
+    let answer = Sync_ledger.Mask.Responder.answer_query responder query in
     (hash, answer)
 
-  let transition_catchup ~frontier hash =
+  let transition_catchup ~frontier state_hash =
     let open Option.Let_syntax in
-    let%bind breadcrumb = Transition_frontier.find frontier hash in
-    Transition_frontier.path_map
-      ~f:(fun b ->
-        Transition_frontier.Breadcrumb.transition_with_hash b
-        |> With_hash.data |> External_transition.of_verified )
-      frontier breadcrumb
-    |> Non_empty_list.of_list_opt
+    let%bind transitions =
+      Transition_frontier.root_history_path_map frontier
+        ~f:(fun b ->
+          Transition_frontier.Breadcrumb.transition_with_hash b
+          |> With_hash.data |> External_transition.of_verified )
+        state_hash
+    in
+    let length =
+      Int.min
+        (Non_empty_list.length transitions)
+        (2 * Transition_frontier.max_length)
+    in
+    Non_empty_list.take (Non_empty_list.rev transitions) length
+    >>| Non_empty_list.rev
 end

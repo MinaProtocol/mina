@@ -197,3 +197,10 @@ module Key = struct
   include Hashable.Make_binable (T)
   include Comparable.Make (T)
 end
+
+module Base_inputs = struct
+  module Key = Key
+  module Balance = Balance
+  module Account = Account
+  module Hash = Hash
+end

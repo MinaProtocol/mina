@@ -15,6 +15,28 @@ module Stable = struct
 
     include T
     include Module_version.Registration.Make_latest_version (T)
+
+    let is_valid {proposer= _; amount; fee_transfer} =
+      match fee_transfer with
+      | None -> true
+      | Some (_, fee) -> Currency.Amount.(of_fee fee <= amount)
+
+    (* check validity when deserializing *)
+    include Binable.Of_binable
+              (T)
+              (struct
+                type nonrec t = t
+
+                let to_binable t = t
+
+                let of_binable t =
+                  (* TODO: maliciously invalid data will halt the node
+                     should this be just logged?
+                     See issue #1767.
+                  *)
+                  assert (is_valid t) ;
+                  t
+              end)
   end
 
   module Latest = V1
@@ -29,24 +51,14 @@ module Stable = struct
   module Registered_V1 = Registrar.Register (V1)
 end
 
-include Stable.Latest
+(* DO NOT add bin_io to the deriving list *)
+type t = Stable.Latest.t =
+  { proposer: Public_key.Compressed.t
+  ; amount: Currency.Amount.t
+  ; fee_transfer: Fee_transfer.single option }
+[@@deriving sexp, compare, eq]
 
-let is_valid {proposer= _; amount; fee_transfer} =
-  match fee_transfer with
-  | None -> true
-  | Some (_, fee) -> Currency.Amount.(of_fee fee <= amount)
-
-include Binable.Of_binable
-          (T)
-          (struct
-            type nonrec t = t
-
-            let to_binable = Fn.id
-
-            let of_binable t =
-              assert (is_valid t) ;
-              t
-          end)
+let is_valid = Stable.Latest.is_valid
 
 let create ~amount ~proposer ~fee_transfer =
   let t = {proposer; amount; fee_transfer} in

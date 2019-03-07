@@ -28,7 +28,7 @@ module type S = sig
     [@@deriving sexp, bin_io]
 
     type coinbase =
-      { coinbase: Coinbase.t
+      { coinbase: Coinbase.Stable.V1.t
       ; previous_empty_accounts: Public_key.Compressed.t list }
     [@@deriving sexp, bin_io]
 
@@ -140,7 +140,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     [@@deriving sexp, bin_io]
 
     type coinbase =
-      { coinbase: Coinbase.t
+      { coinbase: Coinbase.Stable.V1.t
       ; previous_empty_accounts: Public_key.Compressed.t list }
     [@@deriving sexp, bin_io]
 
@@ -240,7 +240,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           set t l1 {a1 with balance} ;
           emptys1 )
         else
-          let emptys2, a2, l2 = get_or_create t pk1 in
+          let emptys2, a2, l2 = get_or_create t pk2 in
           let%bind balance1 = modify_balance a1.balance fee1 in
           let%map balance2 = modify_balance a2.balance fee2 in
           set t l1 {a1 with balance= balance1} ;
