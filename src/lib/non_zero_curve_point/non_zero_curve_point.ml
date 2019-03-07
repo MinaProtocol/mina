@@ -69,9 +69,9 @@ module Compressed = struct
       include T
       include Registration.Make_latest_version (T)
 
-      let to_base64 t = Binable.to_string (module T) t |> B64.encode
+      let to_base64 t = Binable.to_string (module T) t |> Base64.encode_string
 
-      let of_base64_exn s = B64.decode s |> Binable.of_string (module T)
+      let of_base64_exn s = Base64.decode_exn s |> Binable.of_string (module T)
 
       include Codable.Make_of_string (struct
         type nonrec t = t
@@ -100,9 +100,11 @@ module Compressed = struct
 
   let compress (x, y) : t = {x; is_odd= parity y}
 
-  let to_base64 t = Binable.to_string (module Stable.Latest) t |> B64.encode
+  let to_base64 t =
+    Binable.to_string (module Stable.Latest) t |> Base64.encode_string
 
-  let of_base64_exn s = B64.decode s |> Binable.of_string (module Stable.Latest)
+  let of_base64_exn s =
+    Base64.decode_exn s |> Binable.of_string (module Stable.Latest)
 
   let to_string = to_base64
 
