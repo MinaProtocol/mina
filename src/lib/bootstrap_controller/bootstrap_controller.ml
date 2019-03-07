@@ -220,11 +220,11 @@ end = struct
                         { snarked_ledger_hash
                         ; staged_ledger_merkle_root
                         ; scan_state }
-              else
+              else (
                 (* TODO: punish *)
-                Fn.const `Ignored
-                @@ Logger.faulty_peer t.logger
-                     "Received wrong staged_ledger_aux from the network"
+                Logger.faulty_peer t.logger
+                  "Received wrong staged_ledger_aux from the network" ;
+                `Ignored )
           | Error e -> received_bad_proof t e |> Fn.const `Ignored )
 
   let sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader
