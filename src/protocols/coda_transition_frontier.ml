@@ -72,6 +72,8 @@ module type Network_intf = sig
 
   type state_body_hash
 
+  type parallel_scan_state
+
   val random_peers : t -> int -> peer list
 
   val catchup_transition :
@@ -84,9 +86,11 @@ module type Network_intf = sig
        t
     -> peer
     -> consensus_state
-    -> ( external_transition
-       , state_body_hash list * external_transition )
-       Proof_carrying_data.t
+    -> ( ( external_transition
+         , state_body_hash list * external_transition )
+         Proof_carrying_data.t
+       * parallel_scan_state
+       * ledger_hash )
        Deferred.Or_error.t
 
   (* TODO: Change this to strict_pipe *)
@@ -174,10 +178,9 @@ module type Transition_frontier_base_intf = sig
        logger:Logger.t
     -> root_transition:(external_transition_verified, state_hash) With_hash.t
     -> root_snarked_ledger:ledger_database
-    -> root_transaction_snark_scan_state:transaction_snark_scan_state
-    -> root_staged_ledger_diff:staged_ledger_diff option
+    -> root_staged_ledger:staged_ledger
     -> consensus_local_state:consensus_local_state
-    -> t Deferred.t
+    -> t
 
   val close : t -> unit
   (** Clean up internal state. *)

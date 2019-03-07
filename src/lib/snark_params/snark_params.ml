@@ -313,7 +313,7 @@ module Tock = struct
     let conv_fqe v = Field.Vector.(get v 0, get v 1)
 
     let conv_g2 p =
-      let x, y = Tock_backend.Inner_twisted_curve.to_coords p in
+      let x, y = Tock_backend.Inner_twisted_curve.to_affine_coordinates p in
       Pairing.G2.Unchecked.of_affine_coordinates (conv_fqe x, conv_fqe y)
 
     let conv_fqk p =
@@ -666,7 +666,7 @@ module Tick = struct
     let conv_fqe v = Field.Vector.(get v 0, get v 1, get v 2)
 
     let conv_g2 p =
-      let x, y = Tick_backend.Inner_twisted_curve.to_coords p in
+      let x, y = Tick_backend.Inner_twisted_curve.to_affine_coordinates p in
       Pairing.G2.Unchecked.of_affine_coordinates (conv_fqe x, conv_fqe y)
 
     let conv_fqk (p : Tock_backend.Full.Fqk.t) =

@@ -54,3 +54,7 @@ val to_list : 'a t -> 'a list
 val append : 'a t -> 'a t -> 'a t
 
 val take : 'a t -> int -> 'a t option
+
+val min_elt : compare:('a -> 'a -> int) -> 'a t -> 'a
+
+val max_elt : compare:('a -> 'a -> int) -> 'a t -> 'a
