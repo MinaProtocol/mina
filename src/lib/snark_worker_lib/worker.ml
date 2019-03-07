@@ -72,13 +72,17 @@ module Make (Inputs : Intf.Inputs_intf) :
         else Or_error.of_exn exn
     | Ok res -> res
 
-  let metrics_to_strings metrics log =
+  let emit_proof_metrics metrics log =
     List.iter metrics ~f:(fun (total, tag) ->
         match tag with
         | `Merge ->
-            Logger.info log !"Merge Proof %s" (Time.Span.to_string total)
+            Logger.info log
+              !"SNARK Merge Proof Completed - %s%!"
+              (Time.Span.to_string total)
         | `Transition ->
-            Logger.info log !"Base Proof %s" (Time.Span.to_string total) )
+            Logger.info log
+              !"SNARK Base Proof Completed - %s%!"
+              (Time.Span.to_string total) )
 
   let main daemon_address public_key shutdown_on_disconnect =
     let log =
@@ -108,13 +112,13 @@ module Make (Inputs : Intf.Inputs_intf) :
           let%bind () = wait ~sec:random_delay () in
           go ()
       | Ok (Some work) -> (
-          Logger.info log !"Received work." ;
+          Logger.info log !"Received work.%!" ;
           match perform state public_key work with
           | Error e -> log_and_retry "performing work" e
           | Ok result -> (
               match%bind
-                Logger.info log !"Submitting work." ;
-                metrics_to_strings result.metrics log ;
+                Logger.info log !"Submitting work.%!" ;
+                emit_proof_metrics result.metrics log ;
                 dispatch Rpcs.Submit_work.rpc shutdown_on_disconnect result
                   daemon_address
               with
