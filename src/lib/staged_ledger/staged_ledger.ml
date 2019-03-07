@@ -297,8 +297,7 @@ end = struct
     ; pending_coinbase_collection }
 
   (*TODO:Make pending_coinbase part of the hash?*)
-  let hash {scan_state; ledger; pending_coinbase_collection} :
-      Staged_ledger_hash.t =
+  let hash {scan_state; ledger; _} : Staged_ledger_hash.t =
     Staged_ledger_hash.of_aux_and_ledger_hash
       (Scan_state.hash scan_state)
       (Ledger.merkle_root ledger)
@@ -1733,8 +1732,6 @@ let%test_module "test" =
 
         let empty_merkle_root () = ""
 
-        let hash _ = ""
-
         let merkle_root : t -> Pending_coinbase_hash.t =
          fun t ->
           List.map
@@ -1747,7 +1744,7 @@ let%test_module "test" =
         let latest_stack t = List.hd t
 
         let oldest_stack_exn t =
-          match List.rev t with [] -> failwith "No stack" | x :: xs -> x
+          match List.rev t with [] -> failwith "No stack" | x :: _ -> x
 
         module Stack = struct
           type t = Coinbase.t list [@@deriving sexp, bin_io, compare, hash, eq]
@@ -1764,14 +1761,14 @@ let%test_module "test" =
         let remove_coinbase_stack_exn t =
           match List.rev t with
           | [] -> failwith "tried to remove stack from an empty collection"
-          | x :: xs -> List.rev xs
+          | _ :: xs -> List.rev xs
 
         let update_coinbase_stack_exn t stack ~is_new_stack =
           if is_new_stack then stack :: t
           else
             match t with
             | [] -> failwith "tried to update empty tree"
-            | x :: xs -> stack :: xs
+            | _ :: xs -> stack :: xs
       end
 
       module Pending_coinbase_stack_state = struct
