@@ -43,15 +43,7 @@ module type S = sig
   end
 
   module State : sig
-    [%%if fake_hash]
-
-    type t = {triples_consumed: int; acc: curve; ctx: Digestif.SHA256.ctx}
-
-    [%%else]
-
     type t
-
-    [%%endif]
 
     val create : ?triples_consumed:int -> ?init:curve -> unit -> t
 
@@ -155,18 +147,31 @@ module Make (Inputs : Pedersen_inputs_intf.S) :
           O1trace.trace_event "about to make field element" ;
           let bits = List.init 256 ~f:(bit_at dgst) in
           let x = Field.project bits in
-          { t with
-            acc= Curve.point_near_x x
+          { acc= Curve.point_near_x x
           ; ctx
           ; triples_consumed= t.triples_consumed + triples_consumed_here } )
+
+    let acc t = t.acc
+
+    let acc_of_sections secs =
+      let t = create () in
+      List.fold_left secs ~init:t ~f:(fun acc sec ->
+          match sec with
+          | `Acc (acc', n) ->
+              { acc with
+                acc= Curve.add acc' acc.acc
+              ; triples_consumed= acc.triples_consumed + n }
+          | `Skip n -> {acc with triples_consumed= acc.triples_consumed + n}
+          | `Data ts -> update_fold acc ts )
+      |> acc
+
+    let triples_consumed t = t.triples_consumed
 
     let set_chunked_fold _ = ()
 
     let update_fold_chunked = update_fold
 
     let update_fold_unchunked = update_fold
-
-    let acc t = t.acc
 
     [%%else]
 
@@ -299,12 +304,6 @@ module Make (Inputs : Pedersen_inputs_intf.S) :
       t.scalar_triples_consumed
       + (scalar_size_in_triples * t.scalar_chunks_consumed)
 
-    [%%endif]
-
-    let digest t =
-      let x, _y = Curve.to_affine_coordinates (acc t) in
-      x
-
     let acc_of_sections =
       let module Acc = struct
         type t = {triples_consumed: int; acc: Curve.t}
@@ -383,14 +382,6 @@ module Make (Inputs : Pedersen_inputs_intf.S) :
           (max_length + scalar_size_in_triples - 1) / scalar_size_in_triples
         in
         List.init scalars_needed ~f:(fun i ->
-            (*
-          let rec go pt acc k =
-            if k = scalar_size_in_triples
-            then List.rev acc
-            else go
-                  (sixteen_times ~add:Curve.add pt) (pt :: acc) ( k + 1)
-          in
-             go Inputs.params.(i) [] 0 *)
             List.init scalar_size_in_triples ~f:(fun j ->
                 Curve.scale_field Inputs.params.(i) (pow2 (4 * j)) ) )
         |> List.concat |> Array.of_list
@@ -401,21 +392,20 @@ module Make (Inputs : Pedersen_inputs_intf.S) :
               (local_function ~negate:Curve.negate ~add:Curve.add triple
                  naive_params.(i)) )
       in
-      let gen =
-        let open Quickcheck.Generator in
-        let open Let_syntax in
-        let%bind n = Int.gen_incl 0 max_length in
-        let n = (0 * n) + 1 in
-        List.gen_with_length n (tuple3 bool bool bool)
-      in
       let module G = struct
         include Curve
 
         let compare x y = if equal x y then 0 else 1
       end in
-      Quickcheck.test gen ~f:(fun ts ->
+      Quickcheck.test (gen_input max_length) ~f:(fun ts ->
           [%test_eq: G.t] (naive ts)
             (acc (update_fold_chunked (create ()) (Fold.of_list ts))) )
+
+    [%%endif]
+
+    let digest t =
+      let x, _y = Curve.to_affine_coordinates (acc t) in
+      x
 
     let salt s = update_fold_unchunked (create ()) (Fold.string_triples s)
   end

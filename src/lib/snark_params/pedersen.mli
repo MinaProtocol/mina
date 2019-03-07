@@ -41,19 +41,7 @@ module type S = sig
   end
 
   module State : sig
-    [%%if fake_hash]
-
-    type t =
-      { triples_consumed: int
-      ; acc: curve
-      ; params: Params.t
-      ; ctx: Digestif.SHA256.ctx }
-
-    [%%else]
-
     type t
-
-    [%%endif]
 
     val create : ?triples_consumed:int -> ?init:curve -> unit -> t
 
