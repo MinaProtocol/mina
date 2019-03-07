@@ -93,9 +93,10 @@ module Make (Inputs : Intf.Inputs_intf) :
       | Ok None ->
           let random_delay =
             Worker_state.worker_wait_time
-            +. (0.2 *. Random.float Worker_state.worker_wait_time)
+            +. (0.5 *. Random.float Worker_state.worker_wait_time)
           in
-          Logger.trace log "No work; waiting %.3fs" random_delay ;
+          Logger.trace log "No work received. Sleeping %.3f seconds."
+            random_delay ;
           let%bind () = wait ~sec:random_delay () in
           go ()
       | Ok (Some work) -> (
@@ -104,6 +105,7 @@ module Make (Inputs : Intf.Inputs_intf) :
           | Error e -> log_and_retry "performing work" e
           | Ok result -> (
               match%bind
+                Logger.info log !"Submitting work." ;
                 dispatch Rpcs.Submit_work.rpc shutdown_on_disconnect result
                   daemon_address
               with
