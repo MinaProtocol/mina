@@ -1,7 +1,7 @@
 (executable
  (name gen)
  (libraries async core crs coda_digestif fold_lib snarky tuple_lib ppxlib
-   crypto_params_init chunk_table chunked_triples)
+   crypto_params_init)
  (preprocess
   (pps ppx_jane ppxlib.metaquot ppxlib.runner))
  (flags -w -40 -g -warn-error
