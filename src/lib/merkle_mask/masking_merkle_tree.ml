@@ -5,20 +5,9 @@ open Core
 
 (* builds a Merkle tree mask; it's a Merkle tree, with some additional
    operations *)
-module Make
-    (Key : Merkle_ledger.Intf.Key)
-    (Account : Merkle_ledger.Intf.Account with type key := Key.t)
-    (Hash : Merkle_ledger.Intf.Hash with type account := Account.t)
-    (Location : Merkle_ledger.Location_intf.S)
-    (Base : Base_merkle_tree_intf.S
-            with module Addr = Location.Addr
-             and module Location = Location
-            with type key := Key.t
-             and type key_set := Key.Set.t
-             and type hash := Hash.t
-             and type root_hash := Hash.t
-             and type account := Account.t) =
-struct
+module Make (Inputs : Inputs_intf.S) = struct
+  open Inputs
+
   type account = Account.t
 
   type hash = Hash.t
@@ -371,6 +360,7 @@ struct
       module Key = Key
       module Account = Account
       module Hash = Hash
+      module Balance = Balance
 
       module Depth = struct
         let depth = Base.depth
@@ -380,6 +370,8 @@ struct
         type nonrec t = t
 
         let get = get
+
+        let last_filled = last_filled
       end
 
       let location_of_account_addr addr = Location.Account addr
@@ -393,6 +385,11 @@ struct
         List.iter locations_and_hashes ~f:(fun (location, hash) ->
             self_set_hash t (Location.to_path_exn location) hash )
 
+      let set_location_batch ~last_location t key_to_location_list =
+        t.current_location <- Some last_location ;
+        Non_empty_list.iter key_to_location_list ~f:(fun (key, data) ->
+            Key.Table.set t.location_tbl ~key ~data )
+
       let set_raw_account_batch t locations_and_accounts =
         List.iter locations_and_accounts ~f:(fun (location, account) ->
             self_set_account t location account )
@@ -400,20 +397,12 @@ struct
 
     let set_batch_accounts t addresses_and_accounts =
       assert_is_attached t ;
-      set_batch t
-      @@ List.map addresses_and_accounts ~f:(fun (addr, account) ->
-             (Location.Account addr, account) )
+      set_batch_accounts t addresses_and_accounts
 
     (* set accounts in mask *)
     let set_all_accounts_rooted_at_exn t address (accounts : Account.t list) =
       assert_is_attached t ;
-      (* basically, the same code used for the database implementation *)
-      let addresses =
-        Sequence.to_list @@ Addr.Range.subtree_range_seq address
-      in
-      let num_accounts = List.length accounts in
-      List.(zip_exn (take addresses num_accounts) accounts)
-      |> set_batch_accounts t
+      set_all_accounts_rooted_at_exn t address accounts
 
     (* keys from this mask and all ancestors *)
     let keys t =

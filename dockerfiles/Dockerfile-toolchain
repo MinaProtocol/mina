@@ -54,6 +54,10 @@ RUN cd /ocaml-sodium && yes | opam pin add .
 ADD /src/external/rpc_parallel /rpc_parallel
 RUN cd /rpc_parallel && yes | opam pin add .
 
+# Source copy of ocaml-extlib (modified to remove module name conflict)
+ADD /src/external/ocaml-extlib /ocaml-extlib
+RUN sudo rm -rf /ocaml-extlib/.git && cd /ocaml-extlib && yes | opam pin add .
+
 ADD /src/external/async_kernel /async_kernel
 RUN sudo rm -rf /async_kernel/.git && cd /async_kernel && yes | opam pin add .
 
