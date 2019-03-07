@@ -20,9 +20,7 @@ module Chain_hash = struct
   end)
 
   let empty =
-    of_hash
-      ( Pedersen.(State.salt params ~get_chunk_table "CodaReceiptEmpty")
-      |> Pedersen.State.digest )
+    of_hash (Pedersen.(State.salt "CodaReceiptEmpty") |> Pedersen.State.digest)
 
   let cons payload t =
     Pedersen.digest_fold Hash_prefix.receipt_chain
@@ -40,7 +38,7 @@ module Chain_hash = struct
     let cons ~payload t =
       let init =
         Pedersen.Checked.Section.create
-          ~acc:(`Value Hash_prefix.receipt_chain.acc)
+          ~acc:(`Value (Pedersen.State.acc Hash_prefix.receipt_chain))
           ~support:
             (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
       in

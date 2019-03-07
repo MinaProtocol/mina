@@ -55,7 +55,7 @@ module Message = struct
       Snark_params.Tick.Pedersen.hash_fold Coda_base.Hash_prefix.vrf_message
         (fold msg)
     in
-    msg_hash_state.acc
+    Snark_params.Tick.Pedersen.State.acc msg_hash_state
 
   module Checked = struct
     let var_to_triples {state_hash} =

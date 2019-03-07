@@ -465,8 +465,8 @@ module Merge = struct
       let prefix =
         `Var
           (Inner_curve.Checked.if_value is_base
-             ~then_:Hash_prefix.base_snark.acc
-             ~else_:Hash_prefix.merge_snark.acc)
+             ~then_:(Pedersen.State.acc Hash_prefix.base_snark)
+             ~else_:(Pedersen.State.acc Hash_prefix.merge_snark))
       in
       construct_input_checked ~prefix ~sok_digest ~state1:s1 ~state2:s2
         ~supply_increase ~fee_excess ()
@@ -564,7 +564,8 @@ module Merge = struct
         let%bind sok_digest =
           exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest
         in
-        construct_input_checked ~prefix:(`Value Hash_prefix.merge_snark.acc)
+        construct_input_checked
+          ~prefix:(`Value (Pedersen.State.acc Hash_prefix.merge_snark))
           ~sok_digest ~state1:s1_section ~state2:s3_section ~supply_increase
           ~fee_excess:total_fees ~tock_vk:tock_vk_section ()
         >>| Pedersen.Checked.Section.to_initial_segment_digest_exn >>| fst
@@ -667,24 +668,28 @@ module Verification = struct
     this can then be used to compute H(merge_prefix, digest, s1, s2, Amount.Signed.zero, wrap_vk) *)
     let merge_prefix_and_zero_and_vk_curve_pt =
       let open Tick in
+      let acc =
+        let open Pedersen.State in
+        acc_of_sections
+          [ `Acc (acc Hash_prefix.merge_snark, Hash_prefix.length_in_triples)
+          ; `Skip Sok_message.Digest.length_in_triples
+          ; `Skip state_hash_size_in_triples
+          ; `Skip state_hash_size_in_triples
+          ; `Skip Amount.length_in_triples
+          ; `Data Amount.Signed.(fold zero)
+          ; `Data Fold.(group3 ~default:false (of_list wrap_vk_bits)) ]
+      in
       let excess_begin =
         Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
         + (2 * state_hash_size_in_triples)
         + Amount.length_in_triples
-      in
-      let s = {Hash_prefix.merge_snark with triples_consumed= excess_begin} in
-      let s =
-        Pedersen.State.update_fold s
-          Fold.(
-            Amount.Signed.(fold zero)
-            +> group3 ~default:false (of_list wrap_vk_bits))
       in
       let prefix_interval = (0, Hash_prefix.length_in_triples) in
       let excess_end = excess_begin + Amount.Signed.length_in_triples in
       let excess_interval = (excess_begin, excess_end) in
       let vk_length_in_triples = (2 + List.length wrap_vk_bits) / 3 in
       let vk_interval = (excess_end, excess_end + vk_length_in_triples) in
-      Tick.Pedersen.Checked.Section.create ~acc:(`Value s.acc)
+      Tick.Pedersen.Checked.Section.create ~acc:(`Value acc)
         ~support:
           (Interval_union.of_intervals_exn
              [prefix_interval; excess_interval; vk_interval])

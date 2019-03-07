@@ -5,14 +5,12 @@ open Snark_bits
 open Fold_lib
 open Tuple_lib
 
-[%%if fake_hash]
-
-open Coda_digestif
-
-[%%endif]
-
 module type S = sig
   type curve
+
+  type window_table
+
+  type scalar_field
 
   module Digest : sig
     type t [@@deriving bin_io, sexp, eq, hash, compare]
@@ -33,37 +31,16 @@ module type S = sig
   end
 
   module Params : sig
-    type t = curve Quadruple.t array
+    type t = curve array
   end
 
+  val local_function :
+    negate:('a -> 'a) -> add:('a -> 'a -> 'a) -> bool Triple.t -> 'a -> 'a
+
   module State : sig
-    type chunk_table_fun = unit -> curve array array
+    type t
 
-    [%%if fake_hash]
-
-    type t =
-      { triples_consumed: int
-      ; acc: curve
-      ; params: Params.t
-      ; ctx: Digestif.SHA256.ctx
-      ; get_chunk_table: chunk_table_fun }
-
-    [%%else]
-
-    type t =
-      { triples_consumed: int
-      ; acc: curve
-      ; params: Params.t
-      ; get_chunk_table: chunk_table_fun }
-
-    [%%endif]
-
-    val create :
-         ?triples_consumed:int
-      -> ?init:curve
-      -> Params.t
-      -> get_chunk_table:chunk_table_fun
-      -> t
+    val create : ?triples_consumed:int -> ?init:curve -> unit -> t
 
     val update_fold_chunked : t -> bool Triple.t Fold.t -> t
     (** use precomputed table of curve values *)
@@ -79,7 +56,16 @@ module type S = sig
 
     val digest : t -> Digest.t
 
-    val salt : Params.t -> get_chunk_table:chunk_table_fun -> string -> t
+    val triples_consumed : t -> int
+
+    val acc : t -> curve
+
+    val salt : string -> t
+
+    val acc_of_sections :
+         [`Acc of curve * int | `Data of bool Triple.t Fold.t | `Skip of int]
+         list
+      -> curve
   end
 
   val hash_fold : State.t -> bool Triple.t Fold.t -> State.t
@@ -87,23 +73,9 @@ module type S = sig
   val digest_fold : State.t -> bool Triple.t Fold.t -> Digest.t
 end
 
-module Make (Field : sig
-  type t [@@deriving sexp, bin_io, compare, hash, eq]
-
-  include Snarky.Field_intf.S with type t := t
-
-  val project : bool list -> t
-end)
-(Bigint : Snarky.Bigint_intf.Extended with type field := Field.t) (Curve : sig
-    type t
-
-    val to_affine_coordinates : t -> Field.t * Field.t
-
-    val point_near_x : Field.t -> t
-
-    val zero : t
-
-    val add : t -> t -> t
-
-    val negate : t -> t
-end) : S with type curve := Curve.t and type Digest.t = Field.t
+module Make (Inputs : Pedersen_inputs_intf.S) :
+  S
+  with type curve := Inputs.Curve.t
+   and type window_table := Inputs.Curve.Window_table.t
+   and type scalar_field := Inputs.Scalar_field.t
+   and type Digest.t = Inputs.Field.t
