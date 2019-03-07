@@ -46,6 +46,8 @@ module Ledger_inner = struct
     let balance = Account.balance
 
     let initialize = Account.initialize
+
+    let balance = Account.balance
   end
 
   module Inputs = struct
