@@ -1588,8 +1588,22 @@ let%test_module "Proof of stake tests" =
         With_hash.hash previous_protocol_state
       in
       let supply_increase = Currency.Amount.of_int 42 in
+      (* setup ledger, needed to compute proposer_vrf_result here and handler below *)
+      let open Signature_lib in
+      let open Coda_base in
+      (* choose largest account as most likely to propose *)
+      let ledger_data = Genesis_ledger.t in
+      let ledger = Ledger.Any_ledger.cast (module Ledger) ledger_data in
+      let maybe_sk, account = Genesis_ledger.largest_account_exn () in
+      let private_key = Option.value_exn maybe_sk in
+      let public_key = Account.public_key account in
+      let location = Ledger.Any_ledger.M.location_of_key ledger public_key in
+      let delegator =
+        Option.value_exn location |> Ledger.Any_ledger.M.Location.to_path_exn
+        |> Ledger.Addr.to_int
+      in
       let proposer_vrf_result =
-        Random_oracle.Digest.of_string "proposer VRF result"
+        Vrf.eval ~private_key {epoch; slot; seed= Epoch_seed.initial; delegator}
       in
       let next_consensus_state =
         update ~previous_consensus_state ~consensus_transition_data
@@ -1610,7 +1624,7 @@ let%test_module "Proof of stake tests" =
             ~compute:(As_prover.return consensus_transition_data)
         in
         let%bind previous_protocol_state_hash =
-          exists Coda_base.State_hash.typ
+          exists State_hash.typ
             ~compute:(As_prover.return previous_protocol_state_hash)
         in
         let%bind supply_increase =
@@ -1625,21 +1639,7 @@ let%test_module "Proof of stake tests" =
             previous_protocol_state_hash ~supply_increase
             ~previous_blockchain_state_ledger_hash
         in
-        let open Signature_lib in
-        let open Snark_params in
-        let open Coda_base in
         (* setup handler *)
-        let ledger_data = Genesis_ledger.t in
-        let ledger = Ledger.Any_ledger.cast (module Ledger) ledger_data in
-        (* choose arbitrary account *)
-        let maybe_sk, account = Genesis_ledger.largest_account_exn () in
-        let private_key = Option.value_exn maybe_sk in
-        let public_key = Account.public_key account in
-        let location = Ledger.Any_ledger.M.location_of_key ledger public_key in
-        let delegator =
-          Option.value_exn location |> Ledger.Any_ledger.M.Location.to_path_exn
-          |> Ledger.Addr.to_int
-        in
         let indices =
           Ledger.Any_ledger.M.foldi ~init:[] ledger ~f:(fun i accum _acct ->
               Ledger.Any_ledger.M.Addr.to_int i :: accum )
@@ -1650,7 +1650,7 @@ let%test_module "Proof of stake tests" =
         let handler =
           Prover_state.handler {delegator; ledger= sparse_ledger; private_key}
         in
-        let%map `Success _, var = Tick.handle result handler in
+        let%map `Success _, var = Snark_params.Tick.handle result handler in
         As_prover.read typ var
       in
       let (), checked_value =
