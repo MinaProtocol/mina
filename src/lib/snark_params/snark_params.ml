@@ -556,7 +556,7 @@ module Tick = struct
       State.set_chunked_fold true ;
       let trip f x = f x x x in
       test
-        Generator.(list_with_length 1 (trip tuple3 bool))
+        Generator.(list_non_empty (trip tuple3 bool))
         ~f:(fun ts ->
           let typ_in =
             Typ.list ~length:(List.length ts) (trip Typ.tuple3 Boolean.typ)
