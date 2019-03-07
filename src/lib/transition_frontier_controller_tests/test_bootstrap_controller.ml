@@ -101,7 +101,8 @@ let%test_module "Bootstrap Controller" =
               ~root_sync_ledger ~transition_graph ~transition_reader
           in
           let () = Pipe_lib.Strict_pipe.Writer.close transition_writer in
-          let%map () = run_sync in
+          let result = Mvar.create () in
+          let%map () = run_sync ~result in
           let saved_transitions_verified =
             Bootstrap_controller.For_tests.Transition_cache.data
               transition_graph
@@ -110,6 +111,8 @@ let%test_module "Bootstrap Controller" =
             equal
               (of_list input_transitions_verified)
               (of_list saved_transitions_verified)) )
+
+    let is_syncing = function `Ignored -> false | `Syncing _ -> true
 
     let make_transition_pipe () =
       Pipe_lib.Strict_pipe.create
@@ -122,6 +125,41 @@ let%test_module "Bootstrap Controller" =
     let root_hash =
       Fn.compose Ledger.Db.merkle_root
         Transition_frontier.For_tests.root_snarked_ledger
+
+    let%test_unit "reconstruct staged_ledgers using \
+                   of_scan_state_and_snarked_ledger" =
+      let logger = Logger.create () in
+      let num_breadcrumbs = 10 in
+      let accounts = Genesis_ledger.accounts in
+      Thread_safe.block_on_async_exn (fun () ->
+          let%bind frontier = create_root_frontier ~logger accounts in
+          let%bind () =
+            build_frontier_randomly frontier
+              ~gen_root_breadcrumb_builder:
+                (gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
+                   ~accounts_with_secret_keys:accounts)
+          in
+          Deferred.List.iter (Transition_frontier.all_breadcrumbs frontier)
+            ~f:(fun breadcrumb ->
+              let staged_ledger =
+                Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+              in
+              let expected_merkle_root =
+                Staged_ledger.ledger staged_ledger |> Ledger.merkle_root
+              in
+              let snarked_ledger =
+                Transition_frontier.shallow_copy_root_snarked_ledger frontier
+              in
+              let scan_state = Staged_ledger.scan_state staged_ledger in
+              let%map actual_staged_ledger =
+                Staged_ledger.of_scan_state_and_snarked_ledger ~scan_state
+                  ~snarked_ledger ~expected_merkle_root
+                |> Deferred.Or_error.ok_exn
+              in
+              assert (
+                Staged_ledger_hash.equal
+                  (Staged_ledger.hash staged_ledger)
+                  (Staged_ledger.hash actual_staged_ledger) ) ) )
 
     let%test "sync with one node correctly" =
       Backtrace.elide := false ;
@@ -232,7 +270,7 @@ let%test_module "Bootstrap Controller" =
             Bootstrap_controller.For_tests.on_transition bootstrap
               ~root_sync_ledger ~sender:peer.address best_transition
           in
-          assert (should_sync = `Syncing) ;
+          assert (is_syncing should_sync) ;
           let outdated_transition =
             Transition_frontier.root peer.frontier
             |> Transition_frontier.Breadcrumb.transition_with_hash
