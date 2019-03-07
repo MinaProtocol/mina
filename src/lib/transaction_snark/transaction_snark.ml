@@ -24,7 +24,7 @@ module Input = struct
 end
 
 module Proof_type = struct
-  type t = [`Merge | `Base] [@@deriving bin_io, sexp, hash, compare, eq]
+  type t = [`Merge | `Base] [@@deriving bin_io, sexp, hash, compare]
 
   let is_base = function `Base -> true | `Merge -> false
 end
@@ -37,7 +37,7 @@ module Statement = struct
       ; supply_increase: Currency.Amount.Stable.V1.t
       ; fee_excess: Currency.Fee.Signed.Stable.V1.t
       ; proof_type: Proof_type.t }
-    [@@deriving sexp, bin_io, hash, compare, eq, fields]
+    [@@deriving sexp, bin_io, hash, compare, fields]
 
     let option lab =
       Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -99,8 +99,6 @@ let statement
         ~magnitude:Currency.Amount.(to_fee (Signed.magnitude fee_excess))
         ~sgn:(Currency.Amount.Signed.sgn fee_excess) }
 
-let input {source; target; fee_excess; _} = {Input.source; target; fee_excess}
-
 let create = Fields.create
 
 let construct_input ~proof_type ~sok_digest ~state1 ~state2 ~supply_increase
@@ -158,8 +156,6 @@ module Keys0 = struct
   end
 
   include T
-
-  let dummy : t = {proving= Proving.dummy; verification= Verification.dummy}
 end
 
 (* Staging:
@@ -355,17 +351,6 @@ module Base = struct
     in
     ( top_hash
     , Groth16.prove proving_key (tick_input ()) prover_state main top_hash )
-
-  let transaction_proof ~proving_key sok_message state1 state2 transaction
-      handler =
-    transaction_union_proof ~proving_key sok_message state1 state2
-      (Transaction_union.of_transaction transaction)
-      handler
-
-  let fee_transfer_proof ~proving_key sok_message state1 state2 transfer
-      handler =
-    transaction_proof ~proving_key sok_message state1 state2
-      (Fee_transfer transfer) handler
 
   let cached =
     let load =
@@ -723,7 +708,6 @@ module Verification = struct
 
     let verify_complete_merge sok_digest s1 s2 supply_increase get_proof =
       let open Tick in
-      let open Let_syntax in
       let%bind s1 = Frozen_ledger_hash.var_to_triples s1
       and s2 = Frozen_ledger_hash.var_to_triples s2 in
       let%bind top_hash_section =
@@ -811,7 +795,6 @@ struct
    (b1, b2, .., bn) = unpack input,
    there is a proof making one of [ base_vk; merge_vk ] accept (b1, b2, .., bn) *)
   let%snarkydef main (input : Wrap_input.var) =
-    let open Let_syntax in
     let%bind input = with_label __LOC__ (Wrap_input.Checked.to_scalar input) in
     let%bind is_base =
       exists' Boolean.typ ~f:(fun {Prover_state.proof_type; _} ->
@@ -923,9 +906,6 @@ let check_transaction ~sok_message ~source ~target (t : Transaction.t) handler
 
 let check_user_command ~sok_message ~source ~target t handler =
   check_transaction ~sok_message ~source ~target (User_command t) handler
-
-let check_fee_transfer ~sok_message ~source ~target t handler =
-  check_transaction ~sok_message ~source ~target (Fee_transfer t) handler
 
 let verification_keys_of_keys {Keys0.verification; _} = verification
 
@@ -1148,14 +1128,6 @@ module Keys = struct
   module Checksum = struct
     type t = {proving: Md5.t; verification: Md5.t}
   end
-
-  let load ({proving; verification} : Location.t) =
-    let open Async in
-    let%map proving, proving_checksum = Proving.load proving
-    and verification, verification_checksum = Verification.load verification in
-    ( {proving; verification}
-    , {Checksum.proving= proving_checksum; verification= verification_checksum}
-    )
 
   let create () =
     let base = Base.create_keys () in

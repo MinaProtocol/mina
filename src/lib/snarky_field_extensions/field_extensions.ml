@@ -285,7 +285,6 @@ end = struct
     module Base = F
     module Impl = F.Impl
     open Impl
-    open Let_syntax
     module Unchecked = Snarkette.Fields.Make_fp2 (F.Unchecked) (Params)
 
     module A = struct
@@ -421,7 +420,6 @@ module E3
     module Unchecked = Snarkette.Fields.Make_fp3 (F.Unchecked) (Params)
     module Impl = F.Impl
     open Impl
-    open Let_syntax
 
     module A = struct
       include T3
@@ -576,7 +574,6 @@ module F3
     module Unchecked = Snarkette.Fields.Make_fp3 (F.Unchecked) (Params)
     module Impl = F.Impl
     open Impl
-    open Let_syntax
 
     let mul_by_primitive_element (a, b, c) =
       (F.scale c Params.non_residue, a, b)
@@ -653,7 +650,6 @@ module Cyclotomic_square = struct
     let cyclotomic_square (c0, c1) =
       let open F2 in
       let open Impl in
-      let open Let_syntax in
       let%map b_squared = square (c0 + c1) and a = square c1 in
       let c = b_squared - a in
       let d = mul_by_primitive_element a in
@@ -672,7 +668,6 @@ module Cyclotomic_square = struct
   struct
     let cyclotomic_square ((x00, x01, x02), (x10, x11, x12)) =
       let open F2.Impl in
-      let open Let_syntax in
       let ((a0, a1) as a) = (x00, x11) in
       let ((b0, b1) as b) = (x10, x02) in
       let ((c0, c1) as c) = (x01, x12) in
@@ -727,7 +722,7 @@ struct
   let fq_mul_by_non_residue x = Fq.scale x Fq3.Params.non_residue
 
   let special_mul (a0, a1) (b0, b1) =
-    let open Impl.Let_syntax in
+    let open Impl in
     let%bind v1 = Fq3.(a1 * b1) in
     let%bind v0 =
       let a00, a01, a02 = a0 in
@@ -744,7 +739,6 @@ struct
   let assert_special_mul ((((a00, a01, a02) as a0), a1) : t)
       ((((_, _, b02) as b0), b1) : t) ((c00, c01, c02), c1) =
     let open Impl in
-    let open Let_syntax in
     let%bind ((v10, v11, v12) as v1) = Fq3.(a1 * b1) in
     let%bind v0 =
       exists Fq3.typ
@@ -770,7 +764,6 @@ struct
 
   let special_div_unsafe a b =
     let open Impl in
-    let open Let_syntax in
     let%bind result =
       exists typ
         ~compute:As_prover.(map2 ~f:Unchecked.( / ) (read typ a) (read typ b))
