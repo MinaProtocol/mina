@@ -22,7 +22,7 @@ let createWindow = () => {
           ~fullscreenable=false,
           ~resizeable=false,
           ~title="Coda Wallet",
-          ~backgroundColor="#DD" ++ Styles.Colors.(hexToString(bgColor)),
+          ~backgroundColor="#DD" ++ StyleGuide.Colors.(hexToString(bgColor)),
           (),
         ),
       ),
