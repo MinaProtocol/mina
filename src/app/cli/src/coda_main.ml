@@ -34,6 +34,8 @@ module Staged_ledger_aux_hash = struct
   include Staged_ledger_hash.Aux_hash.Stable.Latest
 
   let of_bytes = Staged_ledger_hash.Aux_hash.of_bytes
+
+  let to_bytes = Staged_ledger_hash.Aux_hash.to_bytes
 end
 
 module Staged_ledger_hash = struct
