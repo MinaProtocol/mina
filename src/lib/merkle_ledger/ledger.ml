@@ -2,17 +2,9 @@ open Core
 open Module_version
 
 (* SOMEDAY: handle empty wallets *)
-module Make
-    (Key : Intf.Key)
-    (Account : Intf.Account with type key := Key.t)
-    (Hash : sig
-              type t [@@deriving sexp, hash, compare, bin_io]
+module Make (Inputs : Base_inputs_intf.S) : sig
+  open Inputs
 
-              include Intf.Hash with type t := t
-            end
-            with type account := Account.t) (Depth : sig
-        val depth : int
-    end) : sig
   include
     Ledger_extras_intf.S
     with type hash := Hash.t
@@ -27,6 +19,7 @@ module Make
     val get_leaf_hash_at_addr : t -> Addr.t -> Hash.t
   end
 end = struct
+  open Inputs
   include Depth
   module Addr = Merkle_address.Make (Depth)
 

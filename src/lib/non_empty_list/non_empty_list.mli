@@ -20,6 +20,8 @@ val head : 'a t -> 'a
 val tail : 'a t -> 'a list
 (** The zero or more tail elements of the container *)
 
+val last : 'a t -> 'a
+
 val rev : 'a t -> 'a t
 (** The reverse ordered list *)
 
@@ -52,3 +54,7 @@ val to_list : 'a t -> 'a list
 val append : 'a t -> 'a t -> 'a t
 
 val take : 'a t -> int -> 'a t option
+
+val min_elt : compare:('a -> 'a -> int) -> 'a t -> 'a
+
+val max_elt : compare:('a -> 'a -> int) -> 'a t -> 'a

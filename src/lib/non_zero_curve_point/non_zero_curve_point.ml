@@ -69,9 +69,9 @@ module Compressed = struct
       include T
       include Registration.Make_latest_version (T)
 
-      let to_base64 t = Binable.to_string (module T) t |> B64.encode
+      let to_base64 t = Binable.to_string (module T) t |> Base64.encode_string
 
-      let of_base64_exn s = B64.decode s |> Binable.of_string (module T)
+      let of_base64_exn s = Base64.decode_exn s |> Binable.of_string (module T)
 
       include Codable.Make_of_string (struct
         type nonrec t = t
@@ -100,9 +100,11 @@ module Compressed = struct
 
   let compress (x, y) : t = {x; is_odd= parity y}
 
-  let to_base64 t = Binable.to_string (module Stable.Latest) t |> B64.encode
+  let to_base64 t =
+    Binable.to_string (module Stable.Latest) t |> Base64.encode_string
 
-  let of_base64_exn s = B64.decode s |> Binable.of_string (module Stable.Latest)
+  let of_base64_exn s =
+    Base64.decode_exn s |> Binable.of_string (module Stable.Latest)
 
   let to_string = to_base64
 
@@ -134,7 +136,6 @@ module Compressed = struct
     {x= Field.Var.constant x; is_odd= Boolean.var_of_value is_odd}
 
   let assert_equal (t1 : var) (t2 : var) =
-    let open Let_syntax in
     let%map () = Field.Checked.Assert.equal t1.x t2.x
     and () = Boolean.Assert.(t1.is_odd = t2.is_odd) in
     ()
@@ -147,7 +148,6 @@ module Compressed = struct
   (* TODO: Right now everyone could switch to using the other unpacking...
    Either decide this is ok or assert bitstring lt field size *)
   let var_to_triples ({x; is_odd} : var) =
-    let open Let_syntax in
     let%map x_bits =
       Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
     in
@@ -156,8 +156,6 @@ module Compressed = struct
       ~default:Boolean.false_
 
   module Checked = struct
-    open Let_syntax
-
     let equal t1 t2 =
       let%bind x_eq = Field.Checked.equal t1.x t2.x in
       let%bind odd_eq = Boolean.equal t1.is_odd t2.is_odd in
