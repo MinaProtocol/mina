@@ -124,7 +124,7 @@ module Consensus_state = struct
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let var_to_triples {length; signer_public_key} =
-    let open Snark_params.Tick.Let_syntax in
+    let open Snark_params.Tick.Checked.Let_syntax in
     let%map public_key_triples =
       Public_key.Compressed.var_to_triples signer_public_key
     in
@@ -194,7 +194,7 @@ let is_transition_valid_checked (transition : Snark_transition.var) =
   let Consensus_transition_data.({signature}) =
     Snark_transition.consensus_data transition
   in
-  let open Snark_params.Tick.Let_syntax in
+  let open Snark_params.Tick.Checked.Let_syntax in
   let%bind (module Shifted) =
     Snark_params.Tick.Inner_curve.Checked.Shifted.create ()
   in
@@ -207,7 +207,7 @@ let is_transition_valid_checked (transition : Snark_transition.var) =
 let next_state_checked ~(prev_state : Protocol_state.var) ~prev_state_hash:_
     block _supply_increase =
   let open Consensus_state in
-  let open Snark_params.Tick.Let_syntax in
+  let open Snark_params.Tick.Checked.Let_syntax in
   let prev_state = Protocol_state.consensus_state prev_state in
   let%bind length = Length.increment_var prev_state.length in
   let signer_public_key =

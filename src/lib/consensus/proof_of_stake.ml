@@ -34,7 +34,6 @@ module Epoch_seed = struct
   let update_var (seed : var) (vrf_result : Random_oracle.Digest.Checked.t) :
       (var, _) Snark_params.Tick.Checked.t =
     let open Snark_params.Tick in
-    let open Snark_params.Tick.Let_syntax in
     let%bind seed_triples = var_to_triples seed in
     let%map hash =
       Pedersen.Checked.digest_triples ~init:Coda_base.Hash_prefix.epoch_seed
@@ -292,7 +291,7 @@ module Epoch_ledger = struct
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let var_to_triples {hash; total_currency} =
-    let open Snark_params.Tick.Let_syntax in
+    let open Snark_params.Tick.Checked.Let_syntax in
     let%map hash_triples = Coda_base.Frozen_ledger_hash.var_to_triples hash in
     hash_triples @ Amount.var_to_triples total_currency
 
@@ -304,7 +303,7 @@ module Epoch_ledger = struct
     Coda_base.Frozen_ledger_hash.length_in_triples + Amount.length_in_triples
 
   let if_ cond ~then_ ~else_ =
-    let open Snark_params.Tick.Let_syntax in
+    let open Snark_params.Tick.Checked.Let_syntax in
     let%map hash =
       Coda_base.Frozen_ledger_hash.if_ cond ~then_:then_.hash ~else_:else_.hash
     and total_currency =
@@ -394,7 +393,7 @@ module Vrf = struct
 
     module Checked = struct
       let var_to_triples {epoch; slot; seed; delegator} =
-        let open Snark_params.Tick.Let_syntax in
+        let open Snark_params.Tick.Checked.Let_syntax in
         let%map seed_triples = Epoch_seed.var_to_triples seed in
         Epoch.Unpacked.var_to_triples epoch
         @ Epoch.Slot.Unpacked.var_to_triples slot
@@ -403,7 +402,7 @@ module Vrf = struct
 
       let hash_to_group msg =
         let open Snark_params.Tick in
-        let open Snark_params.Tick.Let_syntax in
+        let open Snark_params.Tick.Checked.Let_syntax in
         let%bind msg_triples = var_to_triples msg in
         Pedersen.Checked.hash_triples ~init:Coda_base.Hash_prefix.vrf_message
           msg_triples
@@ -454,7 +453,7 @@ module Vrf = struct
       include Random_oracle.Digest.Checked
 
       let hash msg g =
-        let open Snark_params.Tick.Let_syntax in
+        let open Snark_params.Tick.Checked.Let_syntax in
         let%bind msg_triples = Message.Checked.var_to_triples msg in
         let%bind g_triples =
           Non_zero_curve_point.(compress_var g >>= Compressed.var_to_triples)
@@ -492,7 +491,8 @@ module Vrf = struct
 
     let of_uint64_exn = Fn.compose of_int64_exn UInt64.to_int64
 
-    let c_int = 1
+    (* TEMPORARY HACK FOR TESTNETS: c should be 1 otherwise *)
+    let c_int = 2
 
     let c = of_int c_int
 
@@ -695,7 +695,7 @@ module Epoch_data = struct
 
   let var_to_triples {ledger; seed; start_checkpoint; lock_checkpoint; length}
       =
-    let open Snark_params.Tick.Let_syntax in
+    let open Snark_params.Tick.Checked.Let_syntax in
     let%map ledger_triples = Epoch_ledger.var_to_triples ledger
     and seed_triples = Epoch_seed.var_to_triples seed
     and start_checkpoint_triples =
@@ -720,7 +720,7 @@ module Epoch_data = struct
     + Coda_base.State_hash.length_in_triples + Length.length_in_triples
 
   let if_ cond ~then_ ~else_ =
-    let open Snark_params.Tick.Let_syntax in
+    let open Snark_params.Tick.Checked.Let_syntax in
     let%map ledger =
       Epoch_ledger.if_ cond ~then_:then_.ledger ~else_:else_.ledger
     and seed = Epoch_seed.if_ cond ~then_:then_.seed ~else_:else_.seed
@@ -902,7 +902,7 @@ module Consensus_state = struct
       ; curr_slot
       ; last_epoch_data
       ; curr_epoch_data } =
-    let open Snark_params.Tick.Let_syntax in
+    let open Snark_params.Tick.Checked.Let_syntax in
     let%map last_epoch_data_triples = Epoch_data.var_to_triples last_epoch_data
     and curr_epoch_data_triples = Epoch_data.var_to_triples curr_epoch_data in
     Length.Unpacked.var_to_triples length
@@ -988,7 +988,6 @@ module Consensus_state = struct
          Coda_base.Frozen_ledger_hash.var) =
     let open Consensus_transition_data in
     let open Snark_params.Tick in
-    let open Let_syntax in
     let {curr_epoch= prev_epoch; curr_slot= prev_slot; _} = previous_state in
     let {epoch= next_epoch; slot= _} = transition_data in
     let%bind epoch_increased =
@@ -1066,7 +1065,7 @@ module Consensus_state = struct
     and epoch_length =
       Length.increment_if_var previous_state.epoch_length epoch_increased
     in
-    return
+    Checked.return
       ( `Success threshold_satisfied
       , { length
         ; epoch_length

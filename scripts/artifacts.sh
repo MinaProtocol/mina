@@ -16,7 +16,7 @@ do_copy () {
     /usr/bin/gcloud auth activate-service-account --key-file=google_creds.json
     /usr/bin/gcloud config set project $(cat google_creds.json | jq -r .project_id)
 
-    SOURCES="/tmp/artifacts/buildocaml.log src/_build/default/lib/coda_base/sample_keypairs.ml /tmp/artifacts/coda.deb"
+    SOURCES="/tmp/artifacts/*"
     DESTINATION="gs://network-debug/${CIRCLE_BUILD_NUM}/build/"
 
     for SOURCE in $SOURCES

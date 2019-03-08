@@ -65,7 +65,7 @@ kademlia:
 # Alias
 dht: kademlia
 
-build: git_hooks
+build: git_hooks reformat-diff
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && (ulimit -u 2128 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
 	$(info Build complete)
@@ -77,6 +77,9 @@ dev: codabuilder containerstart build
 
 reformat: git_hooks
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
+
+reformat-diff:
+	ocamlformat --inplace $(shell git diff --name-only HEAD | grep '.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
 
 check-format:
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
@@ -194,10 +197,10 @@ provingkeys:
 	mkdir -p /tmp/artifacts ; \
 	cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/. ; \
 
-
 genesiskeys:
 	@mkdir -p /tmp/artifacts
 	@cp src/_build/default/lib/coda_base/sample_keypairs.ml /tmp/artifacts/.
+	@cp src/_build/default/lib/coda_base/sample_keypairs.json /tmp/artifacts/.
 
 codaslim:
 	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
