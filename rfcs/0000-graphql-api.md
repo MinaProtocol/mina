@@ -27,6 +27,9 @@ need to store information about blocks that these keys have created.
 We will likely want to at least optionally cache the history of the blocks/payments on the client side as well,
 just to avoid needing to query it all every time (though we could also paginate the )
 
+First thing to note is the scalars defined at the top: GraphQL can define custom types that it treats as opaque and that
+need to be implemented symmetrically on the client and server. We may be able to swap these out for strings in most cases
+in the public api in order to avoid needing to ship libraries supporting them, but for clarity here I've left them as is.
 ```graphql
 scalar Date
 scalar PublicKey
