@@ -14,24 +14,27 @@
 
 open Core
 
-(* Let's call this group_map *)
-
 module type Field_intf = sig
   type t
   val (+) : t -> t -> t
   val ( * ) : t -> t -> t
   val ( / ) : t -> t -> t
-  val equal : t -> t -> bool
   val t_of_sexp: Sexp.t -> t
-  val sexp_of_t: t -> Sexp.t
   val of_int: int -> t
   val one : t
   val zero : t
   val negate : t -> t
-  val sqrt : t -> t
 end
 
-module Intf(F : Field_intf) = struct
+module type Unchecked_field_intf = sig
+  include Field_intf
+  val sqrt : t -> t
+  val equal : t -> t -> bool
+  val is_square : t -> bool
+  val sexp_of_t: t -> Sexp.t
+end
+
+module Intf(F : sig type t end) = struct
   module type S = sig
     val to_group : F.t -> F.t * F.t
   end
@@ -42,7 +45,7 @@ module Make_group_map
     (Params : sig
         val a : F.t
         val b : F.t
-    end) : Intf(F).S =
+    end) =
 struct
   module Hash_key = struct
     module T = struct
@@ -58,7 +61,8 @@ struct
     if s.[0] = '-' then
       let s' = String.sub s ~pos:1 ~len:(String.length s - 1)
       in F.negate (Sexp.of_string_conv_exn s' F.t_of_sexp)
-    else Sexp.of_string_conv_exn s F.t_of_sexp
+
+  else Sexp.of_string_conv_exn s F.t_of_sexp
 
   let field_map = List.map ~f:(fun (a, b) -> (a, field_of_string b))
 
@@ -356,24 +360,6 @@ struct
     let a = 0 and b = 0 in
     go ~a ~b ~acc:F.zero ~s ~j ~tbl
 
-  let%test_unit "iter_a (not special case) test" =
-    Quickcheck.test ~trials:2 Int.gen ~f:(fun j ->
-        let a = iter_a 0 (j mod 4) n1tbl
-        and b = naive_iter_a 0 (j mod 4) n1tbl in
-        printf "iter_a: %s\n%!" (Sexp.to_string (F.sexp_of_t a));
-        printf "naive_iter_a: %s\n%!" (Sexp.to_string (F.sexp_of_t b));
-     assert (F.equal a b)
-    )
-
-  let%test_unit "iter_a (special case) test" =
-    Quickcheck.test ~trials:2 Int.gen ~f:(fun j ->
-        let a = iter_a 1 (j mod 4) n1tbl
-        and b = naive_iter_a 1 (j mod 4) n1tbl in
-        printf "iter_a: %s\n%!" (Sexp.to_string (F.sexp_of_t a));
-        printf "naive_iter_a: %s\n%!" (Sexp.to_string (F.sexp_of_t b));
-     assert (F.equal a b)
-    )
-
   let iter_j s max t_powers tbl =
     let rec go ~j ~acc ~s ~max ~t_powers ~tbl =
       let acc' = iter_a s j tbl in
@@ -420,15 +406,65 @@ struct
       let nt = iter_j 1 15 t_powers n3tbl in
       let dt1 = iter_j 0 5 t_powers d31tbl in
       let dt2 = iter_j 0 10 t_powers d32tbl in
-      F.(nt / (Params.a * dt1 * dt2))
+        F.(nt / (Params.a * dt1 * dt2))
+end
+
+module Make_unchecked (F : Unchecked_field_intf)(Params : sig val a : F.t val b : F.t end) = struct
+  include Make_group_map(F)(Params)
+
+  let%test_unit "iter_a (not special case) test" =
+    Quickcheck.test ~trials:2 Int.gen ~f:(fun j ->
+        let a = iter_a 0 (j mod 4) n1tbl
+        and b = naive_iter_a 0 (j mod 4) n1tbl in
+        printf "iter_a: %s\n%!" (Sexp.to_string (F.sexp_of_t a));
+        printf "naive_iter_a: %s\n%!" (Sexp.to_string (F.sexp_of_t b));
+     assert (F.equal a b)
+    )
+
+  let%test_unit "iter_a (special case) test" =
+    Quickcheck.test ~trials:2 Int.gen ~f:(fun j ->
+        let a = iter_a 1 (j mod 4) n1tbl
+        and b = naive_iter_a 1 (j mod 4) n1tbl in
+        printf "iter_a: %s\n%!" (Sexp.to_string (F.sexp_of_t a));
+        printf "naive_iter_a: %s\n%!" (Sexp.to_string (F.sexp_of_t b));
+     assert (F.equal a b)
+    )
 
   let to_group tvar =
     let a = make_x1 tvar in
-    F.sqrt
+    let fa = F.(a * a * a + Params.a * a + Params.b) in
+    if F.is_square fa then (a, F.sqrt fa)
+    else let b = make_x2 tvar in
+    let fb = F.(b * b * b + Params.a * b + Params.b) in
+      if F.is_square fb then (b, F.sqrt fb)
+    else let c = make_x3 tvar in
+    let fc = F.(c * c * c + Params.a * c + Params.b) in
+      (c, F.sqrt fc)
 end
+
 
 let%test_unit "foo" =
   let module S = Snarky.Snark.Make(Snarky.Backends.Mnt4.Default) in
-  let module M = Make_group_map(S.Field 
-                                  S.Field.Infix)(Snarky.Libsnark.Curves.Mnt4.G1.Coefficients) in
+  let module C = struct
+      type t = S.Field.t
+      let ( + ) = S.Field.add
+      let ( * ) = S.Field.mul
+      let ( / ) = S.Field.Infix.(/)
+      let t_of_sexp = S.Field.t_of_sexp
+      let of_int = S.Field.of_int
+      let one = S.Field.one
+      let zero = S.Field.zero
+      let negate = S.Field.negate
+    end
+  in
+  let module U = struct
+      include C
+      let equal = S.Field.equal
+      let sqrt = S.Field.sqrt
+      let is_square = S.Field.is_square
+      let sexp_of_t = S.Field.sexp_of_t
+    end
+  in
+  let module M = Make_unchecked(U)
+      (Snarky.Libsnark.Curves.Mnt4.G1.Coefficients) in
   ()
