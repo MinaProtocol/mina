@@ -112,7 +112,8 @@ module Make (Inputs : Intf.Inputs_intf) :
           go ()
       | Ok (Some work) -> (
           Logger.info log !"Received work.%!" ;
-          Core.(flush stdout) ;
+          let%bind () = Async.(flush stdout) in
+          (* Pause to flush stdout *)
           match perform state public_key work with
           | Error e -> log_and_retry "performing work" e
           | Ok result -> (
