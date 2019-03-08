@@ -198,7 +198,9 @@ end = struct
         let sender =
           match Envelope.Incoming.sender incoming_transition with
           | Envelope.Sender.Local ->
-              failwith "Unexpected, we should be syncing only to remote nodes"
+              failwith
+                "Unexpected, we should be syncing only to remote nodes in \
+                 sync ledger"
           | Envelope.Sender.Remote peer -> peer
         in
         let protocol_state =
