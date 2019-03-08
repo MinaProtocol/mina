@@ -107,9 +107,7 @@ module Make (Inputs : Intf.Inputs_intf) :
             Worker_state.worker_wait_time
             +. (0.5 *. Random.float Worker_state.worker_wait_time)
           in
-          ( Logger.trace log "No work received from %s - sleeping %.4fs"
-              random_delay
-          , daemon_address.to_string ) ;
+          Logger.trace log "No work received - sleeping %.4fs" random_delay ;
           let%bind () = wait ~sec:random_delay () in
           go ()
       | Ok (Some work) -> (
