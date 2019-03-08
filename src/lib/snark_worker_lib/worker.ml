@@ -95,7 +95,8 @@ module Make (Inputs : Intf.Inputs_intf) :
     let rec go () =
       let log_and_retry label error =
         Logger.error log !"Error %s:\n%{sexp:Error.t}" label error ;
-        let%bind () = wait () in
+        let%bind () = wait ~sec:30.0 () in
+        (* FIXME: Use a backoff algo here *)
         go ()
       in
       match%bind
