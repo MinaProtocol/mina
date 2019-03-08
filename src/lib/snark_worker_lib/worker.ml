@@ -112,7 +112,7 @@ module Make (Inputs : Intf.Inputs_intf) :
           go ()
       | Ok (Some work) -> (
           Logger.info log !"Received work.%!" ;
-          let%bind `This_is_async__Think_about_blocking =
+          let `This_is_async__Think_about_blocking =
             Async.flush `This_is_async__Think_about_blocking
           in
           (* Pause to flush stdout *)
