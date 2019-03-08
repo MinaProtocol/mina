@@ -1,33 +1,48 @@
 let component = ReasonReact.statelessComponent("Body");
 
-let handleClick = (_event, _self) => Js.log("clicked!");
-
-module Test = [%graphql {| { greeting } |}];
+module Test = [%graphql {| query { greeting } |}];
 module TestQuery = ReasonApollo.CreateQuery(Test);
 
 let make = (~message as _, _children) => {
   ...component,
-  render: self => {
+  render: _self => {
     <div
       style={ReactDOMRe.Style.make(
         ~color="white",
+        ~background="#121f2b11",
         ~fontFamily="Sans-Serif",
-        ~padding="15px",
+        ~display="flex",
+        ~overflow="hidden",
         (),
       )}>
-      <div onClick={self.ReasonReact.handle(handleClick)}>
-        <TestQuery>
-          ...{({result}) =>
-            ReasonReact.string(
-              switch (result) {
-              | Loading => ""
-              | Error(error) => error##message
-              | Data(response) => response##greeting
-              },
-            )
-          }
-        </TestQuery>
-      </div>
-    </div>;
+
+        <div
+          style={ReactDOMRe.Style.make(
+            ~display="flex",
+            ~flexDirection="column",
+            ~justifyContent="flex-start",
+            ~width="20%",
+            ~height="auto",
+            ~overflowY="auto",
+            (),
+          )}>
+          <WalletItem name="Hot Wallet" balance=100.0 />
+          <WalletItem name="Vault" balance=234122.123 />
+        </div>
+        <div style={ReactDOMRe.Style.make(~margin="10px", ())}>
+          <TestQuery>
+            ...{({result}) =>
+              ReasonReact.string(
+                switch (result) {
+                | Loading => ""
+                | Error(error) => error##message
+                | Data(response) => response##greeting
+                },
+              )
+            }
+          </TestQuery>
+        </div>
+      </div>;
+      // </div>
   },
 };
