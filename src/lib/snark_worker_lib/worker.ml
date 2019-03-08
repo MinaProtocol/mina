@@ -112,9 +112,7 @@ module Make (Inputs : Intf.Inputs_intf) :
           go ()
       | Ok (Some work) -> (
           Logger.info log !"Received work.%!" ;
-          let `This_is_async__Think_about_blocking =
-            Async.flush `This_is_async__Think_about_blocking
-          in
+          let%bind () = wait () in
           (* Pause to flush stdout *)
           match perform state public_key work with
           | Error e -> log_and_retry "performing work" e
