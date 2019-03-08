@@ -9,7 +9,7 @@ let name = "coda-five-nodes-test"
 let main () =
   let log = Logger.create () in
   let log = Logger.child log name in
-  let n = 6 in
+  let n = 5 in
   let snark_work_public_keys = function
     | 0 ->
         Some
@@ -17,9 +17,8 @@ let main () =
     | _ -> None
   in
   let%bind testnet =
-    Coda_worker_testnet.test log n
-      (fun i -> if i < 5 then Some i else None)
-      snark_work_public_keys Protocols.Coda_pow.Work_selection.Seq
+    Coda_worker_testnet.test log n Option.some snark_work_public_keys
+      Protocols.Coda_pow.Work_selection.Seq
   in
   after (Time.Span.of_min 45.)
 
