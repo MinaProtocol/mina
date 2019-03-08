@@ -107,20 +107,23 @@ module Make (Inputs : Intf.Inputs_intf) :
             Worker_state.worker_wait_time
             +. (0.5 *. Random.float Worker_state.worker_wait_time)
           in
-          Logger.trace log "No work received - sleeping %.4fs" random_delay ;
+          Logger.trace log "No work received from %s - sleeping %.4fs"
+            (Host_and_port.to_string daemon_address)
+            random_delay ;
           let%bind () = wait ~sec:random_delay () in
           go ()
       | Ok (Some work) -> (
-          Logger.info log !"Received work from %s.%!" daemon_address.to_string ;
+          Logger.info log !"Received work from %s%!"
+            (Host_and_port.to_string daemon_address) ;
           let%bind () = wait () in
-          (* Pause to flush stdout *)
+          (* Pause to wait for stdout to flush *)
           match perform state public_key work with
           | Error e -> log_and_retry "performing work" e
           | Ok result -> (
               match%bind
                 emit_proof_metrics result.metrics log ;
-                Logger.info log !"Submitted workto %s .%!"
-                  daemon_address.to_string ;
+                Logger.info log !"Submitted work to %s%!"
+                  (Host_and_port.to_string daemon_address) ;
                 dispatch Rpcs.Submit_work.rpc shutdown_on_disconnect result
                   daemon_address
               with
