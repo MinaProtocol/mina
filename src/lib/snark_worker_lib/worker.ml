@@ -77,11 +77,11 @@ module Make (Inputs : Intf.Inputs_intf) :
         match tag with
         | `Merge ->
             Logger.info log
-              !"SNARK Merge Proof Completed - %s%!"
+              !"Merge Proof Completed - %s%!"
               (Time.Span.to_string total)
         | `Transition ->
             Logger.info log
-              !"SNARK Base Proof Completed - %s%!"
+              !"Base Proof Completed - %s%!"
               (Time.Span.to_string total) )
 
   let main daemon_address public_key shutdown_on_disconnect =
@@ -107,11 +107,12 @@ module Make (Inputs : Intf.Inputs_intf) :
             Worker_state.worker_wait_time
             +. (0.5 *. Random.float Worker_state.worker_wait_time)
           in
-          Logger.trace log "No work received. Sleeping %.4fs" random_delay ;
+          Logger.trace log "No work received from %s - sleeping %.4fs"
+            (random_delay, daemon_address.to_string) ;
           let%bind () = wait ~sec:random_delay () in
           go ()
       | Ok (Some work) -> (
-          Logger.info log !"Received work.%!" ;
+          Logger.info log !"Received work from %s.%!" daemon_address.to_string ;
           let%bind () = wait () in
           (* Pause to flush stdout *)
           match perform state public_key work with
@@ -119,7 +120,8 @@ module Make (Inputs : Intf.Inputs_intf) :
           | Ok result -> (
               match%bind
                 emit_proof_metrics result.metrics log ;
-                Logger.info log !"Submitting work.%!" ;
+                Logger.info log !"Submitted workto %s .%!"
+                  daemon_address.to_string ;
                 dispatch Rpcs.Submit_work.rpc shutdown_on_disconnect result
                   daemon_address
               with
