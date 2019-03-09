@@ -12,7 +12,6 @@ module Message = struct
   type var = Pedersen.Checked.Section.t
 
   let var_of_payload payload =
-    let open Let_syntax in
     let%bind bs = Transaction_union_payload.Checked.to_triples payload in
     Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty bs
       ~start:Hash_prefix.length_in_triples
@@ -29,7 +28,6 @@ module Message = struct
   let () = assert Insecure.signature_hash_function
 
   let%snarkydef hash_checked t ~nonce =
-    let open Let_syntax in
     let init =
       Pedersen.Checked.Section.create ~acc:(`Value Hash_prefix.signature.acc)
         ~support:

@@ -25,13 +25,17 @@ module type Account = sig
 
   type key
 
+  type balance
+
   val public_key : t -> key
+
+  val balance : t -> balance
 
   val empty : t
 end
 
 module type Hash = sig
-  type t [@@deriving bin_io, sexp, eq, compare]
+  type t [@@deriving bin_io, sexp, eq, compare, yojson]
 
   include Hashable.S_binable with type t := t
 

@@ -17,7 +17,7 @@ module Input = struct
   type t =
     { host: string
     ; env: (string * string) list
-    ; should_propose: bool
+    ; proposer: int option
     ; snark_worker_config: Snark_worker_config.t option
     ; work_selection: Protocols.Coda_pow.Work_selection.t
     ; conf_dir: string
@@ -162,7 +162,7 @@ module T = struct
 
     let init_worker_state
         { host
-        ; should_propose
+        ; proposer
         ; snark_worker_config
         ; work_selection
         ; conf_dir
@@ -184,9 +184,9 @@ module T = struct
         let lbc_tree_max_depth = `Finite 50
 
         let propose_keypair =
-          if should_propose then
-            Some (Genesis_ledger.largest_account_keypair_exn ())
-          else None
+          Option.map proposer ~f:(fun i ->
+              List.nth_exn Genesis_ledger.accounts i
+              |> Genesis_ledger.keypair_of_account_record_exn )
 
         let genesis_proof = Precomputed_values.base_proof
 
@@ -198,7 +198,9 @@ module T = struct
 
         let work_selection = work_selection
       end in
-      let%bind (module Init) = make_init ~should_propose (module Config) in
+      let%bind (module Init) =
+        make_init ~should_propose:(Option.is_some proposer) (module Config)
+      in
       let module Main = Coda_main.Make_coda (Init) in
       let module Run = Run (Config) (Main) in
       let banlist_dir_name = conf_dir ^/ "banlist" in
@@ -232,6 +234,11 @@ module T = struct
             ; logger
             ; trust_system } }
       in
+      let frontier_file = conf_dir ^/ "frontier.dot" in
+      let monitor = Async.Monitor.create ~name:"coda" () in
+      let with_monitor f input =
+        Async.Scheduler.within' ~monitor (fun () -> f input)
+      in
       let%bind coda =
         Main.create
           (Main.Config.make ~logger ~net_config
@@ -241,13 +248,21 @@ module T = struct
              ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
              ~time_controller ~receipt_chain_database
              ~snark_work_fee:(Currency.Fee.of_int 0)
-             ?propose_keypair:Config.propose_keypair () ~banlist)
+             ?propose_keypair:Config.propose_keypair () ~banlist ~monitor)
       in
-      Option.iter snark_worker_config ~f:(fun config ->
-          let run_snark_worker = `With_public_key config.public_key in
-          Run.setup_local_server ~client_port:config.port ~coda ~logger () ;
-          Run.run_snark_worker ~logger ~client_port:config.port
-            run_snark_worker ) ;
+      Run.handle_shutdown ~monitor ~frontier_file ~logger coda ;
+      let%map () =
+        with_monitor
+          (fun () ->
+            return
+            @@ Option.iter snark_worker_config ~f:(fun config ->
+                   let run_snark_worker = `With_public_key config.public_key in
+                   Run.setup_local_server ~client_port:config.port ~coda
+                     ~logger () ;
+                   Run.run_snark_worker ~logger ~client_port:config.port
+                     run_snark_worker ) )
+          ()
+      in
       let coda_peers () = return (Main.peers coda) in
       let coda_start () = return (Main.start coda) in
       let coda_get_balance pk =
@@ -306,13 +321,12 @@ module T = struct
                Linear_pipe.write w (prev_state_hash, state_hash) )) ;
         return r.pipe
       in
-      return
-        { coda_peers
-        ; coda_strongest_ledgers
-        ; coda_get_balance
-        ; coda_send_payment
-        ; coda_prove_receipt
-        ; coda_start }
+      { coda_peers= with_monitor coda_peers
+      ; coda_strongest_ledgers= with_monitor coda_strongest_ledgers
+      ; coda_get_balance= with_monitor coda_get_balance
+      ; coda_send_payment= with_monitor coda_send_payment
+      ; coda_prove_receipt= with_monitor coda_prove_receipt
+      ; coda_start= with_monitor coda_start }
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end

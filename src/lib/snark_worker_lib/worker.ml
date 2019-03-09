@@ -72,6 +72,18 @@ module Make (Inputs : Intf.Inputs_intf) :
         else Or_error.of_exn exn
     | Ok res -> res
 
+  let emit_proof_metrics metrics logger =
+    List.iter metrics ~f:(fun (total, tag) ->
+        match tag with
+        | `Merge ->
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              !"Merge Proof Completed - %s%!"
+              (Time.Span.to_string total)
+        | `Transition ->
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              !"Base Proof Completed - %s%!"
+              (Time.Span.to_string total) )
+
   let main daemon_address public_key shutdown_on_disconnect =
     let logger = Logger.create () in
     let%bind state = Worker_state.create () in
@@ -79,9 +91,10 @@ module Make (Inputs : Intf.Inputs_intf) :
     let rec go () =
       let log_and_retry label error =
         Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-          !"Error %s:\n%{sexp:Error.t}"
+          !"Error %s: %{sexp:Error.t}"
           label error ;
-        let%bind () = wait () in
+        let%bind () = wait ~sec:30.0 () in
+        (* FIXME: Use a backoff algo here *)
         go ()
       in
       match%bind
@@ -91,19 +104,28 @@ module Make (Inputs : Intf.Inputs_intf) :
       | Ok None ->
           let random_delay =
             Worker_state.worker_wait_time
-            +. (0.2 *. Random.float Worker_state.worker_wait_time)
+            +. (0.5 *. Random.float Worker_state.worker_wait_time)
           in
           Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-            "No work; waiting %.3fs" random_delay ;
+            "No work received from %s - sleeping %.4fs"
+            (Host_and_port.to_string daemon_address)
+            random_delay ;
           let%bind () = wait ~sec:random_delay () in
           go ()
       | Ok (Some work) -> (
           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-            !"Received work." ;
+            !"Received work from %s%!"
+            (Host_and_port.to_string daemon_address) ;
+          let%bind () = wait () in
+          (* Pause to wait for stdout to flush *)
           match perform state public_key work with
           | Error e -> log_and_retry "performing work" e
           | Ok result -> (
               match%bind
+                emit_proof_metrics result.metrics logger ;
+                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                  "Submitted work to %s%!"
+                  (Host_and_port.to_string daemon_address) ;
                 dispatch Rpcs.Submit_work.rpc shutdown_on_disconnect result
                   daemon_address
               with

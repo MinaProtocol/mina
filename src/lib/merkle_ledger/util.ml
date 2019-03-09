@@ -5,7 +5,10 @@ module type Inputs_intf = sig
 
   module Key : Intf.Key
 
-  module Account : Intf.Account with type key := Key.t
+  module Balance : Intf.Balance
+
+  module Account :
+    Intf.Account with type balance := Balance.t and type key := Key.t
 
   module Hash : Intf.Hash with type account := Account.t
 
@@ -15,6 +18,8 @@ module type Inputs_intf = sig
     type t
 
     val get : t -> Location.t -> Account.t option
+
+    val last_filled : t -> Location.t option
   end
 
   val get_hash : Base.t -> Location.t -> Hash.t
@@ -26,6 +31,12 @@ module type Inputs_intf = sig
   val set_raw_hash_batch : Base.t -> (Location.t * Hash.t) list -> unit
 
   val set_raw_account_batch : Base.t -> (Location.t * Account.t) list -> unit
+
+  val set_location_batch :
+       last_location:Location.t
+    -> Base.t
+    -> (Key.t * Location.t) Non_empty_list.t
+    -> unit
 end
 
 module Make (Inputs : Inputs_intf) : sig
@@ -101,9 +112,43 @@ end = struct
       (compute_affected_locations_and_hashes t locations_and_hashes
          locations_and_hashes)
 
-  (* TODO: When we do batch on a database, we should add accounts and hashes
-     simulatenously to full atomicity. We should do this in the future. *)
+  let compute_last_index addresses =
+    Non_empty_list.map addresses
+      ~f:(Fn.compose Inputs.Location.Addr.to_int Inputs.Location.to_path_exn)
+    |> Non_empty_list.max_elt ~compare:Int.compare
+
+  let set_raw_addresses t addresses_and_accounts =
+    Option.iter (Non_empty_list.of_list_opt addresses_and_accounts)
+      ~f:(fun nonempty_addresses_and_accounts ->
+        let key_locations =
+          Non_empty_list.map nonempty_addresses_and_accounts
+            ~f:(fun (address, account) ->
+              (Inputs.Account.public_key account, address) )
+        in
+        let new_last_location =
+          let current_last_index =
+            let open Option.Let_syntax in
+            let%map last_location = Inputs.Base.last_filled t in
+            Inputs.Location.Addr.to_int
+            @@ Inputs.Location.to_path_exn last_location
+          in
+          let foreign_last_index =
+            compute_last_index
+              (Non_empty_list.map nonempty_addresses_and_accounts ~f:fst)
+          in
+          let max_index_in_all_accounts =
+            Option.value_map current_last_index ~default:foreign_last_index
+              ~f:(fun max_index -> Int.max max_index foreign_last_index )
+          in
+          Inputs.Location.(Account (Addr.of_int_exn max_index_in_all_accounts))
+        in
+        let last_location = new_last_location in
+        Inputs.set_location_batch ~last_location t key_locations )
+
+  (* TODO: When we do batch on a database, we should add accounts, locations and hashes
+     simulatenously for full atomicity. *)
   let set_batch t locations_and_accounts =
+    set_raw_addresses t locations_and_accounts ;
     Inputs.set_raw_account_batch t locations_and_accounts ;
     set_hash_batch t
     @@ List.map locations_and_accounts ~f:(fun (location, account) ->

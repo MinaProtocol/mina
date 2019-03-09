@@ -1,3 +1,6 @@
+[%%import
+"../../config.mlh"]
+
 open Core
 open Import
 open Snark_params
@@ -119,8 +122,17 @@ module With_valid_signature = struct
   include Stable.Latest
 end
 
+[%%if
+fake_hash]
+
+let check_signature _ = true
+
+[%%else]
+
 let check_signature ({payload; sender; signature} : t) =
   Schnorr.verify signature (Inner_curve.of_affine_coordinates sender) payload
+
+[%%endif]
 
 let gen_test =
   let keys = Array.init 2 ~f:(fun _ -> Signature_keypair.create ()) in

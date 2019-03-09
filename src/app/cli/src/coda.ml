@@ -286,64 +286,67 @@ let daemon logger =
            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
              "long async cycle %s"
              (Time_ns.Span.to_string span) ) ;
-       let%bind () =
-         let open M in
-         let run_snark_worker_action =
-           Option.value_map run_snark_worker_flag ~default:`Don't_run
-             ~f:(fun k -> `With_public_key k )
-         in
-         let banlist_dir_name = conf_dir ^/ "banlist" in
-         let%bind () = Async.Unix.mkdir ~p:() banlist_dir_name in
-         let suspicious_dir = banlist_dir_name ^/ "suspicious" in
-         let punished_dir = banlist_dir_name ^/ "banned" in
-         let trust_dir = banlist_dir_name ^/ "trust" in
-         let () = Snark_params.set_chunked_hashing true in
-         let%bind () = Async.Unix.mkdir ~p:() suspicious_dir in
-         let%bind () = Async.Unix.mkdir ~p:() punished_dir in
-         let%bind () = Async.Unix.mkdir ~p:() trust_dir in
-         let banlist =
-           Coda_base.Banlist.create ~suspicious_dir ~punished_dir
-         in
-         let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
-         let time_controller = Inputs.Time.Controller.create () in
-         let net_config =
-           { Inputs.Net.Config.logger
-           ; time_controller
-           ; gossip_net_params=
-               { timeout= Time.Span.of_sec 1.
-               ; logger
-               ; target_peer_count= 8
-               ; conf_dir
-               ; initial_peers
-               ; me
-               ; trust_system } }
-         in
-         let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
-         let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
-         let receipt_chain_database =
-           Coda_base.Receipt_chain_database.create
-             ~directory:receipt_chain_dir_name
-         in
-         let%bind coda =
-           Run.create
-             (Run.Config.make ~logger ~net_config
-                ~run_snark_worker:(Option.is_some run_snark_worker_flag)
-                ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
-                ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
-                ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
-                ~ledger_db_location:(conf_dir ^/ "ledger_db")
-                ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
-                ~time_controller ?propose_keypair:Config0.propose_keypair ()
-                ~banlist)
-         in
-         let%map () = maybe_sleep 3. in
-         M.start coda ;
-         let web_service = Web_pipe.get_service () in
-         Web_pipe.run_service (module Run) coda web_service ~conf_dir ~logger ;
-         Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
-           ~client_port ~logger () ;
-         Run.run_snark_worker ~logger ~client_port run_snark_worker_action
+       let run_snark_worker_action =
+         Option.value_map run_snark_worker_flag ~default:`Don't_run
+           ~f:(fun k -> `With_public_key k )
        in
+       let banlist_dir_name = conf_dir ^/ "banlist" in
+       let%bind () = Async.Unix.mkdir ~p:() banlist_dir_name in
+       let suspicious_dir = banlist_dir_name ^/ "suspicious" in
+       let punished_dir = banlist_dir_name ^/ "banned" in
+       let trust_dir = banlist_dir_name ^/ "trust" in
+       let () = Snark_params.set_chunked_hashing true in
+       let%bind () = Async.Unix.mkdir ~p:() suspicious_dir in
+       let%bind () = Async.Unix.mkdir ~p:() punished_dir in
+       let%bind () = Async.Unix.mkdir ~p:() trust_dir in
+       let banlist = Coda_base.Banlist.create ~suspicious_dir ~punished_dir in
+       let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
+       let time_controller = M.Inputs.Time.Controller.create () in
+       let net_config =
+         { M.Inputs.Net.Config.logger
+         ; time_controller
+         ; gossip_net_params=
+             { timeout= Time.Span.of_sec 1.
+             ; logger
+             ; target_peer_count= 8
+             ; conf_dir
+             ; initial_peers
+             ; me
+             ; trust_system } }
+       in
+       let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
+       let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
+       let receipt_chain_database =
+         Coda_base.Receipt_chain_database.create
+           ~directory:receipt_chain_dir_name
+       in
+       let monitor = Async.Monitor.create ~name:"coda" () in
+       let%bind coda =
+         Run.create
+           (Run.Config.make ~logger ~net_config
+              ~run_snark_worker:(Option.is_some run_snark_worker_flag)
+              ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
+              ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
+              ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+              ~ledger_db_location:(conf_dir ^/ "ledger_db")
+              ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
+              ~time_controller ?propose_keypair:Config0.propose_keypair ()
+              ~banlist ~monitor)
+       in
+       Run.handle_shutdown ~monitor
+         ~frontier_file:(conf_dir ^/ "frontier.dot")
+         ~logger coda ;
+       Async.Scheduler.within' ~monitor
+       @@ fun () ->
+       let%bind () = maybe_sleep 3. in
+       M.start coda ;
+       let web_service = Web_pipe.get_service () in
+       Web_pipe.run_service (module Run) coda web_service ~conf_dir ~logger ;
+       Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
+         ~client_port ~logger () ;
+       Run.run_snark_worker ~logger ~client_port run_snark_worker_action ;
+       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+         "Running coda services" ;
        Async.never ())
 
 [%%if

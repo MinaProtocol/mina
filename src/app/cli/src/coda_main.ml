@@ -27,10 +27,15 @@ end
 
 [%%endif]
 
+module Graphql_cohttp_async =
+  Graphql_cohttp.Make (Graphql_async.Schema) (Cohttp_async.Body)
+
 module Staged_ledger_aux_hash = struct
   include Staged_ledger_hash.Aux_hash.Stable.Latest
 
   let of_bytes = Staged_ledger_hash.Aux_hash.of_bytes
+
+  let to_bytes = Staged_ledger_hash.Aux_hash.to_bytes
 end
 
 module Staged_ledger_hash = struct
@@ -317,7 +322,8 @@ module type Main_intf = sig
       ; time_controller: Inputs.Time.Controller.t
       ; banlist: Banlist.t
       ; receipt_chain_database: Receipt_chain_database.t
-      ; snark_work_fee: Currency.Fee.t }
+      ; snark_work_fee: Currency.Fee.t
+      ; monitor: Async.Monitor.t option }
     [@@deriving make]
   end
 
@@ -620,7 +626,7 @@ struct
     let transactions t = Pool.transactions (pool t)
 
     (* TODO: This causes the signature to get checked twice as it is checked
-   below before feeding it to add *)
+       below before feeding it to add *)
     let add t txn = apply_and_broadcast t (Envelope.Incoming.local [txn])
   end
 
@@ -755,38 +761,7 @@ struct
            ~sender:Network_peer.Peer.local)
   end
 
-  module Root_sync_ledger :
-    Syncable_ledger.S
-    with type addr := Ledger.Location.Addr.t
-     and type hash := Ledger_hash.t
-     and type root_hash := Ledger_hash.t
-     and type merkle_tree := Ledger.Db.t
-     and type account := Account.t
-     and type merkle_path := Ledger.path
-     and type query := Sync_ledger.query
-     and type answer := Sync_ledger.answer =
-    Syncable_ledger.Make (Ledger.Location.Addr) (Account.Stable.V1)
-      (struct
-        include Ledger_hash
-
-        let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
-
-        let empty_account = hash_account Account.empty
-      end)
-      (struct
-        include Ledger_hash
-
-        let to_hash (h : t) =
-          Ledger_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
-      end)
-      (struct
-        include Ledger.Db
-
-        let f = Account.hash
-      end)
-      (struct
-        let subtree_height = 3
-      end)
+  module Root_sync_ledger = Sync_ledger.Db
 
   module Net = Coda_networking.Make (struct
     include Inputs0
@@ -832,6 +807,8 @@ struct
     module Staged_ledger_diff = Staged_ledger_diff
     module Transaction_snark_work = Transaction_snark_work
     module Transition_handler_validator = Transition_handler.Validator
+    module Unprocessed_transition_cache =
+      Transition_handler.Unprocessed_transition_cache
     module Ledger_proof_statement = Ledger_proof_statement
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Protocol_state_validator = Protocol_state_validator
@@ -1198,7 +1175,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       Payment_proof.t Deferred.Or_error.t =
     let receipt_chain_database = receipt_chain_database t in
     (* TODO: since we are making so many reads to `receipt_chain_database`,
-    reads should be async to not get IO-blocked. See #1125 *)
+       reads should be async to not get IO-blocked. See #1125 *)
     let result =
       Receipt_chain_database.prove receipt_chain_database ~proving_receipt
         ~resulting_receipt
@@ -1232,10 +1209,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       Consensus.Protocol_state.hash state
       |> [%sexp_of: State_hash.t] |> Sexp.to_string
     in
-    let block_count =
-      state |> Consensus.Protocol_state.consensus_state
-      |> Consensus.Consensus_state.length
-    in
+    let consensus_state = state |> Consensus.Protocol_state.consensus_state in
+    let block_count = Consensus.Consensus_state.length consensus_state in
     let uptime_secs =
       Time_ns.diff (Time_ns.now ()) start_time
       |> Time_ns.Span.to_sec |> Int.of_float
@@ -1279,6 +1254,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         staged_ledger |> Staged_ledger.hash |> Staged_ledger_hash.sexp_of_t
         |> Sexp.to_string
     ; state_hash
+    ; consensus_time_best_tip=
+        Consensus.Consensus_state.time_hum consensus_state
     ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
     ; peers=
@@ -1290,6 +1267,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; propose_pubkey=
         Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
     ; histograms
+    ; consensus_time_now= Consensus.time_hum (Core_kernel.Time.now ())
     ; consensus_mechanism= Consensus.name
     ; consensus_configuration= Consensus.Configuration.t }
 
@@ -1339,6 +1317,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
   let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
+
+  let log_shutdown ~frontier_file ~logger t =
+    visualize_frontier ~filename:frontier_file t |> ignore ;
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      "Logging the transition_frontier at %s" frontier_file
 
   (* TODO: handle participation_status more appropriately than doing participate_exn *)
   let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
@@ -1435,6 +1418,18 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
         trace_task "REST server" (fun () ->
+            let graphql_schema =
+              Graphql_async.Schema.(
+                schema
+                  [ field "greeting" ~typ:(non_null string)
+                      ~args:Arg.[]
+                      ~resolve:(fun _ () -> "hello coda") ])
+            in
+            let graphql_callback =
+              Graphql_cohttp_async.make_callback
+                (fun _req -> ())
+                graphql_schema
+            in
             Cohttp_async.(
               Server.create
                 ~on_handler_error:
@@ -1446,9 +1441,6 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                    (On_port rest_server_port))
                 (fun ~body _sock req ->
                   let uri = Cohttp.Request.uri req in
-                  let route_not_found () =
-                    Server.respond_string ~status:`Not_found "Route not found"
-                  in
                   let status flag =
                     Server.respond_string
                       ( get_status ~flag coda |> Participating_state.active_exn
@@ -1456,9 +1448,12 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                       |> Yojson.Safe.pretty_to_string )
                   in
                   match Uri.path uri with
+                  | "/graphql" -> graphql_callback () req body
                   | "/status" -> status `None
                   | "/status/performance" -> status `Performance
-                  | _ -> route_not_found () )) )
+                  | _ ->
+                      Server.respond_string ~status:`Not_found
+                        "Route not found" )) )
         |> ignore ) ;
     let where_to_listen =
       Tcp.Where_to_listen.bind_to All_addresses (On_port client_port)
@@ -1526,4 +1521,15 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         create_snark_worker ~shutdown_on_disconnect:s ~logger ~public_key
           ~client_port
         |> ignore
+
+  let handle_shutdown ~monitor ~frontier_file ~logger t =
+    Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
+        log_shutdown ~frontier_file ~logger t ;
+        raise exn ) ;
+    Async_unix.Signal.(
+      handle terminating ~f:(fun signal ->
+          log_shutdown ~frontier_file ~logger t ;
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            !"Coda process got interrupted by signal %{sexp:t}"
+            signal ))
 end

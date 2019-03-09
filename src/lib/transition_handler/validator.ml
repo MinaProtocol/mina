@@ -2,22 +2,27 @@ open Async_kernel
 open Core_kernel
 open Pipe_lib.Strict_pipe
 open Coda_base
+open Cache_lib
 open Protocols.Coda_transition_frontier
 
-module Make (Inputs : Inputs.S) :
+module Make (Inputs : Inputs.With_unprocessed_transition_cache.S) :
   Transition_handler_validator_intf
   with type time := Inputs.Time.t
    and type state_hash := State_hash.t
    and type external_transition_verified :=
               Inputs.External_transition.Verified.t
+   and type unprocessed_transition_cache :=
+              Inputs.Unprocessed_transition_cache.t
    and type transition_frontier := Inputs.Transition_frontier.t
    and type staged_ledger := Inputs.Staged_ledger.t = struct
   open Inputs
   open Consensus
 
-  let validate_transition ~logger ~frontier transition_with_hash =
+  let validate_transition ~logger ~frontier ~unprocessed_transition_cache
+      transition_with_hash =
     let open With_hash in
     let open Protocol_state in
+    let open Result.Let_syntax in
     let {hash; data= transition} = transition_with_hash in
     let protocol_state =
       External_transition.Verified.protocol_state transition
@@ -27,23 +32,42 @@ module Make (Inputs : Inputs.S) :
       |> Transition_frontier.Breadcrumb.transition_with_hash |> With_hash.data
       |> External_transition.Verified.protocol_state
     in
-    let open Result.Let_syntax in
     let%bind () =
       Result.ok_if_true
         (Transition_frontier.find frontier hash |> Option.is_none)
         ~error:`Duplicate
     in
-    Result.ok_if_true
-      ( `Take
-      = Consensus.select ~logger
-          ~existing:(consensus_state root_protocol_state)
-          ~candidate:(consensus_state protocol_state) )
-      ~error:
-        (`Invalid
-          "consensus state was not selected over transition frontier root \
-           consensus state")
+    let%bind () =
+      Result.ok_if_true
+        (not
+           (Unprocessed_transition_cache.mem unprocessed_transition_cache
+              transition_with_hash))
+        ~error:`Duplicate
+    in
+    let%map () =
+      Result.ok_if_true
+        ( `Take
+        = Consensus.select ~logger
+            ~existing:(consensus_state root_protocol_state)
+            ~candidate:(consensus_state protocol_state) )
+        ~error:
+          (`Invalid
+            "consensus state was not selected over transition frontier root \
+             consensus state")
+    in
+    (* we expect this to be Ok since we just checked the cache *)
+    Unprocessed_transition_cache.register unprocessed_transition_cache
+      transition_with_hash
+    |> Or_error.ok_exn
 
-  let run ~logger ~frontier ~transition_reader ~valid_transition_writer =
+  let run ~logger ~frontier ~transition_reader
+      ~(valid_transition_writer :
+         ( ( (External_transition.Verified.t, State_hash.t) With_hash.t
+           , State_hash.t )
+           Cached.t
+         , drop_head buffered
+         , unit )
+         Writer.t) ~unprocessed_transition_cache =
     don't_wait_for
       (Reader.iter transition_reader
          ~f:(fun (`Transition transition_env, `Time_received _) ->
@@ -57,13 +81,14 @@ module Make (Inputs : Inputs.S) :
            let transition_with_hash = {With_hash.hash; data= transition} in
            Deferred.return
              ( match
-                 validate_transition ~logger ~frontier transition_with_hash
+                 validate_transition ~logger ~frontier
+                   ~unprocessed_transition_cache transition_with_hash
                with
-             | Ok () ->
+             | Ok cached_transition ->
                  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                    !"accepting transition %{sexp:State_hash.t}"
                    hash ;
-                 Writer.write valid_transition_writer transition_with_hash
+                 Writer.write valid_transition_writer cached_transition
              | Error `Duplicate ->
                  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                    !"ignoring transition we've already seen \

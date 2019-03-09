@@ -93,6 +93,12 @@ module Receipt = Coda_base.Receipt
 module Hash = struct
   module T = struct
     type t = Md5.t [@@deriving sexp, hash, compare, bin_io, eq]
+
+    let to_yojson t = `String (Md5.to_hex t)
+
+    let of_yojson = function
+      | `String s -> Ok (Md5.of_hex_exn s)
+      | _ -> Error "expected string"
   end
 
   include T
@@ -196,4 +202,11 @@ module Key = struct
   include T
   include Hashable.Make_binable (T)
   include Comparable.Make (T)
+end
+
+module Base_inputs = struct
+  module Key = Key
+  module Balance = Balance
+  module Account = Account
+  module Hash = Hash
 end

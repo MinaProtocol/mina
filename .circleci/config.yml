@@ -12,9 +12,22 @@ jobs:
                   name: Build trace-tool
                   command: cd src/app/trace-tool && cargo build --frozen
 
+    build-wallet:
+        macos:
+            xcode: "10.1.0"
+        steps:
+            - checkout
+            - run: cd frontend/wallet && npm install
+            - run:
+                  name: Lint wallet
+                  command: cd frontend/wallet && npm run reformat && git diff --exit-code src
+            - run:
+                  name: Build wallet
+                  command: cd frontend/wallet && npm run build
+
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -45,8 +58,8 @@ jobs:
                       - homebrew-v1-
             - restore_cache:
                   keys:
-                      - opam-v1-{{ checksum "src/opam.export" }}
-                      - opam-v1-
+                      - opam-v2-{{ checksum "src/opam.export" }}
+                      - opam-v2-
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Deps -- make macos-setup-download
@@ -60,19 +73,22 @@ jobs:
                       - "/usr/local/Homebrew"
                       - "/Users/distiller/Library/Caches/Homebrew"
             - save_cache:
-                  key: opam-v1-{{ checksum "src/opam.export" }}
+                  key: opam-v2-{{ checksum "src/opam.export" }}
                   paths:
                       - "/Users/distiller/.opam"
             - run:
                   name: Build OCaml
                   command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log
+            - run:
                   name: Run all tests (on master)
                   command: echo "FIXME Tests not yet working on mac"
     build_dev:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
         environment:
             DUNE_PROFILE: dev
         steps:
@@ -89,14 +105,17 @@ jobs:
                   name: Build deb Package with keys
                   command: make deb
             - run:
-                  name: Build provingkeys
+                  name: Store Generated Proving and Verifying Keys
                   command: make provingkeys
             - run:
-                  name: Store Genesis keys
+                  name: Store Genesis Public/Private Keypairs
                   command: make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
@@ -105,7 +124,7 @@ jobs:
     build_testnet_posig:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
         environment:
             DUNE_PROFILE: testnet_posig
         steps:
@@ -122,14 +141,17 @@ jobs:
                   name: Build deb Package with keys
                   command: make deb
             - run:
-                  name: Build provingkeys
+                  name: Store Generated Proving and Verifying Keys
                   command: make provingkeys
             - run:
-                  name: Store Genesis keys
+                  name: Store Genesis Public/Private Keypairs
                   command: make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
@@ -138,7 +160,7 @@ jobs:
     build_testnet_postake:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
         environment:
             DUNE_PROFILE: testnet_postake
         steps:
@@ -155,14 +177,17 @@ jobs:
                   name: Build deb Package with keys
                   command: make deb
             - run:
-                  name: Build provingkeys
+                  name: Store Generated Proving and Verifying Keys
                   command: make provingkeys
             - run:
-                  name: Store Genesis keys
+                  name: Store Genesis Public/Private Keypairs
                   command: make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
@@ -171,7 +196,7 @@ jobs:
     build_testnet_public:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
         environment:
             DUNE_PROFILE: testnet_public
         steps:
@@ -188,14 +213,17 @@ jobs:
                   name: Build deb Package with keys
                   command: make deb
             - run:
-                  name: Build provingkeys
+                  name: Store Generated Proving and Verifying Keys
                   command: make provingkeys
             - run:
-                  name: Store Genesis keys
+                  name: Store Genesis Public/Private Keypairs
                   command: make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
@@ -204,7 +232,7 @@ jobs:
     build_testnet_postake_snarkless_fake_hash:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
         environment:
             DUNE_PROFILE: testnet_postake_snarkless_fake_hash
         steps:
@@ -221,14 +249,17 @@ jobs:
                   name: Build deb Package with keys
                   command: make deb
             - run:
-                  name: Build provingkeys
+                  name: Store Generated Proving and Verifying Keys
                   command: make provingkeys
             - run:
-                  name: Store Genesis keys
+                  name: Store Genesis Public/Private Keypairs
                   command: make genesiskeys
             - run:
                   name: Upload deb to repo
                   command: make publish_deb
+            - run:
+                  name: Record Constraint System Digests
+                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
@@ -238,7 +269,7 @@ jobs:
     test-unit-test:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -248,7 +279,7 @@ jobs:
     test-fake_hash_full_test:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -265,7 +296,7 @@ jobs:
     test-posig_integration_tests:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -278,6 +309,10 @@ jobs:
             - run:
                   name: Running test - Proof of Signature Tests | full-test
                   command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
+            
+            - run:
+                  name: Running test - Proof of Signature Tests | transaction-snark-profiler -check-only
+                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'transaction-snark-profiler -check-only'
             
             - run:
                   name: Running test - Proof of Signature Tests | coda-peers-test
@@ -303,18 +338,10 @@ jobs:
                   name: Running test - Proof of Signature Tests | coda-shared-state-test
                   command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-state-test'
             
-            - run:
-                  name: Running test - Proof of Signature Tests | coda-restart-node-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-restart-node-test'
-            
-            - run:
-                  name: Running test - Proof of Signature Tests | transaction-snark-profiler -check-only
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'transaction-snark-profiler -check-only'
-            
     test-postake_integration_tests:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -329,45 +356,50 @@ jobs:
                   command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
             
             - run:
-                  name: Running test - Proof of Stake Tests | coda-peers-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-peers-test'
-            
-            - run:
-                  name: Running test - Proof of Stake Tests | coda-transitive-peers-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-transitive-peers-test'
-            
-            - run:
-                  name: Running test - Proof of Stake Tests | coda-block-production-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-block-production-test'
-            
-            - run:
-                  name: Running test - Proof of Stake Tests | coda-shared-prefix-test -who-proposes 0
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
-            
-            - run:
-                  name: Running test - Proof of Stake Tests | coda-shared-prefix-test -who-proposes 1
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
-            
-            - run:
-                  name: Running test - Proof of Stake Tests | coda-shared-state-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-state-test'
-            
-            - run:
-                  name: Running test - Proof of Stake Tests | coda-restart-node-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-restart-node-test'
-            
-            - run:
                   name: Running test - Proof of Stake Tests | transaction-snark-profiler -check-only
                   command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'transaction-snark-profiler -check-only'
             
+    test-postake_split_integration_tests:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Running test - Proof of Stake Tests | coda-shared-prefix-multiproposer-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-multiproposer-test'
+                  name: Check .circleci Render
+                  command: make check-render-circleci
+            - run:
+                  name: Build OCaml
+                  command: eval `opam config env` && DUNE_PROFILE=test_postake_split_snarkless make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Running test - Proof of Stake (split stake) Tests | coda-peers-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-peers-test'
+            
+            - run:
+                  name: Running test - Proof of Stake (split stake) Tests | coda-transitive-peers-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-transitive-peers-test'
+            
+            - run:
+                  name: Running test - Proof of Stake (split stake) Tests | coda-block-production-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-block-production-test'
+            
+            - run:
+                  name: Running test - Proof of Stake (split stake) Tests | coda-shared-prefix-test -who-proposes 0
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
+            
+            - run:
+                  name: Running test - Proof of Stake (split stake) Tests | coda-shared-prefix-test -who-proposes 1
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
+            
+            - run:
+                  name: Running test - Proof of Stake (split stake) Tests | coda-shared-state-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-state-test'
             
     test-withsnark-sig:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -384,7 +416,7 @@ jobs:
     test-withsnark-stake:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -413,7 +445,9 @@ workflows:
             - test-fake_hash_full_test
             - test-posig_integration_tests
             - test-postake_integration_tests
+            - test-postake_split_integration_tests
             - test-withsnark-sig
             - test-withsnark-stake
             - test-unit-test
             - tracetool
+            - build-wallet
