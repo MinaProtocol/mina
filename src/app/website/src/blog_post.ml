@@ -32,7 +32,8 @@ let title ~standalone ~name s =
       [Style.just "f2 f1-ns ddinexp tracked-tightish pt2 pt3-m pt4-l mb1"]
       [text s]
   in
-  if standalone then t else a [href (sprintf "/blog/%s.html" name)] [t]
+  if standalone then t
+  else a [Style.just "blueblack"; href (sprintf "/blog/%s.html" name)] [t]
 
 let subtitle s =
   let open Html_concise in
