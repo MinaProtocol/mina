@@ -448,6 +448,8 @@ let coda_commands log =
     ; (Coda_five_nodes_test.name, Coda_five_nodes_test.command)
     ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
     ; (Coda_receipt_chain_test.name, Coda_receipt_chain_test.command)
+    ; ( Coda_restarts_and_transactions_holy_grail.name
+      , Coda_restarts_and_transactions_holy_grail.command )
     ; ("full-test", Full_test.command)
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
   in

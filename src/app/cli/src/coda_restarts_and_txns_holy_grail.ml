@@ -4,7 +4,7 @@ open Coda_worker
 open Coda_main
 open Coda_base
 
-let name = "coda-n-nodes-restarts-txns"
+let name = "coda-restarts-and-txns-holy-grail"
 
 let main n () =
   assert (n > 1) ;
@@ -63,8 +63,12 @@ let main n () =
 
 let command =
   let open Command.Let_syntax in
-  let%map_open who_proposes =
-    flag "who-proposes" ~doc:"ID node number which will be proposing"
-      (required int)
-  in
-  main who_proposes
+  Command.async
+    ~summary:
+      "Test the holy grail for n nodes: All sorts of restarts and \
+       transactions work"
+    (let%map_open who_proposes =
+       flag "who-proposes" ~doc:"ID node number which will be proposing"
+         (required int)
+     in
+     main who_proposes)
