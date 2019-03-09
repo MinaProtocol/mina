@@ -1,5 +1,5 @@
 (library
   (name transition_handler)
   (public_name transition_handler)
-  (libraries core_kernel transition_frontier consensus protocols rose_tree pipe_lib otp_lib coda_base cache_lib)
+  (libraries perf_histograms core_kernel transition_frontier consensus protocols rose_tree pipe_lib otp_lib coda_base cache_lib)
   (preprocess (pps ppx_jane)))

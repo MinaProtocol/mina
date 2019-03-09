@@ -80,7 +80,13 @@ let%test_module "Bootstrap Controller" =
               breadcrumbs
           in
           let envelopes =
-            List.map ~f:Envelope.Incoming.local input_transitions_verified
+            List.map
+            (* in order to properly exercise this test code we need to make
+             * these envelopes remote *)
+              ~f:(fun x ->
+                Envelope.Incoming.wrap ~data:x
+                  ~sender:(Envelope.Sender.Remote Network_peer.Peer.local) )
+              input_transitions_verified
           in
           let transition_reader, transition_writer =
             Pipe_lib.Strict_pipe.create Synchronous
