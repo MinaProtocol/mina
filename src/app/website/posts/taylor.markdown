@@ -1,9 +1,13 @@
 ---
-title: SNARKoborous: computing Ouoroborous inside a SNARK
+title: SNARKoborous
+subtitle: Simulating real numbers using finite field arithmetic
+date: 2019-03-09
+author: Izaak Meckler
+author_website: https://twitter.com/imeckler
 ---
 
 In Coda, we use the proof-of-stake protocol Ouoroborous for consensus.
-Naturally since this in Coda, that means we must check proofs-of-stake inside
+Naturally since this is Coda, that means we have to check proofs-of-stake inside
 a SNARK.
 
 A proof-of-stake for a person with some amount of stake $a$
@@ -12,6 +16,9 @@ in Ouoroborous is a random number $s$ between 0 and 1
 less than some threshold depending on $a$. Concretely, that
 threshold is $1 - (1/2)^{\frac{a}{T}}$ where $T$ is the total amount of
 stake in the system.[^0]
+
+It's important to use a threshold of this form because it means that the density
+of blocks over time does not depend on the distribution of stake.
 
 If you know anything about SNARKs, you know that inside of a SNARK all we
 can do is arithmetic (that is, addition and multiplication) in a finite field $F_p$. It's not at
@@ -40,22 +47,27 @@ real numbers (a field, but not a finite one) using a [Taylor series]().
 
 Specifically, we know that
 
-$$
-\begin{align*}
+<div class="katex-block">
+```
+\begin{aligned}
   1 - (1/2)^x
   &= -\log(1/2) x - \frac{(\log(1/2) x)^2}{2!} - \frac{(\log(1/2) x)^3}{3!} - \dots \\
   &= \log(2) x - \frac{(\log(2) x)^2}{2!} + \frac{(\log(2) x)^3}{3!} - \dots
-\end{align*}
-$$
+\end{aligned}
+```
+</div>
 
 We can truncate this Taylor series to get polynomials $T_n$
-$$
-\begin{align*}
+<div class="katex-block">
+```
+\begin{aligned}
   T_n
   &= \log(2) x - \frac{(\log(2) x)^2}{2!} + \dots + \frac{(\log(2) x)^n}{n!} \\
   &= \log(2) x - \frac{\log(2)^2}{2!} x^2 + \dots + \frac{\log(2)^n}{n!} x^n
-\end{align*}
-$$
+\end{aligned}
+```
+</div>
+
 by taking the first $n$ terms. The Taylor polynomials *nearly* compute
 $1 - (1/2)^x$, but with some error that gets smaller as you take more and more
 terms. It turns out there's a handy formula which lets us figure out how
