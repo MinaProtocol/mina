@@ -57,7 +57,7 @@ end = struct
           type t =
             { transaction_with_info: Ledger.Undo.t
             ; statement: Ledger_proof_statement.t
-            ; witness: Transaction_witness.t }
+            ; witness: Transaction_witness.t sexp_opaque }
           [@@deriving sexp, bin_io]
         end
 

@@ -29,7 +29,7 @@ module type S = sig
   end
 
   module Stack_pos : sig
-    (** Used for both numbering the stacks (as keys for the sparse ledger nodes) and the address to the nodes*)
+    (** Used for both numbering the stacks (as keys for the sparse ledger nodes) and as address of the nodes*)
     type t
 
     include Bits_intf.S with type t := t
@@ -93,7 +93,7 @@ module type S = sig
 
   val create_exn : unit -> t
 
-  val remove_coinbase_stack_exn : t -> t
+  val remove_coinbase_stack_exn : t -> Stack.t * t
 
   val merkle_root : t -> Hash.t
 
@@ -103,7 +103,9 @@ module type S = sig
 
   val update_coinbase_stack_exn : t -> Stack.t -> is_new_stack:bool -> t
 
-  val latest_stack : t -> Stack.t option
+  val latest_stack_exn : t -> Stack.t option
+
+  val oldest_stack_exn : t -> Stack.t
 
   module Checked : sig
     type var = Hash.var
@@ -116,12 +118,15 @@ module type S = sig
       | Set_coinbase_stack : Stack_pos.t * Stack.t -> unit Request.t
       | Find_index_of_newest_stack : bool -> Stack_pos.t Request.t
       | Find_index_of_oldest_stack : Stack_pos.t Request.t
-      | Reset : unit Request.t
 
     val get : var -> Stack_pos.Unpacked.var -> (Stack.var, _) Tick.Checked.t
 
     val update_stack :
-      var -> is_new_stack:Boolean.var -> Stack.var -> (var, 's) Tick.Checked.t
+         var
+      -> is_new_stack:Boolean.var
+      -> Stack.var
+      -> Stack.var
+      -> (var, 's) Tick.Checked.t
     (**
    [update_stack t ~is_new_stack updtaed_stack] implements the following spec:
    - gets the address[addr] of the latest stack or a new stack if [is_new_stack] is true
@@ -131,9 +136,10 @@ module type S = sig
    which is [t].
   *)
 
-    val delete_stack : var -> (var, 's) Tick.Checked.t
+    val delete_stack :
+      var -> Stack.var -> Stack.var -> (var, 's) Tick.Checked.t
     (**
-   [delete_stack t pk updtaed_stack] implements the following spec:
+   [delete_stack t pk updated_stack] implements the following spec:
 
    - gets the address[addr] of the oldest stack.
    - finds a coinbase stack in [t] at path [addr] and replaces it with empty stack
@@ -141,12 +147,5 @@ module type S = sig
    which is [t].
    - resets any mutation to the store
   *)
-
-    val update_delete_stack :
-         var
-      -> is_new_stack:Boolean.var
-      -> stack:Stack.var
-      -> (var, 's) Tick.Checked.t
-    (** update_stack (without reset) >>= delete_stack (without reset) >>= reset*)
   end
 end

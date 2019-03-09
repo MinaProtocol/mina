@@ -342,7 +342,12 @@ end = struct
                | Some res -> res )) )
 
   let latest_stack pending_coinbase_collection =
-    match Pending_coinbase.latest_stack pending_coinbase_collection with
+    let open Result.Let_syntax in
+    match%bind
+      to_staged_ledger_or_error
+        (Or_error.try_with (fun () ->
+             Pending_coinbase.latest_stack_exn pending_coinbase_collection ))
+    with
     | Some s -> Ok s
     | None ->
         to_staged_ledger_or_error
@@ -767,38 +772,66 @@ end = struct
 
   (*update the pending_coinbase tree with the updated/new stack and delete the oldest stack if a proof was emitted*)
   let update_pending_coinbase_collection pending_coinbase_collection
-      updated_coinbase_stack ~is_new_stack ~proof_emitted =
+      updated_coinbase_stack ~is_new_stack ~ledger_proof =
     let open Result.Let_syntax in
-    let%bind pending_coinbase_collection_updated =
+    let%bind ( oldest_stack_before
+             , oldest_stack_after
+             , pending_coinbase_collection_updated1 ) =
+      if Option.is_some ledger_proof then
+        let%bind oldest_stack, pending_coinbase_collection_updated1 =
+          Or_error.try_with (fun () ->
+              Pending_coinbase.remove_coinbase_stack_exn
+                pending_coinbase_collection )
+          |> to_staged_ledger_or_error
+        in
+        let ledger_proof_stack =
+          let proof, _ = Option.value_exn ledger_proof in
+          (Ledger_proof.statement proof).pending_coinbase_state.target
+        in
+        let%map () =
+          if Pending_coinbase.Stack.equal oldest_stack ledger_proof_stack then
+            Ok ()
+          else
+            Error
+              (Staged_ledger_error.Unexpected
+                 (Error.of_string
+                    "Pending coinbase stack of the ledger proof did not match \
+                     the oldest stack in the pending coinbase tree"))
+        in
+        ( oldest_stack
+        , Pending_coinbase.Stack.empty
+        , pending_coinbase_collection_updated1 )
+      else
+        let%map oldest_stack =
+          Or_error.try_with (fun () ->
+              Pending_coinbase.oldest_stack_exn pending_coinbase_collection )
+          |> to_staged_ledger_or_error
+        in
+        (oldest_stack, oldest_stack, pending_coinbase_collection)
+    in
+    let%bind latest_stack_before =
+      working_stack pending_coinbase_collection ~is_new_stack
+    in
+    let%map pending_coinbase_collection_updated2 =
       Or_error.try_with (fun () ->
           Pending_coinbase.update_coinbase_stack_exn
-            pending_coinbase_collection updated_coinbase_stack ~is_new_stack )
+            pending_coinbase_collection_updated1 updated_coinbase_stack
+            ~is_new_stack )
       |> to_staged_ledger_or_error
     in
-    let%map pending_coinbase_collection_updated' =
-      if proof_emitted then
-        Or_error.try_with (fun () ->
-            Pending_coinbase.remove_coinbase_stack_exn
-              pending_coinbase_collection_updated )
-        |> to_staged_ledger_or_error
-      else Ok pending_coinbase_collection_updated
-    in
     let prev_root = Pending_coinbase.merkle_root pending_coinbase_collection in
-    let new_root =
-      Pending_coinbase.merkle_root pending_coinbase_collection_updated'
+    let intermediate_root =
+      Pending_coinbase.merkle_root pending_coinbase_collection_updated1
     in
-    let action =
-      match (is_new_stack, proof_emitted) with
-      | true, false -> Pending_coinbase_update.Action.Added
-      | true, true -> Deleted_added
-      | false, false -> Updated
-      | false, true -> Deleted_updated
+    let new_root =
+      Pending_coinbase.merkle_root pending_coinbase_collection_updated2
     in
     let update =
-      Pending_coinbase_update.create_value ~prev_root ~new_root
-        ~updated_stack:updated_coinbase_stack ~action
+      Pending_coinbase_update.create_value ~prev_root ~intermediate_root
+        ~new_root ~oldest_stack_before ~oldest_stack_after ~latest_stack_before
+        ~latest_stack_after:updated_coinbase_stack ~is_new_stack
     in
-    (update, pending_coinbase_collection_updated')
+    (update, pending_coinbase_collection_updated2)
 
   (* N.B.: we don't expose apply_diff_unverified
      in For_tests only, we expose apply apply_unverified, which calls apply_diff_unverified *)
@@ -883,8 +916,7 @@ end = struct
     in
     let%bind pending_coinbase_update, updated_pending_coinbase_collection' =
       update_pending_coinbase_collection t.pending_coinbase_collection
-        updated_coinbase_stack ~is_new_stack
-        ~proof_emitted:(Option.is_some res_opt)
+        updated_coinbase_stack ~is_new_stack ~ledger_proof:res_opt
       |> Deferred.return
     in
     let%map () =
@@ -893,10 +925,11 @@ end = struct
         |> to_staged_ledger_or_error )
     in
     Logger.info logger
-      "Block info: No of transactions included:%d Coinbase parts:%d Work \
-       count:%d Spots available:%d Proofs waiting to be solved:%d"
-      user_commands_count cb_parts_count (List.length works) spots_available
-      proofs_waiting ;
+      "Block info: No of transactions included:%d Coinbase parts:%d Total \
+       pending proofs in scan state:%d No of proofs included:%d Spots \
+       available:%d %!"
+      user_commands_count cb_parts_count proofs_waiting (total_proofs works)
+      spots_available ;
     let new_staged_ledger =
       { scan_state= scan_state'
       ; ledger= new_ledger
@@ -996,8 +1029,7 @@ end = struct
     in
     let%map pending_coinbase_update, update_pending_coinbase_collection' =
       update_pending_coinbase_collection t.pending_coinbase_collection
-        updated_coinbase_stack ~is_new_stack
-        ~proof_emitted:(Option.is_some res_opt)
+        updated_coinbase_stack ~is_new_stack ~ledger_proof:res_opt
       |> Staged_ledger_error.to_or_error |> Deferred.return
     in
     Or_error.ok_exn (verify_scan_state_after_apply new_ledger scan_state') ;
@@ -1480,13 +1512,15 @@ end = struct
     in
     let unbundled_job_count = Scan_state.current_job_count t.scan_state in
     O1trace.trace_event "computed_work" ;
-    let completed_works_seq =
-      Sequence.fold_until all_work_to_do ~init:Sequence.empty
-        ~f:(fun seq w ->
+    let completed_works_seq, proof_count =
+      Sequence.fold_until all_work_to_do ~init:(Sequence.empty, 0)
+        ~f:(fun (seq, count) w ->
           match get_completed_work w with
           | Some cw_checked ->
-              Continue (Sequence.append seq (Sequence.singleton cw_checked))
-          | None -> Stop seq )
+              Continue
+                ( Sequence.append seq (Sequence.singleton cw_checked)
+                , List.length cw_checked.proofs + count )
+          | None -> Stop (seq, count) )
         ~finish:Fn.id
     in
     (* max number of jobs that can be done *)
@@ -1514,8 +1548,7 @@ end = struct
           generate logger completed_works_seq valid_on_this_ledger self
             partitions max_jobs_count unbundled_job_count )
     in
-    Logger.info logger "Block stats: Proofs ready for purchase: %d"
-      (Sequence.length completed_works_seq) ;
+    Logger.info logger "Block stats: Proofs ready for purchase: %d" proof_count ;
     trace_event "prediffs done" ;
     { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
     ; creator= self
@@ -1740,10 +1773,9 @@ let%test_module "test" =
             t
           |> String.concat ~sep:","
 
-        let latest_stack t = List.hd t
+        let latest_stack_exn t = List.hd t
 
-        let oldest_stack_exn t =
-          match List.rev t with [] -> failwith "No stack" | x :: _ -> x
+        let oldest_stack_exn t = match List.rev t with [] -> [] | x :: _ -> x
 
         module Stack = struct
           type t = Coinbase.t list [@@deriving sexp, bin_io, compare, hash, eq]
@@ -1760,7 +1792,7 @@ let%test_module "test" =
         let remove_coinbase_stack_exn t =
           match List.rev t with
           | [] -> failwith "tried to remove stack from an empty collection"
-          | _ :: xs -> List.rev xs
+          | x :: xs -> (x, List.rev xs)
 
         let update_coinbase_stack_exn t stack ~is_new_stack =
           if is_new_stack then stack :: t
@@ -1777,41 +1809,50 @@ let%test_module "test" =
       end
 
       module Pending_coinbase_update = struct
-        module Action = struct
-          type t = Added | Updated | Deleted_added | Deleted_updated
-          [@@deriving eq, sexp, bin_io]
-        end
-
-        type ('pending_coinbase_stack, 'pending_coinbase_hash, 'action) t_ =
-          { updated_stack: 'pending_coinbase_stack
+        type ('pending_coinbase_stack, 'pending_coinbase_hash, 'bool) t_ =
+          { oldest_stack_before: 'pending_coinbase_stack
+          ; oldest_stack_after: 'pending_coinbase_stack
+          ; latest_stack_before: 'pending_coinbase_stack
+          ; latest_stack_after: 'pending_coinbase_stack
+          ; is_new_stack: 'bool
           ; prev_root: 'pending_coinbase_hash
-          ; new_root: 'pending_coinbase_hash
-          ; action: 'action }
+          ; intermediate_root: 'pending_coinbase_hash
+          ; new_root: 'pending_coinbase_hash }
         [@@deriving bin_io, sexp]
 
-        type t =
-          (Pending_coinbase.Stack.t, Pending_coinbase_hash.t, Action.t) t_
+        type t = (Pending_coinbase.Stack.t, Pending_coinbase_hash.t, bool) t_
         [@@deriving bin_io, sexp]
 
-        type value = t
+        type value =
+          (Pending_coinbase.Stack.t, Pending_coinbase_hash.t, bool) t_
+        [@@deriving sexp, bin_io]
 
         let new_root t = t.new_root
 
         let prev_root t = t.prev_root
 
-        let updated_stack t = t.updated_stack
-
-        let action t = t.action
-
-        let create_value ~prev_root ~new_root ~updated_stack ~action =
-          {prev_root; new_root; updated_stack; action}
+        let create_value ~oldest_stack_before ~oldest_stack_after
+            ~latest_stack_before ~latest_stack_after ~is_new_stack ~prev_root
+            ~intermediate_root ~new_root =
+          { oldest_stack_before
+          ; oldest_stack_after
+          ; latest_stack_before
+          ; latest_stack_after
+          ; is_new_stack
+          ; prev_root
+          ; intermediate_root
+          ; new_root }
 
         let genesis =
           let empty_coinbase_tree = Pending_coinbase.empty_merkle_root () in
-          { updated_stack= Pending_coinbase.Stack.empty
+          { oldest_stack_before= Pending_coinbase.Stack.empty
+          ; oldest_stack_after= Pending_coinbase.Stack.empty
+          ; latest_stack_before= Pending_coinbase.Stack.empty
+          ; latest_stack_after= Pending_coinbase.Stack.empty
+          ; is_new_stack= false
           ; prev_root= empty_coinbase_tree
-          ; new_root= empty_coinbase_tree
-          ; action= Action.Added }
+          ; intermediate_root= empty_coinbase_tree
+          ; new_root= empty_coinbase_tree }
       end
 
       module Ledger_proof_statement = struct
@@ -2253,24 +2294,6 @@ let%test_module "test" =
           ; prover }
       else None
 
-    let pending_coinbase_checks sl
-        (pending_coinbase_update : Pending_coinbase_update.t) ledger_proof =
-      match pending_coinbase_update.action with
-      | Pending_coinbase_update.Action.Deleted_added | Deleted_updated ->
-          let oldest_stack =
-            Pending_coinbase.oldest_stack_exn
-              (Sl.pending_coinbase_collection sl)
-          in
-          let statement : Ledger_proof_statement.t =
-            Ledger_proof.statement (fst @@ Option.value_exn ledger_proof)
-          in
-          let state : Pending_coinbase_stack_state.t =
-            statement.pending_coinbase_state
-          in
-          let stack_from_proof : Pending_coinbase.Stack.t = state.target in
-          assert (Pending_coinbase.Stack.equal oldest_stack stack_from_proof)
-      | _ -> ()
-
     let create_and_apply sl logger txns stmt_to_work =
       let open Deferred.Let_syntax in
       let diff =
@@ -2286,7 +2309,6 @@ let%test_module "test" =
         | Ok x -> x
         | Error e -> Error.raise (Sl.Staged_ledger_error.to_error e)
       in
-      pending_coinbase_checks !sl pending_coinbase_update ledger_proof ;
       assert (Staged_ledger_hash.equal hash (Sl.hash sl')) ;
       sl := sl' ;
       (ledger_proof, diff')

@@ -177,7 +177,7 @@ module Make (Inputs : Inputs_intf) :
     let%bind ( diff
              , next_staged_ledger_hash
              , ledger_proof_opt
-             , pending_coinbase_state ) =
+             , pending_coinbase_update ) =
       Interruptible.uninterruptible
         (let open Deferred.Let_syntax in
         let diff =
@@ -190,7 +190,7 @@ module Make (Inputs : Inputs_intf) :
         let%map ( `Hash_after_applying next_staged_ledger_hash
                 , `Ledger_proof ledger_proof_opt
                 , `Staged_ledger _transitioned_staged_ledger
-                , `Pending_coinbase_update pending_coinbase_state ) =
+                , `Pending_coinbase_update pending_coinbase_update ) =
           let%map or_error =
             Staged_ledger.apply_diff_unchecked staged_ledger diff
           in
@@ -200,7 +200,7 @@ module Make (Inputs : Inputs_intf) :
         ( diff
         , next_staged_ledger_hash
         , ledger_proof_opt
-        , pending_coinbase_state ))
+        , pending_coinbase_update ))
     in
     let%bind protocol_state, consensus_transition_data =
       lift_sync (fun () ->
@@ -226,7 +226,7 @@ module Make (Inputs : Inputs_intf) :
               ~snarked_ledger_hash:next_ledger_hash
               ~staged_ledger_hash:next_staged_ledger_hash
               ~pending_coinbase_hash:
-                (Pending_coinbase_update.new_root pending_coinbase_state)
+                (Pending_coinbase_update.new_root pending_coinbase_update)
           in
           let time =
             Time.now time_controller |> Time.to_span_since_epoch
@@ -260,7 +260,7 @@ module Make (Inputs : Inputs_intf) :
                 ~blockchain_state:
                   (Protocol_state.blockchain_state protocol_state)
                 ~consensus_data:consensus_transition_data ()
-                ~pending_coinbase_state
+                ~pending_coinbase_update
             in
             let internal_transition =
               Internal_transition.create ~snark_transition

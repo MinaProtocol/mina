@@ -64,7 +64,7 @@ module Make (Consensus_mechanism : Consensus.S) :
             ~prev_state_hash:previous_state_hash transition supply_increase
         in
         let pending_coinbase_update =
-          Snark_transition.pending_coinbase_state transition
+          Snark_transition.pending_coinbase_update transition
         in
         let%bind success =
           let%bind correct_transaction_snark =
@@ -97,52 +97,22 @@ module Make (Consensus_mechanism : Consensus.S) :
               |> Blockchain_state.snarked_ledger_hash )
           in
           let%bind new_pending_coinbase_hash =
-            let prev_root =
-              previous_state |> Protocol_state.blockchain_state
-              |> Blockchain_state.pending_coinbase_hash
+            let%bind root_after_delete =
+              let prev_root =
+                previous_state |> Protocol_state.blockchain_state
+                |> Blockchain_state.pending_coinbase_hash
+              in
+              let stack_before = pending_coinbase_update.oldest_stack_before in
+              let stack_after = pending_coinbase_update.oldest_stack_after in
+              Pending_coinbase.Checked.delete_stack prev_root stack_before
+                stack_after
             in
-            let updated_stack = pending_coinbase_update.updated_stack in
-            let action = pending_coinbase_update.action in
-            let with_del_add del_added =
-              Pending_coinbase.Checked.update_delete_stack
-                ~is_new_stack:Boolean.true_ ~stack:updated_stack prev_root
-            in
-            let with_del_update del_updated =
-              Pending_coinbase.Checked.update_delete_stack
-                ~is_new_stack:Boolean.false_ ~stack:updated_stack prev_root
-            in
-            let with_add added =
-              Pending_coinbase.Checked.update_stack prev_root
-                ~is_new_stack:Boolean.true_ updated_stack
-            in
-            let with_update updated =
-              Pending_coinbase.Checked.update_stack prev_root
-                ~is_new_stack:Boolean.false_ updated_stack
-            in
-            let%bind added =
-              Pending_coinbase_update.Action.Checked.added action
-            in
-            let%bind updated =
-              Pending_coinbase_update.Action.Checked.updated action
-            in
-            let%bind del_add =
-              Pending_coinbase_update.Action.Checked.deleted_added action
-            in
-            let%bind del_updated =
-              Pending_coinbase_update.Action.Checked.deleted_updated action
-            in
-            let chain if_ b ~then_ ~else_ =
-              let%bind then_ = then_ and else_ = else_ in
-              if_ b ~then_ ~else_
-            in
-            chain Pending_coinbase.Hash.if_ added ~then_:(with_add added)
-              ~else_:
-                (chain Pending_coinbase.Hash.if_ updated
-                   ~then_:(with_update updated)
-                   ~else_:
-                     (chain Pending_coinbase.Hash.if_ del_add
-                        ~then_:(with_del_add del_add)
-                        ~else_:(with_del_update del_updated)))
+            (*new stack or update one*)
+            let stack_before = pending_coinbase_update.latest_stack_before in
+            let stack_after = pending_coinbase_update.latest_stack_after in
+            let is_new_stack = pending_coinbase_update.is_new_stack in
+            Pending_coinbase.Checked.update_stack root_after_delete
+              ~is_new_stack stack_before stack_after
           in
           let%bind correct_coinbase_status =
             let new_root = pending_coinbase_update.new_root in

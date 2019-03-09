@@ -113,7 +113,7 @@ module type Pending_coinbase_intf = sig
   type coinbase
 
   module Stack : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp, bin_io, eq]
 
     val push_exn : t -> coinbase -> t
 
@@ -126,11 +126,13 @@ module type Pending_coinbase_intf = sig
 
   val update_coinbase_stack_exn : t -> Stack.t -> is_new_stack:bool -> t
 
-  val remove_coinbase_stack_exn : t -> t
+  val remove_coinbase_stack_exn : t -> Stack.t * t
 
   val create_exn : unit -> t
 
-  val latest_stack : t -> Stack.t option
+  val latest_stack_exn : t -> Stack.t option
+
+  val oldest_stack_exn : t -> Stack.t
 end
 
 module type Frozen_ledger_hash_intf = sig
@@ -967,33 +969,26 @@ module type Consensus_state_intf = sig
 end
 
 module type Pending_coinbase_update_intf = sig
-  type t [@@deriving sexp, bin_io]
-
-  type value = t
-
   type pending_coinbase_hash
 
   type pending_coinbase_stack
 
-  module Action : sig
-    type t = Added | Updated | Deleted_added | Deleted_updated
-    [@@deriving eq, sexp, bin_io]
-  end
+  type t [@@deriving sexp, bin_io]
+
+  type value = t [@@deriving sexp, bin_io]
 
   val create_value :
-       prev_root:pending_coinbase_hash
+       oldest_stack_before:pending_coinbase_stack
+    -> oldest_stack_after:pending_coinbase_stack
+    -> latest_stack_before:pending_coinbase_stack
+    -> latest_stack_after:pending_coinbase_stack
+    -> is_new_stack:bool
+    -> prev_root:pending_coinbase_hash
+    -> intermediate_root:pending_coinbase_hash
     -> new_root:pending_coinbase_hash
-    -> updated_stack:pending_coinbase_stack
-    -> action:Action.t
     -> value
 
   val new_root : value -> pending_coinbase_hash
-
-  val prev_root : value -> pending_coinbase_hash
-
-  val updated_stack : value -> pending_coinbase_stack
-
-  val action : value -> Action.t
 
   val genesis : value
 end
@@ -1300,7 +1295,7 @@ module type Consensus_mechanism_intf = sig
       -> supply_increase:Currency.Amount.t
       -> blockchain_state:Blockchain_state.value
       -> consensus_data:Consensus_transition_data.value
-      -> pending_coinbase_state:pending_coinbase_update
+      -> pending_coinbase_update:pending_coinbase_update
       -> unit
       -> value
 
