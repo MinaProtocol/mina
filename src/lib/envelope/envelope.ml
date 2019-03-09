@@ -27,7 +27,8 @@ module Sender = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.Latest
+  (* bin_io intentionally omitted in deriving list *)
+  type t = Stable.Latest.t = Local | Remote of Peer.t [@@deriving sexp]
 end
 
 module Incoming = struct
