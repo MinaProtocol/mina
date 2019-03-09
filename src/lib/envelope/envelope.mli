@@ -1,6 +1,5 @@
 open Core
 open Network_peer
-open Module_version
 
 module Sender : sig
   module Stable : sig
