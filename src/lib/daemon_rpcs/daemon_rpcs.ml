@@ -96,6 +96,8 @@ module Types = struct
       type t =
         { rpc_timings: Rpc_timings.t
         ; external_transition_latency: Perf_histograms.Report.t option
+        ; accepted_transition_local_latency: Perf_histograms.Report.t option
+        ; accepted_transition_remote_latency: Perf_histograms.Report.t option
         ; snark_worker_transition_time: Perf_histograms.Report.t option
         ; snark_worker_merge_time: Perf_histograms.Report.t option }
       [@@deriving to_yojson, bin_io, fields]
@@ -112,6 +114,20 @@ module Types = struct
               | Some report ->
                   ("Block Latencies (hist.)", summarize_report report) :: acc
               )
+            ~accepted_transition_local_latency:(fun acc x ->
+              match f x with
+              | None -> acc
+              | Some report ->
+                  ( "Accepted local block Latencies (hist.)"
+                  , summarize_report report )
+                  :: acc )
+            ~accepted_transition_remote_latency:(fun acc x ->
+              match f x with
+              | None -> acc
+              | Some report ->
+                  ( "Accepted remote block Latencies (hist.)"
+                  , summarize_report report )
+                  :: acc )
             ~snark_worker_transition_time:(fun acc x ->
               match f x with
               | None -> acc

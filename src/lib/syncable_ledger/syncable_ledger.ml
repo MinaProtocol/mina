@@ -503,7 +503,7 @@ end = struct
             | Error e ->
                 Logger.faulty_peer t.log
                   !"Got error from when trying to add child_hash %{sexp: \
-                    Hash.t} %s %{sexp: Network_peer.Peer.t}"
+                    Hash.t} %s %{sexp: Envelope.Sender.t}"
                   h' (Error.to_string_hum e)
                   (Envelope.Incoming.sender env) ;
                 ()

@@ -1,8 +1,38 @@
 open Core
 open Network_peer
+open Module_version
+
+module Sender = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        let version = 1
+
+        type t = Local | Remote of Peer.t [@@deriving sexp, bin_io]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "envelope_sender"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  (* bin_io intentionally omitted in deriving list *)
+  type t = Stable.Latest.t = Local | Remote of Peer.t [@@deriving sexp]
+end
 
 module Incoming = struct
-  type 'a t = {data: 'a; sender: Peer.t} [@@deriving sexp, bin_io]
+  type 'a t = {data: 'a; sender: Sender.Stable.V1.t} [@@deriving sexp, bin_io]
 
   let sender {sender; _} = sender
 
@@ -13,9 +43,6 @@ module Incoming = struct
   let map ~f t = {t with data= f t.data}
 
   let local data =
-    let sender =
-      Peer.create Unix.Inet_addr.localhost ~discovery_port:0
-        ~communication_port:0
-    in
+    let sender = Sender.Local in
     {data; sender}
 end
