@@ -4,7 +4,7 @@ open Snark_bits
 open Tuple_lib
 open Fold_lib
 
-type t [@@deriving sexp, eq]
+type t [@@deriving sexp, eq, yojson]
 
 type t0 = t
 
@@ -16,7 +16,7 @@ end
 
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving sexp, bin_io, compare, eq, hash]
+    type nonrec t = t [@@deriving sexp, bin_io, compare, eq, hash, yojson]
   end
 end
 

@@ -71,9 +71,7 @@ let%test_module "Bootstrap Controller" =
           let ledger_db =
             Transition_frontier.For_tests.root_snarked_ledger frontier
           in
-          let root_sync_ledger =
-            Root_sync_ledger.create ledger_db ~parent_log:logger
-          in
+          let root_sync_ledger = Root_sync_ledger.create ledger_db ~logger in
           let parent_breadcrumb = Transition_frontier.best_tip frontier in
           let breadcrumbs_gen =
             gen_linear_breadcrumbs ~logger ~size:num_breadcrumbs
@@ -154,7 +152,7 @@ let%test_module "Bootstrap Controller" =
             Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
           in
           let%map new_frontier, (_ : External_transition.Verified.t list) =
-            Bootstrap_controller.run ~parent_log:logger ~network
+            Bootstrap_controller.run ~logger ~network
               ~frontier:syncing_frontier ~ledger_db ~transition_reader
           in
           Ledger_hash.equal (root_hash new_frontier) (root_hash peer.frontier)
@@ -200,8 +198,8 @@ let%test_module "Bootstrap Controller" =
               (get_best_tip_hash large_peer)
           in
           let%map new_frontier, (_ : External_transition.Verified.t list) =
-            Bootstrap_controller.run ~parent_log:logger ~network ~frontier:me
-              ~ledger_db ~transition_reader
+            Bootstrap_controller.run ~logger ~network ~frontier:me ~ledger_db
+              ~transition_reader
           in
           Ledger_hash.equal (root_hash new_frontier)
             (root_hash large_peer.frontier) )
@@ -219,7 +217,7 @@ let%test_module "Bootstrap Controller" =
             Root_sync_ledger.create
               (Transition_frontier.For_tests.root_snarked_ledger
                  syncing_frontier)
-              ~parent_log:logger
+              ~logger
           in
           let query_reader = Root_sync_ledger.query_reader root_sync_ledger in
           let response_writer =

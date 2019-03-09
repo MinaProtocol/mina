@@ -215,8 +215,7 @@ end = struct
           |> don't_wait_for ;
         Deferred.unit )
 
-  let run ~parent_log ~network ~frontier ~ledger_db ~transition_reader =
-    let logger = Logger.child parent_log __MODULE__ in
+  let run ~logger ~network ~frontier ~ledger_db ~transition_reader =
     let initial_breadcrumb = Transition_frontier.root frontier in
     let initial_root_verified_transition =
       initial_breadcrumb |> Transition_frontier.Breadcrumb.transition_with_hash
@@ -234,7 +233,7 @@ end = struct
     let transition_graph = Transition_cache.create () in
     let%bind synced_db =
       let root_sync_ledger =
-        Root_sync_ledger.create ledger_db ~parent_log:t.logger
+        Root_sync_ledger.create ledger_db ~logger:t.logger
       in
       sync_ledger t ~root_sync_ledger ~transition_graph ~transition_reader
       |> don't_wait_for ;
@@ -255,8 +254,7 @@ end = struct
           verified_root )
     in
     let%map new_frontier =
-      Transition_frontier.create ~logger:parent_log
-        ~root_snarked_ledger:ledger_db
+      Transition_frontier.create ~logger ~root_snarked_ledger:ledger_db
         ~root_transaction_snark_scan_state:(Staged_ledger.Scan_state.empty ())
         ~root_staged_ledger_diff:None ~root_transition:new_root
         ~consensus_local_state:

@@ -53,13 +53,21 @@ struct
       ; just_emitted_a_proof: bool }
     [@@deriving sexp, fields]
 
+    let to_yojson {transition_with_hash; staged_ledger= _; just_emitted_a_proof}
+        =
+      `Assoc
+        [ ( "transition_with_hash"
+          , With_hash.to_yojson Inputs.External_transition.Verified.to_yojson
+              State_hash.to_yojson transition_with_hash )
+        ; ("staged_ledger", `String "<opaque>")
+        ; ("just_emitted_a_proof", `Bool just_emitted_a_proof) ]
+
     let create transition_with_hash staged_ledger =
       {transition_with_hash; staged_ledger; just_emitted_a_proof= false}
 
     let build ~logger ~parent ~transition_with_hash =
       O1trace.measure "Breadcrumb.build" (fun () ->
           let open Deferred.Result.Let_syntax in
-          let logger = Logger.child logger __MODULE__ in
           let staged_ledger = parent.staged_ledger in
           let transition = With_hash.data transition_with_hash in
           let transition_protocol_state =
@@ -322,7 +330,6 @@ struct
       ~root_staged_ledger_diff ~consensus_local_state =
     let open Consensus in
     let open Deferred.Let_syntax in
-    let logger = Logger.child logger __MODULE__ in
     let root_hash = With_hash.hash root_transition in
     let root_protocol_state =
       Inputs.External_transition.Verified.protocol_state
@@ -515,10 +522,10 @@ struct
     (* We only want to update the parent node if we don't have a dupe *)
     Hashtbl.change t.table hash ~f:(function
       | Some x ->
-          Logger.warn t.logger
-            !"attach_node_to with breadcrumb for state %{sexp:State_hash.t} \
-              already present; catchup scheduler bug?"
-            hash ;
+          Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:[("state_hash", State_hash.to_yojson hash)]
+            "attach_node_to with breadcrumb for state $state_hash already \
+             present; catchup scheduler bug?" ;
           Some x
       | None ->
           Hashtbl.set t.table ~key:parent_hash
@@ -634,7 +641,7 @@ struct
         (* note: new_root_node is the same as root_node if the root didn't change *)
         let garbage_breadcrumbs, new_root_node =
           if distance_to_parent > max_length then (
-            Logger.info t.logger
+            Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
               !"Distance to parent: %d exceeded max_lenth %d"
               distance_to_parent max_length ;
             (* 4.I *)

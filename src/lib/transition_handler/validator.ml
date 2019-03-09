@@ -44,7 +44,6 @@ module Make (Inputs : Inputs.S) :
            consensus state")
 
   let run ~logger ~frontier ~transition_reader ~valid_transition_writer =
-    let logger = Logger.child logger __MODULE__ in
     don't_wait_for
       (Reader.iter transition_reader
          ~f:(fun (`Transition transition_env, `Time_received _) ->
@@ -61,17 +60,17 @@ module Make (Inputs : Inputs.S) :
                  validate_transition ~logger ~frontier transition_with_hash
                with
              | Ok () ->
-                 Logger.info logger
+                 Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                    !"accepting transition %{sexp:State_hash.t}"
                    hash ;
                  Writer.write valid_transition_writer transition_with_hash
              | Error `Duplicate ->
-                 Logger.info logger
+                 Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                    !"ignoring transition we've already seen \
                      %{sexp:State_hash.t}"
                    hash
              | Error (`Invalid reason) ->
-                 Logger.warn logger
+                 Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
                    !"rejecting transitions because \"%s\" -- sent by %{sexp: \
                      Network_peer.Peer.t}"
                    reason

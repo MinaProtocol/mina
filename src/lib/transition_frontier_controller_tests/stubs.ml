@@ -277,10 +277,13 @@ struct
           ~transition_with_hash:next_verified_external_transition_with_hash
       with
       | Ok new_breadcrumb ->
-          Logger.info logger
-            !"Producing a breadcrumb with hash : %{sexp:State_hash.t}"
-            ( Transition_frontier.Breadcrumb.transition_with_hash new_breadcrumb
-            |> With_hash.hash ) ;
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ( "state_hash"
+                , Transition_frontier.Breadcrumb.transition_with_hash
+                    new_breadcrumb
+                  |> With_hash.hash |> State_hash.to_yojson ) ]
+            "Producing a breadcrumb with hash: $state_hash" ;
           new_breadcrumb
       | Error (`Fatal_error exn) -> raise exn
       | Error (`Validation_error e) ->
@@ -316,9 +319,9 @@ struct
       |> Blockchain_state.snarked_ledger_hash
       |> Frozen_ledger_hash.to_ledger_hash
     in
-    Logger.info logger
-      !"Snarked_ledger_hash is %{sexp:Ledger_hash.t}"
-      root_ledger_hash ;
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+      ~metadata:[("root_ledger_hash", Ledger_hash.to_yojson root_ledger_hash)]
+      "Snarked_ledger_hash is $root_ledger_hash" ;
     let dummy_staged_ledger_diff =
       let creator =
         Quickcheck.random_value Signature_lib.Public_key.Compressed.gen
@@ -466,10 +469,12 @@ struct
         =
       Pipe_lib.Linear_pipe.iter_unordered ~max_concurrency:8 query_reader
         ~f:(fun (ledger_hash, sync_ledger_query) ->
-          Logger.info logger
-            !"Processing ledger query : %{sexp:(Ledger.Addr.t \
-              Syncable_ledger.query)}"
-            sync_ledger_query ;
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ( "sync_ledger_query"
+                , Syncable_ledger.query_to_yojson Ledger.Addr.to_yojson
+                    sync_ledger_query ) ]
+            "Processing ledger query: $sync_ledger_query" ;
           let answer =
             Hashtbl.to_alist table
             |> List.find_map ~f:(fun (peer, frontier) ->
@@ -482,16 +487,20 @@ struct
           in
           match answer with
           | None ->
-              Logger.info logger
-                !"Could not find an answer for : %{sexp:(Ledger.Addr.t \
-                  Syncable_ledger.query)}"
-                sync_ledger_query ;
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ( "sync_ledger_query"
+                    , Syncable_ledger.query_to_yojson Ledger.Addr.to_yojson
+                        sync_ledger_query ) ]
+                "Could not find an answer for: $sync_ledger_query" ;
               Deferred.unit
           | Some answer ->
-              Logger.info logger
-                !"Found an answer for : %{sexp:(Ledger.Addr.t \
-                  Syncable_ledger.query)}"
-                sync_ledger_query ;
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ( "sync_ledger_query"
+                    , Syncable_ledger.query_to_yojson Ledger.Addr.to_yojson
+                        sync_ledger_query ) ]
+                "Found an answer for:" ;
               Pipe_lib.Linear_pipe.write response_writer answer )
       |> don't_wait_for
   end
@@ -552,9 +561,11 @@ struct
           find_exn frontier state_hash
           |> Breadcrumb.transition_with_hash |> With_hash.data)
       in
-      Logger.info logger
-        !"Peer %{sexp:Network_peer.Peer.t} sending %{sexp:State_hash.t}"
-        address state_hash ;
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:
+          [ ("peer", Network_peer.Peer.to_yojson address)
+          ; ("state_hash", State_hash.to_yojson state_hash) ]
+        "Peer $peer sending $state_hash" ;
       let enveloped_transition =
         Envelope.Incoming.wrap ~data:transition ~sender:address
       in

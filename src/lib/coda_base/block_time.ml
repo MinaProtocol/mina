@@ -15,6 +15,12 @@ module Stable = struct
       let version = 1
 
       type t = UInt64.t [@@deriving bin_io, sexp, compare, eq, hash]
+
+      let to_yojson n = `String (UInt64.to_string n)
+
+      let of_yojson = function
+        | `String s -> Ok (UInt64.of_string s)
+        | _ -> Error "expected string"
     end
 
     include T
@@ -40,7 +46,7 @@ module Controller = struct
 end
 
 (* DO NOT add bin_io the deriving list *)
-type t = Stable.Latest.t [@@deriving sexp, compare, eq, hash]
+type t = Stable.Latest.t [@@deriving sexp, compare, eq, hash, yojson]
 
 type t0 = t
 

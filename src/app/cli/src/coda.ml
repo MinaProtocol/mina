@@ -29,7 +29,7 @@ module type Coda_intf = sig
   module Make (Init : Init_intf) () : Main_intf
 end
 
-let daemon log =
+let daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
   Command.async ~summary:"Coda daemon"
@@ -116,7 +116,6 @@ let daemon log =
          else Sys.home_directory () >>| compute_conf_dir
        in
        Parallel.init_master () ;
-       ignore (Logger.set_sexp_logging sexp_logging) ;
        let%bind config =
          match%map
            Monitor.try_with_or_error ~extract_exn:true (fun () ->
@@ -129,9 +128,10 @@ let daemon log =
          with
          | Ok c -> Some c
          | Error e ->
-             Logger.trace log "error reading daemon.json: %s"
-               (Error.to_string_mach e) ;
-             Logger.warn log "failed to read daemon.json, not using it" ;
+             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+               "error reading daemon.json: %s" (Error.to_string_mach e) ;
+             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+               "failed to read daemon.json, not using it" ;
              None
        in
        let maybe_from_config (type a) (f : YJ.json -> a option)
@@ -149,8 +149,8 @@ let daemon log =
          match maybe_from_config map keyname actual_value with
          | Some x -> x
          | None ->
-             Logger.info log "didn't find %s in the config file, using default"
-               keyname ;
+             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+               "didn't find %s in the config file, using default" keyname ;
              default
        in
        let external_port : int =
@@ -222,10 +222,10 @@ let daemon log =
                          ~host:(Unix.Inet_addr.to_string inet_addr)
                          ~port:(Host_and_port.port addr))
              | Error e ->
-                 Logger.trace log "getaddr exception: %s"
-                   (Error.to_string_mach e) ;
-                 Logger.error log "failed to look up address for %s, skipping"
-                   host ;
+                 Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+                   "getaddr exception: %s" (Error.to_string_mach e) ;
+                 Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                   "failed to look up address for %s, skipping" host ;
                  return None )
        in
        let%bind () =
@@ -258,7 +258,7 @@ let daemon log =
          >>| Or_error.ok
        in
        let module Config0 = struct
-         let logger = log
+         let logger = logger
 
          let conf_dir = conf_dir
 
@@ -283,8 +283,9 @@ let daemon log =
          (Async.Scheduler.long_cycles
             ~at_least:(sec 0.5 |> Time_ns.Span.of_span))
          ~f:(fun span ->
-           Logger.warn log "long async cycle %s" (Time_ns.Span.to_string span)
-           ) ;
+           Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+             "long async cycle %s"
+             (Time_ns.Span.to_string span) ) ;
        let%bind () =
          let open M in
          let run_snark_worker_action =
@@ -306,11 +307,11 @@ let daemon log =
          let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
          let time_controller = Inputs.Time.Controller.create () in
          let net_config =
-           { Inputs.Net.Config.parent_log= log
+           { Inputs.Net.Config.logger
            ; time_controller
            ; gossip_net_params=
                { timeout= Time.Span.of_sec 1.
-               ; parent_log= log
+               ; logger
                ; target_peer_count= 8
                ; conf_dir
                ; initial_peers
@@ -325,7 +326,7 @@ let daemon log =
          in
          let%bind coda =
            Run.create
-             (Run.Config.make ~log ~net_config
+             (Run.Config.make ~logger ~net_config
                 ~run_snark_worker:(Option.is_some run_snark_worker_flag)
                 ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
@@ -338,23 +339,23 @@ let daemon log =
          let%map () = maybe_sleep 3. in
          M.start coda ;
          let web_service = Web_pipe.get_service () in
-         Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;
+         Web_pipe.run_service (module Run) coda web_service ~conf_dir ~logger ;
          Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
-           ~client_port ~log () ;
-         Run.run_snark_worker ~log ~client_port run_snark_worker_action
+           ~client_port ~logger () ;
+         Run.run_snark_worker ~logger ~client_port run_snark_worker_action
        in
        Async.never ())
 
 [%%if
 force_updates]
 
-let rec ensure_testnet_id_still_good log =
+let rec ensure_testnet_id_still_good logger =
   let open Cohttp_async in
   let recheck_soon = 0.1 in
   let recheck_later = 1.0 in
   let try_later hrs =
     Async.Clock.run_after (Time.Span.of_hr hrs)
-      (fun () -> don't_wait_for @@ ensure_testnet_id_still_good log)
+      (fun () -> don't_wait_for @@ ensure_testnet_id_still_good logger)
       ()
   in
   match%bind
@@ -362,14 +363,14 @@ let rec ensure_testnet_id_still_good log =
         Client.get (Uri.of_string "http://updates.o1test.net/testnet_id") )
   with
   | Error e ->
-      Logger.error log
+      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
         "exception while trying to fetch testnet_id, trying again in 6 minutes" ;
       try_later recheck_soon ;
       Deferred.unit
   | Ok (resp, body) -> (
       if resp.status <> `OK then (
         try_later recheck_soon ;
-        Logger.error log
+        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
           "HTTP response status %s while getting testnet id, checking again \
            in 6 minutes."
           (Cohttp.Code.string_of_status resp.status) ;
@@ -424,17 +425,17 @@ let internal_commands =
 
 [%%endif]
 
-let coda_commands log =
+let coda_commands logger =
   [ (Parallel.worker_command_name, Parallel.worker_command)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
-  ; ("daemon", daemon log)
+  ; ("daemon", daemon logger)
   ; ("client", Client.command)
   ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
 
 [%%if
 integration_tests]
 
-let coda_commands log =
+let coda_commands logger =
   let group =
     [ (Coda_peers_test.name, Coda_peers_test.command)
     ; (Coda_block_production_test.name, Coda_block_production_test.command)
@@ -448,16 +449,16 @@ let coda_commands log =
     ; ("full-test", Full_test.command)
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
   in
-  coda_commands log
+  coda_commands logger
   @ [("integration-tests", Command.group ~summary:"Integration tests" group)]
 
 [%%endif]
 
 let () =
   Random.self_init () ;
-  let log = Logger.create () in
-  don't_wait_for (ensure_testnet_id_still_good log) ;
+  let logger = Logger.create () in
+  don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
-  Command.run (Command.group ~summary:"Coda" (coda_commands log)) ;
+  Command.run (Command.group ~summary:"Coda" (coda_commands logger)) ;
   Core.exit 0

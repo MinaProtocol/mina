@@ -145,7 +145,8 @@ module Make (Inputs : Inputs_intf) :
       let bootstrap_controller_reader, bootstrap_controller_writer =
         Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
       in
-      Logger.info logger "Starting Bootstrapping phase" ;
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Starting Bootstrapping phase" ;
       let root_state = get_root_state old_frontier in
       set_bootstrap_phase ~controller_type root_state
         bootstrap_controller_writer ;
@@ -153,7 +154,7 @@ module Make (Inputs : Inputs_intf) :
         ( `Transition _incoming_transition
         , `Time_received (to_unix_timestamp _tm) ) ;
       let%map new_frontier, collected_transitions =
-        Bootstrap_controller.run ~parent_log:logger ~network ~ledger_db
+        Bootstrap_controller.run ~logger ~network ~ledger_db
           ~frontier:old_frontier ~transition_reader:bootstrap_controller_reader
       in
       kill bootstrap_controller_reader bootstrap_controller_writer ;
@@ -168,7 +169,8 @@ module Make (Inputs : Inputs_intf) :
     let start_transition_frontier_controller ~verified_transition_writer
         ~clear_reader ~collected_transitions frontier =
       let transition_reader, transition_writer = create_bufferred_pipe () in
-      Logger.info logger "Starting Transition Frontier Controller phase" ;
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Starting Transition Frontier Controller phase" ;
       let new_verified_transition_reader =
         Transition_frontier_controller.run ~logger ~network ~time_controller
           ~collected_transitions ~frontier

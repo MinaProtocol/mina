@@ -7,7 +7,7 @@
  (libraries core async async_extra pipe_lib merkle_ledger logger
    interruptible envelope)
  (preprocess
-  (pps ppx_jane ppx_deriving.eq))
+  (pps ppx_jane ppx_deriving.eq ppx_deriving_yojson))
  (synopsis "Synchronization of Merkle-tree backed ledgers"))
 
 (library

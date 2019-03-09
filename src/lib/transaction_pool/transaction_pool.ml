@@ -69,7 +69,7 @@ struct
 
   type t =
     { mutable pool: pool
-    ; log: Logger.t
+    ; logger: Logger.t
     ; mutable diff_reader: unit Deferred.t Option.t }
 
   (* FIXME terrible hack *)
@@ -92,7 +92,8 @@ struct
       (diff_opt : Transition_frontier.Extensions.Best_tip_diff.view) =
     match diff_opt with
     | None ->
-        Logger.debug t.log "Got empty best tip diff" ;
+        Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+          "Got empty best tip diff" ;
         Deferred.unit
     | Some {old_best_tip; new_best_tip} ->
         if
@@ -101,7 +102,7 @@ struct
             new_best_tip ~equal:Breadcrumb.equal
         then (
           let new_user_commands = Breadcrumb.to_user_commands new_best_tip in
-          Logger.trace t.log
+          Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
             !"Diff: old: %{sexp:User_command.t list} new: \
               %{sexp:User_command.t list}"
             (Breadcrumb.to_user_commands old_best_tip)
@@ -109,21 +110,21 @@ struct
           List.iter new_user_commands ~f:(fun tx -> remove_tx t tx) ;
           printf !"removed txs\n%!" )
         else
-          Logger.warn t.log
+          Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
             "Got a new best tip breadcrumb that wasn't a direct descendant of \
              the old best tip. Handling this case is unimplemented." ;
-        Logger.trace t.log
+        Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
           !"Current transaction pool: \
             %{sexp:User_command.With_valid_signature.t list}"
           (Fheap.to_list t.pool.heap) ;
         Deferred.unit
 
-  let create ~parent_log ~frontier_broadcast_pipe =
+  let create ~logger ~frontier_broadcast_pipe =
     let t =
       { pool=
           { heap= Fheap.create ~cmp:User_command.With_valid_signature.compare
           ; set= User_command.With_valid_signature.Set.empty }
-      ; log= Logger.child parent_log __MODULE__
+      ; logger
       ; diff_reader= None }
     in
     don't_wait_for
@@ -132,7 +133,8 @@ struct
            ~f:(fun frontier_opt ->
              match frontier_opt with
              | None -> (
-                 Logger.debug t.log "no frontier" ;
+                 Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+                   "no frontier" ;
                  (* Sanity check: the view pipe should have been closed before
                     the frontier was destroyed. *)
                  match t.diff_reader with
@@ -142,12 +144,14 @@ struct
                        [ (let%map () = hdl in
                           t.diff_reader <- None)
                        ; (let%map () = Async.after (Time.Span.of_sec 5.) in
-                          Logger.fatal t.log
+                          Logger.fatal t.logger ~module_:__MODULE__
+                            ~location:__LOC__
                             "Transition frontier closed without first closing \
                              best tip view pipe" ;
                           assert false) ] )
              | Some frontier ->
-                 Logger.debug t.log "Got frontier!\n" ;
+                 Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+                   "Got frontier!\n" ;
                  (* TODO check current pool contents are valid against best tip here *)
                  t.diff_reader
                  <- Some
@@ -177,20 +181,21 @@ struct
         List.fold txns ~init:(pool0, []) ~f:(fun (pool, acc) txn ->
             match User_command.check txn with
             | None ->
-                Logger.faulty_peer t.log
+                Logger.faulty_peer t.logger ~module_:__MODULE__
+                  ~location:__LOC__
                   !"Transaction doesn't check %{sexp: Network_peer.Peer.t}"
                   (Envelope.Incoming.sender env) ;
                 (pool, acc)
             | Some txn ->
                 if Set.mem pool.set txn then (
-                  Logger.debug t.log
+                  Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                     !"Skipping txn %{sexp: \
                       User_command.With_valid_signature.t} because I've \
                       already seen it"
                     txn ;
                   (pool, acc) )
                 else (
-                  Logger.debug t.log
+                  Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                     !"Adding %{sexp: User_command.With_valid_signature.t} to \
                       my pool locally, and scheduling for rebroadcast"
                     txn ;
@@ -203,8 +208,8 @@ struct
   end
 
   (* TODO: Actually back this by the file-system *)
-  let load ~disk_location:_ ~parent_log ~frontier_broadcast_pipe:_ =
-    return (create ~parent_log)
+  let load ~disk_location:_ ~logger ~frontier_broadcast_pipe:_ =
+    return (create ~logger)
 end
 
 (* This test is broken because of #1748, fix it and uncomment when that's

@@ -8,7 +8,7 @@ open Fold_lib
 open Coda_numbers
 
 module type Consensus_state_intf = sig
-  type value [@@deriving hash, compare, bin_io, sexp]
+  type value [@@deriving hash, compare, bin_io, sexp, to_yojson]
 
   type display [@@deriving yojson]
 
@@ -43,7 +43,7 @@ module type S = sig
     type ('a, 'b) t [@@deriving bin_io, sexp]
 
     type value = (Blockchain_state.value, Consensus_state.value) t
-    [@@deriving bin_io, sexp]
+    [@@deriving bin_io, sexp, to_yojson]
 
     type var = (Blockchain_state.var, Consensus_state.var) t
 
@@ -52,7 +52,8 @@ module type S = sig
 
   type ('a, 'body) t [@@deriving bin_io, sexp]
 
-  type value = (State_hash.Stable.V1.t, Body.value) t [@@deriving bin_io, sexp]
+  type value = (State_hash.Stable.V1.t, Body.value) t
+  [@@deriving bin_io, sexp, to_yojson]
 
   type var = (State_hash.var, Body.var) t
 
@@ -95,7 +96,7 @@ end
 
 module T = struct
   type ('state_hash, 'body) t = {previous_state_hash: 'state_hash; body: 'body}
-  [@@deriving eq, ord, bin_io, hash, sexp]
+  [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
 end
 
 include T
@@ -114,7 +115,7 @@ let crypto_hash = hash
 module Body = struct
   type ('blockchain_state, 'consensus_state) t =
     {blockchain_state: 'blockchain_state; consensus_state: 'consensus_state}
-  [@@deriving eq, ord, bin_io, hash, sexp]
+  [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
 end
 
 module Make
@@ -132,7 +133,7 @@ module Make
     include Body
 
     type value = (Blockchain_state.value, Consensus_state.value) t
-    [@@deriving eq, ord, bin_io, hash, sexp]
+    [@@deriving eq, ord, bin_io, hash, sexp, to_yojson]
 
     type var = (Blockchain_state.var, Consensus_state.var) t
 
@@ -178,12 +179,12 @@ module Make
 
   module Value = struct
     type value = (State_hash.Stable.V1.t, Body.value) t
-    [@@deriving bin_io, sexp, hash, compare, eq]
+    [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
 
-    type t = value [@@deriving bin_io, sexp, hash, compare, eq]
+    type t = value [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
   end
 
-  type value = Value.t [@@deriving bin_io, sexp, hash, compare, eq]
+  type value = Value.t [@@deriving bin_io, sexp, hash, compare, eq, to_yojson]
 
   include Hashable.Make (Value)
 

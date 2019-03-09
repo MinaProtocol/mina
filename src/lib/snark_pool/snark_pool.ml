@@ -34,7 +34,7 @@ module type S = sig
   type t [@@deriving bin_io]
 
   val create :
-       parent_log:Logger.t
+       logger:Logger.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> t
@@ -136,7 +136,7 @@ end)
     in
     Deferred.don't_wait_for tf_deferred
 
-  let create ~parent_log:_ ~frontier_broadcast_pipe =
+  let create ~logger:_ ~frontier_broadcast_pipe =
     let t = {snark_table= Work.Table.create (); ref_table= None} in
     listen_to_frontier_broadcast_pipe frontier_broadcast_pipe t ;
     t
@@ -224,7 +224,7 @@ let%test_module "random set test" =
         Broadcast_pipe.create (Some (Mock_transition_frontier.create ()))
       in
       let pool =
-        Mock_snark_pool.create ~parent_log:(Logger.create ())
+        Mock_snark_pool.create ~logger:(Logger.create ())
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
       List.iter sample_solved_work ~f:(fun (work, proof, fee) ->

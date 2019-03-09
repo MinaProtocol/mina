@@ -29,7 +29,6 @@ module Make (Inputs : Inputs.S) :
       ~proposer_transition_reader ~catchup_job_writer
       ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
       ~processed_transition_writer =
-    let logger = Logger.child logger "Transition_handler.Catchup" in
     let catchup_scheduler =
       Catchup_scheduler.create ~logger ~frontier ~time_controller
         ~catchup_job_writer ~catchup_breadcrumbs_writer
@@ -100,7 +99,8 @@ module Make (Inputs : Inputs.S) :
                      with
                      | Ok () -> ()
                      | Error err ->
-                         Logger.error logger
+                         Logger.error logger ~module_:__MODULE__
+                           ~location:__LOC__
                            "error while adding transition: %s"
                            (Error.to_string_hum err) ) ) ) ))
 end

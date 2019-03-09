@@ -2,10 +2,10 @@ open Core_kernel
 open Import
 
 type single = Public_key.Compressed.t * Currency.Fee.t
-[@@deriving bin_io, sexp, compare, eq]
+[@@deriving bin_io, sexp, compare, eq, yojson]
 
 type t = One of single | Two of single * single
-[@@deriving bin_io, sexp, compare, eq]
+[@@deriving bin_io, sexp, compare, eq, yojson]
 
 val to_list : t -> single list
 

@@ -305,7 +305,7 @@ module type Main_intf = sig
   module Config : sig
     (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
     type t =
-      { log: Logger.t
+      { logger: Logger.t
       ; propose_keypair: Keypair.t option
       ; run_snark_worker: bool
       ; net_config: Inputs.Net.Config.t
@@ -479,9 +479,9 @@ struct
       with
       | Ok b -> b
       | Error e ->
-          Logger.error Init.logger
-            !"Could not connect to verifier: %{sexp:Error.t}"
-            e ;
+          Logger.error Init.logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:[("error", `String (Error.to_string_hum e))]
+            "Could not connect to verifier: $error" ;
           false
   end
 
@@ -613,9 +613,9 @@ struct
     type pool_diff = Pool.Diff.t [@@deriving bin_io]
 
     (* TODO *)
-    let load ~parent_log ~disk_location:_ ~incoming_diffs
-        ~frontier_broadcast_pipe =
-      return (create ~parent_log ~incoming_diffs ~frontier_broadcast_pipe)
+    let load ~logger ~disk_location:_ ~incoming_diffs ~frontier_broadcast_pipe
+        =
+      return (create ~logger ~incoming_diffs ~frontier_broadcast_pipe)
 
     let transactions t = Pool.transactions (pool t)
 
@@ -731,16 +731,13 @@ struct
           Transaction_snark_work.Checked.create_unsafe
             {Transaction_snark_work.fee; proofs= proof; prover} )
 
-    let load ~parent_log ~disk_location ~incoming_diffs
-        ~frontier_broadcast_pipe =
+    let load ~logger ~disk_location ~incoming_diffs ~frontier_broadcast_pipe =
       match%map Reader.load_bin_prot disk_location Pool.bin_reader_t with
       | Ok pool ->
-          let network_pool =
-            of_pool_and_diffs pool ~parent_log ~incoming_diffs
-          in
+          let network_pool = of_pool_and_diffs pool ~logger ~incoming_diffs in
           Pool.listen_to_frontier_broadcast_pipe frontier_broadcast_pipe pool ;
           network_pool
-      | Error _e -> create ~parent_log ~incoming_diffs ~frontier_broadcast_pipe
+      | Error _e -> create ~logger ~incoming_diffs ~frontier_broadcast_pipe
 
     open Snark_work_lib.Work
     open Network_pool.Snark_pool_diff
@@ -959,7 +956,7 @@ struct
 
   module Work_selector = Make_work_selector (Work_selector_inputs)
 
-  let request_work ~log ~best_staged_ledger
+  let request_work ~logger ~best_staged_ledger
       ~(seen_jobs : 'a -> Work_selector.State.t)
       ~(set_seen_jobs : 'a -> Work_selector.State.t -> unit)
       ~(snark_pool : 'a -> Snark_pool.t) (t : 'a) (fee : Fee.Unsigned.t) =
@@ -967,7 +964,7 @@ struct
       match best_staged_ledger t with
       | `Active staged_ledger -> Some staged_ledger
       | `Bootstrapping ->
-          Logger.info log
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
             "Could not retrieve staged_ledger due to bootstrapping" ;
           None
     in
@@ -1000,9 +997,9 @@ module Make_coda (Init : Init_intf) = struct
         with
         | Ok b -> b
         | Error e ->
-            Logger.warn Init.logger
-              !"Bad transaction snark: %{sexp: Error.t}"
-              e ;
+            Logger.warn Init.logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:[("error", `String (Error.to_string_hum e))]
+              "Bad transaction snark: $error" ;
             false
   end
 
@@ -1042,7 +1039,7 @@ module Make_coda (Init : Init_intf) = struct
   include Coda_lib.Make (Inputs)
 
   let request_work t =
-    Inputs.request_work ~log:t.log ~best_staged_ledger ~seen_jobs
+    Inputs.request_work ~logger:t.logger ~best_staged_ledger ~seen_jobs
       ~set_seen_jobs ~snark_pool t (snark_work_fee t)
 end
 
@@ -1106,28 +1103,35 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   (** For status *)
   let txn_count = ref 0
 
-  let record_payment ~log t (txn : User_command.t) account =
+  let record_payment ~logger t (txn : User_command.t) account =
     let previous = Account.receipt_chain_hash account in
     let receipt_chain_database = receipt_chain_database t in
     match Receipt_chain_database.add receipt_chain_database ~previous txn with
     | `Ok hash ->
-        Logger.debug log
-          !"Added  payment %{sexp:User_command.t} into receipt_chain \
-            database. You should wait for a bit to see your account's receipt \
-            chain hash update as %s"
-          txn
-          (Receipt.Chain_hash.to_string hash) ;
+        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ("user_command", User_command.to_yojson txn)
+            ; ("receipt_chain_hash", Receipt.Chain_hash.to_yojson hash) ]
+          "Added  payment $user_command into receipt_chain database. You \
+           should wait for a bit to see your account's receipt chain hash \
+           update as $receipt_chain_hash" ;
         hash
     | `Duplicate hash ->
-        Logger.warn log !"Already sent transaction %{sexp:User_command.t}" txn ;
+        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("user_command", User_command.to_yojson txn)]
+          "Already sent transaction $user_command" ;
         hash
     | `Error_multiple_previous_receipts parent_hash ->
-        Logger.fatal log
-          !"A payment is derived from two different blockchain states (%s, \
-            %s). Receipt.Chain_hash is supposed to be collision resistant. \
-            This collision should not happen."
-          (Receipt.Chain_hash.to_string parent_hash)
-          (Receipt.Chain_hash.to_string previous) ;
+        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ( "parent_receipt_chain_hash"
+              , Receipt.Chain_hash.to_yojson parent_hash )
+            ; ( "previous_receipt_chain_hash"
+              , Receipt.Chain_hash.to_yojson previous ) ]
+          "A payment is derived from two different blockchain states \
+           ($parent_receipt_chain_hash, $previous_receipt_chain_hash). \
+           Receipt.Chain_hash is supposed to be collision resistant. This \
+           collision should not happen." ;
         Core.exit 1
 
   module Payment_verifier =
@@ -1158,35 +1162,35 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     else
       let txn_pool = transaction_pool t in
       don't_wait_for (Transaction_pool.add txn_pool txn) ;
-      Logger.info log
-        !"Added payment %{sexp: User_command.t} to pool successfully"
-        txn ;
+      Logger.info log ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:[("user_command", User_command.to_yojson txn)]
+        "Added payment $user_command to pool successfully" ;
       txn_count := !txn_count + 1 ;
       Or_error.return ()
 
-  let send_payment log t (txn : User_command.t) =
+  let send_payment logger t (txn : User_command.t) =
     Deferred.return
     @@
     let public_key = Public_key.compress txn.sender in
     let open Participating_state.Let_syntax in
     let%map account_opt = get_account t public_key in
     let open Or_error.Let_syntax in
-    let%map () = schedule_payment log t txn account_opt in
-    record_payment ~log t txn (Option.value_exn account_opt)
+    let%map () = schedule_payment logger t txn account_opt in
+    record_payment ~logger t txn (Option.value_exn account_opt)
 
   (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
-  let schedule_payments log t txns =
+  let schedule_payments logger t txns =
     List.map txns ~f:(fun (txn : User_command.t) ->
         let public_key = Public_key.compress txn.sender in
         let open Participating_state.Let_syntax in
         let%map account_opt = get_account t public_key in
-        match schedule_payment log t txn account_opt with
+        match schedule_payment logger t txn account_opt with
         | Ok () -> ()
         | Error err ->
-            Logger.warn log
-              !"Failure in schedule_payments: %{sexp:Error.t}. This is not \
-                yet reported to the client, see #1143"
-              err )
+            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:[("error", `String (Error.to_string_hum err))]
+              "Failure in schedule_payments: $error. This is not yet reported \
+               to the client, see #1143" )
     |> Participating_state.sequence
     |> Participating_state.map ~f:ignore
 
@@ -1337,12 +1341,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 
   (* TODO: handle participation_status more appropriately than doing participate_exn *)
-  let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda ~log
-      ~client_port () =
+  let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda
+      ~logger ~client_port () =
     let client_whitelist =
       Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_whitelist)
     in
-    let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
     let implement rpc f =
       Rpc.Rpc.implement rpc (fun () input ->
@@ -1350,16 +1353,16 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     in
     let client_impls =
       [ implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
-            let%map result = send_payment log coda tx in
+            let%map result = send_payment logger coda tx in
             result |> Participating_state.active_exn )
       ; implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
-            schedule_payments log coda ts |> Participating_state.active_exn ;
+            schedule_payments logger coda ts |> Participating_state.active_exn ;
             Deferred.unit )
       ; implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
             return (get_balance coda pk |> Participating_state.active_exn) )
       ; implement Daemon_rpcs.Verify_proof.rpc (fun () (pk, tx, proof) ->
             return
-              ( verify_payment coda log pk tx proof
+              ( verify_payment coda logger pk tx proof
               |> Participating_state.active_exn ) )
       ; implement Daemon_rpcs.Prove_receipt.rpc
           (fun () (proving_receipt, pk) ->
@@ -1411,13 +1414,13 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       [ implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
             let r = request_work coda in
             Option.iter r ~f:(fun r ->
-                Logger.trace log
+                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
                   !"Get_work: %{sexp:Snark_worker.Work.Spec.t}"
                   r ) ;
             return r )
       ; implement Snark_worker.Rpcs.Submit_work.rpc
           (fun () (work : Snark_worker.Work.Result.t) ->
-            Logger.trace log
+            Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               !"Submit_work: %{sexp:Snark_worker.Work.Spec.t}"
               work.spec ;
             List.iter work.metrics ~f:(fun (total, tag) ->
@@ -1437,7 +1440,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                 ~on_handler_error:
                   (`Call
                     (fun net exn ->
-                      Logger.error log "%s" (Exn.to_string_mach exn) ))
+                      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                        "%s" (Exn.to_string_mach exn) ))
                 (Tcp.Where_to_listen.bind_to Localhost
                    (On_port rest_server_port))
                 (fun ~body _sock req ->
@@ -1463,12 +1467,14 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         Tcp.Server.create
           ~on_handler_error:
             (`Call
-              (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
+              (fun net exn ->
+                Logger.error logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+                  (Exn.to_string_mach exn) ))
           where_to_listen
           (fun address reader writer ->
             let address = Socket.Address.Inet.addr address in
             if not (Set.mem client_whitelist address) then (
-              Logger.error log
+              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                 !"Rejecting client connection from \
                   %{sexp:Unix.Inet_addr.Blocking_sexp.t}"
                 address ;
@@ -1483,12 +1489,13 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                 ~on_handshake_error:
                   (`Call
                     (fun exn ->
-                      Logger.error log "%s" (Exn.to_string_mach exn) ;
+                      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                        "%s" (Exn.to_string_mach exn) ;
                       Deferred.unit )) ) )
     |> ignore
 
-  let create_snark_worker ~log ~public_key ~client_port ~shutdown_on_disconnect
-      =
+  let create_snark_worker ~logger ~public_key ~client_port
+      ~shutdown_on_disconnect =
     let open Snark_worker_lib in
     let%map p =
       let our_binary = Sys.executable_name in
@@ -1511,12 +1518,12 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     |> don't_wait_for ;
     Deferred.unit
 
-  let run_snark_worker ?shutdown_on_disconnect:(s = true) ~log ~client_port
+  let run_snark_worker ?shutdown_on_disconnect:(s = true) ~logger ~client_port
       run_snark_worker =
     match run_snark_worker with
     | `Don't_run -> ()
     | `With_public_key public_key ->
-        create_snark_worker ~shutdown_on_disconnect:s ~log ~public_key
+        create_snark_worker ~shutdown_on_disconnect:s ~logger ~public_key
           ~client_port
         |> ignore
 end

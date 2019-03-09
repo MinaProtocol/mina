@@ -79,7 +79,8 @@ module Make (Inputs : Inputs.S) :
               %{sexp:Network_peer.Peer.t} is seen as malicious"
             initial_state_hash peer
         in
-        Logger.faulty_peer logger !"%s" message ;
+        Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__ "%s"
+          message ;
         Deferred.return @@ Or_error.error_string message
     | Some initial_breadcrumb ->
         construct_breadcrumb_path ~logger initial_breadcrumb
@@ -118,12 +119,12 @@ module Make (Inputs : Inputs.S) :
     match%map verified_transition with
     | Ok verified_transition -> Ok (Some verified_transition)
     | Error `Duplicate ->
-        Logger.info logger
-          !"transition queried during ledger catchup has already been seen" ;
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "transition queried during ledger catchup has already been seen" ;
         Ok None
     | Error (`Invalid reason) ->
-        Logger.faulty_peer logger
-          !"transition queried during ledger catchup was not valid because %s"
+        Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
+          "transition queried during ledger catchup was not valid because %s"
           reason ;
         Error (Error.of_string reason)
 
@@ -161,10 +162,13 @@ module Make (Inputs : Inputs.S) :
               let rev_queries =
                 Non_empty_list.(to_list @@ rev queried_transitions)
               in
-              Logger.info logger
-                !"Transisitions to verify for catchup: \
-                  %{sexp:Inputs.External_transition.t Non_empty_list.t }"
-                queried_transitions ;
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ( "transitions"
+                    , `List
+                        (List.map ~f:Inputs.External_transition.to_yojson
+                           (Non_empty_list.to_list queried_transitions)) ) ]
+                "Transisitions to verify for catchup: $transitions" ;
               take_while_map_result_rev rev_queries
                 ~f:(verify_transition ~logger ~frontier)
             in
@@ -178,7 +182,8 @@ module Make (Inputs : Inputs.S) :
                     "Peer should have given us some new transitions that are \
                      not in our transition frontier"
                   in
-                  Logger.faulty_peer logger "%s" error ;
+                  Logger.faulty_peer logger ~module_:__MODULE__
+                    ~location:__LOC__ "%s" error ;
                   Error (Error.of_string error) )
               |> Deferred.return
             in
@@ -187,7 +192,6 @@ module Make (Inputs : Inputs.S) :
 
   let run ~logger ~network ~frontier ~catchup_job_reader
       ~catchup_breadcrumbs_writer =
-    let logger = Logger.child logger __MODULE__ in
     Strict_pipe.Reader.iter catchup_job_reader ~f:(fun hash ->
         match%bind
           get_transitions_and_compute_breadcrumbs ~logger ~network ~frontier
@@ -197,8 +201,8 @@ module Make (Inputs : Inputs.S) :
             Strict_pipe.Writer.write catchup_breadcrumbs_writer
               [Rose_tree.of_list_exn breadcrumbs]
         | Error e ->
-            Logger.info logger
-              !"None of the peers have a transition with state hash:\n%s"
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              "None of the peers have a transition with state hash: %s"
               (Error.to_string_hum e) ;
             Deferred.unit )
     |> don't_wait_for

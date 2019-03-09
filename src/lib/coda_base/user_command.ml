@@ -93,7 +93,7 @@ module With_valid_signature = struct
       module T = struct
         let version = 1
 
-        type t = Stable.V1.t [@@deriving sexp, eq, bin_io]
+        type t = Stable.V1.t [@@deriving sexp, eq, bin_io, yojson]
       end
 
       include T

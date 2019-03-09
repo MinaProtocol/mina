@@ -73,16 +73,14 @@ module Make (Inputs : Intf.Inputs_intf) :
     | Ok res -> res
 
   let main daemon_address public_key shutdown_on_disconnect =
-    let log =
-      Logger.create ()
-      |> Fn.flip Logger.child "snark-worker"
-      |> Fn.flip Logger.child __MODULE__
-    in
+    let logger = Logger.create () in
     let%bind state = Worker_state.create () in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
     let rec go () =
       let log_and_retry label error =
-        Logger.error log !"Error %s:\n%{sexp:Error.t}" label error ;
+        Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+          !"Error %s:\n%{sexp:Error.t}"
+          label error ;
         let%bind () = wait () in
         go ()
       in
@@ -95,11 +93,13 @@ module Make (Inputs : Intf.Inputs_intf) :
             Worker_state.worker_wait_time
             +. (0.2 *. Random.float Worker_state.worker_wait_time)
           in
-          Logger.trace log "No work; waiting %.3fs" random_delay ;
+          Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
+            "No work; waiting %.3fs" random_delay ;
           let%bind () = wait ~sec:random_delay () in
           go ()
       | Ok (Some work) -> (
-          Logger.info log !"Received work." ;
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            !"Received work." ;
           match perform state public_key work with
           | Error e -> log_and_retry "performing work" e
           | Ok result -> (

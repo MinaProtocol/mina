@@ -43,7 +43,6 @@ module Make (Inputs : Inputs.S) = struct
 
   let create ~logger ~frontier ~time_controller ~catchup_job_writer
       ~catchup_breadcrumbs_writer =
-    let logger = Logger.child logger "catchup_scheduler" in
     let collected_transitions = State_hash.Table.create () in
     let parent_root_timeouts = State_hash.Table.create () in
     let breadcrumb_builder_supervisor =
@@ -132,10 +131,10 @@ module Make (Inputs : Inputs.S) = struct
                 (With_hash.data transition)
                 (With_hash.data sibling_transition) )
         then
-          Logger.info t.logger
-            !"Received request to watch transition for catchup that already \
-              was being watched: %{sexp: State_hash.t}"
-            hash
+          Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:[("state_hash", State_hash.to_yojson hash)]
+            "Received request to watch transition for catchup that already \
+             was being watched: $state_hash"
         else
           let _ : Time.Span.t option = cancel_timeout t hash in
           Hashtbl.set t.collected_transitions ~key:parent_hash

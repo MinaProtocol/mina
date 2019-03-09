@@ -170,13 +170,14 @@ module T = struct
         ; external_port
         ; peers
         ; discovery_port } =
-      let log = Logger.create () in
-      let log =
-        Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string external_port)
+      let logger =
+        Logger.create
+          ~metadata:[("host", `String host); ("port", `Int external_port)]
+          ()
       in
       let%bind () = File_system.create_dir conf_dir in
       let module Config = struct
-        let logger = log
+        let logger = logger
 
         let conf_dir = conf_dir
 
@@ -217,7 +218,7 @@ module T = struct
       let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
       let time_controller = Main.Inputs.Time.Controller.create () in
       let net_config =
-        { Main.Inputs.Net.Config.parent_log= log
+        { Main.Inputs.Net.Config.logger
         ; time_controller
         ; gossip_net_params=
             { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
@@ -228,12 +229,12 @@ module T = struct
                 Network_peer.Peer.create
                   (Unix.Inet_addr.of_string host)
                   ~discovery_port ~communication_port:external_port
-            ; parent_log= log
+            ; logger
             ; trust_system } }
       in
       let%bind coda =
         Main.create
-          (Main.Config.make ~log ~net_config
+          (Main.Config.make ~logger ~net_config
              ~run_snark_worker:(Option.is_some snark_worker_config)
              ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
              ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
@@ -244,9 +245,9 @@ module T = struct
       in
       Option.iter snark_worker_config ~f:(fun config ->
           let run_snark_worker = `With_public_key config.public_key in
-          Run.setup_local_server ~client_port:config.port ~coda ~log () ;
-          Run.run_snark_worker ~log ~client_port:config.port run_snark_worker
-      ) ;
+          Run.setup_local_server ~client_port:config.port ~coda ~logger () ;
+          Run.run_snark_worker ~logger ~client_port:config.port
+            run_snark_worker ) ;
       let coda_peers () = return (Main.peers coda) in
       let coda_start () = return (Main.start coda) in
       let coda_get_balance pk =
@@ -269,7 +270,7 @@ module T = struct
         in
         let payment = build_txn amount sk pk fee in
         let%map receipt =
-          Run.send_payment log coda (payment :> User_command.t)
+          Run.send_payment logger coda (payment :> User_command.t)
         in
         receipt |> Participating_state.active_exn
       in
@@ -278,7 +279,7 @@ module T = struct
           Run.prove_receipt coda ~proving_receipt ~resulting_receipt
         with
         | Ok proof ->
-            Logger.info log
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               !"Constructed proof for receipt: %{sexp:Receipt.Chain_hash.t}"
               proving_receipt ;
             proof

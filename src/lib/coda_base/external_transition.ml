@@ -2,7 +2,7 @@ open Core
 
 module type Base_intf = sig
   (* TODO: delegate forget here *)
-  type t [@@deriving sexp, bin_io, compare, eq]
+  type t [@@deriving sexp, bin_io, compare, eq, to_yojson]
 
   include Comparable.S with type t := t
 
@@ -81,6 +81,13 @@ end)
       ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
       ; staged_ledger_diff: Staged_ledger_diff.t }
     [@@deriving sexp, fields, bin_io]
+
+    let to_yojson {protocol_state; protocol_state_proof= _; staged_ledger_diff}
+        =
+      `Assoc
+        [ ("protocol_state", Protocol_state.value_to_yojson protocol_state)
+        ; ("protocol_state_proof", `String "<opaque>")
+        ; ("staged_ledger_diff", `String "<opaque>") ]
 
     (* TODO: Important for bkase to review *)
     let compare t1 t2 =

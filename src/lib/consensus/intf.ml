@@ -43,7 +43,7 @@ module type S = sig
   end
 
   module Consensus_state : sig
-    type value [@@deriving hash, eq, compare, bin_io, sexp]
+    type value [@@deriving hash, eq, compare, bin_io, sexp, to_yojson]
 
     type display [@@deriving yojson]
 

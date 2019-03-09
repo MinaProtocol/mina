@@ -10,7 +10,7 @@ module Banned_status = Banned_status
 module Peer_status = Peer_status
 
 module type Action_intf = sig
-  type t [@@deriving sexp_of]
+  type t [@@deriving sexp_of, yojson]
 
   val to_trust_response : t -> Trust_response.t
 end
@@ -39,14 +39,15 @@ module type S = sig
   val close : t -> unit
 end
 
-module Make0
-    (Peer_id : Sexpable.S) (Now : sig
-        val now : unit -> Time.t
-    end)
-    (Db : Key_value_database.S
-          with type key := Peer_id.t
-           and type value := Record.t)
-    (Action : Action_intf) =
+module Make0 (Peer_id : sig
+  type t [@@deriving sexp, yojson]
+end) (Now : sig
+  val now : unit -> Time.t
+end)
+(Db : Key_value_database.S
+      with type key := Peer_id.t
+       and type value := Record.t)
+(Action : Action_intf) =
 struct
   type t =
     { db: Db.t
@@ -74,8 +75,7 @@ struct
     Db.close db ;
     Strict_pipe.Writer.close bans_writer
 
-  let record {db; bans_writer} log peer action =
-    let log' = Logger.child log "peer_trust" in
+  let record {db; bans_writer} logger peer action =
     let old_record =
       match Db.get db peer with
       | None -> Record_inst.init ()
@@ -96,20 +96,26 @@ struct
     let%map () =
       match (simple_old.banned, simple_new.banned) with
       | Unbanned, Banned_until expiration ->
-          Logger.faulty_peer log'
-            !"Banning peer %{sexp:Peer_id.t} until %{sexp:Time.t} due to \
-              action %{sexp:Action.t}."
-            peer expiration action ;
+          Logger.faulty_peer logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ("peer", Peer_id.to_yojson peer)
+              ; ( "expiration"
+                , `String (Time.to_string_abs expiration ~zone:Time.Zone.utc)
+                )
+              ; ("action", Action.to_yojson action) ]
+            "Banning peer $peer until $expiration due to action $action" ;
           Strict_pipe.Writer.write bans_writer peer
       | _, _ ->
           let verb =
             if simple_new.trust >. simple_old.trust then "Increasing"
             else "Decreasing"
           in
-          Logger.debug log'
-            !"%s trust for peer %{sexp:Peer_id.t} due to action \
-              %{sexp:Action.t}. New trust is %f."
-            verb peer action simple_new.trust ;
+          Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ("peer", Peer_id.to_yojson peer)
+              ; ("action", Action.to_yojson action) ]
+            "%s trust for peer $peer due to action $action. New trust is %f."
+            verb simple_new.trust ;
           Deferred.unit
     in
     Db.set db ~key:peer ~data:new_record
@@ -129,9 +135,13 @@ let%test_module "peer_trust" =
     module Mock_record = Record.Make (Mock_now)
     module Db = Key_value_database.Make_mock (Int) (Record)
 
+    module Peer_id = struct
+      type t = int [@@deriving sexp, yojson]
+    end
+
     module Action = struct
       type t = Insta_ban | Slow_punish | Slow_credit | Big_credit
-      [@@deriving sexp]
+      [@@deriving sexp, yojson]
 
       let to_trust_response t =
         match t with
@@ -141,7 +151,7 @@ let%test_module "peer_trust" =
         | Big_credit -> Trust_response.Trust_increase 0.2
     end
 
-    module Peer_trust_test = Make0 (Int) (Mock_now) (Db) (Action)
+    module Peer_trust_test = Make0 (Peer_id) (Mock_now) (Db) (Action)
 
     (* We want to check the output of the pipe in these tests, but it's
        synchronous, so we need to read from it in a different "thread",
@@ -272,8 +282,15 @@ let%test_module "peer_trust" =
   end )
 
 module Make =
-  Make0
-    (Unix.Inet_addr.Blocking_sexp)
+  Make0 (struct
+      include Unix.Inet_addr.Blocking_sexp
+
+      let to_yojson x = `String (Unix.Inet_addr.to_string x)
+
+      let of_yojson = function
+        | `String str -> Ok (Unix.Inet_addr.of_string str)
+        | _ -> Error "expected string"
+    end)
     (struct
       let now = Time.now
     end)

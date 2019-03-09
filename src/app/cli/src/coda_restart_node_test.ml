@@ -9,8 +9,7 @@ let name = "coda-restart-node-test"
 
 let main () =
   let open Keypair in
-  let log = Logger.create () in
-  let log = Logger.child log name in
+  let logger = Logger.create () in
   let largest_account_keypair =
     Genesis_ledger.largest_account_keypair_exn ()
   in
@@ -37,11 +36,11 @@ let main () =
   let send_amount = Currency.Amount.of_int 10 in
   let fee = Currency.Fee.of_int 0 in
   let%bind testnet =
-    Coda_worker_testnet.test log n should_propose snark_work_public_keys
+    Coda_worker_testnet.test logger n should_propose snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
   in
   let%bind () = after (Time.Span.of_sec 5.) in
-  Logger.info log "Stopping %d" 1 ;
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Stopping %d" 1 ;
   let%bind () = Coda_worker_testnet.Api.stop testnet 1 in
   let%bind () =
     Coda_worker_testnet.Api.send_payment testnet 0 sender_sk receiver_pk

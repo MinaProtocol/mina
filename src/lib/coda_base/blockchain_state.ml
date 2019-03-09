@@ -11,7 +11,7 @@ module type S = sig
     { staged_ledger_hash: 'staged_ledger_hash
     ; snarked_ledger_hash: 'snarked_ledger_hash
     ; timestamp: 'time }
-  [@@deriving sexp, eq, compare, fields]
+  [@@deriving sexp, eq, compare, fields, yojson]
 
   type t = (Staged_ledger_hash.t, Frozen_ledger_hash.t, Block_time.t) t_
   [@@deriving sexp, eq, compare, hash]
@@ -20,18 +20,18 @@ module type S = sig
     module V1 : sig
       type nonrec ('a, 'b, 'c) t_ = ('a, 'b, 'c) t_ =
         {staged_ledger_hash: 'a; snarked_ledger_hash: 'b; timestamp: 'c}
-      [@@deriving bin_io, sexp, eq, compare, hash]
+      [@@deriving bin_io, sexp, eq, compare, hash, yojson]
 
       type nonrec t =
         ( Staged_ledger_hash.Stable.V1.t
         , Frozen_ledger_hash.Stable.V1.t
         , Block_time.Stable.V1.t )
         t_
-      [@@deriving bin_io, sexp, eq, compare, hash]
+      [@@deriving bin_io, sexp, eq, compare, hash, yojson]
     end
   end
 
-  type value = t [@@deriving bin_io, sexp, eq, compare, hash]
+  type value = t [@@deriving bin_io, sexp, eq, compare, hash, yojson]
 
   include
     Snarkable.S
@@ -103,7 +103,7 @@ end) : S = struct
           , Frozen_ledger_hash.Stable.V1.t
           , Block_time.Stable.V1.t )
           t_
-        [@@deriving bin_io, sexp, eq, compare, hash]
+        [@@deriving bin_io, sexp, eq, compare, hash, yojson]
       end
 
       include T
@@ -130,7 +130,7 @@ end) : S = struct
     , Block_time.Unpacked.var )
     t_
 
-  type value = t [@@deriving bin_io, sexp, eq, compare, hash]
+  type value = t [@@deriving bin_io, sexp, eq, compare, hash, yojson]
 
   let create_value ~staged_ledger_hash ~snarked_ledger_hash ~timestamp =
     {staged_ledger_hash; snarked_ledger_hash; timestamp}
