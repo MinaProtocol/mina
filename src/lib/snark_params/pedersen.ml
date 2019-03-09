@@ -352,7 +352,7 @@ module Make (Inputs : Pedersen_inputs_intf.S) :
               (pow2 (4 * i)) )
         |> List.fold ~f:Scalar_field.add ~init:Scalar_field.zero
       in
-      Quickcheck.test ~trials:20 (gen_input 500) ~f:(fun input ->
+      Quickcheck.test ~trials:5 (gen_input 500) ~f:(fun input ->
           let t = update_fold (create ()) (Fold.of_list input) in
           let n = List.length input in
           [%test_eq: int] t.scalar_chunks_consumed (n / scalar_size_in_triples) ;
@@ -368,26 +368,20 @@ module Make (Inputs : Pedersen_inputs_intf.S) :
           end in
           [%test_eq: F.t] t.scalar_acc (scalar_of_triples remainder) )
 
-    let%test_unit "params-windows consistency" =
-      let tables = Lazy.force Inputs.window_tables in
-      let module G = struct
-        include Curve
-
-        let compare x y = if equal x y then 0 else 1
-      end in
-      Array.iter2_exn tables Inputs.params ~f:(fun t p ->
-          [%test_eq: G.t] p (G.Window_table.scale_field t Scalar_field.one) )
-
     let%test_unit "chunked-is-correct" =
       let max_length = 300 in
       let naive_params =
         let scalars_needed =
           (max_length + scalar_size_in_triples - 1) / scalar_size_in_triples
         in
-        List.init scalars_needed ~f:(fun i ->
-            List.init scalar_size_in_triples ~f:(fun j ->
-                Curve.scale_field Inputs.params.(i) (pow2 (4 * j)) ) )
-        |> List.concat |> Array.of_list
+        let open Sequence in
+        init scalars_needed ~f:(fun i -> Inputs.params.(i))
+        |> concat_map ~f:(fun g ->
+               take
+                 (unfold ~init:g ~f:(fun g ->
+                      Some (g, sixteen_times ~add:Curve.add g) ))
+                 scalar_size_in_triples )
+        |> to_array
       in
       let naive triples =
         List.foldi triples ~init:Curve.zero ~f:(fun i acc triple ->
@@ -400,7 +394,7 @@ module Make (Inputs : Pedersen_inputs_intf.S) :
 
         let compare x y = if equal x y then 0 else 1
       end in
-      Quickcheck.test (gen_input max_length) ~f:(fun ts ->
+      Quickcheck.test ~trials:5 (gen_input max_length) ~f:(fun ts ->
           [%test_eq: G.t] (naive ts)
             (acc (update_fold_chunked (create ()) (Fold.of_list ts))) )
 
