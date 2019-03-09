@@ -204,6 +204,7 @@ module Make (Inputs : Pedersen_inputs_intf.S) :
       let x8 = x4 + x4 in
       x8 + x8
 
+    (*
     let%test_unit "sixteen_times" =
       let module F = struct
         include Scalar_field
@@ -212,6 +213,7 @@ module Make (Inputs : Pedersen_inputs_intf.S) :
       end in
       let x = F.random () in
       [%test_eq: F.t] F.(mul (of_int 16) x) (sixteen_times ~add:F.add x)
+       *)
 
     let update ~(scale : int -> Scalar_field.t -> Curve.t) (t : t) triple =
       let term =
@@ -343,6 +345,7 @@ module Make (Inputs : Pedersen_inputs_intf.S) :
       let%bind n = Int.gen_incl 0 max_length in
       List.gen_with_length n (tuple3 bool bool bool)
 
+    (*
     let%test_unit "scalar_acc computed correctly" =
       let scalar_of_triples ts =
         List.mapi ts ~f:(fun i t ->
@@ -367,7 +370,8 @@ module Make (Inputs : Pedersen_inputs_intf.S) :
             let compare x y = if equal x y then 0 else 1
           end in
           [%test_eq: F.t] t.scalar_acc (scalar_of_triples remainder) )
-
+*)
+    (*
     let%test_unit "chunked-is-correct" =
       let max_length = 300 in
       let naive_params =
@@ -398,6 +402,7 @@ module Make (Inputs : Pedersen_inputs_intf.S) :
           [%test_eq: G.t] (naive ts)
             (acc (update_fold_chunked (create ()) (Fold.of_list ts))) )
 
+*)
     [%%endif]
 
     let digest t =
