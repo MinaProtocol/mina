@@ -229,7 +229,7 @@ type Query {
     before: String): PaymentConnection
   
   blocks(
-    filter:BlockFilterInput,
+    filter: BlockFilterInput,
     first: Int,
     after: String,
     last: Int,
@@ -402,7 +402,6 @@ simplify the interface and avoid any binary serialization that might rely on hav
 - Should we be able to query the node for the amount of the balance that corresponds to unknown/missed transactions?
   We could also calculate this client-side by summing up all the payments/fees/coinbases and comparing to the balance
   queried from the node.
-- How should we handle pagination for payments and blocks?
 - Several apis involve objects that get incrementally updated during consensus
   It's important that we have a reliable way to associate updates with their
   corresponding objects in memory. We don't have a concept of IDs for most of these
