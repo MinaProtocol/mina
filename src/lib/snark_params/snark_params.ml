@@ -497,9 +497,11 @@ module Tick = struct
         assert (equal_states result unchunked_result)
     end
 
-    let%test_unit "hash one triple" = For_tests.run_hash_test 1
+    (*     let%test_unit "hash one triple" = For_tests.run_hash_test 1 *)
 
     let scalar_chunk_size = Tock.Field.size_in_bits / 4
+
+    (*
 
     let%test_unit "hash small number of chunks" =
       For_tests.run_hash_test scalar_chunk_size
@@ -512,14 +514,16 @@ module Tick = struct
 
     let%test_unit "hash large number of chunks plus 2" =
       For_tests.run_hash_test ((scalar_chunk_size * 10) + 2)
+*)
 
     [%%if
     not fake_hash]
 
+    (*
     let%test_unit "checked correct on single triple" =
       let open Quickcheck in
       let trip f x = f x x x in
-      test
+      test ~trials:4
         Generator.(trip tuple3 bool)
         ~f:(fun t ->
           let typ_in = trip Typ.tuple3 Boolean.typ in
@@ -540,7 +544,7 @@ module Tick = struct
     let%test_unit "local functions agree" =
       let open Quickcheck in
       let trip f x = f x x x in
-      test
+      test ~trials:5
         Generator.(trip tuple3 bool)
         ~f:(fun t ->
           try
@@ -554,11 +558,13 @@ module Tick = struct
             eprintf !"Failed on %{sexp:bool Tuple_lib.Triple.t}\n%!" t ;
             raise e )
 
+*)
+    (*
     let%test_unit "checked-unchecked equivalence" =
       let open Quickcheck in
       State.set_chunked_fold true ;
       let trip f x = f x x x in
-      test
+      test ~trials:5
         Generator.(list_non_empty (trip tuple3 bool))
         ~f:(fun ts ->
           let typ_in =
@@ -574,7 +580,7 @@ module Tick = struct
           with e ->
             eprintf !"Failed on %{sexp:bool Tuple_lib.Triple.t list}\n%!" ts ;
             raise e )
-
+*)
     [%%endif]
   end
 
