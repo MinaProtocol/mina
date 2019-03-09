@@ -215,7 +215,6 @@ module Make_full_size () = struct
   let of_hash = Fn.id
 
   let if_ cond ~then_ ~else_ =
-    let open Let_syntax in
     let%map digest =
       Field.Checked.if_ cond ~then_:then_.digest ~else_:else_.digest
     in
@@ -229,7 +228,6 @@ struct
   let () = assert (M.length_in_bits < Field.size_in_bits)
 
   include Make_basic (M)
-  open Let_syntax
 
   let var_of_hash_packed digest =
     let%map bits = unpack digest in
