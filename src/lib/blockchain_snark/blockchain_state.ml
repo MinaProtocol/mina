@@ -97,10 +97,10 @@ module Make (Consensus_mechanism : Consensus.S) :
               |> Blockchain_state.snarked_ledger_hash )
           in
           let%bind new_pending_coinbase_hash =
-            let%bind root_after_delete =
+            let%bind _root_after_delete =
               let prev_root =
                 previous_state |> Protocol_state.blockchain_state
-                |> Blockchain_state.pending_coinbase_hash
+                |> Blockchain_state.pending_coinbases_hash
               in
               let stack_before = pending_coinbase_update.oldest_stack_before in
               let stack_after = pending_coinbase_update.oldest_stack_after in
@@ -108,11 +108,12 @@ module Make (Consensus_mechanism : Consensus.S) :
                 stack_after
             in
             (*new stack or update one*)
+            let prev_root = pending_coinbase_update.intermediate_root in
             let stack_before = pending_coinbase_update.latest_stack_before in
             let stack_after = pending_coinbase_update.latest_stack_after in
             let is_new_stack = pending_coinbase_update.is_new_stack in
-            Pending_coinbase.Checked.update_stack root_after_delete
-              ~is_new_stack stack_before stack_after
+            Pending_coinbase.Checked.update_stack prev_root ~is_new_stack
+              stack_before stack_after
           in
           let%bind correct_coinbase_status =
             let new_root = pending_coinbase_update.new_root in

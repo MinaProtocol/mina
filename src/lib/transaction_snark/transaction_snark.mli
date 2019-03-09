@@ -16,7 +16,7 @@ module Statement : sig
     { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
     ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
     ; supply_increase: Currency.Amount.Stable.V1.t
-    ; pending_coinbase_state: Pending_coinbase_stack_state.t
+    ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
     ; fee_excess: Currency.Fee.Signed.Stable.V1.t
     ; proof_type: Proof_type.t }
   [@@deriving sexp, bin_io, hash, compare, eq, fields]
@@ -37,7 +37,7 @@ val create :
   -> target:Frozen_ledger_hash.t
   -> proof_type:Proof_type.t
   -> supply_increase:Currency.Amount.t
-  -> pending_coinbase_state:Pending_coinbase_stack_state.t
+  -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> fee_excess:Currency.Amount.Signed.t
   -> sok_digest:Sok_message.Digest.t
   -> proof:Tock.Proof.t
@@ -123,7 +123,7 @@ val check_transaction :
      sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
-  -> pending_coinbase_state:Pending_coinbase_stack_state.t
+  -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> Transaction.t
   -> Tick.Handler.t
   -> unit
@@ -144,7 +144,7 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> pending_coinbase_state:Pending_coinbase_stack_state.t
+    -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> Transaction.t
     -> Tick.Handler.t
     -> t
@@ -153,7 +153,7 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> pending_coinbase_hash:Pending_coinbase.Stack.t
+    -> pending_coinbase_stack:Pending_coinbase.Stack.t
     -> User_command.With_valid_signature.t
     -> Tick.Handler.t
     -> t
@@ -162,7 +162,7 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> pending_coinbase_hash:Pending_coinbase.Stack.t
+    -> pending_coinbase_stack:Pending_coinbase.Stack.t
     -> Fee_transfer.t
     -> Tick.Handler.t
     -> t

@@ -4,8 +4,6 @@
  3.Merkle root of the tree before and after peforming both update and delete*)
 open Core_kernel
 
-open Fold_lib
-open Tuple_lib
 open Snark_params.Tick
 
 module type S = sig

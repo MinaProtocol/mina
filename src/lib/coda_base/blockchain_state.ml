@@ -13,7 +13,7 @@ module type S = sig
        , 'time ) t_ =
     { staged_ledger_hash: 'staged_ledger_hash
     ; snarked_ledger_hash: 'snarked_ledger_hash
-    ; pending_coinbase_hash: 'pending_coinbase_hash
+    ; pending_coinbases_hash: 'pending_coinbase_hash
     ; timestamp: 'time }
   [@@deriving sexp, eq, compare, fields]
 
@@ -30,7 +30,7 @@ module type S = sig
       type nonrec ('a, 'b, 'c, 'd) t_ = ('a, 'b, 'c, 'd) t_ =
         { staged_ledger_hash: 'a
         ; snarked_ledger_hash: 'b
-        ; pending_coinbase_hash: 'c
+        ; pending_coinbases_hash: 'c
         ; timestamp: 'd }
       [@@deriving bin_io, sexp, eq, compare, hash]
 
@@ -59,7 +59,7 @@ module type S = sig
   val create_value :
        staged_ledger_hash:Staged_ledger_hash.Stable.V1.t
     -> snarked_ledger_hash:Frozen_ledger_hash.Stable.V1.t
-    -> pending_coinbase_hash:Pending_coinbase.Hash.t
+    -> pending_coinbases_hash:Pending_coinbase.Hash.t
     -> timestamp:Block_time.Stable.V1.t
     -> value
 
@@ -113,7 +113,7 @@ end) : S = struct
              , 'time ) t_ =
           { staged_ledger_hash: 'staged_ledger_hash
           ; snarked_ledger_hash: 'snarked_ledger_hash
-          ; pending_coinbase_hash: 'pending_coinbase_hash
+          ; pending_coinbases_hash: 'pending_coinbase_hash
           ; timestamp: 'time }
         [@@deriving bin_io, sexp, fields, eq, compare, hash, yojson]
 
@@ -154,18 +154,18 @@ end) : S = struct
   type value = t [@@deriving bin_io, sexp, eq, compare, hash]
 
   let create_value ~staged_ledger_hash ~snarked_ledger_hash
-      ~pending_coinbase_hash ~timestamp =
-    {staged_ledger_hash; snarked_ledger_hash; pending_coinbase_hash; timestamp}
+      ~pending_coinbases_hash ~timestamp =
+    {staged_ledger_hash; snarked_ledger_hash; pending_coinbases_hash; timestamp}
 
   let to_hlist
       { staged_ledger_hash
       ; snarked_ledger_hash
-      ; pending_coinbase_hash
+      ; pending_coinbases_hash
       ; timestamp } =
     H_list.
       [ staged_ledger_hash
       ; snarked_ledger_hash
-      ; pending_coinbase_hash
+      ; pending_coinbases_hash
       ; timestamp ]
 
   let of_hlist :
@@ -174,11 +174,11 @@ end) : S = struct
     H_list.(
       fun [ staged_ledger_hash
           ; snarked_ledger_hash
-          ; pending_coinbase_hash
+          ; pending_coinbases_hash
           ; timestamp ] ->
         { staged_ledger_hash
         ; snarked_ledger_hash
-        ; pending_coinbase_hash
+        ; pending_coinbases_hash
         ; timestamp })
 
   let data_spec =
@@ -195,7 +195,7 @@ end) : S = struct
   let var_to_triples
       ({ staged_ledger_hash
        ; snarked_ledger_hash
-       ; pending_coinbase_hash
+       ; pending_coinbases_hash
        ; timestamp } :
         var) =
     let%map ledger_hash_triples =
@@ -203,7 +203,7 @@ end) : S = struct
     and staged_ledger_hash_triples =
       Staged_ledger_hash.var_to_triples staged_ledger_hash
     and pending_coinbase_hash_triples =
-      Pending_coinbase.Hash.var_to_triples pending_coinbase_hash
+      Pending_coinbase.Hash.var_to_triples pending_coinbases_hash
     in
     staged_ledger_hash_triples @ ledger_hash_triples
     @ pending_coinbase_hash_triples
@@ -212,13 +212,13 @@ end) : S = struct
   let fold
       ({ staged_ledger_hash
        ; snarked_ledger_hash
-       ; pending_coinbase_hash
+       ; pending_coinbases_hash
        ; timestamp } :
         value) =
     Fold.(
       Staged_ledger_hash.fold staged_ledger_hash
       +> Frozen_ledger_hash.fold snarked_ledger_hash
-      +> Pending_coinbase.Hash.fold pending_coinbase_hash
+      +> Pending_coinbase.Hash.fold pending_coinbases_hash
       +> Block_time.fold timestamp)
 
   let length_in_triples =
@@ -232,7 +232,7 @@ end) : S = struct
     ; snarked_ledger_hash=
         Frozen_ledger_hash.of_ledger_hash
         @@ Ledger.merkle_root Genesis_ledger.t
-    ; pending_coinbase_hash= Pending_coinbase.empty_merkle_root ()
+    ; pending_coinbases_hash= Pending_coinbase.empty_merkle_root ()
     ; timestamp= Genesis_state_timestamp.value |> Block_time.of_time }
 
   type display = (string, string, string, string) t_ [@@deriving yojson]
@@ -240,7 +240,7 @@ end) : S = struct
   let display
       { staged_ledger_hash
       ; snarked_ledger_hash
-      ; pending_coinbase_hash
+      ; pending_coinbases_hash
       ; timestamp } =
     { staged_ledger_hash=
         Visualization.display_short_sexp (module Ledger_hash)
@@ -249,10 +249,10 @@ end) : S = struct
         Visualization.display_short_sexp
           (module Frozen_ledger_hash)
           snarked_ledger_hash
-    ; pending_coinbase_hash=
+    ; pending_coinbases_hash=
         Visualization.display_short_sexp
           (module Pending_coinbase.Hash)
-          pending_coinbase_hash
+          pending_coinbases_hash
     ; timestamp=
         Time.to_string_trimmed ~zone:Time.Zone.utc
           (Block_time.to_time timestamp) }

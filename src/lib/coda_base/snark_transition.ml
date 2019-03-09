@@ -27,7 +27,7 @@ module type S = sig
        , 'consensus_data
        , 'sok_digest
        , 'supply_increase
-       , 'pending_coinbase_state ) t
+       , 'pending_coinbase_update ) t
   [@@deriving sexp]
 
   type value =
@@ -85,13 +85,13 @@ module Make (Inputs : Inputs_intf) :
        , 'consensus_data
        , 'sok_digest
        , 'supply_increase
-       , 'pending_coinbase_state ) t =
+       , 'pending_coinbase_update ) t =
     { blockchain_state: 'blockchain_state
     ; consensus_data: 'consensus_data
     ; sok_digest: 'sok_digest
     ; supply_increase: 'supply_increase
     ; ledger_proof: Proof.t option
-    ; pending_coinbase_update: 'pending_coinbase_state }
+    ; pending_coinbase_update: 'pending_coinbase_update }
   [@@deriving bin_io, sexp, fields]
 
   type value =

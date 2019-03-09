@@ -238,7 +238,9 @@ end = struct
     let target =
       Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
     in
-    let pending_coinbase_before = statement.pending_coinbase_state.source in
+    let pending_coinbase_before =
+      statement.pending_coinbase_stack_state.source
+    in
     let%bind pending_coinbase_after =
       match transaction with
       | Coinbase c ->
@@ -252,7 +254,7 @@ end = struct
     ; target
     ; fee_excess
     ; supply_increase
-    ; pending_coinbase_state=
+    ; pending_coinbase_stack_state=
         { Pending_coinbase_stack_state.source= pending_coinbase_before
         ; target= pending_coinbase_after }
     ; proof_type= `Base }
@@ -279,9 +281,9 @@ end = struct
           { Ledger_proof_statement.source= s.source
           ; target= s'.target
           ; supply_increase
-          ; pending_coinbase_state=
-              { source= s.pending_coinbase_state.source
-              ; target= s'.pending_coinbase_state.target }
+          ; pending_coinbase_stack_state=
+              { source= s.pending_coinbase_stack_state.source
+              ; target= s'.pending_coinbase_stack_state.target }
           ; fee_excess
           ; proof_type= `Merge }
         in
@@ -415,7 +417,7 @@ end = struct
           ; source
           ; target
           ; supply_increase= _
-          ; pending_coinbase_state= _ (*TODO: check pending coinbases?*)
+          ; pending_coinbase_stack_state= _ (*TODO: check pending coinbases?*)
           ; proof_type= _ } ->
           let open Or_error.Let_syntax in
           let%map () =
@@ -458,9 +460,9 @@ end = struct
         { Ledger_proof_statement.source= stmt1.source
         ; target= stmt2.target
         ; supply_increase
-        ; pending_coinbase_state=
-            { source= stmt1.pending_coinbase_state.source
-            ; target= stmt2.pending_coinbase_state.target }
+        ; pending_coinbase_stack_state=
+            { source= stmt1.pending_coinbase_stack_state.source
+            ; target= stmt2.pending_coinbase_stack_state.target }
         ; fee_excess
         ; proof_type= `Merge }
 

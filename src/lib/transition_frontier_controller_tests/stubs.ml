@@ -256,7 +256,7 @@ struct
         Blockchain_state.create_value ~timestamp:(Block_time.now ())
           ~snarked_ledger_hash:next_ledger_hash
           ~staged_ledger_hash:next_staged_ledger_hash
-          ~pending_coinbase_hash:pending_coinbase_update.new_root
+          ~pending_coinbases_hash:pending_coinbase_update.new_root
       in
       let previous_state_hash =
         Consensus.Protocol_state.hash previous_protocol_state

@@ -15,7 +15,7 @@ module type Inputs_intf = sig
   module Ledger_proof_statement :
     Ledger_proof_statement_intf
     with type ledger_hash := Frozen_ledger_hash.t
-     and type pending_coinbase_state := Pending_coinbase_stack_state.t
+     and type pending_coinbase_stack_state := Pending_coinbase_stack_state.t
 
   module Ledger_proof : sig
     include

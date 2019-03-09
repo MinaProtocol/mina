@@ -118,7 +118,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
               T.of_transaction ~sok_digest:Sok_message.Digest.default
                 ~source:(Sparse_ledger.merkle_root sparse_ledger)
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
-                ~pending_coinbase_state:
+                ~pending_coinbase_stack_state:
                   { source= Pending_coinbase.Stack.empty
                   ; target= coinbase_stack_target }
                 t
@@ -160,7 +160,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) =
           Transaction_snark.check_transaction ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
-            ~pending_coinbase_state:
+            ~pending_coinbase_stack_state:
               { source= Pending_coinbase.Stack.empty
               ; target= Pending_coinbase.Stack.empty }
             t

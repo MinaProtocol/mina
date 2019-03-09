@@ -96,7 +96,7 @@ module Make (Blockchain_state : Coda_base.Blockchain_state.S) = struct
   let blockchain_state
       ({ staged_ledger_hash= lbh
        ; snarked_ledger_hash= lh
-       ; pending_coinbase_hash= _pch
+       ; pending_coinbases_hash= _pch
        ; timestamp } :
         Blockchain_state.t) : Lite_base.Blockchain_state.t =
     { staged_ledger_hash= ledger_builder_hash lbh

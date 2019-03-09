@@ -67,7 +67,8 @@ module Inputs = struct
             let res =
               M.of_transaction ~sok_digest ~source:input.Statement.source
                 ~target:input.target t
-                ~pending_coinbase_state:input.Statement.pending_coinbase_state
+                ~pending_coinbase_stack_state:
+                  input.Statement.pending_coinbase_stack_state
                 (unstage (Coda_base.Sparse_ledger.handler w.ledger))
             in
             Cache.add cache ~statement ~proof:res ;

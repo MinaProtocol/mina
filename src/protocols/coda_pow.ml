@@ -416,13 +416,13 @@ end
 module type Ledger_proof_statement_intf = sig
   type ledger_hash
 
-  type pending_coinbase_state
+  type pending_coinbase_stack_state
 
   type t =
     { source: ledger_hash
     ; target: ledger_hash
     ; supply_increase: Currency.Amount.t
-    ; pending_coinbase_state: pending_coinbase_state
+    ; pending_coinbase_stack_state: pending_coinbase_stack_state
     ; fee_excess: Fee.Signed.t
     ; proof_type: [`Base | `Merge] }
   [@@deriving sexp, bin_io, compare]
@@ -1009,7 +1009,7 @@ module type Blockchain_state_intf = sig
   val create_value :
        staged_ledger_hash:staged_ledger_hash
     -> snarked_ledger_hash:frozen_ledger_hash
-    -> pending_coinbase_hash:pending_coinbase_hash
+    -> pending_coinbases_hash:pending_coinbase_hash
     -> timestamp:time
     -> value
 
@@ -1017,7 +1017,7 @@ module type Blockchain_state_intf = sig
 
   val snarked_ledger_hash : value -> frozen_ledger_hash
 
-  val pending_coinbase_hash : value -> pending_coinbase_hash
+  val pending_coinbases_hash : value -> pending_coinbase_hash
 
   val timestamp : value -> time
 end
@@ -1500,7 +1500,7 @@ module type Inputs_intf = sig
   module Ledger_proof_statement :
     Ledger_proof_statement_intf
     with type ledger_hash := Frozen_ledger_hash.t
-     and type pending_coinbase_state := Pending_coinbase_stack_state.t
+     and type pending_coinbase_stack_state := Pending_coinbase_stack_state.t
 
   module Ledger_proof :
     Ledger_proof_intf

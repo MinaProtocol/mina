@@ -391,7 +391,7 @@ end = struct
       ; target= Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
       ; fee_excess
       ; supply_increase
-      ; pending_coinbase_state=
+      ; pending_coinbase_stack_state=
           {source= pending_coinbase_before; target= pending_coinbase_after}
       ; proof_type= `Base }
     , pending_coinbase_after )
@@ -786,7 +786,7 @@ end = struct
         in
         let ledger_proof_stack =
           let proof, _ = Option.value_exn ledger_proof in
-          (Ledger_proof.statement proof).pending_coinbase_state.target
+          (Ledger_proof.statement proof).pending_coinbase_stack_state.target
         in
         let%map () =
           if Pending_coinbase.Stack.equal oldest_stack ledger_proof_stack then
@@ -1829,8 +1829,6 @@ let%test_module "test" =
 
         let new_root t = t.new_root
 
-        let prev_root t = t.prev_root
-
         let create_value ~oldest_stack_before ~oldest_stack_after
             ~latest_stack_before ~latest_stack_after ~is_new_stack ~prev_root
             ~intermediate_root ~new_root =
@@ -1861,7 +1859,7 @@ let%test_module "test" =
             { source: Ledger_hash.t
             ; target: Ledger_hash.t
             ; supply_increase: Currency.Amount.t
-            ; pending_coinbase_state: Pending_coinbase_stack_state.t
+            ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
             ; fee_excess: Fee.Signed.t
             ; proof_type: [`Base | `Merge] }
           [@@deriving sexp, bin_io, compare, hash]
@@ -1885,10 +1883,10 @@ let%test_module "test" =
             { source= s1.source
             ; target= s2.target
             ; supply_increase
-            ; pending_coinbase_state=
+            ; pending_coinbase_stack_state=
                 { Pending_coinbase_stack_state.source=
-                    s1.pending_coinbase_state.source
-                ; target= s2.pending_coinbase_state.target }
+                    s1.pending_coinbase_stack_state.source
+                ; target= s2.pending_coinbase_stack_state.target }
             ; fee_excess
             ; proof_type= `Merge }
         end
@@ -1913,7 +1911,7 @@ let%test_module "test" =
           ; supply_increase
           ; fee_excess
           ; proof_type
-          ; pending_coinbase_state=
+          ; pending_coinbase_stack_state=
               {source= pending_coinbase_before; target= pending_coinbase_after}
           }
       end
@@ -2304,7 +2302,7 @@ let%test_module "test" =
       let%map ( `Hash_after_applying hash
               , `Ledger_proof ledger_proof
               , `Staged_ledger sl'
-              , `Pending_coinbase_update pending_coinbase_update ) =
+              , `Pending_coinbase_update _ ) =
         match%map Sl.apply !sl diff' ~logger with
         | Ok x -> x
         | Error e -> Error.raise (Sl.Staged_ledger_error.to_error e)
