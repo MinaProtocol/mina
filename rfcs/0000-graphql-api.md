@@ -27,9 +27,8 @@ need to store information about blocks that these keys have created.
 We will likely want to at least optionally cache the history of the blocks/payments on the client side as well,
 just to avoid needing to query it all every time (though we could also paginate the )
 
-First thing to note is the scalars defined at the top: GraphQL can define custom types that it treats as opaque and that
-need to be implemented symmetrically on the client and server. We may be able to swap these out for strings in most cases
-in the public api in order to avoid needing to ship libraries supporting them, but for clarity here I've left them as is.
+Note: There are several custom scalars defined at the top for readability. These will be `String`s in the final implementation due to the complications involved in the encoding of custom scalars not being expressed in the schema and needing to be implemented symmetrically on the client and server.
+
 ```graphql
 scalar Date
 scalar PublicKey
@@ -53,11 +52,11 @@ type Payment {
   nonce: Int!,
   submittedAt: Date!
   includedAt: Date
-  from: PublicKey!
+  from: PublicKey! 
   to: PublicKey!
   amount: Int64!
   fee: Int!,
-  memo: String!
+  memo: String
 }
 
 type PaymentUpdate {
@@ -112,6 +111,107 @@ type Wallet {
   balance(consensus: ConsensusStatus): Int64!
 }
 
+type NodeStatus {
+  network: String
+}
+
+## Input types
+
+input AddWalletInput {
+  public: PublicKey
+  private: PrivateKey
+}
+
+input DeleteWalletInput {
+  public: PublicKey
+}
+
+input AddPaymentReceiptInput {
+  receipt: String
+}
+
+input SetNetworkInput {
+  address: String
+}
+
+input SetSnarkWorkerInput {
+  worker: PublicKey!
+  fee: Int!
+}
+
+input CreatePaymentInput {
+  from: PublicKey!,
+  to: PublicKey!,
+  amount: Int64!,
+  fee: Int!,
+  memo: String
+}
+
+input PaymentFilterInput {
+  toOrFrom: PublicKey,
+}
+
+input BlockFilterInput {
+  creator: PublicKey,
+}
+
+## Payload types
+
+type CreatePaymentPayload {
+  payment: Payment
+}
+
+type SetSnarkWorkerPayload {
+  worker: SnarkWorker
+}
+
+type SetNetworkPayload {
+  address: String
+}
+
+type AddPaymentReceiptPayload {
+  payment: Payment
+}
+
+type AddWalletPayload {
+  publicKey: PublicKey
+}
+
+type DeleteWalletPayload {
+  publicKey: PublicKey
+}
+
+# Pagination types
+
+type PageInfo {
+  hasPreviousPage: Boolean!
+  hasNextPage: Boolean!
+}
+
+type PaymentEdge {
+  cursor: String
+  node: PaymentUpdate
+}
+
+type PaymentConnection {
+  edges: [PaymentEdge]
+  nodes: [PaymentUpdate]
+  pageInfo: PageInfo!
+  totalCount: Int
+}
+
+type BlockEdge {
+  cursor: String
+  node: BlockUpdate
+}
+
+type BlockConnection {
+  edges: [BlockEdge]
+  nodes: [BlockUpdate]
+  pageInfo: PageInfo!
+  totalCount: Int
+}
+
 type Query {
   # List of wallets currently tracked by the node
   wallets: [Wallet]!
@@ -121,11 +221,19 @@ type Query {
   # state to be the "real" balance (probably FINALIZED)
   balance(publicKey: PublicKey!, consensus: ConsensusStatus): Int64!
   
-  # Note: we may need to think about pagination here
-  payments(filterBySenderOrReceiver:PublicKey!): [PaymentUpdate]!
+  payments(
+    filter: PaymentFilterInput,
+    first: Int,
+    after: String,
+    last: Int,
+    before: String): PaymentConnection
   
-  # Note: we may need to think about pagination here
-  blocks(filterBycreator:PublicKey!): [BlockUpdate]!
+  blocks(
+    filter:BlockFilterInput,
+    first: Int,
+    after: String,
+    last: Int,
+    before: String): BlockConnection
   
   # Null if node isn't performing snark work
   currentSnarkWorker: SnarkWorker
@@ -138,29 +246,25 @@ type Query {
   
   # Network that the node is connected to
   network: String
+  status: NodeStatus
 }
 
 type Mutation {
-  createPayment(
-    from: PublicKey!,
-    to: PublicKey!,
-    amount: Int64!,
-    fee: Int!,
-    memo: String = ""): Payment!
+  createPayment(input: CreatePaymentInput!): CreatePaymentPayload
   
-  setSnarkWorker(worker: PublicKey!, fee: Int!): SnarkWorker!
+  setSnarkWorker(input: SetSnarkWorkerInput!): SetSnarkWorkerPayload
   
   # Configure which network your node is connected to
-  setNetwork(address: String!): String!
+  setNetwork(input: SetNetworkInput!): SetNetworkPayload
   
   # Adds transaction to the node (note: Not sure how we want to represent this yet)
-  addPaymentReceipt(receipt: String!): Payment
+  addPaymentReceipt(input: AddPaymentReceiptInput!): AddPaymentReceiptPayload
   
   # Tell server to track a private key and all associated transactions
-  addWallet(public: PublicKey, private: PrivateKey): Boolean
+  addWallet(input: AddWalletInput!): AddWalletPayload
   
   # Deletes private key associated with `key` and all related information
-  deleteWallet(key: PublicKey): Boolean
+  deleteWallet(input: DeleteWalletInput!): DeleteWalletPayload
 }
 
 type Subscription {
@@ -206,7 +310,7 @@ type Delegation {
   from: PublicKey!
   to: PublicKey!
   fee: Int!,
-  memo: String!
+  memo: String
 }
 
 type DelegationUpdate {
@@ -229,9 +333,28 @@ type Subscription {
   newDelegationUpdate(publicKey: PublicKey): DelegationUpdate!
 }
 
+input SetStakingInput {
+  on: Boolean
+}
+
+input SetDelegationInput {
+  from: PublicKey!
+  to: PublicKey!
+  fee: Int!
+  memo: String
+}
+
+type SetStakingPayload {
+  on: Boolean
+}
+
+type SetDelegationPayload {
+  delegation: Delegation
+}
+
 type Mutation {
-  setStaking(on: Bool): Boolean!
-  setDelegation(from: PublicKey!, to: PublicKey!, fee: Int!, memo: String = ""): Delegation
+  setStaking(input: SetStakingInput!): SetStakingPayload
+  setDelegation(input: SetDelegationInput!): SetDelegationPayload
 }
 ```
 
