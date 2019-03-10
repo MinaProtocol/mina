@@ -1,0 +1,7 @@
+(library
+  (name snarky_merkle_tree)
+  (public_name snarky_merkle_tree)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (libraries
+    snarky
+    core_kernel ))
