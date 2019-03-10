@@ -26,6 +26,10 @@ module type S = sig
 
     type value = int
 
+    val of_field_exn : depth:int -> M.Field.t -> t
+
+    val to_field : t -> M.Field.t
+
     val typ : depth:int -> (t, value) M.Typ.t
   end
 
@@ -34,6 +38,10 @@ module type S = sig
   val root : t -> Hash.t
 
   val create : depth:int -> root:Hash.t -> t
+
+  val max_size : t -> int
+
+  val depth : t -> int
 
   val modify : t -> Index.t -> f:(Elt.t -> Elt.t) -> t
 

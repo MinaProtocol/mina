@@ -1,8 +1,9 @@
 open Snarky
 open Core
+open Bitstring_lib
 
 module Index = struct
-  type 'f t = 'f Cvar.t Boolean.t list
+  type 'f t = 'f Cvar.t Boolean.t Bitstring.Lsb_first.t
 end
 
 type ('h, 'a) t = {depth: int; root: 'h}
@@ -27,6 +28,10 @@ module type S = sig
 
     type value = int
 
+    val of_field_exn : depth:int -> M.Field.t -> t
+
+    val to_field : t -> M.Field.t
+
     val typ : depth:int -> (t, value) M.Typ.t
   end
 
@@ -35,6 +40,10 @@ module type S = sig
   val root : t -> Hash.t
 
   val create : depth:int -> root:Hash.t -> t
+
+  val max_size : t -> int
+
+  val depth : t -> int
 
   val modify : t -> Index.t -> f:(Elt.t -> Elt.t) -> t
 
@@ -67,11 +76,19 @@ module Make
       val typ : (t, value) M.Typ.t
 
       val hash : t -> Hash.t
-    end) =
+    end) : S with module M = M and module Hash = Hash and module Elt = Elt =
 struct
   type nonrec t = (Hash.t, Elt.t) t
 
+  module Elt = Elt
+  module Hash = Hash
+  module M = M
+
   let root t = t.root
+
+  let max_size t = 1 lsl t.depth
+
+  let depth t = t.depth
 
   module Index = struct
     open M
@@ -84,12 +101,20 @@ struct
       List.init depth ~f:(fun i -> n land (1 lsl i) <> 0)
 
     let typ ~depth : (t, value) Typ.t =
-      Typ.transport
-        (Typ.list ~length:depth Boolean.typ)
-        ~there:(of_int ~depth)
-        ~back:
-          (List.foldi ~init:0 ~f:(fun i acc b ->
-               if b then acc lor (1 lsl i) else acc ))
+      let t1 =
+        Typ.transport_var
+          (Typ.list ~length:depth Boolean.typ)
+          ~there:Bitstring.Lsb_first.to_list ~back:Bitstring.Lsb_first.of_list
+      in
+      Typ.transport t1 ~there:(of_int ~depth) ~back:(fun t ->
+          List.foldi t ~init:0 ~f:(fun i acc b ->
+              if b then acc lor (1 lsl i) else acc ) )
+
+    let to_field = Fn.compose Field.project Bitstring.Lsb_first.to_list
+
+    let of_field_exn ~depth =
+      Fn.compose Bitstring.Lsb_first.of_list
+        (Field.choose_preimage_var ~length:depth)
   end
 
   let create ~depth ~root = {root; depth}
@@ -113,7 +138,7 @@ struct
       | _, _ ->
           failwith "Merkle_tree.implied_root: address, path length mismatch"
     in
-    go 0 entry_hash addr0 path0
+    go 0 entry_hash (Bitstring.Lsb_first.to_list addr0) path0
 
   let modify t idx ~f =
     let prev, prev_path =
