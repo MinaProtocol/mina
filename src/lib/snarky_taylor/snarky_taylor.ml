@@ -168,11 +168,12 @@ module Exp (M : Snark_intf.Run) = struct
       ; terms_needed
       ; per_term_precision
       ; coefficients } x =
-    let powers = Floating_point.powers ~m terms_needed x in
+    let powers = Floating_point.powers ~m x terms_needed in
     let coefficients =
       Array.map coefficients ~f:(fun (sgn, c) ->
-          (sgn, Floating_point.of_bigint_and_precision ~m c per_term_precision)
-      )
+          ( sgn
+          , Floating_point.constant ~m ~value:c ~precision:per_term_precision
+          ) )
     in
     taylor_sum ~m powers coefficients
 

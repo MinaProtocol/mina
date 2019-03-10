@@ -34,13 +34,13 @@ let mul (type f) ~m:((module I) : f m) x y =
   assert (new_precision < Field.Constant.size_in_bits) ;
   {value= Field.(x.value * y.value); precision= new_precision}
 
-let of_bigint_and_precision (type f) ~m:((module M) as m : f m) n precision =
-  assert (B.(n < one lsl precision)) ;
+let constant (type f) ~m:((module M) as m : f m) ~value ~precision =
+  assert (B.(value < one lsl precision)) ;
   let open M in
-  {value= Field.constant (bigint_to_field ~m n); precision}
+  {value= Field.constant (bigint_to_field ~m value); precision}
 
 (* x, x^2, ..., x^n *)
-let powers ~m n x =
+let powers ~m x n =
   let res = Array.create ~len:n x in
   let rec go acc i =
     if i >= n then ()
@@ -98,7 +98,7 @@ let sub ~m x y = add_signed ~m x (`Neg, y)
 *)
 let of_quotient ~m ~precision ~top ~bottom ~top_is_less_than_bottom:() =
   let q, _r = Integer.(div_mod ~m (shift_left ~m top precision) bottom) in
-  {value= q.value; precision}
+  {value= Integer.to_field q; precision}
 
 let%test_unit "of-quotient" =
   let module M = Snarky.Snark.Run.Make (Snarky.Backends.Mnt4.Default) in

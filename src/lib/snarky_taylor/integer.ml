@@ -5,6 +5,8 @@ open Util
 
 type 'f t = {value: 'f Cvar.t; upper_bound: B.t (* A strict upper bound *)}
 
+let to_field t = t.value
+
 let constant (type f) ~m:((module M) as m : f m) x =
   let open M in
   assert (x < Field.Constant.size) ;
