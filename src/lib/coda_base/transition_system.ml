@@ -144,7 +144,7 @@ struct
       let%bind prev_state = exists' State.typ ~f:Prover_state.prev_state
       and update = exists' Update.typ ~f:Prover_state.update in
       let%bind prev_state_hash = State.Checked.hash prev_state in
-      let%bind next_state_hash, next_state, `Success success =
+      let%bind next_state_hash, _next_state, `Success success =
         with_label __LOC__
           (State.Checked.update (prev_state_hash, prev_state) update)
       in
@@ -209,7 +209,6 @@ struct
 
     (* TODO: Use an online verifier here *)
     let%snarkydef main (input : Wrap_input.var) =
-      let open Let_syntax in
       let%bind result =
         (* The use of choose_preimage here is justified since we feed it to the verifier, which doesn't
              depend on which unpacking is provided. *)

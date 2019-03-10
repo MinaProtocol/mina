@@ -497,7 +497,7 @@ let%test_unit "Checked_stack = Unchecked_stack" =
       let unchecked = Stack.push_exn base cb in
       let checked =
         let comp =
-          let open Snark_params.Tick.Let_syntax in
+          let open Snark_params.Tick in
           let cb_var =
             Coinbase_data.(var_of_t @@ Or_error.ok_exn @@ of_coinbase cb)
           in
@@ -516,13 +516,14 @@ let%test_unit "Checked_tree = Unchecked_tree" =
       let unchecked =
         update_coinbase_stack_exn pending_coinbases stack ~is_new_stack:true
       in
+      let update = Checked.update_stack in
       let checked =
         let comp =
-          let open Snark_params.Tick.Let_syntax in
+          let open Snark_params.Tick in
           let stack_var = Stack.(var_of_t stack) in
           let%map res =
             handle
-              (Checked.update_stack
+              (update
                  (Hash.var_of_t (merkle_root pending_coinbases))
                  ~is_new_stack:Boolean.true_ Stack.Checked.empty stack_var)
               (unstage (handler pending_coinbases))

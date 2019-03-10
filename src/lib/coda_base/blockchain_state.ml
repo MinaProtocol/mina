@@ -1,7 +1,6 @@
 open Core_kernel
 open Snark_params
 open Tick
-open Let_syntax
 open Fold_lib
 open Bitstring_lib
 open Tuple_lib
@@ -275,7 +274,6 @@ end) : S = struct
     let () = assert Insecure.signature_hash_function
 
     let%snarkydef hash_checked t ~nonce =
-      let open Let_syntax in
       let%bind trips = var_to_triples t in
       let%bind hash =
         Pedersen.Checked.digest_triples ~init:Hash_prefix.signature

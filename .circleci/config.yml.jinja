@@ -20,7 +20,7 @@ jobs:
             - run: cd frontend/wallet && npm install
             - run:
                   name: Lint wallet
-                  command: cd frontend/wallet && npm run reformat && git diff --exit-code
+                  command: cd frontend/wallet && npm run reformat && git diff --exit-code src
             - run:
                   name: Build wallet
                   command: cd frontend/wallet && npm run build

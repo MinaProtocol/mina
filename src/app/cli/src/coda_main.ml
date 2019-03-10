@@ -34,6 +34,8 @@ module Staged_ledger_aux_hash = struct
   include Staged_ledger_hash.Aux_hash.Stable.Latest
 
   let of_bytes = Staged_ledger_hash.Aux_hash.of_bytes
+
+  let to_bytes = Staged_ledger_hash.Aux_hash.to_bytes
 end
 
 module Staged_ledger_hash = struct
@@ -781,7 +783,7 @@ struct
                 ( List.map res.spec.instances ~f:Single.Spec.statement
                 , { Diff.proof= res.proofs
                   ; fee= {fee= res.spec.fee; prover= res.prover} } ))
-           ~sender:Network_peer.Peer.local)
+           ~sender:Envelope.Sender.Local)
   end
 
   module Root_sync_ledger = Sync_ledger.Db
@@ -1261,6 +1263,10 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             { Daemon_rpcs.Types.Status.Histograms.rpc_timings
             ; external_transition_latency=
                 r ~name:"external_transition_latency"
+            ; accepted_transition_local_latency=
+                r ~name:"accepted_transition_local_latency"
+            ; accepted_transition_remote_latency=
+                r ~name:"accepted_transition_remote_latency"
             ; snark_worker_transition_time=
                 r ~name:"snark_worker_transition_time"
             ; snark_worker_merge_time= r ~name:"snark_worker_merge_time" }

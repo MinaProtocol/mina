@@ -88,9 +88,7 @@ module Make (Inputs : Inputs.S) :
                       let%map crumb =
                         breadcrumb_if_present () |> Deferred.return
                       in
-                      (* We make a copy now so the mask can't be detached while we're
-                          * in the middle of applying it later *)
-                      crumb |> Transition_frontier.Breadcrumb.copy
+                      crumb
                   | `Constructed parent -> Deferred.Or_error.return parent
                 in
                 let parent_state_hash =

@@ -74,7 +74,6 @@ module Body = struct
       ; amount= Currency.Amount.var_of_t amount }
 
     let to_triples ({tag; public_key; amount} : var) =
-      let open Let_syntax in
       let%map public_key = Public_key.Compressed.var_to_triples public_key in
       Tag.Checked.to_triples tag @ public_key
       @ Currency.Amount.var_to_triples amount
@@ -285,7 +284,6 @@ end
 
 module Checked = struct
   let to_triples ({common; body} : var) =
-    let open Let_syntax in
     let%map body = Body.Checked.to_triples body in
     User_command_payload.Common.Checked.to_triples common @ body
 

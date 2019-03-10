@@ -38,7 +38,6 @@ module Chain_hash = struct
     let if_ = if_
 
     let cons ~payload t =
-      let open Let_syntax in
       let init =
         Pedersen.Checked.Section.create
           ~acc:(`Value Hash_prefix.receipt_chain.acc)
@@ -66,7 +65,7 @@ module Chain_hash = struct
         let unchecked = cons payload base in
         let checked =
           let comp =
-            let open Snark_params.Tick.Let_syntax in
+            let open Snark_params.Tick.Checked.Let_syntax in
             let%bind payload =
               Schnorr.Message.var_of_payload
                 Transaction_union_payload.(

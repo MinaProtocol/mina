@@ -242,10 +242,9 @@ let%test_module "blake2-equality test" =
       let open Impl in
       let (), checked_result =
         run_and_check
-          (let open Let_syntax in
-          let%bind input = exists typ1 ~compute:(As_prover.return input) in
-          let%map result = checked input in
-          As_prover.read typ2 result)
+          (let%bind input = exists typ1 ~compute:(As_prover.return input) in
+           let%map result = checked input in
+           As_prover.read typ2 result)
           ()
         |> Or_error.ok_exn
       in
@@ -271,7 +270,6 @@ let%test_module "blake2-equality test" =
       assert (
         Impl.constraint_count
           (let open Impl in
-          let open Let_syntax in
           let%bind bits =
             exists
               (Typ.array ~length:512 Boolean.typ_unchecked)

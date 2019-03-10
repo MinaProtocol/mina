@@ -322,10 +322,8 @@ struct
   let create ~logger
       ~(root_transition :
          (Inputs.External_transition.Verified.t, State_hash.t) With_hash.t)
-      ~root_snarked_ledger ~root_transaction_snark_scan_state
-      ~root_staged_ledger_diff ~consensus_local_state =
+      ~root_snarked_ledger ~root_staged_ledger ~consensus_local_state =
     let open Consensus in
-    let open Deferred.Let_syntax in
     let logger = Logger.child logger __MODULE__ in
     let root_hash = With_hash.hash root_transition in
     let root_protocol_state =
@@ -335,75 +333,33 @@ struct
     let root_blockchain_state =
       Protocol_state.blockchain_state root_protocol_state
     in
-    let root_blockchain_state_ledger_hash, root_blockchain_staged_ledger_hash =
-      ( Protocol_state.Blockchain_state.snarked_ledger_hash
-          root_blockchain_state
-      , Protocol_state.Blockchain_state.staged_ledger_hash
-          root_blockchain_state )
+    let root_blockchain_state_ledger_hash =
+      Protocol_state.Blockchain_state.snarked_ledger_hash root_blockchain_state
     in
     assert (
       Ledger_hash.equal
         (Ledger.Db.merkle_root root_snarked_ledger)
         (Frozen_ledger_hash.to_ledger_hash root_blockchain_state_ledger_hash)
     ) ;
-    let root_masked_ledger = Ledger.of_database root_snarked_ledger in
-    let root_snarked_ledger_hash =
-      Frozen_ledger_hash.of_ledger_hash
-      @@ Ledger.merkle_root (Ledger.of_database root_snarked_ledger)
+    let root_breadcrumb =
+      { Breadcrumb.transition_with_hash= root_transition
+      ; staged_ledger= root_staged_ledger
+      ; just_emitted_a_proof= false }
     in
-    match%bind
-      Inputs.Staged_ledger.of_scan_state_and_ledger
-        ~scan_state:root_transaction_snark_scan_state
-        ~ledger:root_masked_ledger
-        ~snarked_ledger_hash:root_snarked_ledger_hash
-        ~pending_coinbase_collection:(Pending_coinbase.create_exn ())
-    with
-    | Error e -> failwith (Error.to_string_hum e)
-    | Ok pre_root_staged_ledger ->
-        let open Deferred.Let_syntax in
-        let%map root_staged_ledger =
-          match root_staged_ledger_diff with
-          | None -> return pre_root_staged_ledger
-          | Some diff -> (
-              match%map
-                Inputs.Staged_ledger.apply pre_root_staged_ledger diff ~logger
-              with
-              | Error e ->
-                  failwith
-                    (Inputs.Staged_ledger.Staged_ledger_error.to_string e)
-              | Ok
-                  ( `Hash_after_applying staged_ledger_hash
-                  , `Ledger_proof None
-                  , `Staged_ledger transitioned_staged_ledger
-                  , `Pending_coinbase_update _ ) ->
-                  assert (
-                    Staged_ledger_hash.equal root_blockchain_staged_ledger_hash
-                      staged_ledger_hash ) ;
-                  transitioned_staged_ledger
-              | Ok (_, `Ledger_proof (Some _), _, _) ->
-                  failwith
-                    "Did not expect a ledger proof after applying the first \
-                     diff" )
-        in
-        let root_breadcrumb =
-          { Breadcrumb.transition_with_hash= root_transition
-          ; staged_ledger= root_staged_ledger
-          ; just_emitted_a_proof= false }
-        in
-        let root_node =
-          {Node.breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
-        in
-        let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
-        let extension_readers, extension_writers = Extensions.make_pipes () in
-        { logger
-        ; root_snarked_ledger
-        ; root= root_hash
-        ; best_tip= root_hash
-        ; table
-        ; consensus_local_state
-        ; extensions= Extensions.create ()
-        ; extension_readers
-        ; extension_writers }
+    let root_node =
+      {Node.breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
+    in
+    let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
+    let extension_readers, extension_writers = Extensions.make_pipes () in
+    { logger
+    ; root_snarked_ledger
+    ; root= root_hash
+    ; best_tip= root_hash
+    ; table
+    ; consensus_local_state
+    ; extensions= Extensions.create ()
+    ; extension_readers
+    ; extension_writers }
 
   let close {extension_writers; _} = Extensions.close_pipes extension_writers
 

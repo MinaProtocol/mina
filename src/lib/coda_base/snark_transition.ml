@@ -174,7 +174,7 @@ module Make (Inputs : Inputs_intf) :
         ; supply_increase
         ; ledger_proof= _
         ; pending_coinbase_update } =
-      let open Snark_params.Tick.Let_syntax in
+      let open Snark_params.Tick in
       let%map () = Blockchain_state.typ.check blockchain_state
       and () = Consensus_data.typ.check consensus_data
       and () = Sok_message.Digest.typ.check sok_digest
