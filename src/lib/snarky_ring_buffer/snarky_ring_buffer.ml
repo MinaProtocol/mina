@@ -1,6 +1,4 @@
 open Snarky
-open Snark
-open Bitstring_lib
 
 type ('h, 'a, 'f) t =
   {tree: ('h, 'a) Snarky_merkle_tree.t; index: 'f Snarky_merkle_tree.Index.t}
