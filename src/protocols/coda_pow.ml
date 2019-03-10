@@ -657,7 +657,7 @@ module type Transaction_snark_scan_state_intf = sig
   end
 
   module Available_job : sig
-    type t
+    type t [@@deriving sexp]
   end
 
   module Space_partition : sig
@@ -763,12 +763,16 @@ module type Staged_ledger_base_intf = sig
 
   type transaction_witness
 
+  type ledger_proof_statement
+
   (** The ledger in a staged ledger is always a mask *)
   type ledger
 
   type pending_coinbase_collection
 
   type pending_coinbase_update
+
+  type public_key
 
   type serializable [@@deriving bin_io]
 
@@ -803,6 +807,7 @@ module type Staged_ledger_base_intf = sig
       | Bad_prev_hash of staged_ledger_hash * staged_ledger_hash
       | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
       | Non_zero_fee_excess of Scan_state.Space_partition.t * transaction list
+      | Invalid_proof of ledger_proof * ledger_proof_statement * public_key
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -870,15 +875,11 @@ module type Staged_ledger_intf = sig
 
   type user_command_with_valid_signature
 
-  type ledger_proof_statement
-
   type ledger_proof_statement_set
 
   type sparse_ledger
 
   type completed_work_checked
-
-  type public_key
 
   val current_ledger_proof : t -> ledger_proof option
 

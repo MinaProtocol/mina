@@ -14,27 +14,27 @@ let coinbase_tree_depth = Snark_params.pending_coinbase_depth
 let coinbase_stacks = Int.pow 2 coinbase_tree_depth
 
 module Coinbase_data = struct
-  type t = Public_key.Compressed.t * Amount.Signed.t [@@deriving sexp]
+  type t = Public_key.Compressed.t * Amount.t [@@deriving sexp]
 
   let of_coinbase (cb : Coinbase.t) : t Or_error.t =
     Option.value_map cb.fee_transfer
-      ~default:(Ok (cb.proposer, Amount.Signed.of_unsigned cb.amount))
+      ~default:(Ok (cb.proposer, cb.amount))
       ~f:(fun (_, fee) ->
         match Currency.Amount.sub cb.amount (Amount.of_fee fee) with
         | None -> Or_error.error_string "Coinbase underflow"
-        | Some amount -> Ok (cb.proposer, Amount.Signed.of_unsigned amount) )
+        | Some amount -> Ok (cb.proposer, amount) )
 
-  type var = Public_key.Compressed.var * Amount.Signed.var
+  type var = Public_key.Compressed.var * Amount.var
 
   type value = t
 
   let length_in_triples =
-    Public_key.Compressed.length_in_triples + Amount.Signed.length_in_triples
+    Public_key.Compressed.length_in_triples + Amount.length_in_triples
 
   let typ : (var, value) Typ.t =
     let spec =
       let open Data_spec in
-      [Public_key.Compressed.typ; Amount.Signed.typ]
+      [Public_key.Compressed.typ; Amount.typ]
     in
     let of_hlist : 'a 'b. (unit, 'a -> 'b -> unit) H_list.t -> 'a * 'b =
       let open H_list in
@@ -45,18 +45,16 @@ module Coinbase_data = struct
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let var_of_t ((public_key, amount) : value) =
-    ( Public_key.Compressed.var_of_t public_key
-    , Amount.Signed.Checked.of_unsigned @@ Amount.var_of_t
-      @@ Amount.Signed.magnitude amount )
+    (Public_key.Compressed.var_of_t public_key, Amount.var_of_t amount)
 
   let var_to_triples (public_key, amount) =
     let%map public_key = Public_key.Compressed.var_to_triples public_key in
-    let amount = Amount.Signed.Checked.to_triples amount in
+    let amount = Amount.var_to_triples amount in
     public_key @ amount
 
   let fold ((public_key, amount) : t) =
     let open Fold in
-    Public_key.Compressed.fold public_key +> Amount.Signed.fold amount
+    Public_key.Compressed.fold public_key +> Amount.fold amount
 
   let crypto_hash_prefix = Hash_prefix.coinbase
 

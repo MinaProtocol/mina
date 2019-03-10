@@ -50,14 +50,11 @@ let of_transaction : Transaction.t -> t = function
       in
       { payload=
           { common=
-              { fee= Amount.to_fee amount
+              { fee= other_amount
               ; nonce= Account.Nonce.zero
               ; memo= User_command_memo.dummy }
-          ; body=
-              { public_key= other_pk
-              ; amount= Amount.of_fee other_amount
-              ; tag= Tag.Coinbase } }
-      ; sender= Public_key.decompress_exn proposer
+          ; body= {public_key= proposer; amount; tag= Tag.Coinbase} }
+      ; sender= Public_key.decompress_exn other_pk
       ; signature= Signature.dummy }
   | Fee_transfer tr -> (
       let two (pk1, fee1) (pk2, fee2) : t =
