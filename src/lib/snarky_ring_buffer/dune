@@ -1,0 +1,8 @@
+(library
+  (name snarky_ring_buffer)
+  (public_name snarky_ring_buffer)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (libraries
+    snarky
+    snarky_merkle_tree
+    core_kernel ))
