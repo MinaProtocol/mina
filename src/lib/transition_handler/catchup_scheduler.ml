@@ -166,10 +166,11 @@ module Make (Inputs : Inputs.S) = struct
           ~data:[cached_transition] ;
         Hashtbl.update t.collected_transitions hash
           ~f:(Option.value ~default:[]) ;
-        Hashtbl.add_exn t.parent_root_timeouts ~key:parent_hash
+        Hashtbl.add t.parent_root_timeouts ~key:parent_hash
           ~data:
             (make_timeout
                (Option.value remaining_time ~default:timeout_duration))
+        |> ignore
     | Some cached_sibling_transitions ->
         if
           List.exists cached_sibling_transitions
