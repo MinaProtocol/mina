@@ -1,5 +1,5 @@
 ---
-title: SNARKoborous
+title: A SNARKy exponential function
 subtitle: Simulating real numbers using finite field arithmetic
 date: 2019-03-09
 author: Izaak Meckler
@@ -15,7 +15,7 @@ in Ouoroborous is a random number $s$ between 0 and 1
 (which one provably has generated fairly) such that $s$ is
 less than some threshold depending on $a$. Concretely, that
 threshold is $1 - (1/2)^{\frac{a}{T}}$ where $T$ is the total amount of
-stake in the system.[^0]
+stake in the system.
 
 It's important to use a threshold of this form because it means that the density
 of blocks over time does not depend on the distribution of stake.
@@ -26,12 +26,13 @@ all clear how we can compute a fractional number raised to a fractional power!
 
 We'll go through a very cool technique for computing such a thing.
 All the code for doing what we'll talk about is implemented using
-[snarky](https://github.com/o1-labs/snarky) and can be found [here]().
+[snarky](https://github.com/o1-labs/snarky) and can be found [here](https://github.com/CodaProtocol/coda/pull/1822).
 
 The technique will go as follows:
+
 1. We'll use Taylor series to reduce the problem to doing arithmetic with
   real numbers.
-2. We'll use approximate the arithmetic of real numbers using the arithmetic
+2. We'll approximate the arithmetic of real numbers using the arithmetic
   of rational numbers.
 3. We'll then approximate the arithmetic of rational numbers using integer
   arithmetic.
@@ -67,10 +68,14 @@ We can truncate this Taylor series to get polynomials $T_n$
 \end{aligned}
 ```
 </div>
-
 by taking the first $n$ terms. The Taylor polynomials *nearly* compute
 $1 - (1/2)^x$, but with some error that gets smaller as you take more and more
-terms. It turns out there's a handy formula which lets us figure out how
+terms. You can see this in the image of the actual function (in blue) along with the
+first few Taylor polynomials (in black).
+
+![](/static/blog/taylor/taylor-polys.png)
+
+It turns out there's a handy formula which lets us figure out how
 many terms we need to take to make sure we get the first
 $k$ bits of the output correct, so we can just use that and truncate at
 the appropriate point for the amount of precision that we want.
@@ -92,10 +97,15 @@ If $e1, e2$ are small enough compared to $x_1$ and $x_2$,
 then $e1 x1 + e2 x2 + e1 e2$ will be small as well, and so
 $a1 a2$ will be close to $x1 x2$.
 
+![If we change the input by a little, the output changes only by a little.](https://upload.wikimedia.org/wikipedia/commons/d/d5/Epsilon-delta_limit.svg)
+
 What this means is that instead of computing the Taylor polynomial
-$\log(2) x - \frac{(\log(2) x)^2}{2!} + \frac{(\log(2) x)^3}{3!} - ...$
+$$
+  \log(2) x - \frac{\log(2)^2}{2!} x^2 + \dots + \frac{\log(2)^n}{n!} x^n
+$$
+
 using real numbers like $\log(2)$ (which is irrational), we can approximate
-each coefficient $\frac{\log(k)}^k / k!$ with a nearby rational number and compute
+each coefficient $\log(2)^k / k!$ with a nearby rational number and compute
 using those instead! By continuity, we're guaranteed that the result will
 be close to the actual value (and we can quantify exactly how close if we
 want to).
@@ -113,14 +123,17 @@ $$
 so if we represent rationals using pairs of integers, we can simulate rational
 arithmetic perfectly. However, there is a bit of an issue with this approach, which
 is that the integers involved get really huge really quickly when you add numbers together.
-For example,  $1/2 + 1/3 + ... + 1/n$ has $n!$ as its denominator, which is a large number.
+For example,  $1/2 + 1/3 + \dots + 1/n$ has $n!$ as its denominator, which is a large number.
 
 That's a problem for us inside the SNARK, because we're working with a finite field and
 want to make sure there is no overflow.
 
 A better approach is to use rational numbers whose denominator is a power of two.
-These numbers are called [dyadic rationals]() and are basically the same thing as
-[floating point numbers]().
+These numbers are called [dyadic rationals](https://en.wikipedia.org/wiki/Dyadic_rational) and are basically the same thing as
+[floating point numbers](https://en.wikipedia.org/wiki/Floating-point_arithmetic).
+
+![What dyadic rationals look like](https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/Dyadic_rational.svg/1200px-Dyadic_rational.svg.png)
+
 Here,
 addition can be simulated using integers as follows. A rational number $\frac{a}{2^k}$
 is represented as the pair $(a, k)$. Say $k \leq m$. For addition, we have
@@ -152,5 +165,10 @@ That is, if we know ahead of time that $a + b < p$, then we can safely
 compute $a + b \mod p$, knowing that the result will be the same as over the integers.
 The same is true for multiplication.
 
-[^0]: Actually it's a little more general than this, but for the sake of
-concreteness let's stick with this.
+# Conclusion
+
+Let's survey the net result of all this approximation: we have a very efficient way
+of approximately computing an exponential function on fractional inputs inside of a SNARK,
+in such a way that we can have concrete bounds on the error of the approximation. Pretty cool!
+This enables us to use a threshold function for Ouroboros that guarantees a constant density
+of blocks regardless of the distribution of stake.
