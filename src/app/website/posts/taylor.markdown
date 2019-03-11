@@ -39,7 +39,7 @@ The technique will go as follows:
 4. Finally, we'll simulate integer arithmetic using finite field
   arithmetic.
 
-# Taylor series
+## Taylor series
 
 First we need a way to reduce the problem of computing an exponentiation to
 multiplications and additions in a finite field. As a first step, calculus
@@ -81,7 +81,7 @@ $k$ bits of the output correct, so we can just use that and truncate at
 the appropriate point for the amount of precision that we want.
 
 
-# From reals to rationals
+## From reals to rationals
 
 Multiplication and addition are continuous, which means if you change the
 inputs by only a little bit, the outputs change by only a little bit.
@@ -110,7 +110,7 @@ using those instead! By continuity, we're guaranteed that the result will
 be close to the actual value (and we can quantify exactly how close if we
 want to).
 
-# From rationals to integers
+## From rationals to integers
 
 There are a few ways to approximate rational arithmetic using integer arithmetic,
 some of which are more efficient than others.
@@ -147,7 +147,7 @@ will stay as big as the largest input to the sum).
 Moreover, any rational number can be approximated by a number of this form (it's just
 the binary expansion of that number).
 
-# From integers to a finite field
+## From integers to a finite field
 
 To recap, we've done the following.
 
@@ -165,7 +165,7 @@ That is, if we know ahead of time that $a + b < p$, then we can safely
 compute $a + b \mod p$, knowing that the result will be the same as over the integers.
 The same is true for multiplication.
 
-# Conclusion
+## Conclusion
 
 Let's survey the net result of all this approximation: we have a very efficient way
 of approximately computing an exponential function on fractional inputs inside of a SNARK,
