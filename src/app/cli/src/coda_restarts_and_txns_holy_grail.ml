@@ -59,6 +59,7 @@ let main n () =
       ~action:(Fn.const Deferred.unit) ~duration
   in
   (* settle for a few more min *)
+  (* TODO: Make sure to check that catchup actually worked *)
   after (Time.Span.of_min 3.)
 
 let command =
