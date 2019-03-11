@@ -181,9 +181,11 @@ publish_kademlia_deb:
 
 publish_deb:
 	@if [ $(AWS_ACCESS_KEY_ID) ] ; then \
-		if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
+		if [ "$(CIRCLE_BRANCH)" = "master" ] && [ "$(CIRCLE_BRANCH)" = "build_testnet_postake" ] ; then \
+            echo "Publishing to stable" ; \
 			$(DEBS3) --codename stable   --component main src/_build/coda.deb ; \
 		else \
+            echo "Publishing to unstable" ; \
 			$(DEBS3) --codename unstable --component main src/_build/coda.deb ; \
 		fi ; \
 	else  \
