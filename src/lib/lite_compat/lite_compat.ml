@@ -18,7 +18,7 @@ module Make (Blockchain_state : Coda_base.Blockchain_state.S) = struct
     let x, y = Tick.Inner_curve.to_affine_coordinates t in
     {x= field x; y= field y; z= LTock.Fq.one}
 
-  let g2 (t : Snarky.Libsnark.Mnt6.G2.t) : LTock.G2.t =
+  let g2 (t : Crypto_params.Cycle.Mnt6.G2.t) : LTock.G2.t =
     let x, y =
       Crypto_params.Tick_backend.Inner_twisted_curve.to_affine_coordinates t
     in
