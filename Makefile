@@ -182,9 +182,9 @@ publish_kademlia_deb:
 publish_deb:
 	@if [ $(AWS_ACCESS_KEY_ID) ] ; then \
 		if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
-			$(DEBS3) --codename stable   --component main src/_build/coda.deb ; \
+			$(DEBS3) --codename stable   --component main src/_build/coda-*.deb ; \
 		else \
-			$(DEBS3) --codename unstable --component main src/_build/coda.deb ; \
+			$(DEBS3) --codename unstable --component main src/_build/coda-*.deb ; \
 		fi ; \
 	else  \
 		echo "WARNING: AWS_ACCESS_KEY_ID not set, deb-s3 commands not run" ; \
