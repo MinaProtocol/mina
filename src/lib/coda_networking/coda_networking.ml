@@ -25,12 +25,21 @@ end) =
 struct
   open Inputs
 
+  (* see
+
+     RFC 0012, and
+
+     https://ocaml.janestreet.com/ocaml-core/latest/doc/async_rpc_kernel/Async_rpc_kernel/Versioned_rpc/
+
+  *)
+
   module Get_staged_ledger_aux_at_hash = struct
     module T = struct
       let name = "get_staged_ledger_aux_at_hash"
 
       module T = struct
-        type query = Staged_ledger_hash.t Envelope.Incoming.t
+        (* "master" types, do not change *)
+        type query = Staged_ledger_hash.t Envelope.Incoming.Stable.V1.t
 
         type response = (Staged_ledger_aux.t * Ledger_hash.t) option
       end
@@ -50,7 +59,7 @@ struct
 
     module V1 = struct
       module T = struct
-        type query = Staged_ledger_hash.t Envelope.Incoming.t
+        type query = Staged_ledger_hash.t Envelope.Incoming.Stable.V1.t
         [@@deriving bin_io]
 
         type response = (Staged_ledger_aux.t * Ledger_hash.t) option
@@ -77,11 +86,11 @@ struct
       let name = "answer_sync_ledger_query"
 
       module T = struct
-        type query = (Ledger_hash.t * Sync_ledger.query) Envelope.Incoming.t
-        [@@deriving bin_io]
+        (* "master" types, do not change *)
+        type query =
+          (Ledger_hash.t * Sync_ledger.query) Envelope.Incoming.Stable.V1.t
 
         type response = (Ledger_hash.t * Sync_ledger.answer) Or_error.t
-        [@@deriving bin_io]
       end
 
       module Caller = T
@@ -99,7 +108,12 @@ struct
 
     module V1 = struct
       module T = struct
-        include T.T
+        type query =
+          (Ledger_hash.t * Sync_ledger.query) Envelope.Incoming.Stable.V1.t
+        [@@deriving bin_io, sexp]
+
+        type response = (Ledger_hash.t * Sync_ledger.answer) Or_error.t
+        [@@deriving bin_io, sexp]
 
         let version = 1
 
@@ -122,10 +136,10 @@ struct
       let name = "transition_catchup"
 
       module T = struct
-        type query = State_hash.t Envelope.Incoming.t [@@deriving bin_io]
+        (* "master" types, do not change *)
+        type query = State_hash.t Envelope.Incoming.Stable.V1.t
 
         type response = External_transition.t Non_empty_list.t option
-        [@@deriving bin_io]
       end
 
       module Caller = T
@@ -143,7 +157,11 @@ struct
 
     module V1 = struct
       module T = struct
-        include T.T
+        type query = State_hash.t Envelope.Incoming.Stable.V1.t
+        [@@deriving bin_io, sexp]
+
+        type response = External_transition.t Non_empty_list.t option
+        [@@deriving bin_io, sexp]
 
         let version = 1
 
@@ -166,8 +184,10 @@ struct
       let name = "get_ancestry"
 
       module T = struct
-        type query = Consensus.Consensus_state.value Envelope.Incoming.t
-        [@@deriving bin_io, sexp]
+        (* "master" types, do not change *)
+        type query =
+          Consensus.Consensus_state.value Envelope.Incoming.Stable.V1.t
+        [@@deriving sexp]
 
         type response =
           ( ( External_transition.t
@@ -176,7 +196,6 @@ struct
           * Staged_ledger_aux.t
           * Ledger_hash.t )
           option
-        [@@deriving bin_io]
       end
 
       module Caller = T
@@ -194,7 +213,18 @@ struct
 
     module V1 = struct
       module T = struct
-        include T.T
+        type query =
+          Consensus.Consensus_state.value Envelope.Incoming.Stable.V1.t
+        [@@deriving bin_io, sexp]
+
+        type response =
+          ( ( External_transition.t
+            , State_body_hash.t list * External_transition.t )
+            Proof_carrying_data.t
+          * Staged_ledger_aux.t
+          * Ledger_hash.t )
+          option
+        [@@deriving bin_io]
 
         let version = 1
 
@@ -231,17 +261,14 @@ struct
 
   module T = struct
     module T = struct
+      (* "master" types, do not change *)
       type content =
         | New_state of External_transition.t
         | Snark_pool_diff of Snark_pool_diff.t
         | Transaction_pool_diff of Transaction_pool_diff.t
-      [@@deriving sexp, bin_io]
+      [@@deriving bin_io, sexp]
 
-      type msg = content Envelope.Incoming.t [@@deriving sexp, bin_io]
-
-      let content = Envelope.Incoming.data
-
-      let sender = Envelope.Incoming.sender
+      type msg = content Envelope.Incoming.Stable.V1.t [@@deriving sexp]
     end
 
     let name = "message"
@@ -251,11 +278,19 @@ struct
   end
 
   include T.T
+
+  let content ({data; _} : msg) = data
+
+  let sender ({sender; _} : msg) = sender
+
   include Versioned_rpc.Both_convert.One_way.Make (T)
 
   module V1 = struct
     module T = struct
-      include T.T
+      type content = T.T.content [@@deriving bin_io, sexp]
+
+      type msg = content Envelope.Incoming.Stable.V1.t
+      [@@deriving bin_io, sexp]
 
       let version = 1
 
