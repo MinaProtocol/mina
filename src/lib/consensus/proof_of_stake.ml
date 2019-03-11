@@ -1531,7 +1531,7 @@ end
 
 let should_bootstrap ~existing ~candidate =
   let length = Fn.compose Length.to_int Consensus_state.length in
-  length existing - length candidate > (2 * Constants.k) + Constants.delta
+  length candidate - length existing > (2 * Constants.k) + Constants.delta
 
 let to_unix_timestamp recieved_time =
   recieved_time |> Time.to_span_since_epoch |> Time.Span.to_ms
