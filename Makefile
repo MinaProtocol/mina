@@ -166,7 +166,7 @@ deb:
 	@cp src/_build/coda.deb /tmp/artifacts/.
 
 # deb-s3 https://github.com/krobertson/deb-s3
-DEBS3 = deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=120
+DEBS3 = deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=max-age=120
 
 publish_kademlia_deb:
 	@if [ $(AWS_ACCESS_KEY_ID) ] ; then \
