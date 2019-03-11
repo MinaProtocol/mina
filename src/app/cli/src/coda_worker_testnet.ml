@@ -273,3 +273,94 @@ let test log n proposers snark_work_public_keys work_selection =
   start_checks log workers payment_reader start_reader testnet
     ~acceptable_delay ;
   testnet
+
+module Payments : sig
+  val send_several_payments :
+       Api.t
+    -> node:int
+    -> src:Private_key.t
+    -> dest:Public_key.Compressed.t
+    -> unit Deferred.t
+end = struct
+  let send_several_payments testnet ~node ~src ~dest =
+    let send_amount = Currency.Amount.of_int 10 in
+    let fee = Currency.Fee.of_int 0 in
+    let rec go i =
+      let%bind () = after (Time.Span.of_sec 1.) in
+      let%bind () = Api.send_payment testnet node src dest send_amount fee in
+      if i > 0 then go (i - 1) else return ()
+    in
+    go 40
+end
+
+module Restarts : sig
+  val restart_node :
+       Api.t
+    -> log:Logger.t
+    -> node:int
+    -> action:(unit -> unit Deferred.t)
+    -> duration:Time.Span.t
+    -> unit Deferred.t
+
+  val trigger_catchup :
+       Api.t
+    -> log:Logger.t
+    -> node:int
+    -> largest_account_keypair:Keypair.t
+    -> payment_receiver:int
+    -> unit Deferred.t
+
+  val trigger_bootstrap :
+       Api.t
+    -> log:Logger.t
+    -> node:int
+    -> largest_account_keypair:Keypair.t
+    -> payment_receiver:int
+    -> unit Deferred.t
+end = struct
+  let catchup_wait_duration =
+    Time.Span.of_ms
+    @@ ( Consensus.Constants.c
+         * (5 + Consensus.Constants.delta)
+         * Consensus.Constants.block_window_duration_ms
+       |> Float.of_int )
+
+  let bootstrap_wait_duration =
+    Time.Span.of_ms
+    @@ ( Consensus.Constants.(c * ((2 * k) + delta) * block_window_duration_ms)
+       |> Float.of_int )
+
+  let restart_node testnet ~log ~node ~action ~duration =
+    let%bind () = after (Time.Span.of_sec 5.) in
+    Logger.info log "Stopping %d" node ;
+    (* Send one payment *)
+    let%bind () = Api.stop testnet node in
+    let%bind () = action () in
+    let%bind () = after duration in
+    Api.start testnet node
+
+  let restart_and_payment testnet ~node ~log ~largest_account_keypair ~duration
+      ~payment_receiver =
+    let sender_sk = largest_account_keypair.Keypair.private_key in
+    let send_amount = Currency.Amount.of_int 10 in
+    let fee = Currency.Fee.of_int 0 in
+    let keypair = Keypair.create () in
+    restart_node testnet ~node ~log
+      ~action:(fun () ->
+        Api.send_payment testnet payment_receiver sender_sk
+          (Public_key.compress keypair.public_key)
+          send_amount fee )
+      ~duration
+
+  let trigger_catchup testnet ~log ~node ~largest_account_keypair
+      ~payment_receiver =
+    Logger.info log "Triggering catchup on %d" node ;
+    restart_and_payment testnet ~largest_account_keypair ~node ~log
+      ~duration:catchup_wait_duration ~payment_receiver
+
+  let trigger_bootstrap testnet ~log ~node ~largest_account_keypair
+      ~payment_receiver =
+    Logger.info log "Triggering bootstrap on %d" node ;
+    restart_and_payment testnet ~largest_account_keypair ~node ~log
+      ~duration:catchup_wait_duration ~payment_receiver
+end
