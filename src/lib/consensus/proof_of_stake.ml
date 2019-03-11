@@ -1529,7 +1529,7 @@ module For_tests = struct
       ; curr_epoch_data }
 end
 
-let should_bootstrap_len ~exisiting ~candidate =
+let should_bootstrap_len ~existing ~candidate =
   let length = Length.to_int in
   length candidate - length existing > (2 * Constants.k) + Constants.delta
 
