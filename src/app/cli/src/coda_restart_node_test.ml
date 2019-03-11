@@ -40,16 +40,32 @@ let main () =
     Coda_worker_testnet.test log n proposers snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
   in
-  let%bind () = after (Time.Span.of_sec 5.) in
+  let%bind () = after (Time.Span.of_sec 10.) in
   Logger.info log "Stopping %d" 1 ;
   let%bind () = Coda_worker_testnet.Api.stop testnet 1 in
   let%bind () =
     Coda_worker_testnet.Api.send_payment testnet 0 sender_sk receiver_pk
       send_amount fee
   in
-  let%bind () = after (Time.Span.of_sec 5.) in
+  let%bind () =
+    after
+      (Time.Span.of_ms
+         ( Consensus.Constants.c * Consensus.Constants.delta
+           * Consensus.Constants.block_window_duration_ms
+         |> Float.of_int ))
+  in
+  Logger.info log "Restart %d" 1 ;
   let%bind () = Coda_worker_testnet.Api.start testnet 1 in
-  let%map () = after (Time.Span.of_sec 240.) in
+  let%bind () =
+    after
+      (Time.Span.of_ms
+         ( Consensus.Constants.c * Consensus.Constants.delta
+           * Consensus.Constants.block_window_duration_ms
+           + 16_000
+         |> Float.of_int ))
+  in
+  Logger.info log "Catchup finish %d" 1 ;
+  let%map () = after (Time.Span.of_min 4.) in
   ()
 
 let command =

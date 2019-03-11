@@ -11,8 +11,9 @@ module Api = struct
     { workers: Coda_process.t list
     ; configs: Coda_worker.Input.t list
     ; start_writer:
-        (int * Coda_worker.Input.t * (unit -> unit)) Linear_pipe.Writer.t
-    ; online: bool Array.t
+        (int * Coda_worker.Input.t * (unit -> unit) * (unit -> unit))
+        Linear_pipe.Writer.t
+    ; status: [`On of [`Synced | `Catchup] | `Off] Array.t
     ; payment_writer:
         ( int
         * Private_key.t
@@ -22,10 +23,16 @@ module Api = struct
         Linear_pipe.Writer.t }
 
   let create configs workers payment_writer start_writer =
-    let online = Array.init (List.length workers) ~f:(fun _ -> true) in
-    {workers; configs; start_writer; online; payment_writer}
+    let status = Array.init (List.length workers) ~f:(fun _ -> `On `Synced) in
+    {workers; configs; start_writer; status; payment_writer}
 
-  let online t i = t.online.(i)
+  let online t i = match t.status.(i) with `On _ -> true | `Off -> false
+
+  let synced t i =
+    match t.status.(i) with
+    | `On `Synced -> true
+    | `On `Catchup -> false
+    | `Off -> false
 
   let run_online_worker ~f ~arg t i =
     let worker = List.nth_exn t.workers i in
@@ -39,10 +46,13 @@ module Api = struct
 
   let start t i =
     Linear_pipe.write t.start_writer
-      (i, List.nth_exn t.configs i, fun () -> t.online.(i) <- true)
+      ( i
+      , List.nth_exn t.configs i
+      , (fun () -> t.status.(i) <- `On `Catchup)
+      , fun () -> t.status.(i) <- `On `Synced )
 
   let stop t i =
-    t.online.(i) <- false ;
+    t.status.(i) <- `Off ;
     Coda_process.disconnect (List.nth_exn t.workers i)
 
   let send_payment t i sk pk amount fee =
@@ -72,7 +82,7 @@ let start_prefix_check log workers events testnet ~acceptable_delay =
   let all_transitions_r, all_transitions_w = Linear_pipe.create () in
   let chains = Array.init (List.length workers) ~f:(fun i -> []) in
   let check_chains chains =
-    let chains = Array.filteri chains ~f:(fun i c -> Api.online testnet i) in
+    let chains = Array.filteri chains ~f:(fun i _ -> Api.synced testnet i) in
     let lengths =
       Array.to_list (Array.map chains ~f:(fun c -> List.length c))
     in
@@ -225,13 +235,19 @@ let events workers start_reader =
         Linear_pipe.write event_w (`Transition (i, t)) )
   in
   don't_wait_for
-    (Linear_pipe.iter start_reader ~f:(fun (i, config, started) ->
+    (Linear_pipe.iter start_reader ~f:(fun (i, config, started, synced) ->
          don't_wait_for
            (let%bind worker = Coda_process.spawn_exn config in
+            started () ;
             don't_wait_for
-              (let secs_to_catch_up = 10.0 in
-               let%map () = after (Time.Span.of_sec secs_to_catch_up) in
-               started ()) ;
+              (let ms_to_catchup =
+                 Consensus.Constants.c * Consensus.Constants.delta
+                 * Consensus.Constants.block_window_duration_ms
+                 + 16_000
+                 |> Float.of_int
+               in
+               let%map () = after (Time.Span.of_ms ms_to_catchup) in
+               synced ()) ;
             connect_worker i worker) ;
          Deferred.unit )) ;
   List.iteri workers ~f:(fun i w -> don't_wait_for (connect_worker i w)) ;
