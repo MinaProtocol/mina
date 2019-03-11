@@ -164,7 +164,7 @@ struct
             match User_command.check txn with
             | None ->
                 Logger.faulty_peer t.log
-                  !"Transaction doesn't check %{sexp: Network_peer.Peer.t}"
+                  !"Transaction doesn't check %{sexp: Envelope.Sender.t}"
                   (Envelope.Incoming.sender env) ;
                 (pool, acc)
             | Some txn ->

@@ -256,7 +256,8 @@ module Base = struct
              ; public_key= sender_compressed
              ; nonce= next_nonce
              ; receipt_chain_hash
-             ; delegate }) )
+             ; delegate
+             ; participated= account.participated }) )
     in
     let%bind receiver =
       (* A stake delegation only uses the sender *)

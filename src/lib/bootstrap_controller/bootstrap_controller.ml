@@ -237,7 +237,14 @@ end = struct
         let (transition : External_transition.Verified.t) =
           Envelope.Incoming.data incoming_transition
         in
-        let sender = Envelope.Incoming.sender incoming_transition in
+        let sender =
+          match Envelope.Incoming.sender incoming_transition with
+          | Envelope.Sender.Local ->
+              failwith
+                "Unexpected, we should be syncing only to remote nodes in \
+                 sync ledger"
+          | Envelope.Sender.Remote peer -> peer
+        in
         let protocol_state =
           External_transition.Verified.protocol_state transition
         in
