@@ -1,5 +1,5 @@
 ---
-title: A SNARKy exponential function
+title: A SNARKy Exponential Function
 subtitle: Simulating real numbers using finite field arithmetic
 date: 2019-03-09
 author: Izaak Meckler
@@ -167,7 +167,7 @@ The same is true for multiplication.
 
 ## Conclusion
 
-Let's survey the net result of all this approximation: we have a very efficient way
+Let's survey the net result of all this approximation: We have a very efficient way
 of approximately computing an exponential function on fractional inputs inside of a SNARK,
 in such a way that we can have concrete bounds on the error of the approximation. Pretty cool!
 This enables us to use a threshold function for Ouroboros that guarantees a constant density

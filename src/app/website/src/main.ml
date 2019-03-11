@@ -347,10 +347,11 @@ let home () =
             ~not_small:(social_list `Horizontal)
             ~small:(social_list `Vertical)
         , Link_list.create ~named:"Articles" ~orientation:`Vertical
-            [ ( `Read "Fast Accumulation on Streams"
-              , `One
-                  (let _, u, _ = Links.blog in
-                   u)
+            [ ( `Read "A SNARKy Exponential Function"
+              , `One "/blog/taylor.html"
+              , "blogpost-taylor" )
+            ; ( `Read "Fast Accumulation on Streams"
+              , `One "/blog/scanning_for_scans.html"
               , "blogpost-main" )
             ; ( `Read "Coindesk: This Blockchain Tosses Blocks"
               , `One
