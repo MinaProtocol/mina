@@ -22,7 +22,16 @@ module type Sok_message_intf = sig
     type t
   end
 
-  type t [@@deriving bin_io, sexp]
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving sexp, bin_io]
+    end
+
+    module Latest = V1
+  end
+
+  (* bin_io intentionally omitted *)
+  type t = Stable.Latest.t [@@deriving sexp]
 
   val create : fee:Currency.Fee.t -> prover:public_key_compressed -> t
 end

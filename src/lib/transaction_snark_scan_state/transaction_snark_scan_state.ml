@@ -84,7 +84,8 @@ end = struct
         module T = struct
           let version = 1
 
-          type t = Ledger_proof.t * Sok_message.t [@@deriving sexp, bin_io]
+          type t = Ledger_proof.t * Sok_message.Stable.V1.t
+          [@@deriving sexp, bin_io]
         end
 
         include T
@@ -282,7 +283,7 @@ end = struct
           val verify :
                Ledger_proof.t
             -> Ledger_proof_statement.t
-            -> message:Sok_message.t
+            -> message:Sok_message.Stable.Latest.t
             -> sexp_bool M.t
       end) =
   struct
