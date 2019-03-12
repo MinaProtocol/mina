@@ -147,7 +147,7 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test - {{profile}}:{{test}}
-                  command: source ~/.profile && ./scripts/test.py '{{profile}}:{{test}}'
+                  command: source ~/.profile && ./scripts/test.py run '{{profile}}:{{test}}'
     {%- endfor %}
     {%- endfor %}
 
