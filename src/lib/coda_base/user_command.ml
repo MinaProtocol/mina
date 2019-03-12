@@ -24,7 +24,7 @@ module Stable = struct
 
       type with_seed = string * t [@@deriving hash]
 
-      let seed = Secure_random.string ()
+      let seed = lazy (Secure_random.string ())
 
       let compare (t : t) (t' : t) =
         let same_sender = Public_key.equal t.sender t'.sender in
@@ -39,7 +39,7 @@ module Stable = struct
           in
           if nonce_compare <> 0 then nonce_compare else fee_compare
         else
-          let hash x = hash_with_seed (seed, x) in
+          let hash x = hash_with_seed (Lazy.force seed, x) in
           if fee_compare <> 0 then fee_compare else hash t - hash t'
     end
 
