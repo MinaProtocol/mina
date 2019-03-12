@@ -293,6 +293,23 @@ jobs:
                   name: Running test - Fake Hash | full-test
                   command: source ~/.profile && export DUNE_PROFILE=fake_hash && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
             
+    test-ledger_catchup_integration_tests:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Check .circleci Render
+                  command: make check-render-circleci
+            - run:
+                  name: Build OCaml
+                  command: eval `opam config env` && DUNE_PROFILE=test_postake_catchup make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                  name: Running test - Ledger Catchup Tests | coda-restart-node-test
+                  command: source ~/.profile && export DUNE_PROFILE=test_postake_catchup && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-restart-node-test'
+            
     test-posig_integration_tests:
         resource_class: large
         docker:
@@ -443,6 +460,7 @@ workflows:
             - build_testnet_public
             - build_testnet_postake_snarkless_fake_hash
             - test-fake_hash_full_test
+            - test-ledger_catchup_integration_tests
             - test-posig_integration_tests
             - test-postake_integration_tests
             - test-postake_split_integration_tests
