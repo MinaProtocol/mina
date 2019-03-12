@@ -6,12 +6,12 @@ author: Izaak Meckler
 author_website: https://twitter.com/imeckler
 ---
 
-In Coda, we use the proof-of-stake protocol Ouoroborous for consensus.
+In Coda, we use the proof-of-stake protocol Ouroboros for consensus.
 Naturally since this is Coda, that means we have to check proofs-of-stake inside
 a SNARK.
 
 A proof-of-stake for a person with some amount of stake $a$
-in Ouoroborous is a random number $s$ between 0 and 1
+in Ouroboros is a random number $s$ between 0 and 1
 (which one provably has generated fairly) such that $s$ is
 less than some threshold depending on $a$. Concretely, that
 threshold is $1 - (1/2)^{\frac{a}{T}}$ where $T$ is the total amount of
@@ -30,7 +30,7 @@ All the code for doing what we'll talk about is implemented using
 
 The technique will go as follows:
 
-1. We'll use Taylor series to reduce the problem to doing arithmetic with
+1. We'll use Taylor series to approximately reduce the problem to doing arithmetic with
   real numbers.
 2. We'll approximate the arithmetic of real numbers using the arithmetic
   of rational numbers.
@@ -44,7 +44,7 @@ The technique will go as follows:
 First we need a way to reduce the problem of computing an exponentiation to
 multiplications and additions in a finite field. As a first step, calculus
 lets us reduce exponentiation to multiplication and addition over the
-real numbers (a field, but not a finite one) using a [Taylor series]().
+real numbers (a field, but not a finite one) using a [Taylor series](https://en.wikipedia.org/wiki/Taylor_series).
 
 Specifically, we know that
 
@@ -87,7 +87,7 @@ Multiplication and addition are continuous, which means if you change the
 inputs by only a little bit, the outputs change by only a little bit.
 
 Explicitly, if instead of computing $x_1 + x_2$, we compute
-$a_1 + a_2$ where $a_i $ is $x_i$ plus some small error $e_i$, we have
+$a_1 + a_2$ where $a_i$ is $x_i$ plus some small error $e_i$, we have
 $a_1 + a_2 = (x_1 + e_1) + (x_2 + e_2) = (x_1 + x_2) + (e_1 + e_2)$ so
 the result is close to $x_1 + x_2$ (since $e_1 + e_2$ is small).
 
@@ -163,7 +163,10 @@ our prime order field $\mathbb{F}_p$. But this step is actually the easiest!
 As long as we are careful about numbers not overflowing, it's the same thing.
 That is, if we know ahead of time that $a + b < p$, then we can safely
 compute $a + b \mod p$, knowing that the result will be the same as over the integers.
-The same is true for multiplication.
+The same is true for multiplication. So as long as we don't do too many multiplications,
+the integers representing the dyadic rationals we're computing with won't get too big,
+and so we will be okay. And if we don't take too many terms of the Taylor series, this
+will be the case.
 
 ## Conclusion
 
