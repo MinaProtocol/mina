@@ -35,7 +35,13 @@ module type Transition_frontier_intf = sig
 end
 
 module type User_command_intf = sig
-  type t [@@deriving sexp, bin_io]
+  module Stable : sig
+    module Latest : sig
+      type t [@@deriving sexp, bin_io]
+    end
+  end
+
+  type t = Stable.Latest.t [@@deriving sexp]
 
   include Comparable.S with type t := t
 
@@ -267,7 +273,7 @@ struct
   let transactions t = Sequence.unfold ~init:t.pool.heap ~f:Fheap.pop
 
   module Diff = struct
-    type t = User_command.t list [@@deriving bin_io, sexp]
+    type t = User_command.Stable.Latest.t list [@@deriving bin_io, sexp]
 
     let summary t =
       Printf.sprintf "Transaction diff of length %d" (List.length t)
@@ -384,7 +390,12 @@ let%test_module _ =
 
     module Test =
       Make0 (struct
-          include Int
+          module Stable = struct
+            module Latest = Int
+          end
+
+          include (Int : module type of Int with module Stable := Int.Stable)
+
           module With_valid_signature = Int
 
           let check = Option.some
