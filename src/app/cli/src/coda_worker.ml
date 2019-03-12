@@ -217,7 +217,9 @@ module T = struct
       in
       let banlist = Coda_base.Banlist.create ~suspicious_dir ~punished_dir in
       let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
-      let time_controller = Main.Inputs.Time.Controller.create () in
+      let time_controller =
+        Main.Inputs.Time.Controller.create Main.Inputs.Time.Controller.basic
+      in
       let net_config =
         { Main.Inputs.Net.Config.parent_log= log
         ; time_controller

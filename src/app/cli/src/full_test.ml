@@ -72,7 +72,9 @@ let run_test () : unit Deferred.t =
         Coda_base.Receipt_chain_database.create
           ~directory:receipt_chain_dir_name
       in
-      let time_controller = Inputs.Time.Controller.create () in
+      let time_controller =
+        Inputs.Time.Controller.create Inputs.Time.Controller.basic
+      in
       let net_config =
         { Inputs.Net.Config.parent_log= log
         ; time_controller

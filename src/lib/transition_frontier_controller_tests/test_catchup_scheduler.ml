@@ -24,7 +24,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
   ( module struct
     let logger = Logger.null ()
 
-    let time_controller = Time.Controller.create ()
+    let time_controller = Time.Controller.basic
 
     let timeout_duration = Time.Span.of_ms 200L
 

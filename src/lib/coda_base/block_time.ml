@@ -1,3 +1,6 @@
+[%%import
+"../../config.mlh"]
+
 open Util
 open Core_kernel
 open Snark_params
@@ -34,9 +37,36 @@ module Time = struct
   end
 
   module Controller = struct
+    [%%if
+    time_offsets]
+
+    type t = Time.Span.t Lazy.t
+
+    let create offset = offset
+
+    [%%inject
+    "genesis_state_timestamp_string", genesis_state_timestamp]
+
+    let basic =
+      lazy
+        (let genesis_state_timestamp =
+           let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
+           Core.Time.of_string_gen
+             ~if_no_timezone:(`Use_this_one default_timezone)
+             genesis_state_timestamp_string
+         in
+         Core_kernel.Time.diff (Core_kernel.Time.now ())
+           genesis_state_timestamp)
+
+    [%%else]
+
     type t = unit
 
     let create () = ()
+
+    let basic = ()
+
+    [%%endif]
   end
 
   (* DO NOT add bin_io the deriving list *)
@@ -128,7 +158,16 @@ module Time = struct
     Time.of_span_since_epoch
       (Time.Span.of_ms (Int64.to_float (UInt64.to_int64 t)))
 
+  [%%if
+  time_offsets]
+
+  let now offset = of_time (Time.sub (Time.now ()) (Lazy.force offset))
+
+  [%%else]
+
   let now _ = of_time (Time.now ())
+
+  [%%endif]
 
   let field_var_to_unpacked (x : Tick.Field.Var.t) =
     Tick.Field.Checked.unpack ~length:64 x

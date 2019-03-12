@@ -448,7 +448,7 @@ struct
     let limit = Block_time.Span.of_time_span (Core.Time.Span.of_sec 15.)
 
     let validate t =
-      let now = Block_time.now () in
+      let now = Block_time.now Block_time.Controller.basic in
       (* t should be at most [limit] greater than now *)
       Block_time.Span.( < ) (Block_time.diff t now) limit
   end
