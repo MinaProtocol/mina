@@ -44,19 +44,10 @@ module Time = struct
 
     let create offset = offset
 
-    [%%inject
-    "genesis_state_timestamp_string", genesis_state_timestamp]
-
     let basic =
       lazy
-        (let genesis_state_timestamp =
-           let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
-           Core.Time.of_string_gen
-             ~if_no_timezone:(`Use_this_one default_timezone)
-             genesis_state_timestamp_string
-         in
-         Core_kernel.Time.diff (Core_kernel.Time.now ())
-           genesis_state_timestamp)
+        ( Core_kernel.Time.Span.of_int_sec @@ Int.of_string
+        @@ Unix.getenv "CODA_TIME_OFFSET" )
 
     [%%else]
 
