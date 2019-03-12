@@ -13,11 +13,6 @@ module Rpcs (Inputs : sig
 
   module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
 
-  module Staged_ledger_hash :
-    Protocols.Coda_pow.Staged_ledger_hash_intf
-    with type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
-     and type ledger_hash := Ledger_hash.t
-
   module Blockchain_state : Blockchain_state.S
 
   module External_transition : External_transition.S
@@ -39,7 +34,8 @@ struct
 
       module T = struct
         (* "master" types, do not change *)
-        type query = Staged_ledger_hash.t Envelope.Incoming.Stable.V1.t
+        type query =
+          Staged_ledger_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
 
         type response = (Staged_ledger_aux.t * Ledger_hash.t) option
       end
@@ -59,7 +55,8 @@ struct
 
     module V1 = struct
       module T = struct
-        type query = Staged_ledger_hash.t Envelope.Incoming.Stable.V1.t
+        type query =
+          Staged_ledger_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
         [@@deriving bin_io]
 
         type response = (Staged_ledger_aux.t * Ledger_hash.t) option
@@ -311,11 +308,9 @@ module type Inputs_intf = sig
 
   module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
 
-  module Staged_ledger_hash :
-    Protocols.Coda_pow.Staged_ledger_hash_intf
-    with type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
-     and type ledger_hash := Ledger_hash.t
-
+  (* we omit Staged_ledger_hash, because the available module in Inputs is not versioned; instead, in the
+     versioned RPC modules, we use a specific version
+   *)
   module Blockchain_state : Coda_base.Blockchain_state.S
 
   module Staged_ledger_aux : sig
