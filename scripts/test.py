@@ -3,6 +3,8 @@
 import argparse
 import jinja2
 import os
+import subprocess
+import sys
 import time
 
 build_artifact_profiles = [
@@ -87,18 +89,24 @@ def filter_test_permutations(whitelist_filters, blacklist_filters):
     return result
 
 def run(args):
-    def run_cmd(ctx, cmd, log, filter):
+    # wraps a "wet" action, printing if dry run is set, executing otherwise
+    def wet(msg, f):
         if args.dry_run:
-            print('      $', cmd)
+            print(msg)
         else:
-            if os.system(cmd) != 0:
-                filter_cmd = '| ./scripts/jqproc.sh' if filter else ''
-                os.system('cat %s %s' % (log, filter_cmd))
-                fail('%s failed' % ctx)
+            f()
+
+    def run_cmd(cmd, on_failure):
+        def do():
+            if subprocess.call(cmd, shell=True, stdout=sys.stdout, stderr=sys.stderr) != 0:
+                on_failure()
+        wet('$ ' + cmd, do)
 
     coda_exe_path = 'src/app/cli/src/coda.exe'
     coda_build_path = './_build/default'
     coda_exe = os.path.join(coda_build_path, coda_exe_path)
+
+    jq_filter = '.level=="Warn" or .level=="Error" or .level=="Faulty_peer" or .level=="Fatal"'
 
     test_permutations = filter_test_permutations([args.test_pattern], [args.blacklist_pattern])
     if len(test_permutations) == 0:
@@ -110,9 +118,9 @@ def run(args):
 
     print('Preparing to run the following tests:')
     for (profile, tests) in test_permutations.items():
-        print(' - %s:' % profile)
+        print('- %s:' % profile)
         for test in tests:
-            print('    %s' % test)
+            print('  - %s' % test)
 
     timestamp = int(time.time())
     print('======================================')
@@ -120,33 +128,31 @@ def run(args):
     print('======================================')
 
     log_dir = os.path.join('test_logs', str(timestamp))
-    if not(args.dry_run):
+    def make_log_dir():
         if os.path.exists(log_dir):
             fail('test log directory already exists -- how???')
         os.makedirs(log_dir)
+    wet('make new directory: ' + log_dir, make_log_dir)
 
     for profile in test_permutations.keys():
         profile_dir = os.path.join(log_dir, profile)
-        if not(args.dry_run):
-            os.mkdir(profile_dir)
+        wet('make directory: ' + profile_dir, lambda: os.mkdir(profile_dir))
 
+        print('- %s:' % profile)
         build_log = os.path.join(profile_dir, 'build.log')
-        print(' - %s:' % profile)
         run_cmd(
-            'building profile %s' % profile,
-            'dune build --profile=%s %s 2> %s' % (profile, coda_exe_path, build_log),
-            build_log,
-            False
+            'dune build --display=progress --profile=%s %s 2> %s'
+                % (profile, coda_exe_path, build_log),
+            lambda: fail_with_log('building %s failed' % profile, build_log)
         )
 
         for test in test_permutations[profile]:
-            test_log = os.path.join(profile_dir, '%s.log' % test)
-            print('    %s' % test)
+            print('  - %s' % test)
+            log = os.path.join(profile_dir, '%s.log' % test)
             run_cmd(
-                'running test %s:%s' % (profile, test),
-                '%s integration-test %s 2>&1 > %s' % (coda_exe, test, test_log),
-                test_log,
-                True
+                'set -o pipefail && %s integration-test %s 2>&1 | tee \'%s\' | ./scripts/jqproc.sh -f \'%s\''
+                    % (coda_exe, test, log, jq_filter),
+                lambda: fail('test "%s:%s" failed' % (profile, test))
             )
 
     print('all tests ran successfully')
