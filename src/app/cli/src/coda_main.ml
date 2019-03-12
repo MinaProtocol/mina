@@ -256,10 +256,6 @@ module type Main_intf = sig
        and type staged_ledger_hash := Staged_ledger_hash.t
        and type fee_transfer_single := Fee_transfer.single
 
-    module Staged_ledger_hash : sig
-      type t [@@deriving sexp]
-    end
-
     module Staged_ledger :
       Protocols.Coda_pow.Staged_ledger_intf
       with type diff := Staged_ledger_diff.t
