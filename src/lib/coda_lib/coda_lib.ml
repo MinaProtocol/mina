@@ -18,6 +18,8 @@ module type Network_intf = sig
 
   type ledger_hash
 
+  type pending_coinbases
+
   type staged_ledger_hash
 
   type parallel_scan_state
@@ -90,7 +92,8 @@ module type Network_intf = sig
                           , state_body_hash list * state_with_witness )
                           Proof_carrying_data.t
                         * parallel_scan_state
-                        * ledger_hash )
+                        * ledger_hash
+                        * pending_coinbases )
                         Deferred.Option.t)
     -> t Deferred.t
 end
@@ -305,6 +308,7 @@ module type Inputs_intf = sig
      and type state_hash := Coda_base.State_hash.t
      and type state_body_hash := State_body_hash.t
      and type consensus_state := Consensus_mechanism.Consensus_state.value
+     and type pending_coinbases := Pending_coinbase.t
 
   module Transition_router :
     Protocols.Coda_transition_frontier.Transition_router_intf
@@ -651,10 +655,16 @@ module Make (Inputs : Inputs_intf) = struct
                         (Transition_frontier.root frontier)
                     in
                     let scan_state = Staged_ledger.scan_state staged_ledger in
+                    let pending_coinbase_collection =
+                      Staged_ledger.pending_coinbase_collection staged_ledger
+                    in
                     let merkle_root =
                       Ledger.merkle_root (Staged_ledger.ledger staged_ledger)
                     in
-                    (peer_root_with_proof, scan_state, merkle_root)
+                    ( peer_root_with_proof
+                    , scan_state
+                    , merkle_root
+                    , pending_coinbase_collection )
                   in
                   Deferred.return result )
             in

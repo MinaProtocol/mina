@@ -187,6 +187,7 @@ struct
     module Staged_ledger = Staged_ledger
     module Pending_coinbase_stack_state = Pending_coinbase_stack_state
     module Pending_coinbase_hash = Pending_coinbase_hash
+    module Pending_coinbase = Pending_coinbase
 
     let max_length = Inputs.max_length
   end
@@ -319,6 +320,7 @@ struct
     let root_transaction_snark_scan_state =
       Staged_ledger.Scan_state.empty ()
     in
+    let root_pending_coinbases = Pending_coinbase.create_exn () in
     let genesis_protocol_state_with_hash =
       Consensus.For_tests.create_genesis_protocol_state
         (Ledger.of_database root_snarked_ledger)
@@ -362,10 +364,10 @@ struct
     let open Deferred.Let_syntax in
     let expected_merkle_root = Ledger.Db.merkle_root root_snarked_ledger in
     match%map
-      Staged_ledger.of_scan_state_and_snarked_ledger
+      Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
         ~scan_state:root_transaction_snark_scan_state
         ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
-        ~expected_merkle_root
+        ~expected_merkle_root ~pending_coinbases:root_pending_coinbases
     with
     | Ok root_staged_ledger ->
         let frontier =
@@ -499,7 +501,10 @@ struct
            let merkle_root =
              Ledger.merkle_root (Staged_ledger.ledger staged_ledger)
            in
-           (peer_root_with_proof, scan_state, merkle_root))
+           let pending_coinbases =
+             Staged_ledger.pending_coinbase_collection staged_ledger
+           in
+           (peer_root_with_proof, scan_state, merkle_root, pending_coinbases))
 
     let glue_sync_ledger {table; logger; _} query_reader response_writer : unit
         =

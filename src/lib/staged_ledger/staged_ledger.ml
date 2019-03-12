@@ -318,8 +318,8 @@ end = struct
     in
     return t
 
-  let of_scan_state_and_snarked_ledger ~scan_state ~snarked_ledger
-      ~expected_merkle_root =
+  let of_scan_state_pending_coinbases_and_snarked_ledger ~scan_state
+      ~snarked_ledger ~expected_merkle_root ~pending_coinbases =
     let open Deferred.Or_error.Let_syntax in
     let snarked_ledger_hash = Ledger.merkle_root snarked_ledger in
     let snarked_frozen_ledger_hash =
@@ -344,10 +344,9 @@ end = struct
                   Got:%{sexp:Ledger_hash.t}"
                 expected_merkle_root staged_ledger_hash)
     in
-    (*TODO get pending coinbase information*)
-    let pending_coinbase_collection = Pending_coinbase.create_exn () in
     of_scan_state_and_ledger ~snarked_ledger_hash:snarked_frozen_ledger_hash
-      ~ledger:snarked_ledger ~scan_state ~pending_coinbase_collection
+      ~ledger:snarked_ledger ~scan_state
+      ~pending_coinbase_collection:pending_coinbases
 
   let copy {scan_state; ledger; pending_coinbase_collection} =
     let new_mask = Ledger.Mask.create () in
@@ -355,7 +354,6 @@ end = struct
     ; ledger= Ledger.register_mask ledger new_mask
     ; pending_coinbase_collection }
 
-  (*TODO:Make pending_coinbase part of the hash?*)
   let hash {scan_state; ledger; pending_coinbase_collection} :
       Staged_ledger_hash.t =
     Staged_ledger_hash.of_aux_ledger_and_coinbase_hash

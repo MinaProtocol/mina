@@ -41,6 +41,7 @@ module type Inputs_intf = sig
      and type sync_ledger_query := Sync_ledger.query
      and type sync_ledger_answer := Sync_ledger.answer
      and type parallel_scan_state := Staged_ledger.Scan_state.t
+     and type pending_coinbases := Pending_coinbase.t
 
   module Time : Time_intf
 
@@ -122,7 +123,8 @@ module Make (Inputs : Inputs_intf) : sig
                            Pipe_lib.Strict_pipe.Reader.t
       -> result:( Frozen_ledger_hash.t
                 * Ledger_hash.t
-                * Staged_ledger.Scan_state.t )
+                * Staged_ledger.Scan_state.t
+                * Pending_coinbase.t )
                 Mvar.Read_write.t
       -> unit Deferred.t
   end
@@ -140,7 +142,8 @@ end = struct
   type syncing_data =
     { snarked_ledger_hash: Frozen_ledger_hash.t
     ; staged_ledger_merkle_root: Ledger_hash.t
-    ; scan_state: Staged_ledger.Scan_state.t }
+    ; scan_state: Staged_ledger.Scan_state.t
+    ; pending_coinbases: Pending_coinbase.t }
 
   module Transition_cache = Transition_cache.Make (Inputs)
 
@@ -178,7 +181,11 @@ end = struct
           @@ Logger.error t.logger
                !"Could not get the proof of root from the network: %s"
                (Error.to_string_hum e)
-      | Ok (peer_root_with_proof, scan_state, staged_ledger_merkle_root) -> (
+      | Ok
+          ( peer_root_with_proof
+          , scan_state
+          , staged_ledger_merkle_root
+          , pending_coinbases ) -> (
           match%map
             Root_prover.verify ~logger:t.logger ~observed_state:candidate_state
               ~peer_root:peer_root_with_proof
@@ -202,7 +209,8 @@ end = struct
                   (Staged_ledger_hash.Aux_hash.of_bytes
                      (Staged_ledger_aux_hash.to_bytes
                         (Staged_ledger.Scan_state.hash scan_state)))
-                  staged_ledger_merkle_root Pending_coinbase.Hash.empty_hash (*TODO: get pending coinbase colelction from the network*)
+                  staged_ledger_merkle_root
+                  (Coda_base.Pending_coinbase.merkle_root pending_coinbases)
               in
               if
                 Staged_ledger_hash.equal expected_staged_ledger_hash
@@ -219,7 +227,8 @@ end = struct
                    @@ `Syncing
                         { snarked_ledger_hash
                         ; staged_ledger_merkle_root
-                        ; scan_state }
+                        ; scan_state
+                        ; pending_coinbases }
               else (
                 (* TODO: punish! *)
                 Logger.faulty_peer t.logger
@@ -265,9 +274,15 @@ end = struct
                  transition)
           with
           | `Syncing
-              {snarked_ledger_hash; staged_ledger_merkle_root; scan_state} ->
+              { snarked_ledger_hash
+              ; staged_ledger_merkle_root
+              ; scan_state
+              ; pending_coinbases } ->
               Mvar.set result
-                (snarked_ledger_hash, staged_ledger_merkle_root, scan_state)
+                ( snarked_ledger_hash
+                , staged_ledger_merkle_root
+                , scan_state
+                , pending_coinbases )
           | `Ignored -> ()
         else Deferred.unit )
 
@@ -300,7 +315,10 @@ end = struct
       Root_sync_ledger.destroy root_sync_ledger ;
       synced_db
     in
-    let%bind snarked_ledger_hash, expected_merkle_root, scan_state =
+    let%bind ( snarked_ledger_hash
+             , expected_merkle_root
+             , scan_state
+             , pending_coinbases ) =
       Mvar.take result
     in
     assert (
@@ -319,9 +337,10 @@ end = struct
           verified_root )
     in
     match%map
-      Staged_ledger.of_scan_state_and_snarked_ledger ~scan_state
+      Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
+        ~scan_state
         ~snarked_ledger:(Ledger.of_database synced_db)
-        ~expected_merkle_root
+        ~expected_merkle_root ~pending_coinbases
     with
     | Ok root_staged_ledger ->
         let new_frontier =

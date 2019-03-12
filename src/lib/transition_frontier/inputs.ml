@@ -6,11 +6,9 @@ open Signature_lib
 module type Inputs_intf = sig
   module Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf
 
-  module Pending_coinbase_hash : Pending_coinbase_hash_intf
-
   module Pending_coinbase_stack_state :
     Pending_coinbase_stack_state_intf
-    with type pending_coinbase_hash := Pending_coinbase.Stack.t
+    with type pending_coinbase_stack := Pending_coinbase.Stack.t
 
   module Ledger_proof_statement :
     Ledger_proof_statement_intf

@@ -38,6 +38,7 @@ module type Inputs_intf = sig
      and type sync_ledger_query := Sync_ledger.query
      and type sync_ledger_answer := Sync_ledger.answer
      and type parallel_scan_state := Staged_ledger.Scan_state.t
+     and type pending_coinbases := Pending_coinbase.t
 
   module Catchup :
     Catchup_intf

@@ -416,9 +416,9 @@ module type Transaction_intf = sig
 end
 
 module type Pending_coinbase_stack_state_intf = sig
-  type pending_coinbase_hash
+  type pending_coinbase_stack
 
-  type t = {source: pending_coinbase_hash; target: pending_coinbase_hash}
+  type t = {source: pending_coinbase_stack; target: pending_coinbase_stack}
   [@@deriving sexp, bin_io, compare]
 end
 
@@ -925,10 +925,11 @@ module type Staged_ledger_intf = sig
 
   val statement_exn : t -> [`Non_empty of ledger_proof_statement | `Empty]
 
-  val of_scan_state_and_snarked_ledger :
+  val of_scan_state_pending_coinbases_and_snarked_ledger :
        scan_state:Scan_state.t
     -> snarked_ledger:ledger
     -> expected_merkle_root:ledger_hash
+    -> pending_coinbases:pending_coinbase_collection
     -> t Or_error.t Deferred.t
 end
 
@@ -1512,7 +1513,7 @@ module type Inputs_intf = sig
 
   module Pending_coinbase_stack_state :
     Pending_coinbase_stack_state_intf
-    with type pending_coinbase_hash := Pending_coinbase.Stack.t
+    with type pending_coinbase_stack := Pending_coinbase.Stack.t
 
   module Pending_coinbase_update :
     Pending_coinbase_update_intf

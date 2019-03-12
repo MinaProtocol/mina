@@ -634,6 +634,7 @@ struct
     module External_transition = External_transition
     module Staged_ledger = Staged_ledger
     module Pending_coinbase_stack_state = Pending_coinbase_stack_state
+    module Pending_coinbase = Pending_coinbase
 
     let max_length = max_length
   end)
