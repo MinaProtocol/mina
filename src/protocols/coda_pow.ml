@@ -25,7 +25,7 @@ module type Time_controller_intf = sig
 
   type t
 
-  val create : unit -> t
+  val create : t -> t
 
   val basic : t
 
