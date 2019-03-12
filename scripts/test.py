@@ -3,6 +3,7 @@
 import argparse
 import jinja2
 import os
+import time
 
 build_artifact_profiles = [
     'dev',
@@ -86,23 +87,67 @@ def filter_test_permutations(whitelist_filters, blacklist_filters):
     return result
 
 def run(args):
-    test_permutations = filter_test_permutations([args.test_pattern], [args.blacklist_pattern])
-
-    def run_cmd(ctx, cmd):
+    def run_cmd(ctx, cmd, log, filter):
         if args.dry_run:
-            print(cmd)
+            print('      $', cmd)
         else:
             if os.system(cmd) != 0:
+                filter_cmd = '| ./scripts/jqproc.sh' if filter else ''
+                os.system('cat %s %s' % (log, filter_cmd))
                 fail('%s failed' % ctx)
 
     coda_exe_path = 'src/app/cli/src/coda.exe'
     coda_build_path = './_build/default'
     coda_exe = os.path.join(coda_build_path, coda_exe_path)
 
+    test_permutations = filter_test_permutations([args.test_pattern], [args.blacklist_pattern])
+    if len(test_permutations) == 0:
+        # TODO: support direct test dispatching
+        if args.test_pattern:
+            fail('no tests were selected -- whitelist pattern did not match any known tests')
+        else:
+            fail('no tests were selected -- blacklist is too restrictive')
+
+    print('Preparing to run the following tests:')
+    for (profile, tests) in test_permutations.items():
+        print(' - %s:' % profile)
+        for test in tests:
+            print('    %s' % test)
+
+    timestamp = int(time.time())
+    print('======================================')
+    print('=============', timestamp, '=============')
+    print('======================================')
+
+    log_dir = os.path.join('test_logs', str(timestamp))
+    if not(args.dry_run):
+        if os.path.exists(log_dir):
+            fail('test log directory already exists -- how???')
+        os.makedirs(log_dir)
+
     for profile in test_permutations.keys():
-        run_cmd('building profile %s' % profile, 'dune build --profile=%s %s' % (profile, coda_exe_path))
+        profile_dir = os.path.join(log_dir, profile)
+        if not(args.dry_run):
+            os.mkdir(profile_dir)
+
+        build_log = os.path.join(profile_dir, 'build.log')
+        print(' - %s:' % profile)
+        run_cmd(
+            'building profile %s' % profile,
+            'dune build --profile=%s %s 2> %s' % (profile, coda_exe_path, build_log),
+            build_log,
+            False
+        )
+
         for test in test_permutations[profile]:
-            run_cmd('running test %s:%s' % (profile, test), '%s integration-test %s' % (coda_exe, test))
+            test_log = os.path.join(profile_dir, '%s.log' % test)
+            print('    %s' % test)
+            run_cmd(
+                'running test %s:%s' % (profile, test),
+                '%s integration-test %s 2>&1 > %s' % (coda_exe, test, test_log),
+                test_log,
+                True
+            )
 
     print('all tests ran successfully')
 
