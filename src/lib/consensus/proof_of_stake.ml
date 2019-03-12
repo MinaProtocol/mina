@@ -1529,9 +1529,19 @@ module For_tests = struct
       ; curr_epoch_data }
 end
 
+let should_bootstrap_len ~existing ~candidate =
+  let length = Length.to_int in
+  length candidate - length existing > (2 * Constants.k) + Constants.delta
+
 let should_bootstrap ~existing ~candidate =
-  let length = Fn.compose Length.to_int Consensus_state.length in
-  length existing - length candidate > (2 * Constants.k) + Constants.delta
+  should_bootstrap_len
+    ~existing:(Consensus_state.length existing)
+    ~candidate:(Consensus_state.length candidate)
+
+let%test "should_bootstrap is sane" =
+  (* Even when consensus constants are of prod sizes, candidate should still trigger a bootstrap *)
+  should_bootstrap_len ~existing:Length.zero
+    ~candidate:(Length.of_int 100_000_000)
 
 let to_unix_timestamp recieved_time =
   recieved_time |> Time.to_span_since_epoch |> Time.Span.to_ms
