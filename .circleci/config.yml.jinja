@@ -86,8 +86,8 @@ jobs:
                   name: Run all tests (on master)
                   command: echo "FIXME Tests not yet working on mac"
 
-    {%- for profile in build_profiles %}
-    build_{{profile}}:
+    {%- for profile in build_artifact_profiles %}
+    build_artifacts_{{profile}}:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -136,8 +136,9 @@ jobs:
                   name: Test make test-runtest
                   command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless MYPROCS=8 make test-runtest
 
-    {%-for test in tests%}
-    test-{{test.name}}:
+    {%- for profile in test_permutations.keys() %}
+    {%- for test in test_permutations[profile] %}
+    "test-{{profile}}:{{test}}":
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -145,16 +146,9 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Check .circleci Render
-                  command: make check-render-circleci
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE={{test.config}} make build 2>&1 | tee /tmp/buildocaml.log
-            {%- for action in test.actions %}
-            - run:
-                  name: Running test - {{ test.friendly }} | {{ action }}
-                  command: source ~/.profile && export DUNE_PROFILE={{test.config}} && source scripts/test_all.sh && cd src/ && 'run_integration_test' '{{ action }}'
-            {% endfor %}
+                  name: Running test - {{profile}}:{{test}}
+                  command: source ~/.profile && ./scripts/test.py '{{profile}}:{{test}}'
+    {%- endfor %}
     {%- endfor %}
 
 workflows:

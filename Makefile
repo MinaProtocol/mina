@@ -147,7 +147,7 @@ toolchains: docker-toolchain docker-toolchain-rust docker-toolchain-haskell
 
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
-	cd .circleci; python2 render.py > config.yml
+	make render-circleci
 
 # Local 'codabuilder' docker image (based off docker-toolchain)
 codabuilder: git_hooks
@@ -214,10 +214,7 @@ codaslim:
 ## Tests
 
 render-circleci:
-	cd .circleci; python2 render.py > config.yml
-
-check-render-circleci:
-	cd .circleci; ./check_render.sh
+	./scripts/test.py render .circleci/config.yml.jinja
 
 test:
 	$(WRAP) make test-all
