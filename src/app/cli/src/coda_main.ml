@@ -1112,7 +1112,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       (verifying_txn : User_command.t) proof =
     let open Participating_state.Let_syntax in
     let%map account = get_account t addr in
-    let account = account |> Option.value_exn in
+    let account = Option.value_exn account in
     let resulting_receipt = Account.receipt_chain_hash account in
     let open Or_error.Let_syntax in
     let%bind () = Payment_verifier.verify ~resulting_receipt proof in

@@ -276,7 +276,8 @@ module T = struct
         let build_txn amount sender_sk receiver_pk fee =
           let nonce =
             Run.get_nonce coda (pk_of_sk sender_sk)
-            |> Participating_state.active_exn |> Option.value_exn
+            |> Participating_state.active_exn
+            |> Option.value_exn ?here:None ?message:None ?error:None
           in
           let payload : User_command.Payload.t =
             User_command.Payload.create ~fee ~nonce ~memo
