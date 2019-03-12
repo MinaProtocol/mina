@@ -20,7 +20,7 @@ let main () =
     Coda_worker_testnet.test log n Option.some snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
   in
-  after (Time.Span.of_min 45.)
+  after (Time.Span.of_min 10.)
 
 let command =
   let open Command.Let_syntax in
