@@ -75,7 +75,7 @@ let binary_expansion x =
       Some (b, Bignum.(rem, pt / two)) )
 
 module Params = struct
-  type params =
+  type t =
     { total_precision: int
     ; per_term_precision: int
     ; terms_needed: int
@@ -123,6 +123,20 @@ module Exp (M : Snark_intf.Run) = struct
         else None )
 
   let m : M.field m = (module M)
+
+  module Unchecked = struct
+    let one_minus_exp_unchecked (params : Params.t) x =
+      let denom =
+        Bignum.(of_bigint B.(shift_left one params.per_term_precision))
+      in
+      Array.fold params.coefficients ~init:(Bignum.zero, Bignum.one)
+        ~f:(fun (acc, x_i) (sgn, c) ->
+          let x_i = Bignum.(x_i * x) in
+          let c = Bignum.(of_bigint c / denom) in
+          let c = match sgn with `Pos -> c | `Neg -> Bignum.neg c in
+          (Bignum.(acc + (x_i * c)), x_i) )
+      |> fst
+  end
 
   let params base =
     let abs_log_base =
@@ -178,8 +192,8 @@ module Exp (M : Snark_intf.Run) = struct
     taylor_sum ~m powers coefficients
 
   let%test_unit "works" =
+    let params = params Bignum.(one / of_int 2) in
     let c () =
-      let params = params Bignum.(one / of_int 2) in
       let arg =
         Floating_point.of_quotient ~m
           ~top:(Integer.of_bits ~m Boolean.[true_])
@@ -188,7 +202,11 @@ module Exp (M : Snark_intf.Run) = struct
       in
       Floating_point.to_bignum ~m (one_minus_exp params arg)
     in
-    M.run_and_check c |> Or_error.ok_exn |> ignore
+    let res = M.run_and_check c |> Or_error.ok_exn in
+    assert (
+      Bignum.(
+        equal res (Unchecked.one_minus_exp_unchecked params (one / of_int 2)))
+    )
 end
 
 let%test_unit "instantiate" =
