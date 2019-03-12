@@ -283,7 +283,7 @@ end = struct
           val verify :
                Ledger_proof.t
             -> Ledger_proof_statement.t
-            -> message:Sok_message.Stable.Latest.t
+            -> message:Sok_message.t
             -> sexp_bool M.t
       end) =
   struct
