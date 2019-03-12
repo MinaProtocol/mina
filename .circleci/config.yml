@@ -276,7 +276,7 @@ jobs:
             - run:
                   name: Test make test-runtest
                   command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless MYPROCS=8 make test-runtest
-    "test-fake_hash:full-test":
+    test-fake_hash-full-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -286,7 +286,7 @@ jobs:
             - run:
                   name: Running test - fake_hash:full-test
                   command: source ~/.profile && ./scripts/test.py 'fake_hash:full-test'
-    "test-test_posig_snarkless:full-test":
+    test-test_posig_snarkless-full-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -296,7 +296,7 @@ jobs:
             - run:
                   name: Running test - test_posig_snarkless:full-test
                   command: source ~/.profile && ./scripts/test.py 'test_posig_snarkless:full-test'
-    "test-test_posig_snarkless:transaction-snark-profiler -check-only":
+    test-test_posig_snarkless-transaction-snark-profiler:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -306,7 +306,7 @@ jobs:
             - run:
                   name: Running test - test_posig_snarkless:transaction-snark-profiler -check-only
                   command: source ~/.profile && ./scripts/test.py 'test_posig_snarkless:transaction-snark-profiler -check-only'
-    "test-test_posig_snarkless:coda-peers-test":
+    test-test_posig_snarkless-coda-peers-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -316,7 +316,7 @@ jobs:
             - run:
                   name: Running test - test_posig_snarkless:coda-peers-test
                   command: source ~/.profile && ./scripts/test.py 'test_posig_snarkless:coda-peers-test'
-    "test-test_posig_snarkless:coda-transitive-peers-test":
+    test-test_posig_snarkless-coda-transitive-peers-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -326,7 +326,7 @@ jobs:
             - run:
                   name: Running test - test_posig_snarkless:coda-transitive-peers-test
                   command: source ~/.profile && ./scripts/test.py 'test_posig_snarkless:coda-transitive-peers-test'
-    "test-test_posig_snarkless:coda-block-production-test":
+    test-test_posig_snarkless-coda-block-production-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -336,7 +336,7 @@ jobs:
             - run:
                   name: Running test - test_posig_snarkless:coda-block-production-test
                   command: source ~/.profile && ./scripts/test.py 'test_posig_snarkless:coda-block-production-test'
-    "test-test_posig_snarkless:coda-shared-prefix-test -who-proposes 0":
+    test-test_posig_snarkless-coda-shared-prefix-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -346,7 +346,7 @@ jobs:
             - run:
                   name: Running test - test_posig_snarkless:coda-shared-prefix-test -who-proposes 0
                   command: source ~/.profile && ./scripts/test.py 'test_posig_snarkless:coda-shared-prefix-test -who-proposes 0'
-    "test-test_posig_snarkless:coda-shared-prefix-test -who-proposes 1":
+    test-test_posig_snarkless-coda-shared-prefix-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -356,7 +356,7 @@ jobs:
             - run:
                   name: Running test - test_posig_snarkless:coda-shared-prefix-test -who-proposes 1
                   command: source ~/.profile && ./scripts/test.py 'test_posig_snarkless:coda-shared-prefix-test -who-proposes 1'
-    "test-test_posig_snarkless:coda-shared-state-test":
+    test-test_posig_snarkless-coda-shared-state-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -366,7 +366,7 @@ jobs:
             - run:
                   name: Running test - test_posig_snarkless:coda-shared-state-test
                   command: source ~/.profile && ./scripts/test.py 'test_posig_snarkless:coda-shared-state-test'
-    "test-test_postake_snarkless:full-test":
+    test-test_postake_snarkless-full-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -376,7 +376,7 @@ jobs:
             - run:
                   name: Running test - test_postake_snarkless:full-test
                   command: source ~/.profile && ./scripts/test.py 'test_postake_snarkless:full-test'
-    "test-test_postake_snarkless:transaction-snark-profiler -check-only":
+    test-test_postake_snarkless-transaction-snark-profiler:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -386,7 +386,7 @@ jobs:
             - run:
                   name: Running test - test_postake_snarkless:transaction-snark-profiler -check-only
                   command: source ~/.profile && ./scripts/test.py 'test_postake_snarkless:transaction-snark-profiler -check-only'
-    "test-test_postake_split_snarkless:coda-peers-test":
+    test-test_postake_split_snarkless-coda-peers-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -396,7 +396,7 @@ jobs:
             - run:
                   name: Running test - test_postake_split_snarkless:coda-peers-test
                   command: source ~/.profile && ./scripts/test.py 'test_postake_split_snarkless:coda-peers-test'
-    "test-test_postake_split_snarkless:coda-transitive-peers-test":
+    test-test_postake_split_snarkless-coda-transitive-peers-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -406,7 +406,7 @@ jobs:
             - run:
                   name: Running test - test_postake_split_snarkless:coda-transitive-peers-test
                   command: source ~/.profile && ./scripts/test.py 'test_postake_split_snarkless:coda-transitive-peers-test'
-    "test-test_postake_split_snarkless:coda-block-production-test":
+    test-test_postake_split_snarkless-coda-block-production-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -416,7 +416,7 @@ jobs:
             - run:
                   name: Running test - test_postake_split_snarkless:coda-block-production-test
                   command: source ~/.profile && ./scripts/test.py 'test_postake_split_snarkless:coda-block-production-test'
-    "test-test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 0":
+    test-test_postake_split_snarkless-coda-shared-prefix-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -426,7 +426,7 @@ jobs:
             - run:
                   name: Running test - test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 0
                   command: source ~/.profile && ./scripts/test.py 'test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 0'
-    "test-test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1":
+    test-test_postake_split_snarkless-coda-shared-prefix-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -436,7 +436,7 @@ jobs:
             - run:
                   name: Running test - test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1
                   command: source ~/.profile && ./scripts/test.py 'test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1'
-    "test-test_postake_split_snarkless:coda-shared-state-test":
+    test-test_postake_split_snarkless-coda-shared-state-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -446,7 +446,7 @@ jobs:
             - run:
                   name: Running test - test_postake_split_snarkless:coda-shared-state-test
                   command: source ~/.profile && ./scripts/test.py 'test_postake_split_snarkless:coda-shared-state-test'
-    "test-test_posig:full-test":
+    test-test_posig-full-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -456,7 +456,7 @@ jobs:
             - run:
                   name: Running test - test_posig:full-test
                   command: source ~/.profile && ./scripts/test.py 'test_posig:full-test'
-    "test-test_posig:transaction-snark-profiler -check-only":
+    test-test_posig-transaction-snark-profiler:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -466,7 +466,7 @@ jobs:
             - run:
                   name: Running test - test_posig:transaction-snark-profiler -check-only
                   command: source ~/.profile && ./scripts/test.py 'test_posig:transaction-snark-profiler -check-only'
-    "test-test_postake:full-test":
+    test-test_postake-full-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -476,7 +476,7 @@ jobs:
             - run:
                   name: Running test - test_postake:full-test
                   command: source ~/.profile && ./scripts/test.py 'test_postake:full-test'
-    "test-test_postake:transaction-snark-profiler -check-only":
+    test-test_postake-transaction-snark-profiler:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f

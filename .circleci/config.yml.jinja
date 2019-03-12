@@ -138,7 +138,7 @@ jobs:
 
     {%- for profile in test_permutations.keys() %}
     {%- for test in test_permutations[profile] %}
-    "test-{{profile}}:{{test}}":
+    test-{{profile}}-{{test.split(' ')[0]}}:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
