@@ -1,4 +1,4 @@
-(** Pending_coinbase is to keep track of all the coinbase transactions that have been applied to the ledger but for which there is no ledger proof yet. Every ledger proof corresponds to a sequence of coinbase transactions which is part of all the transactions it proves. Each of these sequences[Stack] are stored using the merkle tree representation. The stacks are operated in a FIFO manner by keeping track of its positions[Stack_pos] in the merkle tree. Whenever a ledger proof is emitted, the oldest stack is removed from the tree and when a new coinbase is applied, the latest stack is updated with the new coinbase.
+(** Pending_coinbase is to keep track of all the coinbase transactions that have been applied to the ledger but for which there is no ledger proof yet. Every ledger proof corresponds to a sequence of coinbase transactions which is part of all the transactions it proves. Each of these sequences[Stack] are stored using the merkle tree representation. The stacks are operated in a FIFO manner by keeping track of its positions in the merkle tree. Whenever a ledger proof is emitted, the oldest stack is removed from the tree and when a new coinbase is applied, the latest stack is updated with the new coinbase.
 The operations on the merkle tree of coinbase stacks include:
 1) adding a new singleton stack
 2) updating the latest stack when a new coinbase is added to it
@@ -26,39 +26,6 @@ module type S = sig
     type t = Public_key.Compressed.t * Amount.t [@@deriving sexp]
 
     type var = Public_key.Compressed.var * Amount.var
-  end
-
-  module Stack_pos : sig
-    (** Used for both numbering the stacks (as keys for the sparse ledger nodes) and as address of the nodes*)
-    type t
-
-    include Bits_intf.S with type t := t
-
-    val gen : t Quickcheck.Generator.t
-
-    module Vector : sig
-      type t = int
-
-      val length : t
-
-      val empty : t
-
-      val get : t -> t -> bool
-
-      val set : t -> t -> bool -> t
-    end
-
-    val fold_bits : t -> bool Fold.t
-
-    val fold : t -> (bool * bool * bool) Fold.t
-
-    module Unpacked : sig
-      type value = t
-
-      type var
-
-      include Snarkable.S with type value := value and type var := var
-    end
   end
 
   module rec Hash : sig
@@ -112,14 +79,22 @@ module type S = sig
 
     type path = Pedersen.Digest.t list
 
-    type _ Request.t +=
-      | Coinbase_stack_path : Stack_pos.t -> path Request.t
-      | Get_coinbase_stack : Stack_pos.t -> (Stack.t * path) Request.t
-      | Set_coinbase_stack : Stack_pos.t * Stack.t -> unit Request.t
-      | Find_index_of_newest_stack : bool -> Stack_pos.t Request.t
-      | Find_index_of_oldest_stack : Stack_pos.t Request.t
+    module Address : sig
+      type value
 
-    val get : var -> Stack_pos.Unpacked.var -> (Stack.var, _) Tick.Checked.t
+      type var
+
+      val typ : (var, t) Typ.t
+    end
+
+    type _ Request.t +=
+      | Coinbase_stack_path : Address.value -> path Request.t
+      | Get_coinbase_stack : Address.value -> (Stack.t * path) Request.t
+      | Set_coinbase_stack : Address.value * Stack.t -> unit Request.t
+      | Find_index_of_newest_stack : bool -> Address.value Request.t
+      | Find_index_of_oldest_stack : Address.value Request.t
+
+    val get : var -> Address.var -> (Stack.var, _) Tick.Checked.t
 
     val update_stack :
          var

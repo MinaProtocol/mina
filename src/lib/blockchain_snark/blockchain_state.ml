@@ -69,7 +69,7 @@ module Make (Consensus_mechanism : Consensus.S) :
         let%bind success =
           let%bind correct_transaction_snark =
             let%bind index_oldest_coinbase_stack =
-              request_witness Pending_coinbase.Stack_pos.Unpacked.typ
+              request_witness Pending_coinbase.Checked.Address.typ
                 As_prover.(
                   map (return ()) ~f:(fun _ ->
                       Pending_coinbase.Checked.Find_index_of_oldest_stack ))
