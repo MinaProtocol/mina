@@ -27,7 +27,8 @@ module Body = struct
     let%map amount =
       let min, max =
         let max_amount_without_overflow =
-          Amount.(sub max_int (of_fee fee)) |> Option.value_exn
+          Amount.(sub max_int (of_fee fee))
+          |> Option.value_exn ?here:None ?message:None ?error:None
         in
         match tag with
         | Payment -> (Amount.zero, max_amount_without_overflow)
@@ -160,7 +161,7 @@ module Changes = struct
     match tag with
     | Payment ->
         { sender_delta=
-            Amount.add_fee amount fee |> Option.value_exn
+            Option.value_exn (Amount.add_fee amount fee)
             |> Amount.Signed.of_unsigned |> Amount.Signed.negate
         ; receiver_increase= amount
         ; excess= Amount.Signed.of_unsigned (Amount.of_fee fee)
@@ -176,14 +177,15 @@ module Changes = struct
         { sender_delta= Amount.Signed.of_unsigned (Amount.of_fee fee)
         ; receiver_increase= amount
         ; excess=
-            Amount.add_fee amount fee |> Option.value_exn
+            Option.value_exn (Amount.add_fee amount fee)
             |> Amount.Signed.of_unsigned |> Amount.Signed.negate
         ; supply_increase= Amount.zero }
     | Coinbase ->
         let coinbase_amount = Amount.of_fee fee in
         { sender_delta=
             Amount.sub coinbase_amount amount
-            |> Option.value_exn |> Amount.Signed.of_unsigned
+            |> Option.value_exn ?here:None ?message:None ?error:None
+            |> Amount.Signed.of_unsigned
         ; receiver_increase= amount
         ; excess= Amount.Signed.zero
         ; supply_increase= coinbase_amount }
@@ -293,7 +295,7 @@ let excess (payload : t) : Amount.Signed.t =
   | Payment -> Amount.Signed.of_unsigned (Amount.of_fee fee)
   | Stake_delegation -> Amount.Signed.of_unsigned (Amount.of_fee fee)
   | Fee_transfer ->
-      Amount.add_fee amount fee |> Option.value_exn
+      Option.value_exn (Amount.add_fee amount fee)
       |> Amount.Signed.of_unsigned |> Amount.Signed.negate
   | Coinbase -> Amount.Signed.zero
 
