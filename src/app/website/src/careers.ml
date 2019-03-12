@@ -205,6 +205,8 @@ let content =
               create
                 [ Role.create "Engineering Manager"
                     "/jobs/engineering-manager.html"
+                ; Role.create "Community Manager"
+                    "/jobs/community-manager.html"
                 ; Role.create "Product Manager" "/jobs/product-manager.html"
                 ; Role.create "Senior Frontend Engineer"
                     "/jobs/senior-frontend-engineer.html"
