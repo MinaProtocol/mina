@@ -278,7 +278,8 @@ module For_tests = struct
         { Blockchain_state.genesis with
           staged_ledger_hash=
             Staged_ledger_hash.(
-              of_aux_and_ledger_hash Aux_hash.dummy root_ledger_hash)
+              of_aux_ledger_and_coinbase_hash Aux_hash.dummy root_ledger_hash
+                (Pending_coinbase.empty_merkle_root ()))
         ; snarked_ledger_hash=
             Frozen_ledger_hash.of_ledger_hash root_ledger_hash }
 end

@@ -551,9 +551,10 @@ module Make (Inputs : Inputs_intf) = struct
                     ; coinbase= Staged_ledger_diff.At_most_two.Zero }
                   , None )
               ; prev_hash=
-                  Staged_ledger_hash.of_aux_and_ledger_hash
+                  Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
                     (Staged_ledger_aux_hash.of_bytes "")
                     (Ledger.merkle_root Genesis_ledger.t)
+                    (Pending_coinbase.empty_merkle_root ())
               ; creator=
                   Account.public_key
                     (snd (List.hd_exn Genesis_ledger.accounts)) }

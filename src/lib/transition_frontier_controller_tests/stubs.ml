@@ -93,6 +93,7 @@ struct
     module Compressed_public_key = Public_key.Compressed
     module User_command = User_command
     module Transaction_snark_work = Transaction_snark_work
+    module Pending_coinbase_hash = Pending_coinbase_hash
   end)
 
   module External_transition =

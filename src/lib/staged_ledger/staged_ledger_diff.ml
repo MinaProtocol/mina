@@ -11,10 +11,13 @@ module Make (Inputs : sig
 
   module Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf
 
+  module Pending_coinbase_hash : Pending_coinbase_hash_intf
+
   module Staged_ledger_hash :
     Staged_ledger_hash_intf
     with type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
      and type ledger_hash := Ledger_hash.t
+     and type pending_coinbase_hash := Pending_coinbase_hash.t
 
   module Compressed_public_key : Compressed_public_key_intf
 

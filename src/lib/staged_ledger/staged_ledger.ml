@@ -356,10 +356,12 @@ end = struct
     ; pending_coinbase_collection }
 
   (*TODO:Make pending_coinbase part of the hash?*)
-  let hash {scan_state; ledger; _} : Staged_ledger_hash.t =
-    Staged_ledger_hash.of_aux_and_ledger_hash
+  let hash {scan_state; ledger; pending_coinbase_collection} :
+      Staged_ledger_hash.t =
+    Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
       (Scan_state.hash scan_state)
       (Ledger.merkle_root ledger)
+      (Pending_coinbase.merkle_root pending_coinbase_collection)
 
   [%%if
   call_logger]
@@ -1831,6 +1833,8 @@ let%test_module "test" =
 
         let to_bytes = Fn.id
 
+        let empty_hash = ""
+
         include Hashable.Make_binable (T)
       end
 
@@ -2143,13 +2147,18 @@ let%test_module "test" =
 
         type staged_ledger_aux_hash = Staged_ledger_aux_hash.t
 
+        type pending_coinbase_hash = Pending_coinbase_hash.t
+
         let ledger_hash _ = failwith "stub"
 
         let aux_hash _ = failwith "stub"
 
-        let of_aux_and_ledger_hash : staged_ledger_aux_hash -> ledger_hash -> t
+        let pending_coinbase_hash _ = failwith "stub"
+
+        let of_aux_ledger_and_coinbase_hash :
+            staged_ledger_aux_hash -> ledger_hash -> pending_coinbase_hash -> t
             =
-         fun ah h -> ah ^ Int.to_string h
+         fun ah h hh -> ah ^ Int.to_string h ^ hh
       end
 
       module Transaction_snark_work = struct

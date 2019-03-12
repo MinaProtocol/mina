@@ -198,11 +198,11 @@ end = struct
                    .staged_ledger_hash
               in
               let received_staged_ledger_hash =
-                Staged_ledger_hash.of_aux_and_ledger_hash
+                Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
                   (Staged_ledger_hash.Aux_hash.of_bytes
                      (Staged_ledger_aux_hash.to_bytes
                         (Staged_ledger.Scan_state.hash scan_state)))
-                  staged_ledger_merkle_root
+                  staged_ledger_merkle_root Pending_coinbase.Hash.empty_hash (*TODO: get pending coinbase colelction from the network*)
               in
               if
                 Staged_ledger_hash.equal expected_staged_ledger_hash

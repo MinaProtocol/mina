@@ -13,10 +13,13 @@ module Rpcs (Inputs : sig
 
   module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
 
+  module Pending_coinbase_hash : Protocols.Coda_pow.Pending_coinbase_hash_intf
+
   module Staged_ledger_hash :
     Protocols.Coda_pow.Staged_ledger_hash_intf
     with type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
      and type ledger_hash := Ledger_hash.t
+     and type pending_coinbase_hash := Pending_coinbase_hash.t
 
   module Blockchain_state : Blockchain_state.S
 
@@ -276,10 +279,13 @@ module type Inputs_intf = sig
 
   module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
 
+  module Pending_coinbase_hash : Protocols.Coda_pow.Pending_coinbase_hash_intf
+
   module Staged_ledger_hash :
     Protocols.Coda_pow.Staged_ledger_hash_intf
     with type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
      and type ledger_hash := Ledger_hash.t
+     and type pending_coinbase_hash := Pending_coinbase_hash.t
 
   module Blockchain_state : Coda_base.Blockchain_state.S
 

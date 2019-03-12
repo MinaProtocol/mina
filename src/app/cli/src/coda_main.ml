@@ -45,7 +45,10 @@ module Staged_ledger_hash = struct
 
   let aux_hash = Staged_ledger_hash.aux_hash
 
-  let of_aux_and_ledger_hash = Staged_ledger_hash.of_aux_and_ledger_hash
+  let pending_coinbase_hash = Staged_ledger_hash.pending_coinbase_hash
+
+  let of_aux_ledger_and_coinbase_hash =
+    Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
 end
 
 module Ledger_hash = struct
@@ -418,6 +421,7 @@ module Staged_ledger_diff = Staged_ledger.Make_diff (struct
   module User_command = User_command
   module Transaction_snark_work = Transaction_snark_work
   module Fee_transfer = Fee_transfer
+  module Pending_coinbase_hash = Pending_coinbase.Hash
 end)
 
 let make_init ~should_propose (module Config : Config_intf) :

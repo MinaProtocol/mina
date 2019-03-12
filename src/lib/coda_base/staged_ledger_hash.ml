@@ -50,7 +50,10 @@ module Stable = struct
     module T = struct
       let version = 1
 
-      type t = {ledger_hash: Ledger_hash.Stable.V1.t; aux_hash: Aux_hash.t}
+      type t =
+        { ledger_hash: Ledger_hash.Stable.V1.t
+        ; aux_hash: Aux_hash.t
+        ; pending_coinbase_hash: Pending_coinbase.Hash.t }
       [@@deriving bin_io, sexp, eq, compare, hash]
     end
 
@@ -77,24 +80,35 @@ let ledger_hash {ledger_hash; _} = ledger_hash
 
 let aux_hash {aux_hash; _} = aux_hash
 
-let dummy =
-  {ledger_hash= Ledger_hash.of_hash Field.zero; aux_hash= Aux_hash.dummy}
+let pending_coinbase_hash {pending_coinbase_hash; _} = pending_coinbase_hash
 
-let to_string {ledger_hash; aux_hash} =
-  Printf.sprintf "%s:%s"
+let dummy =
+  { ledger_hash= Ledger_hash.of_hash Field.zero
+  ; aux_hash= Aux_hash.dummy
+  ; pending_coinbase_hash= Pending_coinbase.Hash.empty_hash }
+
+let to_string {ledger_hash; aux_hash; pending_coinbase_hash} =
+  Printf.sprintf "%s:%s:%s"
     (Ledger_hash.to_bytes ledger_hash)
     (Aux_hash.to_bytes aux_hash)
+    (Pending_coinbase.Hash.to_bytes pending_coinbase_hash)
 
-let of_aux_and_ledger_hash aux_hash ledger_hash = {aux_hash; ledger_hash}
+let of_aux_ledger_and_coinbase_hash aux_hash ledger_hash pending_coinbase_hash
+    =
+  {aux_hash; ledger_hash; pending_coinbase_hash}
 
 let length_in_bits = 256
 
 let length_in_triples = (length_in_bits + 2) / 3
 
-let digest {ledger_hash; aux_hash} =
+let digest {ledger_hash; aux_hash; pending_coinbase_hash} =
   let h = Digestif.SHA256.init () in
   let h = Digestif.SHA256.feed_string h (Ledger_hash.to_bytes ledger_hash) in
   let h = Digestif.SHA256.feed_string h aux_hash in
+  let h =
+    Digestif.SHA256.feed_string h
+      (Pending_coinbase.Hash.to_bytes pending_coinbase_hash)
+  in
   (Digestif.SHA256.get h :> string)
 
 let fold t = Fold.string_triples (digest t)
