@@ -193,16 +193,6 @@ let core () =
        running an independent design studio. He believes that all design is \
        experience design. Regardless of the medium, the end goal is for the \
        well-being of the user."
-  and mahoney =
-    plain "Mahoney Turnbull" "Community Lead"
-      "Mahoney Turnbull is a passionate and globally connected community \
-       builder with a diverse background in privacy law, digital rights, \
-       startups, and decentralized ecosystems. She most recently came from \
-       ConsenSys, where she led Community and Global Engagement for Token \
-       Foundry. Before that, she worked in ten different countries in a \
-       variety of roles in the startup ecosystem. She's also involved with \
-       the Blockchain for Science Thinktank, Disruption Disciples, Google \
-       Launchpad Mentorship, Team Block Society and Women in Blockchain."
   and joe =
     advisor "Joseph Bonneau"
       {literal|
@@ -263,7 +253,6 @@ She holds a MSc from Magdalen College, Oxford, and an AB from Harvard, where she
     ; avery
     ; nacera
     ; harold
-    ; mahoney
     ; joe
     ; akis
     ; benedikt

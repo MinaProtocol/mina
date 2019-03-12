@@ -34,7 +34,7 @@ module Inputs = struct
           : S )
       ; cache= Cache.create () }
 
-    let worker_wait_time = 10.
+    let worker_wait_time = 5.
   end
 
   module Proof = Transaction_snark
