@@ -85,7 +85,7 @@ jobs:
             - run:
                   name: Run all tests (on master)
                   command: echo "FIXME Tests not yet working on mac"
-    build_artifacts_dev:
+    build-artifacts--dev:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -121,7 +121,7 @@ jobs:
             - run:
                   name: Copy artifacts to Google Cloud
                   command: scripts/artifacts.sh
-    build_artifacts_testnet_posig:
+    build-artifacts--testnet_posig:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -157,7 +157,7 @@ jobs:
             - run:
                   name: Copy artifacts to Google Cloud
                   command: scripts/artifacts.sh
-    build_artifacts_testnet_postake:
+    build-artifacts--testnet_postake:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -193,7 +193,7 @@ jobs:
             - run:
                   name: Copy artifacts to Google Cloud
                   command: scripts/artifacts.sh
-    build_artifacts_testnet_public:
+    build-artifacts--testnet_public:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -229,7 +229,7 @@ jobs:
             - run:
                   name: Copy artifacts to Google Cloud
                   command: scripts/artifacts.sh
-    build_artifacts_testnet_postake_snarkless_fake_hash:
+    build-artifacts--testnet_postake_snarkless_fake_hash:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -492,7 +492,28 @@ workflows:
     coda_parallel:
         jobs:
             - lint
-            - build-macos
-            - test-unit-test
             - tracetool
+            - build-macos
             - build-wallet
+            - test-unit-test
+            - test--fake_hash--full-test
+            - test--test_posig_snarkless--full-test
+            - test--test_posig_snarkless--transaction-snark-profiler---check-only
+            - test--test_posig_snarkless--coda-peers-test
+            - test--test_posig_snarkless--coda-transitive-peers-test
+            - test--test_posig_snarkless--coda-block-production-test
+            - test--test_posig_snarkless--coda-shared-prefix-test---who-proposes--0
+            - test--test_posig_snarkless--coda-shared-prefix-test---who-proposes--1
+            - test--test_posig_snarkless--coda-shared-state-test
+            - test--test_postake_snarkless--full-test
+            - test--test_postake_snarkless--transaction-snark-profiler---check-only
+            - test--test_postake_split_snarkless--coda-peers-test
+            - test--test_postake_split_snarkless--coda-transitive-peers-test
+            - test--test_postake_split_snarkless--coda-block-production-test
+            - test--test_postake_split_snarkless--coda-shared-prefix-test---who-proposes--0
+            - test--test_postake_split_snarkless--coda-shared-prefix-test---who-proposes--1
+            - test--test_postake_split_snarkless--coda-shared-state-test
+            - test--test_posig--full-test
+            - test--test_posig--transaction-snark-profiler---check-only
+            - test--test_postake--full-test
+            - test--test_postake--transaction-snark-profiler---check-only

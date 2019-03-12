@@ -87,7 +87,7 @@ jobs:
                   command: echo "FIXME Tests not yet working on mac"
 
     {%- for profile in build_artifact_profiles %}
-    build_artifacts_{{profile}}:
+    build-artifacts--{{profile}}:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -156,13 +156,15 @@ workflows:
     coda_parallel:
         jobs:
             - lint
+            - tracetool
             - build-macos
+            - build-wallet
             {%- for profile in build_profiles %}
-            - build_{{profile}}
-            {%- endfor %}
-            {%- for test in tests %}
-            - test-{{test.name}}
+            - build-artifacts--{{profile}}
             {%- endfor %}
             - test-unit-test
-            - tracetool
-            - build-wallet
+            {%- for profile in test_permutations.keys() %}
+            {%- for test in test_permutations[profile] %}
+            - test--{{profile}}--{{'--'.join(test.split(' '))}}
+            {%- endfor %}
+            {%- endfor %}
