@@ -14,8 +14,6 @@ open Core
 open Snark_params
 open Snarky
 open Tick
-open Fold_lib
-open Snark_bits
 open Signature_lib
 open Currency
 
@@ -84,7 +82,7 @@ module type S = sig
 
       type var
 
-      val typ : (var, t) Typ.t
+      val typ : (var, value) Typ.t
     end
 
     type _ Request.t +=

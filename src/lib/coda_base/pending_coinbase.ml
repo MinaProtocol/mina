@@ -6,7 +6,6 @@ open Snark_params.Tick
 open Let_syntax
 open Currency
 open Fold_lib
-open Snark_bits
 
 let coinbase_tree_depth = Snark_params.pending_coinbase_depth
 
@@ -31,19 +30,6 @@ module Coinbase_data = struct
   let length_in_triples =
     Public_key.Compressed.length_in_triples + Amount.length_in_triples
 
-  let typ : (var, value) Typ.t =
-    let spec =
-      let open Data_spec in
-      [Public_key.Compressed.typ; Amount.typ]
-    in
-    let of_hlist : 'a 'b. (unit, 'a -> 'b -> unit) H_list.t -> 'a * 'b =
-      let open H_list in
-      fun [public_key; amount] -> (public_key, amount)
-    in
-    let to_hlist (public_key, amount) = H_list.[public_key; amount] in
-    Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-
   let var_of_t ((public_key, amount) : value) =
     (Public_key.Compressed.var_of_t public_key, Amount.var_of_t amount)
 
@@ -55,38 +41,10 @@ module Coinbase_data = struct
   let fold ((public_key, amount) : t) =
     let open Fold in
     Public_key.Compressed.fold public_key +> Amount.fold amount
-
-  let crypto_hash_prefix = Hash_prefix.coinbase
-
-  let crypto_hash t = Pedersen.hash_fold crypto_hash_prefix (fold t)
-
-  let empty = (Public_key.Compressed.empty, Amount.zero)
-
-  let digest t = Pedersen.State.digest (crypto_hash t)
-
-  let create public_key amount = (public_key, amount)
-
-  let gen =
-    let open Quickcheck.Let_syntax in
-    let%bind public_key = Public_key.Compressed.gen in
-    let%bind amount = Currency.Amount.gen in
-    return (create public_key amount)
-
-  module Checked = struct
-    let hash t =
-      var_to_triples t
-      >>= Pedersen.Checked.hash_triples ~init:crypto_hash_prefix
-
-    let digest t =
-      var_to_triples t
-      >>= Pedersen.Checked.digest_triples ~init:crypto_hash_prefix
-  end
 end
 
 module Stack_id : sig
   type t [@@deriving bin_io, sexp, compare, eq]
-
-  val gen : t Quickcheck.Generator.t
 
   val of_int : int -> t
 
@@ -97,12 +55,8 @@ module Stack_id : sig
   val incr_by_one : t -> t option
 
   val to_string : t -> string
-
-  val of_string : string -> t
 end = struct
   include Int
-
-  let gen = Int.gen_incl 0 ((1 lsl coinbase_tree_depth) - 1)
 
   let incr_by_one t1 =
     let t2 = t1 + 1 in
@@ -165,11 +119,6 @@ module Coinbase_stack = struct
       let if_ = if_
 
       let empty = var_of_t empty
-
-      let equal (x : var) (y : var) =
-        Field.Checked.equal (var_to_hash_packed x) (var_to_hash_packed y)
-
-      let hash t = Fn.id
 
       let digest t =
         var_to_triples t
@@ -306,7 +255,7 @@ module T = struct
       handle
         (Merkle_tree.modify_req ~depth (Hash.var_to_hash_packed t) addr
            ~f:(fun stack ->
-             let%map valid =
+             let%map () =
                Coinbase_stack.Stack.assert_equal stack_before stack
              in
              stack_after ))
@@ -316,8 +265,6 @@ module T = struct
 
   type t = {tree: Merkle_tree.t; pos_list: Stack_id.t list; new_pos: Stack_id.t}
   [@@deriving sexp, bin_io]
-
-  let copy = Fn.id
 
   let create_exn () =
     let init_hash = Stack.hash Stack.empty in
@@ -391,12 +338,6 @@ module T = struct
 
   let oldest_stack_id t = List.last t.pos_list
 
-  let replace_latest_stack t stack ~is_new_stack =
-    match t.pos_list with
-    | [] -> if is_new_stack then Some [stack] else None
-    | x :: xs ->
-        if is_new_stack then Some (stack :: x :: xs) else Some (stack :: xs)
-
   let remove_oldest_stack_id_exn t =
     match List.rev t with
     | [] -> failwith "No stacks"
@@ -430,7 +371,7 @@ module T = struct
     let tree' = Merkle_tree.set_exn t.tree stack_index Stack.empty in
     (stack, {t with tree= tree'; pos_list= remaining})
 
-  let hash ({tree; pos_list; new_pos} as t) =
+  let hash ({pos_list; new_pos; _} as t) =
     let h = Digestif.SHA256.init () in
     let h = Digestif.SHA256.feed_string h (Hash.to_bytes (merkle_root t)) in
     let h =
@@ -448,8 +389,6 @@ module T = struct
     {t with tree= Merkle_tree.set_exn t.tree index stack}
 
   let find_index_exn t = Merkle_tree.find_index_exn t.tree
-
-  type set_unset_tree = {mutable in_use: t; back_up: t}
 
   let handler (t : t) =
     let pending_coinbase = ref t in
