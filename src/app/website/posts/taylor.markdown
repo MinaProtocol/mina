@@ -30,7 +30,7 @@ All the code for doing what we'll talk about is implemented using
 
 The technique will go as follows:
 
-1. We'll use Taylor series to reduce the problem to doing arithmetic with
+1. We'll use Taylor series to approximately reduce the problem to doing arithmetic with
   real numbers.
 2. We'll approximate the arithmetic of real numbers using the arithmetic
   of rational numbers.
@@ -44,7 +44,7 @@ The technique will go as follows:
 First we need a way to reduce the problem of computing an exponentiation to
 multiplications and additions in a finite field. As a first step, calculus
 lets us reduce exponentiation to multiplication and addition over the
-real numbers (a field, but not a finite one) using a [Taylor series]().
+real numbers (a field, but not a finite one) using a [Taylor series](https://en.wikipedia.org/wiki/Taylor_series).
 
 Specifically, we know that
 
