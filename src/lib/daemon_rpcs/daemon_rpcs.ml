@@ -25,7 +25,7 @@ module Types = struct
             sprintf "%s: %s %s" s padding x )
         |> String.concat ~sep:"\n"
       in
-      title ^ output ^ "\n"
+      title ^ "\n" ^ output ^ "\n"
 
     let summarize_report
         {Perf_histograms.Report.values; intervals; overflow; underflow} =
