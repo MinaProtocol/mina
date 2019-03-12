@@ -7,8 +7,6 @@ open Snark_bits
 module Tick_backend = Crypto_params.Tick_backend
 module Tock_backend = Crypto_params.Tock_backend
 
-let () = Snarky.Snark.set_eval_constraints true
-
 module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
   open Impl
 
