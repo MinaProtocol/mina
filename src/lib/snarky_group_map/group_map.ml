@@ -376,8 +376,8 @@ struct
    * D1(t) = sum from j = 0 to j = 5 of [
    *    sum for 2a+3b=3j of ( d1_(a,b) A^a . B^b ) . t^j ]
    *)
-  let make_x1 tvar =
-    let t_powers = powers tvar 15 in
+  let make_x1 t =
+    let t_powers = powers t 15 in
       let nt = iter_j 0 4 t_powers n1tbl in
       let dt = iter_j 0 5 t_powers d1tbl in
       F.(Params.a * t_mul (F.of_int 2) 1 t_powers * nt / dt)
@@ -387,8 +387,8 @@ struct
    * D2(t) = 144At . sum from j = 0 to j = 4 of [
    *    sum for 2a+3b=3j of ( d2_(a,b) A^a . B^b ) . t^j ]
    *)
-  let make_x2 tvar =
-    let t_powers = powers tvar 15 in
+  let make_x2 t =
+    let t_powers = powers t 15 in
       let nt = iter_j 0 6 t_powers n2tbl in
       let dt = iter_j 0 4 t_powers d2tbl in
       F.(nt / (t_mul (F.of_int 144 * Params.a) 1 t_powers * dt))
@@ -401,8 +401,8 @@ struct
    *    sum from j = 0 to j = 10 of [
    *    sum for 2a+3b=3j of ( d32_(a,b) A^a . B^b ) . t^j ]
    *)
-  let make_x3 tvar =
-    let t_powers = powers tvar 15 in
+  let make_x3 t =
+    let t_powers = powers t 15 in
       let nt = iter_j 1 15 t_powers n3tbl in
       let dt1 = iter_j 0 5 t_powers d31tbl in
       let dt2 = iter_j 0 10 t_powers d32tbl in
@@ -430,21 +430,19 @@ module Make_unchecked (F : Unchecked_field_intf)(Params : sig val a : F.t val b 
      assert (F.equal a b)
     )
 
-  let to_group tvar =
-    let a = make_x1 tvar in
-    let fa = F.(a * a * a + Params.a * a + Params.b) in
-    if F.is_square fa then (a, F.sqrt fa)
-    else let b = make_x2 tvar in
-    let fb = F.(b * b * b + Params.a * b + Params.b) in
-      if F.is_square fb then (b, F.sqrt fb)
-    else let c = make_x3 tvar in
-    let fc = F.(c * c * c + Params.a * c + Params.b) in
-      (c, F.sqrt fc)
+  let try_decode x =
+    let f x = F.(x * x * x + Params.a * x + Params.b) in
+    let y = f x in
+    if F.is_square y then Some (x, F.sqrt y) else None
+
+  let to_group t =
+    List.find_map [make_x1; make_x2; make_x3] ~f:(fun mk -> try_decode (mk t))
+    |> Option.value_exn
+
 end
 
-
 let%test_unit "foo" =
-  let module S = Snarky.Snark.Make(Snarky.Backends.Mnt4.Default) in
+  let module S = Snarky.Snark.Make(Snarky.Backends.Mnt6.Default) in
   let module C = struct
       type t = S.Field.t
       let ( + ) = S.Field.add
@@ -466,5 +464,5 @@ let%test_unit "foo" =
     end
   in
   let module M = Make_unchecked(U)
-      (Snarky.Libsnark.Curves.Mnt4.G1.Coefficients) in
+      (Snarky.Libsnark.Mnt4.G1.Coefficients) in
   ()
