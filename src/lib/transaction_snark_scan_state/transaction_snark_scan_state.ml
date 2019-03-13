@@ -185,7 +185,7 @@ end = struct
       let hash t =
         let state_hash =
           Parallel_scan.State.hash t.tree
-            (Binable.to_string (module Ledger_proof_with_sok_message))
+            (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V1))
             (Binable.to_string (module Transaction_with_witness.Stable.V1))
         in
         Staged_ledger_aux_hash.of_bytes
