@@ -2010,7 +2010,7 @@ let%test_module "test" =
 
     let%test_unit "Max throughput" =
       (*Always at worst case number of provers. This is enforced by creating proof bundles *)
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
@@ -2049,7 +2049,7 @@ let%test_module "test" =
     let%test_unit "Be able to include random number of user_commands" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
@@ -2095,7 +2095,7 @@ let%test_module "test" =
           ; prover= "P" }
       in
       Backtrace.elide := false ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
@@ -2142,7 +2142,7 @@ let%test_module "test" =
               ; proofs= stmts
               ; prover= "P" }
           in
-          let logger = Logger.create () in
+          let logger = Logger.null () in
           let txns =
             List.init 6 ~f:(fun _ -> [])
             @ [[(1, 0); (1, 0); (1, 0)]] @ [[(1, 0); (1, 0)]]
@@ -2191,7 +2191,7 @@ let%test_module "test" =
       Quickcheck.test g ~trials:50 ~f:(fun i ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let open Deferred.Let_syntax in
-              let logger = Logger.create () in
+              let logger = Logger.null () in
               let txns = txns i (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let scan_state = Sl.scan_state !sl in
               let work =
@@ -2227,7 +2227,7 @@ let%test_module "test" =
 
     let%test_unit "Snarked ledger" =
       Backtrace.elide := false ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
@@ -2259,7 +2259,7 @@ let%test_module "test" =
     let%test_unit "max throughput-random number of proofs-worst case provers" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
@@ -2309,7 +2309,7 @@ let%test_module "test" =
                    case provers" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
@@ -2376,7 +2376,7 @@ let%test_module "test" =
         else None
       in
       Backtrace.elide := false ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
