@@ -2,6 +2,7 @@
 
 import argparse
 import collections
+import difflib
 import jinja2
 import os
 import subprocess
@@ -183,10 +184,9 @@ def render(args):
     if args.check:
         with open(output_file, 'r') as file:
             real = file.read()
-            print(rendered)
-            print('=================')
-            print(real)
-            if file.read() != rendered:
+            d = difflib.Differ()
+            print('\n'.join(list(d.compare(rendered.splitlines(1), real.splitlines(1)))))
+            if real != rendered:
                 fail('circle CI configuration is out of date, re-render it')
     else:
         with open(output_file, 'w') as file:
