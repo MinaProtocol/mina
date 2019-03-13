@@ -216,7 +216,8 @@ struct
           ~default:previous_ledger_hash
       in
       let next_blockchain_state =
-        Blockchain_state.create_value ~timestamp:(Block_time.now ())
+        Blockchain_state.create_value
+          ~timestamp:(Block_time.now Time.Controller.basic)
           ~snarked_ledger_hash:next_ledger_hash
           ~staged_ledger_hash:next_staged_ledger_hash
       in

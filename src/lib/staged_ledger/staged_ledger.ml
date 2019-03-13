@@ -1368,8 +1368,17 @@ let%test_module "test" =
       module Compressed_public_key = String
 
       module Sok_message = struct
+        module Stable = struct
+          module V1 = struct
+            type t = unit [@@deriving bin_io, sexp]
+          end
+
+          module Latest = V1
+        end
+
         module Digest = Unit
-        include Unit
+
+        type t = Stable.Latest.t [@@deriving sexp]
 
         let create ~fee:_ ~prover:_ = ()
       end
