@@ -56,8 +56,8 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None) n
         in
         Coda_process.local_config ?proposal_interval ~peers ~discovery_port
           ~external_port ~snark_worker_config ~program_dir ~acceptable_delay
-          ~proposer:(proposers i) ~work_selection ~trace_dir ~offset:(Lazy.force offset)
-          () )
+          ~proposer:(proposers i) ~work_selection ~trace_dir
+          ~offset:(Lazy.force offset) () )
   in
   configs
 
