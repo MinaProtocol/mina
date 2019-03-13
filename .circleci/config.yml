@@ -486,6 +486,226 @@ jobs:
             - run:
                   name: Running test - test_postake:transaction-snark-profiler -check-only
                   command: source ~/.profile && ./scripts/test.py run 'test_postake:transaction-snark-profiler -check-only'
+    test--test_postake_catchup--c:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:c
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:c'
+    test--test_postake_catchup--o:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:o
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:o'
+    test--test_postake_catchup--d:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:d
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:d'
+    test--test_postake_catchup--a:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:a
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:a'
+    test--test_postake_catchup---:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:-
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:-'
+    test--test_postake_catchup--r:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:r
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:r'
+    test--test_postake_catchup--e:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:e
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:e'
+    test--test_postake_catchup--s:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:s
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:s'
+    test--test_postake_catchup--t:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:t
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:t'
+    test--test_postake_catchup--a:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:a
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:a'
+    test--test_postake_catchup--r:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:r
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:r'
+    test--test_postake_catchup--t:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:t
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:t'
+    test--test_postake_catchup---:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:-
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:-'
+    test--test_postake_catchup--n:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:n
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:n'
+    test--test_postake_catchup--o:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:o
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:o'
+    test--test_postake_catchup--d:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:d
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:d'
+    test--test_postake_catchup--e:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:e
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:e'
+    test--test_postake_catchup---:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:-
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:-'
+    test--test_postake_catchup--t:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:t
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:t'
+    test--test_postake_catchup--e:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:e
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:e'
+    test--test_postake_catchup--s:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:s
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:s'
+    test--test_postake_catchup--t:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:t
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:t'
 
 workflows:
     version: 2
@@ -517,3 +737,25 @@ workflows:
             - test--test_posig--transaction-snark-profiler---check-only
             - test--test_postake--full-test
             - test--test_postake--transaction-snark-profiler---check-only
+            - test--test_postake_catchup--c
+            - test--test_postake_catchup--o
+            - test--test_postake_catchup--d
+            - test--test_postake_catchup--a
+            - test--test_postake_catchup---
+            - test--test_postake_catchup--r
+            - test--test_postake_catchup--e
+            - test--test_postake_catchup--s
+            - test--test_postake_catchup--t
+            - test--test_postake_catchup--a
+            - test--test_postake_catchup--r
+            - test--test_postake_catchup--t
+            - test--test_postake_catchup---
+            - test--test_postake_catchup--n
+            - test--test_postake_catchup--o
+            - test--test_postake_catchup--d
+            - test--test_postake_catchup--e
+            - test--test_postake_catchup---
+            - test--test_postake_catchup--t
+            - test--test_postake_catchup--e
+            - test--test_postake_catchup--s
+            - test--test_postake_catchup--t

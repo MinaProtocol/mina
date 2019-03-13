@@ -256,10 +256,6 @@ module type Main_intf = sig
        and type staged_ledger_hash := Staged_ledger_hash.t
        and type fee_transfer_single := Fee_transfer.single
 
-    module Staged_ledger_hash : sig
-      type t [@@deriving sexp]
-    end
-
     module Staged_ledger :
       Protocols.Coda_pow.Staged_ledger_intf
       with type diff := Staged_ledger_diff.t
@@ -452,7 +448,7 @@ struct
     let limit = Block_time.Span.of_time_span (Core.Time.Span.of_sec 15.)
 
     let validate t =
-      let now = Block_time.now () in
+      let now = Block_time.now Block_time.Controller.basic in
       (* t should be at most [limit] greater than now *)
       Block_time.Span.( < ) (Block_time.diff t now) limit
   end
@@ -1116,7 +1112,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       (verifying_txn : User_command.t) proof =
     let open Participating_state.Let_syntax in
     let%map account = get_account t addr in
-    let account = account |> Option.value_exn in
+    let account = Option.value_exn account in
     let resulting_receipt = Account.receipt_chain_hash account in
     let open Or_error.Let_syntax in
     let%bind () = Payment_verifier.verify ~resulting_receipt proof in
