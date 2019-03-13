@@ -224,7 +224,7 @@ let%test_module "random set test" =
         Broadcast_pipe.create (Some (Mock_transition_frontier.create ()))
       in
       let pool =
-        Mock_snark_pool.create ~parent_log:(Logger.create ())
+        Mock_snark_pool.create ~parent_log:(Logger.null ())
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
       List.iter sample_solved_work ~f:(fun (work, proof, fee) ->
