@@ -1520,12 +1520,17 @@ let%test_module "test" =
       end
 
       module Ledger_hash = struct
-        module T = struct
-          type t = int [@@deriving sexp, bin_io, compare, hash, eq]
+        module Stable = struct
+          module V1 = struct
+            type t = int [@@deriving sexp, bin_io, compare, hash, eq]
+          end
+
+          module Latest = V1
         end
 
-        include T
-        include Hashable.Make_binable (T)
+        type t = int [@@deriving sexp, compare, hash, eq]
+
+        include Hashable.Make_binable (Stable.Latest)
 
         let to_bytes : t -> string =
          fun _ -> failwith "to_bytes in ledger hash"
@@ -1544,8 +1549,8 @@ let%test_module "test" =
       module Ledger_proof_statement = struct
         module T = struct
           type t =
-            { source: Ledger_hash.t
-            ; target: Ledger_hash.t
+            { source: Ledger_hash.Stable.V1.t
+            ; target: Ledger_hash.Stable.V1.t
             ; supply_increase: Currency.Amount.t
             ; fee_excess: Fee.Signed.t
             ; proof_type: [`Base | `Merge] }

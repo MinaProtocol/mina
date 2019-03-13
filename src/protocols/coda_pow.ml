@@ -116,7 +116,15 @@ module type Time_intf = sig
 end
 
 module type Ledger_hash_intf = sig
-  type t [@@deriving bin_io, eq, sexp, compare]
+  type t [@@deriving eq, sexp, compare]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving eq, sexp, compare, bin_io]
+      end
+    end
+    with type V1.t = t
 
   val to_bytes : t -> string
 

@@ -70,7 +70,8 @@ struct
           Staged_ledger_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
         [@@deriving bin_io]
 
-        type response = (Staged_ledger_aux.Stable.V1.t * Ledger_hash.t) option
+        type response =
+          (Staged_ledger_aux.Stable.V1.t * Ledger_hash.Stable.V1.t) option
         [@@deriving bin_io]
 
         let version = 1
@@ -117,10 +118,12 @@ struct
     module V1 = struct
       module T = struct
         type query =
-          (Ledger_hash.t * Sync_ledger.query) Envelope.Incoming.Stable.V1.t
+          (Ledger_hash.Stable.V1.t * Sync_ledger.query)
+          Envelope.Incoming.Stable.V1.t
         [@@deriving bin_io, sexp]
 
-        type response = (Ledger_hash.t * Sync_ledger.answer) Or_error.t
+        type response =
+          (Ledger_hash.Stable.V1.t * Sync_ledger.answer) Or_error.t
         [@@deriving bin_io, sexp]
 
         let version = 1
@@ -202,7 +205,7 @@ struct
             , State_body_hash.t list * External_transition.t )
             Proof_carrying_data.t
           * Staged_ledger_aux.Stable.V1.t
-          * Ledger_hash.t )
+          * Ledger_hash.Stable.V1.t )
           option
       end
 
@@ -230,7 +233,7 @@ struct
             , State_body_hash.t list * External_transition.t )
             Proof_carrying_data.t
           * Staged_ledger_aux.Stable.V1.t
-          * Ledger_hash.t )
+          * Ledger_hash.Stable.V1.t )
           option
         [@@deriving bin_io]
 
