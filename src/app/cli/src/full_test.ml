@@ -48,8 +48,8 @@ let run_test () : unit Deferred.t =
       let%bind () =
         match Unix.getenv "CODA_TRACING" with
         | Some trace_dir ->
-          let%bind () = Async.Unix.mkdir ~p:() trace_dir in
-          Coda_tracing.start trace_dir
+            let%bind () = Async.Unix.mkdir ~p:() trace_dir in
+            Coda_tracing.start trace_dir
         | None -> Deferred.unit
       in
       let module Main = Coda_main.Make_coda (Init) in

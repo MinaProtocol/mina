@@ -176,9 +176,13 @@ module T = struct
       let log =
         Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string external_port)
       in
-      let%bind () = Option.value_map trace_dir ~f:(fun d ->
-        let%bind () = Async.Unix.mkdir ~p:() d in
-        Coda_tracing.start d) ~default:Deferred.unit in
+      let%bind () =
+        Option.value_map trace_dir
+          ~f:(fun d ->
+            let%bind () = Async.Unix.mkdir ~p:() d in
+            Coda_tracing.start d )
+          ~default:Deferred.unit
+      in
       let%bind () = File_system.create_dir conf_dir in
       let module Config = struct
         let logger = log

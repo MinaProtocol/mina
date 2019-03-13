@@ -33,7 +33,8 @@ let offset =
      Core_kernel.Time.diff (Core_kernel.Time.now ()) genesis_state_timestamp)
 
 let local_configs ?proposal_interval ?(proposers = Fn.const None) n
-    ~acceptable_delay ~program_dir ~snark_worker_public_keys ~work_selection ~trace_dir =
+    ~acceptable_delay ~program_dir ~snark_worker_public_keys ~work_selection
+    ~trace_dir =
   let discovery_ports, external_ports, peers = net_configs n in
   let peers = [] :: List.drop peers 1 in
   let args =
