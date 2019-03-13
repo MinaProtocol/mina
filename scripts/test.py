@@ -45,7 +45,8 @@ test_permutations = {
     'test_postake_split_snarkless': integration_tests,
     'test_posig': simple_tests,
     'test_postake': simple_tests,
-    'test_postake_catchup': ['coda-restart-node-test']
+    'test_postake_catchup': ['coda-restart-node-test'],
+    'test_postake_bootstrap' : ['coda-bootstrap-test']
 }
 
 ci_blacklist = [

@@ -428,6 +428,16 @@ jobs:
             - run:
                   name: Running test - test_postake:transaction-snark-profiler -check-only
                   command: source ~/.profile && ./scripts/test.py run 'test_postake:transaction-snark-profiler -check-only'
+    test--test_postake_bootstrap--coda-bootstrap-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_bootstrap:coda-bootstrap-test
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_bootstrap:coda-bootstrap-test'
     test--test_postake_catchup--coda-restart-node-test:
         resource_class: large
         docker:
@@ -548,6 +558,7 @@ workflows:
             - test--test_posig_snarkless--coda-restart-node-test
             - test--test_postake--full-test
             - test--test_postake--transaction-snark-profiler---check-only
+            - test--test_postake_bootstrap--coda-bootstrap-test
             - test--test_postake_catchup--coda-restart-node-test
             - test--test_postake_snarkless--full-test
             - test--test_postake_snarkless--transaction-snark-profiler---check-only
