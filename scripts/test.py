@@ -32,7 +32,7 @@ integration_tests = [
     'coda-shared-prefix-test -who-proposes 0',
     'coda-shared-prefix-test -who-proposes 1',
     'coda-shared-state-test',
-    # FAILING 'coda-restart-node-test',
+    'coda-restart-node-test',
 ]
 
 all_tests = simple_tests + integration_tests
@@ -48,7 +48,7 @@ test_permutations = {
 }
 
 ci_blacklist = [
-    '*:coda-restart-node-test'
+    'test_postake_split_snarkless:coda-restart-node-test'
 ]
 
 def fail(msg):
