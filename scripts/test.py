@@ -98,7 +98,7 @@ def run(args):
 
     def run_cmd(cmd, on_failure):
         def do():
-            if subprocess.call(cmd, shell=True, stdout=sys.stdout, stderr=sys.stderr) != 0:
+            if subprocess.call(['bash', '-c', cmd], stdout=sys.stdout, stderr=sys.stderr) != 0:
                 on_failure()
         wet('$ ' + cmd, do)
 
