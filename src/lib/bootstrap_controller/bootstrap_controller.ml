@@ -318,13 +318,13 @@ end = struct
           in
           verified_root )
     in
-    match%map
+    match%bind
       Staged_ledger.of_scan_state_and_snarked_ledger ~scan_state
         ~snarked_ledger:(Ledger.of_database synced_db)
         ~expected_merkle_root
     with
     | Ok root_staged_ledger ->
-        let new_frontier =
+        let%map new_frontier =
           Transition_frontier.create ~logger:parent_log
             ~root_transition:new_root ~root_snarked_ledger:synced_db
             ~root_staged_ledger

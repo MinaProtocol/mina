@@ -589,7 +589,7 @@ module Make (Inputs : Inputs_intf) = struct
               | Ok staged_ledger -> staged_ledger
               | Error err -> Error.raise err
             in
-            let transition_frontier =
+            let%bind transition_frontier =
               Transition_frontier.create ~logger:config.log
                 ~root_transition:
                   (With_hash.of_data first_transition
