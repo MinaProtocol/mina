@@ -298,6 +298,26 @@ jobs:
             - run:
                   name: Running test - fake_hash:full-test
                   command: source ~/.profile && ./scripts/test.py run 'fake_hash:full-test'
+    test--test_posig--full-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_posig:full-test
+                  command: source ~/.profile && ./scripts/test.py run 'test_posig:full-test'
+    test--test_posig--transaction-snark-profiler---check-only:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_posig:transaction-snark-profiler -check-only
+                  command: source ~/.profile && ./scripts/test.py run 'test_posig:transaction-snark-profiler -check-only'
     test--test_posig_snarkless--full-test:
         resource_class: large
         docker:
@@ -388,6 +408,36 @@ jobs:
             - run:
                   name: Running test - test_posig_snarkless:coda-restart-node-test
                   command: source ~/.profile && ./scripts/test.py run 'test_posig_snarkless:coda-restart-node-test'
+    test--test_postake--full-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake:full-test
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake:full-test'
+    test--test_postake--transaction-snark-profiler---check-only:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake:transaction-snark-profiler -check-only
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake:transaction-snark-profiler -check-only'
+    test--test_postake_catchup--coda-restart-node-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:coda-restart-node-test
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:coda-restart-node-test'
     test--test_postake_snarkless--full-test:
         resource_class: large
         docker:
@@ -468,56 +518,6 @@ jobs:
             - run:
                   name: Running test - test_postake_split_snarkless:coda-shared-state-test
                   command: source ~/.profile && ./scripts/test.py run 'test_postake_split_snarkless:coda-shared-state-test'
-    test--test_posig--full-test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test - test_posig:full-test
-                  command: source ~/.profile && ./scripts/test.py run 'test_posig:full-test'
-    test--test_posig--transaction-snark-profiler---check-only:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test - test_posig:transaction-snark-profiler -check-only
-                  command: source ~/.profile && ./scripts/test.py run 'test_posig:transaction-snark-profiler -check-only'
-    test--test_postake--full-test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test - test_postake:full-test
-                  command: source ~/.profile && ./scripts/test.py run 'test_postake:full-test'
-    test--test_postake--transaction-snark-profiler---check-only:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test - test_postake:transaction-snark-profiler -check-only
-                  command: source ~/.profile && ./scripts/test.py run 'test_postake:transaction-snark-profiler -check-only'
-    test--test_postake_catchup--coda-restart-node-test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test - test_postake_catchup:coda-restart-node-test
-                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:coda-restart-node-test'
 
 workflows:
     version: 2
@@ -530,6 +530,8 @@ workflows:
             - test-unit--test_posig_snarkless
             - test-unit--test_postake_snarkless
             - test--fake_hash--full-test
+            - test--test_posig--full-test
+            - test--test_posig--transaction-snark-profiler---check-only
             - test--test_posig_snarkless--full-test
             - test--test_posig_snarkless--transaction-snark-profiler---check-only
             - test--test_posig_snarkless--coda-peers-test
@@ -539,6 +541,9 @@ workflows:
             - test--test_posig_snarkless--coda-shared-prefix-test---who-proposes--1
             - test--test_posig_snarkless--coda-shared-state-test
             - test--test_posig_snarkless--coda-restart-node-test
+            - test--test_postake--full-test
+            - test--test_postake--transaction-snark-profiler---check-only
+            - test--test_postake_catchup--coda-restart-node-test
             - test--test_postake_snarkless--full-test
             - test--test_postake_snarkless--transaction-snark-profiler---check-only
             - test--test_postake_split_snarkless--coda-peers-test
@@ -547,8 +552,3 @@ workflows:
             - test--test_postake_split_snarkless--coda-shared-prefix-test---who-proposes--0
             - test--test_postake_split_snarkless--coda-shared-prefix-test---who-proposes--1
             - test--test_postake_split_snarkless--coda-shared-state-test
-            - test--test_posig--full-test
-            - test--test_posig--transaction-snark-profiler---check-only
-            - test--test_postake--full-test
-            - test--test_postake--transaction-snark-profiler---check-only
-            - test--test_postake_catchup--coda-restart-node-test

@@ -141,7 +141,7 @@ jobs:
                   command: source ~/.profile && dune build --profile={{profile}} -j$(nproc --all) && dune runtest --profile={{profile}} -j$(nproc --all)
     {%- endfor %}
 
-    {%- for profile in test_permutations.keys() %}
+    {%- for profile in test_permutations.keys() | sort %}
     {%- for test in test_permutations[profile] %}
     test--{{profile}}--{{'--'.join(test.split(' '))}}:
         resource_class: large
@@ -170,7 +170,7 @@ workflows:
             {%- for profile in unit_test_profiles %}
             - test-unit--{{profile}}
             {%- endfor %}
-            {%- for profile in test_permutations.keys() %}
+            {%- for profile in test_permutations.keys() | sort %}
             {%- for test in test_permutations[profile] %}
             - test--{{profile}}--{{'--'.join(test.split(' '))}}
             {%- endfor %}
