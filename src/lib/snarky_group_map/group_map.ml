@@ -64,7 +64,7 @@ module Make_group_map
 struct
   module Hash_key = struct
     module T = struct
-      type t = int * int [@@deriving compare, hash, sexp, eq]
+      type t = int * int [@@deriving compare, hash, sexp]
     end
 
     include T
@@ -289,10 +289,6 @@ struct
          ; ((3, 8), "7260")
          ; ((0, 10), "1") ])
 
-  let sum (xs : F.t list) = List.fold ~init:F.zero ~f:F.( + ) xs
-
-  let product (xs : F.t list) = List.fold ~init:F.one ~f:F.( * ) xs
-
   (* for v, k, powers produces v^0, v^1, ... v^k *)
   let powers v k =
     let rec make_powers acc prev x =
@@ -303,11 +299,6 @@ struct
         make_powers acc' prev' (x + 1)
     in
     make_powers [F.one] F.one 0
-
-  let check x =
-    match x with
-    | Some x -> x
-    | None -> failwith "trying to mulitply by index not in powers lists"
 
   let mul a b tbl =
     (* highest power of A is 24, of B is 16 *)
@@ -361,6 +352,7 @@ struct
     in
     go ~a ~acc:F.zero ~s ~j ~tbl
 
+  (*
   let naive_iter_a s j tbl =
     let rec go ~a ~b ~acc ~s ~j ~tbl =
       printf "j: %d\n%!" j ;
@@ -396,6 +388,7 @@ struct
     in
     let a = 0 and b = 0 in
     go ~a ~b ~acc:F.zero ~s ~j ~tbl
+  *)
 
   let iter_j s max t_powers tbl =
     let rec go ~j ~acc ~s ~max ~t_powers ~tbl =
@@ -472,7 +465,8 @@ struct
         printf "iter_a: %s\n%!" (Sexp.to_string (F.sexp_of_t a)) ;
         printf "naive_iter_a: %s\n%!" (Sexp.to_string (F.sexp_of_t b)) ;
         assert (F.equal a b) )
-*)
+  *)
+
   let try_decode x =
     let f x = F.((x * x * x) + (Params.a * x) + Params.b) in
     let y = f x in
