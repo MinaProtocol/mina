@@ -32,6 +32,9 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
+                  name: Check circle CI configuration rendering
+                  command: ./scripts/test.py render --check .circleci/config.yml.jinja
+            - run:
                   name: OCamlformat (make check-format)
                   command: eval `opam config env` && make check-format
             - run:
@@ -86,8 +89,8 @@ jobs:
                   name: Run all tests (on master)
                   command: echo "FIXME Tests not yet working on mac"
 
-    {%- for profile in build_profiles %}
-    build_{{profile}}:
+    {%- for profile in build_artifact_profiles %}
+    build-artifacts--{{profile}}:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -125,7 +128,8 @@ jobs:
                   command: scripts/artifacts.sh
     {%- endfor %}
 
-    test-unit-test:
+    {%- for profile in unit_test_profiles %}
+    test-unit--{{profile}}:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -133,11 +137,13 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Test make test-runtest
-                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless MYPROCS=8 make test-runtest
+                  name: Run unit tests
+                  command: source ~/.profile && dune build --profile={{profile}} -j8 && dune runtest --profile={{profile}} -j8
+    {%- endfor %}
 
-    {%-for test in tests%}
-    test-{{test.name}}:
+    {%- for profile in test_permutations.keys() | sort %}
+    {%- for test in test_permutations[profile] %}
+    test--{{profile}}--{{'--'.join(test.split(' '))}}:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -145,16 +151,9 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Check .circleci Render
-                  command: make check-render-circleci
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE={{test.config}} make build 2>&1 | tee /tmp/buildocaml.log
-            {%- for action in test.actions %}
-            - run:
-                  name: Running test - {{ test.friendly }} | {{ action }}
-                  command: source ~/.profile && export DUNE_PROFILE={{test.config}} && source scripts/test_all.sh && cd src/ && 'run_integration_test' '{{ action }}'
-            {% endfor %}
+                  name: Running test - {{profile}}:{{test}}
+                  command: source ~/.profile && ./scripts/test.py run '{{profile}}:{{test}}'
+    {%- endfor %}
     {%- endfor %}
 
 workflows:
@@ -162,13 +161,17 @@ workflows:
     coda_parallel:
         jobs:
             - lint
-            - build-macos
-            {%- for profile in build_profiles %}
-            - build_{{profile}}
-            {%- endfor %}
-            {%- for test in tests %}
-            - test-{{test.name}}
-            {%- endfor %}
-            - test-unit-test
             - tracetool
+            - build-macos
             - build-wallet
+            {%- for profile in build_artifact_profiles %}
+            - build-artifacts--{{profile}}
+            {%- endfor %}
+            {%- for profile in unit_test_profiles %}
+            - test-unit--{{profile}}
+            {%- endfor %}
+            {%- for profile in test_permutations.keys() | sort %}
+            {%- for test in test_permutations[profile] %}
+            - test--{{profile}}--{{'--'.join(test.split(' '))}}
+            {%- endfor %}
+            {%- endfor %}
