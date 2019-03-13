@@ -21,6 +21,7 @@ module Input = struct
     ; snark_worker_config: Snark_worker_config.t option
     ; work_selection: Protocols.Coda_pow.Work_selection.t
     ; conf_dir: string
+    ; trace_dir: string option
     ; program_dir: string
     ; external_port: int
     ; discovery_port: int
@@ -166,6 +167,7 @@ module T = struct
         ; snark_worker_config
         ; work_selection
         ; conf_dir
+        ; trace_dir
         ; program_dir
         ; external_port
         ; peers
@@ -174,6 +176,9 @@ module T = struct
       let log =
         Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string external_port)
       in
+      let%bind () = Option.value_map trace_dir ~f:(fun d ->
+        let%bind () = Async.Unix.mkdir ~p:() d in
+        Coda_tracing.start d) ~default:Deferred.unit in
       let%bind () = File_system.create_dir conf_dir in
       let module Config = struct
         let logger = log
@@ -197,6 +202,7 @@ module T = struct
 
         let work_selection = work_selection
       end in
+      O1trace.trace_task "worker_main" (fun () ->
       let%bind (module Init) =
         make_init ~should_propose:(Option.is_some proposer) (module Config)
       in
@@ -328,7 +334,7 @@ module T = struct
       ; coda_get_balance= with_monitor coda_get_balance
       ; coda_send_payment= with_monitor coda_send_payment
       ; coda_prove_receipt= with_monitor coda_prove_receipt
-      ; coda_start= with_monitor coda_start }
+      ; coda_start= with_monitor coda_start })
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end

@@ -21,7 +21,7 @@ let main () =
   let configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
       ~acceptable_delay ~snark_worker_public_keys:None
-      ~proposers:(Fn.const None) ~work_selection
+      ~proposers:(Fn.const None) ~work_selection ~trace_dir:(Unix.getenv "CODA_TRACING")
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let _, _, expected_peers = Coda_processes.net_configs n in
