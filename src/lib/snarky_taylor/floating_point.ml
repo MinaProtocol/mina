@@ -78,6 +78,24 @@ let add ~m x y = add_signed ~m x (`Pos, y)
 
 let sub ~m x y = add_signed ~m x (`Neg, y)
 
+let le (type f) ~m:((module M) : f m) t1 t2 =
+  let open M in
+  let precision = max t1.precision t2.precision in
+  assert (precision < Field.Constant.size_in_bits) ;
+  let padding =
+    let k = precision - min t1.precision t2.precision in
+    let open Field in
+    constant (pow2 Constant.add ~one:Constant.one k)
+  in
+  let x1, x2 =
+    let open Field in
+    let x1, x2 = (t1.value, t2.value) in
+    if t1.precision < t2.precision then (padding * x1, x2)
+    else if t2.precision < t1.precision then (x1, padding * x2)
+    else (x1, x2)
+  in
+  (Field.compare ~bit_length:precision x1 x2).less_or_equal
+
 (*
     Compute the truncated fixed point representation of the quotient top / bottom.
 
@@ -99,6 +117,10 @@ let sub ~m x y = add_signed ~m x (`Neg, y)
 let of_quotient ~m ~precision ~top ~bottom ~top_is_less_than_bottom:() =
   let q, _r = Integer.(div_mod ~m (shift_left ~m top precision) bottom) in
   {value= Integer.to_field q; precision}
+
+let of_bits (type f) ~m:((module M) : f m) bits ~precision =
+  assert (List.length bits <= precision) ;
+  {value= M.Field.pack bits; precision}
 
 let%test_unit "of-quotient" =
   let module M = Snarky.Snark.Run.Make (Snarky.Backends.Mnt4.Default) in
