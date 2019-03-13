@@ -14,7 +14,7 @@ let%test_module "Root_prover" =
       |> With_hash.data |> External_transition.of_verified
 
     let%test "a node should be able to give a valid proof of their root" =
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let max_length = 4 in
       (* Generating this many breadcrumbs will ernsure the transition_frontier to be full  *)
       let num_breadcrumbs = max_length + 2 in

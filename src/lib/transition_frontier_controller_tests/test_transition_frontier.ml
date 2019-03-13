@@ -28,7 +28,7 @@ let%test_module "Root_history and Transition_frontier" =
 
     let%test "If a transition does not exists in the transition_frontier or \
               in the root_history, then we should not get an answer" =
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind frontier = create_root_frontier ~logger in
           let root = Transition_frontier.root frontier in
@@ -52,7 +52,7 @@ let%test_module "Root_history and Transition_frontier" =
 
     let%test "Query transition only from transition_frontier if the \
               root_history is empty" =
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind frontier = create_root_frontier ~logger in
           let root = Transition_frontier.root frontier in
@@ -82,7 +82,7 @@ let%test_module "Root_history and Transition_frontier" =
           breadcrumb_trail_equals expected_breadcrumbs queried_breadcrumbs )
 
     let%test "Query transitions only from root_history" =
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind frontier = create_root_frontier ~logger in
           let root = Transition_frontier.root frontier in
@@ -111,7 +111,7 @@ let%test_module "Root_history and Transition_frontier" =
             |> Option.value_exn |> Non_empty_list.to_list ) )
 
     let%test "Transitions get popped off from root history" =
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind frontier = create_root_frontier ~logger in
           let root = Transition_frontier.root frontier in
@@ -133,7 +133,7 @@ let%test_module "Root_history and Transition_frontier" =
           Transition_frontier.find frontier root_hash |> Option.is_empty )
 
     let%test "Get transitions from both transition frontier and root history" =
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind frontier = create_root_frontier ~logger in
           let root = Transition_frontier.root frontier in
