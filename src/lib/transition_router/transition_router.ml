@@ -127,7 +127,7 @@ module Make (Inputs : Inputs_intf) :
 
   let set_transition_frontier_controller_phase ~controller_type new_frontier
       reader writer =
-    assert (not @@ is_bootstrapping (Broadcaster.get controller_type)) ;
+    assert (is_bootstrapping (Broadcaster.get controller_type)) ;
     Broadcaster.broadcast controller_type
       (`Transition_frontier_controller (new_frontier, reader, writer))
 
