@@ -73,15 +73,15 @@ module State : sig
   (* bin_io omitted intentionally *)
   type ('a, 'd) t [@@deriving sexp]
 
-  module Stable : sig
-    module V1 :
-      sig
+  module Stable :
+    sig
+      module V1 : sig
         type ('a, 'd) t [@@deriving sexp, bin_io]
       end
-      with type ('a, 'd) t = ('a, 'd) t
 
-    module Latest = V1
-  end
+      module Latest = V1
+    end
+    with type ('a, 'd) V1.t = ('a, 'd) t
 
   val fold_chronological :
     ('a, 'd) t -> init:'acc -> f:('acc -> ('a, 'd) Job.t -> 'acc) -> 'acc
