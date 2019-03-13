@@ -277,7 +277,7 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
-                  command: source ~/.profile && dune build --profile=test_posig_snarkless -j$(nproc --all) && dune runtest --profile=test_posig_snarkless -j$(nproc --all)
+                  command: source ~/.profile && dune build --profile=test_posig_snarkless -j8 && dune runtest --profile=test_posig_snarkless -j8
     test-unit--test_postake_snarkless:
         resource_class: large
         docker:
@@ -287,7 +287,7 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
-                  command: source ~/.profile && dune build --profile=test_postake_snarkless -j$(nproc --all) && dune runtest --profile=test_postake_snarkless -j$(nproc --all)
+                  command: source ~/.profile && dune build --profile=test_postake_snarkless -j8 && dune runtest --profile=test_postake_snarkless -j8
     test--fake_hash--full-test:
         resource_class: large
         docker:
