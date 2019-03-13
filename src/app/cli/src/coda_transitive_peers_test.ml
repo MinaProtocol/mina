@@ -22,7 +22,7 @@ let main () =
   let configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
       ~acceptable_delay ~snark_worker_public_keys:None
-      ~should_propose:(Fn.const false) ~work_selection
+      ~proposers:(Fn.const None) ~work_selection
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let discovery_ports, external_ports, peers =
@@ -35,8 +35,8 @@ let main () =
   Logger.debug log !"connecting to peers %{sexp: Host_and_port.t list}\n" peers ;
   let config =
     Coda_process.local_config ~peers ~external_port ~discovery_port
-      ~acceptable_delay ~snark_worker_config:None ~should_propose:false
-      ~program_dir ~work_selection ()
+      ~acceptable_delay ~snark_worker_config:None ~proposer:None ~program_dir
+      ~work_selection ~offset:Time.Span.zero ()
   in
   let%bind worker = Coda_process.spawn_exn config in
   let%bind _ = after (Time.Span.of_sec 10.) in

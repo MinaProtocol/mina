@@ -46,6 +46,8 @@ struct
     include Staged_ledger_hash.Aux_hash.Stable.V1
 
     let of_bytes = Staged_ledger_hash.Aux_hash.of_bytes
+
+    let to_bytes = Staged_ledger_hash.Aux_hash.to_bytes
   end
 
   module Transaction_snark_work =
@@ -132,9 +134,9 @@ struct
     module Sparse_ledger = Coda_base.Sparse_ledger
   end)
 
-  (* Generate valid payments for each blockchain state by having 
-  each user send a payment of one coin to another random 
-   user if they at least one coin*)
+  (* Generate valid payments for each blockchain state by having
+     each user send a payment of one coin to another random
+     user if they at least one coin*)
   let gen_payments accounts_with_secret_keys :
       User_command.With_valid_signature.t Sequence.t =
     let public_keys =
@@ -239,7 +241,8 @@ struct
           ~default:previous_ledger_hash
       in
       let next_blockchain_state =
-        Blockchain_state.create_value ~timestamp:(Block_time.now ())
+        Blockchain_state.create_value
+          ~timestamp:(Block_time.now Time.Controller.basic)
           ~snarked_ledger_hash:next_ledger_hash
           ~staged_ledger_hash:next_staged_ledger_hash
       in
@@ -341,15 +344,25 @@ struct
     let root_transition_with_data =
       {With_hash.data= root_transition; hash= genesis_protocol_state_hash}
     in
-    let frontier =
-      Transition_frontier.create ~logger
-        ~root_transition:root_transition_with_data ~root_snarked_ledger
-        ~root_transaction_snark_scan_state ~root_staged_ledger_diff:None
-        ~consensus_local_state:
-          (Consensus.Local_state.create
-             (Some proposer_account.Account.public_key))
-    in
-    frontier
+    let open Deferred.Let_syntax in
+    let expected_merkle_root = Ledger.Db.merkle_root root_snarked_ledger in
+    match%map
+      Staged_ledger.of_scan_state_and_snarked_ledger
+        ~scan_state:root_transaction_snark_scan_state
+        ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
+        ~expected_merkle_root
+    with
+    | Ok root_staged_ledger ->
+        let frontier =
+          Transition_frontier.create ~logger
+            ~root_transition:root_transition_with_data ~root_snarked_ledger
+            ~root_staged_ledger
+            ~consensus_local_state:
+              (Consensus.Local_state.create
+                 (Some proposer_account.Account.public_key))
+        in
+        frontier
+    | Error err -> Error.raise err
 
   let build_frontier_randomly ~gen_root_breadcrumb_builder frontier :
       unit Deferred.t =
@@ -395,13 +408,53 @@ struct
     module Protocol_state_validator = Protocol_state_validator
   end)
 
+  module Breadcrumb_visualizations = struct
+    module Graph =
+      Visualization.Make_ocamlgraph (Transition_frontier.Breadcrumb)
+
+    let visualize ~filename ~f breadcrumbs =
+      Out_channel.with_file filename ~f:(fun output_channel ->
+          let graph = f breadcrumbs in
+          Graph.output_graph output_channel graph )
+
+    let graph_breadcrumb_list breadcrumbs =
+      let initial_breadcrumb, tail_breadcrumbs =
+        Non_empty_list.uncons breadcrumbs
+      in
+      let graph = Graph.add_vertex Graph.empty initial_breadcrumb in
+      let graph, _ =
+        List.fold tail_breadcrumbs ~init:(graph, initial_breadcrumb)
+          ~f:(fun (graph, prev_breadcrumb) curr_breadcrumb ->
+            let graph_with_node = Graph.add_vertex graph curr_breadcrumb in
+            ( Graph.add_edge graph_with_node prev_breadcrumb curr_breadcrumb
+            , curr_breadcrumb ) )
+      in
+      graph
+
+    let visualize_list =
+      visualize ~f:(fun breadcrumbs ->
+          breadcrumbs |> Non_empty_list.of_list_opt |> Option.value_exn
+          |> graph_breadcrumb_list )
+
+    let graph_rose_tree tree =
+      let rec go graph (Rose_tree.T (root, children)) =
+        let graph' = Graph.add_vertex graph root in
+        List.fold children ~init:graph'
+          ~f:(fun graph (T (child, grand_children)) ->
+            let graph_with_child = go graph (T (child, grand_children)) in
+            Graph.add_edge graph_with_child root child )
+      in
+      go Graph.empty tree
+
+    let visualize_rose_tree =
+      visualize ~f:(fun breadcrumbs -> graph_rose_tree breadcrumbs)
+  end
+
   module Network = struct
     type t =
       {logger: Logger.t; table: Transition_frontier.t Network_peer.Peer.Table.t}
 
-    let create ~logger = {logger; table= Network_peer.Peer.Table.create ()}
-
-    let add_exn {table; _} = Hashtbl.add_exn table
+    let create ~logger ~peers = {logger; table= peers}
 
     let random_peers {table; _} num_peers =
       let peers = Hashtbl.keys table in
@@ -420,7 +473,18 @@ struct
            ~error:(Error.of_string "Peer could not produce an ancestor")
            (let open Option.Let_syntax in
            let%bind frontier = Hashtbl.find table peer in
-           Root_prover.prove ~logger ~frontier consensus_state)
+           let%map peer_root_with_proof =
+             Root_prover.prove ~logger ~frontier consensus_state
+           in
+           let staged_ledger =
+             Transition_frontier.Breadcrumb.staged_ledger
+               (Transition_frontier.root frontier)
+           in
+           let scan_state = Staged_ledger.scan_state staged_ledger in
+           let merkle_root =
+             Ledger.merkle_root (Staged_ledger.ledger staged_ledger)
+           in
+           (peer_root_with_proof, scan_state, merkle_root))
 
     let glue_sync_ledger {table; logger; _} query_reader response_writer : unit
         =
@@ -438,7 +502,8 @@ struct
                      Sync_handler.answer_query ~frontier ledger_hash
                        sync_ledger_query ~logger
                    in
-                   Envelope.Incoming.wrap ~data:answer ~sender:peer )
+                   Envelope.Incoming.wrap ~data:answer
+                     ~sender:(Envelope.Sender.Remote peer) )
           in
           match answer with
           | None ->
@@ -472,7 +537,6 @@ struct
 
     let setup ~source_accounts ~logger configs =
       let%bind me = create_root_frontier ~logger source_accounts in
-      let network = Network.create ~logger in
       let%map _, peers =
         Deferred.List.fold ~init:(Constants.init_address, []) configs
           ~f:(fun (discovery_port, acc_peers) {num_breadcrumbs; accounts} ->
@@ -487,9 +551,14 @@ struct
               Network_peer.Peer.create Unix.Inet_addr.localhost ~discovery_port
                 ~communication_port:(discovery_port + 1)
             in
-            Network.add_exn network ~key:address ~data:frontier ;
             let peer = {address; frontier} in
             (discovery_port + 2, peer :: acc_peers) )
+      in
+      let network =
+        Network.create ~logger
+          ~peers:
+            ( List.map peers ~f:(fun {address; frontier} -> (address, frontier))
+            |> Network_peer.Peer.Table.of_alist_exn )
       in
       {me; network; peers= List.rev peers}
 
@@ -512,7 +581,8 @@ struct
         !"Peer %{sexp:Network_peer.Peer.t} sending %{sexp:State_hash.t}"
         address state_hash ;
       let enveloped_transition =
-        Envelope.Incoming.wrap ~data:transition ~sender:address
+        Envelope.Incoming.wrap ~data:transition
+          ~sender:(Envelope.Sender.Remote address)
       in
       Pipe_lib.Strict_pipe.Writer.write transition_writer
         (`Transition enveloped_transition, `Time_received Constants.time)

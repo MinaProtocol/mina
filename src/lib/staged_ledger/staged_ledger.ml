@@ -123,7 +123,7 @@ end = struct
     { scan_state:
         scan_state
         (* Invariant: this is the ledger after having applied all the transactions in
-         * the above state. *)
+     * the above state. *)
     ; ledger: Ledger.attached_mask sexp_opaque }
   [@@deriving sexp]
 
@@ -194,11 +194,14 @@ end = struct
     in
     match Scan_state.latest_ledger_proof scan_state with
     | None ->
-        Statement_scanner.check_invariants scan_state ~error_prefix ledger None
+        Statement_scanner.check_invariants scan_state ~error_prefix
+          ~ledger_hash_end:ledger ~ledger_hash_begin:None
     | Some proof ->
-        Statement_scanner.check_invariants scan_state ~error_prefix ledger
-          (Some (get_target proof))
+        Statement_scanner.check_invariants scan_state ~error_prefix
+          ~ledger_hash_end:ledger
+          ~ledger_hash_begin:(Some (get_target proof))
 
+  (* TODO: Remove this. This is deprecated *)
   let snarked_ledger :
       t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t =
    fun {ledger; scan_state; _} ~snarked_ledger_hash:expected_target ->
@@ -241,6 +244,10 @@ end = struct
                 Frozen_ledger_hash.t}))"
               target expected_target
 
+  module For_tests = struct
+    let snarked_ledger = snarked_ledger
+  end
+
   let statement_exn t =
     match Statement_scanner.scan_statement t.scan_state with
     | Ok s -> `Non_empty s
@@ -260,13 +267,44 @@ end = struct
     let t = {ledger; scan_state} in
     let%bind () =
       Statement_scanner_with_proofs.check_invariants scan_state
-        ~error_prefix:"Staged_ledger.of_scan_state_and_ledger" ledger
-        (Some snarked_ledger_hash)
+        ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
+        ~ledger_hash_end:
+          (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
+        ~ledger_hash_begin:(Some snarked_ledger_hash)
     in
     let%bind () =
       Deferred.return (verify_snarked_ledger t snarked_ledger_hash)
     in
     return t
+
+  let of_scan_state_and_snarked_ledger ~scan_state ~snarked_ledger
+      ~expected_merkle_root =
+    let open Deferred.Or_error.Let_syntax in
+    let snarked_ledger_hash = Ledger.merkle_root snarked_ledger in
+    let snarked_frozen_ledger_hash =
+      Frozen_ledger_hash.of_ledger_hash snarked_ledger_hash
+    in
+    let%bind txs = Scan_state.all_transactions scan_state |> Deferred.return in
+    let%bind () =
+      List.fold_result
+        ~f:(fun _ tx ->
+          Ledger.apply_transaction snarked_ledger tx |> Or_error.ignore )
+        ~init:() txs
+      |> Deferred.return
+    in
+    let%bind () =
+      let staged_ledger_hash = Ledger.merkle_root snarked_ledger in
+      Deferred.return
+      @@ Result.ok_if_true
+           (Ledger_hash.equal expected_merkle_root staged_ledger_hash)
+           ~error:
+             (Error.createf
+                !"Mismatching merkle root Expected:%{sexp:Ledger_hash.t} \
+                  Got:%{sexp:Ledger_hash.t}"
+                expected_merkle_root staged_ledger_hash)
+    in
+    of_scan_state_and_ledger ~snarked_ledger_hash:snarked_frozen_ledger_hash
+      ~ledger:snarked_ledger ~scan_state
 
   let copy {scan_state; ledger} =
     let new_mask = Ledger.Mask.create () in
@@ -428,23 +466,23 @@ end = struct
     |> to_staged_ledger_or_error
 
   (*A Coinbase is a single transaction that accommodates the coinbase amount
-  and a fee transfer for the work required to add the coinbase. Unlike a
-  transaction, a coinbase (including the fee transfer) just requires one slot
-  in the jobs queue.
+    and a fee transfer for the work required to add the coinbase. Unlike a
+    transaction, a coinbase (including the fee transfer) just requires one slot
+    in the jobs queue.
 
-  The minimum number of slots required to add a single transaction is three (at
-  worst case number of provers: when each pair of proofs is from a different
-  prover). One slot for the transaction and two slots for fee transfers.
+    The minimum number of slots required to add a single transaction is three (at
+    worst case number of provers: when each pair of proofs is from a different
+    prover). One slot for the transaction and two slots for fee transfers.
 
-  When the diff is split into two prediffs (why? refer to #687) and if after
-  adding transactions, the first prediff has two slots remaining which cannot
-  not accommodate transactions, then those slots are filled by splitting the
-  coinbase into two parts.
-  If it has one slot, then we simply add one coinbase. It is also possible that
-  the first prediff may have no slots left after adding transactions (For
-  example, when there are three slots and
-  maximum number of provers), in which case, we simply add one coinbase as part
-  of the second prediff.
+    When the diff is split into two prediffs (why? refer to #687) and if after
+    adding transactions, the first prediff has two slots remaining which cannot
+    not accommodate transactions, then those slots are filled by splitting the
+    coinbase into two parts.
+    If it has one slot, then we simply add one coinbase. It is also possible that
+    the first prediff may have no slots left after adding transactions (For
+    example, when there are three slots and
+    maximum number of provers), in which case, we simply add one coinbase as part
+    of the second prediff.
   *)
   let create_coinbase coinbase_parts proposer =
     let open Result.Let_syntax in
@@ -577,8 +615,8 @@ end = struct
     ; coinbase_parts_count= List.length coinbase }
 
   (**The total fee excess caused by any diff should be zero. In the case where
-  the slots are split into two partitions, total fee excess of the transactions
-  to be enqueued on each of the partitions should be zero respectively *)
+     the slots are split into two partitions, total fee excess of the transactions
+     to be enqueued on each of the partitions should be zero respectively *)
   let check_zero_fee_excess scan_state data =
     let zero = Currency.Fee.Signed.zero in
     let partitions = Scan_state.partition_if_overflowing scan_state in
@@ -701,7 +739,9 @@ end = struct
     in
     let%map () =
       Deferred.return
-        ( verify_scan_state_after_apply new_ledger scan_state'
+        ( verify_scan_state_after_apply
+            (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
+            scan_state'
         |> to_staged_ledger_or_error )
     in
     Logger.info logger
@@ -802,7 +842,10 @@ end = struct
       Or_error.ok_exn
         (Scan_state.fill_work_and_enqueue_transactions scan_state' data works)
     in
-    Or_error.ok_exn (verify_scan_state_after_apply new_ledger scan_state') ;
+    Or_error.ok_exn
+      (verify_scan_state_after_apply
+         (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
+         scan_state') ;
     let new_staged_ledger = {scan_state= scan_state'; ledger= new_ledger} in
     ( `Hash_after_applying (hash new_staged_ledger)
     , `Ledger_proof res_opt
@@ -1326,8 +1369,17 @@ let%test_module "test" =
       module Compressed_public_key = String
 
       module Sok_message = struct
+        module Stable = struct
+          module V1 = struct
+            type t = unit [@@deriving bin_io, sexp]
+          end
+
+          module Latest = V1
+        end
+
         module Digest = Unit
-        include Unit
+
+        type t = Stable.Latest.t [@@deriving sexp]
 
         let create ~fee:_ ~prover:_ = ()
       end
@@ -1681,6 +1733,8 @@ let%test_module "test" =
         include String
 
         let of_bytes : string -> t = fun s -> s
+
+        let to_bytes : t -> string = fun s -> s
       end
 
       module Staged_ledger_hash = struct
@@ -2197,7 +2251,7 @@ let%test_module "test" =
               expected_snarked_ledger := last_snarked_ledger ;
               let materialized_ledger =
                 Or_error.ok_exn
-                @@ Sl.snarked_ledger !sl
+                @@ Sl.For_tests.snarked_ledger !sl
                      ~snarked_ledger_hash:last_snarked_ledger
               in
               assert (!expected_snarked_ledger = !materialized_ledger) ) )

@@ -24,6 +24,7 @@ module type Inputs_intf = sig
      and type staged_ledger_diff := Staged_ledger_diff.t
      and type masked_ledger := Coda_base.Ledger.t
      and type consensus_local_state := Consensus.Local_state.t
+     and type user_command := User_command.t
 
   module Protocol_state_validator :
     Protocol_state_validator_intf
@@ -66,7 +67,7 @@ module Make (Inputs : Inputs_intf) :
         | Error e ->
             Logger.warn logger
               !"Got an invalid transition from peer : \
-                %{sexp:Network_peer.Peer.t} %{sexp:Error.t}"
+                %{sexp:Envelope.Sender.t} %{sexp:Error.t}"
               sender e )
     |> don't_wait_for
 end

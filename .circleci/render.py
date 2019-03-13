@@ -2,17 +2,21 @@
 
 import jinja2
 
-base_actions = [
-    'full-test',
+shared_integration_tests = [
     'coda-peers-test',
     'coda-transitive-peers-test',
     'coda-block-production-test',
     'coda-shared-prefix-test -who-proposes 0',
     'coda-shared-prefix-test -who-proposes 1',
-    'coda-shared-state-test',
-    'coda-restart-node-test',
+    'coda-shared-state-test'
+]
+
+non_integration_test_shared = [
+    'full-test',
     'transaction-snark-profiler -check-only'
 ]
+
+base_actions = non_integration_test_shared + shared_integration_tests
 
 build_profiles = [
     'dev',
@@ -29,6 +33,11 @@ tests = [
        'name': 'fake_hash_full_test',
        'actions': ['full-test']
    },
+   {   'friendly': 'Ledger Catchup Tests',
+       'config': 'test_postake_catchup',
+       'name': 'ledger_catchup_integration_tests',
+       'actions': ['coda-restart-node-test']
+   },
    {
        'friendly': 'Proof of Signature Tests',
        'config': 'test_posig_snarkless',
@@ -39,7 +48,13 @@ tests = [
        'friendly': 'Proof of Stake Tests',
        'config': 'test_postake_snarkless',
        'name': 'postake_integration_tests',
-       'actions': base_actions + ['coda-shared-prefix-multiproposer-test']
+       'actions': non_integration_test_shared
+   },
+   {
+       'friendly': 'Proof of Stake (split stake) Tests',
+       'config': 'test_postake_split_snarkless',
+       'name': 'postake_split_integration_tests',
+       'actions': shared_integration_tests
    },
    {
        'friendly': 'Full test with SNARK (sig)',

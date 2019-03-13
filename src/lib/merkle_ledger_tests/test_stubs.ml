@@ -1,7 +1,30 @@
 open Core
 open Unsigned
-module Account = Coda_base.Account
 module Balance = Currency.Balance
+
+module Account = struct
+  (* want bin_io, not available with Account.t *)
+  type t = Coda_base.Account.Stable.V1.t
+  [@@deriving bin_io, sexp, eq, compare, hash]
+
+  type key = Coda_base.Account.Stable.V1.key
+  [@@deriving bin_io, sexp, eq, compare, hash]
+
+  (* use Account items needed *)
+  let empty = Coda_base.Account.empty
+
+  let public_key = Coda_base.Account.public_key
+
+  let key_gen = Coda_base.Account.key_gen
+
+  let gen = Coda_base.Account.gen
+
+  let create = Coda_base.Account.create
+
+  let balance = Coda_base.Account.balance
+
+  let update_balance t bal = {t with Coda_base.Account.balance= bal}
+end
 
 (* below are alternative modules that use strings as public keys and UInt64 as balances for
    in accounts
@@ -173,4 +196,11 @@ module Key = struct
   include T
   include Hashable.Make_binable (T)
   include Comparable.Make (T)
+end
+
+module Base_inputs = struct
+  module Key = Key
+  module Balance = Balance
+  module Account = Account
+  module Hash = Hash
 end
