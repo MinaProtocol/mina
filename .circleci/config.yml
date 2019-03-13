@@ -32,6 +32,9 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
+                  name: Check circle CI configuration rendering
+                  command: ./scripts/test.py render --check .circleci/config.yml.jinja
+            - run:
                   name: OCamlformat (make check-format)
                   command: eval `opam config env` && make check-format
             - run:
@@ -85,7 +88,7 @@ jobs:
             - run:
                   name: Run all tests (on master)
                   command: echo "FIXME Tests not yet working on mac"
-    build_dev:
+    build-artifacts--dev:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -121,7 +124,7 @@ jobs:
             - run:
                   name: Copy artifacts to Google Cloud
                   command: scripts/artifacts.sh
-    build_testnet_posig:
+    build-artifacts--testnet_posig:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -157,7 +160,7 @@ jobs:
             - run:
                   name: Copy artifacts to Google Cloud
                   command: scripts/artifacts.sh
-    build_testnet_postake:
+    build-artifacts--testnet_postake:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -193,7 +196,7 @@ jobs:
             - run:
                   name: Copy artifacts to Google Cloud
                   command: scripts/artifacts.sh
-    build_testnet_public:
+    build-artifacts--testnet_public:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -229,7 +232,7 @@ jobs:
             - run:
                   name: Copy artifacts to Google Cloud
                   command: scripts/artifacts.sh
-    build_testnet_postake_snarkless_fake_hash:
+    build-artifacts--testnet_postake_snarkless_fake_hash:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -265,8 +268,7 @@ jobs:
             - run:
                   name: Copy artifacts to Google Cloud
                   command: scripts/artifacts.sh
-
-    test-unit-test:
+    test-unit--test_posig_snarkless:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -274,9 +276,9 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Test make test-runtest
-                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless MYPROCS=8 make test-runtest
-    test-fake_hash_full_test:
+                  name: Run unit tests
+                  command: source ~/.profile && dune build --profile=test_posig_snarkless -j8 && dune runtest --profile=test_posig_snarkless -j8
+    test-unit--test_postake_snarkless:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -284,16 +286,9 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Check .circleci Render
-                  command: make check-render-circleci
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=fake_hash make build 2>&1 | tee /tmp/buildocaml.log
-            - run:
-                  name: Running test - Fake Hash | full-test
-                  command: source ~/.profile && export DUNE_PROFILE=fake_hash && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
-            
-    test-ledger_catchup_integration_tests:
+                  name: Run unit tests
+                  command: source ~/.profile && dune build --profile=test_postake_snarkless -j8 && dune runtest --profile=test_postake_snarkless -j8
+    test--fake_hash--full-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -301,16 +296,9 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Check .circleci Render
-                  command: make check-render-circleci
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_postake_catchup make build 2>&1 | tee /tmp/buildocaml.log
-            - run:
-                  name: Running test - Ledger Catchup Tests | coda-restart-node-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_catchup && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-restart-node-test'
-            
-    test-posig_integration_tests:
+                  name: Running test - fake_hash:full-test
+                  command: source ~/.profile && ./scripts/test.py run 'fake_hash:full-test'
+    test--test_posig--full-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -318,44 +306,9 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Check .circleci Render
-                  command: make check-render-circleci
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_posig_snarkless make build 2>&1 | tee /tmp/buildocaml.log
-            - run:
-                  name: Running test - Proof of Signature Tests | full-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
-            
-            - run:
-                  name: Running test - Proof of Signature Tests | transaction-snark-profiler -check-only
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'transaction-snark-profiler -check-only'
-            
-            - run:
-                  name: Running test - Proof of Signature Tests | coda-peers-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-peers-test'
-            
-            - run:
-                  name: Running test - Proof of Signature Tests | coda-transitive-peers-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-transitive-peers-test'
-            
-            - run:
-                  name: Running test - Proof of Signature Tests | coda-block-production-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-block-production-test'
-            
-            - run:
-                  name: Running test - Proof of Signature Tests | coda-shared-prefix-test -who-proposes 0
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
-            
-            - run:
-                  name: Running test - Proof of Signature Tests | coda-shared-prefix-test -who-proposes 1
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
-            
-            - run:
-                  name: Running test - Proof of Signature Tests | coda-shared-state-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-state-test'
-            
-    test-postake_integration_tests:
+                  name: Running test - test_posig:full-test
+                  command: source ~/.profile && ./scripts/test.py run 'test_posig:full-test'
+    test--test_posig--transaction-snark-profiler---check-only:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -363,20 +316,9 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Check .circleci Render
-                  command: make check-render-circleci
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_postake_snarkless make build 2>&1 | tee /tmp/buildocaml.log
-            - run:
-                  name: Running test - Proof of Stake Tests | full-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
-            
-            - run:
-                  name: Running test - Proof of Stake Tests | transaction-snark-profiler -check-only
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'transaction-snark-profiler -check-only'
-            
-    test-postake_split_integration_tests:
+                  name: Running test - test_posig:transaction-snark-profiler -check-only
+                  command: source ~/.profile && ./scripts/test.py run 'test_posig:transaction-snark-profiler -check-only'
+    test--test_posig_snarkless--full-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -384,36 +326,9 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Check .circleci Render
-                  command: make check-render-circleci
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_postake_split_snarkless make build 2>&1 | tee /tmp/buildocaml.log
-            - run:
-                  name: Running test - Proof of Stake (split stake) Tests | coda-peers-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-peers-test'
-            
-            - run:
-                  name: Running test - Proof of Stake (split stake) Tests | coda-transitive-peers-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-transitive-peers-test'
-            
-            - run:
-                  name: Running test - Proof of Stake (split stake) Tests | coda-block-production-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-block-production-test'
-            
-            - run:
-                  name: Running test - Proof of Stake (split stake) Tests | coda-shared-prefix-test -who-proposes 0
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 0'
-            
-            - run:
-                  name: Running test - Proof of Stake (split stake) Tests | coda-shared-prefix-test -who-proposes 1
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-prefix-test -who-proposes 1'
-            
-            - run:
-                  name: Running test - Proof of Stake (split stake) Tests | coda-shared-state-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake_split_snarkless && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'coda-shared-state-test'
-            
-    test-withsnark-sig:
+                  name: Running test - test_posig_snarkless:full-test
+                  command: source ~/.profile && ./scripts/test.py run 'test_posig_snarkless:full-test'
+    test--test_posig_snarkless--transaction-snark-profiler---check-only:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -421,16 +336,9 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Check .circleci Render
-                  command: make check-render-circleci
-            - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_posig make build 2>&1 | tee /tmp/buildocaml.log
-            - run:
-                  name: Running test - Full test with SNARK (sig) | full-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_posig && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
-            
-    test-withsnark-stake:
+                  name: Running test - test_posig_snarkless:transaction-snark-profiler -check-only
+                  command: source ~/.profile && ./scripts/test.py run 'test_posig_snarkless:transaction-snark-profiler -check-only'
+    test--test_posig_snarkless--coda-peers-test:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -438,34 +346,214 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Check .circleci Render
-                  command: make check-render-circleci
+                  name: Running test - test_posig_snarkless:coda-peers-test
+                  command: source ~/.profile && ./scripts/test.py run 'test_posig_snarkless:coda-peers-test'
+    test--test_posig_snarkless--coda-transitive-peers-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE=test_postake make build 2>&1 | tee /tmp/buildocaml.log
+                  name: Running test - test_posig_snarkless:coda-transitive-peers-test
+                  command: source ~/.profile && ./scripts/test.py run 'test_posig_snarkless:coda-transitive-peers-test'
+    test--test_posig_snarkless--coda-block-production-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Running test - Full test with SNARK (stake) | full-test
-                  command: source ~/.profile && export DUNE_PROFILE=test_postake && source scripts/test_all.sh && cd src/ && 'run_integration_test' 'full-test'
-            
+                  name: Running test - test_posig_snarkless:coda-block-production-test
+                  command: source ~/.profile && ./scripts/test.py run 'test_posig_snarkless:coda-block-production-test'
+    test--test_posig_snarkless--coda-shared-prefix-test---who-proposes--0:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_posig_snarkless:coda-shared-prefix-test -who-proposes 0
+                  command: source ~/.profile && ./scripts/test.py run 'test_posig_snarkless:coda-shared-prefix-test -who-proposes 0'
+    test--test_posig_snarkless--coda-shared-prefix-test---who-proposes--1:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_posig_snarkless:coda-shared-prefix-test -who-proposes 1
+                  command: source ~/.profile && ./scripts/test.py run 'test_posig_snarkless:coda-shared-prefix-test -who-proposes 1'
+    test--test_posig_snarkless--coda-shared-state-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_posig_snarkless:coda-shared-state-test
+                  command: source ~/.profile && ./scripts/test.py run 'test_posig_snarkless:coda-shared-state-test'
+    test--test_posig_snarkless--coda-restart-node-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_posig_snarkless:coda-restart-node-test
+                  command: source ~/.profile && ./scripts/test.py run 'test_posig_snarkless:coda-restart-node-test'
+    test--test_postake--full-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake:full-test
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake:full-test'
+    test--test_postake--transaction-snark-profiler---check-only:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake:transaction-snark-profiler -check-only
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake:transaction-snark-profiler -check-only'
+    test--test_postake_catchup--coda-restart-node-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_catchup:coda-restart-node-test
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_catchup:coda-restart-node-test'
+    test--test_postake_snarkless--full-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_snarkless:full-test
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_snarkless:full-test'
+    test--test_postake_snarkless--transaction-snark-profiler---check-only:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_snarkless:transaction-snark-profiler -check-only
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_snarkless:transaction-snark-profiler -check-only'
+    test--test_postake_split_snarkless--coda-peers-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_split_snarkless:coda-peers-test
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_split_snarkless:coda-peers-test'
+    test--test_postake_split_snarkless--coda-transitive-peers-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_split_snarkless:coda-transitive-peers-test
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_split_snarkless:coda-transitive-peers-test'
+    test--test_postake_split_snarkless--coda-block-production-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_split_snarkless:coda-block-production-test
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_split_snarkless:coda-block-production-test'
+    test--test_postake_split_snarkless--coda-shared-prefix-test---who-proposes--0:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 0
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 0'
+    test--test_postake_split_snarkless--coda-shared-prefix-test---who-proposes--1:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1'
+    test--test_postake_split_snarkless--coda-shared-state-test:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test - test_postake_split_snarkless:coda-shared-state-test
+                  command: source ~/.profile && ./scripts/test.py run 'test_postake_split_snarkless:coda-shared-state-test'
 
 workflows:
     version: 2
     coda_parallel:
         jobs:
             - lint
-            - build-macos
-            - build_dev
-            - build_testnet_posig
-            - build_testnet_postake
-            - build_testnet_public
-            - build_testnet_postake_snarkless_fake_hash
-            - test-fake_hash_full_test
-            - test-ledger_catchup_integration_tests
-            - test-posig_integration_tests
-            - test-postake_integration_tests
-            - test-postake_split_integration_tests
-            - test-withsnark-sig
-            - test-withsnark-stake
-            - test-unit-test
             - tracetool
+            - build-macos
             - build-wallet
+            - build-artifacts--dev
+            - build-artifacts--testnet_posig
+            - build-artifacts--testnet_postake
+            - build-artifacts--testnet_public
+            - build-artifacts--testnet_postake_snarkless_fake_hash
+            - test-unit--test_posig_snarkless
+            - test-unit--test_postake_snarkless
+            - test--fake_hash--full-test
+            - test--test_posig--full-test
+            - test--test_posig--transaction-snark-profiler---check-only
+            - test--test_posig_snarkless--full-test
+            - test--test_posig_snarkless--transaction-snark-profiler---check-only
+            - test--test_posig_snarkless--coda-peers-test
+            - test--test_posig_snarkless--coda-transitive-peers-test
+            - test--test_posig_snarkless--coda-block-production-test
+            - test--test_posig_snarkless--coda-shared-prefix-test---who-proposes--0
+            - test--test_posig_snarkless--coda-shared-prefix-test---who-proposes--1
+            - test--test_posig_snarkless--coda-shared-state-test
+            - test--test_posig_snarkless--coda-restart-node-test
+            - test--test_postake--full-test
+            - test--test_postake--transaction-snark-profiler---check-only
+            - test--test_postake_catchup--coda-restart-node-test
+            - test--test_postake_snarkless--full-test
+            - test--test_postake_snarkless--transaction-snark-profiler---check-only
+            - test--test_postake_split_snarkless--coda-peers-test
+            - test--test_postake_split_snarkless--coda-transitive-peers-test
+            - test--test_postake_split_snarkless--coda-block-production-test
+            - test--test_postake_split_snarkless--coda-shared-prefix-test---who-proposes--0
+            - test--test_postake_split_snarkless--coda-shared-prefix-test---who-proposes--1
+            - test--test_postake_split_snarkless--coda-shared-state-test
