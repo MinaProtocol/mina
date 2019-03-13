@@ -256,10 +256,6 @@ module type Main_intf = sig
        and type staged_ledger_hash := Staged_ledger_hash.t
        and type fee_transfer_single := Fee_transfer.single
 
-    module Staged_ledger_hash : sig
-      type t [@@deriving sexp]
-    end
-
     module Staged_ledger :
       Protocols.Coda_pow.Staged_ledger_intf
       with type diff := Staged_ledger_diff.t
@@ -368,32 +364,6 @@ module type Main_intf = sig
   val receipt_chain_database : t -> Receipt_chain_database.t
 end
 
-module User_command = struct
-  include (
-    User_command :
-      module type of User_command
-      with module With_valid_signature := User_command.With_valid_signature )
-
-  let fee (t : t) = Payload.fee t.payload
-
-  let sender (t : t) = Public_key.compress t.sender
-
-  let seed = Secure_random.string ()
-
-  let compare t1 t2 = User_command.Stable.Latest.compare ~seed t1 t2
-
-  module With_valid_signature = struct
-    module T = struct
-      include User_command.With_valid_signature
-
-      let compare t1 t2 = User_command.With_valid_signature.compare ~seed t1 t2
-    end
-
-    include T
-    include Comparable.Make (T)
-  end
-end
-
 module Fee_transfer = Coda_base.Fee_transfer
 module Ledger_proof_statement = Transaction_snark.Statement
 module Transaction_snark_work =
@@ -452,7 +422,7 @@ struct
     let limit = Block_time.Span.of_time_span (Core.Time.Span.of_sec 15.)
 
     let validate t =
-      let now = Block_time.now () in
+      let now = Block_time.now Block_time.Controller.basic in
       (* t should be at most [limit] greater than now *)
       Block_time.Span.( < ) (Block_time.diff t now) limit
   end
@@ -613,7 +583,7 @@ struct
   end)
 
   module Transaction_pool = struct
-    module Pool = Transaction_pool.Make (User_command) (Transition_frontier)
+    module Pool = Transaction_pool.Make (Staged_ledger) (Transition_frontier)
     include Network_pool.Make (Transition_frontier) (Pool) (Pool.Diff)
 
     type pool_diff = Pool.Diff.t [@@deriving bin_io]
@@ -1116,7 +1086,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       (verifying_txn : User_command.t) proof =
     let open Participating_state.Let_syntax in
     let%map account = get_account t addr in
-    let account = account |> Option.value_exn in
+    let account = Option.value_exn account in
     let resulting_receipt = Account.receipt_chain_hash account in
     let open Or_error.Let_syntax in
     let%bind () = Payment_verifier.verify ~resulting_receipt proof in

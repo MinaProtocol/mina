@@ -1,3 +1,6 @@
+[%%import
+"../config.mlh"]
+
 open Core_kernel
 open Async_kernel
 open Pipe_lib
@@ -10,9 +13,23 @@ module type Security_intf = sig
 end
 
 module type Time_controller_intf = sig
+  [%%if time_offsets]
+
   type t
 
-  val create : unit -> t
+  val create : t -> t
+
+  val basic : t
+
+  [%%else]
+
+  type t
+
+  val create : t -> t
+
+  val basic : t
+
+  [%%endif]
 end
 
 module type Sok_message_intf = sig
@@ -22,7 +39,16 @@ module type Sok_message_intf = sig
     type t
   end
 
-  type t [@@deriving bin_io, sexp]
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving sexp, bin_io]
+    end
+
+    module Latest = V1
+  end
+
+  (* bin_io intentionally omitted *)
+  type t = Stable.Latest.t [@@deriving sexp]
 
   val create : fee:Currency.Fee.t -> prover:public_key_compressed -> t
 end

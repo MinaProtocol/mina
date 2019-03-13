@@ -8,8 +8,7 @@ shared_integration_tests = [
     'coda-block-production-test',
     'coda-shared-prefix-test -who-proposes 0',
     'coda-shared-prefix-test -who-proposes 1',
-    'coda-shared-state-test',
-    # FAILING 'coda-restart-node-test',
+    'coda-shared-state-test'
 ]
 
 non_integration_test_shared = [
@@ -33,6 +32,11 @@ tests = [
        'config': 'fake_hash',
        'name': 'fake_hash_full_test',
        'actions': ['full-test']
+   },
+   {   'friendly': 'Ledger Catchup Tests',
+       'config': 'test_postake_catchup',
+       'name': 'ledger_catchup_integration_tests',
+       'actions': ['coda-restart-node-test']
    },
    {
        'friendly': 'Proof of Signature Tests',

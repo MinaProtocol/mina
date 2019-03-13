@@ -84,7 +84,8 @@ end = struct
         module T = struct
           let version = 1
 
-          type t = Ledger_proof.t * Sok_message.t [@@deriving sexp, bin_io]
+          type t = Ledger_proof.t * Sok_message.Stable.V1.t
+          [@@deriving sexp, bin_io]
         end
 
         include T

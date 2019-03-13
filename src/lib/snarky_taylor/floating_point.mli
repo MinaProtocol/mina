@@ -23,6 +23,10 @@ val of_quotient :
   -> top_is_less_than_bottom:unit
   -> 'f t
 
+val of_bits : m:'f m -> 'f Cvar.t Boolean.t list -> precision:int -> 'f t
+
 val precision : _ t -> int
 
 val to_bignum : m:'f m -> 'f t -> (Bignum.t, 'f, _) As_prover.t
+
+val le : m:'f m -> 'f t -> 'f t -> 'f Cvar.t Boolean.t

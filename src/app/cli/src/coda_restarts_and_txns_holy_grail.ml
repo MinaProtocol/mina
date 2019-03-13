@@ -22,7 +22,7 @@ let main n () =
   in
   (* SEND TXNS *)
   let sender_sk =
-    Genesis_ledger.largest_account_exn () |> fst |> Option.value_exn
+    Option.value_exn (Genesis_ledger.largest_account_exn () |> fst)
   in
   let receiver_pk =
     Genesis_ledger.largest_account_exn () |> snd |> Account.public_key

@@ -2,6 +2,8 @@ open Core
 open Snarky
 open Snark
 open Util
+module Floating_point = Floating_point
+module Integer = Integer
 
 (* 
     Given
@@ -75,7 +77,7 @@ let binary_expansion x =
       Some (b, Bignum.(rem, pt / two)) )
 
 module Params = struct
-  type params =
+  type t =
     { total_precision: int
     ; per_term_precision: int
     ; terms_needed: int
@@ -88,9 +90,7 @@ end
 
    where x is in the interval [0, 1)
 *)
-module Exp (M : Snark_intf.Run) = struct
-  open M
-
+module Exp = struct
   (* An upper bound on the magnitude nth derivative of base^x in [0, 1) is
    |log(base)|^n *)
 
@@ -113,18 +113,16 @@ module Exp (M : Snark_intf.Run) = struct
    in the taylor series will start to overflow when k is too large. E.g.,
    if our field has 298 bits and x has 32 bits, then we cannot easily compute
    x^10, since representing it exactly requires 320 bits. *)
-  let bit_params ~log_base =
+  let bit_params ~field_size_in_bits ~log_base =
     greatest ~such_that:(fun k ->
         let kk = B.of_int k in
         let n = terms_needed ~log_base ~bits_of_precision:kk in
         let per_term_precision = ceil_log2 (B.of_int n) + k in
-        if n * per_term_precision < Field.Constant.size_in_bits then
-          Some {per_term_precision; terms_needed= n; total_precision= k}
+        if (n * per_term_precision) + per_term_precision < field_size_in_bits
+        then Some {per_term_precision; terms_needed= n; total_precision= k}
         else None )
 
-  let m : M.field m = (module M)
-
-  let params base =
+  let params ~field_size_in_bits ~base =
     let abs_log_base =
       let log_base = log base ~terms:100 in
       assert (Bignum.(log_base < zero)) ;
@@ -133,7 +131,7 @@ module Exp (M : Snark_intf.Run) = struct
       r
     in
     let {total_precision; terms_needed; per_term_precision} =
-      bit_params ~log_base:abs_log_base
+      bit_params ~field_size_in_bits ~log_base:abs_log_base
     in
     (* Precompute the coefficeints 
 
@@ -151,6 +149,20 @@ module Exp (M : Snark_intf.Run) = struct
     in
     {Params.total_precision; terms_needed; per_term_precision; coefficients}
 
+  module Unchecked = struct
+    let one_minus_exp (params : Params.t) x =
+      let denom =
+        Bignum.(of_bigint B.(shift_left one params.per_term_precision))
+      in
+      Array.fold params.coefficients ~init:(Bignum.zero, Bignum.one)
+        ~f:(fun (acc, x_i) (sgn, c) ->
+          let x_i = Bignum.(x_i * x) in
+          let c = Bignum.(of_bigint c / denom) in
+          let c = match sgn with `Pos -> c | `Neg -> Bignum.neg c in
+          (Bignum.(acc + (x_i * c)), x_i) )
+      |> fst
+  end
+
   (* Zip together coefficients and powers of x and sum *)
   let taylor_sum ~m x_powers coefficients =
     Array.fold2_exn coefficients x_powers ~init:None
@@ -163,7 +175,7 @@ module Exp (M : Snark_intf.Run) = struct
         | Some s -> Some (Floating_point.add_signed ~m s (sgn, term)) )
     |> Option.value_exn
 
-  let one_minus_exp
+  let one_minus_exp ~m
       { Params.total_precision= _
       ; terms_needed
       ; per_term_precision
@@ -176,21 +188,25 @@ module Exp (M : Snark_intf.Run) = struct
           ) )
     in
     taylor_sum ~m powers coefficients
-
-  let%test_unit "works" =
-    let c () =
-      let params = params Bignum.(one / of_int 2) in
-      let arg =
-        Floating_point.of_quotient ~m
-          ~top:(Integer.of_bits ~m Boolean.[true_])
-          ~bottom:(Integer.of_bits ~m Boolean.[false_; true_])
-          ~top_is_less_than_bottom:() ~precision:2
-      in
-      Floating_point.to_bignum ~m (one_minus_exp params arg)
-    in
-    M.run_and_check c |> Or_error.ok_exn |> ignore
 end
 
 let%test_unit "instantiate" =
-  let module M = Exp (Snarky.Snark.Run.Make (Snarky.Backends.Mnt4.Default)) in
-  ()
+  let module M = Snarky.Snark.Run.Make (Snarky.Backends.Mnt4.Default) in
+  let m : M.field m = (module M) in
+  let open M in
+  let params =
+    Exp.params ~field_size_in_bits:Field.Constant.size_in_bits
+      ~base:Bignum.(one / of_int 2)
+  in
+  let c () =
+    let arg =
+      Floating_point.of_quotient ~m
+        ~top:(Integer.of_bits ~m Boolean.[true_])
+        ~bottom:(Integer.of_bits ~m Boolean.[false_; true_])
+        ~top_is_less_than_bottom:() ~precision:2
+    in
+    Floating_point.to_bignum ~m (Exp.one_minus_exp ~m params arg)
+  in
+  let res = M.run_and_check c |> Or_error.ok_exn in
+  assert (
+    Bignum.(equal res (Exp.Unchecked.one_minus_exp params (one / of_int 2))) )
