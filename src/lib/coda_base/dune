@@ -32,7 +32,6 @@
     coda_numbers
     debug_assert
     merkle_mask
-    banlist_lib
     peer_trust
     receipt_chain_database_lib
     storage
