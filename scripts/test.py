@@ -131,7 +131,7 @@ def run(args):
 
     timestamp = int(time.time())
     print('======================================')
-    print('============= '+timestamp+' =============')
+    print('============= %d =============' % timestamp)
     print('======================================')
 
     log_dir = os.path.join('test_logs', str(timestamp))
