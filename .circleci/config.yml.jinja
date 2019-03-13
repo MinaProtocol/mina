@@ -66,10 +66,10 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Deps -- make macos-setup-download
-                  command: make macos-setup-download
+                  command: ./scripts/skip_if_only_frontend.sh make macos-setup-download
             - run:
                   name: Compile Deps -- make macos-setup-compile
-                  command: make macos-setup-compile
+                  command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
             - save_cache:
                   key: homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
                   paths:
@@ -81,10 +81,10 @@ jobs:
                       - "/Users/distiller/.opam"
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
             - run:
                   name: Record Constraint System Digests
-                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log'
             - run:
                   name: Run all tests (on master)
                   command: echo "FIXME Tests not yet working on mac"
@@ -102,30 +102,30 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Download Stable Proving Keys
-                  command: scripts/getkeys.sh
+                  command: ./scripts/skip_if_only_frontend.sh scripts/getkeys.sh
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
             - run:
                   name: Build deb Package with keys
-                  command: make deb
+                  command: ./scripts/skip_if_only_frontend.sh make deb
             - run:
                   name: Store Generated Proving and Verifying Keys
-                  command: make provingkeys
+                  command: ./scripts/skip_if_only_frontend.sh make provingkeys
             - run:
                   name: Store Genesis Public/Private Keypairs
-                  command: make genesiskeys
+                  command: ./scripts/skip_if_only_frontend.sh make genesiskeys
             - run:
                   name: Upload deb to repo
-                  command: make publish_deb
+                  command: ./scripts/skip_if_only_frontend.sh make publish_deb
             - run:
                   name: Record Constraint System Digests
-                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
             - store_artifacts:
                   path: /tmp/artifacts
             - run:
                   name: Copy artifacts to Google Cloud
-                  command: scripts/artifacts.sh
+                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
     {%- endfor %}
 
     {%- for profile in unit_test_profiles %}
@@ -138,7 +138,7 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
-                  command: source ~/.profile && dune build --profile={{profile}} -j8 && dune runtest --profile={{profile}} -j8
+                  command: source ~/.profile && ./scripts/skip_if_only_frontend.sh bash -c 'dune build --profile={{profile}} -j8 && dune runtest --profile={{profile}} -j8'
     {%- endfor %}
 
     {%- for profile in test_permutations.keys() | sort %}
@@ -152,7 +152,7 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test - {{profile}}:{{test}}
-                  command: source ~/.profile && ./scripts/test.py run '{{profile}}:{{test}}'
+                  command: source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run '{{profile}}:{{test}}'
     {%- endfor %}
     {%- endfor %}
 
