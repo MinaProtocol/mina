@@ -36,7 +36,7 @@ let main () =
   let config =
     Coda_process.local_config ~peers ~external_port ~discovery_port
       ~acceptable_delay ~snark_worker_config:None ~proposer:None ~program_dir
-      ~work_selection ()
+      ~work_selection ~offset:Time.Span.zero ()
   in
   let%bind worker = Coda_process.spawn_exn config in
   let%bind _ = after (Time.Span.of_sec 10.) in

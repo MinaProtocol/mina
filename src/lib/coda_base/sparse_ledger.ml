@@ -27,7 +27,8 @@ let of_ledger_subset_exn (oledger : Ledger.t) keys =
             , add_path sl
                 (Ledger.merkle_path ledger loc)
                 key
-                (Ledger.get ledger loc |> Option.value_exn) )
+                ( Ledger.get ledger loc
+                |> Option.value_exn ?here:None ?error:None ?message:None ) )
         | None ->
             let path, acct = Ledger.create_empty ledger key in
             (key :: new_keys, add_path sl path key acct) )
@@ -84,7 +85,7 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
         Receipt.Chain_hash.cons payload sender_account.receipt_chain_hash
     ; balance=
         Balance.sub_amount sender_account.balance (Amount.of_fee fee)
-        |> Option.value_exn }
+        |> Option.value_exn ?here:None ?error:None ?message:None }
   in
   match User_command.Payload.body payload with
   | Stake_delegation (Set_delegate {new_delegate}) ->
@@ -95,7 +96,7 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
           { sender_account with
             balance=
               Balance.sub_amount sender_account.balance amount
-              |> Option.value_exn }
+              |> Option.value_exn ?here:None ?error:None ?message:None }
       in
       let receiver_idx = find_index_exn t receiver in
       let receiver_account = get_or_initialize_exn receiver t receiver_idx in
@@ -133,7 +134,10 @@ let apply_coinbase_exn t
     | None -> (coinbase_amount, t)
     | Some (receiver, fee) ->
         let fee = Amount.of_fee fee in
-        let reward = Amount.sub coinbase_amount fee |> Option.value_exn in
+        let reward =
+          Amount.sub coinbase_amount fee
+          |> Option.value_exn ?here:None ?message:None ?error:None
+        in
         (reward, add_to_balance t receiver fee)
   in
   add_to_balance t proposer proposer_reward

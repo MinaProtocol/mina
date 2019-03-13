@@ -5,6 +5,7 @@
 [%%import "config/debug_level/some.mlh"]
 [%%import "config/proof_level/none.mlh"]
 
+[%%define time_offsets false]
 [%%define delta 8]
 [%%define cache_exceptions false]
 [%%define fake_hash true]
