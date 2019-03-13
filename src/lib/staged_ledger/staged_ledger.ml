@@ -1340,12 +1340,11 @@ end = struct
                 Transaction_validator.apply_transaction validating_ledger
                   (User_command t) )
           with
-          | Error _ ->
+          | Error e ->
               Logger.error logger
-                !"Invalid user command: %{sexp: \
-                  User_command.With_valid_signature.t} \n\
-                  %!"
-                t ;
+                !"Invalid user command! Error was: %{sexp: Error.t}, command \
+                  was: %{sexp: User_command.With_valid_signature.t}"
+                e t ;
               seq
           | Ok _ -> Sequence.append (Sequence.singleton t) seq )
     in
