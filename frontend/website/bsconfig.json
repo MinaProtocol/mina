@@ -1,0 +1,16 @@
+{
+  "name": "website",
+  "reason" : {"react-jsx" : 2},
+  "sources": {
+      "dir": "src",
+      "subdirs": true
+  },
+  "bs-dependencies": [
+    "reason-react",
+    "bs-css"
+  ],
+  "warnings": {
+    "error": "+101"
+  },
+  "refmt": 3
+}
