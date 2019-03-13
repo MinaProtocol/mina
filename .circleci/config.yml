@@ -527,6 +527,11 @@ workflows:
             - tracetool
             - build-macos
             - build-wallet
+            - build-artifacts--dev
+            - build-artifacts--testnet_posig
+            - build-artifacts--testnet_postake
+            - build-artifacts--testnet_public
+            - build-artifacts--testnet_postake_snarkless_fake_hash
             - test-unit--test_posig_snarkless
             - test-unit--test_postake_snarkless
             - test--fake_hash--full-test

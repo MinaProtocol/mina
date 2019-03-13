@@ -164,7 +164,7 @@ workflows:
             - tracetool
             - build-macos
             - build-wallet
-            {%- for profile in build_profiles %}
+            {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}
             {%- for profile in unit_test_profiles %}
