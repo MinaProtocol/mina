@@ -29,9 +29,12 @@ module Stable = struct
   module Registered_V1 = Registrar.Register (V1)
 end
 
-include Stable.Latest
+(* bin_io omitted intentionally *)
+type t = Stable.Latest.t =
+  {fee: Currency.Fee.Stable.V1.t; prover: Public_key.Compressed.Stable.V1.t}
+[@@deriving sexp]
 
-let create ~fee ~prover = {fee; prover}
+let create ~fee ~prover = Stable.Latest.{fee; prover}
 
 module Digest = struct
   module Stable = struct
@@ -58,9 +61,18 @@ module Digest = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.Latest
+  (* bin_io omitted intentionally *)
+  type t = Stable.Latest.t [@@deriving sexp, eq]
 
-  let default = of_string (String.init length_in_bytes ~f:(fun _ -> '\000'))
+  module Checked = Stable.Latest.Checked
+
+  let fold, typ, length_in_triples =
+    Stable.Latest.(fold, typ, length_in_triples)
+
+  let default =
+    let open Random_oracle.Digest in
+    of_string (String.init length_in_bytes ~f:(fun _ -> '\000'))
 end
 
-let digest t = Random_oracle.digest_string (Binable.to_string (module T) t)
+let digest t =
+  Random_oracle.digest_string (Binable.to_string (module Stable.Latest.T) t)

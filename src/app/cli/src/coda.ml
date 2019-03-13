@@ -300,7 +300,9 @@ let daemon log =
        let%bind () = Async.Unix.mkdir ~p:() trust_dir in
        let banlist = Coda_base.Banlist.create ~suspicious_dir ~punished_dir in
        let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
-       let time_controller = M.Inputs.Time.Controller.create () in
+       let time_controller =
+         M.Inputs.Time.Controller.create M.Inputs.Time.Controller.basic
+       in
        let net_config =
          { M.Inputs.Net.Config.parent_log= log
          ; time_controller

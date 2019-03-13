@@ -271,7 +271,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let initial_account = Account.initialize pk in
       match get_or_create_account_exn t pk (Account.initialize pk) with
       | `Added, location -> (location, initial_account, [pk])
-      | `Existed, location -> (location, get t location |> Option.value_exn, [])
+      | `Existed, location -> (location, Option.value_exn (get t location), [])
     in
     let open Or_error.Let_syntax in
     let%bind proposer_reward, emptys1, receiver_update =
@@ -322,7 +322,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               balance=
                 Option.value_exn
                   (Balance.sub_amount receiver_account.balance fee) } ;
-          Amount.sub coinbase_amount fee |> Option.value_exn
+          Option.value_exn (Amount.sub coinbase_amount fee)
     in
     let proposer_location =
       Or_error.ok_exn (location_of_key' t "receiver" proposer)
