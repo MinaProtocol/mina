@@ -183,7 +183,7 @@ def render(args):
     if args.check:
         with open(output_file, 'r') as file:
             if file.read() != rendered:
-                fail('circle CI configuration was not rendered correctly')
+                fail('circle CI configuration is out of date, re-render it')
     else:
         with open(output_file, 'w') as file:
             file.write(rendered)
