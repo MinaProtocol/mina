@@ -115,7 +115,6 @@ def run(args):
 
     jq_filter = '.level=="Warn" or .level=="Error" or .level=="Faulty_peer" or .level=="Fatal"'
 
-    print(args)
     test_permutations = filter_test_permutations(args.whitelist_patterns, args.blacklist_patterns)
     if len(test_permutations) == 0:
         # TODO: support direct test dispatching
@@ -171,7 +170,6 @@ def render(args):
     (output_file, ext) = os.path.splitext(args.jinja_file)
     assert ext == '.jinja'
 
-    print(ci_blacklist)
     test_permutations = filter_test_permutations(['*'], ci_blacklist)
 
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(circle_ci_conf_dir))
@@ -182,9 +180,13 @@ def render(args):
         test_permutations=test_permutations
     )
 
-    output_file = open(output_file, 'w')
-    output_file.write(rendered)
-    output_file.close()
+    if args.check:
+        with open(output_file, 'r') as file:
+            if file.read() != rendered:
+                fail('circle CI configuration was not rendered correctly')
+    else:
+        with open(output_file, 'w') as file:
+            file.write(rendered)
 
 def list_tests(_args):
     for profile in test_permutations.keys():
@@ -220,7 +222,10 @@ def main():
     run_parser.add_argument(
         '-b', '--blacklist-pattern',
         action='append', type=str, default=[], dest='blacklist_patterns',
-        help='Specify a pattern of tests to exclude from running. This flag can be provided multiple times to specify a series of patterns'
+        help='''
+            Specify a pattern of tests to exclude from running. This flag can be
+            provided multiple times to specify a series of patterns'
+        '''
     )
     run_parser.add_argument(
         'whitelist_patterns',
@@ -230,6 +235,11 @@ def main():
 
     render_parser = subparsers.add_parser('render', description='Render circle CI configuration.')
     render_parser.set_defaults(action='render')
+    render_parser.add_argument(
+        '-c', '--check',
+        action='store_true',
+        help='Check that CI configuration was rendered properly.'
+    )
     render_parser.add_argument('jinja_file')
 
     list_parser = subparsers.add_parser('list', description='List available tests.')

@@ -32,6 +32,9 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
+                  name: Check circle CI configuration rendering
+                  command: ./scripts/test.py render --check
+            - run:
                   name: OCamlformat (make check-format)
                   command: eval `opam config env` && make check-format
             - run:
