@@ -1,6 +1,6 @@
 open Core_kernel
 
-type ('a, 'h) t = {data: 'a; hash: 'h} [@@deriving sexp, bin_io, compare, eq]
+type ('a, 'h) t = {data: 'a; hash: 'h} [@@deriving sexp, bin_io, compare]
 
 let data {data; _} = data
 
