@@ -32,7 +32,7 @@ module Keys = struct
 
     let load ({step; wrap} : Location.t) =
       let open Storage in
-      let parent_log = Logger.create () in
+      let parent_log = Logger.null () in
       let tick_controller =
         Controller.create ~parent_log (module Tick.Groth16.Proving_key)
       in
@@ -71,7 +71,7 @@ module Keys = struct
 
     let load ({step; wrap} : Location.t) =
       let open Storage in
-      let parent_log = Logger.create () in
+      let parent_log = Logger.null () in
       let tick_controller =
         Controller.create ~parent_log (module Tick.Groth16.Verification_key)
       in
