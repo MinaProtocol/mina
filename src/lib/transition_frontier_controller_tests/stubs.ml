@@ -20,8 +20,17 @@ struct
   module Ledger_proof_statement = Transaction_snark.Statement
 
   module Ledger_proof = struct
-    type t = Ledger_proof_statement.t * Sok_message.Digest.Stable.V1.t
-    [@@deriving sexp, bin_io]
+    module Stable = struct
+      module V1 = struct
+        type t = Ledger_proof_statement.t * Sok_message.Digest.Stable.V1.t
+        [@@deriving sexp, bin_io]
+      end
+
+      module Latest = V1
+    end
+
+    (* TODO: remove bin_io, after fixing functors to accept this *)
+    type t = Stable.V1.t [@@deriving sexp, bin_io]
 
     let underlying_proof (_ : t) = Proof.dummy
 
