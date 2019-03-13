@@ -84,7 +84,7 @@ end = struct
         module T = struct
           let version = 1
 
-          type t = Ledger_proof.t * Sok_message.Stable.V1.t
+          type t = Ledger_proof.Stable.V1.t * Sok_message.Stable.V1.t
           [@@deriving sexp, bin_io]
         end
 
@@ -104,7 +104,7 @@ end = struct
       module Registered_V1 = Registrar.Register (V1)
     end
 
-    include Stable.Latest
+    type t = Ledger_proof.t * Sok_message.t [@@deriving sexp]
   end
 
   module Available_job = struct
@@ -144,7 +144,8 @@ end = struct
   type job = Available_job.t [@@deriving sexp]
 
   type parallel_scan_completed_job =
-    Ledger_proof_with_sok_message.t Parallel_scan.State.Completed_job.t
+    Ledger_proof_with_sok_message.Stable.V1.t
+    Parallel_scan.State.Completed_job.t
   [@@deriving sexp, bin_io]
 
   module Stable = struct
@@ -155,7 +156,7 @@ end = struct
         type t =
           { (*Job_count: Keeping track of the number of jobs added to the tree. Every transaction added amounts to two jobs*)
             tree:
-              ( Ledger_proof_with_sok_message.t
+              ( Ledger_proof_with_sok_message.Stable.V1.t
               , Transaction_with_witness.t )
               Parallel_scan.State.t
           ; mutable job_count: int }
@@ -195,7 +196,7 @@ end = struct
   let hash t =
     let state_hash =
       Parallel_scan.State.hash t.tree
-        (Binable.to_string (module Ledger_proof_with_sok_message))
+        (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V1))
         (Binable.to_string (module Transaction_with_witness))
     in
     Staged_ledger_aux_hash.of_bytes
