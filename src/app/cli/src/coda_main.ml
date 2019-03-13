@@ -49,7 +49,7 @@ module Staged_ledger_hash = struct
 end
 
 module Ledger_hash = struct
-  include Ledger_hash.Stable.Latest
+  include Ledger_hash
 
   let of_digest = Ledger_hash.of_digest
 
@@ -63,7 +63,7 @@ module Ledger_hash = struct
 end
 
 module Frozen_ledger_hash = struct
-  include Frozen_ledger_hash.Stable.Latest
+  include Frozen_ledger_hash
 
   let to_bytes = Frozen_ledger_hash.to_bytes
 
