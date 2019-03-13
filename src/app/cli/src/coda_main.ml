@@ -364,32 +364,6 @@ module type Main_intf = sig
   val receipt_chain_database : t -> Receipt_chain_database.t
 end
 
-module User_command = struct
-  include (
-    User_command :
-      module type of User_command
-      with module With_valid_signature := User_command.With_valid_signature )
-
-  let fee (t : t) = Payload.fee t.payload
-
-  let sender (t : t) = Public_key.compress t.sender
-
-  let seed = Secure_random.string ()
-
-  let compare t1 t2 = User_command.Stable.Latest.compare ~seed t1 t2
-
-  module With_valid_signature = struct
-    module T = struct
-      include User_command.With_valid_signature
-
-      let compare t1 t2 = User_command.With_valid_signature.compare ~seed t1 t2
-    end
-
-    include T
-    include Comparable.Make (T)
-  end
-end
-
 module Fee_transfer = Coda_base.Fee_transfer
 module Ledger_proof_statement = Transaction_snark.Statement
 module Transaction_snark_work =
@@ -611,7 +585,7 @@ struct
   end)
 
   module Transaction_pool = struct
-    module Pool = Transaction_pool.Make (User_command) (Transition_frontier)
+    module Pool = Transaction_pool.Make (Staged_ledger) (Transition_frontier)
     include Network_pool.Make (Transition_frontier) (Pool) (Pool.Diff)
 
     type pool_diff = Pool.Diff.t [@@deriving bin_io]
