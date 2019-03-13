@@ -234,19 +234,21 @@ end
 let%test_module "Strict_pipe.Reader.Merge" =
   ( module struct
     let%test_unit "'iter' would filter out the closed pipes" =
-     Async.Thread_safe.block_on_async_exn (fun () ->
-      let reader1, writer1 = create (Buffered (`Capacity 10, `Overflow Drop_head)) in 
-      let reader2, writer2 = create (Buffered (`Capacity 10, `Overflow Drop_head)) in 
-      Reader.Merge.iter [reader1; reader2] ~f:(fun _ ->
-        Deferred.unit) |> don't_wait_for ;
-      Writer.write writer1 1;
-      Writer.write writer2 2;
-      Writer.close writer1 ;
-      let%map () = Async.after (Time.Span.of_ms 5.) in
-      Writer.write writer2 3;
-      () )
-    end
-  )
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let reader1, writer1 =
+            create (Buffered (`Capacity 10, `Overflow Drop_head))
+          in
+          let reader2, writer2 =
+            create (Buffered (`Capacity 10, `Overflow Drop_head))
+          in
+          Reader.Merge.iter [reader1; reader2] ~f:(fun _ -> Deferred.unit)
+          |> don't_wait_for ;
+          Writer.write writer1 1 ;
+          Writer.write writer2 2 ;
+          Writer.close writer1 ;
+          let%map () = Async.after (Time.Span.of_ms 5.) in
+          Writer.write writer2 3 ; () )
+  end )
 
 let%test_module "Strict_pipe.close" =
   ( module struct
