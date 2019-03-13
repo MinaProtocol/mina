@@ -49,7 +49,15 @@ include Binable.Of_binable
           end)
 
 let create ~amount ~proposer ~fee_transfer =
-  let t = {proposer; amount; fee_transfer} in
+  let ft =
+    if
+      Public_key.Compressed.equal
+        (Option.value_map fee_transfer ~default:proposer ~f:fst)
+        proposer
+    then None
+    else fee_transfer
+  in
+  let t = {proposer; amount; fee_transfer= ft} in
   if is_valid t then Ok t
   else Or_error.error_string "Coinbase.create: fee transfer was too high"
 
