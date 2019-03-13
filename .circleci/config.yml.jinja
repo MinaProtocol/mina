@@ -125,7 +125,8 @@ jobs:
                   command: scripts/artifacts.sh
     {%- endfor %}
 
-    test-unit-test:
+    {%- for profile in unit_test_profiles %}
+    test-unit--{{profile}}:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -133,8 +134,9 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Test make test-runtest
-                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless MYPROCS=8 make test-runtest
+                  name: Run unit tests
+                  command: source ~/.profile && dune build --profile={{profile}} && dune runtest --profile={{profile}}
+    {%- endfor %}
 
     {%- for profile in test_permutations.keys() %}
     {%- for test in test_permutations[profile] %}
@@ -162,7 +164,9 @@ workflows:
             {%- for profile in build_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}
-            - test-unit-test
+            {%- for profile in unit_test_profiles %}
+            - test-unit--{{profile}}
+            {%- endfor %}
             {%- for profile in test_permutations.keys() %}
             {%- for test in test_permutations[profile] %}
             - test--{{profile}}--{{'--'.join(test.split(' '))}}

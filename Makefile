@@ -216,29 +216,6 @@ codaslim:
 render-circleci:
 	./scripts/test.py render .circleci/config.yml.jinja
 
-test:
-	$(WRAP) make test-all
-
-test-all: | test-runtest \
-			test-sigs \
-			test-stakes
-
-test-runtest: SHELL := /bin/bash
-test-runtest:
-	source scripts/test_all.sh ; cd src ; run_unit_tests
-
-test-sigs: SHELL := /bin/bash
-test-sigs:
-	source scripts/test_all.sh ; cd src ; run_all_sig_integration_tests
-
-test-stakes: SHELL := /bin/bash
-test-stakes:
-	source scripts/test_all.sh ; cd src ; run_all_stake_integration_tests
-
-test-withsnark: SHELL := /bin/bash
-test-withsnark:
-	source scripts/test_all.sh ; cd src; WITH_SNARKS=true DUNE_PROFILE=test_posig run_integration_test full-test
-
 test-ppx:
 	$(MAKE) -C src/lib/ppx_coda/tests
 

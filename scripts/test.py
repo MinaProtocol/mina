@@ -15,6 +15,11 @@ build_artifact_profiles = [
     'testnet_postake_snarkless_fake_hash'
 ]
 
+unit_test_profiles = [
+    'test_posig_snarkless',
+    'test_postake_snarkless'
+]
+
 simple_tests = [
     'full-test',
     'transaction-snark-profiler -check-only',
@@ -170,6 +175,7 @@ def render(args):
     template = env.get_template(jinja_file_basename)
     rendered = template.render(
         build_artifact_profiles=build_artifact_profiles,
+        unit_test_profiles=unit_test_profiles,
         test_permutations=test_permutations
     )
 
