@@ -1594,7 +1594,12 @@ let%test_module "test" =
 
       module Ledger_proof = struct
         (*A proof here is a statement *)
-        include Ledger_proof_statement
+        module Stable = struct
+          module V1 = Ledger_proof_statement
+          module Latest = V1
+        end
+
+        type t = Stable.Latest.t [@@deriving sexp]
 
         type ledger_hash = Ledger_hash.t
 
@@ -1754,7 +1759,8 @@ let%test_module "test" =
       module Transaction_snark_work = struct
         let proofs_length = 2
 
-        type proof = Ledger_proof.t [@@deriving sexp, bin_io, compare]
+        type proof = Ledger_proof.Stable.V1.t
+        [@@deriving sexp, bin_io, compare]
 
         type statement = Ledger_proof_statement.t
         [@@deriving sexp, bin_io, compare, hash, eq]

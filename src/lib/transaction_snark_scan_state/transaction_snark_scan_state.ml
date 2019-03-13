@@ -88,7 +88,7 @@ end = struct
         module T = struct
           let version = 1
 
-          type t = Ledger_proof.t * Sok_message.Stable.V1.t
+          type t = Ledger_proof.Stable.V1.t * Sok_message.Stable.V1.t
           [@@deriving sexp, bin_io]
         end
 
@@ -108,7 +108,7 @@ end = struct
       module Registered_V1 = Registrar.Register (V1)
     end
 
-    include Stable.Latest
+    type t = Ledger_proof.t * Sok_message.t [@@deriving sexp]
   end
 
   module Available_job = struct
@@ -148,7 +148,8 @@ end = struct
   type job = Available_job.t [@@deriving sexp]
 
   type parallel_scan_completed_job =
-    Ledger_proof_with_sok_message.t Parallel_scan.State.Completed_job.t
+    Ledger_proof_with_sok_message.Stable.V1.t
+    Parallel_scan.State.Completed_job.t
   [@@deriving sexp, bin_io]
 
   (*Work capacity represents max number of work(currently in the tree and the ones that would arise in the future when current jobs are done) in the tree. *)
@@ -171,7 +172,7 @@ end = struct
         type t =
           { (*Job_count: Keeping track of the number of jobs added to the tree. Every transaction added amounts to two jobs*)
             tree:
-              ( Ledger_proof_with_sok_message.t
+              ( Ledger_proof_with_sok_message.Stable.V1.t
               , Transaction_with_witness.Stable.V1.t )
               Parallel_scan.State.Stable.V1.t
           ; mutable job_count: int }

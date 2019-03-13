@@ -415,7 +415,18 @@ module type Ledger_proof_intf = sig
 
   type sok_digest
 
-  type t [@@deriving sexp, bin_io]
+  (* bin_io omitted intentionally *)
+  type t [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io]
+      end
+
+      module Latest = V1
+    end
+    with type V1.t = t
 
   val create : statement:statement -> sok_digest:sok_digest -> proof:proof -> t
 
