@@ -135,7 +135,7 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Run unit tests
-                  command: source ~/.profile && dune build --profile={{profile}} && dune runtest --profile={{profile}}
+                  command: source ~/.profile && dune build --profile={{profile}} -j$(nproc --all) && dune runtest --profile={{profile}} -j$(nproc --all)
     {%- endfor %}
 
     {%- for profile in test_permutations.keys() %}
