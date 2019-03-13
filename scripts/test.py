@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import argparse
+import collections
 import jinja2
 import os
 import subprocess
@@ -32,7 +33,7 @@ integration_tests = [
     'coda-shared-prefix-test -who-proposes 0',
     'coda-shared-prefix-test -who-proposes 1',
     'coda-shared-state-test',
-    'coda-restart-node-test',
+    'coda-restart-node-test'
 ]
 
 all_tests = simple_tests + integration_tests
@@ -71,8 +72,8 @@ def parse_filter(pattern_src):
         return (profile, test)
 
 def filter_test_permutations(whitelist_filters, blacklist_filters):
-    whitelist_patterns = [parse_filter(filter) for filter in whitelist_filters]
-    blacklist_patterns = [parse_filter(filter) for filter in blacklist_filters]
+    whitelist_patterns = list(map(parse_filter, whitelist_filters))
+    blacklist_patterns = list(map(parse_filter, blacklist_filters))
 
     def keep(profile, test):
         whitelisted = all(
@@ -85,12 +86,10 @@ def filter_test_permutations(whitelist_filters, blacklist_filters):
         )
         return whitelisted and not(blacklisted)
 
-    # too complex to represent as a list expression in python
-    result = {}
+    result = collections.defaultdict(list)
     for (profile,tests) in test_permutations.items():
         for test in tests:
             if keep(profile, test):
-                result[profile] = result[profile] if profile in result else []
                 result[profile].append(test)
     return result
 
@@ -108,13 +107,16 @@ def run(args):
                 on_failure()
         wet('$ ' + cmd, do)
 
-    coda_exe_path = 'src/app/cli/src/coda.exe'
+    coda_exe_path = 'app/cli/src/coda.exe'
+    if not(os.path.exists('dune-project')):
+        coda_exe_path = os.path.join('src', coda_exe_path)
     coda_build_path = './_build/default'
     coda_exe = os.path.join(coda_build_path, coda_exe_path)
 
     jq_filter = '.level=="Warn" or .level=="Error" or .level=="Faulty_peer" or .level=="Fatal"'
 
-    test_permutations = filter_test_permutations([args.test_pattern], [args.blacklist_pattern])
+    print(args)
+    test_permutations = filter_test_permutations(args.whitelist_patterns, args.blacklist_patterns)
     if len(test_permutations) == 0:
         # TODO: support direct test dispatching
         if args.test_pattern:
@@ -130,7 +132,7 @@ def run(args):
 
     timestamp = int(time.time())
     print('======================================')
-    print('=============', timestamp, '=============')
+    print('============= '+timestamp+' =============')
     print('======================================')
 
     log_dir = os.path.join('test_logs', str(timestamp))
@@ -169,6 +171,7 @@ def render(args):
     (output_file, ext) = os.path.splitext(args.jinja_file)
     assert ext == '.jinja'
 
+    print(ci_blacklist)
     test_permutations = filter_test_permutations(['*'], ci_blacklist)
 
     env = jinja2.Environment(loader=jinja2.FileSystemLoader(circle_ci_conf_dir))
@@ -183,24 +186,54 @@ def render(args):
     output_file.write(rendered)
     output_file.close()
 
+def list_tests(_args):
+    for profile in test_permutations.keys():
+        print('- ' + profile)
+        for test in test_permutations[profile]:
+            print('  - ' + test)
+
 def main():
     actions = {
         'run': run,
-        'render': render
+        'render': render,
+        'list': list_tests
     }
 
-    root_parser = argparse.ArgumentParser(description='Coda integration test runner/configurator')
-    subparsers = root_parser.add_subparsers(help='command help')
+    root_parser = argparse.ArgumentParser(description='Coda integration test runner/configurator.')
+    subparsers = root_parser.add_subparsers(help='subcommands')
 
-    run_parser = subparsers.add_parser('run', help='run help')
+    run_parser = subparsers.add_parser(
+        'run',
+        description='''
+            Build and run integration tests. Filters can be provided for
+            selecting tests. Filters are specified in the form
+            "<profile>:<test>". On either side, a "*" may be provided as
+            a wildcard. For shorthand, a filter of "*" expands to "*:*".
+        '''
+    )
     run_parser.set_defaults(action='run')
-    run_parser.add_argument('-d', '--dry-run', action='store_true')
-    run_parser.add_argument('-b', '--blacklist-pattern', type=str)
-    run_parser.add_argument('test_pattern', nargs='?', type=str, default='*')
+    run_parser.add_argument(
+        '-d', '--dry-run',
+        action='store_true',
+        help='Do not perform any side effects, only print what the program would do.'
+    )
+    run_parser.add_argument(
+        '-b', '--blacklist-pattern',
+        action='append', type=str, default=[], dest='blacklist_patterns',
+        help='Specify a pattern of tests to exclude from running. This flag can be provided multiple times to specify a series of patterns'
+    )
+    run_parser.add_argument(
+        'whitelist_patterns',
+        nargs='*', type=str, default=['*'],
+        help='The pattern(s) of tests you want to run. Defaults to "*".'
+    )
 
-    render_parser = subparsers.add_parser('render', help='render help')
+    render_parser = subparsers.add_parser('render', description='Render circle CI configuration.')
     render_parser.set_defaults(action='render')
     render_parser.add_argument('jinja_file')
+
+    list_parser = subparsers.add_parser('list', description='List available tests.')
+    list_parser.set_defaults(action='list')
 
     args = root_parser.parse_args()
     if not(hasattr(args, 'action')):
@@ -209,4 +242,5 @@ def main():
         exit(1)
     actions[args.action](args)
 
-main()
+if __name__ == "__main__":
+    main()
