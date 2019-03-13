@@ -49,7 +49,7 @@ module Staged_ledger_hash = struct
 end
 
 module Ledger_hash = struct
-  include Ledger_hash.Stable.Latest
+  include Ledger_hash
 
   let of_digest = Ledger_hash.of_digest
 
@@ -63,7 +63,7 @@ module Ledger_hash = struct
 end
 
 module Frozen_ledger_hash = struct
-  include Frozen_ledger_hash.Stable.Latest
+  include Frozen_ledger_hash
 
   let to_bytes = Frozen_ledger_hash.to_bytes
 
@@ -367,11 +367,13 @@ end
 module Fee_transfer = Coda_base.Fee_transfer
 module Ledger_proof_statement = Transaction_snark.Statement
 module Transaction_snark_work =
-  Staged_ledger.Make_completed_work (Public_key.Compressed) (Ledger_proof)
+  Staged_ledger.Make_completed_work
+    (Public_key.Compressed)
+    (Ledger_proof.Stable.V1)
     (Ledger_proof_statement)
 
 module Staged_ledger_diff = Staged_ledger.Make_diff (struct
-  module Ledger_proof = Ledger_proof
+  module Ledger_proof = Ledger_proof.Stable.V1
   module Ledger_hash = Ledger_hash
   module Staged_ledger_hash = Staged_ledger_hash
   module Staged_ledger_aux_hash = Staged_ledger_aux_hash
@@ -499,7 +501,7 @@ struct
   module Sparse_ledger = Coda_base.Sparse_ledger
 
   module Transaction_snark_work_proof = struct
-    type t = Ledger_proof.t list [@@deriving sexp, bin_io]
+    type t = Ledger_proof.Stable.V1.t list [@@deriving sexp, bin_io]
   end
 
   module Staged_ledger = struct

@@ -75,7 +75,11 @@ end = struct
       module Registered_V1 = Registrar.Register (V1)
     end
 
-    include Stable.Latest
+    type t = Stable.Latest.t =
+      { transaction_with_info: Ledger.Undo.t
+      ; statement: Ledger_proof_statement.t
+      ; witness: Inputs.Sparse_ledger.t }
+    [@@deriving sexp]
   end
 
   module Ledger_proof_with_sok_message = struct
@@ -84,7 +88,7 @@ end = struct
         module T = struct
           let version = 1
 
-          type t = Ledger_proof.t * Sok_message.Stable.V1.t
+          type t = Ledger_proof.Stable.V1.t * Sok_message.Stable.V1.t
           [@@deriving sexp, bin_io]
         end
 
@@ -104,7 +108,7 @@ end = struct
       module Registered_V1 = Registrar.Register (V1)
     end
 
-    include Stable.Latest
+    type t = Ledger_proof.t * Sok_message.t [@@deriving sexp]
   end
 
   module Available_job = struct
@@ -144,8 +148,21 @@ end = struct
   type job = Available_job.t [@@deriving sexp]
 
   type parallel_scan_completed_job =
-    Ledger_proof_with_sok_message.t Parallel_scan.State.Completed_job.t
+    Ledger_proof_with_sok_message.Stable.V1.t
+    Parallel_scan.State.Completed_job.t
   [@@deriving sexp, bin_io]
+
+  (*Work capacity represents max number of work(currently in the tree and the ones that would arise in the future when current jobs are done) in the tree. *)
+  let work_capacity () =
+    let open Constants in
+    (*+1 because of <, +1 to give enough time to adjust the counter after proof is emitted, +1 to due to delay in proof emitting*)
+    (*For Evan: Having C= 2x(txns/block * total-no-of-trees) essentially means all the trees can have full leaves without having to do any work. This doesn't work with the succinct representation and FIFO work order during when this specific edge case occurs*)
+    (*Edge case:When there is a single slot at the end of the tree before continuing at the begining of the tree (referring to the last level), the jobs on the right side of the tree are done along with the jobs on the left (because it wasn't added until then). The root node has to wait until the right sub-tree has completed before the next round begins. By the time the right sub-tree is completed, the left tree is also ready with the proof but has to wait until the root is emitted. This won't work with our succint datastructure impl and FIFO work order.*)
+    let work_delay_factor = max 2 work_delay_factor in
+    let nearest_log_2_txn = Int.ceil_log2 transaction_capacity_log_2 in
+    let nearest_log_2_incr = Int.ceil_log2 work_delay_factor in
+    3 + nearest_log_2_incr + nearest_log_2_txn
+    + Int.pow 2 (transaction_capacity_log_2 + work_delay_factor)
 
   module Stable = struct
     module V1 = struct
@@ -155,15 +172,43 @@ end = struct
         type t =
           { (*Job_count: Keeping track of the number of jobs added to the tree. Every transaction added amounts to two jobs*)
             tree:
-              ( Ledger_proof_with_sok_message.t
-              , Transaction_with_witness.t )
-              Parallel_scan.State.t
+              ( Ledger_proof_with_sok_message.Stable.V1.t
+              , Transaction_with_witness.Stable.V1.t )
+              Parallel_scan.State.Stable.V1.t
           ; mutable job_count: int }
         [@@deriving sexp, bin_io]
       end
 
       include T
       include Registration.Make_latest_version (T)
+
+      let hash t =
+        let state_hash =
+          Parallel_scan.State.hash t.tree
+            (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V1))
+            (Binable.to_string (module Transaction_with_witness.Stable.V1))
+        in
+        Staged_ledger_aux_hash.of_bytes
+          ((state_hash :> string) ^ Int.to_string t.job_count)
+
+      let is_valid t =
+        let k = max Constants.work_delay_factor 2 in
+        Parallel_scan.parallelism ~state:t.tree
+        = Int.pow 2 (Constants.transaction_capacity_log_2 + k)
+        && t.job_count < work_capacity ()
+        && Parallel_scan.is_valid t.tree
+
+      include Binable.Of_binable
+                (T)
+                (struct
+                  type nonrec t = t
+
+                  let to_binable = Fn.id
+
+                  let of_binable t =
+                    assert (is_valid t) ;
+                    t
+                end)
     end
 
     module Latest = V1
@@ -178,47 +223,15 @@ end = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.Latest
+  type t = Stable.Latest.t =
+    { tree:
+        ( Ledger_proof_with_sok_message.t
+        , Transaction_with_witness.Stable.V1.t )
+        Parallel_scan.State.Stable.V1.t
+    ; mutable job_count: int }
+  [@@deriving sexp]
 
-  (*Work capacity represents max number of work(currently in the tree and the ones that would arise in the future when current jobs are done) in the tree. *)
-  let work_capacity () =
-    let open Constants in
-    (*+1 because of <, +1 to give enough time to adjust the counter after proof is emitted, +1 to due to delay in proof emitting*)
-    (*For Evan: Having C= 2x(txns/block * total-no-of-trees) essentially means all the trees can have full leaves without having to do any work. This doesn't work with the succinct representation and FIFO work order during when this specific edge case occurs*)
-    (*Edge case:When there is a single slot at the end of the tree before continuing at the begining of the tree (referring to the last level), the jobs on the right side of the tree are done along with the jobs on the left (because it wasn't added until then). The root node has to wait until the right sub-tree has completed before the next round begins. By the time the right sub-tree is completed, the left tree is also ready with the proof but has to wait until the root is emitted. This won't work with our succint datastructure impl and FIFO work order.*)
-    let work_delay_factor = max 2 work_delay_factor in
-    let nearest_log_2_txn = Int.ceil_log2 transaction_capacity_log_2 in
-    let nearest_log_2_incr = Int.ceil_log2 work_delay_factor in
-    3 + nearest_log_2_incr + nearest_log_2_txn
-    + Int.pow 2 (transaction_capacity_log_2 + work_delay_factor)
-
-  let hash t =
-    let state_hash =
-      Parallel_scan.State.hash t.tree
-        (Binable.to_string (module Ledger_proof_with_sok_message))
-        (Binable.to_string (module Transaction_with_witness))
-    in
-    Staged_ledger_aux_hash.of_bytes
-      ((state_hash :> string) ^ Int.to_string t.job_count)
-
-  let is_valid t =
-    let k = max Constants.work_delay_factor 2 in
-    Parallel_scan.parallelism ~state:t.tree
-    = Int.pow 2 (Constants.transaction_capacity_log_2 + k)
-    && t.job_count < work_capacity ()
-    && Parallel_scan.is_valid t.tree
-
-  include Binable.Of_binable
-            (T)
-            (struct
-              type nonrec t = t
-
-              let to_binable = Fn.id
-
-              let of_binable t =
-                assert (is_valid t) ;
-                t
-            end)
+  let hash, is_valid = Stable.Latest.(hash, is_valid)
 
   (**********Helpers*************)
 

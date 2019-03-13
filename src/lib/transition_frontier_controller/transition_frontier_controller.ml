@@ -92,6 +92,12 @@ module Make (Inputs : Inputs_intf) :
     let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
       Strict_pipe.create Synchronous
     in
+    let proposer_transition_reader_copy, proposer_transition_writer_copy =
+      Strict_pipe.create Synchronous
+    in
+    Strict_pipe.transfer proposer_transition_reader
+      proposer_transition_writer_copy ~f:Fn.id
+    |> don't_wait_for ;
     let unprocessed_transition_cache =
       Transition_handler.Unprocessed_transition_cache.create ~logger
     in
@@ -110,7 +116,8 @@ module Make (Inputs : Inputs_intf) :
       ~f:(Strict_pipe.Writer.write primary_transition_writer)
     |> don't_wait_for ;
     Transition_handler.Processor.run ~logger ~time_controller ~frontier
-      ~primary_transition_reader ~proposer_transition_reader
+      ~primary_transition_reader
+      ~proposer_transition_reader:proposer_transition_reader_copy
       ~catchup_job_writer ~catchup_breadcrumbs_reader
       ~catchup_breadcrumbs_writer ~processed_transition_writer
       ~unprocessed_transition_cache ;
@@ -121,7 +128,8 @@ module Make (Inputs : Inputs_intf) :
         kill primary_transition_reader primary_transition_writer ;
         kill processed_transition_reader processed_transition_writer ;
         kill catchup_job_reader catchup_job_writer ;
-        kill catchup_breadcrumbs_reader catchup_breadcrumbs_writer )
+        kill catchup_breadcrumbs_reader catchup_breadcrumbs_writer ;
+        kill proposer_transition_reader_copy proposer_transition_writer_copy )
     |> don't_wait_for ;
     processed_transition_reader
 end
