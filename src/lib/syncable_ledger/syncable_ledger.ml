@@ -13,6 +13,31 @@ type ('addr, 'hash, 'account) answer =
   | Num_accounts of int * 'hash
 [@@deriving bin_io, sexp]
 
+module type Inputs_intf = sig
+  module Addr : Merkle_address.S
+
+  module Account : sig
+    type t [@@deriving bin_io, sexp]
+  end
+
+  module Hash : Merkle_ledger.Intf.Hash with type account := Account.t
+
+  module Root_hash : sig
+    type t [@@deriving eq, sexp]
+
+    val to_hash : t -> Hash.t
+  end
+
+  module MT :
+    Merkle_ledger.Syncable_intf.S
+    with type hash := Hash.t
+     and type root_hash := Root_hash.t
+     and type addr := Addr.t
+     and type account := Account.t
+
+  val subtree_height : int
+end
+
 module type S = sig
   type t [@@deriving sexp]
 
@@ -137,35 +162,22 @@ don't even set all the hashes for the internal nodes!
 with the hashes in the bottomost N-1 internal nodes).
 *)
 
-module Make
-    (Addr : Merkle_address.S) (Account : sig
-        type t [@@deriving bin_io, sexp]
-    end) (Hash : sig
-      type t [@@deriving bin_io, sexp, eq]
+module Make (Inputs : Inputs_intf) : sig
+  open Inputs
 
-      include
-        Merkle_ledger.Intf.Hash with type account := Account.t and type t := t
-    end) (Root_hash : sig
-      type t [@@deriving eq, sexp]
+  include
+    S
+    with type merkle_tree := MT.t
+     and type hash := Hash.t
+     and type root_hash := Root_hash.t
+     and type addr := Addr.t
+     and type merkle_path := MT.path
+     and type account := Account.t
+     and type query := Addr.t query
+     and type answer := (Addr.t, Hash.t, Account.t) answer
+end = struct
+  open Inputs
 
-      val to_hash : t -> Hash.t
-    end)
-    (MT : Merkle_ledger.Syncable_intf.S
-          with type hash := Hash.t
-           and type root_hash := Root_hash.t
-           and type addr := Addr.t
-           and type account := Account.t) (Subtree_height : sig
-        val subtree_height : int
-    end) :
-  S
-  with type merkle_tree := MT.t
-   and type hash := Hash.t
-   and type root_hash := Root_hash.t
-   and type addr := Addr.t
-   and type merkle_path := MT.path
-   and type account := Account.t
-   and type query := Addr.t query
-   and type answer := (Addr.t, Hash.t, Account.t) answer = struct
   type addr = Addr.t
 
   type diff = unit
@@ -444,7 +456,7 @@ module Make
     go (empty_hash_at_height start_height) hash start_height
 
   let handle_node t addr exp_hash =
-    if Addr.depth addr >= MT.depth - Subtree_height.subtree_height then (
+    if Addr.depth addr >= MT.depth - subtree_height then (
       expect_content t addr exp_hash ;
       Linear_pipe.write_without_pushback t.queries
         (desired_root_exn t, What_contents addr) )
@@ -491,7 +503,7 @@ module Make
             | Error e ->
                 Logger.faulty_peer t.log
                   !"Got error from when trying to add child_hash %{sexp: \
-                    Hash.t} %s %{sexp: Network_peer.Peer.t}"
+                    Hash.t} %s %{sexp: Envelope.Sender.t}"
                   h' (Error.to_string_hum e)
                   (Envelope.Incoming.sender env) ;
                 ()

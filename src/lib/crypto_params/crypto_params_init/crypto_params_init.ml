@@ -1,24 +1,14 @@
 module Tick_backend = struct
   module Full = Snarky.Backends.Mnt4
   include Full.GM
-
-  module Inner_curve = struct
-    include Snarky.Libsnark.Mnt6.Group
-    include Snarky.Libsnark.Curves.Mnt6.G1
-  end
-
+  module Inner_curve = Snarky.Libsnark.Mnt6.G1
   module Inner_twisted_curve = Snarky.Libsnark.Mnt6.G2
 end
 
 module Tock_backend = struct
   module Full = Snarky.Backends.Mnt6
   include Full.GM
-
-  module Inner_curve = struct
-    include Snarky.Libsnark.Mnt4.Group
-    include Snarky.Libsnark.Curves.Mnt4.G1
-  end
-
+  module Inner_curve = Snarky.Libsnark.Mnt4.G1
   module Inner_twisted_curve = Snarky.Libsnark.Mnt4.G2
 end
 
@@ -130,7 +120,6 @@ module Wrap_input = struct
         ; Bitstring.Lsb_first.of_list [high_bit] ]
 
       let to_scalar {low_bits; high_bit} =
-        let open Tock0.Let_syntax in
         let%map low_bits =
           Field.Checked.unpack ~length:(Tick0.Field.size_in_bits - 1) low_bits
         in

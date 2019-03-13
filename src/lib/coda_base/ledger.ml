@@ -43,7 +43,22 @@ module Ledger_inner = struct
 
     let public_key = Account.public_key
 
+    let balance = Account.balance
+
     let initialize = Account.initialize
+
+    let balance = Account.balance
+  end
+
+  module Inputs = struct
+    module Key = Public_key.Compressed
+    module Balance = Currency.Balance
+    module Account = Account
+    module Hash = Hash
+    module Depth = Depth
+    module Kvdb = Kvdb
+    module Location = Location_at_depth
+    module Storage_locations = Storage_locations
   end
 
   module Db :
@@ -55,15 +70,9 @@ module Ledger_inner = struct
      and type account := Account.t
      and type key_set := Public_key.Compressed.Set.t
      and type key := Public_key.Compressed.t =
-    Database.Make (Public_key.Compressed) (Account) (Hash) (Depth)
-      (Location_at_depth)
-      (Kvdb)
-      (Storage_locations)
+    Database.Make (Inputs)
 
-  module Null =
-    Null_ledger.Make (Public_key.Compressed) (Account) (Hash)
-      (Location_at_depth)
-      (Depth)
+  module Null = Null_ledger.Make (Inputs)
 
   module Any_ledger :
     Merkle_ledger.Any_ledger.S
@@ -72,9 +81,7 @@ module Ledger_inner = struct
      and type key := Public_key.Compressed.t
      and type key_set := Public_key.Compressed.Set.t
      and type hash := Hash.t =
-    Merkle_ledger.Any_ledger.Make_base (Public_key.Compressed) (Account) (Hash)
-      (Location_at_depth)
-      (Depth)
+    Merkle_ledger.Any_ledger.Make_base (Inputs)
 
   module Mask :
     Merkle_mask.Masking_merkle_tree_intf.S
@@ -86,10 +93,10 @@ module Ledger_inner = struct
      and type hash := Hash.t
      and type location := Location_at_depth.t
      and type parent := Any_ledger.M.t =
-    Merkle_mask.Masking_merkle_tree.Make (Public_key.Compressed) (Account)
-      (Hash)
-      (Location_at_depth)
-      (Any_ledger.M)
+  Merkle_mask.Masking_merkle_tree.Make (struct
+    include Inputs
+    module Base = Any_ledger.M
+  end)
 
   module Maskable :
     Merkle_mask.Maskable_merkle_tree_intf.S
@@ -103,13 +110,14 @@ module Ledger_inner = struct
      and type unattached_mask := Mask.t
      and type attached_mask := Mask.Attached.t
      and type t := Any_ledger.M.t =
-    Merkle_mask.Maskable_merkle_tree.Make (Public_key.Compressed) (Account)
-      (Hash)
-      (Location_at_depth)
-      (Any_ledger.M)
-      (Mask)
+  Merkle_mask.Maskable_merkle_tree.Make (struct
+    include Inputs
+    module Base = Any_ledger.M
+    module Mask = Mask
+  end)
 
   include Mask.Attached
+  module Debug = Maskable.Debug
 
   type maskable_ledger = t
 
@@ -197,7 +205,7 @@ module Ledger_inner = struct
       | `Existed, loc -> ([], loc)
       | `Added, loc -> ([key], loc)
     in
-    (key, get ledger loc |> Option.value_exn, loc)
+    (key, Option.value_exn (get ledger loc), loc)
 
   let create_empty ledger key =
     let start_hash = merkle_root ledger in

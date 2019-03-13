@@ -19,7 +19,9 @@ module Make (Blockchain_state : Coda_base.Blockchain_state.S) = struct
     {x= field x; y= field y; z= LTock.Fq.one}
 
   let g2 (t : Snarky.Libsnark.Mnt6.G2.t) : LTock.G2.t =
-    let x, y = Crypto_params.Tick_backend.Inner_twisted_curve.to_coords t in
+    let x, y =
+      Crypto_params.Tick_backend.Inner_twisted_curve.to_affine_coordinates t
+    in
     {x= twist_field x; y= twist_field y; z= LTock.Fq3.one}
 
   let g1_vector v =
@@ -78,7 +80,8 @@ module Make (Blockchain_state : Coda_base.Blockchain_state.S) = struct
     ; balance= balance account.balance
     ; delegate= public_key account.delegate
     ; receipt_chain_hash=
-        digest (account.receipt_chain_hash :> Tick.Pedersen.Digest.t) }
+        digest (account.receipt_chain_hash :> Tick.Pedersen.Digest.t)
+    ; participated= account.participated }
 
   let ledger_hash (h : Coda_base.Ledger_hash.t) : Lite_base.Ledger_hash.t =
     digest (h :> Tick.Pedersen.Digest.t)

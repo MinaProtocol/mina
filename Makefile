@@ -65,7 +65,7 @@ kademlia:
 # Alias
 dht: kademlia
 
-build: git_hooks
+build: git_hooks reformat-diff
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && (ulimit -u 2128 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
 	$(info Build complete)
@@ -77,6 +77,9 @@ dev: codabuilder containerstart build
 
 reformat: git_hooks
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
+
+reformat-diff:
+	ocamlformat --inplace $(shell git diff --name-only HEAD | grep '.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
 
 check-format:
 	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
@@ -163,7 +166,7 @@ deb:
 	@cp src/_build/coda.deb /tmp/artifacts/.
 
 # deb-s3 https://github.com/krobertson/deb-s3
-DEBS3 = deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=120
+DEBS3 = deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=max-age=120
 
 publish_kademlia_deb:
 	@if [ $(AWS_ACCESS_KEY_ID) ] ; then \
@@ -178,10 +181,12 @@ publish_kademlia_deb:
 
 publish_deb:
 	@if [ $(AWS_ACCESS_KEY_ID) ] ; then \
-		if [ "$(CIRCLE_BRANCH)" = "master" ] ; then \
-			$(DEBS3) --codename stable   --component main src/_build/coda.deb ; \
+		if [ "$(CIRCLE_BRANCH)" = "master" ] && [ "$(CIRCLE_JOB)" = "build_testnet_postake" ] ; then \
+            echo "Publishing to stable" ; \
+			$(DEBS3) --codename stable   --component main src/_build/coda-*.deb ; \
 		else \
-			$(DEBS3) --codename unstable --component main src/_build/coda.deb ; \
+            echo "Publishing to unstable" ; \
+			$(DEBS3) --codename unstable --component main src/_build/coda-*.deb ; \
 		fi ; \
 	else  \
 		echo "WARNING: AWS_ACCESS_KEY_ID not set, deb-s3 commands not run" ; \

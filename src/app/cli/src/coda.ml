@@ -300,7 +300,9 @@ let daemon log =
        let%bind () = Async.Unix.mkdir ~p:() trust_dir in
        let banlist = Coda_base.Banlist.create ~suspicious_dir ~punished_dir in
        let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
-       let time_controller = M.Inputs.Time.Controller.create () in
+       let time_controller =
+         M.Inputs.Time.Controller.create M.Inputs.Time.Controller.basic
+       in
        let net_config =
          { M.Inputs.Net.Config.parent_log= log
          ; time_controller
@@ -445,8 +447,12 @@ let coda_commands log =
     ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
     ; ( Coda_shared_prefix_multiproposer_test.name
       , Coda_shared_prefix_multiproposer_test.command )
+    ; (Coda_five_nodes_test.name, Coda_five_nodes_test.command)
     ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
     ; (Coda_receipt_chain_test.name, Coda_receipt_chain_test.command)
+    ; ( Coda_restarts_and_txns_holy_grail.name
+      , Coda_restarts_and_txns_holy_grail.command )
+    ; (Coda_bootstrap_test.name, Coda_bootstrap_test.command)
     ; ("full-test", Full_test.command)
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
   in

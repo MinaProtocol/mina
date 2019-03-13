@@ -20,8 +20,17 @@ struct
   module Ledger_proof_statement = Transaction_snark.Statement
 
   module Ledger_proof = struct
-    type t = Ledger_proof_statement.t * Sok_message.Digest.Stable.V1.t
-    [@@deriving sexp, bin_io]
+    module Stable = struct
+      module V1 = struct
+        type t = Ledger_proof_statement.t * Sok_message.Digest.Stable.V1.t
+        [@@deriving sexp, bin_io]
+      end
+
+      module Latest = V1
+    end
+
+    (* TODO: remove bin_io, after fixing functors to accept this *)
+    type t = Stable.V1.t [@@deriving sexp, bin_io]
 
     let underlying_proof (_ : t) = Proof.dummy
 
@@ -46,36 +55,13 @@ struct
     include Staged_ledger_hash.Aux_hash.Stable.V1
 
     let of_bytes = Staged_ledger_hash.Aux_hash.of_bytes
+
+    let to_bytes = Staged_ledger_hash.Aux_hash.to_bytes
   end
 
   module Transaction_snark_work =
     Staged_ledger.Make_completed_work (Public_key.Compressed) (Ledger_proof)
       (Ledger_proof_statement)
-
-  module User_command = struct
-    include (
-      User_command :
-        module type of User_command
-        with module With_valid_signature := User_command.With_valid_signature )
-
-    let fee (t : t) = Payload.fee t.payload
-
-    let sender (t : t) = Signature_lib.Public_key.compress t.sender
-
-    let seed = Secure_random.string ()
-
-    module With_valid_signature = struct
-      module T = struct
-        include User_command.With_valid_signature
-
-        let compare t1 t2 =
-          User_command.With_valid_signature.compare ~seed t1 t2
-      end
-
-      include T
-      include Comparable.Make (T)
-    end
-  end
 
   module Staged_ledger_diff = Staged_ledger.Make_diff (struct
     module Fee_transfer = Fee_transfer
@@ -239,7 +225,8 @@ struct
           ~default:previous_ledger_hash
       in
       let next_blockchain_state =
-        Blockchain_state.create_value ~timestamp:(Block_time.now ())
+        Blockchain_state.create_value
+          ~timestamp:(Block_time.now Time.Controller.basic)
           ~snarked_ledger_hash:next_ledger_hash
           ~staged_ledger_hash:next_staged_ledger_hash
       in
@@ -341,15 +328,25 @@ struct
     let root_transition_with_data =
       {With_hash.data= root_transition; hash= genesis_protocol_state_hash}
     in
-    let frontier =
-      Transition_frontier.create ~logger
-        ~root_transition:root_transition_with_data ~root_snarked_ledger
-        ~root_transaction_snark_scan_state ~root_staged_ledger_diff:None
-        ~consensus_local_state:
-          (Consensus.Local_state.create
-             (Some proposer_account.Account.public_key))
-    in
-    frontier
+    let open Deferred.Let_syntax in
+    let expected_merkle_root = Ledger.Db.merkle_root root_snarked_ledger in
+    match%map
+      Staged_ledger.of_scan_state_and_snarked_ledger
+        ~scan_state:root_transaction_snark_scan_state
+        ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
+        ~expected_merkle_root
+    with
+    | Ok root_staged_ledger ->
+        let frontier =
+          Transition_frontier.create ~logger
+            ~root_transition:root_transition_with_data ~root_snarked_ledger
+            ~root_staged_ledger
+            ~consensus_local_state:
+              (Consensus.Local_state.create
+                 (Some proposer_account.Account.public_key))
+        in
+        frontier
+    | Error err -> Error.raise err
 
   let build_frontier_randomly ~gen_root_breadcrumb_builder frontier :
       unit Deferred.t =
@@ -400,9 +397,9 @@ struct
       Visualization.Make_ocamlgraph (Transition_frontier.Breadcrumb)
 
     let visualize ~filename ~f breadcrumbs =
-      let output_channel = Out_channel.create filename in
-      let graph = f breadcrumbs in
-      Graph.output_graph output_channel graph
+      Out_channel.with_file filename ~f:(fun output_channel ->
+          let graph = f breadcrumbs in
+          Graph.output_graph output_channel graph )
 
     let graph_breadcrumb_list breadcrumbs =
       let initial_breadcrumb, tail_breadcrumbs =
@@ -460,7 +457,18 @@ struct
            ~error:(Error.of_string "Peer could not produce an ancestor")
            (let open Option.Let_syntax in
            let%bind frontier = Hashtbl.find table peer in
-           Root_prover.prove ~logger ~frontier consensus_state)
+           let%map peer_root_with_proof =
+             Root_prover.prove ~logger ~frontier consensus_state
+           in
+           let staged_ledger =
+             Transition_frontier.Breadcrumb.staged_ledger
+               (Transition_frontier.root frontier)
+           in
+           let scan_state = Staged_ledger.scan_state staged_ledger in
+           let merkle_root =
+             Ledger.merkle_root (Staged_ledger.ledger staged_ledger)
+           in
+           (peer_root_with_proof, scan_state, merkle_root))
 
     let glue_sync_ledger {table; logger; _} query_reader response_writer : unit
         =
@@ -478,7 +486,8 @@ struct
                      Sync_handler.answer_query ~frontier ledger_hash
                        sync_ledger_query ~logger
                    in
-                   Envelope.Incoming.wrap ~data:answer ~sender:peer )
+                   Envelope.Incoming.wrap ~data:answer
+                     ~sender:(Envelope.Sender.Remote peer) )
           in
           match answer with
           | None ->
@@ -556,7 +565,8 @@ struct
         !"Peer %{sexp:Network_peer.Peer.t} sending %{sexp:State_hash.t}"
         address state_hash ;
       let enveloped_transition =
-        Envelope.Incoming.wrap ~data:transition ~sender:address
+        Envelope.Incoming.wrap ~data:transition
+          ~sender:(Envelope.Sender.Remote address)
       in
       Pipe_lib.Strict_pipe.Writer.write transition_writer
         (`Transition enveloped_transition, `Time_received Constants.time)

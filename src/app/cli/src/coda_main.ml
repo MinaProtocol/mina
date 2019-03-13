@@ -34,6 +34,8 @@ module Staged_ledger_aux_hash = struct
   include Staged_ledger_hash.Aux_hash.Stable.Latest
 
   let of_bytes = Staged_ledger_hash.Aux_hash.of_bytes
+
+  let to_bytes = Staged_ledger_hash.Aux_hash.to_bytes
 end
 
 module Staged_ledger_hash = struct
@@ -254,10 +256,6 @@ module type Main_intf = sig
        and type staged_ledger_hash := Staged_ledger_hash.t
        and type fee_transfer_single := Fee_transfer.single
 
-    module Staged_ledger_hash : sig
-      type t [@@deriving sexp]
-    end
-
     module Staged_ledger :
       Protocols.Coda_pow.Staged_ledger_intf
       with type diff := Staged_ledger_diff.t
@@ -366,40 +364,16 @@ module type Main_intf = sig
   val receipt_chain_database : t -> Receipt_chain_database.t
 end
 
-module User_command = struct
-  include (
-    User_command :
-      module type of User_command
-      with module With_valid_signature := User_command.With_valid_signature )
-
-  let fee (t : t) = Payload.fee t.payload
-
-  let sender (t : t) = Public_key.compress t.sender
-
-  let seed = Secure_random.string ()
-
-  let compare t1 t2 = User_command.Stable.Latest.compare ~seed t1 t2
-
-  module With_valid_signature = struct
-    module T = struct
-      include User_command.With_valid_signature
-
-      let compare t1 t2 = User_command.With_valid_signature.compare ~seed t1 t2
-    end
-
-    include T
-    include Comparable.Make (T)
-  end
-end
-
 module Fee_transfer = Coda_base.Fee_transfer
 module Ledger_proof_statement = Transaction_snark.Statement
 module Transaction_snark_work =
-  Staged_ledger.Make_completed_work (Public_key.Compressed) (Ledger_proof)
+  Staged_ledger.Make_completed_work
+    (Public_key.Compressed)
+    (Ledger_proof.Stable.V1)
     (Ledger_proof_statement)
 
 module Staged_ledger_diff = Staged_ledger.Make_diff (struct
-  module Ledger_proof = Ledger_proof
+  module Ledger_proof = Ledger_proof.Stable.V1
   module Ledger_hash = Ledger_hash
   module Staged_ledger_hash = Staged_ledger_hash
   module Staged_ledger_aux_hash = Staged_ledger_aux_hash
@@ -450,7 +424,7 @@ struct
     let limit = Block_time.Span.of_time_span (Core.Time.Span.of_sec 15.)
 
     let validate t =
-      let now = Block_time.now () in
+      let now = Block_time.now Block_time.Controller.basic in
       (* t should be at most [limit] greater than now *)
       Block_time.Span.( < ) (Block_time.diff t now) limit
   end
@@ -527,7 +501,7 @@ struct
   module Sparse_ledger = Coda_base.Sparse_ledger
 
   module Transaction_snark_work_proof = struct
-    type t = Ledger_proof.t list [@@deriving sexp, bin_io]
+    type t = Ledger_proof.Stable.V1.t list [@@deriving sexp, bin_io]
   end
 
   module Staged_ledger = struct
@@ -611,7 +585,7 @@ struct
   end)
 
   module Transaction_pool = struct
-    module Pool = Transaction_pool.Make (User_command) (Transition_frontier)
+    module Pool = Transaction_pool.Make (Staged_ledger) (Transition_frontier)
     include Network_pool.Make (Transition_frontier) (Pool) (Pool.Diff)
 
     type pool_diff = Pool.Diff.t [@@deriving bin_io]
@@ -759,41 +733,10 @@ struct
                 ( List.map res.spec.instances ~f:Single.Spec.statement
                 , { Diff.proof= res.proofs
                   ; fee= {fee= res.spec.fee; prover= res.prover} } ))
-           ~sender:Network_peer.Peer.local)
+           ~sender:Envelope.Sender.Local)
   end
 
-  module Root_sync_ledger :
-    Syncable_ledger.S
-    with type addr := Ledger.Location.Addr.t
-     and type hash := Ledger_hash.t
-     and type root_hash := Ledger_hash.t
-     and type merkle_tree := Ledger.Db.t
-     and type account := Account.t
-     and type merkle_path := Ledger.path
-     and type query := Sync_ledger.query
-     and type answer := Sync_ledger.answer =
-    Syncable_ledger.Make (Ledger.Location.Addr) (Account.Stable.V1)
-      (struct
-        include Ledger_hash
-
-        let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
-
-        let empty_account = hash_account Account.empty
-      end)
-      (struct
-        include Ledger_hash
-
-        let to_hash (h : t) =
-          Ledger_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
-      end)
-      (struct
-        include Ledger.Db
-
-        let f = Account.hash
-      end)
-      (struct
-        let subtree_height = 3
-      end)
+  module Root_sync_ledger = Sync_ledger.Db
 
   module Net = Coda_networking.Make (struct
     include Inputs0
@@ -1145,7 +1088,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       (verifying_txn : User_command.t) proof =
     let open Participating_state.Let_syntax in
     let%map account = get_account t addr in
-    let account = account |> Option.value_exn in
+    let account = Option.value_exn account in
     let resulting_receipt = Account.receipt_chain_hash account in
     let open Or_error.Let_syntax in
     let%bind () = Payment_verifier.verify ~resulting_receipt proof in
@@ -1265,6 +1208,10 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             { Daemon_rpcs.Types.Status.Histograms.rpc_timings
             ; external_transition_latency=
                 r ~name:"external_transition_latency"
+            ; accepted_transition_local_latency=
+                r ~name:"accepted_transition_local_latency"
+            ; accepted_transition_remote_latency=
+                r ~name:"accepted_transition_remote_latency"
             ; snark_worker_transition_time=
                 r ~name:"snark_worker_transition_time"
             ; snark_worker_merge_time= r ~name:"snark_worker_merge_time" }

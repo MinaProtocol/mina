@@ -29,7 +29,7 @@ let pedersen_params ~loc =
     List.init (Array.length arr) ~f:(fun i ->
         let g, _, _, _ = arr.(i) in
         estring
-          (B64.encode
+          (Base64.encode_string
              (Binable.to_string
                 (module Lite_base.Crypto_params.Tock.G1)
                 (Lite_compat.g1 g))) )
@@ -40,7 +40,7 @@ let pedersen_params ~loc =
       (fun s ->
         Core_kernel.Binable.of_string
           (module Lite_base.Crypto_params.Tock.G1)
-          (B64.decode s) )
+          (Base64.decode_exn s) )
       [%e arr_expr]]
 
 let wrap_vk ~loc =
@@ -49,7 +49,7 @@ let wrap_vk ~loc =
   let vk = keys.wrap in
   let vk = Lite_compat.verification_key vk in
   let vk_base64 =
-    B64.encode
+    Base64.encode_string
       (Binable.to_string
          (module Lite_base.Crypto_params.Tock.Groth_maller.Verification_key)
          vk)
@@ -69,7 +69,7 @@ let wrap_vk ~loc =
   [%expr
     Core_kernel.Binable.of_string
       (module Lite_base.Crypto_params.Tock.Groth_maller.Verification_key)
-      (B64.decode [%e estring vk_base64])]
+      (Base64.decode_exn [%e estring vk_base64])]
 
 let protocol_state (s : Consensus.Protocol_state.value) :
     Lite_base.Protocol_state.t =
@@ -111,10 +111,10 @@ let genesis ~loc =
   [%expr
     Core_kernel.Binable.of_string
       (module Lite_base.Lite_chain)
-      (B64.decode
+      (Base64.decode_exn
          [%e
            estring
-             (B64.encode
+             (Base64.encode_string
                 (Binable.to_string (module Lite_base.Lite_chain) chain))])]
 
 open Async

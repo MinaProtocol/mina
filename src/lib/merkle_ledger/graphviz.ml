@@ -20,22 +20,22 @@ module type S = sig
 end
 
 module type Inputs_intf = sig
-  module Key : Merkle_ledger.Intf.Key
+  module Key : Intf.Key
 
-  module Balance : Merkle_ledger.Intf.Balance
+  module Balance : Intf.Balance
 
   module Account : sig
-    include Merkle_ledger.Intf.Account with type key := Key.t
+    include Intf.Account with type key := Key.t
 
     val balance : t -> Balance.t
   end
 
-  module Hash : Merkle_ledger.Intf.Hash with type account := Account.t
+  module Hash : Intf.Hash with type account := Account.t
 
-  module Location : Merkle_ledger.Location_intf.S
+  module Location : Location_intf.S
 
   module Ledger :
-    Merkle_ledger.Base_ledger_intf.S
+    Base_ledger_intf.S
     with module Addr = Location.Addr
      and module Location = Location
      and type key := Key.t
@@ -54,8 +54,6 @@ struct
     include Account
     include Comparator.Make (Account)
   end
-
-  (* type edge = Inner of (Hash.t * Hash.t) | Leaf of (Hash.t * Account.t option) *)
 
   type ('source, 'target) edge = {source: 'source; target: 'target}
 
@@ -82,8 +80,8 @@ struct
   module Addr = Location.Addr
 
   let string_of_account_key account =
-    account |> Account.public_key |> Key.to_string
-    |> Visualization.display_prefix_of_string
+    account |> Account.public_key
+    |> Visualization.display_short_sexp (module Key)
 
   let empty_hashes =
     Empty_hashes.cache (module Hash) ~init_hash:Hash.empty_account Ledger.depth
@@ -101,6 +99,10 @@ struct
           if Addr.is_leaf address then
             match Ledger.get t (Location.Account address) with
             | Some new_account ->
+                (* let public_key = Account.public_key new_account in
+                let location = Ledger.location_of_key t public_key |> Option.value_exn in
+                let queried_account = Ledger.get t location |> Option.value_exn in
+                assert (Account.equal queried_account new_account); *)
                 assert (not @@ Set.mem accounts new_account) ;
                 let new_accounts = Set.add accounts new_account in
                 bfs

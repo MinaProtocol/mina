@@ -86,9 +86,11 @@ module type Network_intf = sig
                            -> state_with_witness Non_empty_list.t
                               Deferred.Option.t)
     -> get_ancestry:(   consensus_state Envelope.Incoming.t
-                     -> ( state_with_witness
-                        , state_body_hash list * state_with_witness )
-                        Proof_carrying_data.t
+                     -> ( ( state_with_witness
+                          , state_body_hash list * state_with_witness )
+                          Proof_carrying_data.t
+                        * parallel_scan_state
+                        * ledger_hash )
                         Deferred.Option.t)
     -> t Deferred.t
 end
@@ -570,20 +572,31 @@ module Make (Inputs : Inputs_intf) = struct
             let ledger_db =
               Ledger_db.create ?directory_name:config.ledger_db_location ()
             in
-            let%bind transition_frontier =
+            let root_snarked_ledger =
+              Ledger_transfer.transfer_accounts ~src:Genesis.ledger
+                ~dest:ledger_db
+            in
+            let snarked_ledger_hash =
+              Frozen_ledger_hash.of_ledger_hash
+              @@ Ledger.merkle_root Genesis.ledger
+            in
+            let%bind root_staged_ledger =
+              match%map
+                Staged_ledger.of_scan_state_and_ledger ~snarked_ledger_hash
+                  ~ledger:Genesis.ledger
+                  ~scan_state:(Staged_ledger.Scan_state.empty ())
+              with
+              | Ok staged_ledger -> staged_ledger
+              | Error err -> Error.raise err
+            in
+            let transition_frontier =
               Transition_frontier.create ~logger:config.log
                 ~root_transition:
                   (With_hash.of_data first_transition
                      ~hash_data:
                        (Fn.compose Consensus_mechanism.Protocol_state.hash
                           External_transition.Verified.protocol_state))
-                ~root_transaction_snark_scan_state:
-                  (Staged_ledger.Scan_state.empty ())
-                ~root_staged_ledger_diff:None
-                ~root_snarked_ledger:
-                  (Ledger_transfer.transfer_accounts ~src:Genesis.ledger
-                     ~dest:ledger_db)
-                ~consensus_local_state
+                ~root_staged_ledger ~root_snarked_ledger ~consensus_local_state
             in
             let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
               Broadcast_pipe.create (Some transition_frontier)
@@ -627,8 +640,19 @@ module Make (Inputs : Inputs_intf) = struct
                     let%bind frontier =
                       Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                     in
-                    Root_prover.prove ~logger:config.log ~frontier
-                      consensus_state
+                    let%map peer_root_with_proof =
+                      Root_prover.prove ~logger:config.log ~frontier
+                        consensus_state
+                    in
+                    let staged_ledger =
+                      Transition_frontier.Breadcrumb.staged_ledger
+                        (Transition_frontier.root frontier)
+                    in
+                    let scan_state = Staged_ledger.scan_state staged_ledger in
+                    let merkle_root =
+                      Ledger.merkle_root (Staged_ledger.ledger staged_ledger)
+                    in
+                    (peer_root_with_proof, scan_state, merkle_root)
                   in
                   Deferred.return result )
             in

@@ -20,14 +20,14 @@ jobs:
             - run: cd frontend/wallet && npm install
             - run:
                   name: Lint wallet
-                  command: cd frontend/wallet && npm run reformat && git diff --exit-code
+                  command: cd frontend/wallet && npm run reformat && git diff --exit-code src
             - run:
                   name: Build wallet
                   command: cd frontend/wallet && npm run build
 
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -90,7 +90,7 @@ jobs:
     build_{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
         environment:
             DUNE_PROFILE: {{profile}}
         steps:
@@ -128,7 +128,7 @@ jobs:
     test-unit-test:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
@@ -140,7 +140,7 @@ jobs:
     test-{{test.name}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-e5d68f8d923b6bfe049a55422587bd45c573d81f
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive

@@ -1,3 +1,6 @@
+[%%import
+"../../config.mlh"]
+
 open Core
 open Import
 open Snark_params
@@ -18,28 +21,31 @@ module Stable = struct
 
       type t = (Payload.Stable.V1.t, Public_key.t, Signature.t) t_
       [@@deriving bin_io, eq, sexp, hash, yojson]
+
+      type with_seed = string * t [@@deriving hash]
+
+      let seed = lazy (Secure_random.string ())
+
+      let compare (t : t) (t' : t) =
+        let same_sender = Public_key.equal t.sender t'.sender in
+        let fee_compare =
+          -Fee.compare (Payload.fee t.payload) (Payload.fee t'.payload)
+        in
+        if same_sender then
+          (* We pick the one with a smaller nonce to go first *)
+          let nonce_compare =
+            Account_nonce.compare (Payload.nonce t.payload)
+              (Payload.nonce t'.payload)
+          in
+          if nonce_compare <> 0 then nonce_compare else fee_compare
+        else
+          let hash x = hash_with_seed (Lazy.force seed, x) in
+          if fee_compare <> 0 then fee_compare else hash t - hash t'
     end
 
     include T
     include Registration.Make_latest_version (T)
-
-    type with_seed = string * t [@@deriving hash]
-
-    let compare ~seed (t : t) (t' : t) =
-      let same_sender = Public_key.equal t.sender t'.sender in
-      let fee_compare =
-        -Fee.compare (Payload.fee t.payload) (Payload.fee t'.payload)
-      in
-      if same_sender then
-        (* We pick the one with a smaller nonce to go first *)
-        let nonce_compare =
-          Account_nonce.compare (Payload.nonce t.payload)
-            (Payload.nonce t'.payload)
-        in
-        if nonce_compare <> 0 then nonce_compare else fee_compare
-      else
-        let hash x = hash_with_seed (seed, x) in
-        if fee_compare <> 0 then fee_compare else hash t - hash t'
+    include Comparable.Make (T)
   end
 
   module Latest = V1
@@ -59,6 +65,10 @@ include Stable.Latest
 type value = t
 
 let payload {payload; _} = payload
+
+let fee = Fn.compose Payload.fee payload
+
+let sender t = Public_key.compress t.sender
 
 let accounts_accessed ({payload; sender; _} : value) =
   Public_key.compress sender :: Payload.accounts_accessed payload
@@ -117,10 +127,20 @@ module With_valid_signature = struct
   end
 
   include Stable.Latest
+  include Comparable.Make (Stable.Latest)
 end
+
+[%%if
+fake_hash]
+
+let check_signature _ = true
+
+[%%else]
 
 let check_signature ({payload; sender; signature} : t) =
   Schnorr.verify signature (Inner_curve.of_affine_coordinates sender) payload
+
+[%%endif]
 
 let gen_test =
   let keys = Array.init 2 ~f:(fun _ -> Signature_keypair.create ()) in

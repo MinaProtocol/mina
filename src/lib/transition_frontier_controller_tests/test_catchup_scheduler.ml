@@ -24,7 +24,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
   ( module struct
     let logger = Logger.null ()
 
-    let time_controller = Time.Controller.create ()
+    let time_controller = Time.Controller.basic
 
     let timeout_duration = Time.Span.of_ms 200L
 
@@ -117,7 +117,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let%test_unit "if a linear sequence of transitions in reverse order, \
                    catchup scheduler should not create duplicate jobs" =
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let _catchup_job_reader, catchup_job_writer =
         Strict_pipe.create Synchronous
       in
