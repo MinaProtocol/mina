@@ -182,6 +182,10 @@ def render(args):
 
     if args.check:
         with open(output_file, 'r') as file:
+            real = file.read()
+            print(rendered)
+            print('=================')
+            print(real)
             if file.read() != rendered:
                 fail('circle CI configuration is out of date, re-render it')
     else:
