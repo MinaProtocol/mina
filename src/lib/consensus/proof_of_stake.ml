@@ -6,9 +6,9 @@ consensus_mechanism = "proof_of_stake"]
 
 let name = "proof_of_stake"
 
-open Core_kernel
-open Signed
 open Unsigned
+open Signed
+open Core_kernel
 open Coda_numbers
 open Currency
 open Fold_lib
@@ -63,12 +63,13 @@ module Constants = struct
 
     (** Amount of time in total for an epoch *)
     let duration =
-      Time.Span.of_ms Int64.Infix.(Slot.duration_ms * int64_of_uint32 size)
+      Time.Span.of_ms Int64.(Slot.duration_ms * int64_of_uint32 size)
   end
 
   (** The duration of delta *)
   let delta_duration =
-    Time.Span.of_ms (Int64.of_int (Int64.to_int Slot.duration_ms * delta))
+    Time.Span.of_ms
+      (Int64.of_int_exn (Int64.to_int_exn Slot.duration_ms * delta))
 end
 
 module Proposal_data = struct
@@ -121,13 +122,13 @@ module Epoch = struct
            "Epoch.of_time: time is earlier than genesis block timestamp") ;
     let time_since_genesis = Time.diff t Constants.genesis_state_timestamp in
     uint32_of_int64
-      Int64.Infix.(
+      Int64.(
         Time.Span.to_ms time_since_genesis
         / Time.Span.to_ms Constants.Epoch.duration)
 
   let start_time (epoch : t) =
     let ms =
-      let open Int64.Infix in
+      let open Int64 in
       Time.Span.to_ms
         (Time.to_span_since_epoch Constants.genesis_state_timestamp)
       + (int64_of_uint32 epoch * Time.Span.to_ms Constants.Epoch.duration)
@@ -155,7 +156,7 @@ module Epoch = struct
       let open Snark_params.Tick.Let_syntax in
       let uint32_msb x =
         List.init 32 ~f:(fun i ->
-            UInt32.Infix.((x lsr Int.sub 31 i) land UInt32.one = UInt32.one) )
+            UInt32.Infix.((x lsr Int.(31 - i)) land UInt32.one = UInt32.one) )
         |> Bitstring_lib.Bitstring.Msb_first.of_list
       in
       let ( < ) = Bitstring_checked.lt_value in
@@ -190,7 +191,7 @@ module Epoch = struct
   let slot_start_time (epoch : t) (slot : Slot.t) =
     Time.add (start_time epoch)
       (Time.Span.of_ms
-         Int64.Infix.(int64_of_uint32 slot * Constants.Slot.duration_ms))
+         Int64.(int64_of_uint32 slot * Constants.Slot.duration_ms))
 
   let slot_end_time (epoch : t) (slot : Slot.t) =
     Time.add (slot_start_time epoch slot) Constants.Slot.duration
@@ -200,8 +201,7 @@ module Epoch = struct
     let time_since_epoch = Time.diff tm (start_time epoch) in
     let slot =
       uint32_of_int64
-      @@ Int64.Infix.(
-           Time.Span.to_ms time_since_epoch / Constants.Slot.duration_ms)
+      @@ Int64.(Time.Span.to_ms time_since_epoch / Constants.Slot.duration_ms)
     in
     (epoch, slot)
 end
@@ -491,48 +491,78 @@ module Vrf = struct
   module Threshold = struct
     open Bignum_bigint
 
-    let of_uint64_exn = Fn.compose of_int64_exn UInt64.to_int64
-
     (* TEMPORARY HACK FOR TESTNETS: c should be 1 otherwise *)
-    let c_int = 2
+    let c : [`One | `Two] = `Two
 
-    let c = of_int c_int
+    let c_int = match c with `One -> 1 | `Two -> 2
 
-    (*  Check if
-        vrf_output / 2^256 <= c * my_stake / total_currency
+    let base = Bignum.(one / of_int 2)
 
-        So that we don't have to do division we check
+    let params =
+      Snarky_taylor.Exp.params ~base
+        ~field_size_in_bits:Snark_params.Tick.Field.size_in_bits
 
-        vrf_output * total_currency <= c * my_stake * 2^256
+    (* TODO: Make efficient *)
+    let bigint_of_uint64 = Fn.compose Bigint.of_string UInt64.to_string
+
+    (*  Check approximately if
+        vrf_output / (c * 2^256) <= 1 - base^(my_stake / total_currency)
     *)
     let is_satisfied ~my_stake ~total_stake vrf_output =
-      of_bit_fold_lsb (Random_oracle.Digest.fold_bits vrf_output)
-      * of_uint64_exn (Amount.to_uint64 total_stake)
-      <= shift_left
-           (c * of_uint64_exn (Balance.to_uint64 my_stake))
-           Random_oracle.Digest.length_in_bits
+      let input =
+        (* get first params.per_term_precision bits of top / bottom.
+
+           This is equal to
+
+           floor(2^params.per_term_precision * top / bottom) / 2^params.per_term_precision
+        *)
+        let k = params.per_term_precision in
+        let top = bigint_of_uint64 (Balance.to_uint64 my_stake) in
+        let bottom = bigint_of_uint64 (Amount.to_uint64 total_stake) in
+        Bignum.(
+          of_bigint Bignum_bigint.(shift_left top k / bottom)
+          / of_bigint Bignum_bigint.(shift_left one k))
+      in
+      let rhs = Snarky_taylor.Exp.Unchecked.one_minus_exp params input in
+      let lhs =
+        let bs = Random_oracle.Digest.to_bits vrf_output in
+        of_bits_lsb (match c with `One -> bs | `Two -> List.tl_exn bs)
+      in
+      Bignum.(of_bigint lhs <= rhs)
 
     module Checked = struct
-      (* This version can't be used right now because the field is too small. *)
-      let _is_satisfied ~my_stake ~total_stake vrf_output =
-        let open Snark_params.Tick in
-        let open Let_syntax in
-        let open Number in
-        let%bind lhs = of_bits vrf_output * Amount.var_to_number total_stake in
-        let%bind rhs =
-          let%bind x =
-            (* someday: This should really just be a scalar multiply... *)
-            constant (Field.of_int c_int) * Amount.var_to_number my_stake
-          in
-          mul_pow_2 x (`Two_to_the Random_oracle.Digest.length_in_bits)
-        in
-        lhs <= rhs
+      module M = Snarky.Snark.Run.Make (Snark_params.Tick_backend)
 
-      (* It was somewhat involved to implement that check with the small field, so
-         we've stubbed it out for now. *)
-      let is_satisfied ~my_stake:_ ~total_stake:_ _vrf_output =
-        let () = assert Coda_base.Insecure.vrf_threshold_check in
-        Snark_params.Tick.(Checked.return Boolean.true_)
+      let m : M.field Snarky.Snark.m = (module M)
+
+      let is_satisfied ~my_stake ~total_stake (vrf_output : Output.var) =
+        (* TODO: Ask matthew about this. was thinking there would be a 
+           val direct : (field m, _) Checked.t *)
+        let open Snarky_taylor in
+        let open M in
+        make_checked (fun () ->
+            let rhs =
+              Exp.one_minus_exp ~m params
+                (Floating_point.of_quotient ~m
+                   ~precision:params.per_term_precision
+                   ~top:
+                     (Integer.of_bits ~m
+                        (Balance.var_to_bits my_stake :> Boolean.var list))
+                   ~bottom:
+                     (Integer.of_bits ~m
+                        (Amount.var_to_bits total_stake :> Boolean.var list))
+                   ~top_is_less_than_bottom:())
+            in
+            let vrf_output = Array.to_list (vrf_output :> Boolean.var array) in
+            let lhs =
+              match c with
+              | `One -> vrf_output
+              | `Two -> List.tl_exn vrf_output
+            in
+            Floating_point.(
+              le ~m
+                (of_bits ~m lhs ~precision:Random_oracle.Digest.length_in_bits)
+                rhs) )
     end
   end
 
@@ -1130,10 +1160,10 @@ module Configuration = struct
     ; c
     ; c_times_k= c * k
     ; slots_per_epoch= UInt32.to_int Epoch.size
-    ; slot_duration= Int64.to_int Slot.duration_ms
-    ; epoch_duration= Int64.to_int (Time.Span.to_ms Epoch.duration)
-    ; acceptable_network_delay= Int64.to_int (Time.Span.to_ms delta_duration)
-    }
+    ; slot_duration= Int64.to_int_exn Slot.duration_ms
+    ; epoch_duration= Int64.to_int_exn (Time.Span.to_ms Epoch.duration)
+    ; acceptable_network_delay=
+        Int64.to_int_exn (Time.Span.to_ms delta_duration) }
 end
 
 module Prover_state = struct
@@ -1332,8 +1362,8 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
   in
   Logger.info logger
     "systime: %d, epoch-slot@systime: %08d-%04d, starttime@epoch@systime: %d"
-    (Int64.to_int now) (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
-    ( Int64.to_int @@ Time.Span.to_ms @@ Time.to_span_since_epoch
+    (Int64.to_int_exn now) (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
+    ( Int64.to_int_exn @@ Time.Span.to_ms @@ Time.to_span_since_epoch
     @@ Epoch.start_time epoch ) ;
   let epoch_transitioning = Epoch.equal epoch (Epoch.succ state.curr_epoch) in
   let next_slot =
@@ -1422,7 +1452,7 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
       let epoch_end_time = Epoch.end_time epoch |> ms_since_epoch in
       Logger.info logger
         "No slots won in this epoch. Waiting for next epoch, @%d"
-        (Int64.to_int epoch_end_time) ;
+        (Int64.to_int_exn epoch_end_time) ;
       `Check_again epoch_end_time
 
 (* TODO *)
