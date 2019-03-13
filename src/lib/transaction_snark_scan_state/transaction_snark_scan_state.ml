@@ -75,7 +75,11 @@ end = struct
       module Registered_V1 = Registrar.Register (V1)
     end
 
-    include Stable.Latest
+    type t = Stable.Latest.t =
+      { transaction_with_info: Ledger.Undo.t
+      ; statement: Ledger_proof_statement.t
+      ; witness: Inputs.Sparse_ledger.t }
+    [@@deriving sexp]
   end
 
   module Ledger_proof_with_sok_message = struct
@@ -156,14 +160,23 @@ end = struct
           { (*Job_count: Keeping track of the number of jobs added to the tree. Every transaction added amounts to two jobs*)
             tree:
               ( Ledger_proof_with_sok_message.t
-              , Transaction_with_witness.t )
-              Parallel_scan.State.t
+              , Transaction_with_witness.Stable.V1.t )
+              Parallel_scan.State.Stable.V1.t
           ; mutable job_count: int }
         [@@deriving sexp, bin_io]
       end
 
       include T
       include Registration.Make_latest_version (T)
+
+      let hash t =
+        let state_hash =
+          Parallel_scan.State.hash t.tree
+            (Binable.to_string (module Ledger_proof_with_sok_message))
+            (Binable.to_string (module Transaction_with_witness.Stable.V1))
+        in
+        Staged_ledger_aux_hash.of_bytes
+          ((state_hash :> string) ^ Int.to_string t.job_count)
     end
 
     module Latest = V1
@@ -178,7 +191,15 @@ end = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.Latest
+  type t = Stable.Latest.t =
+    { tree:
+        ( Ledger_proof_with_sok_message.t
+        , Transaction_with_witness.Stable.V1.t )
+        Parallel_scan.State.Stable.V1.t
+    ; mutable job_count: int }
+  [@@deriving sexp]
+
+  let hash = Stable.Latest.hash
 
   (*Work capacity represents max number of work(currently in the tree and the ones that would arise in the future when current jobs are done) in the tree. *)
   let work_capacity () =
@@ -192,33 +213,12 @@ end = struct
     3 + nearest_log_2_incr + nearest_log_2_txn
     + Int.pow 2 (transaction_capacity_log_2 + work_delay_factor)
 
-  let hash t =
-    let state_hash =
-      Parallel_scan.State.hash t.tree
-        (Binable.to_string (module Ledger_proof_with_sok_message))
-        (Binable.to_string (module Transaction_with_witness))
-    in
-    Staged_ledger_aux_hash.of_bytes
-      ((state_hash :> string) ^ Int.to_string t.job_count)
-
   let is_valid t =
     let k = max Constants.work_delay_factor 2 in
     Parallel_scan.parallelism ~state:t.tree
     = Int.pow 2 (Constants.transaction_capacity_log_2 + k)
     && t.job_count < work_capacity ()
     && Parallel_scan.is_valid t.tree
-
-  include Binable.Of_binable
-            (T)
-            (struct
-              type nonrec t = t
-
-              let to_binable = Fn.id
-
-              let of_binable t =
-                assert (is_valid t) ;
-                t
-            end)
 
   (**********Helpers*************)
 

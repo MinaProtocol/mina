@@ -69,7 +69,19 @@ module State : sig
   (** State of the parallel scan possibly containing base ['d] entities
    * and partially complete ['a option * 'a option] merges.
    *)
-  type ('a, 'd) t [@@deriving sexp, bin_io]
+
+  (* bin_io omitted intentionally *)
+  type ('a, 'd) t [@@deriving sexp]
+
+  module Stable : sig
+    module V1 :
+      sig
+        type ('a, 'd) t [@@deriving sexp, bin_io]
+      end
+      with type ('a, 'd) t = ('a, 'd) t
+
+    module Latest = V1
+  end
 
   val fold_chronological :
     ('a, 'd) t -> init:'acc -> f:('acc -> ('a, 'd) Job.t -> 'acc) -> 'acc

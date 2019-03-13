@@ -117,17 +117,16 @@ end = struct
         let verify proof stmt ~message = verify_proof proof stmt ~message
       end)
 
-  type scan_state = Scan_state.t [@@deriving sexp, bin_io]
-
   type t =
     { scan_state:
-        scan_state
+        Scan_state.t
         (* Invariant: this is the ledger after having applied all the transactions in
      * the above state. *)
     ; ledger: Ledger.attached_mask sexp_opaque }
   [@@deriving sexp]
 
-  type serializable = scan_state * Ledger.serializable [@@deriving bin_io]
+  type serializable = Scan_state.Stable.V1.t * Ledger.serializable
+  [@@deriving bin_io]
 
   let serializable_of_t t = (t.scan_state, Ledger.serializable_of_t t.ledger)
 
@@ -188,7 +187,7 @@ end = struct
     let {Ledger_proof_statement.target; _} = Ledger_proof.statement proof in
     target
 
-  let verify_scan_state_after_apply ledger (scan_state : scan_state) =
+  let verify_scan_state_after_apply ledger (scan_state : Scan_state.t) =
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in

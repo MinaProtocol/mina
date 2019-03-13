@@ -600,7 +600,19 @@ module type Transaction_snark_scan_state_intf = sig
 
   type transaction
 
-  type t [@@deriving sexp, bin_io]
+  type staged_ledger_aux_hash
+
+  type t [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io]
+
+        val hash : t -> staged_ledger_aux_hash
+      end
+    end
+    with type V1.t = t
 
   type ledger_proof
 
@@ -611,8 +623,6 @@ module type Transaction_snark_scan_state_intf = sig
   type transaction_with_info
 
   type frozen_ledger_hash
-
-  type staged_ledger_aux_hash
 
   module Transaction_with_witness : sig
     (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
@@ -737,7 +747,17 @@ module type Staged_ledger_base_intf = sig
   type serializable [@@deriving bin_io]
 
   module Scan_state : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+
+          val hash : t -> staged_ledger_aux_hash
+        end
+      end
+      with type V1.t = t
 
     module Job_view : sig
       type t [@@deriving sexp, to_yojson]
