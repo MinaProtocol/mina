@@ -7,7 +7,7 @@
     "build": "bsb -make-world",
     "clean": "bsb -clean-world",
     "watch": "bsb -make-world -w",
-    "start": "cd site && python -m SimpleHTTPServer 8000",
+    "start": "cd site && python -m http.server 8000",
     "reformat": "bsrefmt --in-place src/*.re",
     "link-static": "ln -s $(pwd)/../../src/app/website/static site/static",
     "test": "echo \"Error: no test specified\" && exit 1"

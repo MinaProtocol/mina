@@ -66,7 +66,7 @@ let make = (~jobOpenings, _) => {
         <div className="mw800 center">
           <p className="lh-copy f3 ocean f2-ns tracked-tightly">
             {str(
-               "We're using cryptography and cryptocurrency to build computing systems that put people back in control of their digital lives.",
+               {js|We're using cryptography and cryptocurrency to build computing systems that put people back in control of their digital\u00A0lives.|js},
              )}
           </p>
           <div className="mt45">
@@ -81,12 +81,12 @@ let make = (~jobOpenings, _) => {
                     </h2>
                     <p className="w-65 mt0 mb0 lh-copy">
                       {str(
-                         "We passionately believe in the open-source philosophy, and make our software free for the entire world to use.",
+                         {js|We passionately believe in the open-source philosophy, and make our software free for the entire world to\u00A0use.|js},
                        )}
                       <a
                         href="/static/code.html"
-                        className="dodgerblue fw5 no-underline hover-link">
-                        {str("Take a look →")}
+                        className="dodgerblue fw5 no-underline hover-link nowrap">
+                        {str({js|Take a look →|js})}
                       </a>
                     </p>
                   </div>
@@ -99,12 +99,12 @@ let make = (~jobOpenings, _) => {
                     </h2>
                     <p className="mt3 mb0 ml15 lh-copy">
                       {str(
-                         "We passionately believe in the open-source philosophy, and make our software free for the entire world to use.",
+                         {js|We passionately believe in the open-source philosophy, and make our software free for the entire world to\u00A0use.|js},
                        )}
                       <a
                         href="/static/code.html"
-                        className="dodgerblue fw5 no-underline hover-link">
-                        {str("Take a look →")}
+                        className="dodgerblue fw5 no-underline hover-link nowrap">
+                        {str({js|Take a look →|js})}
                       </a>
                     </p>
                   </div>
@@ -119,7 +119,7 @@ let make = (~jobOpenings, _) => {
                     </h2>
                     <p className="w-65 mt0 mb0 lh-copy">
                       {str(
-                         "The problems we face are novel and challenging and we take them on as a team.",
+                         {js|The problems we face are novel and challenging and we take them on as a\u00A0team.|js},
                        )}
                     </p>
                   </div>
@@ -132,7 +132,7 @@ let make = (~jobOpenings, _) => {
                     </h2>
                     <p className="mt3 mb0 ml15 lh-copy">
                       {str(
-                         "The problems we face are novel and challenging and we take them on as a team.",
+                         {js|The problems we face are novel and challenging and we take them on as a\u00A0team.|js},
                        )}
                     </p>
                   </div>
@@ -147,7 +147,7 @@ let make = (~jobOpenings, _) => {
                     </h2>
                     <p className="w-65 mt0 mb0 lh-copy">
                       {str(
-                         "We're working on technologies with the potential to reimagine social structures. We believe it's important to incorporate diverse perspectives from conception through realization.",
+                         {js|We're working on technologies with the potential to reimagine social structures. We believe it's important to incorporate diverse perspectives from conception through\u00A0realization.|js},
                        )}
                     </p>
                   </div>
@@ -160,7 +160,7 @@ let make = (~jobOpenings, _) => {
                     </h2>
                     <p className="mt3 mb0 ml15 lh-copy">
                       {str(
-                         "We're working on technologies with the potential to reimagine social structures. We believe it's important to incorporate diverse perspectives from conception through realization.",
+                         {js|We're working on technologies with the potential to reimagine social structures. We believe it's important to incorporate diverse perspectives from conception through\u00A0realization.|js},
                        )}
                     </p>
                   </div>
@@ -187,7 +187,7 @@ let make = (~jobOpenings, _) => {
                       <ul className="mt0 mb0 ph0 w-70">
                         <li className="lh-copy list mb0 mt0">
                           {str(
-                             "We cover 100% of employee premiums for platinum healthcare plans with zero deductible, and 99% of vision and dental premiums",
+                             {js|We cover 100% of employee premiums for platinum healthcare plans with zero deductible, and 99% of vision and dental\u00A0premiums|js},
                            )}
                         </li>
                       </ul>
@@ -215,7 +215,7 @@ let make = (~jobOpenings, _) => {
                       <ul className="mt0 mb0 ph0 w-70">
                         <li className="lh-copy list mb0 mt0">
                           {str(
-                             "$750 annual budget for conferences of your choice (we cover company-related conferences)",
+                             {js|$750 annual budget for conferences of your choice (we cover company-related\u00A0conferences)|js},
                            )}
                         </li>
                         <li className="lh-copy list mb0 mt0">
@@ -235,7 +235,7 @@ let make = (~jobOpenings, _) => {
                       <ul className="mt0 mb0 ph0 w-70">
                         <li className="lh-copy list mb0 mt0">
                           {str(
-                             "Top-of-the-line laptop, $500 monitor budget and $500 peripheral budget",
+                             {js|Top-of-the-line laptop, $500 monitor budget and $500 peripheral\u00A0budget|js},
                            )}
                         </li>
                       </ul>
@@ -243,16 +243,16 @@ let make = (~jobOpenings, _) => {
                     <div className="flex justify-between mt4">
                       <div className="flex justify-end w-30">
                         <h3 className="fw6 f5 ph4 mt0 mb0">
-                          {str("Time off")}
+                          {str({js|Time\u00A0off|js})}
                         </h3>
                       </div>
                       <ul className="mt0 mb0 ph0 w-70">
                         <li className="lh-copy list mb0 mt0">
                           {str(
-                             "Unlimited vacation, with encouragement for employees to take off",
+                             {js|Unlimited vacation, with encouragement for employees to take off|js},
                            )}
-                          <span className="i"> {str("at least")} </span>
-                          {str("14 days annually")}
+                          <span className="i"> {str(" at least ")} </span>
+                          {str({js|14 days\u00A0annually|js})}
                         </li>
                       </ul>
                     </div>
@@ -320,7 +320,7 @@ let make = (~jobOpenings, _) => {
                       <ul className="mt0 mb0 ph0 w-70">
                         <li className="lh-copy list mb0 mt0">
                           {str(
-                             "We cover 100% of employee premiums for platinum healthcare plans with zero deductible, and 99% of vision and dental premiums",
+                             {js|We cover 100% of employee premiums for platinum healthcare plans with zero deductible, and 99% of vision and dental\u00A0premiums|js},
                            )}
                         </li>
                       </ul>
@@ -348,7 +348,7 @@ let make = (~jobOpenings, _) => {
                       <ul className="mt0 mb0 ph0 w-70">
                         <li className="lh-copy list mb0 mt0">
                           {str(
-                             "$750 annual budget for conferences of your choice (we cover company-related conferences)",
+                             {js|$750 annual budget for conferences of your choice (we cover company-related\u00A0conferences)|js},
                            )}
                         </li>
                         <li className="lh-copy list mb0 mt0">
@@ -368,7 +368,7 @@ let make = (~jobOpenings, _) => {
                       <ul className="mt0 mb0 ph0 w-70">
                         <li className="lh-copy list mb0 mt0">
                           {str(
-                             "Top-of-the-line laptop, $500 monitor budget and $500 peripheral budget",
+                             {js|Top-of-the-line laptop, $500 monitor budget and $500 peripheral\u00A0budget|js},
                            )}
                         </li>
                       </ul>
@@ -376,16 +376,16 @@ let make = (~jobOpenings, _) => {
                     <div className="flex justify-between mt4">
                       <div className="flex justify-end w-30">
                         <h3 className="fw6 f5 ph4 mt0 mb0">
-                          {str("Time off")}
+                          {str({js|Time\u00A0off|js})}
                         </h3>
                       </div>
                       <ul className="mt0 mb0 ph0 w-70">
                         <li className="lh-copy list mb0 mt0">
                           {str(
-                             "Unlimited vacation, with encouragement for employees to take off",
+                             {js|Unlimited vacation, with encouragement for employees to take off|js},
                            )}
-                          <span className="i"> {str("at least")} </span>
-                          {str("14 days annually")}
+                          <span className="i"> {str(" at least ")} </span>
+                          {str({js|14 days\u00A0annually|js})}
                         </li>
                       </ul>
                     </div>
