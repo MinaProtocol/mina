@@ -136,14 +136,15 @@ let%test_unit "of-quotient" =
   Quickcheck.test ~trials:5 gen ~f:(fun (a, b) ->
       let precision = 32 in
       let res =
-        assert (B.(a < b)) ;
-        M.run_and_check (fun () ->
-            let t =
-              of_quotient ~m ~precision ~top:(Integer.constant ~m a)
-                ~bottom:(Integer.constant ~m b) ~top_is_less_than_bottom:()
-            in
-            to_bignum ~m t )
-        |> Or_error.ok_exn
+        let test () =
+          assert (B.(a < b)) ;
+          let t =
+            of_quotient ~m ~precision ~top:(Integer.constant ~m a)
+              ~bottom:(Integer.constant ~m b) ~top_is_less_than_bottom:()
+          in
+          fun () -> to_bignum ~m t ()
+        in
+        M.run_and_check test |> Or_error.ok_exn
       in
       let actual = Bignum.(of_bigint a / of_bigint b) in
       let good =
