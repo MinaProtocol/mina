@@ -454,9 +454,10 @@ struct
           let graph_with_node = add_vertex graph node in
           List.fold node.successor_hashes ~init:graph_with_node
             ~f:(fun acc_graph successor_state_hash ->
-              add_edge acc_graph node
-                ( State_hash.Table.find t.table successor_state_hash
-                |> Option.value_exn ) ) )
+              Option.value_map
+                (State_hash.Table.find t.table successor_state_hash)
+                ~default:acc_graph ~f:(fun child_node ->
+                  add_edge acc_graph node child_node ) ) )
   end
 
   let visualize ~filename t =

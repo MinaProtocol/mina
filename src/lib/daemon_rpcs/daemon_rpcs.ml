@@ -408,7 +408,7 @@ end
 module Visualize_frontier = struct
   type query = string [@@deriving bin_io]
 
-  type response = unit [@@deriving bin_io]
+  type response = [`Active of unit | `Bootstrapping] [@@deriving bin_io]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Visualize_frontier" ~version:0 ~bin_query

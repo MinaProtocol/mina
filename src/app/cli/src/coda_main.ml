@@ -1291,8 +1291,13 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 
   let log_shutdown ~frontier_file ~log t =
-    visualize_frontier ~filename:frontier_file t |> ignore ;
-    Logger.info log "Logging the transition_frontier at %s" frontier_file
+    match visualize_frontier ~filename:frontier_file t with
+    | `Active () ->
+        Logger.info log "Logging the transition_frontier at %s" frontier_file
+    | `Bootstrapping ->
+        Logger.info log
+          "Could not log transition_frontier since daemon is currently \
+           bootstrapping"
 
   (* TODO: handle participation_status more appropriately than doing participate_exn *)
   let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda ~log
@@ -1361,9 +1366,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
             Coda_tracing.stop () ; Deferred.unit )
       ; implement Daemon_rpcs.Visualize_frontier.rpc (fun () filename ->
-            return
-              ( visualize_frontier ~filename coda
-              |> Participating_state.active_exn ) ) ]
+            return (visualize_frontier ~filename coda) ) ]
     in
     let snark_worker_impls =
       [ implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
