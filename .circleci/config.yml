@@ -254,9 +254,6 @@ jobs:
                   name: Running test -- test_postake_split_snarkless:coda-peers-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-peers-test"'
             - run:
-                  name: Running test -- test_postake_split_snarkless:coda-transitive-peers-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-transitive-peers-test"'
-            - run:
                   name: Running test -- test_postake_split_snarkless:coda-block-production-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-block-production-test"'
             - run:
