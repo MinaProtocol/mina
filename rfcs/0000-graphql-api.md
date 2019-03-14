@@ -25,7 +25,7 @@ Most importantly, we assume the node knows about some private keys which it asso
 try to store related transactions indefinitely (where "related" means being sent to or from the public key). We may also
 need to store information about blocks that these keys have created.
 We will likely want to at least optionally cache the history of the blocks/payments on the client side as well,
-just to avoid needing to query it all every time (though we could also paginate the )
+just to avoid needing to query it all every time.
 
 Note: There are several custom scalars defined at the top for readability. These will be `String`s in the final implementation due to the complications involved in the encoding of custom scalars not being expressed in the schema and needing to be implemented symmetrically on the client and server.
 
@@ -33,11 +33,12 @@ Note: There are several custom scalars defined at the top for readability. These
 scalar Date
 scalar PublicKey
 scalar PrivateKey
-scalar Int64
+scalar UInt64
+scalar UInt32
 
 enum ConsensusStatus {
   SUBMITTED
-  INCLUDED
+  INCLUDED # Included in any block
   FINALIZED
   SNARKED
   FAILED
@@ -54,8 +55,8 @@ type Payment {
   includedAt: Date
   from: PublicKey! 
   to: PublicKey!
-  amount: Int64!
-  fee: Int!,
+  amount: UInt64!
+  fee: UInt32!,
   memo: String
 }
 
@@ -67,7 +68,6 @@ type PaymentUpdate {
 enum SyncStatus {
   ERROR
   BOOTSTRAP # Resyncing
-  CATCHUP # Synced but a little out
   STALE # You haven't seen any activity recently
   SYNCED
 }
@@ -80,12 +80,12 @@ type SyncUpdate {
 
 type SnarkWorker {
   key: PublicKey!
-  fee: Int!
+  fee: UInt32!
 }
 
 type SnarkFee {
   snarkCreator: PublicKey!
-  fee: Int!
+  fee: UInt32!
 }
 
 type SnarkFeeUpdate {
@@ -94,7 +94,7 @@ type SnarkFeeUpdate {
 }
 
 type Block {
-  coinbase: Int!
+  coinbase: UInt32!
   creator: PublicKey!
   payments: [Payment]!
   snarkFees: [SnarkFee]!
@@ -108,7 +108,7 @@ type BlockUpdate {
 type Wallet {
   publicKey: PublicKey!
   privateKey: PrivateKey!
-  balance(consensus: ConsensusStatus): Int64!
+  balance(consensus: ConsensusStatus): UInt64!
 }
 
 type NodeStatus {
@@ -136,14 +136,14 @@ input SetNetworkInput {
 
 input SetSnarkWorkerInput {
   worker: PublicKey!
-  fee: Int!
+  fee: UInt32!
 }
 
 input CreatePaymentInput {
   from: PublicKey!,
   to: PublicKey!,
-  amount: Int64!,
-  fee: Int!,
+  amount: UInt64!,
+  fee: UInt32!,
   memo: String
 }
 
@@ -214,12 +214,12 @@ type BlockConnection {
 
 type Query {
   # List of wallets currently tracked by the node
-  wallets: [Wallet]!
+  wallets: [Wallet!]!
   
   # Gets balance of key at a certain consensus state
   # Note: `consensus` is optional as we will likely decide one
-  # state to be the "real" balance (probably FINALIZED)
-  balance(publicKey: PublicKey!, consensus: ConsensusStatus): Int64!
+  # state to be the "real" balance
+  balance(publicKey: PublicKey!, consensus: ConsensusStatus): UInt64!
   
   payments(
     filter: PaymentFilterInput,
@@ -304,12 +304,12 @@ transactions all awaiting consensus.
 
 ``` graphql
 type Delegation {
-  nonce: Int!,
+  nonce: UInt32!,
   submittedAt: Date!
   includedAt: Date
   from: PublicKey!
   to: PublicKey!
-  fee: Int!,
+  fee: UInt32!,
   memo: String
 }
 
@@ -340,7 +340,7 @@ input SetStakingInput {
 input SetDelegationInput {
   from: PublicKey!
   to: PublicKey!
-  fee: Int!
+  fee: UInt32!
   memo: String
 }
 
@@ -355,6 +355,26 @@ type SetDelegationPayload {
 type Mutation {
   setStaking(input: SetStakingInput!): SetStakingPayload
   setDelegation(input: SetDelegationInput!): SetDelegationPayload
+}
+```
+
+Pagination is done in the relay "connections" style (https://facebook.github.io/relay/graphql/connections.htm). This means that a paginated api will expose an "edges" field, each of which wraps a node (the element being paginated over) with its corresponding cursor. This allows you to pass the cursor to the "after" argument of the query along with a "first" (describing how many elements to return), which in the case below, will result in the "first" 10 elements "after" `"cursor"` to be returned. `hasNextPage` lets you know whether or not you need to query for another page.
+As an example, use of paginated endpoints might look something like this:
+```graphql
+{
+  payments(first: 10, after: "cursor") {
+    edges {
+      cursor
+      node {
+        payment {
+          amount
+        }
+      }
+    }
+    pageInfo {
+      hasNextPage
+    }
+  }
 }
 ```
 
