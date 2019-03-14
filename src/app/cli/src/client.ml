@@ -482,8 +482,15 @@ let visualize_frontier =
        Command.Param.(anon @@ ("output-filepath" %: string))
        ~f:(fun port filename ->
          match%map dispatch Visualize_frontier.rpc filename port with
-         | Ok () ->
-             printf !"Successfully wrote the visual at location %s." filename
+         | Ok (`Active ()) ->
+             printf
+               !"Successfully wrote the visualization of frontier at \
+                 location: %s."
+               filename
+         | Ok `Bootstrapping ->
+             printf
+               !"Could not visualize frontier since daemon is currently \
+                 bootstrapping"
          | Error e ->
              printf "Could not save file: %s\n" (Error.to_string_hum e) ))
 
