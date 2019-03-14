@@ -77,8 +77,7 @@ module Api = struct
         )
       t i
 
-  let teardown t =
-    Deferred.List.iter t.workers ~f:Coda_process.disconnect
+  let teardown t = Deferred.List.iter t.workers ~f:Coda_process.disconnect
 end
 
 let start_prefix_check log workers events testnet ~acceptable_delay =
