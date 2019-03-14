@@ -230,15 +230,19 @@ struct
                match t.diff_reader with
                | None -> Deferred.unit
                | Some hdl ->
+                   let is_finished = ref false in
                    t.best_tip_ledger <- None ;
                    Deferred.any_unit
                      [ (let%map () = hdl in
-                        t.diff_reader <- None)
+                        t.diff_reader <- None ;
+                        is_finished := true)
                      ; (let%map () = Async.after (Time.Span.of_sec 5.) in
-                        Logger.fatal t.log
-                          "Transition frontier closed without first closing \
-                           best tip view pipe" ;
-                        assert false) ] )
+                        if not !is_finished then (
+                          Logger.fatal t.log
+                            "Transition frontier closed without first closing \
+                             best tip view pipe" ;
+                          assert false )
+                        else ()) ] )
            | Some frontier ->
                Logger.debug t.log "Got frontier!\n" ;
                let validation_ledger =

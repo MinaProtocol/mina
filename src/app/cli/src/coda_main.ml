@@ -49,7 +49,7 @@ module Staged_ledger_hash = struct
 end
 
 module Ledger_hash = struct
-  include Ledger_hash.Stable.Latest
+  include Ledger_hash
 
   let of_digest = Ledger_hash.of_digest
 
@@ -63,7 +63,7 @@ module Ledger_hash = struct
 end
 
 module Frozen_ledger_hash = struct
-  include Frozen_ledger_hash.Stable.Latest
+  include Frozen_ledger_hash
 
   let to_bytes = Frozen_ledger_hash.to_bytes
 
@@ -367,11 +367,13 @@ end
 module Fee_transfer = Coda_base.Fee_transfer
 module Ledger_proof_statement = Transaction_snark.Statement
 module Transaction_snark_work =
-  Staged_ledger.Make_completed_work (Public_key.Compressed) (Ledger_proof)
+  Staged_ledger.Make_completed_work
+    (Public_key.Compressed)
+    (Ledger_proof.Stable.V1)
     (Ledger_proof_statement)
 
 module Staged_ledger_diff = Staged_ledger.Make_diff (struct
-  module Ledger_proof = Ledger_proof
+  module Ledger_proof = Ledger_proof.Stable.V1
   module Ledger_hash = Ledger_hash
   module Staged_ledger_hash = Staged_ledger_hash
   module Staged_ledger_aux_hash = Staged_ledger_aux_hash
@@ -499,7 +501,7 @@ struct
   module Sparse_ledger = Coda_base.Sparse_ledger
 
   module Transaction_snark_work_proof = struct
-    type t = Ledger_proof.t list [@@deriving sexp, bin_io]
+    type t = Ledger_proof.Stable.V1.t list [@@deriving sexp, bin_io]
   end
 
   module Staged_ledger = struct
@@ -1289,8 +1291,14 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 
   let log_shutdown ~frontier_file ~log t =
-    visualize_frontier ~filename:frontier_file t |> ignore ;
-    Logger.info log "Logging the transition_frontier at %s" frontier_file
+    match visualize_frontier ~filename:frontier_file t with
+    | `Active () ->
+        Logger.info log
+          "Successfully wrote the visualization of frontier at location: %s"
+          frontier_file
+    | `Bootstrapping ->
+        Logger.info log
+          "Could not visualize frontier since daemon is currently bootstrapping"
 
   (* TODO: handle participation_status more appropriately than doing participate_exn *)
   let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda ~log
@@ -1359,9 +1367,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
             Coda_tracing.stop () ; Deferred.unit )
       ; implement Daemon_rpcs.Visualize_frontier.rpc (fun () filename ->
-            return
-              ( visualize_frontier ~filename coda
-              |> Participating_state.active_exn ) ) ]
+            return (visualize_frontier ~filename coda) ) ]
     in
     let snark_worker_impls =
       [ implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
