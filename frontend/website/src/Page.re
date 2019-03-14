@@ -1,6 +1,6 @@
 module Header = {
   let component = ReasonReact.statelessComponent("Header");
-  let make = (~extra, children) => {
+  let make = (~extra, _children) => {
     ...component,
     render: _self =>
       <head>
@@ -85,10 +85,30 @@ module Header = {
 };
 
 module Footer = {
-  let dot = ReasonReact.string({js| · |js});
+  module Link = {
+    let component = ReasonReact.statelessComponent("Page.Footer.Link");
+    let make = (~last=false, ~link, ~name, children) => {
+      ...component,
+      render: _self =>
+        <li className="mb2 dib">
+          <a
+            href=link
+            className="no-underline fw3 f6 silver hover-link"
+            name={"footer-" ++ name}
+            target="_blank">
+            ...children
+          </a>
+          {last ?
+             <span className="dn" /> :
+             <span className="f6 silver">
+               {ReasonReact.string({js| · |js})}
+             </span>}
+        </li>,
+    };
+  };
 
   let component = ReasonReact.statelessComponent("Footer");
-  let make = (~color="", children) => {
+  let make = (~color, _children) => {
     ...component,
     render: _self =>
       <div>
@@ -97,96 +117,33 @@ module Footer = {
             className="section-wrapper pv4 mw9 center bxs-bb ph6-l ph5-m ph4 mw9-l">
             <div className="flex justify-center tc mb4">
               <ul className="list ph0">
-                <li className="mb2 dib">
-                  <a
-                    href="mailto:contact@o1labs.org"
-                    className="no-underline fw3 f6 silver hover-link"
-                    name="footer-mail"
-                    target="_blank">
-                    {ReasonReact.string("contact@o1labs.org")}
-                  </a>
-                  <span className="f6 silver"> dot </span>
-                </li>
-                <li className="mb2 dib">
-                  <a
-                    href="https://o1labs.org"
-                    className="no-underline fw3 f6 silver hover-link"
-                    name="footer-o1www"
-                    target="_blank">
-                    {ReasonReact.string(" o1labs.org")}
-                  </a>
-                  <span className="f6 silver"> dot </span>
-                </li>
-                <li className="mb2 dib">
-                  <a
-                    href="https://twitter.com/codaprotocol"
-                    className="no-underline fw3 f6 silver hover-link"
-                    name="footer-twitter"
-                    target="_blank">
-                    {ReasonReact.string(" Twitter")}
-                  </a>
-                  <span className="f6 silver"> dot </span>
-                </li>
-                <li className="mb2 dib">
-                  <a
-                    href="https://github.com/o1-labs"
-                    className="no-underline fw3 f6 silver hover-link"
-                    name="footer-github"
-                    target="_blank">
-                    {ReasonReact.string(" GitHub")}
-                  </a>
-                  <span className="f6 silver"> dot </span>
-                </li>
-                <li className="mb2 dib">
-                  <a
-                    href="https://reddit.com/r/coda"
-                    className="no-underline fw3 f6 silver hover-link"
-                    name="footer-reddit"
-                    target="_blank">
-                    {ReasonReact.string(" Reddit")}
-                  </a>
-                  <span className="f6 silver"> dot </span>
-                </li>
-                <li className="mb2 dib">
-                  <a
-                    href="https://t.me/codaprotocol"
-                    className="no-underline fw3 f6 silver hover-link"
-                    name="footer-telegram"
-                    target="_blank">
-                    {ReasonReact.string(" Telegram")}
-                  </a>
-                  <span className="f6 silver"> dot </span>
-                </li>
-                <li className="mb2 dib">
-                  <a
-                    href="/tos.html"
-                    className="no-underline fw3 f6 silver hover-link"
-                    name="footer-tos"
-                    target="_blank">
-                    {ReasonReact.string(" Terms of Service")}
-                  </a>
-                  <span className="f6 silver"> dot </span>
-                </li>
-                <li className="mb2 dib">
-                  <a
-                    href="/privacy.html"
-                    className="no-underline fw3 f6 silver hover-link"
-                    name="footer-privacy"
-                    target="_blank">
-                    {ReasonReact.string(" Privacy Policy")}
-                  </a>
-                  <span className="f6 silver"> dot </span>
-                </li>
-                <li className="mb2 dib">
-                  <a
-                    href="/jobs.html"
-                    className="no-underline fw3 f6 silver hover-link"
-                    name="footer-hiring"
-                    target="_blank">
-                    {ReasonReact.string(" We're Hiring")}
-                  </a>
-                  <span className="dn" />
-                </li>
+                <Link link="mailto:contact@o1labs.org" name="mail">
+                  {ReasonReact.string("contact@o1labs.org")}
+                </Link>
+                <Link link="https://o1labs.org" name="o1www">
+                  {ReasonReact.string("o1labs.org")}
+                </Link>
+                <Link link="https://twitter.com/codaprotocol" name="twitter">
+                  {ReasonReact.string("Twitter.org")}
+                </Link>
+                <Link link="https://github.com/o1-labs" name="github">
+                  {ReasonReact.string("GitHub")}
+                </Link>
+                <Link link="https://reddit.com/r/coda" name="reddit">
+                  {ReasonReact.string("Reddit")}
+                </Link>
+                <Link link="https://t.me/codaprotocol" name="telegram">
+                  {ReasonReact.string("Telegram")}
+                </Link>
+                <Link link="/tos.html" name="tos">
+                  {ReasonReact.string("Terms of service")}
+                </Link>
+                <Link link="/privacy.html" name="privacy">
+                  {ReasonReact.string("Privacy Policy")}
+                </Link>
+                <Link link="/jobs.html" name="hiring" last=true>
+                  {ReasonReact.string("We're Hiring")}
+                </Link>
               </ul>
             </div>
           </section>
@@ -204,7 +161,7 @@ module Footer = {
 };
 
 let component = ReasonReact.statelessComponent("Page");
-let make = (~extraHeaders=ReasonReact.null, children) => {
+let make = (~extraHeaders=ReasonReact.null, ~footerColor="", children) => {
   ...component,
   render: _ =>
     <html>
@@ -212,7 +169,7 @@ let make = (~extraHeaders=ReasonReact.null, children) => {
       <body className="metropolis black bg-white">
         <Nav />
         <div className="wrapper"> ...children </div>
-        <Footer color="bg-snow" />
+        <Footer color=footerColor />
       </body>
     </html>,
 };
