@@ -307,7 +307,8 @@ end = struct
     let rec go i =
       let%bind () = after (Time.Span.of_sec 1.) in
       let%bind () = Api.send_payment testnet node src dest send_amount fee in
-      if i > 0 then go (i - 1) else return ()
+      if i > 0 then go (i - 1) else after (Time.Span.of_sec 1.)
+      (* ensure a sleep at the end to let the last payment through *)
     in
     go 40
 end
