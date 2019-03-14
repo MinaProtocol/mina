@@ -40,7 +40,7 @@ module type S = sig
      and type state_body_hash := State_body_hash.t
      and type ledger_hash := Ledger_hash.t
      and type sync_ledger_query := Ledger.Location.Addr.t Syncable_ledger.query
-     and type sync_ledger_answer := Sync_ledger.answer
+     and type sync_ledger_answer := Sync_ledger.Answer.t
      and type parallel_scan_state := Staged_ledger.Scan_state.t
 
   module Time : Time_intf

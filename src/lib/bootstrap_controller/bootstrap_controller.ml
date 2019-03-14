@@ -27,8 +27,8 @@ module type Inputs_intf = sig
      and type merkle_tree := Ledger.Db.t
      and type account := Account.t
      and type merkle_path := Ledger.path
-     and type query := Sync_ledger.query
-     and type answer := Sync_ledger.answer
+     and type query := Sync_ledger.Query.t
+     and type answer := Sync_ledger.Answer.t
 
   module Network :
     Network_intf
@@ -38,8 +38,8 @@ module type Inputs_intf = sig
      and type consensus_state := Consensus.Consensus_state.value
      and type state_body_hash := State_body_hash.t
      and type ledger_hash := Ledger_hash.t
-     and type sync_ledger_query := Sync_ledger.query
-     and type sync_ledger_answer := Sync_ledger.answer
+     and type sync_ledger_query := Sync_ledger.Query.t
+     and type sync_ledger_answer := Sync_ledger.Answer.t
      and type parallel_scan_state := Staged_ledger.Scan_state.t
 
   module Time : Time_intf
@@ -59,8 +59,8 @@ module type Inputs_intf = sig
      and type state_hash := State_hash.t
      and type external_transition := External_transition.t
      and type transition_frontier := Transition_frontier.t
-     and type syncable_ledger_query := Sync_ledger.query
-     and type syncable_ledger_answer := Sync_ledger.answer
+     and type syncable_ledger_query := Sync_ledger.Query.t
+     and type syncable_ledger_answer := Sync_ledger.Answer.t
 
   module Root_prover :
     Root_prover_intf

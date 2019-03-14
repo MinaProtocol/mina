@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import argparse
 import collections
@@ -9,10 +9,7 @@ import sys
 import time
 
 build_artifact_profiles = [
-    'dev',
-    'testnet_posig',
     'testnet_postake',
-    'testnet_public',
     'testnet_postake_snarkless_fake_hash'
 ]
 
@@ -50,6 +47,8 @@ test_permutations = {
 }
 
 ci_blacklist = [
+    'test_posig:*',
+    'test_posig_snarkless:*',
     'test_postake_split_snarkless:coda-restart-node-test'
 ]
 
