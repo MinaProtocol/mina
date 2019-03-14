@@ -99,10 +99,10 @@ module Reader0 = struct
   module Merge = struct
     let iter readers ~f =
       let not_empty r = not @@ Pipe.is_empty r.reader in
-      let rec read_deferred () =
+      let rec read_deferred readers =
         let%bind ready_reader =
           match List.find readers ~f:not_empty with
-          | Some reader -> Deferred.return reader
+          | Some reader -> Deferred.return (Some reader)
           | None ->
               let%map () =
                 Deferred.choose
@@ -110,15 +110,22 @@ module Reader0 = struct
                        Deferred.choice (Pipe.values_available r.reader)
                          (fun _ -> () ) ))
               in
-              List.find_exn readers ~f:not_empty
+              List.find readers ~f:not_empty
         in
-        match Pipe.read_now ready_reader.reader with
-        | `Nothing_available -> failwith "impossible"
-        | `Eof -> Deferred.return ()
-        | `Ok value -> Deferred.bind (f value) ~f:read_deferred
+        match ready_reader with
+        | Some reader -> (
+          match Pipe.read_now reader.reader with
+          | `Nothing_available -> failwith "impossible"
+          | `Eof -> Deferred.unit
+          | `Ok value ->
+              Deferred.bind (f value) ~f:(fun () -> read_deferred readers) )
+        | None -> (
+          match List.filter readers ~f:(fun r -> not @@ is_closed r) with
+          | [] -> Deferred.unit
+          | open_readers -> read_deferred open_readers )
       in
       List.iter readers ~f:assert_not_read ;
-      read_deferred ()
+      read_deferred readers
 
     let iter_sync readers ~f = iter readers ~f:(fun x -> f x ; Deferred.unit)
   end
@@ -223,6 +230,25 @@ module Reader = struct
     reader.downstreams <- [reader_a; reader_b; reader_c] ;
     (reader_a, reader_b, reader_c)
 end
+
+let%test_module "Strict_pipe.Reader.Merge" =
+  ( module struct
+    let%test_unit "'iter' would filter out the closed pipes" =
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let reader1, writer1 =
+            create (Buffered (`Capacity 10, `Overflow Drop_head))
+          in
+          let reader2, writer2 =
+            create (Buffered (`Capacity 10, `Overflow Drop_head))
+          in
+          Reader.Merge.iter [reader1; reader2] ~f:(fun _ -> Deferred.unit)
+          |> don't_wait_for ;
+          Writer.write writer1 1 ;
+          Writer.write writer2 2 ;
+          Writer.close writer1 ;
+          let%map () = Async.after (Time.Span.of_ms 5.) in
+          Writer.write writer2 3 ; () )
+  end )
 
 let%test_module "Strict_pipe.close" =
   ( module struct

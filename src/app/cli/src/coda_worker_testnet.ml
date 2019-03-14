@@ -281,6 +281,7 @@ let test log n proposers snark_work_public_keys work_selection =
       ~acceptable_delay
       ~snark_worker_public_keys:(Some (List.init n snark_work_public_keys))
       ~work_selection
+      ~trace_dir:(Unix.getenv "CODA_TRACING")
   in
   let%map workers = Coda_processes.spawn_local_processes_exn configs in
   let payment_reader, payment_writer = Linear_pipe.create () in
