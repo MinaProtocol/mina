@@ -76,6 +76,9 @@ module Api = struct
         Coda_process.prove_receipt_exn worker proving_receipt resulting_receipt
         )
       t i
+
+  let teardown t =
+    Deferred.List.iter t.workers (fun worker -> Coda_process.disconnect worker)
 end
 
 let start_prefix_check log workers events testnet ~acceptable_delay =

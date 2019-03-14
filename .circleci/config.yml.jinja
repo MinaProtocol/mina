@@ -159,7 +159,7 @@ jobs:
             {%- for test in test_permutations[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}" && sleep 1'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
             {%- endfor %}
     {%- endfor %}
 
