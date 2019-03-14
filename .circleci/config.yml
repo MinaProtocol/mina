@@ -88,120 +88,12 @@ jobs:
             - run:
                   name: Run all tests (on master)
                   command: echo "FIXME Tests not yet working on mac"
-    build-artifacts--dev:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        environment:
-            DUNE_PROFILE: dev
-        steps:
-            - checkout
-            - run: mkdir -p /tmp/artifacts
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Download Stable Proving Keys
-                  command: ./scripts/skip_if_only_frontend.sh scripts/getkeys.sh
-            - run:
-                  name: Build OCaml
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
-            - run:
-                  name: Build deb Package with keys
-                  command: ./scripts/skip_if_only_frontend.sh make deb
-            - run:
-                  name: Store Generated Proving and Verifying Keys
-                  command: ./scripts/skip_if_only_frontend.sh make provingkeys
-            - run:
-                  name: Store Genesis Public/Private Keypairs
-                  command: ./scripts/skip_if_only_frontend.sh make genesiskeys
-            - run:
-                  name: Upload deb to repo
-                  command: ./scripts/skip_if_only_frontend.sh make publish_deb
-            - run:
-                  name: Record Constraint System Digests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
-            - store_artifacts:
-                  path: /tmp/artifacts
-            - run:
-                  name: Copy artifacts to Google Cloud
-                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
-    build-artifacts--testnet_posig:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        environment:
-            DUNE_PROFILE: testnet_posig
-        steps:
-            - checkout
-            - run: mkdir -p /tmp/artifacts
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Download Stable Proving Keys
-                  command: ./scripts/skip_if_only_frontend.sh scripts/getkeys.sh
-            - run:
-                  name: Build OCaml
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
-            - run:
-                  name: Build deb Package with keys
-                  command: ./scripts/skip_if_only_frontend.sh make deb
-            - run:
-                  name: Store Generated Proving and Verifying Keys
-                  command: ./scripts/skip_if_only_frontend.sh make provingkeys
-            - run:
-                  name: Store Genesis Public/Private Keypairs
-                  command: ./scripts/skip_if_only_frontend.sh make genesiskeys
-            - run:
-                  name: Upload deb to repo
-                  command: ./scripts/skip_if_only_frontend.sh make publish_deb
-            - run:
-                  name: Record Constraint System Digests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
-            - store_artifacts:
-                  path: /tmp/artifacts
-            - run:
-                  name: Copy artifacts to Google Cloud
-                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
     build-artifacts--testnet_postake:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
         environment:
             DUNE_PROFILE: testnet_postake
-        steps:
-            - checkout
-            - run: mkdir -p /tmp/artifacts
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Download Stable Proving Keys
-                  command: ./scripts/skip_if_only_frontend.sh scripts/getkeys.sh
-            - run:
-                  name: Build OCaml
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
-            - run:
-                  name: Build deb Package with keys
-                  command: ./scripts/skip_if_only_frontend.sh make deb
-            - run:
-                  name: Store Generated Proving and Verifying Keys
-                  command: ./scripts/skip_if_only_frontend.sh make provingkeys
-            - run:
-                  name: Store Genesis Public/Private Keypairs
-                  command: ./scripts/skip_if_only_frontend.sh make genesiskeys
-            - run:
-                  name: Upload deb to repo
-                  command: ./scripts/skip_if_only_frontend.sh make publish_deb
-            - run:
-                  name: Record Constraint System Digests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log'
-            - store_artifacts:
-                  path: /tmp/artifacts
-            - run:
-                  name: Copy artifacts to Google Cloud
-                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
-    build-artifacts--testnet_public:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        environment:
-            DUNE_PROFILE: testnet_public
         steps:
             - checkout
             - run: mkdir -p /tmp/artifacts
@@ -288,7 +180,7 @@ jobs:
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless -j8 && dune runtest --profile=test_postake_snarkless -j8'
-    test--fake_hash--full-test:
+    test--fake_hash:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -296,9 +188,9 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Running test - fake_hash:full-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run fake_hash:full-test'
-    test--test_posig--full-test:
+                  name: Running test -- fake_hash:full-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run fake_hash:full-test'
+    test--test_postake:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -306,9 +198,12 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Running test - test_posig:full-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_posig:full-test'
-    test--test_posig--transaction-snark-profiler---check-only:
+                  name: Running test -- test_postake:full-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run test_postake:full-test'
+            - run:
+                  name: Running test -- test_postake:transaction-snark-profiler -check-only
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run test_postake:transaction-snark-profiler -check-only'
+    test--test_postake_catchup:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -316,9 +211,9 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Running test - test_posig:transaction-snark-profiler -check-only
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_posig:transaction-snark-profiler -check-only'
-    test--test_posig_snarkless--full-test:
+                  name: Running test -- test_postake_catchup:coda-restart-node-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run test_postake_catchup:coda-restart-node-test'
+    test--test_postake_snarkless:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -326,9 +221,12 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Running test - test_posig_snarkless:full-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_posig_snarkless:full-test'
-    test--test_posig_snarkless--transaction-snark-profiler---check-only:
+                  name: Running test -- test_postake_snarkless:full-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run test_postake_snarkless:full-test'
+            - run:
+                  name: Running test -- test_postake_snarkless:transaction-snark-profiler -check-only
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run test_postake_snarkless:transaction-snark-profiler -check-only'
+    test--test_postake_split_snarkless:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
@@ -336,188 +234,23 @@ jobs:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Running test - test_posig_snarkless:transaction-snark-profiler -check-only
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_posig_snarkless:transaction-snark-profiler -check-only'
-    test--test_posig_snarkless--coda-peers-test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+                  name: Running test -- test_postake_split_snarkless:coda-peers-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run test_postake_split_snarkless:coda-peers-test'
             - run:
-                  name: Running test - test_posig_snarkless:coda-peers-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_posig_snarkless:coda-peers-test'
-    test--test_posig_snarkless--coda-transitive-peers-test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+                  name: Running test -- test_postake_split_snarkless:coda-transitive-peers-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run test_postake_split_snarkless:coda-transitive-peers-test'
             - run:
-                  name: Running test - test_posig_snarkless:coda-transitive-peers-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_posig_snarkless:coda-transitive-peers-test'
-    test--test_posig_snarkless--coda-block-production-test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+                  name: Running test -- test_postake_split_snarkless:coda-block-production-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run test_postake_split_snarkless:coda-block-production-test'
             - run:
-                  name: Running test - test_posig_snarkless:coda-block-production-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_posig_snarkless:coda-block-production-test'
-    test--test_posig_snarkless--coda-shared-prefix-test---who-proposes--0:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+                  name: Running test -- test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 0
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 0'
             - run:
-                  name: Running test - test_posig_snarkless:coda-shared-prefix-test -who-proposes 0
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_posig_snarkless:coda-shared-prefix-test -who-proposes 0'
-    test--test_posig_snarkless--coda-shared-prefix-test---who-proposes--1:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+                  name: Running test -- test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1'
             - run:
-                  name: Running test - test_posig_snarkless:coda-shared-prefix-test -who-proposes 1
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_posig_snarkless:coda-shared-prefix-test -who-proposes 1'
-    test--test_posig_snarkless--coda-shared-state-test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test - test_posig_snarkless:coda-shared-state-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_posig_snarkless:coda-shared-state-test'
-    test--test_posig_snarkless--coda-restart-node-test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test - test_posig_snarkless:coda-restart-node-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_posig_snarkless:coda-restart-node-test'
-    test--test_postake--full-test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test - test_postake:full-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_postake:full-test'
-    test--test_postake--transaction-snark-profiler---check-only:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test - test_postake:transaction-snark-profiler -check-only
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_postake:transaction-snark-profiler -check-only'
-    test--test_postake_catchup--coda-restart-node-test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test - test_postake_catchup:coda-restart-node-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_postake_catchup:coda-restart-node-test'
-    test--test_postake_snarkless--full-test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test - test_postake_snarkless:full-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_postake_snarkless:full-test'
-    test--test_postake_snarkless--transaction-snark-profiler---check-only:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test - test_postake_snarkless:transaction-snark-profiler -check-only
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_postake_snarkless:transaction-snark-profiler -check-only'
-    test--test_postake_split_snarkless--coda-peers-test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test - test_postake_split_snarkless:coda-peers-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_postake_split_snarkless:coda-peers-test'
-    test--test_postake_split_snarkless--coda-transitive-peers-test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test - test_postake_split_snarkless:coda-transitive-peers-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_postake_split_snarkless:coda-transitive-peers-test'
-    test--test_postake_split_snarkless--coda-block-production-test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test - test_postake_split_snarkless:coda-block-production-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_postake_split_snarkless:coda-block-production-test'
-    test--test_postake_split_snarkless--coda-shared-prefix-test---who-proposes--0:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test - test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 0
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 0'
-    test--test_postake_split_snarkless--coda-shared-prefix-test---who-proposes--1:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test - test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1'
-    test--test_postake_split_snarkless--coda-shared-state-test:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        steps:
-            - checkout
-            - run: git submodule sync && git submodule update --init --recursive
-            - run:
-                  name: Running test - test_postake_split_snarkless:coda-shared-state-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run test_postake_split_snarkless:coda-shared-state-test'
+                  name: Running test -- test_postake_split_snarkless:coda-shared-state-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run test_postake_split_snarkless:coda-shared-state-test'
 
 workflows:
     version: 2
@@ -527,33 +260,12 @@ workflows:
             - tracetool
             - build-macos
             - build-wallet
-            - build-artifacts--dev
-            - build-artifacts--testnet_posig
             - build-artifacts--testnet_postake
-            - build-artifacts--testnet_public
             - build-artifacts--testnet_postake_snarkless_fake_hash
             - test-unit--test_posig_snarkless
             - test-unit--test_postake_snarkless
-            - test--fake_hash--full-test
-            - test--test_posig--full-test
-            - test--test_posig--transaction-snark-profiler---check-only
-            - test--test_posig_snarkless--full-test
-            - test--test_posig_snarkless--transaction-snark-profiler---check-only
-            - test--test_posig_snarkless--coda-peers-test
-            - test--test_posig_snarkless--coda-transitive-peers-test
-            - test--test_posig_snarkless--coda-block-production-test
-            - test--test_posig_snarkless--coda-shared-prefix-test---who-proposes--0
-            - test--test_posig_snarkless--coda-shared-prefix-test---who-proposes--1
-            - test--test_posig_snarkless--coda-shared-state-test
-            - test--test_posig_snarkless--coda-restart-node-test
-            - test--test_postake--full-test
-            - test--test_postake--transaction-snark-profiler---check-only
-            - test--test_postake_catchup--coda-restart-node-test
-            - test--test_postake_snarkless--full-test
-            - test--test_postake_snarkless--transaction-snark-profiler---check-only
-            - test--test_postake_split_snarkless--coda-peers-test
-            - test--test_postake_split_snarkless--coda-transitive-peers-test
-            - test--test_postake_split_snarkless--coda-block-production-test
-            - test--test_postake_split_snarkless--coda-shared-prefix-test---who-proposes--0
-            - test--test_postake_split_snarkless--coda-shared-prefix-test---who-proposes--1
-            - test--test_postake_split_snarkless--coda-shared-state-test
+            - test--fake_hash
+            - test--test_postake
+            - test--test_postake_catchup
+            - test--test_postake_snarkless
+            - test--test_postake_split_snarkless
