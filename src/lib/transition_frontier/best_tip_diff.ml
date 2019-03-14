@@ -22,7 +22,8 @@ end) :
 
   let create () = ()
 
-  let initial_view : view = {new_user_commands= []; removed_user_commands= []}
+  let initial_view () : view =
+    {new_user_commands= []; removed_user_commands= []}
 
   let handle_diff () diff : User_command.t Best_tip_diff_view.t Option.t =
     let open Transition_frontier_diff in
