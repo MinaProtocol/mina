@@ -78,11 +78,31 @@ module Api = struct
       t i
 end
 
+module Tree = struct
+  type key = string
+
+  type t = {parent_map: (key, key) Hashtbl.t}
+
+  let add t ~prev ~curr = Hashtbl.add t.parent_map ~key:curr ~data:prev
+
+  let create () = {parent_map= Hashtbl.create (module String)}
+
+  let path_from t node =
+    let rec go acc cur =
+      match Hashtbl.find t.parent_map cur with
+      | Some parent -> go (parent :: acc) parent
+      | None -> List.rev acc
+    in
+    go [] node
+end
+
 let start_prefix_check log workers events testnet ~acceptable_delay =
   let all_transitions_r, all_transitions_w = Linear_pipe.create () in
-  let chains = Array.init (List.length workers) ~f:(fun i -> []) in
+  let state_hash_tree = Tree.create () in
+  let chains = Array.init (List.length workers) ~f:(fun i -> "") in
   let check_chains chains =
     let chains = Array.filteri chains ~f:(fun i _ -> Api.synced testnet i) in
+    let chains = Array.map chains ~f:(Tree.path_from state_hash_tree) in
     let lengths =
       Array.to_list (Array.map chains ~f:(fun c -> List.length c))
     in
@@ -145,10 +165,10 @@ let start_prefix_check log workers events testnet ~acceptable_delay =
               Md5.to_hex hash
             in
             let curr = bits_to_str curr in
-            let chain = chains.(i) in
-            let chain = curr :: chain in
+            let prev = bits_to_str prev in
+            Tree.add state_hash_tree ~prev ~curr |> ignore ;
             last_time := Time.now () ;
-            chains.(i) <- chain ;
+            chains.(i) <- curr ;
             check_chains chains ;
             return chains ))) ;
   don't_wait_for
