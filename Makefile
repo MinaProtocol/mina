@@ -67,7 +67,7 @@ dht: kademlia
 
 build: git_hooks reformat-diff
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && (ulimit -u 2128 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 dev: codabuilder containerstart build
@@ -181,7 +181,7 @@ publish_kademlia_deb:
 
 publish_deb:
 	@if [ $(AWS_ACCESS_KEY_ID) ] ; then \
-		if [ "$(CIRCLE_BRANCH)" = "master" ] && [ "$(CIRCLE_JOB)" = "build_testnet_postake" ] ; then \
+		if [ "$(CIRCLE_BRANCH)" = "master" ] && [ "$(CIRCLE_JOB)" = "build-artifacts--testnet_postake" ] ; then \
             echo "Publishing to stable" ; \
 			$(DEBS3) --codename stable   --component main src/_build/coda-*.deb ; \
 		else \

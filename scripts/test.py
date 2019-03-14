@@ -42,13 +42,14 @@ test_permutations = {
     'test_postake_split_snarkless': integration_tests,
     'test_posig': simple_tests,
     'test_postake': simple_tests,
-    'test_postake_catchup': ['coda-restart-node-test']
+    'test_postake_catchup': ['coda-restart-node-test'],
+    'test_postake_bootstrap' : ['coda-bootstrap-test']
 }
 
 ci_blacklist = [
     'test_posig:*',
     'test_posig_snarkless:*',
-    'test_postake_split_snarkless:coda-restart-node-test'
+    'test_postake_split_snarkless:*',
 ]
 
 def fail(msg):
