@@ -38,10 +38,10 @@ let div_mod (type f) ~m:((module M) as m : f m) a b =
       Typ.(field * field)
       ~compute:
         As_prover.(
-          Let_syntax.(
-            let%map a = read_var a.value >>| bigint_of_field ~m
-            and b = read_var b.value >>| bigint_of_field ~m in
-            (bigint_to_field ~m B.(a / b), bigint_to_field ~m (B.rem a b))))
+          fun () ->
+            let a = read_var a.value |> bigint_of_field ~m
+            and b = read_var b.value |> bigint_of_field ~m in
+            (bigint_to_field ~m B.(a / b), bigint_to_field ~m (B.rem a b)))
   in
   (* Check
       r < b
