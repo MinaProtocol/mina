@@ -152,7 +152,7 @@ struct
         (* "master" types, do not change *)
         type query = State_hash.t Envelope.Incoming.Stable.V1.t
 
-        type response = External_transition.t Non_empty_list.t option
+        type response = External_transition.t Non_empty_list.Stable.V1.t option
       end
 
       module Caller = T
@@ -173,7 +173,7 @@ struct
         type query = State_hash.t Envelope.Incoming.Stable.V1.t
         [@@deriving bin_io, sexp]
 
-        type response = External_transition.t Non_empty_list.t option
+        type response = External_transition.t Non_empty_list.Stable.V1.t option
         [@@deriving bin_io, sexp]
 
         let version = 1
