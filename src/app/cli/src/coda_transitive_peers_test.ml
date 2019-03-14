@@ -51,7 +51,8 @@ let main () =
       (S.of_list
          (peers |> List.map ~f:Network_peer.Peer.to_discovery_host_and_port))
       (S.of_list expected_peers) ) ;
-  Coda_process.disconnect worker
+  let%bind () = Coda_process.disconnect worker in
+  Deferred.List.iter workers ~f:Coda_process.disconnect
 
 let command =
   Command.async
