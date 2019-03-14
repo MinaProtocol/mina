@@ -20,8 +20,17 @@ struct
   module Ledger_proof_statement = Transaction_snark.Statement
 
   module Ledger_proof = struct
-    type t = Ledger_proof_statement.t * Sok_message.Digest.Stable.V1.t
-    [@@deriving sexp, bin_io]
+    module Stable = struct
+      module V1 = struct
+        type t = Ledger_proof_statement.t * Sok_message.Digest.Stable.V1.t
+        [@@deriving sexp, bin_io]
+      end
+
+      module Latest = V1
+    end
+
+    (* TODO: remove bin_io, after fixing functors to accept this *)
+    type t = Stable.V1.t [@@deriving sexp, bin_io]
 
     let underlying_proof (_ : t) = Proof.dummy
 
@@ -53,31 +62,6 @@ struct
   module Transaction_snark_work =
     Staged_ledger.Make_completed_work (Public_key.Compressed) (Ledger_proof)
       (Ledger_proof_statement)
-
-  module User_command = struct
-    include (
-      User_command :
-        module type of User_command
-        with module With_valid_signature := User_command.With_valid_signature )
-
-    let fee (t : t) = Payload.fee t.payload
-
-    let sender (t : t) = Signature_lib.Public_key.compress t.sender
-
-    let seed = Secure_random.string ()
-
-    module With_valid_signature = struct
-      module T = struct
-        include User_command.With_valid_signature
-
-        let compare t1 t2 =
-          User_command.With_valid_signature.compare ~seed t1 t2
-      end
-
-      include T
-      include Comparable.Make (T)
-    end
-  end
 
   module Staged_ledger_diff = Staged_ledger.Make_diff (struct
     module Fee_transfer = Fee_transfer
