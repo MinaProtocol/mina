@@ -320,14 +320,12 @@ struct
 
   let iter_a s j tbl =
     let rec go ~a ~acc ~s ~j ~tbl =
-      printf "j: %d\n%!" j ;
-      printf "a: %d\n%!" a ;
       (* if s = 0 then 2a + 3b = 3j -> b = 3j - 2a / 3 *)
       (* if s = 1 then 2a + 3b = 3j + 3 -> b = 3 + 3j - 2a / 3 *)
       let b =
         if s = 0 then ((3 * j) - (2 * a)) / 3
         else if s = 1 then (3 + (3 * j) - (2 * a)) / 3
-        else failwith "case that doesn't exist specified"
+        else failwith "case specified doesn't exist"
       in
       let acc' =
         if s = 0 && (2 * a) + (3 * b) = 3 * j then F.( + ) acc (mul a b tbl)
@@ -336,7 +334,6 @@ struct
         else acc
       in
       (* start with a_max and decrement until a = 0 *)
-      printf "b: %d\n%!" b ;
       if a > 0 then
         let a' = a - 1 in
         go ~a:a' ~acc:acc' ~s ~j ~tbl
@@ -348,47 +345,9 @@ struct
     let a =
       if s = 0 then 3 * j / 2
       else if s = 1 then ((3 * j) + 3) / 2
-      else failwith "case that doesn't exist specified"
+      else failwith "case specified doesn't exist"
     in
     go ~a ~acc:F.zero ~s ~j ~tbl
-
-  (*
-  let naive_iter_a s j tbl =
-    let rec go ~a ~b ~acc ~s ~j ~tbl =
-      printf "j: %d\n%!" j ;
-      printf "a: %d\n%!" a ;
-      printf "b: %d\n%!" b ;
-      if s = 0 then
-        (* 2a + 3b = 3j *)
-        if (2 * a) + (3 * b) = 3 * j then (
-          let acc' = F.( + ) acc (mul a b tbl) and a' = a and b' = b + 1 in
-          printf "yes\n%!" ;
-          go ~a:a' ~b:b' ~acc:acc' ~s ~j ~tbl )
-        else if b > j then
-          let a' = a + 1 and b' = 0 in
-          go ~a:a' ~b:b' ~acc ~s ~j ~tbl
-        else if 2 * a > 3 * j then acc
-        else
-          let a' = a and b' = b + 1 in
-          go ~a:a' ~b:b' ~acc ~s ~j ~tbl
-      else if s = 1 then
-        (* 2a + 3b = 3j + 3 *)
-        if (2 * a) + (3 * b) = (3 * j) + 3 then (
-          let acc' = F.( + ) acc (mul a b tbl) and a' = a and b' = b + 1 in
-          printf "yes\n%!" ;
-          go ~a:a' ~b:b' ~acc:acc' ~s ~j ~tbl )
-        else if b > j + 1 then
-          let a' = a + 1 and b' = 0 in
-          go ~a:a' ~b:b' ~acc ~s ~j ~tbl
-        else if 2 * a > (3 * j) + 3 then acc
-        else
-          let a' = a and b' = b + 1 in
-          go ~a:a' ~b:b' ~acc ~s ~j ~tbl
-      else F.zero
-    in
-    let a = 0 and b = 0 in
-    go ~a ~b ~acc:F.zero ~s ~j ~tbl
-  *)
 
   let iter_j s max t_powers tbl =
     let rec go ~j ~acc ~s ~max ~t_powers ~tbl =
@@ -448,24 +407,6 @@ module Make_unchecked
     end) =
 struct
   include Make_group_map (F) (Params)
-
-  (*
-  let%test_unit "iter_a (not special case) test" =
-    Quickcheck.test ~trials:2 Int.gen ~f:(fun j ->
-        let a = iter_a 0 (j mod 4) n1tbl
-        and b = naive_iter_a 0 (j mod 4) n1tbl in
-        printf "iter_a: %s\n%!" (Sexp.to_string (F.sexp_of_t a)) ;
-        printf "naive_iter_a: %s\n%!" (Sexp.to_string (F.sexp_of_t b)) ;
-        assert (F.equal a b) )
-
-  let%test_unit "iter_a (special case) test" =
-    Quickcheck.test ~trials:2 Int.gen ~f:(fun j ->
-        let a = iter_a 1 (j mod 4) n1tbl
-        and b = naive_iter_a 1 (j mod 4) n1tbl in
-        printf "iter_a: %s\n%!" (Sexp.to_string (F.sexp_of_t a)) ;
-        printf "naive_iter_a: %s\n%!" (Sexp.to_string (F.sexp_of_t b)) ;
-        assert (F.equal a b) )
-  *)
 
   let try_decode x =
     let f x = F.((x * x * x) + (Params.a * x) + Params.b) in
