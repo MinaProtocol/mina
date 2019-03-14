@@ -461,12 +461,17 @@ struct
           let graph_with_node = add_vertex graph node in
           List.fold node.successor_hashes ~init:graph_with_node
             ~f:(fun acc_graph successor_state_hash ->
-              add_edge acc_graph node
-                ( State_hash.Table.find t.table successor_state_hash
-                |> Option.value_exn ) ) )
+              match State_hash.Table.find t.table successor_state_hash with
+              | Some child_node -> add_edge acc_graph node child_node
+              | None ->
+                  Logger.info t.logger
+                    !"Could not visualize node %{sexp:State_hash.t}. Looks \
+                      like the node did not get garbage collected properly"
+                    successor_state_hash ;
+                  acc_graph ) )
   end
 
-  let visualize ~filename t =
+  let visualize ~filename (t : t) =
     Out_channel.with_file filename ~f:(fun output_channel ->
         let graph = Visualizor.to_graph t in
         Visualizor.output_graph output_channel graph )
