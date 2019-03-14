@@ -1293,11 +1293,12 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let log_shutdown ~frontier_file ~log t =
     match visualize_frontier ~filename:frontier_file t with
     | `Active () ->
-        Logger.info log "Logging the transition_frontier at %s" frontier_file
+        Logger.info log
+          "Successfully wrote the visualization of frontier at location: %s"
+          frontier_file
     | `Bootstrapping ->
         Logger.info log
-          "Could not log transition_frontier since daemon is currently \
-           bootstrapping"
+          "Could not visualize frontier since daemon is currently bootstrapping"
 
   (* TODO: handle participation_status more appropriately than doing participate_exn *)
   let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda ~log
