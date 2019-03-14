@@ -142,18 +142,18 @@ jobs:
     {%- endfor %}
 
     {%- for profile in test_permutations.keys() | sort %}
-    {%- for test in test_permutations[profile] %}
-    test--{{profile}}--{{'--'.join(test.split(' '))}}:
+    test--{{profile}}:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
         steps:
             - checkout
             - run: git submodule sync && git submodule update --init --recursive
+            {%- for test in test_permutations[profile] %}
             - run:
-                  name: Running test - {{profile}}:{{test}}
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/skip_if_only_frontend.sh ./scripts/test.py run {{profile}}:{{test}}'
-    {%- endfor %}
+                  name: Running test -- {{profile}}:{{test}}
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run {{profile}}:{{test}}'
+            {%- endfor %}
     {%- endfor %}
 
 workflows:
@@ -171,7 +171,5 @@ workflows:
             - test-unit--{{profile}}
             {%- endfor %}
             {%- for profile in test_permutations.keys() | sort %}
-            {%- for test in test_permutations[profile] %}
-            - test--{{profile}}--{{'--'.join(test.split(' '))}}
-            {%- endfor %}
+            - test--{{profile}}
             {%- endfor %}
