@@ -10,6 +10,19 @@ type critical = {
 [@bs.module "emotion-server"]
 external extractCritical: string => critical = "";
 
+[@bs.val] [@bs.module "fs"]
+external mkdirSync:
+  (
+    string,
+    {
+      .
+      "recursive": bool,
+      "mode": int,
+    }
+  ) =>
+  unit =
+  "";
+
 let writeStatic = (path, rootComponent) => {
   let rendered =
     extractCritical(ReactDOMServerRe.renderToStaticMarkup(rootComponent));
@@ -36,9 +49,10 @@ let posts =
        let name = String.sub(fileName, 0, length);
        let content = Node.Fs.readFileAsUtf8Sync("posts/" ++ fileName);
        let html = load("posts/" ++ fileName);
-       print_endline("success " ++ name);
        (name, content, html);
      });
+
+mkdirSync("site/blog", {"recursive": true, "mode": 0o755});
 
 // TODO: Parse metadata from markdown
 Array.iter(

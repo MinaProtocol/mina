@@ -30,7 +30,7 @@ jobs:
                   command: cd frontend/website && npm run reformat && git diff --exit-code src
             - run:
                   name: Build website
-                  command: cd frontend/website && npm run build && mkdir site && brew install pandoc && node ./lib/js/src/Render.js
+                  command: cd frontend/website && npm run build && brew install pandoc && node ./lib/js/src/Render.js
 
     lint:
         docker:
