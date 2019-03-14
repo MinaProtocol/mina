@@ -24,6 +24,13 @@ jobs:
             - run:
                   name: Build wallet
                   command: cd frontend/wallet && npm run build
+            - run: cd frontend/website && npm install
+            - run:
+                  name: Lint website
+                  command: cd frontend/website && npm run reformat && git diff --exit-code src
+            - run:
+                  name: Build website
+                  command: cd frontend/website && npm run build && brew install pandoc && node ./lib/js/src/Render.js
 
     lint:
         docker:
