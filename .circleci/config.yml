@@ -196,7 +196,7 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- fake_hash:full-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "fake_hash:full-test"'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "fake_hash:full-test" && sleep 1'
     test--test_postake:
         resource_class: large
         docker:
@@ -206,10 +206,10 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake:full-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:full-test"'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:full-test" && sleep 1'
             - run:
                   name: Running test -- test_postake:transaction-snark-profiler -check-only
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:transaction-snark-profiler -check-only"'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:transaction-snark-profiler -check-only" && sleep 1'
     test--test_postake_bootstrap:
         resource_class: large
         docker:
@@ -219,7 +219,7 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_bootstrap:coda-bootstrap-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_bootstrap:coda-bootstrap-test"'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_bootstrap:coda-bootstrap-test" && sleep 1'
     test--test_postake_catchup:
         resource_class: large
         docker:
@@ -229,7 +229,7 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_catchup:coda-restart-node-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_catchup:coda-restart-node-test"'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_catchup:coda-restart-node-test" && sleep 1'
     test--test_postake_snarkless:
         resource_class: large
         docker:
@@ -239,10 +239,38 @@ jobs:
             - run: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Running test -- test_postake_snarkless:full-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless:full-test"'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless:full-test" && sleep 1'
             - run:
                   name: Running test -- test_postake_snarkless:transaction-snark-profiler -check-only
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless:transaction-snark-profiler -check-only"'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless:transaction-snark-profiler -check-only" && sleep 1'
+    test--test_postake_split_snarkless:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+        steps:
+            - checkout
+            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Running test -- test_postake_split_snarkless:coda-peers-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-peers-test" && sleep 1'
+            - run:
+                  name: Running test -- test_postake_split_snarkless:coda-transitive-peers-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-transitive-peers-test" && sleep 1'
+            - run:
+                  name: Running test -- test_postake_split_snarkless:coda-block-production-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-block-production-test" && sleep 1'
+            - run:
+                  name: Running test -- test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 0
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 0" && sleep 1'
+            - run:
+                  name: Running test -- test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1" && sleep 1'
+            - run:
+                  name: Running test -- test_postake_split_snarkless:coda-shared-state-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-shared-state-test" && sleep 1'
+            - run:
+                  name: Running test -- test_postake_split_snarkless:coda-restart-node-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-restart-node-test" && sleep 1'
 
 workflows:
     version: 2
@@ -261,3 +289,4 @@ workflows:
             - test--test_postake_bootstrap
             - test--test_postake_catchup
             - test--test_postake_snarkless
+            - test--test_postake_split_snarkless
