@@ -41,7 +41,7 @@ let main () =
   in
   let%bind worker = Coda_process.spawn_exn config in
   let%bind _ = after (Time.Span.of_sec 10.) in
-  let%map peers = Coda_process.peers_exn worker in
+  let%bind peers = Coda_process.peers_exn worker in
   Logger.debug log
     !"got peers %{sexp: Network_peer.Peer.t list} %{sexp: Host_and_port.t list}\n"
     peers expected_peers ;
@@ -50,7 +50,8 @@ let main () =
     S.equal
       (S.of_list
          (peers |> List.map ~f:Network_peer.Peer.to_discovery_host_and_port))
-      (S.of_list expected_peers) )
+      (S.of_list expected_peers) ) ;
+  Coda_process.disconnect worker
 
 let command =
   Command.async
