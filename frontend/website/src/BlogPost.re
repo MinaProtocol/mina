@@ -8,6 +8,9 @@ module Metadata = {
   };
 
   let getValue = (key, content) => {
+    // Search inside of the area enclosed by `---` for
+    // a line that starts with `key:` and capture everything
+    // between the : and the end of the line.
     let re =
       Js.Re.fromStringWithFlags(
         {|^---(?:.|\n)*^|} ++ key ++ {|:(.*)\n(?:.|\n)*^---|},
