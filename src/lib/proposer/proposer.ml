@@ -33,9 +33,9 @@ module type Inputs_intf = sig
 
   module Prover : sig
     val prove :
-         prev_state:Consensus_mechanism.Protocol_state.value
+         prev_state:Consensus_mechanism.Protocol_state.Value.t
       -> prev_state_proof:Protocol_state_proof.t
-      -> next_state:Consensus_mechanism.Protocol_state.value
+      -> next_state:Consensus_mechanism.Protocol_state.Value.t
       -> Internal_transition.t
       -> Protocol_state_proof.t Deferred.Or_error.t
   end
@@ -116,7 +116,7 @@ module Make (Inputs : Inputs_intf) :
    and type ledger_hash := Inputs.Ledger_hash.t
    and type staged_ledger := Inputs.Staged_ledger.t
    and type transaction := Inputs.User_command.With_valid_signature.t
-   and type protocol_state := Inputs.Consensus_mechanism.Protocol_state.value
+   and type protocol_state := Inputs.Consensus_mechanism.Protocol_state.Value.t
    and type protocol_state_proof := Inputs.Protocol_state_proof.t
    and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
    and type completed_work_statement :=

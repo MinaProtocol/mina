@@ -12,15 +12,8 @@ module type S = sig
     ; timestamp: 'time }
   [@@deriving sexp, eq, compare, fields]
 
-  type t = (Staged_ledger_hash.t, Frozen_ledger_hash.t, Block_time.t) t_
-  [@@deriving sexp, eq, compare, hash]
-
   module Stable : sig
     module V1 : sig
-      type nonrec ('a, 'b, 'c) t_ = ('a, 'b, 'c) t_ =
-        {staged_ledger_hash: 'a; snarked_ledger_hash: 'b; timestamp: 'c}
-      [@@deriving bin_io, sexp, eq, compare, hash]
-
       type nonrec t =
         ( Staged_ledger_hash.Stable.V1.t
         , Frozen_ledger_hash.Stable.V1.t
@@ -28,9 +21,12 @@ module type S = sig
         t_
       [@@deriving bin_io, sexp, eq, compare, hash]
     end
+    (*    module Latest = V1 *)
   end
 
-  type value = t [@@deriving bin_io, sexp, eq, compare, hash]
+  type t = Stable.V1.t [@@deriving sexp, eq, compare, hash]
+
+  type value = t [@@deriving sexp, eq, compare, hash]
 
   include
     Snarkable.S
@@ -86,16 +82,16 @@ end
 module Make (Genesis_ledger : sig
   val t : Ledger.t
 end) : S = struct
+  type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t_ =
+    { staged_ledger_hash: 'staged_ledger_hash
+    ; snarked_ledger_hash: 'snarked_ledger_hash
+    ; timestamp: 'time }
+  [@@deriving bin_io, sexp, fields, eq, compare, hash, yojson]
+
   module Stable = struct
     module V1 = struct
       module T = struct
         let version = 1
-
-        type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t_ =
-          { staged_ledger_hash: 'staged_ledger_hash
-          ; snarked_ledger_hash: 'snarked_ledger_hash
-          ; timestamp: 'time }
-        [@@deriving bin_io, sexp, fields, eq, compare, hash, yojson]
 
         type t =
           ( Staged_ledger_hash.Stable.V1.t
@@ -109,19 +105,19 @@ end) : S = struct
       include Module_version.Registration.Make_latest_version (T)
     end
 
-    module Latest = V1
+    (*     module Latest = V1 *)
 
     module Module_decl = struct
       let name = "coda_base_blockchain_state"
 
-      type latest = Latest.t
+      type latest = V1.t
     end
 
     module Registrar = Module_version.Registration.Make (Module_decl)
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  include Stable.Latest
+  type t = Stable.V1.t [@@deriving sexp, eq, compare, hash]
 
   type var =
     ( Staged_ledger_hash.var
@@ -129,7 +125,7 @@ end) : S = struct
     , Block_time.Unpacked.var )
     t_
 
-  type value = t [@@deriving bin_io, sexp, eq, compare, hash]
+  type value = t [@@deriving sexp, eq, compare, hash]
 
   let create_value ~staged_ledger_hash ~snarked_ledger_hash ~timestamp =
     {staged_ledger_hash; snarked_ledger_hash; timestamp}
