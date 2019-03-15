@@ -1,3 +1,6 @@
+[%%import
+"../config.mlh"]
+
 open Core_kernel
 open Async_kernel
 open Pipe_lib
@@ -10,9 +13,23 @@ module type Security_intf = sig
 end
 
 module type Time_controller_intf = sig
+  [%%if time_offsets]
+
   type t
 
-  val create : unit -> t
+  val create : t -> t
+
+  val basic : t
+
+  [%%else]
+
+  type t
+
+  val create : t -> t
+
+  val basic : t
+
+  [%%endif]
 end
 
 module type Sok_message_intf = sig
@@ -22,7 +39,16 @@ module type Sok_message_intf = sig
     type t
   end
 
-  type t [@@deriving bin_io, sexp]
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving sexp, bin_io]
+    end
+
+    module Latest = V1
+  end
+
+  (* bin_io intentionally omitted *)
+  type t = Stable.Latest.t [@@deriving sexp]
 
   val create : fee:Currency.Fee.t -> prover:public_key_compressed -> t
 end
@@ -90,7 +116,15 @@ module type Time_intf = sig
 end
 
 module type Ledger_hash_intf = sig
-  type t [@@deriving bin_io, eq, sexp, compare]
+  type t [@@deriving eq, sexp, compare]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving eq, sexp, compare, bin_io]
+      end
+    end
+    with type V1.t = t
 
   val to_bytes : t -> string
 
@@ -454,7 +488,18 @@ module type Ledger_proof_intf = sig
 
   type sok_digest
 
-  type t [@@deriving sexp, bin_io]
+  (* bin_io omitted intentionally *)
+  type t [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io]
+      end
+
+      module Latest = V1
+    end
+    with type V1.t = t
 
   val create : statement:statement -> sok_digest:sok_digest -> proof:proof -> t
 
@@ -639,7 +684,19 @@ module type Transaction_snark_scan_state_intf = sig
 
   type transaction
 
-  type t [@@deriving sexp, bin_io]
+  type staged_ledger_aux_hash
+
+  type t [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io]
+
+        val hash : t -> staged_ledger_aux_hash
+      end
+    end
+    with type V1.t = t
 
   type ledger_proof
 
@@ -650,10 +707,6 @@ module type Transaction_snark_scan_state_intf = sig
   type transaction_with_info
 
   type frozen_ledger_hash
-
-  type staged_ledger_aux_hash
-
-  type pending_coinbase
 
   type transaction_witness
 
@@ -792,7 +845,17 @@ module type Staged_ledger_base_intf = sig
   type serializable [@@deriving bin_io]
 
   module Scan_state : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+
+          val hash : t -> staged_ledger_aux_hash
+        end
+      end
+      with type V1.t = t
 
     module Job_view : sig
       type t [@@deriving sexp, to_yojson]
@@ -1099,7 +1162,16 @@ module type External_transition_intf = sig
 
   type staged_ledger_diff
 
-  type t [@@deriving sexp, bin_io]
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving sexp, bin_io]
+    end
+
+    module Latest = V1
+  end
+
+  (* bin_io intentionally omitted *)
+  type t = Stable.Latest.t [@@deriving sexp]
 
   val create :
        protocol_state:protocol_state
@@ -1108,7 +1180,7 @@ module type External_transition_intf = sig
     -> t
 
   module Verified : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp]
 
     val protocol_state : t -> protocol_state
 
@@ -1118,7 +1190,7 @@ module type External_transition_intf = sig
   end
 
   module Proof_verified : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp]
 
     val protocol_state : t -> protocol_state
 

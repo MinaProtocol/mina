@@ -1,3 +1,6 @@
+[%%import
+"../../../config.mlh"]
+
 open Core
 open Async
 open Coda_worker
@@ -17,8 +20,21 @@ let net_configs n =
   in
   (discovery_ports, external_ports, peers)
 
+[%%inject
+"genesis_state_timestamp_string", genesis_state_timestamp]
+
+let offset =
+  lazy
+    (let genesis_state_timestamp =
+       let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
+       Core.Time.of_string_gen ~if_no_timezone:(`Use_this_one default_timezone)
+         genesis_state_timestamp_string
+     in
+     Core_kernel.Time.diff (Core_kernel.Time.now ()) genesis_state_timestamp)
+
 let local_configs ?proposal_interval ?(proposers = Fn.const None) n
-    ~acceptable_delay ~program_dir ~snark_worker_public_keys ~work_selection =
+    ~acceptable_delay ~program_dir ~snark_worker_public_keys ~work_selection
+    ~trace_dir =
   let discovery_ports, external_ports, peers = net_configs n in
   let peers = [] :: List.drop peers 1 in
   let args =
@@ -40,7 +56,8 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None) n
         in
         Coda_process.local_config ?proposal_interval ~peers ~discovery_port
           ~external_port ~snark_worker_config ~program_dir ~acceptable_delay
-          ~proposer:(proposers i) ~work_selection () )
+          ~proposer:(proposers i) ~work_selection ~trace_dir
+          ~offset:(Lazy.force offset) () )
   in
   configs
 

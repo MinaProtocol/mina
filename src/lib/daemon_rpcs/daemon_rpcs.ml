@@ -25,7 +25,7 @@ module Types = struct
             sprintf "%s: %s %s" s padding x )
         |> String.concat ~sep:"\n"
       in
-      title ^ output ^ "\n"
+      title ^ "\n" ^ output ^ "\n"
 
     let summarize_report
         {Perf_histograms.Report.values; intervals; overflow; underflow} =
@@ -408,7 +408,7 @@ end
 module Visualize_frontier = struct
   type query = string [@@deriving bin_io]
 
-  type response = unit [@@deriving bin_io]
+  type response = [`Active of unit | `Bootstrapping] [@@deriving bin_io]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Visualize_frontier" ~version:0 ~bin_query

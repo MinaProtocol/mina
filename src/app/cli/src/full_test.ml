@@ -46,10 +46,11 @@ let run_test () : unit Deferred.t =
         make_init ~should_propose:true (module Config)
       in
       let%bind () =
-        if Unix.getenv "CODA_TRACING" = Some "1" then
-          let%bind () = Async.Unix.mkdir ~p:() "/tmp/full-test-traces" in
-          Coda_tracing.start "/tmp/full-test-traces"
-        else Deferred.unit
+        match Unix.getenv "CODA_TRACING" with
+        | Some trace_dir ->
+            let%bind () = Async.Unix.mkdir ~p:() trace_dir in
+            Coda_tracing.start trace_dir
+        | None -> Deferred.unit
       in
       let module Main = Coda_main.Make_coda (Init) in
       let module Run = Run (Config) (Main) in
@@ -72,7 +73,9 @@ let run_test () : unit Deferred.t =
         Coda_base.Receipt_chain_database.create
           ~directory:receipt_chain_dir_name
       in
-      let time_controller = Inputs.Time.Controller.create () in
+      let time_controller =
+        Inputs.Time.Controller.create Inputs.Time.Controller.basic
+      in
       let net_config =
         { Inputs.Net.Config.parent_log= log
         ; time_controller
@@ -163,7 +166,8 @@ let run_test () : unit Deferred.t =
         trace_recurring_task "build_payment" (fun () ->
             let nonce =
               Run.get_nonce coda (pk_of_sk sender_sk)
-              |> Participating_state.active_exn |> Option.value_exn
+              |> Participating_state.active_exn
+              |> Option.value_exn ?here:None ?error:None ?message:None
             in
             let payload : User_command.Payload.t =
               User_command.Payload.create ~fee ~nonce
@@ -180,7 +184,8 @@ let run_test () : unit Deferred.t =
         in
         let prev_sender_balance =
           Run.get_balance coda (pk_of_sk sender_sk)
-          |> Participating_state.active_exn |> Option.value_exn
+          |> Participating_state.active_exn
+          |> Option.value_exn ?here:None ?error:None ?message:None
         in
         let prev_receiver_balance =
           Run.get_balance coda receiver_pk
@@ -210,10 +215,10 @@ let run_test () : unit Deferred.t =
         in
         assert_balance receiver_pk
           ( Currency.Balance.( + ) prev_receiver_balance send_amount
-          |> Option.value_exn ) ;
+          |> Option.value_exn ?here:None ?error:None ?message:None ) ;
         assert_balance (pk_of_sk sender_sk)
           ( Currency.Balance.( - ) prev_sender_balance send_amount
-          |> Option.value_exn )
+          |> Option.value_exn ?here:None ?error:None ?message:None )
       in
       let send_payment_update_balance_sheet sender_sk sender_pk receiver_pk
           amount balance_sheet fee =

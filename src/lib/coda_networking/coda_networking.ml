@@ -5,26 +5,24 @@ open Coda_base
 open Pipe_lib
 open Network_peer
 
+(* assumption: the Rpcs functor is applied only once in the codebase, so that
+   any versions appearing in Inputs represent unique types
+
+   with that assumption, it's legitimate for the choice of versions to be made
+   inside the Rpcs functor, rather than at the locus of application
+*)
+
 module Rpcs (Inputs : sig
   module Staged_ledger_aux_hash :
     Protocols.Coda_pow.Staged_ledger_aux_hash_intf
 
-  module Staged_ledger_aux : Binable.S
-
-  module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
-
-  module Pending_coinbase : sig
-    type t [@@deriving sexp, bin_io]
+  module Staged_ledger_aux : sig
+    module Stable : sig
+      module V1 : Binable.S
+    end
   end
 
-  module Pending_coinbase_hash : Protocols.Coda_pow.Pending_coinbase_hash_intf
-
-  module Staged_ledger_hash :
-    Protocols.Coda_pow.Staged_ledger_hash_intf
-    with type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
-     and type ledger_hash := Ledger_hash.t
-     and type pending_coinbase := Pending_coinbase.t
-     and type pending_coinbase_hash := Pending_coinbase_hash.t
+  module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
 
   module Blockchain_state : Blockchain_state.S
 
@@ -33,14 +31,24 @@ end) =
 struct
   open Inputs
 
+  (* see
+
+     RFC 0012, and
+
+     https://ocaml.janestreet.com/ocaml-core/latest/doc/async_rpc_kernel/Async_rpc_kernel/Versioned_rpc/
+
+  *)
+
   module Get_staged_ledger_aux_at_hash = struct
     module T = struct
       let name = "get_staged_ledger_aux_at_hash"
 
       module T = struct
-        type query = Staged_ledger_hash.t Envelope.Incoming.t
+        (* "master" types, do not change *)
+        type query =
+          Staged_ledger_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
 
-        type response = (Staged_ledger_aux.t * Ledger_hash.t) option
+        type response = (Staged_ledger_aux.Stable.V1.t * Ledger_hash.t) option
       end
 
       module Caller = T
@@ -58,10 +66,12 @@ struct
 
     module V1 = struct
       module T = struct
-        type query = Staged_ledger_hash.t Envelope.Incoming.t
+        type query =
+          Staged_ledger_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
         [@@deriving bin_io]
 
-        type response = (Staged_ledger_aux.t * Ledger_hash.t) option
+        type response =
+          (Staged_ledger_aux.Stable.V1.t * Ledger_hash.Stable.V1.t) option
         [@@deriving bin_io]
 
         let version = 1
@@ -85,11 +95,13 @@ struct
       let name = "answer_sync_ledger_query"
 
       module T = struct
-        type query = (Ledger_hash.t * Sync_ledger.query) Envelope.Incoming.t
-        [@@deriving bin_io]
+        (* "master" types, do not change *)
+        type query =
+          (Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t)
+          Envelope.Incoming.Stable.V1.t
 
-        type response = (Ledger_hash.t * Sync_ledger.answer) Or_error.t
-        [@@deriving bin_io]
+        type response =
+          (Ledger_hash.Stable.V1.t * Sync_ledger.Answer.Stable.V1.t) Or_error.t
       end
 
       module Caller = T
@@ -107,7 +119,14 @@ struct
 
     module V1 = struct
       module T = struct
-        include T.T
+        type query =
+          (Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t)
+          Envelope.Incoming.Stable.V1.t
+        [@@deriving bin_io, sexp]
+
+        type response =
+          (Ledger_hash.Stable.V1.t * Sync_ledger.Answer.Stable.V1.t) Or_error.t
+        [@@deriving bin_io, sexp]
 
         let version = 1
 
@@ -130,10 +149,11 @@ struct
       let name = "transition_catchup"
 
       module T = struct
-        type query = State_hash.t Envelope.Incoming.t [@@deriving bin_io]
+        (* "master" types, do not change *)
+        type query = State_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
 
-        type response = External_transition.t Non_empty_list.t option
-        [@@deriving bin_io]
+        type response =
+          External_transition.Stable.V1.t Non_empty_list.Stable.V1.t option
       end
 
       module Caller = T
@@ -151,7 +171,12 @@ struct
 
     module V1 = struct
       module T = struct
-        include T.T
+        type query = State_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
+        [@@deriving bin_io, sexp]
+
+        type response =
+          External_transition.Stable.V1.t Non_empty_list.Stable.V1.t option
+        [@@deriving bin_io, sexp]
 
         let version = 1
 
@@ -174,18 +199,19 @@ struct
       let name = "get_ancestry"
 
       module T = struct
-        type query = Consensus.Consensus_state.value Envelope.Incoming.t
-        [@@deriving bin_io, sexp]
+        (* "master" types, do not change *)
+        type query =
+          Consensus.Consensus_state.value Envelope.Incoming.Stable.V1.t
+        [@@deriving sexp]
 
         type response =
-          ( ( External_transition.t
+          ( ( External_transition.Stable.V1.t
             , State_body_hash.t list * External_transition.t )
             Proof_carrying_data.t
-          * Staged_ledger_aux.t
-          * Ledger_hash.t
+          * Staged_ledger_aux.Stable.V1.t
+          * Ledger_hash.Stable.V1.t
           * Pending_coinbase.t )
           option
-        [@@deriving bin_io]
       end
 
       module Caller = T
@@ -203,7 +229,19 @@ struct
 
     module V1 = struct
       module T = struct
-        include T.T
+        type query =
+          Consensus.Consensus_state.value Envelope.Incoming.Stable.V1.t
+        [@@deriving bin_io, sexp]
+
+        type response =
+          ( ( External_transition.Stable.V1.t
+            , State_body_hash.t list * External_transition.Stable.V1.t )
+            Proof_carrying_data.t
+          * Staged_ledger_aux.Stable.V1.t
+          * Ledger_hash.Stable.V1.t
+          * Pending_coinbase.t )
+          option
+        [@@deriving bin_io]
 
         let version = 1
 
@@ -231,26 +269,21 @@ module Message (Inputs : sig
     type t [@@deriving bin_io, sexp]
   end
 
-  module External_transition : sig
-    type t [@@deriving bin_io, sexp]
-  end
+  module External_transition : External_transition.S
 end) =
 struct
   open Inputs
 
   module T = struct
     module T = struct
+      (* "master" types, do not change *)
       type content =
-        | New_state of External_transition.t
+        | New_state of External_transition.Stable.V1.t
         | Snark_pool_diff of Snark_pool_diff.t
         | Transaction_pool_diff of Transaction_pool_diff.t
-      [@@deriving sexp, bin_io]
+      [@@deriving bin_io, sexp]
 
-      type msg = content Envelope.Incoming.t [@@deriving sexp, bin_io]
-
-      let content = Envelope.Incoming.data
-
-      let sender = Envelope.Incoming.sender
+      type msg = content Envelope.Incoming.Stable.V1.t [@@deriving sexp]
     end
 
     let name = "message"
@@ -260,11 +293,19 @@ struct
   end
 
   include T.T
+
+  let content ({data; _} : msg) = data
+
+  let sender ({sender; _} : msg) = sender
+
   include Versioned_rpc.Both_convert.One_way.Make (T)
 
   module V1 = struct
     module T = struct
-      include T.T
+      type content = T.T.content [@@deriving bin_io, sexp]
+
+      type msg = content Envelope.Incoming.Stable.V1.t
+      [@@deriving bin_io, sexp]
 
       let version = 1
 
@@ -285,23 +326,21 @@ module type Inputs_intf = sig
 
   module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
 
-  module Pending_coinbase_hash : Protocols.Coda_pow.Pending_coinbase_hash_intf
-
-  module Pending_coinbase : sig
-    type t [@@deriving sexp, bin_io]
-  end
-
-  module Staged_ledger_hash :
-    Protocols.Coda_pow.Staged_ledger_hash_intf
-    with type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
-     and type ledger_hash := Ledger_hash.t
-     and type pending_coinbase := Pending_coinbase.t
-     and type pending_coinbase_hash := Pending_coinbase_hash.t
-
+  (* we omit Staged_ledger_hash, because the available module in Inputs is not versioned; instead, in the
+     versioned RPC modules, we use a specific version
+   *)
   module Blockchain_state : Coda_base.Blockchain_state.S
 
   module Staged_ledger_aux : sig
-    type t [@@deriving bin_io]
+    type t
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving bin_io]
+        end
+      end
+      with type V1.t = t
 
     val hash : t -> Staged_ledger_aux_hash.t
   end
@@ -362,11 +401,11 @@ module Make (Inputs : Inputs_intf) = struct
   let create (config : Config.t)
       ~(get_staged_ledger_aux_at_hash :
             Staged_ledger_hash.t Envelope.Incoming.t
-         -> (Staged_ledger_aux.t * Ledger_hash.t) option Deferred.t)
+         -> (Staged_ledger_aux.Stable.V1.t * Ledger_hash.t) option Deferred.t)
       ~(answer_sync_ledger_query :
-            (Ledger_hash.t * Ledger.Location.Addr.t Syncable_ledger.query)
+            (Ledger_hash.t * Ledger.Location.Addr.t Syncable_ledger.Query.t)
             Envelope.Incoming.t
-         -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t)
+         -> (Ledger_hash.t * Sync_ledger.Answer.t) Deferred.Or_error.t)
       ~(transition_catchup :
             State_hash.t Envelope.Incoming.t
          -> External_transition.t Non_empty_list.t option Deferred.t)

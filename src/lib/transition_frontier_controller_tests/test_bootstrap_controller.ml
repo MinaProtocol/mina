@@ -38,7 +38,7 @@ let%test_module "Bootstrap Controller" =
         Bootstrap_controller.For_tests.Transition_cache.create ()
       in
       let num_breadcrumbs = (Transition_frontier.max_length * 2) + 2 in
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let network =
         Network.create ~logger ~peers:(Network_peer.Peer.Table.of_alist_exn [])
       in
@@ -134,7 +134,7 @@ let%test_module "Bootstrap Controller" =
 
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let num_breadcrumbs = 10 in
       let accounts = Genesis_ledger.accounts in
       Thread_safe.block_on_async_exn (fun () ->
@@ -174,7 +174,7 @@ let%test_module "Bootstrap Controller" =
     let%test "sync with one node correctly" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind syncing_frontier, peer, network =
@@ -200,7 +200,7 @@ let%test_module "Bootstrap Controller" =
               that we are syncing from, than we should retarget our root" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let small_peer_num_breadcrumbs = 6 in
       let large_peer_num_breadcrumbs = small_peer_num_breadcrumbs * 2 in
       let source_accounts = [List.hd_exn Genesis_ledger.accounts] in
@@ -243,7 +243,7 @@ let%test_module "Bootstrap Controller" =
             (root_hash large_peer.frontier) )
 
     let%test "`on_transition` should deny outdated transitions" =
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let num_breadcrumbs = 10 in
       Thread_safe.block_on_async_exn (fun () ->
           let%bind syncing_frontier, peer, network =

@@ -143,14 +143,12 @@ end = struct
         let verify proof stmt ~message = verify_proof proof stmt ~message
       end)
 
-  type scan_state = Scan_state.t [@@deriving sexp, bin_io]
-
   type pending_coinbase_collection = Pending_coinbase.t
   [@@deriving sexp, bin_io]
 
   type t =
     { scan_state:
-        scan_state
+        Scan_state.t
         (* Invariant: this is the ledger after having applied all the transactions in
        *the above state. *)
     ; ledger: Ledger.attached_mask sexp_opaque
@@ -158,7 +156,7 @@ end = struct
   [@@deriving sexp]
 
   type serializable =
-    scan_state * Ledger.serializable * pending_coinbase_collection
+    Scan_state.Stable.V1.t * Ledger.serializable * pending_coinbase_collection
   [@@deriving bin_io]
 
   let serializable_of_t t =
@@ -228,7 +226,7 @@ end = struct
     let {Ledger_proof_statement.target; _} = Ledger_proof.statement proof in
     target
 
-  let verify_scan_state_after_apply ledger (scan_state : scan_state) =
+  let verify_scan_state_after_apply ledger (scan_state : Scan_state.t) =
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
@@ -1609,12 +1607,11 @@ end = struct
                 Transaction_validator.apply_transaction validating_ledger
                   (User_command t) )
           with
-          | Error _ ->
+          | Error e ->
               Logger.error logger
-                !"Invalid user command: %{sexp: \
-                  User_command.With_valid_signature.t} \n\
-                  %!"
-                t ;
+                !"Invalid user command! Error was: %{sexp: Error.t}, command \
+                  was: %{sexp: User_command.With_valid_signature.t}"
+                e t ;
               seq
           | Ok _ -> Sequence.append (Sequence.singleton t) seq )
     in
@@ -1637,8 +1634,17 @@ let%test_module "test" =
       module Compressed_public_key = String
 
       module Sok_message = struct
+        module Stable = struct
+          module V1 = struct
+            type t = unit [@@deriving bin_io, sexp]
+          end
+
+          module Latest = V1
+        end
+
         module Digest = Unit
-        include Unit
+
+        type t = Stable.Latest.t [@@deriving sexp]
 
         let create ~fee:_ ~prover:_ = ()
       end
@@ -1803,12 +1809,17 @@ let%test_module "test" =
       end
 
       module Ledger_hash = struct
-        module T = struct
-          type t = int [@@deriving sexp, bin_io, compare, hash, eq]
+        module Stable = struct
+          module V1 = struct
+            type t = int [@@deriving sexp, bin_io, compare, hash, eq]
+          end
+
+          module Latest = V1
         end
 
-        include T
-        include Hashable.Make_binable (T)
+        type t = int [@@deriving sexp, compare, hash, eq]
+
+        include Hashable.Make_binable (Stable.Latest)
 
         let to_bytes : t -> string =
          fun _ -> failwith "to_bytes in ledger hash"
@@ -1935,8 +1946,8 @@ let%test_module "test" =
       module Ledger_proof_statement = struct
         module T = struct
           type t =
-            { source: Ledger_hash.t
-            ; target: Ledger_hash.t
+            { source: Ledger_hash.Stable.V1.t
+            ; target: Ledger_hash.Stable.V1.t
             ; supply_increase: Currency.Amount.t
             ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
             ; fee_excess: Fee.Signed.t
@@ -1999,7 +2010,12 @@ let%test_module "test" =
 
       module Ledger_proof = struct
         (*A proof here is a statement *)
-        include Ledger_proof_statement
+        module Stable = struct
+          module V1 = Ledger_proof_statement
+          module Latest = V1
+        end
+
+        type t = Stable.Latest.t [@@deriving sexp]
 
         type ledger_hash = Ledger_hash.t
 
@@ -2161,7 +2177,8 @@ let%test_module "test" =
       module Transaction_snark_work = struct
         let proofs_length = 2
 
-        type proof = Ledger_proof.t [@@deriving sexp, bin_io, compare, hash]
+        type proof = Ledger_proof.Stable.V1.t
+        [@@deriving sexp, bin_io, compare]
 
         type statement = Ledger_proof_statement.t
         [@@deriving sexp, bin_io, compare, eq, hash]
@@ -2173,7 +2190,7 @@ let%test_module "test" =
 
         module T = struct
           type t = {fee: fee; proofs: proof list; prover: public_key}
-          [@@deriving sexp, bin_io, compare, hash]
+          [@@deriving sexp, bin_io, compare]
         end
 
         include T
@@ -2420,7 +2437,7 @@ let%test_module "test" =
 
     let%test_unit "Max throughput" =
       (*Always at worst case number of provers. This is enforced by creating proof bundles *)
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
@@ -2457,7 +2474,7 @@ let%test_module "test" =
     let%test_unit "Be able to include random number of user_commands" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
@@ -2500,7 +2517,7 @@ let%test_module "test" =
           ; prover= "P" }
       in
       Backtrace.elide := false ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
@@ -2544,7 +2561,7 @@ let%test_module "test" =
               ; proofs= stmts
               ; prover= "P" }
           in
-          let logger = Logger.create () in
+          let logger = Logger.null () in
           let txns =
             List.init 6 ~f:(fun _ -> [])
             @ [[(1, 0); (1, 0); (1, 0)]] @ [[(1, 0); (1, 0)]]
@@ -2593,7 +2610,7 @@ let%test_module "test" =
       Quickcheck.test g ~trials:50 ~f:(fun i ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let open Deferred.Let_syntax in
-              let logger = Logger.create () in
+              let logger = Logger.null () in
               let txns = txns i (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let scan_state = Sl.scan_state !sl in
               let work =
@@ -2629,7 +2646,7 @@ let%test_module "test" =
 
     let%test_unit "Snarked ledger" =
       Backtrace.elide := false ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
@@ -2661,7 +2678,7 @@ let%test_module "test" =
     let%test_unit "max throughput-random number of proofs-worst case provers" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
@@ -2708,7 +2725,7 @@ let%test_module "test" =
                    case provers" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2
@@ -2770,7 +2787,7 @@ let%test_module "test" =
         else None
       in
       Backtrace.elide := false ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       let p =
         Int.pow 2
           Transaction_snark_scan_state.Constants.transaction_capacity_log_2

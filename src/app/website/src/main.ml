@@ -347,10 +347,11 @@ let home () =
             ~not_small:(social_list `Horizontal)
             ~small:(social_list `Vertical)
         , Link_list.create ~named:"Articles" ~orientation:`Vertical
-            [ ( `Read "Fast Accumulation on Streams"
-              , `One
-                  (let _, u, _ = Links.blog in
-                   u)
+            [ ( `Read "A SNARKy Exponential Function"
+              , `One "/blog/taylor.html"
+              , "blogpost-taylor" )
+            ; ( `Read "Fast Accumulation on Streams"
+              , `One "/blog/scanning_for_scans.html"
               , "blogpost-main" )
             ; ( `Read "Coindesk: This Blockchain Tosses Blocks"
               , `One
@@ -436,9 +437,12 @@ let home () =
 let positions =
   [ ("Protocol Engineer", "protocol-engineer")
   ; ("Protocol Reliability Engineer", "protocol-reliability-engineer")
+  ; ("Community Manager", "community-manager")
   ; ("Senior Frontend Engineer", "senior-frontend-engineer")
   ; ("Product Manager", "product-manager")
-  ; ("Engineering Manager", "engineering-manager") ]
+  ; ("Engineering Manager", "engineering-manager")
+  ; ("Director of Business Developement", "director-of-business-development")
+  ; ("Developer Advocate", "developer-advocate") ]
 
 let testnet () =
   let comic ~title ~content ~alt_content ~img () =
@@ -536,7 +540,7 @@ let site () : Site.t Deferred.t =
   let open File_system in
   let%bind position_files = load_job_posts positions in
   let position_files = List.concat position_files in
-  let%bind post = Blog_post.content "scanning_for_scans" in
+  let%bind posts = Blog_post.files ["scanning_for_scans"; "taylor"] in
   let%map home = home () in
   Site.create
     ( List.map position_files ~f:file
@@ -545,11 +549,9 @@ let site () : Site.t Deferred.t =
       ; file (File.of_html ~name:"code.html" Open_source.content)
       ; file (File.of_html ~name:"testnet.html" (testnet ()))
       ; file (File.of_html ~name:"privacy.html" Privacy_policy.content)
-      ; file (File.of_html ~name:"tos.html" Tos.content)
-        (* TODO: Make some more generalized thing for the blog posts *)
-      ; file (File.of_html_path ~name:"blog/scanning_for_scans.html" post)
-      ; file (File.of_path "static/favicon.ico")
-      ; copy_directory "static" ] )
+      ; file (File.of_html ~name:"tos.html" Tos.content) ]
+    @ posts
+    @ [file (File.of_path "static/favicon.ico"); copy_directory "static"] )
 
 let main ~dst ~working_directory () =
   let%bind () = Sys.chdir working_directory in

@@ -79,7 +79,19 @@ module Stable = struct
   module Latest = V1
 end
 
-include Stable.Latest
+(* bin_io omitted from deriving list intentionally *)
+type ('a, 'd) t = ('a, 'd) Stable.Latest.t =
+  { jobs: ('a, 'd) Job.t Ring_buffer.t
+  ; level_pointer: int Array.t
+  ; capacity: int
+  ; mutable acc: int * ('a * 'd list) option
+  ; mutable current_data_length: int
+  ; mutable base_none_pos: int option
+  ; mutable recent_tree_data: 'd list sexp_opaque
+  ; mutable other_trees_data: 'd list list sexp_opaque
+  ; stateful_work_order: int Queue.t
+  ; mutable curr_job_seq_no: int }
+[@@deriving sexp]
 
 module Hash = struct
   type t = Digestif.SHA256.t
