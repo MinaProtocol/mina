@@ -235,7 +235,7 @@ struct
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
                , `Staged_ledger _
-               , `Pending_coinbase_update pending_coinbase_update ) =
+               , `Pending_coinbase_update _pending_coinbase_update ) =
         Staged_ledger.apply_diff_unchecked parent_staged_ledger
           staged_ledger_diff
         |> Deferred.Or_error.ok_exn
