@@ -44,7 +44,7 @@ module type S = sig
 
   module Pending_coinbase_update :
     Pending_coinbase_update_intf
-    with type pending_coinbase_hash := Pending_coinbase_hash.t
+    with type coinbase_data := Pending_coinbase.Coinbase_data.t
      and type pending_coinbase_stack := Pending_coinbase.Stack.t
 
   module Ledger_proof_statement :

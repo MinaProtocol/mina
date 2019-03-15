@@ -21,9 +21,21 @@ module type S = sig
   type t [@@deriving sexp, bin_io]
 
   module Coinbase_data : sig
-    type t = Public_key.Compressed.t * Amount.t [@@deriving sexp]
+    type t = Public_key.Compressed.t * Amount.t [@@deriving bin_io, sexp]
+
+    type value [@@deriving bin_io, sexp]
 
     type var = Public_key.Compressed.var * Amount.var
+
+    val typ : (var, t) Typ.t
+
+    val empty : t
+
+    val of_coinbase : Coinbase.t -> t Or_error.t
+
+    val add_coinbase : t -> Coinbase.t -> t Or_error.t
+
+    val genesis : t
   end
 
   module rec Hash : sig
@@ -68,7 +80,7 @@ module type S = sig
 
   val update_coinbase_stack_exn : t -> Stack.t -> is_new_stack:bool -> t
 
-  val latest_stack_exn : t -> Stack.t option
+  val latest_stack_exn : t -> is_new_stack:bool -> Stack.t option
 
   val oldest_stack_exn : t -> Stack.t
 
@@ -96,11 +108,10 @@ module type S = sig
 
     val get : var -> Address.var -> (Stack.var, _) Tick.Checked.t
 
-    val update_stack :
+    val add_coinbase :
          var
       -> is_new_stack:Boolean.var
-      -> Stack.var
-      -> Stack.var
+      -> Coinbase_data.var
       -> (var, 's) Tick.Checked.t
     (**
    [update_stack t ~is_new_stack updtaed_stack] implements the following spec:
@@ -112,7 +123,10 @@ module type S = sig
   *)
 
     val delete_stack :
-      var -> Stack.var -> Stack.var -> (var, 's) Tick.Checked.t
+         var
+      -> ledger_proof_stack:Stack.var
+      -> proof_emitted:Boolean.var
+      -> (var, 's) Tick.Checked.t
     (**
    [delete_stack t pk updated_stack] implements the following spec:
 

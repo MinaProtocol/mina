@@ -148,6 +148,16 @@ module type Pending_coinbase_intf = sig
 
   type coinbase
 
+  module Coinbase_data : sig
+    type t [@@deriving bin_io, sexp]
+
+    val empty : t
+
+    val of_coinbase : coinbase -> t Or_error.t
+
+    val add_coinbase : t -> coinbase -> t Or_error.t
+  end
+
   module Stack : sig
     type t [@@deriving sexp, bin_io, eq]
 
@@ -166,7 +176,7 @@ module type Pending_coinbase_intf = sig
 
   val create_exn : unit -> t
 
-  val latest_stack_exn : t -> Stack.t option
+  val latest_stack_exn : t -> is_new_stack:bool -> Stack.t option
 
   val oldest_stack_exn : t -> Stack.t
 
@@ -381,6 +391,8 @@ module type Compressed_public_key_intf = sig
   type t [@@deriving sexp, bin_io, compare]
 
   include Comparable.S with type t := t
+
+  val empty : t
 end
 
 module type Public_key_intf = sig
@@ -1059,26 +1071,19 @@ module type Consensus_state_intf = sig
 end
 
 module type Pending_coinbase_update_intf = sig
-  type pending_coinbase_hash
-
   type pending_coinbase_stack
+
+  type coinbase_data
 
   type t [@@deriving sexp, bin_io]
 
   type value = t [@@deriving sexp, bin_io]
 
   val create_value :
-       oldest_stack_before:pending_coinbase_stack
-    -> oldest_stack_after:pending_coinbase_stack
-    -> latest_stack_before:pending_coinbase_stack
-    -> latest_stack_after:pending_coinbase_stack
+       oldest_stack:pending_coinbase_stack
     -> is_new_stack:bool
-    -> prev_root:pending_coinbase_hash
-    -> intermediate_root:pending_coinbase_hash
-    -> new_root:pending_coinbase_hash
+    -> coinbase_data:coinbase_data
     -> value
-
-  val new_root : value -> pending_coinbase_hash
 
   val genesis : value
 end
@@ -1587,7 +1592,7 @@ module type Inputs_intf = sig
 
   module Pending_coinbase_update :
     Pending_coinbase_update_intf
-    with type pending_coinbase_hash := Pending_coinbase_hash.t
+    with type coinbase_data := Pending_coinbase.Coinbase_data.t
      and type pending_coinbase_stack := Pending_coinbase.Stack.t
 
   module Ledger_proof_statement :

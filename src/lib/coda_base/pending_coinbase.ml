@@ -13,7 +13,7 @@ let coinbase_tree_depth = Snark_params.pending_coinbase_depth
 let coinbase_stacks = Int.pow 2 coinbase_tree_depth
 
 module Coinbase_data = struct
-  type t = Public_key.Compressed.t * Amount.t [@@deriving sexp]
+  type t = Public_key.Compressed.t * Amount.t [@@deriving bin_io, sexp]
 
   let of_coinbase (cb : Coinbase.t) : t Or_error.t =
     Option.value_map cb.fee_transfer
@@ -23,9 +23,23 @@ module Coinbase_data = struct
         | None -> Or_error.error_string "Coinbase underflow"
         | Some amount -> Ok (cb.proposer, amount) )
 
+  let add_coinbase (pk1, amt1) cb : t Or_error.t =
+    let open Or_error.Let_syntax in
+    let%bind pk2, amt2 = of_coinbase cb in
+    if
+      Public_key.Compressed.equal pk1 pk2
+      || Public_key.Compressed.(equal pk1 empty)
+    then
+      match Currency.Amount.add amt1 amt2 with
+      | None -> Or_error.error_string "Coinbase underflow"
+      | Some amount -> Ok (pk2, amount)
+    else
+      Or_error.error_string
+        "Tried to add multiple coinbase with different proposers"
+
   type var = Public_key.Compressed.var * Amount.var
 
-  type value = t
+  type value = t [@@deriving bin_io, sexp]
 
   let length_in_triples =
     Public_key.Compressed.length_in_triples + Amount.length_in_triples
@@ -41,6 +55,23 @@ module Coinbase_data = struct
   let fold ((public_key, amount) : t) =
     let open Fold in
     Public_key.Compressed.fold public_key +> Amount.fold amount
+
+  let typ : (var, value) Typ.t =
+    let spec =
+      let open Data_spec in
+      [Public_key.Compressed.typ; Amount.typ]
+    in
+    let of_hlist : 'a 'b. (unit, 'a -> 'b -> unit) H_list.t -> 'a * 'b =
+      let open H_list in
+      fun [public_key; amount] -> (public_key, amount)
+    in
+    let to_hlist (public_key, amount) = H_list.[public_key; amount] in
+    Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+  let empty = (Public_key.Compressed.empty, Amount.zero)
+
+  let genesis = empty
 end
 
 module Stack_id : sig
@@ -200,7 +231,13 @@ module T = struct
 
     let depth = coinbase_tree_depth
 
-    type path = Pedersen.Digest.t list
+    module Path = struct
+      include Merkle_tree.Path
+
+      let typ : (var, value) Typ.t = typ ~depth
+    end
+
+    type path = Path.value
 
     module Address = struct
       include Merkle_tree.Address
@@ -230,7 +267,7 @@ module T = struct
         (Merkle_tree.get_req ~depth (Hash.var_to_hash_packed t) addr)
         reraise_merkle_requests
 
-    let%snarkydef update_stack t ~is_new_stack stack_before stack_after =
+    let%snarkydef add_coinbase t ~is_new_stack coinbase =
       let%bind addr =
         request_witness Address.typ
           As_prover.(
@@ -239,15 +276,11 @@ module T = struct
       in
       handle
         (Merkle_tree.modify_req ~depth (Hash.var_to_hash_packed t) addr
-           ~f:(fun stack ->
-             let%map () =
-               Coinbase_stack.Stack.assert_equal stack_before stack
-             in
-             stack_after ))
+           ~f:(fun stack -> Coinbase_stack.Stack.Checked.push stack coinbase ))
         reraise_merkle_requests
       >>| Hash.var_of_hash_packed
 
-    let%snarkydef delete_stack t stack_before stack_after =
+    let%snarkydef delete_stack t ~ledger_proof_stack ~proof_emitted =
       let%bind addr =
         request_witness Address.typ
           As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_oldest_stack))
@@ -255,10 +288,10 @@ module T = struct
       handle
         (Merkle_tree.modify_req ~depth (Hash.var_to_hash_packed t) addr
            ~f:(fun stack ->
-             let%map () =
-               Coinbase_stack.Stack.assert_equal stack_before stack
+             let%bind () =
+               Coinbase_stack.Stack.assert_equal ledger_proof_stack stack
              in
-             stack_after ))
+             Stack.if_ proof_emitted ~then_:Stack.Checked.empty ~else_:stack ))
         reraise_merkle_requests
       >>| Hash.var_of_hash_packed
   end
@@ -330,9 +363,9 @@ module T = struct
     if is_new_stack then Some t.new_pos
     else match t.pos_list with [] -> None | x :: _ -> Some x
 
-  let latest_stack_exn t =
+  let latest_stack_exn t ~is_new_stack =
     let open Option.Let_syntax in
-    let%map key = latest_stack_id t ~is_new_stack:false in
+    let%map key = latest_stack_id t ~is_new_stack in
     let index = Merkle_tree.find_index_exn t.tree key in
     Merkle_tree.get_exn t.tree index
 
@@ -457,13 +490,12 @@ let%test_unit "Checked_stack = Unchecked_stack" =
   let open Quickcheck in
   test ~trials:20 (Generator.tuple2 Stack.gen Coinbase.gen)
     ~f:(fun (base, cb) ->
+      let coinbase_data = Coinbase_data.of_coinbase cb |> Or_error.ok_exn in
       let unchecked = Stack.push_exn base cb in
       let checked =
         let comp =
           let open Snark_params.Tick in
-          let cb_var =
-            Coinbase_data.(var_of_t @@ Or_error.ok_exn @@ of_coinbase cb)
-          in
+          let cb_var = Coinbase_data.(var_of_t coinbase_data) in
           let%map res = Stack.Checked.push (Stack.var_of_t base) cb_var in
           As_prover.read Stack.typ res
         in
@@ -475,20 +507,23 @@ let%test_unit "Checked_stack = Unchecked_stack" =
 let%test_unit "Checked_tree = Unchecked_tree" =
   let open Quickcheck in
   let pending_coinbases = create_exn () in
-  test ~trials:20 Stack.gen ~f:(fun stack ->
-      let unchecked =
-        update_coinbase_stack_exn pending_coinbases stack ~is_new_stack:true
+  test ~trials:20 Coinbase.gen ~f:(fun coinbase ->
+      let coinbase_data =
+        Or_error.ok_exn @@ Coinbase_data.of_coinbase coinbase
       in
-      let update = Checked.update_stack in
+      let unchecked =
+        add_coinbase_exn pending_coinbases ~coinbase ~is_new_stack:true
+      in
+      let f_add_coinbase = Checked.add_coinbase in
       let checked =
         let comp =
           let open Snark_params.Tick in
-          let stack_var = Stack.(var_of_t stack) in
+          let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
           let%map res =
             handle
-              (update
+              (f_add_coinbase
                  (Hash.var_of_t (merkle_root pending_coinbases))
-                 ~is_new_stack:Boolean.true_ Stack.Checked.empty stack_var)
+                 ~is_new_stack:Boolean.true_ coinbase_var)
               (unstage (handler pending_coinbases))
           in
           As_prover.read Hash.typ res

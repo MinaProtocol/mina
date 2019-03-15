@@ -50,105 +50,49 @@ module type S = sig
   val genesis : value
 end
 
-type ('pending_coinbase_stack, 'pending_coinbase_hash, 'bool) t_ =
-  { oldest_stack_before: 'pending_coinbase_stack
-  ; oldest_stack_after: 'pending_coinbase_stack
-  ; latest_stack_before: 'pending_coinbase_stack
-  ; latest_stack_after: 'pending_coinbase_stack
-  ; is_new_stack: 'bool
-  ; prev_root: 'pending_coinbase_hash
-  ; intermediate_root: 'pending_coinbase_hash
-  ; new_root: 'pending_coinbase_hash }
+type ('pending_coinbase_stack, 'coinbase_data, 'bool) t_ =
+  { oldest_stack: 'pending_coinbase_stack
+  ; coinbase: 'coinbase_data
+  ; is_new_stack: 'bool }
 [@@deriving bin_io, sexp]
 
-type t = (Pending_coinbase.Stack.t, Pending_coinbase.Hash.t, bool) t_
+type t = (Pending_coinbase.Stack.t, Pending_coinbase.Coinbase_data.t, bool) t_
 [@@deriving bin_io, sexp]
 
-type value = (Pending_coinbase.Stack.t, Pending_coinbase.Hash.t, bool) t_
-[@@deriving sexp, bin_io]
+type value =
+  (Pending_coinbase.Stack.t, Pending_coinbase.Coinbase_data.t, bool) t_
+[@@deriving bin_io, sexp]
 
 type var =
-  (Pending_coinbase.Stack.var, Pending_coinbase.Hash.var, Boolean.var) t_
+  ( Pending_coinbase.Stack.var
+  , Pending_coinbase.Coinbase_data.var
+  , Boolean.var )
+  t_
 
-let new_root t = t.new_root
-
-let prev_root t = t.prev_root
-
-let create_value ~oldest_stack_before ~oldest_stack_after ~latest_stack_before
-    ~latest_stack_after ~is_new_stack ~prev_root ~intermediate_root ~new_root =
-  { oldest_stack_before
-  ; oldest_stack_after
-  ; latest_stack_before
-  ; latest_stack_after
-  ; is_new_stack
-  ; prev_root
-  ; intermediate_root
-  ; new_root }
+let create_value ~oldest_stack ~is_new_stack ~coinbase_data =
+  {oldest_stack; is_new_stack; coinbase= coinbase_data}
 
 let typ : (var, t) Typ.t =
   let spec =
     Data_spec.
       [ Pending_coinbase.Stack.typ
-      ; Pending_coinbase.Stack.typ
-      ; Pending_coinbase.Stack.typ
-      ; Pending_coinbase.Stack.typ
-      ; Boolean.typ
-      ; Pending_coinbase.Hash.typ
-      ; Pending_coinbase.Hash.typ
-      ; Pending_coinbase.Hash.typ ]
+      ; Pending_coinbase.Coinbase_data.typ
+      ; Boolean.typ ]
   in
   let of_hlist
-        : 'a 'b 'c.    ( unit
-                       , 'a -> 'a -> 'a -> 'a -> 'c -> 'b -> 'b -> 'b -> unit
-                       )
-                       H_list.t -> ('a, 'b, 'c) t_ =
+        : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) t_
+      =
     H_list.(
-      fun [ oldest_stack_before
-          ; oldest_stack_after
-          ; latest_stack_before
-          ; latest_stack_after
-          ; is_new_stack
-          ; prev_root
-          ; intermediate_root
-          ; new_root ] ->
-        { oldest_stack_before
-        ; oldest_stack_after
-        ; latest_stack_before
-        ; latest_stack_after
-        ; is_new_stack
-        ; prev_root
-        ; intermediate_root
-        ; new_root })
+      fun [oldest_stack; coinbase; is_new_stack] ->
+        {oldest_stack; coinbase; is_new_stack})
   in
-  let to_hlist
-      { oldest_stack_before
-      ; oldest_stack_after
-      ; latest_stack_before
-      ; latest_stack_after
-      ; is_new_stack
-      ; prev_root
-      ; intermediate_root
-      ; new_root } =
-    H_list.
-      [ oldest_stack_before
-      ; oldest_stack_after
-      ; latest_stack_before
-      ; latest_stack_after
-      ; is_new_stack
-      ; prev_root
-      ; intermediate_root
-      ; new_root ]
+  let to_hlist {oldest_stack; coinbase; is_new_stack} =
+    H_list.[oldest_stack; coinbase; is_new_stack]
   in
   Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
 let genesis =
-  let empty_coinbase_tree = Pending_coinbase.empty_merkle_root () in
-  { oldest_stack_before= Pending_coinbase.Stack.empty
-  ; oldest_stack_after= Pending_coinbase.Stack.empty
-  ; latest_stack_before= Pending_coinbase.Stack.empty
-  ; latest_stack_after= Pending_coinbase.Stack.empty
+  { oldest_stack= Pending_coinbase.Stack.empty
   ; is_new_stack= false
-  ; prev_root= empty_coinbase_tree
-  ; intermediate_root= empty_coinbase_tree
-  ; new_root= empty_coinbase_tree }
+  ; coinbase= Pending_coinbase.Coinbase_data.empty }

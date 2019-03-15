@@ -258,7 +258,7 @@ end = struct
       match transaction with
       | Coinbase c ->
           Or_error.try_with (fun () ->
-              Pending_coinbase.Stack.push_exn pending_coinbase_before c )
+              Pending_coinbase.(Stack.push_exn pending_coinbase_before c) )
       | _ -> Ok pending_coinbase_before
     in
     let%bind fee_excess = Transaction.fee_excess transaction in

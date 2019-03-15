@@ -398,22 +398,19 @@ end = struct
                | None -> return (Or_error.error_string "Fee overflow")
                | Some res -> res )) )
 
-  let latest_stack pending_coinbase_collection =
+  let working_stack pending_coinbase_collection ~is_new_stack =
     let open Result.Let_syntax in
     match%bind
       to_staged_ledger_or_error
         (Or_error.try_with (fun () ->
-             Pending_coinbase.latest_stack_exn pending_coinbase_collection ))
+             Pending_coinbase.latest_stack_exn pending_coinbase_collection
+               ~is_new_stack ))
     with
     | Some s -> Ok s
     | None ->
         to_staged_ledger_or_error
           (Or_error.error_string
              "No working coinbase-stack found in the collection")
-
-  let working_stack pending_coinbase_collection ~is_new_stack =
-    if is_new_stack then Ok Pending_coinbase.Stack.empty
-    else latest_stack pending_coinbase_collection
 
   let push_coinbase_and_get_new_collection current_stack (t : Transaction.t) =
     let open Result.Let_syntax in
@@ -663,7 +660,7 @@ end = struct
       { data: 'data
       ; work: 'work list
       ; user_commands_count: int
-      ; coinbase_parts_count: int }
+      ; coinbases: Coinbase.t list }
   end
 
   let apply_pre_diff coinbase_parts proposer user_commands completed_works =
@@ -712,7 +709,7 @@ end = struct
     { Prediff_info.data= transactions
     ; work= completed_works
     ; user_commands_count= List.length user_commands
-    ; coinbase_parts_count= List.length coinbase }
+    ; coinbases= coinbase }
 
   (**The total fee excess caused by any diff should be zero. In the case where
      the slots are split into two partitions, total fee excess of the transactions
@@ -840,11 +837,9 @@ end = struct
 
   (*update the pending_coinbase tree with the updated/new stack and delete the oldest stack if a proof was emitted*)
   let update_pending_coinbase_collection pending_coinbase_collection
-      updated_coinbase_stack ~is_new_stack ~ledger_proof =
+      updated_coinbase_stack coinbases ~is_new_stack ~ledger_proof =
     let open Result.Let_syntax in
-    let%bind ( oldest_stack_before
-             , oldest_stack_after
-             , pending_coinbase_collection_updated1 ) =
+    let%bind oldest_stack, pending_coinbase_collection_updated1 =
       if Option.is_some ledger_proof then
         let%bind oldest_stack, pending_coinbase_collection_updated1 =
           Or_error.try_with (fun () ->
@@ -866,38 +861,32 @@ end = struct
                     "Pending coinbase stack of the ledger proof did not match \
                      the oldest stack in the pending coinbase tree"))
         in
-        ( oldest_stack
-        , Pending_coinbase.Stack.empty
-        , pending_coinbase_collection_updated1 )
+        (oldest_stack, pending_coinbase_collection_updated1)
       else
         let%map oldest_stack =
           Or_error.try_with (fun () ->
               Pending_coinbase.oldest_stack_exn pending_coinbase_collection )
           |> to_staged_ledger_or_error
         in
-        (oldest_stack, oldest_stack, pending_coinbase_collection)
+        (oldest_stack, pending_coinbase_collection)
     in
-    let%bind latest_stack_before =
-      working_stack pending_coinbase_collection ~is_new_stack
-    in
-    let%map pending_coinbase_collection_updated2 =
+    let%bind pending_coinbase_collection_updated2 =
       Or_error.try_with (fun () ->
           Pending_coinbase.update_coinbase_stack_exn
             pending_coinbase_collection_updated1 updated_coinbase_stack
             ~is_new_stack )
       |> to_staged_ledger_or_error
     in
-    let prev_root = Pending_coinbase.merkle_root pending_coinbase_collection in
-    let intermediate_root =
-      Pending_coinbase.merkle_root pending_coinbase_collection_updated1
-    in
-    let new_root =
-      Pending_coinbase.merkle_root pending_coinbase_collection_updated2
+    let%map coinbase_data =
+      List.fold ~init:(Ok Pending_coinbase.Coinbase_data.empty) coinbases
+        ~f:(fun acc cb ->
+          let%bind acc = acc in
+          Pending_coinbase.Coinbase_data.add_coinbase acc cb
+          |> to_staged_ledger_or_error )
     in
     let update =
-      Pending_coinbase_update.create_value ~prev_root ~intermediate_root
-        ~new_root ~oldest_stack_before ~oldest_stack_after ~latest_stack_before
-        ~latest_stack_after:updated_coinbase_stack ~is_new_stack
+      Pending_coinbase_update.create_value ~oldest_stack ~is_new_stack
+        ~coinbase_data
     in
     (update, pending_coinbase_collection_updated2)
 
@@ -947,7 +936,7 @@ end = struct
     let new_mask = Inputs.Ledger.Mask.create () in
     let new_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
     let scan_state' = Scan_state.copy t.scan_state in
-    let%bind transactions, works, user_commands_count, cb_parts_count =
+    let%bind transactions, works, user_commands_count, coinbases =
       let%bind p1 = apply_pre_diff_with_at_most_two (fst sl_diff.diff) in
       let%map p2 =
         Option.value_map
@@ -959,12 +948,12 @@ end = struct
                   { Prediff_info.data= []
                   ; work= []
                   ; user_commands_count= 0
-                  ; coinbase_parts_count= 0 }))
+                  ; coinbases= [] }))
       in
       ( p1.data @ p2.data
       , p1.work @ p2.work
       , p1.user_commands_count + p2.user_commands_count
-      , p1.coinbase_parts_count + p2.coinbase_parts_count )
+      , p1.coinbases @ p2.coinbases )
     in
     let%bind is_new_stack, data, updated_coinbase_stack =
       update_coinbase_stack_and_get_data scan_state' new_ledger
@@ -984,7 +973,7 @@ end = struct
     in
     let%bind pending_coinbase_update, updated_pending_coinbase_collection' =
       update_pending_coinbase_collection t.pending_coinbase_collection
-        updated_coinbase_stack ~is_new_stack ~ledger_proof:res_opt
+        updated_coinbase_stack coinbases ~is_new_stack ~ledger_proof:res_opt
       |> Deferred.return
     in
     let%map () =
@@ -998,8 +987,8 @@ end = struct
       "Block info: No of transactions included:%d Coinbase parts:%d Total \
        pending proofs in scan state:%d No of proofs included:%d Spots \
        available:%d %!"
-      user_commands_count cb_parts_count proofs_waiting (total_proofs works)
-      spots_available ;
+      user_commands_count (List.length coinbases) proofs_waiting
+      (total_proofs works) spots_available ;
     let new_staged_ledger =
       { scan_state= scan_state'
       ; ledger= new_ledger
@@ -1045,7 +1034,7 @@ end = struct
       @ List.map coinbase_parts ~f:(fun t -> Transaction.Coinbase t)
       @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
     in
-    (transactions, txn_works)
+    (transactions, txn_works, coinbase_parts)
 
   let apply_diff_unchecked t
       (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) =
@@ -1076,14 +1065,16 @@ end = struct
     let new_mask = Inputs.Ledger.Mask.create () in
     let new_ledger = Inputs.Ledger.register_mask t.ledger new_mask in
     let scan_state' = Scan_state.copy t.scan_state in
-    let transactions, works =
-      let data1, work1 = apply_pre_diff_with_at_most_two (fst sl_diff.diff) in
-      let data2, work2 =
+    let transactions, works, coinbases =
+      let data1, work1, coinbases1 =
+        apply_pre_diff_with_at_most_two (fst sl_diff.diff)
+      in
+      let data2, work2, coinbases2 =
         Option.value_map
           ~f:(fun d -> apply_pre_diff_with_at_most_one d)
-          (snd sl_diff.diff) ~default:([], [])
+          (snd sl_diff.diff) ~default:([], [], [])
       in
-      (data1 @ data2, work1 @ work2)
+      (data1 @ data2, work1 @ work2, coinbases1 @ coinbases2)
     in
     let%bind is_new_stack, data, updated_coinbase_stack =
       let open Deferred.Let_syntax in
@@ -1099,7 +1090,7 @@ end = struct
     in
     let%map pending_coinbase_update, update_pending_coinbase_collection' =
       update_pending_coinbase_collection t.pending_coinbase_collection
-        updated_coinbase_stack ~is_new_stack ~ledger_proof:res_opt
+        updated_coinbase_stack coinbases ~is_new_stack ~ledger_proof:res_opt
       |> Staged_ledger_error.to_or_error |> Deferred.return
     in
     Or_error.ok_exn
@@ -1631,7 +1622,14 @@ let%test_module "test" =
   ( module struct
     module Test_input1 = struct
       open Coda_pow
-      module Compressed_public_key = String
+
+      module Compressed_public_key = struct
+        include String
+
+        let empty = ""
+
+        let gen = String.gen
+      end
 
       module Sok_message = struct
         module Stable = struct
@@ -1752,27 +1750,6 @@ let%test_module "test" =
           if is_valid t then Ok t
           else
             Or_error.error_string "Coinbase.create: fee transfer was too high"
-
-        let to_string {proposer; amount; fee_transfer} =
-          proposer
-          ^ Currency.Amount.to_string amount
-          ^ Option.value_map ~default:""
-              ~f:(fun (p, f) -> p ^ Currency.Fee.to_string f)
-              fee_transfer
-
-        let gen =
-          let open Quickcheck.Generator.Let_syntax in
-          let%bind proposer = String.gen in
-          let%bind amount = Currency.Amount.gen in
-          let fee =
-            Currency.Fee.gen_incl Currency.Fee.zero
-              (Currency.Amount.to_fee amount)
-          in
-          let prover = String.gen in
-          let%map fee_transfer =
-            Option.gen (Quickcheck.Generator.tuple2 prover fee)
-          in
-          {proposer; amount; fee_transfer}
       end
 
       module Transaction = struct
@@ -1848,7 +1825,56 @@ let%test_module "test" =
       end
 
       module Pending_coinbase = struct
-        type t = Coinbase.t list list [@@deriving sexp, bin_io]
+        module Coinbase_data = struct
+          type t = Compressed_public_key.t * Currency.Amount.t
+          [@@deriving bin_io, sexp, compare, hash, eq]
+
+          let to_string (pk, amt) = pk ^ Currency.Amount.to_string amt
+
+          let of_coinbase (cb : Coinbase.t) : t Or_error.t =
+            Option.value_map cb.fee_transfer
+              ~default:(Ok (cb.proposer, cb.amount))
+              ~f:(fun (_, fee) ->
+                match
+                  Currency.Amount.sub cb.amount (Currency.Amount.of_fee fee)
+                with
+                | None -> Or_error.error_string "Coinbase underflow"
+                | Some amount -> Ok (cb.proposer, amount) )
+
+          let add_coinbase (pk1, amt1) cb : t Or_error.t =
+            let open Or_error.Let_syntax in
+            let%bind pk2, amt2 = of_coinbase cb in
+            if
+              Compressed_public_key.equal pk1 pk2
+              || Compressed_public_key.equal pk1 Compressed_public_key.empty
+            then
+              match Currency.Amount.add amt1 amt2 with
+              | None -> Or_error.error_string "Coinbase underflow"
+              | Some amount -> Ok (pk2, amount)
+            else
+              Or_error.error_string
+                "Tried to add multiple coinbase with different proposers"
+
+          let empty = (Compressed_public_key.empty, Currency.Amount.zero)
+
+          let gen =
+            Quickcheck.Generator.tuple2 Compressed_public_key.gen
+              Currency.Amount.gen
+        end
+
+        module Stack = struct
+          type t = Coinbase_data.t list
+          [@@deriving sexp, bin_io, compare, hash, eq]
+
+          let push_exn (t : t) c : t =
+            (Coinbase_data.of_coinbase c |> Or_error.ok_exn) :: t
+
+          let empty = []
+
+          let gen = Quickcheck.Generator.list_non_empty Coinbase_data.gen
+        end
+
+        type t = Stack.t list [@@deriving sexp, bin_io]
 
         let empty_merkle_root () = ""
 
@@ -1857,25 +1883,16 @@ let%test_module "test" =
           List.map
             ~f:(fun t ->
               List.fold t ~init:"" ~f:(fun acc c ->
-                  acc ^ " " ^ Coinbase.to_string c ) )
+                  acc ^ " " ^ Coinbase_data.to_string c ) )
             t
           |> String.concat ~sep:","
 
         let hash_extra _ = ""
 
-        let latest_stack_exn t = List.hd t
+        let latest_stack_exn t ~is_new_stack =
+          if is_new_stack then Some [] else List.hd t
 
         let oldest_stack_exn t = match List.rev t with [] -> [] | x :: _ -> x
-
-        module Stack = struct
-          type t = Coinbase.t list [@@deriving sexp, bin_io, compare, hash, eq]
-
-          let push_exn t c = c :: t
-
-          let empty = []
-
-          let gen = Quickcheck.Generator.list_non_empty Coinbase.gen
-        end
 
         let create_exn () = []
 
@@ -1884,7 +1901,8 @@ let%test_module "test" =
           | [] -> failwith "tried to remove stack from an empty collection"
           | x :: xs -> (x, List.rev xs)
 
-        let update_coinbase_stack_exn t stack ~is_new_stack =
+        let update_coinbase_stack_exn (t : t) (stack : Stack.t) ~is_new_stack :
+            t =
           if is_new_stack then stack :: t
           else
             match t with
@@ -1899,48 +1917,27 @@ let%test_module "test" =
       end
 
       module Pending_coinbase_update = struct
-        type ('pending_coinbase_stack, 'pending_coinbase_hash, 'bool) t_ =
-          { oldest_stack_before: 'pending_coinbase_stack
-          ; oldest_stack_after: 'pending_coinbase_stack
-          ; latest_stack_before: 'pending_coinbase_stack
-          ; latest_stack_after: 'pending_coinbase_stack
-          ; is_new_stack: 'bool
-          ; prev_root: 'pending_coinbase_hash
-          ; intermediate_root: 'pending_coinbase_hash
-          ; new_root: 'pending_coinbase_hash }
+        type ('pending_coinbase_stack, 'coinbase, 'bool) t_ =
+          { oldest_stack: 'pending_coinbase_stack
+          ; coinbase: 'coinbase
+          ; is_new_stack: 'bool }
         [@@deriving bin_io, sexp]
 
-        type t = (Pending_coinbase.Stack.t, Pending_coinbase_hash.t, bool) t_
+        type t =
+          (Pending_coinbase.Stack.t, Pending_coinbase.Coinbase_data.t, bool) t_
         [@@deriving bin_io, sexp]
 
         type value =
-          (Pending_coinbase.Stack.t, Pending_coinbase_hash.t, bool) t_
+          (Pending_coinbase.Stack.t, Pending_coinbase.Coinbase_data.t, bool) t_
         [@@deriving sexp, bin_io]
 
-        let new_root t = t.new_root
-
-        let create_value ~oldest_stack_before ~oldest_stack_after
-            ~latest_stack_before ~latest_stack_after ~is_new_stack ~prev_root
-            ~intermediate_root ~new_root =
-          { oldest_stack_before
-          ; oldest_stack_after
-          ; latest_stack_before
-          ; latest_stack_after
-          ; is_new_stack
-          ; prev_root
-          ; intermediate_root
-          ; new_root }
+        let create_value ~oldest_stack ~is_new_stack ~coinbase_data =
+          {oldest_stack; is_new_stack; coinbase= coinbase_data}
 
         let genesis =
-          let empty_coinbase_tree = Pending_coinbase.empty_merkle_root () in
-          { oldest_stack_before= Pending_coinbase.Stack.empty
-          ; oldest_stack_after= Pending_coinbase.Stack.empty
-          ; latest_stack_before= Pending_coinbase.Stack.empty
-          ; latest_stack_after= Pending_coinbase.Stack.empty
+          { oldest_stack= Pending_coinbase.Stack.empty
           ; is_new_stack= false
-          ; prev_root= empty_coinbase_tree
-          ; intermediate_root= empty_coinbase_tree
-          ; new_root= empty_coinbase_tree }
+          ; coinbase= Pending_coinbase.Coinbase_data.empty }
       end
 
       module Ledger_proof_statement = struct

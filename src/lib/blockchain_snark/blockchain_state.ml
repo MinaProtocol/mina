@@ -66,6 +66,11 @@ module Make (Consensus_mechanism : Consensus.S) :
         let pending_coinbase_update =
           Snark_transition.pending_coinbase_update transition
         in
+        let prev_pending_coinbase_root =
+          previous_state |> Protocol_state.blockchain_state
+          |> Blockchain_state.staged_ledger_hash
+          |> Staged_ledger_hash.pending_coinbase_hash_var
+        in
         let%bind success =
           let%bind correct_transaction_snark =
             let%bind index_oldest_coinbase_stack =
@@ -75,8 +80,9 @@ module Make (Consensus_mechanism : Consensus.S) :
                       Pending_coinbase.Checked.Find_index_of_oldest_stack ))
             in
             let%bind pending_coinbase_stack_deleted =
-              Pending_coinbase.Checked.get pending_coinbase_update.prev_root
-                index_oldest_coinbase_stack
+              with_label __LOC__
+                (Pending_coinbase.Checked.get prev_pending_coinbase_root
+                   index_oldest_coinbase_stack)
             in
             verify_complete_merge
               (Snark_transition.sok_digest transition)
@@ -97,27 +103,27 @@ module Make (Consensus_mechanism : Consensus.S) :
               |> Blockchain_state.snarked_ledger_hash )
           in
           let%bind new_pending_coinbase_hash =
-            let%bind _root_after_delete =
-              let prev_root =
-                previous_state |> Protocol_state.blockchain_state
-                |> Blockchain_state.staged_ledger_hash
-                |> Staged_ledger_hash.pending_coinbase_hash_var
+            let%bind root_after_delete =
+              let oldest_stack =
+                pending_coinbase_update.oldest_stack
+                (*ledger proof stack if emitted*)
               in
-              let stack_before = pending_coinbase_update.oldest_stack_before in
-              let stack_after = pending_coinbase_update.oldest_stack_after in
-              Pending_coinbase.Checked.delete_stack prev_root stack_before
-                stack_after
+              Pending_coinbase.Checked.delete_stack prev_pending_coinbase_root
+                ~ledger_proof_stack:oldest_stack
+                ~proof_emitted:(Boolean.not ledger_hash_didn't_change)
             in
             (*new stack or update one*)
-            let prev_root = pending_coinbase_update.intermediate_root in
-            let stack_before = pending_coinbase_update.latest_stack_before in
-            let stack_after = pending_coinbase_update.latest_stack_after in
+            let coinbase = pending_coinbase_update.coinbase in
             let is_new_stack = pending_coinbase_update.is_new_stack in
-            Pending_coinbase.Checked.update_stack prev_root ~is_new_stack
-              stack_before stack_after
+            Pending_coinbase.Checked.add_coinbase root_after_delete
+              ~is_new_stack coinbase
           in
           let%bind correct_coinbase_status =
-            let new_root = pending_coinbase_update.new_root in
+            let new_root =
+              transition |> Snark_transition.blockchain_state
+              |> Blockchain_state.staged_ledger_hash
+              |> Staged_ledger_hash.pending_coinbase_hash_var
+            in
             Pending_coinbase.Hash.equal_var new_pending_coinbase_hash new_root
           in
           let%bind correct_snark =

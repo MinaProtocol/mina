@@ -351,6 +351,7 @@ module Make (Inputs : Inputs_intf) :
                     (let open Deferred.Let_syntax in
                     let t0 = Time.now time_controller in
                     match%bind
+                      Logger.info logger "Proving state transition %!" ;
                       measure "proving state transition valid" (fun () ->
                           Prover.prove ~prev_state:previous_protocol_state
                             ~prev_state_proof:previous_protocol_state_proof
