@@ -268,6 +268,9 @@ jobs:
             - run:
                   name: Running test -- test_postake_split_snarkless:coda-shared-state-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-shared-state-test"'
+            - run:
+                  name: Running test -- test_postake_split_snarkless:coda-restart-node-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-restart-node-test"'
 
 workflows:
     version: 2

@@ -49,7 +49,6 @@ test_permutations = {
 ci_blacklist = [
     'test_posig:*',
     'test_posig_snarkless:*',
-    'test_postake_split_snarkless:coda-restart-node-test'
 ]
 
 def fail(msg):

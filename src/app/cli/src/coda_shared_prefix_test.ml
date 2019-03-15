@@ -15,7 +15,8 @@ let main who_proposes () =
     Coda_worker_testnet.test log n proposers snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
   in
-  after (Time.Span.of_sec 30.)
+  let%bind () = after (Time.Span.of_sec 30.) in
+  Coda_worker_testnet.Api.teardown testnet
 
 let command =
   let open Command.Let_syntax in
