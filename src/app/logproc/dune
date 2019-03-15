@@ -1,4 +1,5 @@
 (executable
   (name logproc)
+  (public_name logproc)
   (libraries core yojson angstrom cmdliner logger)
   (preprocess (pps ppx_jane ppx_deriving.std)))

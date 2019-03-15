@@ -13,6 +13,7 @@ module Ast = struct
     | Value_lit of value
     | Value_access_string of string
     | Value_access_int of int
+    | Value_list of value_exp list
 
   let value_lit x = Value_lit x
 
@@ -20,13 +21,18 @@ module Ast = struct
 
   let value_access_int x = Value_access_int x
 
+  let value_list x = Value_list x
+
   type cmp_exp =
     | Cmp_eq of value_exp * value_exp
     | Cmp_neq of value_exp * value_exp
+    | Cmp_in of value_exp * value_exp
 
   let cmp_eq x y = Cmp_eq (x, y)
 
   let cmp_neq x y = Cmp_neq (x, y)
+
+  let cmp_in x y = Cmp_in (x, y)
 
   type bool_exp =
     | Bool_lit of bool
@@ -113,18 +119,20 @@ module Parser = struct
   let literal = choice [bool >>| Ast.bool; int >>| Ast.int; str >>| Ast.string]
 
   let value_exp =
-    choice
-      [ literal >>| Ast.value_lit
-      ; char '.' *> ident
-        <|> wrap brackets (pad ws str)
-        >>| Ast.value_access_string
-      ; wrap brackets (pad ws int) >>| Ast.value_access_int ]
-    <* commit
+    fix (fun value_exp ->
+        choice
+          [ literal >>| Ast.value_lit
+          ; char '.' *> (ident <|> wrap brackets (pad ws str))
+            >>| Ast.value_access_string
+          ; char '.' *> wrap brackets (pad ws int) >>| Ast.value_access_int
+          ; wrap brackets (pad ws (sep_by (pad ws (char ',')) value_exp))
+            >>| Ast.value_list ] )
 
   let cmp_exp =
     choice
       [ lift2 Ast.cmp_eq (value_exp <* pad ws (stringc "===")) value_exp
-      ; lift2 Ast.cmp_neq (value_exp <* pad ws (stringc "!==")) value_exp ]
+      ; lift2 Ast.cmp_neq (value_exp <* pad ws (stringc "!==")) value_exp
+      ; lift2 Ast.cmp_in (value_exp <* pad ws (stringc "in")) value_exp ]
     <* commit
 
   let bool_exp =
@@ -150,6 +158,16 @@ end
 
 module Interpreter = struct
   open Ast
+  open Option.Let_syntax
+
+  let option_list_map ls ~f =
+    let rec loop acc = function
+      | [] -> Some acc
+      | h :: t ->
+          let%bind el = f h in
+          loop (el :: acc) t
+    in
+    loop [] ls >>| List.rev
 
   let json_value = function
     | Bool b -> `Bool b
@@ -164,10 +182,13 @@ module Interpreter = struct
   let access_int json i =
     match json with `List ls -> List.nth ls i | _ -> None
 
-  let interpret_value_exp json = function
+  let rec interpret_value_exp json = function
     | Value_lit v -> Some (json_value v)
     | Value_access_string s -> access_string json s
     | Value_access_int i -> access_int json i
+    | Value_list ls ->
+        let%map ls' = option_list_map ls ~f:(interpret_value_exp json) in
+        `List ls'
 
   let interpret_cmp_exp json = function
     | Cmp_eq (x, y) ->
@@ -181,6 +202,13 @@ module Interpreter = struct
           (interpret_value_exp json x)
           (interpret_value_exp json y)
           ~f:( <> )
+        |> Option.value ~default:false
+    | Cmp_in (x, y) ->
+        Option.map2 (interpret_value_exp json x) (interpret_value_exp json y)
+          ~f:(fun scalar list ->
+            match list with
+            | `List items -> List.exists items ~f:(( = ) scalar)
+            | _ -> (* TODO: filter warnings *) false )
         |> Option.value ~default:false
 
   let rec interpret_bool_exp json = function
