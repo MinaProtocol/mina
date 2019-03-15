@@ -30,7 +30,7 @@ module Style = {
   let menuBtn =
     style([
       display(`none),
-      selector(":checked ~ ." ++ options, [display(`block)]),
+      selector({j|":checked ~ .$options"|j}, [display(`block)]),
     ]);
 
   let menuIcon =
