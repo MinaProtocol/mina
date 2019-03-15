@@ -1,6 +1,7 @@
 open Core_kernel
 open Protocols
 open Coda_pow
+open Module_version
 
 module Make (Inputs : sig
   module Ledger_hash : Ledger_hash_intf
@@ -84,11 +85,39 @@ end) :
     * pre_diff_with_at_most_one_coinbase option
   [@@deriving sexp, bin_io]
 
-  type t =
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        let version = 1
+
+        type t =
+          { diff: diff
+          ; prev_hash: Staged_ledger_hash.t
+          ; creator: Compressed_public_key.t }
+        [@@deriving sexp, bin_io]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "staged_ledger_diff"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  type t = Stable.Latest.t =
     { diff: diff
     ; prev_hash: Staged_ledger_hash.t
     ; creator: Compressed_public_key.t }
-  [@@deriving sexp, bin_io]
+  [@@deriving sexp]
 
   module With_valid_signatures_and_proofs = struct
     type pre_diff_with_at_most_two_coinbase =

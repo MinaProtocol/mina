@@ -405,12 +405,24 @@ module Stop_tracing = struct
     Rpc.Rpc.create ~name:"Stop_tracing" ~version:0 ~bin_query ~bin_response
 end
 
-module Visualize_frontier = struct
-  type query = string [@@deriving bin_io]
+module Visualization = struct
+  module Frontier = struct
+    type query = string [@@deriving bin_io]
 
-  type response = [`Active of unit | `Bootstrapping] [@@deriving bin_io]
+    type response = [`Active of unit | `Bootstrapping] [@@deriving bin_io]
 
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Visualize_frontier" ~version:0 ~bin_query
-      ~bin_response
+    let rpc : (query, response) Rpc.Rpc.t =
+      Rpc.Rpc.create ~name:"Visualize_frontier" ~version:0 ~bin_query
+        ~bin_response
+  end
+
+  module Registered_masks = struct
+    type query = string [@@deriving bin_io]
+
+    type response = unit [@@deriving bin_io]
+
+    let rpc : (query, response) Rpc.Rpc.t =
+      Rpc.Rpc.create ~name:"Visualize_registered_masks" ~version:0 ~bin_query
+        ~bin_response
+  end
 end
