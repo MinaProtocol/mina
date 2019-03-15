@@ -27,12 +27,15 @@ module Ast = struct
     | Cmp_eq of value_exp * value_exp
     | Cmp_neq of value_exp * value_exp
     | Cmp_in of value_exp * value_exp
+    | Cmp_match of value_exp * Re2.regex
 
   let cmp_eq x y = Cmp_eq (x, y)
 
   let cmp_neq x y = Cmp_neq (x, y)
 
   let cmp_in x y = Cmp_in (x, y)
+
+  let cmp_match x y = Cmp_match (x, y)
 
   type bool_exp =
     | Bool_lit of bool
@@ -89,12 +92,14 @@ module Parser = struct
 
   let infix p op =
     p
-    >>= fun l -> maybe op >>= function Some f -> p >>| f l | None -> return l
+    >>= fun l ->
+    maybe (op <* commit) >>= function Some f -> p >>| f l | None -> return l
 
   let bool =
     choice [string "true" *> return true; string "false" *> return false]
+    <?> "bool"
 
-  let int = take_while1 is_numeric >>| int_of_string
+  let int = take_while1 is_numeric >>| int_of_string <?> "int"
 
   let text_escape =
     choice (List.map ~f:char ['"'; '\\'; '/'; 'b'; 'n'; 'r'; 't'])
@@ -104,7 +109,7 @@ module Parser = struct
     let text_char = alpha_char <|> numeric_char >>| String.of_char in
     char '\\' *> text_escape <|> text_char
 
-  let text = many text_component >>| String.concat ~sep:""
+  let text = many text_component >>| String.concat ~sep:"" <?> "text"
 
   (* let text1 = many1 text_component >>| String.concat ~sep:"" *)
 
@@ -113,10 +118,13 @@ module Parser = struct
       (fun h t -> String.of_char_list (h :: t))
       alpha_char
       (many (alpha_char <|> numeric_char))
+    <?> "ident"
 
-  let str = pad (char '"') text
+  let str = pad (char '"') text <?> "str"
 
-  let literal = choice [bool >>| Ast.bool; int >>| Ast.int; str >>| Ast.string]
+  let literal =
+    choice [bool >>| Ast.bool; int >>| Ast.int; str >>| Ast.string]
+    <?> "literal"
 
   let value_exp =
     fix (fun value_exp ->
@@ -127,13 +135,30 @@ module Parser = struct
           ; char '.' *> wrap brackets (pad ws int) >>| Ast.value_access_int
           ; wrap brackets (pad ws (sep_by (pad ws (char ',')) value_exp))
             >>| Ast.value_list ] )
+    <?> "value_exp"
 
   let cmp_exp =
-    choice
-      [ lift2 Ast.cmp_eq (value_exp <* pad ws (stringc "===")) value_exp
-      ; lift2 Ast.cmp_neq (value_exp <* pad ws (stringc "!==")) value_exp
-      ; lift2 Ast.cmp_in (value_exp <* pad ws (stringc "in")) value_exp ]
-    <* commit
+    let regex =
+      let inner =
+        fix (fun inner ->
+            choice
+              [ lift2 List.cons (string {|\/|}) inner
+              ; char '/' *> return []
+              ; lift2 List.cons (take 1) inner ] )
+        >>| String.concat ~sep:""
+      in
+      char '/' *> commit *> inner
+      <* commit >>| (* TODO: handle gracefully *) Re2.create_exn
+    in
+    lift2
+      (fun value f -> f value)
+      (value_exp <* commit)
+      (choice
+         [ pad ws (stringc "==") *> value_exp >>| Ast.cmp_eq
+         ; pad ws (stringc "!=") *> value_exp >>| Ast.cmp_neq
+         ; pad ws (stringc "in") *> value_exp >>| Ast.cmp_in
+         ; pad ws (stringc "match") *> regex >>| Fn.flip Ast.cmp_match ])
+    <* commit <?> "cmp_exp"
 
   let bool_exp =
     fix (fun bool_exp ->
@@ -143,17 +168,25 @@ module Parser = struct
             ; bool >>| Ast.bool_lit
             ; char '!' *> bool_exp >>| Ast.bool_not
             ; cmp_exp >>| Ast.bool_cmp ]
-          <* commit
         in
         let infix_op =
           choice
             [ stringc "&&" *> return Ast.bool_and
             ; stringc "||" *> return Ast.bool_or ]
-          <* commit
         in
-        infix main infix_op )
+        infix main (pad ws infix_op) )
+    <?> "bool_exp"
 
-  let parse = parse_string bool_exp
+  let parser = ws *> bool_exp <* ws <* end_of_input
+
+  let parse str =
+    Result.map_error (parse_string parser str) ~f:(fun err ->
+        let msg =
+          match err with
+          | ": end_of_input" -> "expected end of input, found more characters"
+          | _ -> err
+        in
+        sprintf "invalid syntax (%s)" msg )
 end
 
 module Interpreter = struct
@@ -182,7 +215,7 @@ module Interpreter = struct
   let access_int json i =
     match json with `List ls -> List.nth ls i | _ -> None
 
-  let rec interpret_value_exp json = function
+  let rec interpret_value_exp (json : Yojson.Safe.json) = function
     | Value_lit v -> Some (json_value v)
     | Value_access_string s -> access_string json s
     | Value_access_int i -> access_int json i
@@ -209,6 +242,12 @@ module Interpreter = struct
             match list with
             | `List items -> List.exists items ~f:(( = ) scalar)
             | _ -> (* TODO: filter warnings *) false )
+        |> Option.value ~default:false
+    | Cmp_match (x, regex) ->
+        Option.map (interpret_value_exp json x) ~f:(fun value ->
+            match value with
+            | `String str -> Re2.matches regex str
+            | _ -> false )
         |> Option.value ~default:false
 
   let rec interpret_bool_exp json = function

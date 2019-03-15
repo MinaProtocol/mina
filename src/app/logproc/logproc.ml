@@ -68,9 +68,16 @@ let main timezone_str interpolation_config filter_str =
   let filter =
     if filter_str = "" then Result.ok_or_failwith (Filter.Parser.parse "true")
     else
-      match Filter.Parser.parse filter_str with
+      let error s =
+        eprintf !"ERROR PARSING FILTER: %s\n%!" s ;
+        exit 1
+      in
+      match
+        try Filter.Parser.parse filter_str with exn ->
+          error (Exn.to_string exn)
+      with
       | Ok x -> x
-      | Error err -> eprintf "%s\n" err ; exit 1
+      | Error err -> error err
   in
   (* let filter = Result.ok_or_failwith (Filter.Parser.parse "true") in *)
   (* let filter = Result.ok_or_failwith (Filter.Parser.parse ".level === \"Info\"") in *)
