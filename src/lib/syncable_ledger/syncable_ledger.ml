@@ -486,16 +486,18 @@ end = struct
     in
     go (empty_hash_at_height start_height) hash start_height
 
+  let write_answer t answer =
+    don't_wait_for @@ Linear_pipe.write_if_open t.queries answer
+
   let handle_node t addr exp_hash =
     if Addr.depth addr >= MT.depth - subtree_height then (
       expect_content t addr exp_hash ;
-      Linear_pipe.write_without_pushback t.queries
-        (desired_root_exn t, What_contents addr) )
+      write_answer t (desired_root_exn t, What_contents addr) )
     else (
       expect_children t addr exp_hash ;
-      Linear_pipe.write_without_pushback t.queries
+      write_answer t
         (desired_root_exn t, What_hash (Addr.child_exn addr Direction.Left)) ;
-      Linear_pipe.write_without_pushback t.queries
+      write_answer t
         (desired_root_exn t, What_hash (Addr.child_exn addr Direction.Right)) )
 
   let num_accounts t n content_hash =
@@ -578,7 +580,7 @@ end = struct
       t.desired_root <- Some h ;
       Valid.set t.validity (Addr.root ()) (Stale, Root_hash.to_hash h)
       |> ignore ;
-      Linear_pipe.write_without_pushback t.queries (h, Num_accounts) ;
+      write_answer t (h, Num_accounts) ;
       `New )
     else (
       Logger.info t.log "new_goal to same hash, not doing anything" ;
