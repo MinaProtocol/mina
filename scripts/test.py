@@ -55,6 +55,11 @@ def fail(msg):
     print('ERROR: %s' % msg)
     exit(1)
 
+def fail_with_log(msg, log):
+    with open(log, 'r') as file:
+        print(file.read())
+    fail(msg)
+
 def test_pattern(pattern, string):
     return (pattern and (pattern == '*' or pattern == string))
 
