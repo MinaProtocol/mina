@@ -30,8 +30,11 @@ let main () =
   in
   let receiver_pk = Public_key.compress another_account_keypair.public_key in
   let sender_sk = largest_account_keypair.private_key in
-  Coda_worker_testnet.Payments.send_several_payments testnet ~node:0
-    ~src:sender_sk ~dest:receiver_pk
+  let%bind () =
+    Coda_worker_testnet.Payments.send_several_payments testnet ~node:0
+      ~src:sender_sk ~dest:receiver_pk
+  in
+  Coda_worker_testnet.Api.teardown testnet
 
 let command =
   let open Command.Let_syntax in

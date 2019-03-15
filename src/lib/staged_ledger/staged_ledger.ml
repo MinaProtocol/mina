@@ -1896,9 +1896,19 @@ let%test_module "test" =
           * pre_diff_with_at_most_one_coinbase option
         [@@deriving sexp, bin_io, yojson]
 
-        type t =
+        module Stable = struct
+          module V1 = struct
+            type t =
+              {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
+            [@@deriving sexp, bin_io]
+          end
+
+          module Latest = V1
+        end
+
+        type t = Stable.Latest.t =
           {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
-        [@@deriving sexp, bin_io, yojson]
+        [@@deriving sexp, yojson]
 
         module With_valid_signatures_and_proofs = struct
           type pre_diff_with_at_most_two_coinbase =

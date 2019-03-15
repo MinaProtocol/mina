@@ -24,7 +24,15 @@ module type S = sig
   module Protocol_state : Protocol_state.S
 
   module Staged_ledger_diff : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving bin_io, sexp]
+        end
+      end
+      with type V1.t = t
   end
 
   include
@@ -76,7 +84,15 @@ module type S = sig
 end
 
 module Make (Staged_ledger_diff : sig
-  type t [@@deriving bin_io, sexp]
+  type t [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving bin_io, sexp]
+      end
+    end
+    with type V1.t = t
 end)
 (Protocol_state : Protocol_state.S) :
   S
@@ -94,7 +110,7 @@ end)
         type t =
           { protocol_state: Protocol_state.value
           ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
-          ; staged_ledger_diff: Staged_ledger_diff.t }
+          ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
         [@@deriving sexp, fields, bin_io]
 
         let to_yojson
@@ -132,7 +148,7 @@ end)
   (* bin_io omitted *)
   type t = Stable.Latest.t =
     { protocol_state: Protocol_state.value
-    ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
+    ; protocol_state_proof: Proof.t sexp_opaque
     ; staged_ledger_diff: Staged_ledger_diff.t }
   [@@deriving sexp, fields]
 

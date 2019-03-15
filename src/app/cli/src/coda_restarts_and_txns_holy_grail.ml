@@ -59,7 +59,8 @@ let main n () =
   in
   (* settle for a few more min *)
   (* TODO: Make sure to check that catchup actually worked *)
-  after (Time.Span.of_min 3.)
+  let%bind () = after (Time.Span.of_min 3.) in
+  Coda_worker_testnet.Api.teardown testnet
 
 let command =
   let open Command.Let_syntax in

@@ -48,7 +48,8 @@ module type S = sig
     ; broadcast_writer: msg Linear_pipe.Writer.t
     ; received_reader: content Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
-    ; peers: Peer.Hash_set.t }
+    ; peers: Peer.Hash_set.t
+    ; connections: (Unix.Inet_addr.t, Rpc.Connection.t) Hashtbl.t }
 
   module Config : Config_intf
 
@@ -84,7 +85,8 @@ module Make (Message : Message_intf) :
     ; broadcast_writer: Message.msg Linear_pipe.Writer.t
     ; received_reader: Message.content Envelope.Incoming.t Strict_pipe.Reader.t
     ; me: Peer.t
-    ; peers: Peer.Hash_set.t }
+    ; peers: Peer.Hash_set.t
+    ; connections: (Unix.Inet_addr.t, Rpc.Connection.t) Hashtbl.t }
 
   module Config = struct
     type t =
@@ -141,7 +143,7 @@ module Make (Message : Message_intf) :
   let create (config : Config.t)
       (implementations : Host_and_port.t Rpc.Implementation.t list) =
     trace_task "gossip net" (fun () ->
-        let%map membership =
+        let%bind membership =
           match%map
             trace_task "membership" (fun () ->
                 Membership.connect ~initial_peers:config.initial_peers
@@ -166,8 +168,20 @@ module Make (Message : Message_intf) :
           ; broadcast_writer
           ; received_reader
           ; me= config.me
-          ; peers= Peer.Hash_set.create () }
+          ; peers= Peer.Hash_set.create ()
+          ; connections= Hashtbl.create (module Unix.Inet_addr) }
         in
+        don't_wait_for
+          (Strict_pipe.Reader.iter
+             (Coda_base.Trust_system.ban_pipe config.trust_system)
+             ~f:(fun addr ->
+               match Hashtbl.find_and_remove t.connections addr with
+               | None -> Deferred.unit
+               | Some conn ->
+                   Logger.debug log
+                     !"Peer %{sexp: Unix.Inet_addr.t} banned, disconnecting."
+                     addr ;
+                   Rpc.Connection.close conn )) ;
         trace_task "rebroadcasting messages" (fun () ->
             don't_wait_for
               (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader
@@ -207,28 +221,36 @@ module Make (Message : Message_intf) :
                   List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer) ;
                   Deferred.unit )
             |> ignore ) ;
-        ignore
-          (Tcp.Server.create
-             ~on_handler_error:
-               (`Call
-                 (fun _ exn ->
-                   Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-                     "%s" (Exn.to_string_mach exn) ))
-             (Tcp.Where_to_listen.of_port config.me.Peer.communication_port)
-             (fun client reader writer ->
-               Rpc.Connection.server_with_close reader writer ~implementations
-                 ~connection_state:(fun _ ->
-                   (* connection state is the client's IP and ephemeral port when
-                 connecting to the server over TCP; the ephemeral port is
-                 distinct from the client's discovery and communication ports
-              *)
-                   Socket.Address.Inet.to_host_and_port client )
-                 ~on_handshake_error:
-                   (`Call
-                     (fun exn ->
-                       Logger.error t.logger ~module_:__MODULE__
-                         ~location:__LOC__ "%s" (Exn.to_string_mach exn) ;
-                       Deferred.unit )) )) ;
+        let%map _ =
+          Tcp.Server.create
+            ~on_handler_error:
+              (`Call
+                (fun _ exn ->
+                  Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+                    (Exn.to_string_mach exn) ))
+            (Tcp.Where_to_listen.of_port config.me.Peer.communication_port)
+            (fun client reader writer ->
+              let%map _ =
+                Rpc.Connection.server_with_close reader writer ~implementations
+                  ~connection_state:(fun conn ->
+                    (* connection state is the client's IP and ephemeral port
+                        when connecting to the server over TCP; the ephemeral
+                        port is distinct from the client's discovery and
+                        communication ports *)
+                    Hashtbl.set t.connections
+                      ~key:(Socket.Address.Inet.addr client)
+                      ~data:conn ;
+                    Socket.Address.Inet.to_host_and_port client )
+                  ~on_handshake_error:
+                    (`Call
+                      (fun exn ->
+                        Logger.error t.logger ~module_:__MODULE__
+                          ~location:__LOC__ (Exn.to_string_mach exn) ;
+                        Deferred.unit ))
+              in
+              Hashtbl.remove t.connections @@ Socket.Address.Inet.addr client
+              )
+        in
         t )
 
   let received t = t.received_reader
