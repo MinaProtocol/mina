@@ -1,8 +1,9 @@
 open Core
+open Module_version
 
 module type Base_intf = sig
   (* TODO: delegate forget here *)
-  type t [@@deriving sexp, bin_io, compare, eq]
+  type t [@@deriving sexp, compare, eq]
 
   include Comparable.S with type t := t
 
@@ -31,6 +32,16 @@ module type S = sig
     with type protocol_state := Protocol_state.value
      and type protocol_state_proof := Proof.t
      and type staged_ledger_diff := Staged_ledger_diff.t
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io]
+      end
+
+      module Latest = V1
+    end
+    with type V1.t = t
 
   module Proof_verified :
     Base_intf
@@ -75,29 +86,52 @@ end)
   module Protocol_state = Protocol_state
   module Blockchain_state = Protocol_state.Blockchain_state
 
-  module T0 = struct
-    type t =
-      { protocol_state: Protocol_state.value
-      ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
-      ; staged_ledger_diff: Staged_ledger_diff.t }
-    [@@deriving sexp, fields, bin_io]
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        let version = 1
 
-    (* TODO: Important for bkase to review *)
-    let compare t1 t2 =
-      Protocol_state.compare t1.protocol_state t2.protocol_state
+        type t =
+          { protocol_state: Protocol_state.value
+          ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
+          ; staged_ledger_diff: Staged_ledger_diff.t }
+        [@@deriving sexp, fields, bin_io]
 
-    let equal t1 t2 =
-      Protocol_state.equal_value t1.protocol_state t2.protocol_state
+        (* TODO: Important for bkase to review *)
+        let compare t1 t2 =
+          Protocol_state.compare t1.protocol_state t2.protocol_state
+
+        let equal t1 t2 =
+          Protocol_state.equal_value t1.protocol_state t2.protocol_state
+      end
+
+      include T
+      include Comparable.Make (T)
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "external_transition"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
   end
 
-  module T = struct
-    include T0
-    include Comparable.Make (T0)
-  end
+  (* bin_io omitted *)
+  type t = Stable.Latest.t =
+    { protocol_state: Protocol_state.value
+    ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
+    ; staged_ledger_diff: Staged_ledger_diff.t }
+  [@@deriving sexp, fields]
 
-  include T
-  module Proof_verified = T
-  module Verified = T
+  include Comparable.Make (Stable.Latest)
+  module Proof_verified = Stable.Latest
+  module Verified = Stable.Latest
 
   let to_proof_verified x = `I_swear_this_is_safe_see_my_comment x
 
