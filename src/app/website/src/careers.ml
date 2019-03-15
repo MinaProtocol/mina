@@ -153,7 +153,7 @@ let content =
                          philosophy, and make our software free for the \
                          entire world to&nbsp;use."
                     ; a
-                        [href "/static/code.html"; Style.render linkstyle]
+                        [href "/code.html"; Style.render linkstyle]
                         [text "Take&nbsp;a&nbsp;look&nbsp;→"] ]
                 ; Quality.create "Collaboration"
                     [ text
@@ -213,7 +213,11 @@ let content =
                 ; Role.create "Protocol Reliability Engineer"
                     "/jobs/protocol-reliability-engineer.html"
                 ; Role.create "Senior Protocol Engineer"
-                    "/jobs/protocol-engineer.html" ]) ] ]
+                    "/jobs/protocol-engineer.html"
+                ; Role.create "Director of Business Development"
+                    "/jobs/director-of-business-development.html"
+                ; Role.create "Developer Advocate"
+                    "/jobs/developer-advocate.html" ]) ] ]
   in
   wrap_simple
     ~body_style:(Style.of_class "bg-white")
