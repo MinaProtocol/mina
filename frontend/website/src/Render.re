@@ -10,27 +10,36 @@ type critical = {
 [@bs.module "emotion-server"]
 external extractCritical: string => critical = "";
 
-[@bs.val] [@bs.module "fs"]
-external mkdirSync:
-  (
-    string,
-    {
-      .
-      "recursive": bool,
-      "mode": int,
-    }
-  ) =>
-  unit =
-  "";
+module Fs = {
+  [@bs.val] [@bs.module "fs"]
+  external mkdirSync:
+    (
+      string,
+      {
+        .
+        "recursive": bool,
+        "mode": int,
+      }
+    ) =>
+    unit =
+    "";
+
+  [@bs.val] [@bs.module "fs"]
+  external symlinkSync: (string, string) => unit = "";
+};
+
+module Rimraf = {
+  [@bs.val] [@bs.module "rimraf"] external sync: string => unit = "";
+};
 
 let writeStatic = (path, rootComponent) => {
   let rendered =
     extractCritical(ReactDOMServerRe.renderToStaticMarkup(rootComponent));
   Node.Fs.writeFileAsUtf8Sync(
-    "site/" ++ path ++ ".html",
+    path ++ ".html",
     "<!doctype html><meta charset=\"utf-8\" />\n" ++ rendered##html,
   );
-  Node.Fs.writeFileAsUtf8Sync("site/" ++ path ++ ".css", rendered##css);
+  Node.Fs.writeFileAsUtf8Sync(path ++ ".css", rendered##css);
 };
 
 let load = path => {
@@ -52,27 +61,26 @@ let posts =
        (name, content, html);
      });
 
-mkdirSync("site/blog", {"recursive": true, "mode": 0o755});
+module Router = {
+  type t =
+    | File(string, ReasonReact.reactElement)
+    | Dir(string, array(t));
 
-// TODO: Parse metadata from markdown
-Array.iter(
-  ((name, content, html)) =>
-    writeStatic(
-      "blog/" ++ name,
-      <Page extraHeaders=BlogPost.extraHeaders>
-        <BlogPost
-          name
-          title="A SNARKy Exponential Function"
-          subtitle="Simulating real numbers using finite field arithmetic"
-          author="Izaak Meckler"
-          authorWebsite="www.twitter.com/imeckler"
-          date="March 09 2019"
-          html
-        />
-      </Page>,
-    ),
-  posts,
-);
+  let generateStatic = {
+    let rec helper = path =>
+      fun
+      | File(name, elem) => {
+          writeStatic(path ++ "/" ++ name, elem);
+        }
+      | Dir(name, routes) => {
+          let path_ = path ++ "/" ++ name;
+          Fs.mkdirSync(path_, {"recursive": true, "mode": 0o755});
+          routes |> Array.iter(helper(path_));
+        };
+
+    helper("./");
+  };
+};
 
 // TODO: Render job pages
 let jobOpenings = [|
@@ -86,7 +94,46 @@ let jobOpenings = [|
   ("protocol-engineer", "Senior Protocol Engineer (San Francisco)."),
 |];
 
-writeStatic(
-  "jobs",
-  <Page extraHeaders=Careers.extraHeaders> <Careers jobOpenings /> </Page>,
+// GENERATE
+
+Rimraf.sync("site");
+Router.(
+  generateStatic(
+    Dir(
+      "site",
+      [|
+        Dir(
+          "blog",
+          posts
+          |> Array.map(((name, _content, html)) =>
+               File(
+                 name,
+                 <Page extraHeaders=BlogPost.extraHeaders>
+                   <BlogPost
+                     name
+                     title="A SNARKy Exponential Function"
+                     subtitle="Simulating real numbers using finite field arithmetic"
+                     author="Izaak Meckler"
+                     authorWebsite="www.twitter.com/imeckler"
+                     date="March 09 2019"
+                     html
+                   />
+                 </Page>,
+               )
+             ),
+        ),
+        File(
+          "jobs",
+          <Page extraHeaders=Careers.extraHeaders>
+            <Careers jobOpenings />
+          </Page>,
+        ),
+        File("code", <Page extraHeaders=Code.extraHeaders> <Code /> </Page>),
+      |],
+    ),
+  )
+);
+Fs.symlinkSync(
+  Node.Process.cwd() ++ "/../../src/app/website/static",
+  "./site/static",
 );
