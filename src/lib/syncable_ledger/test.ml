@@ -30,12 +30,12 @@ module type Input_intf = sig
      and type addr := Ledger.addr
      and type merkle_path := Ledger.path
      and type account := Ledger.account
-     and type query := Ledger.addr Syncable_ledger.query
+     and type query := Ledger.addr Syncable_ledger.Query.t
      and type answer :=
                 ( Ledger.addr
                 , Root_hash.t
                 , Ledger.account )
-                Syncable_ledger.answer
+                Syncable_ledger.Answer.t
 end
 
 module Make_test

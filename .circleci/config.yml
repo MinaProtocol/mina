@@ -30,7 +30,7 @@ jobs:
                   command: cd frontend/website && npm run reformat && git diff --exit-code src
             - run:
                   name: Build website
-                  command: cd frontend/website && npm run build && brew install pandoc && node ./lib/js/src/Render.js
+                  command: cd frontend/website && npm run build && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && node ./lib/js/src/Render.js
 
     lint:
         docker:
@@ -268,6 +268,9 @@ jobs:
             - run:
                   name: Running test -- test_postake_split_snarkless:coda-shared-state-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-shared-state-test"'
+            - run:
+                  name: Running test -- test_postake_split_snarkless:coda-restart-node-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-restart-node-test"'
 
 workflows:
     version: 2

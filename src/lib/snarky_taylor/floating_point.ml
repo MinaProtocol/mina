@@ -19,9 +19,9 @@ let precision t = t.precision
 let to_bignum (type f) ~m:((module M) as m : f m) t =
   let open M in
   let d = t.precision in
-  As_prover.(
-    map (read_var t.value) ~f:(fun t ->
-        Bignum.(of_bigint (bigint_of_field ~m t) / of_bigint B.(one lsl d)) ))
+  fun () ->
+    let t = As_prover.read_var t.value in
+    Bignum.(of_bigint (bigint_of_field ~m t) / of_bigint B.(one lsl d))
 
 (*
     x      y        x*y

@@ -44,9 +44,9 @@ module Answer = struct
 
         type t =
           ( Ledger.Location.Addr.t
-          , Ledger_hash.t
+          , Ledger_hash.Stable.V1.t
           , Account.Stable.V1.t )
-          Syncable_ledger.answer
+          Syncable_ledger.Answer.Stable.V1.t
         [@@deriving bin_io, sexp]
       end
 
@@ -76,7 +76,8 @@ module Query = struct
       module T = struct
         let version = 1
 
-        type t = Ledger.Location.Addr.t Syncable_ledger.query
+        type t =
+          Ledger.Location.Addr.Stable.V1.t Syncable_ledger.Query.Stable.V1.t
         [@@deriving bin_io, sexp]
       end
 
