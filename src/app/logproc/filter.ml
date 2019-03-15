@@ -11,17 +11,20 @@ module Ast = struct
 
   type value_exp =
     | Value_lit of value
-    | Value_access_string of string
-    | Value_access_int of int
+    | Value_this
     | Value_list of value_exp list
+    | Value_access_string of value_exp * string
+    | Value_access_int of value_exp * int
 
   let value_lit x = Value_lit x
 
-  let value_access_string x = Value_access_string x
-
-  let value_access_int x = Value_access_int x
+  let value_this = Value_this
 
   let value_list x = Value_list x
+
+  let value_access_string x y = Value_access_string (x, y)
+
+  let value_access_int x y = Value_access_int (x, y)
 
   type cmp_exp =
     | Cmp_eq of value_exp * value_exp
@@ -128,13 +131,23 @@ module Parser = struct
 
   let value_exp =
     fix (fun value_exp ->
-        choice
-          [ literal >>| Ast.value_lit
-          ; char '.' *> (ident <|> wrap brackets (pad ws str))
-            >>| Ast.value_access_string
-          ; char '.' *> wrap brackets (pad ws int) >>| Ast.value_access_int
-          ; wrap brackets (pad ws (sep_by (pad ws (char ',')) value_exp))
-            >>| Ast.value_list ] )
+        let base =
+          choice
+            [ literal >>| Ast.value_lit
+            ; wrap brackets (pad ws (sep_by (pad ws (char ',')) value_exp))
+              >>| Ast.value_list ]
+        in
+        let rec access parent =
+          choice
+            [ char '.' *> (ident <|> wrap brackets (pad ws str))
+              >>| Ast.value_access_string parent
+            ; wrap brackets (pad ws int) >>| Ast.value_access_int parent ]
+          >>= fun parent' -> access parent' <|> return parent'
+        in
+        maybe base
+        >>= function
+        | Some base -> access base <|> return base
+        | None -> access Ast.value_this )
     <?> "value_exp"
 
   let cmp_exp =
@@ -217,11 +230,14 @@ module Interpreter = struct
 
   let rec interpret_value_exp (json : Yojson.Safe.json) = function
     | Value_lit v -> Some (json_value v)
-    | Value_access_string s -> access_string json s
-    | Value_access_int i -> access_int json i
     | Value_list ls ->
         let%map ls' = option_list_map ls ~f:(interpret_value_exp json) in
         `List ls'
+    | Value_this -> Some json
+    | Value_access_string (parent, s) ->
+        interpret_value_exp json parent >>= (Fn.flip access_string) s
+    | Value_access_int (parent, i) ->
+        interpret_value_exp json parent >>= (Fn.flip access_int) i
 
   let interpret_cmp_exp json = function
     | Cmp_eq (x, y) ->
