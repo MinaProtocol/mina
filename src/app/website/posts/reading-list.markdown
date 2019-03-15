@@ -1,6 +1,7 @@
 ---
 title: Functional programming + crypto reading list
 date: 2018-04-01
+author: O(1) Labs
 ---
 
 Recently a candidate sent us a very thoughtful email asking what kind of knowledge

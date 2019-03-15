@@ -1,3 +1,43 @@
+module Metadata = {
+  type t = {
+    title: string,
+    author: string,
+    date: string,
+    subtitle: option(string),
+    authorWebsite: option(string),
+  };
+
+  let getValue = (key, content) => {
+    let re =
+      Js.Re.fromStringWithFlags(
+        {|^---(?:.|\n)*^|} ++ key ++ {|:(.*)\n(?:.|\n)*^---|},
+        ~flags="m",
+      );
+    switch (Js.Re.exec(content, re)) {
+    | None => None
+    | Some(result) =>
+      let captures = Js.Re.captures(result);
+      let opt = Js.Nullable.toOption(captures[1]);
+      Belt.Option.map(opt, String.trim);
+    };
+  };
+
+  let getRequiredValue = (key, content, filename) =>
+    switch (getValue(key, content)) {
+    | None =>
+      failwith("Didn't provide " ++ key ++ " in " ++ filename ++ ".markdown")
+    | Some(s) => s
+    };
+
+  let parse = (content, filename) => {
+    title: getRequiredValue("title", content, filename),
+    author: getRequiredValue("author", content, filename),
+    date: getRequiredValue("date", content, filename),
+    subtitle: getValue("subtitle", content),
+    authorWebsite: getValue("author_website", content),
+  };
+};
+
 module Comments = {
   let component = ReasonReact.statelessComponent("BlogPost.Comments");
   let make = (~name, _) => {
@@ -95,76 +135,52 @@ let extraHeaders =
     <link rel="stylesheet" href="/static/css/blog.css" />
   </>;
 
-let make =
-    (~name, ~title, ~subtitle, ~author, ~authorWebsite, ~date, ~html, _) => {
-  ...component,
-  render: _self =>
-    <div>
-      <div className="ph3 ph4-m ph5-l">
-        <div>
-          <div className="db dn-l">
-            <div className="mw65-ns ibmplex f5 center blueblack">
-              <h1
-                className="f2 f1-ns ddinexp tracked-tightish pt2 pt3-m pt4-l mb1">
-                {ReasonReact.string(title)}
-              </h1>
-              <h2 className="f4 f3-ns ddinexp mt0 mb4 fw4">
-                {ReasonReact.string(subtitle)}
-              </h2>
-              <h4 className="f7 fw4 tracked-supermega ttu metropolis mt0 mb1">
-                <a
-                  href=authorWebsite
-                  className="blueblack no-underline"
-                  target="_blank">
-                  <span className="mr2">
-                    {ReasonReact.string("by " ++ author ++ " ")}
-                  </span>
-                  <i
-                    className="ml-1 ml-2-ns fab f7 fa-twitter mr3 mr2-m mr3-l"
-                  />
-                </a>
-              </h4>
-              <h4
-                className="f7 fw4 tracked-supermega ttu o-50 metropolis mt0 mb45">
-                {ReasonReact.string(date)}
-              </h4>
-              <div className="blog-content lh-copy">
-                <div dangerouslySetInnerHTML={"__html": html} /> // TODO: replace this with some react markdown component
-                <hr />
-              </div>
-              <div className="share flex justify-center items-center mb4">
-                shareItems
-              </div>
-              <Comments name />
-            </div>
-          </div>
-          <div className="db-l dn">
-            <div className="mw7 center ibmplex blueblack side-footnotes">
-              <div className="mw65-ns f5 left blueblack">
+let make = (~name, ~content, ~html, _) => {
+  let metadata = Metadata.parse(content, name);
+  {
+    ...component,
+    render: _self =>
+      <div>
+        <div className="ph3 ph4-m ph5-l">
+          <div>
+            <div className="db dn-l">
+              <div className="mw65-ns ibmplex f5 center blueblack">
                 <h1
-                  className="f2 f1-ns ddinexp tracked-tightish pt2 pt3-m pt4-l mb1">
-                  {ReasonReact.string(title)}
-                </h1>
-                <h2 className="f4 f3-ns ddinexp mt0 mb4 fw4">
-                  {ReasonReact.string(subtitle)}
-                </h2>
+                  className="f2 f1-ns ddinexp tracked-tightish pt2 pt3-m pt4-l mb1"
+                  dangerouslySetInnerHTML={"__html": metadata.title}
+                />
+                {switch (metadata.subtitle) {
+                 | None => <div className="mt0 mb4" />
+                 | Some(subtitle) =>
+                   <h2
+                     className="f4 f3-ns ddinexp mt0 mb4 fw4"
+                     dangerouslySetInnerHTML={"__html": subtitle}
+                   />
+                 }}
                 <h4
                   className="f7 fw4 tracked-supermega ttu metropolis mt0 mb1">
-                  <a
-                    href=authorWebsite
-                    className="blueblack no-underline"
-                    target="_blank">
-                    <span className="mr2">
-                      {ReasonReact.string("by " ++ author ++ " ")}
-                    </span>
-                    <i
-                      className="ml-1 ml-2-ns fab f7 fa-twitter mr3 mr2-m mr3-l"
-                    />
-                  </a>
+                  {switch (metadata.authorWebsite) {
+                   | None =>
+                     <span className="mr2">
+                       {ReasonReact.string("by " ++ metadata.author ++ " ")}
+                     </span>
+                   | Some(website) =>
+                     <a
+                       href=website
+                       className="blueblack no-underline"
+                       target="_blank">
+                       <span className="mr2">
+                         {ReasonReact.string("by " ++ metadata.author ++ " ")}
+                       </span>
+                       <i
+                         className="ml-1 ml-2-ns fab f7 fa-twitter mr3 mr2-m mr3-l"
+                       />
+                     </a>
+                   }}
                 </h4>
                 <h4
                   className="f7 fw4 tracked-supermega ttu o-50 metropolis mt0 mb45">
-                  {ReasonReact.string(date)}
+                  {ReasonReact.string(metadata.date)}
                 </h4>
                 <div className="blog-content lh-copy">
                   <div dangerouslySetInnerHTML={"__html": html} /> // TODO: replace this with some react markdown component
@@ -173,14 +189,66 @@ let make =
                 <div className="share flex justify-center items-center mb4">
                   shareItems
                 </div>
+                <Comments name />
+              </div>
+            </div>
+            <div className="db-l dn">
+              <div className="mw7 center ibmplex blueblack side-footnotes">
+                <div className="mw65-ns f5 left blueblack">
+                  <h1
+                    className="f2 f1-ns ddinexp tracked-tightish pt2 pt3-m pt4-l mb1"
+                    dangerouslySetInnerHTML={"__html": metadata.title}
+                  />
+                  {switch (metadata.subtitle) {
+                   | None => <div className="mt0 mb4" />
+                   | Some(subtitle) =>
+                     <h2
+                       className="f4 f3-ns ddinexp mt0 mb4 fw4"
+                       dangerouslySetInnerHTML={"__html": subtitle}
+                     />
+                   }}
+                  <h4
+                    className="f7 fw4 tracked-supermega ttu metropolis mt0 mb1">
+                    {switch (metadata.authorWebsite) {
+                     | None =>
+                       <span className="mr2">
+                         {ReasonReact.string("by " ++ metadata.author ++ " ")}
+                       </span>
+                     | Some(website) =>
+                       <a
+                         href=website
+                         className="blueblack no-underline"
+                         target="_blank">
+                         <span className="mr2">
+                           {ReasonReact.string(
+                              "by " ++ metadata.author ++ " ",
+                            )}
+                         </span>
+                         <i
+                           className="ml-1 ml-2-ns fab f7 fa-twitter mr3 mr2-m mr3-l"
+                         />
+                       </a>
+                     }}
+                  </h4>
+                  <h4
+                    className="f7 fw4 tracked-supermega ttu o-50 metropolis mt0 mb45">
+                    {ReasonReact.string(metadata.date)}
+                  </h4>
+                  <div className="blog-content lh-copy">
+                    <div dangerouslySetInnerHTML={"__html": html} /> // TODO: replace this with some react markdown component
+                    <hr />
+                  </div>
+                  <div className="share flex justify-center items-center mb4">
+                    shareItems
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-      <MailingList />
-      <RunScript>
-        {|
+        <MailingList />
+        <RunScript>
+          {|
           document.addEventListener("DOMContentLoaded", function() {
             renderMathInElement(document.body);
 
@@ -198,6 +266,7 @@ let make =
               }
             }
           });|}
-      </RunScript>
-    </div>,
+        </RunScript>
+      </div>,
+  };
 };
