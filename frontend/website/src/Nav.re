@@ -58,6 +58,9 @@ let component = ReasonReact.statelessComponent("Nav");
 let make = children => {
   ...component,
   render: _self => {
+    let items =
+      children |> Array.map(elem => <li className=Style.item> elem </li>);
+
     <nav className=Style.nav>
       <p> {ReasonReact.string("TODO Logo")} </p>
       /* we use the input to get a :checked pseudo selector
@@ -66,11 +69,7 @@ let make = children => {
       <label className=Style.menuIcon htmlFor="nav-menu-btn">
         <span className=Style.menuText> {ReasonReact.string("Menu")} </span>
       </label>
-      <ul className=Style.options>
-        {children
-         |> Array.map(elem => <li className=Style.item> elem </li>)
-         |> ReasonReact.array}
-      </ul>
+      <ul className=Style.options> ...items </ul>
     </nav>;
   },
 };

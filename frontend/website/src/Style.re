@@ -1,6 +1,6 @@
 module Colors = {
   let fadedBlue = `rgb((111, 167, 197));
-  let white = `rgb((255, 255, 255));
+  let white = Css.white;
 };
 
 /** sets both paddingLeft and paddingRight, as one should */
