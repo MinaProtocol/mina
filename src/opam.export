@@ -8,6 +8,7 @@ compiler: [
   "ocaml-config.1"
 ]
 roots: [
+  "angstrom.0.11.1"
   "async_ssl.v0.11.0"
   "bignum.v0.11.0"
   "bisect_ppx.1.4.0"
@@ -22,21 +23,25 @@ roots: [
   "menhir.20181113"
   "merlin.3.2.2"
   "ocaml-base-compiler.4.07.1"
+  "ocaml-extlib.~dev"
   "ocamlformat.0.8"
   "ocamlgraph.1.8.8"
   "ocp-indent.1.7.0"
   "ppx_deriving.4.2.1"
   "ppx_deriving_yojson.3.3"
   "re2.v0.11.0"
+  "rpc_parallel.v0.11.0"
+  "sodium.dev"
   "utop.2.2.0"
   "virtual_dom.v0.11.0"
   "yojson.1.5.0"
 ]
 installed: [
+  "angstrom.0.11.1"
   "astring.0.8.3"
   "async.v0.11.0"
   "async_extra.v0.11.1"
-  "async_kernel.v0.11.1"
+  "async_kernel.v0.11.0"
   "async_rpc_kernel.v0.11.0"
   "async_ssl.v0.11.0"
   "async_unix.v0.11.0"
@@ -47,6 +52,7 @@ installed: [
   "base-unix.base"
   "base64.3.1.0"
   "bignum.v0.11.0"
+  "bigstringaf.0.4.0"
   "bin_prot.v0.11.0"
   "biniou.1.2.0"
   "bisect_ppx.1.4.0"
@@ -104,6 +110,7 @@ installed: [
   "ocaml-base-compiler.4.07.1"
   "ocaml-compiler-libs.v0.11.0"
   "ocaml-config.1"
+  "ocaml-extlib.~dev"
   "ocaml-migrate-parsetree.1.2.0"
   "ocamlbuild.0.12.0"
   "ocamlfind.1.8.0"
@@ -150,10 +157,12 @@ installed: [
   "re2.v0.11.0"
   "react.1.2.1"
   "result.1.3"
+  "rpc_parallel.v0.11.0"
   "rresult.0.6.0"
   "seq.base"
   "sexplib.v0.11.0"
   "sexplib0.v0.11.0"
+  "sodium.dev"
   "spawn.v0.12.0"
   "splittable_random.v0.11.0"
   "stdio.v0.11.0"
@@ -171,3 +180,163 @@ installed: [
   "zarith.1.7"
   "zed.1.6"
 ]
+pinned: [
+  "async_kernel.v0.11.0"
+  "ocaml-extlib.~dev"
+  "rpc_parallel.v0.11.0"
+  "sodium.dev"
+]
+package "async_kernel" {
+  opam-version: "2.0"
+  version: "v0.11.0"
+  synopsis: "Monadic concurrency library"
+  description: """
+Part of Jane Street's Core library
+The Core suite of libraries is an industrial strength alternative to
+OCaml's standard library that was developed by Jane Street, the
+largest industrial user of OCaml."""
+  maintainer: "opensource@janestreet.com"
+  authors: "Jane Street Group, LLC <opensource@janestreet.com>"
+  license: "Apache-2.0"
+  homepage: "https://github.com/janestreet/async_kernel"
+  bug-reports: "https://github.com/janestreet/async_kernel/issues"
+  depends: [
+    "ocaml" {>= "4.04.1"}
+    "core_kernel" {>= "v0.11" & < "v0.12"}
+    "ppx_jane" {>= "v0.11" & < "v0.12"}
+    "jbuilder" {build & >= "1.0+beta18.1"}
+    "ocaml-migrate-parsetree" {>= "1.0"}
+    "ppxlib" {>= "0.1.0"}
+  ]
+  build: ["jbuilder" "build" "-p" name "-j" jobs]
+  dev-repo: "git+https://github.com/janestreet/async_kernel.git"
+  url {
+    src:
+      "git+file:///home/nathan/o1-labs/inttest/src/external/async_kernel#HEAD"
+  }
+}
+package "ocaml-extlib" {
+  opam-version: "2.0"
+  version: "~dev"
+  synopsis: "A complete yet small extension for OCaml standard library"
+  maintainer: "ygrek@autistici.org"
+  authors: [
+    "Nicolas Cannasse"
+    "Brian Hurt"
+    "Yamagata Yoriyuki"
+    "Markus Mottl"
+    "Jesse Guardiani"
+    "John Skaller"
+    "Bardur Arantsson"
+    "Janne Hellsten"
+    "Richard W.M. Jones"
+    "ygrek"
+    "Gabriel Scherer"
+    "Pietro Abate"
+  ]
+  license: "LGPL-2.1 with OCaml linking exception"
+  homepage: "https://github.com/ygrek/ocaml-extlib"
+  doc: "http://ygrek.org.ua/p/extlib/doc/"
+  bug-reports: "https://github.com/ygrek/ocaml-extlib/issues"
+  depends: [
+    "ocaml"
+    "ocamlfind" {build}
+    "cppo" {build}
+    "base-bytes" {build}
+  ]
+  flags: light-uninstall
+  build: [
+    [make "minimal=1" "build"]
+    [make "minimal=1" "test"] {with-test}
+    [make "minimal=1" "doc"] {with-doc}
+  ]
+  install: [make "minimal=1" "install"]
+  remove: ["ocamlfind" "remove" "extlib"]
+  dev-repo: "git://github.com/ygrek/ocaml-extlib.git"
+  url {
+    src:
+      "git+file:///home/nathan/o1-labs/inttest/src/external/ocaml-extlib#HEAD"
+  }
+}
+package "rpc_parallel" {
+  opam-version: "2.0"
+  version: "v0.11.0"
+  synopsis: "Type-safe parallel library built on top of Async_rpc"
+  description: """
+Rpc_parallel offers an API to define various workers and protocols,
+spawn workers as separate processes, and communicate with them using
+Async Rpc."""
+  maintainer: "opensource@janestreet.com"
+  authors: "Jane Street Group, LLC <opensource@janestreet.com>"
+  license: "Apache-2.0"
+  homepage: "https://github.com/janestreet/rpc_parallel"
+  bug-reports: "https://github.com/janestreet/rpc_parallel/issues"
+  depends: [
+    "ocaml" {>= "4.04.1"}
+    "async" {>= "v0.11" & < "v0.12"}
+    "core" {>= "v0.11" & < "v0.12"}
+    "ppx_jane" {>= "v0.11" & < "v0.12"}
+    "sexplib" {>= "v0.11" & < "v0.12"}
+    "dune" {build & >= "1.0"}
+    "ocaml-migrate-parsetree" {>= "1.0"}
+    "ppxlib" {>= "0.1.0"}
+    "ctypes" {>= "0.14" & < "0.15"}
+    "ctypes-foreign" {>= "0.4" & < "0.5"}
+  ]
+  build: ["dune" "build" "-p" name "-j" jobs]
+  dev-repo: "git+https://github.com/janestreet/rpc_parallel.git"
+  url {
+    src: "file:///home/nathan/o1-labs/inttest/src/external/rpc_parallel"
+  }
+}
+package "sodium" {
+  opam-version: "2.0"
+  version: "dev"
+  maintainer: "sheets@alum.mit.edu"
+  authors: [
+    "David Sheets <sheets@alum.mit.edu>"
+    "Peter Zotov <whitequark@whitequark.org>"
+    "Benjamin Canou <benjamin@ocamlpro.com>"
+  ]
+  tags: "org:mirage"
+  homepage: "https://github.com/dsheets/ocaml-sodium/"
+  bug-reports: "https://github.com/dsheets/ocaml-sodium/issues/"
+  depends: [
+    "ocaml" {>= "4.01.0"}
+    "base-bigarray"
+    "base-bytes"
+    "ocamlfind" {build}
+    "ocamlbuild" {build}
+    "ctypes" {>= "0.6.0"}
+  ]
+  flags: light-uninstall
+  build: [
+    [make] {os != "freebsd"}
+    [make "CFLAGS=-I/usr/local/include -L/usr/local/lib"] {os = "freebsd"}
+    [make "test"] {with-test & os != "freebsd"}
+    [make "CFLAGS=-I/usr/local/include -L/usr/local/lib" "test"]
+      {with-test & os = "freebsd"}
+  ]
+  install: [make "PREFIX=%{prefix}%" "install"]
+  remove: ["ocamlfind" "remove" "sodium"]
+  post-messages: [
+    "This package requires installation of libsodium-dev (>= 1.0.9)"
+      {failure & os = "debian"}
+    "This package requires installation of libsodium-dev (>= 1.0.9)"
+      {failure & os = "ubuntu"}
+    "This package requires installation of security/libsodium (>= 1.0.9)"
+      {failure & os = "freebsd"}
+    "This package requires installation of libsodium (>= 1.0.9)"
+      {failure & os = "macos"}
+  ]
+  depexts: [
+    ["libsodium-dev"] {os-distribution = "debian"}
+    ["libsodium-dev"] {os-distribution = "ubuntu"}
+    ["security/libsodium"] {os = "freebsd"}
+    ["libsodium"] {os = "macos" & os-distribution = "homebrew"}
+  ]
+  dev-repo: "git+https://github.com/dsheets/ocaml-sodium.git"
+  url {
+    src: "file:///home/nathan/o1-labs/inttest/src/external/ocaml-sodium"
+  }
+}
