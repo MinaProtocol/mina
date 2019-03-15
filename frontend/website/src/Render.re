@@ -108,7 +108,7 @@ Router.(
           |> Array.map(((name, _content, html)) =>
                File(
                  name,
-                 <Page
+                 <LegacyPage
                    extraHeaders=BlogPost.extraHeaders footerColor="bg-snow">
                    <BlogPost
                      name
@@ -119,17 +119,20 @@ Router.(
                      date="March 09 2019"
                      html
                    />
-                 </Page>,
+                 </LegacyPage>,
                )
              ),
         ),
         File(
           "jobs",
-          <Page extraHeaders=Careers.extraHeaders>
+          <LegacyPage extraHeaders=Careers.extraHeaders>
             <Careers jobOpenings />
-          </Page>,
+          </LegacyPage>,
         ),
-        File("code", <Page extraHeaders=Code.extraHeaders> <Code /> </Page>),
+        File(
+          "code",
+          <LegacyPage extraHeaders=Code.extraHeaders> <Code /> </LegacyPage>,
+        ),
       |],
     ),
   )
