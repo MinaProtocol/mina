@@ -1269,9 +1269,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
           ; state_hash
           ; consensus_time_best_tip } ) =
       match active_status () with
-      | `Active result -> (true, result)
+      | `Active result -> (false, result)
       | `Bootstrapping ->
-          ( false
+          ( true
           , { num_accounts= None
             ; block_count= None
             ; ledger_merkle_root= None
