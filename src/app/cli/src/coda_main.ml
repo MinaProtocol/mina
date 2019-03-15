@@ -49,7 +49,7 @@ module Staged_ledger_hash = struct
 end
 
 module Ledger_hash = struct
-  include Ledger_hash.Stable.Latest
+  include Ledger_hash
 
   let of_digest = Ledger_hash.of_digest
 
@@ -63,7 +63,7 @@ module Ledger_hash = struct
 end
 
 module Frozen_ledger_hash = struct
-  include Frozen_ledger_hash.Stable.Latest
+  include Frozen_ledger_hash
 
   let to_bytes = Frozen_ledger_hash.to_bytes
 
@@ -315,8 +315,8 @@ module type Main_intf = sig
       ; snark_pool_disk_location: string
       ; ledger_db_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
-      ; time_controller: Inputs.Time.Controller.t
-      ; banlist: Banlist.t
+      ; time_controller:
+          Inputs.Time.Controller.t (* FIXME trust system goes here? *)
       ; receipt_chain_database: Receipt_chain_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Async.Monitor.t option }
@@ -367,11 +367,13 @@ end
 module Fee_transfer = Coda_base.Fee_transfer
 module Ledger_proof_statement = Transaction_snark.Statement
 module Transaction_snark_work =
-  Staged_ledger.Make_completed_work (Public_key.Compressed) (Ledger_proof)
+  Staged_ledger.Make_completed_work
+    (Public_key.Compressed)
+    (Ledger_proof.Stable.V1)
     (Ledger_proof_statement)
 
 module Staged_ledger_diff = Staged_ledger.Make_diff (struct
-  module Ledger_proof = Ledger_proof
+  module Ledger_proof = Ledger_proof.Stable.V1
   module Ledger_hash = Ledger_hash
   module Staged_ledger_hash = Staged_ledger_hash
   module Staged_ledger_aux_hash = Staged_ledger_aux_hash
@@ -499,7 +501,7 @@ struct
   module Sparse_ledger = Coda_base.Sparse_ledger
 
   module Transaction_snark_work_proof = struct
-    type t = Ledger_proof.t list [@@deriving sexp, bin_io]
+    type t = Ledger_proof.Stable.V1.t list [@@deriving sexp, bin_io]
   end
 
   module Staged_ledger = struct
@@ -1288,9 +1290,21 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
 
-  let log_shutdown ~frontier_file ~log t =
-    visualize_frontier ~filename:frontier_file t |> ignore ;
-    Logger.info log "Logging the transition_frontier at %s" frontier_file
+  let visualize_registered_masks = Coda_base.Ledger.Debug.visualize
+
+  let log_shutdown ~conf_dir ~log t =
+    let frontier_file = conf_dir ^/ "frontier.dot" in
+    let mask_file = conf_dir ^/ "registered_masks.dot" in
+    Logger.info log !"%s"
+      (Visualization_message.success "registered masks" frontier_file) ;
+    visualize_registered_masks ~filename:mask_file ;
+    match visualize_frontier ~filename:frontier_file t with
+    | `Active () ->
+        Logger.info log !"%s"
+          (Visualization_message.success "transition frontier" frontier_file)
+    | `Bootstrapping ->
+        Logger.info log !"%s"
+          (Visualization_message.bootstrap "transition frontier")
 
   (* TODO: handle participation_status more appropriately than doing participate_exn *)
   let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda ~log
@@ -1358,10 +1372,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             Coda_tracing.start Config_in.conf_dir )
       ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
             Coda_tracing.stop () ; Deferred.unit )
-      ; implement Daemon_rpcs.Visualize_frontier.rpc (fun () filename ->
-            return
-              ( visualize_frontier ~filename coda
-              |> Participating_state.active_exn ) ) ]
+      ; implement Daemon_rpcs.Visualization.Frontier.rpc (fun () filename ->
+            return (visualize_frontier ~filename coda) )
+      ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
+          (fun () filename ->
+            return (Coda_base.Ledger.Debug.visualize ~filename) ) ]
     in
     let snark_worker_impls =
       [ implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
@@ -1488,13 +1503,13 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
           ~client_port
         |> ignore
 
-  let handle_shutdown ~monitor ~frontier_file ~log t =
+  let handle_shutdown ~monitor ~conf_dir ~log t =
     Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
-        log_shutdown ~frontier_file ~log t ;
+        log_shutdown ~conf_dir ~log t ;
         raise exn ) ;
     Async_unix.Signal.(
       handle terminating ~f:(fun signal ->
-          log_shutdown ~frontier_file ~log t ;
+          log_shutdown ~conf_dir ~log t ;
           Logger.info log
             !"Coda process got interrupted by signal %{sexp:t}"
             signal ))

@@ -299,8 +299,8 @@ module type Inputs_intf = sig
      and type transaction_pool_diff := Transaction_pool.pool_diff
      and type parallel_scan_state := Staged_ledger.Scan_state.t
      and type ledger_hash := Ledger_hash.t
-     and type sync_ledger_query := Coda_base.Sync_ledger.query
-     and type sync_ledger_answer := Coda_base.Sync_ledger.answer
+     and type sync_ledger_query := Coda_base.Sync_ledger.Query.t
+     and type sync_ledger_answer := Coda_base.Sync_ledger.Answer.t
      and type time := Time.t
      and type state_hash := Coda_base.State_hash.t
      and type state_body_hash := State_body_hash.t
@@ -368,8 +368,8 @@ module type Inputs_intf = sig
      and type state_hash := Coda_base.State_hash.t
      and type external_transition := External_transition.t
      and type transition_frontier := Transition_frontier.t
-     and type syncable_ledger_query := Coda_base.Sync_ledger.query
-     and type syncable_ledger_answer := Coda_base.Sync_ledger.answer
+     and type syncable_ledger_query := Coda_base.Sync_ledger.Query.t
+     and type syncable_ledger_answer := Coda_base.Sync_ledger.Answer.t
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -508,8 +508,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; snark_pool_disk_location: string
       ; ledger_db_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
-      ; time_controller: Time.Controller.t
-      ; banlist: Coda_base.Banlist.t
+      ; time_controller: Time.Controller.t (* FIXME trust system goes here? *)
       ; receipt_chain_database: Coda_base.Receipt_chain_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Monitor.t option
@@ -589,7 +588,7 @@ module Make (Inputs : Inputs_intf) = struct
               | Ok staged_ledger -> staged_ledger
               | Error err -> Error.raise err
             in
-            let transition_frontier =
+            let%bind transition_frontier =
               Transition_frontier.create ~logger:config.log
                 ~root_transition:
                   (With_hash.of_data first_transition

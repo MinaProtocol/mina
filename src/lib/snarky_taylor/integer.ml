@@ -41,8 +41,8 @@ let div_mod (type f) ~m:((module M) as m : f m) a b =
       ~compute:
         As_prover.(
           fun () ->
-            let a = read_var a.value |> bigint_of_field ~m in
-            let b = read_var b.value |> bigint_of_field ~m in
+            let a = read_var a.value |> bigint_of_field ~m
+            and b = read_var b.value |> bigint_of_field ~m in
             (bigint_to_field ~m B.(a / b), bigint_to_field ~m (B.rem a b)))
   in
   (* Check

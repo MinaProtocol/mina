@@ -41,6 +41,7 @@ let main () =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
       ~acceptable_delay ~snark_worker_public_keys:None
       ~proposers:(Fn.const None) ~work_selection
+      ~trace_dir:(Unix.getenv "CODA_TRACING")
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let worker = List.hd_exn workers in
@@ -51,7 +52,7 @@ let main () =
   in
   let receipt_chain_hash = Or_error.ok_exn receipt_chain_hash in
   let%bind restarted_worker = restart_node ~config worker in
-  let%map proof =
+  let%bind proof =
     Coda_process.prove_receipt_exn restarted_worker receipt_chain_hash
       receipt_chain_hash
   in
@@ -60,7 +61,8 @@ let main () =
       (Payment_proof.initial_receipt proof)
       receipt_chain_hash
   in
-  assert result
+  assert result ;
+  Deferred.List.iter workers ~f:Coda_process.disconnect
 
 let command =
   let open Command.Let_syntax in

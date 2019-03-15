@@ -117,17 +117,16 @@ end = struct
         let verify proof stmt ~message = verify_proof proof stmt ~message
       end)
 
-  type scan_state = Scan_state.t [@@deriving sexp, bin_io]
-
   type t =
     { scan_state:
-        scan_state
+        Scan_state.t
         (* Invariant: this is the ledger after having applied all the transactions in
      * the above state. *)
     ; ledger: Ledger.attached_mask sexp_opaque }
   [@@deriving sexp]
 
-  type serializable = scan_state * Ledger.serializable [@@deriving bin_io]
+  type serializable = Scan_state.Stable.V1.t * Ledger.serializable
+  [@@deriving bin_io]
 
   let serializable_of_t t = (t.scan_state, Ledger.serializable_of_t t.ledger)
 
@@ -188,7 +187,7 @@ end = struct
     let {Ledger_proof_statement.target; _} = Ledger_proof.statement proof in
     target
 
-  let verify_scan_state_after_apply ledger (scan_state : scan_state) =
+  let verify_scan_state_after_apply ledger (scan_state : Scan_state.t) =
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
@@ -1521,12 +1520,17 @@ let%test_module "test" =
       end
 
       module Ledger_hash = struct
-        module T = struct
-          type t = int [@@deriving sexp, bin_io, compare, hash, eq]
+        module Stable = struct
+          module V1 = struct
+            type t = int [@@deriving sexp, bin_io, compare, hash, eq]
+          end
+
+          module Latest = V1
         end
 
-        include T
-        include Hashable.Make_binable (T)
+        type t = int [@@deriving sexp, compare, hash, eq]
+
+        include Hashable.Make_binable (Stable.Latest)
 
         let to_bytes : t -> string =
          fun _ -> failwith "to_bytes in ledger hash"
@@ -1545,8 +1549,8 @@ let%test_module "test" =
       module Ledger_proof_statement = struct
         module T = struct
           type t =
-            { source: Ledger_hash.t
-            ; target: Ledger_hash.t
+            { source: Ledger_hash.Stable.V1.t
+            ; target: Ledger_hash.Stable.V1.t
             ; supply_increase: Currency.Amount.t
             ; fee_excess: Fee.Signed.t
             ; proof_type: [`Base | `Merge] }
@@ -1595,7 +1599,12 @@ let%test_module "test" =
 
       module Ledger_proof = struct
         (*A proof here is a statement *)
-        include Ledger_proof_statement
+        module Stable = struct
+          module V1 = Ledger_proof_statement
+          module Latest = V1
+        end
+
+        type t = Stable.Latest.t [@@deriving sexp]
 
         type ledger_hash = Ledger_hash.t
 
@@ -1755,7 +1764,8 @@ let%test_module "test" =
       module Transaction_snark_work = struct
         let proofs_length = 2
 
-        type proof = Ledger_proof.t [@@deriving sexp, bin_io, compare]
+        type proof = Ledger_proof.Stable.V1.t
+        [@@deriving sexp, bin_io, compare]
 
         type statement = Ledger_proof_statement.t
         [@@deriving sexp, bin_io, compare, hash, eq]
@@ -1865,9 +1875,19 @@ let%test_module "test" =
           * pre_diff_with_at_most_one_coinbase option
         [@@deriving sexp, bin_io]
 
-        type t =
+        module Stable = struct
+          module V1 = struct
+            type t =
+              {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
+            [@@deriving sexp, bin_io]
+          end
+
+          module Latest = V1
+        end
+
+        type t = Stable.Latest.t =
           {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp]
 
         module With_valid_signatures_and_proofs = struct
           type pre_diff_with_at_most_two_coinbase =

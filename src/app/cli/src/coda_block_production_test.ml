@@ -14,7 +14,8 @@ let main () =
     Coda_worker_testnet.test log n Option.some snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
   in
-  after (Time.Span.of_sec 30.)
+  let%bind () = after (Time.Span.of_sec 30.) in
+  Coda_worker_testnet.Api.teardown testnet
 
 let command =
   Command.async ~summary:"Test that blocks get produced"

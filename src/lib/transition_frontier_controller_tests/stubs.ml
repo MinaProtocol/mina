@@ -20,8 +20,17 @@ struct
   module Ledger_proof_statement = Transaction_snark.Statement
 
   module Ledger_proof = struct
-    type t = Ledger_proof_statement.t * Sok_message.Digest.Stable.V1.t
-    [@@deriving sexp, bin_io]
+    module Stable = struct
+      module V1 = struct
+        type t = Ledger_proof_statement.t * Sok_message.Digest.Stable.V1.t
+        [@@deriving sexp, bin_io]
+      end
+
+      module Latest = V1
+    end
+
+    (* TODO: remove bin_io, after fixing functors to accept this *)
+    type t = Stable.V1.t [@@deriving sexp, bin_io]
 
     let underlying_proof (_ : t) = Proof.dummy
 
@@ -321,14 +330,14 @@ struct
     in
     let open Deferred.Let_syntax in
     let expected_merkle_root = Ledger.Db.merkle_root root_snarked_ledger in
-    match%map
+    match%bind
       Staged_ledger.of_scan_state_and_snarked_ledger
         ~scan_state:root_transaction_snark_scan_state
         ~snarked_ledger:(Ledger.of_database root_snarked_ledger)
         ~expected_merkle_root
     with
     | Ok root_staged_ledger ->
-        let frontier =
+        let%map frontier =
           Transition_frontier.create ~logger
             ~root_transition:root_transition_with_data ~root_snarked_ledger
             ~root_staged_ledger
@@ -467,7 +476,7 @@ struct
         ~f:(fun (ledger_hash, sync_ledger_query) ->
           Logger.info logger
             !"Processing ledger query : %{sexp:(Ledger.Addr.t \
-              Syncable_ledger.query)}"
+              Syncable_ledger.Query.t)}"
             sync_ledger_query ;
           let answer =
             Hashtbl.to_alist table
@@ -484,13 +493,13 @@ struct
           | None ->
               Logger.info logger
                 !"Could not find an answer for : %{sexp:(Ledger.Addr.t \
-                  Syncable_ledger.query)}"
+                  Syncable_ledger.Query.t)}"
                 sync_ledger_query ;
               Deferred.unit
           | Some answer ->
               Logger.info logger
                 !"Found an answer for : %{sexp:(Ledger.Addr.t \
-                  Syncable_ledger.query)}"
+                  Syncable_ledger.Query.t)}"
                 sync_ledger_query ;
               Pipe_lib.Linear_pipe.write response_writer answer )
       |> don't_wait_for
