@@ -158,23 +158,31 @@ module Types = struct
 
       let int_entry = map_entry ~f:Int.to_string
 
-      let num_accounts = int_entry "Global Number of Accounts"
+      let bool_entry = map_entry ~f:Bool.to_string
 
-      let block_count = int_entry "Block Count"
+      let option_entry ~(f : 'a -> string) (name : string)
+          (field : 'a option FieldT.t) =
+        match FieldT.get field with None -> None | Some x -> Some (name, f x)
+
+      let string_option_entry = option_entry ~f:Fn.id
+
+      let int_option_entry = option_entry ~f:Int.to_string
+
+      let num_accounts = int_option_entry "Global Number of Accounts"
+
+      let block_count = int_option_entry "Block Count"
 
       let uptime_secs = map_entry "Local Uptime" ~f:(sprintf "%ds")
 
-      let ledger_merkle_root = string_entry "Ledger Merkle Root"
+      let ledger_merkle_root = string_option_entry "Ledger Merkle Root"
 
-      let staged_ledger_hash = string_entry "Staged-ledger Hash"
+      let staged_ledger_hash = string_option_entry "Staged-ledger Hash"
 
-      let state_hash = string_entry "Staged Hash"
+      let state_hash = string_option_entry "Staged Hash"
 
-      let commit_id x =
-        match FieldT.get x with
-        | None -> None
-        | Some sha1 ->
-            Some ("Git SHA1", Git_sha.sexp_of_t sha1 |> Sexp.to_string)
+      let commit_id =
+        option_entry "GIT SHA1"
+          ~f:(Fn.compose Sexp.to_string Git_sha.sexp_of_t)
 
       let conf_dir = string_entry "Configuration Directory"
 
@@ -185,7 +193,9 @@ module Types = struct
 
       let user_commands_sent = int_entry "User_commands Sent"
 
-      let run_snark_worker = map_entry "Snark Worker Running" ~f:Bool.to_string
+      let run_snark_worker = bool_entry "Snark Worker Running"
+
+      let is_bootstrapping = bool_entry "Is Bootstrapping"
 
       let propose_pubkey =
         map_entry "Proposer Running"
@@ -193,12 +203,10 @@ module Types = struct
             (Option.value_map ~default:"false"
                ~f:(Printf.sprintf !"%{sexp: Public_key.t}"))
 
-      let histograms x =
-        match FieldT.get x with
-        | None -> None
-        | Some histograms -> Some ("Histograms", Histograms.to_text histograms)
+      let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
-      let consensus_time_best_tip = string_entry "Best Tip Consensus Time"
+      let consensus_time_best_tip =
+        string_option_entry "Best Tip Consensus Time"
 
       let consensus_time_now = string_entry "Consensus Time Now"
 
@@ -216,87 +224,46 @@ module Types = struct
         map_entry "Consensus Configuration" ~f:render
     end
 
-    module Active = struct
-      type t =
-        { num_accounts: int
-        ; block_count: int
-        ; uptime_secs: int
-        ; ledger_merkle_root: string
-        ; staged_ledger_hash: string
-        ; state_hash: string
-        ; commit_id: Git_sha.t option
-        ; conf_dir: string
-        ; peers: string list
-        ; user_commands_sent: int
-        ; run_snark_worker: bool
-        ; propose_pubkey: Public_key.t option
-        ; histograms: Histograms.t option
-        ; consensus_time_best_tip: string
-        ; consensus_time_now: string
-        ; consensus_mechanism: string
-        ; consensus_configuration: Consensus.Configuration.t }
-      [@@deriving to_yojson, bin_io, fields]
+    type t =
+      { is_bootstrapping: bool
+      ; num_accounts: int option
+      ; block_count: int option
+      ; uptime_secs: int
+      ; ledger_merkle_root: string option
+      ; staged_ledger_hash: string option
+      ; state_hash: string option
+      ; commit_id: Git_sha.t option
+      ; conf_dir: string
+      ; peers: string list
+      ; user_commands_sent: int
+      ; run_snark_worker: bool
+      ; propose_pubkey: Public_key.t option
+      ; histograms: Histograms.t option
+      ; consensus_time_best_tip: string option
+      ; consensus_time_now: string
+      ; consensus_mechanism: string
+      ; consensus_configuration: Consensus.Configuration.t }
+    [@@deriving to_yojson, bin_io, fields]
 
-      let entries (s : t) =
-        let module M = Make_entries (struct
-          type nonrec 'a t =
-            ([`Read | `Set_and_create], t, 'a) Field.t_with_perm
+    let entries (s : t) =
+      let module M = Make_entries (struct
+        type nonrec 'a t = ([`Read | `Set_and_create], t, 'a) Field.t_with_perm
 
-          let get field = Field.get field s
-        end) in
-        let open M in
-        Fields.to_list ~num_accounts ~block_count ~uptime_secs
-          ~ledger_merkle_root ~staged_ledger_hash ~state_hash ~commit_id
-          ~conf_dir ~peers ~user_commands_sent ~run_snark_worker
-          ~propose_pubkey ~histograms ~consensus_time_best_tip
-          ~consensus_time_now ~consensus_mechanism ~consensus_configuration
-        |> List.filter_map ~f:Fn.id
-    end
-
-    module Bootstrapping = struct
-      type t =
-        { uptime_secs: int
-        ; commit_id: Git_sha.t option
-        ; conf_dir: string
-        ; peers: string list
-        ; user_commands_sent: int
-        ; run_snark_worker: bool
-        ; propose_pubkey: Public_key.t option
-        ; histograms: Histograms.t option
-        ; consensus_mechanism: string
-        ; consensus_time_now: string
-        ; consensus_configuration: Consensus.Configuration.t }
-      [@@deriving to_yojson, bin_io, fields]
-
-      let entries (s : t) =
-        let module M = Make_entries (struct
-          type nonrec 'a t =
-            ([`Read | `Set_and_create], t, 'a) Field.t_with_perm
-
-          let get field = Field.get field s
-        end) in
-        let open M in
-        Fields.to_list ~uptime_secs ~commit_id ~conf_dir ~peers
-          ~user_commands_sent ~run_snark_worker ~propose_pubkey ~histograms
-          ~consensus_time_now ~consensus_mechanism ~consensus_configuration
-        |> List.filter_map ~f:Fn.id
-    end
-
-    type t = [`Active of Active.t | `Bootstrapping of Bootstrapping.t]
-    [@@deriving to_yojson, bin_io]
+        let get field = Field.get field s
+      end) in
+      let open M in
+      Fields.to_list ~is_bootstrapping ~num_accounts ~block_count ~uptime_secs
+        ~ledger_merkle_root ~staged_ledger_hash ~state_hash ~commit_id
+        ~conf_dir ~peers ~user_commands_sent ~run_snark_worker ~propose_pubkey
+        ~histograms ~consensus_time_best_tip ~consensus_time_now
+        ~consensus_mechanism ~consensus_configuration
+      |> List.filter_map ~f:Fn.id
 
     let to_text (t : t) =
       let title =
         "Coda Daemon Status\n-----------------------------------\n"
       in
-      let entries =
-        match t with
-        | `Active active -> ("Sync status", "Active") :: Active.entries active
-        | `Bootstrapping bootstrapping ->
-            ("Sync status", "Bootstrapping")
-            :: Bootstrapping.entries bootstrapping
-      in
-      digest_entries ~title entries
+      digest_entries ~title (entries t)
   end
 end
 

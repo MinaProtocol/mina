@@ -1165,6 +1165,14 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let%map sl = best_staged_ledger t in
     Staged_ledger.Scan_state.snark_job_list_json (Staged_ledger.scan_state sl)
 
+  type active_state_fields =
+    { num_accounts: int option
+    ; block_count: int option
+    ; ledger_merkle_root: string option
+    ; staged_ledger_hash: string option
+    ; state_hash: string option
+    ; consensus_time_best_tip: string option }
+
   let get_status ~flag t =
     let uptime_secs =
       Time_ns.diff (Time_ns.now ()) start_time
@@ -1235,44 +1243,60 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       let consensus_state =
         state |> Consensus.Protocol_state.consensus_state
       in
-      let block_count = Consensus.Consensus_state.length consensus_state in
+      let block_count =
+        Length.to_int @@ Consensus.Consensus_state.length consensus_state
+      in
       let%map staged_ledger = best_staged_ledger t in
-      { Daemon_rpcs.Types.Status.Active.num_accounts
-      ; block_count= Int.of_string (Length.to_string block_count)
-      ; uptime_secs
-      ; ledger_merkle_root
-      ; staged_ledger_hash=
-          staged_ledger |> Staged_ledger.hash |> Staged_ledger_hash.sexp_of_t
-          |> Sexp.to_string
-      ; state_hash
-      ; consensus_time_best_tip=
-          Consensus.Consensus_state.time_hum consensus_state
-      ; commit_id
-      ; conf_dir
-      ; peers
-      ; user_commands_sent
-      ; run_snark_worker
-      ; propose_pubkey
-      ; histograms
-      ; consensus_time_now
-      ; consensus_mechanism
-      ; consensus_configuration }
+      let staged_ledger_hash =
+        staged_ledger |> Staged_ledger.hash |> Staged_ledger_hash.sexp_of_t
+        |> Sexp.to_string
+      in
+      let consensus_time_best_tip =
+        Consensus.Consensus_state.time_hum consensus_state
+      in
+      { num_accounts= Some num_accounts
+      ; block_count= Some block_count
+      ; ledger_merkle_root= Some ledger_merkle_root
+      ; staged_ledger_hash= Some staged_ledger_hash
+      ; state_hash= Some state_hash
+      ; consensus_time_best_tip= Some consensus_time_best_tip }
     in
-    match active_status () with
-    | `Active result -> `Active result
-    | `Bootstrapping ->
-        `Bootstrapping
-          { Daemon_rpcs.Types.Status.Bootstrapping.uptime_secs
-          ; commit_id
-          ; conf_dir
-          ; peers
-          ; user_commands_sent
-          ; run_snark_worker
-          ; propose_pubkey
-          ; histograms
-          ; consensus_time_now
-          ; consensus_mechanism
-          ; consensus_configuration }
+    let ( is_bootstrapping
+        , { num_accounts
+          ; block_count
+          ; ledger_merkle_root
+          ; staged_ledger_hash
+          ; state_hash
+          ; consensus_time_best_tip } ) =
+      match active_status () with
+      | `Active result -> (true, result)
+      | `Bootstrapping ->
+          ( false
+          , { num_accounts= None
+            ; block_count= None
+            ; ledger_merkle_root= None
+            ; staged_ledger_hash= None
+            ; state_hash= None
+            ; consensus_time_best_tip= None } )
+    in
+    { Daemon_rpcs.Types.Status.num_accounts
+    ; is_bootstrapping
+    ; block_count
+    ; uptime_secs
+    ; ledger_merkle_root
+    ; staged_ledger_hash
+    ; state_hash
+    ; consensus_time_best_tip
+    ; commit_id
+    ; conf_dir
+    ; peers
+    ; user_commands_sent
+    ; run_snark_worker
+    ; propose_pubkey
+    ; histograms
+    ; consensus_time_now
+    ; consensus_mechanism
+    ; consensus_configuration }
 
   let get_lite_chain :
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =
