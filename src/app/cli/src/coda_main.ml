@@ -315,8 +315,8 @@ module type Main_intf = sig
       ; snark_pool_disk_location: string
       ; ledger_db_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
-      ; time_controller: Inputs.Time.Controller.t
-      ; banlist: Banlist.t
+      ; time_controller:
+          Inputs.Time.Controller.t (* FIXME trust system goes here? *)
       ; receipt_chain_database: Receipt_chain_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Async.Monitor.t option }
