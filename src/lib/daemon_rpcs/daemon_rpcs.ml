@@ -225,8 +225,7 @@ module Types = struct
     end
 
     type t =
-      { is_bootstrapping: bool
-      ; num_accounts: int option
+      { num_accounts: int option
       ; block_count: int option
       ; uptime_secs: int
       ; ledger_merkle_root: string option
@@ -237,6 +236,7 @@ module Types = struct
       ; peers: string list
       ; user_commands_sent: int
       ; run_snark_worker: bool
+      ; is_bootstrapping: bool
       ; propose_pubkey: Public_key.t option
       ; histograms: Histograms.t option
       ; consensus_time_best_tip: string option
