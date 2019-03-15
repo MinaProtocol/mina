@@ -8,9 +8,10 @@ module Level : sig
 end
 
 module Time : sig
-  include (module type of Time)
+  include module type of Time
 
   val to_yojson : t -> Yojson.Safe.json
+
   val of_yojson : Yojson.Safe.json -> (t, string) Result.t
 end
 
@@ -22,8 +23,7 @@ module Source : sig
 end
 
 module Metadata : sig
-  type t = Yojson.Safe.json String.Map.t
-  [@@deriving yojson]
+  type t = Yojson.Safe.json String.Map.t [@@deriving yojson]
 end
 
 module Message : sig

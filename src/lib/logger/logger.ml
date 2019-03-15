@@ -44,7 +44,7 @@ module Metadata = struct
 
   let mem = String.Map.mem
 
-  let extend t alist =
+  let extend (t : t) alist =
     List.fold_left alist ~init:t ~f:(fun acc (key, data) ->
         String.Map.add_exn acc ~key ~data )
 end
@@ -80,7 +80,9 @@ end
 type t = {null: bool; metadata: Metadata.t}
 
 let create ?(metadata = []) () =
-  {null= false; metadata= Metadata.extend Metadata.empty metadata}
+  let pid = lazy (Unix.getpid () |> Pid.to_int) in
+  let metadata' = ("pid", `Int (Lazy.force pid)) :: metadata in
+  {null= false; metadata= Metadata.extend Metadata.empty metadata'}
 
 let null () = {null= true; metadata= Metadata.empty}
 
