@@ -944,7 +944,7 @@ module Checkpoints = struct
   let typ =
     Typ.transport Hash.typ
       ~there:(fun (t : t) -> t.hash)
-      ~back:(fun _ -> failwith "Cannot unhash checkpoints")
+      ~back:(fun hash -> {hash; data= {prefix= Fqueue.empty; tail= hash}})
 
   module Checked = struct
     let if_ = Hash.if_
