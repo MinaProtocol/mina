@@ -2,6 +2,40 @@ open Core
 
 type t
 
+module Level : sig
+  type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
+  [@@deriving sexp, compare, yojson]
+end
+
+module Time : sig
+  include (module type of Time)
+
+  val to_yojson : t -> Yojson.Safe.json
+  val of_yojson : Yojson.Safe.json -> (t, string) Result.t
+end
+
+module Source : sig
+  type t = {module_: string [@key "module"]; location: string}
+  [@@deriving yojson]
+
+  val create : module_:string -> location:string -> t
+end
+
+module Metadata : sig
+  type t = Yojson.Safe.json String.Map.t
+  [@@deriving yojson]
+end
+
+module Message : sig
+  type t =
+    { timestamp: Time.t
+    ; level: Level.t
+    ; source: Source.t
+    ; message: string
+    ; metadata: Metadata.t }
+  [@@deriving yojson]
+end
+
 type 'a log_function =
      t
   -> module_:string
