@@ -534,4 +534,4 @@ let command =
     ; ("start-tracing", start_tracing)
     ; ("stop-tracing", stop_tracing)
     ; ("snark-job-list", snark_job_list)
-    ; ("visualizationr", Visualization.command_group) ]
+    ; ("visualization", Visualization.command_group) ]
