@@ -1055,7 +1055,16 @@ module type External_transition_intf = sig
 
   type staged_ledger_diff
 
-  type t [@@deriving sexp, bin_io]
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving sexp, bin_io]
+    end
+
+    module Latest = V1
+  end
+
+  (* bin_io intentionally omitted *)
+  type t = Stable.Latest.t [@@deriving sexp]
 
   val create :
        protocol_state:protocol_state
@@ -1064,7 +1073,7 @@ module type External_transition_intf = sig
     -> t
 
   module Verified : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp]
 
     val protocol_state : t -> protocol_state
 
@@ -1074,7 +1083,7 @@ module type External_transition_intf = sig
   end
 
   module Proof_verified : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp]
 
     val protocol_state : t -> protocol_state
 
