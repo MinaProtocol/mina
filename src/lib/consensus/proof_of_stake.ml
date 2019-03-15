@@ -1510,7 +1510,7 @@ module For_tests = struct
         staged_ledger_hash=
           Coda_base.Staged_ledger_hash.(
             of_aux_ledger_and_coinbase_hash Aux_hash.dummy root_ledger_hash
-              (Coda_base.Pending_coinbase.empty_merkle_root ()))
+              (Coda_base.Pending_coinbase.create_exn ()))
       ; snarked_ledger_hash=
           Coda_base.Frozen_ledger_hash.of_ledger_hash root_ledger_hash }
 

@@ -371,9 +371,8 @@ module T = struct
     let tree' = Merkle_tree.set_exn t.tree stack_index Stack.empty in
     (stack, {t with tree= tree'; pos_list= remaining})
 
-  let hash ({pos_list; new_pos; _} as t) =
+  let hash_extra {pos_list; new_pos; _} =
     let h = Digestif.SHA256.init () in
-    let h = Digestif.SHA256.feed_string h (Hash.to_bytes (merkle_root t)) in
     let h =
       Digestif.SHA256.feed_string h
         (List.fold pos_list ~init:"" ~f:(fun s a -> s ^ Stack_id.to_string a))

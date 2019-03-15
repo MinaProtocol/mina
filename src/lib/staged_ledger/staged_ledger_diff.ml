@@ -9,7 +9,16 @@ module Make (Inputs : sig
     type t [@@deriving sexp, bin_io]
   end
 
+  module Compressed_public_key : Compressed_public_key_intf
+
   module Staged_ledger_aux_hash : Staged_ledger_aux_hash_intf
+
+  module Fee_transfer :
+    Fee_transfer_intf with type public_key := Compressed_public_key.t
+
+  module Pending_coinbase : sig
+    type t [@@deriving sexp, bin_io]
+  end
 
   module Pending_coinbase_hash : Pending_coinbase_hash_intf
 
@@ -17,9 +26,8 @@ module Make (Inputs : sig
     Staged_ledger_hash_intf
     with type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
      and type ledger_hash := Ledger_hash.t
+     and type pending_coinbase := Pending_coinbase.t
      and type pending_coinbase_hash := Pending_coinbase_hash.t
-
-  module Compressed_public_key : Compressed_public_key_intf
 
   module User_command :
     User_command_intf with type public_key := Compressed_public_key.t
@@ -29,9 +37,6 @@ module Make (Inputs : sig
     with type public_key := Compressed_public_key.t
      and type statement := Transaction_snark.Statement.t
      and type proof := Ledger_proof.t
-
-  module Fee_transfer :
-    Fee_transfer_intf with type public_key := Compressed_public_key.t
 end) :
   Coda_pow.Staged_ledger_diff_intf
   with type user_command := Inputs.User_command.t

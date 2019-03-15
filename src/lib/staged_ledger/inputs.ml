@@ -84,6 +84,7 @@ module type S = sig
     Coda_pow.Staged_ledger_hash_intf
     with type ledger_hash := Ledger_hash.t
      and type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
+     and type pending_coinbase := Pending_coinbase.t
      and type pending_coinbase_hash := Pending_coinbase_hash.t
 
   module Transaction_snark_work :

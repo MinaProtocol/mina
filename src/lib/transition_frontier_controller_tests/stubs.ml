@@ -93,6 +93,7 @@ struct
     module Compressed_public_key = Public_key.Compressed
     module User_command = User_command
     module Transaction_snark_work = Transaction_snark_work
+    module Pending_coinbase = Pending_coinbase
     module Pending_coinbase_hash = Pending_coinbase_hash
   end)
 
@@ -348,7 +349,7 @@ struct
             ; user_commands= []
             ; coinbase= Staged_ledger_diff.At_most_two.Zero }
           , None )
-      ; prev_hash= Coda_base.Staged_ledger_hash.dummy
+      ; prev_hash= Coda_base.Staged_ledger_hash.genesis
       ; creator }
     in
     (* the genesis transition is assumed to be valid *)

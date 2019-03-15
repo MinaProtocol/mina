@@ -359,7 +359,7 @@ end = struct
     Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
       (Scan_state.hash scan_state)
       (Ledger.merkle_root ledger)
-      (Pending_coinbase.merkle_root pending_coinbase_collection)
+      pending_coinbase_collection
 
   [%%if
   call_logger]
@@ -1850,6 +1850,8 @@ let%test_module "test" =
             t
           |> String.concat ~sep:","
 
+        let hash_extra _ = ""
+
         let latest_stack_exn t = List.hd t
 
         let oldest_stack_exn t = match List.rev t with [] -> [] | x :: _ -> x
@@ -2145,8 +2147,6 @@ let%test_module "test" =
 
         type staged_ledger_aux_hash = Staged_ledger_aux_hash.t
 
-        type pending_coinbase_hash = Pending_coinbase_hash.t
-
         let ledger_hash _ = failwith "stub"
 
         let aux_hash _ = failwith "stub"
@@ -2154,9 +2154,8 @@ let%test_module "test" =
         let pending_coinbase_hash _ = failwith "stub"
 
         let of_aux_ledger_and_coinbase_hash :
-            staged_ledger_aux_hash -> ledger_hash -> pending_coinbase_hash -> t
-            =
-         fun ah h hh -> ah ^ Int.to_string h ^ hh
+            staged_ledger_aux_hash -> ledger_hash -> Pending_coinbase.t -> t =
+         fun ah h hh -> ah ^ Int.to_string h ^ Pending_coinbase.merkle_root hh
       end
 
       module Transaction_snark_work = struct

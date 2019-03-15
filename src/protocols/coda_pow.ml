@@ -135,6 +135,8 @@ module type Pending_coinbase_intf = sig
   val latest_stack_exn : t -> Stack.t option
 
   val oldest_stack_exn : t -> Stack.t
+
+  val hash_extra : t -> string
 end
 
 module type Frozen_ledger_hash_intf = sig
@@ -180,6 +182,8 @@ module type Staged_ledger_hash_intf = sig
 
   type staged_ledger_aux_hash
 
+  type pending_coinbase
+
   type pending_coinbase_hash
 
   val ledger_hash : t -> ledger_hash
@@ -189,7 +193,7 @@ module type Staged_ledger_hash_intf = sig
   val pending_coinbase_hash : t -> pending_coinbase_hash
 
   val of_aux_ledger_and_coinbase_hash :
-    staged_ledger_aux_hash -> ledger_hash -> pending_coinbase_hash -> t
+    staged_ledger_aux_hash -> ledger_hash -> pending_coinbase -> t
 
   include Hashable.S_binable with type t := t
 end
@@ -1563,6 +1567,7 @@ module type Inputs_intf = sig
     Staged_ledger_hash_intf
     with type staged_ledger_aux_hash := Staged_ledger_aux_hash.t
      and type ledger_hash := Ledger_hash.t
+     and type pending_coinbase := Pending_coinbase.t
      and type pending_coinbase_hash := Pending_coinbase_hash.t
 
   (*

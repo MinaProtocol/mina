@@ -422,6 +422,7 @@ module Staged_ledger_diff = Staged_ledger.Make_diff (struct
   module Transaction_snark_work = Transaction_snark_work
   module Fee_transfer = Fee_transfer
   module Pending_coinbase_hash = Pending_coinbase.Hash
+  module Pending_coinbase = Pending_coinbase
 end)
 
 let make_init ~should_propose (module Config : Config_intf) :

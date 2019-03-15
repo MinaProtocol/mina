@@ -558,7 +558,7 @@ module Make (Inputs : Inputs_intf) = struct
                   Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
                     (Staged_ledger_aux_hash.of_bytes "")
                     (Ledger.merkle_root Genesis_ledger.t)
-                    (Pending_coinbase.empty_merkle_root ())
+                    (Pending_coinbase.create_exn ())
               ; creator=
                   Account.public_key
                     (snd (List.hd_exn Genesis_ledger.accounts)) }

@@ -209,8 +209,7 @@ end = struct
                   (Staged_ledger_hash.Aux_hash.of_bytes
                      (Staged_ledger_aux_hash.to_bytes
                         (Staged_ledger.Scan_state.hash scan_state)))
-                  staged_ledger_merkle_root
-                  (Coda_base.Pending_coinbase.merkle_root pending_coinbases)
+                  staged_ledger_merkle_root pending_coinbases
               in
               if
                 Staged_ledger_hash.equal expected_staged_ledger_hash

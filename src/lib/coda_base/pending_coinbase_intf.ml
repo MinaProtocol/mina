@@ -72,6 +72,8 @@ module type S = sig
 
   val oldest_stack_exn : t -> Stack.t
 
+  val hash_extra : t -> string
+
   module Checked : sig
     type var = Hash.var
 
