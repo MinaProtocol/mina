@@ -108,7 +108,8 @@ Router.(
           |> Array.map(((name, _content, html)) =>
                File(
                  name,
-                 <Page extraHeaders=BlogPost.extraHeaders footerColor="bg-snow">
+                 <Page
+                   extraHeaders=BlogPost.extraHeaders footerColor="bg-snow">
                    <BlogPost
                      name
                      title="A SNARKy Exponential Function"
