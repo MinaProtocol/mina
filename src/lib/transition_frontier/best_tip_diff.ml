@@ -22,13 +22,17 @@ end) :
 
   let create () = ()
 
-  let initial_view : view = {new_user_commands= []; removed_user_commands= []}
+  let initial_view : view =
+    {new_user_commands= []; removed_user_commands= []; best_tip_length= -1}
 
   let handle_diff () diff : User_command.t Best_tip_diff_view.t Option.t =
     let open Transition_frontier_diff in
     match diff with
     | New_breadcrumb _ -> None (* We only care about the best tip *)
-    | New_best_tip {added_to_best_tip_path; removed_from_best_tip_path; _} ->
+    | New_best_tip
+        { added_to_best_tip_path
+        ; removed_from_best_tip_path
+        ; new_best_tip_length; _ } ->
         Some
           { new_user_commands=
               List.bind
@@ -36,5 +40,6 @@ end) :
                 ~f:Breadcrumb.to_user_commands
           ; removed_user_commands=
               List.bind removed_from_best_tip_path
-                ~f:Breadcrumb.to_user_commands }
+                ~f:Breadcrumb.to_user_commands
+          ; best_tip_length= new_best_tip_length }
 end

@@ -75,7 +75,8 @@ module Make (Inputs : Inputs_intf) :
    and type time := Inputs.Time.t
    and type state_hash := State_hash.t
    and type network := Inputs.Network.t
-   and type ledger_db := Ledger.Db.t = struct
+   and type ledger_db := Ledger.Db.t
+   and type user_command := User_command.t = struct
   open Inputs
   module Initial_validator = Initial_validator.Make (Inputs)
 
@@ -167,7 +168,7 @@ module Make (Inputs : Inputs_intf) :
                     External_transition.Verified.protocol_state)) )
     in
     let start_transition_frontier_controller ~verified_transition_writer
-        ~clear_reader ~collected_transitions frontier =
+        ~best_tip_diff_writer ~clear_reader ~collected_transitions frontier =
       let transition_reader, transition_writer = create_bufferred_pipe () in
       Logger.info logger "Starting Transition Frontier Controller phase" ;
       let new_verified_transition_reader =
@@ -181,16 +182,26 @@ module Make (Inputs : Inputs_intf) :
           (Fn.compose Deferred.return
              (Strict_pipe.Writer.write verified_transition_writer))
       |> don't_wait_for ;
+      Broadcast_pipe.Reader.iter
+        (Transition_frontier.best_tip_diff_pipe frontier)
+        ~f:
+          (Fn.compose Deferred.return
+             (Strict_pipe.Writer.write best_tip_diff_writer))
+      |> don't_wait_for ;
       (transition_reader, transition_writer)
     in
     let clear_reader, clear_writer = Strict_pipe.create Synchronous in
     let verified_transition_reader, verified_transition_writer =
       create_bufferred_pipe ()
     in
+    let best_tip_diff_reader, best_tip_diff_writer =
+      Strict_pipe.create (Buffered (`Capacity 10, `Overflow Crash))
+    in
     let ( transition_frontier_controller_reader
         , transition_frontier_controller_writer ) =
       start_transition_frontier_controller ~verified_transition_writer
-        ~clear_reader ~collected_transitions:[] (peek_exn frontier_r)
+        ~best_tip_diff_writer ~clear_reader ~collected_transitions:[]
+        (peek_exn frontier_r)
     in
     let controller_type =
       Broadcaster.create
@@ -235,8 +246,8 @@ module Make (Inputs : Inputs_intf) :
               in
               let reader, writer =
                 start_transition_frontier_controller
-                  ~verified_transition_writer ~clear_reader
-                  ~collected_transitions new_frontier
+                  ~verified_transition_writer ~best_tip_diff_writer
+                  ~clear_reader ~collected_transitions new_frontier
               in
               set_transition_frontier_controller_phase ~controller_type
                 new_frontier reader writer
@@ -251,5 +262,5 @@ module Make (Inputs : Inputs_intf) :
                 , `Time_received (to_unix_timestamp tm) ) ;
             Deferred.unit )
     |> don't_wait_for ;
-    verified_transition_reader
+    (verified_transition_reader, best_tip_diff_reader)
 end

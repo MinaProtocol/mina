@@ -50,7 +50,11 @@ end
 (** The type of the view onto the changes to the current best tip. This type
     needs to be here to avoid dependency cycles. *)
 module Best_tip_diff_view = struct
-  type 'b t = {new_user_commands: 'b list; removed_user_commands: 'b list}
+  type 'b t =
+    { new_user_commands: 'b list
+    ; removed_user_commands: 'b list
+    ; best_tip_length: int }
+  [@@deriving bin_io]
 end
 
 module type Network_intf = sig
@@ -657,6 +661,8 @@ module type Transition_router_intf = sig
 
   type ledger_db
 
+  type user_command
+
   val run :
        logger:Logger.t
     -> network:network
@@ -676,4 +682,5 @@ module type Transition_router_intf = sig
                                   Strict_pipe.Reader.t
     -> (external_transition_verified, state_hash) With_hash.t
        Strict_pipe.Reader.t
+       * user_command Best_tip_diff_view.t Strict_pipe.Reader.t
 end

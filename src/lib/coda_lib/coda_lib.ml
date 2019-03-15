@@ -316,6 +316,7 @@ module type Inputs_intf = sig
      and type time := Time.t
      and type network := Net.t
      and type ledger_db := Ledger_db.t
+     and type user_command := User_command.t
 
   module Root_prover :
     Protocols.Coda_transition_frontier.Root_prover_intf
@@ -385,6 +386,9 @@ module Make (Inputs : Inputs_intf) = struct
     ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
     ; strongest_ledgers:
         (External_transition.Verified.t, Protocol_state_hash.t) With_hash.t
+        Strict_pipe.Reader.t
+    ; best_tip_diff:
+        User_command.t Protocols.Coda_pow.Best_tip_diff_view.t
         Strict_pipe.Reader.t
     ; proposer_transition_writer:
         ( (External_transition.Verified.t, Protocol_state_hash.t) With_hash.t
@@ -495,6 +499,8 @@ module Make (Inputs : Inputs_intf) = struct
     Staged_ledger.current_ledger_proof sl
 
   let strongest_ledgers t = t.strongest_ledgers
+
+  let best_tip_diff t = t.best_tip_diff
 
   module Config = struct
     (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
@@ -656,7 +662,7 @@ module Make (Inputs : Inputs_intf) = struct
                   in
                   Deferred.return result )
             in
-            let valid_transitions =
+            let valid_transitions, best_tip_diff =
               Transition_router.run ~logger:config.log ~network:net
                 ~time_controller:config.time_controller
                 ~frontier_broadcast_pipe:
@@ -713,6 +719,7 @@ module Make (Inputs : Inputs_intf) = struct
               ; external_transitions_writer=
                   Strict_pipe.Writer.to_linear_pipe external_transitions_writer
               ; strongest_ledgers= valid_transitions_for_api
+              ; best_tip_diff
               ; log= config.log
               ; seen_jobs= Work_selector.State.init
               ; staged_ledger_transition_backup_capacity=

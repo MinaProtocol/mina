@@ -154,7 +154,7 @@ struct
     Option.map ~f:Transaction_validator.create t.best_tip_ledger
 
   let handle_diff t frontier
-      ({new_user_commands; removed_user_commands} :
+      ({new_user_commands; removed_user_commands; _} :
         Transition_frontier.Extensions.Best_tip_diff.view) =
     (* This runs whenever the best tip changes. The simple case is when the new
        best tip is an extension of the old one. There, we remove any user
@@ -386,7 +386,9 @@ let%test_module _ =
       let create () : t * int Best_tip_diff_view.t Broadcast_pipe.Writer.t =
         let pipe_r, pipe_w =
           Broadcast_pipe.create
-            ( {new_user_commands= []; removed_user_commands= []}
+            ( { new_user_commands= []
+              ; removed_user_commands= []
+              ; best_tip_length= -1 }
               : int Best_tip_diff_view.t )
         in
         ((pipe_r, ref ([], Int.Set.empty)), pipe_w)
@@ -456,12 +458,16 @@ let%test_module _ =
           assert_pool_txs txs ;
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              {new_user_commands= [2]; removed_user_commands= []}
+              { new_user_commands= [2]
+              ; removed_user_commands= []
+              ; best_tip_length= -1 }
           in
           assert_pool_txs [0; 1; 3] ;
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              {new_user_commands= [0; 3]; removed_user_commands= []}
+              { new_user_commands= [0; 3]
+              ; removed_user_commands= []
+              ; best_tip_length= -1 }
           in
           assert_pool_txs [1] ;
           Deferred.return true )
@@ -476,7 +482,9 @@ let%test_module _ =
           List.iter ~f:(Test.add pool) txs ;
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              {new_user_commands= [0; 3]; removed_user_commands= [5; 6]}
+              { new_user_commands= [0; 3]
+              ; removed_user_commands= [5; 6]
+              ; best_tip_length= -1 }
           in
           assert_pool_txs [1; 2; 4; 5; 6] ;
           Deferred.return true )
@@ -495,7 +503,9 @@ let%test_module _ =
           best_tip_ref := ([], Int.Set.of_list [2; 5; 7]) ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
-              {new_user_commands= []; removed_user_commands= []}
+              { new_user_commands= []
+              ; removed_user_commands= []
+              ; best_tip_length= -1 }
           in
           let%bind apply_res =
             Test.Diff.apply pool
@@ -516,7 +526,8 @@ let%test_module _ =
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
               { new_user_commands= [5; 6; 7; 8]
-              ; removed_user_commands= [1; 2; 3; 4; 5] }
+              ; removed_user_commands= [1; 2; 3; 4; 5]
+              ; best_tip_length= -1 }
           in
           assert_pool_txs [2; 3] ;
           Deferred.return true )
@@ -539,7 +550,9 @@ let%test_module _ =
           let best_tip_diff_r1, best_tip_diff_w1 =
             Broadcast_pipe.create
               Best_tip_diff_view.
-                {new_user_commands= []; removed_user_commands= []}
+                { new_user_commands= []
+                ; removed_user_commands= []
+                ; best_tip_length= -1 }
           in
           let frontier1 = (best_tip_diff_r1, ref init_bc_1) in
           let%bind _ =
@@ -554,7 +567,9 @@ let%test_module _ =
           let best_tip_diff_r2, _best_tip_diff_w2 =
             Broadcast_pipe.create
               Best_tip_diff_view.
-                {new_user_commands= []; removed_user_commands= []}
+                { new_user_commands= []
+                ; removed_user_commands= []
+                ; best_tip_length= -1 }
           in
           let init_bc_2 = ([], Int.Set.of_list [2; 3; 5]) in
           let frontier2 = (best_tip_diff_r2, ref init_bc_2) in
