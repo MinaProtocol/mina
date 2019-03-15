@@ -1166,23 +1166,25 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     Staged_ledger.Scan_state.snark_job_list_json (Staged_ledger.scan_state sl)
 
   let get_status ~flag t =
-    let open Participating_state.Let_syntax in
-    let%bind ledger = best_ledger t in
-    let ledger_merkle_root =
-      Ledger.merkle_root ledger |> [%sexp_of: Ledger_hash.t] |> Sexp.to_string
-    in
-    let num_accounts = Ledger.num_accounts ledger in
-    let%bind state = best_protocol_state t in
-    let state_hash =
-      Consensus.Protocol_state.hash state
-      |> [%sexp_of: State_hash.t] |> Sexp.to_string
-    in
-    let consensus_state = state |> Consensus.Protocol_state.consensus_state in
-    let block_count = Consensus.Consensus_state.length consensus_state in
     let uptime_secs =
       Time_ns.diff (Time_ns.now ()) start_time
       |> Time_ns.Span.to_sec |> Int.of_float
     in
+    let commit_id = Config_in.commit_id in
+    let conf_dir = Config_in.conf_dir in
+    let peers =
+      List.map (peers t) ~f:(fun peer ->
+          Network_peer.Peer.to_discovery_host_and_port peer
+          |> Host_and_port.to_string )
+    in
+    let user_commands_sent = !txn_count in
+    let run_snark_worker = run_snark_worker t in
+    let propose_pubkey =
+      Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
+    in
+    let consensus_mechanism = Consensus.name in
+    let consensus_time_now = Consensus.time_hum (Core_kernel.Time.now ()) in
+    let consensus_configuration = Consensus.Configuration.t in
     let r = Perf_histograms.report in
     let histograms =
       match flag with
@@ -1217,31 +1219,60 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             ; snark_worker_merge_time= r ~name:"snark_worker_merge_time" }
       | `None -> None
     in
-    let%map staged_ledger = best_staged_ledger t in
-    { Daemon_rpcs.Types.Status.num_accounts
-    ; block_count= Int.of_string (Length.to_string block_count)
-    ; uptime_secs
-    ; ledger_merkle_root
-    ; staged_ledger_hash=
-        staged_ledger |> Staged_ledger.hash |> Staged_ledger_hash.sexp_of_t
+    let active_status () =
+      let open Participating_state.Let_syntax in
+      let%bind ledger = best_ledger t in
+      let ledger_merkle_root =
+        Ledger.merkle_root ledger |> [%sexp_of: Ledger_hash.t]
         |> Sexp.to_string
-    ; state_hash
-    ; consensus_time_best_tip=
-        Consensus.Consensus_state.time_hum consensus_state
-    ; commit_id= Config_in.commit_id
-    ; conf_dir= Config_in.conf_dir
-    ; peers=
-        List.map (peers t) ~f:(fun peer ->
-            Network_peer.Peer.to_discovery_host_and_port peer
-            |> Host_and_port.to_string )
-    ; user_commands_sent= !txn_count
-    ; run_snark_worker= run_snark_worker t
-    ; propose_pubkey=
-        Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
-    ; histograms
-    ; consensus_time_now= Consensus.time_hum (Core_kernel.Time.now ())
-    ; consensus_mechanism= Consensus.name
-    ; consensus_configuration= Consensus.Configuration.t }
+      in
+      let num_accounts = Ledger.num_accounts ledger in
+      let%bind state = best_protocol_state t in
+      let state_hash =
+        Consensus.Protocol_state.hash state
+        |> [%sexp_of: State_hash.t] |> Sexp.to_string
+      in
+      let consensus_state =
+        state |> Consensus.Protocol_state.consensus_state
+      in
+      let block_count = Consensus.Consensus_state.length consensus_state in
+      let%map staged_ledger = best_staged_ledger t in
+      { Daemon_rpcs.Types.Status.Active.num_accounts
+      ; block_count= Int.of_string (Length.to_string block_count)
+      ; uptime_secs
+      ; ledger_merkle_root
+      ; staged_ledger_hash=
+          staged_ledger |> Staged_ledger.hash |> Staged_ledger_hash.sexp_of_t
+          |> Sexp.to_string
+      ; state_hash
+      ; consensus_time_best_tip=
+          Consensus.Consensus_state.time_hum consensus_state
+      ; commit_id
+      ; conf_dir
+      ; peers
+      ; user_commands_sent
+      ; run_snark_worker
+      ; propose_pubkey
+      ; histograms
+      ; consensus_time_now
+      ; consensus_mechanism
+      ; consensus_configuration }
+    in
+    match active_status () with
+    | `Active result -> `Active result
+    | `Bootstrapping ->
+        `Bootstrapping
+          { Daemon_rpcs.Types.Status.Bootstrapping.uptime_secs
+          ; commit_id
+          ; conf_dir
+          ; peers
+          ; user_commands_sent
+          ; run_snark_worker
+          ; propose_pubkey
+          ; histograms
+          ; consensus_time_now
+          ; consensus_mechanism
+          ; consensus_configuration }
 
   let get_lite_chain :
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =
@@ -1350,11 +1381,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       ; implement Daemon_rpcs.Get_nonce.rpc (fun () pk ->
             return (get_nonce coda pk |> Participating_state.active_exn) )
       ; implement Daemon_rpcs.Get_status.rpc (fun () flag ->
-            return (get_status ~flag coda |> Participating_state.active_exn) )
+            return (get_status ~flag coda) )
       ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
-            return
-              (clear_hist_status ~flag coda |> Participating_state.active_exn)
-        )
+            return (clear_hist_status ~flag coda) )
       ; implement Daemon_rpcs.Get_ledger.rpc (fun () lh -> get_ledger coda lh)
       ; implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
             Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
@@ -1418,7 +1447,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                   let uri = Cohttp.Request.uri req in
                   let status flag =
                     Server.respond_string
-                      ( get_status ~flag coda |> Participating_state.active_exn
+                      ( get_status ~flag coda
                       |> Daemon_rpcs.Types.Status.to_yojson
                       |> Yojson.Safe.pretty_to_string )
                   in
