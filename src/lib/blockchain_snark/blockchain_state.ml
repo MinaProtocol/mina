@@ -100,7 +100,8 @@ module Make (Consensus_mechanism : Consensus.S) :
             let%bind _root_after_delete =
               let prev_root =
                 previous_state |> Protocol_state.blockchain_state
-                |> Blockchain_state.pending_coinbases_hash
+                |> Blockchain_state.staged_ledger_hash
+                |> Staged_ledger_hash.pending_coinbase_hash_var
               in
               let stack_before = pending_coinbase_update.oldest_stack_before in
               let stack_after = pending_coinbase_update.oldest_stack_after in

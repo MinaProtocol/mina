@@ -173,6 +173,11 @@ module Stable = struct
         {non_snark: 'non_snark; pending_coinbase_hash: 'pending_coinbase_hash}
       [@@deriving bin_io, sexp, eq, compare, hash]
 
+      (** Staged ledger hash has two parts
+      1) merkle root of the pending coinbases
+      2) ledger hash, aux hash, and the FIFO order of the coinbase stacks(Non snark). 
+      Only part 1 is required for blockchain snark computation and therefore the remaining fields of the staged ledger are grouped together as "Non_snark" 
+      *)
       type t = (Non_snark.Stable.V1.t, Pending_coinbase.Hash.t) t_
       [@@deriving bin_io, sexp, eq, compare, hash]
     end
@@ -201,6 +206,9 @@ let ledger_hash {non_snark; _} = Non_snark.ledger_hash non_snark
 let aux_hash {non_snark; _} = Non_snark.aux_hash non_snark
 
 let pending_coinbase_hash {pending_coinbase_hash; _} = pending_coinbase_hash
+
+let pending_coinbase_hash_var {pending_coinbase_hash; _} =
+  pending_coinbase_hash
 
 let of_aux_ledger_and_coinbase_hash aux_hash ledger_hash pending_coinbase =
   { non_snark=

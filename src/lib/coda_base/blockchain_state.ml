@@ -6,37 +6,24 @@ open Bitstring_lib
 open Tuple_lib
 
 module type S = sig
-  type ( 'staged_ledger_hash
-       , 'snarked_ledger_hash
-       , 'pending_coinbase_hash
-       , 'time ) t_ =
+  type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t_ =
     { staged_ledger_hash: 'staged_ledger_hash
     ; snarked_ledger_hash: 'snarked_ledger_hash
-    ; pending_coinbases_hash: 'pending_coinbase_hash
     ; timestamp: 'time }
   [@@deriving sexp, eq, compare, fields]
 
-  type t =
-    ( Staged_ledger_hash.t
-    , Frozen_ledger_hash.t
-    , Pending_coinbase.Hash.t
-    , Block_time.t )
-    t_
+  type t = (Staged_ledger_hash.t, Frozen_ledger_hash.t, Block_time.t) t_
   [@@deriving sexp, eq, compare, hash]
 
   module Stable : sig
     module V1 : sig
-      type nonrec ('a, 'b, 'c, 'd) t_ = ('a, 'b, 'c, 'd) t_ =
-        { staged_ledger_hash: 'a
-        ; snarked_ledger_hash: 'b
-        ; pending_coinbases_hash: 'c
-        ; timestamp: 'd }
+      type nonrec ('a, 'b, 'c) t_ = ('a, 'b, 'c) t_ =
+        {staged_ledger_hash: 'a; snarked_ledger_hash: 'b; timestamp: 'c}
       [@@deriving bin_io, sexp, eq, compare, hash]
 
       type nonrec t =
         ( Staged_ledger_hash.Stable.V1.t
         , Frozen_ledger_hash.Stable.V1.t
-        , Pending_coinbase.Hash.t
         , Block_time.Stable.V1.t )
         t_
       [@@deriving bin_io, sexp, eq, compare, hash]
@@ -50,7 +37,6 @@ module type S = sig
     with type var =
                 ( Staged_ledger_hash.var
                 , Frozen_ledger_hash.var
-                , Pending_coinbase.Hash.var
                 , Block_time.Unpacked.var )
                 t_
      and type value := value
@@ -58,7 +44,6 @@ module type S = sig
   val create_value :
        staged_ledger_hash:Staged_ledger_hash.Stable.V1.t
     -> snarked_ledger_hash:Frozen_ledger_hash.Stable.V1.t
-    -> pending_coinbases_hash:Pending_coinbase.Hash.t
     -> timestamp:Block_time.Stable.V1.t
     -> value
 
@@ -66,13 +51,13 @@ module type S = sig
 
   val genesis : t
 
-  val set_timestamp : ('a, 'b, 'c, 'd) t_ -> 'd -> ('a, 'b, 'c, 'd) t_
+  val set_timestamp : ('a, 'b, 'c) t_ -> 'c -> ('a, 'b, 'c) t_
 
   val fold : t -> bool Triple.t Fold.t
 
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
-  type display = (string, string, string, string) t_ [@@deriving yojson]
+  type display = (string, string, string) t_ [@@deriving yojson]
 
   val display : value -> display
 
@@ -106,20 +91,15 @@ end) : S = struct
       module T = struct
         let version = 1
 
-        type ( 'staged_ledger_hash
-             , 'snarked_ledger_hash
-             , 'pending_coinbase_hash
-             , 'time ) t_ =
+        type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t_ =
           { staged_ledger_hash: 'staged_ledger_hash
           ; snarked_ledger_hash: 'snarked_ledger_hash
-          ; pending_coinbases_hash: 'pending_coinbase_hash
           ; timestamp: 'time }
         [@@deriving bin_io, sexp, fields, eq, compare, hash, yojson]
 
         type t =
           ( Staged_ledger_hash.Stable.V1.t
           , Frozen_ledger_hash.Stable.V1.t
-          , Pending_coinbase.Hash.t
           , Block_time.Stable.V1.t )
           t_
         [@@deriving bin_io, sexp, eq, compare, hash]
@@ -146,83 +126,50 @@ end) : S = struct
   type var =
     ( Staged_ledger_hash.var
     , Frozen_ledger_hash.var
-    , Pending_coinbase.Hash.var
     , Block_time.Unpacked.var )
     t_
 
   type value = t [@@deriving bin_io, sexp, eq, compare, hash]
 
-  let create_value ~staged_ledger_hash ~snarked_ledger_hash
-      ~pending_coinbases_hash ~timestamp =
-    {staged_ledger_hash; snarked_ledger_hash; pending_coinbases_hash; timestamp}
+  let create_value ~staged_ledger_hash ~snarked_ledger_hash ~timestamp =
+    {staged_ledger_hash; snarked_ledger_hash; timestamp}
 
-  let to_hlist
-      { staged_ledger_hash
-      ; snarked_ledger_hash
-      ; pending_coinbases_hash
-      ; timestamp } =
-    H_list.
-      [ staged_ledger_hash
-      ; snarked_ledger_hash
-      ; pending_coinbases_hash
-      ; timestamp ]
+  let to_hlist {staged_ledger_hash; snarked_ledger_hash; timestamp} =
+    H_list.[staged_ledger_hash; snarked_ledger_hash; timestamp]
 
   let of_hlist :
-         (unit, 'lbh -> 'lh -> 'pch -> 'ti -> unit) H_list.t
-      -> ('lbh, 'lh, 'pch, 'ti) t_ =
+      (unit, 'lbh -> 'lh -> 'ti -> unit) H_list.t -> ('lbh, 'lh, 'ti) t_ =
     H_list.(
-      fun [ staged_ledger_hash
-          ; snarked_ledger_hash
-          ; pending_coinbases_hash
-          ; timestamp ] ->
-        { staged_ledger_hash
-        ; snarked_ledger_hash
-        ; pending_coinbases_hash
-        ; timestamp })
+      fun [staged_ledger_hash; snarked_ledger_hash; timestamp] ->
+        {staged_ledger_hash; snarked_ledger_hash; timestamp})
 
   let data_spec =
     let open Data_spec in
-    [ Staged_ledger_hash.typ
-    ; Frozen_ledger_hash.typ
-    ; Pending_coinbase.Hash.typ
-    ; Block_time.Unpacked.typ ]
+    [Staged_ledger_hash.typ; Frozen_ledger_hash.typ; Block_time.Unpacked.typ]
 
   let typ : (var, value) Typ.t =
     Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let var_to_triples
-      ({ staged_ledger_hash
-       ; snarked_ledger_hash
-       ; pending_coinbases_hash
-       ; timestamp } :
-        var) =
+      ({staged_ledger_hash; snarked_ledger_hash; timestamp} : var) =
     let%map ledger_hash_triples =
       Frozen_ledger_hash.var_to_triples snarked_ledger_hash
     and staged_ledger_hash_triples =
       Staged_ledger_hash.var_to_triples staged_ledger_hash
-    and pending_coinbase_hash_triples =
-      Pending_coinbase.Hash.var_to_triples pending_coinbases_hash
     in
     staged_ledger_hash_triples @ ledger_hash_triples
-    @ pending_coinbase_hash_triples
     @ Block_time.Unpacked.var_to_triples timestamp
 
-  let fold
-      ({ staged_ledger_hash
-       ; snarked_ledger_hash
-       ; pending_coinbases_hash
-       ; timestamp } :
-        value) =
+  let fold ({staged_ledger_hash; snarked_ledger_hash; timestamp} : value) =
     Fold.(
       Staged_ledger_hash.fold staged_ledger_hash
       +> Frozen_ledger_hash.fold snarked_ledger_hash
-      +> Pending_coinbase.Hash.fold pending_coinbases_hash
       +> Block_time.fold timestamp)
 
   let length_in_triples =
     Staged_ledger_hash.length_in_triples + Frozen_ledger_hash.length_in_triples
-    + Pending_coinbase.Hash.length_in_triples + Block_time.length_in_triples
+    + Block_time.length_in_triples
 
   let set_timestamp t timestamp = {t with timestamp}
 
@@ -231,16 +178,11 @@ end) : S = struct
     ; snarked_ledger_hash=
         Frozen_ledger_hash.of_ledger_hash
         @@ Ledger.merkle_root Genesis_ledger.t
-    ; pending_coinbases_hash= Pending_coinbase.empty_merkle_root ()
     ; timestamp= Genesis_state_timestamp.value |> Block_time.of_time }
 
-  type display = (string, string, string, string) t_ [@@deriving yojson]
+  type display = (string, string, string) t_ [@@deriving yojson]
 
-  let display
-      { staged_ledger_hash
-      ; snarked_ledger_hash
-      ; pending_coinbases_hash
-      ; timestamp } =
+  let display {staged_ledger_hash; snarked_ledger_hash; timestamp} =
     { staged_ledger_hash=
         Visualization.display_short_sexp (module Ledger_hash)
         @@ Staged_ledger_hash.ledger_hash staged_ledger_hash
@@ -248,10 +190,6 @@ end) : S = struct
         Visualization.display_short_sexp
           (module Frozen_ledger_hash)
           snarked_ledger_hash
-    ; pending_coinbases_hash=
-        Visualization.display_short_sexp
-          (module Pending_coinbase.Hash)
-          pending_coinbases_hash
     ; timestamp=
         Time.to_string_trimmed ~zone:Time.Zone.utc
           (Block_time.to_time timestamp) }

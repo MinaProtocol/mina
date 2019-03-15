@@ -77,5 +77,7 @@ val aux_hash : t -> Aux_hash.t
 
 val pending_coinbase_hash : t -> Pending_coinbase.Hash.t
 
+val pending_coinbase_hash_var : var -> Pending_coinbase.Hash.var
+
 val of_aux_ledger_and_coinbase_hash :
   Aux_hash.t -> Ledger_hash.t -> Pending_coinbase.t -> t

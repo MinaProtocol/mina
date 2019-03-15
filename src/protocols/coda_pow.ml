@@ -1031,20 +1031,15 @@ module type Blockchain_state_intf = sig
 
   type var
 
-  type pending_coinbase_hash
-
   val create_value :
        staged_ledger_hash:staged_ledger_hash
     -> snarked_ledger_hash:frozen_ledger_hash
-    -> pending_coinbases_hash:pending_coinbase_hash
     -> timestamp:time
     -> value
 
   val staged_ledger_hash : value -> staged_ledger_hash
 
   val snarked_ledger_hash : value -> frozen_ledger_hash
-
-  val pending_coinbases_hash : value -> pending_coinbase_hash
 
   val timestamp : value -> time
 end
@@ -1293,7 +1288,6 @@ module type Consensus_mechanism_intf = sig
     with type staged_ledger_hash := staged_ledger_hash
      and type frozen_ledger_hash := frozen_ledger_hash
      and type time := time
-     and type pending_coinbase_hash := pending_coinbase_hash
 
   module Protocol_state :
     Protocol_state_intf

@@ -225,8 +225,6 @@ module Make (Inputs : Inputs_intf) :
             Blockchain_state.create_value ~timestamp:(Time.now time_controller)
               ~snarked_ledger_hash:next_ledger_hash
               ~staged_ledger_hash:next_staged_ledger_hash
-              ~pending_coinbases_hash:
-                (Pending_coinbase_update.new_root pending_coinbase_update)
           in
           let time =
             Time.now time_controller |> Time.to_span_since_epoch
