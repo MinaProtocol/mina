@@ -97,11 +97,11 @@ struct
       module T = struct
         (* "master" types, do not change *)
         type query =
-          (Ledger_hash.t * Sync_ledger.Query.Stable.V1.t)
+          (Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t)
           Envelope.Incoming.Stable.V1.t
 
         type response =
-          (Ledger_hash.t * Sync_ledger.Answer.Stable.V1.t) Or_error.t
+          (Ledger_hash.Stable.V1.t * Sync_ledger.Answer.Stable.V1.t) Or_error.t
       end
 
       module Caller = T
@@ -152,7 +152,7 @@ struct
         (* "master" types, do not change *)
         type query = State_hash.t Envelope.Incoming.Stable.V1.t
 
-        type response = External_transition.t Non_empty_list.t option
+        type response = External_transition.t Non_empty_list.Stable.V1.t option
       end
 
       module Caller = T
@@ -173,7 +173,7 @@ struct
         type query = State_hash.t Envelope.Incoming.Stable.V1.t
         [@@deriving bin_io, sexp]
 
-        type response = External_transition.t Non_empty_list.t option
+        type response = External_transition.t Non_empty_list.Stable.V1.t option
         [@@deriving bin_io, sexp]
 
         let version = 1
@@ -401,7 +401,7 @@ module Make (Inputs : Inputs_intf) = struct
             Staged_ledger_hash.t Envelope.Incoming.t
          -> (Staged_ledger_aux.Stable.V1.t * Ledger_hash.t) option Deferred.t)
       ~(answer_sync_ledger_query :
-            (Ledger_hash.t * Ledger.Location.Addr.t Syncable_ledger.query)
+            (Ledger_hash.t * Ledger.Location.Addr.t Syncable_ledger.Query.t)
             Envelope.Incoming.t
          -> (Ledger_hash.t * Sync_ledger.Answer.t) Deferred.Or_error.t)
       ~(transition_catchup :
