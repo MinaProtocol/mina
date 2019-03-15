@@ -24,7 +24,15 @@ module type S = sig
   module Protocol_state : Protocol_state.S
 
   module Staged_ledger_diff : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving bin_io, sexp]
+        end
+      end
+      with type V1.t = t
   end
 
   include
@@ -76,7 +84,17 @@ module type S = sig
 end
 
 module Make (Staged_ledger_diff : sig
-  type t [@@deriving bin_io, sexp]
+  module Staged_ledger_diff : sig
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving bin_io, sexp]
+        end
+      end
+      with type V1.t = t
+  end
 end)
 (Protocol_state : Protocol_state.S) :
   S
