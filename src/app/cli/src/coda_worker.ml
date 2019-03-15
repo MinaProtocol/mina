@@ -238,7 +238,6 @@ module T = struct
                 ; parent_log= log
                 ; trust_system } }
           in
-          let frontier_file = conf_dir ^/ "frontier.dot" in
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =
             Async.Scheduler.within' ~monitor (fun () -> f input)
@@ -256,7 +255,7 @@ module T = struct
                  ~snark_work_fee:(Currency.Fee.of_int 0)
                  ?propose_keypair:Config.propose_keypair () ~monitor)
           in
-          Run.handle_shutdown ~monitor ~frontier_file ~log coda ;
+          Run.handle_shutdown ~monitor ~conf_dir ~log coda ;
           let%map () =
             with_monitor
               (fun () ->

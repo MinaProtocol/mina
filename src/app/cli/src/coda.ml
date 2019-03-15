@@ -327,9 +327,7 @@ let daemon log =
               ~time_controller ?propose_keypair:Config0.propose_keypair ()
               ~monitor)
        in
-       Run.handle_shutdown ~monitor
-         ~frontier_file:(conf_dir ^/ "frontier.dot")
-         ~log coda ;
+       Run.handle_shutdown ~monitor ~conf_dir ~log coda ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind () = maybe_sleep 3. in
