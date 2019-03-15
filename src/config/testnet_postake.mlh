@@ -1,5 +1,5 @@
 [%%import "config/ledger_depth/full.mlh"]
-[%%import "config/curve_size/medium.mlh"]
+[%%import "config/curve_size/small.mlh"]
 [%%import "config/coinbase/standard.mlh"]
 [%%import "config/consensus/postake_tiny.mlh"]
 [%%import "config/scan_state/small.mlh"]
