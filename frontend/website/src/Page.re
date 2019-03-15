@@ -98,11 +98,11 @@ module Footer = {
             target="_blank">
             ...children
           </a>
-          {last ?
-             <span className="dn" /> :
-             <span className="f6 silver">
-               {ReasonReact.string({js| · |js})}
-             </span>}
+          {last
+             ? <span className="dn" />
+             : <span className="f6 silver">
+                 {ReasonReact.string({js| · |js})}
+               </span>}
         </li>,
     };
   };
@@ -167,7 +167,13 @@ let make = (~extraHeaders=ReasonReact.null, ~footerColor="", children) => {
     <html>
       <Header extra=extraHeaders />
       <body className="metropolis black bg-white">
-        <Nav />
+        <Nav>
+          <a> {ReasonReact.string("Blog")} </a>
+          <a> {ReasonReact.string("Testnet")} </a>
+          <a> {ReasonReact.string("Github")} </a>
+          <a> {ReasonReact.string("Careers")} </a>
+          <a> {ReasonReact.string("Sign Up")} </a>
+        </Nav>
         <div className="wrapper"> ...children </div>
         <Footer color=footerColor />
       </body>
