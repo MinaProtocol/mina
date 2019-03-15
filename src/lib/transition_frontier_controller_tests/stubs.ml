@@ -476,7 +476,7 @@ struct
         ~f:(fun (ledger_hash, sync_ledger_query) ->
           Logger.info logger
             !"Processing ledger query : %{sexp:(Ledger.Addr.t \
-              Syncable_ledger.query)}"
+              Syncable_ledger.Query.t)}"
             sync_ledger_query ;
           let answer =
             Hashtbl.to_alist table
@@ -493,13 +493,13 @@ struct
           | None ->
               Logger.info logger
                 !"Could not find an answer for : %{sexp:(Ledger.Addr.t \
-                  Syncable_ledger.query)}"
+                  Syncable_ledger.Query.t)}"
                 sync_ledger_query ;
               Deferred.unit
           | Some answer ->
               Logger.info logger
                 !"Found an answer for : %{sexp:(Ledger.Addr.t \
-                  Syncable_ledger.query)}"
+                  Syncable_ledger.Query.t)}"
                 sync_ledger_query ;
               Pipe_lib.Linear_pipe.write response_writer answer )
       |> don't_wait_for

@@ -4,14 +4,47 @@ open Pipe_lib
 
 let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 
-type 'addr query = What_hash of 'addr | What_contents of 'addr | Num_accounts
-[@@deriving bin_io, sexp]
+module Query = struct
+  module Stable = struct
+    module V1 = struct
+      type 'addr t =
+        | What_hash of 'addr
+        | What_contents of 'addr
+        | Num_accounts
+      [@@deriving bin_io, sexp]
+    end
 
-type ('addr, 'hash, 'account) answer =
-  | Has_hash of 'addr * 'hash
-  | Contents_are of 'addr * 'account list
-  | Num_accounts of int * 'hash
-[@@deriving bin_io, sexp]
+    module Latest = V1
+  end
+
+  (* bin_io omitted intentionally *)
+  type 'addr t = 'addr Stable.Latest.t =
+    | What_hash of 'addr
+    | What_contents of 'addr
+    | Num_accounts
+  [@@deriving sexp]
+end
+
+module Answer = struct
+  module Stable = struct
+    module V1 = struct
+      type ('addr, 'hash, 'account) t =
+        | Has_hash of 'addr * 'hash
+        | Contents_are of 'addr * 'account list
+        | Num_accounts of int * 'hash
+      [@@deriving bin_io, sexp]
+    end
+
+    module Latest = V1
+  end
+
+  (* bin_io omitted intentionally *)
+  type ('addr, 'hash, 'account) t = ('addr, 'hash, 'account) Stable.Latest.t =
+    | Has_hash of 'addr * 'hash
+    | Contents_are of 'addr * 'account list
+    | Num_accounts of int * 'hash
+  [@@deriving sexp]
+end
 
 module type Inputs_intf = sig
   module Addr : Merkle_address.S
@@ -173,12 +206,10 @@ module Make (Inputs : Inputs_intf) : sig
      and type addr := Addr.t
      and type merkle_path := MT.path
      and type account := Account.t
-     and type query := Addr.t query
-     and type answer := (Addr.t, Hash.t, Account.t) answer
+     and type query := Addr.t Query.t
+     and type answer := (Addr.t, Hash.t, Account.t) Answer.t
 end = struct
   open Inputs
-
-  type addr = Addr.t
 
   type diff = unit
 
@@ -268,9 +299,9 @@ end = struct
       | _ -> false
   end
 
-  type nonrec answer = (Addr.t, Hash.t, Account.t) answer
+  type answer = (Addr.t, Hash.t, Account.t) Answer.t
 
-  type nonrec query = Addr.t query
+  type query = Addr.t Query.t
 
   (* idea: make this verifiable by including the merkle path to the rightmost account, and verify that
        filling in empty hashes for the rest amounts to the correct hash. *)
@@ -497,7 +528,7 @@ end = struct
       else
         let res =
           match a with
-          | Has_hash (addr, h') -> (
+          | Answer.Has_hash (addr, h') -> (
             match add_child_hash_to t addr h' with
             (* TODO #435: Stick this in a log, punish the sender *)
             | Error e ->
