@@ -65,7 +65,7 @@ kademlia:
 # Alias
 dht: kademlia
 
-build: git_hooks # reformat-diff
+build: git_hooks reformat-diff
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
 	$(info Build complete)
