@@ -152,7 +152,8 @@ struct
         (* "master" types, do not change *)
         type query = State_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
 
-        type response = External_transition.t Non_empty_list.Stable.V1.t option
+        type response =
+          External_transition.Stable.V1.t Non_empty_list.Stable.V1.t option
       end
 
       module Caller = T
@@ -173,7 +174,8 @@ struct
         type query = State_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
         [@@deriving bin_io, sexp]
 
-        type response = External_transition.t Non_empty_list.Stable.V1.t option
+        type response =
+          External_transition.Stable.V1.t Non_empty_list.Stable.V1.t option
         [@@deriving bin_io, sexp]
 
         let version = 1
@@ -203,7 +205,7 @@ struct
         [@@deriving sexp]
 
         type response =
-          ( ( External_transition.t
+          ( ( External_transition.Stable.V1.t
             , State_body_hash.t list * External_transition.t )
             Proof_carrying_data.t
           * Staged_ledger_aux.Stable.V1.t
@@ -231,8 +233,8 @@ struct
         [@@deriving bin_io, sexp]
 
         type response =
-          ( ( External_transition.t
-            , State_body_hash.t list * External_transition.t )
+          ( ( External_transition.Stable.V1.t
+            , State_body_hash.t list * External_transition.Stable.V1.t )
             Proof_carrying_data.t
           * Staged_ledger_aux.Stable.V1.t
           * Ledger_hash.Stable.V1.t )
@@ -265,9 +267,7 @@ module Message (Inputs : sig
     type t [@@deriving bin_io, sexp]
   end
 
-  module External_transition : sig
-    type t [@@deriving bin_io, sexp]
-  end
+  module External_transition : External_transition.S
 end) =
 struct
   open Inputs
@@ -276,7 +276,7 @@ struct
     module T = struct
       (* "master" types, do not change *)
       type content =
-        | New_state of External_transition.t
+        | New_state of External_transition.Stable.V1.t
         | Snark_pool_diff of Snark_pool_diff.t
         | Transaction_pool_diff of Transaction_pool_diff.t
       [@@deriving bin_io, sexp]
