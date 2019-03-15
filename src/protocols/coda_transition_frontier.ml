@@ -36,7 +36,7 @@ module type Transition_frontier_extension_intf0 = sig
 
   val create : input -> t
 
-  val initial_view : view
+  val initial_view : unit -> view
   (** The first view that is ever available. *)
 
   val handle_diff :
@@ -184,7 +184,7 @@ module type Transition_frontier_base_intf = sig
     -> root_snarked_ledger:ledger_database
     -> root_staged_ledger:staged_ledger
     -> consensus_local_state:consensus_local_state
-    -> t
+    -> t Deferred.t
 
   val close : t -> unit
   (** Clean up internal state. *)

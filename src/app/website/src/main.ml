@@ -440,7 +440,9 @@ let positions =
   ; ("Community Manager", "community-manager")
   ; ("Senior Frontend Engineer", "senior-frontend-engineer")
   ; ("Product Manager", "product-manager")
-  ; ("Engineering Manager", "engineering-manager") ]
+  ; ("Engineering Manager", "engineering-manager")
+  ; ("Director of Business Developement", "director-of-business-development")
+  ; ("Developer Advocate", "developer-advocate") ]
 
 let testnet () =
   let comic ~title ~content ~alt_content ~img () =

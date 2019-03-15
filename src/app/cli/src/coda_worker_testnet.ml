@@ -97,6 +97,8 @@ module Api = struct
         Coda_process.prove_receipt_exn worker proving_receipt resulting_receipt
         )
       t i
+
+  let teardown t = Deferred.List.iter t.workers ~f:Coda_process.disconnect
 end
 
 let start_prefix_check log workers events testnet ~acceptable_delay =
@@ -282,6 +284,7 @@ let test log n proposers snark_work_public_keys work_selection =
       ~acceptable_delay
       ~snark_worker_public_keys:(Some (List.init n snark_work_public_keys))
       ~work_selection
+      ~trace_dir:(Unix.getenv "CODA_TRACING")
   in
   let%map workers = Coda_processes.spawn_local_processes_exn configs in
   let payment_reader, payment_writer = Linear_pipe.create () in
@@ -305,7 +308,8 @@ end = struct
     let rec go i =
       let%bind () = after (Time.Span.of_sec 1.) in
       let%bind () = Api.send_payment testnet node src dest send_amount fee in
-      if i > 0 then go (i - 1) else return ()
+      if i > 0 then go (i - 1) else after (Time.Span.of_sec 1.)
+      (* ensure a sleep at the end to let the last payment through *)
     in
     go 40
 end

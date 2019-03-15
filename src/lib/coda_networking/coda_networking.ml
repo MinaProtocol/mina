@@ -97,9 +97,11 @@ struct
       module T = struct
         (* "master" types, do not change *)
         type query =
-          (Ledger_hash.t * Sync_ledger.query) Envelope.Incoming.Stable.V1.t
+          (Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t)
+          Envelope.Incoming.Stable.V1.t
 
-        type response = (Ledger_hash.t * Sync_ledger.answer) Or_error.t
+        type response =
+          (Ledger_hash.Stable.V1.t * Sync_ledger.Answer.Stable.V1.t) Or_error.t
       end
 
       module Caller = T
@@ -118,12 +120,12 @@ struct
     module V1 = struct
       module T = struct
         type query =
-          (Ledger_hash.Stable.V1.t * Sync_ledger.query)
+          (Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t)
           Envelope.Incoming.Stable.V1.t
         [@@deriving bin_io, sexp]
 
         type response =
-          (Ledger_hash.Stable.V1.t * Sync_ledger.answer) Or_error.t
+          (Ledger_hash.Stable.V1.t * Sync_ledger.Answer.Stable.V1.t) Or_error.t
         [@@deriving bin_io, sexp]
 
         let version = 1
@@ -148,9 +150,10 @@ struct
 
       module T = struct
         (* "master" types, do not change *)
-        type query = State_hash.t Envelope.Incoming.Stable.V1.t
+        type query = State_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
 
-        type response = External_transition.t Non_empty_list.t option
+        type response =
+          External_transition.Stable.V1.t Non_empty_list.Stable.V1.t option
       end
 
       module Caller = T
@@ -168,10 +171,11 @@ struct
 
     module V1 = struct
       module T = struct
-        type query = State_hash.t Envelope.Incoming.Stable.V1.t
+        type query = State_hash.Stable.V1.t Envelope.Incoming.Stable.V1.t
         [@@deriving bin_io, sexp]
 
-        type response = External_transition.t Non_empty_list.t option
+        type response =
+          External_transition.Stable.V1.t Non_empty_list.Stable.V1.t option
         [@@deriving bin_io, sexp]
 
         let version = 1
@@ -201,7 +205,7 @@ struct
         [@@deriving sexp]
 
         type response =
-          ( ( External_transition.t
+          ( ( External_transition.Stable.V1.t
             , State_body_hash.t list * External_transition.t )
             Proof_carrying_data.t
           * Staged_ledger_aux.Stable.V1.t
@@ -229,8 +233,8 @@ struct
         [@@deriving bin_io, sexp]
 
         type response =
-          ( ( External_transition.t
-            , State_body_hash.t list * External_transition.t )
+          ( ( External_transition.Stable.V1.t
+            , State_body_hash.t list * External_transition.Stable.V1.t )
             Proof_carrying_data.t
           * Staged_ledger_aux.Stable.V1.t
           * Ledger_hash.Stable.V1.t )
@@ -263,9 +267,7 @@ module Message (Inputs : sig
     type t [@@deriving bin_io, sexp]
   end
 
-  module External_transition : sig
-    type t [@@deriving bin_io, sexp]
-  end
+  module External_transition : External_transition.S
 end) =
 struct
   open Inputs
@@ -274,7 +276,7 @@ struct
     module T = struct
       (* "master" types, do not change *)
       type content =
-        | New_state of External_transition.t
+        | New_state of External_transition.Stable.V1.t
         | Snark_pool_diff of Snark_pool_diff.t
         | Transaction_pool_diff of Transaction_pool_diff.t
       [@@deriving bin_io, sexp]
@@ -399,9 +401,9 @@ module Make (Inputs : Inputs_intf) = struct
             Staged_ledger_hash.t Envelope.Incoming.t
          -> (Staged_ledger_aux.Stable.V1.t * Ledger_hash.t) option Deferred.t)
       ~(answer_sync_ledger_query :
-            (Ledger_hash.t * Ledger.Location.Addr.t Syncable_ledger.query)
+            (Ledger_hash.t * Ledger.Location.Addr.t Syncable_ledger.Query.t)
             Envelope.Incoming.t
-         -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t)
+         -> (Ledger_hash.t * Sync_ledger.Answer.t) Deferred.Or_error.t)
       ~(transition_catchup :
             State_hash.t Envelope.Incoming.t
          -> External_transition.t Non_empty_list.t option Deferred.t)

@@ -22,7 +22,7 @@ end) :
 
   let create () = ()
 
-  let initial_view : view =
+  let initial_view () : view =
     {new_user_commands= []; removed_user_commands= []; best_tip_length= -1}
 
   let handle_diff () diff : User_command.t Best_tip_diff_view.t Option.t =

@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 import argparse
 import collections
@@ -9,10 +9,7 @@ import sys
 import time
 
 build_artifact_profiles = [
-    'dev',
-    'testnet_posig',
     'testnet_postake',
-    'testnet_public',
     'testnet_postake_snarkless_fake_hash'
 ]
 
@@ -45,11 +42,13 @@ test_permutations = {
     'test_postake_split_snarkless': integration_tests,
     'test_posig': simple_tests,
     'test_postake': simple_tests,
-    'test_postake_catchup': ['coda-restart-node-test']
+    'test_postake_catchup': ['coda-restart-node-test'],
+    'test_postake_bootstrap' : ['coda-bootstrap-test']
 }
 
 ci_blacklist = [
-    'test_postake_split_snarkless:coda-restart-node-test'
+    'test_posig:*',
+    'test_posig_snarkless:*',
 ]
 
 def fail(msg):
