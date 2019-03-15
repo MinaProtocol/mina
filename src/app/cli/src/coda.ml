@@ -289,16 +289,9 @@ let daemon log =
          Option.value_map run_snark_worker_flag ~default:`Don't_run
            ~f:(fun k -> `With_public_key k )
        in
-       let banlist_dir_name = conf_dir ^/ "banlist" in
-       let%bind () = Async.Unix.mkdir ~p:() banlist_dir_name in
-       let suspicious_dir = banlist_dir_name ^/ "suspicious" in
-       let punished_dir = banlist_dir_name ^/ "banned" in
-       let trust_dir = banlist_dir_name ^/ "trust" in
+       let trust_dir = conf_dir ^/ "trust" in
        let () = Snark_params.set_chunked_hashing true in
-       let%bind () = Async.Unix.mkdir ~p:() suspicious_dir in
-       let%bind () = Async.Unix.mkdir ~p:() punished_dir in
        let%bind () = Async.Unix.mkdir ~p:() trust_dir in
-       let banlist = Coda_base.Banlist.create ~suspicious_dir ~punished_dir in
        let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
        let time_controller =
          M.Inputs.Time.Controller.create M.Inputs.Time.Controller.basic
@@ -332,11 +325,9 @@ let daemon log =
               ~ledger_db_location:(conf_dir ^/ "ledger_db")
               ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
               ~time_controller ?propose_keypair:Config0.propose_keypair ()
-              ~banlist ~monitor)
+              ~monitor)
        in
-       Run.handle_shutdown ~monitor
-         ~frontier_file:(conf_dir ^/ "frontier.dot")
-         ~log coda ;
+       Run.handle_shutdown ~monitor ~conf_dir ~log coda ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind () = maybe_sleep 3. in

@@ -10,6 +10,7 @@ pull_request_rules:
           - "status-success=ci/circleci: test--test_postake_snarkless"
           - "status-success=ci/circleci: test-unit--test_posig_snarkless"
           - "status-success=ci/circleci: test-unit--test_postake_snarkless"
+          - "status-success=ci/circleci: test--test_postake_split_snarkless"
           - "status-success=ci/circleci: build-wallet"
           - "status-success=ci/circleci: lint"
           - "status-success=ci/circleci: tracetool"

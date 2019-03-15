@@ -212,23 +212,12 @@ module T = struct
           in
           let module Main = Coda_main.Make_coda (Init) in
           let module Run = Run (Config) (Main) in
-          let banlist_dir_name = conf_dir ^/ "banlist" in
-          let%bind () = File_system.create_dir banlist_dir_name in
-          let%bind suspicious_dir =
-            Unix.mkdtemp (banlist_dir_name ^/ "suspicious")
-          in
-          let%bind punished_dir =
-            Unix.mkdtemp (banlist_dir_name ^/ "banned")
-          in
-          let%bind trust_dir = Unix.mkdtemp (banlist_dir_name ^/ "trust") in
+          let%bind trust_dir = Unix.mkdtemp (conf_dir ^/ "trust") in
           let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
           let%bind () = File_system.create_dir receipt_chain_dir_name in
           let receipt_chain_database =
             Coda_base.Receipt_chain_database.create
               ~directory:receipt_chain_dir_name
-          in
-          let banlist =
-            Coda_base.Banlist.create ~suspicious_dir ~punished_dir
           in
           let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
           let time_controller =
@@ -249,7 +238,6 @@ module T = struct
                 ; parent_log= log
                 ; trust_system } }
           in
-          let frontier_file = conf_dir ^/ "frontier.dot" in
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =
             Async.Scheduler.within' ~monitor (fun () -> f input)
@@ -265,9 +253,9 @@ module T = struct
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)
-                 ?propose_keypair:Config.propose_keypair () ~banlist ~monitor)
+                 ?propose_keypair:Config.propose_keypair () ~monitor)
           in
-          Run.handle_shutdown ~monitor ~frontier_file ~log coda ;
+          Run.handle_shutdown ~monitor ~conf_dir ~log coda ;
           let%map () =
             with_monitor
               (fun () ->
