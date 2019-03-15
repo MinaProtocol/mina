@@ -24,23 +24,14 @@ let main () =
     if i = 0 then Some (Public_key.compress largest_account_keypair.public_key)
     else None
   in
-  let receiver_pk = Public_key.compress another_account_keypair.public_key in
-  let sender_sk = largest_account_keypair.private_key in
-  let send_amount = Currency.Amount.of_int 10 in
-  let fee = Currency.Fee.of_int 0 in
   let%bind testnet =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
   in
-  let rec go i =
-    let%bind () = after (Time.Span.of_sec 1.) in
-    let%bind () =
-      Coda_worker_testnet.Api.send_payment testnet 0 sender_sk receiver_pk
-        send_amount fee
-    in
-    if i > 0 then go (i - 1) else return ()
-  in
-  go 40
+  let receiver_pk = Public_key.compress another_account_keypair.public_key in
+  let sender_sk = largest_account_keypair.private_key in
+  Coda_worker_testnet.Payments.send_several_payments testnet ~node:0
+    ~src:sender_sk ~dest:receiver_pk
 
 let command =
   let open Command.Let_syntax in

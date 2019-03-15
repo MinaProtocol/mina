@@ -1,6 +1,15 @@
 (** A non-empty list that is safe by construction. *)
 
-type 'a t [@@deriving sexp, compare, eq, hash, bin_io]
+module Stable : sig
+  module V1 : sig
+    type 'a t [@@deriving sexp, compare, eq, hash, bin_io]
+  end
+
+  module Latest = V1
+end
+
+(* no bin_io on purpose *)
+type 'a t = 'a Stable.Latest.t [@@deriving sexp, compare, eq, hash]
 
 val init : 'a -> 'a list -> 'a t
 (** Create a non-empty list by proving you have a head element *)

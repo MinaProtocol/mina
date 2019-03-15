@@ -66,7 +66,7 @@ module Make (Inputs : Inputs_intf) :
         | Error e ->
             Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:
-                [ ("peer", Network_peer.Peer.to_yojson sender)
+                [ ("peer", Envelope.Sender.to_yojson sender)
                 ; ("error", `String (Error.to_string_hum e)) ]
               !"Got an invalid transition from peer: $peer $error" )
     |> don't_wait_for

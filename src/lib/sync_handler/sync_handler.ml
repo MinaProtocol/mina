@@ -35,8 +35,8 @@ module Make (Inputs : Inputs_intf) :
    and type state_hash := State_hash.t
    and type external_transition := Inputs.External_transition.t
    and type transition_frontier := Inputs.Transition_frontier.t
-   and type syncable_ledger_query := Sync_ledger.query
-   and type syncable_ledger_answer := Sync_ledger.answer = struct
+   and type syncable_ledger_query := Sync_ledger.Query.t
+   and type syncable_ledger_answer := Sync_ledger.Answer.t = struct
   open Inputs
 
   let get_breadcrumb_ledgers frontier =

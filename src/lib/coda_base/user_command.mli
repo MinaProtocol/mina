@@ -18,14 +18,18 @@ module Stable : sig
 
     type t = (Payload.Stable.V1.t, Public_key.t, Signature.t) t_
     [@@deriving bin_io, eq, sexp, hash, yojson]
-
-    val compare : seed:string -> t -> t -> int
   end
 
   module Latest : module type of V1
 end
 
+include Comparable.S with type t := t
+
 val payload : t -> Payload.t
+
+val fee : t -> Currency.Fee.t
+
+val sender : t -> Public_key.Compressed.t
 
 (* Generate a single transaction between
  * $a, b \in keys$
@@ -44,7 +48,7 @@ module With_valid_signature : sig
     module V1 : sig
       type nonrec t = private t [@@deriving sexp, eq, bin_io, yojson]
 
-      val compare : seed:string -> t -> t -> int
+      val compare : t -> t -> int
 
       val gen :
            keys:Signature_keypair.t array
@@ -57,6 +61,8 @@ module With_valid_signature : sig
   end
 
   include module type of Stable.Latest
+
+  include Comparable.S with type t := t
 end
 
 val sign : Signature_keypair.t -> Payload.t -> With_valid_signature.t

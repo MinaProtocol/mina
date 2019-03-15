@@ -194,7 +194,7 @@ let%test_module "cache_lib test instance" =
     let%test_unit "cached objects do not trigger unconsumption hook when \
                    invalidated" =
       setup () ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
               let x = Or_error.ok_exn (Cache.register cache data) in
@@ -205,7 +205,7 @@ let%test_module "cache_lib test instance" =
     let%test_unit "cached objects are garbage collected independently of caches"
         =
       setup () ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
               ignore (Or_error.ok_exn (Cache.register cache data)) ) ;
@@ -215,7 +215,7 @@ let%test_module "cache_lib test instance" =
     let%test_unit "cached objects are garbage collected independently of data"
         =
       setup () ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       with_item ~f:(fun data ->
           with_cache ~logger ~f:(fun cache ->
               ignore (Or_error.ok_exn (Cache.register cache data)) ) ;
@@ -224,7 +224,7 @@ let%test_module "cache_lib test instance" =
 
     let%test_unit "cached objects are not unexpectedly garbage collected" =
       setup () ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
               let cached = Or_error.ok_exn (Cache.register cache data) in
@@ -237,7 +237,7 @@ let%test_module "cache_lib test instance" =
     let%test_unit "garbage collection of derived cached objects do not \
                    trigger unconsumption handler for parents" =
       setup () ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
               Cache.register cache data |> Or_error.ok_exn
@@ -250,7 +250,7 @@ let%test_module "cache_lib test instance" =
     let%test_unit "properly invalidated derived cached objects do not trigger \
                    any unconsumption handler calls" =
       setup () ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
               Cache.register cache data |> Or_error.ok_exn
@@ -263,7 +263,7 @@ let%test_module "cache_lib test instance" =
     let%test_unit "deriving a cached object consumes it's parent, disallowing \
                    use of it" =
       setup () ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       with_cache ~logger ~f:(fun cache ->
           with_item ~f:(fun data ->
               let src = Or_error.ok_exn (Cache.register cache data) in

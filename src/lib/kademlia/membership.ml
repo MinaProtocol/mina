@@ -387,7 +387,7 @@ end = struct
   module For_tests = struct
     let node (me : Peer.t) (peers : Host_and_port.t list) conf_dir trust_system
         =
-      connect ~initial_peers:peers ~me ~logger:(Logger.create ()) ~conf_dir
+      connect ~initial_peers:peers ~me ~logger:(Logger.null ()) ~conf_dir
         ~trust_system
       >>| Or_error.ok_exn
   end
@@ -432,7 +432,7 @@ let%test_module "Tests" =
               ~me:
                 (Peer.create Unix.Inet_addr.localhost ~discovery_port:3001
                    ~communication_port:3000)
-              ~logger:(Logger.create ())
+              ~logger:(Logger.null ())
               ~conf_dir:(Filename.temp_dir_name ^/ "membership-test")
           with
           | Ok t ->

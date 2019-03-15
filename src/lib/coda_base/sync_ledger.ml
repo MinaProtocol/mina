@@ -1,4 +1,5 @@
 open Core_kernel
+open Module_version
 
 module Hash = struct
   include Ledger_hash
@@ -35,12 +36,67 @@ module Db = Syncable_ledger.Make (struct
   let subtree_height = 3
 end)
 
-type answer =
-  ( Ledger.Location.Addr.t
-  , Ledger_hash.t
-  , Account.Stable.V1.t )
-  Syncable_ledger.answer
-[@@deriving bin_io, sexp]
+module Answer = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        let version = 1
 
-type query = Ledger.Location.Addr.t Syncable_ledger.query
-[@@deriving bin_io, sexp]
+        type t =
+          ( Ledger.Location.Addr.t
+          , Ledger_hash.Stable.V1.t
+          , Account.Stable.V1.t )
+          Syncable_ledger.Answer.Stable.V1.t
+        [@@deriving bin_io, sexp]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "sync_ledger_answer"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  (* bin_io omitted from deriving list *)
+  type t = Stable.Latest.t [@@deriving sexp]
+end
+
+module Query = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        let version = 1
+
+        type t =
+          Ledger.Location.Addr.Stable.V1.t Syncable_ledger.Query.Stable.V1.t
+        [@@deriving bin_io, sexp]
+      end
+
+      include T
+      include Registration.Make_latest_version (T)
+    end
+
+    module Latest = V1
+
+    module Module_decl = struct
+      let name = "sync_ledger_query"
+
+      type latest = Latest.t
+    end
+
+    module Registrar = Registration.Make (Module_decl)
+    module Registered_V1 = Registrar.Register (V1)
+  end
+
+  (* bin_io omitted from deriving list *)
+  type t = Stable.Latest.t [@@deriving sexp]
+end

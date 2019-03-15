@@ -21,6 +21,7 @@ module Input = struct
     ; snark_worker_config: Snark_worker_config.t option
     ; work_selection: Protocols.Coda_pow.Work_selection.t
     ; conf_dir: string
+    ; trace_dir: string option
     ; program_dir: string
     ; external_port: int
     ; discovery_port: int
@@ -166,6 +167,7 @@ module T = struct
         ; snark_worker_config
         ; work_selection
         ; conf_dir
+        ; trace_dir
         ; program_dir
         ; external_port
         ; peers
@@ -174,6 +176,13 @@ module T = struct
         Logger.create
           ~metadata:[("host", `String host); ("port", `Int external_port)]
           ()
+      in
+      let%bind () =
+        Option.value_map trace_dir
+          ~f:(fun d ->
+            let%bind () = Async.Unix.mkdir ~p:() d in
+            Coda_tracing.start d )
+          ~default:Deferred.unit
       in
       let%bind () = File_system.create_dir conf_dir in
       let module Config = struct
@@ -198,135 +207,149 @@ module T = struct
 
         let work_selection = work_selection
       end in
-      let%bind (module Init) =
-        make_init ~should_propose:(Option.is_some proposer) (module Config)
-      in
-      let module Main = Coda_main.Make_coda (Init) in
-      let module Run = Run (Config) (Main) in
-      let banlist_dir_name = conf_dir ^/ "banlist" in
-      let%bind () = File_system.create_dir banlist_dir_name in
-      let%bind suspicious_dir =
-        Unix.mkdtemp (banlist_dir_name ^/ "suspicious")
-      in
-      let%bind punished_dir = Unix.mkdtemp (banlist_dir_name ^/ "banned") in
-      let%bind trust_dir = Unix.mkdtemp (banlist_dir_name ^/ "trust") in
-      let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
-      let%bind () = File_system.create_dir receipt_chain_dir_name in
-      let receipt_chain_database =
-        Coda_base.Receipt_chain_database.create
-          ~directory:receipt_chain_dir_name
-      in
-      let banlist = Coda_base.Banlist.create ~suspicious_dir ~punished_dir in
-      let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
-      let time_controller = Main.Inputs.Time.Controller.create () in
-      let net_config =
-        { Main.Inputs.Net.Config.logger
-        ; time_controller
-        ; gossip_net_params=
-            { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
-            ; target_peer_count= 8
-            ; conf_dir
-            ; initial_peers= peers
-            ; me=
-                Network_peer.Peer.create
-                  (Unix.Inet_addr.of_string host)
-                  ~discovery_port ~communication_port:external_port
-            ; logger
-            ; trust_system } }
-      in
-      let frontier_file = conf_dir ^/ "frontier.dot" in
-      let monitor = Async.Monitor.create ~name:"coda" () in
-      let with_monitor f input =
-        Async.Scheduler.within' ~monitor (fun () -> f input)
-      in
-      let%bind coda =
-        Main.create
-          (Main.Config.make ~logger ~net_config
-             ~run_snark_worker:(Option.is_some snark_worker_config)
-             ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
-             ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
-             ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
-             ~time_controller ~receipt_chain_database
-             ~snark_work_fee:(Currency.Fee.of_int 0)
-             ?propose_keypair:Config.propose_keypair () ~banlist ~monitor)
-      in
-      Run.handle_shutdown ~monitor ~frontier_file ~logger coda ;
-      let%map () =
-        with_monitor
-          (fun () ->
-            return
-            @@ Option.iter snark_worker_config ~f:(fun config ->
-                   let run_snark_worker = `With_public_key config.public_key in
-                   Run.setup_local_server ~client_port:config.port ~coda
-                     ~logger () ;
-                   Run.run_snark_worker ~logger ~client_port:config.port
-                     run_snark_worker ) )
-          ()
-      in
-      let coda_peers () = return (Main.peers coda) in
-      let coda_start () = return (Main.start coda) in
-      let coda_get_balance pk =
-        return (Run.get_balance coda pk |> Participating_state.active_exn)
-      in
-      let coda_send_payment (sk, pk, amount, fee, memo) =
-        let pk_of_sk sk =
-          Public_key.of_private_key_exn sk |> Public_key.compress
-        in
-        let build_txn amount sender_sk receiver_pk fee =
-          let nonce =
-            Run.get_nonce coda (pk_of_sk sender_sk)
-            |> Participating_state.active_exn |> Option.value_exn
+      O1trace.trace_task "worker_main" (fun () ->
+          let%bind (module Init) =
+            make_init ~should_propose:(Option.is_some proposer) (module Config)
           in
-          let payload : User_command.Payload.t =
-            User_command.Payload.create ~fee ~nonce ~memo
-              ~body:(Payment {receiver= receiver_pk; amount})
+          let module Main = Coda_main.Make_coda (Init) in
+          let module Run = Run (Config) (Main) in
+          let banlist_dir_name = conf_dir ^/ "banlist" in
+          let%bind () = File_system.create_dir banlist_dir_name in
+          let%bind suspicious_dir =
+            Unix.mkdtemp (banlist_dir_name ^/ "suspicious")
           in
-          User_command.sign (Keypair.of_private_key_exn sender_sk) payload
-        in
-        let payment = build_txn amount sk pk fee in
-        let%map receipt =
-          Run.send_payment logger coda (payment :> User_command.t)
-        in
-        receipt |> Participating_state.active_exn
-      in
-      let coda_prove_receipt (proving_receipt, resulting_receipt) =
-        match%map
-          Run.prove_receipt coda ~proving_receipt ~resulting_receipt
-        with
-        | Ok proof ->
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              !"Constructed proof for receipt: %{sexp:Receipt.Chain_hash.t}"
-              proving_receipt ;
-            proof
-        | Error e ->
-            failwithf
-              !"Failed to construct payment proof: %{sexp:Error.t}"
-              e ()
-      in
-      let coda_strongest_ledgers () =
-        let r, w = Linear_pipe.create () in
-        don't_wait_for
-          (Strict_pipe.Reader.iter (Main.strongest_ledgers coda) ~f:(fun t ->
-               let open Main.Inputs in
-               let p =
-                 External_transition.Verified.protocol_state (With_hash.data t)
-               in
-               let prev_state_hash =
-                 Main.Inputs.Consensus_mechanism.Protocol_state
-                 .previous_state_hash p
-               in
-               let state_hash = With_hash.hash t in
-               let prev_state_hash = State_hash.to_bits prev_state_hash in
-               let state_hash = State_hash.to_bits state_hash in
-               Linear_pipe.write w (prev_state_hash, state_hash) )) ;
-        return r.pipe
-      in
-      { coda_peers= with_monitor coda_peers
-      ; coda_strongest_ledgers= with_monitor coda_strongest_ledgers
-      ; coda_get_balance= with_monitor coda_get_balance
-      ; coda_send_payment= with_monitor coda_send_payment
-      ; coda_prove_receipt= with_monitor coda_prove_receipt
-      ; coda_start= with_monitor coda_start }
+          let%bind punished_dir =
+            Unix.mkdtemp (banlist_dir_name ^/ "banned")
+          in
+          let%bind trust_dir = Unix.mkdtemp (banlist_dir_name ^/ "trust") in
+          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
+          let%bind () = File_system.create_dir receipt_chain_dir_name in
+          let receipt_chain_database =
+            Coda_base.Receipt_chain_database.create
+              ~directory:receipt_chain_dir_name
+          in
+          let banlist =
+            Coda_base.Banlist.create ~suspicious_dir ~punished_dir
+          in
+          let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
+          let time_controller =
+            Run.Inputs.Time.Controller.create Run.Inputs.Time.Controller.basic
+          in
+          let net_config =
+            { Main.Inputs.Net.Config.logger
+            ; time_controller
+            ; gossip_net_params=
+                { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
+                ; target_peer_count= 8
+                ; conf_dir
+                ; initial_peers= peers
+                ; me=
+                    Network_peer.Peer.create
+                      (Unix.Inet_addr.of_string host)
+                      ~discovery_port ~communication_port:external_port
+                ; logger
+                ; trust_system } }
+          in
+          let frontier_file = conf_dir ^/ "frontier.dot" in
+          let monitor = Async.Monitor.create ~name:"coda" () in
+          let with_monitor f input =
+            Async.Scheduler.within' ~monitor (fun () -> f input)
+          in
+          let%bind coda =
+            Main.create
+              (Main.Config.make ~logger ~net_config
+                 ~run_snark_worker:(Option.is_some snark_worker_config)
+                 ~staged_ledger_persistant_location:
+                   (conf_dir ^/ "staged_ledger")
+                 ~transaction_pool_disk_location:
+                   (conf_dir ^/ "transaction_pool")
+                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+                 ~time_controller ~receipt_chain_database
+                 ~snark_work_fee:(Currency.Fee.of_int 0)
+                 ?propose_keypair:Config.propose_keypair () ~banlist ~monitor)
+          in
+          Run.handle_shutdown ~monitor ~frontier_file ~logger coda ;
+          let%map () =
+            with_monitor
+              (fun () ->
+                return
+                @@ Option.iter snark_worker_config ~f:(fun config ->
+                       let run_snark_worker =
+                         `With_public_key config.public_key
+                       in
+                       Run.setup_local_server ~client_port:config.port ~coda
+                         ~logger () ;
+                       Run.run_snark_worker ~logger ~client_port:config.port
+                         run_snark_worker ) )
+              ()
+          in
+          let coda_peers () = return (Main.peers coda) in
+          let coda_start () = return (Main.start coda) in
+          let coda_get_balance pk =
+            return (Run.get_balance coda pk |> Participating_state.active_exn)
+          in
+          let coda_send_payment (sk, pk, amount, fee, memo) =
+            let pk_of_sk sk =
+              Public_key.of_private_key_exn sk |> Public_key.compress
+            in
+            let build_txn amount sender_sk receiver_pk fee =
+              let nonce =
+                Run.get_nonce coda (pk_of_sk sender_sk)
+                |> Participating_state.active_exn
+                |> Option.value_exn ?here:None ?message:None ?error:None
+              in
+              let payload : User_command.Payload.t =
+                User_command.Payload.create ~fee ~nonce ~memo
+                  ~body:(Payment {receiver= receiver_pk; amount})
+              in
+              User_command.sign (Keypair.of_private_key_exn sender_sk) payload
+            in
+            let payment = build_txn amount sk pk fee in
+            let%map receipt =
+              Run.send_payment logger coda (payment :> User_command.t)
+            in
+            receipt |> Participating_state.active_exn
+          in
+          let coda_prove_receipt (proving_receipt, resulting_receipt) =
+            match%map
+              Run.prove_receipt coda ~proving_receipt ~resulting_receipt
+            with
+            | Ok proof ->
+                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                  !"Constructed proof for receipt: %{sexp:Receipt.Chain_hash.t}"
+                  proving_receipt ;
+                proof
+            | Error e ->
+                failwithf
+                  !"Failed to construct payment proof: %{sexp:Error.t}"
+                  e ()
+          in
+          let coda_strongest_ledgers () =
+            let r, w = Linear_pipe.create () in
+            don't_wait_for
+              (Strict_pipe.Reader.iter (Main.strongest_ledgers coda)
+                 ~f:(fun t ->
+                   let open Main.Inputs in
+                   let p =
+                     External_transition.Verified.protocol_state
+                       (With_hash.data t)
+                   in
+                   let prev_state_hash =
+                     Main.Inputs.Consensus_mechanism.Protocol_state
+                     .previous_state_hash p
+                   in
+                   let state_hash = With_hash.hash t in
+                   let prev_state_hash = State_hash.to_bits prev_state_hash in
+                   let state_hash = State_hash.to_bits state_hash in
+                   Linear_pipe.write w (prev_state_hash, state_hash) )) ;
+            return r.pipe
+          in
+          { coda_peers= with_monitor coda_peers
+          ; coda_strongest_ledgers= with_monitor coda_strongest_ledgers
+          ; coda_get_balance= with_monitor coda_get_balance
+          ; coda_send_payment= with_monitor coda_send_payment
+          ; coda_prove_receipt= with_monitor coda_prove_receipt
+          ; coda_start= with_monitor coda_start } )
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end

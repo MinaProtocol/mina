@@ -206,7 +206,7 @@ module Ledger_inner = struct
       | `Existed, loc -> ([], loc)
       | `Added, loc -> ([key], loc)
     in
-    (key, get ledger loc |> Option.value_exn, loc)
+    (key, Option.value_exn (get ledger loc), loc)
 
   let create_empty ledger key =
     let start_hash = merkle_root ledger in

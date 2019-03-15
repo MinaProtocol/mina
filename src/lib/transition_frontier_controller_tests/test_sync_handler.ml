@@ -17,7 +17,7 @@ let%test_module "Sync_handler" =
     let%test "sync with ledgers from another peer via glue_sync_ledger" =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
-      let logger = Logger.create () in
+      let logger = Logger.null () in
       Ledger.with_ephemeral_ledger ~f:(fun dest_ledger ->
           Thread_safe.block_on_async_exn (fun () ->
               let%bind frontier =

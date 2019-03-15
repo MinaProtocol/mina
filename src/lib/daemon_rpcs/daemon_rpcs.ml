@@ -25,7 +25,7 @@ module Types = struct
             sprintf "%s: %s %s" s padding x )
         |> String.concat ~sep:"\n"
       in
-      title ^ output ^ "\n"
+      title ^ "\n" ^ output ^ "\n"
 
     let summarize_report
         {Perf_histograms.Report.values; intervals; overflow; underflow} =
@@ -96,6 +96,8 @@ module Types = struct
       type t =
         { rpc_timings: Rpc_timings.t
         ; external_transition_latency: Perf_histograms.Report.t option
+        ; accepted_transition_local_latency: Perf_histograms.Report.t option
+        ; accepted_transition_remote_latency: Perf_histograms.Report.t option
         ; snark_worker_transition_time: Perf_histograms.Report.t option
         ; snark_worker_merge_time: Perf_histograms.Report.t option }
       [@@deriving to_yojson, bin_io, fields]
@@ -112,6 +114,20 @@ module Types = struct
               | Some report ->
                   ("Block Latencies (hist.)", summarize_report report) :: acc
               )
+            ~accepted_transition_local_latency:(fun acc x ->
+              match f x with
+              | None -> acc
+              | Some report ->
+                  ( "Accepted local block Latencies (hist.)"
+                  , summarize_report report )
+                  :: acc )
+            ~accepted_transition_remote_latency:(fun acc x ->
+              match f x with
+              | None -> acc
+              | Some report ->
+                  ( "Accepted remote block Latencies (hist.)"
+                  , summarize_report report )
+                  :: acc )
             ~snark_worker_transition_time:(fun acc x ->
               match f x with
               | None -> acc
@@ -392,7 +408,7 @@ end
 module Visualize_frontier = struct
   type query = string [@@deriving bin_io]
 
-  type response = unit [@@deriving bin_io]
+  type response = [`Active of unit | `Bootstrapping] [@@deriving bin_io]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Visualize_frontier" ~version:0 ~bin_query

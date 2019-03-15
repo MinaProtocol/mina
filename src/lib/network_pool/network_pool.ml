@@ -144,7 +144,7 @@ let%test_module "network pool test" =
         Broadcast_pipe.create (Some (Mock_transition_frontier.create ()))
       in
       let network_pool =
-        Mock_network_pool.create ~logger:(Logger.create ())
+        Mock_network_pool.create ~logger:(Logger.null ())
           ~incoming_diffs:pool_reader
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
@@ -179,7 +179,7 @@ let%test_module "network pool test" =
           Broadcast_pipe.create (Some (Mock_transition_frontier.create ()))
         in
         let network_pool =
-          Mock_network_pool.create ~logger:(Logger.create ())
+          Mock_network_pool.create ~logger:(Logger.null ())
             ~incoming_diffs:work_diffs
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in

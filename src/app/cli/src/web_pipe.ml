@@ -54,7 +54,7 @@ struct
   let get_proposer_chain coda =
     let open Base in
     let open Keypair in
-    let get_lite_chain_exn = Program.get_lite_chain |> Option.value_exn in
+    let get_lite_chain_exn = Option.value_exn Program.get_lite_chain in
     (* HACK: we are just passing in the proposer path for this demo *)
     let keypair = Genesis_ledger.largest_account_keypair_exn () in
     let keys = [Public_key.compress keypair.public_key] in
