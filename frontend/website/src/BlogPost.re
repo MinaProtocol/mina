@@ -1,45 +1,19 @@
-module Metadata = {
-  type t = {
-    title: string,
-    author: string,
-    date: string,
-    subtitle: option(string),
-    authorWebsite: option(string),
-  };
-
-  let getValue = (key, content) => {
-    // Search inside of the area enclosed by `---` for
-    // a line that starts with `key:` and capture everything
-    // between the : and the end of the line.
-    let re =
-      Js.Re.fromStringWithFlags(
-        {|^---(?:.|\n)*^|} ++ key ++ {|:(.*)\n(?:.|\n)*^---|},
-        ~flags="m",
-      );
-    switch (Js.Re.exec(content, re)) {
-    | None => None
-    | Some(result) =>
-      let captures = Js.Re.captures(result);
-      let opt = Js.Nullable.toOption(captures[1]);
-      Belt.Option.map(opt, String.trim);
-    };
-  };
-
-  let getRequiredValue = (key, content, filename) =>
-    switch (getValue(key, content)) {
-    | None =>
-      failwith("Didn't provide " ++ key ++ " in " ++ filename ++ ".markdown")
-    | Some(s) => s
-    };
-
-  let parse = (content, filename) => {
-    title: getRequiredValue("title", content, filename),
-    author: getRequiredValue("author", content, filename),
-    date: getRequiredValue("date", content, filename),
-    subtitle: getValue("subtitle", content),
-    authorWebsite: getValue("author_website", content),
-  };
+type t = {
+  title: string,
+  author: string,
+  date: string,
+  subtitle: option(string),
+  authorWebsite: option(string),
 };
+
+let parseMetadata = (content, filename) =>
+  Markdown.{
+    title: Metadata.getRequiredValue("title", content, filename),
+    author: Metadata.getRequiredValue("author", content, filename),
+    date: Metadata.getRequiredValue("date", content, filename),
+    subtitle: Metadata.getValue("subtitle", content),
+    authorWebsite: Metadata.getValue("author_website", content),
+  };
 
 module Comments = {
   let component = ReasonReact.statelessComponent("BlogPost.Comments");
@@ -113,7 +87,7 @@ let shareItems =
     </a>
   </>;
 
-let component = ReasonReact.statelessComponent("Blog");
+let component = ReasonReact.statelessComponent("BlogPost");
 
 let extraHeaders =
   <>
@@ -139,7 +113,7 @@ let extraHeaders =
   </>;
 
 let make = (~name, ~content, ~html, _) => {
-  let metadata = Metadata.parse(content, name);
+  let metadata = parseMetadata(content, name);
   {
     ...component,
     render: _self =>
