@@ -17,10 +17,9 @@ module Metadata = {
     };
   };
 
-  let getRequiredValue = (key, content, filename) =>
+  let getRequiredValue = (key, content, path) =>
     switch (getValue(key, content)) {
-    | None =>
-      failwith("Didn't provide " ++ key ++ " in " ++ filename ++ ".markdown")
+    | None => failwith("Didn't provide " ++ key ++ " in " ++ path)
     | Some(s) => s
     };
 };
