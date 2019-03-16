@@ -4,8 +4,6 @@ module Style = {
   open Style;
   open Css;
 
-  let fullQuery = "(min-width: 48rem)";
-
   let no_list = style([listStyle(`none, `inside, `none)]);
 
   let item =
@@ -22,7 +20,7 @@ module Style = {
       backgroundColor(Colors.white),
       // always visible and flexed on full
       media(
-        fullQuery,
+        MediaQuery.full,
         [display(`flex), justifyContent(`flexEnd), position(`static)],
       ),
     ]);
@@ -30,7 +28,7 @@ module Style = {
   let menuBtn =
     style([
       display(`none),
-      selector({j|":checked ~ .$options"|j}, [display(`block)]),
+      selector({j|:checked ~ .$options|j}, [display(`block)]),
     ]);
 
   let menuIcon =
@@ -41,7 +39,7 @@ module Style = {
       position(`relative),
       userSelect(`none),
       // The menu is always shown on full-size
-      media(fullQuery, [display(`none)]),
+      media(MediaQuery.full, [display(`none)]),
     ]);
 
   let menuText = style(paddingX(`rem(1.0)) @ paddingY(`rem(1.0)));

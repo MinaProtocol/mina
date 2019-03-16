@@ -1,45 +1,19 @@
-module Metadata = {
-  type t = {
-    title: string,
-    author: string,
-    date: string,
-    subtitle: option(string),
-    authorWebsite: option(string),
-  };
-
-  let getValue = (key, content) => {
-    // Search inside of the area enclosed by `---` for
-    // a line that starts with `key:` and capture everything
-    // between the : and the end of the line.
-    let re =
-      Js.Re.fromStringWithFlags(
-        {|^---(?:.|\n)*^|} ++ key ++ {|:(.*)\n(?:.|\n)*^---|},
-        ~flags="m",
-      );
-    switch (Js.Re.exec(content, re)) {
-    | None => None
-    | Some(result) =>
-      let captures = Js.Re.captures(result);
-      let opt = Js.Nullable.toOption(captures[1]);
-      Belt.Option.map(opt, String.trim);
-    };
-  };
-
-  let getRequiredValue = (key, content, filename) =>
-    switch (getValue(key, content)) {
-    | None =>
-      failwith("Didn't provide " ++ key ++ " in " ++ filename ++ ".markdown")
-    | Some(s) => s
-    };
-
-  let parse = (content, filename) => {
-    title: getRequiredValue("title", content, filename),
-    author: getRequiredValue("author", content, filename),
-    date: getRequiredValue("date", content, filename),
-    subtitle: getValue("subtitle", content),
-    authorWebsite: getValue("author_website", content),
-  };
+type metadata = {
+  title: string,
+  author: string,
+  date: string,
+  subtitle: option(string),
+  authorWebsite: option(string),
 };
+
+let parseMetadata = (content, filename) =>
+  Markdown.{
+    title: Metadata.getRequiredValue("title", content, filename),
+    author: Metadata.getRequiredValue("author", content, filename),
+    date: Metadata.getRequiredValue("date", content, filename),
+    subtitle: Metadata.getValue("subtitle", content),
+    authorWebsite: Metadata.getValue("author_website", content),
+  };
 
 module Comments = {
   let component = ReasonReact.statelessComponent("BlogPost.Comments");
@@ -47,7 +21,7 @@ module Comments = {
     ...component,
     render: _self =>
       <div>
-        <div id="disqus_thread" />
+        <div id="disqus_thread" className="mw65 center" />
         <RunScript>
           {Printf.sprintf(
              {|
@@ -113,7 +87,7 @@ let shareItems =
     </a>
   </>;
 
-let component = ReasonReact.statelessComponent("Blog");
+let component = ReasonReact.statelessComponent("BlogPost");
 
 let extraHeaders =
   <>
@@ -138,8 +112,7 @@ let extraHeaders =
     <link rel="stylesheet" href="/static/css/blog.css" />
   </>;
 
-let make = (~name, ~content, ~html, _) => {
-  let metadata = Metadata.parse(content, name);
+let make = (~name, ~html, ~metadata, ~showComments=true, _) => {
   {
     ...component,
     render: _self =>
@@ -148,10 +121,14 @@ let make = (~name, ~content, ~html, _) => {
           <div>
             <div className="db dn-l">
               <div className="mw65-ns ibmplex f5 center blueblack">
-                <h1
-                  className="f2 f1-ns ddinexp tracked-tightish pt2 pt3-m pt4-l mb1"
-                  dangerouslySetInnerHTML={"__html": metadata.title}
-                />
+                <a
+                  href={"/blog/" ++ name ++ ".html"}
+                  className="blueblack no-underline hover-link">
+                  <h1
+                    className="f2 f1-ns ddinexp tracked-tightish pt2 pt3-m pt4-l mb1"
+                    dangerouslySetInnerHTML={"__html": metadata.title}
+                  />
+                </a>
                 {switch (metadata.subtitle) {
                  | None => <div className="mt0 mb4" />
                  | Some(subtitle) =>
@@ -192,16 +169,19 @@ let make = (~name, ~content, ~html, _) => {
                 <div className="share flex justify-center items-center mb4">
                   shareItems
                 </div>
-                <Comments name />
               </div>
             </div>
             <div className="db-l dn">
               <div className="mw7 center ibmplex blueblack side-footnotes">
                 <div className="mw65-ns f5 left blueblack">
-                  <h1
-                    className="f2 f1-ns ddinexp tracked-tightish pt2 pt3-m pt4-l mb1"
-                    dangerouslySetInnerHTML={"__html": metadata.title}
-                  />
+                  <a
+                    href={"/blog/" ++ name ++ ".html"}
+                    className="blueblack no-underline hover-link">
+                    <h1
+                      className="f2 f1-ns ddinexp tracked-tightish pt2 pt3-m pt4-l mb1"
+                      dangerouslySetInnerHTML={"__html": metadata.title}
+                    />
+                  </a>
                   {switch (metadata.subtitle) {
                    | None => <div className="mt0 mb4" />
                    | Some(subtitle) =>
@@ -247,6 +227,7 @@ let make = (~name, ~content, ~html, _) => {
                 </div>
               </div>
             </div>
+            {showComments ? <Comments name /> : ReasonReact.null}
           </div>
         </div>
         <MailingList />
