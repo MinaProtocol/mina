@@ -7,17 +7,13 @@ module Wrapped = {
     open Css;
     open Style;
 
-    let fullQuery = "(min-width: 48rem)";
-
-    let paddingX = m => [paddingLeft(m), paddingRight(m)];
-
     let s =
       style(
         paddingX(`rem(1.25))
         @ [
           margin(`auto),
           media(
-            fullQuery,
+            MediaQuery.full,
             [
               maxWidth(`rem(84.0)),
               margin(`auto),
@@ -38,11 +34,11 @@ module Wrapped = {
 };
 
 let component = ReasonReact.statelessComponent("Page");
-let make = (~extraHeaders=ReasonReact.null, ~footerColor="", children) => {
+let make = (~name, ~extraHeaders=ReasonReact.null, ~footerColor="", children) => {
   ...component,
   render: _ =>
     <html>
-      <Header extra=extraHeaders />
+      <Header filename=name extra=extraHeaders />
       <body>
         <Wrapped>
           <Nav>

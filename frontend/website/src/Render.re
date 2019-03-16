@@ -93,7 +93,10 @@ Router.(
     Dir(
       "site",
       [|
-        File("index", <Page extraHeaders=Home.extraHeaders> <Home /> </Page>),
+        File(
+          "index",
+          <Page name="index" extraHeaders=Home.extraHeaders> <Home /> </Page>,
+        ),
         Dir(
           "blog",
           posts
