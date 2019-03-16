@@ -1354,15 +1354,15 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let log_shutdown ~conf_dir ~logger t =
     let frontier_file = conf_dir ^/ "frontier.dot" in
     let mask_file = conf_dir ^/ "registered_masks.dot" in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
       (Visualization_message.success "registered masks" frontier_file) ;
     visualize_registered_masks ~filename:mask_file ;
     match visualize_frontier ~filename:frontier_file t with
     | `Active () ->
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
           (Visualization_message.success "transition frontier" frontier_file)
     | `Bootstrapping ->
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "%s"
           (Visualization_message.bootstrap "transition frontier")
 
   (* TODO: handle participation_status more appropriately than doing participate_exn *)

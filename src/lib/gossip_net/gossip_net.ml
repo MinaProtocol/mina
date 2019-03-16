@@ -178,7 +178,7 @@ module Make (Message : Message_intf) :
                match Hashtbl.find_and_remove t.connections addr with
                | None -> Deferred.unit
                | Some conn ->
-                   Logger.debug log
+                   Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                      !"Peer %{sexp: Unix.Inet_addr.t} banned, disconnecting."
                      addr ;
                    Rpc.Connection.close conn )) ;
@@ -227,7 +227,7 @@ module Make (Message : Message_intf) :
               (`Call
                 (fun _ exn ->
                   Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-                    (Exn.to_string_mach exn) ))
+                    "%s" (Exn.to_string_mach exn) ))
             (Tcp.Where_to_listen.of_port config.me.Peer.communication_port)
             (fun client reader writer ->
               let%map _ =
@@ -245,7 +245,7 @@ module Make (Message : Message_intf) :
                     (`Call
                       (fun exn ->
                         Logger.error t.logger ~module_:__MODULE__
-                          ~location:__LOC__ (Exn.to_string_mach exn) ;
+                          ~location:__LOC__ "%s" (Exn.to_string_mach exn) ;
                         Deferred.unit ))
               in
               Hashtbl.remove t.connections @@ Socket.Address.Inet.addr client
