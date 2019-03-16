@@ -27,6 +27,8 @@ let write_if_open = Pipe.write_if_open
 
 let write_without_pushback = Pipe.write_without_pushback
 
+let write_without_pushback_if_open = Pipe.write_without_pushback_if_open
+
 exception Overflow
 
 let write_or_exn ~capacity writer reader x =
