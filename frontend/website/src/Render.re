@@ -93,18 +93,22 @@ Router.(
     Dir(
       "site",
       [|
+        File(
+          "index",
+          <Page name="index" extraHeaders=Home.extraHeaders> <Home /> </Page>,
+        ),
         Dir(
           "blog",
           posts
           |> Array.map(((name, content, html)) =>
                File(
                  name,
-                 <Page
+                 <LegacyPage
                    name
                    extraHeaders=BlogPost.extraHeaders
                    footerColor="bg-snow">
                    <BlogPost name content html />
-                 </Page>,
+                 </LegacyPage>,
                )
              ),
         ),
@@ -114,21 +118,23 @@ Router.(
           |> Array.map(((name, _)) =>
                File(
                  name,
-                 <Page name footerColor="bg-snow">
+                 <LegacyPage name footerColor="bg-snow">
                    <CareerPost path={"jobs/" ++ name ++ ".markdown"} />
-                 </Page>,
+                 </LegacyPage>,
                )
              ),
         ),
         File(
           "jobs",
-          <Page name="jobs" extraHeaders=Careers.extraHeaders>
+          <LegacyPage name="jobs" extraHeaders=Careers.extraHeaders>
             <Careers jobOpenings />
-          </Page>,
+          </LegacyPage>,
         ),
         File(
           "code",
-          <Page name="code" extraHeaders=Code.extraHeaders> <Code /> </Page>,
+          <LegacyPage name="code" extraHeaders=Code.extraHeaders>
+            <Code />
+          </LegacyPage>,
         ),
       |],
     ),
