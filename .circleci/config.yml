@@ -48,6 +48,16 @@ jobs:
                   name: Snarky tracks master (make check-snarky-submodule)
                   command: make check-snarky-submodule
 
+    update-branch-protection:
+        docker:
+            - image: python:3
+            - run:
+                name: Install dependencies
+                command: pip install --user requests
+            - run:
+                  name: Update branch protection rule from test configuration
+                  command: ./scripts/test.py render --required .circleci/config.yml.jinja .mergify.yml >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
+
     build-macos:
         macos:
             xcode: "10.1.0"
@@ -277,6 +287,10 @@ workflows:
     coda_parallel:
         jobs:
             - lint
+            - update-branch-protection:
+                filters:
+                  branches:
+                    only: master
             - tracetool
             - build-macos
             - build-wallet

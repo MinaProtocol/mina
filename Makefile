@@ -214,7 +214,7 @@ codaslim:
 ## Tests
 
 render-circleci:
-	./scripts/test.py render .circleci/config.yml.jinja
+	./scripts/test.py render .circleci/config.yml.jinja .mergify.yml.jinja
 
 test-ppx:
 	$(MAKE) -C src/lib/ppx_coda/tests
