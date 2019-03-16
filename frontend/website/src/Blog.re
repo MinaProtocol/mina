@@ -14,7 +14,8 @@ let previousPost = (metadata: BlogPost.metadata) =>
          dangerouslySetInnerHTML={"__html": subtitle}
        />
      }}
-    <h5 className="f7 fw4 tracked-supermega ttu metropolis mt0 mb4 mb1-ns">
+    <h5
+      className="f8 f7-ns nowrap fw4 tracked-supermega ttu metropolis mt0 mb4 mb1-ns">
       <span className="mr2">
         {ReasonReact.string("by " ++ metadata.author ++ " ")}
       </span>
