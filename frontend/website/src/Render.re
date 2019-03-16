@@ -42,22 +42,13 @@ let writeStatic = (path, rootComponent) => {
   Node.Fs.writeFileAsUtf8Sync(path ++ ".css", rendered##css);
 };
 
-let load = path => {
-  Node.Child_process.execSync(
-    "pandoc " ++ path ++ " --mathjax",
-    Node.Child_process.option(),
-  );
-};
-
-let postSuffix = ".markdown";
 let posts =
   Node.Fs.readdirSync("posts")
-  |> Js.Array.filter(s => Js.String.endsWith(postSuffix, s))
+  |> Js.Array.filter(s => Js.String.endsWith(Markdown.suffix, s))
   |> Array.map(fileName => {
-       let length = String.length(fileName) - String.length(postSuffix);
+       let length = String.length(fileName) - String.length(Markdown.suffix);
        let name = String.sub(fileName, 0, length);
-       let content = Node.Fs.readFileAsUtf8Sync("posts/" ++ fileName);
-       let html = load("posts/" ++ fileName);
+       let (html, content) = Markdown.load("posts/" ++ fileName);
        (name, content, html);
      });
 
@@ -108,20 +99,39 @@ Router.(
           |> Array.map(((name, content, html)) =>
                File(
                  name,
-                 <Page
-                   extraHeaders=BlogPost.extraHeaders footerColor="bg-snow">
+                 <LegacyPage
+                   name
+                   extraHeaders=BlogPost.extraHeaders
+                   footerColor="bg-snow">
                    <BlogPost name content html />
-                 </Page>,
+                 </LegacyPage>,
+               )
+             ),
+        ),
+        Dir(
+          "jobs",
+          jobOpenings
+          |> Array.map(((name, _)) =>
+               File(
+                 name,
+                 <LegacyPage name footerColor="bg-snow">
+                   <CareerPost path={"jobs/" ++ name ++ ".markdown"} />
+                 </LegacyPage>,
                )
              ),
         ),
         File(
           "jobs",
-          <Page extraHeaders=Careers.extraHeaders>
+          <LegacyPage name="jobs" extraHeaders=Careers.extraHeaders>
             <Careers jobOpenings />
-          </Page>,
+          </LegacyPage>,
         ),
-        File("code", <Page extraHeaders=Code.extraHeaders> <Code /> </Page>),
+        File(
+          "code",
+          <LegacyPage name="code" extraHeaders=Code.extraHeaders>
+            <Code />
+          </LegacyPage>,
+        ),
       |],
     ),
   )
