@@ -118,11 +118,17 @@ The log processor should support a simple `jq`-esque filter language. The scope 
 <ident> ::= <alpha> <text>
 
 <literal> ::= <bool> | <integer> | <string>
-<access_exp> ::= "." <ident> | "[" <string> "]" | "[" <integer> "]"
-<value_exp> ::= <literal> | <access_exp> | "(" <value_exp> ")"
+<list_literal_inner> ::= <value_exp> "," <list_literal_inner> | <value_exp>
+<list_literal> ::= "[" <list_literal_inner> "]"
+<access> ::= "." <ident> | "[" <string> "]" | "[" <integer> "]"
+<access_exp> ::= <access> <access_exp> | <access>
+<base_value_exp> ::= <literal> | <list_literal>
+<value_exp> ::= <base_value_exp> <access_exp> | <access_exp> | "(" <value_exp> ")"
 
-<compare_op> ::= "===" | "!=="
-<compare_exp> ::= <value_exp> <compare_op> <value_exp>
+<regex_inner> ::= "\/" | <any character except "/">
+<regex> ::= "/" <regex_inner> "/"
+<compare_op> ::= "==" | "!=" | "in"
+<compare_exp> ::= <value_exp> <compare_op> <value_exp> | <value_exp> "match" <regex>
 
 <bin_bool_op> ::= "&&" | "||"
 <bool_exp> ::= <bool> | <compare_exp> | "!" <bool_exp> | <bool_exp> <bin_bool_op> <bool_exp> | "(" <bool_exp> ")"
