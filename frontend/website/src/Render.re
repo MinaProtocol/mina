@@ -105,20 +105,12 @@ Router.(
         Dir(
           "blog",
           posts
-          |> Array.map(((name, _content, html)) =>
+          |> Array.map(((name, content, html)) =>
                File(
                  name,
                  <LegacyPage
                    extraHeaders=BlogPost.extraHeaders footerColor="bg-snow">
-                   <BlogPost
-                     name
-                     title="A SNARKy Exponential Function"
-                     subtitle="Simulating real numbers using finite field arithmetic"
-                     author="Izaak Meckler"
-                     authorWebsite="www.twitter.com/imeckler"
-                     date="March 09 2019"
-                     html
-                   />
+                   <BlogPost name content html />
                  </LegacyPage>,
                )
              ),
