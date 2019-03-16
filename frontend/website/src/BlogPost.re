@@ -1,4 +1,4 @@
-type t = {
+type metadata = {
   title: string,
   author: string,
   date: string,
@@ -21,7 +21,7 @@ module Comments = {
     ...component,
     render: _self =>
       <div>
-        <div id="disqus_thread" />
+        <div id="disqus_thread" className="mw65 center" />
         <RunScript>
           {Printf.sprintf(
              {|
@@ -112,8 +112,7 @@ let extraHeaders =
     <link rel="stylesheet" href="/static/css/blog.css" />
   </>;
 
-let make = (~name, ~content, ~html, _) => {
-  let metadata = parseMetadata(content, name);
+let make = (~name, ~html, ~metadata, ~showComments=true, _) => {
   {
     ...component,
     render: _self =>
@@ -121,61 +120,16 @@ let make = (~name, ~content, ~html, _) => {
         <div className="ph3 ph4-m ph5-l">
           <div>
             <div className="db dn-l">
-              <div className="mw65-ns ibmplex f5 center blueblack">
-                <h1
-                  className="f2 f1-ns ddinexp tracked-tightish pt2 pt3-m pt4-l mb1"
-                  dangerouslySetInnerHTML={"__html": metadata.title}
-                />
-                {switch (metadata.subtitle) {
-                 | None => <div className="mt0 mb4" />
-                 | Some(subtitle) =>
-                   <h2
-                     className="f4 f3-ns ddinexp mt0 mb4 fw4"
-                     dangerouslySetInnerHTML={"__html": subtitle}
-                   />
-                 }}
-                <h4
-                  className="f7 fw4 tracked-supermega ttu metropolis mt0 mb1">
-                  {switch (metadata.authorWebsite) {
-                   | None =>
-                     <span className="mr2">
-                       {ReasonReact.string("by " ++ metadata.author ++ " ")}
-                     </span>
-                   | Some(website) =>
-                     <a
-                       href=website
-                       className="blueblack no-underline"
-                       target="_blank">
-                       <span className="mr2">
-                         {ReasonReact.string("by " ++ metadata.author ++ " ")}
-                       </span>
-                       <i
-                         className="ml-1 ml-2-ns fab f7 fa-twitter mr3 mr2-m mr3-l"
-                       />
-                     </a>
-                   }}
-                </h4>
-                <h4
-                  className="f7 fw4 tracked-supermega ttu o-50 metropolis mt0 mb45">
-                  {ReasonReact.string(metadata.date)}
-                </h4>
-                <div className="blog-content lh-copy">
-                  <div dangerouslySetInnerHTML={"__html": html} /> // TODO: replace this with some react markdown component
-                  <hr />
-                </div>
-                <div className="share flex justify-center items-center mb4">
-                  shareItems
-                </div>
-                <Comments name />
-              </div>
-            </div>
-            <div className="db-l dn">
-              <div className="mw7 center ibmplex blueblack side-footnotes">
-                <div className="mw65-ns f5 left blueblack">
-                  <h1
-                    className="f2 f1-ns ddinexp tracked-tightish pt2 pt3-m pt4-l mb1"
-                    dangerouslySetInnerHTML={"__html": metadata.title}
-                  />
+
+                <div className="mw65-ns ibmplex f5 center blueblack">
+                  <a
+                    href={"/blog/" ++ name ++ ".html"}
+                    className="blueblack no-underline hover-link">
+                    <h1
+                      className="f2 f1-ns ddinexp tracked-tightish pt2 pt3-m pt4-l mb1"
+                      dangerouslySetInnerHTML={"__html": metadata.title}
+                    />
+                  </a>
                   {switch (metadata.subtitle) {
                    | None => <div className="mt0 mb4" />
                    | Some(subtitle) =>
@@ -220,7 +174,69 @@ let make = (~name, ~content, ~html, _) => {
                   </div>
                 </div>
               </div>
+              // {showComments ? <Comments name /> : ReasonReact.null}
+            <div className="db-l dn">
+              <div className="mw7 center ibmplex blueblack side-footnotes">
+                <div className="mw65-ns f5 left blueblack">
+
+                    <a
+                      href={"/blog/" ++ name ++ ".html"}
+                      className="blueblack no-underline hover-link">
+                      <h1
+                        className="f2 f1-ns ddinexp tracked-tightish pt2 pt3-m pt4-l mb1"
+                        dangerouslySetInnerHTML={"__html": metadata.title}
+                      />
+                    </a>
+                    {switch (metadata.subtitle) {
+                     | None => <div className="mt0 mb4" />
+                     | Some(subtitle) =>
+                       <h2
+                         className="f4 f3-ns ddinexp mt0 mb4 fw4"
+                         dangerouslySetInnerHTML={"__html": subtitle}
+                       />
+                     }}
+                    <h4
+                      className="f7 fw4 tracked-supermega ttu metropolis mt0 mb1">
+                      {switch (metadata.authorWebsite) {
+                       | None =>
+                         <span className="mr2">
+                           {ReasonReact.string(
+                              "by " ++ metadata.author ++ " ",
+                            )}
+                         </span>
+                       | Some(website) =>
+                         <a
+                           href=website
+                           className="blueblack no-underline"
+                           target="_blank">
+                           <span className="mr2">
+                             {ReasonReact.string(
+                                "by " ++ metadata.author ++ " ",
+                              )}
+                           </span>
+                           <i
+                             className="ml-1 ml-2-ns fab f7 fa-twitter mr3 mr2-m mr3-l"
+                           />
+                         </a>
+                       }}
+                    </h4>
+                    <h4
+                      className="f7 fw4 tracked-supermega ttu o-50 metropolis mt0 mb45">
+                      {ReasonReact.string(metadata.date)}
+                    </h4>
+                    <div className="blog-content lh-copy">
+                      <div dangerouslySetInnerHTML={"__html": html} /> // TODO: replace this with some react markdown component
+                      <hr />
+                    </div>
+                    <div
+                      className="share flex justify-center items-center mb4">
+                      shareItems
+                    </div>
+                  </div>
+                  // <Comments name />
+              </div>
             </div>
+            {showComments ? <Comments name /> : ReasonReact.null}
           </div>
         </div>
         <MailingList />

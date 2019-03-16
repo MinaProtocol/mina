@@ -44,12 +44,15 @@ let writeStatic = (path, rootComponent) => {
 
 let posts =
   Node.Fs.readdirSync("posts")
-  |> Js.Array.filter(s => Js.String.endsWith(Markdown.suffix, s))
-  |> Array.map(fileName => {
+  |> Array.to_list
+  |> List.filter(s => Js.String.endsWith(Markdown.suffix, s))
+  |> List.map(fileName => {
        let length = String.length(fileName) - String.length(Markdown.suffix);
        let name = String.sub(fileName, 0, length);
-       let (html, content) = Markdown.load("posts/" ++ fileName);
-       (name, content, html);
+       let path = "posts/" ++ fileName;
+       let (html, content) = Markdown.load(path);
+       let metadata = BlogPost.parseMetadata(content, path);
+       (name, html, metadata);
      });
 
 module Router = {
@@ -100,14 +103,15 @@ Router.(
         Dir(
           "blog",
           posts
-          |> Array.map(((name, content, html)) =>
+          |> Array.of_list
+          |> Array.map(((name, html, metadata)) =>
                File(
                  name,
                  <LegacyPage
                    name
                    extraHeaders=BlogPost.extraHeaders
                    footerColor="bg-snow">
-                   <BlogPost name content html />
+                   <BlogPost name html metadata />
                  </LegacyPage>,
                )
              ),
@@ -135,6 +139,12 @@ Router.(
           <LegacyPage name="code" extraHeaders=Code.extraHeaders>
             <Code />
           </LegacyPage>,
+        ),
+        File(
+          "blog",
+          <Page name="blog" extraHeaders=BlogPost.extraHeaders>
+            <Blog posts />
+          </Page>,
         ),
       |],
     ),
