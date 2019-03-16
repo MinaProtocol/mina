@@ -492,7 +492,7 @@ module Vrf = struct
     open Bignum_bigint
 
     (* TEMPORARY HACK FOR TESTNETS: c should be 1 otherwise *)
-    let c : [`One | `Two] = `Two
+    let c : [`One | `Two] = `One
 
     let c_int = match c with `One -> 1 | `Two -> 2
 
