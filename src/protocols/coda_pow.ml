@@ -161,24 +161,22 @@ module type Pending_coinbase_intf = sig
   module Stack : sig
     type t [@@deriving sexp, bin_io, eq]
 
-    val push_exn : t -> coinbase -> t
+    val push : t -> coinbase -> t Or_error.t
 
     val empty : t
   end
 
-  val empty_merkle_root : unit -> pending_coinbase_hash
-
   val merkle_root : t -> pending_coinbase_hash
 
-  val update_coinbase_stack_exn : t -> Stack.t -> is_new_stack:bool -> t
+  val update_coinbase_stack : t -> Stack.t -> is_new_stack:bool -> t Or_error.t
 
-  val remove_coinbase_stack_exn : t -> Stack.t * t
+  val remove_coinbase_stack : t -> (Stack.t * t) Or_error.t
 
-  val create_exn : unit -> t
+  val create : unit -> t Or_error.t
 
-  val latest_stack_exn : t -> is_new_stack:bool -> Stack.t option
+  val latest_stack : t -> is_new_stack:bool -> Stack.t Or_error.t
 
-  val oldest_stack_exn : t -> Stack.t
+  val oldest_stack : t -> Stack.t Or_error.t
 
   val hash_extra : t -> string
 end
@@ -909,7 +907,7 @@ module type Staged_ledger_base_intf = sig
 
   val pending_coinbase_collection : t -> pending_coinbase_collection
 
-  val create : ledger:ledger -> t
+  val create_exn : ledger:ledger -> t
 
   val of_scan_state_and_ledger :
        snarked_ledger_hash:frozen_ledger_hash

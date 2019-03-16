@@ -548,6 +548,9 @@ module Make (Inputs : Inputs_intf) = struct
               Strict_pipe.create Synchronous
             in
             let net_ivar = Ivar.create () in
+            let pending_coinbases =
+              Pending_coinbase.create () |> Or_error.ok_exn
+            in
             let empty_diff =
               { Staged_ledger_diff.diff=
                   ( { completed_works= []
@@ -558,7 +561,7 @@ module Make (Inputs : Inputs_intf) = struct
                   Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
                     (Staged_ledger_aux_hash.of_bytes "")
                     (Ledger.merkle_root Genesis_ledger.t)
-                    (Pending_coinbase.create_exn ())
+                    pending_coinbases
               ; creator=
                   Account.public_key
                     (snd (List.hd_exn Genesis_ledger.accounts)) }
@@ -590,7 +593,7 @@ module Make (Inputs : Inputs_intf) = struct
                 Staged_ledger.of_scan_state_and_ledger ~snarked_ledger_hash
                   ~ledger:Genesis.ledger
                   ~scan_state:(Staged_ledger.Scan_state.empty ())
-                  ~pending_coinbase_collection:(Pending_coinbase.create_exn ())
+                  ~pending_coinbase_collection:pending_coinbases
               with
               | Ok staged_ledger -> staged_ledger
               | Error err -> Error.raise err

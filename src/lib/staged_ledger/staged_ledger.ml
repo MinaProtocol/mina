@@ -351,10 +351,11 @@ end = struct
 
   let ledger {ledger; _} = ledger
 
-  let create ~ledger : t =
+  let create_exn ~ledger : t =
     { scan_state= Scan_state.empty ()
     ; ledger
-    ; pending_coinbase_collection= Pending_coinbase.create_exn () }
+    ; pending_coinbase_collection=
+        Pending_coinbase.create () |> Or_error.ok_exn }
 
   let current_ledger_proof t =
     Option.map
@@ -380,18 +381,8 @@ end = struct
                | Some res -> res )) )
 
   let working_stack pending_coinbase_collection ~is_new_stack =
-    let open Result.Let_syntax in
-    match%bind
-      to_staged_ledger_or_error
-        (Or_error.try_with (fun () ->
-             Pending_coinbase.latest_stack_exn pending_coinbase_collection
-               ~is_new_stack ))
-    with
-    | Some s -> Ok s
-    | None ->
-        to_staged_ledger_or_error
-          (Or_error.error_string
-             "No working coinbase-stack found in the collection")
+    to_staged_ledger_or_error
+      (Pending_coinbase.latest_stack pending_coinbase_collection ~is_new_stack)
 
   let push_coinbase_and_get_new_collection current_stack (t : Transaction.t) =
     let open Result.Let_syntax in
@@ -399,8 +390,7 @@ end = struct
     match t with
     | Coinbase c ->
         let%map pending_coinbase_after =
-          Or_error.try_with (fun () ->
-              Pending_coinbase.Stack.push_exn pending_coinbase_before c )
+          Pending_coinbase.Stack.push pending_coinbase_before c
           |> to_staged_ledger_or_error
         in
         (pending_coinbase_before, pending_coinbase_after)
@@ -812,9 +802,7 @@ end = struct
     let%bind oldest_stack, pending_coinbase_collection_updated1 =
       if Option.is_some ledger_proof then
         let%bind oldest_stack, pending_coinbase_collection_updated1 =
-          Or_error.try_with (fun () ->
-              Pending_coinbase.remove_coinbase_stack_exn
-                pending_coinbase_collection )
+          Pending_coinbase.remove_coinbase_stack pending_coinbase_collection
           |> to_staged_ledger_or_error
         in
         let ledger_proof_stack =
@@ -834,17 +822,15 @@ end = struct
         (oldest_stack, pending_coinbase_collection_updated1)
       else
         let%map oldest_stack =
-          Or_error.try_with (fun () ->
-              Pending_coinbase.oldest_stack_exn pending_coinbase_collection )
+          Pending_coinbase.oldest_stack pending_coinbase_collection
           |> to_staged_ledger_or_error
         in
         (oldest_stack, pending_coinbase_collection)
     in
     let%bind pending_coinbase_collection_updated2 =
-      Or_error.try_with (fun () ->
-          Pending_coinbase.update_coinbase_stack_exn
-            pending_coinbase_collection_updated1 updated_coinbase_stack
-            ~is_new_stack )
+      Pending_coinbase.update_coinbase_stack
+        pending_coinbase_collection_updated1 updated_coinbase_stack
+        ~is_new_stack
       |> to_staged_ledger_or_error
     in
     let%map coinbase_data =
@@ -1836,8 +1822,10 @@ let%test_module "test" =
           type t = Coinbase_data.t list
           [@@deriving sexp, bin_io, compare, hash, eq]
 
-          let push_exn (t : t) c : t =
-            (Coinbase_data.of_coinbase c |> Or_error.ok_exn) :: t
+          let push (t : t) c =
+            let open Or_error.Let_syntax in
+            let%map cb = Coinbase_data.of_coinbase c in
+            cb :: t
 
           let empty = []
 
@@ -1845,8 +1833,6 @@ let%test_module "test" =
         end
 
         type t = Stack.t list [@@deriving sexp, bin_io]
-
-        let empty_merkle_root () = ""
 
         let merkle_root : t -> Pending_coinbase_hash.t =
          fun t ->
@@ -1859,25 +1845,31 @@ let%test_module "test" =
 
         let hash_extra _ = ""
 
-        let latest_stack_exn t ~is_new_stack =
-          if is_new_stack then Some [] else List.hd t
+        let latest_stack t ~is_new_stack =
+          if is_new_stack then Ok []
+          else
+            match List.hd t with
+            | Some s -> Ok s
+            | None -> Or_error.error_string "no stack found"
 
-        let oldest_stack_exn t = match List.rev t with [] -> [] | x :: _ -> x
+        let oldest_stack t =
+          match List.rev t with [] -> Ok [] | x :: _ -> Ok x
 
-        let create_exn () = []
+        let create () = Ok []
 
-        let remove_coinbase_stack_exn t =
+        let remove_coinbase_stack t =
           match List.rev t with
-          | [] -> failwith "tried to remove stack from an empty collection"
-          | x :: xs -> (x, List.rev xs)
+          | [] ->
+              Or_error.error_string
+                "tried to remove stack from an empty collection"
+          | x :: xs -> Ok (x, List.rev xs)
 
-        let update_coinbase_stack_exn (t : t) (stack : Stack.t) ~is_new_stack :
-            t =
-          if is_new_stack then stack :: t
+        let update_coinbase_stack (t : t) (stack : Stack.t) ~is_new_stack =
+          if is_new_stack then Ok (stack :: t)
           else
             match t with
-            | [] -> failwith "tried to update empty tree"
-            | _ :: xs -> stack :: xs
+            | [] -> Or_error.error_string "tried to update empty tree"
+            | _ :: xs -> Ok (stack :: xs)
       end
 
       module Pending_coinbase_stack_state = struct
@@ -2411,7 +2403,7 @@ let%test_module "test" =
       in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
-      let sl = ref (Sl.create ~ledger:initial_ledger) in
+      let sl = ref (Sl.create_exn ~ledger:initial_ledger) in
       Quickcheck.test g ~trials:1000 ~f:(fun _ ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let old_ledger = !(Sl.ledger !sl) in
@@ -2448,7 +2440,7 @@ let%test_module "test" =
       in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
-      let sl = ref (Sl.create ~ledger:initial_ledger) in
+      let sl = ref (Sl.create_exn ~ledger:initial_ledger) in
       Quickcheck.test g ~trials:1000 ~f:(fun i ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let old_ledger = !(Sl.ledger !sl) in
@@ -2491,7 +2483,7 @@ let%test_module "test" =
       in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
-      let sl = ref (Sl.create ~ledger:initial_ledger) in
+      let sl = ref (Sl.create_exn ~ledger:initial_ledger) in
       Quickcheck.test g ~trials:1000 ~f:(fun i ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let old_ledger = !(Sl.ledger !sl) in
@@ -2535,7 +2527,7 @@ let%test_module "test" =
             @ [[(1, 0); (1, 0)]]
           in
           let ledger = ref 0 in
-          let sl = ref (Sl.create ~ledger) in
+          let sl = ref (Sl.create_exn ~ledger) in
           let%map _ =
             Deferred.List.fold ~init:() txns ~f:(fun _ ts ->
                 let%map _, _ =
@@ -2552,7 +2544,7 @@ let%test_module "test" =
       in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
-      let sl = ref (Sl.create ~ledger:initial_ledger) in
+      let sl = ref (Sl.create_exn ~ledger:initial_ledger) in
       let create_diff_with_non_zero_fee_excess prev_hash txns completed_works
           (partition : Sl.Scan_state.Space_partition.t) : Staged_ledger_diff.t
           =
@@ -2620,7 +2612,7 @@ let%test_module "test" =
       in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
-      let sl = ref (Sl.create ~ledger:initial_ledger) in
+      let sl = ref (Sl.create_exn ~ledger:initial_ledger) in
       let expected_snarked_ledger = ref 0 in
       Quickcheck.test g ~trials:50 ~f:(fun i ->
           Async.Thread_safe.block_on_async_exn (fun () ->
@@ -2652,7 +2644,7 @@ let%test_module "test" =
       in
       let g = Int.gen_incl 0 p in
       let initial_ledger = ref 0 in
-      let sl = ref (Sl.create ~ledger:initial_ledger) in
+      let sl = ref (Sl.create_exn ~ledger:initial_ledger) in
       Quickcheck.test g ~trials:1000 ~f:(fun i ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let old_ledger = !(Sl.ledger !sl) in
@@ -2701,7 +2693,7 @@ let%test_module "test" =
         Quickcheck.Generator.tuple2 (Int.gen_incl 1 p) (Int.gen_incl 0 p)
       in
       let initial_ledger = ref 0 in
-      let sl = ref (Sl.create ~ledger:initial_ledger) in
+      let sl = ref (Sl.create_exn ~ledger:initial_ledger) in
       Quickcheck.test g ~trials:1000 ~f:(fun (i, j) ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let old_ledger = !(Sl.ledger !sl) in
@@ -2763,7 +2755,7 @@ let%test_module "test" =
         Quickcheck.Generator.tuple2 (Int.gen_incl 1 p) (Int.gen_incl 0 p)
       in
       let initial_ledger = ref 0 in
-      let sl = ref (Sl.create ~ledger:initial_ledger) in
+      let sl = ref (Sl.create_exn ~ledger:initial_ledger) in
       Quickcheck.test g ~trials:1000 ~f:(fun (i, j) ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let old_ledger = !(Sl.ledger !sl) in

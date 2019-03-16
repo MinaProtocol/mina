@@ -52,7 +52,7 @@ module type S = sig
   and Stack : sig
     include Data_hash.Full_size
 
-    val push_exn : t -> Coinbase.t -> t
+    val push : t -> Coinbase.t -> t Or_error.t
 
     val empty : t
 
@@ -69,28 +69,26 @@ module type S = sig
     val hash : t -> Hash.t
   end
 
-  val create_exn : unit -> t
+  val create : unit -> t Or_error.t
 
-  val remove_coinbase_stack_exn : t -> Stack.t * t
+  val remove_coinbase_stack : t -> (Stack.t * t) Or_error.t
 
   val merkle_root : t -> Hash.t
 
-  val empty_merkle_root : unit -> Hash.t
-
   val handler : t -> (request -> response) Staged.t
 
-  val update_coinbase_stack_exn : t -> Stack.t -> is_new_stack:bool -> t
+  val update_coinbase_stack : t -> Stack.t -> is_new_stack:bool -> t Or_error.t
 
-  val latest_stack_exn : t -> is_new_stack:bool -> Stack.t option
+  val latest_stack : t -> is_new_stack:bool -> Stack.t Or_error.t
 
-  val oldest_stack_exn : t -> Stack.t
+  val oldest_stack : t -> Stack.t Or_error.t
 
   val hash_extra : t -> string
 
   module Checked : sig
     type var = Hash.var
 
-    type path = Pedersen.Digest.t list
+    type path
 
     module Address : sig
       type value
@@ -123,13 +121,13 @@ module type S = sig
    which is [t].
   *)
 
-    val delete_stack :
+    val pop_coinbases :
          var
       -> ledger_proof_stack:Stack.var
       -> proof_emitted:Boolean.var
       -> (var, 's) Tick.Checked.t
     (**
-   [delete_stack t pk updated_stack] implements the following spec:
+   [pop_coinbases t pk updated_stack] implements the following spec:
 
    - gets the address[addr] of the oldest stack.
    - finds a coinbase stack in [t] at path [addr] and replaces it with empty stack

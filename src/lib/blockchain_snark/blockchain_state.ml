@@ -108,7 +108,7 @@ module Make (Consensus_mechanism : Consensus.S) :
                 pending_coinbase_update.oldest_stack
                 (*ledger proof stack if emitted*)
               in
-              Pending_coinbase.Checked.delete_stack prev_pending_coinbase_root
+              Pending_coinbase.Checked.pop_coinbases prev_pending_coinbase_root
                 ~ledger_proof_stack:oldest_stack
                 ~proof_emitted:(Boolean.not ledger_hash_didn't_change)
             in

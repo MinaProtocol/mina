@@ -109,7 +109,8 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         in
         let coinbase_stack_target =
           match t with
-          | Coinbase c -> Pending_coinbase.(Stack.push_exn Stack.empty c)
+          | Coinbase c ->
+              Pending_coinbase.(Stack.push Stack.empty c) |> Or_error.ok_exn
           | _ -> Pending_coinbase.Stack.empty
         in
         let span, proof =

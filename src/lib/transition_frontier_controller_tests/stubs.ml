@@ -305,7 +305,9 @@ struct
     let root_transaction_snark_scan_state =
       Staged_ledger.Scan_state.empty ()
     in
-    let root_pending_coinbases = Pending_coinbase.create_exn () in
+    let root_pending_coinbases =
+      Pending_coinbase.create () |> Or_error.ok_exn
+    in
     let genesis_protocol_state_with_hash =
       Consensus.For_tests.create_genesis_protocol_state
         (Ledger.of_database root_snarked_ledger)

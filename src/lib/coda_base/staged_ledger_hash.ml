@@ -222,7 +222,7 @@ type value = (Non_snark.t, Pending_coinbase.Hash.t) t_
 type var = (Non_snark.var, Pending_coinbase.Hash.var) t_
 
 let genesis =
-  let pending_coinbase = Pending_coinbase.create_exn () in
+  let pending_coinbase = Pending_coinbase.create () |> Or_error.ok_exn in
   { non_snark= Non_snark.dummy
   ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase }
 

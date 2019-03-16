@@ -593,7 +593,9 @@ module Vrf = struct
       let dummy_sparse_ledger =
         Coda_base.Sparse_ledger.of_ledger_subset_exn Genesis_ledger.t [pk]
       in
-      let empty_pending_coinbase = Coda_base.Pending_coinbase.create_exn () in
+      let empty_pending_coinbase =
+        Coda_base.Pending_coinbase.create () |> Or_error.ok_exn
+      in
       let ledger_handler =
         unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger)
       in
@@ -1510,7 +1512,7 @@ module For_tests = struct
         staged_ledger_hash=
           Coda_base.Staged_ledger_hash.(
             of_aux_ledger_and_coinbase_hash Aux_hash.dummy root_ledger_hash
-              (Coda_base.Pending_coinbase.create_exn ()))
+              (Coda_base.Pending_coinbase.create () |> Or_error.ok_exn))
       ; snarked_ledger_hash=
           Coda_base.Frozen_ledger_hash.of_ledger_hash root_ledger_hash }
 
@@ -1635,7 +1637,7 @@ let%test_module "Proof of stake tests" =
       (* choose largest account as most likely to propose *)
       let ledger_data = Genesis_ledger.t in
       let ledger = Ledger.Any_ledger.cast (module Ledger) ledger_data in
-      let pending_coinbases = Pending_coinbase.create_exn () in
+      let pending_coinbases = Pending_coinbase.create () |> Or_error.ok_exn in
       let maybe_sk, account = Genesis_ledger.largest_account_exn () in
       let private_key = Option.value_exn maybe_sk in
       let public_key = Account.public_key account in

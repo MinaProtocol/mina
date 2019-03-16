@@ -48,7 +48,8 @@ module Prover_state = struct
 
   let precomputed_handler =
     unstage
-      (Coda_base.Pending_coinbase.handler @@ Pending_coinbase.create_exn ())
+      ( Coda_base.Pending_coinbase.handler
+      @@ (Pending_coinbase.create () |> Or_error.ok_exn) )
 
   let handler () ~pending_coinbase =
     unstage (Coda_base.Pending_coinbase.handler pending_coinbase)
@@ -279,7 +280,7 @@ module For_tests = struct
           staged_ledger_hash=
             Staged_ledger_hash.(
               of_aux_ledger_and_coinbase_hash Aux_hash.dummy root_ledger_hash
-                (Pending_coinbase.create_exn ()))
+                (Pending_coinbase.create () |> Or_error.ok_exn))
         ; snarked_ledger_hash=
             Frozen_ledger_hash.of_ledger_hash root_ledger_hash }
 end
