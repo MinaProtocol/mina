@@ -638,7 +638,7 @@ module type Initial_validator_intf = sig
     -> valid_transition_writer:( [ `Transition of external_transition_verified
                                                   Envelope.Incoming.t ]
                                  * [`Time_received of time]
-                               , Strict_pipe.drop_head Strict_pipe.buffered
+                               , Strict_pipe.crash Strict_pipe.buffered
                                , unit )
                                Strict_pipe.Writer.t
     -> unit

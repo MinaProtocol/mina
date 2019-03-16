@@ -96,6 +96,10 @@ let run_test () : unit Deferred.t =
              ~snark_work_fee:(Currency.Fee.of_int 0))
       in
       Main.start coda ;
+      Strict_pipe.Reader.iter
+        (Run.For_tests.best_tip_diff coda)
+        ~f:(Fn.const Deferred.unit)
+      |> don't_wait_for ;
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
            (Main.strongest_ledgers coda)

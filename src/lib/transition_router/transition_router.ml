@@ -86,7 +86,7 @@ module Make (Inputs : Inputs_intf) :
     |> Unix_timestamp.of_int64
 
   let create_bufferred_pipe () =
-    Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
+    Strict_pipe.create (Buffered (`Capacity 64, `Overflow Crash))
 
   let kill reader writer =
     Strict_pipe.Reader.clear reader ;
@@ -195,7 +195,7 @@ module Make (Inputs : Inputs_intf) :
       create_bufferred_pipe ()
     in
     let best_tip_diff_reader, best_tip_diff_writer =
-      Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
+      create_bufferred_pipe ()
     in
     let ( transition_frontier_controller_reader
         , transition_frontier_controller_writer ) =

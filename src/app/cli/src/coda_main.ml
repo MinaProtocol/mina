@@ -1008,6 +1008,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   module For_tests = struct
     let ledger_proof t = staged_ledger_ledger_proof t
+
+    let best_tip_diff t = best_tip_diff t
   end
 
   module Lite_compat = Lite_compat.Make (Consensus.Blockchain_state)
