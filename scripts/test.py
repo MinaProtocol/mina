@@ -119,7 +119,7 @@ def run(args):
     coda_exe_path = os.path.join(coda_app_path, 'cli/src/coda.exe')
     coda_exe = os.path.join(coda_build_path, coda_exe_path)
 
-    if os.system('which logproc'):
+    if os.system('which logproc') == 0:
         logproc_exe = 'logproc'
         build_targets = coda_exe
     else:
