@@ -3,6 +3,10 @@ module Colors = {
   let white = Css.white;
 };
 
+module MediaQuery = {
+  let full = "(min-width: 48rem)";
+};
+
 /** sets both paddingLeft and paddingRight, as one should */
 let paddingX = m => Css.[paddingLeft(m), paddingRight(m)];
 
