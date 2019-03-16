@@ -17,10 +17,16 @@ module type S = sig
      and type consensus_local_state := Consensus.Local_state.t
      and type user_command := User_command.t
 
+  module Unprocessed_transition_cache :
+    Unprocessed_transition_cache_intf
+    with type state_hash := State_hash.t
+     and type external_transition_verified := External_transition.Verified.t
+
   module Transition_handler_validator :
     Transition_handler_validator_intf
     with type state_hash := State_hash.t
      and type external_transition_verified := External_transition.Verified.t
+     and type unprocessed_transition_cache := Unprocessed_transition_cache.t
      and type transition_frontier := Transition_frontier.t
      and type staged_ledger := Staged_ledger.t
      and type time := Block_time.t0
@@ -33,8 +39,10 @@ module type S = sig
      and type consensus_state := Consensus.Consensus_state.value
      and type state_body_hash := State_body_hash.t
      and type ledger_hash := Ledger_hash.t
-     and type sync_ledger_query := Ledger.Location.Addr.t Syncable_ledger.query
-     and type sync_ledger_answer := Sync_ledger.answer
+     and type sync_ledger_query :=
+                Ledger.Location.Addr.t Syncable_ledger.Query.t
+     and type sync_ledger_answer := Sync_ledger.Answer.t
+     and type parallel_scan_state := Staged_ledger.Scan_state.t
 
   module Time : Time_intf
 

@@ -1,6 +1,15 @@
 (** A non-empty list that is safe by construction. *)
 
-type 'a t [@@deriving sexp, compare, eq, hash, bin_io]
+module Stable : sig
+  module V1 : sig
+    type 'a t [@@deriving sexp, compare, eq, hash, bin_io]
+  end
+
+  module Latest = V1
+end
+
+(* no bin_io on purpose *)
+type 'a t = 'a Stable.Latest.t [@@deriving sexp, compare, eq, hash]
 
 val init : 'a -> 'a list -> 'a t
 (** Create a non-empty list by proving you have a head element *)
@@ -19,6 +28,11 @@ val head : 'a t -> 'a
 
 val tail : 'a t -> 'a list
 (** The zero or more tail elements of the container *)
+
+val last : 'a t -> 'a
+
+val rev : 'a t -> 'a t
+(** The reverse ordered list *)
 
 val of_list_opt : 'a list -> 'a t option
 (** Convert a list into a non-empty-list, returning [None] if the list is
@@ -43,11 +57,13 @@ val iter : 'a t -> f:('a -> unit) -> unit
 
 val length : 'a t -> int
 
-val rev : 'a t -> 'a t
-
 val to_list : 'a t -> 'a list
 (** Note: This is O(1) not O(n) like on most container *)
 
 val append : 'a t -> 'a t -> 'a t
 
 val take : 'a t -> int -> 'a t option
+
+val min_elt : compare:('a -> 'a -> int) -> 'a t -> 'a
+
+val max_elt : compare:('a -> 'a -> int) -> 'a t -> 'a

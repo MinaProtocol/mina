@@ -1,0 +1,4 @@
+[%%define debug_logs false]
+[%%define call_logger false]
+[%%define tracing true]
+[%%define cache_exceptions true]

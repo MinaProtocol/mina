@@ -69,7 +69,19 @@ module State : sig
   (** State of the parallel scan possibly containing base ['d] entities
    * and partially complete ['a option * 'a option] merges.
    *)
-  type ('a, 'd) t [@@deriving sexp, bin_io]
+
+  (* bin_io omitted intentionally *)
+  type ('a, 'd) t [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type ('a, 'd) t [@@deriving sexp, bin_io]
+      end
+
+      module Latest = V1
+    end
+    with type ('a, 'd) V1.t = ('a, 'd) t
 
   val fold_chronological :
     ('a, 'd) t -> init:'acc -> f:('acc -> ('a, 'd) Job.t -> 'acc) -> 'acc
@@ -77,6 +89,13 @@ module State : sig
    * through the ring-buffer, rather we traverse the data structure in the same
    * order we expect the completed jobs to be filled in.
    *)
+
+  val transactions : ('a, 'd) t -> 'd sexp_list
+  (** Returns a list of all the collected transactions in the scan state. The
+    * order of the transactions in the list is the same as the order when they
+    * were added. Namely the head of the list is the first transaction that
+    * was collected by the scan state.
+    *)
 
   val copy : ('a, 'd) t -> ('a, 'd) t
 

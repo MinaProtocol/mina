@@ -285,64 +285,59 @@ let daemon log =
          ~f:(fun span ->
            Logger.warn log "long async cycle %s" (Time_ns.Span.to_string span)
            ) ;
-       let%bind () =
-         let open M in
-         let run_snark_worker_action =
-           Option.value_map run_snark_worker_flag ~default:`Don't_run
-             ~f:(fun k -> `With_public_key k )
-         in
-         let banlist_dir_name = conf_dir ^/ "banlist" in
-         let%bind () = Async.Unix.mkdir ~p:() banlist_dir_name in
-         let suspicious_dir = banlist_dir_name ^/ "suspicious" in
-         let punished_dir = banlist_dir_name ^/ "banned" in
-         let trust_dir = banlist_dir_name ^/ "trust" in
-         let () = Snark_params.set_chunked_hashing true in
-         let%bind () = Async.Unix.mkdir ~p:() suspicious_dir in
-         let%bind () = Async.Unix.mkdir ~p:() punished_dir in
-         let%bind () = Async.Unix.mkdir ~p:() trust_dir in
-         let banlist =
-           Coda_base.Banlist.create ~suspicious_dir ~punished_dir
-         in
-         let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
-         let time_controller = Inputs.Time.Controller.create () in
-         let net_config =
-           { Inputs.Net.Config.parent_log= log
-           ; time_controller
-           ; gossip_net_params=
-               { timeout= Time.Span.of_sec 1.
-               ; parent_log= log
-               ; target_peer_count= 8
-               ; conf_dir
-               ; initial_peers
-               ; me
-               ; trust_system } }
-         in
-         let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
-         let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
-         let receipt_chain_database =
-           Coda_base.Receipt_chain_database.create
-             ~directory:receipt_chain_dir_name
-         in
-         let%bind coda =
-           Run.create
-             (Run.Config.make ~log ~net_config
-                ~run_snark_worker:(Option.is_some run_snark_worker_flag)
-                ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
-                ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
-                ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
-                ~ledger_db_location:(conf_dir ^/ "ledger_db")
-                ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
-                ~time_controller ?propose_keypair:Config0.propose_keypair ()
-                ~banlist)
-         in
-         let%map () = maybe_sleep 3. in
-         M.start coda ;
-         let web_service = Web_pipe.get_service () in
-         Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;
-         Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
-           ~client_port ~log () ;
-         Run.run_snark_worker ~log ~client_port run_snark_worker_action
+       let run_snark_worker_action =
+         Option.value_map run_snark_worker_flag ~default:`Don't_run
+           ~f:(fun k -> `With_public_key k )
        in
+       let trust_dir = conf_dir ^/ "trust" in
+       let () = Snark_params.set_chunked_hashing true in
+       let%bind () = Async.Unix.mkdir ~p:() trust_dir in
+       let trust_system = Coda_base.Trust_system.create ~db_dir:trust_dir in
+       let time_controller =
+         M.Inputs.Time.Controller.create M.Inputs.Time.Controller.basic
+       in
+       let net_config =
+         { M.Inputs.Net.Config.parent_log= log
+         ; time_controller
+         ; gossip_net_params=
+             { timeout= Time.Span.of_sec 1.
+             ; parent_log= log
+             ; target_peer_count= 8
+             ; conf_dir
+             ; initial_peers
+             ; me
+             ; trust_system } }
+       in
+       let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
+       let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
+       let receipt_chain_database =
+         Coda_base.Receipt_chain_database.create
+           ~directory:receipt_chain_dir_name
+       in
+       let monitor = Async.Monitor.create ~name:"coda" () in
+       let%bind coda =
+         Run.create
+           (Run.Config.make ~log ~net_config
+              ~run_snark_worker:(Option.is_some run_snark_worker_flag)
+              ~staged_ledger_persistant_location:(conf_dir ^/ "staged_ledger")
+              ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
+              ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+              ~ledger_db_location:(conf_dir ^/ "ledger_db")
+              ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
+              ~time_controller ?propose_keypair:Config0.propose_keypair ()
+              ~monitor)
+       in
+       Run.handle_shutdown ~monitor ~conf_dir ~log coda ;
+       Async.Scheduler.within' ~monitor
+       @@ fun () ->
+       let%bind () = maybe_sleep 3. in
+       M.start coda ;
+       let web_service = Web_pipe.get_service () in
+       Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;
+       Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
+         ~client_port ~log () ;
+       Run.run_snark_worker ~log ~client_port run_snark_worker_action ;
+       Logger.info log "Running coda services" ;
        Async.never ())
 
 [%%if
@@ -443,8 +438,12 @@ let coda_commands log =
     ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
     ; ( Coda_shared_prefix_multiproposer_test.name
       , Coda_shared_prefix_multiproposer_test.command )
+    ; (Coda_five_nodes_test.name, Coda_five_nodes_test.command)
     ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
     ; (Coda_receipt_chain_test.name, Coda_receipt_chain_test.command)
+    ; ( Coda_restarts_and_txns_holy_grail.name
+      , Coda_restarts_and_txns_holy_grail.command )
+    ; (Coda_bootstrap_test.name, Coda_bootstrap_test.command)
     ; ("full-test", Full_test.command)
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
   in

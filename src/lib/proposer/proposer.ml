@@ -302,6 +302,36 @@ module Make (Inputs : Inputs_intf) :
               match next_state_opt with
               | None -> Interruptible.return ()
               | Some (protocol_state, internal_transition) ->
+                  Debug_assert.debug_assert (fun () ->
+                      let logger = Logger.child logger "Assert_selection" in
+                      [%test_result: [`Take | `Keep]]
+                        (Consensus_mechanism.select
+                           ~existing:
+                             ( previous_protocol_state
+                             |> Protocol_state.consensus_state )
+                           ~candidate:
+                             (protocol_state |> Protocol_state.consensus_state)
+                           ~logger)
+                        ~expect:`Take
+                        ~message:
+                          "newly generated consensus states should be \
+                           selected over their parent" ;
+                      let root_consensus_state =
+                        Transition_frontier.root frontier
+                        |> (fun x -> (Breadcrumb.transition_with_hash x).data)
+                        |> External_transition.Verified.protocol_state
+                        |> Protocol_state.consensus_state
+                      in
+                      [%test_result: [`Take | `Keep]]
+                        (Consensus_mechanism.select
+                           ~existing:root_consensus_state
+                           ~candidate:
+                             (protocol_state |> Protocol_state.consensus_state)
+                           ~logger)
+                        ~expect:`Take
+                        ~message:
+                          "newly generated consensus states should be \
+                           selected over the tf root" ) ;
                   Interruptible.uninterruptible
                     (let open Deferred.Let_syntax in
                     let t0 = Time.now time_controller in
@@ -367,6 +397,11 @@ module Make (Inputs : Inputs_intf) :
                   | `Check_again time ->
                       Singleton_scheduler.schedule scheduler (time_of_ms time)
                         ~f:check_for_proposal
+                  | `Propose_now data ->
+                      Interruptible.finally
+                        (Singleton_supervisor.dispatch proposal_supervisor data)
+                        ~f:check_for_proposal
+                      |> ignore
                   | `Propose (time, data) ->
                       Singleton_scheduler.schedule scheduler (time_of_ms time)
                         ~f:(fun () ->

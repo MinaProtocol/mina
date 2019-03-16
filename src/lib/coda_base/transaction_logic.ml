@@ -28,7 +28,7 @@ module type S = sig
     [@@deriving sexp, bin_io]
 
     type coinbase =
-      { coinbase: Coinbase.t
+      { coinbase: Coinbase.Stable.V1.t
       ; previous_empty_accounts: Public_key.Compressed.t list }
     [@@deriving sexp, bin_io]
 
@@ -140,7 +140,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     [@@deriving sexp, bin_io]
 
     type coinbase =
-      { coinbase: Coinbase.t
+      { coinbase: Coinbase.Stable.V1.t
       ; previous_empty_accounts: Public_key.Compressed.t list }
     [@@deriving sexp, bin_io]
 
@@ -240,7 +240,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           set t l1 {a1 with balance} ;
           emptys1 )
         else
-          let emptys2, a2, l2 = get_or_create t pk1 in
+          let emptys2, a2, l2 = get_or_create t pk2 in
           let%bind balance1 = modify_balance a1.balance fee1 in
           let%map balance2 = modify_balance a2.balance fee2 in
           set t l1 {a1 with balance= balance1} ;
@@ -271,14 +271,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let initial_account = Account.initialize pk in
       match get_or_create_account_exn t pk (Account.initialize pk) with
       | `Added, location -> (location, initial_account, [pk])
-      | `Existed, location -> (location, get t location |> Option.value_exn, [])
+      | `Existed, location -> (location, Option.value_exn (get t location), [])
     in
     let open Or_error.Let_syntax in
     let%bind proposer_reward, emptys1, receiver_update =
       match fee_transfer with
       | None -> return (coinbase_amount, [], None)
       | Some (receiver, fee) ->
-          (* This assertion will pass because of how coinbase is produced by Staged_ledger.apply_diff *)
           assert (not @@ Public_key.Compressed.equal receiver proposer) ;
           let fee = Amount.of_fee fee in
           let%bind proposer_reward =
@@ -322,7 +321,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               balance=
                 Option.value_exn
                   (Balance.sub_amount receiver_account.balance fee) } ;
-          Amount.sub coinbase_amount fee |> Option.value_exn
+          Option.value_exn (Amount.sub coinbase_amount fee)
     in
     let proposer_location =
       Or_error.ok_exn (location_of_key' t "receiver" proposer)

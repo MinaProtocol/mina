@@ -9,13 +9,13 @@ let main () =
   let log = Logger.create () in
   let log = Logger.child log name in
   let n = 1 in
-  let should_propose i = true in
   let snark_work_public_keys i = None in
   let%bind testnet =
-    Coda_worker_testnet.test log n should_propose snark_work_public_keys
+    Coda_worker_testnet.test log n Option.some snark_work_public_keys
       Protocols.Coda_pow.Work_selection.Seq
   in
-  after (Time.Span.of_sec 30.)
+  let%bind () = after (Time.Span.of_sec 30.) in
+  Coda_worker_testnet.Api.teardown testnet
 
 let command =
   Command.async ~summary:"Test that blocks get produced"

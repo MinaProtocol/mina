@@ -45,10 +45,10 @@ struct
         match Work.Table.find table work with
         | Some count ->
             Work.Table.set table ~key:work ~data:(count + 1) ;
-            acc || false
+            acc
         | None ->
             Work.Table.set table ~key:work ~data:1 ;
-            acc || true )
+            true )
 
   (** Returns true if this update changed which elements are in the table
   (but not if the same elements exist with a different reference count) *)
@@ -57,23 +57,27 @@ struct
         match Work.Table.find table work with
         | Some 1 ->
             Work.Table.remove table work ;
-            acc || true
+            true
         | Some v ->
             Work.Table.set table ~key:work ~data:(v - 1) ;
-            acc || false
+            acc
         | None -> failwith "Removed a breadcrumb we didn't know about" )
 
   let create () = Work.Table.create ()
 
-  let initial_view = (0, Work.Table.create ())
+  let initial_view () = (0, Work.Table.create ())
 
   let handle_diff t diff =
     let removed, added =
       match (diff : Inputs.Breadcrumb.t Transition_frontier_diff.t) with
       | New_breadcrumb breadcrumb ->
           (0, add_breadcrumb_to_ref_table t breadcrumb)
-      | New_best_tip {old_root; new_root; new_best_tip; garbage; _} ->
-          let added = add_breadcrumb_to_ref_table t new_best_tip in
+      | New_best_tip {old_root; new_root; added_to_best_tip_path; garbage; _}
+        ->
+          let added =
+            add_breadcrumb_to_ref_table t
+            @@ Non_empty_list.last added_to_best_tip_path
+          in
           let all_garbage =
             if phys_equal old_root new_root then garbage
             else old_root :: garbage

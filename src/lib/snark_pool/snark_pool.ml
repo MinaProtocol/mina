@@ -109,13 +109,13 @@ end)
   let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t) =
     (* start with empty ref table *)
     t.ref_table <- None ;
-    let tf_deferred, _ =
+    let tf_deferred =
       Broadcast_pipe.Reader.iter frontier_broadcast_pipe ~f:(function
         | Some tf ->
             (* Start the count at the max so we flush after reconstructing the transition_frontier *)
             let removedCounter = ref removed_breadcrumb_wait in
             let pipe = Transition_frontier.snark_pool_refcount_pipe tf in
-            let deferred, _ =
+            let deferred =
               Broadcast_pipe.Reader.iter pipe
                 ~f:(fun (removed, refcount_table) ->
                   t.ref_table <- Some refcount_table ;
@@ -224,7 +224,7 @@ let%test_module "random set test" =
         Broadcast_pipe.create (Some (Mock_transition_frontier.create ()))
       in
       let pool =
-        Mock_snark_pool.create ~parent_log:(Logger.create ())
+        Mock_snark_pool.create ~parent_log:(Logger.null ())
           ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
       in
       List.iter sample_solved_work ~f:(fun (work, proof, fee) ->

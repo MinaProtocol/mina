@@ -27,10 +27,15 @@ end
 
 [%%endif]
 
+module Graphql_cohttp_async =
+  Graphql_cohttp.Make (Graphql_async.Schema) (Cohttp_async.Body)
+
 module Staged_ledger_aux_hash = struct
   include Staged_ledger_hash.Aux_hash.Stable.Latest
 
   let of_bytes = Staged_ledger_hash.Aux_hash.of_bytes
+
+  let to_bytes = Staged_ledger_hash.Aux_hash.to_bytes
 end
 
 module Staged_ledger_hash = struct
@@ -44,7 +49,7 @@ module Staged_ledger_hash = struct
 end
 
 module Ledger_hash = struct
-  include Ledger_hash.Stable.Latest
+  include Ledger_hash
 
   let of_digest = Ledger_hash.of_digest
 
@@ -58,7 +63,7 @@ module Ledger_hash = struct
 end
 
 module Frozen_ledger_hash = struct
-  include Frozen_ledger_hash.Stable.Latest
+  include Frozen_ledger_hash
 
   let to_bytes = Frozen_ledger_hash.to_bytes
 
@@ -251,10 +256,6 @@ module type Main_intf = sig
        and type staged_ledger_hash := Staged_ledger_hash.t
        and type fee_transfer_single := Fee_transfer.single
 
-    module Staged_ledger_hash : sig
-      type t [@@deriving sexp]
-    end
-
     module Staged_ledger :
       Protocols.Coda_pow.Staged_ledger_intf
       with type diff := Staged_ledger_diff.t
@@ -314,10 +315,11 @@ module type Main_intf = sig
       ; snark_pool_disk_location: string
       ; ledger_db_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
-      ; time_controller: Inputs.Time.Controller.t
-      ; banlist: Banlist.t
+      ; time_controller:
+          Inputs.Time.Controller.t (* FIXME trust system goes here? *)
       ; receipt_chain_database: Receipt_chain_database.t
-      ; snark_work_fee: Currency.Fee.t }
+      ; snark_work_fee: Currency.Fee.t
+      ; monitor: Async.Monitor.t option }
     [@@deriving make]
   end
 
@@ -362,40 +364,16 @@ module type Main_intf = sig
   val receipt_chain_database : t -> Receipt_chain_database.t
 end
 
-module User_command = struct
-  include (
-    User_command :
-      module type of User_command
-      with module With_valid_signature := User_command.With_valid_signature )
-
-  let fee (t : t) = Payload.fee t.payload
-
-  let sender (t : t) = Public_key.compress t.sender
-
-  let seed = Secure_random.string ()
-
-  let compare t1 t2 = User_command.Stable.Latest.compare ~seed t1 t2
-
-  module With_valid_signature = struct
-    module T = struct
-      include User_command.With_valid_signature
-
-      let compare t1 t2 = User_command.With_valid_signature.compare ~seed t1 t2
-    end
-
-    include T
-    include Comparable.Make (T)
-  end
-end
-
 module Fee_transfer = Coda_base.Fee_transfer
 module Ledger_proof_statement = Transaction_snark.Statement
 module Transaction_snark_work =
-  Staged_ledger.Make_completed_work (Public_key.Compressed) (Ledger_proof)
+  Staged_ledger.Make_completed_work
+    (Public_key.Compressed)
+    (Ledger_proof.Stable.V1)
     (Ledger_proof_statement)
 
 module Staged_ledger_diff = Staged_ledger.Make_diff (struct
-  module Ledger_proof = Ledger_proof
+  module Ledger_proof = Ledger_proof.Stable.V1
   module Ledger_hash = Ledger_hash
   module Staged_ledger_hash = Staged_ledger_hash
   module Staged_ledger_aux_hash = Staged_ledger_aux_hash
@@ -446,7 +424,7 @@ struct
     let limit = Block_time.Span.of_time_span (Core.Time.Span.of_sec 15.)
 
     let validate t =
-      let now = Block_time.now () in
+      let now = Block_time.now Block_time.Controller.basic in
       (* t should be at most [limit] greater than now *)
       Block_time.Span.( < ) (Block_time.diff t now) limit
   end
@@ -523,7 +501,7 @@ struct
   module Sparse_ledger = Coda_base.Sparse_ledger
 
   module Transaction_snark_work_proof = struct
-    type t = Ledger_proof.t list [@@deriving sexp, bin_io]
+    type t = Ledger_proof.Stable.V1.t list [@@deriving sexp, bin_io]
   end
 
   module Staged_ledger = struct
@@ -607,7 +585,7 @@ struct
   end)
 
   module Transaction_pool = struct
-    module Pool = Transaction_pool.Make (User_command) (Transition_frontier)
+    module Pool = Transaction_pool.Make (Staged_ledger) (Transition_frontier)
     include Network_pool.Make (Transition_frontier) (Pool) (Pool.Diff)
 
     type pool_diff = Pool.Diff.t [@@deriving bin_io]
@@ -620,7 +598,7 @@ struct
     let transactions t = Pool.transactions (pool t)
 
     (* TODO: This causes the signature to get checked twice as it is checked
-   below before feeding it to add *)
+       below before feeding it to add *)
     let add t txn = apply_and_broadcast t (Envelope.Incoming.local [txn])
   end
 
@@ -755,41 +733,10 @@ struct
                 ( List.map res.spec.instances ~f:Single.Spec.statement
                 , { Diff.proof= res.proofs
                   ; fee= {fee= res.spec.fee; prover= res.prover} } ))
-           ~sender:Network_peer.Peer.local)
+           ~sender:Envelope.Sender.Local)
   end
 
-  module Root_sync_ledger :
-    Syncable_ledger.S
-    with type addr := Ledger.Location.Addr.t
-     and type hash := Ledger_hash.t
-     and type root_hash := Ledger_hash.t
-     and type merkle_tree := Ledger.Db.t
-     and type account := Account.t
-     and type merkle_path := Ledger.path
-     and type query := Sync_ledger.query
-     and type answer := Sync_ledger.answer =
-    Syncable_ledger.Make (Ledger.Location.Addr) (Account.Stable.V1)
-      (struct
-        include Ledger_hash
-
-        let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
-
-        let empty_account = hash_account Account.empty
-      end)
-      (struct
-        include Ledger_hash
-
-        let to_hash (h : t) =
-          Ledger_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
-      end)
-      (struct
-        include Ledger.Db
-
-        let f = Account.hash
-      end)
-      (struct
-        let subtree_height = 3
-      end)
+  module Root_sync_ledger = Sync_ledger.Db
 
   module Net = Coda_networking.Make (struct
     include Inputs0
@@ -835,6 +782,8 @@ struct
     module Staged_ledger_diff = Staged_ledger_diff
     module Transaction_snark_work = Transaction_snark_work
     module Transition_handler_validator = Transition_handler.Validator
+    module Unprocessed_transition_cache =
+      Transition_handler.Unprocessed_transition_cache
     module Ledger_proof_statement = Ledger_proof_statement
     module Staged_ledger_aux_hash = Staged_ledger_aux_hash
     module Protocol_state_validator = Protocol_state_validator
@@ -1139,7 +1088,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       (verifying_txn : User_command.t) proof =
     let open Participating_state.Let_syntax in
     let%map account = get_account t addr in
-    let account = account |> Option.value_exn in
+    let account = Option.value_exn account in
     let resulting_receipt = Account.receipt_chain_hash account in
     let open Or_error.Let_syntax in
     let%bind () = Payment_verifier.verify ~resulting_receipt proof in
@@ -1194,7 +1143,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       Payment_proof.t Deferred.Or_error.t =
     let receipt_chain_database = receipt_chain_database t in
     (* TODO: since we are making so many reads to `receipt_chain_database`,
-    reads should be async to not get IO-blocked. See #1125 *)
+       reads should be async to not get IO-blocked. See #1125 *)
     let result =
       Receipt_chain_database.prove receipt_chain_database ~proving_receipt
         ~resulting_receipt
@@ -1216,26 +1165,34 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let%map sl = best_staged_ledger t in
     Staged_ledger.Scan_state.snark_job_list_json (Staged_ledger.scan_state sl)
 
+  type active_state_fields =
+    { num_accounts: int option
+    ; block_count: int option
+    ; ledger_merkle_root: string option
+    ; staged_ledger_hash: string option
+    ; state_hash: string option
+    ; consensus_time_best_tip: string option }
+
   let get_status ~flag t =
-    let open Participating_state.Let_syntax in
-    let%bind ledger = best_ledger t in
-    let ledger_merkle_root =
-      Ledger.merkle_root ledger |> [%sexp_of: Ledger_hash.t] |> Sexp.to_string
-    in
-    let num_accounts = Ledger.num_accounts ledger in
-    let%bind state = best_protocol_state t in
-    let state_hash =
-      Consensus.Protocol_state.hash state
-      |> [%sexp_of: State_hash.t] |> Sexp.to_string
-    in
-    let block_count =
-      state |> Consensus.Protocol_state.consensus_state
-      |> Consensus.Consensus_state.length
-    in
     let uptime_secs =
       Time_ns.diff (Time_ns.now ()) start_time
       |> Time_ns.Span.to_sec |> Int.of_float
     in
+    let commit_id = Config_in.commit_id in
+    let conf_dir = Config_in.conf_dir in
+    let peers =
+      List.map (peers t) ~f:(fun peer ->
+          Network_peer.Peer.to_discovery_host_and_port peer
+          |> Host_and_port.to_string )
+    in
+    let user_commands_sent = !txn_count in
+    let run_snark_worker = run_snark_worker t in
+    let propose_pubkey =
+      Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
+    in
+    let consensus_mechanism = Consensus.name in
+    let consensus_time_now = Consensus.time_hum (Core_kernel.Time.now ()) in
+    let consensus_configuration = Consensus.Configuration.t in
     let r = Perf_histograms.report in
     let histograms =
       match flag with
@@ -1261,33 +1218,85 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             { Daemon_rpcs.Types.Status.Histograms.rpc_timings
             ; external_transition_latency=
                 r ~name:"external_transition_latency"
+            ; accepted_transition_local_latency=
+                r ~name:"accepted_transition_local_latency"
+            ; accepted_transition_remote_latency=
+                r ~name:"accepted_transition_remote_latency"
             ; snark_worker_transition_time=
                 r ~name:"snark_worker_transition_time"
             ; snark_worker_merge_time= r ~name:"snark_worker_merge_time" }
       | `None -> None
     in
-    let%map staged_ledger = best_staged_ledger t in
-    { Daemon_rpcs.Types.Status.num_accounts
-    ; block_count= Int.of_string (Length.to_string block_count)
-    ; uptime_secs
-    ; ledger_merkle_root
-    ; staged_ledger_hash=
+    let active_status () =
+      let open Participating_state.Let_syntax in
+      let%bind ledger = best_ledger t in
+      let ledger_merkle_root =
+        Ledger.merkle_root ledger |> [%sexp_of: Ledger_hash.t]
+        |> Sexp.to_string
+      in
+      let num_accounts = Ledger.num_accounts ledger in
+      let%bind state = best_protocol_state t in
+      let state_hash =
+        Consensus.Protocol_state.hash state
+        |> [%sexp_of: State_hash.t] |> Sexp.to_string
+      in
+      let consensus_state =
+        state |> Consensus.Protocol_state.consensus_state
+      in
+      let block_count =
+        Length.to_int @@ Consensus.Consensus_state.length consensus_state
+      in
+      let%map staged_ledger = best_staged_ledger t in
+      let staged_ledger_hash =
         staged_ledger |> Staged_ledger.hash |> Staged_ledger_hash.sexp_of_t
         |> Sexp.to_string
+      in
+      let consensus_time_best_tip =
+        Consensus.Consensus_state.time_hum consensus_state
+      in
+      { num_accounts= Some num_accounts
+      ; block_count= Some block_count
+      ; ledger_merkle_root= Some ledger_merkle_root
+      ; staged_ledger_hash= Some staged_ledger_hash
+      ; state_hash= Some state_hash
+      ; consensus_time_best_tip= Some consensus_time_best_tip }
+    in
+    let ( is_bootstrapping
+        , { num_accounts
+          ; block_count
+          ; ledger_merkle_root
+          ; staged_ledger_hash
+          ; state_hash
+          ; consensus_time_best_tip } ) =
+      match active_status () with
+      | `Active result -> (false, result)
+      | `Bootstrapping ->
+          ( true
+          , { num_accounts= None
+            ; block_count= None
+            ; ledger_merkle_root= None
+            ; staged_ledger_hash= None
+            ; state_hash= None
+            ; consensus_time_best_tip= None } )
+    in
+    { Daemon_rpcs.Types.Status.num_accounts
+    ; is_bootstrapping
+    ; block_count
+    ; uptime_secs
+    ; ledger_merkle_root
+    ; staged_ledger_hash
     ; state_hash
-    ; commit_id= Config_in.commit_id
-    ; conf_dir= Config_in.conf_dir
-    ; peers=
-        List.map (peers t) ~f:(fun peer ->
-            Network_peer.Peer.to_discovery_host_and_port peer
-            |> Host_and_port.to_string )
-    ; user_commands_sent= !txn_count
-    ; run_snark_worker= run_snark_worker t
-    ; propose_pubkey=
-        Option.map ~f:(fun kp -> kp.public_key) (propose_keypair t)
+    ; consensus_time_best_tip
+    ; commit_id
+    ; conf_dir
+    ; peers
+    ; user_commands_sent
+    ; run_snark_worker
+    ; propose_pubkey
     ; histograms
-    ; consensus_mechanism= Consensus.name
-    ; consensus_configuration= Consensus.Configuration.t }
+    ; consensus_time_now
+    ; consensus_mechanism
+    ; consensus_configuration }
 
   let get_lite_chain :
       (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =
@@ -1335,6 +1344,22 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
   let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t
+
+  let visualize_registered_masks = Coda_base.Ledger.Debug.visualize
+
+  let log_shutdown ~conf_dir ~log t =
+    let frontier_file = conf_dir ^/ "frontier.dot" in
+    let mask_file = conf_dir ^/ "registered_masks.dot" in
+    Logger.info log !"%s"
+      (Visualization_message.success "registered masks" frontier_file) ;
+    visualize_registered_masks ~filename:mask_file ;
+    match visualize_frontier ~filename:frontier_file t with
+    | `Active () ->
+        Logger.info log !"%s"
+          (Visualization_message.success "transition frontier" frontier_file)
+    | `Bootstrapping ->
+        Logger.info log !"%s"
+          (Visualization_message.bootstrap "transition frontier")
 
   (* TODO: handle participation_status more appropriately than doing participate_exn *)
   let setup_local_server ?(client_whitelist = []) ?rest_server_port ~coda ~log
@@ -1386,11 +1411,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       ; implement Daemon_rpcs.Get_nonce.rpc (fun () pk ->
             return (get_nonce coda pk |> Participating_state.active_exn) )
       ; implement Daemon_rpcs.Get_status.rpc (fun () flag ->
-            return (get_status ~flag coda |> Participating_state.active_exn) )
+            return (get_status ~flag coda) )
       ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
-            return
-              (clear_hist_status ~flag coda |> Participating_state.active_exn)
-        )
+            return (clear_hist_status ~flag coda) )
       ; implement Daemon_rpcs.Get_ledger.rpc (fun () lh -> get_ledger coda lh)
       ; implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
             Scheduler.yield () >>= (fun () -> exit 0) |> don't_wait_for ;
@@ -1402,10 +1425,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             Coda_tracing.start Config_in.conf_dir )
       ; implement Daemon_rpcs.Stop_tracing.rpc (fun () () ->
             Coda_tracing.stop () ; Deferred.unit )
-      ; implement Daemon_rpcs.Visualize_frontier.rpc (fun () filename ->
-            return
-              ( visualize_frontier ~filename coda
-              |> Participating_state.active_exn ) ) ]
+      ; implement Daemon_rpcs.Visualization.Frontier.rpc (fun () filename ->
+            return (visualize_frontier ~filename coda) )
+      ; implement Daemon_rpcs.Visualization.Registered_masks.rpc
+          (fun () filename ->
+            return (Coda_base.Ledger.Debug.visualize ~filename) ) ]
     in
     let snark_worker_impls =
       [ implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
@@ -1432,6 +1456,18 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
         trace_task "REST server" (fun () ->
+            let graphql_schema =
+              Graphql_async.Schema.(
+                schema
+                  [ field "greeting" ~typ:(non_null string)
+                      ~args:Arg.[]
+                      ~resolve:(fun _ () -> "hello coda") ])
+            in
+            let graphql_callback =
+              Graphql_cohttp_async.make_callback
+                (fun _req -> ())
+                graphql_schema
+            in
             Cohttp_async.(
               Server.create
                 ~on_handler_error:
@@ -1442,19 +1478,19 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                    (On_port rest_server_port))
                 (fun ~body _sock req ->
                   let uri = Cohttp.Request.uri req in
-                  let route_not_found () =
-                    Server.respond_string ~status:`Not_found "Route not found"
-                  in
                   let status flag =
                     Server.respond_string
-                      ( get_status ~flag coda |> Participating_state.active_exn
+                      ( get_status ~flag coda
                       |> Daemon_rpcs.Types.Status.to_yojson
                       |> Yojson.Safe.pretty_to_string )
                   in
                   match Uri.path uri with
+                  | "/graphql" -> graphql_callback () req body
                   | "/status" -> status `None
                   | "/status/performance" -> status `Performance
-                  | _ -> route_not_found () )) )
+                  | _ ->
+                      Server.respond_string ~status:`Not_found
+                        "Route not found" )) )
         |> ignore ) ;
     let where_to_listen =
       Tcp.Where_to_listen.bind_to All_addresses (On_port client_port)
@@ -1519,4 +1555,15 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         create_snark_worker ~shutdown_on_disconnect:s ~log ~public_key
           ~client_port
         |> ignore
+
+  let handle_shutdown ~monitor ~conf_dir ~log t =
+    Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
+        log_shutdown ~conf_dir ~log t ;
+        raise exn ) ;
+    Async_unix.Signal.(
+      handle terminating ~f:(fun signal ->
+          log_shutdown ~conf_dir ~log t ;
+          Logger.info log
+            !"Coda process got interrupted by signal %{sexp:t}"
+            signal ))
 end

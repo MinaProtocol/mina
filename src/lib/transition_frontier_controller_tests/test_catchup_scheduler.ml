@@ -1,5 +1,6 @@
 open Async
 open Core
+open Cache_lib
 open Pipe_lib
 
 module Stubs = Stubs.Make (struct
@@ -8,18 +9,22 @@ end)
 
 open Stubs
 
-module Catchup_scheduler = Transition_handler.Catchup_scheduler.Make (struct
-  module Time = Time
+module Inputs = struct
   include Transition_frontier_inputs
+  module Time = Time
   module State_proof = State_proof
   module Transition_frontier = Transition_frontier
-end)
+end
+
+module Catchup_scheduler = Transition_handler.Catchup_scheduler.Make (Inputs)
+module Transition_handler = Transition_handler.Make (Inputs)
+open Transition_handler
 
 let%test_module "Transition_handler.Catchup_scheduler tests" =
   ( module struct
     let logger = Logger.null ()
 
-    let time_controller = Time.Controller.create ()
+    let time_controller = Time.Controller.basic
 
     let timeout_duration = Time.Span.of_ms 200L
 
@@ -54,6 +59,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let%test_unit "after the timeout expires, the missing node still doesn't \
                    show up, so the catchup job is fired" =
+      Core.Backtrace.elide := false ;
+      Async.Scheduler.set_record_backtraces true ;
       let catchup_job_reader, catchup_job_writer =
         Strict_pipe.create Synchronous
       in
@@ -86,25 +93,39 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let dangling_transition =
             Transition_frontier.Breadcrumb.transition_with_hash
               dangling_breadcrumb
+            |> Cached.pure
           in
           Catchup_scheduler.watch scheduler ~timeout_duration
-            ~transition:dangling_transition ;
+            ~cached_transition:dangling_transition ;
           let result_ivar = Ivar.create () in
           Strict_pipe.Reader.iter_without_pushback catchup_job_reader
-            ~f:(fun catchup_hash -> Ivar.fill result_ivar catchup_hash )
+            ~f:(Ivar.fill result_ivar)
           |> don't_wait_for ;
-          let%map catchup_hash = Ivar.read result_ivar in
-          assert (Coda_base.State_hash.equal missing_hash catchup_hash) ;
+          let%map cached_catchup_transition =
+            match%map Ivar.read result_ivar with
+            | Rose_tree.T (t, []) -> t
+            | _ -> failwith "unexpected rose tree result"
+          in
+          let catchup_parent_hash =
+            Cached.peek cached_catchup_transition
+            |> With_hash.data |> External_transition.Verified.protocol_state
+            |> Protocol_state.previous_state_hash
+          in
+          assert (Coda_base.State_hash.equal missing_hash catchup_parent_hash) ;
           Strict_pipe.Writer.close catchup_breadcrumbs_writer ;
           Strict_pipe.Writer.close catchup_job_writer )
 
     let%test_unit "if a linear sequence of transitions in reverse order, \
                    catchup scheduler should not create duplicate jobs" =
+      let logger = Logger.null () in
       let _catchup_job_reader, catchup_job_writer =
         Strict_pipe.create Synchronous
       in
       let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
         Strict_pipe.create Synchronous
+      in
+      let unprocessed_transition_cache =
+        Unprocessed_transition_cache.create ~logger
       in
       Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
@@ -131,10 +152,20 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let missing_breadcrumb = List.hd_exn upcoming_breadcrumbs in
           let missing_transition = List.hd_exn upcoming_transitions in
           let dangling_transitions = List.tl_exn upcoming_transitions in
+          let cached_dangling_transitions =
+            List.map dangling_transitions
+              ~f:
+                (Fn.compose Or_error.ok_exn
+                   (Unprocessed_transition_cache.register
+                      unprocessed_transition_cache))
+          in
           List.(
-            iter (rev dangling_transitions) ~f:(fun transition ->
-                Catchup_scheduler.watch scheduler ~timeout_duration ~transition ;
-                assert (Catchup_scheduler.has_timeout scheduler transition) )) ;
+            iter (rev cached_dangling_transitions) ~f:(fun cached_transition ->
+                Catchup_scheduler.watch scheduler ~timeout_duration
+                  ~cached_transition ;
+                assert (
+                  Catchup_scheduler.has_timeout scheduler
+                    (Cached.peek cached_transition) ) )) ;
           let%bind _ : unit =
             Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb
           in
@@ -142,9 +173,19 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             ~hash:(With_hash.hash missing_transition)
           |> ignore ;
           assert (Catchup_scheduler.is_empty scheduler) ;
-          let%map received_rose_tree =
+          let%map cached_received_rose_tree =
             extract_children_from ~reader:catchup_breadcrumbs_reader
-              ~root:missing_breadcrumb
+              ~root:
+                ( Unprocessed_transition_cache.register
+                    unprocessed_transition_cache
+                    (Transition_frontier.Breadcrumb.transition_with_hash
+                       missing_breadcrumb)
+                |> Or_error.ok_exn
+                |> Cached.transform ~f:(Fn.const missing_breadcrumb) )
+          in
+          let received_rose_tree =
+            Rose_tree.map cached_received_rose_tree
+              ~f:(Fn.compose Or_error.ok_exn Cached.invalidate)
           in
           assert (
             List.equal
@@ -162,6 +203,9 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       in
       let catchup_breadcrumbs_reader, catchup_breadcrumbs_writer =
         Strict_pipe.create Synchronous
+      in
+      let unprocessed_transition_cache =
+        Unprocessed_transition_cache.create ~logger
       in
       Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
@@ -188,10 +232,17 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let missing_breadcrumb = List.hd_exn upcoming_breadcrumbs in
           let missing_transition = List.hd_exn upcoming_transitions in
           let dangling_transitions = List.tl_exn upcoming_transitions in
-          List.iter (List.permute dangling_transitions)
-            ~f:(fun dangling_transition ->
+          let cached_dangling_transitions =
+            List.map dangling_transitions
+              ~f:
+                (Fn.compose Or_error.ok_exn
+                   (Unprocessed_transition_cache.register
+                      unprocessed_transition_cache))
+          in
+          List.iter (List.permute cached_dangling_transitions)
+            ~f:(fun cached_transition ->
               Catchup_scheduler.watch scheduler ~timeout_duration
-                ~transition:dangling_transition ) ;
+                ~cached_transition ) ;
           assert (not @@ Catchup_scheduler.is_empty scheduler) ;
           let%bind _ : unit =
             Transition_frontier.add_breadcrumb_exn frontier missing_breadcrumb
@@ -200,9 +251,19 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             ~hash:(With_hash.hash missing_transition)
           |> ignore ;
           assert (Catchup_scheduler.is_empty scheduler) ;
-          let%map received_rose_tree =
+          let%map cached_received_rose_tree =
             extract_children_from ~reader:catchup_breadcrumbs_reader
-              ~root:missing_breadcrumb
+              ~root:
+                ( Unprocessed_transition_cache.register
+                    unprocessed_transition_cache
+                    (Transition_frontier.Breadcrumb.transition_with_hash
+                       missing_breadcrumb)
+                |> Or_error.ok_exn
+                |> Cached.transform ~f:(Fn.const missing_breadcrumb) )
+          in
+          let received_rose_tree =
+            Rose_tree.map cached_received_rose_tree
+              ~f:(Fn.compose Or_error.ok_exn Cached.invalidate)
           in
           assert (
             Rose_tree.equiv received_rose_tree upcoming_rose_tree

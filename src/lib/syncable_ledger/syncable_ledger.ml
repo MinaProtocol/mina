@@ -4,14 +4,72 @@ open Pipe_lib
 
 let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 
-type 'addr query = What_hash of 'addr | What_contents of 'addr | Num_accounts
-[@@deriving bin_io, sexp]
+module Query = struct
+  module Stable = struct
+    module V1 = struct
+      type 'addr t =
+        | What_hash of 'addr
+        | What_contents of 'addr
+        | Num_accounts
+      [@@deriving bin_io, sexp]
+    end
 
-type ('addr, 'hash, 'account) answer =
-  | Has_hash of 'addr * 'hash
-  | Contents_are of 'addr * 'account list
-  | Num_accounts of int * 'hash
-[@@deriving bin_io, sexp]
+    module Latest = V1
+  end
+
+  (* bin_io omitted intentionally *)
+  type 'addr t = 'addr Stable.Latest.t =
+    | What_hash of 'addr
+    | What_contents of 'addr
+    | Num_accounts
+  [@@deriving sexp]
+end
+
+module Answer = struct
+  module Stable = struct
+    module V1 = struct
+      type ('addr, 'hash, 'account) t =
+        | Has_hash of 'addr * 'hash
+        | Contents_are of 'addr * 'account list
+        | Num_accounts of int * 'hash
+      [@@deriving bin_io, sexp]
+    end
+
+    module Latest = V1
+  end
+
+  (* bin_io omitted intentionally *)
+  type ('addr, 'hash, 'account) t = ('addr, 'hash, 'account) Stable.Latest.t =
+    | Has_hash of 'addr * 'hash
+    | Contents_are of 'addr * 'account list
+    | Num_accounts of int * 'hash
+  [@@deriving sexp]
+end
+
+module type Inputs_intf = sig
+  module Addr : Merkle_address.S
+
+  module Account : sig
+    type t [@@deriving bin_io, sexp]
+  end
+
+  module Hash : Merkle_ledger.Intf.Hash with type account := Account.t
+
+  module Root_hash : sig
+    type t [@@deriving eq, sexp]
+
+    val to_hash : t -> Hash.t
+  end
+
+  module MT :
+    Merkle_ledger.Syncable_intf.S
+    with type hash := Hash.t
+     and type root_hash := Root_hash.t
+     and type addr := Addr.t
+     and type account := Account.t
+
+  val subtree_height : int
+end
 
 module type S = sig
   type t [@@deriving sexp]
@@ -137,36 +195,21 @@ don't even set all the hashes for the internal nodes!
 with the hashes in the bottomost N-1 internal nodes).
 *)
 
-module Make
-    (Addr : Merkle_address.S) (Account : sig
-        type t [@@deriving bin_io, sexp]
-    end) (Hash : sig
-      type t [@@deriving bin_io, sexp, eq]
+module Make (Inputs : Inputs_intf) : sig
+  open Inputs
 
-      include
-        Merkle_ledger.Intf.Hash with type account := Account.t and type t := t
-    end) (Root_hash : sig
-      type t [@@deriving eq, sexp]
-
-      val to_hash : t -> Hash.t
-    end)
-    (MT : Merkle_ledger.Syncable_intf.S
-          with type hash := Hash.t
-           and type root_hash := Root_hash.t
-           and type addr := Addr.t
-           and type account := Account.t) (Subtree_height : sig
-        val subtree_height : int
-    end) :
-  S
-  with type merkle_tree := MT.t
-   and type hash := Hash.t
-   and type root_hash := Root_hash.t
-   and type addr := Addr.t
-   and type merkle_path := MT.path
-   and type account := Account.t
-   and type query := Addr.t query
-   and type answer := (Addr.t, Hash.t, Account.t) answer = struct
-  type addr = Addr.t
+  include
+    S
+    with type merkle_tree := MT.t
+     and type hash := Hash.t
+     and type root_hash := Root_hash.t
+     and type addr := Addr.t
+     and type merkle_path := MT.path
+     and type account := Account.t
+     and type query := Addr.t Query.t
+     and type answer := (Addr.t, Hash.t, Account.t) Answer.t
+end = struct
+  open Inputs
 
   type diff = unit
 
@@ -256,9 +299,9 @@ module Make
       | _ -> false
   end
 
-  type nonrec answer = (Addr.t, Hash.t, Account.t) answer
+  type answer = (Addr.t, Hash.t, Account.t) Answer.t
 
-  type nonrec query = Addr.t query
+  type query = Addr.t Query.t
 
   (* idea: make this verifiable by including the merkle path to the rightmost account, and verify that
        filling in empty hashes for the rest amounts to the correct hash. *)
@@ -444,7 +487,7 @@ module Make
     go (empty_hash_at_height start_height) hash start_height
 
   let handle_node t addr exp_hash =
-    if Addr.depth addr >= MT.depth - Subtree_height.subtree_height then (
+    if Addr.depth addr >= MT.depth - subtree_height then (
       expect_content t addr exp_hash ;
       Linear_pipe.write_without_pushback t.queries
         (desired_root_exn t, What_contents addr) )
@@ -485,13 +528,13 @@ module Make
       else
         let res =
           match a with
-          | Has_hash (addr, h') -> (
+          | Answer.Has_hash (addr, h') -> (
             match add_child_hash_to t addr h' with
             (* TODO #435: Stick this in a log, punish the sender *)
             | Error e ->
                 Logger.faulty_peer t.log
                   !"Got error from when trying to add child_hash %{sexp: \
-                    Hash.t} %s %{sexp: Network_peer.Peer.t}"
+                    Hash.t} %s %{sexp: Envelope.Sender.t}"
                   h' (Error.to_string_hum e)
                   (Envelope.Incoming.sender env) ;
                 ()

@@ -2,10 +2,12 @@
 [%%import "config/coinbase/standard.mlh"]
 [%%import "config/consensus/postake_tiny.mlh"]
 [%%import "config/scan_state/small.mlh"]
-[%%import "config/debug_level/logs.mlh"]
+[%%import "config/debug_level/some.mlh"]
 [%%import "config/proof_level/none.mlh"]
 
+[%%define time_offsets false]
 [%%define delta 8]
+[%%define cache_exceptions false]
 [%%define fake_hash true]
 
 [%%define genesis_ledger "testnet_postake"]

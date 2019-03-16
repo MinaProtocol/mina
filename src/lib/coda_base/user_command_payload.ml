@@ -195,7 +195,8 @@ let gen =
   let open Quickcheck.Generator.Let_syntax in
   let%bind common = Common.gen in
   let max_amount =
-    Currency.Amount.(sub max_int (of_fee common.fee)) |> Option.value_exn
+    Currency.Amount.(sub max_int (of_fee common.fee))
+    |> Option.value_exn ?here:None ?error:None ?message:None
   in
   let%map body = Body.gen ~max_amount in
   {common; body}
