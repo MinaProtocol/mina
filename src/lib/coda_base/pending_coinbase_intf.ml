@@ -21,11 +21,12 @@ module type S = sig
   type t [@@deriving sexp, bin_io]
 
   module Coinbase_data : sig
-    type t = Public_key.Compressed.t * Amount.t [@@deriving bin_io, sexp]
+    type t = Public_key.Compressed.t * Amount.Signed.t
+    [@@deriving bin_io, sexp]
 
     type value [@@deriving bin_io, sexp]
 
-    type var = Public_key.Compressed.var * Amount.var
+    type var = Public_key.Compressed.var * Amount.Signed.var
 
     val typ : (var, t) Typ.t
 

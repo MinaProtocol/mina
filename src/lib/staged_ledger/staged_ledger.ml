@@ -54,8 +54,6 @@ end = struct
       | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
       | Non_zero_fee_excess of
           Scan_state.Space_partition.t * Transaction.t list
-      | Invalid_proof of
-          Ledger_proof.t * Ledger_proof_statement.t * Compressed_public_key.t
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -81,12 +79,6 @@ end = struct
               Transaction.t list} and the current queue with slots \
               partitioned as %{sexp: Scan_state.Space_partition.t} \n"
             txns partition
-      | Invalid_proof (p, s, prover) ->
-          Format.asprintf
-            !"Verification failed for proof: %{sexp: Ledger_proof.t} \
-              Statement: %{sexp: Ledger_proof_statement.t} Prover: \
-              %{sexp:Compressed_public_key.t}\n"
-            p s prover
       | Unexpected e -> Error.to_string_hum e
 
     let to_error = Fn.compose Error.of_string to_string
@@ -100,26 +92,15 @@ end = struct
     | Ok a -> Ok a
     | Error e -> Error (Staged_ledger_error.Unexpected e)
 
-  type job = Scan_state.Available_job.t [@@deriving sexp]
+  type job = Scan_state.Available_job.t
 
   let verify_proof proof statement ~message =
     Inputs.Ledger_proof_verifier.verify proof statement ~message
 
-  let verify ~message job proof prover =
-    let open Deferred.Let_syntax in
+  let verify ~message job proof =
     match Scan_state.statement_of_job job with
-    | None ->
-        Deferred.return
-          ( Or_error.errorf !"Error creating statement from job %{sexp:job}" job
-          |> to_staged_ledger_or_error )
-    | Some statement -> (
-        match%map verify_proof proof statement ~message with
-        | true -> Ok ()
-        | _ ->
-            Error
-              (Staged_ledger_error.Invalid_proof (proof, statement, prover)) )
-
-  (*TODO: Punish*)
+    | None -> return false
+    | Some statement -> verify_proof proof statement ~message
 
   module M = struct
     include Monad.Ident
@@ -498,6 +479,11 @@ end = struct
   let check_completed_works scan_state
       (completed_works : Transaction_snark_work.t list) =
     let open Deferred.Result.Let_syntax in
+    let check_or_error label b =
+      if not b then
+        Error (Staged_ledger_error.Unexpected (Error.of_string label))
+      else Ok ()
+    in
     let%bind jobses =
       Deferred.return
         (let open Result.Let_syntax in
@@ -508,28 +494,12 @@ end = struct
         in
         chunks_of jobs ~n:Transaction_snark_work.proofs_length)
     in
-    let rec check job_proofs prover message =
-      let open Deferred.Let_syntax in
-      match job_proofs with
-      | [] -> Deferred.return (Ok ())
-      | (job, proof) :: js -> (
-          match%bind verify ~message job proof prover with
-          | Ok () -> check js prover message
-          | e -> Deferred.return e )
-    in
-    let rec go (job_work_pairs : (job list * Transaction_snark_work.t) list) =
-      let open Deferred.Let_syntax in
-      match job_work_pairs with
-      | [] -> Deferred.return (Ok ())
-      | (jobs, work) :: js -> (
-          let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
-          match%bind
-            check (List.zip_exn jobs work.proofs) work.prover message
-          with
-          | Ok () -> go js
-          | e -> Deferred.return e )
-    in
-    go (List.zip_exn jobses completed_works)
+    Deferred.List.for_all (List.zip_exn jobses completed_works)
+      ~f:(fun (jobs, work) ->
+        let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
+        Deferred.List.for_all (List.zip_exn jobs work.proofs)
+          ~f:(fun (job, proof) -> verify ~message job proof ) )
+    |> Deferred.map ~f:(check_or_error "proofs did not verify")
 
   let create_fee_transfers completed_works delta public_key coinbase_fts =
     let open Result.Let_syntax in
