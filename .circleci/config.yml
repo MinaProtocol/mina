@@ -51,6 +51,7 @@ jobs:
     update-branch-protection:
         docker:
             - image: python:3
+        steps:
             - run:
                 name: Install dependencies
                 command: pip install --user requests
