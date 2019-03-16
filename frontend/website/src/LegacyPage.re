@@ -91,7 +91,7 @@ module Header = {
 
 module Footer = {
   module Link = {
-    let component = ReasonReact.statelessComponent("Page.Footer.Link");
+    let component = ReasonReact.statelessComponent("LegacyPage.Footer.Link");
     let make = (~last=false, ~link, ~name, children) => {
       ...component,
       render: _self =>
@@ -165,7 +165,7 @@ module Footer = {
   };
 };
 
-let component = ReasonReact.statelessComponent("Page");
+let component = ReasonReact.statelessComponent("LegacyPage");
 let make = (~name, ~extraHeaders=ReasonReact.null, ~footerColor="", children) => {
   ...component,
   render: _ =>
