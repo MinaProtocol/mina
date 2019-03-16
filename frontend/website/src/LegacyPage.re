@@ -1,6 +1,6 @@
 module Header = {
   let component = ReasonReact.statelessComponent("Header");
-  let make = (~extra, _children) => {
+  let make = (~extra, ~filename, _children) => {
     ...component,
     render: _self =>
       <head>
@@ -39,11 +39,16 @@ module Header = {
           integrity="sha384-G0fIWCsCzJIMAVNQPfjH08cyYaUtMwjJwqiRKxxE/rx96Uroj1BtIQ6MLJuheaO9"
           crossOrigin="anonymous"
         />
-        <link rel="stylesheet" type_="text/css" href="static/css/common.css" />
+        <link rel="stylesheet" type_="text/css" href={filename ++ ".css"} />
         <link
           rel="stylesheet"
           type_="text/css"
-          href="static/css/gallery.css"
+          href="/static/css/common.css"
+        />
+        <link
+          rel="stylesheet"
+          type_="text/css"
+          href="/static/css/gallery.css"
         />
         <link
           media="only screen and (min-device-width: 700px)"
@@ -98,11 +103,11 @@ module Footer = {
             target="_blank">
             ...children
           </a>
-          {last ?
-             <span className="dn" /> :
-             <span className="f6 silver">
-               {ReasonReact.string({js| · |js})}
-             </span>}
+          {last
+             ? <span className="dn" />
+             : <span className="f6 silver">
+                 {ReasonReact.string({js| · |js})}
+               </span>}
         </li>,
     };
   };
@@ -161,11 +166,11 @@ module Footer = {
 };
 
 let component = ReasonReact.statelessComponent("LegacyPage");
-let make = (~extraHeaders=ReasonReact.null, ~footerColor="", children) => {
+let make = (~name, ~extraHeaders=ReasonReact.null, ~footerColor="", children) => {
   ...component,
   render: _ =>
     <html>
-      <Header extra=extraHeaders />
+      <Header extra=extraHeaders filename=name />
       <body className="metropolis black bg-white">
         <Nav>
           <a> {ReasonReact.string("Blog")} </a>
