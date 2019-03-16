@@ -112,14 +112,20 @@ def run(args):
         wet('$ ' + cmd, do)
 
 
+    logproc_filter = '.level in ["Warn", "Error", "Fatal", "Faulty_peer"]'
+    coda_build_path = './_build/default'
+
     coda_app_path = 'app' if os.path.exists('dune-project') else 'src/app'
     coda_exe_path = os.path.join(coda_app_path, 'cli/src/coda.exe')
-    logproc_exe_path = os.path.join(coda_app_path, 'logproc/logproc.exe')
-    coda_build_path = './_build/default'
     coda_exe = os.path.join(coda_build_path, coda_exe_path)
-    logproc_exe = os.path.join(coda_build_path, logproc_exe_path)
 
-    logproc_filter = '.level in ["Warn", "Error", "Fatal", "Faulty_peer"]'
+    if os.system('which logproc'):
+        logproc_exe = 'logproc'
+        build_targets = coda_exe
+    else:
+        logproc_exe_path = os.path.join(coda_app_path, 'logproc/logproc.exe')
+        logproc_exe = os.path.join(coda_build_path, logproc_exe_path)
+        build_targets = '%s %s' % (coda_exe_path, logproc_exe_path)
 
     test_permutations = filter_test_permutations(args.whitelist_patterns, args.blacklist_patterns)
     if len(test_permutations) == 0:
@@ -154,8 +160,8 @@ def run(args):
         print('- %s:' % profile)
         build_log = os.path.join(profile_dir, 'build.log')
         run_cmd(
-            'dune build --display=progress --profile=%s %s %s 2> %s'
-                % (profile, coda_exe_path, logproc_exe_path, build_log),
+            'dune build --display=progress --profile=%s %s 2> %s'
+                % (profile, build_targets, build_log),
             lambda: fail_with_log('building %s failed' % profile, build_log)
         )
 
