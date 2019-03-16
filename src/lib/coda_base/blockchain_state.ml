@@ -21,7 +21,8 @@ module type S = sig
         t_
       [@@deriving bin_io, sexp, eq, compare, hash]
     end
-    (*    module Latest = V1 *)
+
+    module Latest : module type of V1
   end
 
   type t = Stable.V1.t [@@deriving sexp, eq, compare, hash]
@@ -105,7 +106,7 @@ end) : S = struct
       include Module_version.Registration.Make_latest_version (T)
     end
 
-    (*     module Latest = V1 *)
+    module Latest = V1
 
     module Module_decl = struct
       let name = "coda_base_blockchain_state"

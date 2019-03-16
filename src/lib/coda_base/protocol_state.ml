@@ -46,12 +46,24 @@ module type S = sig
   module Body : sig
     type ('a, 'b) t [@@deriving bin_io, sexp]
 
-    type value = (Blockchain_state.value, Consensus_state.value) t
-    [@@deriving bin_io, sexp]
+    module Value : sig
+      module Stable : sig
+        module V1 : sig
+          (* TODO : version these pieces *)
+          type nonrec t = (Blockchain_state.value, Consensus_state.value) t
+          [@@deriving bin_io, sexp]
+        end
+
+        module Latest : module type of V1
+      end
+
+      (* bin_io omitted *)
+      type t = Stable.Latest.t [@@deriving sexp]
+    end
 
     type var = (Blockchain_state.var, Consensus_state.var) t
 
-    val hash : value -> State_body_hash.t
+    val hash : Value.t -> State_body_hash.t
   end
 
   type ('a, 'body) t [@@deriving bin_io, sexp]
@@ -59,8 +71,7 @@ module type S = sig
   module Value : sig
     module Stable : sig
       module V1 : sig
-        type nonrec t =
-          (State_hash.Stable.V1.t, (* TODO: version *) Body.value) t
+        type nonrec t = (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) t
         [@@deriving sexp, bin_io, compare, eq]
       end
 
@@ -146,8 +157,36 @@ module Make
   module Body = struct
     include Body
 
-    type value = (Blockchain_state.Stable.V1.t, Consensus_state.value) t
-    [@@deriving eq, ord, bin_io, hash, sexp]
+    module Value = struct
+      module Stable = struct
+        module V1 = struct
+          module T = struct
+            let version = 1
+
+            type tt = (Blockchain_state.Stable.V1.t, Consensus_state.value) t
+            [@@deriving eq, ord, bin_io, hash, sexp]
+
+            type t = tt [@@deriving eq, ord, bin_io, hash, sexp]
+          end
+
+          include T
+          include Registration.Make_latest_version (T)
+        end
+
+        module Latest = V1
+
+        module Module_decl = struct
+          let name = "protocol_state_body"
+
+          type latest = Latest.t
+        end
+
+        module Registrar = Registration.Make (Module_decl)
+        module Registered_V1 = Registrar.Register (V1)
+      end
+
+      type t = Stable.Latest.t [@@deriving sexp]
+    end
 
     type var = (Blockchain_state.var, Consensus_state.var) t
 
@@ -196,7 +235,7 @@ module Make
         module T = struct
           let version = 1
 
-          type t_ = (State_hash.Stable.V1.t, Body.value) t
+          type t_ = (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) t
           [@@deriving bin_io, sexp, hash, compare, eq]
 
           type t = t_ [@@deriving bin_io, sexp, hash, compare, eq]
