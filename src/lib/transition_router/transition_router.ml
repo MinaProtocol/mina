@@ -195,7 +195,7 @@ module Make (Inputs : Inputs_intf) :
       create_bufferred_pipe ()
     in
     let best_tip_diff_reader, best_tip_diff_writer =
-      Strict_pipe.create (Buffered (`Capacity 10, `Overflow Crash))
+      Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
     in
     let ( transition_frontier_controller_reader
         , transition_frontier_controller_writer ) =

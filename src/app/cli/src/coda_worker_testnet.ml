@@ -259,8 +259,7 @@ let events workers start_reader =
 let start_checks log workers payment_reader start_reader testnet
     ~acceptable_delay =
   let event_pipe, diff_pipe = events workers start_reader in
-  let prefix_events, payment_events = Linear_pipe.fork2 event_pipe in
-  start_prefix_check log workers prefix_events testnet ~acceptable_delay ;
+  start_prefix_check log workers event_pipe testnet ~acceptable_delay ;
   start_payment_check log diff_pipe payment_reader workers testnet
     ~acceptable_delay:7
 
