@@ -512,8 +512,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; snark_pool_disk_location: string
       ; ledger_db_location: string option
       ; staged_ledger_transition_backup_capacity: int [@default 10]
-      ; time_controller: Time.Controller.t
-      ; banlist: Coda_base.Banlist.t
+      ; time_controller: Time.Controller.t (* FIXME trust system goes here? *)
       ; receipt_chain_database: Coda_base.Receipt_chain_database.t
       ; snark_work_fee: Currency.Fee.t
       ; monitor: Monitor.t option

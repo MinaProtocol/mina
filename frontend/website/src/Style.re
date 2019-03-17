@@ -1,6 +1,17 @@
 module Colors = {
   let fadedBlue = `rgb((111, 167, 197));
+  let white = Css.white;
 };
+
+module MediaQuery = {
+  let full = "(min-width: 48rem)";
+};
+
+/** sets both paddingLeft and paddingRight, as one should */
+let paddingX = m => Css.[paddingLeft(m), paddingRight(m)];
+
+/** sets both paddingTop and paddingBottom, as one should */
+let paddingY = m => Css.[paddingTop(m), paddingBottom(m)];
 
 module H3 = {
   open Css;
@@ -8,14 +19,13 @@ module H3 = {
   let wide = {
     let wing = [
       contentRule(" "),
-      paddingLeft(`rem(3.0)),
-      paddingRight(`rem(3.0)),
       marginLeft(`rem(0.25)),
       fontSize(`px(5)),
       verticalAlign(`top),
       lineHeight(`rem(1.3)),
       borderTop(`pt(1), `solid, `rgba((155, 155, 155, 0.3))),
       borderBottom(`pt(1), `solid, `rgba((155, 155, 155, 0.3))),
+      ...paddingX(`rem(3.0)),
     ];
 
     merge([

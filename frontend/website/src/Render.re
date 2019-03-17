@@ -42,23 +42,17 @@ let writeStatic = (path, rootComponent) => {
   Node.Fs.writeFileAsUtf8Sync(path ++ ".css", rendered##css);
 };
 
-let load = path => {
-  Node.Child_process.execSync(
-    "pandoc " ++ path ++ " --mathjax",
-    Node.Child_process.option(),
-  );
-};
-
-let postSuffix = ".markdown";
 let posts =
   Node.Fs.readdirSync("posts")
-  |> Js.Array.filter(s => Js.String.endsWith(postSuffix, s))
-  |> Array.map(fileName => {
-       let length = String.length(fileName) - String.length(postSuffix);
+  |> Array.to_list
+  |> List.filter(s => Js.String.endsWith(Markdown.suffix, s))
+  |> List.map(fileName => {
+       let length = String.length(fileName) - String.length(Markdown.suffix);
        let name = String.sub(fileName, 0, length);
-       let content = Node.Fs.readFileAsUtf8Sync("posts/" ++ fileName);
-       let html = load("posts/" ++ fileName);
-       (name, content, html);
+       let path = "posts/" ++ fileName;
+       let (html, content) = Markdown.load(path);
+       let metadata = BlogPost.parseMetadata(content, path);
+       (name, html, metadata);
      });
 
 module Router = {
@@ -102,33 +96,56 @@ Router.(
     Dir(
       "site",
       [|
+        File(
+          "index",
+          <Page name="index" extraHeaders=Home.extraHeaders> <Home /> </Page>,
+        ),
         Dir(
           "blog",
           posts
-          |> Array.map(((name, _content, html)) =>
+          |> Array.of_list
+          |> Array.map(((name, html, metadata)) =>
                File(
                  name,
-                 <Page extraHeaders=BlogPost.extraHeaders>
-                   <BlogPost
-                     name
-                     title="A SNARKy Exponential Function"
-                     subtitle="Simulating real numbers using finite field arithmetic"
-                     author="Izaak Meckler"
-                     authorWebsite="www.twitter.com/imeckler"
-                     date="March 09 2019"
-                     html
-                   />
-                 </Page>,
+                 <LegacyPage
+                   name
+                   extraHeaders=BlogPost.extraHeaders
+                   footerColor="bg-snow">
+                   <BlogPost name html metadata />
+                 </LegacyPage>,
+               )
+             ),
+        ),
+        Dir(
+          "jobs",
+          jobOpenings
+          |> Array.map(((name, _)) =>
+               File(
+                 name,
+                 <LegacyPage name footerColor="bg-snow">
+                   <CareerPost path={"jobs/" ++ name ++ ".markdown"} />
+                 </LegacyPage>,
                )
              ),
         ),
         File(
           "jobs",
-          <Page extraHeaders=Careers.extraHeaders>
+          <LegacyPage name="jobs" extraHeaders=Careers.extraHeaders>
             <Careers jobOpenings />
+          </LegacyPage>,
+        ),
+        File(
+          "code",
+          <LegacyPage name="code" extraHeaders=Code.extraHeaders>
+            <Code />
+          </LegacyPage>,
+        ),
+        File(
+          "blog",
+          <Page name="blog" extraHeaders=BlogPost.extraHeaders>
+            <Blog posts />
           </Page>,
         ),
-        File("code", <Page extraHeaders=Code.extraHeaders> <Code /> </Page>),
       |],
     ),
   )

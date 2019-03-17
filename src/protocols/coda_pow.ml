@@ -123,6 +123,8 @@ module type Ledger_hash_intf = sig
       module V1 : sig
         type t [@@deriving eq, sexp, compare, bin_io]
       end
+
+      module Latest = V1
     end
     with type V1.t = t
 
@@ -624,7 +626,19 @@ module type Staged_ledger_diff_intf = sig
   [@@deriving sexp, bin_io]
 
   type t = {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
-  [@@deriving sexp, bin_io]
+  [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t =
+          {diff: diff; prev_hash: staged_ledger_hash; creator: public_key}
+        [@@deriving sexp, bin_io]
+      end
+
+      module Latest = V1
+    end
+    with type V1.t = t
 
   module With_valid_signatures_and_proofs : sig
     type pre_diff_with_at_most_two_coinbase =
@@ -705,6 +719,8 @@ module type Transaction_snark_scan_state_intf = sig
 
         val hash : t -> staged_ledger_aux_hash
       end
+
+      module Latest = V1
     end
     with type V1.t = t
 
@@ -860,6 +876,8 @@ module type Staged_ledger_base_intf = sig
 
           val hash : t -> staged_ledger_aux_hash
         end
+
+        module Latest = V1
       end
       with type V1.t = t
 
@@ -1142,7 +1160,17 @@ module type Internal_transition_intf = sig
 
   type prover_state
 
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp]
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io]
+      end
+
+      module Latest = V1
+    end
+    with type V1.t = t
 
   val create :
        snark_transition:snark_transition
