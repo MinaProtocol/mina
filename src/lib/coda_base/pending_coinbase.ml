@@ -114,10 +114,6 @@ module Coinbase_stack = struct
         ( Pedersen.(State.salt params ~get_chunk_table "CoinbaseStack")
         |> Pedersen.State.digest )
 
-    let digest t =
-      Pedersen.State.digest
-        (Pedersen.hash_fold Hash_prefix.coinbase_stack (fold t))
-
     module Checked = struct
       type t = var
 
@@ -151,10 +147,6 @@ module Coinbase_stack = struct
       let if_ = if_
 
       let empty = var_of_t empty
-
-      let digest t =
-        var_to_triples t
-        >>= Pedersen.Checked.digest_triples ~init:Hash_prefix.coinbase_stack
     end
   end
 end
@@ -185,7 +177,7 @@ module T = struct
   module Stack = struct
     include Coinbase_stack.Stack
 
-    let hash (t : t) = Hash.of_digest (digest t :> field)
+    let hash (t : t) = Hash.of_digest (t :> field)
   end
 
   module Merkle_tree =
@@ -227,7 +219,7 @@ module T = struct
 
           type value = t [@@deriving sexp]
 
-          let hash = Checked.digest
+          let hash (t : var) = return (var_to_hash_packed t)
         end)
 
     let depth = coinbase_tree_depth

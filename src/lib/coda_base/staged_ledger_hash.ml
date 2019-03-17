@@ -43,7 +43,7 @@ module Aux_hash = struct
   let dummy : t = String.init length_in_bytes ~f:(fun _ -> '\000')
 end
 
-module Pending_coinbase_extra = struct
+module Pending_coinbase_aux = struct
   let length_in_bits = 256
 
   let length_in_bytes = length_in_bits / 8
@@ -90,7 +90,7 @@ module Non_snark = struct
         type t =
           { ledger_hash: Ledger_hash.Stable.V1.t
           ; aux_hash: Aux_hash.t
-          ; pending_coinbase_extra: Pending_coinbase_extra.t }
+          ; pending_coinbase_aux: Pending_coinbase_aux.t }
         [@@deriving bin_io, sexp, eq, compare, hash]
       end
 
@@ -117,7 +117,7 @@ module Non_snark = struct
   let dummy =
     { ledger_hash= Ledger_hash.of_hash Field.zero
     ; aux_hash= Aux_hash.dummy
-    ; pending_coinbase_extra= Pending_coinbase_extra.dummy }
+    ; pending_coinbase_aux= Pending_coinbase_aux.dummy }
 
   type var = Boolean.var Triple.t list
 
@@ -125,11 +125,11 @@ module Non_snark = struct
 
   let length_in_triples = (length_in_bits + 2) / 3
 
-  let digest {ledger_hash; aux_hash; pending_coinbase_extra} =
+  let digest {ledger_hash; aux_hash; pending_coinbase_aux} =
     let h = Digestif.SHA256.init () in
     let h = Digestif.SHA256.feed_string h (Ledger_hash.to_bytes ledger_hash) in
     let h = Digestif.SHA256.feed_string h aux_hash in
-    let h = Digestif.SHA256.feed_string h pending_coinbase_extra in
+    let h = Digestif.SHA256.feed_string h pending_coinbase_aux in
     (Digestif.SHA256.get h :> string)
 
   let fold t = Fold.string_triples (digest t)
@@ -138,8 +138,8 @@ module Non_snark = struct
 
   let aux_hash {aux_hash; _} = aux_hash
 
-  let of_ledger_aux_coinbase_hash aux_hash ledger_hash pending_coinbase_extra =
-    {aux_hash; ledger_hash; pending_coinbase_extra}
+  let of_ledger_aux_coinbase_hash aux_hash ledger_hash pending_coinbase_aux =
+    {aux_hash; ledger_hash; pending_coinbase_aux}
 
   let var_to_triples = Checked.return
 
