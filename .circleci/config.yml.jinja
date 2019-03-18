@@ -164,6 +164,8 @@ jobs:
                   name: Running test -- {{profile}}:{{test}}
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
             {%- endfor %}
+            - store_artifacts:
+                  path: test_logs
     {%- endfor %}
 
 workflows:
