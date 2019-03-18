@@ -28,7 +28,7 @@ let main () =
     Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~log ~node:1
       ~largest_account_keypair ~payment_receiver:0
   in
-  let%bind () = after (Time.Span.of_sec 60.) in
+  let%bind () = after (Time.Span.of_sec 180.) in
   let%map () = Coda_worker_testnet.Api.teardown testnet in
   Logger.info log "SUCCEEDED" ;
   ()

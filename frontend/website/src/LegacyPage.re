@@ -172,13 +172,7 @@ let make = (~name, ~extraHeaders=ReasonReact.null, ~footerColor="", children) =>
     <html>
       <Header extra=extraHeaders filename=name />
       <body className="metropolis black bg-white">
-        <Nav>
-          <a> {ReasonReact.string("Blog")} </a>
-          <a> {ReasonReact.string("Testnet")} </a>
-          <a> {ReasonReact.string("Github")} </a>
-          <a> {ReasonReact.string("Careers")} </a>
-          <a> {ReasonReact.string("Sign Up")} </a>
-        </Nav>
+        <CodaNav />
         <div className="wrapper"> ...children </div>
         <Footer color=footerColor />
       </body>

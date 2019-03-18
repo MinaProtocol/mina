@@ -10,7 +10,8 @@
     "start": "cd site && python -m http.server 8000",
     "reformat": "bsrefmt --in-place src/*.re",
     "link-static": "ln -s $(pwd)/../../src/app/website/static site/static",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy-ci": "firebase deploy --project coda-staging-84430 --token \"$FIREBASE_TOKEN\""
   },
   "dependencies": {
     "bs-css": "8.0.2",
@@ -19,7 +20,8 @@
     "rimraf": "^2.6.3"
   },
   "devDependencies": {
-    "bs-platform": "^4.0.18"
+    "bs-platform": "^4.0.18",
+    "firebase-tools": "^6.5.0"
   },
   "author": "",
   "license": "ISC"
