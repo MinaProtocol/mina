@@ -1001,7 +1001,17 @@ module type Blockchain_state_intf = sig
 
   type time
 
-  type value [@@deriving sexp, bin_io]
+  module Value : sig
+    type t [@@deriving sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving sexp, bin_io]
+        end
+      end
+      with type V1.t = t
+  end
 
   type var
 
@@ -1009,13 +1019,13 @@ module type Blockchain_state_intf = sig
        staged_ledger_hash:staged_ledger_hash
     -> snarked_ledger_hash:frozen_ledger_hash
     -> timestamp:time
-    -> value
+    -> Value.t
 
-  val staged_ledger_hash : value -> staged_ledger_hash
+  val staged_ledger_hash : Value.t -> staged_ledger_hash
 
-  val snarked_ledger_hash : value -> frozen_ledger_hash
+  val snarked_ledger_hash : Value.t -> frozen_ledger_hash
 
-  val timestamp : value -> time
+  val timestamp : Value.t -> time
 end
 
 module type Protocol_state_intf = sig
@@ -1281,7 +1291,7 @@ module type Consensus_mechanism_intf = sig
   module Protocol_state :
     Protocol_state_intf
     with type state_hash := protocol_state_hash
-     and type blockchain_state := Blockchain_state.value
+     and type blockchain_state := Blockchain_state.Value.t
      and type consensus_state := Consensus_state.value
 
   module Prover_state : sig
@@ -1303,19 +1313,19 @@ module type Consensus_mechanism_intf = sig
          ?sok_digest:sok_digest
       -> ?ledger_proof:proof
       -> supply_increase:Currency.Amount.t
-      -> blockchain_state:Blockchain_state.value
+      -> blockchain_state:Blockchain_state.Value.t
       -> consensus_data:Consensus_transition_data.value
       -> unit
       -> value
 
-    val blockchain_state : value -> Blockchain_state.value
+    val blockchain_state : value -> Blockchain_state.Value.t
 
     val consensus_data : value -> Consensus_transition_data.value
   end
 
   val generate_transition :
        previous_protocol_state:Protocol_state.value
-    -> blockchain_state:Blockchain_state.value
+    -> blockchain_state:Blockchain_state.Value.t
     -> time:Int64.t
     -> proposal_data:Proposal_data.t
     -> transactions:user_command list

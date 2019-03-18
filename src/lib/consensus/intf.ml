@@ -116,7 +116,7 @@ module type S = sig
 
   val generate_transition :
        previous_protocol_state:Protocol_state.value
-    -> blockchain_state:Blockchain_state.value
+    -> blockchain_state:Blockchain_state.Value.t
     -> time:Unix_timestamp.t
     -> proposal_data:Proposal_data.t
     -> transactions:Coda_base.User_command.t list

@@ -45,7 +45,7 @@ module type S = sig
   module Body : sig
     type ('a, 'b) t [@@deriving bin_io, sexp]
 
-    type value = (Blockchain_state.value, Consensus_state.value) t
+    type value = (Blockchain_state.Value.t, Consensus_state.value) t
     [@@deriving bin_io, sexp]
 
     type var = (Blockchain_state.var, Consensus_state.var) t
@@ -71,7 +71,7 @@ module type S = sig
 
   val create_value :
        previous_state_hash:State_hash.Stable.V1.t
-    -> blockchain_state:Blockchain_state.t
+    -> blockchain_state:Blockchain_state.Value.t
     -> consensus_state:Consensus_state.value
     -> value
 
@@ -134,7 +134,7 @@ module Make
   module Body = struct
     include Body
 
-    type value = (Blockchain_state.value, Consensus_state.value) t
+    type value = (Blockchain_state.Value.Stable.V1.t, Consensus_state.value) t
     [@@deriving eq, ord, bin_io, hash, sexp]
 
     type var = (Blockchain_state.var, Consensus_state.var) t
