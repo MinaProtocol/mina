@@ -31,6 +31,9 @@ jobs:
             - run:
                   name: Build website
                   command: cd frontend/website && npm run build && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && node ./lib/js/src/Render.js
+            - run:
+                  name: Deploy staging
+                  command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "master" ]; then npm run deploy-ci; fi)
 
     lint:
         docker:
@@ -208,6 +211,8 @@ jobs:
             - run:
                   name: Running test -- fake_hash:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "fake_hash:full-test"'
+            - store_artifacts:
+                  path: test_logs
     test--test_postake:
         resource_class: large
         docker:
@@ -221,6 +226,8 @@ jobs:
             - run:
                   name: Running test -- test_postake:transaction-snark-profiler -check-only
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:transaction-snark-profiler -check-only"'
+            - store_artifacts:
+                  path: test_logs
     test--test_postake_bootstrap:
         resource_class: large
         docker:
@@ -231,6 +238,8 @@ jobs:
             - run:
                   name: Running test -- test_postake_bootstrap:coda-bootstrap-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_bootstrap:coda-bootstrap-test"'
+            - store_artifacts:
+                  path: test_logs
     test--test_postake_catchup:
         resource_class: large
         docker:
@@ -241,6 +250,8 @@ jobs:
             - run:
                   name: Running test -- test_postake_catchup:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_catchup:coda-restart-node-test"'
+            - store_artifacts:
+                  path: test_logs
     test--test_postake_snarkless:
         resource_class: large
         docker:
@@ -254,6 +265,8 @@ jobs:
             - run:
                   name: Running test -- test_postake_snarkless:transaction-snark-profiler -check-only
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless:transaction-snark-profiler -check-only"'
+            - store_artifacts:
+                  path: test_logs
     test--test_postake_split_snarkless:
         resource_class: large
         docker:
@@ -282,6 +295,8 @@ jobs:
             - run:
                   name: Running test -- test_postake_split_snarkless:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-restart-node-test"'
+            - store_artifacts:
+                  path: test_logs
 
 workflows:
     version: 2

@@ -158,4 +158,8 @@ let error ?loc ?attrs t fmt = log ~level:Error ?loc ?attrs t fmt
 
 let fatal ?loc ?attrs t fmt = log ~level:Fatal ?loc ?attrs t fmt
 
-let faulty_peer ?loc ?attrs t fmt = log ~level:Faulty_peer ?loc ?attrs t fmt
+let faulty_peer_without_punishment ?loc ?attrs t fmt =
+  log ~level:Faulty_peer ?loc ?attrs t fmt
+
+(* deprecated, use Trust_system.record instead *)
+let faulty_peer = faulty_peer_without_punishment
