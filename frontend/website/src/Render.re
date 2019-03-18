@@ -146,6 +146,18 @@ Router.(
             <Blog posts />
           </Page>,
         ),
+        File(
+          "privacy",
+          <Page name="privacy">
+            <RawHtml path="html/Privacy.html" />
+          </Page>,
+        ),
+        File(
+          "tos",
+          <Page name="tos">
+            <RawHtml path="html/TOS.html" />
+          </Page>,
+        ),
       |],
     ),
   )
