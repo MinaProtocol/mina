@@ -31,6 +31,9 @@ jobs:
             - run:
                   name: Build website
                   command: cd frontend/website && npm run build && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && node ./lib/js/src/Render.js
+            - run:
+                  name: Deploy staging
+                  command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "master" ]; then npm run deploy-ci; fi)
 
     lint:
         docker:
@@ -161,6 +164,8 @@ jobs:
                   name: Running test -- {{profile}}:{{test}}
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
             {%- endfor %}
+            - store_artifacts:
+                  path: test_logs
     {%- endfor %}
 
 workflows:

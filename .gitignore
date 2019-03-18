@@ -10,3 +10,4 @@ src/external/ocaml-rocksdb/rocksdb
 .stack-work/
 /wallet-keys/
 test_logs
+.firebase/
