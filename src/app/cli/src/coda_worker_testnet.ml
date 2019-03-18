@@ -401,5 +401,5 @@ end = struct
       ~payment_receiver =
     Logger.info log "Triggering bootstrap on %d" node ;
     restart_and_payment testnet ~largest_account_keypair ~node ~log
-      ~duration:catchup_wait_duration ~payment_receiver
+      ~duration:bootstrap_wait_duration ~payment_receiver
 end
