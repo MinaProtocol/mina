@@ -3,14 +3,14 @@
 [%%import "config/consensus/postake_short.mlh"]
 [%%import "config/scan_state/small.mlh"]
 [%%import "config/debug_level/some.mlh"]
-[%%import "config/proof_level/full.mlh"]
+[%%import "config/proof_level/check.mlh"]
 
 [%%define time_offsets false]
 [%%define fake_hash false]
 
 [%%define genesis_ledger "test_split_two_stakers"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
-[%%define block_window_duration 30000]
+[%%define block_window_duration 10000]
 
 [%%define integration_tests true]
 [%%define force_updates false]
