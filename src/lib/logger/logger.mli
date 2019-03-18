@@ -51,7 +51,9 @@ val error : _ logger
 
 val fatal : _ logger
 
-val faulty_peer : _ logger
+val faulty_peer : _ logger [@@deprecated "use Trust_system.record"]
+
+val faulty_peer_without_punishment : _ logger
 
 val extend : t -> Attribute.t list -> t
 
