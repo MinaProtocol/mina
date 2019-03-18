@@ -294,7 +294,7 @@ module type Inputs_intf = sig
     with type state_with_witness := External_transition.t
      and type staged_ledger := Staged_ledger.t
      and type staged_ledger_hash := Staged_ledger_hash.t
-     and type protocol_state := Consensus_mechanism.Protocol_state.value
+     and type protocol_state := Consensus_mechanism.Protocol_state.Value.t
      and type snark_pool_diff := Snark_pool.pool_diff
      and type transaction_pool_diff := Transaction_pool.pool_diff
      and type parallel_scan_state := Staged_ledger.Scan_state.t
@@ -333,7 +333,7 @@ module type Inputs_intf = sig
      and type ledger_hash := Ledger_hash.t
      and type staged_ledger := Staged_ledger.t
      and type transaction := User_command.With_valid_signature.t
-     and type protocol_state := Consensus_mechanism.Protocol_state.value
+     and type protocol_state := Consensus_mechanism.Protocol_state.Value.t
      and type protocol_state_proof := Protocol_state_proof.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type completed_work_statement := Transaction_snark_work.Statement.t
@@ -353,7 +353,7 @@ module type Inputs_intf = sig
 
   module Genesis : sig
     val state :
-      ( Consensus_mechanism.Protocol_state.value
+      ( Consensus_mechanism.Protocol_state.Value.t
       , Protocol_state_hash.t )
       With_hash.t
 
