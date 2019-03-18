@@ -11,6 +11,8 @@ module Colors = {
 
   let bluishGreen = `rgb((22, 168, 85));
   let purpleBrown = `rgb((100, 46, 48));
+  let offWhite = `rgb((243, 243, 243));
+  let grey = `rgb((129, 146, 168));
 };
 
 module Typeface = {

@@ -20,7 +20,7 @@
     "rimraf": "^2.6.3"
   },
   "devDependencies": {
-    "bs-platform": "^4.0.18",
+    "bs-platform": "^5.0.0-dev.5",
     "firebase-tools": "^6.5.0"
   },
   "author": "",
