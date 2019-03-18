@@ -8,7 +8,9 @@ import requests
 def main(required_file):
     with open(required_file, 'r') as rf:
         required_status = list(filter(bool, rf.read().split('\n')))
-        assert len(required_status) > 0
+        if not (len(required_status) > 0):
+            print("required status was empty, this is probably in error and I refuse to turn off all status checks", file=sys.stderr)
+            sys.exit(1)
         r = requests.patch("https://api.github.com/repos/CodaProtocol/coda/branches/master/protection/required_status_checks",
             json={"strict": True, "contexts": required_status},
             auth=('o1-service-account', os.environ['GITHUB_API_TOKEN']),
