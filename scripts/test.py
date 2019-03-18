@@ -194,7 +194,7 @@ def render(args):
 
     test_permutations = filter_test_permutations(['*'], ci_blacklist)
 
-    env = jinja2.Environment(loader=jinja2.FileSystemLoader(circle_ci_conf_dir))
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(circle_ci_conf_dir), autoescape=False)
     template = env.get_template(jinja_file_basename)
     rendered = template.render(
         build_artifact_profiles=build_artifact_profiles,
