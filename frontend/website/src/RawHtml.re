@@ -7,7 +7,17 @@ let make = (~path, _) => {
     ...component,
     render: _self =>
       <div
-        className="section-wrapper ibmplex blueblack lh-copy mw7-ns center f5 mt4 tl"
+        className=Css.(
+          style([
+            Style.Typeface.ibmplexsans,
+            color(Style.Colors.metallicBlue),
+            lineHeight(`em(1.5)),
+            maxWidth(`rem(48.0)),
+            marginLeft(`auto),
+            marginRight(`auto),
+            marginTop(`rem(2.0)),
+          ])
+        )
         dangerouslySetInnerHTML={"__html": html}
       />,
   };
