@@ -36,7 +36,6 @@ let make = (~path, _) => {
             </div>
           </div>
         </section>
-        <BlogPost.MailingList />
       </div>,
   };
 };
