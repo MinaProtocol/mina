@@ -554,7 +554,8 @@ end = struct
           | Num_accounts (n, h) -> num_accounts t n h
         in
         if Valid.completely_fresh t.validity then (
-          Logger.trace t.log !"We are completely fresh, all done" ;
+          Logger.trace t.log
+            !"Snarked database sync'd. Completely fresh, all done" ;
           all_done t res )
         else res
     in
