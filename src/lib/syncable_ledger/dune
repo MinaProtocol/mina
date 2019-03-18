@@ -3,7 +3,7 @@
  (public_name syncable_ledger)
  (modules syncable_ledger)
  (library_flags -linkall)
- (flags :standard -short-paths -warn-error -32-34-58)
+ (flags :standard -short-paths -warn-error -3-32-34-58)
  (libraries core async async_extra pipe_lib merkle_ledger logger
    interruptible envelope)
  (preprocess
