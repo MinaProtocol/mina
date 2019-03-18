@@ -964,7 +964,7 @@ module Make_coda (Init : Init_intf) = struct
   include Coda_lib.Make (Inputs)
 
   let request_work t =
-    Inputs.request_work ~log:t.log ~best_staged_ledger ~seen_jobs
+    Inputs.request_work ~logger:t.logger ~best_staged_ledger ~seen_jobs
       ~set_seen_jobs ~snark_pool t (snark_work_fee t)
 end
 
