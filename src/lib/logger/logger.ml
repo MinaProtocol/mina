@@ -127,8 +127,7 @@ let error = log ~level:Error
 
 let fatal = log ~level:Fatal
 
-let faulty_peer_without_punishment =
-  log ~level:Faulty_peer
+let faulty_peer_without_punishment = log ~level:Faulty_peer
 
 (* deprecated, use Trust_system.record instead *)
 let faulty_peer = faulty_peer_without_punishment

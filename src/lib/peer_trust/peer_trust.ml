@@ -96,7 +96,8 @@ struct
     let%map () =
       match (simple_old.banned, simple_new.banned) with
       | Unbanned, Banned_until expiration ->
-          Logger.faulty_peer_without_punishment logger ~module_:__MODULE__ ~location:__LOC__
+          Logger.faulty_peer_without_punishment logger ~module_:__MODULE__
+            ~location:__LOC__
             ~metadata:
               [ ("peer", Peer_id.to_yojson peer)
               ; ( "expiration"
