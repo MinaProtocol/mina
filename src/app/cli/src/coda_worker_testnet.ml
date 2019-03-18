@@ -407,5 +407,5 @@ end = struct
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       "Triggering bootstrap on %d" node ;
     restart_and_payment testnet ~largest_account_keypair ~node ~logger
-      ~duration:catchup_wait_duration ~payment_receiver
+      ~duration:bootstrap_wait_duration ~payment_receiver
 end

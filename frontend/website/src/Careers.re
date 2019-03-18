@@ -176,6 +176,7 @@ let extraHeaders =
       type_="text/css"
       href="https://use.typekit.net/mta7mwm.css"
     />
+    Head.legacyStylesheets
   </>;
 
 let component = ReasonReact.statelessComponent("Career");
