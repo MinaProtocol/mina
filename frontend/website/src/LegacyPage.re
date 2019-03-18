@@ -160,11 +160,11 @@ module Footer = {
             target="_blank">
             ...children
           </a>
-          {last ?
-             <span className="dn" /> :
-             <span className="f6 silver">
-               {ReasonReact.string({js| · |js})}
-             </span>}
+          {last
+             ? <span className="dn" />
+             : <span className="f6 silver">
+                 {ReasonReact.string({js| · |js})}
+               </span>}
         </li>,
     };
   };
