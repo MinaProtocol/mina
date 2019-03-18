@@ -1,4 +1,5 @@
 resolver: lts-13.7
+compiler: ghc-8.6.4
 packages:
 - '.'
 nix:
