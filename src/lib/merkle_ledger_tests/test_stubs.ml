@@ -5,7 +5,7 @@ module Balance = Currency.Balance
 module Account = struct
   (* want bin_io, not available with Account.t *)
   type t = Coda_base.Account.Stable.V1.t
-  [@@deriving bin_io, sexp, eq, compare, hash]
+  [@@deriving bin_io, sexp, eq, compare, hash, yojson]
 
   type key = Coda_base.Account.Stable.V1.key
   [@@deriving bin_io, sexp, eq, compare, hash]
