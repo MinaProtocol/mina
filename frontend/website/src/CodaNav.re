@@ -9,7 +9,7 @@ module SimpleButton = {
         href=link
         className=Css.(
           merge([
-            Body.style,
+            Body.basic,
             style([textDecoration(`none), whiteSpace(`nowrap)]),
           ])
         )>
