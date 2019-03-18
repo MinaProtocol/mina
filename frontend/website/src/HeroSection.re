@@ -1,0 +1,149 @@
+module Copy = {
+  let component = ReasonReact.statelessComponent("HeroSection.Copy");
+  let make = _ => {
+    ...component,
+    render: _self =>
+      <div className=Css.(style([width(`percent(50.0))]))>
+        <h1
+          className=Css.(
+            merge([
+              Style.H1.hero,
+              style([
+                marginTop(`rem(1.0)),
+                media(Style.MediaQuery.full, [marginTop(`rem(1.5))]),
+              ]),
+            ])
+          )>
+          {ReasonReact.string(
+             "A cryptocurrency with a tiny, portable blockchain.",
+           )}
+        </h1>
+        <p className=Style.Body.big>
+          <span>
+            {ReasonReact.string(
+               "Coda is the first cryptocurrency with a succinct blockchain. Out lightweight blockchain means ",
+             )}
+          </span>
+          <span className=Style.Body.big_semibold>
+            {ReasonReact.string("anyone can use Coda directly")}
+          </span>
+          <span>
+            {ReasonReact.string(
+               " from any device, in less data than a few tweets.",
+             )}
+          </span>
+        </p>
+      </div>,
+  };
+};
+
+module Graphic = {
+  module Placeholder = {
+    let basic =
+      Css.(
+        style([
+          width(`rem(16.0)),
+          height(`rem(29.0)),
+          backgroundColor(Style.Colors.greyishBrown),
+        ])
+      );
+  };
+
+  module Info = {
+    let component =
+      ReasonReact.statelessComponent("HeroSection.Graphic.Info");
+
+    let make = (~sizeEmphasis, ~name, ~size, ~label, ~textColor, _children) => {
+      ...component,
+      render: _ =>
+        <div
+          className=Css.(
+            style([
+              display(`flex),
+              flexDirection(`column),
+              justifyContent(`spaceBetween),
+              alignItems(`center),
+            ])
+          )>
+          <div>
+            <h3
+              className=Css.(
+                merge([
+                  Style.H3.basic,
+                  style([color(textColor), fontWeight(`medium)]),
+                ])
+              )>
+              {ReasonReact.string(name)}
+            </h3>
+            <h3
+              className=Css.(
+                merge([
+                  Style.H3.basic,
+                  style([
+                    color(textColor),
+                    fontWeight(sizeEmphasis ? `bold : `normal),
+                  ]),
+                ])
+              )>
+              {ReasonReact.string(size)}
+            </h3>
+          </div>
+          <h4
+            className=Css.(
+              merge([Style.H4.basic, style([marginTop(`rem(1.5))])])
+            )>
+            {ReasonReact.string(label)}
+          </h4>
+        </div>,
+    };
+  };
+
+  let component = ReasonReact.statelessComponent("HeroSection.Graphic");
+  let make = _ => {
+    ...component,
+    render: _self =>
+      Css.(
+        <div className={style([width(`percent(50.0))])}>
+          <div className=Placeholder.basic />
+          <div
+            className={style([
+              display(`flex),
+              justifyContent(`spaceBetween),
+            ])}>
+            <Info
+              sizeEmphasis=false
+              name="Coda"
+              size="22kB"
+              label="Fixed"
+              textColor=Style.Colors.bluishGreen
+            />
+            <Info
+              sizeEmphasis=true
+              name="Other blockchains"
+              size="2TB+"
+              label="Increasing"
+              textColor=Style.Colors.purpleBrown
+            />
+          </div>
+        </div>
+      ),
+  };
+};
+
+let component = ReasonReact.statelessComponent("HeroSection");
+let make = _ => {
+  ...component,
+  render: _self =>
+    <div
+      className=Css.(
+        style([
+          display(`flex),
+          marginTop(`rem(1.5)),
+          media(Style.MediaQuery.full, [marginTop(`rem(4.5))]),
+        ])
+      )>
+      <Copy />
+      <Graphic />
+    </div>,
+};
+();
