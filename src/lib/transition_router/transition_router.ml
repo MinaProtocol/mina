@@ -147,7 +147,7 @@ module Make (Inputs : Inputs_intf) :
         Strict_pipe.create (Buffered (`Capacity 10, `Overflow Drop_head))
       in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "Starting Bootstrapping phase" ;
+        "Bootstrap state: starting." ;
       let root_state = get_root_state old_frontier in
       set_bootstrap_phase ~controller_type root_state
         bootstrap_controller_writer ;

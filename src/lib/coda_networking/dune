@@ -1,7 +1,7 @@
 (library
  (name coda_networking)
  (public_name coda_networking)
- (flags :standard -short-paths -warn-error -32-27-58)
+ (flags :standard -short-paths -warn-error -3-32-27-58)
  (inline_tests)
  (library_flags -linkall)
  (libraries core o1trace envelope async gossip_net coda_lib protocols

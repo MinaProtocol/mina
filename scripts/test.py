@@ -168,13 +168,13 @@ def run(args):
         for test in test_permutations[profile]:
             print('  - %s' % test)
             log = os.path.join(profile_dir, '%s.log' % test)
-            run_cmd(
-                'set -o pipefail && %s integration-test %s 2>&1 | tee \'%s\' | %s -f \'%s\''
-                    % (coda_exe, test, log, logproc_exe, logproc_filter),
-                lambda: fail('test "%s:%s" failed' % (profile, test))
-            )
+            cmd = 'set -o pipefail && %s integration-test %s 2>&1 ' % (coda_exe, test)
+            cmd += '| grep -v "* Elements of w " | grep -v "elements in proof:" '
+            cmd += '| tee \'%s\' | %s -f \'%s\' ' % (log, logproc_exe, logproc_filter)
+            print('Running: %s' % (cmd))
+            run_cmd(cmd, lambda: fail('Test "%s:%s" failed' % (profile, test)))
 
-    print('all tests ran successfully')
+    print('Testing successfull')
 
 def render(args):
     circle_ci_conf_dir = os.path.dirname(args.jinja_file)
