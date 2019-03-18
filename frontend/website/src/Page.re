@@ -1,6 +1,3 @@
-// TODO: Improve this later
-// module Header = LegacyPage.Header;
-
 module Footer = {
   module Link = {
     let component = ReasonReact.statelessComponent("Page.Footer.Link");
