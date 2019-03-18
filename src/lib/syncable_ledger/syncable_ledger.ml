@@ -489,13 +489,13 @@ end = struct
   let handle_node t addr exp_hash =
     if Addr.depth addr >= MT.depth - subtree_height then (
       expect_content t addr exp_hash ;
-      Linear_pipe.write_without_pushback t.queries
+      Linear_pipe.write_without_pushback_if_open t.queries
         (desired_root_exn t, What_contents addr) )
     else (
       expect_children t addr exp_hash ;
-      Linear_pipe.write_without_pushback t.queries
+      Linear_pipe.write_without_pushback_if_open t.queries
         (desired_root_exn t, What_hash (Addr.child_exn addr Direction.Left)) ;
-      Linear_pipe.write_without_pushback t.queries
+      Linear_pipe.write_without_pushback_if_open t.queries
         (desired_root_exn t, What_hash (Addr.child_exn addr Direction.Right)) )
 
   let num_accounts t n content_hash =
@@ -554,7 +554,8 @@ end = struct
           | Num_accounts (n, h) -> num_accounts t n h
         in
         if Valid.completely_fresh t.validity then (
-          Logger.trace t.log !"We are completely fresh, all done" ;
+          Logger.trace t.log
+            !"Snarked database sync'd. Completely fresh, all done" ;
           all_done t res )
         else res
     in
@@ -578,7 +579,7 @@ end = struct
       t.desired_root <- Some h ;
       Valid.set t.validity (Addr.root ()) (Stale, Root_hash.to_hash h)
       |> ignore ;
-      Linear_pipe.write_without_pushback t.queries (h, Num_accounts) ;
+      Linear_pipe.write_without_pushback_if_open t.queries (h, Num_accounts) ;
       `New )
     else (
       Logger.info t.log "new_goal to same hash, not doing anything" ;
