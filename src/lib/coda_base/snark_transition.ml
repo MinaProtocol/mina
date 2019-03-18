@@ -81,7 +81,7 @@ module Make (Inputs : Inputs_intf) :
   [@@deriving bin_io, sexp, fields]
 
   type value =
-    ( Blockchain_state.value
+    ( Blockchain_state.Stable.V1.t
     , Consensus_data.value
     , Sok_message.Digest.Stable.V1.t
     , Currency.Amount.t )

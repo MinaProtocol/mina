@@ -11,7 +11,7 @@ module type Inputs_intf = sig
 
   module State_proof :
     Proof_intf
-    with type input := Consensus.Protocol_state.value
+    with type input := Consensus.Protocol_state.Value.t
      and type t := Proof.t
 end
 
