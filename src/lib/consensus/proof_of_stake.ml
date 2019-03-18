@@ -13,6 +13,7 @@ open Coda_numbers
 open Currency
 open Fold_lib
 open Signature_lib
+open Module_version
 module Time = Coda_base.Block_time
 
 module Segment_id = Nat.Make32 ()
@@ -807,7 +808,7 @@ module Consensus_transition_data = struct
 end
 
 module Consensus_state = struct
-  type ('length, 'vrf_output, 'amount, 'epoch, 'slot, 'epoch_data) t =
+  type ('length, 'vrf_output, 'amount, 'epoch, 'slot, 'epoch_data) t_ =
     { length: 'length
     ; epoch_length: 'length
     ; last_vrf_output: 'vrf_output
@@ -818,15 +819,42 @@ module Consensus_state = struct
     ; curr_epoch_data: 'epoch_data }
   [@@deriving sexp, bin_io, eq, compare, hash]
 
-  type value =
-    ( Length.t
-    , Vrf.Output.t
-    , Amount.t
-    , Epoch.t
-    , Epoch.Slot.t
-    , Epoch_data.value )
-    t
-  [@@deriving sexp, bin_io, eq, compare, hash]
+  module Value = struct
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          let version = 1
+
+          type t =
+            ( Length.t
+            , Vrf.Output.t
+            , Amount.t
+            , Epoch.t
+            , Epoch.Slot.t
+            , Epoch_data.value )
+            t_
+          [@@deriving sexp, bin_io, eq, compare, hash]
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
+      module Latest = V1
+
+      module Module_decl = struct
+        let name = "consensus_proof_of_stake"
+
+        type latest = Latest.t
+      end
+
+      module Registrar = Registration.Make (Module_decl)
+      module Registered_V1 = Registrar.Register (V1)
+    end
+
+    type t = Stable.Latest.t (* bin_io omitted intentionally *)
+    [@@deriving sexp, eq, compare, hash]
+  end
 
   type var =
     ( Length.Unpacked.var
@@ -835,7 +863,7 @@ module Consensus_state = struct
     , Epoch.Unpacked.var
     , Epoch.Slot.Unpacked.var
     , Epoch_data.var )
-    t
+    t_
 
   let to_hlist
       { length
@@ -1193,7 +1221,7 @@ let received_within_window (epoch, slot) ~time_received =
   let window_end = add window_start Constants.delta_duration in
   window_start < time_received && time_received < window_end
 
-let received_at_valid_time (consensus_state : Consensus_state.value)
+let received_at_valid_time (consensus_state : Consensus_state.Value.t)
     ~time_received =
   let open Consensus_state in
   received_within_window
@@ -1232,10 +1260,10 @@ let select ~existing ~candidate ~logger =
   in
   Logger.info logger "Selecting best consensus state" ;
   Logger.trace logger
-    !"existing consensus state: %{sexp:Consensus_state.value}"
+    !"existing consensus state: %{sexp:Consensus_state.Value.t}"
     existing ;
   Logger.trace logger
-    !"candidate consensus state: %{sexp:Consensus_state.value}"
+    !"candidate consensus state: %{sexp:Consensus_state.Value.t}"
     candidate ;
   (* TODO: add fork_before_checkpoint check *)
   (* Each branch contains a precondition predicate and a choice predicate,
@@ -1319,7 +1347,7 @@ let time_hum (now : Core_kernel.Time.t) =
   let epoch, slot = Epoch.epoch_and_slot_of_time_exn (Time.of_time now) in
   Printf.sprintf "%d:%d" (Epoch.to_int epoch) (Epoch.Slot.to_int slot)
 
-let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
+let next_proposal now (state : Consensus_state.Value.t) ~local_state ~keypair
     ~logger =
   let open Consensus_state in
   let open Epoch_data in
@@ -1426,8 +1454,8 @@ let next_proposal now (state : Consensus_state.value) ~local_state ~keypair
       `Check_again epoch_end_time
 
 (* TODO *)
-let lock_transition (prev : Consensus_state.value)
-    (next : Consensus_state.value) ~local_state ~snarked_ledger =
+let lock_transition (prev : Consensus_state.Value.t)
+    (next : Consensus_state.Value.t) ~local_state ~snarked_ledger =
   let open Local_state in
   let open Consensus_state in
   if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
@@ -1489,7 +1517,7 @@ module For_tests = struct
                                   , Coda_base.State_hash.t )
                                   With_hash.t
        -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
-       -> Consensus_state.value)
+       -> Consensus_state.Value.t)
       Quickcheck.Generator.t =
     let open Consensus_state in
     let open Quickcheck.Let_syntax in
@@ -1548,7 +1576,7 @@ let to_unix_timestamp recieved_time =
   |> Unix_timestamp.of_int64
 
 let%test "Receive a valid consensus_state with a bit of delay" =
-  let ({curr_epoch; curr_slot; _} : Consensus_state.value) =
+  let ({curr_epoch; curr_slot; _} : Consensus_state.Value.t) =
     Consensus_state.genesis
   in
   let delay = Constants.delta / 2 |> UInt32.of_int in

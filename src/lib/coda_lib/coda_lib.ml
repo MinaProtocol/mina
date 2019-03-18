@@ -304,7 +304,7 @@ module type Inputs_intf = sig
      and type time := Time.t
      and type state_hash := Coda_base.State_hash.t
      and type state_body_hash := State_body_hash.t
-     and type consensus_state := Consensus_mechanism.Consensus_state.value
+     and type consensus_state := Consensus_mechanism.Consensus_state.Value.t
 
   module Transition_router :
     Protocols.Coda_transition_frontier.Transition_router_intf
@@ -324,7 +324,7 @@ module type Inputs_intf = sig
      and type external_transition := External_transition.t
      and type proof_verified_external_transition :=
                 External_transition.Proof_verified.t
-     and type consensus_state := Consensus_mechanism.Consensus_state.value
+     and type consensus_state := Consensus_mechanism.Consensus_state.Value.t
      and type state_hash := Coda_base.State_hash.t
 
   module Proposer :

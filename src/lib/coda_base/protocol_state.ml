@@ -8,33 +8,40 @@ open Fold_lib
 open Coda_numbers
 
 module type Consensus_state_intf = sig
-  type value [@@deriving hash, compare, bin_io, sexp]
+  module Value : sig
+    (* bin_io omitted *)
+    type t [@@deriving hash, compare, eq, sexp]
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving hash, compare, bin_io, sexp, eq]
+        end
+      end
+      with type V1.t = t
+  end
 
   type display [@@deriving yojson]
 
-  include Snarkable.S with type value := value
+  include Snarkable.S with type value := Value.t
 
-  val equal_value : value -> value -> bool
-
-  val compare_value : value -> value -> int
-
-  val genesis : value
+  val genesis : Value.t
 
   val length_in_triples : int
 
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
-  val fold : value -> bool Triple.t Fold.t
+  val fold : Value.t -> bool Triple.t Fold.t
 
-  val length : value -> Length.t
+  val length : Value.t -> Length.t
   (** For status *)
 
-  val time_hum : value -> string
+  val time_hum : Value.t -> string
   (** For status *)
 
-  val to_lite : (value -> Lite_base.Consensus_state.t) option
+  val to_lite : (Value.t -> Lite_base.Consensus_state.t) option
 
-  val display : value -> display
+  val display : Value.t -> display
 end
 
 module type S = sig
@@ -45,7 +52,7 @@ module type S = sig
   module Body : sig
     type ('a, 'b) t [@@deriving bin_io, sexp]
 
-    type value = (Blockchain_state.value, Consensus_state.value) t
+    type value = (Blockchain_state.value, Consensus_state.Value.t) t
     [@@deriving bin_io, sexp]
 
     type var = (Blockchain_state.var, Consensus_state.var) t
@@ -72,7 +79,7 @@ module type S = sig
   val create_value :
        previous_state_hash:State_hash.Stable.V1.t
     -> blockchain_state:Blockchain_state.t
-    -> consensus_state:Consensus_state.value
+    -> consensus_state:Consensus_state.Value.t
     -> value
 
   val create_var :
@@ -134,7 +141,7 @@ module Make
   module Body = struct
     include Body
 
-    type value = (Blockchain_state.value, Consensus_state.value) t
+    type value = (Blockchain_state.value, Consensus_state.Value.Stable.V1.t) t
     [@@deriving eq, ord, bin_io, hash, sexp]
 
     type var = (Blockchain_state.var, Consensus_state.var) t

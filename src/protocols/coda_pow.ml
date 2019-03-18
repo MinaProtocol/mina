@@ -989,7 +989,17 @@ module type Tip_intf = sig
 end
 
 module type Consensus_state_intf = sig
-  type value
+  module Value : sig
+    type t
+
+    module Stable :
+      sig
+        module V1 : sig
+          type t [@@deriving bin_io]
+        end
+      end
+      with type V1.t = t
+  end
 
   type var
 end
@@ -1282,7 +1292,7 @@ module type Consensus_mechanism_intf = sig
     Protocol_state_intf
     with type state_hash := protocol_state_hash
      and type blockchain_state := Blockchain_state.value
-     and type consensus_state := Consensus_state.value
+     and type consensus_state := Consensus_state.Value.t
 
   module Prover_state : sig
     type t [@@deriving bin_io]
@@ -1325,11 +1335,11 @@ module type Consensus_mechanism_intf = sig
     -> Protocol_state.value * Consensus_transition_data.value
 
   val received_at_valid_time :
-    Consensus_state.value -> time_received:Unix_timestamp.t -> bool
+    Consensus_state.Value.t -> time_received:Unix_timestamp.t -> bool
 
   val next_proposal :
        Int64.t
-    -> Consensus_state.value
+    -> Consensus_state.Value.t
     -> local_state:Local_state.t
     -> keypair:keypair
     -> logger:Logger.t
@@ -1338,8 +1348,8 @@ module type Consensus_mechanism_intf = sig
        | `Propose of Int64.t * Proposal_data.t ]
 
   val select :
-       existing:Consensus_state.value
-    -> candidate:Consensus_state.value
+       existing:Consensus_state.Value.t
+    -> candidate:Consensus_state.Value.t
     -> logger:Logger.t
     -> [`Keep | `Take]
 
