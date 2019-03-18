@@ -526,9 +526,16 @@ module Vrf = struct
       let rhs = Snarky_taylor.Exp.Unchecked.one_minus_exp params input in
       let lhs =
         let bs = Random_oracle.Digest.to_bits vrf_output in
-        of_bits_lsb (match c with `One -> bs | `Two -> List.tl_exn bs)
+        let n =
+          of_bits_lsb (match c with `One -> bs | `Two -> List.tl_exn bs)
+        in
+        Bignum.(
+          of_bigint n
+          / of_bigint
+              Bignum_bigint.(
+                shift_left one Random_oracle.Digest.length_in_bits))
       in
-      Bignum.(of_bigint lhs <= rhs)
+      Bignum.(lhs <= rhs)
 
     module Checked = struct
       module M = Snarky.Snark.Run.Make (Snark_params.Tick_backend)
