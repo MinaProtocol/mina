@@ -148,15 +148,11 @@ Router.(
         ),
         File(
           "privacy",
-          <Page name="privacy">
-            <RawHtml path="html/Privacy.html" />
-          </Page>,
+          <Page name="privacy"> <RawHtml path="html/Privacy.html" /> </Page>,
         ),
         File(
           "tos",
-          <Page name="tos">
-            <RawHtml path="html/TOS.html" />
-          </Page>,
+          <Page name="tos"> <RawHtml path="html/TOS.html" /> </Page>,
         ),
       |],
     ),
