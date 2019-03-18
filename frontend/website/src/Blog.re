@@ -1,3 +1,27 @@
+let extraHeaders =
+  <>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.css"
+      integrity="sha384-9eLZqc9ds8eNjO3TmqPeYcDj8n+Qfa4nuSiGYa6DjLNcv9BtN69ZIulL9+8CqC9Y"
+      crossOrigin="anonymous"
+    />
+    <script
+      defer=true
+      src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/katex.min.js"
+      integrity="sha384-K3vbOmF2BtaVai+Qk37uypf7VrgBubhQreNQe9aGsz9lB63dIFiQVlJbr92dw2Lx"
+      crossOrigin="anonymous"
+    />
+    <script
+      defer=true
+      src="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/contrib/auto-render.min.js"
+      integrity="sha384-kmZOZB5ObwgQnS/DuDg6TScgOiWWBiVt0plIRkZCmE6rDZGrEOQeHM5PcHi+nyqe"
+      crossOrigin="anonymous"
+    />
+    <link rel="stylesheet" href="/static/css/blog.css" />
+    Head.legacyStylesheets
+  </>;
+
 let component = ReasonReact.statelessComponent("Blog");
 
 let previousPost = (metadata: BlogPost.metadata) =>
