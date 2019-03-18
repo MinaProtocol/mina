@@ -159,9 +159,9 @@ def run(args):
             cmd += '| grep -v "* Elements of w " | grep -v "elements in proof:" '
             cmd += '| tee \'%s\' | ./scripts/jqproc.sh -f \'%s\' ' % (log, jq_filter)
             print('Running: %s' % (cmd))
-            run_cmd(cmd, lambda: fail('test "%s:%s" failed' % (profile, test)))
+            run_cmd(cmd, lambda: fail('Test "%s:%s" failed' % (profile, test)))
 
-    print('all tests ran successfully')
+    print('Testing successfull')
 
 def render(args):
     circle_ci_conf_dir = os.path.dirname(args.jinja_file)
