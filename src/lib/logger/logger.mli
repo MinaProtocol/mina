@@ -65,5 +65,3 @@ val faulty_peer : _ log_function [@@deprecated "use Trust_system.record"]
 val faulty_peer_without_punishment : _ log_function
 
 val fatal : _ log_function
-
-val faulty_peer : _ log_function
