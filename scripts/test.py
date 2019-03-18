@@ -223,7 +223,7 @@ def render(args):
 
     required_status = list(filter(lambda el: el not in not_required_status_checks,
             chain(
-            ("ci/circleci: %s" % job for job in 
+            ("ci/circleci: %s" % job for job in
                 chain(("test--%s" % profile for profile in test_permutations.keys()),
                       ("test-unit--%s" % profile for profile in unit_test_profiles),
                       ("build-artifacts--%s" % profile for profile in build_artifact_profiles))),
@@ -241,7 +241,7 @@ def render(args):
     elif not args.required:
         with open(output_file, 'w') as file:
             file.write(rendered)
-    
+
     if args.required:
         print('\n'.join(required_status))
 
