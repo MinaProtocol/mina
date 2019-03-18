@@ -209,7 +209,7 @@ def render(args):
     elif not args.required:
         with open(output_file, 'w') as file:
             file.write(rendered)
-        
+
     # now for mergify!
     mergify_conf_dir = os.path.dirname(args.mergify_jinja_file)
     jinja_file_basename = os.path.basename(args.mergify_jinja_file)
@@ -218,7 +218,7 @@ def render(args):
 
     test_permutations = filter_test_permutations(['*'], required_blacklist, permutations=test_permutations)
 
-    env = jinja2.Environment(loader=jinja2.FileSystemLoader(mergify_conf_dir))
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(mergify_conf_dir), autoescape=False)
     template = env.get_template(jinja_file_basename)
 
     required_status = list(filter(lambda el: el not in not_required_status_checks,
