@@ -96,7 +96,7 @@ struct
     let%map () =
       match (simple_old.banned, simple_new.banned) with
       | Unbanned, Banned_until expiration ->
-          Logger.faulty_peer log'
+          Logger.faulty_peer_without_punishment log'
             !"Banning peer %{sexp:Peer_id.t} until %{sexp:Time.t} due to \
               action %{sexp:Action.t}."
             peer expiration action ;
