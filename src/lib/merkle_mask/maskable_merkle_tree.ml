@@ -67,7 +67,15 @@ module Make (Inputs : Inputs_intf) = struct
 
   module Graphviz = Visualization.Make_ocamlgraph (Node)
 
-  let to_graph () =
+  let to_graph ~log =
+    let try_with ~f ~default name =
+      try f () with Mask.Attached.Dangling_parent_reference uuid ->
+        Logger.warn log
+          !"Could not visualize %s, since %{sexp:Uuid.t} has a Dangling \
+            reference to an attached mask that has been detached"
+          name uuid ;
+        default
+    in
     let masks = List.concat @@ Uuid.Table.data registered_masks in
     let uuid_to_masks_table =
       Uuid.Table.of_alist_exn
@@ -76,17 +84,23 @@ module Make (Inputs : Inputs_intf) = struct
     let open Graphviz in
     Uuid.Table.fold uuid_to_masks_table ~init:empty
       ~f:(fun ~key:uuid ~data:mask graph ->
-        let graph_with_mask = add_vertex graph mask in
-        Uuid.Table.find registered_masks uuid
-        |> Option.value_map ~default:graph_with_mask ~f:(fun children_masks ->
-               List.fold ~init:graph_with_mask children_masks
-                 ~f:(fun graph_with_mask_and_child ->
-                   add_edge graph_with_mask_and_child mask ) ) )
+        try_with "vertex" ~default:graph ~f:(fun () ->
+            let graph_with_mask = add_vertex graph mask in
+            Uuid.Table.find registered_masks uuid
+            |> Option.value_map ~default:graph_with_mask
+                 ~f:(fun children_masks ->
+                   List.fold ~init:graph_with_mask children_masks
+                     ~f:(fun graph_with_mask_and_children grandchild ->
+                       try_with "edge" ~default:graph_with_mask_and_children
+                         ~f:(fun () ->
+                           add_edge graph_with_mask_and_children mask
+                             grandchild ) ) ) ) )
 
   module Debug = struct
-    let visualize ~filename =
+    let visualize ~filename ~log =
+      let log = Logger.child log __MODULE__ in
       Out_channel.with_file filename ~f:(fun output_channel ->
-          let graph = to_graph () in
+          let graph = to_graph ~log in
           Graphviz.output_graph output_channel graph )
   end
 

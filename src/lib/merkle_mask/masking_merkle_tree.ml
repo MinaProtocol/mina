@@ -87,6 +87,8 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     exception Location_is_not_account of Location.t
 
+    exception Dangling_parent_reference of Uuid.t
+
     let create () =
       failwith
         "Mask.Attached.create: cannot create an attached mask; use \
@@ -103,9 +105,7 @@ module Make (Inputs : Inputs_intf.S) = struct
 
     let assert_is_attached t =
       match t.parent with
-      | None ->
-          failwith
-            "Dangling reference to an attached mask that has been detached"
+      | None -> raise (Dangling_parent_reference t.uuid)
       | Some _ -> ()
 
     let get_parent ({parent= opt; _} as t) =

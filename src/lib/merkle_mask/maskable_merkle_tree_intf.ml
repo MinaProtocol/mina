@@ -35,6 +35,6 @@ module type S = sig
   *)
 
   module Debug : sig
-    val visualize : filename:string -> unit
+    val visualize : filename:string -> log:Logger.t -> unit
   end
 end
