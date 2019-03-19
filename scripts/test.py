@@ -40,6 +40,7 @@ test_permutations = {
     'test_posig_snarkless': all_tests,
     'test_postake_snarkless': simple_tests,
     'test_postake_split_snarkless': integration_tests,
+    'test_postake_split': ['coda-shared-prefix-multiproposer-test'],
     'test_posig': simple_tests,
     'test_postake': simple_tests,
     'test_postake_catchup': ['coda-restart-node-test'],
