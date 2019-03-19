@@ -118,7 +118,7 @@ end) : S = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  type t = Stable.V1.t [@@deriving sexp, eq, compare, hash]
+  type t = Stable.V1.t [@@deriving sexp, eq, compare, hash, yojson]
 
   type var =
     ( Staged_ledger_hash.var

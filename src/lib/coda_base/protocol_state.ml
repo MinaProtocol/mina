@@ -79,12 +79,12 @@ module type S = sig
     end
 
     (* bin_io omitted *)
-    type t = Stable.Latest.t [@@deriving sexp, compare, eq]
+    type t = Stable.Latest.t [@@deriving sexp, compare, eq, to_yojson]
 
     include Hashable.S with type t := t
   end
 
-  type value = Value.t [@@deriving sexp]
+  type value = Value.t [@@deriving sexp, to_yojson]
 
   type var = (State_hash.var, Body.var) t
 
