@@ -38,7 +38,7 @@ module Make (Inputs : Inputs_intf) :
    and type external_transition := Inputs.External_transition.t
    and type proof_verified_external_transition :=
               Inputs.External_transition.Proof_verified.t
-   and type consensus_state := Consensus.Consensus_state.value
+   and type consensus_state := Consensus.Consensus_state.Value.t
    and type state_hash := State_hash.t = struct
   open Inputs
 
