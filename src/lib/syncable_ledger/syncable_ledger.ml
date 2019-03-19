@@ -34,7 +34,7 @@ end
 module Answer = struct
   module Stable = struct
     module V1 = struct
-      type ('addr, 'hash, 'account) t =
+      type ('hash, 'account) t =
         | Has_hash of 'hash  (** The requested address has this hash **)
         | Contents_are of 'account list
             (** The requested address has these accounts *)
@@ -48,7 +48,7 @@ module Answer = struct
   end
 
   (* bin_io omitted intentionally *)
-  type ('addr, 'hash, 'account) t = ('addr, 'hash, 'account) Stable.Latest.t =
+  type ('hash, 'account) t = ('hash, 'account) Stable.Latest.t =
     | Has_hash of 'hash
     | Contents_are of 'account list
     | Num_accounts of int * 'hash
@@ -218,7 +218,7 @@ module Make (Inputs : Inputs_intf) : sig
      and type merkle_path := MT.path
      and type account := Account.t
      and type query := Addr.t Query.t
-     and type answer := (Addr.t, Hash.t, Account.t) Answer.t
+     and type answer := (Hash.t, Account.t) Answer.t
 end = struct
   open Inputs
 
@@ -309,7 +309,7 @@ end = struct
       | _ -> false
   end
 
-  type answer = (Addr.t, Hash.t, Account.t) Answer.t
+  type answer = (Hash.t, Account.t) Answer.t
 
   type query = Addr.t Query.t
 
@@ -586,7 +586,7 @@ end = struct
               Logger.faulty_peer t.log
                 !"Peer %{sexp: Envelope.Sender.t} answered question we didn't \
                   ask! Query was %{sexp: Addr.t Query.t} answer was %{sexp: \
-                  (Addr.t, Hash.t, Account.t) Answer.t}"
+                  (Hash.t, Account.t) Answer.t}"
                 (Envelope.Incoming.sender env)
                 query answer
         in
