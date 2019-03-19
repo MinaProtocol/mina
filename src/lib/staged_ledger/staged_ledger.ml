@@ -51,6 +51,8 @@ end = struct
       | Insufficient_fee of Currency.Fee.t * Currency.Fee.t
       | Non_zero_fee_excess of
           Scan_state.Space_partition.t * Transaction.t list
+      | Invalid_proof of
+          Ledger_proof.t * Ledger_proof_statement.t * Compressed_public_key.t
       | Unexpected of Error.t
     [@@deriving sexp]
 
@@ -76,6 +78,12 @@ end = struct
               Transaction.t list} and the current queue with slots \
               partitioned as %{sexp: Scan_state.Space_partition.t} \n"
             txns partition
+      | Invalid_proof (p, s, prover) ->
+          Format.asprintf
+            !"Verification failed for proof: %{sexp: Ledger_proof.t} \
+              Statement: %{sexp: Ledger_proof_statement.t} Prover: \
+              %{sexp:Compressed_public_key.t}\n"
+            p s prover
       | Unexpected e -> Error.to_string_hum e
 
     let to_error = Fn.compose Error.of_string to_string
@@ -85,15 +93,26 @@ end = struct
     | Ok a -> Ok a
     | Error e -> Error (Staged_ledger_error.Unexpected e)
 
-  type job = Scan_state.Available_job.t
+  type job = Scan_state.Available_job.t [@@deriving sexp]
 
   let verify_proof proof statement ~message =
     Inputs.Ledger_proof_verifier.verify proof statement ~message
 
-  let verify ~message job proof =
+  let verify ~message job proof prover =
+    let open Deferred.Let_syntax in
     match Scan_state.statement_of_job job with
-    | None -> return false
-    | Some statement -> verify_proof proof statement ~message
+    | None ->
+        Deferred.return
+          ( Or_error.errorf !"Error creating statement from job %{sexp:job}" job
+          |> to_staged_ledger_or_error )
+    | Some statement -> (
+        match%map verify_proof proof statement ~message with
+        | true -> Ok ()
+        | _ ->
+            Error
+              (Staged_ledger_error.Invalid_proof (proof, statement, prover)) )
+
+  (*TODO: Punish*)
 
   module M = struct
     include Monad.Ident
@@ -409,11 +428,6 @@ end = struct
   let check_completed_works scan_state
       (completed_works : Transaction_snark_work.t list) =
     let open Deferred.Result.Let_syntax in
-    let check_or_error label b =
-      if not b then
-        Error (Staged_ledger_error.Unexpected (Error.of_string label))
-      else Ok ()
-    in
     let%bind jobses =
       Deferred.return
         (let open Result.Let_syntax in
@@ -424,12 +438,21 @@ end = struct
         in
         chunks_of jobs ~n:Transaction_snark_work.proofs_length)
     in
-    Deferred.List.for_all (List.zip_exn jobses completed_works)
-      ~f:(fun (jobs, work) ->
-        let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
-        Deferred.List.for_all (List.zip_exn jobs work.proofs)
-          ~f:(fun (job, proof) -> verify ~message job proof ) )
-    |> Deferred.map ~f:(check_or_error "proofs did not verify")
+    let check job_proofs prover message =
+      let open Deferred.Let_syntax in
+      Deferred.List.find_map job_proofs ~f:(fun (job, proof) ->
+          match%map verify ~message job proof prover with
+          | Ok () -> None
+          | Error e -> Some e )
+    in
+    let open Deferred.Let_syntax in
+    let%map result =
+      Deferred.List.find_map (List.zip_exn jobses completed_works)
+        ~f:(fun (jobs, work) ->
+          let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
+          check (List.zip_exn jobs work.proofs) work.prover message )
+    in
+    Option.value_map result ~default:(Ok ()) ~f:(fun e -> Error e)
 
   let create_fee_transfers completed_works delta public_key coinbase_fts =
     let open Result.Let_syntax in
@@ -1794,21 +1817,37 @@ let%test_module "test" =
         type public_key = Compressed_public_key.t
         [@@deriving sexp, bin_io, compare, yojson]
 
-        module T = struct
-          type t = {fee: fee; proofs: proof list; prover: public_key}
-          [@@deriving sexp, bin_io, compare, yojson]
-        end
-
-        include T
-
-        module Statement = struct
-          module T = struct
-            type t = statement list
-            [@@deriving sexp, bin_io, compare, hash, eq]
+        module Stable = struct
+          module V1 = struct
+            type t = {fee: fee; proofs: proof list; prover: public_key}
+            [@@deriving sexp, bin_io, compare, yojson]
           end
 
-          include T
-          include Hashable.Make_binable (T)
+          module Latest = V1
+        end
+
+        type t = Stable.Latest.t =
+          {fee: fee; proofs: proof list; prover: public_key}
+        [@@deriving sexp, compare]
+
+        module Statement = struct
+          module Stable = struct
+            module V1 = struct
+              module T = struct
+                type t = statement list
+                [@@deriving sexp, bin_io, compare, hash, eq]
+              end
+
+              include T
+              include Hashable.Make_binable (T)
+            end
+
+            module Latest = V1
+          end
+
+          type t = Stable.Latest.t [@@deriving sexp, compare, hash, eq]
+
+          include Hashable.Make (Stable.Latest)
 
           let gen =
             Quickcheck.Generator.list_with_length proofs_length
@@ -1818,7 +1857,11 @@ let%test_module "test" =
         type unchecked = t
 
         module Checked = struct
-          include T
+          module Stable = Stable
+
+          type t = Stable.Latest.t =
+            {fee: fee; proofs: proof list; prover: public_key}
+          [@@deriving sexp, compare]
 
           let create_unsafe = Fn.id
         end
@@ -1829,10 +1872,13 @@ let%test_module "test" =
       end
 
       module Staged_ledger_diff = struct
-        type completed_work = Transaction_snark_work.t
+        (* TODO : version *)
+        type completed_work = Transaction_snark_work.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
-        type completed_work_checked = Transaction_snark_work.Checked.t
+        (* TODO : version *)
+        type completed_work_checked =
+          Transaction_snark_work.Checked.Stable.V1.t
         [@@deriving sexp, bin_io, compare, yojson]
 
         type user_command = User_command.t

@@ -3,7 +3,19 @@ module Copy = {
   let make = _ => {
     ...component,
     render: _self =>
-      <div className=Css.(style([width(`percent(50.0))]))>
+      <div
+        className=Css.(
+          style([
+            width(`percent(100.0)),
+            maxWidth(`rem(37.0)),
+            minWidth(`rem(17.5)),
+            media(
+              Style.MediaQuery.full,
+              [width(`percent(50.0)), minWidth(`rem(24.0))],
+            ),
+            media("(min-width: 30rem)", [minWidth(`rem(24.0))]),
+          ])
+        )>
         <h1
           className=Css.(
             merge([
@@ -38,22 +50,32 @@ module Copy = {
 };
 
 module Graphic = {
-  module Placeholder = {
-    let basic =
-      Css.(
-        style([
-          width(`rem(16.0)),
-          height(`rem(29.0)),
-          backgroundColor(Style.Colors.greyishBrown),
-        ])
-      );
+  module Big = {
+    let svg =
+      <svg
+        className=Css.(
+          style([width(`rem(13.9375)), height(`rem(33.375))])
+        )>
+        <image
+          xlinkHref="/static/img/hero-illustration.svg"
+          width="223"
+          height="534"
+        />
+      </svg>;
+  };
+
+  module Small = {
+    let svg =
+      <svg className=Css.(style([width(`px(10)), height(`px(10))]))>
+        <image xlinkHref="/static/img/icon.svg" width="10" height="10" />
+      </svg>;
   };
 
   module Info = {
     let component =
       ReasonReact.statelessComponent("HeroSection.Graphic.Info");
 
-    let make = (~sizeEmphasis, ~name, ~size, ~label, ~textColor, _children) => {
+    let make = (~sizeEmphasis, ~name, ~size, ~label, ~textColor, children) => {
       ...component,
       render: _ =>
         <div
@@ -61,16 +83,22 @@ module Graphic = {
             style([
               display(`flex),
               flexDirection(`column),
-              justifyContent(`spaceBetween),
+              justifyContent(`flexEnd),
               alignItems(`center),
             ])
           )>
+          {children[0]}
           <div>
             <h3
               className=Css.(
                 merge([
                   Style.H3.basic,
-                  style([color(textColor), fontWeight(`medium)]),
+                  style([
+                    color(textColor),
+                    fontWeight(`medium),
+                    marginTop(`rem(1.25)),
+                    marginBottom(`px(0)),
+                  ]),
                 ])
               )>
               {ReasonReact.string(name)}
@@ -81,6 +109,8 @@ module Graphic = {
                   Style.H3.basic,
                   style([
                     color(textColor),
+                    marginTop(`px(0)),
+                    marginBottom(`px(0)),
                     fontWeight(sizeEmphasis ? `bold : `normal),
                   ]),
                 ])
@@ -90,7 +120,10 @@ module Graphic = {
           </div>
           <h4
             className=Css.(
-              merge([Style.H4.basic, style([marginTop(`rem(1.5))])])
+              merge([
+                Style.H4.basic,
+                style([marginTop(`rem(1.5)), marginBottom(`px(0))]),
+              ])
             )>
             {ReasonReact.string(label)}
           </h4>
@@ -103,27 +136,34 @@ module Graphic = {
     ...component,
     render: _self =>
       Css.(
-        <div className={style([width(`percent(50.0))])}>
-          <div className=Placeholder.basic />
+        <div
+          className={style([
+            width(`percent(100.0)),
+            media(Style.MediaQuery.full, [maxWidth(`rem(22.625))]),
+          ])}>
           <div
             className={style([
               display(`flex),
-              justifyContent(`spaceBetween),
+              justifyContent(`spaceAround),
+              width(`percent(100.0)),
+              media(Style.MediaQuery.full, [justifyContent(`spaceBetween)]),
             ])}>
             <Info
               sizeEmphasis=false
               name="Coda"
               size="22kB"
               label="Fixed"
-              textColor=Style.Colors.bluishGreen
-            />
+              textColor=Style.Colors.bluishGreen>
+              Small.svg
+            </Info>
             <Info
               sizeEmphasis=true
               name="Other blockchains"
               size="2TB+"
               label="Increasing"
-              textColor=Style.Colors.purpleBrown
-            />
+              textColor=Style.Colors.purpleBrown>
+              Big.svg
+            </Info>
           </div>
         </div>
       ),
@@ -139,6 +179,8 @@ let make = _ => {
         style([
           display(`flex),
           marginTop(`rem(1.5)),
+          justifyContent(`spaceAround),
+          flexWrap(`wrap),
           media(Style.MediaQuery.full, [marginTop(`rem(4.5))]),
         ])
       )>

@@ -60,8 +60,7 @@ struct
   end
 
   module Transaction_snark_work =
-    Staged_ledger.Make_completed_work (Public_key.Compressed) (Ledger_proof)
-      (Ledger_proof_statement)
+    Staged_ledger.Make_completed_work (Ledger_proof) (Ledger_proof_statement)
 
   module Staged_ledger_diff = Staged_ledger.Make_diff (struct
     module Fee_transfer = Fee_transfer
@@ -190,10 +189,12 @@ struct
         let {Keypair.public_key; _} = Keypair.create () in
         let prover = Public_key.compress public_key in
         Some
-          { Transaction_snark_work.Checked.fee= Fee.Unsigned.of_int 1
-          ; proofs=
-              List.map stmts ~f:(fun stmt -> (stmt, Sok_message.Digest.default))
-          ; prover }
+          Transaction_snark_work.Checked.
+            { fee= Fee.Unsigned.of_int 1
+            ; proofs=
+                List.map stmts ~f:(fun stmt ->
+                    (stmt, Sok_message.Digest.default) )
+            ; prover }
       in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
@@ -510,7 +511,8 @@ struct
                     , Syncable_ledger.Query.to_yojson Ledger.Addr.to_yojson
                         sync_ledger_query ) ]
                 "Found an answer for: $sync_ledger_query" ;
-              Pipe_lib.Linear_pipe.write response_writer answer )
+              Pipe_lib.Linear_pipe.write response_writer
+                (ledger_hash, sync_ledger_query, answer) )
       |> don't_wait_for
   end
 
